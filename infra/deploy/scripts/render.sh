@@ -72,8 +72,10 @@ MIGRATIONS_EXECUTION_ROLE_ARN="$(terraform -chdir="$TF_DIR" output -raw compute_
 API_TASK_ROLE_ARN="$(terraform -chdir="$TF_DIR" output -raw compute_api_task_role_arn)"
 WORKERS_TASK_ROLE_ARN="$(terraform -chdir="$TF_DIR" output -raw compute_workers_task_role_arn)"
 S3_APP_FILES_BUCKET="$(terraform -chdir="$TF_DIR" output -raw storage_app_files_bucket_id)"
+STORAGE_SENSITIVE_KMS_KEY_ID="$(terraform -chdir="$TF_DIR" output -raw storage_sensitive_documents_kms_key_arn)"
 export REDIS_SECRET_ARN PGBOUNCER_SECRET_ARN PGBOUNCER_HOST POSTGRES_SECRET_ARN
 export MIGRATIONS_EXECUTION_ROLE_ARN API_TASK_ROLE_ARN WORKERS_TASK_ROLE_ARN S3_APP_FILES_BUCKET
+export STORAGE_SENSITIVE_KMS_KEY_ID
 
 # The ERPNext plane's internal ALB (staging/prod only; null in dev, which leaves the integration off --
 # an empty ERPNEXT_API_URL counts as unset). apps/api and the workers call it over plain HTTP inside the

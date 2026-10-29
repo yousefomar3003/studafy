@@ -1,3 +1,5 @@
+import { normalizeRecordValue } from "@studafy/records/browser";
+
 import { parseCsv } from "./csv";
 import {
   REQUIRED_STUDENT_IMPORT_FIELDS,
@@ -6,11 +8,34 @@ import {
 } from "./fields";
 import { toStudentImportRecord } from "./record";
 
-import type { StudentImportField } from "./fields";
+import type { ImportRecordField, StudentImportField } from "./fields";
 import type { StudentImportIssue, StudentImportRecord, StudentImportValues } from "./record";
+import type { RecordValue, RecordValueError } from "@studafy/records/browser";
 
-/** Import field -> the source header it is read from. Unmapped optional fields are simply absent. */
-export type ColumnMapping = Partial<Record<StudentImportField, string>>;
+/**
+ * Import field -> the source header it is read from. Unmapped optional fields are simply absent.
+ * `records` maps a student record template field id to its header, the same way.
+ */
+export type ColumnMapping = Partial<Record<StudentImportField, string>> & {
+  records?: Record<string, string>;
+};
+
+/** How a rejected template cell is described: the rule broken, never the value. */
+const RECORD_VALUE_MESSAGES: Record<RecordValueError, string> = {
+  RECORD_VALUE_WRONG_TYPE: "Not a valid answer for this field.",
+  RECORD_VALUE_TOO_LONG: "Too long.",
+  RECORD_VALUE_INVALID_NUMBER: "Not a number.",
+  RECORD_VALUE_INVALID_DATE: "Use the YYYY-MM-DD format.",
+  RECORD_VALUE_INVALID_CHOICE: "Not one of this field's choices.",
+  RECORD_VALUE_INVALID_PHONE: "Not a valid phone number.",
+  RECORD_VALUE_INVALID_EMAIL: "Not a valid email address.",
+  RECORD_VALUE_DOCUMENT_FIELD: "Document fields cannot be imported.",
+};
+
+/** The issue `field` for a template column: `record:<field id>`. */
+export function recordIssueField(fieldId: string): string {
+  return `record:${fieldId}`;
+}
 
 /** One data line, raw cells keyed by the file's own header text. */
 export interface SourceRow {
@@ -91,13 +116,34 @@ export function readCsvSource(raw: string): CsvSource {
   return { header_line: records[headerIndex]!.line, headers, rows };
 }
 
-/** Map each field to the first unclaimed header that spells it (or one of its aliases). */
-export function suggestColumnMapping(headers: readonly string[]): ColumnMapping {
+/**
+ * Map each field to the first unclaimed header that spells it (or one of its aliases), then each
+ * importable template field to an unclaimed header spelling its English or Arabic label.
+ */
+export function suggestColumnMapping(
+  headers: readonly string[],
+  recordFields: readonly ImportRecordField[] = [],
+): ColumnMapping {
   const mapping: ColumnMapping = {};
+  const claimed = new Set<string>();
   for (const header of headers) {
     const field = ALIAS_INDEX.get(normalizeHeader(header));
-    if (field && mapping[field] === undefined) mapping[field] = header;
+    if (field && mapping[field] === undefined) {
+      mapping[field] = header;
+      claimed.add(header);
+    }
   }
+  const records: Record<string, string> = {};
+  for (const field of recordFields) {
+    if (field.field_type === "document") continue;
+    const labels = new Set([normalizeHeader(field.label_en), normalizeHeader(field.label_ar)]);
+    const header = headers.find((h) => !claimed.has(h) && labels.has(normalizeHeader(h)));
+    if (header) {
+      records[field.id] = header;
+      claimed.add(header);
+    }
+  }
+  if (Object.keys(records).length > 0) mapping.records = records;
   return mapping;
 }
 
@@ -106,10 +152,12 @@ export function validateColumnMapping(
   mapping: ColumnMapping,
   headers: readonly string[],
   headerLine: number,
+  recordFields: readonly ImportRecordField[] = [],
 ): StudentImportIssue[] {
   const issues: StudentImportIssue[] = [];
   const byKey = new Map(headers.map((header) => [normalizeHeader(header), header]));
-  const claimedBy = new Map<string, StudentImportField>();
+  // Header key -> what claimed it: an import field name, or a template field's English label.
+  const claimedBy = new Map<string, string>();
 
   for (const field of REQUIRED_STUDENT_IMPORT_FIELDS) {
     if (mapping[field] === undefined) {
@@ -137,6 +185,47 @@ export function validateColumnMapping(
     claimedBy.set(key, field);
   }
 
+  const known = new Map(recordFields.map((field) => [field.id, field]));
+  for (const [fieldId, header] of Object.entries(mapping.records ?? {})) {
+    const field = known.get(fieldId);
+    const issueField = recordIssueField(fieldId);
+    if (!field) {
+      issues.push({
+        line: headerLine,
+        field: issueField,
+        message: "This record field is not on the published student form.",
+      });
+      continue;
+    }
+    if (field.field_type === "document") {
+      issues.push({
+        line: headerLine,
+        field: issueField,
+        message: `"${field.label_en}" is a document field: upload its files on the Records tab.`,
+      });
+      continue;
+    }
+    const key = normalizeHeader(header);
+    if (!byKey.has(key)) {
+      issues.push({
+        line: headerLine,
+        field: issueField,
+        message: `Column "${header}" is not in this file.`,
+      });
+      continue;
+    }
+    const other = claimedBy.get(key);
+    if (other) {
+      issues.push({
+        line: headerLine,
+        field: issueField,
+        message: `Column "${header}" is already mapped to "${other}".`,
+      });
+      continue;
+    }
+    claimedBy.set(key, field.label_en);
+  }
+
   return issues;
 }
 
@@ -146,8 +235,17 @@ export function validateColumnMapping(
  * An unusable mapping stages every line with no record and reports only the mapping problems:
  * per-line errors against a wrong mapping are noise, and the admin's next step is to fix the mapping.
  */
-export function stageRows(source: CsvSource, mapping: ColumnMapping): StagedRows {
-  const mappingIssues = validateColumnMapping(mapping, source.headers, source.header_line);
+export function stageRows(
+  source: CsvSource,
+  mapping: ColumnMapping,
+  recordFields: readonly ImportRecordField[] = [],
+): StagedRows {
+  const mappingIssues = validateColumnMapping(
+    mapping,
+    source.headers,
+    source.header_line,
+    recordFields,
+  );
   if (mappingIssues.length > 0) {
     return { rows: source.rows.map((row) => ({ ...row, record: null })), issues: mappingIssues };
   }
@@ -158,13 +256,38 @@ export function stageRows(source: CsvSource, mapping: ColumnMapping): StagedRows
     return header === undefined ? [] : [[field, byKey.get(normalizeHeader(header))!] as const];
   });
 
+  const fieldsById = new Map(recordFields.map((field) => [field.id, field]));
+  const recordColumns = Object.entries(mapping.records ?? {}).map(
+    ([fieldId, header]) => [fieldsById.get(fieldId)!, byKey.get(normalizeHeader(header))!] as const,
+  );
+
   const issues: StudentImportIssue[] = [];
   const rows = source.rows.map((row) => {
     const values: StudentImportValues = {};
     for (const [field, header] of columns) values[field] = row.source[header] || null;
     const result = toStudentImportRecord(row.line_number, values);
-    issues.push(...result.issues);
-    return { ...row, record: result.record };
+
+    const records: Record<string, RecordValue> = {};
+    const recordIssues: StudentImportIssue[] = [];
+    for (const [field, header] of recordColumns) {
+      const normalized = normalizeRecordValue(field, row.source[header] ?? "");
+      if (!normalized.ok) {
+        // The field and the rule, never the cell: a rejected passport number must not land in the
+        // import's stored errors (docs/modules/student-records.md "CSV import").
+        recordIssues.push({
+          line: row.line_number,
+          field: recordIssueField(field.id),
+          message: `"${field.label_en}": ${RECORD_VALUE_MESSAGES[normalized.error]}`,
+        });
+      } else if (normalized.value !== null) {
+        records[field.id] = normalized.value;
+      }
+    }
+
+    issues.push(...result.issues, ...recordIssues);
+    if (!result.record || recordIssues.length > 0) return { ...row, record: null };
+    const record = recordColumns.length > 0 ? { ...result.record, records } : result.record;
+    return { ...row, record };
   });
 
   return { rows, issues };

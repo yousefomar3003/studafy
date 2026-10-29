@@ -1,4 +1,5 @@
 import { ERROR_CODES } from "@studafy/constants";
+import { maskRecordValue } from "@studafy/records";
 import {
   planStudentImport,
   readCsvSource,
@@ -9,11 +10,13 @@ import {
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
+import { getPublishedForm } from "../records/template-service";
 
 import type { ImportDiffResponse, ImportRowError, ImportStatus, ImportSummary } from "./schemas";
 import type {
   ColumnMapping,
   CsvSource,
+  ImportRecordField,
   StagedRow,
   StudentImportAction,
   StudentImportRecord,
@@ -75,6 +78,26 @@ function mappingColumns(tx: TransactionSql) {
   return tx`id, name, column_mapping, created_by, created_at, updated_at`;
 }
 
+/**
+ * The published student record form's fields, offered as import columns
+ * (docs/modules/student-records.md "CSV import"). Document fields are included so a mapping that
+ * names one is refused with a reason rather than as an unknown field.
+ */
+async function importRecordFields(
+  tx: TransactionSql,
+  schoolId: string,
+): Promise<ImportRecordField[]> {
+  const form = await getPublishedForm(tx, schoolId, "student");
+  return form.fields.map((field) => ({
+    id: field.id,
+    field_type: field.field_type,
+    options: field.options,
+    label_en: field.label_en,
+    label_ar: field.label_ar,
+    sensitivity: field.sensitivity,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Upload, re-map, confirm
 // ---------------------------------------------------------------------------
@@ -101,10 +124,11 @@ export async function uploadImport(
     );
   }
 
+  const recordFields = await importRecordFields(tx, schoolId);
   const mapping = mappingId
     ? (await getMapping(tx, schoolId, mappingId)).column_mapping
-    : suggestColumnMapping(source.headers);
-  const staged = stageRows(source, mapping);
+    : suggestColumnMapping(source.headers, recordFields);
+  const staged = stageRows(source, mapping, recordFields);
   const validRows = countValid(staged.rows);
 
   const [created] = await tx<ImportRecord[]>`
@@ -196,7 +220,7 @@ export async function updateImportMapping(
     headers: current.source_headers,
     rows: sourceRows.map((row) => ({ line_number: row.line_number, source: row.source })),
   };
-  const staged = stageRows(source, mapping);
+  const staged = stageRows(source, mapping, await importRecordFields(tx, schoolId));
   const validRows = countValid(staged.rows);
 
   for (let i = 0; i < staged.rows.length; i += STAGING_BATCH_SIZE) {
@@ -398,6 +422,10 @@ export async function getImportDiff(
     })),
   );
 
+  const fields = new Map(
+    (await importRecordFields(tx, schoolId)).map((field) => [field.id, field]),
+  );
+
   return {
     import_id: importId,
     totals: plan.totals,
@@ -410,7 +438,28 @@ export async function getImportDiff(
         conflict: row.conflict,
         changes: row.changes,
         parent: row.parent,
+        parent_conflict: row.parent_conflict,
+        parent_group_line: row.parent_group_line,
+        parent_email: row.record.parent_email,
+        parent_name: row.record.parent_name,
         link: row.link,
+        // In form order: the staged answers are a jsonb object, which keeps no key order.
+        records: [...fields.values()].flatMap((field) => {
+          const fieldId = field.id;
+          const value = row.record.records?.[fieldId];
+          if (value === undefined) return [];
+          // The preview is a non-reveal response like any other: a sensitive cell is its mask.
+          const sensitive = field.sensitivity === "sensitive";
+          return [
+            {
+              field_id: fieldId,
+              label_en: field.label_en,
+              label_ar: field.label_ar,
+              value: sensitive ? null : value,
+              mask: sensitive ? maskRecordValue(field.field_type, value) : null,
+            },
+          ];
+        }),
       })),
   };
 }

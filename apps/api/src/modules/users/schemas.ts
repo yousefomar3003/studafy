@@ -3,6 +3,7 @@ import { ROLES } from "@studafy/constants";
 import { uuidSchema, dateTimeSchema, dateSchema } from "@studafy/shared-schemas";
 
 import { userStatusSchema } from "../../openapi/components";
+import { recordAnswerInputSchema } from "../records/schemas";
 
 // ---------------------------------------------------------------------------
 // Role
@@ -11,6 +12,24 @@ import { userStatusSchema } from "../../openapi/components";
 const roleValues = Object.values(ROLES) as [string, ...string[]];
 
 export const roleSchema = z.enum(roleValues).openapi({ description: "Predefined platform role." });
+
+// ---------------------------------------------------------------------------
+// Parent relationship
+// ---------------------------------------------------------------------------
+
+const parentRelationshipValues = [
+  "mother",
+  "father",
+  "guardian",
+  "step_parent",
+  "grandparent",
+  "sibling",
+  "other",
+] as const;
+
+export const parentRelationshipSchema = z
+  .enum(parentRelationshipValues)
+  .openapi({ description: "Guardian relationship to the student." });
 
 // ---------------------------------------------------------------------------
 // User with roles
@@ -70,7 +89,48 @@ export const createUserBodySchema = z
       .max(200)
       .openapi({ description: "Human-readable name.", example: "Jamie Rivera" }),
     role: roleSchema.openapi({ description: "Role to assign to the new user." }),
+    children: z
+      .array(
+        z
+          .object({
+            student_id: uuidSchema.openapi({ description: "Student to link the new parent to." }),
+            relationship: parentRelationshipSchema,
+          })
+          .openapi("CreateUserChild"),
+      )
+      .min(1)
+      .max(20)
+      .optional()
+      .openapi({
+        description:
+          "PARENT only: students to link the new parent to, in the same transaction. Each link " +
+          "joins the parent's household (created on the first link). Requires `parent:link` " +
+          "on top of `user:create`; without it a request carrying children is refused with 403.",
+      }),
+    records: z
+      .array(recordAnswerInputSchema)
+      .max(200)
+      .optional()
+      .openapi({
+        description:
+          "PARENT only: answers to the school's published parent record form, written in the " +
+          "same transaction. Requires `studentRecord:update` on top of `user:create`.",
+      }),
   })
+  .refine((body) => !body.records || body.role === "PARENT", {
+    message: "Only a PARENT user has a parent record",
+    path: ["records"],
+  })
+  .refine((body) => !body.children || body.role === "PARENT", {
+    message: "Only a PARENT user can be linked to children",
+    path: ["children"],
+  })
+  .refine(
+    (body) =>
+      !body.children ||
+      new Set(body.children.map((child) => child.student_id)).size === body.children.length,
+    { message: "Each student can be listed once", path: ["children"] },
+  )
   .openapi("CreateUserBody");
 
 export type CreateUserBody = z.infer<typeof createUserBodySchema>;
@@ -239,20 +299,6 @@ export const studentStatusSchema = z
   .openapi({ description: "Lifecycle state of the student within the school." });
 
 export type StudentStatus = z.infer<typeof studentStatusSchema>;
-
-const parentRelationshipValues = [
-  "mother",
-  "father",
-  "guardian",
-  "step_parent",
-  "grandparent",
-  "sibling",
-  "other",
-] as const;
-
-export const parentRelationshipSchema = z
-  .enum(parentRelationshipValues)
-  .openapi({ description: "Guardian relationship to the student." });
 
 // ---------------------------------------------------------------------------
 // Student profile (full — admin / finance-visible)
@@ -445,8 +491,29 @@ export const createStudentBodySchema = z
       )
       .max(10)
       .optional()
-      .openapi({ description: "Guardian links to create." }),
+      .openapi({
+        description:
+          "Guardian links to create in the same transaction. Requires `parent:link` on top of " +
+          "`student:create`; without it a request carrying guardians is refused with 403.",
+      }),
+    records: z
+      .array(recordAnswerInputSchema)
+      .max(200)
+      .optional()
+      .openapi({
+        description:
+          "Answers to the school's published student record form, written in the same " +
+          "transaction. Requires `studentRecord:update` on top of `student:create`. Missing " +
+          "required fields never block creation.",
+      }),
   })
+  .refine(
+    (body) =>
+      !body.guardians ||
+      new Set(body.guardians.map((guardian) => guardian.parent_user_id)).size ===
+        body.guardians.length,
+    { message: "Each guardian can be listed once", path: ["guardians"] },
+  )
   .openapi("CreateStudentBody");
 
 export type CreateStudentBody = z.infer<typeof createStudentBodySchema>;

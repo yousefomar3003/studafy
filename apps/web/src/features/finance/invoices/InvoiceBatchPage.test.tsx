@@ -1,6 +1,6 @@
 import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
@@ -94,12 +94,36 @@ const getMock = mock((path: string) => {
   return Promise.resolve({ data: undefined });
 });
 
+const ALL_LINKED = { total_count: 2, unlinked_count: 0, unlinked_students: [] };
+
+/** What the preflight answers; a test with unlinked targets swaps it. */
+let preflightResult: Record<string, unknown> = ALL_LINKED;
+
 const postMock = mock((path: string, _init?: { body: Record<string, unknown> }) => {
+  if (path === "/api/finance/invoices/batches/preflight") {
+    return Promise.resolve({ data: preflightResult });
+  }
   if (path === "/api/finance/invoices/batches") {
     return Promise.resolve({ data: CREATED_BATCH });
   }
   return Promise.resolve({ data: undefined });
 });
+
+/** The bodies sent to one POST path, in order. */
+function postedTo(path: string): Record<string, unknown>[] {
+  return (postMock.mock.calls as [string, { body: Record<string, unknown> }][])
+    .filter(([called]) => called === path)
+    .map(([, init]) => init.body);
+}
+
+async function fillForm() {
+  await screen.findByText("Grade 5 Fees (1000.000 JOD)");
+  fireEvent.click(screen.getByRole("combobox", { name: "Fee structure" }));
+  fireEvent.click(screen.getByRole("option", { name: "Grade 5 Fees (1000.000 JOD)" }));
+  fireEvent.change(screen.getByLabelText("Period title"), {
+    target: { value: "Spring 2026 Term 1" },
+  });
+}
 
 mock.module("../../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }));
 
@@ -120,6 +144,7 @@ function renderPage(Page: ComponentType, url = "/portal/finance/invoices/batches
 
 afterEach(() => {
   cleanup();
+  preflightResult = ALL_LINKED;
   getMock.mockClear();
   postMock.mockClear();
 });
@@ -140,13 +165,19 @@ describe("InvoiceBatchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start batch" }));
 
     expect(await screen.findByText(/Completed — Spring 2026 Term 1/)).toBeTruthy();
-    expect(postMock).toHaveBeenCalledTimes(1);
-    const [, init] = postMock.mock.calls[0] as [string, { body: Record<string, unknown> }];
-    expect(init.body).toEqual({
+    // Everyone has a family, so the preflight raises no warning and the batch starts straight away.
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(postedTo("/api/finance/invoices/batches/preflight")).toEqual([
+      { target_class_ids: undefined, target_student_ids: undefined },
+    ]);
+    const created = postedTo("/api/finance/invoices/batches");
+    expect(created.length).toBe(1);
+    expect(created[0]).toEqual({
       fee_structure_erpnext_name: "FS-2026-0001",
       period_title: "Spring 2026 Term 1",
       due_date: undefined,
       target_class_ids: undefined,
+      target_student_ids: undefined,
     });
 
     // Terminal-state summary and per-row results.
@@ -177,11 +208,69 @@ describe("InvoiceBatchPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Start batch" }));
 
     await screen.findByText(/Completed/);
-    const [, init] = postMock.mock.calls[0] as [string, { body: Record<string, unknown> }];
-    expect(init.body).toMatchObject({
+    expect(postedTo("/api/finance/invoices/batches")[0]).toMatchObject({
       fee_structure_erpnext_name: "FS-2026-0001",
       period_title: "Term 2",
       target_student_ids: ["student-1", "student-2"],
     });
+  });
+
+  test("warns who has no family before starting, and starts the batch on confirm", async () => {
+    preflightResult = {
+      total_count: 2,
+      unlinked_count: 1,
+      unlinked_students: [{ id: "student-2", name: "Omar Saleh", admission_number: "ADM-002" }],
+    };
+    renderPage(await loadPage());
+    await fillForm();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start batch" }));
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Some students in this batch have no family",
+    });
+    expect(
+      within(dialog).getByText("1 of the 2 students to bill has no guardian linked."),
+    ).toBeTruthy();
+    expect(within(dialog).getByText(/no sibling discount/)).toBeTruthy();
+    const listed = within(dialog).getByRole("list", { name: "Students with no guardian" });
+    expect(within(listed).getByText("Omar Saleh")).toBeTruthy();
+    expect(
+      within(dialog).getByRole("link", { name: "Review unlinked students" }).getAttribute("href"),
+    ).toBe("/portal/finance/unlinked");
+    // A warning, not yet a batch.
+    expect(postedTo("/api/finance/invoices/batches")).toEqual([]);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Generate anyway" }));
+
+    expect(await screen.findByText(/Completed — Spring 2026 Term 1/)).toBeTruthy();
+    expect(postedTo("/api/finance/invoices/batches").length).toBe(1);
+  });
+
+  test("going back from the warning starts nothing", async () => {
+    preflightResult = {
+      total_count: 2,
+      unlinked_count: 2,
+      unlinked_students: [
+        { id: "student-1", name: "Layla Haddad", admission_number: "ADM-001" },
+        { id: "student-2", name: "Omar Saleh", admission_number: "ADM-002" },
+      ],
+    };
+    renderPage(await loadPage());
+    await fillForm();
+
+    fireEvent.click(screen.getByRole("button", { name: "Start batch" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Some students in this batch have no family",
+    });
+    expect(
+      within(dialog).getByText("2 of the 2 students to bill have no guardian linked."),
+    ).toBeTruthy();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Go back" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(postedTo("/api/finance/invoices/batches")).toEqual([]);
+    expect(screen.getByRole("button", { name: "Start batch" })).toBeTruthy();
   });
 });

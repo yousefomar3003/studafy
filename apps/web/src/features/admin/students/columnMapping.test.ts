@@ -5,8 +5,10 @@ import { i18next } from "../../../lib/i18n/i18next";
 
 import {
   assignColumn,
+  assignRecordColumn,
   confirmBlocker,
   isSameMapping,
+  mappedHeaders,
   mappingFitsHeaders,
   matchConfidence,
   missingRequiredFields,
@@ -118,5 +120,25 @@ describe("confirmBlocker", () => {
     expect(confirmBlocker(COMPLETE, {}, 5, t)).toContain("Apply it");
     expect(confirmBlocker(COMPLETE, COMPLETE, 0, t)).toContain("No rows passed validation");
     expect(confirmBlocker(COMPLETE, COMPLETE, 5, t)).toBeNull();
+  });
+});
+
+describe("student record template columns in the mapping", () => {
+  test("a column moves between a fixed field and a template field, never feeding both", () => {
+    const mapping = assignRecordColumn({ email: "Contact" }, "field-1", "Contact");
+    expect(mapping).toEqual({ records: { "field-1": "Contact" } });
+    expect(assignColumn(mapping, "email", "Contact")).toEqual({ email: "Contact" });
+    expect(assignRecordColumn(mapping, "field-1", undefined)).toEqual({});
+  });
+
+  test("comparison and fit include template columns", () => {
+    const a = { email: "Contact", records: { "field-1": "National ID" } };
+    expect(isSameMapping(a, { email: "Contact" })).toBe(false);
+    expect(isSameMapping(a, { email: "Contact", records: { "field-1": "National ID" } })).toBe(
+      true,
+    );
+    expect(mappingFitsHeaders(a, ["contact", "national id"])).toBe(true);
+    expect(mappingFitsHeaders(a, ["contact"])).toBe(false);
+    expect(mappedHeaders(a)).toEqual(["Contact", "National ID"]);
   });
 });

@@ -5,14 +5,20 @@
  * The worker re-plans inside its migration transaction rather than trusting a preview computed
  * earlier, so a record changed between preview and commit is judged against what is live then.
  *
- * Reads are set-based (three queries for the whole import) and assume the caller's transaction sees
+ * Reads are set-based (two queries for the whole import) and assume the caller's transaction sees
  * every student in the school: an admin's tenant transaction or a system one. Under a narrower role
  * scope, students it cannot see would be planned as creates and then fail on the unique key.
+ *
+ * Parents are never matched (docs/modules/finance-module-guide.md "How parents and children get
+ * linked"). A parent_email that already belongs to an account in the school is not looked up and
+ * linked: the student is still imported, with no link and a PARENT_ACCOUNT_EXISTS parent conflict,
+ * and staff link the parent themselves from the Guardians tab or Finance > Unlinked. A new
+ * parent_email creates a new parent and household, once per file: every later line naming the
+ * same new email is a sibling of the first and joins that parent.
  */
 
 import { normalizeAdmissionNumber, normalizeEmail } from "./record";
 
-import type { ParentRelationship } from "./fields";
 import type { StudentImportRecord } from "./record";
 import type { TransactionSql } from "postgres";
 
@@ -34,8 +40,14 @@ export type StudentImportConflict =
   | "EMAIL_BELONGS_TO_OTHER_STUDENT"
   /** The email belongs to a staff account; making it a student would grant it the STUDENT role. */
   | "EMAIL_BELONGS_TO_STAFF"
-  /** The parent email is a student's email, in this file or live. */
+  /** The parent email is the email of a new student created by this same file. */
   | "PARENT_EMAIL_BELONGS_TO_STUDENT";
+
+/**
+ * Why a row's parent is not linked, while the student itself is still imported. Only one reason
+ * today: the email already belongs to an account, which an import never matches people on.
+ */
+export type StudentImportParentConflict = "PARENT_ACCOUNT_EXISTS";
 
 /** Student columns an import may change on an existing student. */
 export const UPDATABLE_STUDENT_FIELDS = [
@@ -61,16 +73,21 @@ export interface PlannedRow {
   conflict: StudentImportConflict | null;
   /** Live student fields this row changes. Empty for creates, which change nothing that exists. */
   changes: Partial<Record<UpdatableStudentField, FieldChange>>;
-  /** Whether the parent account is new, or already exists. Null when the row names no parent. */
-  parent: "create" | "existing" | null;
-  /** What happens to the parent-student link. Null when the row names no parent. */
-  link: "create" | "update" | "unchanged" | null;
+  /**
+   * The parent outcome. "create": this line creates the new parent and household. "sibling": an
+   * earlier line in this file creates them, and this student joins. "conflict": not linked (see
+   * parent_conflict). Null when the row names no parent.
+   */
+  parent: "create" | "sibling" | "conflict" | null;
+  parent_conflict: StudentImportParentConflict | null;
+  /** The line that creates this row's parent (itself for "create"); null otherwise. */
+  parent_group_line: number | null;
+  /** Whether a parent-student link is created. Null when no link will be made. */
+  link: "create" | null;
   /** The live student this row matched, when it matched one. */
   student_id: string | null;
   /** The live account the student's email belongs to, when one exists. */
   user_id: string | null;
-  /** The live parent account, when one exists. */
-  parent_user_id: string | null;
 }
 
 export interface StudentImportPlanTotals {
@@ -80,7 +97,8 @@ export interface StudentImportPlanTotals {
   conflict: number;
   parents_created: number;
   links_created: number;
-  links_updated: number;
+  /** Rows whose parent will not be linked (PARENT_ACCOUNT_EXISTS). Staff link them by hand. */
+  parent_conflicts: number;
 }
 
 export interface StudentImportPlan {
@@ -113,12 +131,6 @@ interface LiveUser {
   is_staff: boolean;
 }
 
-interface LiveLink {
-  parent_user_id: string;
-  student_id: string;
-  relationship: ParentRelationship;
-}
-
 /** Roles that do not make an account "staff" for EMAIL_BELONGS_TO_STAFF. */
 const NON_STAFF_ROLES = ["STUDENT", "PARENT", "GUEST"];
 
@@ -133,7 +145,8 @@ export async function planStudentImport(
   const studentEmailsInFile = new Set(records.map(({ record }) => normalizeEmail(record.email)));
   const seenAdmissions = new Set<string>();
   const emailOwners = new Map<string, string>();
-  const parentsCreatedInFile = new Set<string>();
+  /** New parent email -> the line that creates that parent. */
+  const parentsCreatedInFile = new Map<string, number>();
 
   const rows = records.map(({ line_number, record }): PlannedRow => {
     const admission = normalizeAdmissionNumber(record.admission_number);
@@ -150,10 +163,11 @@ export async function planStudentImport(
       conflict: null,
       changes: {},
       parent: null,
+      parent_conflict: null,
+      parent_group_line: null,
       link: null,
       student_id: student?.id ?? null,
       user_id: student?.user_id ?? user?.id ?? null,
-      parent_user_id: parentUser?.id ?? null,
     };
 
     const firstOwner = emailOwners.get(email);
@@ -169,10 +183,9 @@ export async function planStudentImport(
       row.conflict = "EMAIL_BELONGS_TO_OTHER_STUDENT";
     } else if (!student && user?.is_staff) {
       row.conflict = "EMAIL_BELONGS_TO_STAFF";
-    } else if (
-      parentEmail !== null &&
-      (studentEmailsInFile.has(parentEmail) || parentUser?.is_student === true)
-    ) {
+    } else if (parentEmail !== null && !parentUser && studentEmailsInFile.has(parentEmail)) {
+      // A new account this file is about to create for a student cannot also be the new parent.
+      // A live account (student or not) is PARENT_ACCOUNT_EXISTS below, and the row still imports.
       row.conflict = "PARENT_EMAIL_BELONGS_TO_STUDENT";
     }
     seenAdmissions.add(admission);
@@ -181,25 +194,28 @@ export async function planStudentImport(
     if (student) row.changes = diffStudent(student, record);
 
     if (parentEmail !== null) {
-      if (parentUser || parentsCreatedInFile.has(parentEmail)) {
-        row.parent = "existing";
+      const creatingLine = parentsCreatedInFile.get(parentEmail);
+      if (parentUser) {
+        row.parent = "conflict";
+        row.parent_conflict = "PARENT_ACCOUNT_EXISTS";
+      } else if (creatingLine !== undefined) {
+        row.parent = "sibling";
+        row.parent_group_line = creatingLine;
+        row.link = "create";
       } else {
         row.parent = "create";
-        parentsCreatedInFile.add(parentEmail);
+        row.parent_group_line = line_number;
+        row.link = "create";
+        parentsCreatedInFile.set(parentEmail, line_number);
       }
-      const existingLink =
-        student && parentUser ? live.links.get(linkKey(parentUser.id, student.id)) : undefined;
-      row.link = !existingLink
-        ? "create"
-        : existingLink.relationship === record.parent_relationship
-          ? "unchanged"
-          : "update";
     }
 
-    const changesLink = row.link === "create" || row.link === "update";
+    // Template answers are written for an existing student whenever the file gives any: whether
+    // they differ is only knowable by opening sealed values, which the plan never does.
+    const writesRecords = Object.keys(record.records ?? {}).length > 0;
     row.action = !student
       ? "create"
-      : Object.keys(row.changes).length > 0 || changesLink
+      : Object.keys(row.changes).length > 0 || row.link === "create" || writesRecords
         ? "update"
         : "unchanged";
     return row;
@@ -230,19 +246,15 @@ function totalsOf(rows: readonly PlannedRow[]): StudentImportPlanTotals {
     conflict: 0,
     parents_created: 0,
     links_created: 0,
-    links_updated: 0,
+    parent_conflicts: 0,
   };
   for (const row of rows) {
     totals[row.action]++;
     if (row.parent === "create") totals.parents_created++;
     if (row.link === "create") totals.links_created++;
-    if (row.link === "update") totals.links_updated++;
+    if (row.parent_conflict !== null) totals.parent_conflicts++;
   }
   return totals;
-}
-
-function linkKey(parentUserId: string, studentId: string): string {
-  return `${parentUserId}:${studentId}`;
 }
 
 async function loadLiveData(
@@ -252,7 +264,6 @@ async function loadLiveData(
 ): Promise<{
   students: Map<string, LiveStudent>;
   users: Map<string, LiveUser>;
-  links: Map<string, LiveLink>;
 }> {
   const admissions = [
     ...new Set(records.map((r) => normalizeAdmissionNumber(r.record.admission_number))),
@@ -293,20 +304,9 @@ async function loadLiveData(
       AND u.normalized_email = ANY(${tx.array(emails)}::text[])
   `;
 
-  const studentIds = students.map((s) => s.id);
-  const links =
-    studentIds.length === 0
-      ? []
-      : await tx<LiveLink[]>`
-          SELECT parent_user_id, student_id, relationship::text AS relationship
-          FROM app.parent_child_links
-          WHERE school_id = ${schoolId}::uuid
-            AND student_id = ANY(${tx.array(studentIds)}::uuid[])
-        `;
-
   return {
     students: new Map(students.map((s) => [s.normalized_admission_number, s])),
+    // The parent emails are looked up only to refuse them (PARENT_ACCOUNT_EXISTS), never to link.
     users: new Map(users.map((u) => [u.normalized_email, u])),
-    links: new Map(links.map((l) => [linkKey(l.parent_user_id, l.student_id), l])),
   };
 }

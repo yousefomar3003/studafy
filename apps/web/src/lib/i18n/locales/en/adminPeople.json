@@ -284,7 +284,7 @@
         "email": "The student's sign-in email. An import never changes it for an existing student.",
         "date_of_birth": "Must be YYYY-MM-DD, for example 2012-09-01.",
         "status": "One of {{values}}. Blank means applicant for a new student.",
-        "parent_email": "Finds or creates the parent's account. Needs Parent relationship too.",
+        "parent_email": "Creates a new parent account, shared by siblings with the same email. An email that already has an account is not linked. Needs Parent relationship too.",
         "parent_name": "Only used when a new parent account is created.",
         "parent_relationship": "One of {{values}}. Needs Parent email too."
       },
@@ -317,7 +317,11 @@
         "saveAs": "Save as (optional)",
         "saveAsHelper": "Name this mapping to reuse it next time.",
         "apply": "Apply mapping",
-        "save": "Save mapping"
+        "save": "Save mapping",
+        "recordsHeading": "Student record fields",
+        "recordsIntro": "Columns for the fields on your school's published student record form. Leave a field unmapped to skip it; a blank cell never clears an answer already on file.",
+        "recordSensitive": "Sensitive: encrypted, and shown masked in the preview.",
+        "recordDocument": "{{field}} is a document field and cannot be imported. Upload its files on the student's Records tab."
       },
       "diff": {
         "region": "Import preview",
@@ -332,9 +336,8 @@
         "empty": "No rows match this filter.",
         "change": "{{field}}: {{from}} → {{to}}",
         "blank": "(blank)",
-        "newParentAccount": "New parent account",
+        "newParentAccount": "Creates a new parent account and household",
         "newParentLink": "New parent link",
-        "parentLinkChanges": "Parent link changes",
         "partSeparator": "; ",
         "actions": {
           "create": "New student",
@@ -348,21 +351,27 @@
           "EMAIL_MISMATCH": "This student already exists and signs in with a different email.",
           "EMAIL_BELONGS_TO_OTHER_STUDENT": "This email already belongs to another student.",
           "EMAIL_BELONGS_TO_STAFF": "This email belongs to a staff account.",
-          "PARENT_EMAIL_BELONGS_TO_STUDENT": "The parent email belongs to a student."
+          "PARENT_EMAIL_BELONGS_TO_STUDENT": "The parent email is the email of a new student in this file."
         },
         "stats": {
           "newStudents": "New students",
           "updatedStudents": "Updated students",
           "noChange": "No change",
           "skipped": "Skipped (conflicts)",
-          "newParentAccounts": "New parent accounts"
+          "newParentAccounts": "New parent accounts",
+          "parentConflicts": "Parents to link by hand"
         },
         "columns": {
           "line": "Line",
           "admissionNumber": "Admission number",
           "result": "Result",
           "details": "Details"
-        }
+        },
+        "siblingParent": "Joins the new parent created on line {{line}} (siblings share one parent)",
+        "parentAccountExists": "This parent email already belongs to an account, so no link is made. The student is still imported: link the parent from the student's Guardians tab or Finance > Unlinked.",
+        "recordValue": "{{field}}: {{value}}",
+        "parentConflictsBanner_one": "{{count}} row names a parent email that already belongs to an account. Those students are imported without a parent link; link the parent yourself from the student's Guardians tab or Finance > Unlinked. An import never matches people by email.",
+        "parentConflictsBanner_other": "{{count}} rows name a parent email that already belongs to an account. Those students are imported without a parent link; link the parent yourself from the student's Guardians tab or Finance > Unlinked. An import never matches people by email."
       },
       "page": {
         "title": "Import students",
@@ -413,7 +422,9 @@
         "notImported_one": "{{count}} row from the original file were not imported due to validation errors.",
         "notImported_other": "{{count}} rows from the original file were not imported due to validation errors.",
         "importAnother": "Import another file",
-        "backToStudents": "Back to students"
+        "backToStudents": "Back to students",
+        "parentConflicts": "Parents to link by hand",
+        "recordAnswers": "Record answers"
       },
       "failed": {
         "region": "Import failed",
@@ -491,6 +502,30 @@
       "confirm": "Reset password",
       "done": "Password reset. Username {{username}}, password {{password}}.",
       "error": "Couldn't reset the password."
+    }
+  },
+  "links": {
+    "remove": "Remove {{name}}",
+    "relationshipFor": "Relationship of {{name}}",
+    "guardians": {
+      "legend": "Guardians (optional)",
+      "hint": "Pick the parent accounts to link. Without a guardian the student belongs to no family: no sibling discount, and no parent can see or pay their fees.",
+      "picked": "Guardians to link",
+      "ownFamily": "Joins their own household",
+      "joinsFamily": "Joins the {{family}} household",
+      "useOwnFamily": "Use their own household",
+      "chooseFamily": "Join an existing family",
+      "searchFamilies": "Search families",
+      "searchFamiliesPlaceholder": "Search by family name",
+      "noFamilies": "No families match."
+    },
+    "children": {
+      "legend": "Link children (optional)",
+      "hint": "Pick the students this parent is a guardian of. A parent with no children sees no fees and gets no fee notices.",
+      "picked": "Children to link",
+      "searchStudents": "Search students",
+      "searchPlaceholder": "Search by name or admission number",
+      "noMatches": "No students match."
     }
   }
 }

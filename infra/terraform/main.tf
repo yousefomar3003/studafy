@@ -190,8 +190,13 @@ module "secrets" {
       STRIPE_WEBHOOK_SECRET         = ""
       GOOGLE_PLAY_SERVICE_ACCOUNT   = ""
       GOOGLE_PLAY_RTDN_TOKEN        = ""
+      # The records keyring (ADR-019). apps/api refuses to boot a staging/production tier with it
+      # empty or holding the development key, like TURNSTILE_SECRET_KEY; supply it through
+      # TF_VAR_secrets_app_secret_values (docs/runbooks/production-secrets.md).
+      RECORDS_ENCRYPTION_KEYS           = ""
+      RECORDS_ENCRYPTION_CURRENT_KEY_ID = ""
     }
-    workers = { TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", AI_LLM_API_KEY = "", ERPNEXT_API_KEY = "", RECONCILIATION_API_KEY = "", STRIPE_SECRET_KEY = "", FIREBASE_SERVICE_ACCOUNT = "" }
+    workers = { RECORDS_ENCRYPTION_KEYS = "", RECORDS_ENCRYPTION_CURRENT_KEY_ID = "", TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", AI_LLM_API_KEY = "", ERPNEXT_API_KEY = "", RECONCILIATION_API_KEY = "", STRIPE_SECRET_KEY = "", FIREBASE_SERVICE_ACCOUNT = "" }
   }
 
   postgres_connection_secret_arn = module.postgres.connection_secret_arn
@@ -329,6 +334,8 @@ module "compute" {
   vpc_id               = module.network.vpc_id
   https_listener_arn   = module.edge.https_listener_arn
   app_files_bucket_arn = module.storage.app_files_bucket_arn
+  # Sensitive record documents (ADR-019).
+  sensitive_documents_kms_key_arn = module.storage.sensitive_documents_kms_key_arn
 
   secrets_service_iam_policy_arns = module.secrets.service_iam_policy_arns
   secrets_service_names           = module.secrets.service_names

@@ -6,6 +6,7 @@ import { useTranslation } from "../../../lib/i18n";
 
 import {
   assignColumn,
+  assignRecordColumn,
   fieldHint,
   fieldLabel,
   isSameMapping,
@@ -17,7 +18,12 @@ import {
   REQUIRED_STUDENT_IMPORT_FIELDS,
   STUDENT_IMPORT_FIELDS,
 } from "./columnMapping";
-import { fetchStudentImportMappings, STUDENT_IMPORT_MAPPINGS_KEY } from "./queries";
+import {
+  fetchStudentImportMappings,
+  fetchStudentRecordForm,
+  STUDENT_IMPORT_MAPPINGS_KEY,
+  STUDENT_RECORD_FORM_KEY,
+} from "./queries";
 
 import type { ColumnMapping, MatchConfidence, StudentImportField } from "./columnMapping";
 import type { StudentImport } from "./queries";
@@ -55,8 +61,17 @@ export function ColumnMappingPanel({
   applying,
   onApply,
 }: ColumnMappingPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [saveAs, setSaveAs] = useState("");
+  const arabic = i18n.language.startsWith("ar");
+
+  // The published student record form's fields are importable columns too (a document field is
+  // listed, unmappable, so the admin knows where its files go instead).
+  const recordFormQuery = useQuery({
+    queryKey: STUDENT_RECORD_FORM_KEY,
+    queryFn: fetchStudentRecordForm,
+  });
+  const recordFields = recordFormQuery.data ?? [];
 
   const savedMappingsQuery = useQuery({
     queryKey: STUDENT_IMPORT_MAPPINGS_KEY,
@@ -71,23 +86,29 @@ export function ColumnMappingPanel({
   const pairWarning = parentPairWarning(draft, t);
   const trimmedSaveAs = saveAs.trim();
 
-  function fieldOf(header: string): StudentImportField | undefined {
-    return STUDENT_IMPORT_FIELDS.find((field) => draft[field] === header);
+  function recordLabel(field: { label_en: string; label_ar: string }): string {
+    return arabic ? field.label_ar : field.label_en;
   }
 
-  function optionsFor(field: StudentImportField) {
+  /** Who reads `header` now: a fixed field's label or a template field's, or undefined. */
+  function ownerOf(header: string): { key: string; label: string } | undefined {
+    const field = STUDENT_IMPORT_FIELDS.find((candidate) => draft[candidate] === header);
+    if (field) return { key: field, label: fieldLabel(field, t) };
+    const recordId = Object.entries(draft.records ?? {}).find(([, value]) => value === header)?.[0];
+    const recordField = recordFields.find((candidate) => candidate.id === recordId);
+    return recordField ? { key: recordField.id, label: recordLabel(recordField) } : undefined;
+  }
+
+  function optionsFor(key: string) {
     return [
       { value: NOT_MAPPED, label: t("adminPeople.students.import.mapping.notMapped") },
       ...headers.map((header) => {
-        const owner = fieldOf(header);
+        const owner = ownerOf(header);
         return {
           value: header,
           label:
-            owner && owner !== field
-              ? t("adminPeople.students.import.mapping.nowMapped", {
-                  header,
-                  field: fieldLabel(owner, t),
-                })
+            owner && owner.key !== key
+              ? t("adminPeople.students.import.mapping.nowMapped", { header, field: owner.label })
               : header,
         };
       }),
@@ -190,6 +211,51 @@ export function ColumnMappingPanel({
             );
           })}
         </ul>
+
+        {recordFields.length > 0 ? (
+          <section aria-labelledby="students-import-record-fields">
+            <h3 id="students-import-record-fields" className="students-import__heading">
+              {t("adminPeople.students.import.mapping.recordsHeading")}
+            </h3>
+            <p>{t("adminPeople.students.import.mapping.recordsIntro")}</p>
+            <ul className="students-import__fields">
+              {recordFields.map((field) =>
+                field.field_type === "document" ? (
+                  <li key={field.id} className="students-import__field">
+                    <p className="students-import__hint">
+                      {t("adminPeople.students.import.mapping.recordDocument", {
+                        field: recordLabel(field),
+                      })}
+                    </p>
+                  </li>
+                ) : (
+                  <li key={field.id} className="students-import__field">
+                    <Select
+                      label={recordLabel(field)}
+                      helperText={
+                        field.sensitivity === "sensitive"
+                          ? t("adminPeople.students.import.mapping.recordSensitive")
+                          : undefined
+                      }
+                      options={optionsFor(field.id)}
+                      value={draft.records?.[field.id] ?? NOT_MAPPED}
+                      disabled={applying}
+                      onChange={(value) =>
+                        onDraftChange(
+                          assignRecordColumn(
+                            draft,
+                            field.id,
+                            value === NOT_MAPPED ? undefined : value,
+                          ),
+                        )
+                      }
+                    />
+                  </li>
+                ),
+              )}
+            </ul>
+          </section>
+        ) : null}
 
         <div className="students-import__apply">
           <Input

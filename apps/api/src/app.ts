@@ -114,6 +114,7 @@ import {
   scholarshipRoutes,
   siblingDiscountRoutes,
   financeStudentRoutes,
+  financeUnlinkedRoutes,
   refundWebhookRoutes,
   settleOnlineFeePayment,
   TenantErpNextFactory,
@@ -139,6 +140,7 @@ import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobil
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { platformRoutes } from "./modules/platform";
 import { privacyRoutes } from "./modules/privacy";
+import { DEVELOPMENT_RECORD_KEYRING, recordRoutes } from "./modules/records";
 import { childComparisonRoutes } from "./modules/reports";
 import {
   platformSchoolApplicationRoutes,
@@ -187,6 +189,7 @@ import type { MobileReleaseConfig } from "./modules/mobile";
 import type { PaymentProviderPort } from "./modules/subscriptions";
 import type { StoreBilling } from "./modules/subscriptions/store";
 import type { RedisClient } from "./redis";
+import type { RecordKeyring } from "@studafy/records";
 
 export interface AppOptions {
   isReady: () => boolean | Promise<boolean>;
@@ -317,6 +320,12 @@ export interface AppOptions {
    * deployment has set the variables.
    */
   mobileReleaseConfig?: MobileReleaseConfig;
+  /**
+   * The keyring that seals sensitive student and parent record values (ADR-019). Defaults to the
+   * development keyring, which apps/api/src/env.ts refuses on a deployed tier; index.ts passes the
+   * deployment's own.
+   */
+  recordKeyring?: RecordKeyring;
 }
 
 /**
@@ -354,6 +363,7 @@ export function createApp({
   tapCountries = new Set(),
   storeBilling = null,
   mobileReleaseConfig = EMPTY_MOBILE_RELEASE_CONFIG,
+  recordKeyring = DEVELOPMENT_RECORD_KEYRING,
 }: AppOptions): OpenAPIHono<AppEnv> {
   const eventSink = securityEventSink ?? createNoopSecurityEventSink();
   // The defaultHook makes request-validation failures throw into errorHandlerMiddleware instead of
@@ -592,6 +602,8 @@ export function createApp({
     // The sibling rule is Studafy's own, applied by the billing worker like a scholarship.
     app.route("/", siblingDiscountRoutes(database));
     app.route("/", financeStudentRoutes(database));
+    // Students with no guardian and parents with no children: the people no family reaches.
+    app.route("/", financeUnlinkedRoutes(database));
     // Receipts are rendered from the payment cache, so they need no ERPNext client either.
     app.route("/", receiptRoutes(database));
   }
@@ -885,7 +897,7 @@ export function createApp({
   // role assignments, and deactivation with session/invitation revocation. Gated on USER_*
   // and ROLE_* permissions, with web-only channel guard on all mutations.
   if (database) {
-    app.route("/", userRoutes(database, jtiDenylist));
+    app.route("/", userRoutes(database, jtiDenylist, recordKeyring));
   }
 
   // In-app notification inbox (ST-142). The authenticated user's own notifications: keyset-paginated
@@ -909,8 +921,15 @@ export function createApp({
   // Student profiles (CRUD). Demographics, guardians, and admission data with finance-visible
   // field projection and role-based view scoping. Gated on STUDENT_* permissions.
   if (database) {
-    app.route("/", studentRoutes(database));
+    app.route("/", studentRoutes(database, recordKeyring));
     app.route("/", familyRoutes(database));
+  }
+
+  // School-defined student and parent records (docs/modules/student-records.md): templates,
+  // answers, sensitive reveals and documents. `storage` carries document files; without it,
+  // document routes answer 503 while the rest works.
+  if (database) {
+    app.route("/", recordRoutes(database, storage, recordKeyring));
   }
 
   // Student CSV import (upload → validate → confirm → async processing).

@@ -1,11 +1,14 @@
+import { PERMISSIONS } from "@studafy/constants";
 import { Button, DataGrid, FilterBar, Select } from "@studafy/ui";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { ImportCsvButton } from "../../../components/ImportCsvButton";
 import { api } from "../../../lib/api";
+import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { useSearchParamFlag } from "../../../lib/use-search-param-flag";
 
 import { CreateUserModal } from "./CreateUserModal";
 import { DeactivateUserDialog } from "./DeactivateUserDialog";
@@ -51,6 +54,7 @@ export default function UsersListPage() {
   // this is a starting point for the local search box below, not a URL-driven filter.
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const permissions = usePermissions();
   const { formatDate } = useFormatters();
   const [searchParams] = useSearchParams();
   const [searchInput, setSearchInput] = useState(() => searchParams.get("q") ?? "");
@@ -85,7 +89,12 @@ export default function UsersListPage() {
     placeholderData: keepPreviousData,
   });
 
-  const [createOpen, setCreateOpen] = useState(false);
+  // `?create=1` opens "New user" on arrival, and `?create=PARENT` (any assignable role) opens it on
+  // that role — the global search's "Add a parent" / "Add a teacher". Closing drops the parameter.
+  const [createParam, clearCreateParam] = useSearchParamFlag("create");
+  const createRole = ASSIGNABLE_ROLES.find((candidate) => candidate === createParam);
+  const [createClicked, setCreateOpen] = useState(false);
+  const createOpen = createClicked || createParam === "1" || createRole !== undefined;
   const [editingUser, setEditingUser] = useState<UserWithRoles | null>(null);
   const [deactivatingUser, setDeactivatingUser] = useState<UserWithRoles | null>(null);
   const [sessionsUser, setSessionsUser] = useState<UserWithRoles | null>(null);
@@ -114,6 +123,9 @@ export default function UsersListPage() {
     const key = ROLE_LABEL_KEYS[role as Role];
     return key ? t(key) : role;
   }
+
+  // A PARENT's school-defined record has its own page (`studentRecord:read`).
+  const canReadRecords = permissions.has(PERMISSIONS.STUDENT_RECORD_READ);
 
   const columns: DataGridColumn<UserWithRoles>[] = [
     {
@@ -160,6 +172,16 @@ export default function UsersListPage() {
           <Button variant="tertiary" onClick={() => setSessionsUser(user)}>
             {t("adminPeople.users.list.sessions")}
           </Button>
+          {canReadRecords && user.roles.includes("PARENT") ? (
+            <Link
+              to={`/portal/admin/parents/${user.id}/records`}
+              aria-label={t("records.principal.openParentRecords", {
+                name: user.display_name ?? user.email ?? t("records.admin.parentFallback"),
+              })}
+            >
+              {t("records.admin.openRecords")}
+            </Link>
+          ) : null}
           {user.status !== "suspended" && user.status !== "archived" ? (
             <Button variant="tertiary" onClick={() => setDeactivatingUser(user)}>
               {t("adminPeople.users.list.deactivate")}
@@ -292,7 +314,17 @@ export default function UsersListPage() {
         </Button>
       </div>
 
-      <CreateUserModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateUserModal
+        key={createRole ?? "default"}
+        open={createOpen}
+        onClose={() => {
+          setCreateOpen(false);
+          clearCreateParam();
+        }}
+        {...(createRole ? { initialRole: createRole } : {})}
+        canLinkChildren={permissions.has(PERMISSIONS.PARENT_LINK)}
+        canFillRecords={permissions.has(PERMISSIONS.STUDENT_RECORD_UPDATE)}
+      />
 
       <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} />
 

@@ -42,6 +42,41 @@ const PARENT_USER: Record<string, unknown> = {
 
 let guardians: Record<string, unknown>[] = [];
 
+const RECORDS: Record<string, unknown> = {
+  subject_kind: "student",
+  subject_id: "student-1",
+  template_version: 1,
+  missing_required: 0,
+  entries: [
+    {
+      field: {
+        id: "field-bus",
+        field_type: "short_text",
+        label_en: "Bus stop",
+        label_ar: "موقف الحافلة",
+        help_en: null,
+        help_ar: null,
+        required: false,
+        options: [],
+        sort_order: 0,
+        visibility: "parent",
+        sensitivity: "standard",
+        has_expiry: false,
+      },
+      archived: false,
+      value: "Gate 3",
+      masked: false,
+      mask: null,
+      answered: true,
+      missing: false,
+      answered_in_version: 1,
+      answered_field: null,
+      document: null,
+      updated_at: "2026-10-01T00:00:00.000Z",
+    },
+  ],
+};
+
 interface RequestInit {
   params?: { path?: Record<string, string>; query?: Record<string, unknown> };
   body?: Record<string, unknown>;
@@ -50,6 +85,9 @@ interface RequestInit {
 const getMock = mock((path: string, _init?: RequestInit) => {
   if (path === "/api/students/{studentId}") {
     return Promise.resolve<unknown>({ data: STUDENT });
+  }
+  if (path === "/api/students/{studentId}/records") {
+    return Promise.resolve<unknown>({ data: RECORDS });
   }
   if (path === "/api/students/{studentId}/guardians") {
     return Promise.resolve<unknown>({ data: guardians });
@@ -109,11 +147,15 @@ function fakeJwt(payload: unknown): string {
   return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
 }
 
-async function renderAsOrgAdmin(Page: ComponentType) {
+async function renderAsOrgAdmin(
+  Page: ComponentType,
+  url = "/portal/admin/students/student-1",
+  roles: string[] = ["ORG_ADMIN"],
+) {
   const store = createSessionStore({
     refreshClient: {
       refresh: async (): Promise<SessionTokens> => ({
-        accessToken: fakeJwt({ roles: ["ORG_ADMIN"] }),
+        accessToken: fakeJwt({ roles }),
         expiresAt: Date.now() + 3_600_000,
         sessionId: "session-1",
       }),
@@ -127,7 +169,7 @@ async function renderAsOrgAdmin(Page: ComponentType) {
     <AuthProvider store={store}>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <MemoryRouter initialEntries={["/portal/admin/students/student-1"]}>
+          <MemoryRouter initialEntries={[url]}>
             <Routes>
               <Route path="/portal/admin/students/:studentId" element={<Page />} />
             </Routes>
@@ -177,6 +219,18 @@ describe("StudentProfilePage", () => {
     await screen.findByText("Morgan Lee");
   });
 
+  test("?tab=guardians opens straight on the Guardians tab", async () => {
+    await renderAsOrgAdmin(
+      await loadStudentProfilePage(),
+      "/portal/admin/students/student-1?tab=guardians",
+    );
+
+    expect(await screen.findByText("No guardians linked yet.")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Guardians" }).getAttribute("aria-selected")).toBe(
+      "true",
+    );
+  });
+
   test("unlinks a guardian after confirming", async () => {
     guardians = [{ parent_user_id: "parent-1", relationship: "mother", family_id: "family-1" }];
 
@@ -194,5 +248,30 @@ describe("StudentProfilePage", () => {
       expect(deleteMock).toHaveBeenCalled();
     });
     await screen.findByText("No guardians linked yet.");
+  });
+
+  test("?tab=records opens the student's record for a caller holding studentRecord:read", async () => {
+    await renderAsOrgAdmin(
+      await loadStudentProfilePage(),
+      "/portal/admin/students/student-1?tab=records",
+    );
+
+    expect(await screen.findByText("Gate 3")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Records" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("button", { name: "Edit record" })).toBeTruthy();
+  });
+
+  test("a caller without studentRecord:read sees no Records tab and fetches no record", async () => {
+    await renderAsOrgAdmin(
+      await loadStudentProfilePage(),
+      "/portal/admin/students/student-1?tab=records",
+      ["SUPPORT_AGENT"],
+    );
+
+    expect(await screen.findByRole("heading", { name: "Amara Chen" })).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: "Records" })).toBeNull();
+    expect(getMock.mock.calls.some(([path]) => path === "/api/students/{studentId}/records")).toBe(
+      false,
+    );
   });
 });

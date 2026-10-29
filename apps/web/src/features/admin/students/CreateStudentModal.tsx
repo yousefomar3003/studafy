@@ -3,11 +3,16 @@ import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useState } from "react";
 
 import { useTranslation } from "../../../lib/i18n";
+import { answersFromDrafts, RecordsFormSection } from "../../records/RecordsFormSection";
+import { GuardianPicker } from "../people-links/LinkPickers";
 
 import { useCreateStudent } from "./mutations";
 import { createStudentSchema, fieldErrors, STATUS_LABEL_KEYS } from "./schema";
 
 import type { CreateStudentValues } from "./schema";
+import type { RecordFieldDefinition } from "../../records/queries";
+import type { RecordDrafts } from "../../records/RecordsFormSection";
+import type { GuardianDraft } from "../people-links/LinkPickers";
 import type { SelectOption } from "@studafy/ui";
 import type { FormEvent } from "react";
 
@@ -25,12 +30,26 @@ const EMPTY_VALUES = {
 export interface CreateStudentModalProps {
   open: boolean;
   onClose: () => void;
+  /** `parent:link`: without it the API refuses `guardians`, so the section is not shown at all. */
+  canLinkGuardians: boolean;
+  /**
+   * `studentRecord:update`: without it the API refuses `records`, so the optional Records step is
+   * not shown (nor the school's form fetched) at all.
+   */
+  canFillRecords?: boolean;
 }
 
 /** `POST /api/students` — creates the student profile and its linked user account (STUDENT role) in
- * one call. No email: students sign in with their member ID and the starting password. Guardian links are added afterward from the profile page, not here, to keep this form to
- * the fields every new student needs. */
-export function CreateStudentModal({ open, onClose }: CreateStudentModalProps) {
+ * one call. No email: students sign in with their member ID and the starting password. Guardians are
+ * optional: staff pick existing PARENT accounts and they are linked in the same call (each joins
+ * their own household unless an existing family is chosen), so a new student need not wait for the
+ * profile page's Guardians tab to belong to a family. */
+export function CreateStudentModal({
+  open,
+  onClose,
+  canLinkGuardians,
+  canFillRecords = false,
+}: CreateStudentModalProps) {
   const { t } = useTranslation();
   const { show } = useToast();
   const createStudent = useCreateStudent();
@@ -40,6 +59,9 @@ export function CreateStudentModal({ open, onClose }: CreateStudentModalProps) {
   ).map(([value, key]) => ({ value, label: t(key) }));
 
   const [values, setValues] = useState(EMPTY_VALUES);
+  const [guardians, setGuardians] = useState<GuardianDraft[]>([]);
+  const [recordDrafts, setRecordDrafts] = useState<RecordDrafts>({});
+  const [recordFields, setRecordFields] = useState<RecordFieldDefinition[]>([]);
   const [errors, setErrors] = useState<Partial<Record<keyof CreateStudentValues, string>>>({});
 
   function setField<K extends keyof typeof values>(key: K, value: (typeof values)[K]) {
@@ -49,6 +71,9 @@ export function CreateStudentModal({ open, onClose }: CreateStudentModalProps) {
 
   function reset() {
     setValues(EMPTY_VALUES);
+    setGuardians([]);
+    setRecordDrafts({});
+    setRecordFields([]);
     setErrors({});
   }
 
@@ -65,25 +90,42 @@ export function CreateStudentModal({ open, onClose }: CreateStudentModalProps) {
       return;
     }
 
-    createStudent.mutate(result.data, {
-      onSuccess: () => {
-        show({
-          variant: "success",
-          title: t("adminPeople.students.create.addedToast", {
-            firstName: result.data.first_name,
-            lastName: result.data.last_name,
-          }),
-        });
-        handleClose();
+    const links = canLinkGuardians
+      ? guardians.map((draft) => ({
+          parent_user_id: draft.parent.id,
+          relationship: draft.relationship,
+          family_id: draft.family?.id,
+        }))
+      : [];
+
+    const records = canFillRecords ? answersFromDrafts(recordFields, recordDrafts) : [];
+
+    createStudent.mutate(
+      {
+        ...result.data,
+        guardians: links.length > 0 ? links : undefined,
+        records: records.length > 0 ? records : undefined,
       },
-      onError: (error) => {
-        show({
-          variant: "error",
-          title: t("adminPeople.students.create.error"),
-          description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
-        });
+      {
+        onSuccess: () => {
+          show({
+            variant: "success",
+            title: t("adminPeople.students.create.addedToast", {
+              firstName: result.data.first_name,
+              lastName: result.data.last_name,
+            }),
+          });
+          handleClose();
+        },
+        onError: (error) => {
+          show({
+            variant: "error",
+            title: t("adminPeople.students.create.error"),
+            description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
+          });
+        },
       },
-    });
+    );
   }
 
   return (
@@ -152,6 +194,17 @@ export function CreateStudentModal({ open, onClose }: CreateStudentModalProps) {
             onChange={(value) => setField("status", value)}
             required
           />
+          {canLinkGuardians ? <GuardianPicker value={guardians} onChange={setGuardians} /> : null}
+          {canFillRecords && open ? (
+            <RecordsFormSection
+              kind="student"
+              drafts={recordDrafts}
+              onChange={(drafts, fields) => {
+                setRecordDrafts(drafts);
+                setRecordFields(fields);
+              }}
+            />
+          ) : null}
         </Modal.Body>
         <Modal.Footer>
           <Button type="button" variant="tertiary" onClick={handleClose}>

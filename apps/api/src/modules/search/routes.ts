@@ -9,9 +9,9 @@ import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
 
 import { globalSearchResultSchema, searchQuerySchema } from "./schemas";
-import { globalSearch } from "./service";
+import { globalSearch, SEARCH_TYPES } from "./service";
 
-import type { GlobalSearchSections } from "./service";
+import type { GlobalSearchAccess, SearchType } from "./service";
 import type { Database } from "../../db/client";
 import type { AppEnv } from "../../middleware/requestId";
 import type { Role } from "@studafy/constants";
@@ -34,21 +34,65 @@ function clientIpFrom(c: Context<AppEnv>): string | null {
 }
 
 /**
- * Which sections a caller may see, reusing the exact permission each type's own endpoint already
- * requires (GET /api/students -> STUDENT_READ, GET /api/users -> USER_READ, GET
- * /api/finance/invoices -> BILLING_READ, materials -> MATERIAL_READ). This is the whole of
- * "results respect role scope" at the section level: a FINANCE caller (BILLING_READ, USER_READ,
- * neither STUDENT_READ nor MATERIAL_READ per packages/constants/src/permissions.ts) gets invoices
- * and users back and an empty array for students/materials; an INSTRUCTOR gets the reverse. Which
- * *rows* come back within a permitted section is a separate, database-enforced question -- see the
- * module header in ./service.ts.
+ * Which sections a caller may see: for each type, exactly the gate its own list endpoint applies.
+ * Which *rows* come back within a permitted section is decided by row-level security plus the same
+ * SQL narrowing that endpoint applies -- see the module header in ./service.ts.
+ *
+ *   students        GET /api/students                  student:read
+ *   users           GET /api/users                     user:read
+ *   invoices        GET /api/finance/invoices          billing:read
+ *   materials       GET /api/academics/materials       material:read
+ *   classes, sections, subjects, grade_levels, academic_years, terms, rooms
+ *                   GET /api/academics/*               none: any school member (only writes are
+ *                                                      gated); RLS narrows classes and subjects
+ *   families        GET /api/families                  PARENT role or parent:link (non-managers see
+ *                   GET /api/finance/families          only their own family); billing:read
+ *   announcements   GET /api/announcements             notification:manage
+ *   events          GET /api/school-events             calendarEvent:read
+ *   incidents       /portal/principal/discipline       principalDashboard:view, and the
+ *                   GET /api/discipline/incidents      disciplineIncident:read that endpoint needs.
+ *                   A caller who is also a PARENT is excluded: that endpoint switches a PARENT to
+ *                   their own children's resolved incidents, which is not a search section.
+ *   evaluations     GET /api/evaluations               evaluation:read (an INSTRUCTOR: own, shared)
+ *   fee_structures  GET /api/finance/fee-structures    billing:update
+ *   scholarships    GET /api/finance/scholarships      billing:read
+ *   expenses        GET /api/finance/expenses          billing:update
+ *   notifications   GET /api/notifications             none: the caller's own inbox (RLS)
  */
-function sectionsFor(roles: readonly Role[]): GlobalSearchSections {
-  return {
+export function searchAccessFor(roles: readonly Role[]): GlobalSearchAccess {
+  const isParent = roles.includes("PARENT");
+  const canManageFamilies = hasPermission(roles, PERMISSIONS.PARENT_LINK);
+  const billingRead = hasPermission(roles, PERMISSIONS.BILLING_READ);
+  const billingUpdate = hasPermission(roles, PERMISSIONS.BILLING_UPDATE);
+  const sections: Record<SearchType, boolean> = {
     students: hasPermission(roles, PERMISSIONS.STUDENT_READ),
     users: hasPermission(roles, PERMISSIONS.USER_READ),
-    invoices: hasPermission(roles, PERMISSIONS.BILLING_READ),
+    invoices: billingRead,
     materials: hasPermission(roles, PERMISSIONS.MATERIAL_READ),
+    classes: true,
+    sections: true,
+    subjects: true,
+    grade_levels: true,
+    academic_years: true,
+    terms: true,
+    rooms: true,
+    families: isParent || canManageFamilies || billingRead,
+    announcements: hasPermission(roles, PERMISSIONS.NOTIFICATION_MANAGE),
+    events: hasPermission(roles, PERMISSIONS.CALENDAR_EVENT_READ),
+    incidents:
+      !isParent &&
+      hasPermission(roles, PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW) &&
+      hasPermission(roles, PERMISSIONS.DISCIPLINE_INCIDENT_READ),
+    evaluations: hasPermission(roles, PERMISSIONS.EVALUATION_READ),
+    fee_structures: billingUpdate,
+    scholarships: billingRead,
+    expenses: billingUpdate,
+    notifications: true,
+  };
+  return {
+    sections,
+    familiesOwnOnly: !canManageFamilies && !billingRead,
+    evaluationsOwnSharedOnly: roles.includes("INSTRUCTOR"),
   };
 }
 
@@ -61,17 +105,17 @@ const globalSearchRoute = createRoute({
   path: "/api/search",
   tags: ["Search"],
   operationId: "globalSearch",
-  summary: "Search across students, users, invoices, and materials",
+  summary: "Search across the school's people, academics, communication and finance records",
   description:
-    "Role-scoped full-text search (Postgres websearch_to_tsquery) across the four record types " +
-    "a school's staff commonly look someone or something up by, grouped per type. A caller only " +
-    "ever sees a type's section populated when they hold that type's own read permission " +
-    "(STUDENT_READ, USER_READ, BILLING_READ, MATERIAL_READ) -- for example FINANCE finds " +
-    "invoices but never students, and INSTRUCTOR the reverse. Within a permitted section, row-level " +
-    "security applies exactly as it does on that type's own list endpoint (a teacher's student " +
-    "results are limited to students in classes they teach, for instance). Every call is recorded " +
-    "as a 'read' audit entry against 'global_search', since the query text and which sections it " +
-    "touched are themselves sensitive.",
+    "Role-scoped full-text search across twenty record types (`SearchType`), grouped per type " +
+    "with a total per type. A type's section is populated only when the caller holds the same " +
+    "permission that type's own list endpoint requires -- FINANCE finds invoices but never " +
+    "students, INSTRUCTOR the reverse, only school leadership finds discipline incidents, and " +
+    "every caller finds their own notifications. Within a permitted section, row-level security " +
+    "applies exactly as on that type's list endpoint (a teacher's classes and students are those " +
+    "they teach). Matching is accent- and Arabic-letter-form-insensitive, treats the last word as " +
+    "a prefix, and falls back to typo-tolerant matching for names. Every call is recorded as a " +
+    "'read' audit entry against 'global_search' (query, types, offset, sections run and counts).",
   security: [{ bearerAuth: [] }],
   request: { query: searchQuerySchema },
   responses: standardResponses(
@@ -89,12 +133,24 @@ export function searchRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(globalSearchRoute, async (c) => {
     const auth = requireAuth(c);
-    const { q, limit } = c.req.valid("query");
-    const sections = sectionsFor(auth.roles);
+    const { q, limit, offset, types } = c.req.valid("query");
+    const requested: SearchType[] =
+      types === undefined ? [...SEARCH_TYPES] : SEARCH_TYPES.filter((type) => types.includes(type));
+    const access = searchAccessFor(auth.roles);
 
-    const results = await withTenantTx(database, tenantFrom(c), async (tx) => {
-      const hits = await globalSearch(tx, auth.schoolId, q, limit, sections);
+    const outcome = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const found = await globalSearch(tx, {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        query: q,
+        types: requested,
+        limit,
+        offset,
+        access,
+      });
 
+      // The query text and which sections it touched are themselves sensitive, so they are
+      // recorded -- never a hit's values, only how many there were.
       await emitAuditLog(tx, {
         action: "read",
         targetTable: "global_search",
@@ -102,24 +158,25 @@ export function searchRoutes(database: Database): OpenAPIHono<AppEnv> {
         newValues: {
           query: q,
           limit,
-          sections: Object.entries(sections)
-            .filter(([, enabled]) => enabled)
-            .map(([name]) => name),
-          result_counts: {
-            students: hits.students.length,
-            users: hits.users.length,
-            invoices: hits.invoices.length,
-            materials: hits.materials.length,
-          },
+          offset,
+          types: types === undefined ? null : requested,
+          sections: found.ran,
+          result_counts: Object.fromEntries(
+            found.ran.map((type) => [type, found.results[type].length]),
+          ),
+          totals: Object.fromEntries(found.ran.map((type) => [type, found.totals[type]])),
         },
         clientIp: clientIpFrom(c),
         userAgent: c.req.header("user-agent"),
       });
 
-      return hits;
+      return found;
     });
 
-    return c.json({ query: q, results }, 200);
+    return c.json(
+      { query: q, types: requested, results: outcome.results, totals: outcome.totals },
+      200,
+    );
   });
 
   return routes;

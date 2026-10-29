@@ -25,6 +25,7 @@ import { runTenantErasure } from "./tenant-erasure.worker";
 import { runTenantExport } from "./tenant-export.worker";
 
 import type { MaintenanceS3Client } from "./tenant-export.worker";
+import type { RecordKeyring } from "@studafy/records";
 import type { Job } from "bullmq";
 import type { Sql } from "postgres";
 
@@ -36,6 +37,8 @@ export interface MaintenanceRunnerConfig {
   bucket?: string;
   /** For the account-deletion sweep's Stripe AI add-on cancellations; absent outside production. */
   stripeSecretKey?: string;
+  /** Opens sensitive record answers for a DSR export (ADR-019). */
+  recordKeyring: RecordKeyring;
 }
 
 export interface DsrJobResult {
@@ -63,6 +66,23 @@ function createMaintenanceStorage(config: MaintenanceRunnerConfig): MaintenanceS
   return createReportS3({ region, endpoint: config.s3Endpoint, bucket });
 }
 
+/** Delete erased record documents. A failure leaves an unreferenced object, never a dangling row. */
+async function removeObjects(config: MaintenanceRunnerConfig, keys: readonly string[]) {
+  if (keys.length === 0 || !config.s3Region || !config.bucket) return;
+  const s3 = createReportS3({
+    region: config.s3Region,
+    endpoint: config.s3Endpoint,
+    bucket: config.bucket,
+  });
+  for (const key of keys) {
+    try {
+      await s3.remove(key);
+    } catch {
+      // Unreferenced now; storage-quota reconciliation reports it.
+    }
+  }
+}
+
 export async function processDsrJob(
   job: Job,
   config: MaintenanceRunnerConfig,
@@ -86,32 +106,48 @@ async function runDsrJob(
   schoolId: string,
 ): Promise<DsrJobResult> {
   try {
-    return await withSystemTenantTx(sql, { schoolId }, async (tx) => {
-      const claim = await claimDsrRequest(tx, schoolId, requestId);
-      if (claim.state === "terminal") return { processed: true };
-      const record = claim.record;
+    let orphanedStorageKeys: string[] = [];
+    const result = await withSystemTenantTx(
+      sql,
+      { schoolId },
+      async (tx): Promise<DsrJobResult> => {
+        const claim = await claimDsrRequest(tx, schoolId, requestId);
+        if (claim.state === "terminal") return { processed: true };
+        const record = claim.record;
 
-      if (job.name === JOB_NAMES.RUN_DATA_SUBJECT_EXPORT) {
-        const { manifestKey } = await runTenantExport(tx, {
-          s3: createMaintenanceStorage(config),
-          requestId,
+        if (job.name === JOB_NAMES.RUN_DATA_SUBJECT_EXPORT) {
+          const { manifestKey } = await runTenantExport(tx, {
+            s3: createMaintenanceStorage(config),
+            requestId,
+            schoolId,
+            subjectScope: record.subjectScope,
+            subjectUserId: record.subjectUserId,
+            now: new Date(),
+            recordKeyring: config.recordKeyring,
+          });
+          await completeDsrExport(tx, schoolId, requestId, manifestKey);
+          return { processed: true };
+        }
+
+        const subject =
+          record.subjectScope === "user" && record.subjectUserId
+            ? await resolveSubjectIdentifiers(tx, schoolId, record.subjectUserId)
+            : undefined;
+        const erasure = await runTenantErasure(tx, schoolId, subject);
+        orphanedStorageKeys = erasure.orphanedStorageKeys;
+        await completeDsrErasure(
+          tx,
           schoolId,
-          subjectScope: record.subjectScope,
-          subjectUserId: record.subjectUserId,
-          now: new Date(),
-        });
-        await completeDsrExport(tx, schoolId, requestId, manifestKey);
+          requestId,
+          erasure.redactedTables,
+          erasure.retainedTables,
+        );
         return { processed: true };
-      }
-
-      const subject =
-        record.subjectScope === "user" && record.subjectUserId
-          ? await resolveSubjectIdentifiers(tx, schoolId, record.subjectUserId)
-          : undefined;
-      const { redactedTables, retainedTables } = await runTenantErasure(tx, schoolId, subject);
-      await completeDsrErasure(tx, schoolId, requestId, redactedTables, retainedTables);
-      return { processed: true };
-    });
+      },
+    );
+    // Only after the erasure committed: a rolled-back erasure must leave its files in place.
+    await removeObjects(config, orphanedStorageKeys);
+    return result;
   } catch (error) {
     if (isFinalAttempt(job.attemptsMade, job.opts.attempts)) {
       const message = error instanceof Error ? error.message : String(error);

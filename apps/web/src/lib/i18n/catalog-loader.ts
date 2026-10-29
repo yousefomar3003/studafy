@@ -26,7 +26,10 @@ export type CatalogArea =
   | "platformLicensing"
   | "schoolLicense"
   | "onboarding"
-  | "academicGrading";
+  | "academicGrading"
+  | "records"
+  | "recordTemplates"
+  | "search";
 
 type Catalog = Record<string, unknown>;
 type CatalogModule = Promise<{ default: Catalog }>;
@@ -56,6 +59,9 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     schoolLicense: () => import("./locales/en/schoolLicense.json"),
     onboarding: () => import("./locales/en/onboarding.json"),
     academicGrading: () => import("./locales/en/academicGrading.json"),
+    records: () => import("./locales/en/records.json"),
+    recordTemplates: () => import("./locales/en/recordTemplates.json"),
+    search: () => import("./locales/en/search.json"),
   },
   ar: {
     adminPeople: () => import("./locales/ar/adminPeople.json"),
@@ -69,6 +75,9 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     schoolLicense: () => import("./locales/ar/schoolLicense.json"),
     onboarding: () => import("./locales/ar/onboarding.json"),
     academicGrading: () => import("./locales/ar/academicGrading.json"),
+    records: () => import("./locales/ar/records.json"),
+    recordTemplates: () => import("./locales/ar/recordTemplates.json"),
+    search: () => import("./locales/ar/search.json"),
   },
 };
 
@@ -111,6 +120,21 @@ function ensureCatalogs(locale: string, areas: Iterable<CatalogArea>): Promise<v
 export function loadCatalogAreas(areas: readonly CatalogArea[]): Promise<void> {
   for (const area of areas) requestedAreas.add(area);
   return ensureCatalogs(i18next.language, areas);
+}
+
+/**
+ * Loads the given areas for each of `locales` (unsupported ones are skipped), not only the active
+ * one — for strings matched in more than one language, like the global search's destination
+ * keywords. The areas are also remembered for a later language switch, as with `loadCatalogAreas`.
+ */
+export function loadCatalogAreasIn(
+  locales: readonly string[],
+  areas: readonly CatalogArea[],
+): Promise<void> {
+  for (const area of areas) requestedAreas.add(area);
+  return Promise.all([...new Set(locales)].map((locale) => ensureCatalogs(locale, areas))).then(
+    () => undefined,
+  );
 }
 
 /** Loads everything `locale` needs so far (shell + requested areas); await before switching to it. */

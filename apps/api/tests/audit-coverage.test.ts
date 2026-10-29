@@ -354,6 +354,8 @@ const EXPECTED_MUTATING_ROUTES = [
   // intent; emitAuditLog writes the row inside the batch-creation transaction in
   // finance/invoices/routes.ts.
   "POST /api/finance/invoices/batches",
+  // The batch preflight writes nothing; it declares the batch table, as the quote calculator does.
+  "POST /api/finance/invoices/batches/preflight",
   "POST /api/discipline/incidents",
   "PATCH /api/discipline/incidents/{incidentId}",
   "POST /api/discipline/incidents/{incidentId}/resolve",
@@ -545,6 +547,23 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/platform/features/{featureKey}",
   "POST /api/platform/tiers",
   "PUT /api/platform/tiers/{planId}",
+  // School-defined student and parent records (modules/records/routes.ts): the template editor
+  // (recordTemplate:manage), filling records in and documents (studentRecord:update), and the
+  // sensitive reveal (studentRecord:readSensitive), which is audited as a read.
+  "POST /api/record-templates/{subjectKind}/fields",
+  "PATCH /api/record-templates/{subjectKind}/fields/{fieldId}",
+  "PUT /api/record-templates/{subjectKind}/field-order",
+  "POST /api/record-templates/{subjectKind}/publish",
+  "PUT /api/students/{studentId}/records",
+  "POST /api/students/{studentId}/records/{fieldId}/reveal",
+  "PUT /api/students/{studentId}/records/{fieldId}/document",
+  "PATCH /api/students/{studentId}/records/{fieldId}/document",
+  "DELETE /api/students/{studentId}/records/{fieldId}/document",
+  "PUT /api/parents/{parentUserId}/records",
+  "POST /api/parents/{parentUserId}/records/{fieldId}/reveal",
+  "PUT /api/parents/{parentUserId}/records/{fieldId}/document",
+  "PATCH /api/parents/{parentUserId}/records/{fieldId}/document",
+  "DELETE /api/parents/{parentUserId}/records/{fieldId}/document",
 ];
 
 function collectSourceFiles(dir: string): string[] {

@@ -13,6 +13,73 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Global search covers twenty record types (`GET /api/search`, migration 000171):
+  - Named query enum `SearchType` (`students`, `users`, `invoices`, `materials`, `classes`,
+    `sections`, `subjects`, `grade_levels`, `academic_years`, `terms`, `rooms`, `families`,
+    `announcements`, `events`, `incidents`, `evaluations`, `fee_structures`, `scholarships`,
+    `expenses`, `notifications`); `SearchQuery` gains `types` (array of `SearchType`, repeated or
+    comma-separated; omitted = all) and `offset` (0–1000, default 0).
+  - `GlobalSearchResult` gains `types` (the requested `SearchType[]`, echoed) and `totals`
+    (`GlobalSearchTotals`, one integer per type: total matches the caller can see, 0 when not
+    requested or not permitted). `results` is now the named `GlobalSearchResults` and always carries
+    all twenty arrays.
+  - New hit schemas: `ClassSearchHit`, `SectionSearchHit`, `SubjectSearchHit`,
+    `GradeLevelSearchHit`, `AcademicYearSearchHit`, `TermSearchHit`, `RoomSearchHit`,
+    `FamilySearchHit`, `AnnouncementSearchHit`, `EventSearchHit`, `IncidentSearchHit`,
+    `EvaluationSearchHit`, `FeeStructureSearchHit`, `ScholarshipSearchHit`, `ExpenseSearchHit`,
+    `NotificationSearchHit`. Each section is gated by the permission its own list endpoint requires
+    (incidents: `principalDashboard:view` and `disciplineIncident:read`; notifications: the
+    caller's own inbox) and narrowed by the same row scope.
+
+- School-defined student and parent records (see
+  [`docs/modules/student-records.md`](../modules/student-records.md)), tag "Student and parent
+  records":
+  - Template editor (`recordTemplate:manage`): `GET /api/record-templates/{subjectKind}`,
+    `POST …/fields`, `PATCH …/fields/{fieldId}` (edit or `archived`), `PUT …/field-order`,
+    `POST …/publish` (`RecordTemplate`, `RecordTemplateField`, `CreateRecordFieldBody`,
+    `UpdateRecordFieldBody`, `ReorderRecordFieldsBody`, `RecordTemplateVersion`). 409
+    `RECORD_FIELD_LOCKED` for a published field's type or a sensitive field made standard; 409
+    `RECORD_NOTHING_TO_PUBLISH`.
+  - `GET /api/record-forms/{subjectKind}` (`studentRecord:update`): the published form (`RecordForm`,
+    `RecordFieldDefinition`).
+  - Records for `/api/students/{studentId}` and `/api/parents/{parentUserId}`: `GET`/`PUT …/records`
+    (`SubjectRecords`, `RecordEntry`, `UpdateRecordsBody`, `RecordAnswerInput`, `RecordValue`);
+    `POST …/records/{fieldId}/reveal` (`studentRecord:readSensitive`, audited, `RevealedRecordValue`);
+    `PUT`/`PATCH`/`DELETE …/records/{fieldId}/document` and `GET …/document/download`
+    (`AttachRecordDocumentBody`, `UpdateRecordDocumentBody`, `RecordDocument`,
+    `RecordDocumentDownload`). Sensitive values are always `value: null` with a `mask` outside the
+    reveal call. Record responses carry `Cache-Control: no-store`.
+  - Missing information (`studentRecord:read`): `GET /api/records/missing/students`,
+    `…/parents`, `…/summary` (`RecordMissingQuery` with the named `RecordMissingIssue` filter,
+    echoed as `issue`; `RecordMissingStudentList`, `RecordMissingParentList`, `RecordMissingSummary`).
+  - `POST /api/students` and `POST /api/users` (PARENT only): optional `records`
+    (`RecordAnswerInput[]`), written in the same transaction; needs `studentRecord:update`.
+  - Storage content classes `record.document` and `record.sensitiveDocument` for
+    `POST /api/storage/uploads/request-upload`.
+  - Error codes `RECORD_TEMPLATE_NOT_PUBLISHED`, `RECORD_NOTHING_TO_PUBLISH`,
+    `RECORD_FIELD_NOT_FOUND`, `RECORD_FIELD_INVALID`, `RECORD_FIELD_LOCKED`,
+    `RECORD_FIELD_NOT_DOCUMENT`, `RECORD_FIELD_NOT_SENSITIVE`, `RECORD_VALUE_INVALID`,
+    `RECORD_SUBJECT_NOT_FOUND`, `RECORD_DOCUMENT_NOT_FOUND`, `RECORD_KEY_UNAVAILABLE`.
+  - Student import: `StudentImportColumnMapping.records` (template field id -> source column),
+    `ImportDiffRow.records` (`ImportDiffRecordValue`, sensitive values masked),
+    `ImportDiffRow.parent_conflict`, `parent_group_line`, `parent_email`, `parent_name`,
+    `ImportDiff.totals.parent_conflicts`, and `ImportSummary.parent_conflicts` / `record_answers`.
+
+- Linking parents and children (see
+  [`docs/modules/finance-module-guide.md`](../modules/finance-module-guide.md#how-parents-and-children-get-linked)):
+  - `POST /api/users`: optional `children` (`CreateUserChild`: `student_id`, `relationship`) links a
+    new PARENT to students in the same transaction. It is refused with 400 for any other role or a
+    student listed twice, with 404 for a student outside the school (nothing is created), and with 403
+    without `parent:link`. The response now documents 404.
+  - `GET /api/finance/unlinked/students`, `GET /api/finance/unlinked/parents` and
+    `GET /api/finance/unlinked/summary` (`billing:read`): enrolled students with no guardian and
+    PARENT accounts with no children, searchable and offset-paginated (`FinanceUnlinkedQuery`;
+    `FinanceUnlinkedStudentList`, `FinanceUnlinkedParentList`, `FinanceUnlinkedSummary`).
+  - `POST /api/finance/invoices/batches/preflight` (`billing:read`, writes nothing): resolves a
+    batch's targets (`InvoiceBatchPreflightBody`, same rules as `CreateInvoiceBatchBody`) and
+    reports `total_count`, `unlinked_count` and the first 100 `unlinked_students`
+    (`InvoiceBatchPreflight`, `InvoiceBatchUnlinkedStudent`).
+
 - Paid features and school licensing (see
   [`docs/billing/feature-licensing.md`](../billing/feature-licensing.md)):
   - `GET /api/me/features`: the caller's paid features with their verdicts.
@@ -133,6 +200,30 @@ when it required the `version-bump` label.
 
 ### Changed
 
+- `GET /api/search` matching: the phrase is normalized (case, Arabic harakat/tatweel, alef forms,
+  ى → ي, ة → ه), split into letter/digit words and matched as all of them with the last one as a
+  prefix (`oma` → Omar, `inv-00` → INV-0012), replacing `websearch_to_tsquery`; names fall back to
+  trigram matching (word similarity ≥ 0.5) when nothing matches exactly (for students, classes
+  and subjects: nothing in the whole school, so a name outside the caller's scope gives an empty
+  section rather than look-alikes). Existing hit shapes are
+  unchanged; `rank` is the trigram similarity for a typo match. The audit entry also records
+  `types`, `offset` and per-type `totals`.
+
+- Student import no longer matches parents by email (see
+  [`docs/modules/finance-module-guide.md`](../modules/finance-module-guide.md#how-parents-and-children-get-linked))
+  **(breaking)**: `ImportDiffRow.parent` is now `create | sibling | conflict` (`existing` is gone);
+  a `parent_email` that belongs to an existing account is `parent: "conflict"` with
+  `parent_conflict: "PARENT_ACCOUNT_EXISTS"`, and the student is still imported with no link.
+  `ImportDiffRow.link` is now `create` or null (`update` / `unchanged` are gone).
+  `ImportDiff.totals.links_updated` is replaced by `parent_conflicts`.
+  `PARENT_EMAIL_BELONGS_TO_STUDENT` now means only a new student in the same file; a live
+  student's email is `PARENT_ACCOUNT_EXISTS`.
+
+- `POST /api/students`: `guardians` now require `parent:link` on top of `student:create` (403
+  otherwise). Each guardian is linked through the same checked, audited path as
+  `POST /api/students/{studentId}/guardians`, so an unknown parent is now 404 (it was 400) and a
+  parent listed twice is 400. The response now documents 404. Every role that can create students
+  already holds `parent:link`.
 - `PUT /api/academics/assignments/{assignmentId}/questions` takes at most 20 questions (was 100)
   and 2-4 options per multiple-choice question (was 2-6).
 - Handing in a `questions` assignment now marks it and releases the grade at once: the returned
@@ -158,6 +249,8 @@ when it required the `version-bump` label.
 
 ### Fixed
 
+- `POST /api/students` with `guardians` wrote no `parent_child_links` audit row; it now writes one
+  per link, like the Guardians tab.
 - `GET /api/teachers/me` answered `403 CHANNEL_NOT_AUTHORIZED` to mobile sessions (and required
   `TEACHER_READ`), because the web-only `/api/teachers/{teacherId}` guards matched `me` as an id.
   The id is now constrained to a UUID; `/me` is reachable from every channel as documented. ST-303.

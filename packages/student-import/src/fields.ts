@@ -1,3 +1,9 @@
+import type {
+  RecordFieldOption,
+  RecordFieldSensitivity,
+  RecordFieldType,
+} from "@studafy/records/browser";
+
 /**
  * The closed set of fields a student CSV can be mapped onto, and the table each one lands in.
  *
@@ -121,3 +127,17 @@ export const PARENT_RELATIONSHIPS = [
 ] as const;
 
 export type ParentRelationship = (typeof PARENT_RELATIONSHIPS)[number];
+
+/**
+ * A field of the school's published student record template, offered as an import column next to
+ * the fixed ones (docs/modules/student-records.md "CSV import"). The mapping keys these by field id
+ * under `records`; a document field is listed so the mapping can explain why it is refused.
+ */
+export interface ImportRecordField {
+  id: string;
+  field_type: RecordFieldType;
+  options: readonly RecordFieldOption[];
+  label_en: string;
+  label_ar: string;
+  sensitivity: RecordFieldSensitivity;
+}

@@ -122,6 +122,27 @@ export const invoiceDetailSchema = invoiceSchema
 // Batch generation
 // ---------------------------------------------------------------------------
 
+const targetClassIdsSchema = z.array(uuidSchema).min(1).max(500).optional().openapi({
+  description: "Limit to these classes; omitted = every student. Capped at 5,000 students.",
+});
+
+const targetStudentIdsSchema = z
+  .array(uuidSchema)
+  .min(1)
+  .max(500)
+  .optional()
+  .openapi({
+    description:
+      "Bill exactly these students instead (each must be enrolled); not combinable with " +
+      "`target_class_ids`.",
+  });
+
+const oneTargetKind = {
+  check: (body: { target_class_ids?: string[]; target_student_ids?: string[] }) =>
+    !(body.target_class_ids && body.target_student_ids),
+  params: { message: "Target classes or students, not both", path: ["target_student_ids"] },
+};
+
 export const createInvoiceBatchBodySchema = z
   .object({
     fee_structure_erpnext_name: z
@@ -136,25 +157,40 @@ export const createInvoiceBatchBodySchema = z
       .max(200)
       .openapi({ description: "Human-readable billing period, e.g. 'Spring 2026 Term 1'." }),
     due_date: dateSchema.optional(),
-    target_class_ids: z.array(uuidSchema).min(1).max(500).optional().openapi({
-      description: "Limit to these classes; omitted = every student. Capped at 5,000 students.",
-    }),
-    target_student_ids: z
-      .array(uuidSchema)
-      .min(1)
-      .max(500)
-      .optional()
+    target_class_ids: targetClassIdsSchema,
+    target_student_ids: targetStudentIdsSchema,
+  })
+  .refine(oneTargetKind.check, oneTargetKind.params)
+  .openapi("CreateInvoiceBatchBody");
+
+export const invoiceBatchPreflightBodySchema = z
+  .object({
+    target_class_ids: targetClassIdsSchema,
+    target_student_ids: targetStudentIdsSchema,
+  })
+  .refine(oneTargetKind.check, oneTargetKind.params)
+  .openapi("InvoiceBatchPreflightBody");
+
+export const invoiceBatchUnlinkedStudentSchema = z
+  .object({ id: uuidSchema, name: z.string(), admission_number: z.string() })
+  .openapi("InvoiceBatchUnlinkedStudent");
+
+export const invoiceBatchPreflightSchema = z
+  .object({
+    total_count: z.number().int().openapi({ description: "Students the batch would bill." }),
+    unlinked_count: z
+      .number()
+      .int()
       .openapi({
         description:
-          "Bill exactly these students instead (each must be enrolled); not combinable with " +
-          "`target_class_ids`.",
+          "Of those, students no guardian is linked to (no family): no sibling discount applies " +
+          "to their invoice and no parent can see or pay it.",
       }),
+    unlinked_students: z.array(invoiceBatchUnlinkedStudentSchema).openapi({
+      description: "The first 100 unlinked students by name.",
+    }),
   })
-  .refine((body) => !(body.target_class_ids && body.target_student_ids), {
-    message: "Target classes or students, not both",
-    path: ["target_student_ids"],
-  })
-  .openapi("CreateInvoiceBatchBody");
+  .openapi("InvoiceBatchPreflight");
 
 export const invoiceBatchSchema = z
   .object({

@@ -1,11 +1,20 @@
 import { Modal } from "@studafy/ui";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 
 import { useTranslation } from "../../lib/i18n";
 
-import { SearchPalette } from "./SearchPalette";
-
 import "./search-palette.css";
+
+/**
+ * The palette (with the destinations registry, ranking, record links and result mapping behind it)
+ * is its own chunk. `PortalLayout` sits in the entry bundle, so a static import here would ship all
+ * of it to every page — the marketing home and sign-in included, whose Lighthouse budgets
+ * (`lighthouserc.json`) it pushed over. It loads on first open, or earlier when the browser is idle.
+ */
+const loadSearchPalette = () => import("./SearchPalette");
+const SearchPalette = lazy(() =>
+  loadSearchPalette().then((module) => ({ default: module.SearchPalette })),
+);
 
 function isMacPlatform(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -41,9 +50,25 @@ export function GlobalSearchTrigger() {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, []);
 
+  // Fetch the palette's chunk once the portal page has settled, so the first Ctrl+K opens at once.
+  useEffect(() => {
+    const prefetch = () => void loadSearchPalette().catch(() => undefined);
+    if (typeof window.requestIdleCallback === "function") {
+      const handle = window.requestIdleCallback(prefetch, { timeout: 5000 });
+      return () => window.cancelIdleCallback(handle);
+    }
+    const handle = window.setTimeout(prefetch, 2000);
+    return () => window.clearTimeout(handle);
+  }, []);
+
   return (
     <>
-      <button type="button" className="global-search-trigger" onClick={() => setOpen(true)}>
+      <button
+        type="button"
+        className="global-search-trigger"
+        onClick={() => setOpen(true)}
+        onPointerEnter={() => void loadSearchPalette().catch(() => undefined)}
+      >
         <svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
           <circle cx="9" cy="9" r="6" fill="none" stroke="currentColor" strokeWidth="1.5" />
           <path
@@ -60,7 +85,19 @@ export function GlobalSearchTrigger() {
       </button>
 
       <Modal open={open} onClose={() => setOpen(false)} title={t("globalSearch.title")}>
-        <Modal.Body>{open ? <SearchPalette onClose={() => setOpen(false)} /> : null}</Modal.Body>
+        <Modal.Body>
+          {open ? (
+            <Suspense
+              fallback={
+                <p role="status" className="search-palette__empty">
+                  {t("globalSearch.loading")}
+                </p>
+              }
+            >
+              <SearchPalette onClose={() => setOpen(false)} />
+            </Suspense>
+          ) : null}
+        </Modal.Body>
         <Modal.Footer>
           <span className="search-palette__hint">{t("globalSearch.keyboardHint")}</span>
         </Modal.Footer>

@@ -1,8 +1,8 @@
 import { ApiError } from "@studafy/api-client";
-import { Button, Card, DataGrid, Select, useToast } from "@studafy/ui";
+import { Button, Card, DataGrid, Modal, Select, useToast } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { api } from "../../../lib/api";
 import { useTranslation } from "../../../lib/i18n";
@@ -15,12 +15,18 @@ import {
   invoiceBatchItemStatusTone,
   invoiceBatchStatusLabel,
 } from "./labels";
-import { useCreateInvoiceBatch } from "./mutations";
+import { useCreateInvoiceBatch, usePreflightInvoiceBatch } from "./mutations";
 import { fetchInvoiceBatch, fetchInvoiceBatchItemsPage, invoiceBatchQueryKey } from "./queries";
 
 import "./invoices.css";
 
-import type { InvoiceBatch, InvoiceBatchItem, InvoiceBatchItemStatus } from "./queries";
+import type {
+  CreateInvoiceBatchBody,
+  InvoiceBatch,
+  InvoiceBatchItem,
+  InvoiceBatchItemStatus,
+  InvoiceBatchPreflight,
+} from "./queries";
 import type { ClassOption } from "../../admin/announcements/queries";
 import type { FeeStructure } from "../fees/queries";
 import type { StudentIdentity } from "../students/FinanceStudentPicker";
@@ -39,6 +45,10 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  * the progress panel once `useCreateInvoiceBatch` returns a batch id. The target is every enrolled
  * student, chosen classes, or hand-picked students. `?feeStructure=<erpnext name>` preselects the
  * structure, which is how the fee structure builder's "Bill students" link opens it.
+ *
+ * Starting a batch first runs its preflight: when some targets belong to no family (no guardian
+ * linked), finance is told how many and who, and why it matters, before confirming. A warning, not
+ * a block -- "Generate anyway" starts the batch as it is.
  */
 export default function InvoiceBatchPage() {
   const { t } = useTranslation();
@@ -69,7 +79,12 @@ function BatchForm({ onCreated }: BatchFormProps) {
   const { t } = useTranslation();
   const { show } = useToast();
   const createBatch = useCreateInvoiceBatch();
+  const preflight = usePreflightInvoiceBatch();
   const [searchParams] = useSearchParams();
+  const [warning, setWarning] = useState<{
+    body: CreateInvoiceBatchBody;
+    result: InvoiceBatchPreflight;
+  } | null>(null);
 
   const feeStructuresQuery = useQuery({
     queryKey: ["finance", "fee-structures", "all"],
@@ -143,28 +158,45 @@ function BatchForm({ onCreated }: BatchFormProps) {
       (targetMode === "classes" && selectedClassIds.size > 0) ||
       (targetMode === "students" && selectedStudents.length > 0));
 
+  function showStartError(error: unknown) {
+    show({
+      variant: "error",
+      title: t("finance.invoices.batch.startError"),
+      description: apiErrorMessage(error, t("finance.common.checkFormAndRetry")),
+    });
+  }
+
+  function start(body: CreateInvoiceBatchBody) {
+    createBatch.mutate(body, {
+      onSuccess: (batch) => {
+        setWarning(null);
+        onCreated(batch.id);
+      },
+      onError: showStartError,
+    });
+  }
+
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!canSubmit) return;
 
-    createBatch.mutate(
+    const body: CreateInvoiceBatchBody = {
+      fee_structure_erpnext_name: feeStructureErpnextName,
+      period_title: periodTitle.trim(),
+      due_date: dueDate || undefined,
+      target_class_ids: targetMode === "classes" ? Array.from(selectedClassIds) : undefined,
+      target_student_ids:
+        targetMode === "students" ? selectedStudents.map((student) => student.id) : undefined,
+    };
+
+    preflight.mutate(
+      { target_class_ids: body.target_class_ids, target_student_ids: body.target_student_ids },
       {
-        fee_structure_erpnext_name: feeStructureErpnextName,
-        period_title: periodTitle.trim(),
-        due_date: dueDate || undefined,
-        target_class_ids: targetMode === "classes" ? Array.from(selectedClassIds) : undefined,
-        target_student_ids:
-          targetMode === "students" ? selectedStudents.map((student) => student.id) : undefined,
-      },
-      {
-        onSuccess: (batch) => onCreated(batch.id),
-        onError: (error) => {
-          show({
-            variant: "error",
-            title: t("finance.invoices.batch.startError"),
-            description: apiErrorMessage(error, t("finance.common.checkFormAndRetry")),
-          });
+        onSuccess: (result) => {
+          if (result.unlinked_count > 0) setWarning({ body, result });
+          else start(body);
         },
+        onError: showStartError,
       },
     );
   }
@@ -271,13 +303,82 @@ function BatchForm({ onCreated }: BatchFormProps) {
           </fieldset>
 
           <div className="invoices-batch__form-actions">
-            <Button type="submit" loading={createBatch.isPending} disabled={!canSubmit}>
+            <Button
+              type="submit"
+              loading={preflight.isPending || (createBatch.isPending && !warning)}
+              disabled={!canSubmit}
+            >
               {t("finance.invoices.batch.start")}
             </Button>
           </div>
         </form>
       </Card.Body>
+
+      <UnlinkedWarning
+        warning={warning?.result ?? null}
+        starting={createBatch.isPending}
+        onCancel={() => setWarning(null)}
+        onConfirm={() => warning && start(warning.body)}
+      />
     </Card>
+  );
+}
+
+interface UnlinkedWarningProps {
+  warning: InvoiceBatchPreflight | null;
+  starting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+/** Who in the batch has no family, and why that matters, before finance confirms the batch. */
+function UnlinkedWarning({ warning, starting, onCancel, onConfirm }: UnlinkedWarningProps) {
+  const { t } = useTranslation();
+  const listed = warning?.unlinked_students ?? [];
+  const unlisted = warning ? warning.unlinked_count - listed.length : 0;
+
+  return (
+    <Modal
+      open={warning !== null}
+      onClose={onCancel}
+      title={t("finance.invoices.batch.unlinked.title")}
+      description={
+        warning
+          ? t("finance.invoices.batch.unlinked.summary", {
+              count: warning.unlinked_count,
+              total: warning.total_count,
+            })
+          : undefined
+      }
+    >
+      <Modal.Body>
+        <p>{t("finance.invoices.batch.unlinked.why")}</p>
+        <ul
+          className="invoices-batch__unlinked"
+          aria-label={t("finance.invoices.batch.unlinked.listLabel")}
+        >
+          {listed.map((student) => (
+            <li key={student.id}>
+              {student.name} <span>{student.admission_number}</span>
+            </li>
+          ))}
+        </ul>
+        {unlisted > 0 ? (
+          <p>{t("finance.invoices.batch.unlinked.more", { count: unlisted })}</p>
+        ) : null}
+        <p>
+          <Link to="/portal/finance/unlinked">{t("finance.invoices.batch.unlinked.review")}</Link>
+        </p>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button type="button" variant="tertiary" onClick={onCancel}>
+          {t("finance.invoices.batch.unlinked.back")}
+        </Button>
+        <Button type="button" loading={starting} onClick={onConfirm}>
+          {t("finance.invoices.batch.unlinked.confirm")}
+        </Button>
+      </Modal.Footer>
+    </Modal>
   );
 }
 

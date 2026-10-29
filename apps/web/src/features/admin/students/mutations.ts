@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
+import { invalidateLinkViews } from "../people-links/queries";
 
 import {
   STUDENT_IMPORT_MAPPINGS_KEY,
@@ -69,11 +70,20 @@ function tempId(): string {
   return `optimistic-${crypto.randomUUID()}`;
 }
 
+export type CreateStudentGuardian = NonNullable<
+  components["schemas"]["CreateStudentBody"]["guardians"]
+>[number];
+
 export function useCreateStudent() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (values: CreateStudentValues) => {
+    mutationFn: async (
+      values: CreateStudentValues & {
+        guardians?: CreateStudentGuardian[];
+        records?: components["schemas"]["RecordAnswerInput"][];
+      },
+    ) => {
       const { data } = await api.POST("/api/students", { body: values });
       if (!data) throw new Error("Student creation returned no data.");
       return data as StudentProfile;
@@ -112,7 +122,10 @@ export function useCreateStudent() {
     onError: (_error, _values, context) => {
       if (context) restoreStudentLists(queryClient, context.snapshot);
     },
-    onSettled: () => invalidateStudentLists(queryClient),
+    onSettled: (_data, _error, values) => {
+      invalidateStudentLists(queryClient);
+      if (values.guardians?.length) invalidateLinkViews(queryClient);
+    },
   });
 }
 
@@ -189,6 +202,7 @@ export function useLinkGuardian() {
     },
     onSuccess: (_data, { studentId }) => {
       void queryClient.invalidateQueries({ queryKey: studentGuardiansQueryKey(studentId) });
+      invalidateLinkViews(queryClient);
     },
   });
 }
@@ -224,6 +238,7 @@ export function useUnlinkGuardian() {
     },
     onSettled: (_data, _error, { studentId }) => {
       void queryClient.invalidateQueries({ queryKey: studentGuardiansQueryKey(studentId) });
+      invalidateLinkViews(queryClient);
     },
   });
 }

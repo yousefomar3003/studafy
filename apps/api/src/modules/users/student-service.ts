@@ -8,7 +8,7 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 import type { StudentStatus, CreateStudentBody, UpdateStudentBody } from "./schemas";
 import type { TransactionSql } from "postgres";
 
-type ParentRelationship =
+export type ParentRelationship =
   "mother" | "father" | "guardian" | "step_parent" | "grandparent" | "sibling" | "other";
 
 // ---------------------------------------------------------------------------
@@ -287,29 +287,6 @@ export async function createStudent(
     throw new HTTPException(500, { message: "Failed to create student profile" });
   }
 
-  // Create guardian links.
-  if (params.guardians && params.guardians.length > 0) {
-    for (const guardian of params.guardians) {
-      const familyId = await resolveGuardianFamily(
-        tx,
-        schoolId,
-        guardian.parent_user_id,
-        guardian.family_id,
-      );
-      await tx`
-        INSERT INTO app.parent_child_links
-          (school_id, family_id, parent_user_id, student_id, relationship)
-        VALUES (
-          ${schoolId},
-          ${familyId}::uuid,
-          ${guardian.parent_user_id}::uuid,
-          ${student.id},
-          ${guardian.relationship}::app.parent_relationship
-        )
-      `;
-    }
-  }
-
   // Audit: user creation.
   await emitAuditLog(tx, {
     action: "insert",
@@ -338,6 +315,18 @@ export async function createStudent(
       status: params.status ?? "applicant",
     },
   });
+
+  // Guardian links, through the same checked, audited path as linking one from the profile page.
+  for (const guardian of params.guardians ?? []) {
+    await linkParentToStudent(
+      tx,
+      schoolId,
+      student.id,
+      guardian.parent_user_id,
+      guardian.relationship,
+      guardian.family_id,
+    );
+  }
 
   return { ...student, status: student.status as StudentStatus };
 }
@@ -506,6 +495,12 @@ async function resolveGuardianFamily(
   return created.id;
 }
 
+/**
+ * Link a PARENT user to a student, joining `familyId` or the parent's own household
+ * (resolveGuardianFamily). The one path every new parent_child_links row goes through -- the
+ * Guardians tab, a student created with guardians, a parent created with children -- so each is
+ * checked and audited the same way. Links are only ever made from ids staff picked explicitly.
+ */
 export async function linkParentToStudent(
   tx: TransactionSql,
   schoolId: string,

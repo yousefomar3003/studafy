@@ -6,6 +6,7 @@ import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip"
 import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { LicenseTile } from "../license/LicenseTile";
+import { useMissingSummaryQuery } from "../records/missing/queries";
 
 import { useAttendanceTodayQuery, useUserStatusCountsQuery } from "./queries";
 import { StorageUsageTile } from "./tiles/StorageUsageTile";
@@ -42,6 +43,8 @@ export default function AdminDashboardPage() {
   const userCounts = useUserStatusCountsQuery();
   const attendance = useAttendanceTodayQuery();
   const approvals = useApprovalQueueQuery();
+  const canReadRecords = permissions.has(PERMISSIONS.STUDENT_RECORD_READ);
+  const missingRecords = useMissingSummaryQuery(canReadRecords);
 
   const invited = userCounts.data?.invited ?? 0;
   const active = userCounts.data?.active ?? 0;
@@ -115,6 +118,23 @@ export default function AdminDashboardPage() {
       errorMessage: t("adminSchool.tiles.approvals.error"),
     },
   ];
+
+  // School-defined records: how many people still have missing information (features/records).
+  if (canReadRecords) {
+    const people = (missingRecords.data?.students ?? 0) + (missingRecords.data?.parents ?? 0);
+    items.push({
+      key: "missingRecords",
+      label: t("recordTemplates.dashboard.missing"),
+      value: formatNumber(people),
+      hint: t("recordTemplates.dashboard.missingHint", {
+        count: missingRecords.data?.expired_documents ?? 0,
+      }),
+      to: "/portal/admin/records/missing",
+      attention: people > 0,
+      status: statusOf(missingRecords),
+      errorMessage: t("recordTemplates.tile.error"),
+    });
+  }
 
   return (
     <>

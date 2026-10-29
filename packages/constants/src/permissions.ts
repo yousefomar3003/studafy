@@ -190,6 +190,14 @@ export const PERMISSIONS = {
   STUDENT_READ: "student:read",
   STUDENT_UPDATE: "student:update",
   STUDENT_IMPORT: "student:import",
+  // School-defined student and parent records (docs/modules/student-records.md). Building the
+  // templates is separate from filling them in, and reading a sensitive value in full is separate
+  // again: it is a masked-by-default value whose every reveal is audited (ADR-019), so holding
+  // studentRecord:read never implies seeing a national ID or a medical note.
+  RECORD_TEMPLATE_MANAGE: "recordTemplate:manage",
+  STUDENT_RECORD_READ: "studentRecord:read",
+  STUDENT_RECORD_UPDATE: "studentRecord:update",
+  STUDENT_RECORD_READ_SENSITIVE: "studentRecord:readSensitive",
 
   TEACHER_CREATE: "teacher:create",
   TEACHER_READ: "teacher:read",
@@ -335,6 +343,11 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.ATTENDANCE_RECORD_CREATE,
   PERMISSIONS.ATTENDANCE_RECORD_READ,
   PERMISSIONS.ATTENDANCE_REPORT_READ,
+  // Reads the record fields the school marked teacher-visible (an allergy, a bus stop) for
+  // students they teach. The service narrows to visibility "teachers" or "parent", never a
+  // sensitive field, and the row scope is app.can_read_student -- the same predicate the student
+  // profile uses -- so a teacher outside the student's classes and sections reads nothing.
+  PERMISSIONS.STUDENT_RECORD_READ,
 ];
 
 const STUDENT_PERMISSIONS: readonly Permission[] = [
@@ -376,6 +389,10 @@ const PARENT_PERMISSIONS: readonly Permission[] = [
   // Message their child's teachers; see MESSAGE_READ above for the row-level narrowing.
   PERMISSIONS.MESSAGE_READ,
   PERMISSIONS.MESSAGE_SEND,
+  // Reads their linked child's record fields the school marked parent-visible and not sensitive.
+  // Row scope is app.is_related_to_student, as for every other child-scoped read above. A parent
+  // enters nothing: no studentRecord:update.
+  PERMISSIONS.STUDENT_RECORD_READ,
 ];
 
 const GUEST_PERMISSIONS: readonly Permission[] = [PERMISSIONS.COURSE_READ, PERMISSIONS.LESSON_READ];
@@ -435,6 +452,14 @@ const PRINCIPAL_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.EVALUATION_SCORE_READ,
   PERMISSIONS.EVALUATION_SCORE_UPDATE,
   PERMISSIONS.EVALUATION_SCORE_DELETE,
+  // The school's records are the principal's to shape and keep complete, exactly as they are the
+  // admin's: build the templates, fill in and correct the records of students and parents who
+  // already exist (still no student:create / user:create), and reveal a sensitive value when the
+  // work needs it -- every reveal audited like a write.
+  PERMISSIONS.RECORD_TEMPLATE_MANAGE,
+  PERMISSIONS.STUDENT_RECORD_READ,
+  PERMISSIONS.STUDENT_RECORD_UPDATE,
+  PERMISSIONS.STUDENT_RECORD_READ_SENSITIVE,
 ];
 
 // The attendance office: takes, corrects and reports attendance for the whole school, and nothing
@@ -469,6 +494,9 @@ const FINANCE_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.ORGANIZATION_READ,
   PERMISSIONS.USER_READ,
   PERMISSIONS.NOTIFICATION_READ,
+  // Reads only the record fields marked finance-visible (a sponsor, a fee-paying guardian's
+  // employer), never a sensitive one; the service filters by visibility, not this list.
+  PERMISSIONS.STUDENT_RECORD_READ,
 ];
 
 const SUPPORT_AGENT_PERMISSIONS: readonly Permission[] = [

@@ -5,6 +5,8 @@ import {
   UPDATABLE_STUDENT_FIELDS,
 } from "@studafy/student-import";
 
+import { recordValueSchema } from "../records/schemas";
+
 import type { StudentImportField } from "@studafy/student-import";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +61,18 @@ export const importSummarySchema = z
     }),
     parents_created: z.number().int().openapi({ description: "New parent user accounts created." }),
     parents_linked: z.number().int().openapi({ description: "Parent-child links created." }),
+    parent_conflicts: z
+      .number()
+      .int()
+      .optional()
+      .openapi({
+        description:
+          "Rows whose parent_email already belonged to an account: the student was imported, the " +
+          "parent not linked. Absent on imports completed before the change.",
+      }),
+    record_answers: z.number().int().optional().openapi({
+      description: "Student record answers written from template columns.",
+    }),
   })
   .openapi("ImportSummary");
 
@@ -87,7 +101,17 @@ const columnMappingShape = Object.fromEntries(
 ) as Record<StudentImportField, z.ZodOptional<z.ZodString>>;
 
 export const columnMappingSchema = z
-  .object(columnMappingShape)
+  .object({
+    ...columnMappingShape,
+    records: z
+      .record(z.string().uuid(), z.string().trim().min(1).max(200))
+      .optional()
+      .openapi({
+        description:
+          "Student record template fields (by field id) mapped to source columns. Document fields " +
+          "cannot be imported; their files are uploaded on the Records tab.",
+      }),
+  })
   .strict()
   .openapi("StudentImportColumnMapping", {
     description:
@@ -286,6 +310,18 @@ export const mappingIdParamSchema = z
 // ---------------------------------------------------------------------------
 
 export const importDiffActionValues = ["create", "update", "unchanged", "conflict"] as const;
+export const importDiffRecordValueSchema = z
+  .object({
+    field_id: z.string().uuid(),
+    label_en: z.string(),
+    label_ar: z.string(),
+    value: recordValueSchema.nullable().openapi({ description: "Null for a sensitive field." }),
+    mask: z
+      .string()
+      .nullable()
+      .openapi({ description: "A sensitive field's mask, e.g. •••• 1234." }),
+  })
+  .openapi("ImportDiffRecordValue");
 
 const fieldChangeSchema = z.object({ from: z.string().nullable(), to: z.string() });
 
@@ -313,13 +349,36 @@ export const importDiffRowSchema = z
       )
       .openapi({ description: "Live student fields this row changes (from -> to)." }),
     parent: z
-      .enum(["create", "existing"])
+      .enum(["create", "sibling", "conflict"])
       .nullable()
-      .openapi({ description: "Parent account outcome. Null when the row names no parent." }),
+      .openapi({
+        description:
+          "create: this line creates a new parent and household. sibling: an earlier line in this " +
+          "file creates them and this student joins (see parent_group_line). conflict: the parent " +
+          "is not linked (see parent_conflict). Null when the row names no parent.",
+      }),
+    parent_conflict: z
+      .enum(["PARENT_ACCOUNT_EXISTS"])
+      .nullable()
+      .openapi({
+        description:
+          "PARENT_ACCOUNT_EXISTS: parent_email already belongs to an account. The student is still " +
+          "imported, with no link; link the parent from the student's Guardians tab or Finance > " +
+          "Unlinked. An import never matches people by email.",
+      }),
+    parent_group_line: z.number().int().positive().nullable().openapi({
+      description:
+        "The line that creates this row's new parent; equal to line_number on that line.",
+    }),
+    parent_email: z.string().nullable().openapi({ description: "The parent email as given." }),
+    parent_name: z.string().nullable().openapi({ description: "The parent name as given." }),
     link: z
-      .enum(["create", "update", "unchanged"])
+      .enum(["create"])
       .nullable()
-      .openapi({ description: "Parent-student link outcome. Null when the row names no parent." }),
+      .openapi({ description: "create: a parent-student link is made. Null: no link." }),
+    records: z
+      .array(importDiffRecordValueSchema)
+      .openapi({ description: "Template answers this row writes. Sensitive ones are masked." }),
   })
   .openapi("ImportDiffRow");
 
@@ -334,7 +393,9 @@ export const importDiffSchema = z
         conflict: z.number().int(),
         parents_created: z.number().int(),
         links_created: z.number().int(),
-        links_updated: z.number().int(),
+        parent_conflicts: z.number().int().openapi({
+          description: "Rows whose parent will not be linked (PARENT_ACCOUNT_EXISTS).",
+        }),
       })
       .openapi({ description: "Counts over every valid row, regardless of the action filter." }),
     rows: z.array(importDiffRowSchema),

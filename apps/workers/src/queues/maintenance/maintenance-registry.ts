@@ -9,11 +9,14 @@ import { JOB_NAMES } from "@studafy/constants";
 import postgres from "postgres";
 
 import { workerLogger } from "../../log";
+import { createReportS3 } from "../reports/report-s3";
 
 import { runAccountDeletionSweep } from "./account-deletion-sweep";
 import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
 import { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 import { processDsrJob } from "./dsr-processor";
+import { resealRecordValues } from "./record-key-rotation";
+import { purgeExpiredSensitiveRecords } from "./record-retention-sweep";
 import { StripeAiBillingCanceller } from "./stripe-ai-billing-canceller";
 
 import type { EnqueueDsrJob } from "./closure-sweep";
@@ -55,6 +58,26 @@ export async function processMaintenanceJob(
     return { processed: true, ...result };
   }
 
+  if (job.name === JOB_NAMES.PURGE_EXPIRED_SENSITIVE_RECORDS) {
+    const storage =
+      config.s3Region && config.bucket
+        ? createReportS3({
+            region: config.s3Region,
+            endpoint: config.s3Endpoint,
+            bucket: config.bucket,
+          })
+        : null;
+    // Purge first, so nothing about to be deleted is re-sealed; then move every remaining sealed
+    // value onto the current key (ADR-019's rotation).
+    const result = await withPrimarySql(config, async (sql) => ({
+      ...(await purgeExpiredSensitiveRecords(sql, storage, new Date(), workerLogger)),
+      ...(await resealRecordValues(sql, config.recordKeyring, workerLogger).then((reseal) => ({
+        resealed: reseal.resealed,
+        resealFailed: reseal.failed,
+      }))),
+    }));
+    return { processed: true, ...result };
+  }
   if (
     job.name === JOB_NAMES.RUN_DATA_SUBJECT_EXPORT ||
     job.name === JOB_NAMES.RUN_DATA_SUBJECT_ERASURE

@@ -2,7 +2,13 @@
  * Staging-to-target migration for confirmed student imports (ST-097, ST-299).
  *
  * The API stages every CSV line in app.student_import_rows, mapped and validated. This job moves the
- * valid ones into app.users / app.students / app.parent_child_links.
+ * valid ones into app.users / app.students / app.parent_child_links, and template columns into
+ * app.record_answers (sensitive ones sealed, ADR-019). Once the import has completed its staged
+ * rows -- the uploaded file's cells -- are deleted in the same transaction.
+ *
+ * Parents are never matched by email (docs/modules/finance-module-guide.md): a row whose
+ * parent_email belongs to an existing account imports its student unlinked (PARENT_ACCOUNT_EXISTS),
+ * and rows sharing one new parent_email share the one parent the first of them creates.
  *
  * Atomic: the whole import is one transaction. The plan, every write, every audit row and the
  * `completed` status commit together or not at all, so a failure part-way leaves no half-imported
@@ -19,6 +25,7 @@
  * the admin who asked for the change.
  */
 
+import { normalizeRecordValue, sealRecordValue } from "@studafy/records";
 import { normalizeEmail, planStudentImport } from "@studafy/student-import";
 import postgres from "postgres";
 
@@ -26,6 +33,13 @@ import { emitAuditLogs } from "../../db/audit";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import type { WorkerAuditEntry } from "../../db/audit";
+import type {
+  RecordFieldOption,
+  RecordFieldSensitivity,
+  RecordFieldType,
+  RecordKeyring,
+  RecordValue,
+} from "@studafy/records";
 import type {
   PlannedRow,
   StagedRecord,
@@ -48,6 +62,10 @@ export interface StudentImportSummary {
   parents_created: number;
   /** Parent-student links created. */
   parents_linked: number;
+  /** Rows whose parent_email already belonged to an account: student imported, parent unlinked. */
+  parent_conflicts: number;
+  /** Student record answers written from template columns. */
+  record_answers: number;
 }
 
 /** Statuses a migration may start from. `processing` is a previous attempt that died mid-run; its
@@ -57,10 +75,11 @@ const MIGRATABLE_STATUSES = ["confirmed", "processing", "failed"];
 export async function processStudentImport(
   data: StudentImportJobData,
   databaseUrl: string,
+  keyring: RecordKeyring,
 ): Promise<StudentImportSummary> {
   const sql = postgres(databaseUrl, { max: 2, idle_timeout: 20, prepare: false });
   try {
-    return await migrateStagedImport(sql, data);
+    return await migrateStagedImport(sql, data, keyring);
   } finally {
     await sql.end({ timeout: 5 });
   }
@@ -69,6 +88,7 @@ export async function processStudentImport(
 export async function migrateStagedImport(
   sql: Sql,
   { importId, schoolId }: StudentImportJobData,
+  keyring: RecordKeyring,
 ): Promise<StudentImportSummary> {
   // Visible progress for the import page's poll. Committed on its own, ahead of the migration.
   await withSystemTenantTx(sql, { schoolId }, (tx) =>
@@ -76,7 +96,9 @@ export async function migrateStagedImport(
   );
 
   try {
-    return await withSystemTenantTx(sql, { schoolId }, (tx) => migrate(tx, schoolId, importId));
+    return await withSystemTenantTx(sql, { schoolId }, (tx) =>
+      migrate(tx, schoolId, importId, keyring),
+    );
   } catch (error) {
     await withSystemTenantTx(sql, { schoolId }, (tx) =>
       setStatus(tx, importId, "failed", ["processing"]),
@@ -91,6 +113,7 @@ async function migrate(
   tx: TransactionSql,
   schoolId: string,
   importId: string,
+  keyring: RecordKeyring,
 ): Promise<StudentImportSummary> {
   // The row lock serializes attempts at this import: a second worker waits here, then sees the
   // first one's `completed`.
@@ -128,7 +151,15 @@ async function migrate(
   }));
 
   const plan = await planStudentImport(tx, schoolId, records);
-  const { summary, audit } = await applyPlan(tx, schoolId, importId, plan);
+  const recordForm = await loadRecordForm(tx, schoolId);
+  const { summary, audit } = await applyPlan(tx, schoolId, importId, plan, recordForm, keyring);
+
+  // The import is applied: its staged cells (the uploaded file, sensitive columns included) have
+  // no further use, so they go in the same transaction that records the outcome.
+  await tx`
+    DELETE FROM app.student_import_rows
+    WHERE school_id = ${schoolId}::uuid AND import_id = ${importId}::uuid
+  `;
 
   await tx`
     UPDATE app.student_imports
@@ -178,6 +209,34 @@ interface ApplyContext {
   parentsByEmail: Map<string, string>;
   /** Each parent's household, once looked up or created in this run. */
   familiesByParent: Map<string, string>;
+  /** The published student record form, by field id. */
+  recordForm: Map<string, RecordFormField>;
+  keyring: RecordKeyring;
+}
+
+interface RecordFormField {
+  id: string;
+  field_version_id: string;
+  field_type: RecordFieldType;
+  options: RecordFieldOption[];
+  sensitivity: RecordFieldSensitivity;
+}
+
+/** The current published student record form; answers are written against it. */
+async function loadRecordForm(
+  tx: TransactionSql,
+  schoolId: string,
+): Promise<Map<string, RecordFormField>> {
+  const fields = await tx<RecordFormField[]>`
+    SELECT fv.field_id AS id, fv.id AS field_version_id, fv.field_type, fv.options, fv.sensitivity
+    FROM app.record_templates AS t
+    JOIN app.record_template_versions AS tv
+      ON tv.template_id = t.id AND tv.school_id = t.school_id AND tv.version = t.published_version
+    JOIN app.record_field_versions AS fv
+      ON fv.template_version_id = tv.id AND fv.school_id = tv.school_id
+    WHERE t.school_id = ${schoolId}::uuid AND t.subject_kind = 'student'
+  `;
+  return new Map(fields.map((field) => [field.id, field]));
 }
 
 async function applyPlan(
@@ -185,6 +244,8 @@ async function applyPlan(
   schoolId: string,
   importId: string,
   plan: StudentImportPlan,
+  recordForm: Map<string, RecordFormField>,
+  keyring: RecordKeyring,
 ): Promise<{ summary: StudentImportSummary; audit: WorkerAuditEntry[] }> {
   const ctx: ApplyContext = {
     tx,
@@ -193,6 +254,8 @@ async function applyPlan(
     audit: [],
     parentsByEmail: new Map(),
     familiesByParent: new Map(),
+    recordForm,
+    keyring,
   };
   const summary: StudentImportSummary = {
     students_created: 0,
@@ -201,6 +264,8 @@ async function applyPlan(
     conflicts: 0,
     parents_created: 0,
     parents_linked: 0,
+    parent_conflicts: 0,
+    record_answers: 0,
   };
 
   for (const row of plan.rows) {
@@ -220,16 +285,15 @@ async function applyPlan(
       summary.students_updated++;
     }
 
-    if (row.link === "create" || row.link === "update") {
+    if (row.link === "create") {
       const { parentUserId, created } = await resolveParent(ctx, row);
       if (created) summary.parents_created++;
-      if (row.link === "create") {
-        await createLink(ctx, parentUserId, studentId, row.record);
-        summary.parents_linked++;
-      } else {
-        await updateLinkRelationship(ctx, parentUserId, studentId, row.record);
-      }
+      await createLink(ctx, parentUserId, studentId, row.record);
+      summary.parents_linked++;
     }
+    if (row.parent_conflict !== null) summary.parent_conflicts++;
+
+    summary.record_answers += await writeRecordAnswers(ctx, studentId, row.record.records ?? {});
   }
 
   return { summary, audit: ctx.audit };
@@ -304,22 +368,85 @@ async function updateStudent(ctx: ApplyContext, studentId: string, row: PlannedR
   });
 }
 
+/**
+ * The new parent a row links to: created by the first line naming its email ("create"), reused by
+ * every later one ("sibling"). Never an existing account -- the plan has already refused those.
+ */
 async function resolveParent(
   ctx: ApplyContext,
   row: PlannedRow,
 ): Promise<{ parentUserId: string; created: boolean }> {
   const email = row.record.parent_email!;
   const normalized = normalizeEmail(email);
-  const known = row.parent_user_id ?? ctx.parentsByEmail.get(normalized);
-  if (known) {
-    await grantRole(ctx, known, "PARENT");
-    return { parentUserId: known, created: false };
-  }
+  const sibling = ctx.parentsByEmail.get(normalized);
+  if (sibling) return { parentUserId: sibling, created: false };
 
   const parentUserId = await createUser(ctx, email, row.record.parent_name ?? email);
   await grantRole(ctx, parentUserId, "PARENT");
   ctx.parentsByEmail.set(normalized, parentUserId);
   return { parentUserId, created: true };
+}
+
+/**
+ * Template columns for one student, against the form as published now (a field archived since
+ * staging is skipped, and a value is re-validated in case its choices changed). A sensitive value
+ * is sealed and its audit row names the field only.
+ */
+async function writeRecordAnswers(
+  ctx: ApplyContext,
+  studentId: string,
+  records: Record<string, RecordValue>,
+): Promise<number> {
+  let written = 0;
+  for (const [fieldId, raw] of Object.entries(records)) {
+    const field = ctx.recordForm.get(fieldId);
+    if (!field || field.field_type === "document") continue;
+    const normalized = normalizeRecordValue(field, raw);
+    if (!normalized.ok || normalized.value === null) continue;
+    const value = normalized.value;
+    const sensitive = field.sensitivity === "sensitive";
+    const sealed = sensitive
+      ? sealRecordValue(
+          ctx.keyring,
+          { schoolId: ctx.schoolId, subjectKind: "student", subjectId: studentId, fieldId },
+          field.field_type,
+          value,
+        )
+      : null;
+    const [row] = await ctx.tx<{ id: string; inserted: boolean }[]>`
+      INSERT INTO app.record_answers (
+        school_id, subject_kind, student_id, field_id, field_version_id, value, value_ciphertext,
+        value_key_id, value_mask, updated_by
+      ) VALUES (
+        ${ctx.schoolId}::uuid, 'student', ${studentId}::uuid, ${fieldId}::uuid,
+        ${field.field_version_id}::uuid, ${sealed ? null : ctx.tx.json(value as never)}::jsonb,
+        ${sealed?.ciphertext ?? null}::bytea, ${sealed?.keyId ?? null}, ${sealed?.mask ?? null},
+        NULLIF(current_setting('app.user_id', true), '')::uuid
+      )
+      ON CONFLICT (school_id, subject_kind, subject_id, field_id) DO UPDATE SET
+        field_version_id = EXCLUDED.field_version_id,
+        value = EXCLUDED.value,
+        value_ciphertext = EXCLUDED.value_ciphertext,
+        value_key_id = EXCLUDED.value_key_id,
+        value_mask = EXCLUDED.value_mask,
+        updated_by = EXCLUDED.updated_by,
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING id, (xmax = 0) AS inserted
+    `;
+    ctx.audit.push({
+      action: row!.inserted ? "insert" : "update",
+      targetTable: "record_answers",
+      targetId: row!.id,
+      oldValues: row!.inserted
+        ? null
+        : { field_id: fieldId, ...(sensitive ? { sensitive: true } : {}) },
+      newValues: sensitive
+        ? { import_id: ctx.importId, field_id: fieldId, sensitive: true, changed: true }
+        : { import_id: ctx.importId, field_id: fieldId, value },
+    });
+    written++;
+  }
+  return written;
 }
 
 async function createUser(ctx: ApplyContext, email: string, displayName: string): Promise<string> {
@@ -386,41 +513,6 @@ async function createLink(
     newValues: {
       import_id: ctx.importId,
       family_id: familyId,
-      parent_user_id: parentUserId,
-      relationship: record.parent_relationship,
-    },
-  });
-}
-
-async function updateLinkRelationship(
-  ctx: ApplyContext,
-  parentUserId: string,
-  studentId: string,
-  record: StudentImportRecord,
-): Promise<void> {
-  const [previous] = await ctx.tx<{ relationship: string }[]>`
-    SELECT relationship::text AS relationship
-    FROM app.parent_child_links
-    WHERE school_id = ${ctx.schoolId}::uuid
-      AND parent_user_id = ${parentUserId}::uuid
-      AND student_id = ${studentId}::uuid
-    FOR UPDATE
-  `;
-  await ctx.tx`
-    UPDATE app.parent_child_links
-    SET relationship = ${record.parent_relationship}::app.parent_relationship,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE school_id = ${ctx.schoolId}::uuid
-      AND parent_user_id = ${parentUserId}::uuid
-      AND student_id = ${studentId}::uuid
-  `;
-  ctx.audit.push({
-    action: "update",
-    targetTable: "parent_child_links",
-    targetId: studentId,
-    oldValues: { parent_user_id: parentUserId, relationship: previous!.relationship },
-    newValues: {
-      import_id: ctx.importId,
       parent_user_id: parentUserId,
       relationship: record.parent_relationship,
     },

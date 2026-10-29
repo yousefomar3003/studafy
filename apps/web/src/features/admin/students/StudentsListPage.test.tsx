@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 import { AuthProvider, createSessionStore } from "../../../lib/auth";
 
@@ -31,6 +31,10 @@ function defaultGetImplementation(path: string, _init?: unknown) {
   if (path === "/api/academics/classes") {
     return Promise.resolve<unknown>({ data: { classes: [], total: 0 } });
   }
+  // The create modal's record step asks for the school's student form.
+  if (path === "/api/record-forms/{subjectKind}") {
+    return Promise.resolve<unknown>({ data: { fields: [] } });
+  }
   return Promise.resolve<unknown>({ data: { students: [STUDENT], next_cursor: null } });
 }
 
@@ -51,7 +55,13 @@ function fakeJwt(payload: unknown): string {
   return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
 }
 
-async function renderAsOrgAdmin(Page: ComponentType) {
+/** Renders the router's current `search`, so a test can see a query parameter being dropped. */
+function LocationProbe() {
+  const location = useLocation();
+  return <output data-testid="location-search">{location.search}</output>;
+}
+
+async function renderAsOrgAdmin(Page: ComponentType, initialEntry = "/portal/admin/students") {
   const store = createSessionStore({
     refreshClient: {
       refresh: async (): Promise<SessionTokens> => ({
@@ -69,8 +79,9 @@ async function renderAsOrgAdmin(Page: ComponentType) {
     <AuthProvider store={store}>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <MemoryRouter>
+          <MemoryRouter initialEntries={[initialEntry]}>
             <Page />
+            <LocationProbe />
           </MemoryRouter>
         </ToastProvider>
       </QueryClientProvider>
@@ -129,5 +140,16 @@ describe("StudentsListPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "New student" }));
 
     expect(await screen.findByRole("dialog", { name: "New student" })).toBeTruthy();
+  });
+
+  test("?create=1 opens the create-student modal on arrival, and closing it drops the parameter", async () => {
+    await renderAsOrgAdmin(await loadStudentsListPage(), "/portal/admin/students?create=1&q=x");
+
+    expect(await screen.findByRole("dialog", { name: "New student" })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "New student" })).toBeNull());
+    expect(screen.getByTestId("location-search").textContent).toBe("?q=x");
   });
 });

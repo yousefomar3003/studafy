@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { useSearchParamFlag } from "../../../lib/use-search-param-flag";
 
 import { AwardScholarshipModal } from "./AwardScholarshipModal";
 import { DecideAwardModal } from "./DecideAwardModal";
@@ -52,7 +53,10 @@ export default function ScholarshipsPage() {
   const [status, setStatus] = useState<AwardStatus | "">(canDecide ? "pending_approval" : "");
   const [offset, setOffset] = useState(0);
   const [formOpen, setFormOpen] = useState(false);
-  const [awardOpen, setAwardOpen] = useState(false);
+  const [awardClicked, setAwardOpen] = useState(false);
+  // `?award=1` (the global search's "Request a scholarship") opens "Award a student" on arrival,
+  // once the catalog shows an active scholarship to award — the same condition as the button.
+  const [awardParam, clearAwardParam] = useSearchParamFlag("award");
   const [decision, setDecision] = useState<{ award: ScholarshipAward; kind: AwardDecision } | null>(
     null,
   );
@@ -61,6 +65,8 @@ export default function ScholarshipsPage() {
     queryKey: [...SCHOLARSHIPS_KEY, "list"],
     queryFn: fetchScholarships,
   });
+  const canAward = canManage && (scholarships.data?.some((s) => s.is_active) ?? false);
+  const awardOpen = canAward && (awardClicked || awardParam === "1");
   const awards = useQuery({
     queryKey: [...SCHOLARSHIPS_KEY, "awards", status, offset],
     queryFn: () => fetchAwardsPage(status, offset),
@@ -231,10 +237,7 @@ export default function ScholarshipsPage() {
             <Button variant="secondary" onClick={() => setFormOpen(true)}>
               {t("financeReports.adjustments.scholarships.newScholarship")}
             </Button>
-            <Button
-              onClick={() => setAwardOpen(true)}
-              disabled={!scholarships.data?.some((s) => s.is_active)}
-            >
+            <Button onClick={() => setAwardOpen(true)} disabled={!canAward}>
               {t("financeReports.adjustments.scholarships.awardStudent")}
             </Button>
           </div>
@@ -305,7 +308,10 @@ export default function ScholarshipsPage() {
         <AwardScholarshipModal
           open
           scholarships={scholarships.data ?? []}
-          onClose={() => setAwardOpen(false)}
+          onClose={() => {
+            setAwardOpen(false);
+            clearAwardParam();
+          }}
         />
       ) : null}
       <DecideAwardModal

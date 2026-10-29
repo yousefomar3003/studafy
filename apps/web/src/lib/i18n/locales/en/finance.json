@@ -179,7 +179,19 @@
       "filterByStatus": "Filter by status",
       "resultsCaption": "Batch results",
       "resultsError": "Unable to load results.",
-      "resultsEmpty": "No students match this filter."
+      "resultsEmpty": "No students match this filter.",
+      "unlinked": {
+        "title": "Some students in this batch have no family",
+        "summary_one": "{{count}} of the {{total}} students to bill has no guardian linked.",
+        "summary_other": "{{count}} of the {{total}} students to bill have no guardian linked.",
+        "why": "Their invoices get no sibling discount, appear in no family account or statement, and no parent can see or pay them in the app. You can still generate the batch and link guardians later.",
+        "listLabel": "Students with no guardian",
+        "more_one": "…and {{count}} more.",
+        "more_other": "…and {{count}} more.",
+        "review": "Review unlinked students",
+        "back": "Go back",
+        "confirm": "Generate anyway"
+      }
     }
   },
   "payments": {
@@ -513,6 +525,48 @@
         "confirmed": "Confirmed",
         "awaiting": "Awaiting ERPNext"
       }
+    },
+    "unlinked": {
+      "summary": "Not in any family — enrolled students with no guardian: {{students}} · parents with no children: {{parents}}.",
+      "review": "Review and link them"
+    }
+  },
+  "unlinked": {
+    "title": "Unlinked students and parents",
+    "intro": "People no family reaches. A student with no guardian gets no sibling discount, appears in no family account or statement, and no parent can see or pay their invoices. A parent with no children sees no fees and gets no fee notices.",
+    "backToFamilies": "← Families",
+    "askAdmin": "Ask a school admin to link them",
+    "loadError": "Unable to load this list.",
+    "columns": {
+      "fix": "Fix",
+      "parent": "Parent"
+    },
+    "students": {
+      "title": "Enrolled students with no guardian",
+      "intro": "Link a guardian from the student's Guardians tab.",
+      "search": "Search students",
+      "caption": "Enrolled students with no guardian",
+      "empty": "Every enrolled student has a guardian.",
+      "addGuardian": "Add a guardian"
+    },
+    "parents": {
+      "title": "Parents with no children",
+      "intro": "Link the students this parent is a guardian of.",
+      "search": "Search parents",
+      "caption": "Parents with no children",
+      "empty": "Every parent account is linked to a child.",
+      "linkChildren": "Link children to {{name}}"
+    },
+    "linkChildren": {
+      "title": "Link children to {{name}}",
+      "description": "Each child joins this parent's household.",
+      "legend": "Children",
+      "submit": "Link children",
+      "linkedToast_one": "Linked {{count}} child to {{name}}",
+      "linkedToast_other": "Linked {{count}} children to {{name}}",
+      "error": "Couldn't link every child",
+      "partial_one": "{{count}} child was linked before the error.",
+      "partial_other": "{{count}} children were linked before the error."
     }
   }
 }

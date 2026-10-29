@@ -32,6 +32,8 @@ export interface PromoteOptions {
    * because this module is storage infra and must stay database-free.
    */
   onSize?: (sizeBytes: number) => Promise<void>;
+  /** Promote under the sensitive-documents KMS key (ADR-019); see StorageService.copy. */
+  sensitive?: boolean;
 }
 
 /**
@@ -69,7 +71,11 @@ export async function promoteTempObject(
 
   await options.onSize?.(sizeBytes);
 
-  await storage.copy(tempKey, permanentKey);
+  if (options.sensitive) {
+    await storage.copy(tempKey, permanentKey, { sensitive: true });
+  } else {
+    await storage.copy(tempKey, permanentKey);
+  }
 
   // Deliberately not awaited inside a try/catch that rethrows: a failed cleanup has already been
   // rendered harmless by the 24h lifecycle rule on temp/, and failing the caller's request over it

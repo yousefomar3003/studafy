@@ -115,6 +115,15 @@ data "aws_iam_policy_document" "api_storage" {
       values   = ["permanent/*", "reports/*", "tenant-*/reports/*"]
     }
   }
+
+  # Sensitive record documents (ADR-019): GenerateDataKey to promote one into permanent/ under the
+  # KMS key, Decrypt to sign the short-lived download URL a browser then fetches with these
+  # credentials.
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:GenerateDataKey", "kms:Decrypt"]
+    resources = [var.sensitive_documents_kms_key_arn]
+  }
 }
 
 resource "aws_iam_role_policy" "api_storage" {

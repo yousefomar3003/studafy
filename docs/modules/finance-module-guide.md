@@ -288,6 +288,70 @@ derived from the family key and the invoice, so a retry after a `partial` outcom
 left. An amount above the family's balance is refused (`FAMILY_PAYMENT_EXCEEDS_BALANCE`) rather than
 becoming an unallocated advance.
 
+### How parents and children get linked
+
+A family is a group of `app.parent_child_links` rows, so everything family-based in finance starts
+with a link. Staff make every link by picking both people themselves. Studafy never matches or links
+anyone by name, email, phone, record data or any ID number, the CSV import included. Studafy never
+asks for government ID itself. A school may collect it on its own record templates
+([student-records.md](student-records.md)), and it is then handled as sensitive data and never used
+to find anyone. Every link made on screen goes through `linkParentToStudent`
+(`modules/users/student-service.ts`). That function checks both people are in the school and that
+the parent has the PARENT role, puts the link in a family through `resolveGuardianFamily` (a chosen
+family, else the parent's oldest one, else a new one named after the parent), and writes an
+`insert` audit row on `parent_child_links`. There are five ways in:
+
+| Where                                                                | Call                                       | Needs                            |
+| -------------------------------------------------------------------- | ------------------------------------------ | -------------------------------- |
+| Admin > Students > New student, "Guardians (optional)"               | `POST /api/students` with `guardians`      | `student:create` + `parent:link` |
+| Admin > Users > New user, role Parent, "Link children (optional)"    | `POST /api/users` with `children`          | `user:create` + `parent:link`    |
+| A student's profile > Guardians tab > Add guardian                   | `POST /api/students/{studentId}/guardians` | `student:update`                 |
+| Finance > Unlinked > a parent's "Link children" (one call per child) | `POST /api/students/{studentId}/guardians` | `student:update`                 |
+| Admin > Students > Import, a row naming a **new** parent email       | the import worker (`queues/imports`)       | `student:import`                 |
+
+**The CSV import never matches by email.** A row's `parent_email` is used only to create a new
+parent. If it already belongs to any account in the school, the row is a `PARENT_ACCOUNT_EXISTS`
+parent conflict: the student is still imported, with no link, and the preview tells staff to link
+the parent from the student's Guardians tab or Finance > Unlinked. A new `parent_email` creates a new
+PARENT account and household. Rows in the same file that share one new `parent_email` are siblings:
+the first creates the parent and household, the others are linked to the same parent, and the
+preview shows that grouping before confirm. The match is within that one uploaded file, never against
+existing people. The import writes its own `insert` audit rows on `users`, `families` and
+`parent_child_links`.
+
+Linking while creating runs in the creating transaction. A guardian or child that cannot be linked
+(not a PARENT, not in this school, listed twice) fails the whole request, and nothing is created.
+Creating a person and linking them are separate powers. A caller holding `user:create` or
+`student:create` without `parent:link` gets 403 for a request that carries links, and the web hides
+the link step from them. Today every role that can create people also holds `parent:link`, so this
+check is a guardrail and not a change of behavior. `/api/families/{familyId}/links` (`parent:link`)
+stays the way to move a link between households.
+
+**What happens to an unlinked student.** An enrolled student no guardian is linked to belongs to no
+family. The sibling discount does not count them or apply to them. They appear in no family account,
+statement, reminder or family payment. Their invoices carry `family_id: null`. No parent can see
+their fees, pay them online (`finance/online-payments` accepts a linked parent or staff), or receive
+their receipts and fee notices. Their invoices are still generated and payable at the desk, and once
+a guardian is linked the next invoice counts the student as a sibling. Issued invoices never change.
+
+**Where the school finds them.**
+
+- **Finance > Families** shows a count of unlinked students and parents above the list, linking to
+  Finance > Unlinked (`/portal/finance/unlinked`).
+- **Finance > Unlinked** lists both groups, searchable and paginated:
+  `GET /api/finance/unlinked/students` (enrolled students with no link),
+  `GET /api/finance/unlinked/parents` (PARENT accounts, archived ones excluded, with no link) and
+  `GET /api/finance/unlinked/summary` (the counts). They are gated on `billing:read`, like the
+  families list whose gap they show, and they run through `withStudentIdentityTx` (identity columns
+  only), so FINANCE can see who is missing even though it cannot read student records. A student row
+  opens the student's Guardians tab (`?tab=guardians`), and a parent row opens a picker for their
+  children. Both fixes need `student:update`, which finance does not hold, so finance sees a note to
+  ask a school admin instead.
+- **Generate invoices** first calls `POST /api/finance/invoices/batches/preflight` with the batch's
+  targets. It resolves the same students the batch would bill and creates nothing. If any of them
+  have no family, finance sees how many, who (the first 100 by name) and why it matters before
+  confirming. This is a warning, not a block: "Generate anyway" starts the batch as it is.
+
 ### Fee notices to guardians
 
 Four notification types (000152) reach a student's guardians, written straight into

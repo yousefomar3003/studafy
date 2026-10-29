@@ -207,3 +207,26 @@
 .families-outcome[data-outcome="failed"] {
   color: var(--color-danger-subtle-foreground);
 }
+
+/* --- Unlinked people (\`unlinked/UnlinkedPage.tsx\`, and the count on the families list) --- */
+
+.families-unlinked {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  margin-bottom: var(--space-16);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-md);
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.families-unlinked p {
+  margin: 0;
+}
+
+.unlinked-section {
+  margin-top: var(--space-24);
+}

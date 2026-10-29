@@ -186,6 +186,11 @@ export const JOB_NAMES = {
   // the sweep runs app.delete_expired_ai_messages() per school until a batch comes back short.
   // Registered on the maintenance queue via Job Scheduler.
   PURGE_EXPIRED_AI_MESSAGES: "purge-expired-ai-messages",
+  // Scheduled deletion of sensitive student and parent record answers past their retention period
+  // (docs/modules/student-records.md "Retention"): a field's months, default 12, counted from when
+  // the student left (app.students.left_at) or, for a parent, from when their last child left.
+  // Carries no payload. Registered on the maintenance queue via Job Scheduler.
+  PURGE_EXPIRED_SENSITIVE_RECORDS: "purge-expired-sensitive-records",
   // Cost & budget reporting sweep (ST-293). Carries `{ mode: "daily" | "monthly" }`: "daily"
   // publishes today's AI-spend/Stripe-fee CloudWatch metrics so the budget alarms
   // (infra/terraform/modules/monitoring/alerts.tf) stay current; "monthly" additionally logs the

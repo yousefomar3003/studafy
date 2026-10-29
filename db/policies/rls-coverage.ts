@@ -158,7 +158,16 @@ approved_flexible_columns(table_name, column_name) AS (
     -- subject, finalization, status and the reported figures remain normalized, constrained columns.
     ('student_subject_results', 'config_snapshot'),
     ('student_subject_results', 'breakdown'),
-    ('certificates', 'content')
+    ('certificates', 'content'),
+    -- 000170: a school-defined field's choice list (value + en/ar labels), in display order, read
+    -- whole with the field and never joined or filtered on; the published copy is write-once.
+    ('record_fields', 'options'),
+    ('record_field_versions', 'options'),
+    -- 000170: one answer to a school-defined field. Its shape is the field's type (text, number,
+    -- date, choice list, yes/no), validated by apps/api/src/modules/records against that type;
+    -- the subject, field, version and timestamps remain normalized, constrained columns. Sensitive
+    -- answers are never here (value_ciphertext, ADR-019).
+    ('record_answers', 'value')
 ),
 relations AS (
   SELECT

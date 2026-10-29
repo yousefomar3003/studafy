@@ -298,5 +298,16 @@
   "SCHOOL_APPLICATION_ALREADY_PENDING": "لديك بالفعل طلب قيد المراجعة",
   "SCHOOL_APPLICATION_ACCOUNT_EXISTS": "هذا الحساب مرتبط بالفعل بمستخدم في Studafy. سجّل الدخول بدلاً من ذلك",
   "SCHOOL_APPLICATION_PROOF_INVALID": "ملف إثبات الملكية مفقود أو بنوع غير مدعوم أو حجمه كبير جداً",
-  "SCHOOL_APPLICATION_NOT_PENDING": "تمت مراجعة هذا الطلب بالفعل"
+  "SCHOOL_APPLICATION_NOT_PENDING": "تمت مراجعة هذا الطلب بالفعل",
+  "RECORD_TEMPLATE_NOT_PUBLISHED": "لم تنشر هذه المدرسة نموذج سجلات بعد",
+  "RECORD_NOTHING_TO_PUBLISH": "لا توجد تغييرات في المسودة لنشرها",
+  "RECORD_FIELD_NOT_FOUND": "هذا الحقل غير موجود في نموذج السجلات المنشور",
+  "RECORD_FIELD_INVALID": "إعداد هذا الحقل غير صالح",
+  "RECORD_FIELD_LOCKED": "لا يمكن تغيير نوع الحقل المنشور أو حساسيته؛ أرشِفه وأضِف حقلًا جديدًا بدلًا منه",
+  "RECORD_FIELD_NOT_DOCUMENT": "هذا الحقل لا يقبل مستندًا",
+  "RECORD_FIELD_NOT_SENSITIVE": "الكشف مطلوب للحقول الحساسة فقط؛ هذا الحقل معروض بالكامل",
+  "RECORD_VALUE_INVALID": "إجابة واحدة أو أكثر غير صالحة لحقولها",
+  "RECORD_SUBJECT_NOT_FOUND": "لم يُعثر على سجل لهذا الشخص",
+  "RECORD_DOCUMENT_NOT_FOUND": "لا يوجد مستند محفوظ",
+  "RECORD_KEY_UNAVAILABLE": "لا يمكن فتح هذه القيمة حاليًا. تواصل مع الدعم"
 }

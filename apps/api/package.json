@@ -39,6 +39,7 @@
     "@studafy/observability": "workspace:*",
     "@studafy/sanitize": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
+    "@studafy/records": "workspace:*",
     "@studafy/student-import": "workspace:*",
     "@studafy/tap-payments": "workspace:*",
     "bullmq": "5.79.3",

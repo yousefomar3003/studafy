@@ -1,112 +1,145 @@
 import { materialIngestStatusLabel, studentStatusLabel, userStatusLabel } from "./labels";
+import { SEARCH_TYPES } from "./queries";
+import { recordHref } from "./record-links";
 
-import type {
-  GlobalSearchResult,
-  InvoiceSearchHit,
-  StudentSearchHit,
-  UserSearchHit,
-} from "./queries";
+import type { PaletteItem } from "./palette-groups";
+import type { GlobalSearchResult, SearchType } from "./queries";
+import type { SearchHitOf } from "./record-links";
+import type { Permission } from "@studafy/constants";
 
-export type SearchResultType = "students" | "users" | "invoices" | "materials";
+export type SearchResultType = SearchType;
 
-export interface SearchResultItem {
-  /** Unique across the whole palette (`${type}:${id}`) -- the React key and the
-   * `aria-activedescendant` target id. */
-  key: string;
-  title: string;
-  subtitle: string;
-  /** Absent when the record has no page to link to yet (materials -- see the comment below).
-   * A row with no `href` is still shown, but excluded from keyboard/click navigation. */
-  href?: string;
-}
+/** A palette row; `href` is absent when this caller has no page to open the record on. */
+export type SearchResultItem = PaletteItem;
 
 export interface SearchResultGroup {
   type: SearchResultType;
   items: SearchResultItem[];
+  /** Every match of this type (the API's `totals`), for "See all N" when it exceeds the rows. */
+  total: number;
 }
 
-/** A `SearchResultItem` narrowed to the ones with somewhere to go -- see `href`'s doc comment. */
+/** A row narrowed to the ones with somewhere to go -- see `href`'s doc comment. */
 export type NavigableSearchResultItem = SearchResultItem & { href: string };
 
 export function isNavigable(item: SearchResultItem): item is NavigableSearchResultItem {
   return item.href !== undefined;
 }
 
-function studentTitle(hit: StudentSearchHit): string {
-  return hit.preferred_name ?? `${hit.first_name} ${hit.last_name}`;
-}
-
-function invoiceSubtitle(hit: InvoiceSearchHit): string {
-  // Matches `InvoiceListPage`'s own amount rendering exactly, rather than reformatting through
-  // `Intl.NumberFormat` -- `total_amount` is already the display string that page shows.
-  const amount = `${hit.total_amount} ${hit.currency}`;
-  return hit.student_name ? `${hit.student_name} · ${amount}` : amount;
-}
-
-function userTitle(hit: UserSearchHit): string {
-  return hit.display_name ?? hit.email ?? hit.id;
-}
-
 /** Label translator — the palette passes its hook `t`; tests and other callers can omit it. */
 type Translate = (key: string) => string;
 
-function userSubtitle(hit: UserSearchHit, t?: Translate): string {
-  const status = userStatusLabel(hit.status, t);
-  return hit.display_name ? `${hit.email} · ${status}` : status;
+const day = (value: string | null | undefined) => (value ? value.slice(0, 10) : null);
+const join = (...parts: (string | null | undefined | false)[]) =>
+  parts.filter((part): part is string => typeof part === "string" && part.length > 0).join(" · ");
+const span = (from: string | null | undefined, to: string | null | undefined) =>
+  from && to ? `${day(from)} – ${day(to)}` : day(from);
+const money = (amount: string | null | undefined, currency: string | null | undefined) =>
+  amount ? join(amount, currency) : null;
+
+type Describe<T extends SearchType> = (
+  hit: SearchHitOf<T>,
+  t?: Translate,
+) => { title: string; subtitle: string };
+
+/**
+ * Title and secondary line per record type. Kept to the hit's own display fields (names, codes,
+ * dates, amounts) — never anything a list page would not show.
+ */
+const DESCRIBE: { [T in SearchType]: Describe<T> } = {
+  students: (hit, t) => ({
+    title: hit.preferred_name ?? `${hit.first_name} ${hit.last_name}`,
+    subtitle: `${hit.admission_number} · ${studentStatusLabel(hit.status, t)}`,
+  }),
+  users: (hit, t) => {
+    const status = userStatusLabel(hit.status, t);
+    return {
+      title: hit.display_name ?? hit.email ?? hit.id,
+      subtitle: hit.display_name ? `${hit.email} · ${status}` : status,
+    };
+  },
+  invoices: (hit) => ({
+    title: hit.erpnext_docname,
+    // `total_amount` is already the display string `InvoiceListPage` shows.
+    subtitle: join(hit.student_name, `${hit.total_amount} ${hit.currency}`),
+  }),
+  materials: (hit, t) => ({
+    title: hit.title,
+    subtitle: materialIngestStatusLabel(hit.ingest_status, t),
+  }),
+  classes: (hit) => ({ title: hit.code, subtitle: join(hit.course_name) }),
+  sections: (hit) => ({ title: hit.name, subtitle: join(hit.grade_level_name) }),
+  subjects: (hit) => ({ title: hit.name, subtitle: join(hit.code) }),
+  grade_levels: (hit) => ({ title: hit.name, subtitle: "" }),
+  academic_years: (hit) => ({
+    title: hit.name,
+    subtitle: join(hit.code, span(hit.starts_on, hit.ends_on)),
+  }),
+  terms: (hit) => ({
+    title: hit.name,
+    subtitle: join(hit.academic_year_name, span(hit.starts_on, hit.ends_on)),
+  }),
+  rooms: (hit) => ({ title: hit.name, subtitle: join(hit.code, hit.building) }),
+  families: (hit) => ({ title: hit.display_name, subtitle: join(hit.primary_parent_name) }),
+  announcements: (hit) => ({
+    title: hit.title,
+    subtitle: join(day(hit.published_at ?? hit.scheduled_at)),
+  }),
+  events: (hit) => ({ title: hit.title, subtitle: join(span(hit.starts_on, hit.ends_on)) }),
+  incidents: (hit) => ({
+    title: hit.title,
+    subtitle: join(hit.student_name, day(hit.incident_at)),
+  }),
+  evaluations: (hit) => ({
+    title: hit.teacher_name ?? hit.teacher_id,
+    subtitle: join(day(hit.evaluated_at)),
+  }),
+  fee_structures: (hit) => ({
+    title: hit.title,
+    subtitle: join(money(hit.total_amount, hit.currency), hit.academic_year_name),
+  }),
+  scholarships: (hit) => ({
+    title: hit.name,
+    subtitle: join(
+      hit.percentage !== null && hit.percentage !== undefined
+        ? `${hit.percentage}%`
+        : money(hit.amount, hit.currency),
+    ),
+  }),
+  expenses: (hit) => ({
+    title: hit.vendor ?? hit.erpnext_docname ?? hit.id,
+    subtitle: join(money(hit.amount, hit.currency), day(hit.expense_date)),
+  }),
+  notifications: (hit) => ({ title: hit.title, subtitle: join(day(hit.created_at)) }),
+};
+
+function describe<T extends SearchType>(type: T, hit: SearchHitOf<T>, t?: Translate) {
+  return (DESCRIBE[type] as Describe<T>)(hit, t);
 }
 
 /**
  * Maps the API's `GlobalSearchResult` (already grouped and role-scoped server-side) into display
- * rows, skipping any group with zero hits. Route targets:
- *
- * - Students -> their real profile page (`admin/students/:studentId`).
- * - Invoices -> their real detail page (`finance/invoices/:invoiceId`).
- * - Users -> there is no per-user detail route in the portal today (see `nav-items.ts`'s own rule,
- *   "only entries backed by a real route belong here"), so this deep-links into the real list page
- *   pre-filtered to this exact person (`UsersListPage` reads the `q` param) rather than a page that
- *   doesn't exist.
- * - Materials -> no portal page exists yet at all (list or detail --
- *   `apps/api/src/modules/academics/routes/material-routes.ts` is API-only so far). These rows are
- *   left with no `href` and rendered as read-only until a page ships.
+ * rows in the API's canonical type order, skipping any type with zero hits. Each row's link is
+ * whatever page this caller can open it on (`recordHref`), or none.
  */
-export function buildResultGroups(result: GlobalSearchResult, t?: Translate): SearchResultGroup[] {
-  const groups: SearchResultGroup[] = [
-    {
-      type: "students",
-      items: result.results.students.map((hit) => ({
-        key: `students:${hit.id}`,
-        title: studentTitle(hit),
-        subtitle: `${hit.admission_number} · ${studentStatusLabel(hit.status, t)}`,
-        href: `/portal/admin/students/${hit.id}`,
+export function buildResultGroups(
+  result: GlobalSearchResult,
+  permissions: ReadonlySet<Permission>,
+  t?: Translate,
+): SearchResultGroup[] {
+  const groups: SearchResultGroup[] = [];
+  for (const type of SEARCH_TYPES) {
+    const hits = (result.results[type] ?? []) as readonly SearchHitOf<typeof type>[];
+    if (hits.length === 0) continue;
+    groups.push({
+      type,
+      total: Math.max(result.totals?.[type] ?? hits.length, hits.length),
+      items: hits.map((hit) => ({
+        key: `${type}:${hit.id}`,
+        ...describe(type, hit, t),
+        href: recordHref(type, hit, permissions),
       })),
-    },
-    {
-      type: "users",
-      items: result.results.users.map((hit) => ({
-        key: `users:${hit.id}`,
-        title: userTitle(hit),
-        subtitle: userSubtitle(hit, t),
-        href: `/portal/admin/users?q=${encodeURIComponent(hit.email ?? hit.display_name ?? "")}`,
-      })),
-    },
-    {
-      type: "invoices",
-      items: result.results.invoices.map((hit) => ({
-        key: `invoices:${hit.id}`,
-        title: hit.erpnext_docname,
-        subtitle: invoiceSubtitle(hit),
-        href: `/portal/finance/invoices/${hit.id}`,
-      })),
-    },
-    {
-      type: "materials",
-      items: result.results.materials.map((hit) => ({
-        key: `materials:${hit.id}`,
-        title: hit.title,
-        subtitle: materialIngestStatusLabel(hit.ingest_status, t),
-      })),
-    },
-  ];
-
-  return groups.filter((group) => group.items.length > 0);
+    });
+  }
+  return groups;
 }

@@ -9,6 +9,7 @@ export { paymentWebhookRoutes } from "./webhooks/payment-confirmed";
 export { refundRoutes } from "./refunds/routes";
 export { scholarshipRoutes } from "./scholarships/routes";
 export { financeStudentRoutes } from "./students/routes";
+export { financeUnlinkedRoutes } from "./unlinked/routes";
 export { refundWebhookRoutes } from "./webhooks/refund-processed";
 export { installmentRoutes } from "./installments/routes";
 export { reconciliationRoutes } from "./jobs/reconciliation.routes";

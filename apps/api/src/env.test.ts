@@ -1,8 +1,16 @@
+import { DEVELOPMENT_RECORD_KEYS_JSON, DEVELOPMENT_RECORD_KEY_ID } from "@studafy/records";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
 import { EnvValidationError, loadEnv } from "./env";
 import { LOG_LEVEL_NAMES } from "./logger";
+
+// A deployed tier needs a real records keyring and a KMS key for sensitive documents (ADR-019).
+const RECORD_SECRETS = {
+  RECORDS_ENCRYPTION_KEYS: JSON.stringify({ "prod-1": Buffer.alloc(32, 3).toString("base64") }),
+  RECORDS_ENCRYPTION_CURRENT_KEY_ID: "prod-1",
+  STORAGE_SENSITIVE_KMS_KEY_ID: "alias/studafy-records",
+};
 
 describe("loadEnv", () => {
   test("applies defaults for an empty environment", () => {
@@ -38,6 +46,7 @@ describe("loadEnv", () => {
         APP_ENV: "staging",
         CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
         TURNSTILE_SECRET_KEY: "turnstile-secret",
+        ...RECORD_SECRETS,
         PORT: "8080",
         HOST: "127.0.0.1",
         SHUTDOWN_TIMEOUT_MS: "5000",
@@ -50,6 +59,7 @@ describe("loadEnv", () => {
       APP_ENV: "staging",
       CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
       TURNSTILE_SECRET_KEY: "turnstile-secret",
+      ...RECORD_SECRETS,
       PORT: 8080,
       HOST: "127.0.0.1",
       METRICS_PORT: 9464,
@@ -129,13 +139,14 @@ describe("loadEnv", () => {
         APP_ENV: "production",
         CORS_ALLOWED_ORIGINS: " https://app.studafy.com , https://api.studafy.com ",
         TURNSTILE_SECRET_KEY: "turnstile-secret",
+        ...RECORD_SECRETS,
         NODE_ENV: "development",
       }).CORS_ALLOWED_ORIGINS,
     ).toBe(" https://app.studafy.com , https://api.studafy.com ");
   });
 
   test("requires a Turnstile secret on every deployed tier, never in development", () => {
-    const deployed = { CORS_ALLOWED_ORIGINS: "https://app.studafy.com" };
+    const deployed = { CORS_ALLOWED_ORIGINS: "https://app.studafy.com", ...RECORD_SECRETS };
     expect(() => loadEnv({ ...deployed, APP_ENV: "staging" })).toThrow(EnvValidationError);
     // The secret manager injects "" for a key nobody has supplied yet: still missing.
     expect(() => loadEnv({ ...deployed, APP_ENV: "production", TURNSTILE_SECRET_KEY: "" })).toThrow(
@@ -146,6 +157,39 @@ describe("loadEnv", () => {
         .TURNSTILE_SECRET_KEY,
     ).toBe("s");
     expect(loadEnv({ APP_ENV: "development" }).TURNSTILE_SECRET_KEY).toBeUndefined();
+  });
+
+  test("requires a real records keyring and sensitive-document KMS key on deployed tiers", () => {
+    const deployed = {
+      CORS_ALLOWED_ORIGINS: "https://app.studafy.com",
+      TURNSTILE_SECRET_KEY: "s",
+      APP_ENV: "production",
+    };
+    expect(loadEnv({ ...deployed, ...RECORD_SECRETS }).RECORDS_ENCRYPTION_CURRENT_KEY_ID).toBe(
+      "prod-1",
+    );
+    expect(() => loadEnv({ ...deployed, ...RECORD_SECRETS, RECORDS_ENCRYPTION_KEYS: "" })).toThrow(
+      /RECORDS_ENCRYPTION_KEYS/,
+    );
+    expect(() =>
+      loadEnv({ ...deployed, ...RECORD_SECRETS, STORAGE_SENSITIVE_KMS_KEY_ID: "" }),
+    ).toThrow(/STORAGE_SENSITIVE_KMS_KEY_ID/);
+    // The in-repository development key never seals real data.
+    expect(() =>
+      loadEnv({
+        ...deployed,
+        ...RECORD_SECRETS,
+        RECORDS_ENCRYPTION_KEYS: DEVELOPMENT_RECORD_KEYS_JSON,
+        RECORDS_ENCRYPTION_CURRENT_KEY_ID: DEVELOPMENT_RECORD_KEY_ID,
+      }),
+    ).toThrow(/development key/);
+    // A malformed keyring is named, never echoed.
+    const malformed = () =>
+      loadEnv({ ...deployed, ...RECORD_SECRETS, RECORDS_ENCRYPTION_KEYS: '{"prod-1":"c2hvcnQ="}' });
+    expect(malformed).toThrow(/32 bytes/);
+    expect(malformed).not.toThrow(/c2hvcnQ=/);
+    // Development needs neither.
+    expect(loadEnv({ APP_ENV: "development" }).RECORDS_ENCRYPTION_KEYS).toBeUndefined();
   });
 
   test('treats a deployed tier with only OAuth redirect URIs as "provider off", not half-configured', () => {

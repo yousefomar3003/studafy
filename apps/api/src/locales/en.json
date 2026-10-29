@@ -298,5 +298,16 @@
   "SCHOOL_APPLICATION_ALREADY_PENDING": "You already have an application awaiting review",
   "SCHOOL_APPLICATION_ACCOUNT_EXISTS": "This account already belongs to a Studafy user. Sign in instead",
   "SCHOOL_APPLICATION_PROOF_INVALID": "The proof of ownership file is missing, of an unsupported type, or too large",
-  "SCHOOL_APPLICATION_NOT_PENDING": "This application has already been reviewed"
+  "SCHOOL_APPLICATION_NOT_PENDING": "This application has already been reviewed",
+  "RECORD_TEMPLATE_NOT_PUBLISHED": "This school has not published a record template yet",
+  "RECORD_NOTHING_TO_PUBLISH": "The draft has no changes to publish",
+  "RECORD_FIELD_NOT_FOUND": "That field is not on the published record form",
+  "RECORD_FIELD_INVALID": "That field setting is not valid",
+  "RECORD_FIELD_LOCKED": "A published field's type and sensitivity cannot change; archive it and add a new field instead",
+  "RECORD_FIELD_NOT_DOCUMENT": "This field does not take a document",
+  "RECORD_FIELD_NOT_SENSITIVE": "Only a sensitive field needs revealing; this one is already shown in full",
+  "RECORD_VALUE_INVALID": "One or more record answers are not valid for their fields",
+  "RECORD_SUBJECT_NOT_FOUND": "No record found for that person",
+  "RECORD_DOCUMENT_NOT_FOUND": "No document on file",
+  "RECORD_KEY_UNAVAILABLE": "This value cannot be opened right now. Contact support"
 }

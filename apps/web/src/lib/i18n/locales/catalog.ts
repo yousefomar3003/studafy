@@ -20,7 +20,10 @@ import arOnboarding from "./ar/onboarding.json";
 import arPlatform from "./ar/platform.json";
 import arPlatformLicensing from "./ar/platformLicensing.json";
 import arPrincipal from "./ar/principal.json";
+import arRecords from "./ar/records.json";
+import arRecordTemplates from "./ar/recordTemplates.json";
 import arSchoolLicense from "./ar/schoolLicense.json";
+import arSearch from "./ar/search.json";
 import arSite from "./ar/site.json";
 import ar from "./ar.json";
 import enAcademicGrading from "./en/academicGrading.json";
@@ -33,7 +36,10 @@ import enOnboarding from "./en/onboarding.json";
 import enPlatform from "./en/platform.json";
 import enPlatformLicensing from "./en/platformLicensing.json";
 import enPrincipal from "./en/principal.json";
+import enRecords from "./en/records.json";
+import enRecordTemplates from "./en/recordTemplates.json";
 import enSchoolLicense from "./en/schoolLicense.json";
+import enSearch from "./en/search.json";
 import enSite from "./en/site.json";
 import en from "./en.json";
 
@@ -50,6 +56,9 @@ export const enCatalog = {
   schoolLicense: enSchoolLicense,
   onboarding: enOnboarding,
   academicGrading: enAcademicGrading,
+  records: enRecords,
+  recordTemplates: enRecordTemplates,
+  search: enSearch,
   site: enSite,
 };
 
@@ -66,5 +75,8 @@ export const arCatalog = {
   schoolLicense: arSchoolLicense,
   onboarding: arOnboarding,
   academicGrading: arAcademicGrading,
+  records: arRecords,
+  recordTemplates: arRecordTemplates,
+  search: arSearch,
   site: arSite,
 };

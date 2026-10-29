@@ -1,0 +1,12 @@
+/**
+ * Missing information. Laid out with Finance > Unlinked's classes (`../../finance/families/
+ * families.css`); only the per-row issue list is its own.
+ */
+
+.records-missing__issues {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

@@ -38,7 +38,8 @@
     "articleNotFoundBody": "This article doesn’t exist or was moved.",
     "open": "Open help center",
     "needHelpWithStep": "Need help with this step?",
-    "readGuide": "Read the guide"
+    "readGuide": "Read the guide",
+    "doItNow": "Do it now"
   },
   "localeSwitcher": {
     "label": "Language"
@@ -135,14 +136,33 @@
   "globalSearch": {
     "triggerLabel": "Search",
     "title": "Search",
-    "inputLabel": "Search students, users, invoices, and materials",
-    "placeholder": "Search students, users, invoices, materials…",
+    "inputLabel": "Search pages, tasks, help and records",
+    "placeholder": "Search pages, tasks, help, students, invoices…",
     "resultsLabel": "Search results",
     "groups": {
+      "pages": "Go to",
+      "actions": "Do",
+      "help": "How to",
       "students": "Students",
       "users": "Users",
       "invoices": "Invoices",
-      "materials": "Materials"
+      "materials": "Materials",
+      "classes": "Classes",
+      "sections": "Sections",
+      "subjects": "Subjects",
+      "grade_levels": "Grade levels",
+      "academic_years": "Academic years",
+      "terms": "Terms",
+      "rooms": "Rooms",
+      "families": "Families",
+      "announcements": "Announcements",
+      "events": "Calendar events",
+      "incidents": "Discipline incidents",
+      "evaluations": "Evaluations",
+      "fee_structures": "Fee structures",
+      "scholarships": "Scholarships",
+      "expenses": "Expenses",
+      "notifications": "Notifications"
     },
     "minLengthHint": "Keep typing — search starts at 2 characters.",
     "loading": "Searching…",
@@ -152,7 +172,28 @@
     "recentEmpty": "Your recent searches will show up here.",
     "clearRecent": "Clear",
     "noDetailPage": "No detail page for this yet.",
-    "keyboardHint": "↑↓ to navigate · ↵ to open · esc to close"
+    "keyboardHint": "↑↓ to navigate · ↵ to open · esc to close",
+    "suggestedHeading": "Suggested for you",
+    "seeAll_one": "See all {{count}} result",
+    "seeAll_other": "See all {{count}} results",
+    "tryInstead": "Closest matches",
+    "helpCenter": "Browse the help center",
+    "results": {
+      "title": "Search results",
+      "queryLabel": "Search",
+      "submit": "Search",
+      "filtersLabel": "Filter by type",
+      "allTypes": "All types",
+      "minLength": "Enter at least 2 characters to search.",
+      "count_one": "{{count}} result",
+      "count_other": "{{count}} results",
+      "empty": "No records match “{{query}}”.",
+      "emptyHint": "Try fewer words, or check the spelling. Pages and how-to articles are in the search box (Ctrl+K).",
+      "previous": "Previous",
+      "next": "Next",
+      "pageOf": "Page {{page}} of {{pages}}",
+      "pagination": "Results pages"
+    }
   },
   "ui": {
     "closeDialog": "Close dialog",

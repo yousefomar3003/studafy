@@ -1,3 +1,4 @@
+import { keyringHoldsDevelopmentKey, parseRecordKeyring } from "@studafy/records";
 import { z } from "zod";
 
 import { LOG_LEVEL_NAMES } from "./logger";
@@ -186,6 +187,16 @@ export const envSchema = z
     // allowed only in development: the refinement below refuses to boot a staging/production tier
     // without it. Empty means unset (secret-manager default, as with TAP_SECRET_KEY).
     TURNSTILE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The keyring that seals sensitive student and parent record values (ADR-019):
+    // {"<key id>": "<base64 32 bytes>"} plus the id new writes use. Required together on a
+    // deployed tier, which also refuses the in-repository development key; development and test
+    // fall back to that development key (resolveRecordKeyring).
+    RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // KMS key for sensitive record documents (ADR-019): applied when a staged upload is promoted to
+    // permanent/. Required on a deployed tier; local rustfs has no KMS, so development falls back
+    // to the bucket default.
+    STORAGE_SENSITIVE_KMS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // S3-compatible object storage for the app-files bucket (ST-103). All optional and validated
     // as a group below: the feature activates only when the whole set is present, so dev and test
     // boot without object storage and attachment endpoints answer 503 instead of the app failing to
@@ -380,6 +391,51 @@ export const envSchema = z
         code: "custom",
         path: ["TURNSTILE_SECRET_KEY"],
         message: `TURNSTILE_SECRET_KEY is required when APP_ENV is ${env.APP_ENV}`,
+      });
+    }
+
+    // Sensitive record values are sealed with a real, deployment-held key or not written at all.
+    const recordKeyVars = [env.RECORDS_ENCRYPTION_KEYS, env.RECORDS_ENCRYPTION_CURRENT_KEY_ID];
+    const recordKeySetCount = recordKeyVars.filter((v) => v !== undefined).length;
+    if (recordKeySetCount === 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["RECORDS_ENCRYPTION_KEYS"],
+        message:
+          "RECORDS_ENCRYPTION_KEYS and RECORDS_ENCRYPTION_CURRENT_KEY_ID must be set together",
+      });
+    } else if (recordKeySetCount === 2) {
+      try {
+        const keyring = parseRecordKeyring(
+          env.RECORDS_ENCRYPTION_KEYS!,
+          env.RECORDS_ENCRYPTION_CURRENT_KEY_ID!,
+        );
+        if (env.APP_ENV !== "development" && keyringHoldsDevelopmentKey(keyring)) {
+          context.addIssue({
+            code: "custom",
+            path: ["RECORDS_ENCRYPTION_KEYS"],
+            message: `RECORDS_ENCRYPTION_KEYS must not hold the development key when APP_ENV is ${env.APP_ENV}`,
+          });
+        }
+      } catch (error) {
+        context.addIssue({
+          code: "custom",
+          path: ["RECORDS_ENCRYPTION_KEYS"],
+          message: (error as Error).message,
+        });
+      }
+    } else if (env.APP_ENV !== "development") {
+      context.addIssue({
+        code: "custom",
+        path: ["RECORDS_ENCRYPTION_KEYS"],
+        message: `RECORDS_ENCRYPTION_KEYS is required when APP_ENV is ${env.APP_ENV}`,
+      });
+    }
+    if (env.APP_ENV !== "development" && env.STORAGE_SENSITIVE_KMS_KEY_ID === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["STORAGE_SENSITIVE_KMS_KEY_ID"],
+        message: `STORAGE_SENSITIVE_KMS_KEY_ID is required when APP_ENV is ${env.APP_ENV}`,
       });
     }
 

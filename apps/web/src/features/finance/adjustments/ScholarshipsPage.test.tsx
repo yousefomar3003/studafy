@@ -1,9 +1,9 @@
 import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 import { AuthProvider, createSessionStore } from "../../../lib/auth";
 
@@ -91,7 +91,15 @@ function fakeJwt(payload: unknown): string {
   return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
 }
 
-async function renderAs(role: "ORG_ADMIN" | "FINANCE") {
+/** Renders the router's current `search`, so a test can see a query parameter being dropped. */
+function LocationProbe() {
+  return <output data-testid="location-search">{useLocation().search}</output>;
+}
+
+async function renderAs(
+  role: "ORG_ADMIN" | "FINANCE",
+  initialEntry = "/portal/finance/scholarships",
+) {
   const store = createSessionStore({
     refreshClient: {
       refresh: async (): Promise<SessionTokens> => ({
@@ -110,8 +118,9 @@ async function renderAs(role: "ORG_ADMIN" | "FINANCE") {
     <AuthProvider store={store}>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <MemoryRouter>
+          <MemoryRouter initialEntries={[initialEntry]}>
             <Page />
+            <LocationProbe />
           </MemoryRouter>
         </ToastProvider>
       </QueryClientProvider>
@@ -191,5 +200,17 @@ describe("ScholarshipsPage", () => {
     expect(postMock).toHaveBeenCalledWith("/api/finance/scholarship-awards", {
       body: { scholarship_id: "scholarship-1", student_id: "student-1" },
     });
+  });
+
+  test("?award=1 opens 'award to a student' once the catalog loads; closing drops it", async () => {
+    await renderAs("FINANCE", "/portal/finance/scholarships?award=1");
+
+    const dialog = await screen.findByRole("dialog", { name: "Award a scholarship" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Award a scholarship" })).toBeNull(),
+    );
+    expect(screen.getByTestId("location-search").textContent).toBe("");
   });
 });

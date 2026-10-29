@@ -7,6 +7,7 @@
  * a no-op. Skipped (as `skipIf` tests) unless TEST_DATABASE_URL is set.
  */
 
+import { DEVELOPMENT_RECORD_KEYRING, openRecordValue } from "@studafy/records";
 import { readCsvSource, stageRows, suggestColumnMapping } from "@studafy/student-import";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
@@ -14,6 +15,7 @@ import postgres from "postgres";
 
 import { migrateStagedImport } from "./worker";
 
+import type { ImportRecordField } from "@studafy/student-import";
 import type { JSONValue, Sql, TransactionSql } from "postgres";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
@@ -107,10 +109,14 @@ async function seedSchool(): Promise<Fixture> {
 }
 
 /** Stage a CSV the way the API upload does, with the suggested mapping, as a confirmed import. */
-async function stageConfirmedImport(fixture: Fixture, csv: string): Promise<string> {
+async function stageConfirmedImport(
+  fixture: Fixture,
+  csv: string,
+  recordFields: ImportRecordField[] = [],
+): Promise<string> {
   const source = readCsvSource(csv);
-  const mapping = suggestColumnMapping(source.headers);
-  const staged = stageRows(source, mapping);
+  const mapping = suggestColumnMapping(source.headers, recordFields);
+  const staged = stageRows(source, mapping, recordFields);
   expect(staged.issues).toEqual([]);
 
   return asAdmin(fixture.schoolId, async (tx) => {
@@ -146,7 +152,8 @@ function mixedCsv(slug: string): string {
     `Doe,Jane,NEW-1,jane@${slug}.local,Enrolled,mum@${slug}.local,Mother`,
     // create, reusing the parent created on the line above
     `Doe,John,NEW-2,john@${slug}.local,,mum@${slug}.local,mother`,
-    // update: status changes and the existing link's relationship changes
+    // update: status changes; the parent email belongs to an existing account, so it is a
+    // PARENT_ACCOUNT_EXISTS parent conflict -- the student updates, no link is made or changed
     `Name,Old,OLD-1,old@${slug}.local,enrolled,parent@${slug}.local,father`,
     // conflict: same admission number as an earlier line
     `Dup,Dup,NEW-1,dup@${slug}.local,,,`,
@@ -186,7 +193,11 @@ describe("student import staging migration", () => {
     const importId = await stageConfirmedImport(fixture, mixedCsv(fixture.slug));
     const before = await counts(fixture.schoolId);
 
-    const summary = await migrateStagedImport(db!, { importId, schoolId: fixture.schoolId });
+    const summary = await migrateStagedImport(
+      db!,
+      { importId, schoolId: fixture.schoolId },
+      DEVELOPMENT_RECORD_KEYRING,
+    );
 
     expect(summary).toEqual({
       students_created: 2,
@@ -195,6 +206,8 @@ describe("student import staging migration", () => {
       conflicts: 2,
       parents_created: 1,
       parents_linked: 2,
+      parent_conflicts: 1,
+      record_answers: 0,
     });
     expect(await importState(fixture.schoolId, importId)).toEqual({ status: "completed", summary });
 
@@ -210,7 +223,8 @@ describe("student import staging migration", () => {
         JOIN app.parent_child_links AS l ON l.student_id = s.id AND l.school_id = s.school_id
         WHERE s.id = ${fixture.existingStudentId}::uuid
       `;
-      expect(old).toEqual({ status: "enrolled", relationship: "father" });
+      // The existing parent was never matched by email: the old link keeps its relationship.
+      expect(old).toEqual({ status: "enrolled", relationship: "guardian" });
 
       const [jane] = await tx<{ status: string }[]>`
         SELECT status::text AS status FROM app.students
@@ -235,7 +249,11 @@ describe("student import staging migration", () => {
       );
     });
 
-    const retried = await migrateStagedImport(db!, { importId, schoolId: fixture.schoolId });
+    const retried = await migrateStagedImport(
+      db!,
+      { importId, schoolId: fixture.schoolId },
+      DEVELOPMENT_RECORD_KEYRING,
+    );
     expect(retried).toEqual(summary);
     expect(await counts(fixture.schoolId)).toEqual(after);
   });
@@ -255,9 +273,11 @@ describe("student import staging migration", () => {
       WHERE import_id = ${importId}::uuid AND record->>'admission_number' = 'NEW-2'
     `,
     );
-    const failure = await migrateStagedImport(db!, { importId, schoolId: fixture.schoolId }).catch(
-      (error: unknown) => error,
-    );
+    const failure = await migrateStagedImport(
+      db!,
+      { importId, schoolId: fixture.schoolId },
+      DEVELOPMENT_RECORD_KEYRING,
+    ).catch((error: unknown) => error);
     expect(String(failure)).toContain("ck_users_display_name");
     expect((await importState(fixture.schoolId, importId)).status).toBe("failed");
     expect(await counts(fixture.schoolId)).toEqual(before);
@@ -271,7 +291,11 @@ describe("student import staging migration", () => {
     `,
     );
 
-    const summary = await migrateStagedImport(db!, { importId, schoolId: fixture.schoolId });
+    const summary = await migrateStagedImport(
+      db!,
+      { importId, schoolId: fixture.schoolId },
+      DEVELOPMENT_RECORD_KEYRING,
+    );
     expect(summary.students_created).toBe(2);
     expect((await importState(fixture.schoolId, importId)).status).toBe("completed");
   });
@@ -286,10 +310,195 @@ describe("student import staging migration", () => {
     `,
     );
 
-    const refusal = await migrateStagedImport(db!, { importId, schoolId: fixture.schoolId }).catch(
-      (error: unknown) => error,
-    );
+    const refusal = await migrateStagedImport(
+      db!,
+      { importId, schoolId: fixture.schoolId },
+      DEVELOPMENT_RECORD_KEYRING,
+    ).catch((error: unknown) => error);
     expect(String(refusal)).toContain("not confirmed");
     expect((await importState(fixture.schoolId, importId)).status).toBe("validated");
   });
+});
+
+/** Publish a one-version student record template straight into the tables, as a publish would. */
+async function publishStudentTemplate(
+  fixture: Fixture,
+  fields: { label: string; sensitive: boolean }[],
+): Promise<ImportRecordField[]> {
+  return asAdmin(fixture.schoolId, async (tx) => {
+    const [template] = await tx<{ id: string }[]>`
+      INSERT INTO app.record_templates (school_id, subject_kind, published_version)
+      VALUES (${fixture.schoolId}::uuid, 'student', 1) RETURNING id
+    `;
+    const [version] = await tx<{ id: string }[]>`
+      INSERT INTO app.record_template_versions (school_id, template_id, version, published_by)
+      VALUES (${fixture.schoolId}::uuid, ${template!.id}::uuid, 1, ${fixture.adminId}::uuid)
+      RETURNING id
+    `;
+    const out: ImportRecordField[] = [];
+    for (const [index, field] of fields.entries()) {
+      const sensitivity = field.sensitive ? "sensitive" : "standard";
+      const [row] = await tx<{ id: string }[]>`
+        INSERT INTO app.record_fields (school_id, template_id, field_type, label_en, label_ar,
+                                       sensitivity, sort_order, created_by, first_published_at)
+        VALUES (${fixture.schoolId}::uuid, ${template!.id}::uuid, 'short_text', ${field.label},
+                ${field.label}, ${sensitivity}::app.record_field_sensitivity, ${index},
+                ${fixture.adminId}::uuid, now())
+        RETURNING id
+      `;
+      await tx`
+        INSERT INTO app.record_field_versions (school_id, template_version_id, field_id, field_type,
+          label_en, label_ar, required, options, sort_order, visibility, sensitivity, has_expiry)
+        VALUES (${fixture.schoolId}::uuid, ${version!.id}::uuid, ${row!.id}::uuid, 'short_text',
+                ${field.label}, ${field.label}, false, '[]'::jsonb, ${index}, 'staff_only',
+                ${sensitivity}::app.record_field_sensitivity, false)
+      `;
+      out.push({
+        id: row!.id,
+        field_type: "short_text",
+        options: [],
+        label_en: field.label,
+        label_ar: field.label,
+        sensitivity,
+      });
+    }
+    return out;
+  });
+}
+
+describe("parents are never matched by email", () => {
+  dbTest(
+    "an existing account's email imports the student unlinked; siblings share one new parent",
+    async () => {
+      const fixture = await seedSchool();
+      const csv = [
+        "Surname,Given Name,Student ID,E-mail,Guardian Email,Relationship",
+        // Two siblings sharing one new parent email: one parent, one household, two links.
+        `Haddad,Rana,SIB-1,rana@${fixture.slug}.local,new-dad@${fixture.slug}.local,father`,
+        `Haddad,Omar,SIB-2,omar@${fixture.slug}.local,NEW-DAD@${fixture.slug}.local,father`,
+        // An email that belongs to an existing parent account: imported, never linked to it.
+        `Saleh,Huda,EXIST-1,huda@${fixture.slug}.local,parent@${fixture.slug}.local,mother`,
+        // An email that belongs to a staff account: same rule.
+        `Saleh,Ali,EXIST-2,ali@${fixture.slug}.local,teacher@${fixture.slug}.local,father`,
+      ].join("\n");
+      const importId = await stageConfirmedImport(fixture, csv);
+
+      const summary = await migrateStagedImport(
+        db!,
+        { importId, schoolId: fixture.schoolId },
+        DEVELOPMENT_RECORD_KEYRING,
+      );
+      expect(summary).toMatchObject({
+        students_created: 4,
+        parents_created: 1,
+        parents_linked: 2,
+        parent_conflicts: 2,
+      });
+
+      await asAdmin(fixture.schoolId, async (tx) => {
+        const links = await tx<{ admission_number: string; email: string; family_id: string }[]>`
+        SELECT s.admission_number, u.normalized_email AS email, l.family_id
+        FROM app.parent_child_links AS l
+        JOIN app.students AS s ON s.id = l.student_id AND s.school_id = l.school_id
+        JOIN app.users AS u ON u.id = l.parent_user_id AND u.school_id = l.school_id
+        WHERE l.school_id = ${fixture.schoolId}::uuid AND s.admission_number LIKE 'SIB-%'
+           OR (l.school_id = ${fixture.schoolId}::uuid AND s.admission_number LIKE 'EXIST-%')
+        ORDER BY s.admission_number
+      `;
+        expect(links.map((l) => l.admission_number)).toEqual(["SIB-1", "SIB-2"]);
+        expect(new Set(links.map((l) => l.email))).toEqual(
+          new Set([`new-dad@${fixture.slug}.local`]),
+        );
+        expect(new Set(links.map((l) => l.family_id)).size).toBe(1);
+
+        // The existing parent gained no child and no role change.
+        const [existing] = await tx<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM app.parent_child_links
+        WHERE school_id = ${fixture.schoolId}::uuid AND parent_user_id = ${fixture.existingParentId}::uuid
+      `;
+        expect(existing!.count).toBe(1);
+        const [staffParent] = await tx<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM app.user_roles AS r
+        JOIN app.users AS u ON u.id = r.user_id AND u.school_id = r.school_id
+        WHERE r.school_id = ${fixture.schoolId}::uuid AND u.normalized_email = ${`teacher@${fixture.slug}.local`}
+          AND r.role = 'PARENT'
+      `;
+        expect(staffParent!.count).toBe(0);
+
+        // The applied import's staged cells are gone.
+        const [staged] = await tx<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM app.student_import_rows WHERE import_id = ${importId}::uuid
+      `;
+        expect(staged!.count).toBe(0);
+      });
+    },
+  );
+});
+
+describe("student record template columns", () => {
+  dbTest(
+    "writes answers, sealing the sensitive ones, and audits them without the value",
+    async () => {
+      const fixture = await seedSchool();
+      const [busStop, nationalId] = await publishStudentTemplate(fixture, [
+        { label: "Bus stop", sensitive: false },
+        { label: "National ID", sensitive: true },
+      ]);
+      const csv = [
+        "Surname,Given Name,Student ID,E-mail,Bus stop,National ID",
+        `Nasser,Layla,REC-1,layla@${fixture.slug}.local,Gate 3,784-1990-1234567-1`,
+      ].join("\n");
+      const importId = await stageConfirmedImport(fixture, csv, [busStop!, nationalId!]);
+
+      const summary = await migrateStagedImport(
+        db!,
+        { importId, schoolId: fixture.schoolId },
+        DEVELOPMENT_RECORD_KEYRING,
+      );
+      expect(summary).toMatchObject({ students_created: 1, record_answers: 2 });
+
+      await asAdmin(fixture.schoolId, async (tx) => {
+        const answers = await tx<
+          {
+            field_id: string;
+            subject_id: string;
+            value: unknown;
+            value_ciphertext: Uint8Array | null;
+            value_key_id: string | null;
+            value_mask: string | null;
+          }[]
+        >`
+        SELECT field_id, subject_id, value, value_ciphertext, value_key_id, value_mask
+        FROM app.record_answers WHERE school_id = ${fixture.schoolId}::uuid
+      `;
+        const plain = answers.find((a) => a.field_id === busStop!.id)!;
+        expect(plain.value).toBe("Gate 3");
+        const sealed = answers.find((a) => a.field_id === nationalId!.id)!;
+        expect(sealed.value).toBeNull();
+        const opened = openRecordValue(
+          DEVELOPMENT_RECORD_KEYRING,
+          {
+            schoolId: fixture.schoolId,
+            subjectKind: "student",
+            subjectId: sealed.subject_id,
+            fieldId: nationalId!.id,
+          },
+          {
+            ciphertext: sealed.value_ciphertext!,
+            keyId: sealed.value_key_id!,
+            mask: sealed.value_mask!,
+          },
+        );
+        expect(opened.unwrap()).toBe("784-1990-1234567-1");
+
+        const audits = await tx<{ payload: string }[]>`
+        SELECT coalesce(old_values::text, '') || coalesce(new_values::text, '') AS payload
+        FROM app.audit_logs
+        WHERE school_id = ${fixture.schoolId}::uuid AND target_table IN ('record_answers', 'student_imports')
+      `;
+        expect(audits.some((a) => a.payload.includes(nationalId!.id))).toBe(true);
+        for (const audit of audits) expect(audit.payload).not.toContain("1234567");
+      });
+    },
+  );
 });

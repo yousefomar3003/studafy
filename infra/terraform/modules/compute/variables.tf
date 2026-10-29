@@ -81,6 +81,11 @@ variable "app_files_bucket_arn" {
   type        = string
 }
 
+variable "sensitive_documents_kms_key_arn" {
+  description = "ARN of the KMS key for sensitive record documents (modules/storage, ADR-019)."
+  type        = string
+}
+
 variable "cost_metric_namespace" {
   description = "CloudWatch namespace the workers task role is granted PutMetricData on, for its cost-report sweep (ST-293). Must match apps/workers/src/queues/billing/cost-report.ts's COST_METRIC_NAMESPACE constant and module.monitoring's own cost_metric_namespace (its alarms watch the same metrics this grant lets workers publish)."
   type        = string

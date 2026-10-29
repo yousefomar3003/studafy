@@ -26,6 +26,15 @@ const PII_ROOTS = new Set([
   "dob",
   "birth",
   "name",
+  // School-defined records (docs/modules/student-records.md): a revealed or entered answer, an
+  // ID or medical field, and the sealed form of one never belong in an error event.
+  "passport",
+  "medical",
+  "answer",
+  "answers",
+  "reveal",
+  "revealed",
+  "ciphertext",
 ]);
 
 const REDACTED = "[Redacted]";

@@ -1,11 +1,13 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
+import { invalidateLinkViews } from "../people-links/queries";
 
 import { USERS_LIST_KEY } from "./queries";
 
 import type { UserWithRoles } from "./queries";
 import type { CreateUserValues } from "./schema";
+import type { components } from "@studafy/api-client";
 import type { Role } from "@studafy/constants";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 
@@ -62,11 +64,18 @@ function tempId(): string {
   return `optimistic-${crypto.randomUUID()}`;
 }
 
+export type CreateUserChild = components["schemas"]["CreateUserChild"];
+
 export function useCreateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (values: CreateUserValues) => {
+    mutationFn: async (
+      values: CreateUserValues & {
+        children?: CreateUserChild[];
+        records?: components["schemas"]["RecordAnswerInput"][];
+      },
+    ) => {
       const { data } = await api.POST("/api/users", { body: values });
       if (!data) throw new Error("User creation returned no data.");
       return data;
@@ -99,7 +108,14 @@ export function useCreateUser() {
     onError: (_error, _values, context) => {
       if (context) restoreUserLists(queryClient, context.snapshot);
     },
-    onSettled: () => invalidateUserLists(queryClient),
+    onSettled: (_data, _error, values) => {
+      invalidateUserLists(queryClient);
+      if (values.children?.length) {
+        invalidateLinkViews(queryClient);
+        // Each child's Guardians tab now lists the new parent.
+        void queryClient.invalidateQueries({ queryKey: ["students", "detail"] });
+      }
+    },
   });
 }
 

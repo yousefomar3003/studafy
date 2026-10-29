@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { fetchUnlinkedSummary, UNLINKED_KEY } from "../unlinked/queries";
 
 import { childPositionLabel, MoneyLines } from "./family-format";
 import {
@@ -32,7 +33,8 @@ const INITIAL_FILTERS: FamilyFilters = {
  * guardians, its children (eldest first, with the sibling discount each one's next invoice gets)
  * and what it owes across all of them. Finance (`billing:update`) can remind every family with an
  * overdue balance from here; a family's own page records one payment across its children's
- * invoices and sends reminders and statements to that family.
+ * invoices and sends reminders and statements to that family. Above the list, a count of the
+ * students and parents no family reaches links to the unlinked page.
  */
 export default function FamiliesListPage() {
   const { t } = useTranslation();
@@ -53,6 +55,12 @@ export default function FamiliesListPage() {
   });
   const items = query.data?.items ?? [];
   const total = query.data?.total ?? 0;
+  // People no family reaches: shown here so the school notices them, fixed from the unlinked page.
+  const unlinked = useQuery({
+    queryKey: [...UNLINKED_KEY, "summary"],
+    queryFn: fetchUnlinkedSummary,
+  });
+  const unlinkedTotal = (unlinked.data?.students ?? 0) + (unlinked.data?.parents ?? 0);
 
   function update(next: Partial<FamilyFilters>) {
     setFilters((current) => ({ ...current, ...next }));
@@ -170,6 +178,18 @@ export default function FamiliesListPage() {
           </Button>
         ) : null}
       </div>
+
+      {unlinked.data && unlinkedTotal > 0 ? (
+        <div className="families-unlinked" role="status">
+          <p>
+            {t("finance.families.unlinked.summary", {
+              students: unlinked.data.students,
+              parents: unlinked.data.parents,
+            })}
+          </p>
+          <Link to="/portal/finance/unlinked">{t("finance.families.unlinked.review")}</Link>
+        </div>
+      ) : null}
 
       <form
         className="families-toolbar"

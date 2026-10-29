@@ -187,3 +187,19 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups_archive" {
     }
   }
 }
+
+# Sensitive student and parent record documents (a passport scan, a medical certificate) are
+# re-encrypted with this key when apps/api promotes them from temp/ to permanent/ (ADR-019). Reading
+# one then needs kms:Decrypt on top of s3:GetObject, and CloudTrail records every use of the key.
+# S3 Bucket Keys (set per object at promotion) keep KMS request charges negligible; the key itself
+# is the only fixed cost. Every other object keeps the bucket's SSE-S3 default above.
+resource "aws_kms_key" "sensitive_documents" {
+  description             = "Encrypts sensitive student and parent record documents in ${var.name_prefix}-app-files (ADR-019)."
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+}
+
+resource "aws_kms_alias" "sensitive_documents" {
+  name          = "alias/${var.name_prefix}-sensitive-documents"
+  target_key_id = aws_kms_key.sensitive_documents.key_id
+}

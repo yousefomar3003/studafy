@@ -13,6 +13,21 @@ keywords:
     "csv",
     "skip",
   ]
+title_ar: "دليل الإعداد الأولي"
+description_ar: "شرح كامل لمعالج الإعداد ذي الخطوات الخمس الذي يظهر لكل مسؤول بعد تفعيل حساب المدرسة."
+keywords_ar:
+  [
+    "إعداد",
+    "معالج الإعداد",
+    "ملف المدرسة",
+    "العام الدراسي",
+    "نظام الدرجات",
+    "الجدول الدراسي",
+    "استيراد الطلاب",
+    "ملف CSV",
+    "تخطي",
+    "بداية",
+  ]
 order: 1
 ---
 
@@ -119,7 +134,7 @@ placement are finalised later in the Timetable builder.
 
 "Upload a CSV of students to validate. Nothing is saved until you confirm."
 
-1. `Download template` to get a starter CSV with the expected columns.
+1. `Download CSV template` to get a starter CSV with the expected columns.
 2. Upload your file. It is validated in a dry run — **no students are saved.**
 3. Review the result: total rows, valid rows, rows with errors. Errors list
    the line, field, and message, and can be downloaded as a report.

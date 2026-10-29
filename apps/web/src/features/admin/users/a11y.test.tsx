@@ -5,7 +5,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { AuthProvider } from "../../../lib/auth";
 import { expectNoA11yViolations } from "../../../lib/test/axe";
+import { createTestSessionStore } from "../../../lib/test/session";
 
 import type { ComponentType } from "react";
 
@@ -41,18 +43,22 @@ mock.module("../../../lib/api", () => ({
 const loadUsersListPage = async (): Promise<ComponentType> =>
   (await import("./UsersListPage")).default;
 
-function renderInMain(Page: ComponentType) {
+/** As an ORG_ADMIN: the page reads the session's permissions (the create modal's link step). */
+async function renderInMain(Page: ComponentType) {
+  const store = await createTestSessionStore(["ORG_ADMIN"]);
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <MemoryRouter>
-          <main>
-            <Page />
-          </main>
-        </MemoryRouter>
-      </ToastProvider>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <MemoryRouter>
+            <main>
+              <Page />
+            </main>
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -65,14 +71,14 @@ afterEach(() => {
 
 describe("users feature accessibility", () => {
   test("user list", async () => {
-    const { container } = renderInMain(await loadUsersListPage());
+    const { container } = await renderInMain(await loadUsersListPage());
     await screen.findByText("Jamie Chen");
 
     await expectNoA11yViolations(container);
   });
 
   test("create-user modal open", async () => {
-    const { container } = renderInMain(await loadUsersListPage());
+    const { container } = await renderInMain(await loadUsersListPage());
     await screen.findByText("Jamie Chen");
 
     fireEvent.click(screen.getByRole("button", { name: "New user" }));

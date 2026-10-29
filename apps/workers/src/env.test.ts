@@ -3,6 +3,12 @@ import { describe, expect, test } from "bun:test";
 
 import { EnvValidationError, loadEnv } from "./env";
 
+// Production seals sensitive import columns with a real records keyring (ADR-019).
+const RECORD_KEYS = {
+  RECORDS_ENCRYPTION_KEYS: JSON.stringify({ "prod-1": Buffer.alloc(32, 3).toString("base64") }),
+  RECORDS_ENCRYPTION_CURRENT_KEY_ID: "prod-1",
+};
+
 describe("loadEnv", () => {
   test("applies defaults for an empty environment", () => {
     expect(loadEnv({})).toEqual({
@@ -97,6 +103,7 @@ describe("loadEnv", () => {
         READ_DATABASE_NAME: "workers_read",
         STRIPE_SECRET_KEY: "sk_test_prod",
         CLAMAV_HOST: "clamd.internal",
+        ...RECORD_KEYS,
         SES_REGION: "eu-central-1",
         FIREBASE_SERVICE_ACCOUNT: "{}",
       }),
@@ -105,6 +112,7 @@ describe("loadEnv", () => {
       READ_DATABASE_NAME: "workers_read",
       STRIPE_SECRET_KEY: "sk_test_prod",
       CLAMAV_HOST: "clamd.internal",
+      ...RECORD_KEYS,
     });
   });
 
@@ -114,6 +122,7 @@ describe("loadEnv", () => {
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
+      ...RECORD_KEYS,
       SES_REGION: "eu-central-1",
       FIREBASE_SERVICE_ACCOUNT: "{}",
       // Injected empty by the task definition when the secret holds no Stripe key.
@@ -128,6 +137,7 @@ describe("loadEnv", () => {
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
+      ...RECORD_KEYS,
       PUSH_DRY_RUN: "true",
     };
 
@@ -154,6 +164,7 @@ describe("loadEnv", () => {
       READ_DATABASE_HOST: "pgbouncer.internal",
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
+      ...RECORD_KEYS,
       EMAIL_DRY_RUN: "true",
     };
 
@@ -167,5 +178,29 @@ describe("loadEnv", () => {
     test("boots without one only when dry-run is chosen on purpose", () => {
       expect(loadEnv({ ...deployed, PUSH_DRY_RUN: "true" }).PUSH_DRY_RUN).toBe(true);
     });
+  });
+
+  test("requires a real records keyring in production", () => {
+    const production = {
+      NODE_ENV: "production",
+      EMAIL_DRY_RUN: "true",
+      PUSH_DRY_RUN: "true",
+      CLAMAV_HOST: "clamd.internal",
+      READ_DATABASE_HOST: "pgbouncer.internal",
+      READ_DATABASE_NAME: "api_read",
+    };
+    expect(() => loadEnv(production)).toThrow(/RECORDS_ENCRYPTION_KEYS is required/);
+    expect(() =>
+      loadEnv({
+        ...production,
+        RECORDS_ENCRYPTION_KEYS: JSON.stringify({
+          "dev-1": Buffer.from("studafy-development-only-key-v1!").toString("base64"),
+        }),
+        RECORDS_ENCRYPTION_CURRENT_KEY_ID: "dev-1",
+      }),
+    ).toThrow(/development key/);
+    expect(loadEnv({ ...production, ...RECORD_KEYS }).RECORDS_ENCRYPTION_CURRENT_KEY_ID).toBe(
+      "prod-1",
+    );
   });
 });

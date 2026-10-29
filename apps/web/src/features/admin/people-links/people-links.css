@@ -1,0 +1,100 @@
+.people-links {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin: 0;
+  padding: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.people-links legend {
+  padding: 0 var(--space-4);
+  font-weight: 600;
+}
+
+.people-links__hint {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.people-links__picked {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.people-links__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.people-links__row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.people-links__row-head p,
+.people-links__family span {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.people-links__family {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.people-links__results {
+  list-style: none;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.people-links__result {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  text-align: start;
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.people-links__result:hover,
+.people-links__result:focus-visible {
+  border-color: var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.people-links__result span,
+.people-links__empty {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.people-links__empty {
+  padding: var(--space-8) var(--space-12);
+}

@@ -9,6 +9,7 @@ export {
   STUDENT_STATUSES,
 } from "./fields";
 export type {
+  ImportRecordField,
   ParentRelationship,
   StudentImportField,
   StudentImportFieldDefinition,
@@ -19,6 +20,7 @@ export type {
 export {
   normalizeHeader,
   readCsvSource,
+  recordIssueField,
   stageRows,
   suggestColumnMapping,
   validateColumnMapping,
@@ -35,6 +37,7 @@ export type {
   StagedRecord,
   StudentImportAction,
   StudentImportConflict,
+  StudentImportParentConflict,
   StudentImportPlan,
   StudentImportPlanTotals,
   UpdatableStudentField,

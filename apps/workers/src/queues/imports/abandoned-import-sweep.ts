@@ -13,7 +13,8 @@
  *
  * Deliberately scoped to `uploaded`/`validated` only. A `confirmed`/`processing`/`completed`/
  * `failed` row already committed to (or already ran) student creation — that's a real outcome with
- * a summary worth keeping, not an abandoned draft, so it is never a candidate here.
+ * a summary worth keeping, not an abandoned draft, so it is never a candidate here. A `failed`
+ * import past the same window does lose its staged rows (the uploaded cells), never the import row.
  */
 
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -57,6 +58,18 @@ export async function purgeAbandonedStudentImports(
             AND status IN ('uploaded', 'validated')
             AND created_at < ${cutoff}
           RETURNING id
+        `;
+        // A failed import keeps its row (and summary) for the record, but not the uploaded file's
+        // cells once a retry is no longer coming: a completed import drops them at apply time
+        // (worker.ts), and these would otherwise hold sensitive template columns indefinitely.
+        await tx`
+          DELETE FROM app.student_import_rows AS staged
+          USING app.student_imports AS import
+          WHERE staged.school_id = current_setting('app.school_id')::uuid
+            AND import.school_id = staged.school_id
+            AND import.id = staged.import_id
+            AND import.status = 'failed'
+            AND import.updated_at < ${cutoff}
         `;
         return rows.length;
       });

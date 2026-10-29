@@ -583,6 +583,25 @@ export const ERROR_CODES = {
   MESSAGE_REPORT_NOT_FOUND: "MESSAGE_REPORT_NOT_FOUND",
   MESSAGE_REPORT_INVALID_TRANSITION: "MESSAGE_REPORT_INVALID_TRANSITION",
 
+  // School-defined student and parent records (docs/modules/student-records.md, 000170).
+  // TEMPLATE_NOT_PUBLISHED: no published version to fill in yet. FIELD_LOCKED: a published field's
+  // type cannot change, nor can a sensitive field be made standard again (ADR-019). VALUE_INVALID
+  // names the field, never echoes the value. NOT_SENSITIVE: a reveal of a field that is not
+  // sensitive. KEY_UNAVAILABLE: the sealing key for a stored value is not in the keyring (fails
+  // closed). SUBJECT_NOT_FOUND covers a student or parent the caller cannot see as well as one that
+  // does not exist, so the endpoints cannot be used to probe.
+  RECORD_TEMPLATE_NOT_PUBLISHED: "RECORD_TEMPLATE_NOT_PUBLISHED",
+  RECORD_NOTHING_TO_PUBLISH: "RECORD_NOTHING_TO_PUBLISH",
+  RECORD_FIELD_NOT_FOUND: "RECORD_FIELD_NOT_FOUND",
+  RECORD_FIELD_INVALID: "RECORD_FIELD_INVALID",
+  RECORD_FIELD_LOCKED: "RECORD_FIELD_LOCKED",
+  RECORD_FIELD_NOT_DOCUMENT: "RECORD_FIELD_NOT_DOCUMENT",
+  RECORD_FIELD_NOT_SENSITIVE: "RECORD_FIELD_NOT_SENSITIVE",
+  RECORD_VALUE_INVALID: "RECORD_VALUE_INVALID",
+  RECORD_SUBJECT_NOT_FOUND: "RECORD_SUBJECT_NOT_FOUND",
+  RECORD_DOCUMENT_NOT_FOUND: "RECORD_DOCUMENT_NOT_FOUND",
+  RECORD_KEY_UNAVAILABLE: "RECORD_KEY_UNAVAILABLE",
+
   // Uncategorized server-side failure.
   INTERNAL_ERROR: "INTERNAL_ERROR",
 } as const;

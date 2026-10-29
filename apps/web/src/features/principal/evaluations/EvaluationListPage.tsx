@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { useSearchParamFlag } from "../../../lib/use-search-param-flag";
 
 import { CreateEvaluationModal } from "./CreateEvaluationModal";
 import {
@@ -48,7 +49,11 @@ export default function EvaluationListPage() {
     ALL_STATUSES,
   );
   const [teacherFilter, setTeacherFilter] = useState<string>(ALL_TEACHERS);
-  const [createOpen, setCreateOpen] = useState(false);
+  // `?create=1` (the global search's "Start a teacher evaluation") opens the modal on arrival;
+  // closing it drops the parameter, so Back does not reopen it.
+  const [createParam, clearCreateParam] = useSearchParamFlag("create");
+  const [createClicked, setCreateOpen] = useState(false);
+  const createOpen = createClicked || createParam === "1";
 
   const teachersQuery = useQuery({
     queryKey: TEACHER_CONTACTS_KEY,
@@ -167,7 +172,10 @@ export default function EvaluationListPage() {
       <CreateEvaluationModal
         open={createOpen}
         teachers={teachersQuery.data ?? []}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => {
+          setCreateOpen(false);
+          clearCreateParam();
+        }}
       />
     </>
   );

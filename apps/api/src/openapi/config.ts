@@ -139,6 +139,15 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "finance-visible roles receive full profiles including admission data.",
     },
     {
+      name: "Student and parent records",
+      description:
+        "School-defined records about students and their parents (docs/modules/student-records.md). " +
+        "Templates are built and published by leadership (recordTemplate:manage); records are " +
+        "filled in by leadership (studentRecord:update) and read per field visibility and row scope " +
+        "(studentRecord:read). Sensitive values are encrypted at rest, masked in every response, and " +
+        "returned in full only by the audited reveal call (studentRecord:readSensitive).",
+    },
+    {
       name: "Teachers",
       description:
         "Teacher profile management. Authenticated and tenant-scoped. " +

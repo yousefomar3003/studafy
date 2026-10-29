@@ -48,6 +48,8 @@
         { "name": "DATABASE_PASSWORD", "valueFrom": "${PGBOUNCER_SECRET_ARN}:api_password::" },
         { "name": "DATABASE_CA_CERT", "valueFrom": "${PGBOUNCER_SECRET_ARN}:ca_cert_pem::" },
         { "name": "STRIPE_SECRET_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:STRIPE_SECRET_KEY::" },
+        { "name": "RECORDS_ENCRYPTION_KEYS", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:RECORDS_ENCRYPTION_KEYS::" },
+        { "name": "RECORDS_ENCRYPTION_CURRENT_KEY_ID", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:RECORDS_ENCRYPTION_CURRENT_KEY_ID::" },
         { "name": "TAP_SECRET_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_SECRET_KEY::" },
         { "name": "TAP_WEBHOOK_URL", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:TAP_WEBHOOK_URL::" },
         { "name": "AI_LLM_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:AI_LLM_API_KEY::" },

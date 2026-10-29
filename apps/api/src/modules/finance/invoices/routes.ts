@@ -13,6 +13,7 @@ import {
   studentFamilies,
   withStudentIdentityTx,
 } from "../students/service";
+import { studentsWithoutFamily } from "../unlinked/service";
 
 import {
   createInvoiceBatchBodySchema,
@@ -21,6 +22,8 @@ import {
   invoiceBatchItemQuerySchema,
   invoiceBatchListQuerySchema,
   invoiceBatchListSchema,
+  invoiceBatchPreflightBodySchema,
+  invoiceBatchPreflightSchema,
   invoiceBatchSchema,
   invoiceDetailSchema,
   invoiceIdParamSchema,
@@ -163,6 +166,30 @@ const createInvoiceBatchRoute = createRoute({
   ),
 });
 
+const preflightInvoiceBatchRoute = createRoute({
+  method: "post",
+  path: "/api/finance/invoices/batches/preflight",
+  tags: ["Finance"],
+  operationId: "preflightInvoiceBatch",
+  summary: "Check a batch's targets before starting it",
+  description:
+    "Resolves the same targets `POST /api/finance/invoices/batches` would bill, without creating " +
+    "anything, and reports how many of those students belong to no family (no guardian linked). " +
+    "Their invoices get no sibling discount and no parent can see or pay them. A warning for the " +
+    "person about to start the batch, not a block: the batch can still be started.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: invoiceBatchPreflightBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "Who the batch would bill.", schema: invoiceBatchPreflightSchema } },
+    [400, 401, 403, 429, 500],
+  ),
+});
+
 const listInvoiceBatchesRoute = createRoute({
   method: "get",
   path: "/api/finance/invoices/batches",
@@ -244,6 +271,9 @@ export function financeInvoiceRoutes(
   routes.use("/api/finance/invoices/:invoiceId", requirePermission(PERMISSIONS.BILLING_READ));
 
   routes.use("/api/finance/invoices/batches", auditAction("insert", "invoice_batches"));
+  // The preflight writes nothing; like the license quote calculator it declares the table the
+  // batch it checks ends up in, for the audit coverage gate. BILLING_READ comes from batches/*.
+  routes.use("/api/finance/invoices/batches/preflight", auditAction("insert", "invoice_batches"));
 
   // --- Invoices ---
 
@@ -352,6 +382,28 @@ export function financeInvoiceRoutes(
     log?.info({ invoice_batch_id: batch.id, total: batch.total_count }, "invoice batch created");
 
     return c.json(toBatchResponse(batch), 201);
+  });
+
+  routes.openapi(preflightInvoiceBatchRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+
+    // The same identity read the batch itself resolves its targets with (FINANCE cannot see
+    // app.students under its own role scope).
+    const preflight = await withStudentIdentityTx(database, auth.schoolId, async (tx) => {
+      const studentIds = await resolveBillableStudentIds(tx, auth.schoolId, {
+        classIds: body.target_class_ids,
+        studentIds: body.target_student_ids,
+      });
+      const unlinked = await studentsWithoutFamily(tx, auth.schoolId, studentIds, 100);
+      return {
+        total_count: studentIds.length,
+        unlinked_count: unlinked.count,
+        unlinked_students: unlinked.students,
+      };
+    });
+
+    return c.json(preflight, 200);
   });
 
   routes.openapi(getInvoiceBatchRoute, async (c) => {

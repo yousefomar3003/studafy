@@ -1,0 +1,189 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "previous": "Previous",
+    "next": "Next"
+  },
+  "page": {
+    "title": "Student and parent records",
+    "intro": "Choose what your school records about each student and each parent. Staff fill the records in; parents never enter anything. Changes are drafts until you publish them.",
+    "subjects": "Whose record",
+    "student": "Student record",
+    "parent": "Parent record",
+    "backToSettings": "Back to school settings",
+    "backToDashboard": "Back to the dashboard"
+  },
+  "editor": {
+    "loadError": "This template could not be loaded. Try again in a moment.",
+    "neverPublished": "Not published yet: staff cannot fill this record in until you publish it.",
+    "publishedVersion": "Published version {{version}}, {{date}}.",
+    "unpublishedChanges": "Unpublished changes",
+    "versionsNote": "Publishing creates a new version. Answers already given keep the field as it was when they were given, and archiving a field never deletes its answers.",
+    "addField": "Add field",
+    "publish": "Publish",
+    "published": "Version {{version}} published",
+    "nothingToPublish": "There are no changes to publish",
+    "publishError": "The template could not be published",
+    "reorderError": "The fields could not be reordered",
+    "fieldsHeading_one": "{{count}} field on the form",
+    "fieldsHeading_other": "{{count}} fields on the form",
+    "empty": "No fields yet. Add the first one.",
+    "archivedHeading_one": "{{count}} archived field",
+    "archivedHeading_other": "{{count}} archived fields",
+    "archivedNote": "Archived fields leave the form at the next publish. Their answers are kept and stay visible to leadership.",
+    "moveUp": "Move {{label}} up",
+    "moveDown": "Move {{label}} down",
+    "edit": "Edit {{label}}",
+    "archive": "Archive {{label}}",
+    "restore": "Restore {{label}}",
+    "archived": "{{label}} archived",
+    "restored": "{{label}} restored"
+  },
+  "field": {
+    "addTitle": "Add a field",
+    "editTitle": "Edit field",
+    "type": "Type",
+    "typeLocked": "This field has been published, so its type is locked. Archive it and add a new field to change the type.",
+    "labelEn": "Label (English)",
+    "labelAr": "Label (Arabic)",
+    "helpEn": "Help text (English)",
+    "helpAr": "Help text (Arabic)",
+    "options": "Choices",
+    "optionValue": "Choice {{number}} value",
+    "optionLabelEn": "Choice {{number}} label (English)",
+    "optionLabelAr": "Choice {{number}} label (Arabic)",
+    "removeOption": "Remove choice {{number}}",
+    "addOption": "Add a choice",
+    "required": "Required",
+    "hasExpiry": "Has an expiry date",
+    "visibility": "Who can see it",
+    "visibilityHelp": "Leadership always sees every field. Sensitive fields are seen by leadership only, whatever this says.",
+    "sensitive": "Sensitive",
+    "sensitivityLocked": "This field was published as sensitive, so it stays sensitive.",
+    "retention": "Delete after (months)",
+    "retentionHelp_one": "Months after the person leaves. Leave empty for the default, {{count}} month.",
+    "retentionHelp_other": "Months after the person leaves. Leave empty for the default, {{count}} months.",
+    "add": "Add field",
+    "save": "Save field",
+    "added": "Field added to the draft",
+    "updated": "Field saved to the draft",
+    "saveError": "The field could not be saved",
+    "lockedError": "That change is not allowed on a published field",
+    "errors": {
+      "labelRequired": "Enter a label",
+      "optionsRequired": "Add at least one choice",
+      "optionIncomplete": "Every choice needs a value and both labels",
+      "optionDuplicate": "Each choice needs a different value",
+      "retention": "Enter a whole number of months from 1 to 120"
+    }
+  },
+  "sensitive": {
+    "title": "This field is handled as sensitive:",
+    "hint": "This label looks like an ID number, a passport or medical information. Consider marking it sensitive:",
+    "markSensitive": "Mark as sensitive",
+    "masked": "Its value is encrypted and shown masked everywhere, for example •••• 1234.",
+    "permission": "Only school leadership can reveal the full value, with a separate permission.",
+    "logged": "Every reveal and every download is logged: who, when, and which field.",
+    "retention_one": "It is deleted automatically {{count}} month after the person leaves the school, unless you set another period.",
+    "retention_other": "It is deleted automatically {{count}} months after the person leaves the school, unless you set another period."
+  },
+  "badges": {
+    "required": "Required",
+    "sensitive": "Sensitive",
+    "looksSensitive": "Looks sensitive",
+    "draft": "Not yet published"
+  },
+  "types": {
+    "short_text": "Short text",
+    "long_text": "Long text",
+    "number": "Number",
+    "date": "Date",
+    "single_choice": "One choice",
+    "multi_choice": "Several choices",
+    "yes_no": "Yes or no",
+    "phone": "Phone",
+    "email": "Email",
+    "document": "Document"
+  },
+  "visibility": {
+    "staff_only": "Leadership only",
+    "finance": "Finance and leadership",
+    "teachers": "Teachers, finance and leadership",
+    "parent": "Parents, teachers, finance and leadership"
+  },
+  "preview": {
+    "heading": "Preview",
+    "language": "Preview language",
+    "en": "English",
+    "ar": "العربية",
+    "empty": "The form has no fields yet.",
+    "notice": "Preview: the form as staff will fill it in.",
+    "required": "required",
+    "choose": "Choose…",
+    "yes": "Yes",
+    "no": "No",
+    "expiry": "Expiry date"
+  },
+  "links": {
+    "templates": "Student and parent records",
+    "templatesDescription": "Choose what your school records about each student and parent, which fields are required, and which are sensitive.",
+    "openEditor": "Edit the record forms",
+    "missing": "Missing information"
+  },
+  "missing": {
+    "title": "Missing information",
+    "intro": "Current students and parents with a required field or document missing, or a document that has expired or expires within 30 days. Open a record to complete it.",
+    "subjects": "Whose records",
+    "issueFilter": "Show",
+    "issueAll": "Every issue",
+    "issues": {
+      "missing": "Missing",
+      "expired": "Expired",
+      "expiring": "Expires soon"
+    },
+    "separator": ", ",
+    "withDate": "{{label}} ({{date}})",
+    "loadError": "This list could not be loaded. Try again in a moment.",
+    "openRecord": "Open {{name}}'s record",
+    "columns": {
+      "student": "Student",
+      "parent": "Parent",
+      "issues": "What is missing",
+      "open": "Record"
+    },
+    "students": {
+      "tab": "Students",
+      "title": "Students with missing information",
+      "search": "Search students",
+      "caption": "Students with missing information",
+      "empty": "No student has missing information."
+    },
+    "parents": {
+      "tab": "Parents",
+      "title": "Parents with missing information",
+      "search": "Search parents",
+      "caption": "Parents with missing information",
+      "empty": "No parent has missing information."
+    }
+  },
+  "dashboard": {
+    "missing": "Missing information",
+    "missingHint_one": "{{count}} document expired",
+    "missingHint_other": "{{count}} documents expired"
+  },
+  "tile": {
+    "title": "Missing information",
+    "error": "Missing information could not be loaded.",
+    "empty": "Every record is complete.",
+    "students_one": "{{formatted}} student with missing information",
+    "students_other": "{{formatted}} students with missing information",
+    "parents_one": "{{formatted}} parent with missing information",
+    "parents_other": "{{formatted}} parents with missing information",
+    "expired_one": "{{formatted}} document expired",
+    "expired_other": "{{formatted}} documents expired",
+    "expiring_one": "{{formatted}} document expires within 30 days",
+    "expiring_other": "{{formatted}} documents expire within 30 days",
+    "link": "See missing information"
+  }
+}
