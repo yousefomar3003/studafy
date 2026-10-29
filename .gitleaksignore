@@ -5,3 +5,9 @@
 # already-reviewed, immutable commit 90535696, so the commit cannot be rewritten; this ignores exactly
 # that one finding by fingerprint instead of allowlisting the whole commit.
 90535696cedbe48881ec94ef740521bc6fe1c740:apps/docs-api/src/content/idempotency.ts:generic-api-key:47
+# Student and parent records: gitleaks flagged the fake passport-number constant in
+# apps/api/tests/records/records-http.test.ts (commit e767e9b1) as a `generic-api-key`. It is a fake
+# passport number stored in a sensitive record field, so the test can assert it never appears in a
+# response; not a credential. The constant is now SENSITIVE_ID_VALUE; the old line only exists in
+# the already-pushed commit e767e9b1, so this ignores exactly that one finding by fingerprint.
+e767e9b1ff28ad0f6c8a6d6b0d0ba5eef199114f:apps/api/tests/records/records-http.test.ts:generic-api-key:130

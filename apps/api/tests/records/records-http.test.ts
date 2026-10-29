@@ -127,7 +127,7 @@ interface World {
   otherParent: Actor;
 }
 
-const SECRET = "P1234567-SECRET";
+const SENSITIVE_ID_VALUE = "P1234567-PASSPORT";
 
 function actor(schoolId: string, userId: string, role: Role): Actor {
   return { schoolId, userId, roles: [role], channel: "web" };
@@ -267,7 +267,7 @@ async function fill(
       { field_id: fields.financeField.id, value: "Grandfather" },
       { field_id: fields.teachersField.id, value: "Peanuts" },
       { field_id: fields.parentField.id, value: "red" },
-      { field_id: fields.nationalId.id, value: SECRET },
+      { field_id: fields.nationalId.id, value: SENSITIVE_ID_VALUE },
     ],
   });
   expect(response.status).toBe(200);
@@ -483,23 +483,23 @@ describeDb("sensitive values", () => {
     const w = await world();
     const fields = await standardTemplate(w);
     const write = await fill(w, w.studentId, fields);
-    expect(await write.clone().text()).not.toContain(SECRET);
+    expect(await write.clone().text()).not.toContain(SENSITIVE_ID_VALUE);
 
     const staff = await call(w.admin, "GET", `/api/students/${w.studentId}/records`);
     const text = await staff.text();
-    expect(text).not.toContain(SECRET);
+    expect(text).not.toContain(SENSITIVE_ID_VALUE);
     expect(staff.headers.get("Cache-Control")).toBe("no-store");
     const id = (JSON.parse(text) as { entries: EntryDto[] }).entries.find(
       (entry) => entry.field.id === fields.nationalId.id,
     )!;
-    expect(id).toMatchObject({ value: null, masked: true, mask: "•••• CRET" });
+    expect(id).toMatchObject({ value: null, masked: true, mask: "•••• PORT" });
 
     for (const path of [
       "/api/records/missing/students",
       "/api/records/missing/summary",
       "/api/record-templates/student",
     ]) {
-      expect(await (await call(w.admin, "GET", path)).text()).not.toContain(SECRET);
+      expect(await (await call(w.admin, "GET", path)).text()).not.toContain(SENSITIVE_ID_VALUE);
     }
 
     const [stored] = await database!.sql<
@@ -509,7 +509,9 @@ describeDb("sensitive values", () => {
       WHERE school_id = ${w.schoolId}::uuid AND field_id = ${fields.nationalId.id}::uuid
     `;
     expect(stored!.value).toBeNull();
-    expect(Buffer.from(stored!.value_ciphertext).toString("utf8")).not.toContain(SECRET);
+    expect(Buffer.from(stored!.value_ciphertext).toString("utf8")).not.toContain(
+      SENSITIVE_ID_VALUE,
+    );
 
     const audits = await database!.sql<{ payload: string }[]>`
       SELECT coalesce(old_values::text, '') || coalesce(new_values::text, '') AS payload
@@ -517,7 +519,7 @@ describeDb("sensitive values", () => {
       WHERE school_id = ${w.schoolId}::uuid AND target_table = 'record_answers'
     `;
     expect(audits.length).toBeGreaterThan(0);
-    for (const row of audits) expect(row.payload).not.toContain(SECRET);
+    for (const row of audits) expect(row.payload).not.toContain(SENSITIVE_ID_VALUE);
   });
 
   test("reveal returns the value to ORG_ADMIN and PRINCIPAL, audited with who and which field", async () => {
@@ -531,7 +533,7 @@ describeDb("sensitive values", () => {
       expect(response.status).toBe(200);
       expect(await json<{ field_id: string; value: unknown }>(response)).toEqual({
         field_id: fields.nationalId.id,
-        value: SECRET,
+        value: SENSITIVE_ID_VALUE,
       });
       const [audit] = await database!.sql<
         { actor_id: string; new_values: Record<string, unknown> }[]
@@ -541,7 +543,7 @@ describeDb("sensitive values", () => {
         ORDER BY created_at DESC LIMIT 1
       `;
       expect(audit!.new_values).toMatchObject({ field_id: fields.nationalId.id, reveal: true });
-      expect(JSON.stringify(audit!.new_values)).not.toContain(SECRET);
+      expect(JSON.stringify(audit!.new_values)).not.toContain(SENSITIVE_ID_VALUE);
     }
 
     for (const who of [w.finance, w.teacher, w.parent]) {
@@ -838,7 +840,7 @@ describeDb("filling a record while creating the account", () => {
       last_name: "Nasser",
       records: [
         { field_id: fields.parentField.id, value: "blue" },
-        { field_id: fields.nationalId.id, value: SECRET },
+        { field_id: fields.nationalId.id, value: SENSITIVE_ID_VALUE },
       ],
     });
     expect(created.status).toBe(201);
