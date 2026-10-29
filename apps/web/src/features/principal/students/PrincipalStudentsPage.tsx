@@ -1,5 +1,6 @@
 import { Input, Select, Table } from "@studafy/ui";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { studentDisplayName, useAllStudents } from "../school/queries";
@@ -28,6 +29,7 @@ function calendarDay(value: string): Date {
  * Students (`/portal/principal/students`): the school's whole student roll, searchable by name and
  * filterable by status. Read-only — enrolling and editing students is the admin's job. Admission
  * numbers are finance-visible only (see `projectStudent` in the API), so a principal sees "—".
+ * Each name opens the student's page (PrincipalStudentPage), where their record is kept.
  */
 export default function PrincipalStudentsPage() {
   const { t } = useTranslation();
@@ -88,7 +90,11 @@ export default function PrincipalStudentsPage() {
         >
           {rows.map((student) => (
             <Table.Row key={student.id}>
-              <Table.Cell>{studentDisplayName(student)}</Table.Cell>
+              <Table.Cell>
+                <Link to={`/portal/principal/students/${student.id}`}>
+                  {studentDisplayName(student)}
+                </Link>
+              </Table.Cell>
               <Table.Cell>{student.admission_number || "—"}</Table.Cell>
               <Table.Cell>
                 {student.date_of_birth

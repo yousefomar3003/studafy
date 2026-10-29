@@ -1,5 +1,9 @@
+import { PERMISSIONS } from "@studafy/constants";
+import { Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 
+import { usePermissions } from "../../../lib/auth";
 import { useTranslation } from "../../../lib/i18n";
 
 import { AttendanceAlertsSection } from "./AttendanceAlertsSection";
@@ -19,6 +23,7 @@ import "./settings.css";
  */
 export default function SchoolSettingsPage() {
   const { t } = useTranslation();
+  const permissions = usePermissions();
   const settingsQuery = useQuery({
     queryKey: SCHOOL_SETTINGS_KEY,
     queryFn: fetchSchoolSettings,
@@ -40,6 +45,21 @@ export default function SchoolSettingsPage() {
         <LocaleTimezoneSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
         <GradingSchemeSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
         <AttendanceAlertsSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
+        {permissions.has(PERMISSIONS.RECORD_TEMPLATE_MANAGE) ? (
+          <Card as="section" aria-label={t("recordTemplates.links.templates")}>
+            <Card.Header>
+              <h2>{t("recordTemplates.links.templates")}</h2>
+              <p className="settings-card__description">
+                {t("recordTemplates.links.templatesDescription")}
+              </p>
+            </Card.Header>
+            <Card.Body>
+              <Link to="/portal/admin/settings/records">
+                {t("recordTemplates.links.openEditor")}
+              </Link>
+            </Card.Body>
+          </Card>
+        ) : null}
       </div>
     </>
   );

@@ -6,6 +6,9 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 import { MEMBER_PASSWORD_ROLES } from "../auth/services/member-password-service";
 import { adminRevokeUserSessions, REVOCATION_REASONS } from "../auth/services/revocation-service";
 
+import { linkParentToStudent } from "./student-service";
+
+import type { ParentRelationship } from "./student-service";
 import type { Database } from "../../db/client";
 import type { TenantContext } from "../../db/tenant-tx";
 import type { Logger } from "../../logger";
@@ -53,6 +56,8 @@ export interface CreateUserParams {
   email?: string;
   display_name?: string;
   role: Role;
+  /** PARENT only: students to link the new parent to. The caller has checked `parent:link`. */
+  children?: { student_id: string; relationship: ParentRelationship }[];
 }
 
 export interface UpdateUserParams {
@@ -268,6 +273,9 @@ export async function createUser(
       message: "An email is required for roles that sign in with Google or Microsoft.",
     });
   }
+  if (params.children?.length && params.role !== "PARENT") {
+    throw new HTTPException(400, { message: "Only a PARENT user can be linked to children." });
+  }
   const email = params.email?.trim() || null;
   const normalizedEmail = email?.toLowerCase() ?? null;
 
@@ -311,6 +319,11 @@ export async function createUser(
       role: params.role,
     },
   });
+
+  // Same transaction: a child that cannot be linked rolls the new account back with it.
+  for (const child of params.children ?? []) {
+    await linkParentToStudent(tx, schoolId, child.student_id, row.id, child.relationship);
+  }
 
   const user = await getUser(tx, schoolId, row.id);
   if (!user) {

@@ -5,7 +5,7 @@ import { HTTPException } from "hono/http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
-import { requirePermission } from "../../../middleware/authz";
+import { requirePermission, requirePermissionIn } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
@@ -19,6 +19,7 @@ import {
   adminRevokeUserSessions,
   REVOCATION_REASONS,
 } from "../../auth/services/revocation-service";
+import { writeAnswers } from "../../records/record-service";
 import {
   createUserBodySchema,
   userListQuerySchema,
@@ -47,6 +48,7 @@ import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { JtiDenylist } from "../../auth/denylist";
 import type { Role } from "@studafy/constants";
+import type { RecordKeyring } from "@studafy/records";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -166,7 +168,9 @@ const createUserRoute = createRoute({
   summary: "Create a user",
   description:
     "Creates a new user in the school with the specified role. The user is created with " +
-    "'invited' status. Fails with 409 if the email already exists in this school.",
+    "'invited' status. Fails with 409 if the email already exists in this school. A PARENT can " +
+    "be created already linked to `children` in the same transaction; that also needs " +
+    "`parent:link`, and any child that cannot be linked fails the whole request.",
   security: [{ bearerAuth: [] }],
   request: {
     body: {
@@ -181,7 +185,7 @@ const createUserRoute = createRoute({
         schema: userListItemSchema,
       },
     },
-    [400, 401, 403, 409, 429, 500],
+    [400, 401, 403, 404, 409, 429, 500],
   ),
 });
 
@@ -297,7 +301,11 @@ const resetPasswordRoute = createRoute({
 // Route factory
 // ---------------------------------------------------------------------------
 
-export function userRoutes(database: Database, denylist: JtiDenylist | null): OpenAPIHono<AppEnv> {
+export function userRoutes(
+  database: Database,
+  denylist: JtiDenylist | null,
+  recordKeyring: RecordKeyring,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // --- Channel guard: mutations restricted to web sessions ---
@@ -387,13 +395,30 @@ export function userRoutes(database: Database, denylist: JtiDenylist | null): Op
   routes.openapi(createUserRoute, async (c) => {
     const auth = requireAuth(c);
     const body = c.req.valid("json");
+    // Creating a user and linking them to students are separate powers: user:create alone does
+    // not let a caller attach a parent to a child.
+    if (body.children?.length) requirePermissionIn(c, PERMISSIONS.PARENT_LINK);
+    // Likewise filling in the new parent's record: that is studentRecord:update.
+    if (body.records?.length) requirePermissionIn(c, PERMISSIONS.STUDENT_RECORD_UPDATE);
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      createUserService(tx, auth.schoolId, {
-        ...body,
-        role: body.role as Role,
-      }),
-    );
+    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const { records, ...account } = body;
+      const created = await createUserService(tx, auth.schoolId, {
+        ...account,
+        role: account.role as Role,
+      });
+      if (records?.length) {
+        await writeAnswers(
+          tx,
+          auth.schoolId,
+          { kind: "parent", id: created.id },
+          auth.userId,
+          records,
+          recordKeyring,
+        );
+      }
+      return created;
+    });
 
     return c.json(row, 201);
   });

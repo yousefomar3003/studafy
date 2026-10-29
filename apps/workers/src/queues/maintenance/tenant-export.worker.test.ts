@@ -3,6 +3,7 @@
  * fake S3 (no AWS dependency, same shape report-runner.test.ts's fakes use). Skipped without
  * TEST_DATABASE_URL.
  */
+import { DEVELOPMENT_RECORD_KEYRING } from "@studafy/records";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import postgres from "postgres";
@@ -91,6 +92,7 @@ describe("runTenantExport", () => {
           subjectScope: "tenant",
           subjectUserId: null,
           now: new Date("2026-09-09T12:00:00.000Z"),
+          recordKeyring: DEVELOPMENT_RECORD_KEYRING,
         }),
       );
 
@@ -120,6 +122,7 @@ describe("runTenantExport", () => {
         subjectScope: "user",
         subjectUserId: userId,
         now: new Date(),
+        recordKeyring: DEVELOPMENT_RECORD_KEYRING,
       }),
     );
 

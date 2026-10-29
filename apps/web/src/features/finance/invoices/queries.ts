@@ -11,6 +11,14 @@ export type InvoiceBatchStatus = InvoiceBatch["status"];
 export type InvoiceBatchItem = components["schemas"]["InvoiceBatchItem"];
 export type InvoiceBatchItemStatus = InvoiceBatchItem["status"];
 export type CreateInvoiceBatchBody = components["schemas"]["CreateInvoiceBatchBody"];
+export type InvoiceBatchPreflightBody = components["schemas"]["InvoiceBatchPreflightBody"];
+export type InvoiceBatchUnlinkedStudent = components["schemas"]["InvoiceBatchUnlinkedStudent"];
+/** Restated with a plain array; see `../families/queries.ts` on the generated `readonly` arrays. */
+export interface InvoiceBatchPreflight {
+  total_count: number;
+  unlinked_count: number;
+  unlinked_students: InvoiceBatchUnlinkedStudent[];
+}
 
 const PAGE_SIZE = 20;
 

@@ -11,6 +11,8 @@ import {
 } from "./mapping";
 import { toStudentImportRecord } from "./record";
 
+import type { ImportRecordField } from "./fields";
+
 const TEMPLATE_HEADER =
   "admission_number,email,first_name,middle_name,last_name,preferred_name,date_of_birth,status,parent_email,parent_relationship";
 
@@ -197,5 +199,90 @@ describe("toStudentImportRecord", () => {
   test("parent details without a parent email are rejected", () => {
     const result = toStudentImportRecord(2, { ...base, parent_name: "Pat" });
     expect(result.issues.map((i) => i.field)).toEqual(["parent_email"]);
+  });
+});
+
+describe("student record template columns", () => {
+  const fields: ImportRecordField[] = [
+    {
+      id: "11111111-1111-4111-8111-111111111111",
+      field_type: "single_choice",
+      options: [{ value: "red", label_en: "Red", label_ar: "أحمر" }],
+      label_en: "Bus route",
+      label_ar: "خط الحافلة",
+      sensitivity: "standard",
+    },
+    {
+      id: "22222222-2222-4222-8222-222222222222",
+      field_type: "short_text",
+      options: [],
+      label_en: "National ID",
+      label_ar: "رقم الهوية",
+      sensitivity: "sensitive",
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333333",
+      field_type: "document",
+      options: [],
+      label_en: "Birth certificate",
+      label_ar: "شهادة الميلاد",
+      sensitivity: "standard",
+    },
+  ];
+  const [route, nationalId, certificate] = fields as [
+    ImportRecordField,
+    ImportRecordField,
+    ImportRecordField,
+  ];
+  const csv = [
+    "admission_number,email,first_name,last_name,Bus Route,رقم الهوية,Birth certificate",
+    "A-1,a@x.test,Ali,Saleh,red,784-1990-1234567-1,",
+    "A-2,b@x.test,Huda,Saleh,purple,784-1990-7654321-1,",
+  ].join("\n");
+
+  test("suggests template columns by English or Arabic label, never a document field", () => {
+    const source = readCsvSource(csv);
+    expect(suggestColumnMapping(source.headers, fields).records).toEqual({
+      [route.id]: "Bus Route",
+      [nationalId.id]: "رقم الهوية",
+    });
+  });
+
+  test("a document field cannot be imported", () => {
+    const source = readCsvSource(csv);
+    const issues = validateColumnMapping(
+      {
+        ...suggestColumnMapping(source.headers, fields),
+        records: { [certificate.id]: "Birth certificate" },
+      },
+      source.headers,
+      source.header_line,
+      fields,
+    );
+    expect(issues).toEqual([
+      {
+        line: 1,
+        field: `record:${certificate.id}`,
+        message: '"Birth certificate" is a document field: upload its files on the Records tab.',
+      },
+    ]);
+  });
+
+  test("stages valid answers by field id; an invalid cell is reported without its value", () => {
+    const source = readCsvSource(csv);
+    const staged = stageRows(source, suggestColumnMapping(source.headers, fields), fields);
+    expect(staged.rows[0]!.record?.records).toEqual({
+      [route.id]: "red",
+      [nationalId.id]: "784-1990-1234567-1",
+    });
+    expect(staged.rows[1]!.record).toBeNull();
+    expect(staged.issues).toEqual([
+      {
+        line: 3,
+        field: `record:${route.id}`,
+        message: '"Bus route": Not one of this field\'s choices.',
+      },
+    ]);
+    expect(JSON.stringify(staged.issues)).not.toContain("purple");
   });
 });

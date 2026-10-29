@@ -136,6 +136,32 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
       gatewayConfirm: false,
     },
   ],
+  // The file behind a document field on a student's or parent's record (000169): a birth
+  // certificate, a vaccination record, a previous school's report. Uploaded by school leadership
+  // only (parents enter nothing) and confirmed by the records module inside the write that attaches
+  // it; mirrors ck_record_documents_mime_type. Phone photos arrive as HEIC.
+  [
+    "record.document",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png", "image/heic"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.STUDENT_RECORD_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
+  // A document field the school marked sensitive (a passport scan, a medical certificate). Stricter
+  // than record.document: PDF and the two common image types only, a smaller cap, promoted under the
+  // sensitive-documents KMS key, downloaded through one-minute URLs that need
+  // studentRecord:readSensitive and are audited (ADR-019).
+  [
+    "record.sensitiveDocument",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png"]),
+      maxSizeBytes: 5 * MIB,
+      requiredPermission: PERMISSIONS.STUDENT_RECORD_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
   [
     "user.avatar",
     {

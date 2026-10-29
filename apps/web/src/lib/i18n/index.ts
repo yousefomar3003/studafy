@@ -33,5 +33,5 @@ export type { LocaleStore, LocaleStoreOptions } from "./store";
 // Components read translations the same way regardless of which app-level provider mounted i18next.
 export { Trans, useTranslation } from "react-i18next";
 
-export { loadCatalogAreas, prepareLocale } from "./catalog-loader";
+export { loadCatalogAreas, loadCatalogAreasIn, prepareLocale } from "./catalog-loader";
 export type { CatalogArea } from "./catalog-loader";

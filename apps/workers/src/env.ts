@@ -1,3 +1,4 @@
+import { keyringHoldsDevelopmentKey, parseRecordKeyring } from "@studafy/records";
 import { z } from "zod";
 
 /**
@@ -65,6 +66,10 @@ export const envSchema = z
     // through Tap, so a deployment serving only them has no Stripe account at all. Seat
     // reconciliation still never stops silently -- without a key it fails loudly the moment any
     // active subscription is billed through Stripe (queues/billing/worker.ts).
+    // The records keyring (ADR-019; see apps/api/src/env.ts). The import worker seals sensitive
+    // template columns with it. Production requires a real one; elsewhere the development key.
+    RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // SES transactional email (deliverability R-08). When SES_REGION is unset the email dispatcher
     // runs in dry-run mode: it renders, dedups, and records deliveries exactly as in production but
@@ -157,7 +162,47 @@ export const envSchema = z
     AI_LLM_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
   })
   .superRefine((env, context) => {
+    if (
+      (env.RECORDS_ENCRYPTION_KEYS === undefined) !==
+      (env.RECORDS_ENCRYPTION_CURRENT_KEY_ID === undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["RECORDS_ENCRYPTION_KEYS"],
+        message:
+          "RECORDS_ENCRYPTION_KEYS and RECORDS_ENCRYPTION_CURRENT_KEY_ID must be set together",
+      });
+    } else if (env.RECORDS_ENCRYPTION_KEYS !== undefined) {
+      try {
+        const keyring = parseRecordKeyring(
+          env.RECORDS_ENCRYPTION_KEYS,
+          env.RECORDS_ENCRYPTION_CURRENT_KEY_ID!,
+        );
+        if (env.NODE_ENV === "production" && keyringHoldsDevelopmentKey(keyring)) {
+          context.addIssue({
+            code: "custom",
+            path: ["RECORDS_ENCRYPTION_KEYS"],
+            message: "RECORDS_ENCRYPTION_KEYS must not hold the development key in production",
+          });
+        }
+      } catch (error) {
+        context.addIssue({
+          code: "custom",
+          path: ["RECORDS_ENCRYPTION_KEYS"],
+          message: (error as Error).message,
+        });
+      }
+    }
+
     if (env.NODE_ENV !== "production") return;
+
+    if (env.RECORDS_ENCRYPTION_KEYS === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["RECORDS_ENCRYPTION_KEYS"],
+        message: "RECORDS_ENCRYPTION_KEYS is required in production",
+      });
+    }
     if ((env.ERPNEXT_API_URL === undefined) !== (env.ERPNEXT_API_KEY === undefined)) {
       context.addIssue({
         code: "custom",

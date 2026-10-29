@@ -108,6 +108,21 @@ passes may miss rows this policy hides from whichever admin they resolved to act
 (`admin-actor.ts`). The export manifest's `knownGaps` field says so explicitly for every bundle
 that reaches this table, rather than silently shipping an incomplete one.
 
+## School-defined record data
+
+Student and parent records (`app.record_answers`, `app.record_documents`;
+[docs/modules/student-records.md](../modules/student-records.md)) are handled outside the
+generic walk by `apps/workers/src/queues/maintenance/records-dsr.ts`:
+
+- **Export** writes `data/record_answers.ndjson`: every answer about the subject as a student
+  (`student_id`) and as a parent (`parent_user_id`), sensitive values decrypted with the records
+  keyring and labelled with the field as it read when answered. Document files are listed in the
+  manifest's `files`.
+- **Erasure** deletes the answers outright, with documents cascading (`hard_deleted` on
+  `record_answers` in `redacted_tables`), and deletes the stored files after the erasure commits.
+- **Retention**: sensitive answers are also deleted on a schedule, 12 months (or the field's own
+  period) after the student leaves, by `record-retention-sweep.ts`.
+
 ## Operational notes
 
 - The tenant-closure sweep is idempotent: it never files a second `tenant`-scope request of a

@@ -102,3 +102,19 @@ module has no visibility into which `schoolId` a given request is for.
   under `tenant-<schoolId>/reports/` (see [`docs/modules/report-framework.md`](../modules/report-framework.md))
   and are invisible to that rule; the workers' daily `purge-expired-reports` sweep (ST-175) is the
   DB-driven closure for both prefixes.
+
+## Student and parent record documents
+
+The file behind a record's document field (docs/modules/student-records.md) is staged and promoted
+like any other upload, under `temp/` then `permanent/<schoolId>/…`, through two content classes in
+`apps/api/src/modules/storage/content-classes.ts`. The records module confirms the upload inside the
+write that attaches it (`gatewayConfirm: false`).
+
+- `record.document`: PDF, JPEG, PNG or HEIC, up to 10 MiB, downloaded through five-minute URLs.
+- `record.sensitiveDocument`: PDF, JPEG or PNG, up to 5 MiB. The promotion `CopyObject` re-encrypts
+  the object with the sensitive-documents KMS key (`STORAGE_SENSITIVE_KMS_KEY_ID`, Bucket Key
+  enabled, ADR-019). Downloads are one-minute URLs that need `studentRecord:readSensitive` and are
+  audited.
+
+A replaced or removed document's object is deleted after its row change commits. The retention
+sweep and DSR erasure delete objects the same way, once their transaction has committed.

@@ -25,6 +25,7 @@ import { scheduleAbandonedImportSweepJob } from "./queues/imports";
 import {
   scheduleAccountDeletionSweepJob,
   scheduleAiMessageRetentionSweepJob,
+  scheduleRecordRetentionSweepJob,
   scheduleClosureSweepJob,
 } from "./queues/maintenance";
 import {
@@ -252,6 +253,13 @@ void scheduleClosureSweepJob(closureSweepRedis).then(() => closureSweepRedis.dis
 const aiMessageRetentionRedis = createRedisConnection(env);
 void scheduleAiMessageRetentionSweepJob(aiMessageRetentionRedis).then(() =>
   aiMessageRetentionRedis.disconnect(),
+);
+
+// Sensitive record retention scheduler (docs/modules/student-records.md "Retention"):
+// idempotently register the daily 08:50 deletion of sensitive answers past their retention period.
+const recordRetentionRedis = createRedisConnection(env);
+void scheduleRecordRetentionSweepJob(recordRetentionRedis).then(() =>
+  recordRetentionRedis.disconnect(),
 );
 
 // Account-deletion sweep scheduler (000143): idempotently register the daily 09:00 run of every

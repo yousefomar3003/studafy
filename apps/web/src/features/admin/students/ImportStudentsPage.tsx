@@ -486,6 +486,14 @@ function CompletedPanel({ record, onReset }: CompletedPanelProps) {
             <dt>{t("adminPeople.students.import.completed.guardianLinks")}</dt>
             <dd>{summary?.parents_linked ?? 0}</dd>
           </div>
+          <div>
+            <dt>{t("adminPeople.students.import.completed.parentConflicts")}</dt>
+            <dd>{summary?.parent_conflicts ?? 0}</dd>
+          </div>
+          <div>
+            <dt>{t("adminPeople.students.import.completed.recordAnswers")}</dt>
+            <dd>{summary?.record_answers ?? 0}</dd>
+          </div>
         </dl>
         {record.error_rows > 0 ? (
           <p>

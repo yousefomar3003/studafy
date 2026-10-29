@@ -3,10 +3,11 @@ import { PERMISSIONS } from "@studafy/constants";
 import { Button, Card, Input, Select, Tabs, useToast } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { RecordsPanel } from "../../records/RecordsPanel";
 
 import { LinkGuardianModal } from "./LinkGuardianModal";
 import { useUpdateStudent } from "./mutations";
@@ -374,9 +375,11 @@ function AdmissionSection({ student, canEdit }: AdmissionSectionProps) {
 interface GuardiansTabProps {
   studentId: string;
   canManage: boolean;
+  /** `studentRecord:read`: each guardian links to their own record. */
+  canReadRecords: boolean;
 }
 
-function GuardiansTab({ studentId, canManage }: GuardiansTabProps) {
+function GuardiansTab({ studentId, canManage, canReadRecords }: GuardiansTabProps) {
   const { t } = useTranslation();
   const guardiansQuery = useQuery({
     queryKey: studentGuardiansQueryKey(studentId),
@@ -415,6 +418,11 @@ function GuardiansTab({ studentId, canManage }: GuardiansTabProps) {
                   &middot; {t(RELATIONSHIP_LABEL_KEYS[guardian.relationship])}
                 </p>
               </div>
+              {canReadRecords && guardian.user ? (
+                <Link to={`/portal/admin/parents/${guardian.parent_user_id}/records`}>
+                  {t("records.admin.openRecords")}
+                </Link>
+              ) : null}
               {canManage ? (
                 <Button variant="tertiary" onClick={() => setRemovingGuardian(guardian)}>
                   {t("adminPeople.students.profile.removeGuardian")}
@@ -496,6 +504,22 @@ export default function StudentProfilePage() {
   const permissions = usePermissions();
   const canViewAdmissionData = permissions.has(PERMISSIONS.BILLING_READ);
   const canEdit = permissions.has(PERMISSIONS.STUDENT_UPDATE);
+  // School-defined records (`studentRecord:*`): the tab exists only for a reader; editing and
+  // revealing a sensitive value are separate permissions again.
+  const canReadRecords = permissions.has(PERMISSIONS.STUDENT_RECORD_READ);
+  const canEditRecords = permissions.has(PERMISSIONS.STUDENT_RECORD_UPDATE);
+  const canRevealSensitive = permissions.has(PERMISSIONS.STUDENT_RECORD_READ_SENSITIVE);
+  // `?tab=guardians` opens straight on the Guardians tab: where finance's unlinked list sends a
+  // student with no guardian to be fixed. `?tab=records` is where the missing-information list
+  // sends a student whose record needs completing.
+  const [searchParams] = useSearchParams();
+  const requestedTab = searchParams.get("tab");
+  const initialTab =
+    requestedTab === "guardians"
+      ? "guardians"
+      : requestedTab === "records" && canReadRecords
+        ? "records"
+        : "profile";
 
   const studentQuery = useQuery({
     queryKey: studentQueryKey(studentId!),
@@ -521,13 +545,14 @@ export default function StudentProfilePage() {
     <>
       <h1>{fullName(student) || t("adminPeople.students.profile.studentFallback")}</h1>
 
-      <Tabs defaultValue="profile">
+      <Tabs defaultValue={initialTab}>
         <Tabs.List>
           <Tabs.Tab value="profile">{t("adminPeople.students.profile.tabProfile")}</Tabs.Tab>
           <Tabs.Tab value="guardians">{t("adminPeople.students.profile.guardians")}</Tabs.Tab>
           <Tabs.Tab value="enrollment">
             {t("adminPeople.students.profile.enrollmentHistory")}
           </Tabs.Tab>
+          {canReadRecords ? <Tabs.Tab value="records">{t("records.panel.title")}</Tabs.Tab> : null}
         </Tabs.List>
 
         <Tabs.Panel value="profile">
@@ -538,12 +563,26 @@ export default function StudentProfilePage() {
         </Tabs.Panel>
 
         <Tabs.Panel value="guardians">
-          <GuardiansTab studentId={student.id} canManage={canEdit} />
+          <GuardiansTab
+            studentId={student.id}
+            canManage={canEdit}
+            canReadRecords={canReadRecords}
+          />
         </Tabs.Panel>
 
         <Tabs.Panel value="enrollment">
           <EnrollmentHistoryTab studentId={student.id} />
         </Tabs.Panel>
+
+        {canReadRecords ? (
+          <Tabs.Panel value="records">
+            <RecordsPanel
+              subject={{ kind: "student", id: student.id }}
+              canEdit={canEditRecords}
+              canRevealSensitive={canRevealSensitive}
+            />
+          </Tabs.Panel>
+        ) : null}
       </Tabs>
     </>
   );

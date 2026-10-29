@@ -292,3 +292,7 @@
   flex-shrink: 0;
   vertical-align: middle;
 }
+
+.help-article__action {
+  margin: var(--space-12) 0 0;
+}

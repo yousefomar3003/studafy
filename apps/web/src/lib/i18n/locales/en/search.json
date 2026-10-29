@@ -1,0 +1,449 @@
+{
+  "destinations": {
+    "home": {
+      "title": "Home",
+      "where": "Portal",
+      "keywords": "home, dashboard, start page, main page, portal, overview, landing"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "where": "Portal › Notifications",
+      "keywords": "notifications, inbox, alerts, messages, updates, bell, unread"
+    },
+    "notification-preferences": {
+      "title": "Notification preferences",
+      "where": "Notifications › Preferences",
+      "keywords": "notification settings, email alerts, push notifications, mute, unsubscribe, alert preferences, stop emails"
+    },
+    "account": {
+      "title": "My account",
+      "where": "Account",
+      "keywords": "my account, profile, my details, my name, language, personal settings, my profile"
+    },
+    "account-sessions": {
+      "title": "Signed-in devices",
+      "where": "Account › Sessions",
+      "keywords": "sessions, devices, sign out, log out everywhere, security, active logins, revoke device, phones"
+    },
+    "delete-account": {
+      "title": "Delete my account",
+      "where": "Account › Delete account",
+      "keywords": "delete account, close account, remove my data, erase, privacy, gdpr, deactivate"
+    },
+    "help": {
+      "title": "Help center",
+      "where": "Help",
+      "keywords": "help, support, guide, how to, instructions, manual, faq, tutorial, documentation"
+    },
+    "platform-overview": {
+      "title": "Platform overview",
+      "where": "Studafy platform",
+      "keywords": "platform, console, super admin, all schools, platform dashboard, overview, studafy"
+    },
+    "platform-schools": {
+      "title": "Schools",
+      "where": "Studafy platform › Schools",
+      "keywords": "schools, tenants, customers, school list, organizations, suspend school, school status"
+    },
+    "review-school-applications": {
+      "title": "Review school applications",
+      "where": "Studafy platform › Applications",
+      "keywords": "applications, sign-ups, new schools, approve school, onboarding requests, pending schools, registrations"
+    },
+    "platform-inquiries": {
+      "title": "Sales inquiries",
+      "where": "Studafy platform › Inquiries",
+      "keywords": "inquiries, leads, talk to us, sales, prospects, contact requests, demo requests"
+    },
+    "review-platform-refunds": {
+      "title": "Review refund requests",
+      "where": "Studafy platform › Refunds",
+      "keywords": "refund requests, subscription refunds, approve refund, reject refund, ai add-on refund, money back"
+    },
+    "platform-finance": {
+      "title": "Platform finance",
+      "where": "Studafy platform › Finance",
+      "keywords": "platform revenue, earnings, mrr, subscriptions, overdue schools, platform billing, income"
+    },
+    "platform-ai-usage": {
+      "title": "AI usage",
+      "where": "Studafy platform › AI usage",
+      "keywords": "ai usage, tokens, model cost, ai spend, llm, ai budget, assistant usage"
+    },
+    "platform-plans": {
+      "title": "Plans & pricing",
+      "where": "Studafy platform › Plans",
+      "keywords": "plans, subscription plans, packages, price list, plan limits, pricing plans"
+    },
+    "platform-settings": {
+      "title": "Platform settings",
+      "where": "Studafy platform › Settings",
+      "keywords": "platform settings, configuration, sales email, global settings, platform options"
+    },
+    "look-up-account": {
+      "title": "Look up an account",
+      "where": "Studafy platform › Account lookup",
+      "keywords": "find user, user lookup, search account, email lookup, support lookup, who is, account search"
+    },
+    "platform-features": {
+      "title": "License features",
+      "where": "Studafy platform › Features",
+      "keywords": "features, modules, feature catalog, licensed features, feature flags, capabilities"
+    },
+    "platform-tiers": {
+      "title": "License tiers",
+      "where": "Studafy platform › Tiers",
+      "keywords": "tiers, bundles, packages, feature tiers, levels, editions"
+    },
+    "platform-pricing": {
+      "title": "Seat pricing",
+      "where": "Studafy platform › Pricing",
+      "keywords": "seat price, volume discounts, duration discounts, price per seat, pricing rules, rates"
+    },
+    "build-license-quote": {
+      "title": "Build a license quote",
+      "where": "Studafy platform › Quotes",
+      "keywords": "quote, price calculator, estimate, proposal, offer, seat quote, calculator"
+    },
+    "platform-licenses": {
+      "title": "School licenses",
+      "where": "Studafy platform › Licenses",
+      "keywords": "licenses, license list, seats sold, renewals, expiring licenses, contracts"
+    },
+    "platform-payments": {
+      "title": "License payments",
+      "where": "Studafy platform › Payments",
+      "keywords": "license payments, license invoices, receivables, paid invoices, payment status, collections"
+    },
+    "run-setup-wizard": {
+      "title": "Run the school setup wizard",
+      "where": "Admin › Setup",
+      "keywords": "setup wizard, get started, first steps, onboarding, school profile, academic year, initial setup, configure school"
+    },
+    "admin-dashboard": {
+      "title": "Admin dashboard",
+      "where": "Admin",
+      "keywords": "admin, administration, school admin, admin console, admin home, management"
+    },
+    "admin-users": {
+      "title": "Users",
+      "where": "Admin › Users",
+      "keywords": "users, accounts, people, teachers, parents list, deactivate user, edit user, roles, invitations"
+    },
+    "add-parent": {
+      "title": "Add a parent",
+      "where": "Admin › Users",
+      "keywords": "new parent, parent account, invite parent, create parent, add guardian, new guardian, add mother, add father"
+    },
+    "add-teacher": {
+      "title": "Add a teacher",
+      "where": "Admin › Users",
+      "keywords": "new teacher, invite teacher, create teacher, add instructor, hire, new staff member, teacher account"
+    },
+    "staff-accounts": {
+      "title": "Staff accounts",
+      "where": "Admin › Staff accounts",
+      "keywords": "staff, principal account, finance account, staff invitations, employees, office staff"
+    },
+    "invite-staff": {
+      "title": "Invite staff",
+      "where": "Admin › Staff accounts",
+      "keywords": "invite staff, add staff, invite principal, invite accountant, new employee, staff invitation, send invite"
+    },
+    "school-members": {
+      "title": "School members",
+      "where": "Admin › School members",
+      "keywords": "members, member id, usernames, reset password, head count, student count, member list"
+    },
+    "admin-students": {
+      "title": "Students",
+      "where": "Admin › Students",
+      "keywords": "students, pupils, learners, student list, enrollment, student records, admission number"
+    },
+    "add-student": {
+      "title": "Add a student",
+      "where": "Admin › Students",
+      "keywords": "new student, enroll student, register student, admit student, add pupil, create student, admission"
+    },
+    "import-students": {
+      "title": "Import students",
+      "where": "Admin › Students › Import",
+      "keywords": "import, csv, excel, spreadsheet, upload students, bulk add, student list file, migrate data"
+    },
+    "build-timetable": {
+      "title": "Build the timetable",
+      "where": "Admin › Timetable",
+      "keywords": "timetable, schedule, class schedule, periods, lessons, weekly schedule, school day, rota"
+    },
+    "school-calendar": {
+      "title": "School calendar",
+      "where": "Admin › Calendar",
+      "keywords": "calendar, holidays, events, term dates, exam period, school year, vacation, meetings"
+    },
+    "add-calendar-event": {
+      "title": "Add a calendar event",
+      "where": "Admin › Calendar",
+      "keywords": "new event, add holiday, schedule meeting, add exam period, school event, mark holiday, add to calendar"
+    },
+    "school-settings": {
+      "title": "School settings",
+      "where": "Admin › Settings",
+      "keywords": "settings, school profile, school name, logo, configuration, preferences, close school"
+    },
+    "build-record-templates": {
+      "title": "Build record templates",
+      "where": "Admin › Settings › Records",
+      "keywords": "record templates, custom fields, student form, parent form, medical information, emergency contact, data fields, registration form"
+    },
+    "missing-information": {
+      "title": "Missing information",
+      "where": "Admin › Records › Missing",
+      "keywords": "missing information, incomplete records, missing fields, data gaps, follow up, required fields, empty records"
+    },
+    "create-announcement": {
+      "title": "Send an announcement",
+      "where": "Admin › Announcements",
+      "keywords": "announcement, broadcast, notice, circular, message parents, newsletter, notify school, bulletin"
+    },
+    "link-parent": {
+      "title": "Link a parent to a student",
+      "where": "Finance › Unlinked",
+      "keywords": "guardian, link parent, connect parent, mother, father, family, link child, parent link, unlinked parents"
+    },
+    "principal-dashboard": {
+      "title": "Principal dashboard",
+      "where": "Principal",
+      "keywords": "principal, school leadership, head teacher, headmaster, leadership dashboard, principal home"
+    },
+    "discipline": {
+      "title": "Discipline incidents",
+      "where": "Principal › Discipline",
+      "keywords": "discipline, behavior, incidents, misconduct, detention, warnings, behaviour report, conduct"
+    },
+    "message-reports": {
+      "title": "Message reports",
+      "where": "Principal › Message reports",
+      "keywords": "reported messages, safeguarding, complaints, abuse report, message review, flagged messages"
+    },
+    "principal-attendance": {
+      "title": "Attendance overview",
+      "where": "Principal › Attendance",
+      "keywords": "attendance overview, absences, absence rate, late arrivals, attendance trends, students at risk, truancy"
+    },
+    "evaluations": {
+      "title": "Teacher evaluations",
+      "where": "Principal › Evaluations",
+      "keywords": "evaluations, teacher appraisal, performance review, observation, staff review, teacher assessment"
+    },
+    "start-evaluation": {
+      "title": "Start a teacher evaluation",
+      "where": "Principal › Evaluations",
+      "keywords": "new evaluation, evaluate teacher, classroom observation, appraise teacher, performance review, start review"
+    },
+    "evaluation-templates": {
+      "title": "Evaluation criteria templates",
+      "where": "Principal › Evaluations › Templates",
+      "keywords": "criteria, rubric, evaluation template, scoring rubric, evaluation form, appraisal criteria"
+    },
+    "principal-grades": {
+      "title": "Grades overview",
+      "where": "Principal › Grades",
+      "keywords": "grades, marks, scores, gradebook, class averages, student performance, results overview"
+    },
+    "school-calendar-principal": {
+      "title": "School calendar",
+      "where": "Principal › Calendar",
+      "keywords": "calendar, holidays, events, term dates, exam period, school year, vacation, meetings"
+    },
+    "add-calendar-event-principal": {
+      "title": "Add a calendar event",
+      "where": "Principal › Calendar",
+      "keywords": "new event, add holiday, schedule meeting, add exam period, school event, mark holiday, add to calendar"
+    },
+    "build-timetable-principal": {
+      "title": "Build the timetable",
+      "where": "Principal › Timetable",
+      "keywords": "timetable, schedule, class schedule, periods, lessons, weekly schedule, school day, rota"
+    },
+    "principal-classes": {
+      "title": "Classes",
+      "where": "Principal › Classes",
+      "keywords": "classes, courses, class list, class teachers, rosters, subjects taught"
+    },
+    "grades-sections": {
+      "title": "Grades & sections",
+      "where": "Principal › Grades & sections",
+      "keywords": "grade levels, sections, homerooms, class sections, divisions, placement, year groups, add section"
+    },
+    "set-up-academics": {
+      "title": "Set up academics",
+      "where": "Principal › Academic setup",
+      "keywords": "academic setup, academic framework, curriculum, grading system, grade scale, subjects setup, academic year, grading rules, assessment weights"
+    },
+    "academic-subjects": {
+      "title": "Grades & subjects",
+      "where": "Principal › Academic setup › Subjects",
+      "keywords": "subjects, subject list, grade subjects, courses per grade, subject rules, weightings, assessments, passing mark"
+    },
+    "academic-sections": {
+      "title": "Section overrides",
+      "where": "Principal › Academic setup › Sections",
+      "keywords": "section overrides, electives, section subjects, subject teachers, exclude subject, optional subjects"
+    },
+    "academic-scales": {
+      "title": "Grading scales",
+      "where": "Principal › Academic setup › Scales",
+      "keywords": "grading scale, grade scale, letter grades, grade boundaries, gpa, mark bands, grade bands"
+    },
+    "academic-approvals": {
+      "title": "Mark sheet approvals",
+      "where": "Principal › Academic setup › Approvals",
+      "keywords": "mark sheets, approve marks, submitted grades, proposed assessments, grade approval, review marks"
+    },
+    "academic-results": {
+      "title": "Results & certificates",
+      "where": "Principal › Academic setup › Results",
+      "keywords": "results, finalize results, report cards, certificates, term results, annual results, transcripts, print certificate"
+    },
+    "build-record-templates-principal": {
+      "title": "Build record templates",
+      "where": "Principal › School › Records",
+      "keywords": "record templates, custom fields, student form, parent form, medical information, emergency contact, data fields, registration form"
+    },
+    "missing-information-principal": {
+      "title": "Missing information",
+      "where": "Principal › Records › Missing",
+      "keywords": "missing information, incomplete records, missing fields, data gaps, follow up, required fields, empty records"
+    },
+    "principal-students": {
+      "title": "Students",
+      "where": "Principal › Students",
+      "keywords": "students, pupils, learners, student list, student profile, find student, admission number"
+    },
+    "attendance-office": {
+      "title": "Attendance office",
+      "where": "Attendance",
+      "keywords": "attendance, registers, roll call, daily attendance, attendance office, absences today"
+    },
+    "take-attendance": {
+      "title": "Take attendance",
+      "where": "Attendance › Registers",
+      "keywords": "take attendance, mark attendance, register, roll call, mark absent, mark present, morning register"
+    },
+    "correct-attendance": {
+      "title": "Correct attendance",
+      "where": "Attendance › Registers",
+      "keywords": "correct attendance, fix register, change absence, excuse absence, late note, amend attendance"
+    },
+    "attendance-reports": {
+      "title": "Attendance reports",
+      "where": "Attendance › Reports",
+      "keywords": "attendance report, export attendance, absence report, attendance statistics, download attendance, monthly attendance"
+    },
+    "approvals": {
+      "title": "Approvals",
+      "where": "Approvals",
+      "keywords": "approvals, pending requests, approve, review queue, sign off, waiting for approval"
+    },
+    "license": {
+      "title": "School license",
+      "where": "License",
+      "keywords": "license, subscription, plan, features, our plan, renewal, studafy license"
+    },
+    "license-seats": {
+      "title": "License seats",
+      "where": "License › Seats",
+      "keywords": "seats, assign seats, seat usage, licensed users, seat count, free seats"
+    },
+    "license-quotes": {
+      "title": "License quotes",
+      "where": "License › Quotes",
+      "keywords": "quotes, request quote, upgrade, add seats, price offer, change plan"
+    },
+    "license-invoices": {
+      "title": "License invoices",
+      "where": "License › Invoices",
+      "keywords": "license invoices, studafy invoices, subscription bill, pay license, receipts, billing history"
+    },
+    "finance-dashboard": {
+      "title": "Finance dashboard",
+      "where": "Finance",
+      "keywords": "finance, accounts, money, collections, revenue, finance overview, outstanding fees"
+    },
+    "finance-overdue": {
+      "title": "Overdue installments",
+      "where": "Finance › Overdue",
+      "keywords": "overdue, late payments, arrears, unpaid fees, debtors, outstanding installments, defaulters"
+    },
+    "add-fee-structure": {
+      "title": "Add a fee structure",
+      "where": "Finance › Fee structures",
+      "keywords": "fee structure, tuition fees, fee schedule, fee items, school fees, installments plan, fee plan"
+    },
+    "invoices": {
+      "title": "Invoices",
+      "where": "Finance › Invoices",
+      "keywords": "invoices, bills, fee invoices, statements, invoice list, unpaid invoices"
+    },
+    "create-invoice-batch": {
+      "title": "Create an invoice batch",
+      "where": "Finance › Invoices › New batch",
+      "keywords": "invoice batch, invoice run, bill, fees, charge, generate invoices, bulk invoices, term billing"
+    },
+    "families": {
+      "title": "Families",
+      "where": "Finance › Families",
+      "keywords": "families, family accounts, siblings, household, family statement, family balance"
+    },
+    "unlinked": {
+      "title": "Unlinked students & parents",
+      "where": "Finance › Unlinked",
+      "keywords": "unlinked, no guardian, no family, orphan accounts, missing parent, parents without children"
+    },
+    "payments": {
+      "title": "Payments",
+      "where": "Finance › Payments",
+      "keywords": "payments, receipts, received payments, transactions, collections, payment history"
+    },
+    "record-payment": {
+      "title": "Record a payment",
+      "where": "Finance › Payments › New",
+      "keywords": "record payment, receive payment, cash payment, bank transfer, receipt, collect fees, pay invoice"
+    },
+    "refunds": {
+      "title": "Refunds",
+      "where": "Finance › Refunds",
+      "keywords": "refunds, refund list, pending refunds, approve refund, refund status, money returned"
+    },
+    "issue-refund": {
+      "title": "Issue a refund",
+      "where": "Finance › Refunds › New",
+      "keywords": "issue refund, refund parent, give money back, return payment, overpayment, credit note, reimburse"
+    },
+    "scholarships": {
+      "title": "Scholarships",
+      "where": "Finance › Scholarships",
+      "keywords": "scholarships, discounts, financial aid, bursary, fee waiver, sibling discount, awards"
+    },
+    "request-scholarship": {
+      "title": "Request a scholarship",
+      "where": "Finance › Scholarships",
+      "keywords": "request scholarship, award scholarship, apply discount, fee waiver, financial aid, bursary request, give discount"
+    },
+    "finance-reports": {
+      "title": "Finance reports",
+      "where": "Finance › Reports",
+      "keywords": "finance reports, export, collections report, aging report, revenue report, statements, download report"
+    },
+    "expenses": {
+      "title": "Expenses",
+      "where": "Finance › Expenses",
+      "keywords": "expenses, spending, costs, purchases, bills paid, expense list"
+    },
+    "record-expense": {
+      "title": "Record an expense",
+      "where": "Finance › Expenses › New",
+      "keywords": "record expense, new expense, add expense, purchase, receipt, spending, petty cash, supplier bill"
+    }
+  }
+}

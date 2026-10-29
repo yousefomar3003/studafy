@@ -5,12 +5,13 @@ import { HTTPException } from "hono/http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
-import { hasPermission, requirePermission } from "../../../middleware/authz";
+import { hasPermission, requirePermission, requirePermissionIn } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses, requestIdHeaders } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import { writeAnswers } from "../../records/record-service";
 import {
   createStudentBodySchema,
   guardianParamSchema,
@@ -38,6 +39,7 @@ import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { StudentProfile, StudentSelf } from "../schemas";
 import type { StudentRow, StudentSelfRow } from "../student-service";
+import type { RecordKeyring } from "@studafy/records";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -194,7 +196,9 @@ const createStudentRoute = createRoute({
   summary: "Create a student",
   description:
     "Creates a new student with a linked user account and the STUDENT role. Fails with 409 if " +
-    "the admission number already exists in this school.",
+    "the admission number already exists in this school. `guardians` are linked in the same " +
+    "transaction; that also needs `parent:link`, and any guardian that cannot be linked fails " +
+    "the whole request.",
   security: [{ bearerAuth: [] }],
   request: {
     body: {
@@ -209,7 +213,7 @@ const createStudentRoute = createRoute({
         schema: studentProfileSchema,
       },
     },
-    [400, 401, 403, 409, 429, 500],
+    [400, 401, 403, 404, 409, 429, 500],
   ),
 });
 
@@ -309,7 +313,10 @@ const unlinkGuardianRoute = createRoute({
 // Route factory
 // ---------------------------------------------------------------------------
 
-export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
+export function studentRoutes(
+  database: Database,
+  recordKeyring: RecordKeyring,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // `:studentId` is constrained to a UUID in the guards below so none of them match
@@ -400,10 +407,26 @@ export function studentRoutes(database: Database): OpenAPIHono<AppEnv> {
   routes.openapi(createStudentRoute, async (c) => {
     const auth = requireAuth(c);
     const body = c.req.valid("json");
+    // student:create alone does not let a caller attach a parent to a child.
+    if (body.guardians?.length) requirePermissionIn(c, PERMISSIONS.PARENT_LINK);
+    // Nor does it let them fill in the student's record: that is studentRecord:update.
+    if (body.records?.length) requirePermissionIn(c, PERMISSIONS.STUDENT_RECORD_UPDATE);
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      createStudentService(tx, auth.schoolId, body),
-    );
+    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const { records, ...student } = body;
+      const created = await createStudentService(tx, auth.schoolId, student);
+      if (records?.length) {
+        await writeAnswers(
+          tx,
+          auth.schoolId,
+          { kind: "student", id: created.id },
+          auth.userId,
+          records,
+          recordKeyring,
+        );
+      }
+      return created;
+    });
 
     return c.json(projectStudent(row, c), 201);
   });

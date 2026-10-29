@@ -106,7 +106,7 @@ export function withPartialSuggestions(
   headers: readonly string[],
 ): ColumnMapping {
   const suggested: ColumnMapping = { ...mapping };
-  const claimed = new Set(Object.values(suggested));
+  const claimed = new Set(mappedHeaders(suggested));
   for (const field of STUDENT_IMPORT_FIELDS) {
     if (suggested[field] !== undefined) continue;
     const header = headers.find(
@@ -119,19 +119,57 @@ export function withPartialSuggestions(
   return suggested;
 }
 
+/** Every source header the mapping reads: fixed fields and student record template columns. */
+export function mappedHeaders(mapping: ColumnMapping): string[] {
+  return [
+    ...STUDENT_IMPORT_FIELDS.flatMap((field) =>
+      mapping[field] === undefined ? [] : [mapping[field]!],
+    ),
+    ...Object.values(mapping.records ?? {}),
+  ];
+}
+
+/** `mapping` with `header` released from whatever fixed field or template column held it. */
+function releaseHeader(mapping: ColumnMapping, header: string | undefined): ColumnMapping {
+  const next: ColumnMapping = {};
+  for (const field of STUDENT_IMPORT_FIELDS) {
+    const current = mapping[field];
+    if (current !== undefined && current !== header) next[field] = current;
+  }
+  const records = Object.fromEntries(
+    Object.entries(mapping.records ?? {}).filter(([, current]) => current !== header),
+  );
+  if (Object.keys(records).length > 0) next.records = records;
+  return next;
+}
+
 /** Map `field` to `header` (or unmap it with `undefined`). A column feeds one field only, so a
- * header already mapped elsewhere moves to `field`. */
+ * header already mapped elsewhere (a fixed field or a template column) moves to `field`. */
 export function assignColumn(
   mapping: ColumnMapping,
   field: StudentImportField,
   header: string | undefined,
 ): ColumnMapping {
-  const next: ColumnMapping = {};
-  for (const other of STUDENT_IMPORT_FIELDS) {
-    const current = mapping[other];
-    if (other !== field && current !== undefined && current !== header) next[other] = current;
-  }
+  const next = releaseHeader(mapping, header);
+  delete next[field];
   if (header !== undefined) next[field] = header;
+  return next;
+}
+
+/** The same, for a student record template field (by id). */
+export function assignRecordColumn(
+  mapping: ColumnMapping,
+  fieldId: string,
+  header: string | undefined,
+): ColumnMapping {
+  const next = releaseHeader(mapping, header);
+  const records = { ...(next.records ?? {}) };
+  // eslint-disable-next-line security/detect-object-injection -- `fieldId` is a field id from the school's own published form
+  delete records[fieldId];
+  // eslint-disable-next-line security/detect-object-injection -- as above
+  if (header !== undefined) records[fieldId] = header;
+  if (Object.keys(records).length > 0) next.records = records;
+  else delete next.records;
   return next;
 }
 
@@ -140,14 +178,21 @@ export function missingRequiredFields(mapping: ColumnMapping): StudentImportFiel
 }
 
 export function isSameMapping(a: ColumnMapping, b: ColumnMapping): boolean {
-  return STUDENT_IMPORT_FIELDS.every((field) => a[field] === b[field]);
+  const recordsA = a.records ?? {};
+  const recordsB = b.records ?? {};
+  const ids = new Set([...Object.keys(recordsA), ...Object.keys(recordsB)]);
+  return (
+    STUDENT_IMPORT_FIELDS.every((field) => a[field] === b[field]) &&
+    // eslint-disable-next-line security/detect-object-injection -- ids come from the two mappings' own keys
+    [...ids].every((id) => recordsA[id] === recordsB[id])
+  );
 }
 
 /** Whether every column a saved mapping reads exists in this file. Headers compare the way the
  * server compares them, so `Student ID` in the mapping matches `student id` in the file. */
 export function mappingFitsHeaders(mapping: ColumnMapping, headers: readonly string[]): boolean {
   const keys = new Set(headers.map(normalizeHeader));
-  return Object.values(mapping).every((header) => keys.has(normalizeHeader(header)));
+  return mappedHeaders(mapping).every((header) => keys.has(normalizeHeader(header)));
 }
 
 /** A parent is all or nothing on the server: a row naming only one of these two is rejected. */

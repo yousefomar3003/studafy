@@ -48,6 +48,7 @@ describe("attendance report ECS task definitions", () => {
       S3_REGION: "1",
       S3_APP_FILES_BUCKET: "1",
       S3_PRESIGN_TTL_SECONDS: "900",
+      STORAGE_SENSITIVE_KMS_KEY_ID: "1",
       APP_ENV: "1",
       CORS_ALLOWED_ORIGINS: "1",
       FRONTEND_URL: "1",
@@ -127,6 +128,8 @@ describe("production readiness of the ECS task definitions", () => {
       "MICROSOFT_OAUTH_CLIENT_ID",
       "MICROSOFT_OAUTH_CLIENT_SECRET",
       "TURNSTILE_SECRET_KEY",
+      "RECORDS_ENCRYPTION_KEYS",
+      "RECORDS_ENCRYPTION_CURRENT_KEY_ID",
     ]) {
       expect(secrets[key]).toBe(`<API_APP_SECRETS_ARN>:${key}::`);
     }

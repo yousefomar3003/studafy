@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { useSearchParamFlag } from "../../../lib/use-search-param-flag";
 import {
   todayIso,
   useAcademicYears,
@@ -64,6 +65,13 @@ function daysInRange(from: string, to: string, windowStart: string, windowEnd: s
   return days;
 }
 
+/** The event form being shown: a new event on `date`, or `event` to edit. */
+interface EventForm {
+  event?: SchoolEvent;
+  date: string;
+  key: number;
+}
+
 /**
  * School calendar (`/portal/principal/calendar`): one month of the school year on a grid — term
  * start and end dates, every class's exams, and the school's own holidays, events, meetings and exam
@@ -81,7 +89,12 @@ export default function SchoolCalendarPage() {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [form, setForm] = useState<{ event?: SchoolEvent; date: string; key: number }>();
+  const [pickedForm, setForm] = useState<EventForm>();
+  // `?create=1` (the global search's "Add a calendar event") opens a new event on today; closing
+  // the form drops the parameter, so Back does not reopen it.
+  const [createParam, clearCreateParam] = useSearchParamFlag("create");
+  const form: EventForm | undefined =
+    pickedForm ?? (canManage && createParam === "1" ? { date: today, key: 0 } : undefined);
 
   const grid = monthGrid(month);
   const windowStart = grid[0]!;
@@ -310,7 +323,10 @@ export default function SchoolCalendarPage() {
         <EventFormModal
           key={form.key}
           open
-          onClose={() => setForm(undefined)}
+          onClose={() => {
+            setForm(undefined);
+            clearCreateParam();
+          }}
           defaultDate={form.date}
           {...(form.event ? { event: form.event } : {})}
         />

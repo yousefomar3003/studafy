@@ -1,9 +1,10 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Card, DataGrid, Input, Select, useToast } from "@studafy/ui";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { z } from "zod";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { useSearchParamFlag } from "../../../lib/use-search-param-flag";
 import { ROLE_LABEL_KEYS } from "../users/schema";
 
 import { useInviteStaff, useResendStaffInvitation, useRevokeStaffInvitation } from "./mutations";
@@ -44,6 +45,17 @@ export default function StaffAccountsPage() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<StaffRole>(STAFF_ROLES[0]);
   const [emailError, setEmailError] = useState<string | undefined>();
+
+  // `?invite=1` (the global search's "Invite staff") lands on the invite form ready to type into.
+  // The form is inline rather than a modal, so the parameter is dropped once it has been focused.
+  const emailRef = useRef<HTMLInputElement>(null);
+  const [inviteParam, clearInviteParam] = useSearchParamFlag("invite");
+  useEffect(() => {
+    if (inviteParam !== "1") return;
+    emailRef.current?.scrollIntoView?.({ block: "center" });
+    emailRef.current?.focus();
+    clearInviteParam();
+  }, [inviteParam, clearInviteParam]);
 
   const roleLabel = (value: string) => t(ROLE_LABEL_KEYS[value as StaffRole] ?? value);
   const roleOptions: SelectOption<StaffRole>[] = STAFF_ROLES.map((value) => ({
@@ -192,6 +204,7 @@ export default function StaffAccountsPage() {
               aria-label={t("adminPeople.staff.invite.title")}
             >
               <Input
+                ref={emailRef}
                 label={t("adminPeople.users.form.email")}
                 type="email"
                 value={email}

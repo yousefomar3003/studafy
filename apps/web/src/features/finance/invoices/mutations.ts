@@ -2,7 +2,12 @@ import { useMutation } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
 
-import type { CreateInvoiceBatchBody, InvoiceBatch } from "./queries";
+import type {
+  CreateInvoiceBatchBody,
+  InvoiceBatch,
+  InvoiceBatchPreflight,
+  InvoiceBatchPreflightBody,
+} from "./queries";
 
 /** Starts a batch generation run. The response's `id` is what `InvoiceBatchPage` then polls via
  * `fetchInvoiceBatch`/`fetchInvoiceBatchItemsPage` for progress — this mutation itself only kicks
@@ -13,6 +18,17 @@ export function useCreateInvoiceBatch() {
       const { data } = await api.POST("/api/finance/invoices/batches", { body });
       if (!data) throw new Error("Invoice batch creation returned no data.");
       return data as InvoiceBatch;
+    },
+  });
+}
+
+/** Who a batch would bill and which of them have no family, before starting it. Creates nothing. */
+export function usePreflightInvoiceBatch() {
+  return useMutation({
+    mutationFn: async (body: InvoiceBatchPreflightBody) => {
+      const { data } = await api.POST("/api/finance/invoices/batches/preflight", { body });
+      if (!data) throw new Error("Invoice batch preflight returned no data.");
+      return data as InvoiceBatchPreflight;
     },
   });
 }

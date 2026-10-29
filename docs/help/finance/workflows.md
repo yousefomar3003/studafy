@@ -16,6 +16,25 @@ keywords:
     "reports",
     "reconciliation",
   ]
+title_ar: "سير العمل المالي"
+description_ar: "دورة الفوترة كاملة من هياكل الرسوم ودفعات الفواتير إلى المدفوعات والمبالغ المستردة والمنح والمصروفات والتقارير."
+keywords_ar:
+  [
+    "المالية",
+    "الرسوم",
+    "الرسوم الدراسية",
+    "هيكل الرسوم",
+    "فاتورة",
+    "فواتير",
+    "دفعة",
+    "استرداد",
+    "منحة",
+    "خصم",
+    "مصروفات",
+    "تقارير",
+    "مطابقة",
+  ]
+roles: [FINANCE]
 order: 1
 ---
 
@@ -55,7 +74,8 @@ already selected, and with its student preselected.
 
 ## 2. Generate invoices
 
-Finance → Invoices → `Generate invoices`.
+Finance → `Invoices →` → `Generate invoices`. Step by step:
+[Create an invoice batch](/help/create-invoice-batch).
 
 1. Pick a `Submitted` fee structure. The option shows its total and currency.
 2. Enter a **Period title** (e.g. "Spring 2026 Term 1") and optionally a due date.
@@ -75,39 +95,42 @@ invoice number and filterable by `Draft`, `Submitted`, or `Cancelled`.
 
 ## 3. Record payments
 
-Finance → Payments → `Record a payment`.
+Finance → `Payments →` → `Record payment`. Step by step:
+[Record a payment](/help/record-payment).
 
 1. Search for the **Invoice**. Only submitted invoices with an outstanding
    balance are payable.
 2. Enter the **Amount**. The form tells you when it is a full payment, a
-   partial payment (and what will remain outstanding), or an overpayment —
-   ERPNext rejects overpayments, so it stops you.
-3. Pick a **Payment method**: Cash, Bank transfer, or Card (external). Bank
-   transfer and card need a **Reference number**.
+   partial payment (and what will remain outstanding), or more than the
+   outstanding balance. ERPNext rejects an overpayment, so lower the amount.
+3. Pick a **Payment method**: Cash, Bank transfer, or Card (external). ERPNext
+   requires a **Reference number** for bank transfer and card.
 4. Optionally set reference/ posting dates and remarks, then `Record payment`.
 
 Payments are sent to ERPNext and confirmed in the background. The success
-panel shows `Pending` while awaiting confirmation, then links a receipt.
-Payments are idempotent — double-submitting cannot record the same payment
-twice. If a submission was already recorded, you are told to check the payment
-history before retrying.
+panel shows `Pending` while awaiting confirmation, then `Open receipt` once it
+is confirmed. Payments are idempotent — double-submitting cannot record the
+same payment twice. If a submission may already have been recorded, you are
+told to check the payment history before retrying.
 
 ## 4. Refunds
 
 ### Request a refund
 
-Finance → Refunds → `Request a refund`.
+Finance → `Refunds →` → `Request refund`. Step by step, including approval:
+[Issue a refund](/help/issue-refund).
 
 1. Pick an **Invoice** that has a paid amount (the form shows "Paid to date").
 2. Enter the **Amount** (cannot exceed what was paid), pick a **Reason**
    (`Overpayment`, `Withdrawal`, `Discount adjustment`, or `Error correction`),
    and add notes if useful.
-3. `Review refund`, then confirm.
+3. `Review refund`, then `Request refund`.
 
 The refund is created **Pending approval**. A different user with refund
-approval rights must approve it before ERPNext issues the credit note. Track
-the request through `Approved`, `Submitted to ERPNext`, `Completed`, and the
-failure states `Rejected` and `Failed` on the refunds list.
+approval rights (the school admin) must click `Approve` on the refunds list
+before ERPNext issues the credit note; you cannot approve your own request.
+Track the request through `Submitted to ERPNext` and `Completed`, or
+`Rejected` (a rejection always carries a reason), on the refunds list.
 
 ## 5. Scholarships
 

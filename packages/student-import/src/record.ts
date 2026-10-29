@@ -3,6 +3,7 @@ import { z } from "zod";
 import { PARENT_RELATIONSHIPS, STUDENT_IMPORT_FIELDS, STUDENT_STATUSES } from "./fields";
 
 import type { ParentRelationship, StudentImportField, StudentStatus } from "./fields";
+import type { RecordValue } from "@studafy/records/browser";
 
 /**
  * One mapped, validated CSV line — the shape staged in app.student_import_rows.record.
@@ -22,6 +23,12 @@ export interface StudentImportRecord {
   parent_email: string | null;
   parent_name: string | null;
   parent_relationship: ParentRelationship | null;
+  /**
+   * Answers for the school's student record template, by field id: only the cells the file
+   * actually fills (an empty cell leaves a live answer alone, like every other column). Absent on
+   * rows staged before template columns existed.
+   */
+  records?: Record<string, RecordValue>;
 }
 
 /** A problem with one line (or, at the header line, with the mapping itself). */

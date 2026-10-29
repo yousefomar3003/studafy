@@ -10,6 +10,7 @@
  */
 
 import { armAdminActor, resolveAdminActor } from "./admin-actor";
+import { RECORD_DATA_TABLES, eraseRecordData } from "./records-dsr";
 import { hardDeleteRows, redactPersonalColumns } from "./redact";
 import { classifyTable } from "./retention-registry";
 import { findSubjectPredicate } from "./subject-resolver";
@@ -22,6 +23,8 @@ import type { TransactionSql } from "postgres";
 export interface ErasureResult {
   redactedTables: RedactedTableEntry[];
   retainedTables: RetainedTableEntry[];
+  /** Record document files whose rows this erasure deleted: remove them after commit. */
+  orphanedStorageKeys: string[];
 }
 
 /**
@@ -74,6 +77,18 @@ export async function runTenantErasure(
     }
   }
 
+  // School-defined records hold nothing worth keeping once their subject is erased: no redacted
+  // remainder, so the answers go entirely (their documents cascade).
+  const records = await eraseRecordData(tx, schoolId, subject);
+  if (records.rows > 0) {
+    redacted.push({
+      table: "record_answers",
+      action: "hard_deleted",
+      columns: [],
+      rows: records.rows,
+    });
+  }
+
   // A tenant-wide closure additionally owns the school's own contact identity: app.schools is
   // global (no school_id column), so it is never discovered by tenant-tables.ts and the loop above
   // never reaches it. redactPersonalColumns' "school_id = $1" WHERE assumption does not apply to
@@ -95,5 +110,9 @@ export async function runTenantErasure(
     }
   }
 
-  return { redactedTables: redacted, retainedTables: retained };
+  return {
+    redactedTables: redacted,
+    retainedTables: retained,
+    orphanedStorageKeys: records.storageKeys,
+  };
 }

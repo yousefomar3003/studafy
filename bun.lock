@@ -39,6 +39,7 @@
         "@studafy/license-pricing": "workspace:*",
         "@studafy/notification-templates": "workspace:*",
         "@studafy/observability": "workspace:*",
+        "@studafy/records": "workspace:*",
         "@studafy/sanitize": "workspace:*",
         "@studafy/shared-schemas": "workspace:*",
         "@studafy/student-import": "workspace:*",
@@ -161,6 +162,7 @@
         "@studafy/notification-templates": "workspace:*",
         "@studafy/observability": "workspace:*",
         "@studafy/progress-reporting": "workspace:*",
+        "@studafy/records": "workspace:*",
         "@studafy/sanitize": "workspace:*",
         "@studafy/student-import": "workspace:*",
         "@studafy/tap-payments": "workspace:*",
@@ -399,6 +401,16 @@
         "typescript": "^5.9.3",
       },
     },
+    "packages/records": {
+      "name": "@studafy/records",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
+        "@types/bun": "1.3.14",
+        "typescript": "^5.9.3",
+      },
+    },
     "packages/sanitize": {
       "name": "@studafy/sanitize",
       "version": "0.0.0",
@@ -431,6 +443,7 @@
       "name": "@studafy/student-import",
       "version": "0.0.0",
       "dependencies": {
+        "@studafy/records": "workspace:*",
         "postgres": "3.4.9",
         "zod": "4.6.7",
       },
@@ -1075,6 +1088,8 @@
     "@studafy/progress-reporting": ["@studafy/progress-reporting@workspace:packages/progress-reporting"],
 
     "@studafy/realtime": ["@studafy/realtime@workspace:apps/realtime"],
+
+    "@studafy/records": ["@studafy/records@workspace:packages/records"],
 
     "@studafy/sanitize": ["@studafy/sanitize@workspace:packages/sanitize"],
 

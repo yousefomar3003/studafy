@@ -47,6 +47,7 @@ code no longer matches must be superseded before the code, not after.
 | [ADR-016](0016-channel-policy.md)                     | `AUTH_CHANNELS` (web/mobile/api) fixed at login, `requireChannel` guard                                | Channel policy       |
 | [ADR-017](0017-year-scoped-grading-with-snapshots.md) | Grade-level subject defaults with section overrides, one grading engine, immutable result snapshots    | Academic grading     |
 | [ADR-018](0018-feature-licensing.md)                  | Paid features as code-registered keys, granted through tiers and resolved per person, `requireFeature` | Billing / licensing  |
+| [ADR-019](0019-sensitive-record-field-encryption.md)  | App-level AES-256-GCM for sensitive record values, keyring app secret, stored masks; SSE-KMS documents | Data protection      |
 
 ## Platform decision coverage
 

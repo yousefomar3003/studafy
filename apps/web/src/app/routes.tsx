@@ -71,16 +71,18 @@ const SetupWizardPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../routes/onboarding-setup/SetupWizardPage"),
 );
+// Its strings live in the shell catalog (`globalSearch`), like the palette's.
+const SearchResultsPage = lazy(() => import("../features/search/SearchResultsPage"));
 const PortalPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../routes/portal/PortalPage"),
 );
 const AdminDashboardPage = lazyWithCatalogs(
-  [...ADMIN_CATALOGS, ...LICENSE_CATALOGS],
+  [...ADMIN_CATALOGS, ...LICENSE_CATALOGS, "recordTemplates"],
   () => import("../features/admin/AdminDashboardPage"),
 );
 const UsersListPage = lazyWithCatalogs(
-  ADMIN_CATALOGS,
+  [...ADMIN_CATALOGS, "records"],
   () => import("../features/admin/users/UsersListPage"),
 );
 const StaffAccountsPage = lazyWithCatalogs(
@@ -92,12 +94,16 @@ const SchoolMembersPage = lazyWithCatalogs(
   () => import("../features/admin/members/SchoolMembersPage"),
 );
 const StudentsListPage = lazyWithCatalogs(
-  ADMIN_CATALOGS,
+  [...ADMIN_CATALOGS, "records"],
   () => import("../features/admin/students/StudentsListPage"),
 );
 const StudentProfilePage = lazyWithCatalogs(
-  ADMIN_CATALOGS,
+  [...ADMIN_CATALOGS, "records"],
   () => import("../features/admin/students/StudentProfilePage"),
+);
+const AdminParentRecordsPage = lazyWithCatalogs(
+  [...ADMIN_CATALOGS, "records"],
+  () => import("../features/records/AdminParentRecordsPage"),
 );
 const ImportStudentsPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
@@ -108,7 +114,7 @@ const TimetableBuilderPage = lazyWithCatalogs(
   () => import("../features/admin/timetable/TimetableBuilderPage"),
 );
 const SchoolSettingsPage = lazyWithCatalogs(
-  ADMIN_CATALOGS,
+  [...ADMIN_CATALOGS, "recordTemplates"],
   () => import("../features/admin/settings/SchoolSettingsPage"),
 );
 const AnnouncementsPage = lazyWithCatalogs(
@@ -198,7 +204,7 @@ const PlatformInvoicePage = lazyWithCatalogs(
   () => import("../features/platform/licensing/InvoicePage"),
 );
 const PrincipalDashboardPage = lazyWithCatalogs(
-  [...PRINCIPAL_CATALOGS, ...LICENSE_CATALOGS],
+  [...PRINCIPAL_CATALOGS, ...LICENSE_CATALOGS, "recordTemplates"],
   () => import("../features/principal/PrincipalDashboardPage"),
 );
 const LicensePage = lazyWithCatalogs(
@@ -251,9 +257,28 @@ const AcademicSetupPage = lazyWithCatalogs(
   [...PRINCIPAL_CATALOGS, "academicGrading"],
   () => import("../features/principal/academic-setup/AcademicSetupPage"),
 );
+// School-defined student and parent records: the template editor and the missing-information
+// list, one component each, mounted by both the admin and the principal portal.
+const RecordTemplatesPage = lazyWithCatalogs(
+  ["recordTemplates"],
+  () => import("../features/records/templates/RecordTemplatesPage"),
+);
+const MissingInformationPage = lazyWithCatalogs(
+  ["recordTemplates"],
+  () => import("../features/records/missing/MissingInformationPage"),
+);
 const PrincipalStudentsPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/students/PrincipalStudentsPage"),
+);
+// The principal's student and parent pages mount the shared records panel, so they load its strings.
+const PrincipalStudentPage = lazyWithCatalogs(
+  [...PRINCIPAL_CATALOGS, "records"],
+  () => import("../features/principal/students/PrincipalStudentPage"),
+);
+const PrincipalParentPage = lazyWithCatalogs(
+  [...PRINCIPAL_CATALOGS, "records"],
+  () => import("../features/principal/students/PrincipalParentPage"),
 );
 const IncidentListPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
@@ -342,6 +367,11 @@ const FamiliesListPage = lazyWithCatalogs(
 const FamilyDetailPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/families/FamilyDetailPage"),
+);
+// The link-children picker on this page is the admin one, with its adminPeople strings.
+const UnlinkedPage = lazyWithCatalogs(
+  [...FINANCE_CATALOGS, "adminPeople"],
+  () => import("../features/finance/unlinked/UnlinkedPage"),
 );
 const RecordFamilyPaymentPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
@@ -595,6 +625,14 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            path: "admin/parents/:parentUserId/records",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <AdminParentRecordsPage />
+              </RequirePermission>
+            ),
+          },
+          {
             path: "admin/timetable",
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
@@ -616,6 +654,24 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <SchoolSettingsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `recordTemplate:manage`, not the admin console's own permission: the same
+            // editor is mounted for a PRINCIPAL at `principal/school/records`.
+            path: "admin/settings/records",
+            element: (
+              <RequirePermission permission={PERMISSIONS.RECORD_TEMPLATE_MANAGE}>
+                <RecordTemplatesPage portal="admin" />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "admin/records/missing",
+            element: (
+              <RequirePermission permission={PERMISSIONS.STUDENT_RECORD_READ}>
+                <MissingInformationPage portal="admin" />
               </RequirePermission>
             ),
           },
@@ -760,10 +816,44 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            // Gated on `recordTemplate:manage` rather than `principalDashboard:view`, matching the
+            // admin mount at `admin/settings/records`.
+            path: "principal/school/records",
+            element: (
+              <RequirePermission permission={PERMISSIONS.RECORD_TEMPLATE_MANAGE}>
+                <RecordTemplatesPage portal="principal" />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/records/missing",
+            element: (
+              <RequirePermission permission={PERMISSIONS.STUDENT_RECORD_READ}>
+                <MissingInformationPage portal="principal" />
+              </RequirePermission>
+            ),
+          },
+          {
             path: "principal/students",
             element: (
               <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <PrincipalStudentsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/students/:studentId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
+                <PrincipalStudentPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/parents/:parentUserId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
+                <PrincipalParentPage />
               </RequirePermission>
             ),
           },
@@ -829,6 +919,13 @@ export const routes: RouteObject[] = [
               <RequirePermission permission={PERMISSIONS.LICENSE_READ}>{page}</RequirePermission>
             ),
           })),
+          {
+            // The palette's "See all" results. No `RequirePermission`, the same posture as
+            // `GET /api/search` itself: every session may search, and the API scopes each record
+            // type to the caller's permissions and row-level security.
+            path: "search",
+            element: <SearchResultsPage />,
+          },
           {
             // No `RequirePermission` — self-service on the caller's own rows, matching the API's
             // own no-gate posture (see `notificationRoutes`'s doc comment). Every authenticated
@@ -908,6 +1005,16 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_READ}>
                 <FamiliesListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Gated on `billing:read`, like the families list it complements and the read routes
+            // behind it (apps/api/src/modules/finance/unlinked/routes.ts).
+            path: "finance/unlinked",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <UnlinkedPage />
               </RequirePermission>
             ),
           },

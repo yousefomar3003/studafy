@@ -92,4 +92,24 @@ describe("ROLE_PERMISSIONS", () => {
       ].sort(),
     );
   });
+
+  // School-defined records (docs/modules/student-records.md): leadership builds templates, fills
+  // records and reveals sensitive values; finance, teachers and parents only read, narrowed by
+  // field visibility and row scope. Nobody else reads them, and no reader holds update.
+  test("records: leadership manages and reveals; finance, teachers and parents read", () => {
+    const leadership = [ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort();
+    expect(rolesHolding(PERMISSIONS.RECORD_TEMPLATE_MANAGE)).toEqual(leadership);
+    expect(rolesHolding(PERMISSIONS.STUDENT_RECORD_UPDATE)).toEqual(leadership);
+    expect(rolesHolding(PERMISSIONS.STUDENT_RECORD_READ_SENSITIVE)).toEqual(leadership);
+    expect(rolesHolding(PERMISSIONS.STUDENT_RECORD_READ)).toEqual(
+      [
+        ROLES.FINANCE,
+        ROLES.INSTRUCTOR,
+        ROLES.ORG_ADMIN,
+        ROLES.PARENT,
+        ROLES.PRINCIPAL,
+        ROLES.SUPER_ADMIN,
+      ].sort(),
+    );
+  });
 });

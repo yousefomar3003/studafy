@@ -84,6 +84,9 @@ export async function fetchStudentsPage(filters: StudentsFilters, cursor: string
 
 const MAX_OFFSET_PAGES = 20;
 
+/** The academics list endpoints' own `limit` maximum (`apps/api/src/modules/academics/schemas.ts`). */
+const ACADEMICS_PAGE_SIZE = 100;
+
 /** Exhausts an offset/limit/total-shaped list endpoint. Capped at `MAX_OFFSET_PAGES` so a `total`
  * that undercounts (or a caller re-hitting a moving target) can't page forever. */
 async function fetchAllOffsetPages<TRow>(
@@ -107,7 +110,7 @@ async function fetchAllClasses(status?: Class["status"]): Promise<Class[]> {
       params: { query: { status, limit, offset } },
     });
     return { rows: (data?.classes ?? []) as Class[], total: data?.total ?? 0 };
-  }, 200);
+  }, ACADEMICS_PAGE_SIZE);
 }
 
 async function fetchAllEnrollmentsForClass(classId: string): Promise<Enrollment[]> {
@@ -116,7 +119,7 @@ async function fetchAllEnrollmentsForClass(classId: string): Promise<Enrollment[
       params: { path: { classId }, query: { limit, offset } },
     });
     return { rows: (data?.enrollments ?? []) as Enrollment[], total: data?.total ?? 0 };
-  }, 200);
+  }, ACADEMICS_PAGE_SIZE);
 }
 
 // ---------------------------------------------------------------------------
@@ -338,6 +341,22 @@ export async function fetchStudentImportDiff(importId: string): Promise<StudentI
   });
   if (!data) throw new Error("Import diff returned no data.");
   return data as StudentImportDiff;
+}
+
+export type StudentRecordFormField = components["schemas"]["RecordFieldDefinition"];
+
+export const STUDENT_RECORD_FORM_KEY = ["students", "import-record-form"] as const;
+
+/**
+ * `GET /api/record-forms/student` — the published student record form, whose fields are offered
+ * as import columns next to the fixed ones. Empty when nothing is published (or the caller cannot
+ * fill records in, which the API answers with 403).
+ */
+export async function fetchStudentRecordForm(): Promise<StudentRecordFormField[]> {
+  const { data } = await api.GET("/api/record-forms/{subjectKind}", {
+    params: { path: { subjectKind: "student" } },
+  });
+  return (data?.fields ?? []) as StudentRecordFormField[];
 }
 
 export const STUDENT_IMPORT_MAPPINGS_KEY = ["students", "import-mappings"] as const;

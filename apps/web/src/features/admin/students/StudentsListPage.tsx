@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 import { usePermissions } from "../../../lib/auth";
 import { useTranslation } from "../../../lib/i18n";
+import { useSearchParamFlag } from "../../../lib/use-search-param-flag";
 
 import { CreateStudentModal } from "./CreateStudentModal";
 import {
@@ -112,7 +113,11 @@ export default function StudentsListPage() {
   const isPending = isClassFiltered ? classFilteredQuery.isPending : pagedQuery.isPending;
   const isError = isClassFiltered ? classFilteredQuery.isError : pagedQuery.isError;
 
-  const [createOpen, setCreateOpen] = useState(false);
+  // `?create=1` (the global search's "Add a student") opens the modal on arrival; closing it drops
+  // the parameter, so Back does not reopen it.
+  const [createParam, clearCreateParam] = useSearchParamFlag("create");
+  const [createClicked, setCreateOpen] = useState(false);
+  const createOpen = canCreate && (createClicked || createParam === "1");
 
   const columns = [
     {
@@ -240,7 +245,15 @@ export default function StudentsListPage() {
         </div>
       )}
 
-      <CreateStudentModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <CreateStudentModal
+        open={createOpen}
+        onClose={() => {
+          setCreateOpen(false);
+          clearCreateParam();
+        }}
+        canLinkGuardians={permissions.has(PERMISSIONS.PARENT_LINK)}
+        canFillRecords={permissions.has(PERMISSIONS.STUDENT_RECORD_UPDATE)}
+      />
     </>
   );
 }

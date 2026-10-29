@@ -1,0 +1,93 @@
+{
+  "panel": {
+    "title": "Records",
+    "description": "What the school keeps on file about this person. A missing field never blocks enrolment or billing.",
+    "loading": "Loading the record…",
+    "loadError": "The record could not be loaded.",
+    "notPublished": "This school has not published a record form yet.",
+    "nothingShared": "No record fields are shared with you.",
+    "edit": "Edit record",
+    "cancel": "Cancel",
+    "save": "Save record",
+    "savedToast": "Record saved",
+    "saveError": "The record could not be saved",
+    "noChanges": "Nothing has changed.",
+    "missing": "Missing",
+    "notAnswered": "Not answered",
+    "required": "Required",
+    "missingCount_one": "{{count}} required field is missing",
+    "missingCount_other": "{{count}} required fields are missing",
+    "olderVersion": "Answered on an earlier version of the form, when the field read “{{label}}”.",
+    "archivedTitle": "No longer on the form",
+    "archivedDescription": "These answers are kept, but their fields have been removed from the form.",
+    "yes": "Yes",
+    "no": "No",
+    "unset": "Not answered",
+    "choose": "Choose…"
+  },
+  "sensitive": {
+    "badge": "Sensitive",
+    "reveal": "Reveal",
+    "revealLabel": "Reveal {{label}}",
+    "hide": "Hide",
+    "hideLabel": "Hide {{label}}",
+    "revealError": "The value could not be revealed",
+    "revealNotice": "Shown for 30 seconds. Every reveal is recorded.",
+    "keepHint": "Leave blank to keep the current value.",
+    "masked": "Hidden"
+  },
+  "document": {
+    "status": {
+      "missing": "No file",
+      "uploaded": "Uploaded, not yet verified",
+      "verified": "Verified"
+    },
+    "expired": "Expired on {{date}}",
+    "expiring": "Expires on {{date}}",
+    "valid": "Valid until {{date}}",
+    "upload": "Upload file",
+    "replace": "Replace file",
+    "fileLabel": "File for {{label}}",
+    "uploadedToast": "File uploaded",
+    "uploadError": "The file could not be uploaded",
+    "verify": "Mark verified",
+    "unverify": "Withdraw verification",
+    "remove": "Remove file",
+    "removedToast": "File removed",
+    "actionError": "The document could not be updated",
+    "download": "Download",
+    "downloadLabel": "Download {{label}}",
+    "downloadError": "The file could not be opened",
+    "expiresOn": "Expiry date",
+    "expiresOnFor": "Expiry date for {{label}}",
+    "saveExpiry": "Save expiry date",
+    "sensitiveNote": "Sensitive document: every download is recorded, and its link lasts one minute."
+  },
+  "form": {
+    "toggle": "Records (optional)",
+    "hint": "Fill in the school's record form now, or later from the Records tab. Documents are uploaded once the account exists.",
+    "loading": "Loading the record form…",
+    "loadError": "The record form could not be loaded."
+  },
+  "admin": {
+    "parentTitle": "{{name}}: records",
+    "parentFallback": "Parent",
+    "parentLoadError": "This parent could not be loaded.",
+    "backToUsers": "Back to users",
+    "openRecords": "Records"
+  },
+  "principal": {
+    "backToStudents": "Back to students",
+    "studentLoadError": "This student could not be loaded.",
+    "studentFallback": "Student",
+    "statusLabel": "Status",
+    "guardians": "Guardians",
+    "noGuardians": "No guardians linked.",
+    "guardiansLoadError": "Guardians could not be loaded.",
+    "openParentRecords": "Open {{name}}'s records",
+    "parentTitle": "{{name}}: records",
+    "parentFallback": "Parent",
+    "parentLoadError": "This parent could not be loaded.",
+    "backToStudent": "Back"
+  }
+}

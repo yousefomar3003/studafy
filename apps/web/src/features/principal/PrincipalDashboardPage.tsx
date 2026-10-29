@@ -6,6 +6,7 @@ import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip"
 import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { LicenseTile } from "../license/LicenseTile";
+import { MissingRecordsTile } from "../records/missing/MissingRecordsTile";
 
 import {
   useDraftEvaluationsQuery,
@@ -27,7 +28,13 @@ import "./principal-dashboard.css";
 
 /** Every area of the principal's work, in the order a principal reaches for them. A link with a
  * `permission` is shown only to sessions holding it (its route is gated on the same one). */
-const PRINCIPAL_LINKS: readonly { key: string; to: string; permission?: Permission }[] = [
+const PRINCIPAL_LINKS: readonly {
+  key: string;
+  to: string;
+  permission?: Permission;
+  /** A translation key outside `principal.dashboard.links`, for links owned by another area. */
+  labelKey?: string;
+}[] = [
   { key: "grades", to: "/portal/principal/grades" },
   { key: "calendar", to: "/portal/principal/calendar" },
   { key: "timetable", to: "/portal/principal/timetable" },
@@ -49,6 +56,19 @@ const PRINCIPAL_LINKS: readonly { key: string; to: string; permission?: Permissi
   { key: "evaluations", to: "/portal/principal/evaluations" },
   { key: "approvals", to: "/portal/approvals" },
   { key: "announcements", to: "/portal/admin/announcements" },
+  // School-defined student and parent records (features/records).
+  {
+    key: "recordTemplates",
+    to: "/portal/principal/school/records",
+    permission: PERMISSIONS.RECORD_TEMPLATE_MANAGE,
+    labelKey: "recordTemplates.links.templates",
+  },
+  {
+    key: "missingRecords",
+    to: "/portal/principal/records/missing",
+    permission: PERMISSIONS.STUDENT_RECORD_READ,
+    labelKey: "recordTemplates.links.missing",
+  },
 ];
 
 const statusOf = (query: UseQueryResult) =>
@@ -149,7 +169,7 @@ export default function PrincipalDashboardPage() {
         ).map((link) => ({
           key: link.key,
           to: link.to,
-          label: t(`principal.dashboard.links.${link.key}`),
+          label: t(link.labelKey ?? `principal.dashboard.links.${link.key}`),
         }))}
       />
 
@@ -161,6 +181,7 @@ export default function PrincipalDashboardPage() {
           <OpenDisciplineIncidentsTile />
           <OpenMessageReportsTile />
           <DraftEvaluationsTile />
+          {permissions.has(PERMISSIONS.STUDENT_RECORD_READ) ? <MissingRecordsTile /> : null}
         </div>
       </section>
 

@@ -36,9 +36,10 @@ const CONFLICT_MESSAGE_KEYS: Readonly<Record<DiffConflict, string>> = {
 
 const FILTER_VALUES: readonly ActionFilter[] = ["all", "create", "update", "unchanged", "conflict"];
 
-/** What will happen to one row, as short sentences: the conflict reason, each field change, and
- * the parent account and link outcomes. */
-function describeRow(row: StudentImportDiffRow, t: TFunction): string {
+/** What will happen to one row, as short sentences: the conflict reason, each field change, the
+ * parent outcome (new, sibling of an earlier line, or not linked), and each template answer, with
+ * a sensitive one shown only as its mask. */
+function describeRow(row: StudentImportDiffRow, t: TFunction, language: string): string {
   if (row.conflict) return t(CONFLICT_MESSAGE_KEYS[row.conflict]);
   const parts = Object.entries(row.changes).map(([field, change]) =>
     t("adminPeople.students.import.diff.change", {
@@ -48,9 +49,28 @@ function describeRow(row: StudentImportDiffRow, t: TFunction): string {
     }),
   );
   if (row.parent === "create") parts.push(t("adminPeople.students.import.diff.newParentAccount"));
-  if (row.link === "create") parts.push(t("adminPeople.students.import.diff.newParentLink"));
-  if (row.link === "update") parts.push(t("adminPeople.students.import.diff.parentLinkChanges"));
+  if (row.parent === "sibling") {
+    parts.push(
+      t("adminPeople.students.import.diff.siblingParent", { line: row.parent_group_line }),
+    );
+  }
+  if (row.parent_conflict === "PARENT_ACCOUNT_EXISTS") {
+    parts.push(t("adminPeople.students.import.diff.parentAccountExists"));
+  }
+  for (const answer of row.records) {
+    parts.push(
+      t("adminPeople.students.import.diff.recordValue", {
+        field: language.startsWith("ar") ? answer.label_ar : answer.label_en,
+        value: answer.mask ?? formatValue(answer.value),
+      }),
+    );
+  }
   return parts.join(t("adminPeople.students.import.diff.partSeparator"));
+}
+
+function formatValue(value: StudentImportDiffRow["records"][number]["value"]): string {
+  if (Array.isArray(value)) return value.join(", ");
+  return value === null ? "" : String(value);
 }
 
 interface ImportDiffPanelProps {
@@ -62,7 +82,7 @@ interface ImportDiffPanelProps {
  * not a reservation; the worker re-plans against live data when it runs.
  */
 export function ImportDiffPanel({ record }: ImportDiffPanelProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [filter, setFilter] = useState<ActionFilter>("all");
   const filterOptions = FILTER_VALUES.map((value) => ({
     value,
@@ -121,7 +141,19 @@ export function ImportDiffPanel({ record }: ImportDiffPanelProps) {
                 <dt>{t("adminPeople.students.import.diff.stats.newParentAccounts")}</dt>
                 <dd>{diff.totals.parents_created}</dd>
               </div>
+              <div>
+                <dt>{t("adminPeople.students.import.diff.stats.parentConflicts")}</dt>
+                <dd>{diff.totals.parent_conflicts}</dd>
+              </div>
             </dl>
+
+            {diff.totals.parent_conflicts > 0 ? (
+              <p role="status" className="students-import__warning">
+                {t("adminPeople.students.import.diff.parentConflictsBanner", {
+                  count: diff.totals.parent_conflicts,
+                })}
+              </p>
+            ) : null}
 
             <div className="students-import__diff-filter">
               <Select<ActionFilter>
@@ -156,7 +188,7 @@ export function ImportDiffPanel({ record }: ImportDiffPanelProps) {
                 {
                   id: "details",
                   header: t("adminPeople.students.import.diff.columns.details"),
-                  renderCell: (row: StudentImportDiffRow) => describeRow(row, t),
+                  renderCell: (row: StudentImportDiffRow) => describeRow(row, t, i18n.language),
                 },
               ]}
               rows={rows}

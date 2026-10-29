@@ -281,6 +281,8 @@ const EXPECTED_MUTATING_ROUTES = [
   // permissions per verb, so each handler asserts its own via requirePermissionIn() rather than a
   // path-mounted requirePermission() (see finance/invoices/routes.ts).
   "POST /api/finance/invoices/batches",
+  // Read-only check of a batch's targets (who has no family); billing:read via batches/*.
+  "POST /api/finance/invoices/batches/preflight",
   "POST /api/discipline/incidents",
   "PATCH /api/discipline/incidents/{incidentId}",
   "POST /api/discipline/incidents/{incidentId}/resolve",
@@ -471,6 +473,23 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/platform/features/{featureKey}",
   "POST /api/platform/tiers",
   "PUT /api/platform/tiers/{planId}",
+  // School-defined student and parent records (modules/records/routes.ts): the template editor
+  // (recordTemplate:manage), filling records in and documents (studentRecord:update), and the
+  // sensitive reveal (studentRecord:readSensitive), which is audited as a read.
+  "POST /api/record-templates/{subjectKind}/fields",
+  "PATCH /api/record-templates/{subjectKind}/fields/{fieldId}",
+  "PUT /api/record-templates/{subjectKind}/field-order",
+  "POST /api/record-templates/{subjectKind}/publish",
+  "PUT /api/students/{studentId}/records",
+  "POST /api/students/{studentId}/records/{fieldId}/reveal",
+  "PUT /api/students/{studentId}/records/{fieldId}/document",
+  "PATCH /api/students/{studentId}/records/{fieldId}/document",
+  "DELETE /api/students/{studentId}/records/{fieldId}/document",
+  "PUT /api/parents/{parentUserId}/records",
+  "POST /api/parents/{parentUserId}/records/{fieldId}/reveal",
+  "PUT /api/parents/{parentUserId}/records/{fieldId}/document",
+  "PATCH /api/parents/{parentUserId}/records/{fieldId}/document",
+  "DELETE /api/parents/{parentUserId}/records/{fieldId}/document",
 ];
 
 /**

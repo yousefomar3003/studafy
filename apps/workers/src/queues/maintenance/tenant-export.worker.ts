@@ -20,12 +20,14 @@ import { createHash } from "node:crypto";
 
 import { armAdminActor, resolveAdminActor } from "./admin-actor";
 import { FILE_TABLES, parseExportManifest } from "./export-manifest";
+import { RECORD_DATA_TABLES, exportRecordData } from "./records-dsr";
 import { assertSafeIdentifier } from "./redact";
 import { findSubjectPredicate, resolveSubjectIdentifiers } from "./subject-resolver";
 import { discoverTenantTables } from "./tenant-tables";
 
 import type { ExportManifest } from "./export-manifest";
 import type { SubjectIdentifiers } from "./subject-resolver";
+import type { RecordKeyring } from "@studafy/records";
 import type { TransactionSql } from "postgres";
 
 /** The narrow object-storage port this worker needs -- shared shape with the reports framework's. */
@@ -77,6 +79,8 @@ export interface TenantExportOptions {
   subjectScope: "tenant" | "user";
   subjectUserId: string | null;
   now: Date;
+  /** Opens sensitive record answers so the bundle holds the subject's data, not ciphertext. */
+  recordKeyring: RecordKeyring;
 }
 
 export interface TenantExportResult {
@@ -93,7 +97,7 @@ export async function runTenantExport(
   tx: TransactionSql,
   options: TenantExportOptions,
 ): Promise<TenantExportResult> {
-  const { s3, requestId, schoolId, subjectScope, subjectUserId, now } = options;
+  const { s3, requestId, schoolId, subjectScope, subjectUserId, now, recordKeyring } = options;
   const adminUserId = await resolveAdminActor(tx, schoolId);
   await armAdminActor(tx, adminUserId);
 
@@ -159,6 +163,25 @@ export async function runTenantExport(
           });
         }
       }
+    }
+  }
+
+  const records = await exportRecordData(tx, schoolId, resolvedSubject, recordKeyring);
+  if (records.lines.length > 0) {
+    const body = new TextEncoder().encode(records.lines.join("\n"));
+    const key = `${prefix}/data/record_answers.ndjson`;
+    await s3.put(key, body, {
+      contentType: "application/x-ndjson",
+      contentDisposition: `attachment; filename="record_answers.ndjson"`,
+    });
+    tableEntries.push({
+      table: "record_answers",
+      rowCount: records.lines.length,
+      storageKey: key,
+      sha256: sha256Hex(body),
+    });
+    for (const file of records.files) {
+      fileEntries.push({ table: "record_documents", ...file, checksumSha256: null });
     }
   }
 

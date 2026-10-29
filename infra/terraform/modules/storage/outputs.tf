@@ -22,3 +22,8 @@ output "backups_archive_bucket_arn" {
   description = "ARN of the backups-archive bucket. Grant s3:PutObject to the backup job's IAM role, not to anything that generates browser-facing pre-signed URLs — this bucket has no CORS configuration."
   value       = aws_s3_bucket.this["backups_archive"].arn
 }
+
+output "sensitive_documents_kms_key_arn" {
+  description = "ARN of the KMS key sensitive record documents are encrypted with (ADR-019). The API and workers task roles hold kms:Decrypt/GenerateDataKey on it; nothing else should."
+  value       = aws_kms_key.sensitive_documents.arn
+}

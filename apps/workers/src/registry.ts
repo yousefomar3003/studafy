@@ -1,5 +1,6 @@
 import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 import { injectTraceContext } from "@studafy/observability";
+import { resolveRecordKeyring } from "@studafy/records";
 import { Queue } from "bullmq";
 import postgres from "postgres";
 
@@ -400,7 +401,11 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       if (!data.importId || !data.schoolId) {
         return { processed: false, reason: "missing job data" };
       }
-      return processStudentImport(data as { importId: string; schoolId: string }, databaseUrl);
+      return processStudentImport(
+        data as { importId: string; schoolId: string },
+        databaseUrl,
+        resolveRecordKeyring(workerEnv),
+      );
     },
   },
   {
@@ -483,6 +488,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           s3Endpoint: workerEnv.S3_ENDPOINT,
           bucket: workerEnv.S3_APP_FILES_BUCKET,
           stripeSecretKey: workerEnv.STRIPE_SECRET_KEY,
+          recordKeyring: resolveRecordKeyring(workerEnv),
         },
         enqueueDsrJob,
       ),

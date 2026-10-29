@@ -236,6 +236,18 @@
   justify-content: flex-end;
 }
 
+.invoices-batch__unlinked {
+  margin: 0;
+  padding-inline-start: var(--space-16);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.invoices-batch__unlinked span {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
 .invoices-batch__stats {
   display: flex;
   flex-wrap: wrap;

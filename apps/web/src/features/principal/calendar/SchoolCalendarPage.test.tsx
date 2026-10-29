@@ -1,9 +1,9 @@
 import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 import { AuthProvider, createSessionStore } from "../../../lib/auth";
 import { todayIso } from "../school/queries";
@@ -78,7 +78,12 @@ function fakeJwt(payload: unknown): string {
   return `${segment({ alg: "RS256" })}.${segment(payload)}.signature`;
 }
 
-async function renderAs(role: string) {
+/** Renders the router's current `search`, so a test can see a query parameter being dropped. */
+function LocationProbe() {
+  return <output data-testid="location-search">{useLocation().search}</output>;
+}
+
+async function renderAs(role: string, initialEntry = "/portal/principal/calendar") {
   const Page: ComponentType = (await import("./SchoolCalendarPage")).default;
   const store = createSessionStore({
     refreshClient: {
@@ -96,8 +101,9 @@ async function renderAs(role: string) {
     <AuthProvider store={store}>
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
-          <MemoryRouter>
+          <MemoryRouter initialEntries={[initialEntry]}>
             <Page />
+            <LocationProbe />
           </MemoryRouter>
         </ToastProvider>
       </QueryClientProvider>
@@ -136,5 +142,24 @@ describe("SchoolCalendarPage", () => {
     expect((await screen.findAllByText("Founders' day")).length).toBeGreaterThan(0);
     expect(screen.queryByRole("button", { name: "Add event" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Founders' day" })).toBeNull();
+  });
+
+  test("?create=1 opens a new event for a manager, and closing it drops the parameter", async () => {
+    await renderAs("PRINCIPAL", "/portal/principal/calendar?create=1");
+
+    const dialog = await screen.findByRole("dialog", { name: "Add calendar event" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Add calendar event" })).toBeNull(),
+    );
+    expect(screen.getByTestId("location-search").textContent).toBe("");
+  });
+
+  test("?create=1 opens nothing for a read-only viewer", async () => {
+    await renderAs("INSTRUCTOR", "/portal/principal/calendar?create=1");
+
+    expect((await screen.findAllByText("Founders' day")).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

@@ -1,9 +1,9 @@
 import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 import type { ComponentType } from "react";
 
@@ -56,13 +56,19 @@ mock.module("../../../lib/api", () => ({ api: { GET: getMock } }));
 const loadEvaluationListPage = async (): Promise<ComponentType> =>
   (await import("./EvaluationListPage")).default;
 
-function renderPage(Page: ComponentType) {
+/** Renders the router's current `search`, so a test can see a query parameter being dropped. */
+function LocationProbe() {
+  return <output data-testid="location-search">{useLocation().search}</output>;
+}
+
+function renderPage(Page: ComponentType, initialEntry = "/portal/principal/evaluations") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <Page />
+          <LocationProbe />
         </MemoryRouter>
       </ToastProvider>
     </QueryClientProvider>,
@@ -99,5 +105,17 @@ describe("EvaluationListPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "New evaluation" }));
 
     expect(await screen.findByRole("dialog", { name: "Start a teacher evaluation" })).toBeTruthy();
+  });
+
+  test("?create=1 opens the create-evaluation dialog on arrival; closing drops the parameter", async () => {
+    renderPage(await loadEvaluationListPage(), "/portal/principal/evaluations?create=1");
+
+    const dialog = await screen.findByRole("dialog", { name: "Start a teacher evaluation" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: "Start a teacher evaluation" })).toBeNull(),
+    );
+    expect(screen.getByTestId("location-search").textContent).toBe("");
   });
 });

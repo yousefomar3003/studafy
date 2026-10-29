@@ -70,6 +70,15 @@ const INJECTION_PAYLOADS = {
     `'; UPDATE app.users SET display_name = '${STACKED_QUERY_MARKER}'--`,
     `%'; UPDATE app.users SET display_name = '${STACKED_QUERY_MARKER}'; --`,
   ],
+  // Arabic letters, harakat and tatweel around the same escapes: global search normalizes these
+  // (app.search_normalize) and tokenizes the rest, so they must reach SQL only as bound values.
+  arabic: [
+    "أحمد' OR '1'='1",
+    "أَحْمَدُ'||(SELECT current_user)||'",
+    "مـــريم' UNION SELECT NULL--",
+    `اسم'; SELECT pg_sleep(${PROBE_SLEEP_SECONDS})--`,
+    "ة ى إ' AND 1=CAST((SELECT version()) AS int)--",
+  ],
   time: [
     `'; SELECT pg_sleep(${PROBE_SLEEP_SECONDS})--`,
     `' AND 1=(SELECT 1 FROM pg_sleep(${PROBE_SLEEP_SECONDS}))--`,
@@ -86,6 +95,9 @@ const DATABASE_ERROR_SIGNATURE =
 
 const FREE_TEXT_ENDPOINTS = [
   "/api/search?q=",
+  // The same phrase through one section and through a page past the first.
+  "/api/search?types=students&q=",
+  "/api/search?offset=5&limit=20&q=",
   "/api/users?search=",
   "/api/students?search=",
   "/api/teachers?search=",
@@ -93,6 +105,10 @@ const FREE_TEXT_ENDPOINTS = [
   "/api/invitations?search=",
   "/api/finance/invoices?search=",
   "/api/finance/families?search=",
+  "/api/finance/unlinked/students?search=",
+  "/api/finance/unlinked/parents?search=",
+  "/api/records/missing/students?search=",
+  "/api/records/missing/parents?search=",
 ];
 
 const ENUM_FILTER_ENDPOINTS = [
@@ -102,6 +118,10 @@ const ENUM_FILTER_ENDPOINTS = [
   "/api/invitations?status=",
   "/api/finance/invoices?status=",
   "/api/finance/families?balance=",
+  "/api/records/missing/students?issue=",
+  // Global search's named SearchType filter and its numeric offset.
+  "/api/search?q=ab&types=",
+  "/api/search?q=ab&offset=",
 ];
 
 interface Canaries {
@@ -143,6 +163,29 @@ beforeAll(async () => {
     employeeNumber: CANARY_EMPLOYEE_NUMBER,
   });
 
+  // A published student template with one required field puts every student on the
+  // missing-information list, so its search has a canary to find.
+  const field = await authenticatedRequest(
+    harness,
+    "POST",
+    "/api/record-templates/student/fields",
+    auth,
+    {
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        field_type: "short_text",
+        label_en: "Bus stop",
+        label_ar: "موقف",
+        required: true,
+      }),
+    },
+  );
+  expect(field.status).toBe(201);
+  expect(
+    (await authenticatedRequest(harness, "POST", "/api/record-templates/student/publish", auth))
+      .status,
+  ).toBe(201);
+
   canaries = {
     ids: [user.id, student.id, student.userId, teacher.id, teacher.userId],
     positiveControls: [
@@ -150,6 +193,8 @@ beforeAll(async () => {
       { url: `/api/students?search=${CANARY_SURNAME}`, expectedId: student.id },
       { url: `/api/teachers?search=${CANARY_EMPLOYEE_NUMBER}`, expectedId: teacher.id },
       { url: `/api/search?q=${CANARY_SURNAME}`, expectedId: student.id },
+      { url: `/api/search?types=students&q=${CANARY_SURNAME}`, expectedId: student.id },
+      { url: `/api/records/missing/students?search=${CANARY_SURNAME}`, expectedId: student.id },
     ],
   };
 }, 60_000);

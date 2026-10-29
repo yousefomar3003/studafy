@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 import { useTranslation } from "../../lib/i18n";
 
-import { articles, CATEGORY_ORDER, helpPath, searchHelp } from "./articles";
+import { articles, CATEGORY_ORDER, filterHelpCatalog, helpPath } from "./articles";
 
 import type { CategorySlug, HelpArticle } from "./content.types";
 
@@ -14,7 +14,7 @@ export default function HelpHomePage() {
   const { t } = useTranslation();
   const [query, setQuery] = useState("");
 
-  const results = useMemo(() => (query.trim() ? searchHelp(query) : [...articles]), [query]);
+  const results = useMemo(() => (query.trim() ? filterHelpCatalog(query) : [...articles]), [query]);
 
   const byCategory = useMemo(
     () =>

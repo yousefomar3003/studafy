@@ -11,6 +11,17 @@ export {
   scheduleAiMessageRetentionSweepJob,
 } from "./ai-message-retention-sweep-scheduler";
 export { resolveAdminActor, armAdminActor, NoAdminActorError } from "./admin-actor";
+export {
+  RECORD_RETENTION_BATCH_SIZE,
+  purgeExpiredSensitiveRecords,
+} from "./record-retention-sweep";
+export type { PurgeExpiredSensitiveRecordsResult } from "./record-retention-sweep";
+export {
+  RECORD_RETENTION_SWEEP_CRON_PATTERN,
+  scheduleRecordRetentionSweepJob,
+} from "./record-retention-sweep-scheduler";
+export { RECORD_DATA_TABLES, eraseRecordData, exportRecordData } from "./records-dsr";
+export { RECORD_RESEAL_BATCH_SIZE, resealRecordValues } from "./record-key-rotation";
 export { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 export type { ClosureSweepResult, EnqueueDsrJob } from "./closure-sweep";
 export { CLOSURE_SWEEP_CRON_PATTERN, scheduleClosureSweepJob } from "./closure-sweep-scheduler";

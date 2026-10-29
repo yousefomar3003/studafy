@@ -58,7 +58,7 @@ function importDiff() {
       conflict: 0,
       parents_created: 0,
       links_created: 0,
-      links_updated: 0,
+      parent_conflicts: 0,
     },
     rows: [
       {
@@ -68,7 +68,12 @@ function importDiff() {
         changes: {},
         conflict: null,
         parent: null,
+        parent_conflict: null,
+        parent_group_line: null,
+        parent_email: null,
+        parent_name: null,
         link: null,
+        records: [],
       },
       {
         line_number: 3,
@@ -77,7 +82,12 @@ function importDiff() {
         changes: { first_name: { from: "Sam", to: "Samuel" } },
         conflict: null,
         parent: null,
+        parent_conflict: null,
+        parent_group_line: null,
+        parent_email: null,
+        parent_name: null,
         link: null,
+        records: [],
       },
     ],
   };
@@ -464,5 +474,152 @@ describe("ImportStudentsPage", () => {
     await screen.findByText("New students");
 
     await expectNoA11yViolations(container);
+  });
+
+  test("the preview reports PARENT_ACCOUNT_EXISTS, groups siblings and masks sensitive columns", async () => {
+    FakeXhr.nextResponseBody = importRecord({ status: "validated", valid_rows: 3, error_rows: 0 });
+    const row = (overrides: Record<string, unknown>) => ({
+      action: "create",
+      changes: {},
+      conflict: null,
+      parent: null,
+      parent_conflict: null,
+      parent_group_line: null,
+      parent_email: null,
+      parent_name: null,
+      link: null,
+      records: [],
+      ...overrides,
+    });
+    getMock.mockImplementation((path: string) => {
+      if (path === "/api/imports/students/{importId}/diff") {
+        return Promise.resolve({
+          data: {
+            import_id: IMPORT_ID,
+            totals: {
+              create: 3,
+              update: 0,
+              unchanged: 0,
+              conflict: 0,
+              parents_created: 1,
+              links_created: 2,
+              parent_conflicts: 1,
+            },
+            rows: [
+              row({
+                line_number: 2,
+                admission_number: "S-1",
+                parent: "create",
+                parent_group_line: 2,
+                link: "create",
+                records: [
+                  {
+                    field_id: "f1",
+                    label_en: "Bus stop",
+                    label_ar: "موقف",
+                    value: "Gate 3",
+                    mask: null,
+                  },
+                  {
+                    field_id: "f2",
+                    label_en: "National ID",
+                    label_ar: "الهوية",
+                    value: null,
+                    mask: "•••• 67-1",
+                  },
+                ],
+              }),
+              row({
+                line_number: 3,
+                admission_number: "S-2",
+                parent: "sibling",
+                parent_group_line: 2,
+                link: "create",
+              }),
+              row({
+                line_number: 4,
+                admission_number: "S-3",
+                parent: "conflict",
+                parent_conflict: "PARENT_ACCOUNT_EXISTS",
+              }),
+            ],
+          },
+        });
+      }
+      return defaultGet(path);
+    });
+
+    await renderPage(await loadImportStudentsPage());
+    uploadFile();
+
+    const preview = within(await screen.findByRole("region", { name: "Import preview" }));
+    expect(await preview.findByText(/National ID: •••• 67-1/)).toBeTruthy();
+    expect(preview.getByText(/Bus stop: Gate 3/)).toBeTruthy();
+    expect(preview.getByText(/Joins the new parent created on line 2/)).toBeTruthy();
+    expect(preview.getByText(/already belongs to an account, so no link is made/)).toBeTruthy();
+    expect(preview.getByRole("status").textContent).toContain(
+      "Guardians tab or Finance > Unlinked",
+    );
+  });
+
+  test("offers template fields as columns and explains that document fields are not imported", async () => {
+    FakeXhr.nextResponseBody = importRecord({
+      status: "validated",
+      valid_rows: 1,
+      error_rows: 0,
+      source_headers: [...TEMPLATE_HEADERS, "National ID"],
+    });
+    getMock.mockImplementation((path: string) => {
+      if (path === "/api/record-forms/{subjectKind}") {
+        return Promise.resolve({
+          data: {
+            subject_kind: "student",
+            version: 1,
+            fields: [
+              {
+                id: "f2",
+                field_type: "short_text",
+                label_en: "National ID",
+                label_ar: "الهوية",
+                help_en: null,
+                help_ar: null,
+                required: false,
+                options: [],
+                sort_order: 0,
+                visibility: "staff_only",
+                sensitivity: "sensitive",
+                has_expiry: false,
+              },
+              {
+                id: "f3",
+                field_type: "document",
+                label_en: "Birth certificate",
+                label_ar: "شهادة الميلاد",
+                help_en: null,
+                help_ar: null,
+                required: true,
+                options: [],
+                sort_order: 1,
+                visibility: "staff_only",
+                sensitivity: "standard",
+                has_expiry: false,
+              },
+            ],
+          },
+        });
+      }
+      return defaultGet(path);
+    });
+
+    await renderPage(await loadImportStudentsPage());
+    uploadFile();
+
+    expect(await screen.findByRole("heading", { name: "Student record fields" })).toBeTruthy();
+    expect(screen.getByText(/Sensitive: encrypted, and shown masked/)).toBeTruthy();
+    expect(
+      screen.getByText(/Birth certificate is a document field and cannot be imported/),
+    ).toBeTruthy();
+    choose("National ID", "National ID");
+    expect(screen.getByRole("button", { name: "Apply mapping" })).toBeTruthy();
   });
 });

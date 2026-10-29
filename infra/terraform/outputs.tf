@@ -138,6 +138,11 @@ output "secrets_postgres_rotation_lambda_arn" {
   value       = module.secrets.postgres_rotation_lambda_arn
 }
 
+output "storage_sensitive_documents_kms_key_arn" {
+  description = "KMS key for sensitive record documents; rendered into the api task definition as STORAGE_SENSITIVE_KMS_KEY_ID (ADR-019)."
+  value       = module.storage.sensitive_documents_kms_key_arn
+}
+
 output "storage_app_files_bucket_id" {
   description = "Name of the app-files bucket. Pass to `aws s3api`/`aws s3` commands when verifying lifecycle rules and CORS (see modules/storage/README.md)."
   value       = module.storage.app_files_bucket_id

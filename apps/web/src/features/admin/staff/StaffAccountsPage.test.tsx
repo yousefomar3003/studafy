@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 
 import type { ComponentType } from "react";
 
@@ -63,14 +63,20 @@ mock.module("../../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }
 
 const loadPage = async (): Promise<ComponentType> => (await import("./StaffAccountsPage")).default;
 
-async function renderPage() {
+/** Renders the router's current `search`, so a test can see a query parameter being dropped. */
+function LocationProbe() {
+  return <output data-testid="location-search">{useLocation().search}</output>;
+}
+
+async function renderPage(initialEntry = "/portal/accounts") {
   const Page = await loadPage();
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[initialEntry]}>
           <Page />
+          <LocationProbe />
         </MemoryRouter>
       </ToastProvider>
     </QueryClientProvider>,
@@ -134,5 +140,20 @@ describe("StaffAccountsPage", () => {
         params: { path: { id: PENDING_ID } },
       }),
     );
+  });
+
+  test("?invite=1 focuses the invite form's email field, then drops the parameter", async () => {
+    await renderPage("/portal/accounts?invite=1");
+
+    const email = await screen.findByRole("textbox", { name: /email/i });
+    await waitFor(() => expect(document.activeElement).toBe(email));
+    await waitFor(() => expect(screen.getByTestId("location-search").textContent).toBe(""));
+  });
+
+  test("without ?invite the email field is not focused", async () => {
+    await renderPage();
+
+    const email = await screen.findByRole("textbox", { name: /email/i });
+    expect(document.activeElement).not.toBe(email);
   });
 });

@@ -26,6 +26,7 @@ import { syncFeatureCatalog } from "./modules/features";
 import { createFlagsService } from "./modules/flags";
 import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
 import { resolveMobileReleaseConfig } from "./modules/mobile";
+import { resolveRecordKeyring } from "./modules/records";
 import {
   startEntitlementInvalidationSubscriber,
   StripeAdapter,
@@ -252,6 +253,8 @@ const app = createApp({
   // Folds MOBILE_MIN_SUPPORTED_VERSION_* / MOBILE_LATEST_VERSION_* into the shape
   // GET /api/mobile/config serves (ST-257). An unset variable becomes "0.0.0" ("no floor").
   mobileReleaseConfig: resolveMobileReleaseConfig(env),
+  // Sensitive record values (ADR-019). env.ts has already validated the keyring.
+  recordKeyring: resolveRecordKeyring(env),
 });
 
 const server = Bun.serve({

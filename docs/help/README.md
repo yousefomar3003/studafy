@@ -32,16 +32,40 @@ documents the rules. It is not published to the site (`publish: false`).
 
 Every published file starts with a `---` block. Supported keys:
 
-| Key           | Required | Rules                                                                         |
-| ------------- | -------- | ----------------------------------------------------------------------------- |
-| `title`       | yes      | Human-readable, sentence case. Used for the page heading and search.          |
-| `description` | yes      | One sentence. Used for listing cards and search.                              |
-| `keywords`    | no       | Comma-agnostic YAML list of search terms, e.g. `["setup", "wizard", "skip"]`. |
-| `order`       | yes      | Integer. Sort order within the category, ascending.                           |
-| `publish`     | no       | `true` by default. Set `false` for drafts.                                    |
+| Key              | Required        | Rules                                                                                                                                    |
+| ---------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`          | yes             | Human-readable, sentence case. Used for the page heading and search.                                                                     |
+| `description`    | yes             | One sentence. Used for listing cards and search.                                                                                         |
+| `keywords`       | no              | Comma-agnostic YAML list of search terms, e.g. `["setup", "wizard", "skip"]`.                                                            |
+| `title_ar`       | yes (published) | Arabic title. Searched by the global search palette.                                                                                     |
+| `description_ar` | yes (published) | Arabic one-sentence description. Searched by the palette.                                                                                |
+| `keywords_ar`    | yes (published) | List of 5–15 Arabic search terms, same syntax as `keywords`. Use the words staff actually type (MSA and Gulf school vocabulary).         |
+| `roles`          | no              | List of role names from `ROLES` in `packages/constants`, e.g. `[FINANCE]`. Boosts the article in search for those roles; never hides it. |
+| `action`         | no              | Search-registry action id this article walks through, e.g. `add-student` (lowercase letters, digits and hyphens). See below.             |
+| `order`          | yes             | Integer. Sort order within the category, ascending.                                                                                      |
+| `publish`        | no              | `true` by default. Set `false` for drafts.                                                                                               |
 
 The parser is deliberately small (regex-based). Use the exact `key: value`
-form above. Do not use colons inside values.
+form above. Do not use colons inside values. Lists may be on one line or in
+Prettier's wrapped form (`key:` then `[` and one quoted item per line). Separate
+list items with an ASCII comma, not the Arabic comma `،`. An unknown key, an
+unknown role or a malformed `action` fails the build.
+
+### Every new article and page must be searchable
+
+- **Every published article needs `title_ar`, `description_ar` and
+  `keywords_ar`.** The build throws for a published article that is missing
+  any of them (`content.test.ts` checks the real files). The global search
+  palette matches English and Arabic, ignoring case, diacritics and hamza forms
+  (`أ إ آ` match `ا`), and links straight to the `##`/`###` heading where the
+  query matched — another reason to keep headings stable.
+- **`action` must name a real registry entry.** It is the id of an action in
+  `apps/web/src/features/search/destinations.ts`, so the palette can offer
+  "do it now" next to the article.
+- **Every new web page needs a search registry entry** in
+  `apps/web/src/features/search/destinations.ts`, with its keywords in the
+  `search` i18n catalog (English and Arabic). The destinations pin test fails
+  otherwise.
 
 ## Markdown subset
 
