@@ -219,7 +219,9 @@ def enforce_android_size_budget!
     "--build-name=#{pubspec_version_name}",
     "--build-number=#{resolved_build_number}",
   )
-  apks = Dir.glob(File.join(MOBILE_DIR, "build/app/outputs/apk/#{FLAVOR}Release/*.apk"))
+  # Flutter's own output (`app-<abi>-<flavor>-release.apk`); Gradle's raw copies live under
+  # apk/<flavor>/release/, never apk/<flavor>Release/.
+  apks = Dir.glob(File.join(MOBILE_DIR, "build/app/outputs/flutter-apk/app-*-#{FLAVOR}-release.apk"))
   UI.user_error!("flutter build apk --split-per-abi produced no APKs") if apks.empty?
   enforce_size_budget!(apks, "Android release (largest per-ABI APK)")
 end
