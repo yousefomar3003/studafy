@@ -1899,6 +1899,23 @@
       }
     }
   },
+  "releasedMarks": {
+    "title": "Term marks",
+    "entry": "Term marks",
+    "entrySubtitle": "Midterm, final exam and other marks your school has approved",
+    "error": "Couldn't load marks.",
+    "unavailable": "Marks aren't available for this account.",
+    "empty": "No approved marks yet. A term's marks appear here once the school approves them.",
+    "retry": "Try again",
+    "annual": "Full year",
+    "approvedOn": "Approved {date}",
+    "retake": "{name} (retake)",
+    "status": {
+      "absent": "Absent",
+      "excused": "Excused",
+      "notApplicable": "N/A"
+    }
+  },
   "academicResults": {
     "title": "Results",
     "entry": "Official results",

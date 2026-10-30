@@ -1,5 +1,8 @@
 import { z } from "@hono/zod-openapi";
 
+import { examWeightsProblem } from "../../grading/exam-structure";
+import { examStructureSchema, examWeightsSchema } from "../../grading/schemas";
+
 // ---------------------------------------------------------------------------
 // Shared enums
 // ---------------------------------------------------------------------------
@@ -71,8 +74,27 @@ export const updateSchoolSettingsBodySchema = z
     attendance_correction_window_hours: attendanceCorrectionWindowHoursSchema.optional().openapi({
       description: "Attendance correction window, in hours.",
     }),
+    exam_structure: examStructureSchema.optional().openapi({
+      description: "Exam system subjects are set up with. Send together with exam_weights.",
+    }),
+    exam_weights: examWeightsSchema.optional().openapi({
+      description: "Share of a term per part of exam_structure; totals 100.",
+    }),
   })
   .strict()
+  .superRefine((body, ctx) => {
+    if (body.exam_structure === undefined && body.exam_weights === undefined) return;
+    if (body.exam_structure === undefined || body.exam_weights === undefined) {
+      ctx.addIssue({
+        code: "custom",
+        path: [body.exam_structure === undefined ? "exam_structure" : "exam_weights"],
+        message: "Send exam_structure and exam_weights together.",
+      });
+      return;
+    }
+    const problem = examWeightsProblem(body.exam_structure, body.exam_weights);
+    if (problem) ctx.addIssue({ code: "custom", path: ["exam_weights"], message: problem });
+  })
   .openapi("UpdateSchoolSettings");
 
 // ---------------------------------------------------------------------------
@@ -96,6 +118,8 @@ export const schoolSettingsResponseSchema = z
     attendance_correction_window_hours: attendanceCorrectionWindowHoursSchema.openapi({
       description: "Attendance correction window, in hours.",
     }),
+    exam_structure: examStructureSchema,
+    exam_weights: examWeightsSchema,
     created_at: z
       .string()
       .datetime()

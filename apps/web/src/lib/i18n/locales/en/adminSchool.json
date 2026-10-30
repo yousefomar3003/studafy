@@ -195,6 +195,37 @@
       "showBody": "Every parent at this school will immediately be able to see their own child's resolved discipline incidents in the portal.",
       "hideBody": "Parents will immediately lose access to their child's resolved discipline incidents in the portal.",
       "updated": "Attendance alerts updated"
+    },
+    "exams": {
+      "title": "Exam system",
+      "description": "How every term is examined. Subjects are set up from this, so teachers enter exactly these parts each term.",
+      "systemLabel": "Each term has",
+      "systems": {
+        "midterm": "Midterm exam and final exam, plus quizzes and homework",
+        "periods": "First period exam, second period exam and final exam, plus quizzes and homework"
+      },
+      "weightsLabel": "Share of the term (%)",
+      "weightsHelp": "Each part is marked out of its share: a 30% midterm is out of 30. Set a part to 0 to leave it out.",
+      "parts": {
+        "first_period": "First period exam",
+        "second_period": "Second period exam",
+        "midterm": "Midterm exam",
+        "final_exam": "Final exam",
+        "quiz": "Quizzes",
+        "homework": "Homework"
+      },
+      "total": "Total: {{total}}% (must be 100%)",
+      "updated": "Exam system saved",
+      "apply": "Apply to all subjects",
+      "applyHelp": "Rebuilds every subject of the current academic year on this system. Subjects that already have marks are left as they are.",
+      "saveBeforeApply": "Save your changes before applying them to subjects.",
+      "confirmTitle": "Apply the exam system to all subjects?",
+      "confirmBody": "Every subject of the current academic year without marks gets this system's parts for each term, replacing its current categories and assessments. Subjects that already have marks are not changed.",
+      "applied": "Subjects set up: {{count}}",
+      "applyFailed": "Couldn't apply the exam system",
+      "resultUpdated": "{{count}} subjects in {{year}} now use this system.",
+      "resultHasMarks": "Not changed because they already have marks: {{subjects}}.",
+      "resultOther": "Not changed (set these up in Academic Setup): {{subjects}}."
     }
   },
   "timetable": {

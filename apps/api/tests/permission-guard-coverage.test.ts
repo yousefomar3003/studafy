@@ -150,6 +150,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/assessments/{assessmentId}/decision",
   "POST /api/grading/certificates/{certificateId}/reissue",
   "POST /api/grading/certificates/{certificateId}/revoke",
+  "POST /api/grading/exam-structure/apply",
   "POST /api/grading/finalizations/{finalizationId}/certificates",
   "POST /api/grading/finalizations/{finalizationId}/corrections",
   "POST /api/grading/mark-sheets/{sheetId}/decision",

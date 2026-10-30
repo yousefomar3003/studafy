@@ -67,6 +67,8 @@ const categoryKindSchema = z.enum([
   "practical",
   "participation",
   "exam",
+  "first_period",
+  "second_period",
   "midterm",
   "final_exam",
   "other",
@@ -1060,6 +1062,141 @@ export const studentResultsSchema = z
     ),
   })
   .openapi("StudentFinalizedResults");
+
+export const studentReleasedMarksSchema = z
+  .object({
+    periods: z.array(
+      z
+        .object({
+          academic_year_id: uuidSchema,
+          academic_year_name: z.string(),
+          term_id: uuidSchema.nullable().openapi({ description: "Null: the annual period." }),
+          term_name: z.string().nullable(),
+          subjects: z.array(
+            z
+              .object({
+                subject_id: uuidSchema,
+                subject_code: z.string(),
+                subject_name: z.string(),
+                approved_at: dateTimeSchema.nullable(),
+                categories: z.array(
+                  z
+                    .object({
+                      category_id: uuidSchema,
+                      name: z.string(),
+                      kind: z.string(),
+                      assessments: z.array(
+                        z
+                          .object({
+                            assessment_id: uuidSchema,
+                            name: z.string(),
+                            max_marks: z.number(),
+                            assessment_date: z.string().nullable(),
+                            attempts: z.array(
+                              z
+                                .object({
+                                  attempt: z.number().int(),
+                                  status: markStatusSchema,
+                                  score: z.number().nullable(),
+                                })
+                                .openapi("ReleasedMarkAttempt"),
+                            ),
+                          })
+                          .openapi("ReleasedAssessment"),
+                      ),
+                    })
+                    .openapi("ReleasedMarkCategory"),
+                ),
+              })
+              .openapi("ReleasedMarkSubject"),
+          ),
+        })
+        .openapi("ReleasedMarkPeriod"),
+    ),
+  })
+  .openapi("StudentReleasedMarks");
+
+// ---------------------------------------------------------------------------
+// Exam structure (School Settings exam system)
+// ---------------------------------------------------------------------------
+
+export const examStructureSchema = z
+  .enum(["midterm", "periods"])
+  .openapi({ description: "midterm: midterm + final; periods: first + second period + final." });
+
+export const examWeightsSchema = z
+  .object({
+    first_period: z.number().min(0).max(100).optional(),
+    second_period: z.number().min(0).max(100).optional(),
+    midterm: z.number().min(0).max(100).optional(),
+    final_exam: z.number().min(0).max(100).optional(),
+    quiz: z.number().min(0).max(100).optional(),
+    homework: z.number().min(0).max(100).optional(),
+  })
+  .strict()
+  .openapi("ExamWeights", { description: "Share of a term per part; totals 100." });
+
+export const examTemplateSchema = z
+  .object({
+    structure: examStructureSchema,
+    weights: examWeightsSchema,
+    term_weights: z.array(
+      z.object({ term_id: uuidSchema, weight: z.number() }).openapi("ExamTemplateTermWeight"),
+    ),
+    categories: z.array(
+      z
+        .object({
+          ref: z.string(),
+          name: z.string(),
+          kind: categoryKindSchema,
+          scope: categoryScopeSchema,
+          weight: z.number().nullable(),
+          aggregation: aggregationSchema,
+          drop_lowest: z.number().int(),
+          sort_order: z.number().int(),
+        })
+        .openapi("ExamTemplateCategory"),
+    ),
+    assessments: z.array(
+      z
+        .object({
+          category_ref: z.string(),
+          term_id: uuidSchema.nullable(),
+          name: z.string(),
+          max_marks: z.number(),
+          weight: z.number(),
+          is_mandatory: z.boolean(),
+          assessment_date: z.string().nullable(),
+          due_date: z.string().nullable(),
+          sort_order: z.number().int(),
+        })
+        .openapi("ExamTemplateAssessment"),
+    ),
+  })
+  .openapi("ExamTemplate");
+
+const appliedConfigSchema = z.object({
+  config_id: uuidSchema,
+  subject_name: z.string(),
+  section_id: uuidSchema.nullable(),
+});
+
+export const applyExamStructureResultSchema = z
+  .object({
+    academic_year_id: uuidSchema,
+    academic_year_name: z.string(),
+    structure: examStructureSchema,
+    updated: z.array(appliedConfigSchema.openapi("ExamStructureAppliedConfig")),
+    skipped: z.array(
+      appliedConfigSchema
+        .extend({
+          reason: z.enum(["has_marks", "section_assessments", "excluded", "invalid"]),
+          detail: z.string().nullable(),
+        })
+        .openapi("ExamStructureSkippedConfig"),
+    ),
+  })
+  .openapi("ApplyExamStructureResult");
 
 // ---------------------------------------------------------------------------
 // Certificates

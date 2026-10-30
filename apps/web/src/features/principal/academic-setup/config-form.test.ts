@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   draftFromConfig,
+  draftFromTemplate,
   draftToBody,
   emptyDraft,
   newAssessment,
@@ -19,6 +20,54 @@ const TERMS = [
 ];
 
 describe("config-form", () => {
+  test("a new subject on the period system gets every part in every term, valid as is", () => {
+    const parts = [
+      ["first_period", "First period exam", 20],
+      ["second_period", "Second period exam", 20],
+      ["final_exam", "Final exam", 30],
+      ["quiz", "Quizzes", 15],
+      ["homework", "Homework", 15],
+    ] as const;
+    const draft = draftFromTemplate(TERMS, {
+      structure: "periods",
+      weights: { first_period: 20, second_period: 20, final_exam: 30, quiz: 15, homework: 15 },
+      term_weights: [
+        { term_id: "term-1", weight: 33.33 },
+        { term_id: "term-2", weight: 33.33 },
+        { term_id: "term-3", weight: 33.34 },
+      ],
+      categories: parts.map(([kind, name, weight], index) => ({
+        ref: kind,
+        name,
+        kind,
+        scope: "term" as const,
+        weight,
+        aggregation: "weighted_average" as const,
+        drop_lowest: 0,
+        sort_order: index,
+      })),
+      assessments: TERMS.flatMap((term) =>
+        parts.map(([kind, name, weight], index) => ({
+          category_ref: kind,
+          term_id: term.id,
+          name,
+          max_marks: weight,
+          weight: 1,
+          is_mandatory: true,
+          assessment_date: null,
+          due_date: null,
+          sort_order: index,
+        })),
+      ),
+    });
+    expect(draft.categories.map((c) => c.kind)).toEqual(parts.map(([kind]) => kind));
+    expect(draft.assessments).toHaveLength(15);
+    // Each assessment points at its own category's draft key.
+    const first = draft.assessments.find((a) => a.termId === "term-2" && a.name === "Quizzes")!;
+    expect(draft.categories.find((c) => c.key === first.categoryKey)?.kind).toBe("quiz");
+    expect(validateDraft(draft, TERMS).issues.filter((i) => i.severity === "error")).toEqual([]);
+  });
+
   test("a new subject starts with its terms weighted to exactly 100", () => {
     const draft = emptyDraft(TERMS);
     expect(draft.termWeights).toEqual({ "term-1": "33.33", "term-2": "33.33", "term-3": "33.34" });

@@ -34,6 +34,7 @@ import {
   upsertProgram,
 } from "../config-service";
 import { copyYearConfiguration } from "../copy-year-service";
+import { applyExamStructure, getExamTemplate } from "../exam-structure";
 import { getGradingOverview } from "../overview-service";
 import {
   assignmentIdParamSchema,
@@ -68,6 +69,8 @@ import {
   updateSubjectConfigBodySchema,
   yearIdParamSchema,
   yearStatusResultSchema,
+  applyExamStructureResultSchema,
+  examTemplateSchema,
 } from "../schemas";
 
 import type { Database } from "../../../db/client";
@@ -110,6 +113,39 @@ const publishCheckRoute = createRoute({
   responses: standardResponses(
     { 200: { description: "Issues.", schema: publishCheckSchema } },
     [401, 403, 404, 500],
+  ),
+});
+
+const examTemplateRoute = createRoute({
+  method: "get",
+  path: "/api/grading/years/{yearId}/exam-template",
+  tags: TAGS,
+  operationId: "getGradingExamTemplate",
+  summary: "The term structure a new subject starts from",
+  description:
+    "Built from the school's exam system (School Settings): each term's categories and " +
+    "assessments, weighted as the admin set them.",
+  security,
+  request: { params: yearIdParamSchema },
+  responses: standardResponses(
+    { 200: { description: "Template.", schema: examTemplateSchema } },
+    [401, 403, 404, 500],
+  ),
+});
+
+const applyExamStructureRoute = createRoute({
+  method: "post",
+  path: "/api/grading/exam-structure/apply",
+  tags: TAGS,
+  operationId: "applyGradingExamStructure",
+  summary: "Set up the active year's subjects on the school's exam system",
+  description:
+    "Rebuilds every subject of the active academic year that has no marks yet; subjects with " +
+    "marks are reported as skipped and left unchanged.",
+  security,
+  responses: standardResponses(
+    { 200: { description: "What changed.", schema: applyExamStructureResultSchema } },
+    [401, 403, 409, 500],
   ),
 });
 
@@ -510,6 +546,8 @@ export function gradingConfigRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.use("/api/grading/years/:yearId/overview", read);
   routes.use("/api/grading/years/:yearId/publish-check", read);
+  routes.use("/api/grading/years/:yearId/exam-template", read);
+  routes.use("/api/grading/exam-structure/apply", manage, auditAction("update", "subject_configs"));
   routes.use("/api/grading/years/:yearId/status", manage, auditAction("update", "academic_years"));
   routes.use("/api/grading/years/:yearId/copy", manage, auditAction("insert", "subject_configs"));
   routes.use(
@@ -588,6 +626,25 @@ export function gradingConfigRoutes(database: Database): OpenAPIHono<AppEnv> {
       collectPublishIssues(tx, tenant.schoolId, yearId),
     );
     return c.json({ ready: !issues.some((issue) => issue.severity === "error"), issues }, 200);
+  });
+
+  routes.openapi(examTemplateRoute, async (c) => {
+    const { yearId } = c.req.valid("param");
+    const tenant = tenantFrom(c);
+    return c.json(
+      await withTenantTx(database, tenant, (tx) => getExamTemplate(tx, tenant.schoolId, yearId)),
+      200,
+    );
+  });
+
+  routes.openapi(applyExamStructureRoute, async (c) => {
+    const tenant = tenantFrom(c);
+    return c.json(
+      await withTenantTx(database, tenant, (tx) =>
+        applyExamStructure(tx, tenant.schoolId, tenant.userId),
+      ),
+      200,
+    );
   });
 
   routes.openapi(setStatusRoute, async (c) => {

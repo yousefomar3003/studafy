@@ -16,6 +16,7 @@ import {
   reissueCertificate,
   revokeCertificate,
 } from "../certificate-service";
+import { listReleasedStudentMarks } from "../marks-service";
 import {
   computationView,
   computeSection,
@@ -46,6 +47,7 @@ import {
   readinessSchema,
   reasonBodySchema,
   resultPreviewSchema,
+  studentReleasedMarksSchema,
   studentResultsSchema,
 } from "../schemas";
 
@@ -260,6 +262,23 @@ const studentCertificatesRoute = createRoute({
   ),
 });
 
+const studentMarksRoute = createRoute({
+  method: "get",
+  path: "/api/grading/students/{studentId}/marks",
+  tags: TAGS,
+  operationId: "listStudentReleasedMarks",
+  summary: "A student's approved marks",
+  description:
+    "Marks from mark sheets school leadership has approved, by term (and the annual period), " +
+    "subject and category. School leadership, the student, or a linked parent.",
+  security,
+  request: { params: gradingStudentParamSchema },
+  responses: standardResponses(
+    { 200: { description: "Released marks.", schema: studentReleasedMarksSchema } },
+    [401, 403, 500],
+  ),
+});
+
 function tenantFrom(c: Context<AppEnv>) {
   const auth = requireAuth(c);
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
@@ -322,6 +341,7 @@ export function gradingResultsRoutes(database: Database): OpenAPIHono<AppEnv> {
     "/api/grading/students/:studentId/certificates",
     requirePermission(PERMISSIONS.GRADE_READ),
   );
+  routes.use("/api/grading/students/:studentId/marks", requirePermission(PERMISSIONS.GRADE_READ));
 
   routes.openapi(previewRoute, async (c) => {
     const { sectionId } = c.req.valid("param");
@@ -469,6 +489,16 @@ export function gradingResultsRoutes(database: Database): OpenAPIHono<AppEnv> {
       return listCertificates(tx, tenant.schoolId, { studentId });
     });
     return c.json({ certificates }, 200);
+  });
+
+  routes.openapi(studentMarksRoute, async (c) => {
+    const { studentId } = c.req.valid("param");
+    const tenant = tenantFrom(c);
+    const periods = await withTenantTx(database, tenant, async (tx) => {
+      await assertStudentAccess(tx, studentId);
+      return listReleasedStudentMarks(tx, tenant.schoolId, studentId);
+    });
+    return c.json({ periods }, 200);
   });
 
   return routes;

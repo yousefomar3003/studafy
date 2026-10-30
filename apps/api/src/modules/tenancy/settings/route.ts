@@ -29,6 +29,8 @@ function formatSettingsResponse(row: SchoolSettingsRow): SchoolSettingsResponse 
     absence_alert_threshold: row.absence_alert_threshold,
     parent_discipline_visibility: row.parent_discipline_visibility,
     attendance_correction_window_hours: row.attendance_correction_window_hours,
+    exam_structure: row.exam_structure,
+    exam_weights: row.exam_weights,
     created_at:
       row.created_at instanceof Date ? row.created_at.toISOString() : String(row.created_at),
     updated_at:

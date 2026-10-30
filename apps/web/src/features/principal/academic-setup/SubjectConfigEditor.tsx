@@ -18,6 +18,7 @@ import {
   ROUNDING_MODES,
   displayTotal,
   draftFromConfig,
+  draftFromTemplate,
   draftToBody,
   draftToCreateBody,
   emptyDraft,
@@ -30,7 +31,7 @@ import { isProblem, problemMessage } from "./errors";
 import { ImpactModal } from "./ImpactModal";
 import { issueText } from "./issues";
 import { useCreateSubjectConfig, useUpdateSubjectConfig } from "./mutations";
-import { useGradeScales, useSubjectConfig } from "./queries";
+import { useExamTemplate, useGradeScales, useSubjectConfig } from "./queries";
 
 import type { AssessmentDraft, CategoryDraft, ConfigDraft } from "./config-form";
 import type { SetupContext } from "./context";
@@ -65,8 +66,13 @@ export function SubjectConfigEditor({
   const terms = useTerms(ctx.year.id);
   const scales = useGradeScales(ctx.year.id);
   const config = useSubjectConfig(target.kind === "edit" ? target.configId : undefined);
+  // A new subject starts from the school's exam system; without it (not loaded), from an empty draft.
+  const template = useExamTemplate(target.kind === "create" ? ctx.year.id : undefined);
   const loading =
-    terms.isPending || scales.isPending || (target.kind === "edit" && config.isPending);
+    terms.isPending ||
+    scales.isPending ||
+    (target.kind === "edit" && config.isPending) ||
+    (target.kind === "create" && template.isPending);
   const error = terms.error ?? scales.error ?? (target.kind === "edit" ? config.error : null);
 
   if (loading || error) return <QueryState isPending={loading} error={error} />;
@@ -80,7 +86,7 @@ export function SubjectConfigEditor({
         config={null}
         terms={termList}
         scales={scales.data ?? []}
-        initial={emptyDraft(termList)}
+        initial={template.data ? draftFromTemplate(termList, template.data) : emptyDraft(termList)}
         onClose={onClose}
       />
     );

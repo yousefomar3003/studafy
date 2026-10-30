@@ -1,6 +1,11 @@
 import { summarizeWeights, validateSubjectConfig } from "@studafy/grading-engine";
 
-import type { CreateSubjectConfigBody, SubjectConfig, UpdateSubjectConfigBody } from "./queries";
+import type {
+  CreateSubjectConfigBody,
+  ExamTemplate,
+  SubjectConfig,
+  UpdateSubjectConfigBody,
+} from "./queries";
 import type { Term } from "../../admin/timetable/queries";
 import type { SubjectGradingConfig, ValidationIssue, WeightSummary } from "@studafy/grading-engine";
 
@@ -32,6 +37,8 @@ export const CATEGORY_KINDS: readonly CategoryKind[] = [
   "practical",
   "participation",
   "exam",
+  "first_period",
+  "second_period",
   "midterm",
   "final_exam",
   "other",
@@ -137,6 +144,48 @@ export function emptyDraft(terms: readonly Pick<Term, "id">[]): ConfigDraft {
     termWeights,
     categories: [],
     assessments: [],
+  };
+}
+
+/**
+ * A new subject's draft on the school's exam system: the template's term weights, one category per
+ * part and one assessment per part per term. Every field stays editable before saving.
+ */
+export function draftFromTemplate(
+  terms: readonly Pick<Term, "id">[],
+  template: ExamTemplate,
+): ConfigDraft {
+  const draft = emptyDraft(terms);
+  const keys = new Map(template.categories.map((category) => [category.ref, newKey("category")]));
+  return {
+    ...draft,
+    termWeights: Object.fromEntries(
+      template.term_weights.map((term) => [term.term_id, str(term.weight)]),
+    ),
+    categories: template.categories.map((category) => ({
+      key: keys.get(category.ref)!,
+      id: null,
+      name: category.name,
+      kind: category.kind,
+      scope: category.scope,
+      weight: str(category.weight),
+      aggregation: category.aggregation,
+      dropLowest: str(category.drop_lowest),
+    })),
+    assessments: template.assessments.map((assessment) => ({
+      key: newKey("assessment"),
+      id: null,
+      categoryKey: keys.get(assessment.category_ref)!,
+      termId: assessment.term_id,
+      name: assessment.name,
+      maxMarks: str(assessment.max_marks),
+      weight: str(assessment.weight),
+      mandatory: assessment.is_mandatory,
+      assessmentDate: assessment.assessment_date ?? "",
+      dueDate: assessment.due_date ?? "",
+      markCount: 0,
+      status: "active",
+    })),
   };
 }
 

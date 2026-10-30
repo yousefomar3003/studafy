@@ -80,6 +80,8 @@
     "practical": "Practical",
     "participation": "Participation",
     "exam": "Exam",
+    "first_period": "First period exam",
+    "second_period": "Second period exam",
     "midterm": "Midterm exam",
     "final_exam": "Final exam",
     "other": "Other"
