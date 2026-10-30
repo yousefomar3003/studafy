@@ -165,9 +165,9 @@ def install_google_service_info
   project.save
 end
 
-# Extra `--dart-define`s for a one-off test build, from MOBILE_EXTRA_DART_DEFINES as
-# "KEY=value,KEY=value" (e.g. API_BASE_URL and SHOW_DEMO_LOGIN for a TestFlight build that talks to
-# a developer's tunnelled API). The release workflows never set it.
+# Extra `--dart-define`s for a one-off test build (TestFlight / Play internal), from
+# MOBILE_EXTRA_DART_DEFINES as "KEY=value,KEY=value" — e.g. API_BASE_URL and SHOW_DEMO_LOGIN for a
+# build that talks to a developer's tunnelled API. The release workflows never set it.
 def extra_dart_defines
   ENV["MOBILE_EXTRA_DART_DEFINES"].to_s.split(",").map(&:strip).reject(&:empty?).map do |pair|
     UI.user_error!("MOBILE_EXTRA_DART_DEFINES entry '#{pair}' is not KEY=value") unless pair.include?("=")
@@ -203,6 +203,7 @@ def build_android_aab
     "--flavor", FLAVOR, "-t", ENTRYPOINT,
     "--build-name=#{pubspec_version_name}",
     "--build-number=#{resolved_build_number}",
+    *extra_dart_defines,
   )
   path = File.join(MOBILE_DIR, "build/app/outputs/bundle/#{FLAVOR}Release/app-#{FLAVOR}-release.aab")
   File.exist?(path) ? path : UI.user_error!("no app bundle at #{path}")
