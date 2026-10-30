@@ -22,7 +22,6 @@ import '../../../core/api/generated/models/create_assignment_body_status.dart';
 import '../../../core/api/generated/models/create_material_body.dart';
 import '../../../core/api/generated/models/create_upload_url_body.dart';
 import '../../../core/api/generated/models/material.dart' as material_api;
-import '../../../core/api/generated/models/toggle_ai_visible_body.dart';
 import '../../../core/api/generated/models/update_assignment_body.dart';
 import '../../../core/api/generated/models/update_assignment_body_status.dart';
 import '../../../core/api/generated/models/update_material_body.dart';
@@ -169,32 +168,12 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
         _MaterialList(
           future: _materials,
           onRefresh: _refreshMaterials,
-          onToggleAi: _toggleAi,
           onEdit: (material) =>
               _open(_MaterialEditor(material: material), assignments: false),
         ),
       ],
     ),
   );
-
-  Future<void> _toggleAi(material_api.Material material, bool visible) async {
-    try {
-      await ref
-          .read(apiClientProvider)
-          .academics
-          .toggleMaterialAiVisible(
-            materialId: material.id,
-            body: ToggleAiVisibleBody(aiVisible: visible),
-          );
-      _refreshMaterials();
-    } on DioException catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('teacher.content.materials.aiError'.tr())),
-        );
-      }
-    }
-  }
 }
 
 /// Maps an API rejection to a translation key. Branches on the stable `code`, falling back to
@@ -323,12 +302,10 @@ class _MaterialList extends StatelessWidget {
   const _MaterialList({
     required this.future,
     required this.onRefresh,
-    required this.onToggleAi,
     required this.onEdit,
   });
   final Future<List<material_api.Material>> future;
   final VoidCallback onRefresh;
-  final Future<void> Function(material_api.Material, bool) onToggleAi;
   final ValueChanged<material_api.Material> onEdit;
 
   @override
@@ -403,17 +380,6 @@ class _MaterialList extends StatelessWidget {
                             state: materialReadyStateFromWireName(
                               material.ingestStatus.name,
                             ),
-                          ),
-                          SwitchListTile.adaptive(
-                            contentPadding: EdgeInsets.zero,
-                            title: Text(
-                              'teacher.content.materials.aiTitle'.tr(),
-                            ),
-                            subtitle: Text(
-                              'teacher.content.materials.aiSubtitle'.tr(),
-                            ),
-                            value: material.aiVisible,
-                            onChanged: (value) => onToggleAi(material, value),
                           ),
                         ],
                       ),
@@ -901,7 +867,6 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
   final _title = TextEditingController();
   final _description = TextEditingController();
   _LocalFile? _file;
-  bool _aiVisible = false;
   bool _uploading = false;
   double? _progress;
   String? _errorKey;
@@ -993,16 +958,11 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
           }
         },
       );
-      var material = await api.academics.confirmMaterialUpload(
+      // New materials are AI-visible by default; the clean scan hands them to AI ingestion.
+      await api.academics.confirmMaterialUpload(
         materialId: pending.id,
         body: ConfirmUploadBody(storageKey: upload.storageKey),
       );
-      if (_aiVisible && !material.aiVisible) {
-        material = await api.academics.toggleMaterialAiVisible(
-          materialId: material.id,
-          body: const ToggleAiVisibleBody(aiVisible: true),
-        );
-      }
       if (mounted) Navigator.of(context).pop(true);
     } on DioException catch (error) {
       setState(
@@ -1046,15 +1006,6 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
               leading: const Icon(Icons.insert_drive_file_outlined),
               title: Text(_file!.name),
             ),
-          SwitchListTile.adaptive(
-            contentPadding: EdgeInsets.zero,
-            title: Text('teacher.content.materials.aiTitle'.tr()),
-            subtitle: Text('teacher.content.materials.aiSubtitle'.tr()),
-            value: _aiVisible,
-            onChanged: _uploading
-                ? null
-                : (v) => setState(() => _aiVisible = v),
-          ),
           if (_uploading)
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.space12),
