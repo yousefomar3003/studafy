@@ -103,7 +103,10 @@ class _PillNavigationBarState extends State<PillNavigationBar> {
         ),
         // A drag that moves past touch slop scrubs at once; a press held still first becomes a
         // long press, whose moves scrub the same way. Either one wins over the tabs' own taps.
+        // Scrubbing is a touch shortcut only: screen readers reach each tab as its own labelled
+        // button, so the bar itself exposes no unlabelled long-press or scroll action.
         child: GestureDetector(
+          excludeFromSemantics: true,
           behavior: HitTestBehavior.opaque,
           onHorizontalDragStart: (details) =>
               _startScrub(details.globalPosition),
