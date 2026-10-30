@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -224,6 +225,48 @@ void main() {
     await tester.pumpAndSettle();
     expect(navBar().selectedIndex, 0);
     expect(find.byType(TodayScreen), findsOneWidget);
+  });
+
+  group('sliding a finger along the nav bar selects the tab under it', () {
+    PillNavigationBar navBar(WidgetTester tester) => tester.widget(find.byType(PillNavigationBar));
+
+    testWidgets('straight away, like a swipe', (tester) async {
+      await pumpAppShell(
+        tester,
+        session: await fakeAuthenticatedSession(roles: const ['STUDENT']),
+      );
+
+      final gesture = await tester.startGesture(tester.getCenter(find.text('Home')));
+      await gesture.moveTo(tester.getCenter(find.byTooltip('Lessons')));
+      await tester.pump();
+      expect(navBar(tester).selectedIndex, 1);
+
+      await gesture.moveTo(tester.getCenter(find.byTooltip('Work')));
+      await tester.pump();
+      expect(navBar(tester).selectedIndex, 2);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(navBar(tester).selectedIndex, 2);
+      expect(tester.widget<PageView>(find.byType(PageView).first).controller?.page, 2);
+    });
+
+    testWidgets('after pressing and holding first', (tester) async {
+      await pumpAppShell(
+        tester,
+        session: await fakeAuthenticatedSession(roles: const ['STUDENT']),
+      );
+
+      final gesture = await tester.startGesture(tester.getCenter(find.text('Home')));
+      await tester.pump(kLongPressTimeout + const Duration(milliseconds: 50));
+      await gesture.moveTo(tester.getCenter(find.byTooltip('AI')));
+      await tester.pump();
+      expect(navBar(tester).selectedIndex, 3);
+
+      await gesture.up();
+      await tester.pumpAndSettle();
+      expect(navBar(tester).selectedIndex, 3);
+    });
   });
 
   testWidgets('builds a tab only once it is first selected, then keeps it mounted', (

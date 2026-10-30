@@ -204,6 +204,11 @@
     }
   },
   "today": {
+    "aiPromo": {
+      "title": "Studafy AI",
+      "body": "Quizzes, flashcards and answers from your class materials.",
+      "action": "Explore"
+    },
     "greeting": {
       "morning": "Good morning",
       "afternoon": "Good afternoon",
@@ -446,12 +451,27 @@
       }
     },
     "notActive": {
-      "title": "The AI Study Assistant isn't active",
-      "body": "The AI Study Assistant isn't active for this account. Once it is, its tools appear here on their own — no app update needed.",
-      "points": {
-        "ask": "Ask questions and get grounded answers from your own class materials",
-        "quizzesAndFlashcards": "Practice with generated quizzes and flashcards",
-        "summaries": "Get quick summaries and key concepts from your materials"
+      "badge": "Subscription required",
+      "title": "Unlock the AI Study Assistant",
+      "body": "Your AI tools open up here as soon as an AI subscription is active on your account. No app update needed.",
+      "includedTitle": "What's included",
+      "features": {
+        "ask": {
+          "title": "Ask anything",
+          "body": "Grounded answers from your own class materials"
+        },
+        "practice": {
+          "title": "Quizzes & flashcards",
+          "body": "Practice sets generated from what you're studying"
+        },
+        "summaries": {
+          "title": "Summaries & key concepts",
+          "body": "The main ideas of any material at a glance"
+        },
+        "exam": {
+          "title": "Exam mode",
+          "body": "Full practice exams built from your materials"
+        }
       }
     },
     "schoolInactive": {
@@ -1094,10 +1114,7 @@
         "upload": "Upload material",
         "edit": "Edit material",
         "empty": "No materials yet.",
-        "loadError": "Could not load materials.",
-        "aiTitle": "Allow Studafy AI to use this material",
-        "aiSubtitle": "When on, its content can be processed for AI study tools.",
-        "aiError": "Could not update AI visibility."
+        "loadError": "Could not load materials."
       },
       "assignmentForm": {
         "title": "Title",
