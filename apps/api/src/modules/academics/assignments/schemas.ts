@@ -299,9 +299,11 @@ export const createAssignmentBodySchema = z
   .object({
     class_id: uuidSchema.openapi({ description: "Class to assign this to." }),
     title: titleSchema,
-    description: z.string().trim().min(1).max(2_000).optional(),
-    instructions: z.string().trim().min(1).max(20_000).optional(),
-    available_from: dateTimeSchema.optional().openapi({
+    // Nullish, not just optional: the generated mobile client serializes every field and sends
+    // null for one it leaves unset. On a create, null and absent both mean "none".
+    description: z.string().trim().min(1).max(2_000).nullish(),
+    instructions: z.string().trim().min(1).max(20_000).nullish(),
+    available_from: dateTimeSchema.nullish().openapi({
       description: "When students may begin. Must not be after due_at.",
     }),
     due_at: dateTimeSchema.openapi({ description: "Submission deadline." }),

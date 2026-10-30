@@ -36,6 +36,15 @@ describe("createAssignmentBodySchema", () => {
     expect(parsed.allow_late_submission).toBe(false);
   });
 
+  test("reads null optional fields as absent, as the mobile client sends them", () => {
+    const parsed = createAssignmentBodySchema.parse(
+      validCreateBody({ description: null, instructions: null, available_from: null }),
+    );
+    expect(parsed.description ?? null).toBeNull();
+    expect(parsed.instructions ?? null).toBeNull();
+    expect(parsed.available_from ?? null).toBeNull();
+  });
+
   test("rejects available_from after due_at", () => {
     // Mirrors ck_assignments_availability. Caught here so the caller gets a field-level 400.
     const result = createAssignmentBodySchema.safeParse(

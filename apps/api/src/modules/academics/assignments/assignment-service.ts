@@ -82,9 +82,9 @@ export interface ListAssignmentsParams {
 export interface CreateAssignmentParams {
   class_id: string;
   title: string;
-  description?: string;
-  instructions?: string;
-  available_from?: string;
+  description?: string | null;
+  instructions?: string | null;
+  available_from?: string | null;
   due_at: string;
   max_score: number;
   allow_late_submission: boolean;
