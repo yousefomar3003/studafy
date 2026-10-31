@@ -19,6 +19,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import {
+  assignRole,
   createAcademicYear,
   createClass,
   createCourse,
@@ -41,10 +42,12 @@ import {
   gradeSubmission,
   isStaffForAssignment,
   listSubmissions,
+  listSubmissionsAcrossAssignments,
   resolveCallerStudentId,
   submitAssignment,
 } from "../submission-service";
 
+import type { ListSubmissionsAcrossAssignmentsParams } from "../submission-service";
 import type { Sql, TransactionSql } from "postgres";
 
 const describeDb = integrationEnabled ? describe : describe.skip;
@@ -524,6 +527,187 @@ describeDb("cross-student isolation", () => {
         }),
       ),
     ).rejects.toThrow(/do not teach|not found/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cross-assignment list
+// ---------------------------------------------------------------------------
+
+describeDb("cross-assignment list", () => {
+  /**
+   * Class A (teacher A) carries two assignments, class B (teacher B) one. Student A is enrolled in
+   * both classes, student B in class A only, so each caller's expected slice is distinct.
+   */
+  async function seedAcross() {
+    const t = await seedTenant(db.sql);
+    await createEnrollment(db.sql, t.school.id, t.classB.id, t.studentA.id);
+    const a1 = await seedAssignment(db.sql, t.school.id, t.classA.id, t.teacherA.userId);
+    const a2 = await seedAssignment(db.sql, t.school.id, t.classA.id, t.teacherA.userId);
+    const b1 = await seedAssignment(db.sql, t.school.id, t.classB.id, t.teacherB.userId);
+
+    const sA1 = (await submitAs(t.school.id, t.studentA.userId, a1)).row;
+    const sB1 = (await submitAs(t.school.id, t.studentB.userId, a1)).row;
+    const sA2 = (await submitAs(t.school.id, t.studentA.userId, a2)).row;
+    const sAb = (await submitAs(t.school.id, t.studentA.userId, b1)).row;
+
+    return { ...t, a1, a2, b1, sA1, sB1, sA2, sAb };
+  }
+
+  function listAs(
+    schoolId: string,
+    userId: string,
+    params: Partial<ListSubmissionsAcrossAssignmentsParams> = {},
+  ) {
+    return asUser(schoolId, userId, async (tx) => {
+      const studentId = await resolveCallerStudentId(tx, schoolId);
+      return listSubmissionsAcrossAssignments(
+        tx,
+        schoolId,
+        { limit: 50, offset: 0, ...params },
+        studentId,
+      );
+    });
+  }
+
+  const ids = (rows: { id: string }[]) => rows.map((r) => r.id).sort();
+
+  test("a teacher sees every submission on their classes' assignments, and nothing else", async () => {
+    const t = await seedAcross();
+
+    const page = await listAs(t.school.id, t.teacherA.userId);
+
+    expect(page.total).toBe(3);
+    expect(ids(page.rows)).toEqual(ids([t.sA1, t.sB1, t.sA2]));
+    expect(page.rows.every((r) => r.viewer_is_staff)).toBe(true);
+  });
+
+  test("another teacher sees only their own class", async () => {
+    const t = await seedAcross();
+
+    const page = await listAs(t.school.id, t.teacherB.userId);
+
+    expect(ids(page.rows)).toEqual([t.sAb.id]);
+  });
+
+  test("a student sees only their own work, across classes", async () => {
+    const t = await seedAcross();
+
+    const pageA = await listAs(t.school.id, t.studentA.userId);
+    const pageB = await listAs(t.school.id, t.studentB.userId);
+
+    expect(ids(pageA.rows)).toEqual(ids([t.sA1, t.sA2, t.sAb]));
+    expect(pageA.rows.every((r) => !r.viewer_is_staff)).toBe(true);
+    expect(ids(pageB.rows)).toEqual([t.sB1.id]);
+  });
+
+  test("a parent gets nothing, exactly as on the per-assignment list", async () => {
+    const t = await seedAcross();
+
+    const page = await listAs(t.school.id, t.parent.id);
+
+    expect(page.total).toBe(0);
+  });
+
+  test("a school admin sees the whole school", async () => {
+    const t = await seedAcross();
+    const admin = await createUser(db.sql, t.school.id);
+    await assignRole(db.sql, t.school.id, admin.id, "ORG_ADMIN");
+
+    const page = await listAs(t.school.id, admin.id);
+
+    expect(page.total).toBe(4);
+    expect(page.rows.every((r) => r.viewer_is_staff)).toBe(true);
+  });
+
+  test("another school's caller sees nothing", async () => {
+    await seedAcross();
+    const other = await seedTenant(db.sql);
+
+    const page = await listAs(other.school.id, other.teacherA.userId);
+
+    expect(page.total).toBe(0);
+  });
+
+  test("orders newest hand-in first", async () => {
+    const t = await seedAcross();
+
+    const page = await listAs(t.school.id, t.studentA.userId);
+
+    const submitted = page.rows.map((r) => r.submitted_at!.getTime());
+    expect(submitted).toEqual([...submitted].sort((a, b) => b - a));
+  });
+
+  test("grade_status=none is the teacher's marking queue", async () => {
+    const t = await seedAcross();
+    await asUser(t.school.id, t.teacherA.userId, (tx) =>
+      gradeSubmission(tx, t.school.id, t.teacherA.userId, t.sA1.id, {
+        score: 50,
+        publish: false,
+        return_to_student: false,
+      }),
+    );
+
+    const queue = await listAs(t.school.id, t.teacherA.userId, { grade_status: "none" });
+    const drafts = await listAs(t.school.id, t.teacherA.userId, { grade_status: "draft" });
+
+    expect(ids(queue.rows)).toEqual(ids([t.sB1, t.sA2]));
+    expect(ids(drafts.rows)).toEqual([t.sA1.id]);
+  });
+
+  test("a student's grade_status filter matches what they are shown, never the draft", async () => {
+    const t = await seedAcross();
+    await asUser(t.school.id, t.teacherA.userId, (tx) =>
+      gradeSubmission(tx, t.school.id, t.teacherA.userId, t.sA1.id, {
+        score: 50,
+        publish: false,
+        return_to_student: false,
+      }),
+    );
+
+    // The draft-marked row reads as `none` to the student, so it matches `none` and not `draft`:
+    // asking for `draft` must not reveal that marking has begun.
+    const drafts = await listAs(t.school.id, t.studentA.userId, { grade_status: "draft" });
+    const none = await listAs(t.school.id, t.studentA.userId, { grade_status: "none" });
+
+    expect(drafts.total).toBe(0);
+    expect(ids(none.rows)).toEqual(ids([t.sA1, t.sA2, t.sAb]));
+  });
+
+  test("filters by status and by assignment_id", async () => {
+    const t = await seedAcross();
+    await asUser(t.school.id, t.teacherA.userId, (tx) =>
+      gradeSubmission(tx, t.school.id, t.teacherA.userId, t.sA2.id, {
+        score: 90,
+        publish: true,
+        return_to_student: false,
+      }),
+    );
+
+    const graded = await listAs(t.school.id, t.studentA.userId, { status: "graded" });
+    const narrowed = await listAs(t.school.id, t.studentA.userId, {
+      assignment_id: [t.a1, t.b1],
+    });
+    // Naming an assignment the caller does not teach yields nothing extra.
+    const teacherNarrowed = await listAs(t.school.id, t.teacherB.userId, {
+      assignment_id: [t.a1, t.b1],
+    });
+
+    expect(ids(graded.rows)).toEqual([t.sA2.id]);
+    expect(ids(narrowed.rows)).toEqual(ids([t.sA1, t.sAb]));
+    expect(ids(teacherNarrowed.rows)).toEqual([t.sAb.id]);
+  });
+
+  test("pages with limit and offset and reports the full total", async () => {
+    const t = await seedAcross();
+
+    const first = await listAs(t.school.id, t.teacherA.userId, { limit: 2, offset: 0 });
+    const second = await listAs(t.school.id, t.teacherA.userId, { limit: 2, offset: 2 });
+
+    expect(first.total).toBe(3);
+    expect(first.rows).toHaveLength(2);
+    expect(second.rows).toHaveLength(1);
+    expect(ids([...first.rows, ...second.rows])).toEqual(ids([t.sA1, t.sB1, t.sA2]));
   });
 });
 

@@ -84,7 +84,10 @@ class _FakeSubmissionsClient implements SubmissionsClient {
     createSubmissionCalls++;
     final error = createSubmissionError;
     if (error != null) throw error;
-    return _fakeSubmission(id: submissionId, attemptNumber: createSubmissionCalls);
+    return _fakeSubmission(
+      id: submissionId,
+      attemptNumber: createSubmissionCalls,
+    );
   }
 
   @override
@@ -110,7 +113,8 @@ class _FakeSubmissionsClient implements SubmissionsClient {
   }
 
   @override
-  Future<Submission> getSubmission({required String submissionId}) => throw UnimplementedError();
+  Future<Submission> getSubmission({required String submissionId}) =>
+      throw UnimplementedError();
 
   @override
   Future<Submission> gradeSubmission({
@@ -124,6 +128,15 @@ class _FakeSubmissionsClient implements SubmissionsClient {
     Status13? status,
     GradeStatus? gradeStatus,
     String? studentId,
+    int? limit,
+    int? offset,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<SubmissionList> listSubmissionsAcrossAssignments({
+    Status13? status,
+    GradeStatus? gradeStatus,
+    List<String>? assignmentId,
     int? limit,
     int? offset,
   }) => throw UnimplementedError();
@@ -163,7 +176,9 @@ class _FakeUploadAdapter implements HttpClientAdapter {
 ResponseBody _ok() => ResponseBody.fromString('', 200);
 
 File _tempFile(String content) {
-  final file = File('${Directory.systemTemp.createTempSync('submission_test_').path}/homework.pdf');
+  final file = File(
+    '${Directory.systemTemp.createTempSync('submission_test_').path}/homework.pdf',
+  );
   file.writeAsStringSync(content);
   addTearDown(() {
     if (file.existsSync()) file.deleteSync();
@@ -181,22 +196,32 @@ void main() {
   SubmissionFormController buildController({
     Future<ResponseBody> Function(RequestOptions options)? uploadBehavior,
   }) {
-    final dio = Dio()..httpClientAdapter = _FakeUploadAdapter(uploadBehavior ?? (_) async => _ok());
-    return SubmissionFormController(client: client, assignmentId: _assignmentId, uploadDio: dio);
+    final dio = Dio()
+      ..httpClientAdapter = _FakeUploadAdapter(
+        uploadBehavior ?? (_) async => _ok(),
+      );
+    return SubmissionFormController(
+      client: client,
+      assignmentId: _assignmentId,
+      uploadDio: dio,
+    );
   }
 
-  test('submitting text only calls createSubmission and marks didSubmit', () async {
-    final controller = buildController();
-    addTearDown(controller.dispose);
+  test(
+    'submitting text only calls createSubmission and marks didSubmit',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
 
-    controller.updateContent('My answer');
-    await controller.submit();
+      controller.updateContent('My answer');
+      await controller.submit();
 
-    expect(client.createSubmissionCalls, 1);
-    expect(controller.state.didSubmit, isTrue);
-    expect(controller.state.submitError, isNull);
-    expect(controller.state.isSubmitting, isFalse);
-  });
+      expect(client.createSubmissionCalls, 1);
+      expect(controller.state.didSubmit, isTrue);
+      expect(controller.state.submitError, isNull);
+      expect(controller.state.isSubmitting, isFalse);
+    },
+  );
 
   test(
     'submitting with one attachment uploads it through the full URL/PUT/confirm sequence',
@@ -205,7 +230,9 @@ void main() {
       addTearDown(controller.dispose);
       final file = _tempFile('pdf-bytes');
 
-      controller.addFiles([(path: file.path, name: 'homework.pdf', sizeBytes: 9)]);
+      controller.addFiles([
+        (path: file.path, name: 'homework.pdf', sizeBytes: 9),
+      ]);
       await controller.submit();
 
       expect(client.createSubmissionCalls, 1);
@@ -217,61 +244,74 @@ void main() {
     },
   );
 
-  test('a failed upload marks the attachment failed without blocking the text hand-in', () async {
-    final controller = buildController(
-      uploadBehavior: (_) async => throw DioException(
-        requestOptions: RequestOptions(path: '/upload'),
-        type: DioExceptionType.connectionError,
-      ),
-    );
-    addTearDown(controller.dispose);
-    final file = _tempFile('pdf-bytes');
+  test(
+    'a failed upload marks the attachment failed without blocking the text hand-in',
+    () async {
+      final controller = buildController(
+        uploadBehavior: (_) async => throw DioException(
+          requestOptions: RequestOptions(path: '/upload'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+      addTearDown(controller.dispose);
+      final file = _tempFile('pdf-bytes');
 
-    controller.addFiles([(path: file.path, name: 'homework.pdf', sizeBytes: 9)]);
-    await controller.submit();
+      controller.addFiles([
+        (path: file.path, name: 'homework.pdf', sizeBytes: 9),
+      ]);
+      await controller.submit();
 
-    // The text step still succeeded — only the attachment failed.
-    expect(client.createSubmissionCalls, 1);
-    expect(controller.state.attachments.single.status, UploadStatus.failed);
-    expect(controller.state.submitError, SubmissionSubmitError.attachmentsFailed);
-    expect(controller.state.didSubmit, isFalse);
-  });
+      // The text step still succeeded — only the attachment failed.
+      expect(client.createSubmissionCalls, 1);
+      expect(controller.state.attachments.single.status, UploadStatus.failed);
+      expect(
+        controller.state.submitError,
+        SubmissionSubmitError.attachmentsFailed,
+      );
+      expect(controller.state.didSubmit, isFalse);
+    },
+  );
 
-  test('retrying a failed attachment requests a fresh upload URL and can succeed', () async {
-    var shouldFail = true;
-    final controller = buildController(
-      uploadBehavior: (_) async {
-        if (shouldFail) {
-          throw DioException(
-            requestOptions: RequestOptions(path: '/upload'),
-            type: DioExceptionType.connectionError,
-          );
-        }
-        return _ok();
-      },
-    );
-    addTearDown(controller.dispose);
-    final file = _tempFile('pdf-bytes');
+  test(
+    'retrying a failed attachment requests a fresh upload URL and can succeed',
+    () async {
+      var shouldFail = true;
+      final controller = buildController(
+        uploadBehavior: (_) async {
+          if (shouldFail) {
+            throw DioException(
+              requestOptions: RequestOptions(path: '/upload'),
+              type: DioExceptionType.connectionError,
+            );
+          }
+          return _ok();
+        },
+      );
+      addTearDown(controller.dispose);
+      final file = _tempFile('pdf-bytes');
 
-    controller.addFiles([(path: file.path, name: 'homework.pdf', sizeBytes: 9)]);
-    await controller.submit();
-    expect(controller.state.attachments.single.status, UploadStatus.failed);
-    expect(client.createUploadUrlCalls, 1);
+      controller.addFiles([
+        (path: file.path, name: 'homework.pdf', sizeBytes: 9),
+      ]);
+      await controller.submit();
+      expect(controller.state.attachments.single.status, UploadStatus.failed);
+      expect(client.createUploadUrlCalls, 1);
 
-    shouldFail = false;
-    final localId = controller.state.attachments.single.localId;
-    await controller.retryAttachment(localId);
+      shouldFail = false;
+      final localId = controller.state.attachments.single.localId;
+      await controller.retryAttachment(localId);
 
-    // A fresh upload URL was requested rather than reusing the failed attempt's.
-    expect(client.createUploadUrlCalls, 2);
-    expect(controller.state.attachments.single.status, UploadStatus.uploaded);
+      // A fresh upload URL was requested rather than reusing the failed attempt's.
+      expect(client.createUploadUrlCalls, 2);
+      expect(controller.state.attachments.single.status, UploadStatus.uploaded);
 
-    // A second submit() with unchanged text must not bump attempt_number again — only the
-    // (now-fixed) attachment set needs re-checking, and there's nothing left to upload.
-    await controller.submit();
-    expect(client.createSubmissionCalls, 1);
-    expect(controller.state.didSubmit, isTrue);
-  });
+      // A second submit() with unchanged text must not bump attempt_number again — only the
+      // (now-fixed) attachment set needs re-checking, and there's nothing left to upload.
+      await controller.submit();
+      expect(client.createSubmissionCalls, 1);
+      expect(controller.state.didSubmit, isTrue);
+    },
+  );
 
   test('a 409 from createSubmission classifies as closed', () async {
     client.createSubmissionError = DioException(
@@ -288,16 +328,21 @@ void main() {
     expect(controller.state.didSubmit, isFalse);
   });
 
-  test('removing a queued attachment drops it without contacting the server', () async {
-    final controller = buildController();
-    addTearDown(controller.dispose);
-    final file = _tempFile('pdf-bytes');
+  test(
+    'removing a queued attachment drops it without contacting the server',
+    () async {
+      final controller = buildController();
+      addTearDown(controller.dispose);
+      final file = _tempFile('pdf-bytes');
 
-    controller.addFiles([(path: file.path, name: 'homework.pdf', sizeBytes: 9)]);
-    final localId = controller.state.attachments.single.localId;
-    controller.removeAttachment(localId);
+      controller.addFiles([
+        (path: file.path, name: 'homework.pdf', sizeBytes: 9),
+      ]);
+      final localId = controller.state.attachments.single.localId;
+      controller.removeAttachment(localId);
 
-    expect(controller.state.attachments, isEmpty);
-    expect(client.createUploadUrlCalls, 0);
-  });
+      expect(controller.state.attachments, isEmpty);
+      expect(client.createUploadUrlCalls, 0);
+    },
+  );
 }

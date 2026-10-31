@@ -6,6 +6,7 @@ import {
   createSubmissionBodySchema,
   createSubmissionUploadUrlBodySchema,
   gradeSubmissionBodySchema,
+  submissionAcrossAssignmentsQuerySchema,
   submissionListQuerySchema,
 } from "../schemas";
 
@@ -144,6 +145,50 @@ describe("submissionListQuerySchema", () => {
 
   test("rejects an unknown grade_status", () => {
     expect(submissionListQuerySchema.safeParse({ grade_status: "secret" }).success).toBe(false);
+  });
+});
+
+describe("submissionAcrossAssignmentsQuerySchema", () => {
+  const a = "00000000-0000-4000-8000-000000000001";
+  const b = "00000000-0000-4000-8000-000000000002";
+
+  test("defaults limit and offset and leaves assignment_id unset", () => {
+    const result = submissionAcrossAssignmentsQuerySchema.safeParse({});
+    expect(result.success).toBe(true);
+    expect(result.data?.offset).toBe(0);
+    expect(result.data?.limit).toBeGreaterThan(0);
+    expect(result.data?.assignment_id).toBeUndefined();
+  });
+
+  test("accepts assignment_id once, repeated, or comma-separated, de-duplicated", () => {
+    const parse = (assignment_id: unknown) =>
+      submissionAcrossAssignmentsQuerySchema.parse({ assignment_id }).assignment_id;
+
+    expect(parse(a)).toEqual([a]);
+    expect(parse([a, b, a])).toEqual([a, b]);
+    expect(parse(`${a}, ${b}`)).toEqual([a, b]);
+  });
+
+  test("rejects a malformed, empty, or excessive assignment_id list", () => {
+    const accepts = (assignment_id: unknown) =>
+      submissionAcrossAssignmentsQuerySchema.safeParse({ assignment_id }).success;
+    const tooMany = Array.from(
+      { length: 101 },
+      (_, i) => `00000000-0000-4000-8000-${i.toString().padStart(12, "0")}`,
+    );
+
+    expect(accepts("not-a-uuid")).toBe(false);
+    expect(accepts(",")).toBe(false);
+    expect(accepts(tooMany)).toBe(false);
+  });
+
+  test("rejects an unknown status or grade_status", () => {
+    expect(submissionAcrossAssignmentsQuerySchema.safeParse({ status: "lost" }).success).toBe(
+      false,
+    );
+    expect(
+      submissionAcrossAssignmentsQuerySchema.safeParse({ grade_status: "secret" }).success,
+    ).toBe(false);
   });
 });
 
