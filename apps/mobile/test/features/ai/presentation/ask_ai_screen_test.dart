@@ -49,7 +49,10 @@ class _RecordingAskAiClient implements AskAiClient {
 Widget _screen({required AskAiClient client, String? studentId = 'student-1'}) {
   return wrapWithLocalization(
     ProviderScope(
-      overrides: [askAiClientProvider.overrideWithValue(client), askAiStudentIdProvider.overrideWithValue(studentId)],
+      overrides: [
+        askAiClientProvider.overrideWithValue(client),
+        askAiStudentIdProvider.overrideWithValue(studentId),
+      ],
       child: Builder(
         builder: (context) => MaterialApp(
           theme: AppTheme.light,
@@ -73,7 +76,9 @@ Future<void> _ask(WidgetTester tester, String question) async {
 
 void main() {
   testWidgets('shows the signed-out notice when there is no session', (tester) async {
-    await tester.pumpWidget(_screen(client: _FakeAskAiClient(() => const Stream.empty()), studentId: null));
+    await tester.pumpWidget(
+      _screen(client: _FakeAskAiClient(() => const Stream.empty()), studentId: null),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Sign in to ask the study assistant a question.'), findsOneWidget);
@@ -85,6 +90,18 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ask about your study materials'), findsOneWidget);
+  });
+
+  testWidgets('the send button sits centred in a single-line composer', (tester) async {
+    await tester.pumpWidget(_screen(client: _FakeAskAiClient(() => const Stream.empty())));
+    await tester.pumpAndSettle();
+
+    final field = tester.getRect(
+      find.ancestor(of: find.byType(TextField), matching: find.byType(AnimatedContainer)),
+    );
+    final button = tester.getRect(find.byTooltip('Send'));
+    expect(button.center.dy, field.center.dy);
+    expect(field.bottom - button.bottom, field.right - button.right);
   });
 
   testWidgets('tapping a suggested prompt sends it as the first question', (tester) async {
@@ -112,7 +129,13 @@ void main() {
           messageId: 'msg-1',
           text: 'Light reactions split water. [1]',
           citations: [
-            AskAiCitation(order: 1, chunkId: 'c1', materialId: 'm1', materialTitle: 'Biology Unit 3', pageNumber: 12),
+            AskAiCitation(
+              order: 1,
+              chunkId: 'c1',
+              materialId: 'm1',
+              materialTitle: 'Biology Unit 3',
+              pageNumber: 12,
+            ),
           ],
         ),
       ]),
@@ -132,7 +155,9 @@ void main() {
   testWidgets('renders a grounding refusal distinctly from an answer', (tester) async {
     final client = _FakeAskAiClient(
       () => Stream.fromIterable([
-        const AskAiRefusalEvent([AskAiNearestTopic(chunkId: 'c1', materialTitle: 'Algebra Basics')]),
+        const AskAiRefusalEvent([
+          AskAiNearestTopic(chunkId: 'c1', materialTitle: 'Algebra Basics'),
+        ]),
       ]),
     );
     await tester.pumpWidget(_screen(client: client));
@@ -147,7 +172,9 @@ void main() {
 
   testWidgets('a quota problem renders the send-error banner', (tester) async {
     final client = _FakeAskAiClient(
-      () => Stream<AskAiEvent>.error(const ApiException(status: 429, title: 'quota', code: 'AI_QUOTA_EXCEEDED')),
+      () => Stream<AskAiEvent>.error(
+        const ApiException(status: 429, title: 'quota', code: 'AI_QUOTA_EXCEEDED'),
+      ),
     );
     await tester.pumpWidget(_screen(client: client));
     await tester.pumpAndSettle();

@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/ask_ai_controller.dart';
 
+const double _sendButtonSize = 40;
+
+/// Gap between the field's border and the send button, kept even on every side.
+const double _fieldInset = 6;
+
 /// How close to [askAiQuestionMaxChars] a question gets before the character counter appears.
 const int _counterThreshold = askAiQuestionMaxChars - 200;
 
@@ -83,9 +88,9 @@ class _AskAiComposerState extends State<AskAiComposer> {
                 duration: const Duration(milliseconds: 150),
                 padding: const EdgeInsetsDirectional.fromSTEB(
                   AppSpacing.space16,
-                  AppSpacing.space4,
-                  AppSpacing.space4,
-                  AppSpacing.space4,
+                  _fieldInset,
+                  _fieldInset,
+                  _fieldInset,
                 ),
                 decoration: BoxDecoration(
                   color: widget.enabled ? colorScheme.surface : colorScheme.surfaceContainerHighest,
@@ -113,7 +118,10 @@ class _AskAiComposerState extends State<AskAiComposer> {
                           focusedBorder: InputBorder.none,
                           disabledBorder: InputBorder.none,
                           isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.space12),
+                          // One line of text plus this padding is exactly [_sendButtonSize] tall, so
+                          // the bottom-aligned button sits centred on a single line and stays by
+                          // the last line once the question wraps.
+                          contentPadding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
                         ),
                       ),
                     ),
@@ -171,7 +179,7 @@ class _SendButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return SizedBox.square(
-      dimension: 40,
+      dimension: _sendButtonSize,
       child: IconButton.filled(
         onPressed: enabled ? onPressed : null,
         tooltip: 'askAi.composer.send'.tr(),
