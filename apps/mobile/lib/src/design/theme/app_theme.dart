@@ -15,9 +15,11 @@ import 'component_themes/app_input_theme.dart';
 /// `design/` into the two themes [StudafyApp] hands to [MaterialApp.router]. See
 /// `design/README.md` for how each piece maps back to the token spec.
 abstract final class AppTheme {
-  static ThemeData get light => _build(AppColorScheme.light, AppSemanticColors.light());
+  // Built once, not per access: `StudafyApp.build` reads these on every rebuild, and assembling
+  // the Inter text theme and component themes each time is wasted work.
+  static final ThemeData light = _build(AppColorScheme.light, AppSemanticColors.light());
 
-  static ThemeData get dark => _build(AppColorScheme.dark, AppSemanticColors.dark());
+  static final ThemeData dark = _build(AppColorScheme.dark, AppSemanticColors.dark());
 
   static ThemeData _build(ColorScheme colors, AppSemanticColors semanticColors) {
     final textTheme = AppTypography.textTheme;

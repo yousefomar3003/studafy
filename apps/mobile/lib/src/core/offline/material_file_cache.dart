@@ -24,20 +24,19 @@ import '../auth/auth_state.dart';
 class MaterialFileCache {
   const MaterialFileCache();
 
+  // Async filesystem calls throughout: every row of the materials list runs [find], so blocking
+  // `*Sync` calls here stall the UI isolate once per row.
   Future<Directory> _materialsDir() async {
     final support = await getApplicationSupportDirectory();
-    final dir = Directory(p.join(support.path, 'materials'));
-    if (!dir.existsSync()) {
-      await dir.create(recursive: true);
-    }
-    return dir;
+    return Directory(p.join(support.path, 'materials')).create(recursive: true);
   }
 
   /// The cached file for [materialId], or null if it hasn't been downloaded (or was cleared).
   Future<File?> find(String materialId) async {
-    final dir = await _materialsDir();
-    if (!dir.existsSync()) return null;
-    for (final entry in dir.listSync()) {
+    final support = await getApplicationSupportDirectory();
+    final dir = Directory(p.join(support.path, 'materials'));
+    if (!await dir.exists()) return null;
+    await for (final entry in dir.list()) {
       if (entry is File && p.basenameWithoutExtension(entry.path) == materialId) {
         return entry;
       }
@@ -57,9 +56,7 @@ class MaterialFileCache {
   /// Wipes every cached material file. Called on logout — see [materialFileCacheProvider].
   Future<void> clear() async {
     final dir = await _materialsDir();
-    if (dir.existsSync()) {
-      await dir.delete(recursive: true);
-    }
+    await dir.delete(recursive: true);
   }
 }
 
