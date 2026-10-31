@@ -546,7 +546,8 @@ class _MemberSignInFormState extends ConsumerState<_MemberSignInForm> {
                 controller: _username,
                 enabled: !_submitting,
                 autocorrect: false,
-                textCapitalization: TextCapitalization.characters,
+                // The API upper-cases the code at sign-in, so lowercase typing still works.
+                textCapitalization: TextCapitalization.none,
                 autofillHints: const [AutofillHints.username],
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(

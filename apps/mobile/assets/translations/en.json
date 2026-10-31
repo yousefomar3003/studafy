@@ -550,11 +550,19 @@
   },
   "askAi": {
     "title": "Ask AI",
+    "assistantName": "Study assistant",
+    "copy": { "action": "Copy answer", "done": "Answer copied" },
     "signedOut": "Sign in to ask the study assistant a question.",
     "thinking": "Thinking…",
     "empty": {
       "title": "Ask about your study materials",
-      "hint": "Answers are drawn from your school's materials and cite where they came from."
+      "hint": "Answers are drawn from your school's materials and cite where they came from.",
+      "suggestionsHeading": "Try asking",
+      "suggestions": {
+        "summarize": "Summarize the main ideas of my latest material",
+        "explain": "Explain a key term from my materials in simple words",
+        "review": "What should I review before my next test?"
+      }
     },
     "composer": {
       "hint": "Ask a question…",

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/features/features_providers.dart';
 import '../../../core/push/push_providers.dart';
 import '../application/shell_providers.dart';
 import '../domain/shell_role.dart';
@@ -101,7 +102,12 @@ class _AppShellScaffoldState extends ConsumerState<_AppShellScaffold> {
         // Keyed by tab so the scrolled-under state (which tints the bar) resets on a tab switch
         // instead of carrying over from the previous tab's scroll position.
         key: ValueKey(_selectedIndex),
-        title: const StudafyLogo(),
+        // A subscribed student sees the subscriber mark in place of the wordmark.
+        title:
+            widget.shellRole == ShellRole.student &&
+                ref.watch(hasPersonalSubscriptionProvider)
+            ? const StudafyLogo.subscriber()
+            : const StudafyLogo(),
         actions: const [LocaleToggleButton()],
       ),
       body: Column(
