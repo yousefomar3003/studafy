@@ -151,6 +151,10 @@ approved_flexible_columns(table_name, column_name) AS (
     -- row and never joined or filtered on, so a child table would add a join and an ordinal column to
     -- store what the array already guarantees.
     ('school_settings', 'school_days'),
+    -- 000174: the admin's share of a term per exam part, keyed by category kind. A small closed map
+    -- whose keys the API validates against exam_structure (a CHECK holds it to an object), read whole
+    -- with the settings row to set up subjects and never joined or filtered on.
+    ('school_settings', 'exam_weights'),
     -- 000160: write-once snapshots taken when results are finalized or a certificate is issued --
     -- the full grading configuration a result was computed with, the computed breakdown, and the
     -- certificate exactly as rendered. They record what was true at that moment so later
