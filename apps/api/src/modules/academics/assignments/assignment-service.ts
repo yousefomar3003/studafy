@@ -242,10 +242,17 @@ export async function listAssignments(
   // that would have to re-evaluate the same scope predicates.
   const fetchLimit = params.limit + 1;
 
+  // `upcoming` reads nearest deadline first -- a "due soon" view taking the first page wants the
+  // next deadlines, not the farthest ones. Every other view is newest deadline first. The cursor
+  // compares in the same direction as the sort.
+  const ascending = params.status === "upcoming";
+
   const cursorFilter = params.cursor
     ? (() => {
         const { dueAt, id } = decodeCursor(params.cursor);
-        return tx` AND (a.due_at, a.id) < (${dueAt}::timestamptz, ${id}::uuid)`;
+        return ascending
+          ? tx` AND (a.due_at, a.id) > (${dueAt}::timestamptz, ${id}::uuid)`
+          : tx` AND (a.due_at, a.id) < (${dueAt}::timestamptz, ${id}::uuid)`;
       })()
     : tx``;
 
@@ -288,7 +295,7 @@ export async function listAssignments(
       ${subjectFilter}
       ${statusFilter}
       ${cursorFilter}
-    ORDER BY a.due_at DESC, a.id DESC
+    ORDER BY ${ascending ? tx`a.due_at ASC, a.id ASC` : tx`a.due_at DESC, a.id DESC`}
     LIMIT ${fetchLimit}
   `;
 

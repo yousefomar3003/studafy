@@ -6,8 +6,8 @@
 -- db:test:rls-coverage). This file is the readable copy kept alongside the other policy references
 -- (tenant_isolation.sql, evaluation_visibility.sql, notification_user_isolation.sql).
 --
--- It covers the 000037 tables, with the 000120 (PRINCIPAL) and 000133 (ATTENDANCE_OFFICER) changes
--- folded in. Tables created later install their own role_scope_visibility policy in the migration that
+-- It covers the 000037 tables, with the 000120 (PRINCIPAL), 000133 (ATTENDANCE_OFFICER) and 000176
+-- (set-based class visibility) changes folded in. Tables created later install their own role_scope_visibility policy in the migration that
 -- creates them and are NOT repeated here:
 --   app.assignment_attachments      000049  app.can_read_assignment(assignment_id)
 --   app.submission_attachments      000050  app.can_read_submission(submission_id)
@@ -70,6 +70,8 @@
 --   app.teaches_gradebook / _exam / _assignment(id) -> boolean teacher of the record's class
 --   app.can_read_grade(grade_submission_id) -> boolean grade row via its submission (release-gated)
 --   app.can_read_course / _subject(id)      -> boolean referenced by a readable class
+--   app.readable_class_ids()                -> SETOF uuid  can_read_class's non-admin branches as one set,
+--                                              computed once per statement (000176)
 
 CREATE POLICY role_scope_visibility ON app.students
   AS RESTRICTIVE FOR SELECT TO studafy_app
@@ -86,7 +88,11 @@ CREATE POLICY role_scope_visibility ON app.enrollments
 
 CREATE POLICY role_scope_visibility ON app.classes
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_class_for_attendance(id)); -- 000133
+  USING (
+    (SELECT app.current_user_is_school_admin())
+    OR (SELECT app.current_user_is_attendance_officer())
+    OR id IN (SELECT app.readable_class_ids())
+  ); -- 000176
 
 CREATE POLICY role_scope_visibility ON app.subjects
   AS RESTRICTIVE FOR SELECT TO studafy_app
@@ -98,15 +104,24 @@ CREATE POLICY role_scope_visibility ON app.courses
 
 CREATE POLICY role_scope_visibility ON app.materials
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_class(class_id));
+  USING (
+    (SELECT app.current_user_is_school_admin())
+    OR class_id IN (SELECT app.readable_class_ids())
+  ); -- 000176
 
 CREATE POLICY role_scope_visibility ON app.assignments
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_class(class_id));
+  USING (
+    (SELECT app.current_user_is_school_admin())
+    OR class_id IN (SELECT app.readable_class_ids())
+  ); -- 000176
 
 CREATE POLICY role_scope_visibility ON app.exams
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_class(class_id));
+  USING (
+    (SELECT app.current_user_is_school_admin())
+    OR class_id IN (SELECT app.readable_class_ids())
+  ); -- 000176
 
 CREATE POLICY role_scope_visibility ON app.gradebooks
   AS RESTRICTIVE FOR SELECT TO studafy_app
@@ -114,7 +129,11 @@ CREATE POLICY role_scope_visibility ON app.gradebooks
 
 CREATE POLICY role_scope_visibility ON app.timetable_slots
   AS RESTRICTIVE FOR SELECT TO studafy_app
-  USING (app.can_read_class_for_attendance(class_id)); -- 000133
+  USING (
+    (SELECT app.current_user_is_school_admin())
+    OR (SELECT app.current_user_is_attendance_officer())
+    OR class_id IN (SELECT app.readable_class_ids())
+  ); -- 000176
 
 -- Student's own submission is theirs in any grading status; teacher of the class and admins also see it.
 CREATE POLICY role_scope_visibility ON app.assignment_submissions
