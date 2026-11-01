@@ -39,6 +39,7 @@
         "@studafy/license-pricing": "workspace:*",
         "@studafy/notification-templates": "workspace:*",
         "@studafy/observability": "workspace:*",
+        "@studafy/ocr": "workspace:*",
         "@studafy/records": "workspace:*",
         "@studafy/sanitize": "workspace:*",
         "@studafy/shared-schemas": "workspace:*",
@@ -161,6 +162,7 @@
         "@studafy/grades-reporting": "workspace:*",
         "@studafy/notification-templates": "workspace:*",
         "@studafy/observability": "workspace:*",
+        "@studafy/ocr": "workspace:*",
         "@studafy/progress-reporting": "workspace:*",
         "@studafy/records": "workspace:*",
         "@studafy/sanitize": "workspace:*",
@@ -177,7 +179,6 @@
         "pdf-lib": "1.17.1",
         "postgres": "3.4.9",
         "stripe": "22.4.0",
-        "tesseract.js": "7.0.0",
         "unpdf": "1.8.0",
         "uuid": "11.1.0",
         "zod": "4.6.7",
@@ -379,6 +380,19 @@
         "@sentry/node": "10.70.0",
         "bullmq": "5.79.3",
         "hono": "4.12.34",
+      },
+      "devDependencies": {
+        "@studafy/config": "workspace:*",
+        "@studafy/tsconfig": "workspace:*",
+        "@types/bun": "1.3.14",
+        "typescript": "^5.9.3",
+      },
+    },
+    "packages/ocr": {
+      "name": "@studafy/ocr",
+      "version": "0.0.0",
+      "dependencies": {
+        "tesseract.js": "7.0.0",
       },
       "devDependencies": {
         "@studafy/config": "workspace:*",
@@ -1084,6 +1098,8 @@
     "@studafy/notification-templates": ["@studafy/notification-templates@workspace:packages/notification-templates"],
 
     "@studafy/observability": ["@studafy/observability@workspace:packages/observability"],
+
+    "@studafy/ocr": ["@studafy/ocr@workspace:packages/ocr"],
 
     "@studafy/progress-reporting": ["@studafy/progress-reporting@workspace:packages/progress-reporting"],
 

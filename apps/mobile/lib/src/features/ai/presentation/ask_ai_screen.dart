@@ -21,7 +21,11 @@ import '../../../core/features/feature_gate.dart';
 /// student's id (their user id — see [askAiStudentIdProvider]); with no session it shows the
 /// signed-out state instead of a dead input.
 class AskAiScreen extends ConsumerStatefulWidget {
-  const AskAiScreen({super.key});
+  const AskAiScreen({this.initialMaterial, super.key});
+
+  /// The material to ask about when the screen opens from a material's page; the student can
+  /// remove it or pick another from the composer.
+  final AskAiMaterialScope? initialMaterial;
 
   @override
   ConsumerState<AskAiScreen> createState() => _AskAiScreenState();
@@ -37,6 +41,7 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
     final studentId = ref.read(askAiStudentIdProvider);
     if (studentId != null) {
       _controller = AskAiController(client: ref.read(askAiClientProvider), studentId: studentId)
+        ..materialScope = widget.initialMaterial
         ..addListener(_onChange);
     }
   }
@@ -82,6 +87,7 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
                     onReport: _reportAnswer,
                     onRetryTurn: controller.retryLastFailed,
                     onSuggestion: controller.send,
+                    materialScope: controller.materialScope,
                   ),
                 ),
                 if (controller.state.sendError != null)
@@ -92,7 +98,12 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
                     onRetry: controller.retryLastFailed,
                     onDismiss: controller.dismissSendError,
                   ),
-                AskAiComposer(enabled: !controller.state.isStreaming, onSend: controller.send),
+                AskAiComposer(
+                  enabled: !controller.state.isStreaming,
+                  onSend: controller.send,
+                  materialScope: controller.materialScope,
+                  onMaterialScopeChanged: (scope) => controller.materialScope = scope,
+                ),
               ],
             ),
     );
@@ -106,6 +117,7 @@ class _Conversation extends StatelessWidget {
     required this.onReport,
     required this.onRetryTurn,
     required this.onSuggestion,
+    required this.materialScope,
   });
 
   final AskAiConversation state;
@@ -113,10 +125,11 @@ class _Conversation extends StatelessWidget {
   final ValueChanged<String> onReport;
   final VoidCallback onRetryTurn;
   final ValueChanged<String> onSuggestion;
+  final AskAiMaterialScope? materialScope;
 
   @override
   Widget build(BuildContext context) {
-    if (state.isEmpty) return _EmptyState(onSuggestion: onSuggestion);
+    if (state.isEmpty) return _EmptyState(onSuggestion: onSuggestion, materialScope: materialScope);
 
     return ListView.separated(
       controller: scrollController,
@@ -142,9 +155,10 @@ const _suggestionKeys = [
 ];
 
 class _EmptyState extends StatelessWidget {
-  const _EmptyState({required this.onSuggestion});
+  const _EmptyState({required this.onSuggestion, required this.materialScope});
 
   final ValueChanged<String> onSuggestion;
+  final AskAiMaterialScope? materialScope;
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +194,9 @@ class _EmptyState extends StatelessWidget {
                   Text('askAi.empty.title'.tr(), style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
                   const SizedBox(height: AppSpacing.space8),
                   Text(
-                    'askAi.empty.hint'.tr(),
+                    materialScope == null
+                        ? 'askAi.empty.hint'.tr()
+                        : 'askAi.empty.scopedHint'.tr(namedArgs: {'title': materialScope!.title}),
                     style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
                     textAlign: TextAlign.center,
                   ),

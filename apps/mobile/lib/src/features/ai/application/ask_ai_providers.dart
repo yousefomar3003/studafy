@@ -5,6 +5,7 @@ import '../../../core/api/auth_interceptor.dart';
 import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/di/app_providers.dart';
+import '../data/ai_photo_text_client.dart';
 import '../data/ask_ai_client.dart';
 
 /// [AskAiClient] on its own [Dio], wired identically to `createApiClient` — same base URL, same
@@ -19,6 +20,20 @@ final askAiClientProvider = Provider<AskAiClient>((ref) {
     ..interceptors.add(ErrorMappingInterceptor());
   return AskAiClient(dio);
 });
+
+/// [AiPhotoTextClient] on the same kind of standalone [Dio] as [askAiClientProvider]: the `AI`
+/// tag is excluded from the generated client.
+final aiPhotoTextClientProvider = Provider<AiPhotoTextClient>((ref) {
+  final baseUrl = ref.watch(networkConfigProvider).apiBaseUrl;
+  final session = ref.watch(authSessionProvider);
+  final dio = Dio(BaseOptions(baseUrl: baseUrl.toString()))
+    ..interceptors.add(AuthInterceptor(() => session.tokenProvider))
+    ..interceptors.add(ErrorMappingInterceptor());
+  return AiPhotoTextClient(dio);
+});
+
+/// The camera / library picker the Ask AI composer reads photos from; overridden in tests.
+final aiPhotoPickerProvider = Provider<AiPhotoPicker>((ref) => AiPhotoPicker());
 
 /// The `{studentId}` the Ask AI routes take is the signed-in student's **user id**, not a
 /// `StudentProfile` id: `report-routes.ts` rejects any call where `auth.userId != studentId`

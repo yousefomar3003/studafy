@@ -98,6 +98,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text("Included in the AI assistant's study materials."), findsOneWidget);
+    for (final tool in ['Ask AI', 'AI summary', 'Key concepts', 'Quiz', 'Exam mode']) {
+      expect(find.text(tool), findsOneWidget);
+    }
   });
 
   testWidgets('offers an external-open action for a ready file with no in-app preview', (

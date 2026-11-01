@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "bun --env-file=../../.env --watch src/index.ts",
     "build": "bun build ./src/index.ts --outdir dist --target bun",
-    "build:ocr": "bun build node_modules/tesseract.js/src/worker-script/node/index.js --outdir dist/ocr --target bun && bun run scripts/copy-ocr-assets.ts",
+    "build:ocr": "bun ../../packages/ocr/scripts/build-assets.ts dist",
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
     "test": "bun test",
@@ -34,6 +34,7 @@
     "@studafy/grades-reporting": "workspace:*",
     "@studafy/notification-templates": "workspace:*",
     "@studafy/observability": "workspace:*",
+    "@studafy/ocr": "workspace:*",
     "@studafy/progress-reporting": "workspace:*",
     "@studafy/sanitize": "workspace:*",
     "@xmldom/xmldom": "0.8.15",
@@ -47,7 +48,6 @@
     "pdf-lib": "1.17.1",
     "postgres": "3.4.9",
     "stripe": "22.4.0",
-    "tesseract.js": "7.0.0",
     "unpdf": "1.8.0",
     "uuid": "11.1.0",
     "zod": "4.6.7"

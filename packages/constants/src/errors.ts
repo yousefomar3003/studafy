@@ -479,6 +479,10 @@ export const ERROR_CODES = {
   // provider -- show the consent modal. AI_CONSENT_DISCLOSURE_OUTDATED is a grant that named a
   // disclosure version other than the one currently served -- refetch it and ask again.
   AI_CONSENT_REQUIRED: "AI_CONSENT_REQUIRED",
+  // Ask AI photo text (POST /api/ai/photo-text): a photo is read on the server and only its text is
+  // returned. Too large refuses before the bytes are read; anything but JPEG or PNG is refused unread.
+  AI_PHOTO_TOO_LARGE: "AI_PHOTO_TOO_LARGE",
+  AI_PHOTO_UNSUPPORTED_TYPE: "AI_PHOTO_UNSUPPORTED_TYPE",
   AI_CONSENT_DISCLOSURE_OUTDATED: "AI_CONSENT_DISCLOSURE_OUTDATED",
 
   // LLM gateway (ST-164). The generate route answers with one of three provider-stage codes:

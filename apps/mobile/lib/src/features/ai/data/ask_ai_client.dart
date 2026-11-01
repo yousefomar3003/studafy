@@ -32,16 +32,19 @@ class AskAiClient {
   /// response and is thrown here as an [ApiException] (read `.code` to branch). Once the stream
   /// is open the endpoint reports failures as a terminal event instead, never an exception.
   ///
-  /// [conversationId] threads a follow-up onto an existing conversation. [level] is the
-  /// student's age band for moderation strictness (`elementary` | `middle` | `high`).
+  /// [conversationId] threads a follow-up onto an existing conversation. [materialId] answers
+  /// from that one study material only. [level] is the student's age band for moderation
+  /// strictness (`elementary` | `middle` | `high`).
   Stream<AskAiEvent> ask({
     required String studentId,
     required String question,
     String? conversationId,
+    String? materialId,
     String level = 'high',
   }) async* {
     final payload = <String, Object?>{'question': question, 'level': level};
     if (conversationId != null) payload['conversation_id'] = conversationId;
+    if (materialId != null) payload['material_id'] = materialId;
 
     final response = await _dio.post<ResponseBody>(
       '/api/ai/students/$studentId/ask',

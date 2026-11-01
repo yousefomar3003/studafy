@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "bun --env-file=../../.env --watch src/index.ts",
+    "build:ocr": "bun ../../packages/ocr/scripts/build-assets.ts dist",
     "build": "bun build ./src/index.ts --outdir dist --target bun",
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
@@ -37,6 +38,7 @@
     "@studafy/license-pricing": "workspace:*",
     "@studafy/notification-templates": "workspace:*",
     "@studafy/observability": "workspace:*",
+    "@studafy/ocr": "workspace:*",
     "@studafy/sanitize": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
     "@studafy/records": "workspace:*",

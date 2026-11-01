@@ -55,6 +55,7 @@ import {
   aiMetricsRoutes,
   aiRetrievalRoutes,
   aiSummaryRoutes,
+  aiPhotoTextRoutes,
   aiUsageRoutes,
   createAiTokenMeter,
   createConceptsCache,
@@ -182,7 +183,7 @@ import type { StorageService } from "./lib/storage";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
-import type { AiModelTier, LlmProvider } from "./modules/ai";
+import type { AiModelTier, LlmProvider, PhotoTextReader } from "./modules/ai";
 import type { KeyStore } from "./modules/auth";
 import type { FlagsService } from "./modules/flags";
 import type { MobileReleaseConfig } from "./modules/mobile";
@@ -258,6 +259,12 @@ export interface AppOptions {
    * inject a fake.
    */
   aiLlmProvider?: LlmProvider | null;
+  /**
+   * Reads the text in an Ask AI photo (POST /api/ai/photo-text). Built in src/index.ts from the OCR
+   * environment (the bundled worker-script and traineddata in the image); null leaves the route
+   * unmounted, the bare-test default.
+   */
+  photoTextReader?: PhotoTextReader | null;
   /**
    * Model-id overrides for the gateway's routing table (`AI_LLM_SMALL_MODEL` / `AI_LLM_LARGE_MODEL`).
    * Threaded from the environment by src/index.ts so flipping a model is an env change, not a code
@@ -353,6 +360,7 @@ export function createApp({
   docsEnabled = false,
   flags = null,
   aiLlmProvider = null,
+  photoTextReader = null,
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
   reviewLoginPassword,
@@ -1281,6 +1289,9 @@ export function createApp({
       }),
     );
     app.route("/", aiUsageRoutes({ meter: aiMeter }));
+    if (photoTextReader) {
+      app.route("/", aiPhotoTextRoutes({ reader: photoTextReader, redis }));
+    }
     // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Not behind
     // requireFeature -- it never reaches the provider, and withdrawal must work without an add-on.
     app.route("/", aiConsentRoutes({ database }));

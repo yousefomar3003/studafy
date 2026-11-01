@@ -52,6 +52,11 @@ RUN bun run --cwd packages/constants build \
  && bun run --cwd packages/finance-reporting build \
  && bun run --cwd packages/notification-templates build
 RUN bunx turbo run build --filter=@studafy/api
+# Ask AI photo text reads photos with the shared OCR engine (packages/ocr). Same as the workers image:
+# bundle tesseract's worker-script and copy its WASM cores and traineddata next to dist/, because
+# the runtime stage ships only apps/api/dist and no node_modules. See
+# packages/ocr/scripts/build-assets.ts for the layout.
+RUN bun run --cwd apps/api build:ocr
 
 FROM oven/bun:${BUN_VERSION}-alpine AS runtime
 WORKDIR /app
@@ -74,6 +79,11 @@ USER app
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=3000
+
+# tesseract's worker-script runs as a worker thread; with no node_modules in the image, point it at
+# the bundled copy. The engine's traineddata default already resolves to dist/traineddata/ next to
+# the bundled main module, so no OCR_LANG_PATH is needed.
+ENV OCR_WORKER_PATH=/app/dist/ocr/index.js
 
 EXPOSE 3000
 

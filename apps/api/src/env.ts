@@ -301,6 +301,12 @@ export const envSchema = z
       .enum(["true", "false"])
       .optional()
       .transform((value) => value === "true"),
+    // OCR for Ask AI photo text (POST /api/ai/photo-text), the workers' engine and settings
+    // (packages/ocr). OCR_WORKER_PATH and OCR_LANG_PATH point at the bundled tesseract worker-script
+    // and the traineddata in the image, which has no node_modules; unset in development, where the
+    // engine resolves tesseract.js's own worker and the checked-in traineddata.
+    OCR_WORKER_PATH: z.string().min(1).optional(),
+    OCR_LANG_PATH: z.string().min(1).optional(),
     // Mobile release floor / latest versions, served verbatim at GET /api/mobile/config (ST-257).
     // Operational config, not code: the mobile app polls the endpoint and blocks itself below
     // MIN_SUPPORTED, so raising the floor mid-rollout is an env change on this service, never an

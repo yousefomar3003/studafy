@@ -470,6 +470,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // borrowing a write verb that did not happen; see routes/quiz-routes.ts.
   "POST /api/ai/students/{studentId}/quizzes",
   "POST /api/ai/students/{studentId}/quizzes/{quizId}/grade",
+  // Ask AI photo text. POST carries the photo; it is read in memory and only its text is returned,
+  // so nothing is written and it is declared "read" against ai_messages, like quiz grading.
+  "POST /api/ai/photo-text",
   // Flashcard deck generation and spaced-repetition reviews (ST-168). Generation's writes are
   // app.flashcard_decks, app.flashcards, and the durable usage meter, declared "insert" on
   // flashcards. Review submission's one write is the student's per-card SM-2 progress row,

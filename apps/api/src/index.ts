@@ -5,6 +5,7 @@ import {
   startTracing,
   withErrorMonitoringScope,
 } from "@studafy/observability";
+import { TesseractOcrEngine } from "@studafy/ocr";
 
 import { createApp } from "./app";
 import { closeDatabasePools, createDatabase, createReadDatabase } from "./database";
@@ -187,6 +188,15 @@ const aiLlmProvider: LlmProvider | null =
       })
     : null;
 
+// Ask AI photo text: English and Arabic in one pass, the two languages students' work is written in.
+// One shared tesseract worker thread, spawned on the first photo.
+const photoTextReader = new TesseractOcrEngine({
+  languages: ["eng", "ara"],
+  languageCandidates: [],
+  ...(env.OCR_WORKER_PATH !== undefined ? { workerPath: env.OCR_WORKER_PATH } : {}),
+  ...(env.OCR_LANG_PATH !== undefined ? { langPath: env.OCR_LANG_PATH } : {}),
+});
+
 const aiLlmModelOverrides: Partial<Record<AiModelTier, string>> = {
   ...(env.AI_LLM_SMALL_MODEL ? { small: env.AI_LLM_SMALL_MODEL } : {}),
   ...(env.AI_LLM_LARGE_MODEL ? { large: env.AI_LLM_LARGE_MODEL } : {}),
@@ -250,6 +260,7 @@ const app = createApp({
   flags,
   aiLlmProvider,
   aiLlmModelOverrides,
+  photoTextReader,
   // Folds MOBILE_MIN_SUPPORTED_VERSION_* / MOBILE_LATEST_VERSION_* into the shape
   // GET /api/mobile/config serves (ST-257). An unset variable becomes "0.0.0" ("no floor").
   mobileReleaseConfig: resolveMobileReleaseConfig(env),
@@ -289,6 +300,7 @@ const shutdown = (signal: string) => {
     keyStore.destroy();
     // Drains buffered security events. Must run before closeDatabase, which it writes through.
     await securityEventSink.close();
+    await photoTextReader.close();
     await gradePublishedSubscriber?.close();
     await entitlementInvalidationSubscriber?.close();
     await closeRedis(redis);

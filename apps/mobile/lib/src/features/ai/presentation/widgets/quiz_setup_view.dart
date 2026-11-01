@@ -10,17 +10,25 @@ import '../../../../core/features/feature_gate.dart';
 /// The quiz screen's landing step: pick up to [quizMaxMaterials] ready materials and how many
 /// questions to generate, then start round 1.
 class QuizSetupView extends StatefulWidget {
-  const QuizSetupView({required this.state, required this.onGenerate, super.key});
+  const QuizSetupView({
+    required this.state,
+    required this.onGenerate,
+    this.initialSelection = const {},
+    super.key,
+  });
 
   final QuizSetup state;
   final void Function(List<String> materialIds, int questionCount) onGenerate;
+
+  /// Materials ticked when the view opens.
+  final Set<String> initialSelection;
 
   @override
   State<QuizSetupView> createState() => _QuizSetupViewState();
 }
 
 class _QuizSetupViewState extends State<QuizSetupView> {
-  final Set<String> _selected = {};
+  late final Set<String> _selected = {...widget.initialSelection};
   int _questionCount = quizDefaultQuestions;
 
   void _toggle(String materialId) {

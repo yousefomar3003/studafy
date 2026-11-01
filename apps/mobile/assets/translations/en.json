@@ -550,6 +550,29 @@
   },
   "askAi": {
     "title": "Ask AI",
+    "attach": {
+      "tooltip": "Add a photo or material",
+      "camera": "Take a photo",
+      "gallery": "Choose a photo",
+      "material": "Ask about a material",
+      "materialHint": "Answers come only from the material you choose"
+    },
+    "material": {
+      "sheetTitle": "Ask about a material",
+      "sheetHint": "Answers will come only from the material you choose.",
+      "none": "You don't have any class materials yet.",
+      "chip": "Asking about: {title}",
+      "clear": "Ask about all materials"
+    },
+    "photo": {
+      "reading": "Reading the photo…",
+      "noText": "No text found in that photo. Try a clearer, closer shot.",
+      "checkText": "Some of the text may be wrong. Check it before sending.",
+      "truncated": "The photo had more text than fits in one question, so the end was cut.",
+      "tooLarge": "That photo is too large to read.",
+      "unsupported": "Only JPEG or PNG photos can be read.",
+      "failed": "Couldn't read that photo. Try again."
+    },
     "assistantName": "Study assistant",
     "copy": { "action": "Copy answer", "done": "Answer copied" },
     "signedOut": "Sign in to ask the study assistant a question.",
@@ -557,6 +580,7 @@
     "empty": {
       "title": "Ask about your study materials",
       "hint": "Answers are drawn from your school's materials and cite where they came from.",
+      "scopedHint": "Answers come only from {title}.",
       "suggestionsHeading": "Try asking",
       "suggestions": {
         "summarize": "Summarize the main ideas of my latest material",
@@ -812,8 +836,11 @@
   "aiStudy": {
     "signedOut": "Sign in to use the AI study tools.",
     "retry": "Try again",
+    "openAskAi": "Ask AI",
     "openSummary": "AI summary",
     "openConcepts": "Key concepts",
+    "openQuiz": "Quiz",
+    "openExam": "Exam mode",
     "summary": {
       "subtitle": "AI summary",
       "cached": "From cache"
