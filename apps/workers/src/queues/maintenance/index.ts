@@ -20,7 +20,13 @@ export {
   RECORD_RETENTION_SWEEP_CRON_PATTERN,
   scheduleRecordRetentionSweepJob,
 } from "./record-retention-sweep-scheduler";
-export { RECORD_DATA_TABLES, eraseRecordData, exportRecordData } from "./records-dsr";
+export {
+  RECORD_DATA_TABLES,
+  eraseCustomListData,
+  eraseRecordData,
+  exportCustomListData,
+  exportRecordData,
+} from "./records-dsr";
 export { RECORD_RESEAL_BATCH_SIZE, resealRecordValues } from "./record-key-rotation";
 export { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 export type { ClosureSweepResult, EnqueueDsrJob } from "./closure-sweep";

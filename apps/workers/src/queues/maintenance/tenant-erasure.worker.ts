@@ -11,7 +11,7 @@
 
 import { armAdminActor, resolveAdminActor } from "./admin-actor";
 import { eraseImportData } from "./imports-dsr";
-import { RECORD_DATA_TABLES, eraseRecordData } from "./records-dsr";
+import { RECORD_DATA_TABLES, eraseCustomListData, eraseRecordData } from "./records-dsr";
 import { hardDeleteRows, redactPersonalColumns } from "./redact";
 import { classifyTable } from "./retention-registry";
 import { findSubjectPredicate } from "./subject-resolver";
@@ -48,6 +48,8 @@ export async function runTenantErasure(
   for (const { tableName } of tables) {
     // This pipeline's own compliance trail must not be touched by the erasure it is recording.
     if (tableName === "data_subject_requests") continue;
+    // Record answers and custom list rows and cells are deleted outright, below (records-dsr.ts).
+    if (RECORD_DATA_TABLES.has(tableName)) continue;
 
     const action = classifyTable(tableName);
     if (action === "legal_hold") {
@@ -87,6 +89,26 @@ export async function runTenantErasure(
       action: "hard_deleted",
       columns: [],
       rows: records.rows,
+    });
+  }
+
+  // Custom lists (records-dsr.ts): a person's linked rows go entirely, cells and all; a closure
+  // deletes every list with its columns, choices, rows and cells.
+  const customLists = await eraseCustomListData(tx, schoolId, subject);
+  if (customLists.rows > 0) {
+    redacted.push({
+      table: "custom_list_rows",
+      action: "hard_deleted",
+      columns: [],
+      rows: customLists.rows,
+    });
+  }
+  if (customLists.lists > 0) {
+    redacted.push({
+      table: "custom_lists",
+      action: "hard_deleted",
+      columns: [],
+      rows: customLists.lists,
     });
   }
 

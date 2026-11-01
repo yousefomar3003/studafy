@@ -19,7 +19,7 @@ import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { resealRecordValues } from "./record-key-rotation";
 import { purgeExpiredSensitiveRecords } from "./record-retention-sweep";
-import { eraseRecordData } from "./records-dsr";
+import { eraseCustomListData, eraseRecordData } from "./records-dsr";
 import { resolveSubjectIdentifiers } from "./subject-resolver";
 import { runTenantErasure } from "./tenant-erasure.worker";
 import { runTenantExport } from "./tenant-export.worker";
@@ -583,6 +583,316 @@ describeDb("records key rotation", () => {
         ...JSON.parse(DEVELOPMENT_RECORD_KEYS_JSON),
         "rotated-2": Buffer.alloc(32, 5).toString("base64"),
       }),
+      DEVELOPMENT_RECORD_KEYRING.currentKeyId,
+    );
+    expect((await resealRecordValues(sql!, back)).failed).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Custom lists (000182)
+// ---------------------------------------------------------------------------
+
+const LOCKER_CODE = "LOCK-7781-SECRET";
+
+interface CustomListFixture {
+  listId: string;
+  codeColumn: string;
+  sizeColumn: string;
+  countColumn: string;
+  options: Record<"s" | "m", string>;
+}
+
+async function customList(s: School): Promise<CustomListFixture> {
+  return withAdmin(s.schoolId, async (tx) => {
+    const [list] = await tx<{ id: string }[]>`
+      INSERT INTO app.custom_lists (school_id, name_en, name_ar, audience, link_student,
+                                    link_parent, link_staff, link_class, created_by)
+      VALUES (${s.schoolId}::uuid, ${"Lockers " + crypto.randomUUID().slice(0, 6)}, 'الخزائن',
+              'staff', true, true, true, true, ${s.adminId}::uuid)
+      RETURNING id
+    `;
+    const column = async (type: string, label: string, sensitivity: string, order: number) => {
+      const [row] = await tx<{ id: string }[]>`
+        INSERT INTO app.custom_list_columns (school_id, list_id, field_type, label_en, label_ar,
+                                             sensitivity, sort_order)
+        VALUES (${s.schoolId}::uuid, ${list!.id}::uuid, ${type}::app.record_field_type, ${label},
+                ${label + " ar"}, ${sensitivity}::app.record_field_sensitivity, ${order})
+        RETURNING id
+      `;
+      return row!.id;
+    };
+    const codeColumn = await column("short_text", "Locker code", "sensitive", 0);
+    const sizeColumn = await column("single_choice", "Size", "standard", 1);
+    const countColumn = await column("number", "Keys", "standard", 2);
+    const options = {} as CustomListFixture["options"];
+    for (const [index, value] of (["s", "m"] as const).entries()) {
+      const [option] = await tx<{ id: string }[]>`
+        INSERT INTO app.custom_list_column_options (school_id, list_id, column_id, value, label_en,
+                                                    label_ar, sort_order)
+        VALUES (${s.schoolId}::uuid, ${list!.id}::uuid, ${sizeColumn}::uuid, ${value},
+                ${value.toUpperCase()}, ${value + " ar"}, ${index})
+        RETURNING id
+      `;
+      options[value] = option!.id;
+    }
+    return { listId: list!.id, codeColumn, sizeColumn, countColumn, options };
+  });
+}
+
+/** A row with a sealed locker code, a size and a key count; `link` null for an unlinked row. */
+async function listRow(
+  s: School,
+  list: CustomListFixture,
+  link: { kind: "student" | "parent" | "staff" | "class"; id: string } | null,
+  code: string,
+) {
+  return withAdmin(s.schoolId, async (tx) => {
+    const column =
+      link === null
+        ? null
+        : link.kind === "student"
+          ? "student_id"
+          : link.kind === "class"
+            ? "class_id"
+            : "user_id";
+    const [row] = await tx<{ id: string }[]>`
+      INSERT INTO app.custom_list_rows (school_id, list_id, link_kind, student_id, user_id, class_id)
+      VALUES (${s.schoolId}::uuid, ${list.listId}::uuid,
+              ${link?.kind ?? null}::app.custom_list_link_kind,
+              ${column === "student_id" ? link!.id : null}::uuid,
+              ${column === "user_id" ? link!.id : null}::uuid,
+              ${column === "class_id" ? link!.id : null}::uuid)
+      RETURNING id
+    `;
+    const sealed = sealRecordValue(
+      DEVELOPMENT_RECORD_KEYRING,
+      {
+        schoolId: s.schoolId,
+        subjectKind: "custom_list_row",
+        subjectId: row!.id,
+        fieldId: list.codeColumn,
+      },
+      "short_text",
+      code,
+    );
+    await tx`
+      INSERT INTO app.custom_list_values (school_id, list_id, row_id, column_id, value_ciphertext,
+                                          value_key_id, value_mask)
+      VALUES (${s.schoolId}::uuid, ${list.listId}::uuid, ${row!.id}::uuid, ${list.codeColumn}::uuid,
+              ${sealed.ciphertext}::bytea, ${sealed.keyId}, ${sealed.mask})
+    `;
+    await tx`
+      INSERT INTO app.custom_list_values (school_id, list_id, row_id, column_id, option_id)
+      VALUES (${s.schoolId}::uuid, ${list.listId}::uuid, ${row!.id}::uuid, ${list.sizeColumn}::uuid,
+              ${list.options.m}::uuid)
+    `;
+    await tx`
+      INSERT INTO app.custom_list_values (school_id, list_id, row_id, column_id, value_number)
+      VALUES (${s.schoolId}::uuid, ${list.listId}::uuid, ${row!.id}::uuid, ${list.countColumn}::uuid, 2)
+    `;
+    return row!.id;
+  });
+}
+
+async function customListCounts(s: School) {
+  const [counts] = await withAdmin(
+    s.schoolId,
+    (tx) => tx<{ lists: number; columns: number; options: number; rows: number; values: number }[]>`
+    SELECT (SELECT count(*)::int FROM app.custom_lists WHERE school_id = ${s.schoolId}::uuid) AS lists,
+           (SELECT count(*)::int FROM app.custom_list_columns WHERE school_id = ${s.schoolId}::uuid) AS columns,
+           (SELECT count(*)::int FROM app.custom_list_column_options WHERE school_id = ${s.schoolId}::uuid) AS options,
+           (SELECT count(*)::int FROM app.custom_list_rows WHERE school_id = ${s.schoolId}::uuid) AS rows,
+           (SELECT count(*)::int FROM app.custom_list_values WHERE school_id = ${s.schoolId}::uuid) AS values
+  `,
+  );
+  return counts!;
+}
+
+async function remainingListRows(s: School) {
+  const rows = await withAdmin(
+    s.schoolId,
+    (tx) => tx<{ id: string }[]>`
+    SELECT id FROM app.custom_list_rows WHERE school_id = ${s.schoolId}::uuid
+  `,
+  );
+  return rows.map((row) => row.id).sort();
+}
+
+describeDb("custom lists in the DSR pipeline", () => {
+  test("a person's export holds their linked rows with sensitive cells opened, and nobody else's", async () => {
+    const s = await school();
+    const pupil = await student(s, null);
+    const other = await student(s, null);
+    const list = await customList(s);
+    await listRow(s, list, { kind: "student", id: pupil.studentId }, LOCKER_CODE);
+    await listRow(s, list, { kind: "student", id: other.studentId }, "OTHER-CODE-1234");
+
+    const objects = new Map<string, Uint8Array>();
+    const s3 = { put: async (key: string, body: Uint8Array) => void objects.set(key, body) };
+    const exported = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, (tx) =>
+      runTenantExport(tx, {
+        s3,
+        requestId: crypto.randomUUID(),
+        schoolId: s.schoolId,
+        subjectScope: "user",
+        subjectUserId: pupil.userId,
+        now: new Date(),
+        recordKeyring: DEVELOPMENT_RECORD_KEYRING,
+      }),
+    );
+    const entry = exported.manifest.tables.find((table) => table.table === "custom_list_rows")!;
+    expect(entry.rowCount).toBe(1);
+    const body = new TextDecoder().decode(objects.get(entry.storageKey)!);
+    expect(body).not.toContain("OTHER-CODE-1234");
+    const line = JSON.parse(body) as {
+      link_kind: string;
+      link_id: string;
+      list_name_ar: string;
+      cells: { label_en: string; sensitivity: string; value: unknown; choices?: unknown[] }[];
+    };
+    expect(line.link_kind).toBe("student");
+    expect(line.link_id).toBe(pupil.studentId);
+    expect(line.list_name_ar).toBe("الخزائن");
+    expect(line.cells.map((cell) => [cell.label_en, cell.value])).toEqual([
+      ["Locker code", LOCKER_CODE],
+      ["Size", "m"],
+      ["Keys", 2],
+    ]);
+    expect(line.cells[1]!.choices).toEqual([{ value: "m", label_en: "M", label_ar: "m ar" }]);
+    // The cells table, ciphertext and all, never ships through the generic dump.
+    expect(exported.manifest.tables.some((table) => table.table === "custom_list_values")).toBe(
+      false,
+    );
+    expect(exported.manifest.tables.filter((t) => t.table === "custom_list_rows")).toHaveLength(1);
+  });
+
+  test("erasure deletes a person's rows and cells only; class and unlinked rows stay", async () => {
+    const s = await school();
+    const pupil = await student(s, null);
+    const other = await student(s, null);
+    const guardian = await parent(s, [pupil.studentId]);
+    const teacher = await staffMember(s, null);
+    const classId = await aClass(s);
+    const list = await customList(s);
+    await listRow(s, list, { kind: "student", id: pupil.studentId }, LOCKER_CODE);
+    const otherRow = await listRow(s, list, { kind: "student", id: other.studentId }, "X-1");
+    const guardianRow = await listRow(s, list, { kind: "parent", id: guardian }, "X-2");
+    const teacherRow = await listRow(s, list, { kind: "staff", id: teacher }, "X-3");
+    const classRow = await listRow(s, list, { kind: "class", id: classId }, "X-4");
+    const unlinkedRow = await listRow(s, list, null, "X-5");
+
+    const erasure = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, async (tx) =>
+      runTenantErasure(
+        tx,
+        s.schoolId,
+        await resolveSubjectIdentifiers(tx, s.schoolId, pupil.userId),
+      ),
+    );
+    expect(erasure.redactedTables).toContainEqual({
+      table: "custom_list_rows",
+      action: "hard_deleted",
+      columns: [],
+      rows: 1,
+    });
+    expect(await remainingListRows(s)).toEqual(
+      [otherRow, guardianRow, teacherRow, classRow, unlinkedRow].sort(),
+    );
+    // Five rows of three cells each remain: the erased row's cells went with it.
+    expect((await customListCounts(s)).values).toBe(15);
+
+    // A member of staff's request reaches their row by user_id.
+    await withSystemTenantTx(sql!, { schoolId: s.schoolId }, async (tx) =>
+      runTenantErasure(tx, s.schoolId, await resolveSubjectIdentifiers(tx, s.schoolId, teacher)),
+    );
+    expect(await remainingListRows(s)).toEqual(
+      [otherRow, guardianRow, classRow, unlinkedRow].sort(),
+    );
+  });
+
+  test("a tenant closure deletes every list with its columns, choices, rows and cells", async () => {
+    const s = await school();
+    const pupil = await student(s, null);
+    const classId = await aClass(s);
+    const list = await customList(s);
+    await customList(s);
+    await listRow(s, list, { kind: "student", id: pupil.studentId }, LOCKER_CODE);
+    await listRow(s, list, { kind: "class", id: classId }, "X-4");
+    expect(await customListCounts(s)).toEqual({
+      lists: 2,
+      columns: 6,
+      options: 4,
+      rows: 2,
+      values: 6,
+    });
+
+    const closure = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, (tx) =>
+      eraseCustomListData(tx, s.schoolId, undefined),
+    );
+    expect(closure).toEqual({ rows: 2, lists: 2 });
+    expect(await customListCounts(s)).toEqual({
+      lists: 0,
+      columns: 0,
+      options: 0,
+      rows: 0,
+      values: 0,
+    });
+  });
+
+  test("a closure export holds every row; key rotation re-seals list cells", async () => {
+    const s = await school();
+    const pupil = await student(s, null);
+    const classId = await aClass(s);
+    const list = await customList(s);
+    const rowId = await listRow(s, list, { kind: "student", id: pupil.studentId }, LOCKER_CODE);
+    await listRow(s, list, { kind: "class", id: classId }, "X-4");
+
+    const objects = new Map<string, Uint8Array>();
+    const s3 = { put: async (key: string, body: Uint8Array) => void objects.set(key, body) };
+    const exported = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, (tx) =>
+      runTenantExport(tx, {
+        s3,
+        requestId: crypto.randomUUID(),
+        schoolId: s.schoolId,
+        subjectScope: "tenant",
+        subjectUserId: null,
+        now: new Date(),
+        recordKeyring: DEVELOPMENT_RECORD_KEYRING,
+      }),
+    );
+    const entry = exported.manifest.tables.find((table) => table.table === "custom_list_rows")!;
+    expect(entry.rowCount).toBe(2);
+
+    const rotatedKey = Buffer.alloc(32, 7).toString("base64");
+    const rotated = parseRecordKeyring(
+      JSON.stringify({ ...JSON.parse(DEVELOPMENT_RECORD_KEYS_JSON), "rotated-3": rotatedKey }),
+      "rotated-3",
+    );
+    expect((await resealRecordValues(sql!, rotated)).failed).toBe(0);
+    const [cell] = await withAdmin(
+      s.schoolId,
+      (tx) => tx<{ value_ciphertext: Uint8Array; value_key_id: string; value_mask: string }[]>`
+      SELECT value_ciphertext, value_key_id, value_mask FROM app.custom_list_values
+      WHERE school_id = ${s.schoolId}::uuid AND row_id = ${rowId}::uuid
+        AND value_ciphertext IS NOT NULL
+    `,
+    );
+    expect(cell!.value_key_id).toBe("rotated-3");
+    const opened = openRecordValue(
+      parseRecordKeyring(JSON.stringify({ "rotated-3": rotatedKey }), "rotated-3"),
+      {
+        schoolId: s.schoolId,
+        subjectKind: "custom_list_row",
+        subjectId: rowId,
+        fieldId: list.codeColumn,
+      },
+      { ciphertext: cell!.value_ciphertext, keyId: cell!.value_key_id, mask: cell!.value_mask },
+    );
+    expect(opened.unwrap()).toBe(LOCKER_CODE);
+
+    // Rotate back so later runs against the same database open with the development key.
+    const back = parseRecordKeyring(
+      JSON.stringify({ ...JSON.parse(DEVELOPMENT_RECORD_KEYS_JSON), "rotated-3": rotatedKey }),
       DEVELOPMENT_RECORD_KEYRING.currentKeyId,
     );
     expect((await resealRecordValues(sql!, back)).failed).toBe(0);

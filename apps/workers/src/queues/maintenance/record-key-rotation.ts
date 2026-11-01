@@ -3,6 +3,10 @@
  * names a new key, every answer still sealed under an older one is opened and sealed again under the
  * current key, in batches, per school. Runs with the daily record retention job; an operator removes
  * an old key from the secret only after this reports zero `remaining` for it.
+ *
+ * Sensitive custom list cells (000182) are sealed with the same keyring, as subject kind
+ * "custom_list_row" (the row as subject, the column as field), and are re-sealed the same way after
+ * the record answers, in the same per-school transaction batches.
  */
 import { openRecordValue, sealRecordValue } from "@studafy/records";
 
@@ -11,7 +15,7 @@ import { loadSchoolIds } from "../notifications/email/schools";
 
 import type { PurgeLogger } from "../imports";
 import type { RecordFieldType, RecordKeyring, RecordSubjectKind } from "@studafy/records";
-import type { Sql } from "postgres";
+import type { Sql, TransactionSql } from "postgres";
 
 export const RECORD_RESEAL_BATCH_SIZE = 500;
 
@@ -79,6 +83,12 @@ export async function resealRecordValues(
         });
         result.resealed += batch;
       } while (batch === RECORD_RESEAL_BATCH_SIZE);
+      do {
+        batch = await withSystemTenantTx(sql, { schoolId }, (tx) =>
+          resealCustomListBatch(tx, schoolId, keyring),
+        );
+        result.resealed += batch;
+      } while (batch === RECORD_RESEAL_BATCH_SIZE);
     } catch (error) {
       result.failed += 1;
       // The error names the key id at most (RecordKeyUnavailableError), never a value.
@@ -89,4 +99,53 @@ export async function resealRecordValues(
     }
   }
   return result;
+}
+
+/** One batch of custom list cells still sealed under an older key; the number re-sealed. */
+async function resealCustomListBatch(
+  tx: TransactionSql,
+  schoolId: string,
+  keyring: RecordKeyring,
+): Promise<number> {
+  const rows = await tx<
+    {
+      id: string;
+      row_id: string;
+      column_id: string;
+      field_type: RecordFieldType;
+      value_ciphertext: Uint8Array;
+      value_key_id: string;
+      value_mask: string;
+    }[]
+  >`
+    SELECT v.id, v.row_id, v.column_id, c.field_type, v.value_ciphertext, v.value_key_id,
+           v.value_mask
+    FROM app.custom_list_values AS v
+    JOIN app.custom_list_columns AS c ON c.id = v.column_id AND c.school_id = v.school_id
+    WHERE v.school_id = ${schoolId}::uuid AND v.value_ciphertext IS NOT NULL
+      AND v.value_key_id <> ${keyring.currentKeyId}
+    ORDER BY v.id
+    LIMIT ${RECORD_RESEAL_BATCH_SIZE}
+    FOR UPDATE OF v
+  `;
+  for (const row of rows) {
+    const context = {
+      schoolId,
+      subjectKind: "custom_list_row" as const,
+      subjectId: row.row_id,
+      fieldId: row.column_id,
+    };
+    const opened = openRecordValue(keyring, context, {
+      ciphertext: row.value_ciphertext,
+      keyId: row.value_key_id,
+      mask: row.value_mask,
+    });
+    const sealed = sealRecordValue(keyring, context, row.field_type, opened.unwrap());
+    await tx`
+      UPDATE app.custom_list_values
+      SET value_ciphertext = ${sealed.ciphertext}, value_key_id = ${sealed.keyId}
+      WHERE school_id = ${schoolId}::uuid AND id = ${row.id}::uuid
+    `;
+  }
+  return rows.length;
 }

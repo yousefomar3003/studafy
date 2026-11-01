@@ -154,6 +154,13 @@ export function isPersonalDataColumn(columnName: string): boolean {
  * person's own user id under the name that says which subject column it is. It is listed so no
  * table holding it is out of a per-person request's reach by naming alone; record_answers itself
  * is RECORD_DATA_TABLES' (records-dsr.ts), which exports it opened and erases it outright.
+ *
+ * app.custom_list_rows (000182) reaches a person through `student_id` (a student) and `user_id` (a
+ * parent or a member of staff), both already listed; its `class_id` is a class, not a person, and is
+ * deliberately not a link column. Its cells (app.custom_list_values) have no link column at all.
+ * Both tables are RECORD_DATA_TABLES' too: records-dsr.ts exports a person's linked rows with their
+ * cells opened and deletes them outright, and a tenant closure deletes every list. Neither is a
+ * legal hold -- a school's own working list is not a compliance record.
  */
 export const SUBJECT_LINK_COLUMNS: readonly string[] = [
   "user_id",

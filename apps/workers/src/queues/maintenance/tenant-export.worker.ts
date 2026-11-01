@@ -21,7 +21,7 @@ import { createHash } from "node:crypto";
 import { armAdminActor, resolveAdminActor } from "./admin-actor";
 import { FILE_TABLES, parseExportManifest } from "./export-manifest";
 import { IMPORT_FILES_EXPORT_GAP } from "./imports-dsr";
-import { RECORD_DATA_TABLES, exportRecordData } from "./records-dsr";
+import { RECORD_DATA_TABLES, exportCustomListData, exportRecordData } from "./records-dsr";
 import { assertSafeIdentifier } from "./redact";
 import { findSubjectPredicate, resolveSubjectIdentifiers } from "./subject-resolver";
 import { discoverTenantTables } from "./tenant-tables";
@@ -120,6 +120,9 @@ export async function runTenantExport(
   for (const { tableName } of tables) {
     // This pipeline's own request ledger is metadata about the DSR process, not the subject's data.
     if (tableName === "data_subject_requests") continue;
+    // Record answers and custom list cells are exported opened, below (records-dsr.ts): a raw dump
+    // would hand the subject ciphertext, and a cell has no link column to scope it by.
+    if (RECORD_DATA_TABLES.has(tableName)) continue;
 
     const predicate = resolvedSubject
       ? await findSubjectPredicate(tx, tableName, resolvedSubject)
@@ -184,6 +187,22 @@ export async function runTenantExport(
     for (const file of records.files) {
       fileEntries.push({ table: "record_documents", ...file, checksumSha256: null });
     }
+  }
+
+  const customListLines = await exportCustomListData(tx, schoolId, resolvedSubject, recordKeyring);
+  if (customListLines.length > 0) {
+    const body = new TextEncoder().encode(customListLines.join("\n"));
+    const key = `${prefix}/data/custom_list_rows.ndjson`;
+    await s3.put(key, body, {
+      contentType: "application/x-ndjson",
+      contentDisposition: `attachment; filename="custom_list_rows.ndjson"`,
+    });
+    tableEntries.push({
+      table: "custom_list_rows",
+      rowCount: customListLines.length,
+      storageKey: key,
+      sha256: sha256Hex(body),
+    });
   }
 
   // Original student import files: a closure's bundle lists every one still held (the school's own
