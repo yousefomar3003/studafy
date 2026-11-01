@@ -15,6 +15,8 @@ import '../../account/presentation/notification_preferences_screen.dart';
 import '../../account/presentation/own_staff_record_screen.dart';
 import '../../account/presentation/signed_in_devices_screen.dart';
 import '../../ai/store/ai_store_controller.dart';
+import '../../custom_lists/application/custom_lists_providers.dart';
+import '../../custom_lists/presentation/custom_lists_screen.dart';
 import '../../student/application/student_context_providers.dart';
 import '../application/shell_providers.dart';
 import '../domain/app_role.dart';
@@ -38,6 +40,9 @@ import '../../../design/layout/bottom_inset_padding.dart';
 /// "Delete school" ([DeleteSchoolScreen]): it closes the whole school — every member is signed out
 /// and can no longer sign in, and the school's data is kept. See
 /// `apps/mobile/store/review-checklist.md` §1.
+///
+/// Members of staff also get "My staff record" ([OwnStaffRecordScreen]) and "Lists"
+/// ([CustomListsScreen]), the school's custom lists they may read.
 ///
 /// "Switch account" ([showAccountSwitcher]) moves between the accounts signed in on this phone, for
 /// example a parent's accounts at two schools, or a student handing the family phone to a parent or
@@ -156,6 +161,21 @@ class ProfileTabScreen extends ConsumerWidget {
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => const OwnStaffRecordScreen(),
+                          ),
+                        ),
+                      ),
+                    ],
+                    // The school's custom lists this member of staff may read (bus routes, lockers).
+                    if (canUseCustomLists(roles)) ...[
+                      const Divider(height: 1, indent: 68),
+                      _SettingsRow(
+                        key: const Key('profileCustomLists'),
+                        icon: Icons.table_rows_outlined,
+                        titleKey: 'customLists.title',
+                        trailing: Icons.chevron_right,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const CustomListsScreen(),
                           ),
                         ),
                       ),

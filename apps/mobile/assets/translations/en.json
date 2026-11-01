@@ -1955,6 +1955,56 @@
       "no": "No"
     }
   },
+  "customLists": {
+    "title": "Lists",
+    "intro": "Lists your school keeps, such as bus routes, library loans or lockers. Who can see each list is up to your school.",
+    "loadError": "Couldn't load your school's lists.",
+    "empty": "There are no lists you can see yet.",
+    "retry": "Try again",
+    "rows": {
+      "one": "1 row",
+      "other": "{} rows"
+    },
+    "audience": {
+      "admins": "School admins",
+      "leadership": "School leadership",
+      "staff": "All staff"
+    },
+    "linkKinds": {
+      "student": "Student",
+      "parent": "Parent",
+      "staff": "Staff",
+      "class": "Class"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "list": {
+      "webOnly": "To add or change rows, use Studafy on the web.",
+      "search": "Search this list",
+      "sort": "Sort",
+      "sortCreated": "Date added",
+      "sortUpdated": "Last changed",
+      "sortLink": "Linked to",
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "noRows": "This list has no rows yet.",
+      "noMatches": "No rows match your search.",
+      "loadError": "Couldn't load this list.",
+      "loadMoreError": "Couldn't load more rows.",
+      "notVisible": "Someone you can't see",
+      "emptyRow": "Nothing filled in",
+      "sensitive": "Sensitive, hidden"
+    },
+    "linked": {
+      "title": "Lists",
+      "empty": "No lists mention this student.",
+      "loadError": "Couldn't load lists.",
+      "more": {
+        "one": "And 1 more row in this list",
+        "other": "And {} more rows in this list"
+      }
+    }
+  },
   "releasedMarks": {
     "title": "Term marks",
     "entry": "Term marks",

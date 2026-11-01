@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/enrollment.dart';
+import 'package:studafy_mobile/src/features/custom_lists/application/custom_lists_providers.dart';
+import 'package:studafy_mobile/src/features/custom_lists/data/custom_lists_client.dart';
+import 'package:studafy_mobile/src/features/custom_lists/domain/custom_list.dart';
+import 'package:studafy_mobile/src/features/custom_lists/presentation/student_custom_lists_screen.dart';
+import 'package:studafy_mobile/src/features/shell/application/shell_providers.dart';
 import 'package:studafy_mobile/src/features/teacher/application/teacher_providers.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/teacher_class_detail_screen.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/widgets/roster_entry_tile.dart';
@@ -10,6 +15,20 @@ import 'package:studafy_mobile/src/features/teacher/presentation/widgets/roster_
 import '../../../support/ensure_date_formatting.dart';
 import '../../../support/wrap_with_localization.dart';
 import '../support.dart';
+
+/// Custom lists for the roster tests: nothing links anywhere, and every call is recorded.
+class _NoLinkedRows implements CustomListsClient {
+  final List<(String, String)> linkedCalls = [];
+
+  @override
+  Future<List<LinkedCustomList>> linked(String kind, String id) async {
+    linkedCalls.add((kind, id));
+    return const [];
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
 
 Future<void> _pump(WidgetTester tester, ProviderScope scope) {
   return tester.pumpWidget(wrapWithLocalization(scope));
@@ -38,6 +57,8 @@ void main() {
       tester,
       ProviderScope(
         overrides: [
+          // No staff role: the Lists section and the roster tap stay out of the way.
+          sessionRolesProvider.overrideWithValue(const <String>[]),
           classCourseNameProvider(
             'class-1',
           ).overrideWith((ref) => 'Mathematics'),
@@ -57,6 +78,8 @@ void main() {
       tester,
       ProviderScope(
         overrides: [
+          // No staff role: the Lists section and the roster tap stay out of the way.
+          sessionRolesProvider.overrideWithValue(const <String>[]),
           classCourseNameProvider(
             'class-1',
           ).overrideWith((ref) => 'Mathematics'),
@@ -75,28 +98,29 @@ void main() {
     expect(find.byType(RosterEntryTile), findsNWidgets(2));
   });
 
-  testWidgets(
-    'falls back to a short student id while no name resolver exists',
-    (tester) async {
-      await _pump(
-        tester,
-        ProviderScope(
-          overrides: [
-            classCourseNameProvider(
-              'class-1',
-            ).overrideWith((ref) => 'Mathematics'),
-            classRosterProvider('class-1').overrideWith(
-              (ref) => [enrollmentFixture(studentId: 'student-abcdef')],
-            ),
-          ],
-          child: _detailApp(),
-        ),
-      );
-      await tester.pumpAndSettle();
+  testWidgets('falls back to a short student id while no name resolver exists', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      ProviderScope(
+        overrides: [
+          // No staff role: the Lists section and the roster tap stay out of the way.
+          sessionRolesProvider.overrideWithValue(const <String>[]),
+          classCourseNameProvider(
+            'class-1',
+          ).overrideWith((ref) => 'Mathematics'),
+          classRosterProvider('class-1').overrideWith(
+            (ref) => [enrollmentFixture(studentId: 'student-abcdef')],
+          ),
+        ],
+        child: _detailApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.text('Student abcdef'), findsOneWidget);
-    },
-  );
+    expect(find.text('Student abcdef'), findsOneWidget);
+  });
 
   testWidgets('shows the name when the resolver seam is populated', (
     tester,
@@ -105,6 +129,8 @@ void main() {
       tester,
       ProviderScope(
         overrides: [
+          // No staff role: the Lists section and the roster tap stay out of the way.
+          sessionRolesProvider.overrideWithValue(const <String>[]),
           classCourseNameProvider(
             'class-1',
           ).overrideWith((ref) => 'Mathematics'),
@@ -129,6 +155,8 @@ void main() {
       tester,
       ProviderScope(
         overrides: [
+          // No staff role: the Lists section and the roster tap stay out of the way.
+          sessionRolesProvider.overrideWithValue(const <String>[]),
           classCourseNameProvider(
             'class-1',
           ).overrideWith((ref) => 'Mathematics'),
@@ -140,5 +168,77 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('No students enrolled yet.'), findsOneWidget);
+  });
+
+  testWidgets(
+    'a teacher opens what the school lists hold about a student from the roster',
+    (tester) async {
+      final lists = _NoLinkedRows();
+      await _pump(
+        tester,
+        ProviderScope(
+          overrides: [
+            sessionRolesProvider.overrideWithValue(const ['INSTRUCTOR']),
+            customListsClientProvider.overrideWithValue(lists),
+            classCourseNameProvider(
+              'class-1',
+            ).overrideWith((ref) => 'Mathematics'),
+            classRosterProvider('class-1').overrideWith(
+              (ref) => [enrollmentFixture(studentId: 'student-abcdef')],
+            ),
+            rosterStudentNameProvider(
+              'student-abcdef',
+            ).overrideWithValue('Sara Ahmed'),
+          ],
+          child: _detailApp(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      // The class's own Lists section asked, found nothing, and takes no space.
+      expect(lists.linkedCalls, [('class', 'class-1')]);
+      expect(find.byKey(const Key('linkedCustomLists')), findsNothing);
+
+      await tester.tap(find.text('Sara Ahmed'));
+      await tester.pumpAndSettle();
+      expect(find.byType(StudentCustomListsScreen), findsOneWidget);
+      expect(lists.linkedCalls.last, ('student', 'student-abcdef'));
+      expect(find.text('No lists mention this student.'), findsOneWidget);
+    },
+  );
+
+  testWidgets('without a staff role the roster is not tappable', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      ProviderScope(
+        overrides: [
+          // No staff role: the Lists section and the roster tap stay out of the way.
+          sessionRolesProvider.overrideWithValue(const <String>[]),
+          classCourseNameProvider(
+            'class-1',
+          ).overrideWith((ref) => 'Mathematics'),
+          classRosterProvider('class-1').overrideWith(
+            (ref) => [enrollmentFixture(studentId: 'student-abcdef')],
+          ),
+        ],
+        child: _detailApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.ancestor(
+        of: find.byType(RosterEntryTile),
+        matching: find.byType(InkWell),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: find.byType(RosterEntryTile),
+        matching: find.byType(InkWell),
+      ),
+      findsNothing,
+    );
   });
 }

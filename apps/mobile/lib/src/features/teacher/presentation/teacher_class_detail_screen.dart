@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/generated/models/announcement.dart';
 import '../../../core/api/generated/models/discipline_incident.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../custom_lists/presentation/linked_custom_lists_section.dart';
 import '../application/teacher_providers.dart';
 import 'class_announcement_composer_screen.dart';
 import 'grade_entry_screen.dart';
@@ -85,6 +86,13 @@ class TeacherClassDetailScreen extends ConsumerWidget {
                   courseName.maybeWhen(
                     data: (name) => Text(name, style: textTheme.titleMedium),
                     orElse: () => const SizedBox.shrink(),
+                  ),
+                  const SizedBox(height: AppSpacing.space12),
+                  // The class's rows in the school's custom lists (a bus group, a homeroom); takes
+                  // no space when there are none.
+                  LinkedCustomListsSection(
+                    subjectKind: 'class',
+                    subjectId: classId,
                   ),
                   const SizedBox(height: AppSpacing.space4),
                   Text(

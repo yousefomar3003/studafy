@@ -4,10 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/generated/models/enrollment.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../custom_lists/application/custom_lists_providers.dart';
+import '../../../custom_lists/presentation/student_custom_lists_screen.dart';
+import '../../../shell/application/shell_providers.dart';
 import '../../application/teacher_providers.dart';
 
 /// One student in a class roster: their name (or a stable id fallback while the name-resolution
-/// seam is empty — see [rosterStudentNameProvider]) and when they enrolled.
+/// seam is empty — see [rosterStudentNameProvider]) and when they enrolled. For a member of staff
+/// it opens what the school's custom lists hold about the student ([StudentCustomListsScreen]).
 class RosterEntryTile extends ConsumerWidget {
   const RosterEntryTile({required this.enrollment, super.key});
 
@@ -28,7 +32,9 @@ class RosterEntryTile extends ConsumerWidget {
       context.locale.toString(),
     ).format(enrollment.enrolledAt);
 
-    return Padding(
+    final canOpenLists = canUseCustomLists(ref.watch(sessionRolesProvider));
+
+    final tile = Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
       child: Row(
         children: [
@@ -62,6 +68,18 @@ class RosterEntryTile extends ConsumerWidget {
           ),
         ],
       ),
+    );
+    if (!canOpenLists) return tile;
+    return InkWell(
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => StudentCustomListsScreen(
+            studentId: enrollment.studentId,
+            studentName: title,
+          ),
+        ),
+      ),
+      child: tile,
     );
   }
 
