@@ -5,6 +5,7 @@ import '../../../core/api/auth_interceptor.dart';
 import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/di/app_providers.dart';
+import '../../student/application/student_context_providers.dart';
 import '../data/ai_photo_text_client.dart';
 import '../data/ask_ai_client.dart';
 
@@ -35,17 +36,14 @@ final aiPhotoTextClientProvider = Provider<AiPhotoTextClient>((ref) {
 /// The camera / library picker the Ask AI composer reads photos from; overridden in tests.
 final aiPhotoPickerProvider = Provider<AiPhotoPicker>((ref) => AiPhotoPicker());
 
-/// The `{studentId}` the Ask AI routes take is the signed-in student's **user id**, not a
-/// `StudentProfile` id: `report-routes.ts` rejects any call where `auth.userId != studentId`
-/// with 403, and `app.ai_subscriptions.student_id` is keyed by user id. So — unlike
-/// `currentStudentIdProvider`, which has no resolution path and stays null — this seam is just
-/// the session subject (`sub` claim).
+/// The `{studentId}` the AI routes take: the signed-in student's **student record id** (from
+/// `GET /api/students/me`), not their user id. `app.ai_subscriptions`, conversations, quizzes and
+/// reports are all keyed by the student record, and the server refuses any id that is not the
+/// caller's own student record with 403.
 ///
-/// Null only when the session holds no token; the screen renders its signed-out state then.
-/// Overridable in tests the same way as the other student-context seams.
+/// Null while signed out, while `/students/me` is loading, or for a session with no student record;
+/// the screens render their signed-out state then. Overridable in tests the same way as the other
+/// student-context seams.
 final askAiStudentIdProvider = Provider<String?>((ref) {
-  // authSessionProvider hands back a long-lived mutable object; authStatusProvider is what
-  // actually changes on login/logout, so watch it to rebuild.
-  ref.watch(authStatusProvider);
-  return ref.watch(authSessionProvider).userId;
+  return ref.watch(currentStudentIdProvider);
 });

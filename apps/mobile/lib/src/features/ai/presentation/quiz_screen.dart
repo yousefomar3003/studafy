@@ -16,7 +16,7 @@ import 'widgets/quiz_setup_view.dart';
 /// feedback, then review the round and optionally retry just what was missed.
 ///
 /// Route-only (`/me/quiz`), like Ask AI. Reuses [askAiStudentIdProvider] — every `/api/ai/*`
-/// route takes the same `{studentId}` path convention (the session's own user id), so a second,
+/// route takes the same `{studentId}` path convention (the session's own student record id), so a second,
 /// identically-shaped provider would just be a copy of that one.
 class QuizScreen extends ConsumerStatefulWidget {
   const QuizScreen({this.initialMaterialIds = const {}, super.key});

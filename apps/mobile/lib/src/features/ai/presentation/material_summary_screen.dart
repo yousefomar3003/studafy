@@ -20,7 +20,7 @@ import 'widgets/ai_source_anchor_chip.dart';
 /// first switch to each preset costs one request, then the server serves that preset for free.
 ///
 /// Pushed from [MaterialViewerScreen] for an AI-visible material. Needs the signed-in student's id
-/// (their user id — see `askAiStudentIdProvider`); with no session it shows the signed-out state.
+/// (their student record id — see `askAiStudentIdProvider`); with no session it shows the signed-out state.
 class MaterialSummaryScreen extends ConsumerStatefulWidget {
   const MaterialSummaryScreen({required this.material, super.key});
 

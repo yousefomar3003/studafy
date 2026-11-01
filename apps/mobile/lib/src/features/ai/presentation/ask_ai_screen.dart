@@ -18,7 +18,7 @@ import '../../../core/features/feature_gate.dart';
 /// refusals / quota limits / moderation blocks each render as their own distinct state.
 ///
 /// Route-only (`/me/ask-ai`), like the other self-scoped student screens. Needs the signed-in
-/// student's id (their user id — see [askAiStudentIdProvider]); with no session it shows the
+/// student's id (their student record id — see [askAiStudentIdProvider]); with no session it shows the
 /// signed-out state instead of a dead input.
 class AskAiScreen extends ConsumerStatefulWidget {
   const AskAiScreen({this.initialMaterial, super.key});

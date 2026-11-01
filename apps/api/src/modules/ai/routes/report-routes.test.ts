@@ -19,6 +19,8 @@ import type { TransactionSql } from "postgres";
 const SCHOOL_ID = "00000000-0000-4000-8000-000000000001";
 const STUDENT_ID = "00000000-0000-4000-8000-000000000002";
 const OTHER_STUDENT_ID = "00000000-0000-4000-8000-000000000003";
+/** The signed-in student's user id -- a different id from their student record. */
+const USER_ID = "00000000-0000-4000-8000-000000000004";
 const MESSAGE_ID = "00000000-0000-4000-8000-000000000021";
 const QUIZ_ID = "00000000-0000-4000-8000-000000000022";
 const DECK_ID = "00000000-0000-4000-8000-000000000023";
@@ -38,7 +40,7 @@ const silentLogger: Logger = {
 };
 
 const auth: AuthContext = {
-  userId: STUDENT_ID,
+  userId: USER_ID,
   schoolId: SCHOOL_ID,
   roles: [ROLES.STUDENT],
   channel: AUTH_CHANNELS.API,
@@ -61,6 +63,9 @@ function fakeDatabase(opts: { contentExists?: boolean; duplicateReport?: boolean
 
   const tx = ((strings: TemplateStringsArray, ...values: unknown[]) => {
     const sql = strings.join("?");
+    if (sql.includes("app.student_user_id")) {
+      return result([{ user_id: values[0] === STUDENT_ID ? USER_ID : null }]);
+    }
     if (sql.includes("INSERT INTO app.ai_content_reports")) {
       inserts.push({ sql, values });
       if (opts.duplicateReport) {
