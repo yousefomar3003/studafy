@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 
 import { buildImportErrorReportCsv, downloadTextFile } from "../../../lib/csv";
 import { useTranslation } from "../../../lib/i18n";
+import { SheetOffer } from "../../custom-lists/SheetOffer";
 
 import { confirmBlocker, withPartialSuggestions } from "./columnMapping";
 import { ColumnMappingPanel } from "./ColumnMappingPanel";
@@ -26,6 +27,7 @@ import "./students.css";
 
 import type { ColumnMapping } from "./columnMapping";
 import type { StudentImport, UploadProgress } from "./queries";
+import type { PendingSheet } from "../../custom-lists/sheet-handoff";
 import type { components } from "@studafy/api-client";
 import type { ChangeEvent } from "react";
 
@@ -89,6 +91,8 @@ export default function ImportStudentsPage() {
   // The mapping the panel shows. It equals `record.column_mapping` until the admin edits it, apart
   // from the partial-name suggestions a fresh upload adds for fields the server left unmapped.
   const [mappingDraft, setMappingDraft] = useState<ColumnMapping>({});
+  // An upload none of whose columns maps to a student field: offered as a custom list instead.
+  const [unrecognised, setUnrecognised] = useState<PendingSheet | null>(null);
 
   const uploadImport = useUploadStudentImport();
   const updateMapping = useUpdateStudentImportMapping();
@@ -130,6 +134,7 @@ export default function ImportStudentsPage() {
     setMappingDraft({});
     setUploadProgress(null);
     setBanner(null);
+    setUnrecognised(null);
     notifiedCompletionRef.current = false;
   }
 
@@ -148,13 +153,18 @@ export default function ImportStudentsPage() {
     if (!file) return;
 
     setBanner(null);
+    setUnrecognised(null);
     setUploadProgress({ loaded: 0, total: file.size, percent: 0 });
+    const text = file.text();
     uploadImport.mutate(
       { file, onProgress: setUploadProgress },
       {
         onSuccess: (data) => {
           setRecord(data);
           setMappingDraft(withPartialSuggestions(data.column_mapping, data.source_headers));
+          if (!Object.values(data.column_mapping).some(Boolean)) {
+            void text.then((csv) => setUnrecognised({ fileName: file.name, csv }));
+          }
         },
         onError: (error) => {
           setUploadProgress(null);
@@ -251,6 +261,9 @@ export default function ImportStudentsPage() {
           </Card.Body>
         </Card>
       ) : null}
+
+      {/* The page is the school admin's (organization:manageSettings), who holds customList:manage. */}
+      {step === "review" && unrecognised ? <SheetOffer sheet={unrecognised} /> : null}
 
       {step === "review" && record ? (
         <ReviewStep

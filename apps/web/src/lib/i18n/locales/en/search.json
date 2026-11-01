@@ -509,6 +509,16 @@
       "title": "Teachers' employment",
       "where": "Admin › Teachers",
       "keywords": "teachers, staff, employee number, on leave, hire date, end date, teacher left, suspend teacher, employment status, HR"
+    },
+    "custom-lists": {
+      "title": "Lists",
+      "where": "Lists",
+      "keywords": "lists, custom lists, my lists, own data, bus routes, library loans, clinic visits, lockers, uniform orders, alumni, spreadsheet data"
+    },
+    "create-list-from-sheet": {
+      "title": "Create a list from a spreadsheet",
+      "where": "Lists › From a spreadsheet",
+      "keywords": "import list, spreadsheet, csv, excel, upload sheet, unrecognised file, custom list import, new list from file"
     }
   }
 }

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { usePermissions } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
+import { LinkedListsPanel } from "../custom-lists/LinkedListsPanel";
 
 import { fetchParentIdentity, parentIdentityQueryKey } from "./queries";
 import { RecordsPanel } from "./RecordsPanel";
@@ -43,6 +44,7 @@ export function ParentRecordsView({ parentUserId, back, copy }: ParentRecordsVie
         canEdit={permissions.has(PERMISSIONS.STUDENT_RECORD_UPDATE)}
         canRevealSensitive={permissions.has(PERMISSIONS.STUDENT_RECORD_READ_SENSITIVE)}
       />
+      <LinkedListsPanel subject={{ kind: "parent", id: parentUserId }} />
     </>
   );
 }

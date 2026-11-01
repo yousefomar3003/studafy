@@ -161,6 +161,22 @@ export function coerceImportValue(
   }
 }
 
+/**
+ * True when the file has a header row and data but not one of its columns names a field of `spec`:
+ * a sheet this import does not recognise at all, which can become a custom list instead.
+ */
+export function recognisesNoColumn<TRecord>(
+  text: string,
+  spec: Pick<ImportSpec<TRecord>, "fields">,
+): boolean {
+  const [header, ...body] = parseCsv(text);
+  if (!header || body.length === 0) return false;
+  const known = new Set(
+    spec.fields.flatMap((field) => [normaliseHeader(field.key), normaliseHeader(field.label)]),
+  );
+  return header.every((name) => name.trim() === "" || !known.has(normaliseHeader(name)));
+}
+
 /** Parses and validates a whole file against `spec`. Never calls the API. */
 export function prepareImport<TRecord>(
   text: string,

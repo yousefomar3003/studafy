@@ -111,6 +111,11 @@ const DESCRIBE: { [T in SearchType]: Describe<T> } = {
     subtitle: join(money(hit.amount, hit.currency), day(hit.expense_date)),
   }),
   notifications: (hit) => ({ title: hit.title, subtitle: join(day(hit.created_at)) }),
+  // Both names: the palette has no language here, and a list is often looked for in either.
+  custom_lists: (hit) => ({
+    title: hit.name_en,
+    subtitle: join(hit.name_ar !== hit.name_en && hit.name_ar),
+  }),
 };
 
 function describe<T extends SearchType>(type: T, hit: SearchHitOf<T>, t?: Translate) {

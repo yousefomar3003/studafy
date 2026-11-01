@@ -18,6 +18,7 @@
     "license": "الترخيص",
     "platform": "منصة Studafy",
     "finance": "المالية",
+    "lists": "القوائم",
     "approvals": "الموافقات",
     "account": "الحساب"
   },
@@ -168,7 +169,8 @@
       "fee_structures": "هياكل الرسوم",
       "scholarships": "المنح الدراسية",
       "expenses": "المصروفات",
-      "notifications": "الإشعارات"
+      "notifications": "الإشعارات",
+      "custom_lists": "القوائم"
     },
     "minLengthHint": "تابع الكتابة — يبدأ البحث بحرفين على الأقل.",
     "loading": "جارٍ البحث…",
@@ -355,6 +357,10 @@
       "done_many": "تم الاحتفاظ بـ«{{column}}»: كُتبت {{count}} قيمة.",
       "done_other": "تم الاحتفاظ بـ«{{column}}»: كُتبت {{count}} قيمة.",
       "back": "العودة إلى الاستيراد"
+    },
+    "customList": {
+      "unrecognised": "لا يتعرّف Studafy على أي عمود في هذا الجدول. يمكنك الاحتفاظ به كقائمة مخصّصة بدلًا من ذلك.",
+      "create": "إنشاء قائمة مخصّصة من هذا الجدول"
     }
   },
   "home": {

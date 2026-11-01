@@ -69,6 +69,12 @@ const PATHS: Readonly<Record<string, ReactNode>> = {
       <path d="M3 8.5h14M6 12h3" />
     </>
   ),
+  lists: (
+    <>
+      <rect x="3" y="3.5" width="14" height="13" rx="1.5" />
+      <path d="M3 7.5h14M3 11.5h14M8 7.5v9" />
+    </>
+  ),
   approvals: (
     <>
       <rect x="4" y="3.5" width="12" height="14" rx="1.5" />

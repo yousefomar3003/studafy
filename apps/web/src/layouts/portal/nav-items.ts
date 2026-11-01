@@ -102,6 +102,16 @@ export const PORTAL_NAV_ITEMS: readonly PortalNavItem[] = [
     schoolScoped: true,
   },
   {
+    // Custom lists -- the school's own tables (bus routes, library loans, lockers). Held by every
+    // school staff role; each list is narrowed to its audience by the API. Top-level path for the
+    // same prefix-matching reason as "staff".
+    id: "lists",
+    labelKey: "nav.lists",
+    to: "/portal/lists",
+    requiredPermission: PERMISSIONS.CUSTOM_LIST_USE,
+    schoolScoped: true,
+  },
+  {
     id: "approvals",
     labelKey: "nav.approvals",
     to: "/portal/approvals",

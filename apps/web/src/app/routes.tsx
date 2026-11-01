@@ -93,6 +93,21 @@ const SchoolMembersPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
   () => import("../features/admin/members/SchoolMembersPage"),
 );
+// Custom lists (docs/modules/custom-lists.md): one top-level area for every staff role that may use
+// lists, each list narrowed to its audience by the API. "records" carries the shared field inputs.
+const LISTS_CATALOGS: readonly CatalogArea[] = ["customLists", "records"];
+const CustomListsPage = lazyWithCatalogs(
+  LISTS_CATALOGS,
+  () => import("../features/custom-lists/CustomListsPage"),
+);
+const CustomListPage = lazyWithCatalogs(
+  LISTS_CATALOGS,
+  () => import("../features/custom-lists/CustomListPage"),
+);
+const CustomListImportPage = lazyWithCatalogs(
+  LISTS_CATALOGS,
+  () => import("../features/custom-lists/CustomListImportPage"),
+);
 const StudentsListPage = lazyWithCatalogs(
   [...ADMIN_CATALOGS, "records"],
   () => import("../features/admin/students/StudentsListPage"),
@@ -673,6 +688,30 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <SchoolMembersPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "lists",
+            element: (
+              <RequirePermission permission={PERMISSIONS.CUSTOM_LIST_USE}>
+                <CustomListsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "lists/import",
+            element: (
+              <RequirePermission permission={PERMISSIONS.CUSTOM_LIST_MANAGE}>
+                <CustomListImportPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "lists/:listId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.CUSTOM_LIST_USE}>
+                <CustomListPage />
               </RequirePermission>
             ),
           },

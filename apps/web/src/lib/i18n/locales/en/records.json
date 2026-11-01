@@ -109,5 +109,12 @@
     "intro": "What your school keeps on file about you, such as your qualifications or contract type. The school admin fills it in. Fields your school marks sensitive, such as a salary or an ID number, are not shown here.",
     "notStaff": "Only members of the school's staff have a staff record.",
     "backToAccount": "Back to account"
+  },
+  "lists": {
+    "title": "Lists",
+    "yes": "Yes",
+    "no": "No",
+    "more_one": "and {{count}} more row in this list",
+    "more_other": "and {{count}} more rows in this list"
   }
 }

@@ -124,6 +124,32 @@ describe("buildResultGroups", () => {
     expect(group!.items[0]!.href).toBeUndefined();
   });
 
+  test("a custom list opens its list page, titled by both its names", () => {
+    const list = { id: "l-1", name_en: "Lockers", name_ar: "الخزائن", archived: false, rank: 0.3 };
+    for (const permissions of [ADMIN, PRINCIPAL, FINANCE]) {
+      expect(buildResultGroups(resultWith({ custom_lists: [list] }), permissions)).toEqual([
+        {
+          type: "custom_lists",
+          total: 1,
+          items: [
+            {
+              key: "custom_lists:l-1",
+              title: "Lockers",
+              subtitle: "الخزائن",
+              href: "/portal/lists/l-1",
+            },
+          ],
+        },
+      ]);
+    }
+    // A parent never holds customList:use: the hit (which the API would never send) has no link.
+    const [group] = buildResultGroups(
+      resultWith({ custom_lists: [list] }),
+      permissionsForRoles([ROLES.PARENT]),
+    );
+    expect(group?.items[0]?.href).toBeUndefined();
+  });
+
   test("carries the API total, so the palette can offer See all N", () => {
     const [group] = buildResultGroups(resultWith({ students: [STUDENT] }, { students: 37 }), ADMIN);
     expect(group!.total).toBe(37);

@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { usePermissions } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
+import { LinkedListsPanel } from "../custom-lists/LinkedListsPanel";
 
 import { fetchStaffIdentity, staffIdentityQueryKey } from "./queries";
 import { RecordsPanel } from "./RecordsPanel";
@@ -49,6 +50,7 @@ export default function StaffRecordPage({ portal = "admin" }: StaffRecordPagePro
         canEdit={permissions.has(PERMISSIONS.STAFF_RECORD_UPDATE)}
         canRevealSensitive={permissions.has(PERMISSIONS.STAFF_RECORD_READ_SENSITIVE)}
       />
+      <LinkedListsPanel subject={{ kind: "staff", id: staffUserId }} />
     </>
   );
 }

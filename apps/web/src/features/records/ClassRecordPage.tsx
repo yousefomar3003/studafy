@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { usePermissions } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
+import { LinkedListsPanel } from "../custom-lists/LinkedListsPanel";
 
 import { classIdentityQueryKey, fetchClassIdentity } from "./queries";
 import { RecordsPanel } from "./RecordsPanel";
@@ -45,6 +46,7 @@ export default function ClassRecordPage(_props: ClassRecordPageProps) {
         canEdit={permissions.has(PERMISSIONS.TIMETABLE_MANAGE)}
         canRevealSensitive={false}
       />
+      <LinkedListsPanel subject={{ kind: "class", id: classId }} />
     </>
   );
 }
