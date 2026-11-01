@@ -13,6 +13,42 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Custom lists (migration 000182; [custom-lists.md](../modules/custom-lists.md)), under the new
+  "Custom lists" tag. School-defined tables with typed columns (`RecordColumnFieldType`: every record
+  field type but `document`, and `RecordFieldSensitivity`) whose rows may link to a student, parent,
+  member of staff or class:
+  - Lists: `GET/POST /api/custom-lists` (`CustomListList`, `CustomListSummary`,
+    `CreateCustomListBody`, `NewCustomListColumn`, `CustomListAudience`, `CustomListLinks`),
+    `GET/PATCH/DELETE /api/custom-lists/{listId}` (`CustomListDetail`, `UpdateCustomListBody`).
+  - Columns: `POST /api/custom-lists/{listId}/columns`, `PATCH …/columns/{columnId}`
+    (`CustomListColumn`, `UpdateCustomListColumnBody`), `PUT …/column-order`
+    (`ReorderCustomListColumnsBody`). Type and sensitivity cannot change once a column exists.
+  - Rows: `GET/POST /api/custom-lists/{listId}/rows` (`CustomListRowPage`, `CustomListRow`,
+    `CustomListRowLink`, `CustomListCell`, `CreateCustomListRowBody`, `CustomListRowLinkInput`,
+    `CustomListCellInput`). The list query takes `q`, `filter_column`, `filter_value`, `sort`,
+    `order`, `link_kind`, `limit` and `offset`. `PATCH/DELETE …/rows/{rowId}`
+    (`UpdateCustomListRowBody`).
+  - Sensitive cells: `POST …/rows/{rowId}/cells/{columnId}/reveal` (`RevealedCustomListCell`),
+    audited.
+  - CSV export: `GET …/export?lang=en|ar` (`text/csv`). Sensitive columns are always left out.
+  - Link picker: `GET …/link-candidates?kind=&q=` (`CustomListLinkCandidates`,
+    `CustomListLinkCandidate`). Up to 10 subjects of a kind the list allows, holding the matching
+    role, that the caller can see, matched by name or school key, for a person to choose from.
+  - A subject's Lists panel: `GET /api/custom-lists/linked/{subjectKind}/{subjectId}`
+    (`CustomListLinkedRows`, `CustomListLinkedEntry`, `CustomListRef`, `CustomListLinkKind`).
+  - A sheet as a new list: `POST /api/custom-lists/imports/preview` and `…/apply`
+    (`CustomListImportBody`, `CustomListImportList`, `ApplyCustomListImportBody`,
+    `CustomListImportColumnInput`,
+    `CustomListImportKey`, `CustomListImportPreview`, `CustomListImportResult`). Rows link by
+    school-issued key only (`member_id`, `admission_number`, `employee_number`, `class_code`), and
+    only on an exact match. Nothing is written without the preview's token.
+  - New permissions: `customList:manage` (ORG_ADMIN, PRINCIPAL), `customList:use` (every school
+    staff role, narrowed by each list's audience: `admins`, `leadership` or `staff`) and
+    `customList:readSensitive` (ORG_ADMIN, PRINCIPAL).
+  - New error codes: `CUSTOM_LIST_NOT_FOUND`, `CUSTOM_LIST_INVALID`, `CUSTOM_LIST_NAME_TAKEN`,
+    `CUSTOM_LIST_LIMIT_REACHED`, `CUSTOM_LIST_LINK_INVALID` and `CUSTOM_LIST_PREVIEW_STALE`.
+  - Global search: new type `custom_lists` (`CustomListSearchHit`) in `SearchType`,
+    `GlobalSearchResults` and `GlobalSearchTotals`. It matches list names only, never a row value.
 - Staff and class records (migrations 000180, 000181;
   [student-records.md](../modules/student-records.md#staff-and-class-records)), under the new
   "Staff and class records" tag:
