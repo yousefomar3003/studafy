@@ -10,13 +10,16 @@
 //     refund request, and webhook confirmation must transition the status. It needs a real
 //     PostgreSQL with the migrations applied and is gated on TEST_DATABASE_URL.
 
+import { ROLES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 
 import {
+  assignRole,
   createTestDatabase,
   createSchool,
   createStudent,
+  createUser,
   integrationEnabled,
   migrateDatabase,
   type TestDatabase,
@@ -182,6 +185,14 @@ async function withTx<T>(schoolId: string, fn: (tx: TransactionSql) => Promise<T
   return result as T;
 }
 
+// Makers and checkers are real FINANCE staff: every refund mutation writes an app.audit_logs row whose
+// actor_id is the acting user, and fk_audit_logs_actor requires that user to exist in the school.
+async function createFinanceUser(schoolId: string): Promise<string> {
+  const user = await createUser(db.sql, schoolId);
+  await assignRole(db.sql, schoolId, user.id, ROLES.FINANCE);
+  return user.id;
+}
+
 function mockErpNext(creditNoteName: string): TenantErpNext {
   return {
     get: () => Promise.reject(new Error("not implemented")),
@@ -208,7 +219,7 @@ describeDb("initiateRefund", () => {
       db.sql,
       {
         schoolId: school.id,
-        userId: crypto.randomUUID(),
+        userId: await createFinanceUser(school.id),
       },
       {
         student_id: student.id,
@@ -237,7 +248,7 @@ describeDb("initiateRefund", () => {
       db.sql,
       {
         schoolId: school.id,
-        userId: crypto.randomUUID(),
+        userId: await createFinanceUser(school.id),
       },
       {
         student_id: student.id,
@@ -253,7 +264,7 @@ describeDb("initiateRefund", () => {
       db.sql,
       {
         schoolId: school.id,
-        userId: crypto.randomUUID(),
+        userId: await createFinanceUser(school.id),
       },
       {
         student_id: student.id,
@@ -278,7 +289,7 @@ describeDb("initiateRefund", () => {
       db.sql,
       {
         schoolId: school.id,
-        userId: crypto.randomUUID(),
+        userId: await createFinanceUser(school.id),
       },
       {
         student_id: student.id,
@@ -295,7 +306,7 @@ describeDb("initiateRefund", () => {
         db.sql,
         {
           schoolId: school.id,
-          userId: crypto.randomUUID(),
+          userId: await createFinanceUser(school.id),
         },
         {
           student_id: student.id,
@@ -313,7 +324,7 @@ describeDb("initiateRefund", () => {
         db.sql,
         {
           schoolId: school.id,
-          userId: crypto.randomUUID(),
+          userId: await createFinanceUser(school.id),
         },
         {
           student_id: student.id,
@@ -336,7 +347,7 @@ describeDb("initiateRefund", () => {
         db.sql,
         {
           schoolId: school.id,
-          userId: crypto.randomUUID(),
+          userId: await createFinanceUser(school.id),
         },
         {
           student_id: student.id,
@@ -361,8 +372,8 @@ describeDb("listRefunds / getRefund", () => {
     const schoolB = await createSchool(db.sql);
     const studentA = await createStudent(db.sql, schoolA.id);
     const studentB = await createStudent(db.sql, schoolB.id);
-    const userIdA = crypto.randomUUID();
-    const userIdB = crypto.randomUUID();
+    const userIdA = await createFinanceUser(schoolA.id);
+    const userIdB = await createFinanceUser(schoolB.id);
 
     await initiateRefund(
       db.sql,
@@ -406,7 +417,7 @@ describeDb("listRefunds / getRefund", () => {
   test("filters by status", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
-    const userId = crypto.randomUUID();
+    const userId = await createFinanceUser(school.id);
 
     await initiateRefund(
       db.sql,
@@ -458,7 +469,7 @@ describeDb("listRefunds / getRefund", () => {
       db.sql,
       {
         schoolId: school.id,
-        userId: crypto.randomUUID(),
+        userId: await createFinanceUser(school.id),
       },
       {
         student_id: student.id,
@@ -491,7 +502,7 @@ describeDb("listRefunds / getRefund", () => {
       db.sql,
       {
         schoolId: schoolA.id,
-        userId: crypto.randomUUID(),
+        userId: await createFinanceUser(schoolA.id),
       },
       {
         student_id: studentA.id,
@@ -517,8 +528,8 @@ describeDb("rejectRefund", () => {
   test("rejects a pending refund", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
-    const makerId = crypto.randomUUID();
-    const checkerId = crypto.randomUUID();
+    const makerId = await createFinanceUser(school.id);
+    const checkerId = await createFinanceUser(school.id);
 
     const { row } = await initiateRefund(
       db.sql,
@@ -547,7 +558,7 @@ describeDb("rejectRefund", () => {
   test("refuses self-rejection (maker === checker)", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
-    const userId = crypto.randomUUID();
+    const userId = await createFinanceUser(school.id);
 
     const { row } = await initiateRefund(
       db.sql,
@@ -573,8 +584,8 @@ describeDb("rejectRefund", () => {
   test("refuses to reject an already-rejected refund", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
-    const makerId = crypto.randomUUID();
-    const checkerId = crypto.randomUUID();
+    const makerId = await createFinanceUser(school.id);
+    const checkerId = await createFinanceUser(school.id);
 
     const { row } = await initiateRefund(
       db.sql,
@@ -596,19 +607,21 @@ describeDb("rejectRefund", () => {
       rejectRefund(tx, school.id, checkerId, row.id, "First rejection"),
     );
 
+    const secondCheckerId = await createFinanceUser(school.id);
     await expect(
       withTx(school.id, (tx) =>
-        rejectRefund(tx, school.id, crypto.randomUUID(), row.id, "Second rejection"),
+        rejectRefund(tx, school.id, secondCheckerId, row.id, "Second rejection"),
       ),
     ).rejects.toMatchObject({ status: 409 });
   });
 
   test("refuses to reject a non-existent refund", async () => {
     const school = await createSchool(db.sql);
+    const checkerId = await createFinanceUser(school.id);
 
     await expect(
       withTx(school.id, (tx) =>
-        rejectRefund(tx, school.id, crypto.randomUUID(), crypto.randomUUID(), "Nope"),
+        rejectRefund(tx, school.id, checkerId, crypto.randomUUID(), "Nope"),
       ),
     ).rejects.toMatchObject({ status: 404 });
   });
@@ -622,8 +635,8 @@ describeDb("approveRefund", () => {
   test("approves a refund and marks it as submitted_to_erpnext", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
-    const makerId = crypto.randomUUID();
-    const checkerId = crypto.randomUUID();
+    const makerId = await createFinanceUser(school.id);
+    const checkerId = await createFinanceUser(school.id);
     const creditNoteName = "ACC-CRN-2026-00001";
 
     const { row } = await initiateRefund(
@@ -655,7 +668,7 @@ describeDb("approveRefund", () => {
   test("refuses self-approval (maker === checker)", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
-    const userId = crypto.randomUUID();
+    const userId = await createFinanceUser(school.id);
 
     const { row } = await initiateRefund(
       db.sql,
@@ -681,8 +694,8 @@ describeDb("approveRefund", () => {
   test("refuses to approve a rejected refund", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
-    const makerId = crypto.randomUUID();
-    const checkerId = crypto.randomUUID();
+    const makerId = await createFinanceUser(school.id);
+    const checkerId = await createFinanceUser(school.id);
 
     const { row } = await initiateRefund(
       db.sql,
@@ -702,19 +715,21 @@ describeDb("approveRefund", () => {
 
     await withTx(school.id, (tx) => rejectRefund(tx, school.id, checkerId, row.id, "Not valid"));
 
+    const secondCheckerId = await createFinanceUser(school.id);
     await expect(
       withTx(school.id, (tx) =>
-        approveRefund(tx, mockErpNext("CN-2"), school.id, crypto.randomUUID(), row.id),
+        approveRefund(tx, mockErpNext("CN-2"), school.id, secondCheckerId, row.id),
       ),
     ).rejects.toMatchObject({ status: 409 });
   });
 
   test("refuses to approve a non-existent refund", async () => {
     const school = await createSchool(db.sql);
+    const checkerId = await createFinanceUser(school.id);
 
     await expect(
       withTx(school.id, (tx) =>
-        approveRefund(tx, mockErpNext("CN-X"), school.id, crypto.randomUUID(), crypto.randomUUID()),
+        approveRefund(tx, mockErpNext("CN-X"), school.id, checkerId, crypto.randomUUID()),
       ),
     ).rejects.toMatchObject({ status: 404 });
   });
@@ -728,8 +743,8 @@ describeDb("applyRefundCompleted", () => {
   test("completes a submitted refund via webhook", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
-    const makerId = crypto.randomUUID();
-    const checkerId = crypto.randomUUID();
+    const makerId = await createFinanceUser(school.id);
+    const checkerId = await createFinanceUser(school.id);
     const creditNoteName = "ACC-CRN-WH-00001";
 
     const { row } = await initiateRefund(
@@ -767,7 +782,7 @@ describeDb("applyRefundCompleted", () => {
       db.sql,
       {
         schoolId: school.id,
-        userId: crypto.randomUUID(),
+        userId: await createFinanceUser(school.id),
       },
       {
         student_id: student.id,
@@ -796,8 +811,8 @@ describeDb("applyRefundCompleted", () => {
   test("full maker -> checker -> webhook happy path", async () => {
     const school = await createSchool(db.sql);
     const student = await createStudent(db.sql, school.id);
-    const makerId = crypto.randomUUID();
-    const checkerId = crypto.randomUUID();
+    const makerId = await createFinanceUser(school.id);
+    const checkerId = await createFinanceUser(school.id);
     const creditNoteName = "ACC-CRN-HAPPY-00001";
 
     // Maker initiates

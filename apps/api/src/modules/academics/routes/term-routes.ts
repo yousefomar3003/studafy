@@ -1,9 +1,12 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import {
@@ -155,6 +158,11 @@ function tenantFrom(c: Context<AppEnv>): {
 
 export function termRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  // Writes need timetable:manage (ORG_ADMIN, PRINCIPAL), as the years they belong to do.
+  const manage = requirePermission(PERMISSIONS.TIMETABLE_MANAGE);
+  routes.use("/api/academics/years/:yearId/terms", onlyMethods(["POST"], manage));
+  routes.use("/api/academics/terms/:termId", onlyMethods(["PATCH", "DELETE"], manage));
 
   // Audit declarations
   routes.use("/api/academics/years/:yearId/terms", auditAction("insert", "terms"));

@@ -331,12 +331,17 @@ async function seedFinanceFixture(
       INSERT INTO app.payment_cache (
         school_id, student_id, currency_id, erpnext_docname, erpnext_status,
         amount_minor, payment_date, erpnext_payload, last_synced_at,
-        status, payment_mode, erpnext_invoice_id, receipt_url, confirmed_at
+        status, payment_mode, erpnext_invoice_id, receipt_url, confirmed_at,
+        created_at, updated_at
       ) VALUES (
         ${schoolId}, ${studentAId}, ${currencyId}, 'PAY-1', 'Submitted',
         600000, '2026-01-10'::date, '{}'::jsonb, '2026-07-22T10:00:00Z'::timestamptz,
         'confirmed', 'bank_transfer', 'INV-1', 'https://erp.example/receipt/PAY-1',
-        '2026-07-22T10:00:00Z'::timestamptz
+        '2026-07-22T10:00:00Z'::timestamptz,
+        -- Pinned: ck_payment_cache_confirmed_after_created requires confirmed_at >= created_at,
+        -- and the column default (CURRENT_TIMESTAMP) would put creation after the pinned
+        -- confirmation once the wall clock passes it.
+        '2026-07-22T09:00:00Z'::timestamptz, '2026-07-22T10:00:00Z'::timestamptz
       )
     `;
 

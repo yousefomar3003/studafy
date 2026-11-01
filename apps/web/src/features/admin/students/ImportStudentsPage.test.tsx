@@ -1,3 +1,4 @@
+import { ApiError } from "@studafy/api-client";
 import { ToastProvider } from "@studafy/ui";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -111,9 +112,25 @@ function defaultGet(path: string): Promise<unknown> {
 }
 
 const getMock = mock((path: string, _init?: RequestInit) => defaultGet(path));
-const postMock = mock((_path: string, _init?: RequestInit) =>
-  Promise.resolve<unknown>({ data: importRecord({ status: "processing", confirmed_at: "now" }) }),
-);
+/** Staging the original file answers as a deployment without object storage does, so these tests
+ * upload exactly as before; the test that keeps the original overrides it. */
+const NO_STORAGE = new ApiError({
+  status: 503,
+  title: "Service Unavailable",
+  code: "STORAGE_NOT_CONFIGURED",
+  detail: null,
+  instance: null,
+  type: null,
+  request_id: null,
+  problem: null,
+});
+
+function defaultPost(path: string): Promise<unknown> {
+  if (path === "/api/storage/uploads/request-upload") return Promise.reject(NO_STORAGE);
+  return Promise.resolve({ data: importRecord({ status: "processing", confirmed_at: "now" }) });
+}
+
+const postMock = mock((path: string, _init?: RequestInit) => defaultPost(path));
 
 const putMock = mock((_path: string, _init?: RequestInit) =>
   Promise.resolve<unknown>({ data: importRecord() }),
@@ -131,6 +148,7 @@ class FakeXhr {
   static nextStatus = 201;
   static nextResponseBody: unknown = importRecord();
   static lastInstance: FakeXhr | null = null;
+  static lastUrl = "";
 
   status = 0;
   response = "";
@@ -143,8 +161,9 @@ class FakeXhr {
   onload: (() => void) | null = null;
   onerror: (() => void) | null = null;
 
-  open(_method: string, _url: string) {
+  open(_method: string, url: string) {
     FakeXhr.lastInstance = this;
+    FakeXhr.lastUrl = url;
   }
   // `uploadStudentImportCsv` calls this for Content-Type/X-File-Name/Authorization; this test only
   // needs the response side, so recording headers isn't worth the extra state (see queries.test.ts's
@@ -203,6 +222,7 @@ afterEach(() => {
   getMock.mockClear();
   getMock.mockImplementation((path: string) => defaultGet(path));
   postMock.mockClear();
+  postMock.mockImplementation((path: string) => defaultPost(path));
   putMock.mockClear();
   savedMappings = [];
   FakeXhr.nextStatus = 201;
@@ -310,8 +330,10 @@ describe("ImportStudentsPage", () => {
 
   test("shows a failure panel and lets the user start over", async () => {
     FakeXhr.nextResponseBody = importRecord({ status: "validated", valid_rows: 2, error_rows: 0 });
-    postMock.mockImplementation(() =>
-      Promise.resolve<unknown>({ data: importRecord({ status: "failed" }) }),
+    postMock.mockImplementation((path: string) =>
+      path === "/api/storage/uploads/request-upload"
+        ? defaultPost(path)
+        : Promise.resolve<unknown>({ data: importRecord({ status: "failed" }) }),
     );
 
     await renderPage(await loadImportStudentsPage());
@@ -621,5 +643,44 @@ describe("ImportStudentsPage", () => {
     ).toBeTruthy();
     choose("National ID", "National ID");
     expect(screen.getByRole("button", { name: "Apply mapping" })).toBeTruthy();
+  });
+  test("keeps the original file: stages the same bytes as text/csv, then names it on upload", async () => {
+    const fetchMock = mock(
+      async (_url: string, _init?: RequestInit & { headers?: unknown }) =>
+        new Response(null, { status: 200 }),
+    );
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    postMock.mockImplementation((path: string) =>
+      path === "/api/storage/uploads/request-upload"
+        ? Promise.resolve({
+            data: {
+              upload_url: "https://storage.example/put?signed",
+              storage_key: "temp/school-1/obj-1/students.csv",
+            },
+          })
+        : defaultPost(path),
+    );
+    try {
+      await renderPage(await loadImportStudentsPage());
+      uploadFile();
+      expect(await screen.findByText("Rows in file")).toBeTruthy();
+
+      const [, staged] = postMock.mock.calls.find(
+        ([path]) => path === "/api/storage/uploads/request-upload",
+      )!;
+      expect(
+        (staged as { body: { content_class: string; content_type: string } }).body,
+      ).toMatchObject({
+        content_class: "import.source",
+        content_type: "text/csv",
+      });
+      expect(fetchMock.mock.calls[0]![0]).toBe("https://storage.example/put?signed");
+      expect(FakeXhr.lastUrl).toContain(
+        `source_key=${encodeURIComponent("temp/school-1/obj-1/students.csv")}`,
+      );
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });

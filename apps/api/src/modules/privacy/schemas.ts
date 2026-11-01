@@ -50,3 +50,23 @@ export const createSelfDsrBodySchema = z
   .openapi("CreateSelfDataSubjectRequestBody");
 
 export const dsrListResponseSchema = z.array(dsrResponseSchema).openapi("DataSubjectRequestList");
+
+export const listDsrQuerySchema = z
+  .object({
+    subject_user_id: uuidSchema.optional().openapi({ description: "Only this person's requests." }),
+    limit: z.coerce.number().int().min(1).max(200).default(100),
+  })
+  .openapi("DataSubjectRequestListQuery");
+
+export const schoolDsrSchema = dsrResponseSchema
+  .extend({
+    subject_display_name: z.string().nullable().openapi({
+      description:
+        "The person's name. Once an erasure has run it is gone: null, or an `erased-<uuid>` placeholder.",
+    }),
+  })
+  .openapi("SchoolDataSubjectRequest");
+
+export const schoolDsrListResponseSchema = z
+  .object({ requests: z.array(schoolDsrSchema) })
+  .openapi("SchoolDataSubjectRequestList");

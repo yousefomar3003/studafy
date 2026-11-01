@@ -6,6 +6,7 @@ import { renderReceiptPdf } from "./render";
 describe("renderReceiptPdf", () => {
   const input = {
     schoolName: "Studafy Demo Academy",
+    taxRegistrationNumber: null,
     receiptNumber: "ACC-PAY-2026-00004",
     paymentDate: "2026-10-26",
     status: "confirmed" as const,
@@ -31,5 +32,18 @@ describe("renderReceiptPdf", () => {
       familyName: "عائلة باسل فارس",
     });
     expect(new TextDecoder().decode(pdf.subarray(0, 5))).toBe("%PDF-");
+  });
+
+  test("renders the school's tax registration number and a reversed payment in both languages", async () => {
+    for (const locale of ["en", "ar"] as const) {
+      const pdf = await renderReceiptPdf({
+        ...input,
+        locale,
+        studentName: "Adam Fares",
+        taxRegistrationNumber: "100234567800003",
+        status: "reversed",
+      });
+      expect(new TextDecoder().decode(pdf.subarray(0, 5))).toBe("%PDF-");
+    }
   });
 });

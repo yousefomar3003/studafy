@@ -3,8 +3,11 @@
  *
  * The API stages every CSV line in app.student_import_rows, mapped and validated. This job moves the
  * valid ones into app.users / app.students / app.parent_child_links, and template columns into
- * app.record_answers (sensitive ones sealed, ADR-019). Once the import has completed its staged
- * rows -- the uploaded file's cells -- are deleted in the same transaction.
+ * app.record_answers (sensitive ones sealed, ADR-019). Once the import has completed, its staged
+ * rows -- the uploaded file's cells -- are cut down in the same transaction to what a later column
+ * mapping needs: the cells of columns the mapping did not read, on the lines whose student this run
+ * created or updated (and whose parent it created), tagged with those ids. Everything else goes.
+ * What is kept expires with the school's import retention period (import-source-retention-sweep.ts).
  *
  * Parents are never matched by email (docs/modules/finance-module-guide.md): a row whose
  * parent_email belongs to an existing account imports its student unlinked (PARENT_ACCOUNT_EXISTS),
@@ -26,7 +29,7 @@
  */
 
 import { normalizeRecordValue, sealRecordValue } from "@studafy/records";
-import { normalizeEmail, planStudentImport } from "@studafy/student-import";
+import { normalizeEmail, planStudentImport, unmappedColumns } from "@studafy/student-import";
 import postgres from "postgres";
 
 import { emitAuditLogs } from "../../db/audit";
@@ -41,6 +44,7 @@ import type {
   RecordValue,
 } from "@studafy/records";
 import type {
+  ColumnMapping,
   PlannedRow,
   StagedRecord,
   StudentImportPlan,
@@ -118,9 +122,15 @@ async function migrate(
   // The row lock serializes attempts at this import: a second worker waits here, then sees the
   // first one's `completed`.
   const [target] = await tx<
-    { status: string; summary: StudentImportSummary | null; confirmed_by: string | null }[]
+    {
+      status: string;
+      summary: StudentImportSummary | null;
+      confirmed_by: string | null;
+      source_headers: string[];
+      column_mapping: ColumnMapping;
+    }[]
   >`
-    SELECT status, summary, confirmed_by
+    SELECT status, summary, confirmed_by, source_headers, column_mapping
     FROM app.student_imports
     WHERE id = ${importId}::uuid AND school_id = ${schoolId}::uuid
     FOR UPDATE
@@ -152,14 +162,24 @@ async function migrate(
 
   const plan = await planStudentImport(tx, schoolId, records);
   const recordForm = await loadRecordForm(tx, schoolId);
-  const { summary, audit } = await applyPlan(tx, schoolId, importId, plan, recordForm, keyring);
+  const { summary, audit, applied } = await applyPlan(
+    tx,
+    schoolId,
+    importId,
+    plan,
+    recordForm,
+    keyring,
+  );
 
-  // The import is applied: its staged cells (the uploaded file, sensitive columns included) have
-  // no further use, so they go in the same transaction that records the outcome.
-  await tx`
-    DELETE FROM app.student_import_rows
-    WHERE school_id = ${schoolId}::uuid AND import_id = ${importId}::uuid
-  `;
+  await keepLeftoverCells(
+    tx,
+    schoolId,
+    importId,
+    applied,
+    unmappedColumns(target.source_headers ?? [], target.column_mapping ?? {}).map(
+      (column) => column.header,
+    ),
+  );
 
   await tx`
     UPDATE app.student_imports
@@ -181,6 +201,47 @@ async function migrate(
   return summary;
 }
 
+/**
+ * The import is applied. Its staged cells (the uploaded file, sensitive columns included) are cut
+ * down to the unmapped columns' non-empty cells on the lines this run wrote a student for, each line
+ * tagged with that student (and the parent it created). Mapped cells already live in the records
+ * they were written to; lines skipped as conflicts or unchanged wrote no one, so nothing of theirs
+ * may later be applied to anyone. With no unmapped column, nothing is kept.
+ */
+async function keepLeftoverCells(
+  tx: TransactionSql,
+  schoolId: string,
+  importId: string,
+  applied: readonly AppliedLine[],
+  unmappedHeaders: readonly string[],
+): Promise<void> {
+  if (applied.length > 0 && unmappedHeaders.length > 0) {
+    await tx`
+      UPDATE app.student_import_rows AS staged
+      SET student_id = line.student_id,
+          parent_user_id = line.parent_user_id,
+          record = NULL,
+          source = coalesce(
+            (SELECT jsonb_object_agg(cell.key, cell.value)
+             FROM jsonb_each_text(staged.source) AS cell
+             WHERE cell.key = ANY(${tx.array(unmappedHeaders as string[])}::text[])
+               AND btrim(cell.value) <> ''),
+            '{}'::jsonb
+          )
+      FROM jsonb_to_recordset(${tx.json(applied as never)}::jsonb)
+        AS line (line_number int, student_id uuid, parent_user_id uuid)
+      WHERE staged.school_id = ${schoolId}::uuid
+        AND staged.import_id = ${importId}::uuid
+        AND staged.line_number = line.line_number
+    `;
+  }
+  await tx`
+    DELETE FROM app.student_import_rows
+    WHERE school_id = ${schoolId}::uuid AND import_id = ${importId}::uuid
+      AND (student_id IS NULL OR source = '{}'::jsonb)
+  `;
+}
+
 async function setStatus(
   tx: TransactionSql,
   importId: string,
@@ -199,6 +260,13 @@ async function setStatus(
 // ---------------------------------------------------------------------------
 // Applying the plan
 // ---------------------------------------------------------------------------
+
+/** A line this run wrote a student for, and the parent it created for that line, if any. */
+interface AppliedLine {
+  line_number: number;
+  student_id: string;
+  parent_user_id: string | null;
+}
 
 interface ApplyContext {
   tx: TransactionSql;
@@ -246,7 +314,8 @@ async function applyPlan(
   plan: StudentImportPlan,
   recordForm: Map<string, RecordFormField>,
   keyring: RecordKeyring,
-): Promise<{ summary: StudentImportSummary; audit: WorkerAuditEntry[] }> {
+): Promise<{ summary: StudentImportSummary; audit: WorkerAuditEntry[]; applied: AppliedLine[] }> {
+  const applied: AppliedLine[] = [];
   const ctx: ApplyContext = {
     tx,
     schoolId,
@@ -285,18 +354,25 @@ async function applyPlan(
       summary.students_updated++;
     }
 
+    let parentUserId: string | null = null;
     if (row.link === "create") {
-      const { parentUserId, created } = await resolveParent(ctx, row);
-      if (created) summary.parents_created++;
+      const resolved = await resolveParent(ctx, row);
+      parentUserId = resolved.parentUserId;
+      if (resolved.created) summary.parents_created++;
       await createLink(ctx, parentUserId, studentId, row.record);
       summary.parents_linked++;
     }
     if (row.parent_conflict !== null) summary.parent_conflicts++;
 
     summary.record_answers += await writeRecordAnswers(ctx, studentId, row.record.records ?? {});
+    applied.push({
+      line_number: row.line_number,
+      student_id: studentId,
+      parent_user_id: parentUserId,
+    });
   }
 
-  return { summary, audit: ctx.audit };
+  return { summary, audit: ctx.audit, applied };
 }
 
 async function createStudent(ctx: ApplyContext, row: PlannedRow): Promise<string> {

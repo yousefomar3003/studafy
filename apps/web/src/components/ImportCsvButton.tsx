@@ -10,6 +10,8 @@ import {
 } from "../lib/data-transfer";
 import { useTranslation } from "../lib/i18n";
 
+import { KeepColumnPanel } from "./KeepColumnPanel";
+
 import "./data-transfer.css";
 
 import type {
@@ -29,12 +31,22 @@ export interface ImportCsvButtonProps<TRecord> {
   disabled?: boolean;
 }
 
+interface DoneStage {
+  kind: "done";
+  results: ImportRowResult[];
+  skipped: number;
+  notAttempted: number;
+  rows: PreparedRow<unknown>[];
+  ignoredColumns: string[];
+}
+
 type Stage =
   | { kind: "pick" }
   | { kind: "invalidFile"; result: Extract<PrepareResult<unknown>, { ok: false }> }
   | { kind: "review"; fileName: string; rows: PreparedRow<unknown>[]; ignoredColumns: string[] }
   | { kind: "running"; total: number; done: number }
-  | { kind: "done"; results: ImportRowResult[]; skipped: number; notAttempted: number };
+  | DoneStage
+  | { kind: "keep"; column: string; done: DoneStage };
 
 /** Lines listed in the dialog before collapsing into "and N more" (the full list is downloadable). */
 const VISIBLE_ISSUES = 8;
@@ -43,6 +55,8 @@ const VISIBLE_ISSUES = 8;
  * "Import" button plus its dialog: download a template, pick a CSV, review per-row validation, then
  * create the valid rows through the entity's existing create endpoint. Rows with errors are never
  * sent; rows the server rejects are reported by line and downloadable as a CSV to fix and re-upload.
+ * When the spec allows it (`recordColumns`), each column the spec does not know can then be kept as
+ * a school-defined record field for the rows this import created (KeepColumnPanel).
  */
 export function ImportCsvButton<TRecord>({
   spec,
@@ -87,7 +101,19 @@ export function ImportCsvButton<TRecord>({
     if (inputRef.current) inputRef.current.value = "";
   };
 
-  const handleImport = async (rows: PreparedRow<unknown>[]) => {
+  /** The rows this import created, by the id each create returned, with their cell in `column`. */
+  const keepRows = (done: DoneStage, column: string) => {
+    const option = spec.recordColumns;
+    if (!option) return [];
+    const byLine = new Map(done.rows.map((row) => [row.line, row]));
+    return done.results.flatMap((result) => {
+      const subjectId = result.ok ? option.idOf(result.created) : null;
+      const value = byLine.get(result.line)?.extra[column]?.trim() ?? "";
+      return subjectId && value !== "" ? [{ line: result.line, subjectId, value }] : [];
+    });
+  };
+
+  const handleImport = async (rows: PreparedRow<unknown>[], ignoredColumns: string[]) => {
     const valid = rows.filter((row) => row.record !== null);
     const controller = new AbortController();
     abortRef.current = controller;
@@ -102,6 +128,8 @@ export function ImportCsvButton<TRecord>({
       results,
       skipped: rows.length - valid.length,
       notAttempted: valid.length - results.length,
+      rows,
+      ignoredColumns,
     });
     const created = results.filter((result) => result.ok).length;
     if (created > 0) {
@@ -221,9 +249,12 @@ export function ImportCsvButton<TRecord>({
             </p>
             {stage.ignoredColumns.length > 0 ? (
               <p className="data-transfer__muted">
-                {t("dataTransfer.import.ignoredColumns", {
-                  columns: stage.ignoredColumns.join(", "),
-                })}
+                {t(
+                  spec.recordColumns?.canKeep
+                    ? "dataTransfer.keepColumn.ignoredColumns"
+                    : "dataTransfer.import.ignoredColumns",
+                  { columns: stage.ignoredColumns.join(", ") },
+                )}
               </p>
             ) : null}
             {invalid.length > 0
@@ -246,9 +277,22 @@ export function ImportCsvButton<TRecord>({
             <progress className="data-transfer__progress" value={stage.done} max={stage.total} />
           </>
         );
+      case "keep":
+        return (
+          <KeepColumnPanel
+            subjectKind={spec.recordColumns!.subjectKind}
+            header={stage.column}
+            rows={keepRows(stage.done, stage.column)}
+            canCreateField={spec.recordColumns!.canCreateField}
+            onBack={() => setStage(stage.done)}
+          />
+        );
       case "done": {
         const failed = stage.results.filter((result) => !result.ok);
         const created = stage.results.length - failed.length;
+        const keepable = spec.recordColumns?.canKeep
+          ? stage.ignoredColumns.filter((column) => keepRows(stage, column).length > 0)
+          : [];
         return (
           <>
             <p role="status">
@@ -266,6 +310,26 @@ export function ImportCsvButton<TRecord>({
                   })),
                 )
               : null}
+            {keepable.length > 0 ? (
+              <section className="data-transfer__keep-columns" aria-labelledby={`${inputId}-keep`}>
+                <h3 id={`${inputId}-keep`}>{t("dataTransfer.keepColumn.sectionTitle")}</h3>
+                <p className="data-transfer__muted">{t("dataTransfer.keepColumn.sectionIntro")}</p>
+                <ul className="data-transfer__fields">
+                  {keepable.map((column) => (
+                    <li key={column}>
+                      <code>{column}</code>{" "}
+                      <Button
+                        variant="tertiary"
+                        aria-label={t("dataTransfer.keepColumn.actionLabel", { column })}
+                        onClick={() => setStage({ kind: "keep", column, done: stage })}
+                      >
+                        {t("dataTransfer.keepColumn.action")}
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
           </>
         );
       }
@@ -281,7 +345,10 @@ export function ImportCsvButton<TRecord>({
             <Button variant="tertiary" onClick={() => setStage({ kind: "pick" })}>
               {t("dataTransfer.import.chooseAnother")}
             </Button>
-            <Button disabled={validRows.length === 0} onClick={() => void handleImport(stage.rows)}>
+            <Button
+              disabled={validRows.length === 0}
+              onClick={() => void handleImport(stage.rows, stage.ignoredColumns)}
+            >
               {t("dataTransfer.import.confirm", { count: validRows.length })}
             </Button>
           </>

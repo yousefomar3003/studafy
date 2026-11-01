@@ -16,6 +16,8 @@ import { createDerivationS3, processMaterialDerivation } from "./queues/derivati
 import { createAnthropicClient } from "./queues/exam-generation/anthropic-client";
 import { processExamGeneration } from "./queues/exam-generation/worker";
 import { purgeAbandonedStudentImports } from "./queues/imports/abandoned-import-sweep";
+import { purgeExpiredImportSources } from "./queues/imports/import-source-retention-sweep";
+import { backfillUnmappedColumns } from "./queues/imports/unmapped-columns-backfill";
 import { processStudentImport } from "./queues/imports/worker";
 import { processMaintenanceJob } from "./queues/maintenance";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
@@ -29,6 +31,7 @@ import {
 import { processDigest, processNotificationDigest } from "./queues/notifications/email";
 import { createFcmSender } from "./queues/notifications/push";
 import { processReportJob } from "./queues/reports";
+import { createReportS3 } from "./queues/reports/report-s3";
 import { createScanS3, materialScanFailedListener, processMaterialScan } from "./queues/scan";
 
 import type { AiIngestionJobData } from "./queues/ai-ingestion/job";
@@ -390,8 +393,29 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       if (job.name === JOB_NAMES.PURGE_ABANDONED_IMPORTS) {
         const sql = postgres(databaseUrl, { max: 2, idle_timeout: 20, prepare: false });
         try {
-          const result = await purgeAbandonedStudentImports(sql, new Date(), workerLogger);
-          return { processed: true, ...result };
+          const now = new Date();
+          const result = await purgeAbandonedStudentImports(sql, now, workerLogger);
+          // Same daily job: original files and leftover cells past the school's retention period.
+          const storage =
+            workerEnv.S3_REGION && workerEnv.S3_APP_FILES_BUCKET
+              ? createReportS3({
+                  region: workerEnv.S3_REGION,
+                  endpoint: workerEnv.S3_ENDPOINT,
+                  bucket: workerEnv.S3_APP_FILES_BUCKET,
+                })
+              : null;
+          const sources = await purgeExpiredImportSources(sql, storage, now, workerLogger);
+          // Unmapped columns of imports uploaded before they were recorded, for the platform count.
+          const backfill = await backfillUnmappedColumns(sql, workerLogger);
+          return {
+            processed: true,
+            ...result,
+            sourceFiles: sources.files,
+            sourceCellImports: sources.cellImports,
+            sourceFailed: sources.failed,
+            unmappedBackfilled: backfill.imports,
+            unmappedBackfillFailed: backfill.failed,
+          };
         } finally {
           await sql.end({ timeout: 5 });
         }

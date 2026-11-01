@@ -9,7 +9,7 @@ import {
   DEFAULT_RETENTION_MONTHS,
   isChoiceType,
   RECORD_FIELD_TYPES,
-  RECORD_FIELD_VISIBILITIES,
+  RECORD_SUBJECT_RULES,
 } from "./queries";
 import { labelSuggestsSensitive } from "./sensitive-hint";
 
@@ -196,7 +196,8 @@ export function FieldEditorModal({ open, kind, field, onClose }: FieldEditorModa
     value: type,
     label: t(`recordTemplates.types.${type}`),
   }));
-  const visibilityOptions = RECORD_FIELD_VISIBILITIES.map((visibility) => ({
+  const rules = RECORD_SUBJECT_RULES[kind];
+  const visibilityOptions = rules.visibilities.map((visibility) => ({
     value: visibility,
     label: t(`recordTemplates.visibility.${visibility}`),
   }));
@@ -317,28 +318,38 @@ export function FieldEditorModal({ open, kind, field, onClose }: FieldEditorModa
               onChange={(event) => setField("has_expiry", event.target.checked)}
             />
           ) : null}
-          <Select
-            label={t("recordTemplates.field.visibility")}
-            options={visibilityOptions}
-            value={values.visibility}
-            onChange={(value) => setField("visibility", value)}
-            helperText={t("recordTemplates.field.visibilityHelp")}
-          />
-          <Checkbox
-            label={t("recordTemplates.field.sensitive")}
-            checked={sensitive}
-            disabled={sensitivityLocked}
-            onChange={(event) =>
-              setField("sensitivity", event.target.checked ? "sensitive" : "standard")
-            }
-          />
+          {visibilityOptions.length > 1 ? (
+            <Select
+              label={t("recordTemplates.field.visibility")}
+              options={visibilityOptions}
+              value={values.visibility}
+              onChange={(value) => setField("visibility", value)}
+              helperText={t(
+                kind === "class"
+                  ? "recordTemplates.field.classVisibilityHelp"
+                  : "recordTemplates.field.visibilityHelp",
+              )}
+            />
+          ) : (
+            <p className="record-templates__muted">{t("recordTemplates.field.staffVisibility")}</p>
+          )}
+          {rules.sensitive ? (
+            <Checkbox
+              label={t("recordTemplates.field.sensitive")}
+              checked={sensitive}
+              disabled={sensitivityLocked}
+              onChange={(event) =>
+                setField("sensitivity", event.target.checked ? "sensitive" : "standard")
+              }
+            />
+          ) : null}
           {sensitivityLocked ? (
             <p className="record-templates__muted">
               {t("recordTemplates.field.sensitivityLocked")}
             </p>
           ) : null}
 
-          {suggestsSensitive ? (
+          {suggestsSensitive && rules.sensitive ? (
             <div className="record-templates__note" role="note" data-tone="warning">
               <p>{t("recordTemplates.sensitive.hint")}</p>
               <SensitiveExplanation />

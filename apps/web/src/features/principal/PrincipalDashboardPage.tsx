@@ -45,6 +45,16 @@ const PRINCIPAL_LINKS: readonly {
     permission: PERMISSIONS.TIMETABLE_MANAGE,
   },
   {
+    key: "years",
+    to: "/portal/principal/years",
+    permission: PERMISSIONS.TIMETABLE_MANAGE,
+  },
+  {
+    key: "catalog",
+    to: "/portal/principal/catalog",
+    permission: PERMISSIONS.TIMETABLE_MANAGE,
+  },
+  {
     key: "academicSetup",
     to: "/portal/principal/academic-setup",
     permission: PERMISSIONS.ACADEMIC_CONFIG_READ,

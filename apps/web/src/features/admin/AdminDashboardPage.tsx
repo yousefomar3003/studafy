@@ -20,10 +20,17 @@ import "./admin-dashboard.css";
 const ADMIN_LINKS = [
   { key: "users", to: "/portal/admin/users" },
   { key: "students", to: "/portal/admin/students" },
+  { key: "teachers", to: "/portal/admin/teachers" },
   { key: "timetable", to: "/portal/admin/timetable" },
+  // The school's classes and each one's record. The admin console has no class list of its own:
+  // ORG_ADMIN holds principalDashboard:view, so the shared Classes page serves both.
+  { key: "classes", to: "/portal/principal/classes" },
   { key: "calendar", to: "/portal/admin/calendar" },
   { key: "settings", to: "/portal/admin/settings" },
   { key: "announcements", to: "/portal/admin/announcements" },
+  { key: "audit", to: "/portal/admin/audit" },
+  { key: "privacy", to: "/portal/admin/privacy" },
+  { key: "aiReports", to: "/portal/admin/ai-reports" },
 ] as const;
 
 const statusOf = (query: UseQueryResult) =>

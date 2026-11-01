@@ -15,7 +15,9 @@
       "auditTrail": "Audit trail",
       "allStatuses": "All statuses",
       "previous": "Previous",
-      "next": "Next"
+      "next": "Next",
+      "kind": "Type",
+      "allKinds": "All types"
     },
     "refundStatus": {
       "pending_approval": "Pending approval",
@@ -29,7 +31,8 @@
       "overpayment": "Overpayment",
       "withdrawal": "Withdrawal",
       "discount_adjustment": "Discount adjustment",
-      "error_correction": "Error correction"
+      "error_correction": "Error correction",
+      "write_off": "Write-off"
     },
     "auditTrailModal": {
       "title": "Audit trail",
@@ -48,8 +51,8 @@
       "noMatches": "No refundable invoices match."
     },
     "refunds": {
-      "title": "Refunds",
-      "description": "Pending refunds need approval from a different user with refund approval rights.",
+      "title": "Refunds and corrections",
+      "description": "Refunds, credit notes, write-offs, invoice cancellations and payment reversals. Each needs approval from a different user with refund approval rights.",
       "requestRefund": "Request refund",
       "caption": "Refund requests",
       "loadError": "Unable to load refunds.",
@@ -66,7 +69,7 @@
     },
     "newRefund": {
       "back": "← Back to refunds",
-      "title": "Request a refund",
+      "title": "Request a refund or credit note",
       "formLabel": "Refund form",
       "selectReason": "Select a reason",
       "exceedsPaid": "This exceeds the paid amount on this invoice ({{amount}} {{currency}}). Reduce the amount to continue.",
@@ -82,7 +85,11 @@
       "createdHeadline": "Refund requested — {{amount}} {{currency}}",
       "createdBody": "Pending approval from a different user with refund approval rights. ERPNext will not issue the credit note until then.",
       "requestAnother": "Request another refund",
-      "viewRefunds": "View refunds"
+      "viewRefunds": "View refunds",
+      "upToOutstanding": "Up to {{amount}} {{currency}} is still owed and can be written off.",
+      "exceedsOutstanding": "This is more than is still owed on this invoice ({{amount}} {{currency}}). Reduce the amount to continue.",
+      "upToTotal": "Up to {{amount}} {{currency}} (the invoice total) can be credited.",
+      "exceedsTotal": "This is more than the invoice total ({{amount}} {{currency}}). Reduce the amount to continue."
     },
     "rejectRefund": {
       "title": "Reject refund",
@@ -232,6 +239,40 @@
       "saved": "Sibling discount saved",
       "saveError": "The rule could not be saved. Try again.",
       "save": "Save rule"
+    },
+    "refundKind": {
+      "credit_note": "Credit note",
+      "invoice_cancellation": "Invoice cancellation",
+      "payment_reversal": "Payment reversal"
+    },
+    "corrections": {
+      "reason": "Why",
+      "reasonRequired": "Say why, for the approver and the audit trail.",
+      "approveCancellation": "This cancels the invoice in ERPNext. The family no longer owes it. It cannot be undone from here.",
+      "approveReversal": "This cancels the payment in ERPNext. Its invoice is owed again. It cannot be undone from here.",
+      "cancelInvoice": {
+        "title": "Ask to cancel this invoice?",
+        "description": "{{summary}}. A school admin approves the cancellation before ERPNext cancels it. Nothing changes until then.",
+        "submit": "Ask to cancel",
+        "requestedToast": "Cancellation sent for approval",
+        "error": "The cancellation could not be requested."
+      },
+      "reversePayment": {
+        "title": "Ask to reverse this payment?",
+        "description": "{{summary}}. A school admin approves the reversal before ERPNext cancels the payment; its invoice is then owed again.",
+        "submit": "Ask to reverse",
+        "requestedToast": "Reversal sent for approval",
+        "error": "The reversal could not be requested."
+      }
+    },
+    "detail": {
+      "label": "Request details",
+      "loadError": "Unable to load this request.",
+      "notes": "Notes",
+      "approvedAt": "Approved",
+      "completedAt": "Completed",
+      "creditNote": "Credit note",
+      "studentAccount": "Open the student's account"
     }
   },
   "reports": {
@@ -242,7 +283,8 @@
         "arAging": "Aging",
         "collections": "Collections",
         "generalLedger": "General ledger",
-        "familyStatement": "Family statement"
+        "familyStatement": "Family statement",
+        "collectionsByMethod": "Collections by method"
       }
     },
     "types": {
@@ -323,6 +365,17 @@
       "generalLedger": "General ledger activity",
       "generalLedgerCaption": "Family general ledger",
       "disabledReason": "Pick a family to enable export."
+    },
+    "collectionsByMethod": {
+      "description": "Money received per day and payment method, from confirmed payments. Runs even while ERPNext is unavailable.",
+      "idle": "Pick a date range and run the report. It starts on today: the daily cash-up.",
+      "error": "The report could not be run.",
+      "empty": "No confirmed payments in this range.",
+      "caption": "Collections by day and payment method",
+      "day": "Day",
+      "total": "Total",
+      "other": "Other",
+      "download": "Download CSV"
     }
   }
 }

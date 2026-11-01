@@ -82,7 +82,7 @@ export async function listTeachers(
     LIMIT ${limit}
   `;
 
-  const hasMore = rows.length > limit;
+  const hasMore = rows.length > params.limit;
   const sliced = hasMore ? rows.slice(0, params.limit) : rows;
   const next_cursor =
     hasMore && sliced.length > 0

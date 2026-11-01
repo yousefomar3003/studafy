@@ -178,11 +178,19 @@ describeDb("teacher class scope", () => {
       createAssignment(tx, t.school.id, t.teacherB.userId, draftBody(t.classB.id)),
     );
 
+    // 404, not the 403 assertCanManageClass would give: role_scope_visibility on app.assignments
+    // hides another teacher's class from the load the mutation starts with, so the row does not
+    // exist as far as teacher A is concerned. The 403 is reserved for a class id the caller names.
     await expect(
       asUser(t.school.id, t.teacherA.userId, (tx) =>
         updateAssignment(tx, t.school.id, t.teacherA.userId, assignment.id, { title: "Hijacked" }),
       ),
-    ).rejects.toThrow(/not assigned to this class/i);
+    ).rejects.toThrow(/assignment not found/i);
+
+    const unchanged = await asUser(t.school.id, t.teacherB.userId, (tx) =>
+      getAssignment(tx, t.school.id, assignment.id),
+    );
+    expect(unchanged?.title).toBe("Problem Set 1");
   });
 
   test("a teacher cannot delete another teacher's assignment", async () => {
@@ -192,11 +200,17 @@ describeDb("teacher class scope", () => {
       createAssignment(tx, t.school.id, t.teacherB.userId, draftBody(t.classB.id)),
     );
 
+    // 404 for the same reason as the update case: RLS hides the row from teacher A's load.
     await expect(
       asUser(t.school.id, t.teacherA.userId, (tx) =>
         deleteAssignment(tx, t.school.id, t.teacherA.userId, assignment.id),
       ),
-    ).rejects.toThrow(/not assigned to this class/i);
+    ).rejects.toThrow(/assignment not found/i);
+
+    const survivor = await asUser(t.school.id, t.teacherB.userId, (tx) =>
+      getAssignment(tx, t.school.id, assignment.id),
+    );
+    expect(survivor?.id).toBe(assignment.id);
   });
 
   test("a co-teacher holding a timetable slot for the class may manage it", async () => {

@@ -392,9 +392,10 @@ function structuresPlaceholder(isPending: boolean, count: number, t: TFunction):
 // Progress
 // ---------------------------------------------------------------------------
 
-interface BatchProgressProps {
+export interface BatchProgressProps {
   batchId: string;
-  onReset: () => void;
+  /** Offers "Start another batch" once the run is done; omitted on the batch history page. */
+  onReset?: () => void;
 }
 
 /** Batches still being worked are polled every 3s — this is what keeps a 1,000-student run cheap on
@@ -402,7 +403,7 @@ interface BatchProgressProps {
 const IN_FLIGHT_STATUSES = new Set<InvoiceBatch["status"]>(["pending", "processing"]);
 const POLL_INTERVAL_MS = 3000;
 
-function BatchProgress({ batchId, onReset }: BatchProgressProps) {
+export function BatchProgress({ batchId, onReset }: BatchProgressProps) {
   const { t } = useTranslation();
   const [statusFilter, setStatusFilter] = useState<InvoiceBatchItemStatus | "">("");
   const [cursor, setCursor] = useState<string | undefined>(undefined);
@@ -510,9 +511,11 @@ function BatchProgress({ batchId, onReset }: BatchProgressProps) {
               />
             </div>
             {batch.status === "completed" || batch.status === "failed" ? (
-              <Button type="button" onClick={onReset}>
-                {t("finance.invoices.batch.startAnother")}
-              </Button>
+              onReset ? (
+                <Button type="button" onClick={onReset}>
+                  {t("finance.invoices.batch.startAnother")}
+                </Button>
+              ) : null
             ) : (
               <p>{t("finance.invoices.batch.longRunning")}</p>
             )}

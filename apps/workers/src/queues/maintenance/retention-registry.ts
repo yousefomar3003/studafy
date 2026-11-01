@@ -149,5 +149,15 @@ export function isPersonalDataColumn(columnName: string): boolean {
  * tables) rather than every spelling a "who does this belong to" column might take across 100+
  * tables (`created_by`, `invited_by`, `actor_id`, `uploaded_by`, ...) -- see the retention policy
  * doc's "Known gaps" for what a per-user request does not reach as a result.
+ *
+ * `staff_user_id` (app.record_answers, 000176) is the member of staff a staff record is about: the
+ * person's own user id under the name that says which subject column it is. It is listed so no
+ * table holding it is out of a per-person request's reach by naming alone; record_answers itself
+ * is RECORD_DATA_TABLES' (records-dsr.ts), which exports it opened and erases it outright.
  */
-export const SUBJECT_LINK_COLUMNS: readonly string[] = ["user_id", "student_id", "teacher_id"];
+export const SUBJECT_LINK_COLUMNS: readonly string[] = [
+  "user_id",
+  "student_id",
+  "teacher_id",
+  "staff_user_id",
+];

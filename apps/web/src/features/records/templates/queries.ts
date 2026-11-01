@@ -38,6 +38,21 @@ export const RECORD_FIELD_VISIBILITIES: readonly RecordFieldVisibility[] = [
   "parent",
 ];
 
+/**
+ * What a field on each subject's template may be, mirroring the API's RECORD_SUBJECT_FIELD_RULES
+ * (packages/records): a staff record is read by role, not by visibility, so its fields are
+ * staff_only; a class record is read by leadership and the class's teachers, and a class is not a
+ * person, so nothing on it is sensitive.
+ */
+export const RECORD_SUBJECT_RULES: Readonly<
+  Record<RecordSubjectKind, { visibilities: readonly RecordFieldVisibility[]; sensitive: boolean }>
+> = {
+  student: { visibilities: RECORD_FIELD_VISIBILITIES, sensitive: true },
+  parent: { visibilities: RECORD_FIELD_VISIBILITIES, sensitive: true },
+  staff: { visibilities: ["staff_only"], sensitive: true },
+  class: { visibilities: ["staff_only", "teachers"], sensitive: false },
+};
+
 /** Months a sensitive answer is kept after the person leaves when the school sets none. */
 export const DEFAULT_RETENTION_MONTHS = 12;
 

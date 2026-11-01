@@ -146,6 +146,8 @@ beforeEach(() => {
   templates = {
     student: { published_version: 0, fields: [], changed: false },
     parent: { published_version: 0, fields: [], changed: false },
+    staff: { published_version: 0, fields: [], changed: false },
+    class: { published_version: 0, fields: [], changed: false },
   };
 });
 
@@ -332,6 +334,33 @@ describe("RecordTemplatesPage", () => {
     expect((postMock.mock.calls[0] as [string, RequestInit])[1].params?.path).toEqual({
       subjectKind: "parent",
     });
+  });
+
+  test("a staff field is staff_only: no visibility choice, but it can be sensitive", async () => {
+    await renderAs(["ORG_ADMIN"], "admin");
+    fireEvent.click(await screen.findByRole("tab", { name: "Staff record" }));
+    const dialog = await addField("Monthly salary", "الراتب الشهري");
+    expect(within(dialog).queryByRole("combobox", { name: /Who can see it/ })).toBeNull();
+    expect(within(dialog).getByText(/A staff record is read by the school admin/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "Sensitive" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add field" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [, init] = postMock.mock.calls[0] as [string, RequestInit];
+    expect(init.params?.path).toEqual({ subjectKind: "staff" });
+    expect(init.body).toMatchObject({ visibility: "staff_only", sensitivity: "sensitive" });
+  });
+
+  test("a class field offers leadership or teachers, and is never sensitive", async () => {
+    await renderAs(["PRINCIPAL"], "principal");
+    fireEvent.click(await screen.findByRole("tab", { name: "Class record" }));
+    const dialog = await addField("Bus group", "مجموعة الحافلة");
+    expect(within(dialog).queryByRole("checkbox", { name: "Sensitive" })).toBeNull();
+    expect(within(dialog).getByText(/A class field cannot be sensitive/)).toBeTruthy();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Add field" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [, init] = postMock.mock.calls[0] as [string, RequestInit];
+    expect(init.params?.path).toEqual({ subjectKind: "class" });
+    expect(init.body).toMatchObject({ sensitivity: "standard" });
   });
 
   test("a caller without recordTemplate:manage sees the draft read-only", async () => {

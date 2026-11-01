@@ -1,0 +1,44 @@
+/**
+ * Privacy requests page: the heading row with its "New request" button, each request's status
+ * label, and the new-request form's spacing.
+ */
+
+.privacy-page__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-block-end: var(--space-16);
+}
+
+.privacy-page__status {
+  display: inline-block;
+  padding: 0 var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  white-space: nowrap;
+}
+
+.privacy-page__status[data-status="completed"] {
+  border-color: transparent;
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.privacy-page__status[data-status="failed"] {
+  border-color: transparent;
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.privacy-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.privacy-form__explain {
+  margin: 0;
+  color: var(--color-muted-foreground);
+}

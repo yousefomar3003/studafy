@@ -4,8 +4,10 @@
  * A sensitive answer (a national ID, a medical note, a passport scan) is kept only while the school
  * has a use for it: the field's retention period in months -- the school's own, or
  * DEFAULT_SENSITIVE_RETENTION_MONTHS -- counted from when the student left (app.students.left_at,
- * maintained by 000170's trigger) or, for a parent, from when the last of their linked children
- * left. A parent with no linked child at all is never swept: staff may still be about to link them.
+ * maintained by 000170's trigger), for a parent from when the last of their linked children left,
+ * and for a member of staff from when their account was archived (app.users.archived_at, 000176's
+ * trigger). A parent with no linked child at all is never swept: staff may still be about to link
+ * them. Class fields are never sensitive, so a class record is never swept.
  * The period is read from the field's latest published version, so a school that shortens it
  * shortens it for existing answers too.
  *
@@ -70,9 +72,10 @@ async function sweepBatch(
       LEFT JOIN app.record_documents AS d ON d.answer_id = a.id AND d.school_id = a.school_id
       LEFT JOIN app.students AS s ON s.id = a.student_id AND s.school_id = a.school_id
       LEFT JOIN parent_left AS p ON p.parent_user_id = a.parent_user_id
+      LEFT JOIN app.users AS staff ON staff.id = a.staff_user_id AND staff.school_id = a.school_id
       WHERE a.school_id = ${schoolId}::uuid
         AND (f.sensitivity = 'sensitive' OR a.value_ciphertext IS NOT NULL OR d.sensitive)
-        AND coalesce(s.left_at, CASE WHEN p.all_left THEN p.last_left_at END)
+        AND coalesce(s.left_at, CASE WHEN p.all_left THEN p.last_left_at END, staff.archived_at)
             + make_interval(months => coalesce(f.retention_months, ${DEFAULT_SENSITIVE_RETENTION_MONTHS}::int))
             <= ${now}
       ORDER BY a.id

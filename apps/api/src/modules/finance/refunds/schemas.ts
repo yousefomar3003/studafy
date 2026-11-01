@@ -2,11 +2,22 @@ import { z } from "@hono/zod-openapi";
 import { uuidSchema, dateTimeSchema } from "@studafy/shared-schemas";
 
 export const reasonCodeSchema = z
-  .enum(["overpayment", "withdrawal", "discount_adjustment", "error_correction"])
+  .enum(["overpayment", "withdrawal", "discount_adjustment", "error_correction", "write_off"])
   .openapi("ReasonCode", {
     description:
       "Classification for the refund reason. ERPNext receives this as a custom field but does not " +
-      "enforce it — the classification is for local reporting and audit.",
+      "enforce it — the classification is for local reporting and audit. `write_off` clears a " +
+      "balance that will not be collected and may not exceed the invoice's outstanding amount.",
+  });
+
+export const refundKindSchema = z
+  .enum(["credit_note", "invoice_cancellation", "payment_reversal"])
+  .openapi("RefundKind", {
+    description:
+      "What approval does in ERPNext. `credit_note` — a Sales Invoice return (refund, fee " +
+      "correction, write-off). `invoice_cancellation` — cancel an invoice nothing was paid " +
+      "against. `payment_reversal` — cancel a payment recorded by mistake; its invoice is owed " +
+      "again. The last two complete on approval.",
   });
 
 export const refundStatusSchema = z
@@ -33,6 +44,24 @@ export const refundIdParamSchema = z
     }),
   })
   .openapi("RefundIdParam");
+
+export const correctionInvoiceParamSchema = z
+  .object({
+    invoiceId: uuidSchema.openapi({
+      param: { name: "invoiceId", in: "path" },
+      description: "app.invoice_cache row id.",
+    }),
+  })
+  .openapi("CorrectionInvoiceParam");
+
+export const correctionPaymentParamSchema = z
+  .object({
+    paymentId: uuidSchema.openapi({
+      param: { name: "paymentId", in: "path" },
+      description: "Studafy payment UUID (app.payment_cache row id).",
+    }),
+  })
+  .openapi("CorrectionPaymentParam");
 
 // ---------------------------------------------------------------------------
 // Request bodies
@@ -81,6 +110,15 @@ export const approveRefundBodySchema = z.object({}).openapi("ApproveRefundBody",
   description: "Empty body — approval is an administrative authorization, not a data submission.",
 });
 
+export const correctionRequestBodySchema = z
+  .object({
+    reason_code: reasonCodeSchema.default("error_correction"),
+    reason_notes: z.string().trim().min(1).max(1000).openapi({
+      description: "Why: shown to the approver and kept in the audit trail.",
+    }),
+  })
+  .openapi("CorrectionRequestBody");
+
 export const rejectRefundBodySchema = z
   .object({
     reason_notes: z.string().trim().min(1).max(1000).openapi({
@@ -97,6 +135,7 @@ export const refundQuerySchema = z
   .object({
     student_id: uuidSchema.optional().openapi({ description: "Filter by student." }),
     status: refundStatusSchema.optional(),
+    kind: refundKindSchema.optional(),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().min(0).default(0),
   })
@@ -110,7 +149,10 @@ export const refundSchema = z
   .object({
     id: uuidSchema,
     school_id: uuidSchema,
-    payment_entry_id: uuidSchema.nullable(),
+    kind: refundKindSchema,
+    payment_entry_id: uuidSchema.nullable().openapi({
+      description: "The payment a `payment_reversal` cancels; null for the other kinds.",
+    }),
     erpnext_invoice_id: z.string(),
     erpnext_credit_note_id: z.string().nullable(),
     student_id: uuidSchema,

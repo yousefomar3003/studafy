@@ -113,6 +113,7 @@ import {
   refundRoutes,
   scholarshipRoutes,
   siblingDiscountRoutes,
+  taxSettingsRoutes,
   financeStudentRoutes,
   financeUnlinkedRoutes,
   refundWebhookRoutes,
@@ -126,7 +127,7 @@ import {
   publishedGradeRoutes,
 } from "./modules/grades";
 import { gradingConfigRoutes, gradingMarksRoutes, gradingResultsRoutes } from "./modules/grading";
-import { importRoutes } from "./modules/imports";
+import { importRoutes, importSignalRoutes } from "./modules/imports";
 import { inquiryRoutes } from "./modules/inquiries";
 import {
   platformLicenseBillingRoutes,
@@ -601,6 +602,8 @@ export function createApp({
     app.route("/", scholarshipRoutes(database));
     // The sibling rule is Studafy's own, applied by the billing worker like a scholarship.
     app.route("/", siblingDiscountRoutes(database));
+    // Sales tax (VAT) settings: Studafy's own too, applied by the billing worker at generation.
+    app.route("/", taxSettingsRoutes(database));
     app.route("/", financeStudentRoutes(database));
     // Students with no guardian and parents with no children: the people no family reaches.
     app.route("/", financeUnlinkedRoutes(database));
@@ -932,10 +935,14 @@ export function createApp({
     app.route("/", recordRoutes(database, storage, recordKeyring));
   }
 
-  // Student CSV import (upload → validate → confirm → async processing).
-  // Gated on STUDENT_IMPORT permission. Idempotency key middleware pre-wired on /api/imports/*.
+  // Student CSV import (upload → validate → confirm → async processing), its history, original
+  // files (`storage`; without it imports work but no original is kept) and unmapped columns applied
+  // to records later (`recordKeyring` seals sensitive values). Gated on STUDENT_IMPORT permission.
+  // Idempotency key middleware pre-wired on /api/imports/*. The platform-wide unmapped header count
+  // is platform:read only.
   if (database) {
-    app.route("/", importRoutes(database, redis ?? null));
+    app.route("/", importRoutes(database, redis ?? null, storage, recordKeyring));
+    app.route("/", importSignalRoutes(database));
   }
 
   // Teacher profiles (CRUD). Employment data with role-based view scoping. Admin full CRUD,

@@ -36,6 +36,21 @@ export interface ImportSpec<TRecord> {
   /** Builds the create payload from validated values; return error strings to reject the row. */
   toRecord: (values: Readonly<Record<string, ImportValue>>) => TRecord | { errors: string[] };
   create: (record: TRecord) => Promise<unknown>;
+  /**
+   * Offer the file's unknown columns as school-defined record fields after the import, for the
+   * rows it created (`POST /api/record-imports/{subjectKind}/preview`, then `/apply`).
+   */
+  recordColumns?: RecordColumnsOption;
+}
+
+export interface RecordColumnsOption {
+  subjectKind: "staff" | "class";
+  /** The id of the user or class a successful `create` returned, or null if it has none. */
+  idOf: (created: unknown) => string | null;
+  /** The caller holds the subject's record edit permission (staffRecord:update / timetable:manage). */
+  canKeep: boolean;
+  /** The caller also holds recordTemplate:manage, so a column can become a new field. */
+  canCreateField: boolean;
 }
 
 /** A validation failure, kept as an i18n key + params so the dialog renders it in the UI locale. */
@@ -61,6 +76,8 @@ export interface PreparedRow<TRecord> {
   /** 1-based line number in the file, counting the header, so it matches a spreadsheet row. */
   line: number;
   raw: Record<string, string>;
+  /** The line's cells in the columns the spec does not know, by header. */
+  extra: Record<string, string>;
   record: TRecord | null;
   issues: ImportIssue[];
 }
@@ -167,12 +184,15 @@ export function prepareImport<TRecord>(
   if (missingColumns.length > 0) return { ok: false, reason: "missingColumns", missingColumns };
 
   const usedIndexes = new Set(columnIndex.values());
-  const ignoredColumns = header.filter(
-    (name, index) => name.trim() !== "" && !usedIndexes.has(index),
+  const ignoredIndexes = header.flatMap((name, index) =>
+    name.trim() !== "" && !usedIndexes.has(index) ? [index] : [],
   );
+  const ignoredColumns = ignoredIndexes.map((index) => header[index]!);
 
   const rows = body.map((cells, rowIndex): PreparedRow<TRecord> => {
     const raw: Record<string, string> = {};
+    const extra: Record<string, string> = {};
+    for (const index of ignoredIndexes) extra[header[index]!] = cells.at(index) ?? "";
     const values: Record<string, ImportValue> = {};
     const issues: ImportIssue[] = [];
     for (const field of spec.fields) {
@@ -197,7 +217,7 @@ export function prepareImport<TRecord>(
         record = built as TRecord;
       }
     }
-    return { line: rowIndex + 2, raw, record, issues };
+    return { line: rowIndex + 2, raw, extra, record, issues };
   });
   return { ok: true, rows, ignoredColumns };
 }
@@ -214,6 +234,8 @@ export interface ImportRowResult {
   line: number;
   ok: boolean;
   error?: string;
+  /** What a successful create returned. */
+  created?: unknown;
 }
 
 /** Best human-readable reason for a failed create call. */
@@ -245,8 +267,8 @@ export async function runImport<TRecord>(
       next += 1;
       if (!row) break;
       try {
-        await create(row.record);
-        results.push({ line: row.line, ok: true });
+        const created = await create(row.record);
+        results.push({ line: row.line, ok: true, created });
       } catch (error) {
         results.push({ line: row.line, ok: false, error: importErrorMessage(error) });
       }

@@ -110,18 +110,63 @@ that reaches this table, rather than silently shipping an incomplete one.
 
 ## School-defined record data
 
-Student and parent records (`app.record_answers`, `app.record_documents`;
+Student, parent, staff and class records (`app.record_answers`, `app.record_documents`;
 [docs/modules/student-records.md](../modules/student-records.md)) are handled outside the
 generic walk by `apps/workers/src/queues/maintenance/records-dsr.ts`:
 
 - **Export** writes `data/record_answers.ndjson`: every answer about the subject as a student
-  (`student_id`) and as a parent (`parent_user_id`), sensitive values decrypted with the records
-  keyring and labelled with the field as it read when answered. Document files are listed in the
-  manifest's `files`.
+  (`student_id`), as a parent (`parent_user_id`) and as a member of staff (`staff_user_id`, the
+  person's own user id; listed in `SUBJECT_LINK_COLUMNS` since 000176), sensitive values decrypted
+  with the records keyring and labelled with the field as it read when answered. Document files are
+  listed in the manifest's `files`.
 - **Erasure** deletes the answers outright, with documents cascading (`hard_deleted` on
   `record_answers` in `redacted_tables`), and deletes the stored files after the erasure commits.
+- **Class records** (`class_id`) are about a class, not a person: no per-person request reaches
+  them. A tenant closure erases them with every other answer.
 - **Retention**: sensitive answers are also deleted on a schedule, 12 months (or the field's own
-  period) after the student leaves, by `record-retention-sweep.ts`.
+  period) after the student leaves, the last linked child of a parent leaves, or a staff member's
+  account is archived (`app.users.archived_at`), by `record-retention-sweep.ts`. Class fields are
+  never sensitive.
+
+## Student import files
+
+A student import keeps the school's original file (`app.student_imports.source_storage_key`, in
+object storage under the sensitive-documents KMS key) and, once it completes, the cells of the
+columns no field read on the lines whose student it created or updated
+(`app.student_import_rows`, tagged with `student_id` and, for a parent the import created,
+`parent_user_id`; [docs/modules/student-import-mapping-guide.md](../modules/student-import-mapping-guide.md#import-history-and-unmapped-columns)).
+Both exist so a school's data is never lost and a column can be mapped to a record later.
+
+An archived file holds many people's data in one object, and a per-person erasure can neither
+search nor redact inside it. So the risk is bounded by time, not by per-person handling:
+
+- **Retention.** Original files and leftover cells are deleted automatically **180 days after
+  upload** by default. A school can shorten that (1-180 days, `app.student_import_settings`) but
+  never extend it. The daily abandoned-import job runs
+  `apps/workers/src/queues/imports/import-source-retention-sweep.ts`: expired files are forgotten on
+  the import row (`source_removed_reason = 'retention'`), deleted from storage after the commit and
+  released from the quota meter; expired imports' leftover cells are deleted (`cells_purged_at`).
+  Staff can also delete a file at any time. The import row, its summary and its header text stay
+  as the school's record that the import happened.
+- **Tenant closure (erasure).** `apps/workers/src/queues/maintenance/imports-dsr.ts` deletes every
+  leftover cell (`hard_deleted` on `student_import_rows`) and every original file
+  (`student_imports` redacted: `source_storage_key`, `source_size_bytes`; reason `erasure`). The
+  files are removed from storage after the erasure commits, with the record documents.
+- **Per-person erasure.** The person's own leftover cells are deleted, as a student and as a parent
+  (`hard_deleted` on `student_import_rows`). The original files are recorded in `retained_tables`
+  (`student_imports`, with the reason above), because they cannot be redacted per person; they
+  still expire with the retention period.
+- **Per-person export.** Leftover cells tied to the person as a student are in the bundle
+  (`app.student_import_rows`, reached by `student_id`). What is inside the original files is not,
+  and the manifest's `knownGaps` says so, with the retention bound; cells tied to the person as a
+  parent are named in the same gap. A tenant-closure export lists every file still held in the
+  manifest's `files`.
+
+Imported values are never sent to an AI model or any other service: column type and sensitivity
+suggestions are computed on the server from the cells
+(`packages/student-import/src/unmapped.ts`). The platform-wide unmapped-column count reads header
+text only, never a cell, never names a school, and shows a header only once at least 3 schools
+share it.
 
 ## Operational notes
 

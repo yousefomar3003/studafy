@@ -50,7 +50,7 @@ export interface ErpNextPaymentEntry {
   }[];
 }
 
-export type PaymentStatus = "pending" | "confirmed" | "failed";
+export type PaymentStatus = "pending" | "confirmed" | "failed" | "reversed";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -214,27 +214,31 @@ export async function projectPaymentEntry(
     // The common confirm path: this gateway forwarded the payment, so the row already exists as
     // 'pending' with its student, mode, and requested invoice already correct. Only ERPNext-owned
     // facts are refreshed, and COALESCE preserves what only the original request knew.
-    const [updated] = await tx<{ id: string; confirmed_at: Date | null }[]>`
+    // A cancel of a payment that was confirmed is a reversal (000172), not a failure: the money
+    // did arrive once, so the row reads 'reversed' and keeps its confirmed_at. The right-hand
+    // `status` below is the row's value before this update.
+    const reversed = tx`(${status} = 'failed' AND status IN ('confirmed', 'reversed'))`;
+    const [updated] = await tx<{ id: string; status: PaymentStatus; confirmed_at: Date | null }[]>`
       UPDATE app.payment_cache
       SET erpnext_status     = ${erpnextStatus},
-          status             = ${status},
+          status             = CASE WHEN ${reversed} THEN 'reversed' ELSE ${status} END,
           amount_minor       = ${amountMinor.toString()}::bigint,
           currency_id        = ${currency.id}::uuid,
           payment_date       = ${paymentDate}::date,
           erpnext_invoice_id = COALESCE(${invoiceId}, erpnext_invoice_id),
           receipt_url        = COALESCE(${receiptUrl}, receipt_url),
-          confirmed_at       = ${confirmedAtSql},
+          confirmed_at       = CASE WHEN ${reversed} THEN confirmed_at ELSE ${confirmedAtSql} END,
           erpnext_payload    = ${tx.json(doc as unknown as JSONValue)}::jsonb,
           last_synced_at     = CURRENT_TIMESTAMP,
           updated_at         = CURRENT_TIMESTAMP
       WHERE school_id = ${schoolId}::uuid AND erpnext_docname = ${docname}
-      RETURNING id, confirmed_at
+      RETURNING id, status, confirmed_at
     `;
     await upsertMapping(tx, schoolId, "payment", updated!.id, docname);
     return {
       id: updated!.id,
       erpnext_docname: docname,
-      status,
+      status: updated!.status,
       amount_minor: Number(amountMinor),
       currency: currency.code,
       // Read back rather than reconstructed, so the audit row records the exact timestamp stored.

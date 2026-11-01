@@ -148,6 +148,9 @@ const jobFor = (f: MaterialFixture): Job =>
     id: crypto.randomUUID(),
     name: "ai-ingestion",
     data: { version: 1, materialId: f.materialId, schoolId: f.schoolId },
+    // Read by processIngestJob's failure path to tell a final attempt from a retry.
+    attemptsMade: 0,
+    opts: { attempts: 1 },
   }) as unknown as Job;
 
 async function chunkContents(

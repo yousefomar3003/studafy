@@ -22,6 +22,7 @@ import {
   integrationEnabled,
   type TestDatabase,
 } from "../../../../tests/harness";
+import { withTenantTx } from "../../../db/tenant-tx";
 import {
   listUsers,
   getUser,
@@ -60,13 +61,17 @@ afterAll(async () => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function withTx<T>(fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
-  let result: T | undefined;
-  await db.sql.begin(async (tx) => {
-    await tx`SELECT set_config('role', 'studafy_app', true)`;
-    result = await fn(tx);
-  });
-  return result as T;
+/**
+ * Run `fn` in the same tenant transaction production opens (`withTenantTx`): role studafy_app with
+ * `app.school_id` armed, so tenant_isolation RLS applies exactly as it does behind a route.
+ *
+ * No acting user is set. Every table these services touch (users, user_roles, invitations,
+ * audit_logs) is guarded by tenant_isolation alone -- none has a policy that reads `app.user_id` --
+ * and seeding an ORG_ADMIN actor into the school would make it one of the rows `listUsers` and
+ * `getUserStatusCounts` count. Audit rows written here therefore carry a NULL actor_id.
+ */
+function withTx<T>(schoolId: string, fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
+  return withTenantTx(db.sql, { schoolId }, fn);
 }
 
 // ---------------------------------------------------------------------------
@@ -87,7 +92,9 @@ describeDb("listUsers", () => {
     await assignRole(db.sql, school.id, user1.id, "INSTRUCTOR");
     await assignRole(db.sql, school.id, user2.id, "STUDENT");
 
-    const { rows, next_cursor } = await withTx((tx) => listUsers(tx, school.id, { limit: 10 }));
+    const { rows, next_cursor } = await withTx(school.id, (tx) =>
+      listUsers(tx, school.id, { limit: 10 }),
+    );
 
     expect(rows.length).toBe(2);
     expect(next_cursor).toBeNull();
@@ -113,7 +120,7 @@ describeDb("listUsers", () => {
     await assignRole(db.sql, school.id, user1.id, "INSTRUCTOR");
     await assignRole(db.sql, school.id, user2.id, "STUDENT");
 
-    const { rows } = await withTx((tx) =>
+    const { rows } = await withTx(school.id, (tx) =>
       listUsers(tx, school.id, { limit: 10, role: "INSTRUCTOR" }),
     );
 
@@ -132,7 +139,7 @@ describeDb("listUsers", () => {
       status: "invited",
     });
 
-    const { rows } = await withTx((tx) =>
+    const { rows } = await withTx(school.id, (tx) =>
       listUsers(tx, school.id, { limit: 10, status: "invited" }),
     );
 
@@ -151,7 +158,7 @@ describeDb("listUsers", () => {
       displayName: "Other User",
     });
 
-    const { rows } = await withTx((tx) =>
+    const { rows } = await withTx(school.id, (tx) =>
       listUsers(tx, school.id, { limit: 10, search: "findme" }),
     );
 
@@ -167,11 +174,11 @@ describeDb("listUsers", () => {
       });
     }
 
-    const page1 = await withTx((tx) => listUsers(tx, school.id, { limit: 2 }));
+    const page1 = await withTx(school.id, (tx) => listUsers(tx, school.id, { limit: 2 }));
     expect(page1.rows.length).toBe(2);
     expect(page1.next_cursor).not.toBeNull();
 
-    const page2 = await withTx((tx) =>
+    const page2 = await withTx(school.id, (tx) =>
       listUsers(tx, school.id, { limit: 2, cursor: page1.next_cursor! }),
     );
     expect(page2.rows.length).toBe(2);
@@ -202,7 +209,7 @@ describeDb("getUserStatusCounts", () => {
       status: "active",
     });
 
-    const counts = await withTx((tx) => getUserStatusCounts(tx, school.id));
+    const counts = await withTx(school.id, (tx) => getUserStatusCounts(tx, school.id));
 
     expect(counts).toEqual({ invited: 1, active: 2, suspended: 1, archived: 0 });
   });
@@ -210,7 +217,7 @@ describeDb("getUserStatusCounts", () => {
   test("returns all-zero counts for a school with no users", async () => {
     const school = await createSchool(db.sql);
 
-    const counts = await withTx((tx) => getUserStatusCounts(tx, school.id));
+    const counts = await withTx(school.id, (tx) => getUserStatusCounts(tx, school.id));
 
     expect(counts).toEqual({ invited: 0, active: 0, suspended: 0, archived: 0 });
   });
@@ -229,7 +236,7 @@ describeDb("getUser", () => {
     });
     await assignRole(db.sql, school.id, user.id, "ORG_ADMIN");
 
-    const result = await withTx((tx) => getUser(tx, school.id, user.id));
+    const result = await withTx(school.id, (tx) => getUser(tx, school.id, user.id));
 
     expect(result).toBeDefined();
     expect(result!.email).toBe("getuser@test.local");
@@ -239,7 +246,7 @@ describeDb("getUser", () => {
 
   test("returns undefined for non-existent ID", async () => {
     const school = await createSchool(db.sql);
-    const result = await withTx((tx) =>
+    const result = await withTx(school.id, (tx) =>
       getUser(tx, school.id, "00000000-0000-0000-0000-000000000000"),
     );
     expect(result).toBeUndefined();
@@ -254,7 +261,7 @@ describeDb("createUser", () => {
   test("creates a user with role and emits audit", async () => {
     const school = await createSchool(db.sql);
 
-    const user = await withTx((tx) =>
+    const user = await withTx(school.id, (tx) =>
       createUser(tx, school.id, {
         email: "newuser@test.local",
         display_name: "New User",
@@ -274,7 +281,7 @@ describeDb("createUser", () => {
     await createUserFactory(db.sql, school.id, { email: "dup@test.local" });
 
     await expect(
-      withTx((tx) =>
+      withTx(school.id, (tx) =>
         createUser(tx, school.id, {
           email: "dup@test.local",
           role: "STUDENT",
@@ -287,14 +294,14 @@ describeDb("createUser", () => {
     const school1 = await createSchool(db.sql);
     const school2 = await createSchool(db.sql);
 
-    const user1 = await withTx((tx) =>
+    const user1 = await withTx(school1.id, (tx) =>
       createUser(tx, school1.id, {
         email: "shared@test.local",
         role: "STUDENT",
       }),
     );
 
-    const user2 = await withTx((tx) =>
+    const user2 = await withTx(school2.id, (tx) =>
       createUser(tx, school2.id, {
         email: "shared@test.local",
         role: "INSTRUCTOR",
@@ -317,7 +324,7 @@ describeDb("updateUser", () => {
       displayName: "Original Name",
     });
 
-    const updated = await withTx((tx) =>
+    const updated = await withTx(school.id, (tx) =>
       updateUser(tx, school.id, user.id, { display_name: "Updated Name" }),
     );
 
@@ -329,7 +336,7 @@ describeDb("updateUser", () => {
     const school = await createSchool(db.sql);
 
     await expect(
-      withTx((tx) =>
+      withTx(school.id, (tx) =>
         updateUser(tx, school.id, "00000000-0000-0000-0000-000000000000", {
           display_name: "Ghost",
         }),
@@ -350,7 +357,7 @@ describeDb("updateUserRole", () => {
     });
     await assignRole(db.sql, school.id, user.id, "STUDENT");
 
-    const updated = await withTx((tx) =>
+    const updated = await withTx(school.id, (tx) =>
       updateUserRole(tx, school.id, user.id, { role: "INSTRUCTOR" }),
     );
 
@@ -362,7 +369,7 @@ describeDb("updateUserRole", () => {
     const school = await createSchool(db.sql);
 
     await expect(
-      withTx((tx) =>
+      withTx(school.id, (tx) =>
         updateUserRole(tx, school.id, "00000000-0000-0000-0000-000000000000", {
           role: "STUDENT",
         }),
@@ -394,7 +401,7 @@ describeDb("deactivateUser", () => {
     expect(result.invitations_revoked).toBe(0);
 
     // Verify status changed
-    const updated = await withTx((tx) => getUser(tx, school.id, user.id));
+    const updated = await withTx(school.id, (tx) => getUser(tx, school.id, user.id));
     expect(updated!.status).toBe("suspended");
   });
 
@@ -405,10 +412,9 @@ describeDb("deactivateUser", () => {
       status: "invited",
     });
 
-    // Create a pending invitation
-    await db.sql.begin(async (tx) => {
-      await tx`SELECT set_config('role', 'studafy_app', true)`;
-      await tx`SELECT set_config('app.school_id', ${school.id}, true)`;
+    // Create a pending invitation. token_hash is a SHA-256 digest, so ck_invitations_token_hash
+    // requires exactly 32 bytes.
+    await withTx(school.id, async (tx) => {
       await tx`
         INSERT INTO app.invitations (
           school_id, email, normalized_email, role, token_hash, expires_at
@@ -417,7 +423,7 @@ describeDb("deactivateUser", () => {
           'invited-deactivate@test.local',
           'invited-deactivate@test.local',
           'STUDENT'::app.user_role,
-          ${Buffer.from("test-token-hash")},
+          ${Buffer.from(crypto.getRandomValues(new Uint8Array(32)))},
           CURRENT_TIMESTAMP + INTERVAL '7 days'
         )
       `;

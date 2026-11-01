@@ -10,6 +10,7 @@ import { PAYMENT_MODE_LABEL_KEYS, PAYMENT_STATUS_LABEL_KEYS, paymentStatusTone }
 import { ReceiptButton } from "../ReceiptButton";
 
 import { childPositionLabel, moneyText } from "./family-format";
+import { ManageHouseholdPanel } from "./ManageHouseholdPanel";
 import {
   FAMILIES_KEY,
   fetchFamilyProfile,
@@ -54,7 +55,8 @@ function sendToast(t: TFunction, kind: "reminder" | "statement", result: FamilyS
  * One family (`/portal/finance/families/:familyId`), gated by `billing:read`: guardians and how to
  * reach them, the family's balance, each child's invoices and payments (receipts open from here),
  * and every fee message sent to the guardians. Finance (`billing:update`) records one payment across
- * the children's invoices, reminds the family of what is overdue, or sends its statement.
+ * the children's invoices, reminds the family of what is overdue, or sends its statement. A school
+ * admin (`parent:link`) also manages the household itself: `ManageHouseholdPanel`.
  *
  * Two reads: the family's finance profile (names, sibling ranking, totals, messages) and the
  * household view the parent app uses (the invoices, installments and payments themselves).
@@ -65,6 +67,7 @@ export default function FamilyDetailPage() {
   const { show } = useToast();
   const permissions = usePermissions();
   const canManage = permissions.has(PERMISSIONS.BILLING_UPDATE);
+  const canLinkParents = permissions.has(PERMISSIONS.PARENT_LINK);
   const { familyId = "" } = useParams<{ familyId: string }>();
   const reminder = useSendReminder();
   const statement = useSendStatement();
@@ -194,6 +197,14 @@ export default function FamilyDetailPage() {
 
       <h2>{t("finance.families.detail.messagesHeading")}</h2>
       <CommunicationsTable rows={family.communications} />
+
+      {canLinkParents ? (
+        <ManageHouseholdPanel
+          key={family.id}
+          family={family}
+          canUnlink={permissions.has(PERMISSIONS.PARENT_UNLINK)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -288,7 +299,9 @@ function ChildSection({
       <Card as="section" aria-label={child.name}>
         <Card.Header>
           <div className="families-child__title">
-            <h3>{child.name}</h3>
+            <h3>
+              <Link to={`/portal/finance/students/${child.student_id}`}>{child.name}</Link>
+            </h3>
             <span className="families-cell__muted">
               {child.admission_number} · {childPositionLabel(t, child.child_position)}
             </span>

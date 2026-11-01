@@ -61,12 +61,15 @@ function decode(token: string): Record<string, unknown> {
   >;
 }
 
+// The users minted for here are INSTRUCTORs, a mobile-only role (`MOBILE_ONLY_ROLES`): a web session
+// is refused for them (src/modules/auth/web-access.ts), so they sign in on the mobile channel. The
+// claim under test is channel-independent.
 async function mint(schoolId: string, userId: string): Promise<Record<string, unknown>> {
   const pair = await withTenantTx(db!.sql, { schoolId, userId }, (tx) =>
     issueTokenPair(tx, config(), {
       userId,
       schoolId,
-      channel: AUTH_CHANNELS.WEB,
+      channel: AUTH_CHANNELS.MOBILE,
     }),
   );
   return decode(pair.accessToken);
@@ -158,7 +161,7 @@ describe("entitlements_ver on refresh", () => {
       issueTokenPair(tx, config(), {
         userId,
         schoolId: tenant.schoolId,
-        channel: AUTH_CHANNELS.WEB,
+        channel: AUTH_CHANNELS.MOBILE,
       }),
     );
     expect(decode(issued.accessToken).entitlements_ver).toBe(1);

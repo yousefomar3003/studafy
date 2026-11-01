@@ -323,10 +323,11 @@ function insertChunks(
   materialId: string,
   chunks: readonly IngestChunk[],
 ): Promise<unknown> {
+  // The column list comes from the helper, not the SQL text: postgres.js picks its builder from the
+  // last keyword before the interpolation, and a literal "(...)" column list there selects the
+  // select builder, which cannot serialize an array of rows.
   return tx`
-    INSERT INTO app.material_chunks (
-      school_id, material_id, chunk_index, content, page_number, section_title, embedding, embedding_model
-    ) ${tx(
+    INSERT INTO app.material_chunks ${tx(
       chunks.map((chunk) => ({
         school_id: schoolId,
         material_id: materialId,

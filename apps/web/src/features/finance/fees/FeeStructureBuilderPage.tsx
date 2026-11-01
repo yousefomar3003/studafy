@@ -6,6 +6,7 @@ import { useTranslation } from "../../../lib/i18n";
 
 import { FeeStructureForm } from "./FeeStructureForm";
 import { feeStructureStatusLabel, feeStructureStatusTone } from "./labels";
+import { PaymentPlanPanel } from "./PaymentPlanPanel";
 import {
   ACADEMIC_YEARS_KEY,
   fetchAcademicYears,
@@ -24,7 +25,8 @@ import type { SelectOption } from "@studafy/ui";
  * held by FINANCE and ORG_ADMIN. A year → structure drill-down: pick an academic year to scope the
  * list, select an existing structure to view/edit it, or start a new one. `FeeStructureForm` owns the
  * item composition, validation, and the invoice preview; this page owns which structure is loaded
- * into it.
+ * into it. A selected structure also gets its payment plan (`PaymentPlanPanel`): installments for
+ * the students it is for.
  */
 export default function FeeStructureBuilderPage() {
   const { t } = useTranslation();
@@ -125,6 +127,8 @@ export default function FeeStructureBuilderPage() {
 
         <FeeStructureForm academicYears={years} editing={editing} onSaved={handleSaved} />
       </div>
+
+      {editing ? <PaymentPlanPanel key={editing.erpnext_name} structure={editing} /> : null}
     </>
   );
 }

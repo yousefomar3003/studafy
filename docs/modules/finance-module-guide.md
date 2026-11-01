@@ -397,3 +397,58 @@ embed the WOFF font nor place the dots Noto Sans Arabic positions as separate ma
 An expense is posted as a Purchase Invoice (a supplier bill) or a Journal Entry. There is no
 `expense_claim` type: ERPNext's Expense Claim lives in the separate HRMS app, which the erpnext image
 does not install (it would add payroll, leave and attendance to every school's site).
+
+### Corrections: cancellations, reversals, write-offs
+
+Every correction goes through the refund maker-checker queue (`app.refund_requests`, migration
+000172), so a school has one place to approve money changes and one audit trail. FINANCE asks
+(`billing:update`); a different user holding `billing:refund` (ORG_ADMIN) approves at
+`POST /api/finance/refunds/{refundId}/approve`. `kind` says what approval does:
+
+| `kind`                 | Asked at                                              | Approval in ERPNext                | Local effect                                                                                     |
+| ---------------------- | ----------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `credit_note`          | `POST /api/finance/refunds/initiate`                  | Sales Invoice return (`is_return`) | Completes on the refund-processed webhook                                                        |
+| `invoice_cancellation` | `POST /api/finance/invoices/{invoiceId}/cancellation` | `frappe.client.cancel` on the SI   | `invoice_cache` → `cancelled`, outstanding 0; completes at once                                  |
+| `payment_reversal`     | `POST /api/finance/payments/{paymentId}/reversal`     | `frappe.client.cancel` on the PE   | `payment_cache` → `reversed`; the invoice's outstanding rises by the amount, capped at its total |
+
+- A cancellation is only for a submitted invoice nothing is against: no pending or confirmed
+  payment and no credit note that is not rejected or failed. Anything else is corrected with a
+  credit note, which keeps the payment history a cancel would unlink.
+- A write-off is a credit note with reason `write_off`; the API refuses one above the invoice's
+  outstanding amount.
+- Cancellations and reversals are projected locally on approval because ERPNext sends no webhook on
+  cancel. A later projection of the cancelled Payment Entry keeps it `reversed` (not `failed`) and
+  keeps its `confirmed_at`: the money did arrive once.
+- One open or completed cancellation per invoice and reversal per payment (partial unique indexes).
+
+### Payment plans
+
+`POST /api/finance/fee-schedules/generate` (`billing:update`) splits a submitted fee structure into
+installments for the students saved on it; ERPNext divides the total by `schedule_type` over the
+due dates. The web's Fees page offers it per structure. Installments show on the student's account
+(`/portal/finance/students/:studentId`), the overdue list and the dashboard tiles.
+
+### Sales tax (VAT)
+
+Off by default (`app.school_tax_settings`, `app.school_tax_exempt_categories`, migration 000173).
+Whether a fee is taxable is the school's legal call (UAE zero-rates core tuition; Saudi Arabia taxes
+private schooling for non-citizens), so saving needs `organization:manageSettings`. When on, the
+billing worker (`sales-tax.ts`) adds one "On Net Total" tax row on the school's ERPNext tax account
+to each invoice it generates, after scholarship and sibling discounts, and zero-rates exempt fee
+categories through each line's `item_tax_rate`. `prices_include_tax` marks the row
+`included_in_print_rate`. Issued invoices never change. The registration number prints on the
+invoice detail and the payment receipt.
+
+### Collections by method
+
+`GET /api/finance/reports/collections-by-method` groups confirmed payments by day, currency and
+method from `payment_cache`, one indexed query and no ERPNext call, so the daily cash-up works
+while ERPNext is down. Reversed and pending payments are not counted. The payments list's `totals`
+gives the same figure for any filter.
+
+### Finance reads and row-level security
+
+FINANCE holds `billing:read` but not `student:read`, so `app.students` is invisible to it under its
+own RLS. Every finance read that joins a student's name runs through `withStudentIdentityTx`
+(identity columns only, tenant-scoped). The invoice list, invoice detail and batch items did not,
+and returned nothing to FINANCE until this was fixed.

@@ -1880,6 +1880,27 @@
         "materialIngestFailed": "File couldn't be prepared for AI",
         "directMessage": "Messages"
       }
+    },
+    "staffRecord": {
+      "title": "My staff record",
+      "intro": "What your school keeps on file about you, such as your qualifications or contract type. The school admin fills it in. Fields your school marks sensitive, such as a salary or an ID number, are not shown here.",
+      "loadError": "Couldn't load your staff record.",
+      "notPublished": "Your school hasn't set up staff records yet.",
+      "empty": "There is nothing in your staff record yet.",
+      "missing": {
+        "one": "1 required field is still empty. Ask your school admin to complete it.",
+        "other": "{} required fields are still empty. Ask your school admin to complete them."
+      },
+      "notFilledIn": "Not filled in",
+      "noFile": "No file yet",
+      "fileOnRecord": "File on record",
+      "verified": "Verified",
+      "expires": "Expires {date}",
+      "open": "Open",
+      "openLabel": "Open the file for {field}",
+      "openFailed": "Couldn't open the file. Check your connection and try again.",
+      "yes": "Yes",
+      "no": "No"
     }
   },
   "academicResults": {

@@ -502,3 +502,87 @@ describe("student record template columns", () => {
     },
   );
 });
+
+describe("leftover cells of a completed import", () => {
+  dbTest(
+    "keeps only unmapped, non-empty cells, on lines this run wrote, tagged with whom",
+    async () => {
+      const fixture = await seedSchool();
+      const s = fixture.slug;
+      const csv = [
+        "Surname,Given Name,Student ID,E-mail,Guardian Email,Relationship,Blood Type,Notes",
+        // create, with a new parent
+        `Doe,Jane,NEW-1,jane@${s}.local,mum@${s}.local,mother,A+,Likes chess`,
+        // create, the sibling of the line above: same new parent
+        `Doe,John,NEW-2,john@${s}.local,mum@${s}.local,mother,B+,`,
+        // update of an existing student (a new given name); its parent email belongs to an
+        // account, so no parent is linked or recorded
+        `Name,Olivia,OLD-1,old@${s}.local,parent@${s}.local,father,O-,`,
+        // conflict (duplicate admission number): writes no one, so keeps nothing
+        `Dup,Dup,NEW-1,dup@${s}.local,,,AB+,Secret`,
+        // create, but with nothing in the unmapped columns: nothing to keep
+        `Solo,Sam,NEW-4,sam@${s}.local,,,,`,
+      ].join("\n");
+      const importId = await stageConfirmedImport(fixture, csv);
+
+      await migrateStagedImport(
+        db!,
+        { importId, schoolId: fixture.schoolId },
+        DEVELOPMENT_RECORD_KEYRING,
+      );
+
+      await asAdmin(fixture.schoolId, async (tx) => {
+        const rows = await tx<
+          {
+            line_number: number;
+            student_id: string | null;
+            parent_user_id: string | null;
+            source: Record<string, string>;
+            record: unknown;
+          }[]
+        >`
+          SELECT line_number, student_id, parent_user_id, source, record
+          FROM app.student_import_rows
+          WHERE school_id = ${fixture.schoolId}::uuid AND import_id = ${importId}::uuid
+          ORDER BY line_number
+        `;
+        const students = await tx<{ id: string; admission_number: string }[]>`
+          SELECT id, admission_number FROM app.students WHERE school_id = ${fixture.schoolId}::uuid
+        `;
+        const admission = new Map(students.map((row) => [row.id, row.admission_number]));
+        expect(
+          rows.map((row) => [row.line_number, admission.get(row.student_id!), row.source]),
+        ).toEqual([
+          [2, "NEW-1", { "Blood Type": "A+", Notes: "Likes chess" }],
+          [3, "NEW-2", { "Blood Type": "B+" }],
+          [4, "OLD-1", { "Blood Type": "O-" }],
+        ]);
+        expect(rows.every((row) => row.record === null)).toBe(true);
+        expect(rows[3 - 2]!.student_id).not.toBe(rows[2 - 2]!.student_id);
+        // Both siblings carry the one parent the import created; the existing account is never used.
+        expect(rows[0]!.parent_user_id).not.toBeNull();
+        expect(rows[1]!.parent_user_id).toBe(rows[0]!.parent_user_id);
+        expect(rows[2]!.parent_user_id).toBeNull();
+        expect(rows[0]!.parent_user_id).not.toBe(fixture.existingParentId);
+        expect(rows[2]!.student_id).toBe(fixture.existingStudentId);
+      });
+    },
+  );
+
+  dbTest("keeps nothing when every column was mapped", async () => {
+    const fixture = await seedSchool();
+    const importId = await stageConfirmedImport(fixture, mixedCsv(fixture.slug));
+    await migrateStagedImport(
+      db!,
+      { importId, schoolId: fixture.schoolId },
+      DEVELOPMENT_RECORD_KEYRING,
+    );
+    const [left] = await asAdmin(
+      fixture.schoolId,
+      (tx) => tx<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM app.student_import_rows WHERE import_id = ${importId}::uuid
+      `,
+    );
+    expect(left!.n).toBe(0);
+  });
+});

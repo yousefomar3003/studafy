@@ -90,14 +90,38 @@ describe("prepareImport", () => {
   });
 });
 
+describe("unknown columns", () => {
+  test("keeps each line's cells in the columns the spec does not know, by header", () => {
+    const result = prepareImport("name,Contract,Bus group\nAmal,Permanent,4\nBadr,,7\n", {
+      fields: [{ key: "name", label: "Name", required: true }],
+      toRecord: (values) => String(values.name),
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.ignoredColumns).toEqual(["Contract", "Bus group"]);
+    expect(result.rows.map((row) => row.extra)).toEqual([
+      { Contract: "Permanent", "Bus group": "4" },
+      { Contract: "", "Bus group": "7" },
+    ]);
+  });
+
+  test("runImport keeps what each create returned, for a later record column", async () => {
+    const results = await runImport(
+      [{ line: 2, raw: {}, extra: {}, record: "a", issues: [] }],
+      async () => ({ id: "user-1" }),
+    );
+    expect(results).toEqual([{ line: 2, ok: true, created: { id: "user-1" } }]);
+  });
+});
+
 describe("runImport", () => {
   test("creates valid rows only and records failures by line", async () => {
     const created: string[] = [];
     const results = await runImport(
       [
-        { line: 2, raw: {}, record: "a", issues: [] },
-        { line: 3, raw: {}, record: null, issues: [{ code: "required" }] },
-        { line: 4, raw: {}, record: "boom", issues: [] },
+        { line: 2, raw: {}, extra: {}, record: "a", issues: [] },
+        { line: 3, raw: {}, extra: {}, record: null, issues: [{ code: "required" }] },
+        { line: 4, raw: {}, extra: {}, record: "boom", issues: [] },
       ],
       async (record: string) => {
         if (record === "boom") throw new Error("Duplicate");
@@ -115,7 +139,7 @@ describe("runImport", () => {
     const controller = new AbortController();
     controller.abort();
     const results = await runImport(
-      [{ line: 2, raw: {}, record: "a", issues: [] }],
+      [{ line: 2, raw: {}, extra: {}, record: "a", issues: [] }],
       async () => undefined,
       { signal: controller.signal },
     );

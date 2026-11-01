@@ -5,7 +5,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, mock, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { AuthProvider } from "../../../lib/auth";
 import { expectNoA11yViolations } from "../../../lib/test/axe";
+import { createTestSessionStore } from "../../../lib/test/session";
 
 import type { ComponentType } from "react";
 
@@ -78,20 +80,24 @@ const postMock = mock((path: string) => {
 });
 mock.module("../../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }));
 
-function renderInPortal(Page: ComponentType, initialPath: string, routePath: string) {
+async function renderInPortal(Page: ComponentType, initialPath: string, routePath: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // FINANCE: the pages check `billing:update` before offering corrections.
+  const store = await createTestSessionStore(["FINANCE"]);
   return render(
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <MemoryRouter initialEntries={[initialPath]}>
-          <main>
-            <Routes>
-              <Route path={routePath} element={<Page />} />
-            </Routes>
-          </main>
-        </MemoryRouter>
-      </ToastProvider>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={[initialPath]}>
+            <main>
+              <Routes>
+                <Route path={routePath} element={<Page />} />
+              </Routes>
+            </main>
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -104,7 +110,7 @@ afterEach(() => {
 describe("payment screens accessibility", () => {
   test("payments list, populated", async () => {
     const Page = (await import("./PaymentsListPage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/payments",
       "/portal/finance/payments",
@@ -117,7 +123,7 @@ describe("payment screens accessibility", () => {
 
   test("record payment form, invoice selected and math shown", async () => {
     const Page = (await import("./RecordPaymentPage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/payments/new",
       "/portal/finance/payments/new",
@@ -138,7 +144,7 @@ describe("payment screens accessibility", () => {
 
   test("payment recorded, confirmed with a receipt", async () => {
     const Page = (await import("./RecordPaymentPage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/payments/new",
       "/portal/finance/payments/new",

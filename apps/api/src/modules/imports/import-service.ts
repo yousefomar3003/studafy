@@ -6,13 +6,23 @@ import {
   REQUIRED_STUDENT_IMPORT_FIELDS,
   stageRows,
   suggestColumnMapping,
+  unmappedColumns,
 } from "@studafy/student-import";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { getPublishedForm } from "../records/template-service";
 
-import type { ImportDiffResponse, ImportRowError, ImportStatus, ImportSummary } from "./schemas";
+import { DEFAULT_SOURCE_RETENTION_DAYS } from "./source-service";
+
+import type {
+  ImportDiffResponse,
+  ImportRowError,
+  ImportStatus,
+  ImportSummary,
+  SourceRemovedReason,
+} from "./schemas";
+import type { StagedSourceFile } from "./source-service";
 import type {
   ColumnMapping,
   CsvSource,
@@ -47,6 +57,23 @@ export interface ImportRecord {
   updated_at: Date;
   confirmed_at: Date | null;
   completed_at: Date | null;
+  source_storage_key: string | null;
+  source_file_name: string | null;
+  source_size_bytes: number | null;
+  source_uploaded_at: Date | null;
+  source_removed_at: Date | null;
+  source_removed_reason: SourceRemovedReason | null;
+  cells_purged_at: Date | null;
+  /** The school's retention period, for the file's and the leftover cells' expiry. */
+  retention_days: number;
+}
+
+/** An import as the history lists it: who ran it, and what is left of its file. */
+export interface ImportListRecord extends ImportRecord {
+  uploaded_by_name: string | null;
+  confirmed_by_name: string | null;
+  unmapped_column_count: number;
+  cells_available: boolean;
 }
 
 export interface StudentImportMapping {
@@ -66,11 +93,27 @@ const STAGING_BATCH_SIZE = 2_000;
 /** Only an unconfirmed import may be re-mapped; once confirmed, the worker owns its staging rows. */
 const REMAPPABLE_STATUSES: readonly ImportStatus[] = ["uploaded", "validated"];
 
+/**
+ * Every column of an import record, usable in a SELECT and in INSERT/UPDATE ... RETURNING alike
+ * (both may reference the target table by name).
+ */
 function importColumns(tx: TransactionSql) {
   return tx`
-    id, school_id, uploaded_by, confirmed_by, status, file_name, idempotency_key,
-    row_count, valid_rows, error_rows, header_line, source_headers, column_mapping,
-    errors, summary, created_at, updated_at, confirmed_at, completed_at
+    student_imports.id, student_imports.school_id, student_imports.uploaded_by,
+    student_imports.confirmed_by, student_imports.status, student_imports.file_name,
+    student_imports.idempotency_key, student_imports.row_count, student_imports.valid_rows,
+    student_imports.error_rows, student_imports.header_line, student_imports.source_headers,
+    student_imports.column_mapping, student_imports.errors, student_imports.summary,
+    student_imports.created_at, student_imports.updated_at, student_imports.confirmed_at,
+    student_imports.completed_at, student_imports.source_storage_key,
+    student_imports.source_file_name, student_imports.source_size_bytes::int AS source_size_bytes,
+    student_imports.source_uploaded_at, student_imports.source_removed_at,
+    student_imports.source_removed_reason, student_imports.cells_purged_at,
+    coalesce(
+      (SELECT settings.source_retention_days FROM app.student_import_settings AS settings
+       WHERE settings.school_id = student_imports.school_id),
+      ${DEFAULT_SOURCE_RETENTION_DAYS}
+    )::int AS retention_days
   `;
 }
 
@@ -113,6 +156,7 @@ export async function uploadImport(
   fileName: string,
   rawCsv: string,
   mappingId?: string,
+  stageSource?: () => Promise<StagedSourceFile>,
 ): Promise<ImportRecord> {
   const source = readCsvSource(rawCsv);
 
@@ -130,11 +174,14 @@ export async function uploadImport(
     : suggestColumnMapping(source.headers, recordFields);
   const staged = stageRows(source, mapping, recordFields);
   const validRows = countValid(staged.rows);
+  // After the file has parsed: a file refused for its content is never kept.
+  const file = stageSource ? await stageSource() : null;
 
   const [created] = await tx<ImportRecord[]>`
     INSERT INTO app.student_imports (
       school_id, uploaded_by, status, file_name, row_count, valid_rows, error_rows,
-      header_line, source_headers, column_mapping, errors
+      header_line, source_headers, column_mapping, errors, source_storage_key, source_file_name,
+      source_size_bytes, source_uploaded_at
     ) VALUES (
       ${schoolId},
       ${uploadedBy},
@@ -146,11 +193,16 @@ export async function uploadImport(
       ${source.header_line},
       ${tx.json(source.headers)}::jsonb,
       ${tx.json(mapping as JSONValue)}::jsonb,
-      ${tx.json(staged.issues as unknown as JSONValue)}::jsonb
+      ${tx.json(staged.issues as unknown as JSONValue)}::jsonb,
+      ${file?.storageKey ?? null},
+      ${file?.fileName ?? null},
+      ${file?.sizeBytes ?? null},
+      ${file ? tx`CURRENT_TIMESTAMP` : null}
     )
     RETURNING ${importColumns(tx)}
   `;
   const record = deserializeRecord(created!);
+  await replaceUnmappedColumns(tx, schoolId, record.id, source.headers, mapping);
 
   for (let i = 0; i < staged.rows.length; i += STAGING_BATCH_SIZE) {
     const chunk = staged.rows.slice(i, i + STAGING_BATCH_SIZE);
@@ -168,6 +220,7 @@ export async function uploadImport(
     targetId: record.id,
     newValues: {
       file_name: fileName,
+      source_file_kept: file !== null,
       mapping_id: mappingId ?? null,
       column_mapping: mapping,
       row_count: record.row_count,
@@ -250,6 +303,7 @@ export async function updateImportMapping(
     RETURNING ${importColumns(tx)}
   `;
   const record = deserializeRecord(updated!);
+  await replaceUnmappedColumns(tx, schoolId, importId, current.source_headers, mapping);
 
   await emitAuditLog(tx, {
     action: "update",
@@ -360,8 +414,10 @@ export async function listImports(
   tx: TransactionSql,
   schoolId: string,
   params: { limit: number; cursor?: string; status?: ImportStatus },
-): Promise<{ rows: ImportRecord[]; next_cursor: string | null }> {
-  const statusFilter = params.status ? tx` AND status = ${params.status}::app.import_status` : tx``;
+): Promise<{ rows: ImportListRecord[]; next_cursor: string | null }> {
+  const statusFilter = params.status
+    ? tx` AND student_imports.status = ${params.status}::app.import_status`
+    : tx``;
 
   // Cursor is "timestamp:id" — decode and use for keyset pagination.
   const cursorFilter = params.cursor
@@ -369,18 +425,30 @@ export async function listImports(
         const sep = params.cursor.lastIndexOf(":");
         const createdAt = params.cursor.slice(0, sep);
         const id = params.cursor.slice(sep + 1);
-        return tx` AND (created_at, id) < (${createdAt}::timestamptz, ${id}::uuid)`;
+        return tx` AND (student_imports.created_at, student_imports.id) < (${createdAt}::timestamptz, ${id}::uuid)`;
       })()
     : tx``;
 
   // One row beyond the page, so its presence says whether another page exists.
-  const rows = await tx<ImportRecord[]>`
-    SELECT ${importColumns(tx)}
+  const rows = await tx<ImportListRecord[]>`
+    SELECT ${importColumns(tx)},
+           uploader.display_name AS uploaded_by_name,
+           confirmer.display_name AS confirmed_by_name,
+           EXISTS (
+             SELECT 1 FROM app.student_import_rows AS cell
+             WHERE cell.school_id = student_imports.school_id
+               AND cell.import_id = student_imports.id
+           ) AS cells_available
     FROM app.student_imports
-    WHERE school_id = ${schoolId}
+    LEFT JOIN app.users AS uploader
+      ON uploader.id = student_imports.uploaded_by AND uploader.school_id = student_imports.school_id
+    LEFT JOIN app.users AS confirmer
+      ON confirmer.id = student_imports.confirmed_by
+     AND confirmer.school_id = student_imports.school_id
+    WHERE student_imports.school_id = ${schoolId}
       ${statusFilter}
       ${cursorFilter}
-    ORDER BY created_at DESC, id DESC
+    ORDER BY student_imports.created_at DESC, student_imports.id DESC
     LIMIT ${params.limit + 1}
   `;
 
@@ -390,7 +458,16 @@ export async function listImports(
   const next_cursor =
     hasMore && lastRow ? `${lastRow.created_at.toISOString()}:${lastRow.id}` : null;
 
-  return { rows: page.map(deserializeRecord), next_cursor };
+  return {
+    rows: page.map((row) => {
+      const record = deserializeRecord(row);
+      // Counted from the headers and mapping, as the columns endpoint lists them, so an import
+      // uploaded before unmapped columns were recorded still shows its count.
+      const unmapped = unmappedColumns(record.source_headers, record.column_mapping).length;
+      return { ...row, ...record, unmapped_column_count: unmapped };
+    }),
+    next_cursor,
+  };
 }
 
 /**
@@ -611,6 +688,37 @@ function nameExists(name: string): CodedHttpException {
     ERROR_CODES.IMPORT_MAPPING_NAME_EXISTS,
     `A saved column mapping named "${name}" already exists.`,
   );
+}
+
+/**
+ * Record which source columns the import's mapping leaves unread: the history lists them, staff map
+ * them later, and the platform counts their (normalized) header text across schools. Re-mapping an
+ * unconfirmed import replaces the set; nothing has been applied from an unconfirmed import.
+ */
+async function replaceUnmappedColumns(
+  tx: TransactionSql,
+  schoolId: string,
+  importId: string,
+  headers: readonly string[],
+  mapping: ColumnMapping,
+): Promise<void> {
+  await tx`
+    DELETE FROM app.student_import_unmapped_columns
+    WHERE school_id = ${schoolId} AND import_id = ${importId}::uuid
+  `;
+  const columns = unmappedColumns(headers, mapping).map((column) => ({
+    position: column.position,
+    header: column.header.slice(0, 500),
+    normalized_header: column.normalized_header.slice(0, 500),
+  }));
+  if (columns.length === 0) return;
+  await tx`
+    INSERT INTO app.student_import_unmapped_columns
+      (school_id, import_id, position, header, normalized_header)
+    SELECT ${schoolId}::uuid, ${importId}::uuid, col.position, col.header, col.normalized_header
+    FROM jsonb_to_recordset(${tx.json(columns as unknown as JSONValue)}::jsonb)
+      AS col (position int, header text, normalized_header text)
+  `;
 }
 
 function statusFor(issues: readonly unknown[]): ImportStatus {

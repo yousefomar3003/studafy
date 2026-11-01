@@ -27,6 +27,9 @@ export {
 } from "./mapping";
 export type { ColumnMapping, CsvSource, SourceRow, StagedRow, StagedRows } from "./mapping";
 
+export { guessColumn, unmappedColumns } from "./unmapped";
+export type { ColumnGuess, ImportableFieldType, UnmappedColumn } from "./unmapped";
+
 export { normalizeAdmissionNumber, normalizeEmail, toStudentImportRecord } from "./record";
 export type { StudentImportIssue, StudentImportRecord, StudentImportValues } from "./record";
 

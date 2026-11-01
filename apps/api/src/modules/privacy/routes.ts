@@ -35,11 +35,14 @@ import {
   dsrIdParamSchema,
   dsrListResponseSchema,
   dsrResponseSchema,
+  listDsrQuerySchema,
+  schoolDsrListResponseSchema,
 } from "./schemas";
 import {
   createDsrRequest,
   findOpenDsrRequest,
   getDsrRequest,
+  listDsrRequestsForSchool,
   listDsrRequestsForSubject,
   subjectExists,
 } from "./service";
@@ -126,6 +129,24 @@ const createDsrRoute = createRoute({
   ),
 });
 
+const listDsrRoute = createRoute({
+  method: "get",
+  path: "/api/privacy/dsr",
+  tags: ["Privacy"],
+  operationId: "listDataSubjectRequests",
+  summary: "List the school's data subject requests, most recent first",
+  description:
+    "Every per-person export and erasure request in the school, whoever filed it, newest first. " +
+    "A completed export's download link is fetched per request from `GET /api/privacy/dsr/{requestId}`, " +
+    "which signs a short-lived URL; this list never carries one.",
+  security: [{ bearerAuth: [] }],
+  request: { query: listDsrQuerySchema },
+  responses: standardResponses(
+    { 200: { description: "The school's requests.", schema: schoolDsrListResponseSchema } },
+    [400, 401, 403, 500],
+  ),
+});
+
 const getDsrRoute = createRoute({
   method: "get",
   path: "/api/privacy/dsr/{requestId}",
@@ -195,6 +216,26 @@ export function privacyRoutes(
   // permission grant. (routes.use() applies to every method on this path; the GET handler simply
   // never calls emitAuditLog, so this declaration is inert for it.)
   routes.use("/api/privacy/me/dsr", auditAction("insert", "data_subject_requests"));
+
+  routes.openapi(listDsrRoute, async (c) => {
+    const auth = requireAuth(c);
+    const query = c.req.valid("query");
+    const rows = await withTenantTx(primary, tenantFrom(c), (tx) =>
+      listDsrRequestsForSchool(tx, auth.schoolId, {
+        subjectUserId: query.subject_user_id,
+        limit: query.limit,
+      }),
+    );
+    return c.json(
+      {
+        requests: rows.map((row) => ({
+          ...toResponse(row),
+          subject_display_name: row.subjectDisplayName,
+        })),
+      },
+      200,
+    );
+  });
 
   routes.openapi(createDsrRoute, async (c) => {
     const auth = requireAuth(c);

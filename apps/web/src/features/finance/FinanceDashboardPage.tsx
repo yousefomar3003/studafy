@@ -47,6 +47,8 @@ const FINANCE_LINKS = [
   { key: "scholarships", to: "/portal/finance/scholarships", managementOnly: false },
   { key: "reports", to: "/portal/finance/reports", managementOnly: false },
   { key: "expenses", to: "/portal/finance/expenses", managementOnly: true },
+  // VAT is the school admin's to set, so both audiences get the link.
+  { key: "tax", to: "/portal/finance/settings/tax", managementOnly: false },
 ] as const;
 
 export default function FinanceDashboardPage() {

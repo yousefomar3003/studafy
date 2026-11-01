@@ -10,6 +10,7 @@ import {
   runnerEnv,
   testDatabase,
 } from "../../../../../packages/db/tests/helpers";
+import { createSchool } from "../../../tests/harness";
 
 import { emit } from "./emitter";
 import { eventPayloadSchemas } from "./schemas";
@@ -94,7 +95,7 @@ describe("eventPayloadSchemas", () => {
 
 describe("emit", () => {
   integrationTest("inserts a row into outbox_events inside a transaction", async () => {
-    const schoolId = crypto.randomUUID();
+    const { id: schoolId } = await createSchool(database!.sql);
     const userId = crypto.randomUUID();
     const event = DOMAIN_EVENTS.USER_CREATED;
 
@@ -124,7 +125,7 @@ describe("emit", () => {
   });
 
   integrationTest("throws on invalid payload", async () => {
-    const schoolId = crypto.randomUUID();
+    const { id: schoolId } = await createSchool(database!.sql);
 
     await expect(
       database!.sql.begin(async (tx) => {
@@ -137,7 +138,7 @@ describe("emit", () => {
   integrationTest(
     "emits every event name without throwing",
     async () => {
-      const schoolId = crypto.randomUUID();
+      const { id: schoolId } = await createSchool(database!.sql);
       const uid = crypto.randomUUID();
 
       const payloads: Record<DomainEvent, unknown> = {

@@ -46,9 +46,11 @@ them.
 2. Under **Invoice**, search by student name or invoice number and pick the
    invoice. Only submitted invoices with a paid amount are listed. The form
    shows what has been paid to date.
-3. Enter the **Amount**. It cannot be more than what was paid on the invoice.
-4. Pick the **Reason**: `Overpayment`, `Withdrawal`, `Discount adjustment` or
-   `Error correction`. Add **Notes** if they help the approver.
+3. Pick the **Reason**: `Overpayment`, `Withdrawal`, `Discount adjustment`,
+   `Error correction` or `Write-off`. Add **Notes** if they help the approver.
+4. Enter the **Amount**. How much you can enter depends on the reason: what was
+   paid for an overpayment or withdrawal, the invoice total for a discount
+   adjustment or error correction, and what is still owed for a write-off.
 5. Click `Review refund`, check the summary, then click `Request refund`.
 
 The refund is now `Pending approval`. Nothing has been paid back yet.

@@ -8,6 +8,7 @@ import type { DisciplineAction, DisciplineIncident, DisciplineIncidentStatus } f
 import type { components } from "@studafy/api-client";
 
 export type CreateActionInput = components["schemas"]["CreateActionBody"];
+export type CreateIncidentInput = components["schemas"]["CreateIncidentBody"];
 export type ResolveIncidentInput = components["schemas"]["ResolveIncidentBody"];
 
 /** A workflow-button transition target — every status except "resolved", which goes through the
@@ -81,5 +82,18 @@ export function useResolveIncident(incidentId: string) {
     onSuccess: async () => {
       await invalidate();
     },
+  });
+}
+
+/** Reports a new incident (`discipline:incident:create`); it starts in the "reported" status. */
+export function useCreateIncident() {
+  const invalidate = useInvalidateDiscipline();
+  return useMutation({
+    mutationFn: async (body: CreateIncidentInput): Promise<DisciplineIncident> => {
+      const { data } = await api.POST("/api/discipline/incidents", { body });
+      if (!data) throw new Error("Incident creation returned no data.");
+      return data as DisciplineIncident;
+    },
+    onSuccess: invalidate,
   });
 }

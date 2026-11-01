@@ -1,11 +1,18 @@
 import { z } from "@hono/zod-openapi";
+import { RECORD_VALUE_ERRORS } from "@studafy/records";
 import {
   STUDENT_IMPORT_FIELD_DEFINITIONS,
   STUDENT_IMPORT_FIELDS,
   UPDATABLE_STUDENT_FIELDS,
 } from "@studafy/student-import";
 
-import { recordValueSchema } from "../records/schemas";
+import {
+  recordFieldOptionSchema,
+  recordFieldSensitivitySchema,
+  recordFieldTypeSchema,
+  recordFieldVisibilitySchema,
+  recordValueSchema,
+} from "../records/schemas";
 
 import type { StudentImportField } from "@studafy/student-import";
 
@@ -120,6 +127,37 @@ export const columnMappingSchema = z
   });
 
 // ---------------------------------------------------------------------------
+// The original file
+// ---------------------------------------------------------------------------
+
+export const sourceRemovedReasonValues = ["deleted", "retention", "erasure"] as const;
+export type SourceRemovedReason = (typeof sourceRemovedReasonValues)[number];
+
+export const importSourceFileSchema = z
+  .object({
+    file_name: z.string().openapi({ description: "The uploaded file's name." }),
+    size_bytes: z
+      .number()
+      .int()
+      .nullable()
+      .openapi({ description: "Stored size. Null once the file is removed." }),
+    uploaded_at: z.string().datetime(),
+    stored: z.boolean().openapi({ description: "Whether the file can still be downloaded." }),
+    expires_at: z.string().datetime().nullable().openapi({
+      description:
+        "When the daily sweep deletes the file under the school's retention period. Null once removed.",
+    }),
+    removed_at: z.string().datetime().nullable(),
+    removed_reason: z.enum(sourceRemovedReasonValues).nullable().openapi({
+      description:
+        "deleted: by staff. retention: the retention period ended. erasure: the school's closure.",
+    }),
+  })
+  .openapi("ImportSourceFile", {
+    description: "The original file a school uploaded, kept so nothing in it is lost.",
+  });
+
+// ---------------------------------------------------------------------------
 // Import record
 // ---------------------------------------------------------------------------
 
@@ -165,6 +203,9 @@ export const importRecordSchema = z
       .datetime()
       .nullable()
       .openapi({ description: "When processing finished." }),
+    source_file: importSourceFileSchema.nullable().openapi({
+      description: "The original file. Null when none was kept (uploads before files were kept).",
+    }),
   })
   .openapi("ImportRecord");
 
@@ -202,6 +243,17 @@ export const uploadImportQuerySchema = z
       description:
         "A saved column mapping to apply. Omitted: a mapping is suggested from the headers.",
     }),
+    source_key: z
+      .string()
+      .min(1)
+      .max(1024)
+      .optional()
+      .openapi({
+        description:
+          "The temp/ storage key the same file was staged under (content class import.source). " +
+          "The stored bytes must equal the request body; the file is then kept as the import's " +
+          "original. Omitted: no original is kept (deployments without object storage).",
+      }),
   })
   .openapi("UploadImportQuery");
 
@@ -236,9 +288,24 @@ export const importListQuerySchema = z
 // Import list response
 // ---------------------------------------------------------------------------
 
+export const importListItemSchema = importRecordSchema
+  .extend({
+    uploaded_by_name: z.string().nullable().openapi({ description: "Who uploaded the file." }),
+    confirmed_by_name: z.string().nullable().openapi({ description: "Who confirmed the import." }),
+    unmapped_column_count: z
+      .number()
+      .int()
+      .openapi({ description: "Source columns no field read." }),
+    cells_available: z.boolean().openapi({
+      description:
+        "Whether the import still holds cells (staged rows, or a completed import's leftover cells).",
+    }),
+  })
+  .openapi("ImportListItem");
+
 export const importListSchema = z
   .object({
-    imports: z.array(importRecordSchema),
+    imports: z.array(importListItemSchema),
     next_cursor: z.string().nullable().openapi({
       description: "Opaque cursor for the next page. Null when no more results.",
     }),
@@ -412,3 +479,256 @@ export const importDiffQuerySchema = z
       .openapi({ description: "Only return rows with this action." }),
   })
   .openapi("ImportDiffQuery");
+
+// ---------------------------------------------------------------------------
+// Original file download
+// ---------------------------------------------------------------------------
+
+export const importSourceDownloadSchema = z
+  .object({
+    url: z.string().url().openapi({ description: "Signed download URL." }),
+    expires_at: z.string().datetime().openapi({ description: "When the URL stops working." }),
+  })
+  .openapi("ImportSourceDownload");
+
+// ---------------------------------------------------------------------------
+// Retention settings
+// ---------------------------------------------------------------------------
+
+export const importSettingsSchema = z
+  .object({
+    source_retention_days: z.number().int().openapi({
+      description: "Days original files and leftover cells are kept after an upload.",
+    }),
+    default_retention_days: z.number().int(),
+    max_retention_days: z.number().int().openapi({ description: "A school can only shorten it." }),
+    updated_at: z.string().datetime().nullable(),
+  })
+  .openapi("ImportSettings");
+
+export const updateImportSettingsBodySchema = z
+  .object({ source_retention_days: z.number().int().min(1).max(180) })
+  .openapi("UpdateImportSettingsBody");
+
+// ---------------------------------------------------------------------------
+// Unmapped columns
+// ---------------------------------------------------------------------------
+
+export const importableFieldTypeSchema = recordFieldTypeSchema.exclude(["document"]);
+
+// Whose record a student import's column is written to. A student import creates students and
+// parents only, so the staff and class kinds of RecordSubjectKind are not offered here.
+export const importSubjectKindSchema = z.enum(["student", "parent"]).openapi("ImportSubjectKind");
+
+export const unmappedColumnSchema = z
+  .object({
+    position: z.number().int().min(0).openapi({ description: "0-based index in source_headers." }),
+    header: z.string(),
+    non_empty_count: z.number().int().openapi({ description: "Lines with a value in the column." }),
+    student_count: z.number().int().openapi({
+      description: "Students this import created or updated that have a value in the column.",
+    }),
+    parent_count: z.number().int().openapi({
+      description: "Parents this import created that have a value in the column.",
+    }),
+    suggested_field_type: importableFieldTypeSchema,
+    suggested_options: z.array(recordFieldOptionSchema).openapi({
+      description: "Choices for a suggested single_choice field.",
+    }),
+    suggested_sensitive: z.boolean().openapi({
+      description: "The header or values look like an ID number, passport, medical or pay data.",
+    }),
+    sensitive_reason: z.enum(["label", "values"]).nullable(),
+    applied: z
+      .object({
+        field_id: z.string().uuid(),
+        subject_kind: importSubjectKindSchema,
+        label_en: z.string(),
+        label_ar: z.string(),
+        count: z.number().int(),
+        applied_at: z.string().datetime(),
+        applied_by_name: z.string().nullable(),
+      })
+      .nullable()
+      .openapi({ description: "The record field this column was last applied to." }),
+  })
+  .openapi("UnmappedColumn");
+
+export const unmappedColumnsSchema = z
+  .object({
+    import_id: z.string().uuid(),
+    status: importStatusSchema,
+    cells_available: z.boolean(),
+    can_apply: z.boolean().openapi({
+      description: "Completed, and its leftover cells are still held: a column can be applied.",
+    }),
+    cells_expire_at: z.string().datetime().nullable().openapi({
+      description: "When the leftover cells are deleted under the school's retention period.",
+    }),
+    columns: z.array(unmappedColumnSchema),
+  })
+  .openapi("UnmappedColumns");
+
+export type UnmappedColumnsResponse = z.infer<typeof unmappedColumnsSchema>;
+
+const newFieldSchema = z
+  .object({
+    label_en: z.string().trim().min(1).max(200),
+    label_ar: z.string().trim().min(1).max(200),
+    field_type: importableFieldTypeSchema,
+    options: z.array(recordFieldOptionSchema).max(100).default([]),
+    sensitivity: recordFieldSensitivitySchema.default("standard"),
+    visibility: recordFieldVisibilitySchema.default("staff_only"),
+  })
+  .openapi("ImportColumnNewField", {
+    description: "A record field to create (and publish) from the column.",
+  });
+
+const columnTargetShape = {
+  position: z.number().int().min(0).openapi({ description: "The unmapped column's position." }),
+  // The enum as is: a description here would wrap the $ref, which the Dart client generator turns
+  // into a class it cannot compile. The body schema's description says what it means.
+  subject_kind: importSubjectKindSchema,
+  field_id: z.string().uuid().optional().openapi({
+    description: "An existing field on the published form. Give this or new_field.",
+  }),
+  new_field: newFieldSchema.optional(),
+  overwrite: z.boolean().default(false).openapi({
+    description: "Replace a different answer a person already has. Default: keep it.",
+  }),
+};
+
+const oneTarget = {
+  check: (body: { field_id?: string; new_field?: unknown }) =>
+    (body.field_id === undefined) !== (body.new_field === undefined),
+  message: "Give field_id or new_field, not both.",
+};
+
+export const columnTargetBodySchema = z
+  .object(columnTargetShape)
+  .refine(oneTarget.check, { message: oneTarget.message })
+  .openapi("ImportColumnTarget", {
+    description:
+      "A column and the record field to write it to. subject_kind student: the students this " +
+      "import created or updated; parent: the parents it created.",
+  });
+
+export type ColumnTargetInput = z.infer<typeof columnTargetBodySchema>;
+
+export const applyColumnBodySchema = z
+  .object({
+    ...columnTargetShape,
+    preview_token: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .openapi({
+        description: "The preview's token. A changed outcome since the preview is refused (409).",
+      }),
+  })
+  .refine(oneTarget.check, { message: oneTarget.message })
+  .openapi("ApplyImportColumnBody", {
+    description: "ImportColumnTarget plus the preview's token.",
+  });
+
+export const columnPreviewStatusValues = [
+  "write",
+  "unchanged",
+  "kept",
+  "invalid",
+  "empty",
+  "conflict",
+] as const;
+export type ColumnPreviewStatus = (typeof columnPreviewStatusValues)[number];
+
+export const columnPreviewRowSchema = z
+  .object({
+    line_number: z.number().int().positive(),
+    subject_id: z.string().uuid(),
+    name: z.string(),
+    admission_number: z.string().nullable(),
+    status: z.enum(columnPreviewStatusValues).openapi({
+      description:
+        "write: written. unchanged: already this value. kept: has a different answer, kept " +
+        "(overwrite off). invalid: not a valid answer for the field. conflict: a parent's siblings " +
+        "disagree. (empty: nothing in the cell; counted, not listed.)",
+    }),
+    replaces_existing: z.boolean(),
+    value: recordValueSchema.nullable().openapi({ description: "Null for a sensitive field." }),
+    mask: z.string().nullable().openapi({ description: "A sensitive value's mask." }),
+    current_value: recordValueSchema.nullable(),
+    current_mask: z.string().nullable(),
+    reason: z
+      .enum([...RECORD_VALUE_ERRORS, "CONFLICTING_VALUES"])
+      .nullable()
+      .openapi({ description: "Why invalid or conflict. Names the rule, never the value." }),
+  })
+  .openapi("ImportColumnPreviewRow");
+
+export type ColumnPreviewRow = z.infer<typeof columnPreviewRowSchema>;
+
+const columnTotalsSchema = z.object({
+  write: z.number().int(),
+  unchanged: z.number().int(),
+  kept: z.number().int(),
+  invalid: z.number().int(),
+  empty: z.number().int(),
+  conflict: z.number().int(),
+});
+
+export const importColumnPreviewSchema = z
+  .object({
+    import_id: z.string().uuid(),
+    position: z.number().int(),
+    header: z.string(),
+    subject_kind: importSubjectKindSchema,
+    field: z.object({
+      id: z.string().uuid().nullable().openapi({ description: "Null for a field to be created." }),
+      field_type: importableFieldTypeSchema,
+      label_en: z.string(),
+      label_ar: z.string(),
+      sensitivity: recordFieldSensitivitySchema,
+    }),
+    totals: columnTotalsSchema,
+    rows: z.array(columnPreviewRowSchema),
+    preview_token: z.string().openapi({ description: "Send back to apply exactly this outcome." }),
+  })
+  .openapi("ImportColumnPreview");
+
+export type ImportColumnPreview = z.infer<typeof importColumnPreviewSchema>;
+
+export const columnApplyResultSchema = z
+  .object({
+    import_id: z.string().uuid(),
+    position: z.number().int(),
+    field_id: z.string().uuid(),
+    field_created: z.boolean(),
+    written: z.number().int(),
+    totals: columnTotalsSchema,
+  })
+  .openapi("ImportColumnApplyResult");
+
+export type ColumnApplyResult = z.infer<typeof columnApplyResultSchema>;
+
+// ---------------------------------------------------------------------------
+// Platform product signal
+// ---------------------------------------------------------------------------
+
+export const unmappedHeaderSignalSchema = z
+  .object({
+    min_schools: z.number().int().openapi({
+      description: "A header is listed only once this many schools have brought it.",
+    }),
+    headers: z.array(
+      z.object({
+        normalized_header: z.string(),
+        header: z.string().openapi({ description: "Its most common spelling." }),
+        schools: z.number().int(),
+        imports: z.number().int(),
+      }),
+    ),
+  })
+  .openapi("UnmappedHeaderSignal", {
+    description: "Unmapped import column headers across schools. Header text and counts only.",
+  });
+
+export type UnmappedHeaderSignal = z.infer<typeof unmappedHeaderSignalSchema>;

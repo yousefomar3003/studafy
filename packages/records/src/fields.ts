@@ -1,9 +1,10 @@
 /**
- * The vocabulary of school-defined student and parent records (docs/modules/student-records.md).
- * Mirrors the enums created by db/migrations/000170_create_student_and_parent_records.sql.
+ * The vocabulary of school-defined records (docs/modules/student-records.md). Mirrors the enums
+ * created by db/migrations/000170_create_student_and_parent_records.sql and extended by 000175.
  */
 
-export const RECORD_SUBJECT_KINDS = ["student", "parent"] as const;
+/** Whose record: a student, a parent, a staff member (by user id), or a class. */
+export const RECORD_SUBJECT_KINDS = ["student", "parent", "staff", "class"] as const;
 export type RecordSubjectKind = (typeof RECORD_SUBJECT_KINDS)[number];
 
 export const RECORD_FIELD_TYPES = [
@@ -36,10 +37,13 @@ export interface RecordFieldOption {
 }
 
 /**
- * Who is reading. "staff" is school leadership (ORG_ADMIN, PRINCIPAL), who read every field; the
- * other three read only fields whose visibility reaches them, and never a sensitive one.
+ * Who is reading. "staff" is whoever reads every field, sensitive ones as their mask: school
+ * leadership on a student, parent or class record, ORG_ADMIN on a staff record. "standard" reads
+ * every field that is not sensitive, whatever its visibility: a PRINCIPAL on a staff record, and a
+ * staff member on their own. The other three read only fields whose visibility reaches them, and
+ * never a sensitive one.
  */
-export type RecordAudience = "staff" | "finance" | "teachers" | "parent";
+export type RecordAudience = "staff" | "standard" | "finance" | "teachers" | "parent";
 
 /**
  * Visibility is a widening ladder: staff_only < finance < teachers < parent. A field marked
@@ -54,6 +58,7 @@ const LADDER: Record<RecordFieldVisibility, number> = {
 
 const AUDIENCE_FLOOR: Record<RecordAudience, number> = {
   staff: 0,
+  standard: 0,
   finance: 1,
   teachers: 2,
   parent: 3,
@@ -73,6 +78,22 @@ export function isFieldVisibleTo(
 export function visibilitiesFor(audience: RecordAudience): RecordFieldVisibility[] {
   return RECORD_FIELD_VISIBILITIES.filter((v) => LADDER[v] >= AUDIENCE_FLOOR[audience]);
 }
+
+/**
+ * What a field on each subject's template may be. Students and parents keep the full ladder. A
+ * staff record has no finance, teacher or parent audience -- leadership and the staff member read
+ * it by role, not by visibility -- so its fields are staff_only. A class record is read by
+ * leadership and the class's teachers, so staff_only or teachers; and a class is not a person, so
+ * nothing on it is sensitive (there is no one whose ID number or medical note it could be).
+ */
+export const RECORD_SUBJECT_FIELD_RULES: Readonly<
+  Record<RecordSubjectKind, { visibilities: readonly RecordFieldVisibility[]; sensitive: boolean }>
+> = {
+  student: { visibilities: RECORD_FIELD_VISIBILITIES, sensitive: true },
+  parent: { visibilities: RECORD_FIELD_VISIBILITIES, sensitive: true },
+  staff: { visibilities: ["staff_only"], sensitive: true },
+  class: { visibilities: ["staff_only", "teachers"], sensitive: false },
+};
 
 /**
  * Months after a subject leaves before the retention job deletes a sensitive answer, when the

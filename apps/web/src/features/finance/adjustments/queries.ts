@@ -5,6 +5,7 @@ import type { components } from "@studafy/api-client";
 export type Refund = components["schemas"]["Refund"];
 export type RefundStatus = Refund["status"];
 export type ReasonCode = Refund["reason_code"];
+export type RefundKind = Refund["kind"];
 export type InitiateRefundBody = components["schemas"]["InitiateRefundBody"];
 
 /** A decimal amount at `minorUnit` precision, formatted the same way `RecordPaymentPage`'s
@@ -21,6 +22,9 @@ const PAGE_SIZE = 20;
 
 export interface RefundFilters {
   status: RefundStatus | "";
+  /** `""` means every kind. */
+  kind?: RefundKind | "";
+  studentId?: string;
 }
 
 export interface RefundsPage {
@@ -38,6 +42,8 @@ export async function fetchRefundsPage(
         limit: PAGE_SIZE,
         offset,
         status: (filters.status || undefined) as RefundStatus | undefined,
+        kind: (filters.kind || undefined) as RefundKind | undefined,
+        student_id: filters.studentId,
       },
     },
   });
@@ -45,6 +51,26 @@ export async function fetchRefundsPage(
 }
 
 export const REFUNDS_PAGE_SIZE = PAGE_SIZE;
+
+export function refundQueryKey(refundId: string) {
+  return ["finance", "refunds", refundId] as const;
+}
+
+export async function fetchRefund(refundId: string): Promise<Refund> {
+  const { data } = await api.GET("/api/finance/refunds/{refundId}", {
+    params: { path: { refundId } },
+  });
+  if (!data) throw new Error("Refund request not found.");
+  return data as Refund;
+}
+
+/** Every request for one student, newest first (one page of 100: a student's history is short). */
+export async function fetchStudentRefunds(studentId: string): Promise<Refund[]> {
+  const { data } = await api.GET("/api/finance/refunds", {
+    params: { query: { student_id: studentId, limit: 100, offset: 0 } },
+  });
+  return (data?.refunds ?? []) as Refund[];
+}
 
 /** The invoice's net paid amount, in minor units: what a refund's amount is capped against. There
  * is no direct `paid_amount` field on `Invoice` (see `refunds/schemas.ts`'s own description of the

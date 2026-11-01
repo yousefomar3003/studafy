@@ -2,10 +2,10 @@ import { resolve } from "node:path";
 
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import postgres from "postgres";
 
 import { runMigrationCommand } from "../../../../packages/db/src/runner";
 import { integrationEnabled, runnerEnv, testDatabase } from "../../../../packages/db/tests/helpers";
+import { createSchool, createUser } from "../../tests/harness";
 import { withTenantTx } from "../db/tenant-tx";
 
 import { SENSITIVE_KEYS, auditAction, emitAuditLog, redactPayload } from "./auditEmitter";
@@ -155,10 +155,17 @@ afterAll(async () => {
   await database?.cleanup();
 });
 
+// app.audit_logs references app.schools (fk_audit_logs_school) and, through (actor_id, school_id),
+// app.users (fk_audit_logs_actor), so the GUC identity must name a real school and a user in it.
+async function seedTenant(): Promise<{ schoolId: string; userId: string }> {
+  const school = await createSchool(database!.sql);
+  const user = await createUser(database!.sql, school.id);
+  return { schoolId: school.id, userId: user.id };
+}
+
 describe("emitAuditLog", () => {
   integrationTest("inserts a row with correct GUC-derived identity", async () => {
-    const schoolId = crypto.randomUUID();
-    const userId = crypto.randomUUID();
+    const { schoolId, userId } = await seedTenant();
     const requestId = crypto.randomUUID();
 
     await withTenantTx(database!.sql, { schoolId, userId, requestId }, async (tx) => {
@@ -187,8 +194,7 @@ describe("emitAuditLog", () => {
   });
 
   integrationTest("writes update audit with both old and new values", async () => {
-    const schoolId = crypto.randomUUID();
-    const userId = crypto.randomUUID();
+    const { schoolId, userId } = await seedTenant();
     const targetId = crypto.randomUUID();
 
     await withTenantTx(database!.sql, { schoolId, userId }, async (tx) => {
@@ -212,7 +218,7 @@ describe("emitAuditLog", () => {
   });
 
   integrationTest("nulls actor_id when user_id GUC is unset", async () => {
-    const schoolId = crypto.randomUUID();
+    const { id: schoolId } = await createSchool(database!.sql);
 
     await withTenantTx(database!.sql, { schoolId }, async (tx) => {
       await emitAuditLog(tx, {
@@ -231,43 +237,38 @@ describe("emitAuditLog", () => {
   });
 
   integrationTest("audit write failure rolls back the mutation", async () => {
-    const schoolId = crypto.randomUUID();
-    const userId = crypto.randomUUID();
+    const { schoolId, userId } = await seedTenant();
+    const email = `rollback-${crypto.randomUUID().slice(0, 8)}@test.local`;
     let mutationCommitted = false;
 
-    const pooled = postgres(database!.url, { max: 2, ssl: false, prepare: false });
-    try {
-      await expect(
-        withTenantTx(pooled, { schoolId, userId }, async (tx) => {
-          await tx`CREATE TEMPORARY TABLE _audit_test (id int)`;
-          await tx`INSERT INTO _audit_test VALUES (1)`;
-          mutationCommitted = true;
-
-          await emitAuditLog(tx, {
-            action: "not_a_valid_action" as AuditAction,
-            targetTable: "students",
-            targetId: crypto.randomUUID(),
-          });
-        }),
-      ).rejects.toThrow();
-
-      expect(mutationCommitted).toBe(true);
-
-      const check = await withTenantTx(pooled, { schoolId }, async (tx) => {
-        const [row] = await tx<{ exists: boolean }[]>`
-          SELECT to_regclass('pg_temp._audit_test') IS NOT NULL AS exists
+    // withTenantTx runs as studafy_app, which has no TEMPORARY privilege on the database, so the
+    // mutation under test is a real tenant-table write rather than a temp table.
+    await expect(
+      withTenantTx(database!.sql, { schoolId, userId }, async (tx) => {
+        await tx`
+          INSERT INTO app.users (school_id, email, normalized_email, status)
+          VALUES (${schoolId}, ${email}, ${email}, 'active')
         `;
-        return row!.exists;
-      });
-      expect(check).toBe(false);
-    } finally {
-      await pooled.end({ timeout: 1 });
-    }
+        mutationCommitted = true;
+
+        await emitAuditLog(tx, {
+          action: "not_a_valid_action" as AuditAction,
+          targetTable: "users",
+          targetId: crypto.randomUUID(),
+        });
+      }),
+    ).rejects.toThrow();
+
+    expect(mutationCommitted).toBe(true);
+
+    const rows = await database!.sql`
+      SELECT id FROM app.users WHERE school_id = ${schoolId} AND normalized_email = ${email}
+    `;
+    expect(rows).toHaveLength(0);
   });
 
   integrationTest("redacted payload is emitted when caller redacts before passing", async () => {
-    const schoolId = crypto.randomUUID();
-    const userId = crypto.randomUUID();
+    const { schoolId, userId } = await seedTenant();
     const targetId = crypto.randomUUID();
 
     const rawPayload = { name: "Ada", password: "s3cret", ssn: "123-45-6789" };

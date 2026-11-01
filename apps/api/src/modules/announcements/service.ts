@@ -137,22 +137,15 @@ export async function createAnnouncement(
     if (input.audience_class_id === undefined) {
       throw new Error("audience_class_id missing for audience_type 'class' past validation");
     }
-    const [klass] = await tx<{ id: string }[]>`
-      SELECT id FROM app.classes
-      WHERE id = ${input.audience_class_id}::uuid AND school_id = ${schoolId}::uuid
-    `;
-    if (!klass) {
-      throw new CodedHttpException(
-        404,
-        ERROR_CODES.ANNOUNCEMENT_CLASS_NOT_FOUND,
-        "Class not found",
-      );
-    }
-
     if (options.restrictToTaughtClass) {
       // Same SECURITY DEFINER predicate the role_scope_visibility RLS policies call, so "teaches
       // this class" has one definition system-wide: the lead teacher, or a co-teacher/substitute
       // holding a timetable slot for it.
+      //
+      // Checked before the class lookup below: app.classes is RLS-scoped, so a class the teacher
+      // does not teach is invisible to that lookup and would surface as a 404 rather than this
+      // 403. teaches_class is false for a nonexistent class too, so the answer is uniform and
+      // discloses nothing about which class ids exist.
       const [row] = await tx<{ allowed: boolean }[]>`
         SELECT app.teaches_class(${input.audience_class_id}::uuid) AS allowed
       `;
@@ -163,6 +156,18 @@ export async function createAnnouncement(
           "You do not teach this class",
         );
       }
+    }
+
+    const [klass] = await tx<{ id: string }[]>`
+      SELECT id FROM app.classes
+      WHERE id = ${input.audience_class_id}::uuid AND school_id = ${schoolId}::uuid
+    `;
+    if (!klass) {
+      throw new CodedHttpException(
+        404,
+        ERROR_CODES.ANNOUNCEMENT_CLASS_NOT_FOUND,
+        "Class not found",
+      );
     }
   }
 

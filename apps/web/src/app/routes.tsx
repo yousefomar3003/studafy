@@ -105,9 +105,26 @@ const AdminParentRecordsPage = lazyWithCatalogs(
   [...ADMIN_CATALOGS, "records"],
   () => import("../features/records/AdminParentRecordsPage"),
 );
+// Staff and class records: one page each, mounted by both the admin and the principal portal.
+const StaffRecordPage = lazyWithCatalogs(
+  [...ADMIN_CATALOGS, "records"],
+  () => import("../features/records/StaffRecordPage"),
+);
+const ClassRecordPage = lazyWithCatalogs(
+  [...ADMIN_CATALOGS, "records"],
+  () => import("../features/records/ClassRecordPage"),
+);
 const ImportStudentsPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
   () => import("../features/admin/students/ImportStudentsPage"),
+);
+const ImportHistoryPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/students/imports/ImportHistoryPage"),
+);
+const ImportDetailPage = lazyWithCatalogs(
+  [...ADMIN_CATALOGS, "recordTemplates"],
+  () => import("../features/admin/students/imports/ImportDetailPage"),
 );
 const TimetableBuilderPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
@@ -116,6 +133,26 @@ const TimetableBuilderPage = lazyWithCatalogs(
 const SchoolSettingsPage = lazyWithCatalogs(
   [...ADMIN_CATALOGS, "recordTemplates"],
   () => import("../features/admin/settings/SchoolSettingsPage"),
+);
+const TeachersPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/teachers/TeachersPage"),
+);
+const AiReportsListPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/ai-reports/AiReportsListPage"),
+);
+const AiReportDetailPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/ai-reports/AiReportDetailPage"),
+);
+const PrivacyRequestsPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/privacy/PrivacyRequestsPage"),
+);
+const AuditLogExplorerPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/audit/AuditLogExplorerPage"),
 );
 const AnnouncementsPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
@@ -162,6 +199,10 @@ const PlatformFinancePage = lazyWithCatalogs(
 const PlatformAiUsagePage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/AiUsagePage"),
+);
+const PlatformImportSignalsPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/ImportSignalsPage"),
 );
 const PlatformInquiriesPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
@@ -252,6 +293,14 @@ const GradesSectionsPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/sections/GradesSectionsPage"),
 );
+const SubjectsCoursesPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/catalog/SubjectsCoursesPage"),
+);
+const SchoolYearsPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/years/SchoolYearsPage"),
+);
 // Loads the principal catalog too: it names sections the way the grades & sections page does.
 const AcademicSetupPage = lazyWithCatalogs(
   [...PRINCIPAL_CATALOGS, "academicGrading"],
@@ -272,8 +321,9 @@ const PrincipalStudentsPage = lazyWithCatalogs(
   () => import("../features/principal/students/PrincipalStudentsPage"),
 );
 // The principal's student and parent pages mount the shared records panel, so they load its strings.
+// Loads academicGrading too: the overview names a result's outcome the way the results tab does.
 const PrincipalStudentPage = lazyWithCatalogs(
-  [...PRINCIPAL_CATALOGS, "records"],
+  [...PRINCIPAL_CATALOGS, "records", "academicGrading"],
   () => import("../features/principal/students/PrincipalStudentPage"),
 );
 const PrincipalParentPage = lazyWithCatalogs(
@@ -360,6 +410,22 @@ const InvoiceBatchPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/invoices/InvoiceBatchPage"),
 );
+const InvoiceBatchHistoryPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/invoices/InvoiceBatchHistoryPage"),
+);
+const InvoiceBatchDetailPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/invoices/InvoiceBatchDetailPage"),
+);
+const StudentFinancePage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/students/StudentFinancePage"),
+);
+const TaxSettingsPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/settings/TaxSettingsPage"),
+);
 const FamiliesListPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/families/FamiliesListPage"),
@@ -388,6 +454,10 @@ const RecordPaymentPage = lazyWithCatalogs(
 const RefundsListPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/adjustments/RefundsListPage"),
+);
+const RefundDetailPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/adjustments/RefundDetailPage"),
 );
 const NewRefundPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
@@ -420,6 +490,11 @@ const AccountPage = lazyWithCatalogs(
 const SessionsPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../features/account/sessions/SessionsPage"),
+);
+// A member of staff's own record, read-only; mounts the shared records panel, so it loads its strings.
+const MyStaffRecordPage = lazyWithCatalogs(
+  [...ONBOARDING_CATALOGS, "records"],
+  () => import("../features/records/MyStaffRecordPage"),
 );
 const DeleteAccountPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
@@ -550,6 +625,7 @@ export const routes: RouteObject[] = [
               ["platform/refunds", <PlatformRefundsPage key="refunds" />],
               ["platform/finance", <PlatformFinancePage key="finance" />],
               ["platform/ai", <PlatformAiUsagePage key="ai" />],
+              ["platform/import-signals", <PlatformImportSignalsPage key="import-signals" />],
               ["platform/plans", <PlatformPlansPage key="plans" />],
               ["platform/settings", <PlatformSettingsPage key="settings" />],
               ["platform/users", <PlatformUserLookupPage key="users" />],
@@ -617,6 +693,22 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            path: "admin/students/imports",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <ImportHistoryPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "admin/students/imports/:importId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <ImportDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
             path: "admin/students/:studentId",
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
@@ -629,6 +721,24 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <AdminParentRecordsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // A member of staff's record. `staffRecord:read` rather than the admin console's own
+            // permission: the principal mounts the same page at `principal/staff/:staffUserId/records`.
+            path: "admin/staff/:staffUserId/records",
+            element: (
+              <RequirePermission permission={PERMISSIONS.STAFF_RECORD_READ}>
+                <StaffRecordPage portal="admin" />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "admin/classes/:classId/records",
+            element: (
+              <RequirePermission permission={PERMISSIONS.CLASS_RECORD_READ}>
+                <ClassRecordPage portal="admin" />
               </RequirePermission>
             ),
           },
@@ -672,6 +782,54 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.STUDENT_RECORD_READ}>
                 <MissingInformationPage portal="admin" />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Who changed what in the school, with a before/after view of each change and a CSV
+            // export. Gated on `auditLog:read` (the export inside on `auditLog:export`), not
+            // `organization:manageSettings`: FINANCE and SUPPORT_AGENT hold the former only.
+            path: "admin/audit",
+            element: (
+              <RequirePermission permission={PERMISSIONS.AUDIT_LOG_READ}>
+                <AuditLogExplorerPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Teachers' employment records (employee number, status, dates); every change also
+            // needs `teacher:update` at the API.
+            path: "admin/teachers",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <TeachersPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Data export and erasure requests about the school's people (GDPR Art. 15 / 17).
+            path: "admin/privacy",
+            element: (
+              <RequirePermission permission={PERMISSIONS.PRIVACY_DSR_MANAGE}>
+                <PrivacyRequestsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // The AI content moderation queue: students' reports of AI output and the safety
+            // filter's escalations. A safeguarding duty, so `aiContent:moderate` (ORG_ADMIN).
+            path: "admin/ai-reports",
+            element: (
+              <RequirePermission permission={PERMISSIONS.AI_CONTENT_MODERATE}>
+                <AiReportsListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "admin/ai-reports/:reportId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.AI_CONTENT_MODERATE}>
+                <AiReportDetailPage />
               </RequirePermission>
             ),
           },
@@ -795,12 +953,49 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            path: "principal/classes/:classId/records",
+            element: (
+              <RequirePermission permission={PERMISSIONS.CLASS_RECORD_READ}>
+                <ClassRecordPage portal="principal" />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Non-sensitive fields only: the API leaves a principal's sensitive staff fields out.
+            path: "principal/staff/:staffUserId/records",
+            element: (
+              <RequirePermission permission={PERMISSIONS.STAFF_RECORD_READ}>
+                <StaffRecordPage portal="principal" />
+              </RequirePermission>
+            ),
+          },
+          {
             // Grades, their per-year sections, and who is placed in each — the "Grade 10 – C" a
             // timetable is built for. Every write behind it requires `timetable:manage`.
             path: "principal/sections",
             element: (
               <RequirePermission permission={PERMISSIONS.TIMETABLE_MANAGE}>
                 <GradesSectionsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Academic years and their terms, and starting a new year (rollover). Every write behind
+            // it requires `timetable:manage`, the same as the API's.
+            path: "principal/years",
+            element: (
+              <RequirePermission permission={PERMISSIONS.TIMETABLE_MANAGE}>
+                <SchoolYearsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // The course catalog: subjects and the courses under them, renamed, re-statused or
+            // removed (archived when still used). Writes require `timetable:manage`.
+            path: "principal/catalog",
+            element: (
+              <RequirePermission permission={PERMISSIONS.TIMETABLE_MANAGE}>
+                <SubjectsCoursesPage />
               </RequirePermission>
             ),
           },
@@ -991,6 +1186,24 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            // Past batch runs and one run's per-student results, gated on `billing:read` like
+            // `GET /api/finance/invoices/batches` and its items.
+            path: "finance/invoices/batches",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <InvoiceBatchHistoryPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "finance/invoices/batches/:batchId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <InvoiceBatchDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
             path: "finance/invoices/:invoiceId",
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_READ}>
@@ -1082,6 +1295,36 @@ export const routes: RouteObject[] = [
             ),
           },
           {
+            // One refund or correction request; deciding it needs `billing:refund`, which the page
+            // checks before offering approve/reject (the API is the real gate).
+            path: "finance/adjustments/refunds/:refundId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <RefundDetailPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // One student's account: invoices, installments, payments and corrections. Identity
+            // comes from `GET /api/finance/students/{studentId}`, so FINANCE can open it.
+            path: "finance/students/:studentId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <StudentFinancePage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Readable with `billing:read`; saving needs `organization:manageSettings`, which the
+            // page checks and `PUT /api/finance/tax-settings` enforces.
+            path: "finance/settings/tax",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <TaxSettingsPage />
+              </RequirePermission>
+            ),
+          },
+          {
             // Gated on `billing:read`, matching the scholarship API's read routes. Requesting an award
             // needs `billing:update` and deciding one `billing:approveScholarship` (ORG_ADMIN) — both
             // enforced by the API and reflected by `ScholarshipsPage`'s own controls.
@@ -1154,6 +1397,12 @@ export const routes: RouteObject[] = [
             // the API's own tenant scoping is what actually restricts a session to its own school).
             path: "sessions",
             element: <SessionsPage />,
+          },
+          {
+            // The caller's own staff record (non-sensitive fields). No `RequirePermission`, same as
+            // the rest of `/account`: the API serves `GET /api/me/staff-record` to any staff role.
+            path: "staff-record",
+            element: <MyStaffRecordPage />,
           },
           {
             // Self-service account deletion — no `RequirePermission`, same posture as the rest of

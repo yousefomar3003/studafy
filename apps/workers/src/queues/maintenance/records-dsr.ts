@@ -7,10 +7,15 @@
  * and redaction by column name would leave every answer in place. So both halves skip
  * RECORD_DATA_TABLES and call in here instead:
  *
- *   - export: every answer about the subject (as a student and as a parent), opened with the
- *     records keyring and labelled with the field as it read when answered, plus document metadata;
+ *   - export: every answer about the subject (as a student, a parent and a member of staff),
+ *     opened with the records keyring and labelled with the field as it read when answered, plus
+ *     document metadata;
  *   - erasure: the answers are deleted outright (documents cascade), and the stored files' keys are
  *     returned for the caller to delete once its transaction has committed.
+ *
+ * A class's record is not about a person (000176): no per-person request reaches it -- its
+ * class_id never matches a subject -- and only a tenant closure, which takes every answer, removes
+ * it. A staff member's answers are keyed by `staff_user_id`, the person's own user id.
  */
 
 import { openRecordValue } from "@studafy/records";
@@ -48,9 +53,10 @@ interface AnswerExportRow {
 
 function subjectFilter(tx: TransactionSql, subject: SubjectIdentifiers | undefined) {
   if (!subject) return tx``;
+  const asUser = tx`(a.parent_user_id = ${subject.userId}::uuid OR a.staff_user_id = ${subject.userId}::uuid)`;
   return subject.studentId
-    ? tx`AND (a.parent_user_id = ${subject.userId}::uuid OR a.student_id = ${subject.studentId}::uuid)`
-    : tx`AND a.parent_user_id = ${subject.userId}::uuid`;
+    ? tx`AND (${asUser} OR a.student_id = ${subject.studentId}::uuid)`
+    : tx`AND ${asUser}`;
 }
 
 export interface RecordExport {

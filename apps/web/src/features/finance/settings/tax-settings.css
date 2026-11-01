@@ -1,0 +1,28 @@
+/**
+ * Sales tax (VAT) settings. Own stylesheet, loaded with the page, as every finance feature.
+ */
+
+.tax-settings {
+  display: grid;
+  gap: var(--space-24);
+  max-width: 640px;
+}
+
+.tax-settings__form,
+.tax-settings__fieldset {
+  display: grid;
+  gap: var(--space-16);
+}
+
+.tax-settings__fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.tax-settings__note {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}

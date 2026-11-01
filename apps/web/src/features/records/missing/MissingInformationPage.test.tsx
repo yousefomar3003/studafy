@@ -169,9 +169,9 @@ describe("missing information on the dashboards", () => {
     expect(
       within(tile).getByRole("link", { name: "See missing information" }).getAttribute("href"),
     ).toBe("/portal/principal/records/missing");
-    expect(
-      screen.getByRole("link", { name: "Student and parent records" }).getAttribute("href"),
-    ).toBe("/portal/principal/school/records");
+    expect(screen.getByRole("link", { name: "School records" }).getAttribute("href")).toBe(
+      "/portal/principal/school/records",
+    );
   });
 
   test("without studentRecord:read the principal dashboard has no tile", async () => {
@@ -179,6 +179,6 @@ describe("missing information on the dashboards", () => {
     wrap(<Page />, await createTestSessionStore(["ATTENDANCE_OFFICER"]));
     await screen.findAllByRole("heading");
     expect(screen.queryByRole("region", { name: "Missing information" })).toBeNull();
-    expect(screen.queryByRole("link", { name: "Student and parent records" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "School records" })).toBeNull();
   });
 });

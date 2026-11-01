@@ -21,6 +21,10 @@ export type RecordMissingStudent = Omit<
   Issues;
 export type RecordMissingParent = Omit<components["schemas"]["RecordMissingParent"], keyof Issues> &
   Issues;
+export type RecordMissingStaff = Omit<components["schemas"]["RecordMissingStaff"], keyof Issues> &
+  Issues;
+export type RecordMissingClass = Omit<components["schemas"]["RecordMissingClass"], keyof Issues> &
+  Issues;
 
 export const MISSING_PAGE_SIZE = 20;
 export const MISSING_KEY = ["records", "missing"] as const;
@@ -60,6 +64,28 @@ export async function fetchMissingParents(
     params: { query: query(search, issue, offset) },
   });
   return { items: (data?.parents ?? []) as RecordMissingParent[], total: data?.total ?? 0 };
+}
+
+export async function fetchMissingStaff(
+  search: string,
+  issue: RecordMissingIssue | null,
+  offset: number,
+): Promise<MissingPage<RecordMissingStaff>> {
+  const { data } = await api.GET("/api/records/missing/staff", {
+    params: { query: query(search, issue, offset) },
+  });
+  return { items: (data?.staff ?? []) as RecordMissingStaff[], total: data?.total ?? 0 };
+}
+
+export async function fetchMissingClasses(
+  search: string,
+  issue: RecordMissingIssue | null,
+  offset: number,
+): Promise<MissingPage<RecordMissingClass>> {
+  const { data } = await api.GET("/api/records/missing/classes", {
+    params: { query: query(search, issue, offset) },
+  });
+  return { items: (data?.classes ?? []) as RecordMissingClass[], total: data?.total ?? 0 };
 }
 
 const EMPTY_SUMMARY: RecordMissingSummary = {

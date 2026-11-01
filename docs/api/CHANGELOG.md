@@ -13,6 +13,104 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Staff and class records (migrations 000175, 000176;
+  [student-records.md](../modules/student-records.md#staff-and-class-records)), under the new
+  "Staff and class records" tag:
+  - `RecordSubjectKind` gains `staff` and `class`, so `/api/record-templates/{subjectKind}…` and
+    `GET /api/record-forms/{subjectKind}` serve them. A staff field must be `staff_only`; a class
+    field `staff_only` or `teachers`, and never sensitive (422 `RECORD_FIELD_INVALID`). The form
+    route now needs the subject's own update permission (`staffRecord:update`, `timetable:manage`).
+  - `GET/PUT /api/staff/{staffUserId}/records`, `POST …/{fieldId}/reveal`,
+    `PUT/PATCH/DELETE …/{fieldId}/document`, `GET …/{fieldId}/document/download`
+    (`StaffRecordParam`, `StaffRecordFieldParam`), gated on the new permissions `staffRecord:read`,
+    `staffRecord:update` and `staffRecord:readSensitive`. A PRINCIPAL's response leaves sensitive
+    fields out.
+  - `GET /api/me/staff-record` and `GET /api/me/staff-record/{fieldId}/document/download`
+    (`SelfRecordFieldParam`): a member of staff's own non-sensitive fields; 403 for anyone holding
+    no staff role.
+  - `GET/PUT /api/classes/{classId}/records`, `PUT/PATCH/DELETE …/{fieldId}/document`,
+    `GET …/{fieldId}/document/download` (`ClassRecordParam`, `ClassRecordFieldParam`): read with the
+    new `classRecord:read`, edited with `timetable:manage`. No reveal: class fields are never
+    sensitive.
+  - `GET /api/records/missing/staff` (`RecordMissingStaffList`, `RecordMissingStaff`) and
+    `GET /api/records/missing/classes` (`RecordMissingClassList`, `RecordMissingClass`).
+  - `POST /api/record-imports/{subjectKind}/preview` and `…/apply` (`RecordImportSubjectKind`,
+    `RecordImportParam`, `RecordImportColumnBody`, `ApplyRecordImportColumnBody`,
+    `RecordImportNewField`, `RecordColumnFieldType`, `RecordImportPreview`,
+    `RecordImportPreviewRow`, `RecordImportTotals`, `RecordImportApplyResult`): keep an unknown
+    column of the users or classes CSV import as a record field, for the subjects the caller
+    created in the last 24 hours (others are `skipped`).
+  - Storage content classes `staffRecord.document`, `staffRecord.sensitiveDocument` and
+    `classRecord.document`.
+
+- Student import history, original files and unmapped columns (migration 000174;
+  [student-import-mapping-guide.md](../modules/student-import-mapping-guide.md#import-history-and-unmapped-columns)):
+  - `POST /api/imports/students/upload` gains optional `source_key` (`UploadImportQuery`): the temp
+    key of the same file staged under the new content class `import.source` (`text/csv`, 25 MiB,
+    `student:import`). The stored bytes must equal the body (400 `STORAGE_CHECKSUM_MISMATCH`); the
+    file is kept as the import's original. `ImportRecord` gains `source_file` (`ImportSourceFile`:
+    `file_name`, `size_bytes`, `uploaded_at`, `stored`, `expires_at`, `removed_at`,
+    `removed_reason`).
+  - `GET /api/imports/students` items are now `ImportListItem`: `ImportRecord` plus
+    `uploaded_by_name`, `confirmed_by_name`, `unmapped_column_count`, `cells_available`.
+  - `GET /api/imports/students/{importId}/source` (one-minute signed URL, audited;
+    `ImportSourceDownload`) and `DELETE /api/imports/students/{importId}/source` (204). 404
+    `IMPORT_SOURCE_NOT_FOUND` once the file is gone.
+  - `GET /api/imports/students/{importId}/columns` (`UnmappedColumns`, `UnmappedColumn`): unmapped
+    columns with a suggested field type, suggested options, `suggested_sensitive`,
+    `sensitive_reason` and what each was applied to.
+  - `POST /api/imports/students/{importId}/columns/preview` (`ImportColumnTarget` →
+    `ImportColumnPreview`, `ImportColumnPreviewRow`) and `POST …/columns/apply`
+    (`ApplyImportColumnBody` → `ImportColumnApplyResult`): write a completed import's unmapped
+    column to an existing or new (`ImportColumnNewField`) student or parent record field, for the
+    people the import itself wrote. Both need `studentRecord:update` too; a new field needs
+    `recordTemplate:manage`. New error codes: `IMPORT_COLUMN_NOT_FOUND`,
+    `IMPORT_CELLS_UNAVAILABLE`, `IMPORT_COLUMN_PREVIEW_STALE`, `IMPORT_RECORD_DRAFT_PENDING`.
+  - `GET`/`PUT /api/imports/students/settings` (`ImportSettings`, `UpdateImportSettingsBody`):
+    how long originals and leftover cells are kept, 1-180 days (default 180).
+  - `GET /api/platform/import-signals/unmapped-headers` (`platform:read`, `UnmappedHeaderSignal`):
+    normalized unmapped header text with school and import counts, shown once 3 schools share it.
+  - `ContentClass` (storage uploads) gains `import.source`.
+
+- `GET /api/privacy/dsr` (`privacy:manageDsr`): the school's per-person export and erasure
+  requests, newest first, optionally for one `subject_user_id` (`DataSubjectRequestListQuery`,
+  `SchoolDataSubjectRequestList`, `SchoolDataSubjectRequest` = `DataSubjectRequest` plus
+  `subject_display_name`). A closure's whole-school request is not listed; a download link is
+  still signed per request by `GET /api/privacy/dsr/{requestId}`.
+- Finance corrections through the refund maker-checker queue (migration 000172):
+  - `POST /api/finance/invoices/{invoiceId}/cancellation` and
+    `POST /api/finance/payments/{paymentId}/reversal` (maker, `billing:update`; body
+    `CorrectionRequestBody`: `reason_code`, required `reason_notes`; params `CorrectionInvoiceParam`,
+    `CorrectionPaymentParam`). Each creates a pending request; the existing
+    `POST /api/finance/refunds/{refundId}/approve` (`billing:refund`, a different user) cancels the
+    Sales Invoice or Payment Entry in ERPNext and completes it. 409 `INVOICE_NOT_CANCELLABLE` (not
+    submitted, or a payment or credit note is against it), `PAYMENT_NOT_REVERSIBLE` (not confirmed,
+    or no invoice), `ADJUSTMENT_ALREADY_REQUESTED` (one open or completed request per invoice or
+    payment).
+  - `Refund` gains `kind` (named enum `RefundKind`: `credit_note`, `invoice_cancellation`,
+    `payment_reversal`); `RefundQuery` gains `kind`. `ReasonCode` gains `write_off`: a credit note
+    that clears what is still owed, refused above the outstanding balance with 400
+    `WRITE_OFF_EXCEEDS_OUTSTANDING`.
+  - `PaymentStatus` gains `reversed`.
+- `GET /api/finance/reports/collections-by-method` (`report:viewFinancial`): confirmed payments per
+  day, currency and method between `from_date` and `to_date` (at most 400 days), with range totals
+  (`CollectionsByMethodQuery`, `CollectionsByMethodReport`, `CollectionsByMethodRow`,
+  `CollectionsByMethodTotal`). Read from Studafy's payment records, not ERPNext.
+- Sales tax (VAT) settings (migration 000173): `GET /api/finance/tax-settings` (`billing:read`),
+  `PUT /api/finance/tax-settings` (`organization:manageSettings`) (`TaxSettings`,
+  `UpdateTaxSettingsBody`). Off by default; when on, the billing worker adds an ERPNext "On Net
+  Total" tax row to every invoice it generates and zero-rates exempt fee categories.
+  `InvoiceDetail` gains `net_total`, `taxes` (`InvoiceTax[]`) and `tax_registration_number`; the
+  payment receipt prints the registration number.
+- `GET /api/finance/students/{studentId}` (`billing:read`): one student's identity, enrolment status
+  and family for finance's per-student account page (`FinanceStudentIdentity`,
+  `FinanceStudentIdParam`), withdrawn students included.
+- `GET /api/finance/payments`: `payment_mode`, `date_from`, `date_to` and `search` (payment or
+  invoice number, student name or admission number); `PaymentList` gains `totals`
+  (`PaymentTotal[]`: confirmed money matching the filters, every page, per currency).
+- `GET /api/finance/invoices`: `issued_from`, `issued_to`, `due_from`, `due_to` (inclusive; a
+  backwards range is a 400).
+
 - Global search covers twenty record types (`GET /api/search`, migration 000171):
   - Named query enum `SearchType` (`students`, `users`, `invoices`, `materials`, `classes`,
     `sections`, `subjects`, `grade_levels`, `academic_years`, `terms`, `rooms`, `families`,
@@ -200,6 +298,11 @@ when it required the `version-bump` label.
 
 ### Changed
 
+- The student import's column calls take `ImportSubjectKind` (`student` | `parent`) for
+  `subject_kind` in `ImportColumnTarget`, `ApplyImportColumnBody`, `ImportColumnPreview` and
+  `UnmappedColumn.applied`, rather than `RecordSubjectKind`, which now also lists `staff` and
+  `class`. Same accepted values as before.
+
 - `GET /api/search` matching: the phrase is normalized (case, Arabic harakat/tatweel, alef forms,
   ى → ي, ة → ه), split into letter/digit words and matched as all of them with the last one as a
   prefix (`oma` → Omar, `inv-00` → INV-0012), replacing `websearch_to_tsquery`; names fall back to
@@ -248,6 +351,28 @@ when it required the `version-bump` label.
   [`apps/mobile/docs/store_payment_routing.md`](../../apps/mobile/docs/store_payment_routing.md)).
 
 ### Fixed
+
+- **Security:** academic year, term, class enrolment and exam writes were guarded only by
+  sign-in, and row-level security fences them to the school, not to a role, so any signed-in
+  member of a school (a student or parent included) could create, change or delete years, terms and
+  exams, enrol, withdraw or transfer students, or roll the year over (closing it and archiving
+  every enrolment). `POST /api/academics/years`, `PATCH`/`DELETE /api/academics/years/{yearId}`,
+  `POST /api/academics/years/{yearId}/rollover`, `POST /api/academics/years/{yearId}/terms`,
+  `PATCH`/`DELETE /api/academics/terms/{termId}`,
+  `POST /api/academics/classes/{classId}/enrollments`,
+  `DELETE /api/academics/classes/{classId}/enrollments/{studentId}`,
+  `POST /api/academics/classes/{classId}/enrollments/transfer`, `POST /api/academics/exams` and
+  `PATCH`/`DELETE /api/academics/exams/{examId}` now require `timetable:manage` (ORG_ADMIN,
+  PRINCIPAL), like the subjects, classes and sections they belong with; anyone else gets 403.
+  Reads are unchanged.
+- `GET /api/finance/invoices`, `GET /api/finance/invoices/{invoiceId}` and
+  `GET /api/finance/invoices/batches/{batchId}/items` returned nothing (404 for the detail) to a
+  FINANCE caller: they joined the student's name under the caller's own row-level security, which
+  hides every student from a role without `student:read`. They now read through the finance
+  identity transaction, like the other finance lists.
+- `GET /api/finance/invoices`, `GET /api/finance/invoices/batches` and
+  `GET /api/finance/invoices/batches/{batchId}/items` never returned a `next_cursor`, so no list got
+  past its first page.
 
 - `POST /api/students` with `guardians` wrote no `parent_child_links` audit row; it now writes one
   per link, like the Guardians tab.

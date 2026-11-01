@@ -5,6 +5,9 @@ import '../../../core/api/generated/models/notification_preferences.dart';
 import '../../../core/api/generated/models/session.dart';
 import '../../../core/api/generated/models/update_notification_preferences_request.dart';
 import '../../../core/auth/auth_providers.dart';
+import '../../../core/auth/authenticated_dio.dart';
+import '../data/own_staff_record_client.dart';
+import '../domain/own_staff_record.dart';
 
 /// Every live session of the signed-in user (`GET /api/auth/sessions`), this device's first, then
 /// the most recently issued.
@@ -68,4 +71,38 @@ final updateNotificationPreferenceProvider =
       return (update) => api.notifications.updateNotificationPreferences(
         body: UpdateNotificationPreferencesRequest(preferences: [update]),
       );
+    });
+
+/// The roles that make someone a member of the school's staff, and so the subject of a staff
+/// record they can read (mirrors `SCHOOL_STAFF_ROLES` in packages/constants).
+const schoolStaffRoleClaims = {
+  'ORG_ADMIN',
+  'PRINCIPAL',
+  'ATTENDANCE_OFFICER',
+  'FINANCE',
+  'INSTRUCTOR',
+};
+
+/// Whether these session roles include a staff role, so Profile offers "My staff record".
+bool holdsStaffRole(Iterable<String> roles) =>
+    roles.any(schoolStaffRoleClaims.contains);
+
+/// [OwnStaffRecordClient] on its own [authenticatedDio], as `academicResultsClientProvider` is.
+final ownStaffRecordClientProvider = Provider<OwnStaffRecordClient>((ref) {
+  return OwnStaffRecordClient(authenticatedDio(ref));
+});
+
+/// The signed-in member of staff's own record (`GET /api/me/staff-record`).
+final ownStaffRecordProvider = FutureProvider.autoDispose<OwnStaffRecord>((
+  ref,
+) {
+  return ref.watch(ownStaffRecordClientProvider).fetch();
+});
+
+/// A short-lived download URL for one of the staff member's own documents. Not a cached provider:
+/// the URL expires within minutes, so it is fetched each time the file is opened.
+final ownStaffRecordDocumentUrlProvider =
+    Provider<Future<Uri> Function(String fieldId)>((ref) {
+      final client = ref.watch(ownStaffRecordClientProvider);
+      return client.documentUrl;
     });

@@ -10,6 +10,7 @@
  */
 
 import { armAdminActor, resolveAdminActor } from "./admin-actor";
+import { eraseImportData } from "./imports-dsr";
 import { RECORD_DATA_TABLES, eraseRecordData } from "./records-dsr";
 import { hardDeleteRows, redactPersonalColumns } from "./redact";
 import { classifyTable } from "./retention-registry";
@@ -23,7 +24,7 @@ import type { TransactionSql } from "postgres";
 export interface ErasureResult {
   redactedTables: RedactedTableEntry[];
   retainedTables: RetainedTableEntry[];
-  /** Record document files whose rows this erasure deleted: remove them after commit. */
+  /** Record document and import source files this erasure released: remove them after commit. */
   orphanedStorageKeys: string[];
 }
 
@@ -89,6 +90,28 @@ export async function runTenantErasure(
     });
   }
 
+  // Student import files and leftover cells (imports-dsr.ts): a closure deletes them all; a person's
+  // request deletes their leftover cells and records the files, which cannot be redacted, as
+  // retained until their retention period ends.
+  const imports = await eraseImportData(tx, schoolId, subject);
+  if (imports.rows > 0) {
+    redacted.push({
+      table: "student_import_rows",
+      action: "hard_deleted",
+      columns: [],
+      rows: imports.rows,
+    });
+  }
+  if (imports.storageKeys.length > 0) {
+    redacted.push({
+      table: "student_imports",
+      action: "redacted",
+      columns: ["source_storage_key", "source_size_bytes"],
+      rows: imports.storageKeys.length,
+    });
+  }
+  retained.push(...imports.retained);
+
   // A tenant-wide closure additionally owns the school's own contact identity: app.schools is
   // global (no school_id column), so it is never discovered by tenant-tables.ts and the loop above
   // never reaches it. redactPersonalColumns' "school_id = $1" WHERE assumption does not apply to
@@ -113,6 +136,6 @@ export async function runTenantErasure(
   return {
     redactedTables: redacted,
     retainedTables: retained,
-    orphanedStorageKeys: records.storageKeys,
+    orphanedStorageKeys: [...records.storageKeys, ...imports.storageKeys],
   };
 }

@@ -45,7 +45,8 @@
   "paymentStatus": {
     "pending": "قيد الانتظار",
     "confirmed": "مؤكَّد",
-    "failed": "فشل"
+    "failed": "فشل",
+    "reversed": "مُلغاة"
   },
   "dashboard": {
     "title": "نظرة عامة على المالية",
@@ -59,7 +60,8 @@
       "scholarships": "المنح الدراسية ←",
       "reports": "التقارير ←",
       "expenses": "المصروفات ←",
-      "families": "العائلات ←"
+      "families": "العائلات ←",
+      "tax": "ضريبة القيمة المضافة"
     }
   },
   "overdue": {
@@ -140,7 +142,12 @@
       "invoiceNumber": "رقم الفاتورة",
       "caption": "الفواتير",
       "loadError": "تعذّر تحميل الفواتير.",
-      "empty": "لا توجد فواتير مطابقة لعامل التصفية هذا."
+      "empty": "لا توجد فواتير مطابقة لعامل التصفية هذا.",
+      "batchHistory": "سجل الدفعات",
+      "issuedFrom": "صدرت من",
+      "issuedTo": "صدرت إلى",
+      "dueFrom": "تستحق من",
+      "dueTo": "تستحق إلى"
     },
     "detail": {
       "loadError": "تعذّر تحميل هذه الفاتورة. يرجى المحاولة مرة أخرى.",
@@ -152,7 +159,13 @@
       "noLines": "لا توجد بنود في هذه الفاتورة.",
       "feeCategory": "فئة الرسوم",
       "lineDescription": "الوصف",
-      "quantity": "الكمية"
+      "quantity": "الكمية",
+      "cancelInvoice": "إلغاء الفاتورة",
+      "creditNote": "إشعار دائن",
+      "writeOff": "شطب الرصيد",
+      "taxRegistration": "الرقم الضريبي",
+      "netTotal": "الإجمالي قبل الضريبة",
+      "corrections": "الاستردادات والتصحيحات"
     },
     "batch": {
       "title": "إنشاء الفواتير",
@@ -203,6 +216,19 @@
         "back": "رجوع",
         "confirm": "إنشاء الفواتير على أي حال"
       }
+    },
+    "history": {
+      "title": "سجل دفعات الفواتير",
+      "intro": "كل دفعة تم تشغيلها، الأحدث أولًا. افتح إحداها لترى من صدرت له فاتورة ومن تعذّر.",
+      "caption": "دفعات إصدار الفواتير",
+      "started": "بدأت",
+      "period": "فترة الفوترة",
+      "feeStructure": "هيكل الرسوم",
+      "results": "النتائج",
+      "counts": "{{succeeded}} من {{total}} صدرت · {{failed}} تعذّر",
+      "loadError": "تعذّر تحميل الدفعات.",
+      "empty": "لم يتم تشغيل أي دفعة بعد.",
+      "detailTitle": "دفعة فواتير"
     }
   },
   "payments": {
@@ -212,7 +238,21 @@
       "receipt": "الإيصال",
       "caption": "الدفعات",
       "loadError": "تعذّر تحميل الدفعات.",
-      "empty": "لا توجد دفعات مطابقة لعامل التصفية هذا."
+      "empty": "لا توجد دفعات مطابقة لعامل التصفية هذا.",
+      "allMethods": "كل الطرق",
+      "actions": "إجراءات",
+      "reverse": "إلغاء الدفعة",
+      "search": "بحث",
+      "searchPlaceholder": "رقم الدفعة أو الفاتورة، أو اسم الطالب أو رقمه",
+      "dateFrom": "مدفوعة من",
+      "dateTo": "مدفوعة إلى",
+      "noConfirmedTotal": "لا توجد دفعات مؤكدة تطابق هذه الفلاتر.",
+      "confirmedTotal_zero": "المؤكد: {{amount}} {{currency}} من دون دفعات",
+      "confirmedTotal_one": "المؤكد: {{amount}} {{currency}} من دفعة واحدة",
+      "confirmedTotal_two": "المؤكد: {{amount}} {{currency}} من دفعتين",
+      "confirmedTotal_few": "المؤكد: {{amount}} {{currency}} من {{count}} دفعات",
+      "confirmedTotal_many": "المؤكد: {{amount}} {{currency}} من {{count}} دفعة",
+      "confirmedTotal_other": "المؤكد: {{amount}} {{currency}} من {{count}} دفعة"
     },
     "record": {
       "back": "→ العودة إلى الدفعات",
@@ -312,6 +352,45 @@
       "scholarships": "المنح الدراسية ({{names}})",
       "noScholarships": "لا توجد منح موافق عليها",
       "studentTotal": "الإجمالي لـ {{name}}"
+    },
+    "plan": {
+      "title": "خطة الدفع",
+      "intro": "قسّم هذا الهيكل إلى أقساط للطلاب المخصص لهم. يوزّع ERPNext الإجمالي على تواريخ الاستحقاق.",
+      "notSubmitted": "اعتمد هذا الهيكل في ERPNext قبل جدولة الأقساط.",
+      "noStudents": "احفظ الطلاب المخصص لهم هذا الهيكل أولًا.",
+      "forStudents_zero": "لا يوجد طلاب.",
+      "forStudents_one": "لطالب واحد.",
+      "forStudents_two": "لطالبين.",
+      "forStudents_few": "لـ {{count}} طلاب.",
+      "forStudents_many": "لـ {{count}} طالبًا.",
+      "forStudents_other": "لـ {{count}} طالب.",
+      "scheduleTypeLabel": "الجدولة",
+      "scheduleType": {
+        "term_wise": "حسب الفصل",
+        "monthly": "شهري",
+        "quarterly": "ربع سنوي",
+        "yearly": "سنوي"
+      },
+      "dueDates": "تواريخ الاستحقاق",
+      "dueDate": "تاريخ الاستحقاق {{number}}",
+      "addDate": "إضافة تاريخ استحقاق",
+      "removeDate": "إزالة",
+      "duplicateDate": "يُستخدم كل تاريخ استحقاق مرة واحدة.",
+      "generate": "إنشاء الأقساط",
+      "error": "تعذّر إنشاء الأقساط.",
+      "createdToast_zero": "لم يُنشأ أي قسط",
+      "createdToast_one": "تم إنشاء قسط واحد",
+      "createdToast_two": "تم إنشاء قسطين",
+      "createdToast_few": "تم إنشاء {{count}} أقساط",
+      "createdToast_many": "تم إنشاء {{count}} قسطًا",
+      "createdToast_other": "تم إنشاء {{count}} قسط",
+      "created_zero": "لم يُنشأ أي قسط.",
+      "created_one": "تم إنشاء قسط واحد.",
+      "created_two": "تم إنشاء قسطين.",
+      "created_few": "تم إنشاء {{count}} أقساط.",
+      "created_many": "تم إنشاء {{count}} قسطًا.",
+      "created_other": "تم إنشاء {{count}} قسط.",
+      "viewOverdue": "عرض الأقساط المتأخرة"
     }
   },
   "expenses": {
@@ -350,7 +429,12 @@
       "loadError": "تعذّر تحميل هذا المصروف.",
       "label": "تفاصيل المصروف",
       "viewReceipt": "عرض الإيصال",
-      "noReceipt": "لا يوجد إيصال مرفق."
+      "noReceipt": "لا يوجد إيصال مرفق.",
+      "edit": "تعديل المصروف",
+      "attachReceipt": "إرفاق إيصال",
+      "uploading": "جارٍ الرفع…",
+      "attachedToast": "تم إرفاق الإيصال",
+      "attachError": "تعذّر إرفاق الإيصال."
     },
     "new": {
       "title": "تسجيل مصروف",
@@ -371,6 +455,12 @@
     "import": {
       "title": "استيراد المصروفات",
       "amountPositive": "يجب أن يكون المبلغ أكبر من صفر."
+    },
+    "edit": {
+      "label": "تعديل المصروف",
+      "save": "حفظ التغييرات",
+      "savedToast": "تم تحديث المصروف",
+      "error": "تعذّر تحديث المصروف."
     }
   },
   "invoiceStatus": {
@@ -568,6 +658,28 @@
     "unlinked": {
       "summary": "خارج أي عائلة: طلاب مسجّلون بلا ولي أمر: {{students}} · أولياء أمور بلا أبناء: {{parents}}.",
       "review": "مراجعتهم وربطهم"
+    },
+    "manage": {
+      "title": "إدارة الأسرة",
+      "intro": "غيّر اسم العائلة، أو اختر من تُوجَّه إليه الفواتير، أو انقل ولي أمر طفل إلى أسرة أخرى.",
+      "name": "اسم العائلة",
+      "primary": "ولي الأمر الرئيسي",
+      "save": "حفظ",
+      "savedToast": "تم تحديث الأسرة",
+      "saveError": "تعذّر تحديث الأسرة.",
+      "links": "أولياء الأمور والأبناء",
+      "noLinks": "لم يعد أحد مرتبطًا بهذه العائلة.",
+      "delete": "حذف العائلة",
+      "deletedToast": "تم حذف العائلة",
+      "deleteError": "تعذّر حذف العائلة.",
+      "link": "{{guardian}} ← {{child}}",
+      "move": "نقل",
+      "remove": "إزالة",
+      "moveTo": "نقل {{link}} إلى العائلة المسماة",
+      "movedToast": "تم النقل إلى العائلة الأخرى",
+      "moveError": "تعذّر نقل الارتباط.",
+      "removedToast": "تمت إزالة الارتباط",
+      "removeError": "تعذّرت إزالة الارتباط."
     }
   },
   "unlinked": {
@@ -615,5 +727,57 @@
       "partial_many": "رُبط {{count}} ابنًا قبل الخطأ.",
       "partial_other": "رُبط {{count}} ابن قبل الخطأ."
     }
+  },
+  "studentAccount": {
+    "loadError": "تعذّر تحميل حساب هذا الطالب.",
+    "owed": "المستحق",
+    "noFamily": "لا توجد عائلة مرتبطة",
+    "kind": "النوع",
+    "invoices": "الفواتير",
+    "noInvoices": "لا توجد فواتير بعد.",
+    "installments": "خطة الأقساط",
+    "noInstallments": "لا توجد أقساط مجدولة.",
+    "installmentsError": "تعذّر تحميل الأقساط.",
+    "payments": "الدفعات",
+    "noPayments": "لا توجد دفعات بعد.",
+    "corrections": "الاستردادات والتصحيحات",
+    "noCorrections": "لم يُطلب شيء.",
+    "correctionsError": "تعذّر تحميل الاستردادات والتصحيحات.",
+    "installmentStatus": {
+      "pending": "قيد الانتظار",
+      "partially_paid": "مدفوع جزئيًا",
+      "paid": "مدفوع",
+      "overdue": "متأخر"
+    },
+    "status": {
+      "applicant": "متقدّم",
+      "enrolled": "مسجّل",
+      "suspended": "موقوف",
+      "graduated": "متخرّج",
+      "withdrawn": "منسحب",
+      "archived": "مؤرشف"
+    }
+  },
+  "taxSettings": {
+    "title": "ضريبة المبيعات (القيمة المضافة)",
+    "intro": "هل تحمل الفواتير ضريبة القيمة المضافة، وبأي نسبة، وما الرسوم المعفاة. متوقفة ما لم تفعّلها المدرسة.",
+    "readOnly": "مدير المدرسة وحده يمكنه تغيير هذه الإعدادات.",
+    "enabled": "فرض الضريبة على الفواتير الجديدة",
+    "name": "اسم الضريبة على الفواتير",
+    "rate": "النسبة",
+    "rateInvalid": "أدخل نسبة بين 0 و100.",
+    "account": "حساب الضريبة في ERPNext",
+    "accountHelp": "الحساب الذي تُرحّل إليه الضريبة، مثل VAT 5% - SCH.",
+    "registration": "الرقم الضريبي",
+    "registrationHelp": "يُطبع على الفواتير والإيصالات.",
+    "inclusive": "مبالغ الرسوم تشمل الضريبة",
+    "exempt": "فئات الرسوم المعفاة",
+    "exemptHelp": "فئة رسوم واحدة في كل سطر (كما هي في ERPNext). لا تُفرض الضريبة على هذه البنود.",
+    "needRateAndAccount": "تفعيل الضريبة يتطلب نسبة أكبر من 0 وحساب الضريبة في ERPNext.",
+    "notRetroactive": "تنطبق التغييرات على الفواتير التي تُصدر من الآن. لا تتغير الفواتير الصادرة؛ صحّح أيًّا منها بإشعار دائن.",
+    "save": "حفظ إعدادات الضريبة",
+    "savedToast": "تم حفظ إعدادات الضريبة",
+    "saveError": "تعذّر حفظ إعدادات الضريبة.",
+    "loadError": "تعذّر تحميل إعدادات الضريبة."
   }
 }

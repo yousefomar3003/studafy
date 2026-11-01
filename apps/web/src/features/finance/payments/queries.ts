@@ -16,15 +16,26 @@ export type PaymentStatus = Payment["status"];
 
 const PAGE_SIZE = 20;
 
+export type PaymentTotal = components["schemas"]["PaymentTotal"];
+
 export interface PaymentFilters {
   /** `""` means "every status" — left off the request rather than sent empty, same convention
-   * `invoices/queries.ts`'s `InvoiceFilters` documents. */
+   * `invoices/queries.ts`'s `InvoiceFilters` documents. The same for every field below. */
   status: PaymentStatus | "";
+  mode?: PaymentMode | "";
+  /** Inclusive YYYY-MM-DD payment-date bounds. */
+  dateFrom?: string;
+  dateTo?: string;
+  /** Payment or invoice number, or the student's name or admission number. */
+  search?: string;
+  studentId?: string;
 }
 
 export interface PaymentsPage {
   items: PaymentListItem[];
   total: number;
+  /** Confirmed money matching the filters across every page, per currency. */
+  totals: PaymentTotal[];
 }
 
 /**
@@ -43,6 +54,11 @@ export async function fetchPaymentsPage(
         limit: PAGE_SIZE,
         offset,
         status: (filters.status || undefined) as PaymentStatus | undefined,
+        payment_mode: filters.mode || undefined,
+        date_from: filters.dateFrom || undefined,
+        date_to: filters.dateTo || undefined,
+        search: filters.search || undefined,
+        student_id: filters.studentId,
       },
     },
   });
@@ -52,6 +68,7 @@ export async function fetchPaymentsPage(
   return {
     items: (data?.payments ?? []) as PaymentListItem[],
     total: data?.total ?? 0,
+    totals: (data?.totals ?? []) as PaymentTotal[],
   };
 }
 

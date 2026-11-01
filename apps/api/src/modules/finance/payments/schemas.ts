@@ -1,5 +1,5 @@
 import { z } from "@hono/zod-openapi";
-import { uuidSchema, dateTimeSchema } from "@studafy/shared-schemas";
+import { dateSchema, dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
 export const paymentModeSchema = z
   .enum(["cash", "bank_transfer", "card_external"])
@@ -10,12 +10,14 @@ export const paymentModeSchema = z
   });
 
 export const paymentStatusSchema = z
-  .enum(["pending", "confirmed", "failed"])
+  .enum(["pending", "confirmed", "failed", "reversed"])
   .openapi("PaymentStatus", {
     description:
       "`pending` — forwarded to ERPNext and accepted, awaiting the submission webhook. " +
       "`confirmed` — ERPNext confirmed submission and a receipt exists. " +
-      "`failed` — ERPNext ultimately rejected or cancelled the entry.",
+      "`failed` — ERPNext ultimately rejected or cancelled the entry before it was confirmed. " +
+      "`reversed` — confirmed, then cancelled through an approved reversal; its invoice is owed " +
+      "again.",
   });
 
 export const paymentIdParamSchema = z
@@ -169,10 +171,24 @@ export const paymentListItemSchema = paymentSchema
   })
   .openapi("PaymentListItem");
 
+export const paymentTotalSchema = z
+  .object({
+    currency: z.string().length(3),
+    amount: z.string().openapi({ description: "Decimal string at the currency's precision." }),
+    amount_minor: z.number().int(),
+    count: z.number().int(),
+  })
+  .openapi("PaymentTotal");
+
 export const paymentListSchema = z
   .object({
     payments: z.array(paymentListItemSchema),
     total: z.number().int(),
+    totals: z.array(paymentTotalSchema).openapi({
+      description:
+        "Confirmed payments matching the filters (every page, not just this one), summed per " +
+        "currency: the figure a cash-up or bank match compares against.",
+    }),
   })
   .openapi("PaymentList");
 
@@ -185,8 +201,23 @@ export const paymentQuerySchema = z
       .optional()
       .openapi({ description: "Filter by target ERPNext Sales Invoice docname." }),
     status: paymentStatusSchema.optional(),
+    payment_mode: paymentModeSchema.optional(),
+    date_from: dateSchema
+      .optional()
+      .openapi({ description: "Payment date on or after (YYYY-MM-DD)." }),
+    date_to: dateSchema
+      .optional()
+      .openapi({ description: "Payment date on or before (YYYY-MM-DD)." }),
+    search: z.string().trim().min(1).max(200).optional().openapi({
+      description:
+        "Payment or invoice number (contains), or the student's name or admission number.",
+    }),
     limit: z.coerce.number().int().min(1).max(100).default(20),
     offset: z.coerce.number().int().min(0).default(0),
+  })
+  .refine((q) => !q.date_from || !q.date_to || q.date_from <= q.date_to, {
+    message: "date_from must be on or before date_to",
+    path: ["date_to"],
   })
   .openapi("PaymentQuery");
 

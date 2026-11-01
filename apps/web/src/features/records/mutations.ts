@@ -7,6 +7,15 @@ import { recordsQueryKey } from "./queries";
 
 import type { RecordAnswerInput, RecordSubject, SubjectRecords } from "./queries";
 
+/**
+ * The four subjects' document routes share one request and response shape; the generated client
+ * types each path separately, so the call is made through this one signature.
+ */
+type DocumentWrite = (
+  path: string,
+  init: { params: { path: Record<string, string> }; body?: unknown },
+) => Promise<{ data?: SubjectRecords }>;
+
 function useRecordsMutation<Input>(
   subject: RecordSubject,
   run: (input: Input) => Promise<SubjectRecords | undefined>,
@@ -23,22 +32,81 @@ function useRecordsMutation<Input>(
   });
 }
 
+async function putRecords(subject: RecordSubject, body: { answers: RecordAnswerInput[] }) {
+  switch (subject.kind) {
+    case "student":
+      return api.PUT("/api/students/{studentId}/records", {
+        params: { path: { studentId: subject.id } },
+        body,
+      });
+    case "parent":
+      return api.PUT("/api/parents/{parentUserId}/records", {
+        params: { path: { parentUserId: subject.id } },
+        body,
+      });
+    case "staff":
+      return api.PUT("/api/staff/{staffUserId}/records", {
+        params: { path: { staffUserId: subject.id } },
+        body,
+      });
+    case "class":
+      return api.PUT("/api/classes/{classId}/records", {
+        params: { path: { classId: subject.id } },
+        body,
+      });
+  }
+}
+
 /** `PUT …/records`: the changed answers only; `null` clears one. */
 export function useSaveRecordAnswers(subject: RecordSubject) {
   return useRecordsMutation(subject, async (answers: RecordAnswerInput[]) => {
-    const body = { answers };
-    const { data } =
-      subject.kind === "student"
-        ? await api.PUT("/api/students/{studentId}/records", {
-            params: { path: { studentId: subject.id } },
-            body,
-          })
-        : await api.PUT("/api/parents/{parentUserId}/records", {
-            params: { path: { parentUserId: subject.id } },
-            body,
-          });
+    const { data } = await putRecords(subject, { answers });
     return data as SubjectRecords | undefined;
   });
+}
+
+/**
+ * The content class a document field's file is staged under (the API's content-classes.ts): each
+ * subject's pairs that subject's edit permission, and a class field is never sensitive.
+ */
+export function documentContentClass(subject: RecordSubject, sensitive: boolean) {
+  if (subject.kind === "staff") {
+    return sensitive ? "staffRecord.sensitiveDocument" : "staffRecord.document";
+  }
+  if (subject.kind === "class") return "classRecord.document";
+  return sensitive ? "record.sensitiveDocument" : "record.document";
+}
+
+interface DocumentPath {
+  fieldId: string;
+}
+
+function documentCall(
+  subject: RecordSubject,
+  { fieldId }: DocumentPath,
+): { path: string; params: { path: Record<string, string> } } {
+  switch (subject.kind) {
+    case "student":
+      return {
+        path: "/api/students/{studentId}/records/{fieldId}/document",
+        params: { path: { studentId: subject.id, fieldId } },
+      };
+    case "parent":
+      return {
+        path: "/api/parents/{parentUserId}/records/{fieldId}/document",
+        params: { path: { parentUserId: subject.id, fieldId } },
+      };
+    case "staff":
+      return {
+        path: "/api/staff/{staffUserId}/records/{fieldId}/document",
+        params: { path: { staffUserId: subject.id, fieldId } },
+      };
+    case "class":
+      return {
+        path: "/api/classes/{classId}/records/{fieldId}/document",
+        params: { path: { classId: subject.id, fieldId } },
+      };
+  }
 }
 
 export interface AttachDocumentInput {
@@ -57,7 +125,7 @@ export function useAttachRecordDocument(subject: RecordSubject) {
   return useRecordsMutation(subject, async (input: AttachDocumentInput) => {
     const { data: target } = await api.POST("/api/storage/uploads/request-upload", {
       body: {
-        content_class: input.sensitive ? "record.sensitiveDocument" : "record.document",
+        content_class: documentContentClass(subject, input.sensitive),
         file_name: input.file.name,
         content_type: input.file.type,
         size_bytes: input.file.size,
@@ -69,17 +137,12 @@ export function useAttachRecordDocument(subject: RecordSubject) {
       storage_key: target.storage_key,
       ...(input.expiresOn ? { expires_on: input.expiresOn } : {}),
     };
-    const { data } =
-      subject.kind === "student"
-        ? await api.PUT("/api/students/{studentId}/records/{fieldId}/document", {
-            params: { path: { studentId: subject.id, fieldId: input.fieldId } },
-            body,
-          })
-        : await api.PUT("/api/parents/{parentUserId}/records/{fieldId}/document", {
-            params: { path: { parentUserId: subject.id, fieldId: input.fieldId } },
-            body,
-          });
-    return data as SubjectRecords | undefined;
+    const call = documentCall(subject, input);
+    const { data } = await (api.PUT as unknown as DocumentWrite)(call.path, {
+      params: call.params,
+      body,
+    });
+    return data;
   });
 }
 
@@ -96,31 +159,19 @@ export function useUpdateRecordDocument(subject: RecordSubject) {
       ...(input.status ? { status: input.status } : {}),
       ...(input.expiresOn !== undefined ? { expires_on: input.expiresOn } : {}),
     };
-    const { data } =
-      subject.kind === "student"
-        ? await api.PATCH("/api/students/{studentId}/records/{fieldId}/document", {
-            params: { path: { studentId: subject.id, fieldId: input.fieldId } },
-            body,
-          })
-        : await api.PATCH("/api/parents/{parentUserId}/records/{fieldId}/document", {
-            params: { path: { parentUserId: subject.id, fieldId: input.fieldId } },
-            body,
-          });
-    return data as SubjectRecords | undefined;
+    const call = documentCall(subject, input);
+    const { data } = await (api.PATCH as unknown as DocumentWrite)(call.path, {
+      params: call.params,
+      body,
+    });
+    return data;
   });
 }
 
 export function useRemoveRecordDocument(subject: RecordSubject) {
   return useRecordsMutation(subject, async (fieldId: string) => {
-    if (subject.kind === "student") {
-      await api.DELETE("/api/students/{studentId}/records/{fieldId}/document", {
-        params: { path: { studentId: subject.id, fieldId } },
-      });
-    } else {
-      await api.DELETE("/api/parents/{parentUserId}/records/{fieldId}/document", {
-        params: { path: { parentUserId: subject.id, fieldId } },
-      });
-    }
+    const call = documentCall(subject, { fieldId });
+    await (api.DELETE as unknown as DocumentWrite)(call.path, { params: call.params });
     return undefined;
   });
 }

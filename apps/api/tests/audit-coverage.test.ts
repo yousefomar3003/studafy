@@ -171,6 +171,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/imports/students/mappings",
   "PATCH /api/imports/students/mappings/{mappingId}",
   "DELETE /api/imports/students/mappings/{mappingId}",
+  // Original files and unmapped columns: deleting a file, applying a column (one audit row per
+  // record answer written plus one for the column) and changing retention are audited.
+  "DELETE /api/imports/students/{importId}/source",
+  // The column preview writes nothing; it declares the table its apply audits.
+  "POST /api/imports/students/{importId}/columns/preview",
+  "POST /api/imports/students/{importId}/columns/apply",
+  "PUT /api/imports/students/settings",
   // Bulk invitations. Admin dispatches invitations in batches; audit rows written by
   // auditAction middleware in bulk-invite-routes.ts.
   "POST /api/invitations/bulk",
@@ -379,6 +386,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/refunds/initiate",
   "POST /api/finance/refunds/{refundId}/approve",
   "POST /api/finance/refunds/{refundId}/reject",
+  "POST /api/finance/invoices/{invoiceId}/cancellation",
+  "POST /api/finance/payments/{paymentId}/reversal",
   // Scholarships: finance requests an award, the school admin decides it (finance/scholarships).
   "POST /api/finance/scholarships",
   "PATCH /api/finance/scholarships/{scholarshipId}",
@@ -564,6 +573,18 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/parents/{parentUserId}/records/{fieldId}/document",
   "PATCH /api/parents/{parentUserId}/records/{fieldId}/document",
   "DELETE /api/parents/{parentUserId}/records/{fieldId}/document",
+  // Staff and class records (000176), and imported columns kept as record fields.
+  "PUT /api/staff/{staffUserId}/records",
+  "POST /api/staff/{staffUserId}/records/{fieldId}/reveal",
+  "PUT /api/staff/{staffUserId}/records/{fieldId}/document",
+  "PATCH /api/staff/{staffUserId}/records/{fieldId}/document",
+  "DELETE /api/staff/{staffUserId}/records/{fieldId}/document",
+  "PUT /api/classes/{classId}/records",
+  "PUT /api/classes/{classId}/records/{fieldId}/document",
+  "PATCH /api/classes/{classId}/records/{fieldId}/document",
+  "DELETE /api/classes/{classId}/records/{fieldId}/document",
+  "POST /api/record-imports/{subjectKind}/preview",
+  "POST /api/record-imports/{subjectKind}/apply",
 ];
 
 function collectSourceFiles(dir: string): string[] {

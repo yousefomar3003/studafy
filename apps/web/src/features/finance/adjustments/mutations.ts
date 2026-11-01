@@ -62,3 +62,39 @@ export function useRejectRefund() {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Corrections through the same queue: cancel an invoice, reverse a payment (maker step). Approval
+// is the refund approve endpoint, so `useApproveRefund` above covers both.
+// ---------------------------------------------------------------------------
+
+export interface CorrectionRequestInput {
+  id: string;
+  reasonNotes: string;
+}
+
+export function useRequestInvoiceCancellation() {
+  return useMutation({
+    mutationFn: async ({ id, reasonNotes }: CorrectionRequestInput) => {
+      const { data } = await api.POST("/api/finance/invoices/{invoiceId}/cancellation", {
+        params: { path: { invoiceId: id } },
+        body: { reason_code: "error_correction", reason_notes: reasonNotes },
+      });
+      if (!data) throw new Error("Cancellation request returned no data.");
+      return data as Refund;
+    },
+  });
+}
+
+export function useRequestPaymentReversal() {
+  return useMutation({
+    mutationFn: async ({ id, reasonNotes }: CorrectionRequestInput) => {
+      const { data } = await api.POST("/api/finance/payments/{paymentId}/reversal", {
+        params: { path: { paymentId: id } },
+        body: { reason_code: "error_correction", reason_notes: reasonNotes },
+      });
+      if (!data) throw new Error("Reversal request returned no data.");
+      return data as Refund;
+    },
+  });
+}

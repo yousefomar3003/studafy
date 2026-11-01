@@ -1,12 +1,14 @@
 /**
- * The missing-information list: current students and parents whose required fields or documents
- * are missing, and documents that have expired or expire within 30 days. Field labels only, never
- * a value. Each audience sees only the fields it may read (visibilitiesFor); leadership sees all.
+ * The missing-information list: current students, parents, staff and classes whose required fields
+ * or documents are missing, and documents that have expired or expire within 30 days. Field labels
+ * only, never a value. Each audience sees only the fields it may read (visibilitiesFor); the
+ * "staff" audience sees all.
  *
  * Runs under whatever transaction the route opens: RLS narrows a teacher to their students, and
  * finance reads through the identity transaction, as Finance > Unlinked does.
  */
 
+import { SCHOOL_STAFF_ROLES } from "@studafy/constants";
 import { visibilitiesFor } from "@studafy/records";
 
 import type { RecordMissingIssue } from "./schemas";
@@ -62,7 +64,12 @@ function issuesQuery(
         : issue === "expiring"
           ? tx`cardinality(i.expiring) > 0`
           : tx`(cardinality(i.missing) + cardinality(i.expired) + cardinality(i.expiring)) > 0`;
-  const subjectColumn = kind === "student" ? tx`a.student_id` : tx`a.parent_user_id`;
+  const subjectColumn = {
+    student: tx`a.student_id`,
+    parent: tx`a.parent_user_id`,
+    staff: tx`a.staff_user_id`,
+    class: tx`a.class_id`,
+  }[kind];
 
   return tx`
     WITH form AS (
@@ -158,6 +165,40 @@ function parentScope(tx: TransactionSql, schoolId: string, search?: string) {
   `;
 }
 
+/** Members of staff whose account is not archived. */
+function staffScope(tx: TransactionSql, schoolId: string, search?: string) {
+  const term = search?.trim();
+  const nameFilter = term
+    ? tx`AND (u.display_name ILIKE ${likePattern(term)} OR u.email ILIKE ${likePattern(term)})`
+    : tx``;
+  return tx`
+    SELECT u.id AS subject_id, lower(coalesce(u.display_name, u.email, '')) AS sort_name
+    FROM app.users AS u
+    WHERE u.school_id = ${schoolId}::uuid AND u.status <> 'archived'
+      AND EXISTS (
+        SELECT 1 FROM app.user_roles AS role
+        WHERE role.school_id = u.school_id AND role.user_id = u.id
+          AND role.role::text = ANY(${[...SCHOOL_STAFF_ROLES]}::text[])
+      )
+      ${nameFilter}
+  `;
+}
+
+/** Classes still running or about to (planned, active); RLS narrows a teacher to their own. */
+function classScope(tx: TransactionSql, schoolId: string, search?: string) {
+  const term = search?.trim();
+  const nameFilter = term
+    ? tx`AND (c.code ILIKE ${likePattern(term)} OR co.name ILIKE ${likePattern(term)})`
+    : tx``;
+  return tx`
+    SELECT c.id AS subject_id, lower(c.code) AS sort_name
+    FROM app.classes AS c
+    JOIN app.courses AS co ON co.id = c.course_id AND co.school_id = c.school_id
+    WHERE c.school_id = ${schoolId}::uuid AND c.status IN ('planned', 'active')
+      ${nameFilter}
+  `;
+}
+
 async function page(
   tx: TransactionSql,
   query: PendingQuery<Row[]>,
@@ -241,6 +282,90 @@ export async function listMissingParents(
       user_id: row.subject_id,
       name: byId.get(row.subject_id)?.name ?? "",
       email: byId.get(row.subject_id)?.email ?? null,
+      missing: row.missing,
+      expired: row.expired,
+      expiring: row.expiring,
+    })),
+    total,
+    issue: params.issue,
+  };
+}
+
+/** Staff records: ORG_ADMIN (every field) and PRINCIPAL (non-sensitive fields) only. */
+export async function listMissingStaff(
+  tx: TransactionSql,
+  schoolId: string,
+  audience: RecordAudience,
+  params: MissingListParams,
+) {
+  if (audience !== "staff" && audience !== "standard") {
+    return { staff: [], total: 0, issue: params.issue };
+  }
+  const query = issuesQuery(
+    tx,
+    schoolId,
+    "staff",
+    audience,
+    staffScope(tx, schoolId, params.search),
+    params.issue,
+  );
+  const { rows, total } = await page(tx, query, params);
+  const ids = rows.map((row) => row.subject_id);
+  const identities = ids.length
+    ? await tx<{ id: string; name: string; email: string | null }[]>`
+        SELECT id, coalesce(display_name, email, '') AS name, email
+        FROM app.users WHERE school_id = ${schoolId}::uuid AND id = ANY(${ids}::uuid[])
+      `
+    : [];
+  const byId = new Map(identities.map((identity) => [identity.id, identity]));
+  return {
+    staff: rows.map((row) => ({
+      user_id: row.subject_id,
+      name: byId.get(row.subject_id)?.name ?? "",
+      email: byId.get(row.subject_id)?.email ?? null,
+      missing: row.missing,
+      expired: row.expired,
+      expiring: row.expiring,
+    })),
+    total,
+    issue: params.issue,
+  };
+}
+
+/** Class records: leadership (every field) and a class's teachers (teacher-visible fields). */
+export async function listMissingClasses(
+  tx: TransactionSql,
+  schoolId: string,
+  audience: RecordAudience,
+  params: MissingListParams,
+) {
+  if (audience !== "staff" && audience !== "teachers") {
+    return { classes: [], total: 0, issue: params.issue };
+  }
+  const query = issuesQuery(
+    tx,
+    schoolId,
+    "class",
+    audience,
+    classScope(tx, schoolId, params.search),
+    params.issue,
+  );
+  const { rows, total } = await page(tx, query, params);
+  const ids = rows.map((row) => row.subject_id);
+  const identities = ids.length
+    ? await tx<{ id: string; code: string; course_name: string }[]>`
+        SELECT c.id, c.code, co.name AS course_name
+        FROM app.classes AS c
+        JOIN app.courses AS co ON co.id = c.course_id AND co.school_id = c.school_id
+        WHERE c.school_id = ${schoolId}::uuid AND c.id = ANY(${ids}::uuid[])
+      `
+    : [];
+  const byId = new Map(identities.map((identity) => [identity.id, identity]));
+  return {
+    classes: rows.map((row) => ({
+      class_id: row.subject_id,
+      code: byId.get(row.subject_id)?.code ?? "",
+      course_name: byId.get(row.subject_id)?.course_name ?? "",
       missing: row.missing,
       expired: row.expired,
       expiring: row.expiring,

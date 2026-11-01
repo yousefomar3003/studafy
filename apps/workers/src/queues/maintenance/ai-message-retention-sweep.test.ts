@@ -104,9 +104,11 @@ async function seedMessages(
     await tx`
       INSERT INTO app.ai_messages
         (school_id, conversation_id, question, answer, prompt_tokens, completion_tokens,
-         total_tokens, expires_at)
+         total_tokens, created_at, expires_at)
+      -- Created 90 days before it expires: ck_ai_messages_expires_at requires expires_at >
+      -- created_at, so an already-expired message must also have been created in the past.
       SELECT ${schoolId}::uuid, ${conversationId}::uuid, 'question', 'answer', 10, 5, 15,
-             now() + ${expiresIn}::interval
+             now() + ${expiresIn}::interval - interval '90 days', now() + ${expiresIn}::interval
       FROM generate_series(1, ${count})
     `;
   });

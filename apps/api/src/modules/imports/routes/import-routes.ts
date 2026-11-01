@@ -1,16 +1,21 @@
+import { createHash } from "node:crypto";
+
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { QUEUE_NAMES, PERMISSIONS } from "@studafy/constants";
+import { ERROR_CODES, QUEUE_NAMES, PERMISSIONS } from "@studafy/constants";
 import { Queue } from "bullmq";
 import { HTTPException } from "hono/http-exception";
 
+import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
+import { requireStorage } from "../../../lib/storage";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
-import { requirePermission } from "../../../middleware/authz";
+import { hasPermission, requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import { applyColumn, listUnmappedColumns, previewColumn } from "../column-service";
 import {
   confirmImport,
   createMapping,
@@ -24,6 +29,9 @@ import {
   uploadImport,
 } from "../import-service";
 import {
+  applyColumnBodySchema,
+  columnApplyResultSchema,
+  columnTargetBodySchema,
   confirmImportBodySchema,
   createStudentImportMappingBodySchema,
   importDiffQuerySchema,
@@ -31,20 +39,34 @@ import {
   importIdParamSchema,
   importListQuerySchema,
   importListSchema,
+  importColumnPreviewSchema,
   importRecordSchema,
+  importSettingsSchema,
+  importSourceDownloadSchema,
   mappingIdParamSchema,
   studentImportMappingListSchema,
   studentImportMappingSchema,
+  unmappedColumnsSchema,
   updateImportMappingBodySchema,
+  updateImportSettingsBodySchema,
   updateStudentImportMappingBodySchema,
   uploadImportQuerySchema,
 } from "../schemas";
+import {
+  deleteSource,
+  getImportSettings,
+  promoteSourceFile,
+  sourceDownload,
+  updateImportSettings,
+} from "../source-service";
 
 import type { Database } from "../../../db/client";
+import type { StorageService } from "../../../lib/storage";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { RedisClient } from "../../../redis";
-import type { ImportRecord, StudentImportMapping } from "../import-service";
+import type { ImportListRecord, ImportRecord, StudentImportMapping } from "../import-service";
 import type { ImportRecordResponse, StudentImportMappingResponse } from "../schemas";
+import type { RecordKeyring } from "@studafy/records";
 import type { Context } from "hono";
 
 // ---------------------------------------------------------------------------
@@ -80,7 +102,45 @@ function toResponse(record: ImportRecord): ImportRecordResponse {
     updated_at: record.updated_at.toISOString(),
     confirmed_at: record.confirmed_at?.toISOString() ?? null,
     completed_at: record.completed_at?.toISOString() ?? null,
+    source_file: toSourceFile(record),
   };
+}
+
+function toSourceFile(record: ImportRecord): ImportRecordResponse["source_file"] {
+  if (!record.source_file_name || !record.source_uploaded_at) return null;
+  const stored = record.source_storage_key !== null;
+  return {
+    file_name: record.source_file_name,
+    size_bytes: record.source_size_bytes,
+    uploaded_at: record.source_uploaded_at.toISOString(),
+    stored,
+    expires_at: stored
+      ? new Date(
+          record.source_uploaded_at.getTime() + record.retention_days * 86_400_000,
+        ).toISOString()
+      : null,
+    removed_at: record.source_removed_at?.toISOString() ?? null,
+    removed_reason: record.source_removed_reason,
+  };
+}
+
+function toListItem(record: ImportListRecord) {
+  return {
+    ...toResponse(record),
+    uploaded_by_name: record.uploaded_by_name,
+    confirmed_by_name: record.confirmed_by_name,
+    unmapped_column_count: record.unmapped_column_count,
+    cells_available: record.cells_available,
+  };
+}
+
+/** Remove an object after its row change committed; a failure is left to the bucket's inventory. */
+async function removeObject(storage: StorageService, key: string): Promise<void> {
+  try {
+    await storage.remove(key);
+  } catch {
+    // The row no longer references it; storage-quota reconciliation reports the stray object.
+  }
 }
 
 function toMappingResponse(mapping: StudentImportMapping): StudentImportMappingResponse {
@@ -390,6 +450,144 @@ const deleteStudentImportMappingRoute = createRoute({
   },
 });
 
+const downloadStudentImportSourceRoute = createRoute({
+  method: "get",
+  path: "/api/imports/students/{importId}/source",
+  tags: ["Imports"],
+  operationId: "downloadStudentImportSource",
+  summary: "Download an import's original file",
+  description:
+    "A one-minute signed URL for the file the school uploaded. Every URL issued is audited. 404 " +
+    "IMPORT_SOURCE_NOT_FOUND once the file was deleted or expired.",
+  security: [{ bearerAuth: [] }],
+  request: { params: importIdParamSchema },
+  responses: standardResponses(
+    { 200: { description: "Signed download URL.", schema: importSourceDownloadSchema } },
+    [401, 403, 404, 500, 503],
+  ),
+});
+
+const deleteStudentImportSourceRoute = createRoute({
+  method: "delete",
+  path: "/api/imports/students/{importId}/source",
+  tags: ["Imports"],
+  operationId: "deleteStudentImportSource",
+  summary: "Delete an import's original file",
+  description:
+    "Deletes the stored original file now, ahead of the retention period. The import, its " +
+    "history and its leftover cells are kept.",
+  security: [{ bearerAuth: [] }],
+  request: { params: importIdParamSchema },
+  responses: {
+    204: { description: "File deleted.", headers: requestIdHeaders },
+    ...standardResponses({}, [401, 403, 404, 500]),
+  },
+});
+
+const listStudentImportColumnsRoute = createRoute({
+  method: "get",
+  path: "/api/imports/students/{importId}/columns",
+  tags: ["Imports"],
+  operationId: "listStudentImportColumns",
+  summary: "List an import's unmapped columns",
+  description:
+    "The source columns no import or record field read, with a suggested field type, whether " +
+    "the column looks sensitive, and what it was applied to. Suggestions are computed from the " +
+    "cells on the server; no value leaves for classification.",
+  security: [{ bearerAuth: [] }],
+  request: { params: importIdParamSchema },
+  responses: standardResponses(
+    { 200: { description: "Unmapped columns.", schema: unmappedColumnsSchema } },
+    [401, 403, 404, 500],
+  ),
+});
+
+const previewStudentImportColumnRoute = createRoute({
+  method: "post",
+  path: "/api/imports/students/{importId}/columns/preview",
+  tags: ["Imports"],
+  operationId: "previewStudentImportColumn",
+  summary: "Preview applying an unmapped column",
+  description:
+    "What applying a completed import's unmapped column to a record field would write, per " +
+    "student it created or updated (or parent it created). Sensitive values are masked. Writes " +
+    "nothing; returns a preview_token for the apply.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: importIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: columnTargetBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "The preview.", schema: importColumnPreviewSchema } },
+    [400, 401, 403, 404, 409, 422, 500],
+  ),
+});
+
+const applyStudentImportColumnRoute = createRoute({
+  method: "post",
+  path: "/api/imports/students/{importId}/columns/apply",
+  tags: ["Imports"],
+  operationId: "applyStudentImportColumn",
+  summary: "Apply a previewed unmapped column",
+  description:
+    "Writes what the preview showed, through the records save path (validation, sealing of " +
+    "sensitive values, audit). 409 IMPORT_COLUMN_PREVIEW_STALE when the outcome changed since the " +
+    "preview. With new_field, the field is created and published first (needs " +
+    "recordTemplate:manage; 409 IMPORT_RECORD_DRAFT_PENDING while the draft has other changes).",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: importIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: applyColumnBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "Applied.", schema: columnApplyResultSchema } },
+    [400, 401, 403, 404, 409, 422, 500],
+  ),
+});
+
+const getStudentImportSettingsRoute = createRoute({
+  method: "get",
+  path: "/api/imports/students/settings",
+  tags: ["Imports"],
+  operationId: "getStudentImportSettings",
+  summary: "Get import retention settings",
+  description:
+    "How long original files and leftover cells are kept (default and maximum 180 days).",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "Settings.", schema: importSettingsSchema } },
+    [401, 403, 500],
+  ),
+});
+
+const updateStudentImportSettingsRoute = createRoute({
+  method: "put",
+  path: "/api/imports/students/settings",
+  tags: ["Imports"],
+  operationId: "updateStudentImportSettings",
+  summary: "Set import retention",
+  description:
+    "Shorten (1-180 days) how long original files and leftover cells are kept. Applies to " +
+    "imports already held from the next daily sweep.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: updateImportSettingsBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "Settings.", schema: importSettingsSchema } },
+    [400, 401, 403, 500],
+  ),
+});
+
 // ---------------------------------------------------------------------------
 // Template
 // ---------------------------------------------------------------------------
@@ -403,7 +601,12 @@ const CSV_TEMPLATE =
 // Route factory
 // ---------------------------------------------------------------------------
 
-export function importRoutes(database: Database, redis: RedisClient | null): OpenAPIHono<AppEnv> {
+export function importRoutes(
+  database: Database,
+  redis: RedisClient | null,
+  storage: StorageService | null,
+  keyring: RecordKeyring,
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   const importQueue = redis ? new Queue(QUEUE_NAMES.IMPORTS, { connection: redis as never }) : null;
@@ -417,11 +620,36 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
   routes.use("/api/imports/students", requirePermission(PERMISSIONS.STUDENT_IMPORT));
   routes.use("/api/imports/students/*", requirePermission(PERMISSIONS.STUDENT_IMPORT));
   routes.use("/api/imports/students/template", requirePermission(PERMISSIONS.STUDENT_READ));
+  // Applying a column writes record answers: the records module's own write permission as well.
+  routes.use(
+    "/api/imports/students/:importId/columns/preview",
+    requirePermission(PERMISSIONS.STUDENT_RECORD_UPDATE),
+  );
+  routes.use(
+    "/api/imports/students/:importId/columns/apply",
+    requirePermission(PERMISSIONS.STUDENT_RECORD_UPDATE),
+  );
 
   // --- Audit declarations ---
   routes.use("/api/imports/students/upload", auditAction("insert", "student_imports"));
   routes.use("/api/imports/students/:importId/confirm", auditAction("update", "student_imports"));
   routes.use("/api/imports/students/:importId/mapping", auditAction("update", "student_imports"));
+  routes.use("/api/imports/students/:importId/source", async (c, next) =>
+    auditAction(c.req.method === "DELETE" ? "delete" : "read", "student_imports")(c, next),
+  );
+  // The preview writes nothing; it declares the table its apply audits, as the invoice batch
+  // preflight does.
+  routes.use(
+    "/api/imports/students/:importId/columns/preview",
+    auditAction("update", "student_import_unmapped_columns"),
+  );
+  routes.use(
+    "/api/imports/students/:importId/columns/apply",
+    auditAction("update", "student_import_unmapped_columns"),
+  );
+  routes.use("/api/imports/students/settings", async (c, next) =>
+    c.req.method === "PUT" ? auditAction("update", "student_import_settings")(c, next) : next(),
+  );
   routes.use("/api/imports/students/mappings", async (c, next) =>
     c.req.method === "POST" ? auditAction("insert", "student_import_mappings")(c, next) : next(),
   );
@@ -437,18 +665,32 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
   routes.openapi(uploadStudentCsvRoute, async (c) => {
     const auth = requireAuth(c);
 
-    // Parse multipart body — Hono delivers raw text/csv when content type matches.
-    const rawCsv = await c.req.text();
+    // The raw bytes, not c.req.text(): the kept original must be byte-for-byte this body, so the
+    // hash is taken before any decoding.
+    const body = new Uint8Array(await c.req.arrayBuffer());
+    const rawCsv = new TextDecoder().decode(body);
 
     if (!rawCsv || rawCsv.trim().length === 0) {
       throw new HTTPException(400, { message: "Request body is empty." });
     }
 
     const fileName = c.req.header("X-File-Name") ?? "students.csv";
-    const { mapping_id } = c.req.valid("query");
+    const { mapping_id, source_key } = c.req.valid("query");
+    const sourceStorage = source_key === undefined ? null : requireStorage(storage);
+    const bodySha256 = createHash("sha256").update(body).digest("hex");
 
     const record = await withTenantTx(database, tenantFrom(c), (tx) =>
-      uploadImport(tx, auth.schoolId, auth.userId, fileName, rawCsv, mapping_id),
+      uploadImport(
+        tx,
+        auth.schoolId,
+        auth.userId,
+        fileName,
+        rawCsv,
+        mapping_id,
+        sourceStorage && source_key
+          ? () => promoteSourceFile(tx, sourceStorage, auth.schoolId, source_key, bodySha256)
+          : undefined,
+      ),
     );
 
     return c.json(toResponse(record), 201);
@@ -493,6 +735,24 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
         "Content-Disposition": 'attachment; filename="student-import-template.csv"',
       },
     });
+  });
+
+  // Registered ahead of getStudentImportRoute for the same reason as the template route above.
+  routes.openapi(getStudentImportSettingsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const settings = await withTenantTx(database, tenantFrom(c), (tx) =>
+      getImportSettings(tx, auth.schoolId),
+    );
+    return c.json(settings, 200);
+  });
+
+  routes.openapi(updateStudentImportSettingsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+    const settings = await withTenantTx(database, tenantFrom(c), (tx) =>
+      updateImportSettings(tx, auth.schoolId, auth.userId, body.source_retention_days),
+    );
+    return c.json(settings, 200);
   });
 
   // Registered ahead of getStudentImportRoute for the same reason as the template route above:
@@ -560,6 +820,62 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
     return c.json(diff, 200);
   });
 
+  routes.openapi(downloadStudentImportSourceRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { importId } = c.req.valid("param");
+    const files = requireStorage(storage);
+    const download = await withTenantTx(database, tenantFrom(c), (tx) =>
+      sourceDownload(tx, files, auth.schoolId, importId),
+    );
+    c.header("Cache-Control", "no-store");
+    return c.json(download, 200);
+  });
+
+  routes.openapi(deleteStudentImportSourceRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { importId } = c.req.valid("param");
+    const { removedKey } = await withTenantTx(database, tenantFrom(c), (tx) =>
+      deleteSource(tx, auth.schoolId, importId),
+    );
+    if (storage) await removeObject(storage, removedKey);
+    return c.body(null, 204);
+  });
+
+  routes.openapi(listStudentImportColumnsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { importId } = c.req.valid("param");
+    const columns = await withTenantTx(database, tenantFrom(c), (tx) =>
+      listUnmappedColumns(tx, auth.schoolId, importId),
+    );
+    c.header("Cache-Control", "no-store");
+    return c.json(columns, 200);
+  });
+
+  routes.openapi(previewStudentImportColumnRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { importId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const preview = await withTenantTx(database, tenantFrom(c), (tx) =>
+      previewColumn(tx, auth.schoolId, importId, body),
+    );
+    c.header("Cache-Control", "no-store");
+    return c.json(preview, 200);
+  });
+
+  routes.openapi(applyStudentImportColumnRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { importId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    // Creating a field is template work: the body decides whether that permission is needed.
+    if (body.new_field && !hasPermission(auth.roles, PERMISSIONS.RECORD_TEMPLATE_MANAGE)) {
+      throw new CodedHttpException(403, ERROR_CODES.AUTHZ_FORBIDDEN, "Insufficient permissions");
+    }
+    const result = await withTenantTx(database, tenantFrom(c), (tx) =>
+      applyColumn(tx, auth.schoolId, auth.userId, importId, body, keyring),
+    );
+    return c.json(result, 200);
+  });
+
   routes.openapi(getStudentImportRoute, async (c) => {
     const auth = requireAuth(c);
     const { importId } = c.req.valid("param");
@@ -579,7 +895,7 @@ export function importRoutes(database: Database, redis: RedisClient | null): Ope
       listImports(tx, auth.schoolId, query),
     );
 
-    return c.json({ imports: rows.map(toResponse), next_cursor }, 200);
+    return c.json({ imports: rows.map(toListItem), next_cursor }, 200);
   });
 
   return routes;

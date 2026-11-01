@@ -14,6 +14,10 @@ keywords:
     "medical",
     "missing information",
     "import",
+    "staff record",
+    "class record",
+    "qualification",
+    "contract",
   ]
 title_ar: "سجلات الطلاب وأولياء الأمور"
 description_ar: "أنشئ نماذج سجلات مدرستك، واملأ سجلات الطلاب وأولياء الأمور، وتعامل مع البيانات الحساسة، وتابع المعلومات الناقصة."
@@ -31,6 +35,8 @@ keywords_ar:
     "ملف طبي",
     "معلومات ناقصة",
     "استيراد",
+    "سجل الموظف",
+    "سجل الشعبة",
   ]
 roles: [ORG_ADMIN, PRINCIPAL]
 order: 2
@@ -49,9 +55,9 @@ records of people who already exist and does not create students or users.
 
 ## Build the forms
 
-Open Admin → School settings → **Student and parent records**, or
-Principal → **Student and parent records**. Pick the **Student** or **Parent**
-form.
+Open Admin → School settings → **School records**, or
+Principal → **School records**. Pick the **Student**, **Parent**, **Staff** or
+**Class** form.
 
 1. Click `Add field`. Give it a type (text, number, date, choice, yes/no,
    phone, email or document), an English and an Arabic label, and optional
@@ -105,6 +111,28 @@ Admin → **Missing information** (and the same page in the principal portal)
 lists current students and parents with an empty required field or document,
 and documents that have expired or expire within 30 days. Search by name, filter
 by issue, and click a row to open that record. Your dashboard shows the counts.
+
+## Staff and class records
+
+The same forms work for your staff and your classes: a teacher's qualifications
+or contract type, a class's homeroom notes or bus group. Open the **Staff** or
+**Class** form next to the student and parent ones.
+
+- **Staff records** are kept by the school admin, who fills them in and reveals
+  sensitive fields such as a salary or a national ID. A principal sees only the
+  fields that are not sensitive. Each member of staff can see their own record's
+  fields that are not sensitive, under Account → **My staff record** on the
+  web or Profile → **My staff record** in the app. Open someone's record from
+  Admin → **Teachers** or **Users** (`Staff record`).
+- **Class records** are filled in by whoever manages the classes. A class's own
+  teachers see the fields you mark "Teachers". A class field is never
+  sensitive. Open one from **Classes** (`Record`); admins reach Classes from
+  the admin home.
+- **Missing information** has a Staff tab and a Classes tab for the people who
+  can read them.
+- When you import users or classes from a CSV, any column Studafy does not know
+  can be kept as a record field afterwards: choose `Keep as a record field`,
+  check the preview, and confirm. Only the rows that import created are written.
 
 ## Importing records from a CSV
 

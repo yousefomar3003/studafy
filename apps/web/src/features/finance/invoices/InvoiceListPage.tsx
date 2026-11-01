@@ -1,4 +1,4 @@
-import { Button, DataGrid, Select, useCursorPagination } from "@studafy/ui";
+import { Button, DataGrid, Input, Select, useCursorPagination } from "@studafy/ui";
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -22,8 +22,8 @@ const STATUS_OPTION_KEYS: { value: string; labelKey: string }[] = [
 ];
 
 /**
- * Invoice list (`/portal/finance/invoices`), gated by `billing:read`. Status filter and a single
- * search field for "student or invoice number" — the number half of that search is server-side
+ * Invoice list (`/portal/finance/invoices`), gated by `billing:read`. Status and issue/due date
+ * filters, and a single search field for "student or invoice number" — the number half of that search is server-side
  * exact-match-first (see `listInvoices`'s doc comment in the API's `service.ts`), so this page does
  * not need to guess which kind of value the caller typed.
  *
@@ -36,19 +36,30 @@ export default function InvoiceListPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [issuedFrom, setIssuedFrom] = useState("");
+  const [issuedTo, setIssuedTo] = useState("");
+  const [dueFrom, setDueFrom] = useState("");
+  const [dueTo, setDueTo] = useState("");
 
   useEffect(() => {
     const handle = setTimeout(() => setDebouncedSearch(searchInput), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(handle);
   }, [searchInput]);
 
-  const filters: InvoiceFilters = { status, search: debouncedSearch };
+  const filters: InvoiceFilters = {
+    status,
+    search: debouncedSearch,
+    issuedFrom,
+    issuedTo,
+    dueFrom,
+    dueTo,
+  };
 
-  // `filters` is a fresh object every render; its two primitive fields are the real dependency,
+  // `filters` is a fresh object every render; its primitive fields are the real dependency,
   // matching useCursorPagination's own "memoize over whatever filters it captures" contract.
   const fetchPage = useCallback(
     (cursor: string | undefined) => fetchInvoicesPage(filters, cursor),
-    [filters.status, filters.search],
+    [filters.status, filters.search, issuedFrom, issuedTo, dueFrom, dueTo],
   );
 
   const { items, loading, error, hasNextPage, hasPreviousPage, goToNextPage, goToPreviousPage } =
@@ -119,9 +130,14 @@ export default function InvoiceListPage() {
           <h1>{t("finance.invoices.list.title")}</h1>
           <p>{t("finance.invoices.list.intro")}</p>
         </div>
-        <Link to="/portal/finance/invoices/batches/new">
-          <Button variant="secondary">{t("finance.invoices.list.generate")}</Button>
-        </Link>
+        <div className="invoices-list__actions">
+          <Link to="/portal/finance/invoices/batches">
+            <Button variant="secondary">{t("finance.invoices.list.batchHistory")}</Button>
+          </Link>
+          <Link to="/portal/finance/invoices/batches/new">
+            <Button variant="secondary">{t("finance.invoices.list.generate")}</Button>
+          </Link>
+        </div>
       </div>
 
       <div className="invoices-list__toolbar">
@@ -141,6 +157,36 @@ export default function InvoiceListPage() {
           options={statusOptions}
           value={status}
           onChange={setStatus}
+        />
+      </div>
+      <div className="invoices-list__toolbar invoices-list__dates">
+        <Input
+          type="date"
+          label={t("finance.invoices.list.issuedFrom")}
+          value={issuedFrom}
+          max={issuedTo || undefined}
+          onChange={(event) => setIssuedFrom(event.target.value)}
+        />
+        <Input
+          type="date"
+          label={t("finance.invoices.list.issuedTo")}
+          value={issuedTo}
+          min={issuedFrom || undefined}
+          onChange={(event) => setIssuedTo(event.target.value)}
+        />
+        <Input
+          type="date"
+          label={t("finance.invoices.list.dueFrom")}
+          value={dueFrom}
+          max={dueTo || undefined}
+          onChange={(event) => setDueFrom(event.target.value)}
+        />
+        <Input
+          type="date"
+          label={t("finance.invoices.list.dueTo")}
+          value={dueTo}
+          min={dueFrom || undefined}
+          onChange={(event) => setDueTo(event.target.value)}
         />
       </div>
 

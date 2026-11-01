@@ -178,7 +178,7 @@ export function paymentRoutes(
     const auth = requireAuth(c);
     const query = c.req.valid("query");
 
-    const { rows, total } = await withTenantTx(database, tenantFrom(c), (tx) =>
+    const { rows, total, totals } = await withStudentIdentityTx(database, auth.schoolId, (tx) =>
       listPayments(tx, auth.schoolId, query),
     );
     // The cache row carries only a student id; finance needs to see whose money it is.
@@ -196,7 +196,7 @@ export function paymentRoutes(
       family_name: families.get(row.student_id)?.family_name ?? null,
     }));
 
-    return c.json({ payments, total }, 200);
+    return c.json({ payments, total, totals }, 200);
   });
 
   routes.openapi(getRouteDef, async (c) => {

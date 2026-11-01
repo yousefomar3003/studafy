@@ -104,6 +104,7 @@ const FREE_TEXT_ENDPOINTS = [
   "/api/families?search=",
   "/api/invitations?search=",
   "/api/finance/invoices?search=",
+  "/api/finance/payments?search=",
   "/api/finance/families?search=",
   "/api/finance/unlinked/students?search=",
   "/api/finance/unlinked/parents?search=",
@@ -117,6 +118,8 @@ const ENUM_FILTER_ENDPOINTS = [
   "/api/students?status=",
   "/api/invitations?status=",
   "/api/finance/invoices?status=",
+  "/api/finance/payments?payment_mode=",
+  "/api/finance/refunds?kind=",
   "/api/finance/families?balance=",
   "/api/records/missing/students?issue=",
   // Global search's named SearchType filter and its numeric offset.

@@ -9,11 +9,12 @@ import {
   createUser,
   assignRole,
   createEvaluationCriteriaTemplate,
-  createTeacherEvaluation,
   createEvaluationScore,
   integrationEnabled,
   type TestDatabase,
+  type UserRecord,
 } from "../../../../tests/harness";
+import { withTenantTx } from "../../../db/tenant-tx";
 import {
   listTemplates,
   createTemplate,
@@ -47,20 +48,54 @@ afterAll(async () => {
   if (db?.cleanup) await db.cleanup();
 });
 
-async function withTx<T>(fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
-  let result: T | undefined;
-  await db.sql.begin(async (tx) => {
-    await tx`SELECT set_config('role', 'studafy_app', true)`;
-    result = await fn(tx);
-  });
-  return result as T;
+/**
+ * Run `fn` as `userId` in the same tenant transaction a route opens (`withTenantTx`): role
+ * studafy_app with `app.school_id` and `app.user_id` armed. The acting user is load-bearing here:
+ * teacher_evaluation_visibility is a RESTRICTIVE SELECT policy that reads `app.user_id` (and raises
+ * when it is unset), admitting only the evaluator and -- once shared -- the evaluated teacher.
+ */
+function withTx<T>(
+  schoolId: string,
+  userId: string,
+  fn: (tx: TransactionSql) => Promise<T>,
+): Promise<T> {
+  return withTenantTx(db.sql, { schoolId, userId }, fn);
+}
+
+/**
+ * Seed a draft evaluation through the real service, acting as its evaluator -- the production path.
+ *
+ * Not the harness `createTeacherEvaluation` factory: its `INSERT ... RETURNING` runs as studafy_app
+ * with no `app.user_id`, and teacher_evaluation_visibility (a RESTRICTIVE SELECT policy, which
+ * PostgreSQL also applies to RETURNING) calls `app.current_user_id()`, which raises on the unset GUC.
+ */
+function seedEvaluation(
+  schoolId: string,
+  teacherId: string,
+  evaluatorUserId: string,
+): Promise<{ id: string }> {
+  return withTx(schoolId, evaluatorUserId, (tx) =>
+    createEvaluation(tx, schoolId, evaluatorUserId, {
+      teacher_id: teacherId,
+      evaluation_type: "formal_observation",
+      evaluated_at: new Date().toISOString(),
+    }),
+  );
+}
+
+/** A PRINCIPAL of the school: the role that manages criteria templates and evaluates teachers. */
+async function createPrincipal(schoolId: string): Promise<UserRecord> {
+  const principal = await createUser(db.sql, schoolId);
+  await assignRole(db.sql, schoolId, principal.id, "PRINCIPAL");
+  return principal;
 }
 
 describeDb("createTemplate", () => {
   test("creates and returns a new criteria template", async () => {
     const school = await createSchool(db.sql);
+    const principal = await createPrincipal(school.id);
 
-    const template = await withTx((tx) =>
+    const template = await withTx(school.id, principal.id, (tx) =>
       createTemplate(tx, school.id, {
         title: "Classroom Management",
         description: "Assesses classroom management skills",
@@ -79,11 +114,12 @@ describeDb("createTemplate", () => {
 describeDb("listTemplates", () => {
   test("returns paginated templates", async () => {
     const school = await createSchool(db.sql);
+    const principal = await createPrincipal(school.id);
 
     await createEvaluationCriteriaTemplate(db.sql, school.id, { title: "A" });
     await createEvaluationCriteriaTemplate(db.sql, school.id, { title: "B" });
 
-    const { rows, total } = await withTx((tx) =>
+    const { rows, total } = await withTx(school.id, principal.id, (tx) =>
       listTemplates(tx, school.id, { limit: 10, offset: 0 }),
     );
 
@@ -95,12 +131,15 @@ describeDb("listTemplates", () => {
 describeDb("getTemplate", () => {
   test("returns template by id", async () => {
     const school = await createSchool(db.sql);
+    const principal = await createPrincipal(school.id);
 
     const created = await createEvaluationCriteriaTemplate(db.sql, school.id, {
       title: "Lesson Planning",
     });
 
-    const template = await withTx((tx) => getTemplate(tx, school.id, created.id));
+    const template = await withTx(school.id, principal.id, (tx) =>
+      getTemplate(tx, school.id, created.id),
+    );
 
     expect(template).toBeDefined();
     expect(template!.id).toBe(created.id);
@@ -108,8 +147,9 @@ describeDb("getTemplate", () => {
 
   test("returns undefined for non-existent template", async () => {
     const school = await createSchool(db.sql);
+    const principal = await createPrincipal(school.id);
 
-    const template = await withTx((tx) =>
+    const template = await withTx(school.id, principal.id, (tx) =>
       getTemplate(tx, school.id, "00000000-0000-0000-0000-000000000000"),
     );
 
@@ -120,13 +160,14 @@ describeDb("getTemplate", () => {
 describeDb("updateTemplate", () => {
   test("updates title and max_score", async () => {
     const school = await createSchool(db.sql);
+    const principal = await createPrincipal(school.id);
 
     const created = await createEvaluationCriteriaTemplate(db.sql, school.id, {
       title: "Original Title",
       maxScore: 5,
     });
 
-    const updated = await withTx((tx) =>
+    const updated = await withTx(school.id, principal.id, (tx) =>
       updateTemplate(tx, school.id, created.id, {
         title: "Updated Title",
         max_score: 10,
@@ -141,12 +182,15 @@ describeDb("updateTemplate", () => {
 describeDb("deleteTemplate", () => {
   test("soft-deletes a template", async () => {
     const school = await createSchool(db.sql);
+    const principal = await createPrincipal(school.id);
 
     const created = await createEvaluationCriteriaTemplate(db.sql, school.id);
 
-    await withTx((tx) => deleteTemplate(tx, school.id, created.id));
+    await withTx(school.id, principal.id, (tx) => deleteTemplate(tx, school.id, created.id));
 
-    const template = await withTx((tx) => getTemplate(tx, school.id, created.id));
+    const template = await withTx(school.id, principal.id, (tx) =>
+      getTemplate(tx, school.id, created.id),
+    );
 
     expect(template).toBeDefined();
     expect(template!.is_active).toBe(false);
@@ -157,9 +201,9 @@ describeDb("createEvaluation", () => {
   test("creates and returns a new evaluation in draft status", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const evaluation = await withTx((tx) =>
+    const evaluation = await withTx(school.id, user.id, (tx) =>
       createEvaluation(tx, school.id, user.id, {
         teacher_id: teacher.id,
         evaluation_type: "formal_observation",
@@ -179,14 +223,11 @@ describeDb("listEvaluations", () => {
   test("returns evaluations for principal", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    await seedEvaluation(school.id, teacher.id, user.id);
 
-    const { rows, total } = await withTx((tx) =>
+    const { rows, total } = await withTx(school.id, user.id, (tx) =>
       listEvaluations(tx, school.id, user.id, false, { limit: 10, offset: 0 }),
     );
 
@@ -197,14 +238,12 @@ describeDb("listEvaluations", () => {
   test("teacher sees only shared evaluations", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const evaluator = await createUser(db.sql, school.id);
+    const evaluator = await createPrincipal(school.id);
+    await assignRole(db.sql, school.id, teacher.userId, "INSTRUCTOR");
 
-    const created = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: evaluator.id,
-    });
+    await seedEvaluation(school.id, teacher.id, evaluator.id);
 
-    const { rows, total } = await withTx((tx) =>
+    const { rows, total } = await withTx(school.id, teacher.userId, (tx) =>
       listEvaluations(tx, school.id, teacher.userId, true, { limit: 10, offset: 0 }),
     );
 
@@ -217,14 +256,13 @@ describeDb("getEvaluation", () => {
   test("returns evaluation by id with scores", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const created = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const created = await seedEvaluation(school.id, teacher.id, user.id);
 
-    const evaluation = await withTx((tx) => getEvaluation(tx, school.id, created.id));
+    const evaluation = await withTx(school.id, user.id, (tx) =>
+      getEvaluation(tx, school.id, created.id),
+    );
 
     expect(evaluation).toBeDefined();
     expect(evaluation!.id).toBe(created.id);
@@ -236,14 +274,11 @@ describeDb("updateEvaluation", () => {
   test("updates rating and narrative", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const created = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const created = await seedEvaluation(school.id, teacher.id, user.id);
 
-    const updated = await withTx((tx) =>
+    const updated = await withTx(school.id, user.id, (tx) =>
       updateEvaluation(tx, school.id, created.id, {
         rating: "proficient",
         narrative: "Strong teaching skills overall",
@@ -259,14 +294,13 @@ describeDb("submitEvaluation", () => {
   test("transitions draft to submitted", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const created = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const created = await seedEvaluation(school.id, teacher.id, user.id);
 
-    const submitted = await withTx((tx) => submitEvaluation(tx, school.id, created.id));
+    const submitted = await withTx(school.id, user.id, (tx) =>
+      submitEvaluation(tx, school.id, created.id),
+    );
 
     expect(submitted.status).toBe("submitted");
   });
@@ -274,18 +308,15 @@ describeDb("submitEvaluation", () => {
   test("rejects submit on already submitted evaluation", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const created = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const created = await seedEvaluation(school.id, teacher.id, user.id);
 
-    await withTx((tx) => submitEvaluation(tx, school.id, created.id));
+    await withTx(school.id, user.id, (tx) => submitEvaluation(tx, school.id, created.id));
 
-    await expect(withTx((tx) => submitEvaluation(tx, school.id, created.id))).rejects.toThrow(
-      "Cannot submit",
-    );
+    await expect(
+      withTx(school.id, user.id, (tx) => submitEvaluation(tx, school.id, created.id)),
+    ).rejects.toThrow("Cannot submit");
   });
 });
 
@@ -293,14 +324,13 @@ describeDb("shareEvaluationWithTeacher", () => {
   test("sets shared_with_teacher and shared_at", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const created = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const created = await seedEvaluation(school.id, teacher.id, user.id);
 
-    const shared = await withTx((tx) => shareEvaluationWithTeacher(tx, school.id, created.id));
+    const shared = await withTx(school.id, user.id, (tx) =>
+      shareEvaluationWithTeacher(tx, school.id, created.id),
+    );
 
     expect(shared.shared_with_teacher).toBe(true);
     expect(shared.shared_at).not.toBeNull();
@@ -309,17 +339,14 @@ describeDb("shareEvaluationWithTeacher", () => {
   test("rejects share on already shared evaluation", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const created = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const created = await seedEvaluation(school.id, teacher.id, user.id);
 
-    await withTx((tx) => shareEvaluationWithTeacher(tx, school.id, created.id));
+    await withTx(school.id, user.id, (tx) => shareEvaluationWithTeacher(tx, school.id, created.id));
 
     await expect(
-      withTx((tx) => shareEvaluationWithTeacher(tx, school.id, created.id)),
+      withTx(school.id, user.id, (tx) => shareEvaluationWithTeacher(tx, school.id, created.id)),
     ).rejects.toThrow("already shared");
   });
 });
@@ -328,9 +355,9 @@ describeDb("upsertScore", () => {
   test("creates and updates a score", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const template = await withTx((tx) =>
+    const template = await withTx(school.id, user.id, (tx) =>
       createTemplate(tx, school.id, {
         title: "Test",
         max_score: 10,
@@ -338,12 +365,9 @@ describeDb("upsertScore", () => {
       }),
     );
 
-    const evaluation = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const evaluation = await seedEvaluation(school.id, teacher.id, user.id);
 
-    const score = await withTx((tx) =>
+    const score = await withTx(school.id, user.id, (tx) =>
       upsertScore(tx, school.id, evaluation.id, template.id, {
         score: 8,
         comment: "Good classroom control",
@@ -355,7 +379,7 @@ describeDb("upsertScore", () => {
     expect(score.comment).toBe("Good classroom control");
     expect(score.criteria_template_id).toBe(template.id);
 
-    const updated = await withTx((tx) =>
+    const updated = await withTx(school.id, user.id, (tx) =>
       upsertScore(tx, school.id, evaluation.id, template.id, {
         score: 9,
       }),
@@ -367,9 +391,9 @@ describeDb("upsertScore", () => {
   test("rejects score exceeding template max", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const template = await withTx((tx) =>
+    const template = await withTx(school.id, user.id, (tx) =>
       createTemplate(tx, school.id, {
         title: "Test",
         max_score: 5,
@@ -377,13 +401,10 @@ describeDb("upsertScore", () => {
       }),
     );
 
-    const evaluation = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const evaluation = await seedEvaluation(school.id, teacher.id, user.id);
 
     await expect(
-      withTx((tx) =>
+      withTx(school.id, user.id, (tx) =>
         upsertScore(tx, school.id, evaluation.id, template.id, {
           score: 10,
         }),
@@ -396,9 +417,9 @@ describeDb("deleteScore", () => {
   test("deletes a score", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const template = await withTx((tx) =>
+    const template = await withTx(school.id, user.id, (tx) =>
       createTemplate(tx, school.id, {
         title: "Test",
         max_score: 10,
@@ -406,19 +427,20 @@ describeDb("deleteScore", () => {
       }),
     );
 
-    const evaluation = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const evaluation = await seedEvaluation(school.id, teacher.id, user.id);
 
-    const score = await createEvaluationScore(db.sql, school.id, {
+    await createEvaluationScore(db.sql, school.id, {
       evaluationId: evaluation.id,
       criteriaTemplateId: template.id,
     });
 
-    await withTx((tx) => deleteScore(tx, school.id, evaluation.id, template.id));
+    await withTx(school.id, user.id, (tx) =>
+      deleteScore(tx, school.id, evaluation.id, template.id),
+    );
 
-    const scores = await withTx((tx) => getEvaluationScores(tx, school.id, evaluation.id));
+    const scores = await withTx(school.id, user.id, (tx) =>
+      getEvaluationScores(tx, school.id, evaluation.id),
+    );
 
     expect(scores).toHaveLength(0);
   });
@@ -428,9 +450,9 @@ describeDb("getEvaluationScores", () => {
   test("returns scores for an evaluation", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);
-    const user = await createUser(db.sql, school.id);
+    const user = await createPrincipal(school.id);
 
-    const template = await withTx((tx) =>
+    const template = await withTx(school.id, user.id, (tx) =>
       createTemplate(tx, school.id, {
         title: "Test",
         max_score: 10,
@@ -438,17 +460,16 @@ describeDb("getEvaluationScores", () => {
       }),
     );
 
-    const evaluation = await createTeacherEvaluation(db.sql, school.id, {
-      teacherId: teacher.id,
-      evaluatorUserId: user.id,
-    });
+    const evaluation = await seedEvaluation(school.id, teacher.id, user.id);
 
     await createEvaluationScore(db.sql, school.id, {
       evaluationId: evaluation.id,
       criteriaTemplateId: template.id,
     });
 
-    const scores = await withTx((tx) => getEvaluationScores(tx, school.id, evaluation.id));
+    const scores = await withTx(school.id, user.id, (tx) =>
+      getEvaluationScores(tx, school.id, evaluation.id),
+    );
 
     expect(scores).toHaveLength(1);
     expect(scores[0]?.criteria_template_id).toBe(template.id);

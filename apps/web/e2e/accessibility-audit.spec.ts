@@ -297,6 +297,189 @@ test.describe("discipline", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Student import history, one import's unused columns with the mapping preview open, and the
+// platform's unused-column count.
+// ---------------------------------------------------------------------------
+
+test.describe("student import history", () => {
+  const IMPORT_ID = "11111111-1111-4111-8111-111111111111";
+  const IMPORT = {
+    id: IMPORT_ID,
+    school_id: "school-1",
+    uploaded_by: "user-1",
+    confirmed_by: "user-1",
+    status: "completed",
+    file_name: "sis-export.csv",
+    row_count: 3,
+    valid_rows: 3,
+    error_rows: 0,
+    header_line: 1,
+    source_headers: ["Student ID", "First", "Last", "Civil ID", "Bus stop"],
+    column_mapping: { admission_number: "Student ID", first_name: "First", last_name: "Last" },
+    errors: [],
+    summary: {
+      students_created: 2,
+      students_updated: 1,
+      students_skipped: 0,
+      parents_created: 0,
+      parents_linked: 0,
+    },
+    created_at: NOW,
+    updated_at: NOW,
+    confirmed_at: NOW,
+    completed_at: NOW,
+    source_file: {
+      file_name: "sis-export.csv",
+      size_bytes: 2048,
+      uploaded_at: NOW,
+      stored: true,
+      expires_at: "2027-02-19T09:00:00.000Z",
+      removed_at: null,
+      removed_reason: null,
+    },
+    uploaded_by_name: "Amal Admin",
+    confirmed_by_name: "Amal Admin",
+    unmapped_column_count: 2,
+    cells_available: true,
+  };
+  const COLUMNS = {
+    import_id: IMPORT_ID,
+    status: "completed",
+    cells_available: true,
+    can_apply: true,
+    cells_expire_at: "2027-02-19T09:00:00.000Z",
+    columns: [
+      {
+        position: 3,
+        header: "Civil ID",
+        non_empty_count: 3,
+        student_count: 3,
+        parent_count: 0,
+        suggested_field_type: "short_text",
+        suggested_options: [],
+        suggested_sensitive: true,
+        sensitive_reason: "label",
+        applied: null,
+      },
+      {
+        position: 4,
+        header: "Bus stop",
+        non_empty_count: 2,
+        student_count: 2,
+        parent_count: 0,
+        suggested_field_type: "short_text",
+        suggested_options: [],
+        suggested_sensitive: false,
+        sensitive_reason: null,
+        applied: null,
+      },
+    ],
+  };
+  const PREVIEW = {
+    import_id: IMPORT_ID,
+    position: 3,
+    header: "Civil ID",
+    subject_kind: "student",
+    field: {
+      id: null,
+      field_type: "short_text",
+      label_en: "Civil ID",
+      label_ar: "Civil ID",
+      sensitivity: "sensitive",
+    },
+    totals: { write: 2, unchanged: 0, kept: 0, invalid: 1, empty: 0, conflict: 0 },
+    rows: [
+      {
+        line_number: 2,
+        subject_id: "s-1",
+        name: "Rana Haddad",
+        admission_number: "S-1",
+        status: "write",
+        replaces_existing: false,
+        value: null,
+        mask: "•••• 2345",
+        current_value: null,
+        current_mask: null,
+        reason: null,
+      },
+      {
+        line_number: 4,
+        subject_id: "s-3",
+        name: "Huda Saleh",
+        admission_number: "S-3",
+        status: "invalid",
+        replaces_existing: false,
+        value: null,
+        mask: null,
+        current_value: null,
+        current_mask: null,
+        reason: "RECORD_VALUE_TOO_LONG",
+      },
+    ],
+    preview_token: "a".repeat(64),
+  };
+
+  async function stubImports(page: Page) {
+    await stubPortalShellDefaults(page);
+    await stubAuthenticatedSession(page, ["ORG_ADMIN"]);
+    await page.route("**/api/record-forms/**", (route) =>
+      fulfillJson(route, 200, { subject_kind: "student", version: 0, fields: [] }),
+    );
+    await page.route("**/api/imports/students**", (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname === "/api/imports/students") {
+        return fulfillJson(route, 200, { imports: [IMPORT], next_cursor: null });
+      }
+      if (pathname.endsWith("/settings")) {
+        return fulfillJson(route, 200, {
+          source_retention_days: 180,
+          default_retention_days: 180,
+          max_retention_days: 180,
+          updated_at: null,
+        });
+      }
+      if (pathname.endsWith("/columns/preview")) return fulfillJson(route, 200, PREVIEW);
+      if (pathname.endsWith("/columns")) return fulfillJson(route, 200, COLUMNS);
+      return fulfillJson(route, 200, IMPORT);
+    });
+  }
+
+  test("history has no critical/serious violations", async ({ page }) => {
+    await stubImports(page);
+    await page.goto("/portal/admin/students/imports");
+    await expect(page.getByRole("heading", { name: "Import history", level: 1 })).toBeVisible();
+    await expect(page.getByRole("table", { name: "Student imports" })).toBeVisible();
+    await runAudit(page);
+  });
+
+  test("the column mapping preview has no critical/serious violations", async ({ page }) => {
+    await stubImports(page);
+    await page.goto(`/portal/admin/students/imports/${IMPORT_ID}`);
+    await page.getByRole("button", { name: "Map column Civil ID" }).click();
+    const dialog = page.getByRole("dialog", { name: "Map “Civil ID”" });
+    await dialog.getByRole("button", { name: "Preview" }).click();
+    await expect(dialog.getByRole("table", { name: "What “Civil ID” would write" })).toBeVisible();
+    await runAudit(page);
+  });
+
+  test("the platform's unused-column count has no critical/serious violations", async ({
+    page,
+  }) => {
+    await stubPortalShellDefaults(page);
+    await stubAuthenticatedSession(page, ["SUPER_ADMIN"]);
+    await page.route("**/api/platform/import-signals/unmapped-headers", (route) =>
+      fulfillJson(route, 200, {
+        min_schools: 3,
+        headers: [{ normalized_header: "bloodtype", header: "Blood Type", schools: 7, imports: 9 }],
+      }),
+    );
+    await page.goto("/portal/platform/import-signals");
+    await expect(page.getByRole("table", { name: "Unused column headers" })).toBeVisible();
+    await runAudit(page);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Public marketing site — no auth, real color-contrast matters most here (first-impression pages).
 // ---------------------------------------------------------------------------
 
@@ -319,6 +502,195 @@ test.describe("sign in", () => {
     await page.route("**/api/auth/refresh", (route) => fulfillJson(route, 401, {}));
     await page.goto("/auth/login");
     await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+    await runAudit(page);
+  });
+});
+
+test.describe("staff and class records", () => {
+  const field = (overrides: Record<string, unknown>) => ({
+    help_en: null,
+    help_ar: null,
+    required: false,
+    options: [],
+    sort_order: 0,
+    visibility: "staff_only",
+    sensitivity: "standard",
+    has_expiry: false,
+    ...overrides,
+  });
+  const entry = (definition: Record<string, unknown>, overrides: Record<string, unknown>) => ({
+    field: definition,
+    archived: false,
+    value: null,
+    masked: false,
+    mask: null,
+    answered: false,
+    missing: false,
+    answered_in_version: 1,
+    answered_field: null,
+    document: null,
+    updated_at: NOW,
+    ...overrides,
+  });
+  const STAFF_RECORDS = {
+    subject_kind: "staff",
+    subject_id: "user-2",
+    template_version: 1,
+    missing_required: 1,
+    entries: [
+      entry(
+        field({
+          id: "f-qual",
+          field_type: "short_text",
+          label_en: "Qualification",
+          label_ar: "المؤهل",
+        }),
+        { value: "BEd Mathematics", answered: true },
+      ),
+      entry(
+        field({
+          id: "f-salary",
+          field_type: "short_text",
+          label_en: "Monthly salary",
+          label_ar: "الراتب الشهري",
+          sensitivity: "sensitive",
+          required: true,
+        }),
+        { masked: true, mask: "•••• JOD", answered: true },
+      ),
+      entry(
+        field({
+          id: "f-licence",
+          field_type: "document",
+          label_en: "Teaching licence",
+          label_ar: "رخصة التعليم",
+          required: true,
+        }),
+        { missing: true, answered_in_version: null, updated_at: null },
+      ),
+    ],
+  };
+  const CLASS_RECORDS = {
+    subject_kind: "class",
+    subject_id: "class-1",
+    template_version: 1,
+    missing_required: 0,
+    entries: [
+      entry(
+        field({
+          id: "f-bus",
+          field_type: "short_text",
+          label_en: "Bus group",
+          label_ar: "مجموعة الحافلة",
+          visibility: "teachers",
+        }),
+        { value: "Route 4", answered: true },
+      ),
+    ],
+  };
+
+  async function stubRecords(page: Page, roles: string[]) {
+    await stubPortalShellDefaults(page);
+    await stubAuthenticatedSession(page, roles);
+    await page.route("**/api/users/user-2", (route) =>
+      fulfillJson(route, 200, { id: "user-2", display_name: "Lina Saleh", email: "lina@x.edu" }),
+    );
+    await page.route("**/api/staff/user-2/records", (route) =>
+      fulfillJson(route, 200, STAFF_RECORDS),
+    );
+    await page.route("**/api/academics/classes/class-1", (route) =>
+      fulfillJson(route, 200, { id: "class-1", code: "CLS-10A" }),
+    );
+    await page.route("**/api/classes/class-1/records", (route) =>
+      fulfillJson(route, 200, CLASS_RECORDS),
+    );
+    await page.route("**/api/records/missing/**", (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname.endsWith("/staff")) {
+        return fulfillJson(route, 200, {
+          staff: [
+            {
+              user_id: "user-2",
+              name: "Lina Saleh",
+              email: "lina@x.edu",
+              missing: [
+                {
+                  field_id: "f-licence",
+                  label_en: "Teaching licence",
+                  label_ar: "رخصة التعليم",
+                  expires_on: null,
+                },
+              ],
+              expired: [],
+              expiring: [],
+            },
+          ],
+          total: 1,
+          issue: "all",
+        });
+      }
+      if (pathname.endsWith("/classes")) {
+        return fulfillJson(route, 200, { classes: [], total: 0, issue: "all" });
+      }
+      if (pathname.endsWith("/students")) {
+        return fulfillJson(route, 200, { students: [], total: 0, issue: "all" });
+      }
+      if (pathname.endsWith("/parents")) {
+        return fulfillJson(route, 200, { parents: [], total: 0, issue: "all" });
+      }
+      return fulfillJson(route, 200, {
+        students: 0,
+        parents: 0,
+        expired_documents: 0,
+        expiring_documents: 0,
+      });
+    });
+  }
+
+  test("a staff record has no critical/serious violations", async ({ page }) => {
+    await stubRecords(page, ["ORG_ADMIN"]);
+    await page.goto("/portal/admin/staff/user-2/records");
+    await expect(
+      page.getByRole("heading", { name: "Lina Saleh: staff record", level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reveal Monthly salary" })).toBeVisible();
+    await runAudit(page);
+  });
+
+  test("a class record has no critical/serious violations", async ({ page }) => {
+    await stubRecords(page, ["PRINCIPAL"]);
+    await page.goto("/portal/principal/classes/class-1/records");
+    await expect(
+      page.getByRole("heading", { name: "CLS-10A: class record", level: 1 }),
+    ).toBeVisible();
+    await expect(page.getByText("Route 4")).toBeVisible();
+    await runAudit(page);
+  });
+
+  test("my own staff record has no critical/serious violations", async ({ page }) => {
+    await stubPortalShellDefaults(page);
+    await stubAuthenticatedSession(page, ["FINANCE"]);
+    await page.route("**/api/me/staff-record", (route) =>
+      fulfillJson(route, 200, {
+        ...STAFF_RECORDS,
+        entries: STAFF_RECORDS.entries.filter(
+          (item) => (item.field as { sensitivity: string }).sensitivity !== "sensitive",
+        ),
+      }),
+    );
+    await page.goto("/account/staff-record");
+    await expect(page.getByRole("heading", { name: "My staff record", level: 1 })).toBeVisible();
+    await expect(page.getByText("BEd Mathematics")).toBeVisible();
+    await runAudit(page);
+  });
+
+  test("the staff tab of missing information has no critical/serious violations", async ({
+    page,
+  }) => {
+    await stubRecords(page, ["ORG_ADMIN"]);
+    await page.goto("/portal/admin/records/missing");
+    await page.getByRole("tab", { name: "Staff" }).click();
+    await expect(page.getByRole("link", { name: "Open Lina Saleh's record" })).toBeVisible();
     await runAudit(page);
   });
 });

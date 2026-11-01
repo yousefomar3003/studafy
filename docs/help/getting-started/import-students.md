@@ -100,3 +100,24 @@ accounts and guardian links were created. Click `Back to students` or
   student is still imported, but without a parent link, and the preview counts
   them under **Parents to link by hand**. Link them yourself afterwards (see
   [Link a parent to a student](/help/link-parent)).
+
+## Past imports and columns Studafy did not use
+
+Studafy keeps every file you import, so nothing in it is lost. Click
+`Import history` on the import page to see past imports, newest first: when,
+who, the outcome, and the original file.
+
+- Click `Download original file` to get your file back, or
+  `Delete original file` to remove it now.
+- Original files and the columns Studafy did not use are deleted
+  automatically after 180 days. Under **How long files are kept** you can make
+  that shorter.
+- Click a file name, or **N unused columns**, to see the columns no field
+  read. Studafy suggests a field type for each, and flags columns that look
+  like ID numbers, passports, medical or salary data so you can keep them as a
+  sensitive field.
+- Click `Map column` to write a column to a student or parent record field: an
+  existing one, or a new one made from the column. Only the students this
+  import created or updated (and the parents it created) get the values. Click
+  `Preview` to see exactly what would be written, then `Write to N people` to
+  save it.

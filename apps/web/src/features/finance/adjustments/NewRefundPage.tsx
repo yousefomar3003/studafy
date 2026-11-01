@@ -1,9 +1,11 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Card, Input, Select } from "@studafy/ui";
-import { useId, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useId, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { useTranslation } from "../../../lib/i18n";
+import { fetchInvoice, invoiceQueryKey } from "../invoices/queries";
 
 import { AdjustmentConfirmDialog } from "./AdjustmentConfirmDialog";
 import { REASON_CODE_LABEL_KEYS } from "./labels";
@@ -35,10 +37,13 @@ function apiErrorMessage(error: unknown, fallback: string, t: TFunction): string
  * the exact amount before it commits, then the created refund's own pending-approval state — this
  * page only ever produces the maker half of the pair (see `initiateRefund`'s doc comment in the API).
  *
- * The refund amount is capped in the UI at the selected invoice's paid-to-date amount
- * (`invoicePaidAmountMinor`) — the same cap ERPNext itself enforces when a checker approves (see
- * `approveRefund`'s doc comment) — so an over-refund is rejected here before it is ever submitted,
- * not just after a round trip to ERPNext.
+ * The amount is capped in the UI by what the reason means (`capFor`): money going back to a family
+ * (overpayment, withdrawal) at what was paid, a write-off at what is still owed, a fee correction
+ * (discount adjustment, error correction) at what was billed. The API enforces the write-off cap and
+ * ERPNext the others when a checker approves, so this only saves the round trip.
+ *
+ * `?invoiceId=<uuid>&reason=<code>` (from an invoice's "Credit note" and "Write off" actions) opens
+ * the form on that invoice and reason; a write-off starts at the whole outstanding balance.
  */
 export default function NewRefundPage() {
   const { t } = useTranslation();
@@ -65,14 +70,70 @@ interface RefundFormProps {
   onCreated: (refund: Refund) => void;
 }
 
+type Cap = "paid" | "outstanding" | "total";
+
+/** What a reason may give back or clear: see `NewRefundPage`'s doc comment. */
+export function capFor(reason: ReasonCode | ""): Cap {
+  if (reason === "write_off") return "outstanding";
+  if (reason === "discount_adjustment" || reason === "error_correction") return "total";
+  return "paid";
+}
+
+function capMinor(invoice: Invoice, cap: Cap): number {
+  if (cap === "outstanding") return invoice.outstanding_amount_minor;
+  if (cap === "total") return invoice.total_amount_minor;
+  return invoicePaidAmountMinor(invoice);
+}
+
+const CAP_MESSAGE_KEYS: Record<Cap, { within: string; exceeds: string }> = {
+  paid: {
+    within: "financeReports.adjustments.newRefund.upTo",
+    exceeds: "financeReports.adjustments.newRefund.exceedsPaid",
+  },
+  outstanding: {
+    within: "financeReports.adjustments.newRefund.upToOutstanding",
+    exceeds: "financeReports.adjustments.newRefund.exceedsOutstanding",
+  },
+  total: {
+    within: "financeReports.adjustments.newRefund.upToTotal",
+    exceeds: "financeReports.adjustments.newRefund.exceedsTotal",
+  },
+};
+
+function isReasonCode(value: string | null): value is ReasonCode {
+  return value !== null && value in REASON_CODE_LABEL_KEYS;
+}
+
 function RefundForm({ onCreated }: RefundFormProps) {
   const { t } = useTranslation();
   const initiateRefund = useInitiateRefund();
   const reasonNotesId = useId();
+  const [searchParams] = useSearchParams();
+  const prefillInvoiceId = searchParams.get("invoiceId");
+  const prefillReason = searchParams.get("reason");
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [amountInput, setAmountInput] = useState("");
-  const [reasonCode, setReasonCode] = useState<ReasonCode | "">("");
+  const [reasonCode, setReasonCode] = useState<ReasonCode | "">(
+    isReasonCode(prefillReason) ? prefillReason : "",
+  );
+
+  const prefill = useQuery({
+    queryKey: invoiceQueryKey(prefillInvoiceId ?? "none"),
+    queryFn: () => fetchInvoice(prefillInvoiceId as string),
+    enabled: prefillInvoiceId !== null,
+  });
+  const prefilledRef = useRef(false);
+  useEffect(() => {
+    if (prefilledRef.current || !prefill.data) return;
+    prefilledRef.current = true;
+    setInvoice(prefill.data);
+    if (prefillReason === "write_off") {
+      setAmountInput(
+        formatMinorAmount(prefill.data.outstanding_amount_minor, prefill.data.currency_minor_unit),
+      );
+    }
+  }, [prefill.data, prefillReason]);
   const [reasonNotes, setReasonNotes] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
 
@@ -85,10 +146,12 @@ function RefundForm({ onCreated }: RefundFormProps) {
   const amountValue = Number(amountInput);
   const isValidAmount =
     amountInput.trim() !== "" && Number.isFinite(amountValue) && amountValue > 0;
+  const cap = capFor(reasonCode);
   const paidAmountMinor = invoice ? invoicePaidAmountMinor(invoice) : 0;
+  const limitMinor = invoice ? capMinor(invoice, cap) : 0;
   const amountMinor =
     isValidAmount && invoice ? Math.round(amountValue * 10 ** invoice.currency_minor_unit) : 0;
-  const exceedsPaidAmount = isValidAmount && invoice !== null && amountMinor > paidAmountMinor;
+  const exceedsPaidAmount = isValidAmount && invoice !== null && amountMinor > limitMinor;
 
   const reasonOptions: SelectOption<ReasonCode | "">[] = [
     { value: "", label: t("financeReports.adjustments.newRefund.selectReason") },
@@ -158,15 +221,10 @@ function RefundForm({ onCreated }: RefundFormProps) {
                 role="status"
                 data-tone={exceedsPaidAmount ? "danger" : "neutral"}
               >
-                {exceedsPaidAmount
-                  ? t("financeReports.adjustments.newRefund.exceedsPaid", {
-                      amount: formatMinorAmount(paidAmountMinor, invoice.currency_minor_unit),
-                      currency: invoice.currency,
-                    })
-                  : t("financeReports.adjustments.newRefund.upTo", {
-                      amount: formatMinorAmount(paidAmountMinor, invoice.currency_minor_unit),
-                      currency: invoice.currency,
-                    })}
+                {t(CAP_MESSAGE_KEYS[cap][exceedsPaidAmount ? "exceeds" : "within"], {
+                  amount: formatMinorAmount(limitMinor, invoice.currency_minor_unit),
+                  currency: invoice.currency,
+                })}
               </p>
             ) : null}
 

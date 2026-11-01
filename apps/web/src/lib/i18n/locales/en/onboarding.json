@@ -234,7 +234,8 @@
     "description": "Manage your account settings.",
     "aiLink": "AI Study Assistant",
     "sessionsLink": "Devices & sessions",
-    "deleteLink": "Delete account"
+    "deleteLink": "Delete account",
+    "staffRecordLink": "My staff record"
   },
   "portal": {
     "title": "Portal",

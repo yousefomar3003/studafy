@@ -1,8 +1,11 @@
 import { z, createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { PERMISSIONS } from "@studafy/constants";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import {
@@ -153,6 +156,16 @@ function tenantFrom(c: Context<AppEnv>): {
 
 export function enrollmentRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  // Writes need timetable:manage (ORG_ADMIN, PRINCIPAL), as the classes themselves do: placing,
+  // withdrawing or moving a student is the school's call, not any signed-in member's.
+  const manage = requirePermission(PERMISSIONS.TIMETABLE_MANAGE);
+  routes.use("/api/academics/classes/:classId/enrollments", onlyMethods(["POST"], manage));
+  routes.use(
+    "/api/academics/classes/:classId/enrollments/:studentId",
+    onlyMethods(["DELETE"], manage),
+  );
+  routes.use("/api/academics/classes/:classId/enrollments/transfer", onlyMethods(["POST"], manage));
 
   // Audit declarations
   routes.use("/api/academics/classes/:classId/enrollments", auditAction("insert", "enrollments"));

@@ -1,5 +1,6 @@
 /**
- * Record templates: the per-school, per-subject form staff build (docs/modules/student-records.md).
+ * Record templates: the per-school, per-subject form staff build -- one each for students, parents,
+ * staff and classes (docs/modules/student-records.md).
  *
  * Every edit is a draft on app.record_fields; publishing snapshots the non-archived fields into a
  * new app.record_template_versions row. Answers are always written against the current published
@@ -15,6 +16,7 @@
 import { ERROR_CODES } from "@studafy/constants";
 import {
   DEFAULT_SENSITIVE_RETENTION_MONTHS,
+  RECORD_SUBJECT_FIELD_RULES,
   labelSuggestsSensitive,
   sealRecordValue,
 } from "@studafy/records";
@@ -109,8 +111,18 @@ function emptyAsNull(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-/** Cross-field rules a single column CHECK cannot state with a useful message. */
-function assertDefinition(definition: FieldDefinition): void {
+/**
+ * Cross-field rules a single column CHECK cannot state with a useful message, and what the subject
+ * allows (RECORD_SUBJECT_FIELD_RULES): a staff field is staff_only, a class field never sensitive.
+ */
+function assertDefinition(kind: RecordSubjectKind, definition: FieldDefinition): void {
+  const rules = RECORD_SUBJECT_FIELD_RULES[kind];
+  if (!rules.visibilities.includes(definition.visibility)) {
+    invalid(`A ${kind} field's visibility is one of: ${rules.visibilities.join(", ")}`);
+  }
+  if (!rules.sensitive && definition.sensitivity === "sensitive") {
+    invalid(`A ${kind} field cannot be sensitive`);
+  }
   const isChoice =
     definition.field_type === "single_choice" || definition.field_type === "multi_choice";
   if (isChoice && definition.options.length === 0) {
@@ -330,7 +342,7 @@ export async function createField(
     has_expiry: input.has_expiry ?? false,
     retention_months: input.retention_months ?? null,
   };
-  assertDefinition(definition);
+  assertDefinition(kind, definition);
 
   const [row] = await tx<DraftFieldRow[]>`
     INSERT INTO app.record_fields (
@@ -410,7 +422,7 @@ export async function updateField(
       );
     }
   }
-  assertDefinition(next);
+  assertDefinition(kind, next);
 
   const archivedAt =
     input.archived === undefined

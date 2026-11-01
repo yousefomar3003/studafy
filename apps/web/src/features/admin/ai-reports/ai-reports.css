@@ -1,0 +1,13 @@
+/**
+ * AI content report detail: the reported output, shown as plain text with its own line breaks
+ * once the moderator reveals it. Everything else reuses the message-report review styles.
+ */
+
+.ai-reports__snapshot {
+  margin: 0;
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -12,6 +12,7 @@ import {
   integrationEnabled,
   type TestDatabase,
 } from "../../../../tests/harness";
+import { withTenantTx } from "../../../db/tenant-tx";
 import {
   createIncident,
   getIncident,
@@ -25,6 +26,7 @@ import {
   getParentDisciplineVisibility,
 } from "../discipline-service";
 
+import type { TenantContext } from "../../../db/tenant-tx";
 import type { TransactionSql } from "postgres";
 
 const describeDb = integrationEnabled ? describe : describe.skip;
@@ -41,13 +43,14 @@ afterAll(async () => {
   if (db?.cleanup) await db.cleanup();
 });
 
-async function withTx<T>(fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
-  let result: T | undefined;
-  await db.sql.begin(async (tx) => {
-    await tx`SELECT set_config('role', 'studafy_app', true)`;
-    result = await fn(tx);
-  });
-  return result as T;
+/**
+ * Run `fn` in the same tenant transaction a route opens (`withTenantTx`): role studafy_app with
+ * `app.school_id` and, when given, `app.user_id` armed. The discipline tables are guarded by
+ * tenant_isolation; the acting user is the reporting teacher wherever a test has one, so audit rows
+ * carry the same actor_id a route would write.
+ */
+function withTx<T>(tenant: TenantContext, fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
+  return withTenantTx(db.sql, tenant, fn);
 }
 
 describeDb("createIncident", () => {
@@ -56,7 +59,7 @@ describeDb("createIncident", () => {
     const teacher = await createTeacher(db.sql, school.id);
     const student = await createStudent(db.sql, school.id);
 
-    const incident = await withTx((tx) =>
+    const incident = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
       createIncident(tx, school.id, teacher.userId, {
         student_id: student.id,
         incident_type: "behavioral",
@@ -81,7 +84,7 @@ describeDb("createIncident", () => {
     const student = await createStudent(db.sql, school.id);
 
     await expect(
-      withTx((tx) =>
+      withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
         createIncident(tx, school.id, teacher.userId, {
           student_id: student.id,
           incident_type: "other",
@@ -111,7 +114,7 @@ describeDb("listIncidents", () => {
       title: "Incident B",
     });
 
-    const { rows, total } = await withTx((tx) =>
+    const { rows, total } = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
       listIncidents(tx, school.id, { limit: 10, offset: 0 }),
     );
 
@@ -134,7 +137,7 @@ describeDb("listIncidents", () => {
       reporterUserId: teacher.userId,
     });
 
-    const { rows, total } = await withTx((tx) =>
+    const { rows, total } = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
       listIncidents(tx, school.id, { limit: 10, offset: 0, student_id: student1.id }),
     );
 
@@ -154,7 +157,9 @@ describeDb("getIncident", () => {
       reporterUserId: teacher.userId,
     });
 
-    const incident = await withTx((tx) => getIncident(tx, school.id, created.id));
+    const incident = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
+      getIncident(tx, school.id, created.id),
+    );
 
     expect(incident).toBeDefined();
     expect(incident!.id).toBe(created.id);
@@ -162,7 +167,7 @@ describeDb("getIncident", () => {
 
   test("returns undefined for non-existent incident", async () => {
     const school = await createSchool(db.sql);
-    const incident = await withTx((tx) =>
+    const incident = await withTx({ schoolId: school.id }, (tx) =>
       getIncident(tx, school.id, "00000000-0000-0000-0000-000000000000"),
     );
 
@@ -182,7 +187,7 @@ describeDb("updateIncident", () => {
       severity: "minor",
     });
 
-    const updated = await withTx((tx) =>
+    const updated = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
       updateIncident(tx, school.id, created.id, { severity: "major" }),
     );
 
@@ -200,11 +205,15 @@ describeDb("updateIncident", () => {
     });
 
     await expect(
-      withTx((tx) => updateIncident(tx, school.id, created.id, { status: "resolved" })),
+      withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
+        updateIncident(tx, school.id, created.id, { status: "resolved" }),
+      ),
     ).resolves.toBeDefined();
 
     await expect(
-      withTx((tx) => updateIncident(tx, school.id, created.id, { status: "reported" })),
+      withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
+        updateIncident(tx, school.id, created.id, { status: "reported" }),
+      ),
     ).rejects.toThrow("Cannot transition");
   });
 });
@@ -220,7 +229,9 @@ describeDb("resolveIncident", () => {
       reporterUserId: teacher.userId,
     });
 
-    const resolved = await withTx((tx) => resolveIncident(tx, school.id, created.id));
+    const resolved = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
+      resolveIncident(tx, school.id, created.id),
+    );
 
     expect(resolved.status).toBe("resolved");
     expect(resolved.resolved_at).not.toBeNull();
@@ -236,9 +247,11 @@ describeDb("resolveIncident", () => {
       reporterUserId: teacher.userId,
     });
 
-    await withTx((tx) => resolveIncident(tx, school.id, created.id));
+    await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
+      resolveIncident(tx, school.id, created.id),
+    );
 
-    const closed = await withTx((tx) =>
+    const closed = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
       updateIncident(tx, school.id, created.id, { status: "closed" }),
     );
 
@@ -257,7 +270,7 @@ describeDb("createAction", () => {
       reporterUserId: teacher.userId,
     });
 
-    const action = await withTx((tx) =>
+    const action = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
       createAction(tx, school.id, teacher.userId, incident.id, {
         action_type: "detention",
         description: "After-school detention",
@@ -279,11 +292,15 @@ describeDb("createAction", () => {
       reporterUserId: teacher.userId,
     });
 
-    await withTx((tx) => resolveIncident(tx, school.id, incident.id));
-    await withTx((tx) => updateIncident(tx, school.id, incident.id, { status: "closed" }));
+    await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
+      resolveIncident(tx, school.id, incident.id),
+    );
+    await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
+      updateIncident(tx, school.id, incident.id, { status: "closed" }),
+    );
 
     await expect(
-      withTx((tx) =>
+      withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
         createAction(tx, school.id, teacher.userId, incident.id, {
           action_type: "detention",
         }),
@@ -309,7 +326,7 @@ describeDb("updateAction", () => {
       actionType: "detention",
     });
 
-    const updated = await withTx((tx) =>
+    const updated = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
       updateAction(tx, school.id, incident.id, action.id, { status: "active" }),
     );
 
@@ -332,7 +349,7 @@ describeDb("updateAction", () => {
     });
 
     await expect(
-      withTx((tx) =>
+      withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
         updateAction(tx, school.id, incident.id, action.id, {
           status: "completed",
         }),
@@ -353,7 +370,9 @@ describeDb("getParentResolvedIncidents", () => {
       title: "Resolved incident",
     });
 
-    await withTx((tx) => resolveIncident(tx, school.id, incident1.id));
+    await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
+      resolveIncident(tx, school.id, incident1.id),
+    );
 
     await createDisciplineIncident(db.sql, school.id, {
       studentId: student.id,
@@ -361,7 +380,7 @@ describeDb("getParentResolvedIncidents", () => {
       title: "Unresolved incident",
     });
 
-    const { rows, total } = await withTx((tx) =>
+    const { rows, total } = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
       getParentResolvedIncidents(tx, school.id, [student.id], { limit: 10, offset: 0 }),
     );
 
@@ -372,7 +391,7 @@ describeDb("getParentResolvedIncidents", () => {
   test("returns empty for no children", async () => {
     const school = await createSchool(db.sql);
 
-    const { rows, total } = await withTx((tx) =>
+    const { rows, total } = await withTx({ schoolId: school.id }, (tx) =>
       getParentResolvedIncidents(tx, school.id, [], { limit: 10, offset: 0 }),
     );
 
@@ -385,7 +404,9 @@ describeDb("getParentDisciplineVisibility", () => {
   test("returns false by default", async () => {
     const school = await createSchool(db.sql);
 
-    const visible = await withTx((tx) => getParentDisciplineVisibility(tx, school.id));
+    const visible = await withTx({ schoolId: school.id }, (tx) =>
+      getParentDisciplineVisibility(tx, school.id),
+    );
 
     expect(visible).toBe(false);
   });
@@ -408,7 +429,7 @@ describeDb("listActions", () => {
       actionType: "verbal_warning",
     });
 
-    const { rows, total } = await withTx((tx) =>
+    const { rows, total } = await withTx({ schoolId: school.id, userId: teacher.userId }, (tx) =>
       listActions(tx, school.id, incident.id, { limit: 10, offset: 0 }),
     );
 

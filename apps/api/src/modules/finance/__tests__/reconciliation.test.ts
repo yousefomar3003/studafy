@@ -128,12 +128,14 @@ describe("reconciliation integration", () => {
         const studentId = await seedStudent(database.sql, schoolId);
         const currencyId = await getCurrencyId(database.sql, "JOD");
 
+        // JOD has 3 minor digits (000005), so 1000 JOD is 1,000,000 fils — in step with the
+        // ERPNext doc below, so only the overdue phase (not drift healing) can flag this row.
         await seedInstallmentCache(database.sql, schoolId, studentId, currencyId, {
           erpnext_fee_schedule_id: "FS-OVERDUE-1",
           due_date: "2020-01-01",
-          total_amount_minor: 100000,
+          total_amount_minor: 1_000_000,
           paid_amount_minor: 0,
-          outstanding_amount_minor: 100000,
+          outstanding_amount_minor: 1_000_000,
           status: "pending",
         });
 
@@ -150,7 +152,10 @@ describe("reconciliation integration", () => {
 
           const result = await reconcileSchool(tx, schoolId, erpnext);
 
-          expect(result.status).toBe("drift_corrected");
+          // Amounts agree with ERPNext, so the run records no drift; overdue flagging alone
+          // does not change the run status.
+          expect(result.driftDetectedCount).toBe(0);
+          expect(result.status).toBe("success");
 
           const [row] = await tx<{ status: string }[]>`
             SELECT status FROM app.installment_cache
@@ -176,13 +181,13 @@ describe("reconciliation integration", () => {
         const studentId = await seedStudent(database.sql, schoolId);
         const currencyId = await getCurrencyId(database.sql, "JOD");
 
-        // Seed with stale outstanding (500 local vs 300 ERPNext)
+        // Seed with stale outstanding (500 local vs 300 ERPNext), in fils (JOD minor unit = 3)
         await seedInstallmentCache(database.sql, schoolId, studentId, currencyId, {
           erpnext_fee_schedule_id: "FS-DRIFT-1",
           due_date: "2099-12-31",
-          total_amount_minor: 100000,
-          paid_amount_minor: 50000,
-          outstanding_amount_minor: 50000,
+          total_amount_minor: 1_000_000,
+          paid_amount_minor: 500_000,
+          outstanding_amount_minor: 500_000,
           status: "partially_paid",
         });
 
@@ -203,12 +208,14 @@ describe("reconciliation integration", () => {
           expect(result.autoHealedCount).toBe(1);
           expect(result.status).toBe("drift_corrected");
 
-          const [row] = await tx<{ outstanding_amount_minor: number; status: string }[]>`
+          // bigint columns come back as strings from postgres.js.
+          const [row] = await tx<{ outstanding_amount_minor: string; status: string }[]>`
             SELECT outstanding_amount_minor, status FROM app.installment_cache
             WHERE school_id = ${schoolId}::uuid AND erpnext_fee_schedule_id = 'FS-DRIFT-1'
           `;
-          expect(row!.outstanding_amount_minor).toBe(30000);
-          expect(row!.status).toBe("paid");
+          expect(row!.outstanding_amount_minor).toBe("300000");
+          // ERPNext reports 700 paid and 300 still outstanding: partially paid, not settled.
+          expect(row!.status).toBe("partially_paid");
         });
       } finally {
         await database.cleanup();
@@ -231,9 +238,9 @@ describe("reconciliation integration", () => {
         await seedInstallmentCache(database.sql, schoolId, studentId, currencyId, {
           erpnext_fee_schedule_id: "FS-DIVERGE-1",
           due_date: "2099-12-31",
-          total_amount_minor: 100000,
+          total_amount_minor: 1_000_000,
           paid_amount_minor: 0,
-          outstanding_amount_minor: 100000,
+          outstanding_amount_minor: 1_000_000,
           status: "pending",
         });
 
@@ -347,10 +354,10 @@ async function seedSchool(sql: Sql | TransactionSql, slug?: string) {
       (SELECT id FROM app.currencies WHERE code = 'JOD') AS currency
   `;
   const slugVal = slug ?? `recon-${crypto.randomUUID().slice(0, 8)}`;
+  const email = `${slugVal}@admin.local`;
   const [school] = await sql<{ id: string }[]>`
     INSERT INTO app.schools (slug, name, email, normalized_email, country_id, default_currency_id)
-    VALUES (${slugVal}, ${slugVal}, ${slugVal}@admin.local', ${slugVal}@admin.local',
-            ${refs!.country}, ${refs!.currency})
+    VALUES (${slugVal}, ${slugVal}, ${email}, ${email}, ${refs!.country}, ${refs!.currency})
     RETURNING id
   `;
   return school!.id;
@@ -364,9 +371,10 @@ async function seedStudent(sql: Sql, schoolId: string) {
       INSERT INTO app.users (school_id, email, normalized_email)
       VALUES (${schoolId}, ${email}, ${email}) RETURNING id
     `;
+    const admissionNumber = `ADM-${crypto.randomUUID().slice(0, 8)}`;
     const [student] = await tx<{ id: string }[]>`
       INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name)
-      VALUES (${schoolId}, ${user!.id}, 'ADM-${crypto.randomUUID().slice(0, 8)}', 'Test', 'Student')
+      VALUES (${schoolId}, ${user!.id}, ${admissionNumber}, 'Test', 'Student')
       RETURNING id
     `;
     return student!.id;

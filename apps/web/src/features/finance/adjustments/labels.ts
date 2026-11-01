@@ -1,4 +1,4 @@
-import type { ReasonCode, RefundStatus } from "./queries";
+import type { ReasonCode, RefundKind, RefundStatus } from "./queries";
 
 // Translation keys (not display strings): resolved with `t()` at render time so the label follows
 // the active locale instead of whatever locale was active when this module loaded.
@@ -23,4 +23,18 @@ export const REASON_CODE_LABEL_KEYS: Record<ReasonCode, string> = {
   withdrawal: "financeReports.adjustments.reasonCode.withdrawal",
   discount_adjustment: "financeReports.adjustments.reasonCode.discount_adjustment",
   error_correction: "financeReports.adjustments.reasonCode.error_correction",
+  write_off: "financeReports.adjustments.reasonCode.write_off",
+};
+
+export const REFUND_KIND_LABEL_KEYS: Record<RefundKind, string> = {
+  credit_note: "financeReports.adjustments.refundKind.credit_note",
+  invoice_cancellation: "financeReports.adjustments.refundKind.invoice_cancellation",
+  payment_reversal: "financeReports.adjustments.refundKind.payment_reversal",
+};
+
+/** What approving a request of this kind does, for the approve dialog. */
+export const REFUND_KIND_EFFECT_KEYS: Record<RefundKind, string> = {
+  credit_note: "financeReports.adjustments.refunds.approveDescription",
+  invoice_cancellation: "financeReports.adjustments.corrections.approveCancellation",
+  payment_reversal: "financeReports.adjustments.corrections.approveReversal",
 };

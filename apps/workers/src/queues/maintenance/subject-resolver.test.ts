@@ -106,12 +106,12 @@ describe("findSubjectPredicate", () => {
 });
 
 describe("subjectLinkValues", () => {
-  test("always includes user_id, and only includes resolved role ids", () => {
+  test("always includes user_id (and staff_user_id, the same id), and only resolved role ids", () => {
     expect(
       Object.fromEntries(subjectLinkValues({ userId: "u1", studentId: null, teacherId: null })),
-    ).toEqual({ user_id: "u1" });
+    ).toEqual({ user_id: "u1", staff_user_id: "u1" });
     expect(
       Object.fromEntries(subjectLinkValues({ userId: "u1", studentId: "s1", teacherId: null })),
-    ).toEqual({ user_id: "u1", student_id: "s1" });
+    ).toEqual({ user_id: "u1", staff_user_id: "u1", student_id: "s1" });
   });
 });

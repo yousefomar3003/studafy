@@ -106,8 +106,19 @@ export interface ListPaymentsParams {
   student_id?: string;
   invoice_id?: string;
   status?: PaymentStatus;
+  payment_mode?: PaymentMode;
+  date_from?: string;
+  date_to?: string;
+  search?: string;
   limit: number;
   offset: number;
+}
+
+export interface PaymentTotal {
+  currency: string;
+  amount: string;
+  amount_minor: number;
+  count: number;
 }
 
 const CACHE_COLUMNS = `
@@ -195,37 +206,71 @@ export async function getPayment(
   return parseCacheRow(row);
 }
 
+/**
+ * Reads app.students for the name search, so it runs in the finance identity transaction
+ * (`withStudentIdentityTx`): a FINANCE caller cannot see student rows under its own RLS.
+ */
 export async function listPayments(
   tx: TransactionSql,
   schoolId: string,
   params: ListPaymentsParams,
-): Promise<{ rows: PaymentRow[]; total: number }> {
-  const conditions = tx`pc.school_id = ${schoolId}::uuid`;
-  const studentFilter = params.student_id
-    ? tx` AND pc.student_id = ${params.student_id}::uuid`
+): Promise<{ rows: PaymentRow[]; total: number; totals: PaymentTotal[] }> {
+  const like = params.search ? `%${params.search}%` : null;
+  const student = params.student_id ? tx` AND pc.student_id = ${params.student_id}::uuid` : tx``;
+  const invoice = params.invoice_id ? tx` AND pc.erpnext_invoice_id = ${params.invoice_id}` : tx``;
+  const mode = params.payment_mode ? tx` AND pc.payment_mode = ${params.payment_mode}` : tx``;
+  const from = params.date_from ? tx` AND pc.payment_date >= ${params.date_from}::date` : tx``;
+  const to = params.date_to ? tx` AND pc.payment_date <= ${params.date_to}::date` : tx``;
+  const search = like
+    ? tx` AND (
+        pc.erpnext_docname ILIKE ${like}
+        OR pc.erpnext_invoice_id ILIKE ${like}
+        OR pc.student_id IN (
+          SELECT s.id FROM app.students AS s
+          WHERE s.school_id = ${schoolId}::uuid
+            AND (s.first_name || ' ' || s.last_name ILIKE ${like} OR s.admission_number ILIKE ${like})
+        )
+      )`
     : tx``;
-  const invoiceFilter = params.invoice_id
-    ? tx` AND pc.erpnext_invoice_id = ${params.invoice_id}`
-    : tx``;
+  const filters = tx`pc.school_id = ${schoolId}::uuid${student}${invoice}${mode}${from}${to}${search}`;
+  // The status filter narrows the rows but not the totals: totals only ever count confirmed money.
   const statusFilter = params.status ? tx` AND pc.status = ${params.status}` : tx``;
 
-  const [rows, [count]] = await Promise.all([
+  const [rows, [count], totals] = await Promise.all([
     tx<Record<string, unknown>[]>`
       SELECT ${tx.unsafe(CACHE_COLUMNS)}
       FROM app.payment_cache AS pc
       JOIN app.currencies AS c ON c.id = pc.currency_id
-      WHERE ${conditions}${studentFilter}${invoiceFilter}${statusFilter}
-      ORDER BY pc.created_at DESC
+      WHERE ${filters}${statusFilter}
+      ORDER BY pc.payment_date DESC, pc.created_at DESC
       LIMIT ${params.limit} OFFSET ${params.offset}
     `,
     tx<{ total: number }[]>`
       SELECT count(*)::int AS total
       FROM app.payment_cache AS pc
-      WHERE ${conditions}${studentFilter}${invoiceFilter}${statusFilter}
+      WHERE ${filters}${statusFilter}
+    `,
+    tx<{ currency: string; minor_unit: number; amount_minor: string; count: number }[]>`
+      SELECT c.code AS currency, c.minor_unit, sum(pc.amount_minor)::text AS amount_minor,
+             count(*)::int AS count
+      FROM app.payment_cache AS pc
+      JOIN app.currencies AS c ON c.id = pc.currency_id
+      WHERE ${filters} AND pc.status = 'confirmed'
+      GROUP BY c.code, c.minor_unit
+      ORDER BY c.code
     `,
   ]);
 
-  return { rows: rows.map(parseCacheRow), total: count?.total ?? 0 };
+  return {
+    rows: rows.map(parseCacheRow),
+    total: count?.total ?? 0,
+    totals: totals.map((t) => ({
+      currency: t.currency,
+      amount: formatMinorUnits(BigInt(t.amount_minor), t.minor_unit),
+      amount_minor: Number(t.amount_minor),
+      count: t.count,
+    })),
+  };
 }
 
 // ---------------------------------------------------------------------------
