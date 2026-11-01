@@ -49,6 +49,11 @@ const PROBE_SLEEP_SECONDS = 5;
 const STACKED_QUERY_MARKER = "sqli-stacked-canary";
 const CANARY_SURNAME = "Quillfeather";
 const CANARY_EMPLOYEE_NUMBER = "ZQ-CANARY-7";
+// A custom list seeded with fixed ids (the endpoint lists below are built before any request).
+const CANARY_LIST_ID = "c0ffee00-0000-4000-8000-000000000001";
+const CANARY_COLUMN_ID = "c0ffee00-0000-4000-8000-000000000002";
+const CANARY_ROW_ID = "c0ffee00-0000-4000-8000-000000000003";
+const CUSTOM_LIST_ROWS = `/api/custom-lists/${CANARY_LIST_ID}/rows`;
 
 /** One entry per sqlmap technique; each payload is shaped to escape both `'${x}'` and `'%${x}%'`. */
 const INJECTION_PAYLOADS = {
@@ -110,6 +115,11 @@ const FREE_TEXT_ENDPOINTS = [
   "/api/finance/unlinked/parents?search=",
   "/api/records/missing/students?search=",
   "/api/records/missing/parents?search=",
+  // Custom lists: a row's free-text search and a text column's filter value.
+  `${CUSTOM_LIST_ROWS}?q=`,
+  `${CUSTOM_LIST_ROWS}?filter_column=${CANARY_COLUMN_ID}&filter_value=`,
+  // The link picker's search (the canary list allows student links).
+  `/api/custom-lists/${CANARY_LIST_ID}/link-candidates?kind=student&q=`,
 ];
 
 const ENUM_FILTER_ENDPOINTS = [
@@ -125,6 +135,15 @@ const ENUM_FILTER_ENDPOINTS = [
   // Global search's named SearchType filter and its numeric offset.
   "/api/search?q=ab&types=",
   "/api/search?q=ab&offset=",
+  // Custom lists: the rows table's sort key, order, link kind and paging, the export language,
+  // and the lists' archived toggle.
+  `${CUSTOM_LIST_ROWS}?sort=`,
+  `${CUSTOM_LIST_ROWS}?order=`,
+  `${CUSTOM_LIST_ROWS}?link_kind=`,
+  `${CUSTOM_LIST_ROWS}?offset=`,
+  `/api/custom-lists/${CANARY_LIST_ID}/export?lang=`,
+  "/api/custom-lists?include_archived=",
+  `/api/custom-lists/${CANARY_LIST_ID}/link-candidates?q=ab&kind=`,
 ];
 
 interface Canaries {
@@ -189,8 +208,29 @@ beforeAll(async () => {
       .status,
   ).toBe(201);
 
+  // A custom list whose one row holds the canary surname in a text cell.
+  await database.sql`
+    INSERT INTO app.custom_lists (id, school_id, name_en, name_ar, audience, link_student)
+    VALUES (${CANARY_LIST_ID}::uuid, ${fixture.schoolId}::uuid, 'Canary list', 'قائمة', 'admins',
+            true)
+  `;
+  await database.sql`
+    INSERT INTO app.custom_list_columns (id, school_id, list_id, field_type, label_en, label_ar)
+    VALUES (${CANARY_COLUMN_ID}::uuid, ${fixture.schoolId}::uuid, ${CANARY_LIST_ID}::uuid,
+            'short_text', 'Name', 'الاسم')
+  `;
+  await database.sql`
+    INSERT INTO app.custom_list_rows (id, school_id, list_id)
+    VALUES (${CANARY_ROW_ID}::uuid, ${fixture.schoolId}::uuid, ${CANARY_LIST_ID}::uuid)
+  `;
+  await database.sql`
+    INSERT INTO app.custom_list_values (school_id, list_id, row_id, column_id, value_text)
+    VALUES (${fixture.schoolId}::uuid, ${CANARY_LIST_ID}::uuid, ${CANARY_ROW_ID}::uuid,
+            ${CANARY_COLUMN_ID}::uuid, ${`Zephyrine ${CANARY_SURNAME}`})
+  `;
+
   canaries = {
-    ids: [user.id, student.id, student.userId, teacher.id, teacher.userId],
+    ids: [user.id, student.id, student.userId, teacher.id, teacher.userId, CANARY_ROW_ID],
     positiveControls: [
       { url: `/api/users?search=${CANARY_SURNAME}`, expectedId: user.id },
       { url: `/api/students?search=${CANARY_SURNAME}`, expectedId: student.id },
@@ -198,6 +238,15 @@ beforeAll(async () => {
       { url: `/api/search?q=${CANARY_SURNAME}`, expectedId: student.id },
       { url: `/api/search?types=students&q=${CANARY_SURNAME}`, expectedId: student.id },
       { url: `/api/records/missing/students?search=${CANARY_SURNAME}`, expectedId: student.id },
+      { url: `${CUSTOM_LIST_ROWS}?q=${CANARY_SURNAME}`, expectedId: CANARY_ROW_ID },
+      {
+        url: `${CUSTOM_LIST_ROWS}?filter_column=${CANARY_COLUMN_ID}&filter_value=${CANARY_SURNAME}`,
+        expectedId: CANARY_ROW_ID,
+      },
+      {
+        url: `/api/custom-lists/${CANARY_LIST_ID}/link-candidates?kind=student&q=${CANARY_SURNAME}`,
+        expectedId: student.id,
+      },
     ],
   };
 }, 60_000);

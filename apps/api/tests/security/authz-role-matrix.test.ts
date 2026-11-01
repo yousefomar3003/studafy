@@ -977,6 +977,117 @@ const GUARD_CASES: GuardCase[] = [
     permission: "timetable:manage",
     source: "records/routes.ts",
   },
+  // Custom lists (000182): customList:use opens every route (the list's audience narrows it in the
+  // service and RLS); customList:manage shapes lists, columns and imports; customList:readSensitive
+  // reveals a sensitive cell.
+  {
+    method: "GET",
+    path: "/api/custom-lists",
+    permission: "customList:use",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/custom-lists",
+    permission: "customList:manage",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/custom-lists/linked/{subjectKind}/{subjectId}",
+    permission: "customList:use",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/custom-lists/imports/preview",
+    permission: "customList:manage",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/custom-lists/imports/apply",
+    permission: "customList:manage",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/custom-lists/{listId}",
+    permission: "customList:use",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "PATCH",
+    path: "/api/custom-lists/{listId}",
+    permission: "customList:manage",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "DELETE",
+    path: "/api/custom-lists/{listId}",
+    permission: "customList:manage",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/custom-lists/{listId}/columns",
+    permission: "customList:manage",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "PATCH",
+    path: "/api/custom-lists/{listId}/columns/{columnId}",
+    permission: "customList:manage",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "PUT",
+    path: "/api/custom-lists/{listId}/column-order",
+    permission: "customList:manage",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/custom-lists/{listId}/rows",
+    permission: "customList:use",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/custom-lists/{listId}/rows",
+    permission: "customList:use",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "PATCH",
+    path: "/api/custom-lists/{listId}/rows/{rowId}",
+    permission: "customList:use",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "DELETE",
+    path: "/api/custom-lists/{listId}/rows/{rowId}",
+    permission: "customList:use",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/custom-lists/{listId}/rows/{rowId}/cells/{columnId}/reveal",
+    permission: "customList:readSensitive",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/custom-lists/{listId}/export",
+    permission: "customList:use",
+    source: "custom-lists/routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/custom-lists/{listId}/link-candidates",
+    permission: "customList:use",
+    source: "custom-lists/routes.ts",
+  },
   {
     method: "GET",
     path: "/api/finance/expenses",

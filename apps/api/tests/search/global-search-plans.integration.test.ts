@@ -106,6 +106,8 @@ const TSV_TABLES = [
   "scholarships",
   "expense_cache",
   "notifications",
+  // Custom lists by name (000182).
+  "custom_lists",
 ];
 
 /** Every table with a GENERATED search_name for the trigram fallback (000171). */

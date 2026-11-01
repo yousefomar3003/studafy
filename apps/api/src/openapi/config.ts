@@ -159,6 +159,18 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "Unknown columns of the users and classes CSV imports can be kept as record fields.",
     },
     {
+      name: "Custom lists",
+      description:
+        "School-defined tables for data Studafy has no section for -- bus routes, library loans, " +
+        "clinic visits, lockers (docs/modules/custom-lists.md). Typed columns reuse the record " +
+        "field types and sensitivities; rows may link to a student, parent, member of staff or " +
+        "class. Lists are shaped with customList:manage (ORG_ADMIN, PRINCIPAL) and used with " +
+        "customList:use (every school staff role), narrowed by each list's audience: admins, " +
+        "leadership or all staff. Sensitive cells are encrypted, masked, revealed only through the " +
+        "audited reveal (customList:readSensitive), and left out of search and CSV export. A sheet " +
+        "Studafy does not recognise can become a list, linking rows by school-issued key only.",
+    },
+    {
       name: "Teachers",
       description:
         "Teacher profile management. Authenticated and tenant-scoped. " +

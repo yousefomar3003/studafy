@@ -126,6 +126,7 @@ export const SEARCH_TYPES = [
   "scholarships",
   "expenses",
   "notifications",
+  "custom_lists",
 ] as const;
 
 export type SearchType = (typeof SEARCH_TYPES)[number];
@@ -367,6 +368,14 @@ export interface NotificationSearchHit {
   rank: number;
 }
 
+export interface CustomListSearchHit {
+  id: string;
+  name_en: string;
+  name_ar: string;
+  archived: boolean;
+  rank: number;
+}
+
 export interface GlobalSearchResult {
   students: StudentSearchHit[];
   users: UserSearchHit[];
@@ -388,6 +397,7 @@ export interface GlobalSearchResult {
   scholarships: ScholarshipSearchHit[];
   expenses: ExpenseSearchHit[];
   notifications: NotificationSearchHit[];
+  custom_lists: CustomListSearchHit[];
 }
 
 export type GlobalSearchTotals = Record<SearchType, number>;
@@ -1215,6 +1225,35 @@ const notificationQuery: SectionQuery<RawNotificationRow> = (
     LIMIT ${limit} OFFSET ${offset}
   `;
 
+interface RawCustomListRow {
+  id: string;
+  name_en: string;
+  name_ar: string;
+  archived: boolean;
+  rank: number;
+}
+
+/**
+ * Custom lists by their two names only (000182) -- never a description or a row value, sensitive
+ * or not. app.custom_lists' role_scope_visibility policy (RLS) admits only lists whose audience
+ * includes the caller, so a list a principal may not use is never a hit, nor counted.
+ */
+const customListQuery: SectionQuery<RawCustomListRow> = (
+  { tx, schoolId, terms },
+  _mode,
+  limit,
+  offset,
+) =>
+  tx<(RawCustomListRow & Counted)[]>`
+    SELECT l.id, l.name_en, l.name_ar, (l.archived_at IS NOT NULL) AS archived,
+           ts_rank(l.search_tsv, q.query) AS rank, count(*) OVER ()::int AS total_count
+    FROM app.custom_lists l,
+         to_tsquery('simple', app.search_normalize(${terms.tsquery})) AS q(query)
+    WHERE l.school_id = ${schoolId}::uuid AND l.search_tsv @@ q.query
+    ORDER BY l.archived_at IS NOT NULL, rank DESC, lower(l.name_en), l.id
+    LIMIT ${limit} OFFSET ${offset}
+  `;
+
 // ---------------------------------------------------------------------------
 // Row mapping
 // ---------------------------------------------------------------------------
@@ -1269,6 +1308,7 @@ function emptyResult(): GlobalSearchResult {
     scholarships: [],
     expenses: [],
     notifications: [],
+    custom_lists: [],
   };
 }
 
@@ -1602,6 +1642,17 @@ export async function globalSearch(
         notification_type: row.notification_type,
         read_at: isoOrNull(row.read_at),
         created_at: iso(row.created_at),
+        rank: rank(row),
+      }));
+    },
+    custom_lists: async () => {
+      const page = await run(customListQuery);
+      totals.custom_lists = page.total;
+      results.custom_lists = page.rows.map((row) => ({
+        id: row.id,
+        name_en: row.name_en,
+        name_ar: row.name_ar,
+        archived: row.archived,
         rank: rank(row),
       }));
     },

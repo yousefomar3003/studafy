@@ -511,6 +511,20 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/classes/{classId}/records/{fieldId}/document",
   "POST /api/record-imports/{subjectKind}/preview",
   "POST /api/record-imports/{subjectKind}/apply",
+  // Custom lists (000182): shaping a list (customList:manage), its rows (customList:use, narrowed
+  // by the list's audience), the audited sensitive-cell reveal, and imports from a sheet.
+  "POST /api/custom-lists",
+  "POST /api/custom-lists/imports/preview",
+  "POST /api/custom-lists/imports/apply",
+  "PATCH /api/custom-lists/{listId}",
+  "DELETE /api/custom-lists/{listId}",
+  "POST /api/custom-lists/{listId}/columns",
+  "PATCH /api/custom-lists/{listId}/columns/{columnId}",
+  "PUT /api/custom-lists/{listId}/column-order",
+  "POST /api/custom-lists/{listId}/rows",
+  "PATCH /api/custom-lists/{listId}/rows/{rowId}",
+  "DELETE /api/custom-lists/{listId}/rows/{rowId}",
+  "POST /api/custom-lists/{listId}/rows/{rowId}/cells/{columnId}/reveal",
 ];
 
 /**
