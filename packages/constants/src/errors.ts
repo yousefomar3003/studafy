@@ -620,6 +620,19 @@ export const ERROR_CODES = {
   RECORD_DOCUMENT_NOT_FOUND: "RECORD_DOCUMENT_NOT_FOUND",
   RECORD_KEY_UNAVAILABLE: "RECORD_KEY_UNAVAILABLE",
 
+  // Custom lists (docs/modules/custom-lists.md, 000182). NOT_FOUND covers a list, column or row the
+  // caller cannot see (outside the list's audience) as well as one that does not exist, so the
+  // endpoints cannot be used to probe. LIMIT_REACHED: a per-school or per-list cap. LINK_INVALID: a
+  // link the list does not allow, or a person or class that is not there. PREVIEW_STALE: an import
+  // confirmed with a preview token that no longer matches what would be written. Cell values reuse
+  // RECORD_VALUE_INVALID, RECORD_FIELD_NOT_SENSITIVE and RECORD_KEY_UNAVAILABLE.
+  CUSTOM_LIST_NOT_FOUND: "CUSTOM_LIST_NOT_FOUND",
+  CUSTOM_LIST_INVALID: "CUSTOM_LIST_INVALID",
+  CUSTOM_LIST_NAME_TAKEN: "CUSTOM_LIST_NAME_TAKEN",
+  CUSTOM_LIST_LIMIT_REACHED: "CUSTOM_LIST_LIMIT_REACHED",
+  CUSTOM_LIST_LINK_INVALID: "CUSTOM_LIST_LINK_INVALID",
+  CUSTOM_LIST_PREVIEW_STALE: "CUSTOM_LIST_PREVIEW_STALE",
+
   // Uncategorized server-side failure.
   INTERNAL_ERROR: "INTERNAL_ERROR",
 } as const;

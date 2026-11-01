@@ -132,6 +132,31 @@ describe("ROLE_PERMISSIONS", () => {
       [ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
     );
   });
+
+  // Custom lists: leadership shapes them; every school staff role may work in one, narrowed by the
+  // list's audience; families never hold any of it.
+  describe("custom lists", () => {
+    test("leadership manages lists and reveals sensitive cells", () => {
+      const leadership = [ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort();
+      expect(rolesHolding(PERMISSIONS.CUSTOM_LIST_MANAGE)).toEqual(leadership);
+      expect(rolesHolding(PERMISSIONS.CUSTOM_LIST_READ_SENSITIVE)).toEqual(leadership);
+    });
+
+    test("every school staff role may use lists; parents and students never", () => {
+      expect(rolesHolding(PERMISSIONS.CUSTOM_LIST_USE)).toEqual(
+        [...SCHOOL_STAFF_ROLES, ROLES.SUPER_ADMIN].sort(),
+      );
+      for (const role of [ROLES.PARENT, ROLES.STUDENT, ROLES.GUEST]) {
+        for (const permission of [
+          PERMISSIONS.CUSTOM_LIST_MANAGE,
+          PERMISSIONS.CUSTOM_LIST_USE,
+          PERMISSIONS.CUSTOM_LIST_READ_SENSITIVE,
+        ]) {
+          expect(ROLE_PERMISSIONS[role]).not.toContain(permission);
+        }
+      }
+    });
+  });
 });
 
 describe("SCHOOL_STAFF_ROLES", () => {

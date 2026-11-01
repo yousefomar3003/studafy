@@ -128,6 +128,9 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `staffRecord:update`             | ✅          | ✅        |           |                    |         |            |         |        |       |               |
 | `staffRecord:readSensitive`      | ✅          | ✅        |           |                    |         |            |         |        |       |               |
 | `classRecord:read`               | ✅          | ✅        | ✅        |                    |         | ✅         |         |        |       |               |
+| `customList:manage`              | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
+| `customList:use`                 | ✅          | ✅        | ✅        | ✅                 | ✅      | ✅         |         |        |       |               |
+| `customList:readSensitive`       | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `teacher:create`                 | ✅          | ✅        |           |                    |         |            |         |        |       |               |
 | `teacher:read`                   | ✅          | ✅        | ✅        |                    |         | ✅         |         |        |       |               |
 | `teacher:update`                 | ✅          | ✅        |           |                    |         |            |         |        |       |               |
