@@ -1,5 +1,5 @@
 /**
- * Corrections through the refund maker-checker queue (000172): asking to cancel an invoice,
+ * Corrections through the refund maker-checker queue (000177): asking to cancel an invoice,
  * reverse a payment, or write off a balance, and what approval does to the local read models.
  * The maker steps run over HTTP as FINANCE; approval runs the service against a recording ERPNext
  * double, since the harness has no ERPNext site. Requires a live PostgreSQL instance, gated on

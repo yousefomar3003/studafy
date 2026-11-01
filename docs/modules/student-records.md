@@ -14,7 +14,7 @@ dedupe or link people. Parent-child links are made only by staff choosing both p
 
 | Piece             | Where                                                                                                       |
 | ----------------- | ----------------------------------------------------------------------------------------------------------- |
-| Data model        | `db/migrations/000170_create_student_and_parent_records.sql`; staff and class: `000175`, `000176`           |
+| Data model        | `db/migrations/000170_create_student_and_parent_records.sql`; staff and class: `000180`, `000181`           |
 | Encryption design | [ADR-019](../adr/0019-sensitive-record-field-encryption.md)                                                 |
 | Shared logic      | `packages/records` (field vocabulary, value validation, masking, sealing)                                   |
 | API               | `apps/api/src/modules/records` (templates, records, documents, missing information)                         |
@@ -75,7 +75,7 @@ Finance > Unlinked does, because FINANCE cannot read `app.students`.
 
 ## Staff and class records
 
-Two more subjects use the same tables, services and screens (migrations 000175, 000176). A **staff
+Two more subjects use the same tables, services and screens (migrations 000180, 000181). A **staff
 record** is about a user holding a staff role (ORG_ADMIN, PRINCIPAL, ATTENDANCE_OFFICER, FINANCE or
 INSTRUCTOR; `SCHOOL_STAFF_ROLES`), linked by `record_answers.staff_user_id`. A **class record** is
 about a class, linked by `class_id`. Each has its own template tab, records page, missing-information
@@ -168,7 +168,7 @@ A sensitive answer is deleted **12 months after the person leaves** unless the s
 period on the field (1–120 months). For a student, "leaves" means moving to `graduated`, `withdrawn`
 or `archived`; `app.students.left_at` is kept by a trigger. For a parent, it means the last of their
 linked children has left; a parent linked to no child is never swept. For a member of staff, it means
-their account was archived; `app.users.archived_at` is kept by a trigger (000176). Class fields are
+their account was archived; `app.users.archived_at` is kept by a trigger (000181). Class fields are
 never sensitive, so class records are never swept.
 
 Why 12 months: it covers the year in which a school is still asked for a leaver's transfer

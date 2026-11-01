@@ -174,7 +174,7 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
       gatewayConfirm: false,
     },
   ],
-  // The file behind a document field on a staff member's record (000176): a teaching licence, a
+  // The file behind a document field on a staff member's record (000181): a teaching licence, a
   // signed contract. Uploaded by whoever edits staff records (staffRecord:update, ORG_ADMIN) and
   // confirmed by the records module inside the write that attaches it. Same types and cap as
   // record.document; a sensitive one is staffRecord.sensitiveDocument.
@@ -211,7 +211,7 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
       gatewayConfirm: false,
     },
   ],
-  // The original file a school uploaded to the student import (000174), kept so nothing in it is
+  // The original file a school uploaded to the student import (000179), kept so nothing in it is
   // lost: staff map its unmapped columns later without a re-upload, and download it back. Staged
   // through the generic request-upload route, then confirmed by the import upload itself, which
   // checks the stored bytes are the bytes it parsed and promotes them under the sensitive-documents

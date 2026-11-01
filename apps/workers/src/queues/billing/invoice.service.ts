@@ -247,7 +247,7 @@ async function approvedScholarships(
   }));
 }
 
-/** The school's sales tax settings (000173); null when it never configured them. */
+/** The school's sales tax settings (000178); null when it never configured them. */
 async function salesTaxSettings(
   tx: TransactionSql,
   schoolId: string,

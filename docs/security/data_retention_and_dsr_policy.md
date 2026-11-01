@@ -116,7 +116,7 @@ generic walk by `apps/workers/src/queues/maintenance/records-dsr.ts`:
 
 - **Export** writes `data/record_answers.ndjson`: every answer about the subject as a student
   (`student_id`), as a parent (`parent_user_id`) and as a member of staff (`staff_user_id`, the
-  person's own user id; listed in `SUBJECT_LINK_COLUMNS` since 000176), sensitive values decrypted
+  person's own user id; listed in `SUBJECT_LINK_COLUMNS` since 000181), sensitive values decrypted
   with the records keyring and labelled with the field as it read when answered. Document files are
   listed in the manifest's `files`.
 - **Erasure** deletes the answers outright, with documents cascading (`hard_deleted` on

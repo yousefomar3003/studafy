@@ -1,6 +1,6 @@
 -- Staff and class records (docs/modules/student-records.md "Staff and class records", ADR-019).
 --
--- 000170 built school-defined records for students and parents; 000175 added the 'staff' and
+-- 000170 built school-defined records for students and parents; 000180 added the 'staff' and
 -- 'class' subject kinds. This wires them into the same tables -- templates, fields, versions and
 -- documents need nothing new, since they are keyed by subject kind or hang off an answer:
 --

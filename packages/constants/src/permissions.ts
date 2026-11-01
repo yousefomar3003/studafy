@@ -211,7 +211,7 @@ export const PERMISSIONS = {
   STAFF_RECORD_UPDATE: "staffRecord:update",
   STAFF_RECORD_READ_SENSITIVE: "staffRecord:readSensitive",
   // Class records (homeroom notes, a bus group): read by school leadership and by the class's own
-  // teachers, whose row scope is app.teaches_class (000176) and whose field scope is the "teachers"
+  // teachers, whose row scope is app.teaches_class (000181) and whose field scope is the "teachers"
   // visibility. Editing is timetable:manage -- whoever builds the classes keeps their details --
   // and building the template is recordTemplate:manage, as for every subject. No sensitive tier: a
   // class is not a person, so its template refuses sensitive fields.

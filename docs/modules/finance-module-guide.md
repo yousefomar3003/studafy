@@ -401,7 +401,7 @@ does not install (it would add payroll, leave and attendance to every school's s
 ### Corrections: cancellations, reversals, write-offs
 
 Every correction goes through the refund maker-checker queue (`app.refund_requests`, migration
-000172), so a school has one place to approve money changes and one audit trail. FINANCE asks
+000177), so a school has one place to approve money changes and one audit trail. FINANCE asks
 (`billing:update`); a different user holding `billing:refund` (ORG_ADMIN) approves at
 `POST /api/finance/refunds/{refundId}/approve`. `kind` says what approval does:
 
@@ -430,7 +430,7 @@ due dates. The web's Fees page offers it per structure. Installments show on the
 
 ### Sales tax (VAT)
 
-Off by default (`app.school_tax_settings`, `app.school_tax_exempt_categories`, migration 000173).
+Off by default (`app.school_tax_settings`, `app.school_tax_exempt_categories`, migration 000178).
 Whether a fee is taxable is the school's legal call (UAE zero-rates core tuition; Saudi Arabia taxes
 private schooling for non-citizens), so saving needs `organization:manageSettings`. When on, the
 billing worker (`sales-tax.ts`) adds one "On Net Total" tax row on the school's ERPNext tax account

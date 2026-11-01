@@ -3,7 +3,7 @@
  * student-import-mapping-guide.md "Product signal").
  *
  * The API writes app.student_import_unmapped_columns at upload and re-map. Imports uploaded before
- * migration 000174 -- or by an API instance still running the previous release during a deploy --
+ * migration 000179 -- or by an API instance still running the previous release during a deploy --
  * have no rows, so the platform's cross-school unmapped-header count would miss them. Once a day, in
  * the same IMPORTS job as the abandoned-import purge, this computes their unmapped columns from the
  * stored header row and mapping snapshot with the same function the API uses and inserts them.

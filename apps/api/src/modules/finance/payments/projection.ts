@@ -214,7 +214,7 @@ export async function projectPaymentEntry(
     // The common confirm path: this gateway forwarded the payment, so the row already exists as
     // 'pending' with its student, mode, and requested invoice already correct. Only ERPNext-owned
     // facts are refreshed, and COALESCE preserves what only the original request knew.
-    // A cancel of a payment that was confirmed is a reversal (000172), not a failure: the money
+    // A cancel of a payment that was confirmed is a reversal (000177), not a failure: the money
     // did arrive once, so the row reads 'reversed' and keeps its confirmed_at. The right-hand
     // `status` below is the row's value before this update.
     const reversed = tx`(${status} = 'failed' AND status IN ('confirmed', 'reversed'))`;

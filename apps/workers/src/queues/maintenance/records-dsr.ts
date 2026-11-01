@@ -13,7 +13,7 @@
  *   - erasure: the answers are deleted outright (documents cascade), and the stored files' keys are
  *     returned for the caller to delete once its transaction has committed.
  *
- * A class's record is not about a person (000176): no per-person request reaches it -- its
+ * A class's record is not about a person (000181): no per-person request reaches it -- its
  * class_id never matches a subject -- and only a tenant closure, which takes every answer, removes
  * it. A staff member's answers are keyed by `staff_user_id`, the person's own user id.
  */

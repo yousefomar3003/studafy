@@ -6,7 +6,7 @@
  * role_scope_visibility policy reuses app.can_read_student, so a teacher outside the student's
  * classes and a parent of another family read nothing (FINANCE, which cannot read students at all,
  * reads through the identity transaction instead); a staff record is leadership's and the staff
- * member's own, and a class record leadership's and its teachers' (000176). Field scope is this
+ * member's own, and a class record leadership's and its teachers' (000181). Field scope is this
  * module's: an audience reads only the fields whose visibility reaches it (isFieldVisibleTo), and
  * never a sensitive one unless it is the "staff" audience. Value scope is ADR-019's: a sensitive
  * value leaves this module as its mask, except through revealValue, which is audited like a write.

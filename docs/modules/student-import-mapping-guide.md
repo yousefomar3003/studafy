@@ -16,7 +16,7 @@ Source:
 - [`apps/workers/src/queues/imports/worker.ts`](../../apps/workers/src/queues/imports/worker.ts):
   the staging-to-target migration.
 - [`db/migrations/000114_add_student_import_mapping_and_staging.sql`](../../db/migrations/000114_add_student_import_mapping_and_staging.sql).
-- [`db/migrations/000174_keep_student_import_sources.sql`](../../db/migrations/000174_keep_student_import_sources.sql):
+- [`db/migrations/000179_keep_student_import_sources.sql`](../../db/migrations/000179_keep_student_import_sources.sql):
   original files, leftover cells, unmapped columns and retention (see
   [Import history and unmapped columns](#import-history-and-unmapped-columns)).
 
@@ -269,7 +269,7 @@ Import columns**) counts normalized unmapped header text across schools: header 
 common spelling), the number of schools and of imports. No cell value, no school name, and a header
 only once at least 3 schools have brought it, so a header one school alone uses (which can say
 something about that school) is never shown. Read one school's scope at a time, as every
-cross-school platform figure is. Imports uploaded before migration 000174 (or by an instance of the
+cross-school platform figure is. Imports uploaded before migration 000179 (or by an instance of the
 previous release during a deploy) get their rows from
 [`unmapped-columns-backfill.ts`](../../apps/workers/src/queues/imports/unmapped-columns-backfill.ts),
 which the daily import job runs: computed from the stored header row and mapping, header text only.

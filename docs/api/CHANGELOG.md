@@ -13,7 +13,7 @@ when it required the `version-bump` label.
 
 ### Added
 
-- Staff and class records (migrations 000175, 000176;
+- Staff and class records (migrations 000180, 000181;
   [student-records.md](../modules/student-records.md#staff-and-class-records)), under the new
   "Staff and class records" tag:
   - `RecordSubjectKind` gains `staff` and `class`, so `/api/record-templates/{subjectKind}…` and
@@ -43,7 +43,7 @@ when it required the `version-bump` label.
   - Storage content classes `staffRecord.document`, `staffRecord.sensitiveDocument` and
     `classRecord.document`.
 
-- Student import history, original files and unmapped columns (migration 000174;
+- Student import history, original files and unmapped columns (migration 000179;
   [student-import-mapping-guide.md](../modules/student-import-mapping-guide.md#import-history-and-unmapped-columns)):
   - `POST /api/imports/students/upload` gains optional `source_key` (`UploadImportQuery`): the temp
     key of the same file staged under the new content class `import.source` (`text/csv`, 25 MiB,
@@ -77,7 +77,7 @@ when it required the `version-bump` label.
   `SchoolDataSubjectRequestList`, `SchoolDataSubjectRequest` = `DataSubjectRequest` plus
   `subject_display_name`). A closure's whole-school request is not listed; a download link is
   still signed per request by `GET /api/privacy/dsr/{requestId}`.
-- Finance corrections through the refund maker-checker queue (migration 000172):
+- Finance corrections through the refund maker-checker queue (migration 000177):
   - `POST /api/finance/invoices/{invoiceId}/cancellation` and
     `POST /api/finance/payments/{paymentId}/reversal` (maker, `billing:update`; body
     `CorrectionRequestBody`: `reason_code`, required `reason_notes`; params `CorrectionInvoiceParam`,
@@ -96,7 +96,7 @@ when it required the `version-bump` label.
   day, currency and method between `from_date` and `to_date` (at most 400 days), with range totals
   (`CollectionsByMethodQuery`, `CollectionsByMethodReport`, `CollectionsByMethodRow`,
   `CollectionsByMethodTotal`). Read from Studafy's payment records, not ERPNext.
-- Sales tax (VAT) settings (migration 000173): `GET /api/finance/tax-settings` (`billing:read`),
+- Sales tax (VAT) settings (migration 000178): `GET /api/finance/tax-settings` (`billing:read`),
   `PUT /api/finance/tax-settings` (`organization:manageSettings`) (`TaxSettings`,
   `UpdateTaxSettingsBody`). Off by default; when on, the billing worker adds an ERPNext "On Net
   Total" tax row to every invoice it generates and zero-rates exempt fee categories.

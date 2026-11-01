@@ -577,7 +577,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/parents/{parentUserId}/records/{fieldId}/document",
   "PATCH /api/parents/{parentUserId}/records/{fieldId}/document",
   "DELETE /api/parents/{parentUserId}/records/{fieldId}/document",
-  // Staff and class records (000176), and imported columns kept as record fields.
+  // Staff and class records (000181), and imported columns kept as record fields.
   "PUT /api/staff/{staffUserId}/records",
   "POST /api/staff/{staffUserId}/records/{fieldId}/reveal",
   "PUT /api/staff/{staffUserId}/records/{fieldId}/document",

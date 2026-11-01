@@ -879,7 +879,7 @@ const GUARD_CASES: GuardCase[] = [
     source: "imports/routes/import-signal-routes.ts",
     allowedRole: ROLES.SUPER_ADMIN,
   },
-  // Staff and class records (000176). Literal subject kinds on record-imports: each kind has its
+  // Staff and class records (000181). Literal subject kinds on record-imports: each kind has its
   // own guard, mounted on its own path.
   {
     method: "GET",

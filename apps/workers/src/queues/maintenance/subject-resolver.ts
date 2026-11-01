@@ -49,7 +49,7 @@ export async function resolveSubjectIdentifiers(
 export function subjectLinkValues(subject: SubjectIdentifiers): ReadonlyMap<string, string> {
   const values = new Map<string, string>([
     ["user_id", subject.userId],
-    // A staff record's subject column holds the person's own user id (000176).
+    // A staff record's subject column holds the person's own user id (000181).
     ["staff_user_id", subject.userId],
   ]);
   if (subject.studentId) values.set("student_id", subject.studentId);

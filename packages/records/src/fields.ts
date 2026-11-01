@@ -1,6 +1,6 @@
 /**
  * The vocabulary of school-defined records (docs/modules/student-records.md). Mirrors the enums
- * created by db/migrations/000170_create_student_and_parent_records.sql and extended by 000175.
+ * created by db/migrations/000170_create_student_and_parent_records.sql and extended by 000180.
  */
 
 /** Whose record: a student, a parent, a staff member (by user id), or a class. */

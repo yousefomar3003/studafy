@@ -18,7 +18,7 @@ const SALES_INVOICE_RESOURCE = "/api/resource/Sales%20Invoice";
 export type ReasonCode =
   "overpayment" | "withdrawal" | "discount_adjustment" | "error_correction" | "write_off";
 /**
- * What the approval does in ERPNext (000172). `credit_note`: a Sales Invoice return (a refund, a
+ * What the approval does in ERPNext (000177). `credit_note`: a Sales Invoice return (a refund, a
  * fee correction, a write-off). `invoice_cancellation`: cancel an invoice nothing was paid against.
  * `payment_reversal`: cancel a payment recorded by mistake, so its invoice is owed again.
  */
@@ -484,7 +484,7 @@ export async function approveRefund(
 }
 
 // ---------------------------------------------------------------------------
-// Maker step — ask to cancel an invoice or reverse a payment (000172)
+// Maker step — ask to cancel an invoice or reverse a payment (000177)
 // ---------------------------------------------------------------------------
 
 const FRAPPE_CANCEL = "/api/method/frappe.client.cancel";

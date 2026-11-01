@@ -1,5 +1,5 @@
 /**
- * The school's sales tax (VAT) settings (000173) and what an invoice shows of them: off by
+ * The school's sales tax (VAT) settings (000178) and what an invoice shows of them: off by
  * default, readable by finance, saved only by a school admin, refused when turned on without a
  * rate or an ERPNext account. Requires a live PostgreSQL instance, gated on TEST_DATABASE_URL.
  *

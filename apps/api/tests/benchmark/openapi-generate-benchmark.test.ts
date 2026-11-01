@@ -251,7 +251,7 @@ const EXPECTED_PATHS = [
   "/api/finance/refunds/{refundId}",
   "/api/finance/refunds/{refundId}/approve",
   "/api/finance/refunds/{refundId}/reject",
-  // Corrections through the refund queue (000172) and the VAT settings (000173).
+  // Corrections through the refund queue (000177) and the VAT settings (000178).
   "/api/finance/invoices/{invoiceId}/cancellation",
   "/api/finance/payments/{paymentId}/reversal",
   "/api/finance/tax-settings",

@@ -5,7 +5,7 @@
  * has a use for it: the field's retention period in months -- the school's own, or
  * DEFAULT_SENSITIVE_RETENTION_MONTHS -- counted from when the student left (app.students.left_at,
  * maintained by 000170's trigger), for a parent from when the last of their linked children left,
- * and for a member of staff from when their account was archived (app.users.archived_at, 000176's
+ * and for a member of staff from when their account was archived (app.users.archived_at, 000181's
  * trigger). A parent with no linked child at all is never swept: staff may still be about to link
  * them. Class fields are never sensitive, so a class record is never swept.
  * The period is read from the field's latest published version, so a school that shortens it

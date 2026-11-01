@@ -228,7 +228,7 @@ export const ERROR_CODES = {
   REFUND_CONFIRM_SELF: "REFUND_CONFIRM_SELF",
   REFUND_IN_PROGRESS: "REFUND_IN_PROGRESS",
   REFUND_IDEMPOTENCY_KEY_REQUIRED: "REFUND_IDEMPOTENCY_KEY_REQUIRED",
-  // Corrections through the same queue (000172). INVOICE_NOT_CANCELLABLE: the invoice is not
+  // Corrections through the same queue (000177). INVOICE_NOT_CANCELLABLE: the invoice is not
   // submitted, or money or a credit note is already against it (use a credit note).
   // PAYMENT_NOT_REVERSIBLE: the payment is not confirmed or names no invoice.
   // WRITE_OFF_EXCEEDS_OUTSTANDING: a write-off may clear at most what is still owed.

@@ -1,5 +1,5 @@
 /**
- * A school's sales tax (VAT) on fees (000173). Read by the billing worker when it generates an
+ * A school's sales tax (VAT) on fees (000178). Read by the billing worker when it generates an
  * invoice; changing it never touches an invoice already issued.
  */
 
