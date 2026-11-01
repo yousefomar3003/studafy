@@ -42,4 +42,9 @@ export {
   resolveRecordKeyring,
   sealRecordValue,
 } from "./crypto";
-export type { RecordKeyring, RecordSealContext, SealedRecordValue } from "./crypto";
+export type {
+  RecordKeyring,
+  RecordSealContext,
+  RecordSealSubjectKind,
+  SealedRecordValue,
+} from "./crypto";

@@ -370,6 +370,7 @@ describe("published docs", () => {
       "add-student",
       "import-students",
       "link-parent",
+      "keep-your-own-lists",
       "timetable",
       "academic-setup",
       "build-timetable",

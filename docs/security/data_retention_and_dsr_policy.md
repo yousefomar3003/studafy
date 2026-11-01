@@ -128,6 +128,37 @@ generic walk by `apps/workers/src/queues/maintenance/records-dsr.ts`:
   account is archived (`app.users.archived_at`), by `record-retention-sweep.ts`. Class fields are
   never sensitive.
 
+Both walks skip `RECORD_DATA_TABLES` (the record and custom list tables below). Its rows are
+exported opened and erased outright by `records-dsr.ts`, never dumped raw or redacted by column
+name.
+
+## Custom lists
+
+Custom lists (`app.custom_lists`, `app.custom_list_columns`, `app.custom_list_column_options`,
+`app.custom_list_rows`, `app.custom_list_values`; migration 000182,
+[docs/modules/custom-lists.md](../modules/custom-lists.md)) are school-defined tables whose rows may
+link to a student (`student_id`), a parent or member of staff (`user_id`), or a class (`class_id`).
+A cell has no link column of its own and may be ciphertext, so rows and cells are handled by
+`records-dsr.ts` too:
+
+- **Per-person export** writes `data/custom_list_rows.ndjson`. It holds every row linked to the
+  subject as a student or by their user id, with the list's name, the link, and every cell labelled
+  by its column. Sensitive cells are decrypted with the records keyring, under the AAD
+  `custom_list_row | <row> | <column>`.
+- **Per-person erasure** deletes those rows outright. Their cells cascade, and the result records
+  `hard_deleted` on `custom_list_rows` in `redacted_tables`.
+- **Class-linked and unlinked rows** are about no person. No per-person request reaches them.
+- **Tenant closure export** writes every row of every list to `custom_list_rows.ndjson`. The list,
+  column and choice definitions go through the generic walk.
+- **Tenant closure erasure** deletes every list, cascading to columns, choices, rows and cells.
+  The result records `hard_deleted` on `custom_list_rows` and on `custom_lists`.
+- **No scheduled retention**: unlike record answers, sensitive list cells have no retention sweep.
+  They are deleted by erasure, by deleting the row, column or list, or by closure.
+- **Key rotation**: `record-key-rotation.ts` re-seals sensitive list cells under the current key
+  along with record answers.
+
+None of these tables is a legal hold (`retention-registry.ts`).
+
 ## Student import files
 
 A student import keeps the school's original file (`app.student_imports.source_storage_key`, in

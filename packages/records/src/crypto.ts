@@ -24,13 +24,20 @@ export interface RecordKeyring {
   readonly keys: ReadonlyMap<string, Uint8Array>;
 }
 
-/** Where a sealed value belongs. Bound into the ciphertext as AAD. */
+/**
+ * Where a sealed value belongs. Bound into the ciphertext as AAD. A custom list cell
+ * (docs/modules/custom-lists.md) is sealed the same way, as subject kind "custom_list_row" with
+ * the row as subject and the column as field, so a cell can never be opened as a record answer or
+ * as another row's or column's cell.
+ */
 export interface RecordSealContext {
   schoolId: string;
-  subjectKind: RecordSubjectKind;
+  subjectKind: RecordSealSubjectKind;
   subjectId: string;
   fieldId: string;
 }
+
+export type RecordSealSubjectKind = RecordSubjectKind | "custom_list_row";
 
 export interface SealedRecordValue {
   ciphertext: Uint8Array;

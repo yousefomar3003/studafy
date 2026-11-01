@@ -7,6 +7,7 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { LinkedListsPanel } from "../../custom-lists/LinkedListsPanel";
 import { RecordsPanel } from "../../records/RecordsPanel";
 
 import { LinkGuardianModal } from "./LinkGuardianModal";
@@ -581,6 +582,7 @@ export default function StudentProfilePage() {
               canEdit={canEditRecords}
               canRevealSensitive={canRevealSensitive}
             />
+            <LinkedListsPanel subject={{ kind: "student", id: student.id }} />
           </Tabs.Panel>
         ) : null}
       </Tabs>

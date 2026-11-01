@@ -1,11 +1,13 @@
 import { Button, Modal, useToast } from "@studafy/ui";
 import { useId, useRef, useState } from "react";
 
+import { ManagerSheetOffer } from "../features/custom-lists/SheetOffer";
 import { buildCsv, downloadCsv } from "../lib/csv";
 import {
   buildImportTemplate,
   MAX_IMPORT_ROWS,
   prepareImport,
+  recognisesNoColumn,
   runImport,
 } from "../lib/data-transfer";
 import { useTranslation } from "../lib/i18n";
@@ -14,6 +16,7 @@ import { KeepColumnPanel } from "./KeepColumnPanel";
 
 import "./data-transfer.css";
 
+import type { PendingSheet } from "../features/custom-lists/sheet-handoff";
 import type {
   ImportIssue,
   ImportRowResult,
@@ -71,6 +74,8 @@ export function ImportCsvButton<TRecord>({
   const abortRef = useRef<AbortController | null>(null);
   const [open, setOpen] = useState(false);
   const [stage, setStage] = useState<Stage>({ kind: "pick" });
+  // A file none of whose columns this import knows: offered as a custom list instead.
+  const [unrecognised, setUnrecognised] = useState<PendingSheet | null>(null);
 
   const issueText = (issue: ImportIssue): string =>
     issue.code === "custom"
@@ -84,10 +89,13 @@ export function ImportCsvButton<TRecord>({
     if (stage.kind === "running") return;
     setOpen(false);
     setStage({ kind: "pick" });
+    setUnrecognised(null);
   };
 
   const handleFile = async (file: File) => {
-    const result = prepareImport(await file.text(), spec);
+    const text = await file.text();
+    setUnrecognised(recognisesNoColumn(text, spec) ? { fileName: file.name, csv: text } : null);
+    const result = prepareImport(text, spec);
     if (result.ok) {
       setStage({
         kind: "review",
@@ -227,15 +235,18 @@ export function ImportCsvButton<TRecord>({
       case "invalidFile": {
         const { result } = stage;
         return (
-          <p role="alert" className="data-transfer__error">
-            {result.reason === "missingColumns"
-              ? t("dataTransfer.import.missingColumns", {
-                  columns: (result.missingColumns ?? []).join(", "),
-                })
-              : result.reason === "tooManyRows"
-                ? t("dataTransfer.import.tooManyRows", { max: result.limit ?? MAX_IMPORT_ROWS })
-                : t("dataTransfer.import.emptyFile")}
-          </p>
+          <>
+            <p role="alert" className="data-transfer__error">
+              {result.reason === "missingColumns"
+                ? t("dataTransfer.import.missingColumns", {
+                    columns: (result.missingColumns ?? []).join(", "),
+                  })
+                : result.reason === "tooManyRows"
+                  ? t("dataTransfer.import.tooManyRows", { max: result.limit ?? MAX_IMPORT_ROWS })
+                  : t("dataTransfer.import.emptyFile")}
+            </p>
+            {unrecognised ? <ManagerSheetOffer sheet={unrecognised} onLeave={close} /> : null}
+          </>
         );
       }
       case "review": {
@@ -244,6 +255,7 @@ export function ImportCsvButton<TRecord>({
         return (
           <>
             <p className="data-transfer__muted">{stage.fileName}</p>
+            {unrecognised ? <ManagerSheetOffer sheet={unrecognised} onLeave={close} /> : null}
             <p role="status">
               {t("dataTransfer.import.summary", { valid: validCount, invalid: invalid.length })}
             </p>

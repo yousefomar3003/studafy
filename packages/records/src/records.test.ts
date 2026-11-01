@@ -59,6 +59,13 @@ describe("sealing", () => {
     }
   });
 
+  test("a custom list cell opens only as that row's cell, never as a record answer", () => {
+    const cell = { ...context, subjectKind: "custom_list_row" as const };
+    const sealed = sealRecordValue(keyring, cell, "short_text", "Locker 12");
+    expect(openRecordValue(keyring, cell, sealed).unwrap()).toBe("Locker 12");
+    expect(() => openRecordValue(keyring, context, sealed)).toThrow(RecordSealBrokenError);
+  });
+
   test("tampering fails authentication", () => {
     const sealed = sealRecordValue(keyring, context, "short_text", "secret");
     const tampered = Buffer.from(sealed.ciphertext);

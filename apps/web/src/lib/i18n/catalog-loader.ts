@@ -29,7 +29,8 @@ export type CatalogArea =
   | "academicGrading"
   | "records"
   | "recordTemplates"
-  | "search";
+  | "search"
+  | "customLists";
 
 type Catalog = Record<string, unknown>;
 type CatalogModule = Promise<{ default: Catalog }>;
@@ -62,6 +63,7 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     records: () => import("./locales/en/records.json"),
     recordTemplates: () => import("./locales/en/recordTemplates.json"),
     search: () => import("./locales/en/search.json"),
+    customLists: () => import("./locales/en/customLists.json"),
   },
   ar: {
     adminPeople: () => import("./locales/ar/adminPeople.json"),
@@ -78,6 +80,7 @@ const AREA_LOADERS: Record<Locale, Record<CatalogArea, () => CatalogModule>> = {
     records: () => import("./locales/ar/records.json"),
     recordTemplates: () => import("./locales/ar/recordTemplates.json"),
     search: () => import("./locales/ar/search.json"),
+    customLists: () => import("./locales/ar/customLists.json"),
   },
 };
 

@@ -16,6 +16,17 @@
  * A class's record is not about a person (000181): no per-person request reaches it -- its
  * class_id never matches a subject -- and only a tenant closure, which takes every answer, removes
  * it. A staff member's answers are keyed by `staff_user_id`, the person's own user id.
+ *
+ * Custom lists (000182, docs/modules/custom-lists.md) are handled here for the same reasons: a
+ * sensitive cell is ciphertext, and a cell (app.custom_list_values) has no link column at all -- it
+ * reaches a person only through its row. So:
+ *
+ *   - export: every row linked to the subject (as a student by student_id, as a parent or member of
+ *     staff by user_id), with its list's name and each cell labelled by its column, sensitive cells
+ *     opened; a tenant closure exports every row of every list;
+ *   - erasure: the subject's linked rows are deleted outright (their cells cascade); a tenant
+ *     closure deletes every list, which cascades to its columns, choices, rows and cells. A row
+ *     linked to a class, or to no one, is about no person and is reached only by a closure.
  */
 
 import { openRecordValue } from "@studafy/records";
@@ -27,6 +38,8 @@ import type { TransactionSql } from "postgres";
 export const RECORD_DATA_TABLES: ReadonlySet<string> = new Set([
   "record_answers",
   "record_documents",
+  "custom_list_rows",
+  "custom_list_values",
 ]);
 
 interface AnswerExportRow {
@@ -163,4 +176,185 @@ export async function eraseRecordData(
       ${subjectFilter(tx, subject)}
   `;
   return { rows: deleted.count, storageKeys: documents.map((row) => row.storage_key) };
+}
+
+// ---------------------------------------------------------------------------
+// Custom lists (000182)
+// ---------------------------------------------------------------------------
+
+interface CustomListRowExport {
+  row_id: string;
+  list_id: string;
+  name_en: string;
+  name_ar: string;
+  link_kind: string | null;
+  link_id: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
+interface CustomListValueExport {
+  row_id: string;
+  column_id: string;
+  label_en: string;
+  label_ar: string;
+  field_type: string;
+  sensitivity: "standard" | "sensitive";
+  column_archived: boolean;
+  value_text: string | null;
+  value_number: string | null;
+  value_date: string | null;
+  value_bool: boolean | null;
+  option_value: string | null;
+  option_label_en: string | null;
+  option_label_ar: string | null;
+  value_ciphertext: Uint8Array | null;
+  value_key_id: string | null;
+  value_mask: string | null;
+}
+
+interface ExportedCell {
+  column_id: string;
+  label_en: string;
+  label_ar: string;
+  field_type: string;
+  sensitivity: "standard" | "sensitive";
+  column_archived: boolean;
+  value: RecordValue | null;
+  choices?: { value: string; label_en: string; label_ar: string }[];
+}
+
+function customListSubjectFilter(tx: TransactionSql, subject: SubjectIdentifiers | undefined) {
+  if (!subject) return tx``;
+  const asUser = tx`r.user_id = ${subject.userId}::uuid`;
+  return subject.studentId
+    ? tx`AND (${asUser} OR r.student_id = ${subject.studentId}::uuid)`
+    : tx`AND ${asUser}`;
+}
+
+/** NDJSON lines, one per custom list row linked to the subject (every row, for a closure). */
+export async function exportCustomListData(
+  tx: TransactionSql,
+  schoolId: string,
+  subject: SubjectIdentifiers | undefined,
+  keyring: RecordKeyring,
+): Promise<string[]> {
+  const rows = await tx<CustomListRowExport[]>`
+    SELECT r.id AS row_id, r.list_id, l.name_en, l.name_ar, r.link_kind::text AS link_kind,
+           coalesce(r.student_id, r.user_id, r.class_id) AS link_id, r.created_at, r.updated_at
+    FROM app.custom_list_rows AS r
+    JOIN app.custom_lists AS l ON l.id = r.list_id AND l.school_id = r.school_id
+    WHERE r.school_id = ${schoolId}::uuid
+      ${customListSubjectFilter(tx, subject)}
+    ORDER BY lower(l.name_en), r.list_id, r.created_at, r.id
+  `;
+  if (rows.length === 0) return [];
+  const values = await tx<CustomListValueExport[]>`
+    SELECT v.row_id, v.column_id, c.label_en, c.label_ar, c.field_type::text AS field_type,
+           c.sensitivity::text AS sensitivity, (c.archived_at IS NOT NULL) AS column_archived,
+           v.value_text, v.value_number::text AS value_number,
+           to_char(v.value_date, 'YYYY-MM-DD') AS value_date, v.value_bool,
+           o.value AS option_value, o.label_en AS option_label_en, o.label_ar AS option_label_ar,
+           v.value_ciphertext, v.value_key_id, v.value_mask
+    FROM app.custom_list_values AS v
+    JOIN app.custom_list_columns AS c ON c.id = v.column_id AND c.school_id = v.school_id
+    LEFT JOIN app.custom_list_column_options AS o
+      ON o.id = v.option_id AND o.school_id = v.school_id
+    WHERE v.school_id = ${schoolId}::uuid
+      AND v.row_id = ANY(${rows.map((row) => row.row_id)}::uuid[])
+    ORDER BY v.row_id, c.sort_order, c.id, o.sort_order
+  `;
+
+  const cellsByRow = new Map<string, Map<string, ExportedCell>>();
+  for (const value of values) {
+    const cells = cellsByRow.get(value.row_id) ?? new Map<string, ExportedCell>();
+    cellsByRow.set(value.row_id, cells);
+    let cell = cells.get(value.column_id);
+    if (!cell) {
+      cell = {
+        column_id: value.column_id,
+        label_en: value.label_en,
+        label_ar: value.label_ar,
+        field_type: value.field_type,
+        sensitivity: value.sensitivity,
+        column_archived: value.column_archived,
+        value: null,
+      };
+      cells.set(value.column_id, cell);
+    }
+    if (value.value_ciphertext !== null) {
+      // The subject is entitled to their own data in full (GDPR art. 15), sensitive or not.
+      cell.value = openRecordValue(
+        keyring,
+        {
+          schoolId,
+          subjectKind: "custom_list_row",
+          subjectId: value.row_id,
+          fieldId: value.column_id,
+        },
+        { ciphertext: value.value_ciphertext, keyId: value.value_key_id!, mask: value.value_mask! },
+      ).unwrap();
+    } else if (value.option_value !== null) {
+      const choice = {
+        value: value.option_value,
+        label_en: value.option_label_en!,
+        label_ar: value.option_label_ar!,
+      };
+      cell.choices = [...(cell.choices ?? []), choice];
+      cell.value =
+        value.field_type === "multi_choice"
+          ? cell.choices.map((option) => option.value)
+          : choice.value;
+    } else if (value.value_number !== null) {
+      cell.value = Number(value.value_number);
+    } else if (value.value_date !== null) {
+      cell.value = value.value_date;
+    } else if (value.value_bool !== null) {
+      cell.value = value.value_bool;
+    } else {
+      cell.value = value.value_text;
+    }
+  }
+
+  return rows.map((row) =>
+    JSON.stringify({
+      list_id: row.list_id,
+      list_name_en: row.name_en,
+      list_name_ar: row.name_ar,
+      row_id: row.row_id,
+      link_kind: row.link_kind,
+      link_id: row.link_id,
+      created_at: row.created_at.toISOString(),
+      updated_at: row.updated_at.toISOString(),
+      cells: [...(cellsByRow.get(row.row_id)?.values() ?? [])],
+    }),
+  );
+}
+
+export interface CustomListErasure {
+  /** Rows deleted (their cells cascade). */
+  rows: number;
+  /** Lists deleted: a tenant closure only. */
+  lists: number;
+}
+
+export async function eraseCustomListData(
+  tx: TransactionSql,
+  schoolId: string,
+  subject: SubjectIdentifiers | undefined,
+): Promise<CustomListErasure> {
+  if (subject) {
+    const deleted = await tx`
+      DELETE FROM app.custom_list_rows AS r
+      WHERE r.school_id = ${schoolId}::uuid
+        ${customListSubjectFilter(tx, subject)}
+    `;
+    return { rows: deleted.count, lists: 0 };
+  }
+  const [counted] = await tx<{ rows: number }[]>`
+    SELECT count(*)::int AS rows FROM app.custom_list_rows WHERE school_id = ${schoolId}::uuid
+  `;
+  // A list cascades to its columns, their choices, its rows and every cell (000182).
+  const lists = await tx`DELETE FROM app.custom_lists WHERE school_id = ${schoolId}::uuid`;
+  return { rows: counted?.rows ?? 0, lists: lists.count };
 }

@@ -67,6 +67,7 @@ const SEARCH_TYPES = [
   "scholarships",
   "expenses",
   "notifications",
+  "custom_lists",
 ] as const;
 type SearchType = (typeof SEARCH_TYPES)[number];
 

@@ -109,6 +109,8 @@ export const RECORD_LINK_CANDIDATES: CandidateTable = {
   expenses: [{ permission: P.BILLING_READ, href: (hit) => `/portal/finance/expenses/${hit.id}` }],
   // The caller's own inbox; open to every session.
   notifications: [{ href: () => "/portal/notifications" }],
+  // The API returns only lists whose audience reaches the caller (RLS, 000182).
+  custom_lists: [{ permission: P.CUSTOM_LIST_USE, href: (hit) => `/portal/lists/${hit.id}` }],
 };
 
 function holds(candidate: Candidate<SearchType>, permissions: ReadonlySet<Permission>): boolean {

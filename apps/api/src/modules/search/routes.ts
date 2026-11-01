@@ -58,6 +58,7 @@ function clientIpFrom(c: Context<AppEnv>): string | null {
  *   scholarships    GET /api/finance/scholarships      billing:read
  *   expenses        GET /api/finance/expenses          billing:update
  *   notifications   GET /api/notifications             none: the caller's own inbox (RLS)
+ *   custom_lists    GET /api/custom-lists              customList:use, then the list's audience (RLS)
  */
 export function searchAccessFor(roles: readonly Role[]): GlobalSearchAccess {
   const isParent = roles.includes("PARENT");
@@ -88,6 +89,8 @@ export function searchAccessFor(roles: readonly Role[]): GlobalSearchAccess {
     scholarships: billingRead,
     expenses: billingUpdate,
     notifications: true,
+    // Narrowed further by each list's audience (RLS, 000182).
+    custom_lists: hasPermission(roles, PERMISSIONS.CUSTOM_LIST_USE),
   };
   return {
     sections,

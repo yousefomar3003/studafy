@@ -251,6 +251,18 @@ export const roomSearchHitSchema = z
   })
   .openapi("RoomSearchHit");
 
+export const customListSearchHitSchema = z
+  .object({
+    id: uuidSchema.openapi({ description: "The list id (the `listId` of custom list pages)." }),
+    name_en: z.string(),
+    name_ar: z.string(),
+    archived: z.boolean(),
+    rank: rankSchema,
+  })
+  .openapi("CustomListSearchHit", {
+    description: "A custom list, matched by its name only; never by a row value.",
+  });
+
 export const familySearchHitSchema = z
   .object({
     id: uuidSchema.openapi({ description: "The family id (the `familyId` of family pages)." }),
@@ -397,6 +409,7 @@ export const globalSearchResultsSchema = z
     scholarships: z.array(scholarshipSearchHitSchema),
     expenses: z.array(expenseSearchHitSchema),
     notifications: z.array(notificationSearchHitSchema),
+    custom_lists: z.array(customListSearchHitSchema),
   })
   .openapi("GlobalSearchResults", {
     description:
@@ -428,6 +441,7 @@ export const globalSearchTotalsSchema = z
     scholarships: totalSchema,
     expenses: totalSchema,
     notifications: totalSchema,
+    custom_lists: totalSchema,
   })
   .openapi("GlobalSearchTotals", {
     description:

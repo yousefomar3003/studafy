@@ -36,6 +36,8 @@ import importStudents from "@docs/help/getting-started/import-students.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import inviteStaff from "@docs/help/getting-started/invite-staff.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
+import keepYourOwnLists from "@docs/help/getting-started/keep-your-own-lists.md?raw";
+// eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import linkParent from "@docs/help/getting-started/link-parent.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import onboardingGuide from "@docs/help/getting-started/onboarding-guide.md?raw";
@@ -65,6 +67,7 @@ const ARTICLE_SOURCES = [
   { path: "@docs/help/getting-started/add-student.md", raw: addStudent },
   { path: "@docs/help/getting-started/import-students.md", raw: importStudents },
   { path: "@docs/help/getting-started/invite-staff.md", raw: inviteStaff },
+  { path: "@docs/help/getting-started/keep-your-own-lists.md", raw: keepYourOwnLists },
   { path: "@docs/help/getting-started/link-parent.md", raw: linkParent },
   { path: "@docs/help/getting-started/onboarding-guide.md", raw: onboardingGuide },
   {

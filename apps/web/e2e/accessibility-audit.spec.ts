@@ -694,3 +694,192 @@ test.describe("staff and class records", () => {
     await runAudit(page);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Custom lists -- the index, one list's table, the add-row dialog with its link picker, and a
+// sheet previewed as a new list.
+// ---------------------------------------------------------------------------
+
+test.describe("custom lists", () => {
+  const LIST_ID = "11111111-1111-4111-8111-111111111111";
+  const column = (overrides: Record<string, unknown>) => ({
+    required: false,
+    sensitivity: "standard",
+    sort_order: 0,
+    archived: false,
+    options: [],
+    ...overrides,
+  });
+  const SUMMARY = {
+    id: LIST_ID,
+    name_en: "Lockers",
+    name_ar: "الخزائن",
+    description: "Who has which locker.",
+    audience: "leadership",
+    links: { student: true, parent: false, staff: false, class: false },
+    archived: false,
+    row_count: 1,
+    column_count: 3,
+    can_manage: true,
+    created_at: NOW,
+    updated_at: NOW,
+  };
+  const DETAIL = {
+    ...SUMMARY,
+    columns: [
+      column({
+        id: "col-locker",
+        field_type: "short_text",
+        label_en: "Locker",
+        label_ar: "الخزانة",
+      }),
+      column({
+        id: "col-issued",
+        field_type: "date",
+        label_en: "Issued on",
+        label_ar: "تاريخ التسليم",
+        sort_order: 1,
+      }),
+      column({
+        id: "col-code",
+        field_type: "short_text",
+        label_en: "Combination",
+        label_ar: "الرمز",
+        sensitivity: "sensitive",
+        sort_order: 2,
+      }),
+    ],
+  };
+  const ROW = {
+    id: "row-1",
+    link: { kind: "student", id: "student-1", name: "Amara Chen" },
+    cells: [
+      { column_id: "col-locker", value: "B-12", masked: false, mask: null },
+      { column_id: "col-issued", value: "2026-09-01T00:00:00.000Z", masked: false, mask: null },
+      { column_id: "col-code", value: null, masked: true, mask: "••••" },
+    ],
+    created_at: NOW,
+    updated_at: NOW,
+  };
+  const PREVIEW = {
+    header_line: 1,
+    row_count: 2,
+    columns: [
+      {
+        index: 0,
+        header: "Admission No",
+        include: true,
+        label_en: "Admission No",
+        label_ar: "Admission No",
+        field_type: "short_text",
+        guessed_type: "short_text",
+        sensitivity: "standard",
+        suggested_sensitive: false,
+        options: [],
+        sample: ["ADM-0001", "NOPE-9"],
+        invalid_count: 0,
+        invalid_lines: [],
+      },
+      {
+        index: 1,
+        header: "Book",
+        include: true,
+        label_en: "Book",
+        label_ar: "Book",
+        field_type: "short_text",
+        guessed_type: "short_text",
+        sensitivity: "standard",
+        suggested_sensitive: false,
+        options: [],
+        sample: ["Dune", "Emma"],
+        invalid_count: 0,
+        invalid_lines: [],
+      },
+    ],
+    rows: [
+      {
+        line: 2,
+        key: "ADM-0001",
+        status: "linked",
+        reason: null,
+        link: { kind: "student", id: "student-1", name: "Amara Chen" },
+      },
+      { line: 3, key: "NOPE-9", status: "unmatched", reason: "NO_MATCH", link: null },
+    ],
+    totals: { rows: 2, linked: 1, unmatched: 1, skipped: 0, invalid_cells: 0 },
+    links: { student: true, parent: false, staff: false, class: false },
+    preview_token: "a".repeat(64),
+  };
+
+  async function stubLists(page: Page, roles: string[]) {
+    await stubPortalShellDefaults(page);
+    await stubAuthenticatedSession(page, roles);
+    await page.route("**/api/custom-lists**", (route) => {
+      const { pathname } = new URL(route.request().url());
+      if (pathname === "/api/custom-lists") {
+        return fulfillJson(route, 200, {
+          lists: [SUMMARY],
+          limits: { lists: 50, columns_per_list: 30, rows_per_list: 5000, rows_per_school: 20000 },
+        });
+      }
+      if (pathname === "/api/custom-lists/imports/preview") return fulfillJson(route, 200, PREVIEW);
+      if (pathname.endsWith("/rows")) {
+        return fulfillJson(route, 200, { rows: [ROW], total: 1, limit: 25, offset: 0 });
+      }
+      if (pathname.endsWith("/link-candidates")) {
+        return fulfillJson(route, 200, {
+          candidates: [{ id: "student-2", name: "Bilal Omari", detail: "ADM-0042" }],
+        });
+      }
+      return fulfillJson(route, 200, DETAIL);
+    });
+  }
+
+  test("the lists index has no critical/serious violations", async ({ page }) => {
+    await stubLists(page, ["ORG_ADMIN"]);
+    await page.goto("/portal/lists");
+    await expect(page.getByRole("heading", { name: "Lists", level: 1 })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Lockers" })).toBeVisible();
+    await runAudit(page);
+  });
+
+  test("a list's table has no critical/serious violations", async ({ page }) => {
+    await stubLists(page, ["PRINCIPAL"]);
+    await page.goto(`/portal/lists/${LIST_ID}`);
+    await expect(page.getByRole("heading", { name: "Lockers", level: 1 })).toBeVisible();
+    await expect(page.getByText("B-12")).toBeVisible();
+    await expect(page.getByText("••••")).toBeVisible();
+    await runAudit(page);
+  });
+
+  test("the add-row dialog and its link picker have no critical/serious violations", async ({
+    page,
+  }) => {
+    await stubLists(page, ["ORG_ADMIN"]);
+    await page.goto(`/portal/lists/${LIST_ID}`);
+    await expect(page.getByText("B-12")).toBeVisible();
+    await page.getByRole("button", { name: "Add row" }).click();
+    const dialog = page.getByRole("dialog", { name: "Add a row to Lockers" });
+    await dialog.getByLabel("Find a Student").fill("Bil");
+    await expect(dialog.getByText("Bilal Omari · ADM-0042")).toBeVisible();
+    await runAudit(page);
+  });
+
+  test("a sheet previewed as a new list has no critical/serious violations", async ({ page }) => {
+    await stubLists(page, ["ORG_ADMIN"]);
+    await page.goto("/portal/lists/import");
+    await expect(
+      page.getByRole("heading", { name: "Create a list from a spreadsheet", level: 1 }),
+    ).toBeVisible();
+    await page.getByLabel("CSV file").setInputFiles({
+      name: "library-loans.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from("Admission No,Book\nADM-0001,Dune\nNOPE-9,Emma\n"),
+    });
+    await page.getByLabel("List name (English)").fill("Library loans");
+    await page.getByLabel("List name (Arabic)").fill("إعارات المكتبة");
+    await page.getByRole("button", { name: "Preview", exact: true }).click();
+    await expect(page.getByText("Amara Chen")).toBeVisible();
+    await runAudit(page);
+  });
+});

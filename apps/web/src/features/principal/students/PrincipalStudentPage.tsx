@@ -11,6 +11,7 @@ import {
   studentGuardiansQueryKey,
   studentQueryKey,
 } from "../../admin/students/queries";
+import { LinkedListsPanel } from "../../custom-lists/LinkedListsPanel";
 import { RecordsPanel } from "../../records/RecordsPanel";
 import { studentDisplayName } from "../school/queries";
 
@@ -66,6 +67,7 @@ export default function PrincipalStudentPage() {
             canRevealSensitive={permissions.has(PERMISSIONS.STUDENT_RECORD_READ_SENSITIVE)}
           />
         ) : null}
+        <LinkedListsPanel subject={{ kind: "student", id: profile.id }} />
 
         <Card as="section" aria-label={t("records.principal.guardians")}>
           <Card.Header>

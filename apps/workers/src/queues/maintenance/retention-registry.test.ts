@@ -1,6 +1,7 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 import { describe, expect, test } from "bun:test";
 
+import { RECORD_DATA_TABLES } from "./records-dsr";
 import {
   classifyTable,
   HARD_DELETE_TABLES,
@@ -82,5 +83,32 @@ describe("isPersonalDataColumn", () => {
 describe("SUBJECT_LINK_COLUMNS", () => {
   test("is the short, verified set this module's header documents", () => {
     expect(SUBJECT_LINK_COLUMNS).toEqual(["user_id", "student_id", "teacher_id", "staff_user_id"]);
+  });
+});
+
+// Custom lists (000182): a person's rows are reached by the link columns already listed, never by
+// class_id; the rows and cells are handled by records-dsr.ts, and nothing about them is a legal hold.
+describe("custom lists", () => {
+  test("rows link to a person only through student_id and user_id", () => {
+    expect(SUBJECT_LINK_COLUMNS).toContain("student_id");
+    expect(SUBJECT_LINK_COLUMNS).toContain("user_id");
+    expect(SUBJECT_LINK_COLUMNS).not.toContain("class_id");
+  });
+
+  test("no custom list table is a legal hold or a bare hard delete", () => {
+    for (const table of [
+      "custom_lists",
+      "custom_list_columns",
+      "custom_list_column_options",
+      "custom_list_rows",
+      "custom_list_values",
+    ]) {
+      expect(classifyTable(table)).toBe("redact");
+    }
+  });
+
+  test("rows and cells are exported opened and erased by records-dsr.ts, not the generic walk", () => {
+    expect(RECORD_DATA_TABLES.has("custom_list_rows")).toBe(true);
+    expect(RECORD_DATA_TABLES.has("custom_list_values")).toBe(true);
   });
 });

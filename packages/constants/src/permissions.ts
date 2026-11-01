@@ -216,6 +216,18 @@ export const PERMISSIONS = {
   // and building the template is recordTemplate:manage, as for every subject. No sensitive tier: a
   // class is not a person, so its template refuses sensitive fields.
   CLASS_RECORD_READ: "classRecord:read",
+  // Custom lists (docs/modules/custom-lists.md): school-defined tables for data Studafy has no
+  // section for (bus routes, library loans, clinic visits). Shaping a list -- creating it, choosing
+  // its audience and link kinds, adding and archiving columns -- is customList:manage, school
+  // leadership's. Working in one is customList:use, held by every school staff role, but it only
+  // opens the door: each list names its audience (admins, leadership, or all staff), and the API and
+  // the database's role_scope_visibility policy (000182) hide every list outside it. Revealing a
+  // sensitive cell in full is customList:readSensitive (masked by default, every reveal audited,
+  // ADR-019), leadership's like the other sensitive reveals. Parents and students hold none of the
+  // three: a custom list is the school's working data, never shown to families.
+  CUSTOM_LIST_MANAGE: "customList:manage",
+  CUSTOM_LIST_USE: "customList:use",
+  CUSTOM_LIST_READ_SENSITIVE: "customList:readSensitive",
 
   TEACHER_CREATE: "teacher:create",
   TEACHER_READ: "teacher:read",
@@ -370,6 +382,9 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   // row scope app.teaches_class hides every other class's record. No staffRecord:read: a teacher
   // reads their own staff record through the self-service read, never a colleague's.
   PERMISSIONS.CLASS_RECORD_READ,
+  // Works in the custom lists whose audience is all staff (a lockers list, a duty rota); the
+  // service and RLS hide admin and leadership lists.
+  PERMISSIONS.CUSTOM_LIST_USE,
 ];
 
 const STUDENT_PERMISSIONS: readonly Permission[] = [
@@ -490,6 +505,11 @@ const PRINCIPAL_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.STAFF_RECORD_READ,
   // Class records in full. Editing them comes with timetable:manage, which the principal holds.
   PERMISSIONS.CLASS_RECORD_READ,
+  // Custom lists: shapes them as the admin does, works in every list whose audience is leadership
+  // or all staff (never an admins-only list), and reveals a sensitive cell when the work needs it.
+  PERMISSIONS.CUSTOM_LIST_MANAGE,
+  PERMISSIONS.CUSTOM_LIST_USE,
+  PERMISSIONS.CUSTOM_LIST_READ_SENSITIVE,
 ];
 
 // The attendance office: takes, corrects and reports attendance for the whole school, and nothing
@@ -510,6 +530,8 @@ const ATTENDANCE_OFFICER_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.ENROLLMENT_READ,
   PERMISSIONS.CALENDAR_EVENT_READ,
   PERMISSIONS.NOTIFICATION_READ,
+  // All-staff custom lists only (the audience narrows it).
+  PERMISSIONS.CUSTOM_LIST_USE,
 ];
 
 const FINANCE_PERMISSIONS: readonly Permission[] = [
@@ -527,6 +549,8 @@ const FINANCE_PERMISSIONS: readonly Permission[] = [
   // Reads only the record fields marked finance-visible (a sponsor, a fee-paying guardian's
   // employer), never a sensitive one; the service filters by visibility, not this list.
   PERMISSIONS.STUDENT_RECORD_READ,
+  // All-staff custom lists only (the audience narrows it).
+  PERMISSIONS.CUSTOM_LIST_USE,
 ];
 
 const SUPPORT_AGENT_PERMISSIONS: readonly Permission[] = [

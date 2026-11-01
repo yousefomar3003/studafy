@@ -34,6 +34,7 @@ export const SEARCH_TYPES: readonly SearchType[] = [
   "scholarships",
   "expenses",
   "notifications",
+  "custom_lists",
 ];
 
 export function isSearchType(value: string): value is SearchType {

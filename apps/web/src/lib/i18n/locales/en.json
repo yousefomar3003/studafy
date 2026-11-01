@@ -18,6 +18,7 @@
     "attendance": "Attendance",
     "platform": "Studafy platform",
     "finance": "Finance",
+    "lists": "Lists",
     "approvals": "Approvals",
     "account": "Account"
   },
@@ -162,7 +163,8 @@
       "fee_structures": "Fee structures",
       "scholarships": "Scholarships",
       "expenses": "Expenses",
-      "notifications": "Notifications"
+      "notifications": "Notifications",
+      "custom_lists": "Lists"
     },
     "minLengthHint": "Keep typing — search starts at 2 characters.",
     "loading": "Searching…",
@@ -317,6 +319,10 @@
       "done_one": "Kept “{{column}}”: {{count}} value written.",
       "done_other": "Kept “{{column}}”: {{count}} values written.",
       "back": "Back to the import"
+    },
+    "customList": {
+      "unrecognised": "Studafy doesn't recognise any column of this sheet. You can keep it as a custom list instead.",
+      "create": "Create a custom list from this sheet"
     }
   },
   "home": {

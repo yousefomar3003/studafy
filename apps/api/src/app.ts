@@ -95,6 +95,7 @@ import {
 } from "./modules/auth";
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
 import { invitationRoutes } from "./modules/auth/invitation/route";
+import { customListRoutes } from "./modules/custom-lists";
 import { disciplineRoutes, evaluationRoutes } from "./modules/discipline";
 import { createFeatureService, featureRoutes, provideFeatures } from "./modules/features";
 import {
@@ -942,6 +943,12 @@ export function createApp({
   // document routes answer 503 while the rest works.
   if (database) {
     app.route("/", recordRoutes(database, storage, recordKeyring));
+  }
+
+  // Custom lists (docs/modules/custom-lists.md): school-defined tables for data Studafy has no
+  // section for, rows optionally linked to a person or class. `recordKeyring` seals sensitive cells.
+  if (database) {
+    app.route("/", customListRoutes(database, recordKeyring));
   }
 
   // Student CSV import (upload → validate → confirm → async processing), its history, original

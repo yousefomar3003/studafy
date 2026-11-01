@@ -188,6 +188,16 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     ...SCHOOL,
     alsoRequires: [P.ORGANIZATION_MANAGE_SETTINGS],
   }),
+  // Custom lists: one area for every staff role that may use them; each list's audience narrows
+  // what is inside (the API's, not this registry's).
+  entry("custom-lists", "page", "/portal/lists", {
+    requiredPermission: P.CUSTOM_LIST_USE,
+    ...SCHOOL,
+  }),
+  entry("create-list-from-sheet", "action", "/portal/lists/import", {
+    requiredPermission: P.CUSTOM_LIST_MANAGE,
+    ...SCHOOL,
+  }),
   entry("missing-information", "page", "/portal/admin/records/missing", {
     requiredPermission: P.STUDENT_RECORD_READ,
     ...SCHOOL,

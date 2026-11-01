@@ -14,6 +14,7 @@ import arAcademicGrading from "./ar/academicGrading.json";
 import arAdminPeople from "./ar/adminPeople.json";
 import arAdminSchool from "./ar/adminSchool.json";
 import arAttendanceOffice from "./ar/attendanceOffice.json";
+import arCustomLists from "./ar/customLists.json";
 import arFinance from "./ar/finance.json";
 import arFinanceReports from "./ar/financeReports.json";
 import arOnboarding from "./ar/onboarding.json";
@@ -30,6 +31,7 @@ import enAcademicGrading from "./en/academicGrading.json";
 import enAdminPeople from "./en/adminPeople.json";
 import enAdminSchool from "./en/adminSchool.json";
 import enAttendanceOffice from "./en/attendanceOffice.json";
+import enCustomLists from "./en/customLists.json";
 import enFinance from "./en/finance.json";
 import enFinanceReports from "./en/financeReports.json";
 import enOnboarding from "./en/onboarding.json";
@@ -59,6 +61,7 @@ export const enCatalog = {
   records: enRecords,
   recordTemplates: enRecordTemplates,
   search: enSearch,
+  customLists: enCustomLists,
   site: enSite,
 };
 
@@ -78,5 +81,6 @@ export const arCatalog = {
   records: arRecords,
   recordTemplates: arRecordTemplates,
   search: arSearch,
+  customLists: arCustomLists,
   site: arSite,
 };

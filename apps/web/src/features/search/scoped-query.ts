@@ -31,6 +31,8 @@ const ALIASES: Readonly<Record<string, SearchType>> = {
   scholarship: "scholarships",
   expense: "expenses",
   notification: "notifications",
+  list: "custom_lists",
+  lists: "custom_lists",
 };
 
 const SCOPE = /(?:^|\s)in:([a-z_]+)(?=\s|$)/i;
