@@ -7,6 +7,7 @@ import { usePermissions } from "../../../lib/auth";
 import { useTranslation } from "../../../lib/i18n";
 
 import { AttendanceAlertsSection } from "./AttendanceAlertsSection";
+import { ExamStructureSection } from "./ExamStructureSection";
 import { GradingSchemeSection } from "./GradingSchemeSection";
 import { LocaleTimezoneSection } from "./LocaleTimezoneSection";
 import { ProfileSection } from "./ProfileSection";
@@ -44,6 +45,7 @@ export default function SchoolSettingsPage() {
         <ProfileSection />
         <LocaleTimezoneSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
         <GradingSchemeSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
+        <ExamStructureSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
         <AttendanceAlertsSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
         {permissions.has(PERMISSIONS.RECORD_TEMPLATE_MANAGE) ? (
           <Card as="section" aria-label={t("recordTemplates.links.templates")}>

@@ -99,6 +99,19 @@ export interface ListSubmissionsParams {
   student_id?: string;
 }
 
+export interface ListSubmissionsAcrossAssignmentsParams {
+  limit: number;
+  offset: number;
+  status?: SubmissionStatus;
+  grade_status?: SubmissionGradeStatus;
+  assignment_id?: string[];
+}
+
+/** A cross-assignment list row: staff-ness is per row there, so it travels with the row. */
+export interface CrossAssignmentSubmissionRow extends SubmissionRow {
+  viewer_is_staff: boolean;
+}
+
 export interface GradeSubmissionParams {
   score?: number;
   feedback?: string | null;
@@ -314,6 +327,111 @@ export async function listSubmissions(
     WHERE s.school_id = ${schoolId}
       AND s.assignment_id = ${assignmentId}
       ${studentFilter}
+      ${statusFilter}
+      ${gradeStatusFilter}
+  `;
+
+  return { rows, total: Number(counted?.total ?? 0) };
+}
+
+/**
+ * List submissions across assignments.
+ *
+ * Returns exactly the union of what listSubmissions would return for each assignment, never more:
+ * on an assignment the caller is staff for (admin, or teacher of its class), every submission; on
+ * any other, only the caller's own row; for a caller who is neither (a parent), nothing. RLS
+ * (`role_scope_visibility`) still applies underneath, so this narrows the policy rather than
+ * widening it.
+ *
+ * ## Why two branches instead of one predicate
+ *
+ * "Staff for this row's assignment OR my own row" as a single WHERE would scan the whole school's
+ * submissions and evaluate the RLS helpers on every one. Instead, for a non-admin each half is
+ * driven by an index: the teacher half walks the caller's classes (`app.teaches_class`, the helper
+ * `teaches_assignment` itself calls, so "staff" keeps its single SQL definition) into their
+ * assignments and then uq_assignment_submissions_school_assignment_student; the own-work half is
+ * idx_assignment_submissions_school_student_assignment. Neither needs a new index. An admin is staff for everything, so
+ * theirs is a plain school-scoped list.
+ *
+ * `viewer_is_staff` is carried per row because, unlike the per-assignment list, it can differ
+ * between rows on one page -- a teacher who is also enrolled somewhere sees both kinds.
+ *
+ * `grade_status` filters on the value the caller is shown (see gradeIsVisible): staff match the
+ * stored state, everyone else matches `published` or `none`. Filtering on the projection can never
+ * reveal more than the projection does.
+ */
+export async function listSubmissionsAcrossAssignments(
+  tx: TransactionSql,
+  schoolId: string,
+  params: ListSubmissionsAcrossAssignmentsParams,
+  callerStudentId: string | null,
+): Promise<{ rows: CrossAssignmentSubmissionRow[]; total: number }> {
+  const [caller] = await tx<{ is_admin: boolean }[]>`
+    SELECT app.current_user_is_school_admin() AS is_admin
+  `;
+  const isAdmin = caller?.is_admin ?? false;
+
+  const assignmentFilter = params.assignment_id
+    ? tx`AND s.assignment_id = ANY(${params.assignment_id}::uuid[])`
+    : tx``;
+
+  const scoped = isAdmin
+    ? tx`
+        SELECT ${selectColumns(tx)}, true AS viewer_is_staff
+        FROM app.assignment_submissions AS s
+        WHERE s.school_id = ${schoolId}
+          ${assignmentFilter}
+      `
+    : tx`
+        SELECT ${selectColumns(tx)}, true AS viewer_is_staff
+        FROM app.classes AS c
+        JOIN app.assignments AS a
+          ON a.school_id = c.school_id AND a.class_id = c.id
+        JOIN app.assignment_submissions AS s
+          ON s.school_id = a.school_id AND s.assignment_id = a.id
+        WHERE c.school_id = ${schoolId}
+          AND app.teaches_class(c.id)
+          ${assignmentFilter}
+        ${
+          callerStudentId
+            ? tx`
+              UNION ALL
+              SELECT ${selectColumns(tx)}, false AS viewer_is_staff
+              FROM app.assignment_submissions AS s
+              WHERE s.school_id = ${schoolId}
+                AND s.student_id = ${callerStudentId}
+                AND NOT app.teaches_assignment(s.assignment_id)
+                ${assignmentFilter}
+            `
+            : tx``
+        }
+      `;
+
+  const statusFilter = params.status ? tx`AND v.status = ${params.status}` : tx``;
+
+  const gradeStatusFilter = params.grade_status
+    ? tx`AND (
+        CASE
+          WHEN v.viewer_is_staff OR v.grade_status = 'published' THEN v.grade_status
+          ELSE 'none'
+        END
+      ) = ${params.grade_status}`
+    : tx``;
+
+  const rows = await tx<CrossAssignmentSubmissionRow[]>`
+    SELECT v.*
+    FROM (${scoped}) AS v
+    WHERE true
+      ${statusFilter}
+      ${gradeStatusFilter}
+    ORDER BY v.submitted_at DESC NULLS LAST, v.id DESC
+    LIMIT ${params.limit} OFFSET ${params.offset}
+  `;
+
+  const [counted] = await tx<{ total: string }[]>`
+    SELECT count(*)::text AS total
+    FROM (${scoped}) AS v
+    WHERE true
       ${statusFilter}
       ${gradeStatusFilter}
   `;

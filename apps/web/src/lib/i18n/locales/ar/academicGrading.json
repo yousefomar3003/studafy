@@ -80,6 +80,8 @@
     "practical": "عملي",
     "participation": "مشاركة",
     "exam": "اختبار",
+    "first_period": "اختبار الفترة الأولى",
+    "second_period": "اختبار الفترة الثانية",
     "midterm": "اختبار منتصف الفصل",
     "final_exam": "الاختبار النهائي",
     "other": "أخرى"

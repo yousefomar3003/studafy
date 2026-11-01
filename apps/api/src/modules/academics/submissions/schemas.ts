@@ -234,6 +234,71 @@ export const submissionListQuerySchema = z
 
 export type SubmissionListQuery = z.infer<typeof submissionListQuerySchema>;
 
+/**
+ * Upper bound on `assignment_id` values in one cross-assignment list request.
+ *
+ * Matches PAGINATION_MAX_LIMIT so a client can always narrow to "the assignments on the page I am
+ * showing", and keeps the repeated parameter well inside common proxy URL limits (~5 KB at the cap).
+ */
+export const SUBMISSION_LIST_MAX_ASSIGNMENT_IDS = PAGINATION_MAX_LIMIT;
+
+/**
+ * `assignment_id` arrives as a string for one value and a string[] when repeated; a comma-separated
+ * value is accepted too. Normalized to a de-duplicated array before validation -- the same contract
+ * as global search's `types` (modules/search/schemas.ts).
+ */
+const assignmentIdsParamSchema = z
+  .preprocess((value) => {
+    if (value === undefined) return undefined;
+    const parts = (Array.isArray(value) ? value : [value]).flatMap((part) =>
+      typeof part === "string" ? part.split(",") : [part],
+    );
+    const trimmed = parts.map((part) => (typeof part === "string" ? part.trim() : part));
+    return [...new Set(trimmed.filter((part) => part !== ""))];
+  }, z.array(uuidSchema).min(1).max(SUBMISSION_LIST_MAX_ASSIGNMENT_IDS).optional())
+  .openapi({
+    param: { style: "form", explode: true },
+    description:
+      "Restrict to these assignments. Repeat the parameter (`assignment_id=a&assignment_id=b`) or " +
+      `comma-separate it; at most ${SUBMISSION_LIST_MAX_ASSIGNMENT_IDS} ids. An id the caller ` +
+      "cannot see simply contributes no rows.",
+  });
+
+/**
+ * The cross-assignment list: the same limit/offset contract as the per-assignment one, without
+ * `student_id` (a student is already narrowed to themselves, and staff browse by assignment).
+ *
+ * `grade_status` is honoured for every caller here, but always against the value that caller would
+ * see in the response: a student's unreleased mark matches `none`, never `draft`. That is what keeps
+ * it from being the oracle the per-assignment list avoids by ignoring the filter for non-staff.
+ */
+export const submissionAcrossAssignmentsQuerySchema = z
+  .object({
+    limit: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(PAGINATION_MAX_LIMIT)
+      .default(PAGINATION_DEFAULT_LIMIT)
+      .openapi({ description: "Maximum submissions to return." }),
+    offset: z.coerce.number().int().min(0).default(0).openapi({ description: "Records to skip." }),
+    status: submissionStatusSchema.optional().openapi({
+      description: "Restrict to one lifecycle state.",
+    }),
+    grade_status: submissionGradeStatusSchema.optional().openapi({
+      description:
+        "Restrict to one grade release state, as the caller sees it -- the teacher's marking " +
+        "queue is `grade_status=none`. A student's or parent's unreleased mark reads as `none`, " +
+        "so `draft` never matches their rows.",
+    }),
+    assignment_id: assignmentIdsParamSchema,
+  })
+  .openapi("SubmissionAcrossAssignmentsQuery");
+
+export type SubmissionAcrossAssignmentsQuery = z.infer<
+  typeof submissionAcrossAssignmentsQuerySchema
+>;
+
 export const submissionListSchema = z
   .object({
     submissions: z.array(submissionSchema),

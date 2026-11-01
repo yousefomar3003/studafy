@@ -204,6 +204,11 @@
     }
   },
   "today": {
+    "aiPromo": {
+      "title": "Studafy AI",
+      "body": "Quizzes, flashcards and answers from your class materials.",
+      "action": "Explore"
+    },
     "greeting": {
       "morning": "Good morning",
       "afternoon": "Good afternoon",
@@ -446,12 +451,27 @@
       }
     },
     "notActive": {
-      "title": "The AI Study Assistant isn't active",
-      "body": "The AI Study Assistant isn't active for this account. Once it is, its tools appear here on their own — no app update needed.",
-      "points": {
-        "ask": "Ask questions and get grounded answers from your own class materials",
-        "quizzesAndFlashcards": "Practice with generated quizzes and flashcards",
-        "summaries": "Get quick summaries and key concepts from your materials"
+      "badge": "Subscription required",
+      "title": "Unlock the AI Study Assistant",
+      "body": "Your AI tools open up here as soon as an AI subscription is active on your account. No app update needed.",
+      "includedTitle": "What's included",
+      "features": {
+        "ask": {
+          "title": "Ask anything",
+          "body": "Grounded answers from your own class materials"
+        },
+        "practice": {
+          "title": "Quizzes & flashcards",
+          "body": "Practice sets generated from what you're studying"
+        },
+        "summaries": {
+          "title": "Summaries & key concepts",
+          "body": "The main ideas of any material at a glance"
+        },
+        "exam": {
+          "title": "Exam mode",
+          "body": "Full practice exams built from your materials"
+        }
       }
     },
     "schoolInactive": {
@@ -530,11 +550,43 @@
   },
   "askAi": {
     "title": "Ask AI",
+    "attach": {
+      "tooltip": "Add a photo or material",
+      "camera": "Take a photo",
+      "gallery": "Choose a photo",
+      "material": "Ask about a material",
+      "materialHint": "Answers come only from the material you choose"
+    },
+    "material": {
+      "sheetTitle": "Ask about a material",
+      "sheetHint": "Answers will come only from the material you choose.",
+      "none": "You don't have any class materials yet.",
+      "chip": "Asking about: {title}",
+      "clear": "Ask about all materials"
+    },
+    "photo": {
+      "reading": "Reading the photo…",
+      "noText": "No text found in that photo. Try a clearer, closer shot.",
+      "checkText": "Some of the text may be wrong. Check it before sending.",
+      "truncated": "The photo had more text than fits in one question, so the end was cut.",
+      "tooLarge": "That photo is too large to read.",
+      "unsupported": "Only JPEG or PNG photos can be read.",
+      "failed": "Couldn't read that photo. Try again."
+    },
+    "assistantName": "Study assistant",
+    "copy": { "action": "Copy answer", "done": "Answer copied" },
     "signedOut": "Sign in to ask the study assistant a question.",
     "thinking": "Thinking…",
     "empty": {
       "title": "Ask about your study materials",
-      "hint": "Answers are drawn from your school's materials and cite where they came from."
+      "hint": "Answers are drawn from your school's materials and cite where they came from.",
+      "scopedHint": "Answers come only from {title}.",
+      "suggestionsHeading": "Try asking",
+      "suggestions": {
+        "summarize": "Summarize the main ideas of my latest material",
+        "explain": "Explain a key term from my materials in simple words",
+        "review": "What should I review before my next test?"
+      }
     },
     "composer": {
       "hint": "Ask a question…",
@@ -784,8 +836,11 @@
   "aiStudy": {
     "signedOut": "Sign in to use the AI study tools.",
     "retry": "Try again",
+    "openAskAi": "Ask AI",
     "openSummary": "AI summary",
     "openConcepts": "Key concepts",
+    "openQuiz": "Quiz",
+    "openExam": "Exam mode",
     "summary": {
       "subtitle": "AI summary",
       "cached": "From cache"
@@ -1094,10 +1149,7 @@
         "upload": "Upload material",
         "edit": "Edit material",
         "empty": "No materials yet.",
-        "loadError": "Could not load materials.",
-        "aiTitle": "Allow Studafy AI to use this material",
-        "aiSubtitle": "When on, its content can be processed for AI study tools.",
-        "aiError": "Could not update AI visibility."
+        "loadError": "Could not load materials."
       },
       "assignmentForm": {
         "title": "Title",
@@ -1901,6 +1953,23 @@
       "openFailed": "Couldn't open the file. Check your connection and try again.",
       "yes": "Yes",
       "no": "No"
+    }
+  },
+  "releasedMarks": {
+    "title": "Term marks",
+    "entry": "Term marks",
+    "entrySubtitle": "Midterm, final exam and other marks your school has approved",
+    "error": "Couldn't load marks.",
+    "unavailable": "Marks aren't available for this account.",
+    "empty": "No approved marks yet. A term's marks appear here once the school approves them.",
+    "retry": "Try again",
+    "annual": "Full year",
+    "approvedOn": "Approved {date}",
+    "retake": "{name} (retake)",
+    "status": {
+      "absent": "Absent",
+      "excused": "Excused",
+      "notApplicable": "N/A"
     }
   },
   "academicResults": {

@@ -66,6 +66,30 @@ export async function getAssignmentKind(
   return row?.kind ?? null;
 }
 
+/**
+ * The ids among `assignmentIds` that are `questions` assignments, in one query.
+ *
+ * The batch form of getAssignmentKind, for a page of submissions that spans assignments. Read
+ * through RLS the same way: an assignment the caller cannot see is simply absent, which projects
+ * exactly as getAssignmentKind's null does.
+ */
+export async function listQuestionAssignmentIds(
+  tx: TransactionSql,
+  schoolId: string,
+  assignmentIds: string[],
+): Promise<Set<string>> {
+  if (assignmentIds.length === 0) return new Set();
+
+  const rows = await tx<{ id: string }[]>`
+    SELECT id FROM app.assignments
+    WHERE school_id = ${schoolId}
+      AND id = ANY(${assignmentIds}::uuid[])
+      AND kind = 'questions'
+  `;
+
+  return new Set(rows.map((row) => row.id));
+}
+
 /** Load the answers for a page of submissions in one query, with what marking them needs. */
 export async function listAnswersBySubmission(
   tx: TransactionSql,

@@ -12,6 +12,21 @@ import '../domain/ask_ai_conversation.dart';
 /// composer can stop an over-long question before the round trip.
 const int askAiQuestionMaxChars = 2000;
 
+/// One study material an Ask AI question is limited to.
+@immutable
+class AskAiMaterialScope {
+  const AskAiMaterialScope({required this.id, required this.title});
+
+  final String id;
+  final String title;
+
+  @override
+  bool operator ==(Object other) => other is AskAiMaterialScope && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
 /// Drives one Ask AI conversation: sends a question, folds the answer's SSE events into the
 /// [AskAiConversation] snapshot the screen renders.
 ///
@@ -35,6 +50,18 @@ class AskAiController extends ChangeNotifier {
   AskAiConversation get state => _state;
 
   StreamSubscription<AskAiEvent>? _subscription;
+
+  AskAiMaterialScope? _materialScope;
+
+  /// The material questions are asked about, or null for every material the student can see.
+  /// Applies to each question sent while it is set.
+  AskAiMaterialScope? get materialScope => _materialScope;
+
+  set materialScope(AskAiMaterialScope? scope) {
+    if (scope == _materialScope) return;
+    _materialScope = scope;
+    notifyListeners();
+  }
 
   /// The last question that failed before streaming — what a "retry" on the send-error banner
   /// re-sends.
@@ -83,6 +110,7 @@ class AskAiController extends ChangeNotifier {
               studentId: _studentId,
               question: trimmed,
               conversationId: _state.conversationId,
+              materialId: _materialScope?.id,
               level: _level,
             )
             .listen(

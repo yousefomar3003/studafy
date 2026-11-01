@@ -178,7 +178,8 @@ void main() {
         expect(find.byType(ChatImageView), findsNWidgets(2));
         final images = tester.widgetList<Image>(find.byType(Image)).toList();
         expect(
-          images.map((image) => (image.image as NetworkImage).url),
+          // Bubbles decode at display size, so each NetworkImage is wrapped in a ResizeImage.
+          images.map((image) => ((image.image as ResizeImage).imageProvider as NetworkImage).url),
           containsAll([
             'https://storage.test/a1.jpg',
             'https://storage.test/a2.jpg',

@@ -37,6 +37,11 @@ export interface HybridSearchInput {
   queryVector: string;
   /** How many fused results to return (default `HYBRID_DEFAULT_LIMIT`). */
   limit?: number;
+  /**
+   * Search one material only (Ask AI's "ask about this material"). Both legs filter on it; RLS
+   * still applies, so a material the caller cannot see simply yields no hits.
+   */
+  materialId?: string;
 }
 
 export interface HybridSearchHit {
@@ -86,10 +91,15 @@ function setHnswSettings(tx: TransactionSql, efSearch: number): Promise<unknown>
 }
 
 /** The semantic leg alone, asserted on its own terms per the design note. */
-function semanticLegCount(tx: TransactionSql, queryVector: string): Promise<number> {
+function semanticLegCount(
+  tx: TransactionSql,
+  queryVector: string,
+  materialId?: string,
+): Promise<number> {
   return tx<{ id: string }[]>`
     SELECT id
     FROM app.material_chunks
+    WHERE ${materialId === undefined ? tx`TRUE` : tx`material_id = ${materialId}::uuid`}
     ORDER BY embedding <=> ${queryVector}::public.vector
     LIMIT ${HYBRID_LEG_LIMIT}
   `.then((rows) => rows.length);
@@ -102,10 +112,12 @@ function semanticLegCount(tx: TransactionSql, queryVector: string): Promise<numb
  */
 function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<HybridSearchHit[]> {
   const limit = clampLimit(input.limit);
+  const { materialId } = input;
   return tx<RawHit[]>`
     WITH semantic AS (
       SELECT id, row_number() OVER (ORDER BY embedding <=> ${input.queryVector}::public.vector) AS rank
       FROM app.material_chunks
+      WHERE ${materialId === undefined ? tx`TRUE` : tx`material_id = ${materialId}::uuid`}
       ORDER BY embedding <=> ${input.queryVector}::public.vector
       LIMIT ${HYBRID_LEG_LIMIT}
     ), keyword AS (
@@ -113,6 +125,7 @@ function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<H
       FROM app.material_chunks c,
            websearch_to_tsquery('english', ${input.query}) AS q(query)
       WHERE c.content_tsv @@ q.query
+        AND ${materialId === undefined ? tx`TRUE` : tx`c.material_id = ${materialId}::uuid`}
       ORDER BY ts_rank(c.content_tsv, q.query) DESC
       LIMIT ${HYBRID_LEG_LIMIT}
     ), fused AS (
@@ -170,9 +183,11 @@ export async function hybridSearch(
   input: HybridSearchInput,
 ): Promise<HybridSearchResult> {
   await setHnswSettings(tx, HYBRID_EF_SEARCH);
-  let count = await semanticLegCount(tx, input.queryVector);
+  let count = await semanticLegCount(tx, input.queryVector, input.materialId);
   let retried = false;
-  if (count < HYBRID_LEG_LIMIT) {
+  // One material legitimately has fewer chunks than a leg's limit, so a short semantic leg there
+  // says nothing about recall; the retry is only for the corpus-wide search.
+  if (count < HYBRID_LEG_LIMIT && input.materialId === undefined) {
     await setHnswSettings(tx, HYBRID_EF_SEARCH_RETRY);
     count = await semanticLegCount(tx, input.queryVector);
     retried = true;

@@ -111,7 +111,11 @@ class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingOb
                       when state is FeatureAskSchool ||
                           state is FeatureSchoolInactive ||
                           state is FeatureUnavailable =>
-                    [FeatureGateNotice(state: state)],
+                    [
+                      const AiNotActiveCard(),
+                      const SizedBox(height: AppSpacing.space16),
+                      FeatureGateNotice(state: state),
+                    ],
                   _ => const [AiNotActiveCard()],
                 },
               ),

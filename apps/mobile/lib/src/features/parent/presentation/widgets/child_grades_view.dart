@@ -6,6 +6,7 @@ import '../../../../core/api/generated/models/grade_trend_point.dart';
 import '../../../../core/api/generated/models/published_term_summary.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../../student/presentation/academic_results_screen.dart';
+import '../../../student/presentation/released_marks_screen.dart';
 import '../../../student/presentation/widgets/subject_grades_card.dart';
 import '../../application/child_detail_providers.dart';
 import '../../domain/child_subject_grades.dart';
@@ -42,6 +43,8 @@ class ChildGradesView extends ConsumerWidget {
             padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
             physics: const AlwaysScrollableScrollPhysics(),
             children: [
+              _ApprovedMarksTile(studentId: studentId, studentName: studentName),
+              const SizedBox(height: AppSpacing.space8),
               _OfficialResultsTile(studentId: studentId, studentName: studentName),
               const SizedBox(height: AppSpacing.space16),
               _TermSummaryCard(summary: data.grade.termSummary),
@@ -60,6 +63,36 @@ class ChildGradesView extends ConsumerWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Opens the child's approved term marks (midterm, final exam, …) — the same
+/// [ReleasedMarksScreen] the child sees from their own grades screen.
+class _ApprovedMarksTile extends StatelessWidget {
+  const _ApprovedMarksTile({required this.studentId, this.studentName});
+
+  final String studentId;
+  final String? studentName;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: EdgeInsets.zero,
+      child: ListTile(
+        leading: const Icon(Icons.fact_check_outlined),
+        title: Text('releasedMarks.entry'.tr()),
+        subtitle: Text('releasedMarks.entrySubtitle'.tr()),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => ReleasedMarksScreen(
+              studentId: studentId,
+              studentName: studentName,
+            ),
+          ),
+        ),
       ),
     );
   }

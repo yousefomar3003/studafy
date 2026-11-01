@@ -47,7 +47,7 @@ RUN bunx turbo run build --filter=@studafy/workers
 # The OCR stage bundles tesseract's worker-script (spawned as a worker thread) and copies its WASM
 # cores and traineddata next to dist/. The runtime stage ships only apps/workers/dist — no
 # node_modules — so without this step every asset tesseract.js would normally resolve from packages
-# would be missing at runtime. See apps/workers/scripts/copy-ocr-assets.ts for the layout.
+# would be missing at runtime. See packages/ocr/scripts/build-assets.ts for the layout.
 RUN bun run --cwd apps/workers build:ocr
 
 FROM oven/bun:${BUN_VERSION}-alpine AS runtime

@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/api/auth_interceptor.dart';
 import '../../../core/api/error_mapping_interceptor.dart';
+import '../../../core/auth/auth_notifier.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/di/app_providers.dart';
+import '../../../core/features/features_providers.dart';
 import '../data/ai_hub_client.dart';
 import '../domain/ai_hub_status.dart';
 
@@ -37,7 +39,16 @@ final aiHubClientProvider = Provider<AiHubClient>((ref) {
 /// `.autoDispose`, not kept alive: [AiHubScreen] re-reads it on every app resume (see that
 /// screen's `WidgetsBindingObserver`) so an add-on activated outside the app is reflected without
 /// the student having to force-quit and reopen the app.
+///
+/// It also re-reads on sign-in/sign-out and whenever [myFeaturesProvider] reloads (an entitlement
+/// change pushed over realtime, a store purchase), so the AI tab and everything else driven by the
+/// feature list — the subscriber logo, feature gates — never disagree about one person.
 final aiHubStatusProvider = FutureProvider.autoDispose<AiHubStatus>((ref) async {
+  ref.watch(authStatusProvider);
+  ref.listen(myFeaturesProvider, (previous, next) {
+    // Only a reload of a list already read: the first load says nothing new about this status.
+    if (previous?.hasValue == true && next.hasValue && !next.isLoading) ref.invalidateSelf();
+  });
   final client = ref.watch(aiHubClientProvider);
 
   try {

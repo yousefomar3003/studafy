@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
@@ -33,11 +34,22 @@ class ChatImage {
 /// and a neutral placeholder stays in the meantime instead of an error. A local file that fails
 /// and an attachment with no URL show "Photo unavailable".
 class ChatImageView extends StatefulWidget {
-  const ChatImageView({required this.image, this.fit = BoxFit.cover, this.onError, super.key});
+  const ChatImageView({
+    required this.image,
+    this.fit = BoxFit.cover,
+    this.onError,
+    this.decodeAtDisplaySize = true,
+    super.key,
+  });
 
   final ChatImage image;
   final BoxFit fit;
   final VoidCallback? onError;
+
+  /// Decodes the image at the size it is laid out at rather than at full resolution: a phone photo
+  /// decodes to ~48MB, so a few full-size ones in a chat thrash the image cache and stutter on
+  /// scroll. Off for the full-screen viewer, where pinch-zoom needs the full resolution.
+  final bool decodeAtDisplaySize;
 
   @override
   State<ChatImageView> createState() => _ChatImageViewState();
@@ -56,10 +68,28 @@ class _ChatImageViewState extends State<ChatImageView> {
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.decodeAtDisplaySize) return _buildImage(null);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // The longer side, so a cover-fitted image still fills its tile in both directions.
+        // Unbounded in both directions (no box to fit) falls back to full resolution.
+        final side = math.max(
+          constraints.hasBoundedWidth ? constraints.maxWidth : 0.0,
+          constraints.hasBoundedHeight ? constraints.maxHeight : 0.0,
+        );
+        return _buildImage(
+          side > 0 ? (side * MediaQuery.devicePixelRatioOf(context)).ceil() : null,
+        );
+      },
+    );
+  }
+
+  Widget _buildImage(int? cacheWidth) {
     final image = widget.image;
     if (image.filePath case final path?) {
       return Image.file(
         File(path),
+        cacheWidth: cacheWidth,
         fit: widget.fit,
         errorBuilder: (context, _, _) => const _Placeholder(unavailable: true),
       );
@@ -69,6 +99,7 @@ class _ChatImageViewState extends State<ChatImageView> {
     return Image.network(
       url,
       key: ValueKey(url),
+      cacheWidth: cacheWidth,
       fit: widget.fit,
       loadingBuilder: (context, child, progress) => progress == null
           ? child
@@ -235,6 +266,7 @@ class _ChatImageViewerState extends ConsumerState<ChatImageViewer> {
               child: ChatImageView(
                 image: images[index],
                 fit: BoxFit.contain,
+                decodeAtDisplaySize: false,
                 onError: conversationId == null
                     ? null
                     : () => ref

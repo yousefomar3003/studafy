@@ -37,6 +37,8 @@ export {
   type AiQuotaHandle,
   type AiTokenBudgetConfig,
 } from "./gate/token-budget";
+export { aiPhotoTextRoutes } from "./routes/photo-text-routes";
+export type { PhotoTextReader } from "./routes/photo-text-routes";
 export { aiUsageRoutes } from "./routes/usage-routes";
 export { aiConsentGate } from "./gate/consent-gate";
 export { aiConsentRoutes } from "./routes/consent-routes";

@@ -127,12 +127,18 @@ class ChatDraftController extends Notifier<List<DraftAttachment>> {
         sizeBytes: attachment.image.sizeBytes,
       );
       if (!ref.mounted || cancelToken.isCancelled) return;
+      // Dio reports progress per chunk — many times a second — and each state change rebuilds the
+      // chat screen, so only whole-percent steps are published.
+      var lastPercent = -1;
       await client.uploadAttachment(
         uploadUrl: ticket.uploadUrl,
         file: File(attachment.image.path),
         contentType: attachment.image.contentType!,
         cancelToken: cancelToken,
         onProgress: (progress) {
+          final percent = (progress * 100).floor();
+          if (percent == lastPercent) return;
+          lastPercent = percent;
           if (ref.mounted) _update(localId, (a) => a.copyWith(progress: progress));
         },
       );

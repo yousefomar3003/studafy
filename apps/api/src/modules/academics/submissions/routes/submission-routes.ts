@@ -9,7 +9,7 @@ import { requireAuth } from "../../../../middleware/authContext";
 import { requirePermission } from "../../../../middleware/authz";
 import { openApiValidationHook } from "../../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../../openapi/responses";
-import { autoScore, getAssignmentKind, listAnswersBySubmission } from "../answer-service";
+import { autoScore, listAnswersBySubmission, listQuestionAssignmentIds } from "../answer-service";
 import {
   assignmentIdParamSchema,
   confirmSubmissionAttachmentBodySchema,
@@ -18,6 +18,7 @@ import {
   gradeSubmissionBodySchema,
   submissionAttachmentIdParamSchema,
   submissionAttachmentSchema,
+  submissionAcrossAssignmentsQuerySchema,
   submissionIdParamSchema,
   submissionListQuerySchema,
   submissionListSchema,
@@ -36,6 +37,7 @@ import {
   gradeSubmission,
   isStaffForAssignment,
   listSubmissions,
+  listSubmissionsAcrossAssignments,
   resolveCallerStudentId,
   submitAssignment,
 } from "../submission-service";
@@ -179,24 +181,25 @@ export function toSubmissionResponse(
   };
 }
 
-/** Load attachments and answers for a page of submissions and project the whole page. */
-async function hydrate(
+/**
+ * Load attachments and answers for a page of submissions and project the whole page.
+ *
+ * `viewerIsStaff` is one answer for a single-assignment page, or a per-row predicate for a
+ * cross-assignment one, where the caller can be staff on some rows and not others.
+ */
+async function hydrate<R extends SubmissionRow>(
   tx: TransactionSql,
   schoolId: string,
-  rows: SubmissionRow[],
+  rows: R[],
   storage: StorageService | null,
-  viewerIsStaff: boolean,
+  viewerIsStaff: boolean | ((row: R) => boolean),
 ): Promise<Submission[]> {
   const ids = rows.map((row) => row.id);
   const bySubmission = await listAttachmentsBySubmission(tx, schoolId, ids);
 
-  // Every page is one assignment's submissions (or a single row), so this is one lookup in practice.
-  const questionAssignments = new Set<string>();
-  for (const assignmentId of new Set(rows.map((row) => row.assignment_id))) {
-    if ((await getAssignmentKind(tx, schoolId, assignmentId)) === "questions") {
-      questionAssignments.add(assignmentId);
-    }
-  }
+  const questionAssignments = await listQuestionAssignmentIds(tx, schoolId, [
+    ...new Set(rows.map((row) => row.assignment_id)),
+  ]);
   const answersBySubmission =
     questionAssignments.size > 0
       ? await listAnswersBySubmission(tx, schoolId, ids)
@@ -211,7 +214,7 @@ async function hydrate(
             toAttachmentResponse(attachment, storage),
           ),
         ),
-        viewerIsStaff,
+        typeof viewerIsStaff === "function" ? viewerIsStaff(row) : viewerIsStaff,
         questionAssignments.has(row.assignment_id) ? (answersBySubmission.get(row.id) ?? []) : null,
       ),
     ),
@@ -268,6 +271,27 @@ const listSubmissionsRoute = createRoute({
   responses: standardResponses(
     { 200: { description: "Paginated list of submissions.", schema: submissionListSchema } },
     [400, 401, 403, 404, 500],
+  ),
+});
+
+const listSubmissionsAcrossAssignmentsRoute = createRoute({
+  method: "get",
+  path: "/api/academics/submissions",
+  tags: ["Submissions"],
+  operationId: "listSubmissionsAcrossAssignments",
+  summary: "List submissions across assignments",
+  description:
+    "The per-assignment list, unioned over assignments: on assignments of classes the caller " +
+    "teaches (or every assignment, for a school admin) all submissions; elsewhere only the " +
+    "caller's own. Linked parents get an empty list, as on the per-assignment " +
+    "endpoint. Newest hand-in first (`submitted_at` descending, never-submitted last, then `id` " +
+    "descending). Marks that have not been published are withheld from students exactly as on " +
+    "the per-assignment endpoint, and `grade_status` filters on the value the caller is shown.",
+  security: [{ bearerAuth: [] }],
+  request: { query: submissionAcrossAssignmentsQuerySchema },
+  responses: standardResponses(
+    { 200: { description: "Paginated list of submissions.", schema: submissionListSchema } },
+    [400, 401, 403, 500],
   ),
 });
 
@@ -417,6 +441,10 @@ export function submissionRoutes(
     ]),
   );
   routes.use(
+    "/api/academics/submissions",
+    permissionByMethod([["GET", PERMISSIONS.SUBMISSION_READ]]),
+  );
+  routes.use(
     "/api/academics/submissions/:submissionId",
     permissionByMethod([["GET", PERMISSIONS.SUBMISSION_READ]]),
   );
@@ -525,6 +553,34 @@ export function submissionRoutes(
 
       return {
         submissions: await hydrate(tx, auth.schoolId, page.rows, storage, viewerIsStaff),
+        total: page.total,
+      };
+    });
+
+    return c.json({ submissions, total }, 200);
+  });
+
+  routes.openapi(listSubmissionsAcrossAssignmentsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const query = c.req.valid("query");
+
+    const { submissions, total } = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const callerStudentId = await resolveCallerStudentId(tx, auth.schoolId);
+      const page = await listSubmissionsAcrossAssignments(
+        tx,
+        auth.schoolId,
+        query,
+        callerStudentId,
+      );
+
+      return {
+        submissions: await hydrate(
+          tx,
+          auth.schoolId,
+          page.rows,
+          storage,
+          (row) => row.viewer_is_staff,
+        ),
         total: page.total,
       };
     });

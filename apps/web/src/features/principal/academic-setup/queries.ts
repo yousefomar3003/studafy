@@ -28,6 +28,7 @@ export type ProposedAssessment = Schemas["ProposedAssessmentList"]["assessments"
 export type MarkSheet = Schemas["MarkSheet"];
 export type ResultPreview = Schemas["ResultPreview"];
 export type ResultFinalization = Schemas["ResultFinalization"];
+export type ExamTemplate = Schemas["ExamTemplate"];
 export type ResultFinalizationSummary = Schemas["ResultFinalizationList"]["finalizations"][number];
 export type ResultFinalizationDetail = Schemas["ResultFinalizationDetail"];
 export type CertificateReadiness = Schemas["CertificateReadiness"];
@@ -47,6 +48,7 @@ export const GRADING_KEY = ["academic-grading"] as const;
 export const gradingKeys = {
   overview: (yearId: string) => [...GRADING_KEY, "overview", yearId] as const,
   publishCheck: (yearId: string) => [...GRADING_KEY, "publish-check", yearId] as const,
+  examTemplate: (yearId: string) => [...GRADING_KEY, "exam-template", yearId] as const,
   scales: (yearId: string) => [...GRADING_KEY, "scales", yearId] as const,
   programs: (yearId: string) => [...GRADING_KEY, "programs", yearId] as const,
   gradeSubjects: (yearId: string, gradeLevelId: string) =>
@@ -90,6 +92,20 @@ export function useGradingOverview(yearId: string | undefined) {
         params: { path: { yearId: yearId! } },
       });
       return required<GradingOverview>(data, "Grading overview");
+    },
+  });
+}
+
+/** The term structure a new subject starts from: the school's exam system (School Settings). */
+export function useExamTemplate(yearId: string | undefined) {
+  return useQuery({
+    queryKey: gradingKeys.examTemplate(yearId ?? ""),
+    enabled: yearId !== undefined,
+    queryFn: async () => {
+      const { data } = await api.GET("/api/grading/years/{yearId}/exam-template", {
+        params: { path: { yearId: yearId! } },
+      });
+      return required<ExamTemplate>(data, "Exam template");
     },
   });
 }

@@ -521,6 +521,36 @@ class FakeSubmissionsClient extends Fake implements SubmissionsClient {
     return SubmissionList(submissions: rows, total: rows.length);
   }
 
+  /// Every `listSubmissionsAcrossAssignments` call's `assignment_id` list, in order.
+  final List<List<String>?> acrossAssignmentsCalls = [];
+
+  /// Honours the filters and limit/offset like the API does, over every stubbed row. Rows are
+  /// returned in stub order: the providers under test sort for themselves.
+  @override
+  Future<SubmissionList> listSubmissionsAcrossAssignments({
+    Status13? status,
+    GradeStatus? gradeStatus,
+    List<String>? assignmentId,
+    int? limit = 20,
+    int? offset = 0,
+  }) async {
+    acrossAssignmentsCalls.add(assignmentId);
+    final matching = [
+      for (final entry in byAssignmentId.entries)
+        if (assignmentId == null || assignmentId.contains(entry.key))
+          for (final s in entry.value)
+            if ((status == null || s.status.json == status.json) &&
+                (gradeStatus == null || s.gradeStatus.json == gradeStatus.json))
+              s,
+    ];
+    final start = (offset ?? 0).clamp(0, matching.length);
+    final end = (start + (limit ?? 20)).clamp(0, matching.length);
+    return SubmissionList(
+      submissions: matching.sublist(start, end),
+      total: matching.length,
+    );
+  }
+
   @override
   Future<Submission> getSubmission({required String submissionId}) async =>
       byAssignmentId.values

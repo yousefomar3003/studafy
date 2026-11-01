@@ -19,7 +19,10 @@ import 'widgets/quiz_setup_view.dart';
 /// route takes the same `{studentId}` path convention (the session's own user id), so a second,
 /// identically-shaped provider would just be a copy of that one.
 class QuizScreen extends ConsumerStatefulWidget {
-  const QuizScreen({super.key});
+  const QuizScreen({this.initialMaterialIds = const {}, super.key});
+
+  /// Materials ticked when setup opens -- the one a student came from on the material page.
+  final Set<String> initialMaterialIds;
 
   @override
   ConsumerState<QuizScreen> createState() => _QuizScreenState();
@@ -99,7 +102,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
             ),
         ],
       ),
-      body: controller == null ? const _SignedOutNotice() : _Body(controller: controller),
+      body: controller == null
+          ? const _SignedOutNotice()
+          : _Body(controller: controller, initialMaterialIds: widget.initialMaterialIds),
     );
   }
 }
@@ -111,9 +116,10 @@ AiReportTarget? _reportTarget(QuizState? state) => switch (state) {
 };
 
 class _Body extends StatelessWidget {
-  const _Body({required this.controller});
+  const _Body({required this.controller, required this.initialMaterialIds});
 
   final QuizController controller;
+  final Set<String> initialMaterialIds;
 
   @override
   Widget build(BuildContext context) {
@@ -122,6 +128,7 @@ class _Body extends StatelessWidget {
     return switch (state) {
       QuizSetup() => QuizSetupView(
         state: state,
+        initialSelection: initialMaterialIds,
         onGenerate: (materialIds, questionCount) =>
             controller.generate(materialIds: materialIds, questionCount: questionCount),
       ),

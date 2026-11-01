@@ -93,7 +93,7 @@ export async function seedMaterials(sql: Sql, ctx: FullCtx): Promise<MaterialsCt
           mime_type: "application/pdf",
           size_bytes: 1_204_990,
           checksum_sha256: null,
-          ai_visible: false,
+          ai_visible: true,
           ingest_status: "uploaded",
           ingest_error: null,
           ingested_at: null,

@@ -23,6 +23,7 @@ import {
   createTeacher,
   createTestApp,
   createTestDatabase,
+  createUser,
   integrationEnabled,
   migrateDatabase,
 } from "../../../../tests/harness";
@@ -60,6 +61,7 @@ import {
   decideMarkSheet,
   getMarkSheet,
   listMarkSheets,
+  listReleasedStudentMarks,
   saveMarks,
   submitMarkSheet,
 } from "../marks-service";
@@ -726,6 +728,10 @@ describeDb("academic grading", () => {
   });
 
   test("approval: incomplete sheets cannot be submitted, submitted ones lock, approval unlocks finalization", async () => {
+    // Marks still being entered are staff-only: the student sees nothing yet.
+    expect(
+      await as(ids.s1User!, (tx) => listReleasedStudentMarks(tx, tenant.schoolId, ids.s1!)),
+    ).toEqual([]);
     const user = tenant.teachers[0]!.userId;
     const math = await assessmentIds(ids["8A"]!, ids.math!);
     expect(
@@ -799,6 +805,112 @@ describeDb("academic grading", () => {
           null,
         );
     });
+  });
+
+  test("released marks: the student and a linked parent see approved marks by term, nobody else does", async () => {
+    const parent = await createUser(db.sql, tenant.schoolId, { displayName: "Amal's mother" });
+    await assignRole(db.sql, tenant.schoolId, parent.id, ROLES.PARENT);
+    const [term1] = await admin(
+      (tx) => tx<{ name: string }[]>`SELECT name FROM app.terms WHERE id = ${ids.term1}::uuid`,
+    );
+    ids.term1Name = term1!.name;
+    const [family] = await db.sql<{ id: string }[]>`
+      INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+      VALUES (${tenant.schoolId}::uuid, 'Test family', ${parent.id}::uuid)
+      RETURNING id
+    `;
+    await db.sql`
+      INSERT INTO app.parent_child_links (school_id, family_id, parent_user_id, student_id, relationship)
+      VALUES (${tenant.schoolId}::uuid, ${family!.id}::uuid, ${parent.id}::uuid, ${ids.s1}::uuid, 'mother')
+    `;
+    ids.parentUser = parent.id;
+
+    const released = (userId: string, studentId: string) =>
+      as(userId, (tx) => listReleasedStudentMarks(tx, tenant.schoolId, studentId));
+    /** "period / subject / category / assessment: score of max" lines, in response order. */
+    const lines = (periods: Awaited<ReturnType<typeof released>>) =>
+      periods.flatMap((period) =>
+        period.subjects.flatMap((subject) =>
+          subject.categories.flatMap((cat) =>
+            cat.assessments.map(
+              (a) =>
+                `${period.term_name ?? "Annual"} / ${subject.subject_name} / ${cat.kind} / ${a.name}: ${a.attempts.map((t) => t.score).join(",")} of ${a.max_marks}`,
+            ),
+          ),
+        ),
+      );
+
+    const own = await released(ids.s1User!, ids.s1!);
+    // Science: Semester 1 and 2 each on their own, then the annual period with the year-long
+    // assessments of every subject (Science's annual final among them).
+    expect(lines(own).filter((line) => line.includes("Science"))).toEqual([
+      `${ids.term1Name!} / Science / exam / Exam S1: 40 of 50`,
+      `${ids.term1Name!} / Science / homework / Homework S1: 10 of 10`,
+      "Semester 2 / Science / exam / Exam S2: 35 of 50",
+      "Semester 2 / Science / homework / Homework S2: 5 of 10",
+      "Annual / Science / final_exam / Annual final: 90 of 100",
+    ]);
+    expect(lines(own)).toContain("Annual / Mathematics / midterm / Midterm: 40 of 50");
+    expect(lines(own)).toContain("Annual / Mathematics / final_exam / Final: 75 of 100");
+    expect(own.map((p) => p.term_name)).toEqual([ids.term1Name!, "Semester 2", null]);
+
+    // A linked parent sees exactly what the student sees.
+    expect(await released(ids.parentUser, ids.s1!)).toEqual(own);
+    // Another student's session reads none of Amal's marks (RLS, not just the route check).
+    expect(await released(ids.s3User!, ids.s1!)).toEqual([]);
+    const [peek] = await as(
+      ids.s1User!,
+      (tx) => tx<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM app.student_marks WHERE student_id = ${ids.s2}::uuid
+      `,
+    );
+    expect(peek!.count).toBe(0);
+
+    // Reopening a sheet takes its period back from the family until it is approved again.
+    const [science1] = (
+      await admin((tx) =>
+        listMarkSheets(tx, tenant.schoolId, { yearId: tenant.academicYear.id, status: "approved" }),
+      )
+    ).filter((row) => row.subject_id === ids.science && row.term_id === ids.term1);
+    await admin((tx) =>
+      decideMarkSheet(
+        tx,
+        tenant.schoolId,
+        tenant.users.ORG_ADMIN.id,
+        science1!.id,
+        "reopen",
+        "Exam S1 needs a recount",
+      ),
+    );
+    expect(
+      lines(await released(ids.s1User!, ids.s1!)).filter((line) =>
+        line.startsWith(`${ids.term1Name!} / Science`),
+      ),
+    ).toEqual([]);
+    const user = tenant.teachers[0]!.userId;
+    await teacher((tx) =>
+      submitMarkSheet(tx, tenant.schoolId, user, ids["8A"]!, ids.science!, ids.term1!),
+    );
+    await admin((tx) =>
+      decideMarkSheet(
+        tx,
+        tenant.schoolId,
+        tenant.users.ORG_ADMIN.id,
+        science1!.id,
+        "approve",
+        null,
+      ),
+    );
+    expect(await released(ids.s1User!, ids.s1!)).toEqual(
+      own.map((period) => ({
+        ...period,
+        subjects: period.subjects.map((subject) =>
+          subject.subject_id === ids.science && period.term_id === ids.term1
+            ? { ...subject, approved_at: expect.any(String) as unknown as string }
+            : subject,
+        ),
+      })),
+    );
   });
 
   test("finalize: results are stored as immutable snapshots", async () => {
@@ -1233,6 +1345,33 @@ describeDb("academic grading", () => {
       studentAuth,
     );
     expect(marksRes.status).toBe(403);
+    const released = await authenticatedRequest(
+      http,
+      "GET",
+      `/api/grading/students/${ids.s1}/marks`,
+      studentAuth,
+    );
+    expect(released.status).toBe(200);
+    const releasedBody = (await released.json()) as { periods: { term_name: string | null }[] };
+    expect(releasedBody.periods.map((p) => p.term_name)).toEqual([
+      ids.term1Name!,
+      "Semester 2",
+      null,
+    ]);
+    const othersMarks = await authenticatedRequest(
+      http,
+      "GET",
+      `/api/grading/students/${ids.s2}/marks`,
+      studentAuth,
+    );
+    expect(othersMarks.status).toBe(403);
+    const parentMarks = await authenticatedRequest(
+      http,
+      "GET",
+      `/api/grading/students/${ids.s1}/marks`,
+      { schoolId: tenant.schoolId, userId: ids.parentUser!, roles: [ROLES.PARENT] },
+    );
+    expect(parentMarks.status).toBe(200);
 
     const adminAuth = {
       schoolId: tenant.schoolId,

@@ -28,6 +28,7 @@ class _FakeAskAiClient implements AskAiClient {
     required String studentId,
     required String question,
     String? conversationId,
+    String? materialId,
     String level = 'high',
   }) {
     askCalls++;

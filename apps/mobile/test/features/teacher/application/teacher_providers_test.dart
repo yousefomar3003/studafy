@@ -261,8 +261,120 @@ void main() {
 
         expect(pending.map((p) => p.submission.id), ['sub-new', 'sub-old']);
         expect(pending.first.assignment.title, 'Essay');
+        // One cross-assignment call, narrowed to the published assignments only.
+        expect(api.submissions.acrossAssignmentsCalls, [
+          ['a1'],
+        ]);
       },
     );
+
+    test('drops already-marked and never-submitted rows', () async {
+      final api = FakeStudafyApiClient(
+        academics: FakeAcademicsClient(
+          classes: [classFixture(id: 'c1', code: 'MATH101-A')],
+        ),
+        assignments: FakeAssignmentsClient(
+          byClassId: {
+            'c1': [assignmentFixture(id: 'a1', classId: 'c1')],
+          },
+        ),
+        submissions: FakeSubmissionsClient(
+          byAssignmentId: {
+            'a1': [
+              submissionFixture(
+                id: 'sub-pending',
+                assignmentId: 'a1',
+                studentId: 'stu-1',
+              ),
+              submissionFixture(
+                id: 'sub-draft-mark',
+                assignmentId: 'a1',
+                studentId: 'stu-2',
+                gradeStatus: 'draft',
+              ),
+              submissionFixture(
+                id: 'sub-published',
+                assignmentId: 'a1',
+                studentId: 'stu-3',
+                gradeStatus: 'published',
+                status: 'graded',
+                score: 90,
+              ),
+            ],
+          },
+        ),
+      );
+
+      final pending = await _container(
+        api,
+      ).read(teacherPendingSubmissionsProvider.future);
+
+      expect(pending.map((p) => p.submission.id), ['sub-pending']);
+    });
+
+    test('splits many published assignments into bounded requests', () async {
+      final assignments = [
+        for (var i = 0; i < 120; i++)
+          assignmentFixture(id: 'a$i', classId: 'c1'),
+      ];
+      final api = FakeStudafyApiClient(
+        academics: FakeAcademicsClient(
+          classes: [classFixture(id: 'c1', code: 'MATH101-A')],
+        ),
+        assignments: FakeAssignmentsClient(byClassId: {'c1': assignments}),
+        submissions: FakeSubmissionsClient(
+          byAssignmentId: {
+            'a0': [
+              submissionFixture(
+                id: 'sub-first',
+                assignmentId: 'a0',
+                studentId: 'stu-1',
+                submittedAt: DateTime.utc(2026, 3, 1),
+              ),
+            ],
+            'a119': [
+              submissionFixture(
+                id: 'sub-last',
+                assignmentId: 'a119',
+                studentId: 'stu-1',
+                submittedAt: DateTime.utc(2026, 3, 2),
+              ),
+            ],
+          },
+        ),
+      );
+
+      final pending = await _container(
+        api,
+      ).read(teacherPendingSubmissionsProvider.future);
+
+      expect(pending.map((p) => p.submission.id), ['sub-last', 'sub-first']);
+      expect(api.submissions.acrossAssignmentsCalls.map((ids) => ids!.length), [
+        50,
+        50,
+        20,
+      ]);
+    });
+
+    test('makes no request when nothing is published', () async {
+      final api = FakeStudafyApiClient(
+        academics: FakeAcademicsClient(
+          classes: [classFixture(id: 'c1', code: 'MATH101-A')],
+        ),
+        assignments: FakeAssignmentsClient(
+          byClassId: {
+            'c1': [assignmentFixture(id: 'a1', classId: 'c1', status: 'draft')],
+          },
+        ),
+      );
+
+      final pending = await _container(
+        api,
+      ).read(teacherPendingSubmissionsProvider.future);
+
+      expect(pending, isEmpty);
+      expect(api.submissions.acrossAssignmentsCalls, isEmpty);
+    });
   });
 
   group('classRosterProvider', () {

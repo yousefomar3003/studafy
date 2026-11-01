@@ -30,3 +30,20 @@ export function useUpdateSchoolSettings() {
     },
   });
 }
+
+export type ApplyExamStructureResult = components["schemas"]["ApplyExamStructureResult"];
+
+/**
+ * `POST /api/grading/exam-structure/apply` — rebuild the active year's subjects on the saved exam
+ * system. Subjects that already have marks come back in `skipped` and are left as they are.
+ */
+export function useApplyExamStructure() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.POST("/api/grading/exam-structure/apply");
+      if (!data) throw new Error("Applying the exam system returned no data.");
+      // Same generated-response array typing gap as `fetchMyProfile` (queries.ts); the shape is identical.
+      return data as ApplyExamStructureResult;
+    },
+  });
+}

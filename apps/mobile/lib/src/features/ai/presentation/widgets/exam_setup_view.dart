@@ -16,6 +16,7 @@ class ExamSetupView extends StatefulWidget {
     required this.state,
     required this.onCreate,
     required this.onRetryRestore,
+    this.initialSelection = const {},
     super.key,
   });
 
@@ -23,12 +24,15 @@ class ExamSetupView extends StatefulWidget {
   final void Function(List<String> materialIds, int questionCount, int durationMinutes) onCreate;
   final VoidCallback onRetryRestore;
 
+  /// Materials ticked when the view opens.
+  final Set<String> initialSelection;
+
   @override
   State<ExamSetupView> createState() => _ExamSetupViewState();
 }
 
 class _ExamSetupViewState extends State<ExamSetupView> {
-  final Set<String> _selected = {};
+  late final Set<String> _selected = {...widget.initialSelection};
   int _questionCount = examDefaultQuestions;
   int _durationMinutes = examDefaultDurationMinutes;
 

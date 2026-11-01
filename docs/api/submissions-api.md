@@ -14,6 +14,7 @@ explains the parts of the behaviour a schema cannot express.
 | ------ | ---------------------------------------------------------------------- | ------------------- |
 | POST   | `/api/academics/assignments/{assignmentId}/submissions`                | `submission:create` |
 | GET    | `/api/academics/assignments/{assignmentId}/submissions`                | `submission:read`   |
+| GET    | `/api/academics/submissions`                                           | `submission:read`   |
 | GET    | `/api/academics/submissions/{submissionId}`                            | `submission:read`   |
 | PATCH  | `/api/academics/submissions/{submissionId}/grade`                      | `submission:grade`  |
 | POST   | `/api/academics/submissions/{submissionId}/attachments/upload-url`     | `submission:update` |
@@ -120,6 +121,26 @@ Two filters are silently narrowed rather than rejected for non-staff callers:
 - **`grade_status` is dropped.** A non-staff caller cannot observe the distinction it filters on, so
   honouring it would turn the query into an oracle for the fact the projection hides — ask for
   `grade_status=draft` and a non-empty result tells you marking has begun.
+
+### Across assignments
+
+`GET /api/academics/submissions` is the per-assignment list unioned over assignments, so a client
+does not fan out one request per assignment (the teacher's marking queue, a student's "submitted"
+tab). It accepts `limit`, `offset`, `status`, `grade_status`, and `assignment_id` — repeated or
+comma-separated, at most 100 — and orders by `submitted_at DESC NULLS LAST, id DESC`.
+
+It never returns a row the per-assignment list would hide: on an assignment the caller is staff for,
+every submission; elsewhere only their own; for a linked parent, nothing (the per-assignment list
+also returns a parent nothing, because it narrows non-staff callers to their own student id). Staff
+is decided per row, since one caller can be a teacher on some assignments and a student on others.
+
+`grade_status` is honoured for everyone here, but against the value the caller is shown: a
+student's unreleased mark matches `none`, never `draft`. Filtering on the projection reveals
+nothing the projection does not, so it is not the oracle the per-assignment list avoids.
+
+For a non-admin the query is two index-driven branches rather than one OR: the caller's classes
+(`app.teaches_class`) into their assignments and `uq_assignment_submissions_school_assignment_student`,
+plus their own rows through `idx_assignment_submissions_school_student_assignment`. No new index.
 
 ## Lifecycle
 

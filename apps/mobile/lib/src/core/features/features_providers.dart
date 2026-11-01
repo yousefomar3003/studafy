@@ -44,6 +44,16 @@ final featureGateProvider =
           .whenData((features) => featureGateStateOf(features, key));
     });
 
+/// The person pays for (or is trialling) at least one feature themselves -- a school seat alone
+/// does not count. False while the list loads or when it fails.
+final hasPersonalSubscriptionProvider = Provider<bool>((ref) {
+  final features = ref.watch(myFeaturesProvider).value;
+  if (features == null) return false;
+  return features.features.values.any(
+    (f) => f.active && f.sources.any((s) => s.source.isPersonal),
+  );
+});
+
 /// The domain event the API emits whenever a person's grants change (a seat assigned or freed, a
 /// license activated, suspended or ended); the realtime gateway delivers it to that person's room.
 const userEntitlementChangedEvent = 'userEntitlement.changed';

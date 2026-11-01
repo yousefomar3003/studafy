@@ -554,7 +554,7 @@ integrationTest(
         FROM app.materials WHERE id = ${a.material}
       `;
       });
-      expect(defaults).toEqual({ aiVisible: false, status: "uploaded" });
+      expect(defaults).toEqual({ aiVisible: true, status: "uploaded" });
 
       const base = `(school_id,class_id,uploaded_by_user_id,last_edited_by_user_id,title,
       storage_key,original_file_name,mime_type,size_bytes)`;

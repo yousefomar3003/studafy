@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../../design/widgets/today_date_hero.dart';
 import '../application/today_providers.dart';
+import 'widgets/today_ai_promo.dart';
 import 'widgets/today_announcements_card.dart';
 import 'widgets/today_assignments_card.dart';
 import 'widgets/today_grades_card.dart';
@@ -32,7 +33,8 @@ class TodayScreen extends ConsumerWidget {
       child: ListView(
         padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
         children: const [
-          TodayDateHero(),
+          // The AI offer renders inside the hero only for a student who could buy the add-on.
+          TodayDateHero(footer: TodayAiPromo()),
           SizedBox(height: AppSpacing.space16),
           TodayTimetableCard(),
           SizedBox(height: AppSpacing.space16),

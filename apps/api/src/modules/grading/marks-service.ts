@@ -1002,3 +1002,182 @@ export async function listMarkSheets(
     ORDER BY sheet.submitted_at NULLS LAST, grade.sort_order, section.name, subject.name
   `;
 }
+
+// ---------------------------------------------------------------------------
+// Released marks (student and parent view)
+// ---------------------------------------------------------------------------
+
+export interface ReleasedMarkAttempt {
+  attempt: number;
+  status: MarkStatus;
+  score: number | null;
+}
+
+export interface ReleasedAssessment {
+  assessment_id: string;
+  name: string;
+  max_marks: number;
+  assessment_date: string | null;
+  attempts: ReleasedMarkAttempt[];
+}
+
+export interface ReleasedCategory {
+  category_id: string;
+  name: string;
+  kind: string;
+  assessments: ReleasedAssessment[];
+}
+
+export interface ReleasedSubject {
+  subject_id: string;
+  subject_code: string;
+  subject_name: string;
+  approved_at: string | null;
+  categories: ReleasedCategory[];
+}
+
+/** One period of a year: a term, or the annual period (`term_id` null) for year-long assessments. */
+export interface ReleasedPeriod {
+  academic_year_id: string;
+  academic_year_name: string;
+  term_id: string | null;
+  term_name: string | null;
+  subjects: ReleasedSubject[];
+}
+
+/**
+ * A student's marks from approved mark sheets, newest year first, its terms in order and the
+ * annual period last. A mark shows once leadership approves the sheet of its period (section,
+ * subject and term), and disappears again if the sheet is reopened -- the same rule RLS enforces
+ * for a student or parent (000173 `app.is_released_student_mark`), applied here for every caller so
+ * leadership sees exactly what the family sees. Remarks stay staff-only.
+ */
+export async function listReleasedStudentMarks(
+  tx: TransactionSql,
+  schoolId: string,
+  studentId: string,
+): Promise<ReleasedPeriod[]> {
+  const rows = await tx<
+    {
+      academic_year_id: string;
+      academic_year_name: string;
+      term_id: string | null;
+      term_name: string | null;
+      subject_id: string;
+      subject_code: string;
+      subject_name: string;
+      approved_at: Date | null;
+      category_id: string;
+      category_name: string;
+      category_kind: string;
+      assessment_id: string;
+      assessment_name: string;
+      max_marks: string;
+      assessment_date: string | null;
+      attempt: number;
+      status: MarkStatus;
+      score: string | null;
+    }[]
+  >`
+    SELECT year.id AS academic_year_id, year.name AS academic_year_name,
+           sheet.term_id, term.name AS term_name,
+           subject.id AS subject_id, subject.code AS subject_code, subject.name AS subject_name,
+           sheet.decided_at AS approved_at,
+           category.id AS category_id, category.name AS category_name, category.kind AS category_kind,
+           assessment.id AS assessment_id, assessment.name AS assessment_name, assessment.max_marks,
+           assessment.assessment_date::text AS assessment_date,
+           mark.attempt, mark.status, mark.score
+    FROM app.student_marks AS mark
+    JOIN app.subject_config_assessments AS assessment
+      ON assessment.id = mark.assessment_id AND assessment.school_id = mark.school_id
+    JOIN app.subject_config_categories AS category
+      ON category.id = assessment.category_id AND category.school_id = assessment.school_id
+    JOIN app.subject_configs AS config
+      ON config.id = assessment.subject_config_id AND config.school_id = assessment.school_id
+    JOIN app.student_sections AS placement
+      ON placement.student_id = mark.student_id
+     AND placement.academic_year_id = assessment.academic_year_id
+     AND placement.school_id = mark.school_id
+    JOIN app.mark_sheets AS sheet
+      ON sheet.school_id = mark.school_id
+     AND sheet.academic_year_id = assessment.academic_year_id
+     AND sheet.section_id = placement.section_id
+     AND sheet.subject_id = config.subject_id
+     AND sheet.term_id IS NOT DISTINCT FROM assessment.term_id
+    JOIN app.academic_years AS year
+      ON year.id = assessment.academic_year_id AND year.school_id = mark.school_id
+    JOIN app.subjects AS subject ON subject.id = config.subject_id AND subject.school_id = mark.school_id
+    LEFT JOIN app.terms AS term ON term.id = sheet.term_id AND term.school_id = mark.school_id
+    WHERE mark.school_id = ${schoolId}::uuid
+      AND mark.student_id = ${studentId}::uuid
+      AND assessment.status = 'active'
+      AND (assessment.section_id IS NULL OR assessment.section_id = placement.section_id)
+      AND sheet.status = 'approved'
+    ORDER BY year.starts_on DESC, term.sequence_number NULLS LAST, subject.name,
+             category.sort_order, category.name, assessment.sort_order, assessment.name, mark.attempt
+  `;
+
+  const periods: ReleasedPeriod[] = [];
+  const periodByKey = new Map<string, ReleasedPeriod>();
+  const subjectByKey = new Map<string, ReleasedSubject>();
+  const categoryByKey = new Map<string, ReleasedCategory>();
+  const assessmentByKey = new Map<string, ReleasedAssessment>();
+  for (const row of rows) {
+    const periodKey = `${row.academic_year_id}:${row.term_id ?? "annual"}`;
+    let period = periodByKey.get(periodKey);
+    if (!period) {
+      period = {
+        academic_year_id: row.academic_year_id,
+        academic_year_name: row.academic_year_name,
+        term_id: row.term_id,
+        term_name: row.term_name,
+        subjects: [],
+      };
+      periodByKey.set(periodKey, period);
+      periods.push(period);
+    }
+    const subjectKey = `${periodKey}:${row.subject_id}`;
+    let subject = subjectByKey.get(subjectKey);
+    if (!subject) {
+      subject = {
+        subject_id: row.subject_id,
+        subject_code: row.subject_code,
+        subject_name: row.subject_name,
+        approved_at: row.approved_at?.toISOString() ?? null,
+        categories: [],
+      };
+      subjectByKey.set(subjectKey, subject);
+      period.subjects.push(subject);
+    }
+    const categoryKey = `${subjectKey}:${row.category_id}`;
+    let category = categoryByKey.get(categoryKey);
+    if (!category) {
+      category = {
+        category_id: row.category_id,
+        name: row.category_name,
+        kind: row.category_kind,
+        assessments: [],
+      };
+      categoryByKey.set(categoryKey, category);
+      subject.categories.push(category);
+    }
+    let assessment = assessmentByKey.get(row.assessment_id);
+    if (!assessment) {
+      assessment = {
+        assessment_id: row.assessment_id,
+        name: row.assessment_name,
+        max_marks: Number(row.max_marks),
+        assessment_date: row.assessment_date,
+        attempts: [],
+      };
+      assessmentByKey.set(row.assessment_id, assessment);
+      category.assessments.push(assessment);
+    }
+    assessment.attempts.push({
+      attempt: row.attempt,
+      status: row.status,
+      score: row.score === null ? null : Number(row.score),
+    });
+  }
+  return periods;
+}

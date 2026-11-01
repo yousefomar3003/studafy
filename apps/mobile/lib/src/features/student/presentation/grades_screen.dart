@@ -7,6 +7,7 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/grade_providers.dart';
 import '../domain/grade_report.dart';
 import 'academic_results_screen.dart';
+import 'released_marks_screen.dart';
 import 'widgets/grade_term_selector.dart';
 import 'widgets/grade_trend_card.dart';
 import 'widgets/grades_placeholders.dart';
@@ -70,6 +71,16 @@ class _GradesScreenState extends ConsumerState<GradesScreen> {
       appBar: AppBar(
         title: Text('grades.title'.tr()),
         actions: [
+          // Approved term marks (midterm, final exam, …) from the teacher's mark sheets.
+          IconButton(
+            icon: const Icon(Icons.fact_check_outlined),
+            tooltip: 'releasedMarks.entry'.tr(),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const ReleasedMarksScreen(),
+              ),
+            ),
+          ),
           // Official (finalized) results, certificates and report cards — distinct from the
           // published running grades this screen shows.
           IconButton(

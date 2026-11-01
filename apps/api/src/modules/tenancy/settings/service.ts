@@ -4,6 +4,7 @@ import { withTenantTx } from "../../../db";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
 import type { Database } from "../../../db";
+import type { ExamStructure, ExamWeights } from "../../grading/exam-structure";
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -20,6 +21,8 @@ export interface SchoolSettingsRow {
   absence_alert_threshold: number;
   parent_discipline_visibility: boolean;
   attendance_correction_window_hours: number;
+  exam_structure: ExamStructure;
+  exam_weights: ExamWeights;
   created_at: Date;
   updated_at: Date;
 }
@@ -33,6 +36,8 @@ export interface UpdateSchoolSettingsParams {
   absence_alert_threshold?: number;
   parent_discipline_visibility?: boolean;
   attendance_correction_window_hours?: number;
+  exam_structure?: ExamStructure;
+  exam_weights?: ExamWeights;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +55,8 @@ function rowToSettings(row: SchoolSettingsRow): SchoolSettingsRow {
     absence_alert_threshold: row.absence_alert_threshold,
     parent_discipline_visibility: row.parent_discipline_visibility,
     attendance_correction_window_hours: row.attendance_correction_window_hours,
+    exam_structure: row.exam_structure,
+    exam_weights: row.exam_weights,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -75,6 +82,7 @@ export async function getSchoolSettings(
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
         attendance_correction_window_hours,
+        exam_structure, exam_weights,
         created_at, updated_at
       FROM app.school_settings
       WHERE school_id = ${schoolId}::uuid
@@ -102,6 +110,7 @@ export async function getSchoolSettings(
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
         attendance_correction_window_hours,
+        exam_structure, exam_weights,
         created_at, updated_at
     `;
 
@@ -143,6 +152,7 @@ export async function updateSchoolSettings(
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
         attendance_correction_window_hours,
+        exam_structure, exam_weights,
         created_at, updated_at
       FROM app.school_settings
       WHERE school_id = ${schoolId}::uuid
@@ -173,6 +183,8 @@ export async function updateSchoolSettings(
         absence_alert_threshold       = COALESCE(${patch.absence_alert_threshold ?? null}, absence_alert_threshold),
         parent_discipline_visibility  = COALESCE(${patch.parent_discipline_visibility ?? null}, parent_discipline_visibility),
         attendance_correction_window_hours = COALESCE(${patch.attendance_correction_window_hours ?? null}, attendance_correction_window_hours),
+        exam_structure                = COALESCE(${patch.exam_structure ?? null}, exam_structure),
+        exam_weights                  = COALESCE(${patch.exam_weights ? tx.json(patch.exam_weights) : null}::jsonb, exam_weights),
         updated_at                    = CURRENT_TIMESTAMP
       WHERE school_id = ${schoolId}::uuid
       RETURNING
@@ -182,6 +194,7 @@ export async function updateSchoolSettings(
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
         attendance_correction_window_hours,
+        exam_structure, exam_weights,
         created_at, updated_at
     `;
 
@@ -206,6 +219,8 @@ export async function updateSchoolSettings(
             absence_alert_threshold: before.absence_alert_threshold,
             parent_discipline_visibility: before.parent_discipline_visibility,
             attendance_correction_window_hours: before.attendance_correction_window_hours,
+            exam_structure: before.exam_structure,
+            exam_weights: before.exam_weights,
           }
         : null,
       newValues: {
@@ -217,6 +232,8 @@ export async function updateSchoolSettings(
         absence_alert_threshold: after.absence_alert_threshold,
         parent_discipline_visibility: after.parent_discipline_visibility,
         attendance_correction_window_hours: after.attendance_correction_window_hours,
+        exam_structure: after.exam_structure,
+        exam_weights: after.exam_weights,
       },
     });
 

@@ -37,6 +37,7 @@ import {
   type TenantFixture,
   type TestDatabase,
 } from "../../../../tests/harness";
+import { withTenantTx } from "../../../db/tenant-tx";
 import { errorHandlerMiddleware } from "../../../middleware/errorHandler";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { AUTH_CHANNELS } from "../../auth/channels";
@@ -48,7 +49,7 @@ import {
   RETRIEVAL_EMBEDDING_MODEL,
 } from "../retrieval/embeddings";
 import { RERANK_K, RERANK_MODEL } from "../retrieval/rerank";
-import { HYBRID_LEG_LIMIT } from "../retrieval/search";
+import { HYBRID_LEG_LIMIT, hybridSearch } from "../retrieval/search";
 
 import { aiRetrievalRoutes } from "./retrieval-routes";
 
@@ -254,6 +255,56 @@ afterAll(async () => {
   if (tenantClient) await tenantClient.end({ timeout: 1 });
   if (adminClient) await adminClient.end({ timeout: 1 });
   if (db?.cleanup) await db.cleanup();
+});
+
+describeDb("hybridSearch scoped to one material", () => {
+  test("returns only that material's chunks and skips the corpus-wide retry", async () => {
+    const other = await createMaterial(db.sql, tenant.schoolId, {
+      classId: tenant.cls.id,
+      uploadedByUserId: tenant.teachers[0]!.userId,
+      title: "Chemistry Notes",
+    });
+    const otherChunk = await seedChunk({
+      schoolId: tenant.schoolId,
+      materialId: other.id,
+      chunkIndex: 5,
+      content: "Zirconium oxide forms a passive layer that resists corrosion in acids.",
+    });
+    const embedder = createDeterministicQueryEmbedder();
+    const query = "zirconium corrosion resistance";
+    const search = (scope?: string) =>
+      withTenantTx(tenantClient!, { schoolId: tenant.schoolId, userId: auth.userId }, (tx) =>
+        hybridSearch(tx, {
+          query,
+          queryVector: embedder.embed(query),
+          ...(scope !== undefined ? { materialId: scope } : {}),
+        }),
+      );
+
+    const everything = await search();
+    expect(everything.hits.map((hit) => hit.chunkId)).toEqual(
+      expect.arrayContaining([tenantChunkIds[0], otherChunk]),
+    );
+
+    const scoped = await search(other.id);
+    expect(scoped.hits.map((hit) => hit.chunkId)).toEqual([otherChunk]);
+    expect(scoped.semanticLegCount).toBe(1);
+    expect(scoped.retried).toBe(false);
+
+    // Another school's material grounds nothing, as RLS would have it.
+    const foreign = await search(
+      (
+        await adminClient!<{ material_id: string }[]>`
+          SELECT material_id::text FROM app.material_chunks WHERE id = ${foreignChunkId}`
+      )[0]!.material_id,
+    );
+    expect(foreign.hits).toEqual([]);
+
+    await asAdmin(
+      tenant.schoolId,
+      (tx) => tx`DELETE FROM app.material_chunks WHERE id = ${otherChunk}`,
+    );
+  });
 });
 
 describeDb("POST /api/ai/students/{studentId}/search", () => {

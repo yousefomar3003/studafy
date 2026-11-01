@@ -6,8 +6,12 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/api/generated/models/material.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../ai/application/ask_ai_controller.dart';
+import '../../ai/presentation/ask_ai_screen.dart';
+import '../../ai/presentation/exam_screen.dart';
 import '../../ai/presentation/key_concepts_screen.dart';
 import '../../ai/presentation/material_summary_screen.dart';
+import '../../ai/presentation/quiz_screen.dart';
 import '../../ai/presentation/widgets/ai_consent_gate.dart';
 import '../application/materials_providers.dart';
 import '../domain/material_ready_state.dart';
@@ -122,30 +126,37 @@ class _MaterialReadyBody extends StatelessWidget {
             runSpacing: AppSpacing.space8,
             children: [
               OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => FeatureGate(
-                      featureKey: FeatureKeys.studyTools,
-                      whenPurchasable: (_) => const AiPaywall(),
-                      child: AiConsentGate(child: MaterialSummaryScreen(material: material)),
-                    ),
+                onPressed: () => _openStudyTool(
+                  context,
+                  AskAiScreen(
+                    initialMaterial: AskAiMaterialScope(id: material.id, title: material.title),
                   ),
+                  featureKey: FeatureKeys.aiTutor,
                 ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                label: Text('aiStudy.openAskAi'.tr()),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openStudyTool(context, MaterialSummaryScreen(material: material)),
                 icon: const Icon(Icons.auto_awesome_outlined, size: 18),
                 label: Text('aiStudy.openSummary'.tr()),
               ),
               OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => FeatureGate(
-                      featureKey: FeatureKeys.studyTools,
-                      whenPurchasable: (_) => const AiPaywall(),
-                      child: AiConsentGate(child: KeyConceptsScreen(material: material)),
-                    ),
-                  ),
-                ),
+                onPressed: () => _openStudyTool(context, KeyConceptsScreen(material: material)),
                 icon: const Icon(Icons.lightbulb_outline, size: 18),
                 label: Text('aiStudy.openConcepts'.tr()),
+              ),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _openStudyTool(context, QuizScreen(initialMaterialIds: {material.id})),
+                icon: const Icon(Icons.quiz_outlined, size: 18),
+                label: Text('aiStudy.openQuiz'.tr()),
+              ),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _openStudyTool(context, ExamScreen(initialMaterialIds: {material.id})),
+                icon: const Icon(Icons.timer_outlined, size: 18),
+                label: Text('aiStudy.openExam'.tr()),
               ),
             ],
           ),
@@ -164,6 +175,25 @@ class _MaterialReadyBody extends StatelessWidget {
 /// a plain [Image.file] for an image. Both read from the same on-device cache
 /// [ensureMaterialDownloadedProvider] fills, so a material opened once is available with no
 /// connectivity on every later visit.
+/// Opens one of the material's AI tools behind the same gates the AI hub's routes use: its paid
+/// feature (study tools unless given; a paywall when it can be bought) and the AI data-sharing
+/// consent.
+void _openStudyTool(
+  BuildContext context,
+  Widget screen, {
+  String featureKey = FeatureKeys.studyTools,
+}) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => FeatureGate(
+        featureKey: featureKey,
+        whenPurchasable: (_) => const AiPaywall(),
+        child: AiConsentGate(child: screen),
+      ),
+    ),
+  );
+}
+
 class _InAppPreview extends ConsumerWidget {
   const _InAppPreview({required this.materialId, required this.kind, this.initialPage});
 

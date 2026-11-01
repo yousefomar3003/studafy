@@ -28,6 +28,8 @@ let schoolSettings = {
   absence_alert_threshold: 25,
   parent_discipline_visibility: false,
   attendance_correction_window_hours: 48,
+  exam_structure: "midterm" as "midterm" | "periods",
+  exam_weights: { midterm: 30, final_exam: 40, quiz: 15, homework: 15 } as Record<string, number>,
   created_at: "2026-08-01T00:00:00.000Z",
   updated_at: "2026-08-01T00:00:00.000Z",
 };
@@ -87,10 +89,36 @@ function patchMockImplementation(path: string, init?: { body?: Record<string, un
   throw new Error(`Unhandled PATCH ${path}`);
 }
 
+const APPLY_RESULT = {
+  academic_year_id: "year-1",
+  academic_year_name: "2026–2027",
+  structure: "midterm",
+  updated: [{ config_id: "c-1", subject_name: "Mathematics", section_id: null }],
+  skipped: [
+    {
+      config_id: "c-2",
+      subject_name: "Science",
+      section_id: null,
+      reason: "has_marks",
+      detail: null,
+    },
+  ],
+};
+
+function postMockImplementation(path: string) {
+  if (path === "/api/grading/exam-structure/apply") {
+    return Promise.resolve<unknown>({ data: APPLY_RESULT });
+  }
+  throw new Error(`Unhandled POST ${path}`);
+}
+
 const getMock = mock(getMockImplementation);
 const patchMock = mock(patchMockImplementation);
+const postMock = mock(postMockImplementation);
 
-mock.module("../../../lib/api", () => ({ api: { GET: getMock, PATCH: patchMock } }));
+mock.module("../../../lib/api", () => ({
+  api: { GET: getMock, PATCH: patchMock, POST: postMock },
+}));
 
 const loadPage = async (): Promise<ComponentType> => (await import("./SchoolSettingsPage")).default;
 
@@ -140,6 +168,8 @@ afterEach(() => {
     absence_alert_threshold: 25,
     parent_discipline_visibility: false,
     attendance_correction_window_hours: 48,
+    exam_structure: "midterm",
+    exam_weights: { midterm: 30, final_exam: 40, quiz: 15, homework: 15 },
     created_at: "2026-08-01T00:00:00.000Z",
     updated_at: "2026-08-01T00:00:00.000Z",
   };
@@ -157,6 +187,7 @@ afterEach(() => {
   };
   getMock.mockClear();
   patchMock.mockClear();
+  postMock.mockClear();
 });
 
 describe("SchoolSettingsPage", () => {
@@ -269,5 +300,86 @@ describe("SchoolSettingsPage", () => {
         }),
       );
     });
+  });
+
+  test("exam system: switching to periods shows its parts with defaults and saves them", async () => {
+    await renderAsOrgAdmin(await loadPage());
+
+    const examCard = await screen.findByRole("region", { name: "Exam system" });
+    await waitFor(() =>
+      expect(within(examCard).getByRole("spinbutton", { name: "Midterm exam" })).toHaveProperty(
+        "value",
+        "30",
+      ),
+    );
+    fireEvent.click(
+      within(examCard).getByLabelText(
+        "First period exam, second period exam and final exam, plus quizzes and homework",
+      ),
+    );
+    expect(within(examCard).queryByRole("spinbutton", { name: "Midterm exam" })).toBeNull();
+    expect(within(examCard).getByRole("spinbutton", { name: "Second period exam" })).toHaveProperty(
+      "value",
+      "20",
+    );
+    // Applying is only offered for what is saved.
+    expect(within(examCard).getByRole("button", { name: "Apply to all subjects" })).toHaveProperty(
+      "disabled",
+      true,
+    );
+
+    fireEvent.click(within(examCard).getByRole("button", { name: "Save changes" }));
+    await waitFor(() => {
+      expect(patchMock).toHaveBeenCalledWith(
+        "/api/schools/current/settings",
+        expect.objectContaining({
+          body: {
+            exam_structure: "periods",
+            exam_weights: {
+              first_period: 20,
+              second_period: 20,
+              final_exam: 30,
+              quiz: 15,
+              homework: 15,
+            },
+          },
+        }),
+      );
+    });
+  });
+
+  test("exam system: weights that do not total 100 are not saved", async () => {
+    await renderAsOrgAdmin(await loadPage());
+
+    const examCard = await screen.findByRole("region", { name: "Exam system" });
+    const final = await within(examCard).findByRole("spinbutton", { name: "Final exam" });
+    fireEvent.change(final, { target: { value: "50" } });
+    expect(within(examCard).getByText("Total: 110% (must be 100%)")).toBeTruthy();
+
+    fireEvent.click(within(examCard).getByRole("button", { name: "Save changes" }));
+    expect(patchMock).not.toHaveBeenCalled();
+  });
+
+  test("exam system: apply to all subjects confirms, then reports what changed", async () => {
+    await renderAsOrgAdmin(await loadPage());
+
+    const examCard = await screen.findByRole("region", { name: "Exam system" });
+    const apply = await within(examCard).findByRole("button", { name: "Apply to all subjects" });
+    await waitFor(() => expect(apply).toHaveProperty("disabled", false));
+    fireEvent.click(apply);
+
+    const dialog = await screen.findByRole("dialog", {
+      name: "Apply the exam system to all subjects?",
+    });
+    expect(postMock).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply to all subjects" }));
+
+    await waitFor(() => expect(postMock).toHaveBeenCalledWith("/api/grading/exam-structure/apply"));
+    expect(
+      await within(examCard).findByText("1 subjects in 2026–2027 now use this system."),
+    ).toBeTruthy();
+    expect(
+      within(examCard).getByText("Not changed because they already have marks: Science."),
+    ).toBeTruthy();
   });
 });

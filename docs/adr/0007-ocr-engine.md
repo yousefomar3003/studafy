@@ -23,13 +23,13 @@ cost are treated, and how the OCR path is deployed (no `node_modules` in the pro
 
 - **Engine: tesseract.js 7.0.0** (Tesseract 5 + Leptonica compiled to WASM), with traineddata for
   `eng`, `spa`, and `ara` committed in
-  `apps/workers/src/queues/ai-ingestion/ocr/traineddata/`. A WASM engine is chosen over a cloud OCR
+  `packages/ocr/src/traineddata/`. A WASM engine is chosen over a cloud OCR
   API (Textract/OCR.space) because it is free per page, runs inside the existing worker process, and
   keeps the pipeline's "no external services beyond S3/Redis/Postgres" posture — and because the
   accuracy we need (clean printed text) is where local tesseract is strong.
 - **One shared worker per job.** Spawning a worker is the expensive part (a worker thread plus a
   WASM core); the engine creates it lazily on first recognize, reuses it across pages, and the job
-  closes it in a `finally`. See `ocr/tesseract.ts`.
+  closes it in a `finally`. See `packages/ocr/src/tesseract.ts`.
 
 ### Language detection is recognition-based, not OSD
 

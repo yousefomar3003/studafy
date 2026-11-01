@@ -256,38 +256,53 @@ final teacherPublishedAssignmentsProvider = FutureProvider<List<Assignment>>((
       .toList();
 });
 
+/// How many assignment ids one cross-assignment submissions request names. The API accepts up to
+/// 100; 50 keeps the repeated `assignment_id` query string near 2.5 KB.
+const _assignmentIdsPerRequest = 50;
+
 /// Turned-in submissions across the teacher's published assignments that still need a mark
 /// (`grade_status = none`), newest first.
 ///
-/// The API has no cross-assignment submission list, so this is one call per assignment. The
-/// home screen's pending-count and recent-submissions cards both read this single provider
-/// rather than each making its own pass.
+/// Read through `GET /api/academics/submissions?grade_status=none`, narrowed with `assignment_id`
+/// to the published assignments — one paged call per [_assignmentIdsPerRequest] assignments rather
+/// than one per assignment. Narrowing (instead of filtering client-side) keeps a teacher who is
+/// also a school admin, and so sees every class's submissions, from paging through the whole
+/// school. The home screen's pending-count and recent-submissions cards both read this single
+/// provider rather than each making its own pass.
 final teacherPendingSubmissionsProvider =
     FutureProvider<List<PendingSubmission>>((ref) async {
       final assignments = await ref.watch(
         teacherPublishedAssignmentsProvider.future,
       );
       final api = ref.watch(apiClientProvider);
+      final assignmentsById = {for (final a in assignments) a.id: a};
+      final ids = assignmentsById.keys.toList();
 
-      final pages = await Future.wait(
-        assignments.map((assignment) async {
-          final list = await api.submissions.listSubmissions(
-            assignmentId: assignment.id,
-            gradeStatus: GradeStatus.none,
-            limit: 100,
-          );
-          return list.submissions
-              .where(
-                (s) =>
-                    s.submittedAt != null &&
-                    s.status != SubmissionStatus.withdrawn,
-              )
-              .map(
-                (s) => PendingSubmission(submission: s, assignment: assignment),
-              );
-        }),
-      );
+      final chunks = await Future.wait([
+        for (var i = 0; i < ids.length; i += _assignmentIdsPerRequest)
+          fetchAllPages((limit, offset) async {
+            final page = await api.submissions.listSubmissionsAcrossAssignments(
+              assignmentId: ids.sublist(
+                i,
+                (i + _assignmentIdsPerRequest).clamp(0, ids.length),
+              ),
+              gradeStatus: GradeStatus.none,
+              limit: limit,
+              offset: offset,
+            );
+            return (rows: page.submissions, total: page.total);
+          }),
+      ]);
+      final submissions = [for (final chunk in chunks) ...chunk];
 
-      return [for (final page in pages) ...page]
-        ..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
+      return [
+        for (final s in submissions)
+          if (s.submittedAt != null &&
+              s.status != SubmissionStatus.withdrawn &&
+              assignmentsById.containsKey(s.assignmentId))
+            PendingSubmission(
+              submission: s,
+              assignment: assignmentsById[s.assignmentId]!,
+            ),
+      ]..sort((a, b) => b.submittedAt.compareTo(a.submittedAt));
     });

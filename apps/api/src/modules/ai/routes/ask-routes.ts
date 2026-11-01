@@ -180,6 +180,17 @@ const askBodySchema = z.object({
         "id is returned in the sources and done events.",
       example: "0f5c6b64-2b3f-4c8e-9a1e-6f3e5f0a9b12",
     }),
+  material_id: z
+    .string()
+    .uuid()
+    .optional()
+    .openapi({
+      description:
+        "Answer from this one study material only. When omitted, every material the student can " +
+        "see is searched. A material the student cannot see grounds nothing, like any other " +
+        "question the materials do not cover.",
+      example: "6a1f2c9e-4b7d-4e2a-9f3c-1d2e3f4a5b6c",
+    }),
   level: z
     .enum(AI_EXPLAIN_LEVELS)
     .optional()
@@ -417,6 +428,7 @@ export function aiAskRoutes(deps: {
         query: body.question,
         queryVector: embedder.embed(body.question),
         limit: AI_ASK_SOURCE_LIMIT,
+        ...(body.material_id !== undefined ? { materialId: body.material_id } : {}),
       });
       const conversationId = await resolveConversation(tx, {
         schoolId: auth.schoolId,

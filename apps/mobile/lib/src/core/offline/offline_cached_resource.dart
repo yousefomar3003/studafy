@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'cached_value.dart';
 import 'offline_database.dart';
@@ -22,12 +23,23 @@ class OfflineCachedResource<T> {
   final Object? Function(T value) _encode;
   final T Function(Object? json) _decode;
 
+  /// Cached payloads at least this long (in UTF-16 code units, ~50KB) are decoded on a
+  /// background isolate. A whole school's timetable or a long materials list parsed on the UI
+  /// isolate drops frames; small payloads aren't worth the isolate hop. Same threshold as Dio's
+  /// default `BackgroundTransformer` uses for network responses.
+  static const _backgroundCodecThreshold = 50 * 1024;
+
   /// The cached value for [cacheKey], or null if nothing has ever been cached for it.
   Future<CachedValue<T>?> peek(String cacheKey) async {
     final row = await _database.read(resource: _resource, cacheKey: cacheKey);
     if (row == null) return null;
+    final payload = row.payload;
+    final decode = _decode;
     return CachedValue(
-      data: _decode(jsonDecode(row.payload)),
+      data: payload.length < _backgroundCodecThreshold
+          ? decode(jsonDecode(payload))
+          // Captures only locals: `this` holds the database connection, which can't cross isolates.
+          : await Isolate.run(() => decode(jsonDecode(payload))),
       fetchedAt: row.fetchedAt,
       source: CacheSource.cache,
     );

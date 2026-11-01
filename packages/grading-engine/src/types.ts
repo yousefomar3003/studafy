@@ -30,6 +30,8 @@ export type CategoryKind =
   | "practical"
   | "participation"
   | "exam"
+  | "first_period"
+  | "second_period"
   | "midterm"
   | "final_exam"
   | "other";
