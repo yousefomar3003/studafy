@@ -62,6 +62,18 @@ export const invoiceQuerySchema = paginationQuerySchema
     search: z.string().trim().min(1).max(200).optional().openapi({
       description: "Exact invoice-number match first; falls back to student name/admission #.",
     }),
+    issued_from: dateSchema.optional().openapi({ description: "Issued on or after (YYYY-MM-DD)." }),
+    issued_to: dateSchema.optional().openapi({ description: "Issued on or before (YYYY-MM-DD)." }),
+    due_from: dateSchema.optional().openapi({ description: "Due on or after (YYYY-MM-DD)." }),
+    due_to: dateSchema.optional().openapi({ description: "Due on or before (YYYY-MM-DD)." }),
+  })
+  .refine((q) => !q.issued_from || !q.issued_to || q.issued_from <= q.issued_to, {
+    message: "issued_from must be on or before issued_to",
+    path: ["issued_to"],
+  })
+  .refine((q) => !q.due_from || !q.due_to || q.due_from <= q.due_to, {
+    message: "due_from must be on or before due_to",
+    path: ["due_to"],
   })
   .openapi("InvoiceQuery");
 
@@ -114,8 +126,27 @@ const invoiceLineSchema = z
   })
   .openapi("InvoiceLine");
 
+const invoiceTaxSchema = z
+  .object({
+    description: z.string().openapi({ description: "The tax line's label, e.g. 'VAT 5%'." }),
+    rate: z.number().nullable().openapi({ description: "Percent; null for a fixed charge." }),
+    amount: z.number().openapi({ description: "Decimal, as ERPNext computed it." }),
+  })
+  .openapi("InvoiceTax");
+
 export const invoiceDetailSchema = invoiceSchema
-  .extend({ lines: z.array(invoiceLineSchema) })
+  .extend({
+    lines: z.array(invoiceLineSchema),
+    net_total: z.number().nullable().openapi({
+      description: "Total before tax, from ERPNext; null on an invoice cached without it.",
+    }),
+    taxes: z.array(invoiceTaxSchema).openapi({
+      description: "ERPNext's tax rows on this invoice; empty when it carries no tax.",
+    }),
+    tax_registration_number: z.string().nullable().openapi({
+      description: "The school's tax registration number (VAT settings), for the printed invoice.",
+    }),
+  })
   .openapi("InvoiceDetail");
 
 // ---------------------------------------------------------------------------

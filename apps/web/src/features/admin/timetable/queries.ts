@@ -71,7 +71,7 @@ async function fetchAllOffsetPages<TRow>(
 }
 
 /** Exhausts a cursor-shaped list endpoint, capped at `MAX_PAGES`. */
-async function fetchAllCursorPages<TRow>(
+export async function fetchAllCursorPages<TRow>(
   fetchPage: (
     limit: number,
     cursor: string | undefined,

@@ -13,6 +13,7 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { withStudentIdentityTx } from "../students/service";
 
+import { collectionsByMethod, collectionsByMethodRoute } from "./collections-by-method";
 import {
   arAgingQuerySchema,
   collectionsQuerySchema,
@@ -210,6 +211,7 @@ export function financeReportRoutes(
     "/api/finance/reports/ar-aging",
     "/api/finance/reports/general-ledger",
     "/api/finance/reports/collections-vs-due",
+    "/api/finance/reports/collections-by-method",
   ]) {
     routes.use(path, requirePermission(PERMISSIONS.REPORT_VIEW_FINANCIAL));
   }
@@ -225,6 +227,15 @@ export function financeReportRoutes(
   routes.use("/api/finance/reports/export", requirePermission(PERMISSIONS.REPORT_VIEW_FINANCIAL));
   routes.use("/api/finance/reports/export/:jobId", requirePermission(PERMISSIONS.REPORT_EXPORT));
   routes.use("/api/finance/reports/export", auditAction("insert", "finance_report_jobs"));
+
+  routes.openapi(collectionsByMethodRoute, async (c) => {
+    const auth = requireAuth(c);
+    const query = c.req.valid("query");
+    const report = await withTenantTx(database, tenantFrom(c), (tx) =>
+      collectionsByMethod(tx, auth.schoolId, query),
+    );
+    return c.json(report, 200);
+  });
 
   routes.openapi(arAgingRoute, async (c) => {
     const auth = requireAuth(c);

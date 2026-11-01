@@ -89,5 +89,25 @@
     "parentFallback": "Parent",
     "parentLoadError": "This parent could not be loaded.",
     "backToStudent": "Back"
+  },
+  "staff": {
+    "title": "{{name}}: staff record",
+    "fallback": "Staff member",
+    "loadError": "This staff member could not be loaded.",
+    "backToTeachers": "Back to teachers",
+    "backToMissing": "Back to missing information",
+    "openRecord": "Open {{name}}'s staff record",
+    "openShort": "Staff record"
+  },
+  "class": {
+    "title": "{{code}}: class record",
+    "loadError": "This class could not be loaded.",
+    "backToClasses": "Back to classes"
+  },
+  "self": {
+    "title": "My staff record",
+    "intro": "What your school keeps on file about you, such as your qualifications or contract type. The school admin fills it in. Fields your school marks sensitive, such as a salary or an ID number, are not shown here.",
+    "notStaff": "Only members of the school's staff have a staff record.",
+    "backToAccount": "Back to account"
   }
 }

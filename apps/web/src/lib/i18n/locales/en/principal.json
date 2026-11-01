@@ -19,7 +19,9 @@
       "messageReports": "Message reports →",
       "evaluations": "Teacher evaluations →",
       "approvals": "Approvals →",
-      "announcements": "Announcements →"
+      "announcements": "Announcements →",
+      "years": "School years & terms →",
+      "catalog": "Subjects & courses →"
     }
   },
   "tiles": {
@@ -281,6 +283,23 @@
       "submit": "Resolve",
       "success": "Incident resolved",
       "failed": "Couldn't resolve incident"
+    },
+    "report": {
+      "open": "Report an incident",
+      "title": "Report an incident",
+      "student": "Student",
+      "studentPlaceholder": "Name or admission number",
+      "noMatches": "No students match.",
+      "changeStudent": "Change",
+      "type": "Type",
+      "severity": "Severity",
+      "titleLabel": "Title",
+      "titlePlaceholder": "Fight in the playground",
+      "when": "When it happened",
+      "description": "What happened",
+      "submit": "Report incident",
+      "created": "Incident reported",
+      "failed": "Couldn't report the incident"
     }
   },
   "messageReports": {
@@ -781,7 +800,9 @@
       "confirm": "Delete",
       "deleted": "Class removed",
       "failed": "Couldn't delete the class"
-    }
+    },
+    "record": "Record",
+    "recordLabel": "Open the record of class {{code}}"
   },
   "sections": {
     "title": "Grades & sections",
@@ -912,6 +933,47 @@
       "graduated": "Graduated",
       "withdrawn": "Withdrawn",
       "archived": "Archived"
+    },
+    "overview": {
+      "results": {
+        "heading": "Results",
+        "caption": "Finalized results, newest first",
+        "period": "Period",
+        "section": "Class",
+        "average": "Average",
+        "grade": "Grade",
+        "outcome": "Outcome",
+        "termOf": "{{term}}, {{year}}",
+        "annualOf": "Whole year {{year}}",
+        "failed_one": "{{count}} subject failed",
+        "failed_other": "{{count}} subjects failed",
+        "empty": "No results have been finalized for this student yet.",
+        "error": "Couldn't load the results."
+      },
+      "certificates": {
+        "heading": "Report cards & certificates",
+        "kind": {
+          "annual_certificate": "Certificate {{serial}}, issued {{date}}",
+          "term_report": "Report card {{serial}}, issued {{date}}"
+        },
+        "status": {
+          "superseded": "replaced",
+          "revoked": "revoked"
+        },
+        "empty": "None issued yet.",
+        "error": "Couldn't load the report cards and certificates."
+      },
+      "discipline": {
+        "heading": "Discipline",
+        "empty": "No incidents recorded.",
+        "error": "Couldn't load the incidents.",
+        "more_one": "And {{count}} older incident.",
+        "more_other": "And {{count}} older incidents."
+      },
+      "attendance": {
+        "heading": "Attendance",
+        "open": "Open this student's attendance history"
+      }
     }
   },
   "calendar": {
@@ -975,5 +1037,152 @@
     },
     "attentionHeading": "Needs attention",
     "activityHeading": "School activity"
+  },
+  "years": {
+    "title": "School years & terms",
+    "description": "Set up each academic year and its terms. Starting a new year makes it the school's current year and closes the one before it.",
+    "edit": "Edit",
+    "startsOn": "Starts on",
+    "endsOn": "Ends on",
+    "datesInvalid": "The end date must be after the start date.",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "dates": "Dates",
+      "status": "Status",
+      "actions": "Actions",
+      "order": "#"
+    },
+    "status": {
+      "planned": "Planned",
+      "active": "Current",
+      "closed": "Closed",
+      "archived": "Archived"
+    },
+    "yearList": {
+      "heading": "Academic years",
+      "add": "Add year",
+      "caption": "Every academic year, newest first",
+      "empty": "No academic years yet. Add the first one.",
+      "error": "Couldn't load the academic years.",
+      "editLabel": "Edit {{name}}",
+      "deleteLabel": "Delete {{name}}"
+    },
+    "termList": {
+      "heading": "Terms",
+      "headingFor": "Terms of {{name}}",
+      "add": "Add term",
+      "caption": "The selected year's terms in order",
+      "empty": "This year has no terms yet.",
+      "noYear": "Add an academic year first.",
+      "error": "Couldn't load the terms.",
+      "editLabel": "Edit {{name}}",
+      "deleteLabel": "Delete {{name}}"
+    },
+    "yearModal": {
+      "addTitle": "Add academic year",
+      "editTitle": "Edit academic year",
+      "name": "Name",
+      "namePlaceholder": "2026–2027",
+      "code": "Code",
+      "codePlaceholder": "2026-27",
+      "codeHelper": "A short code, unique in the school.",
+      "add": "Add year",
+      "save": "Save",
+      "created": "Academic year added",
+      "updated": "Academic year saved",
+      "saveFailed": "Couldn't save the academic year"
+    },
+    "termModal": {
+      "addTitle": "Add term",
+      "editTitle": "Edit term",
+      "name": "Name",
+      "namePlaceholder": "Term 2",
+      "code": "Code",
+      "codePlaceholder": "T2",
+      "codeHelper": "A short code, unique within the year.",
+      "sequence": "Order in the year",
+      "sequenceHelper": "1 for the first term, 2 for the second, and so on.",
+      "status": "Status",
+      "add": "Add term",
+      "save": "Save",
+      "created": "Term added",
+      "updated": "Term saved",
+      "saveFailed": "Couldn't save the term"
+    },
+    "delete": {
+      "action": "Delete",
+      "title": "Delete {{name}}?",
+      "body": "Only a planned year or term can be deleted.",
+      "deleted": "Deleted",
+      "failed": "Couldn't delete it"
+    },
+    "rollover": {
+      "start": "Start this year",
+      "startLabel": "Start {{name}} as the current year",
+      "title": "Start {{name}}?",
+      "bodyWithActive": "{{name}} becomes the school's current year. {{current}} is closed, and every student's class enrolment in it is marked completed.",
+      "bodyFirst": "{{name}} becomes the school's current year.",
+      "irreversible": "This can't be undone here, so start the new year only after the old year's results are finalized.",
+      "understand": "I understand",
+      "confirm": "Start the year",
+      "done": "{{name}} is now the current year",
+      "archived_one": "{{count}} enrolment marked completed.",
+      "archived_other": "{{count}} enrolments marked completed.",
+      "failed": "Couldn't start the year"
+    }
+  },
+  "catalog": {
+    "title": "Subjects & courses",
+    "description": "The school's course catalog: every subject and the courses taught under it. Classes on the Classes page are built from these courses.",
+    "addCourse": "Add course",
+    "caption": "Subjects with their courses",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "credits": "Credits",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "inactive": "Inactive",
+      "archived": "Archived"
+    },
+    "courseCount_one": "{{count}} course",
+    "courseCount_other": "{{count}} courses",
+    "edit": "Edit",
+    "editLabel": "Edit {{name}}",
+    "removeLabel": "Remove {{name}}",
+    "empty": "No subjects yet. Add a course to create the first one.",
+    "error": "Couldn't load the catalog.",
+    "remove": {
+      "action": "Remove",
+      "title": "Remove {{name}}?",
+      "subjectBody": "A subject that already has courses is archived instead of deleted, so its courses and grades keep it.",
+      "courseBody": "A course that already has classes is archived instead of deleted, so its classes and grades keep it.",
+      "done": "Removed",
+      "failed": "Couldn't remove it"
+    },
+    "modal": {
+      "subject": {
+        "title": "Edit subject",
+        "saved": "Subject saved",
+        "saveFailed": "Couldn't save the subject"
+      },
+      "course": {
+        "title": "Edit course",
+        "saved": "Course saved",
+        "saveFailed": "Couldn't save the course"
+      },
+      "name": "Name",
+      "code": "Code",
+      "credits": "Credit hours",
+      "creditsInvalid": "Enter a number above 0.",
+      "status": "Status",
+      "statusHelper": "Only active courses are offered for new classes.",
+      "save": "Save"
+    }
   }
 }

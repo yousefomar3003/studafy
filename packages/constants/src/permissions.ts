@@ -198,6 +198,24 @@ export const PERMISSIONS = {
   STUDENT_RECORD_READ: "studentRecord:read",
   STUDENT_RECORD_UPDATE: "studentRecord:update",
   STUDENT_RECORD_READ_SENSITIVE: "studentRecord:readSensitive",
+  // Staff records: the fields a school keeps on its own staff (a qualification, a contract type, a
+  // salary, a national ID). Separate from the student and parent record permissions because the
+  // people who may read a colleague's file are not the people who may read a child's: a PRINCIPAL
+  // runs the student records but is not the employer of record, so seeing a teacher's salary or ID
+  // number stays with ORG_ADMIN. The same three-way split as studentRecord: reading the
+  // non-sensitive fields, editing, and revealing a sensitive value in full (masked by default,
+  // every reveal audited, ADR-019). Each staff member also reads their own non-sensitive fields;
+  // that is a self-service read (GET /api/me/staff-record), granted by holding a staff role
+  // (SCHOOL_STAFF_ROLES), not by a permission, exactly as reading one's own profile is.
+  STAFF_RECORD_READ: "staffRecord:read",
+  STAFF_RECORD_UPDATE: "staffRecord:update",
+  STAFF_RECORD_READ_SENSITIVE: "staffRecord:readSensitive",
+  // Class records (homeroom notes, a bus group): read by school leadership and by the class's own
+  // teachers, whose row scope is app.teaches_class (000181) and whose field scope is the "teachers"
+  // visibility. Editing is timetable:manage -- whoever builds the classes keeps their details --
+  // and building the template is recordTemplate:manage, as for every subject. No sensitive tier: a
+  // class is not a person, so its template refuses sensitive fields.
+  CLASS_RECORD_READ: "classRecord:read",
 
   TEACHER_CREATE: "teacher:create",
   TEACHER_READ: "teacher:read",
@@ -348,6 +366,10 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   // sensitive field, and the row scope is app.can_read_student -- the same predicate the student
   // profile uses -- so a teacher outside the student's classes and sections reads nothing.
   PERMISSIONS.STUDENT_RECORD_READ,
+  // Reads the teacher-visible fields of the classes they teach (a bus group, homeroom notes); the
+  // row scope app.teaches_class hides every other class's record. No staffRecord:read: a teacher
+  // reads their own staff record through the self-service read, never a colleague's.
+  PERMISSIONS.CLASS_RECORD_READ,
 ];
 
 const STUDENT_PERMISSIONS: readonly Permission[] = [
@@ -460,6 +482,14 @@ const PRINCIPAL_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.STUDENT_RECORD_READ,
   PERMISSIONS.STUDENT_RECORD_UPDATE,
   PERMISSIONS.STUDENT_RECORD_READ_SENSITIVE,
+  // Staff records: the non-sensitive fields only (a qualification, a contract type), which a head
+  // of school needs to plan cover and staffing. Not staffRecord:update -- the staff file is the
+  // employer's, kept by the school admin -- and not staffRecord:readSensitive: a colleague's
+  // salary or national ID is not the principal's to see. The service also hides sensitive fields
+  // from a principal entirely (the "standard" audience), not just their values.
+  PERMISSIONS.STAFF_RECORD_READ,
+  // Class records in full. Editing them comes with timetable:manage, which the principal holds.
+  PERMISSIONS.CLASS_RECORD_READ,
 ];
 
 // The attendance office: takes, corrects and reports attendance for the whole school, and nothing

@@ -123,6 +123,14 @@ async function stubPaymentsBackend(page: Page) {
       return fulfillJson(route, 200, CONFIRMED_PAYMENT);
     }
 
+    if (pathIs(url, `/api/finance/payments/${PAYMENT_ID}/receipt`) && method === "GET") {
+      return route.fulfill({
+        status: 200,
+        contentType: "application/pdf",
+        body: "%PDF-1.4\n%%EOF\n",
+      });
+    }
+
     return route.fallback();
   });
 
@@ -171,12 +179,19 @@ test.describe("payment recording", () => {
 
     await expect(page.getByText("Payment recorded — 500 JOD")).toBeVisible();
 
-    const receiptLink = page.getByRole("link", { name: "Open receipt" });
-    await expect(receiptLink).toBeVisible();
-    await expect(receiptLink).toHaveAttribute(
-      "href",
-      "https://erpnext.example.com/receipts/payment-1",
+    // The receipt sits behind the API's bearer auth, so it is fetched, not linked (ReceiptButton):
+    // the click opens a tab, the PDF is requested with the session's token, and the tab loads it.
+    const receiptRequest = page.waitForRequest(
+      (req) => new URL(req.url()).pathname === `/api/finance/payments/${PAYMENT_ID}/receipt`,
     );
+    // Headless Chromium has no PDF viewer, so loading the PDF into the tab arrives as a download.
+    const download = page
+      .context()
+      .waitForEvent("page")
+      .then((tab) => tab.waitForEvent("download"));
+    await page.getByRole("button", { name: "Open receipt" }).click();
+    expect((await receiptRequest).headers()["authorization"]).toMatch(/^Bearer /);
+    expect((await download).url()).toMatch(/^blob:/);
   });
 
   test("double-clicking submit does not double-record the payment", async ({ page }) => {

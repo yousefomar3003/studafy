@@ -112,6 +112,10 @@ function isoOffsetDays(days: number): string {
  * Deliberately not routed through the assignments service: these tests are about submissions, and
  * an assignment created with an already-past due_at (which is what the lateness cases need) is not
  * something that service will produce.
+ *
+ * assigned_at follows ck_assignments_lifecycle (NULL for a draft, set otherwise) and is placed a day
+ * before the earlier of now and due_at, so ck_assignments_assignment_time holds however the JS
+ * clock that computed due_at and the database clock happen to interleave.
  */
 async function seedAssignment(
   sql: Sql,
@@ -120,6 +124,8 @@ async function seedAssignment(
   teacherUserId: string,
   overrides: { dueAt?: string; allowLate?: boolean; status?: string; availableFrom?: string } = {},
 ): Promise<string> {
+  const status = overrides.status ?? "published";
+  const dueAt = overrides.dueAt ?? isoOffsetDays(7);
   const [row] = await sql<{ id: string }[]>`
     INSERT INTO app.assignments (
       school_id, class_id, created_by_user_id, last_edited_by_user_id,
@@ -127,10 +133,13 @@ async function seedAssignment(
     ) VALUES (
       ${schoolId}, ${classId}, ${teacherUserId}, ${teacherUserId},
       'Problem Set 1',
-      ${overrides.status ?? "published"}::app.assignment_status,
-      CURRENT_TIMESTAMP - interval '1 day',
+      ${status}::app.assignment_status,
+      CASE
+        WHEN ${status} = 'draft' THEN NULL
+        ELSE LEAST(CURRENT_TIMESTAMP, ${dueAt}::timestamptz) - interval '1 day'
+      END,
       ${overrides.availableFrom ?? null}::timestamptz,
-      ${overrides.dueAt ?? isoOffsetDays(7)}::timestamptz,
+      ${dueAt}::timestamptz,
       100,
       ${overrides.allowLate ?? false}
     )
@@ -954,9 +963,14 @@ describeDb("enrollment scope", () => {
       t.teacherB.userId,
     );
 
+    // 404, not the 403 SUBMISSION_NOT_ENROLLED: role_scope_visibility on app.assignments hides a
+    // class the student has never been enrolled in, so to them the assignment does not exist --
+    // the same non-disclosure rule as a draft. The 403 is for a student who still has an
+    // enrollment row in the class but not an active one (the withdrawn case below).
     await expect(submitAs(t.school.id, t.studentA.userId, otherAssignment)).rejects.toThrow(
-      /not actively enrolled/i,
+      /Assignment not found/i,
     );
+    expect(await countSubmissions(t.school.id, otherAssignment)).toBe(0);
   });
 
   test("a withdrawn student cannot resubmit but can still read their own work", async () => {

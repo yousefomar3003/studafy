@@ -51,8 +51,17 @@ export interface InvoiceLine {
   amount: number;
 }
 
+export interface InvoiceTax {
+  description: string;
+  rate: number | null;
+  amount: number;
+}
+
 export interface InvoiceDetail extends InvoiceRow {
   lines: InvoiceLine[];
+  net_total: number | null;
+  taxes: InvoiceTax[];
+  tax_registration_number: string | null;
 }
 
 export interface ListInvoicesParams {
@@ -61,6 +70,10 @@ export interface ListInvoicesParams {
   status?: InvoiceStatus;
   student_id?: string;
   search?: string;
+  issued_from?: string;
+  issued_to?: string;
+  due_from?: string;
+  due_to?: string;
 }
 
 export interface InvoiceBatchRow {
@@ -203,6 +216,38 @@ export function parseInvoiceLines(payload: unknown): InvoiceLine[] {
   return lines;
 }
 
+/**
+ * ERPNext Sales Taxes and Charges rows (`erpnext_payload.taxes`), read as defensively as the lines.
+ * A row with no usable `tax_amount` is dropped.
+ */
+export function parseInvoiceTaxes(payload: unknown): {
+  net_total: number | null;
+  taxes: InvoiceTax[];
+} {
+  if (payload === null || typeof payload !== "object") return { net_total: null, taxes: [] };
+  const record = payload as Record<string, unknown>;
+  const net = Number(record.net_total);
+  const rows = Array.isArray(record.taxes) ? record.taxes : [];
+
+  const taxes: InvoiceTax[] = [];
+  for (const row of rows) {
+    if (row === null || typeof row !== "object") continue;
+    const tax = row as Record<string, unknown>;
+    const amount = Number(tax.tax_amount);
+    if (!Number.isFinite(amount)) continue;
+    const rate = Number(tax.rate);
+    taxes.push({
+      description:
+        typeof tax.description === "string" && tax.description
+          ? tax.description
+          : String(tax.account_head ?? "Tax"),
+      rate: Number.isFinite(rate) ? rate : null,
+      amount,
+    });
+  }
+  return { net_total: record.net_total === undefined || !Number.isFinite(net) ? null : net, taxes };
+}
+
 // ---------------------------------------------------------------------------
 // Invoice list / detail
 // ---------------------------------------------------------------------------
@@ -248,6 +293,14 @@ export async function listInvoices(
         OR s.admission_number ILIKE ${`%${params.search}%`}
       )`
     : tx``;
+  // Inclusive on both ends. An invoice with no due date never matches a due-date bound.
+  const issuedFrom = params.issued_from
+    ? tx` AND ic.issued_date >= ${params.issued_from}::date`
+    : tx``;
+  const issuedTo = params.issued_to ? tx` AND ic.issued_date <= ${params.issued_to}::date` : tx``;
+  const dueFrom = params.due_from ? tx` AND ic.due_date >= ${params.due_from}::date` : tx``;
+  const dueTo = params.due_to ? tx` AND ic.due_date <= ${params.due_to}::date` : tx``;
+  const dateFilter = tx`${issuedFrom}${issuedTo}${dueFrom}${dueTo}`;
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor!);
@@ -266,12 +319,13 @@ export async function listInvoices(
       ${statusFilter}
       ${studentFilter}
       ${searchFilter}
+      ${dateFilter}
       ${cursorFilter}
     ORDER BY ic.last_synced_at DESC, ic.id DESC
     LIMIT ${limit}
   `;
 
-  const hasMore = rows.length > limit;
+  const hasMore = rows.length > params.limit;
   const sliced = hasMore ? rows.slice(0, params.limit) : rows;
   const lastRow = sliced[sliced.length - 1];
   const next_cursor =
@@ -297,7 +351,18 @@ export async function getInvoiceDetail(
     throw new CodedHttpException(404, ERROR_CODES.INVOICE_NOT_FOUND, "Invoice not found");
   }
 
-  return { ...parseInvoiceRow(row), lines: parseInvoiceLines(row.erpnext_payload) };
+  // The school's registration number as it stands now: it identifies the school, not this
+  // invoice's tax, so a later correction to it is meant to show on reprints.
+  const [tax] = await tx<{ registration_number: string | null }[]>`
+    SELECT registration_number FROM app.school_tax_settings WHERE school_id = ${schoolId}::uuid
+  `;
+
+  return {
+    ...parseInvoiceRow(row),
+    lines: parseInvoiceLines(row.erpnext_payload),
+    ...parseInvoiceTaxes(row.erpnext_payload),
+    tax_registration_number: tax?.registration_number ?? null,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -429,7 +494,7 @@ export async function listInvoiceBatches(
     LIMIT ${limit}
   `;
 
-  const hasMore = rows.length > limit;
+  const hasMore = rows.length > params.limit;
   const sliced = hasMore ? rows.slice(0, params.limit) : rows;
   const lastRow = sliced[sliced.length - 1];
   const next_cursor =
@@ -511,7 +576,7 @@ export async function getInvoiceBatchItems(
     LIMIT ${limit}
   `;
 
-  const hasMore = rows.length > limit;
+  const hasMore = rows.length > params.limit;
   const sliced = hasMore ? rows.slice(0, params.limit) : rows;
   const lastRow = sliced[sliced.length - 1];
   const next_cursor =

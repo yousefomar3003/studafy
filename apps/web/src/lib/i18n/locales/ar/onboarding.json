@@ -238,7 +238,8 @@
     "description": "إدارة إعدادات حسابك.",
     "aiLink": "مساعد الدراسة بالذكاء الاصطناعي",
     "sessionsLink": "الأجهزة والجلسات",
-    "deleteLink": "حذف الحساب"
+    "deleteLink": "حذف الحساب",
+    "staffRecordLink": "سجلي الوظيفي"
   },
   "portal": {
     "title": "البوابة",

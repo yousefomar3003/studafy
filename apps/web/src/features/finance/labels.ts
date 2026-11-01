@@ -15,11 +15,12 @@ export const PAYMENT_STATUS_LABEL_KEYS: Record<PaymentStatus, string> = {
   pending: "finance.paymentStatus.pending",
   confirmed: "finance.paymentStatus.confirmed",
   failed: "finance.paymentStatus.failed",
+  reversed: "finance.paymentStatus.reversed",
 };
 
 /** `dashboard-tile__status-pill` tone for a payment's ERPNext confirmation status. */
 export function paymentStatusTone(status: PaymentStatus): "success" | "warning" | "danger" {
   if (status === "confirmed") return "success";
-  if (status === "failed") return "danger";
+  if (status === "failed" || status === "reversed") return "danger";
   return "warning";
 }

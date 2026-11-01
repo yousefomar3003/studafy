@@ -25,6 +25,7 @@ const REFUND = {
   amount_minor: 100000,
   currency: "JOD",
   currency_minor_unit: 3,
+  kind: "credit_note",
   reason_code: "overpayment",
   reason_notes: null,
   status: "pending_approval",
@@ -126,7 +127,7 @@ describe("refund screens accessibility", () => {
       "/portal/finance/adjustments/refunds",
       "/portal/finance/adjustments/refunds",
     );
-    await screen.findByRole("heading", { name: "Refunds" });
+    await screen.findByRole("heading", { name: "Refunds and corrections" });
     await screen.findByText("ACC-SINV-2026-00001");
 
     await expectNoA11yViolations(container);
@@ -155,7 +156,7 @@ describe("refund screens accessibility", () => {
       "/portal/finance/adjustments/refunds/new",
       "/portal/finance/adjustments/refunds/new",
     );
-    await screen.findByRole("heading", { name: "Request a refund" });
+    await screen.findByRole("heading", { name: "Request a refund or credit note" });
 
     fireEvent.change(screen.getByLabelText("Invoice", { exact: false }), {
       target: { value: "Layla" },

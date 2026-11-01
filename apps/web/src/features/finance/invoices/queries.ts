@@ -28,6 +28,11 @@ export interface InvoiceFilters {
   /** Matched server-side against the invoice number first (exact, indexed), then the student's
    * name/admission number — see `listInvoices`'s doc comment in the API's `service.ts`. */
   search: string;
+  /** Inclusive YYYY-MM-DD bounds; absent or `""` leaves a bound off. */
+  issuedFrom?: string;
+  issuedTo?: string;
+  dueFrom?: string;
+  dueTo?: string;
 }
 
 /**
@@ -46,6 +51,10 @@ export async function fetchInvoicesPage(
         cursor,
         status: (filters.status || undefined) as "draft" | "submitted" | "cancelled" | undefined,
         search: filters.search || undefined,
+        issued_from: filters.issuedFrom || undefined,
+        issued_to: filters.issuedTo || undefined,
+        due_from: filters.dueFrom || undefined,
+        due_to: filters.dueTo || undefined,
       },
     },
   });
@@ -74,6 +83,19 @@ export async function fetchInvoice(invoiceId: string): Promise<InvoiceDetail> {
 // Batch generation — polled from `InvoiceBatchPage`'s progress panel while the batch is
 // pending/processing.
 // ---------------------------------------------------------------------------
+
+/** One page of past batch runs, newest first, for `InvoiceBatchHistoryPage`. */
+export async function fetchInvoiceBatchesPage(
+  cursor: string | undefined,
+): Promise<CursorPage<InvoiceBatch>> {
+  const { data } = await api.GET("/api/finance/invoices/batches", {
+    params: { query: { limit: PAGE_SIZE, cursor } },
+  });
+  return {
+    items: (data?.invoice_batches ?? []) as InvoiceBatch[],
+    nextCursor: data?.next_cursor ?? undefined,
+  };
+}
 
 export function invoiceBatchQueryKey(batchId: string) {
   return ["finance", "invoices", "batches", batchId] as const;

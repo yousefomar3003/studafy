@@ -9,10 +9,13 @@
  *   TEST_DATABASE_URL=postgres://... bun test src/modules/academics/__tests__/exam-service
  */
 
+import { ROLES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 
 import {
+  assignRole,
+  createUser,
   createTestDatabase,
   migrateDatabase,
   createSchool,
@@ -26,6 +29,7 @@ import {
   integrationEnabled,
   type TestDatabase,
 } from "../../../../tests/harness";
+import { withTenantTx } from "../../../db/tenant-tx";
 import {
   listExams,
   getExamById,
@@ -63,13 +67,25 @@ afterAll(async () => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function withTx<T>(fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
-  let result: T | undefined;
-  await db.sql.begin(async (tx) => {
-    await tx`SELECT set_config('role', 'studafy_app', true)`;
-    result = await fn(tx);
+const schoolAdmins = new Map<string, string>();
+
+/** A school admin of `schoolId`, created on first use: the app always acts as a signed-in user,
+ * and the row-level security policies read that user's roles. */
+async function adminOf(schoolId: string): Promise<string> {
+  const known = schoolAdmins.get(schoolId);
+  if (known) return known;
+  const admin = await createUser(db.sql, schoolId, {
+    email: `admin-${crypto.randomUUID().slice(0, 8)}@test.local`,
   });
-  return result as T;
+  await assignRole(db.sql, schoolId, admin.id, ROLES.ORG_ADMIN);
+  schoolAdmins.set(schoolId, admin.id);
+  return admin.id;
+}
+
+/** Runs `fn` exactly as a request does: through the app's own `withTenantTx`, as `studafy_app`,
+ * scoped to `schoolId` and signed in as that school's admin. */
+async function withTx<T>(schoolId: string, fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
+  return withTenantTx(db.sql, { schoolId, userId: await adminOf(schoolId) }, fn);
 }
 
 /** Build an ISO-8601 datetime string for the given weekday in the current week. */
@@ -109,7 +125,7 @@ describeDb("exam service", () => {
     const startsAt = weekdayDate(1, 9);
     const endsAt = weekdayDate(1, 11);
 
-    const result = await withTx((tx) =>
+    const result = await withTx(school.id, (tx) =>
       createExam(tx, school.id, teacher.userId, {
         class_id: cls.id,
         title: "Midterm Mathematics",
@@ -138,7 +154,7 @@ describeDb("exam service", () => {
     const teacher = await createTeacher(db.sql, school.id);
 
     await expect(
-      withTx((tx) =>
+      withTx(school.id, (tx) =>
         createExam(tx, school.id, teacher.userId, {
           class_id: "00000000-0000-0000-0000-000000000000",
           title: "Bad Class Exam",
@@ -167,7 +183,7 @@ describeDb("exam service", () => {
     });
 
     await expect(
-      withTx((tx) =>
+      withTx(school.id, (tx) =>
         createExam(tx, school.id, teacher.userId, {
           class_id: cls.id,
           title: "Bad Room Exam",
@@ -182,7 +198,7 @@ describeDb("exam service", () => {
 
   test("getExamById returns undefined for non-existent ID", async () => {
     const school = await createSchool(db.sql);
-    const result = await withTx((tx) =>
+    const result = await withTx(school.id, (tx) =>
       getExamById(tx, school.id, "00000000-0000-0000-0000-000000000000"),
     );
     expect(result).toBeUndefined();
@@ -204,7 +220,7 @@ describeDb("exam service", () => {
       roomId: room.id,
     });
 
-    await withTx((tx) =>
+    await withTx(school.id, (tx) =>
       createExam(tx, school.id, teacher.userId, {
         class_id: cls.id,
         title: "Exam 1",
@@ -213,7 +229,7 @@ describeDb("exam service", () => {
         max_score: 100,
       }),
     );
-    await withTx((tx) =>
+    await withTx(school.id, (tx) =>
       createExam(tx, school.id, teacher.userId, {
         class_id: cls.id,
         title: "Exam 2",
@@ -223,7 +239,7 @@ describeDb("exam service", () => {
       }),
     );
 
-    const { rows, total } = await withTx((tx) =>
+    const { rows, total } = await withTx(school.id, (tx) =>
       listExams(tx, school.id, { class_id: cls.id, limit: 1, offset: 0 }),
     );
     expect(total).toBe(2);
@@ -246,7 +262,7 @@ describeDb("exam service", () => {
       roomId: room.id,
     });
 
-    await withTx((tx) =>
+    await withTx(school.id, (tx) =>
       createExam(tx, school.id, teacher.userId, {
         class_id: cls.id,
         title: "Draft Exam",
@@ -256,7 +272,7 @@ describeDb("exam service", () => {
         status: "draft",
       }),
     );
-    await withTx((tx) =>
+    await withTx(school.id, (tx) =>
       createExam(tx, school.id, teacher.userId, {
         class_id: cls.id,
         title: "Scheduled Exam",
@@ -267,7 +283,7 @@ describeDb("exam service", () => {
       }),
     );
 
-    const { total } = await withTx((tx) =>
+    const { total } = await withTx(school.id, (tx) =>
       listExams(tx, school.id, { class_id: cls.id, status: "draft", limit: 10, offset: 0 }),
     );
     expect(total).toBe(1);
@@ -289,7 +305,7 @@ describeDb("exam service", () => {
       roomId: room.id,
     });
 
-    const created = await withTx((tx) =>
+    const created = await withTx(school.id, (tx) =>
       createExam(tx, school.id, teacher.userId, {
         class_id: cls.id,
         title: "Original Title",
@@ -299,7 +315,7 @@ describeDb("exam service", () => {
       }),
     );
 
-    const result = await withTx((tx) =>
+    const result = await withTx(school.id, (tx) =>
       updateExam(tx, school.id, created.exam.id, teacher.userId, {
         title: "Updated Title",
         weight: 3,
@@ -326,7 +342,7 @@ describeDb("exam service", () => {
       roomId: room.id,
     });
 
-    const created = await withTx((tx) =>
+    const created = await withTx(school.id, (tx) =>
       createExam(tx, school.id, teacher.userId, {
         class_id: cls.id,
         title: "Draft Exam",
@@ -338,7 +354,7 @@ describeDb("exam service", () => {
     );
 
     await expect(
-      withTx((tx) =>
+      withTx(school.id, (tx) =>
         updateExam(tx, school.id, created.exam.id, teacher.userId, {
           status: "closed",
         }),
@@ -362,7 +378,7 @@ describeDb("exam service", () => {
       roomId: room.id,
     });
 
-    const created = await withTx((tx) =>
+    const created = await withTx(school.id, (tx) =>
       createExam(tx, school.id, teacher.userId, {
         class_id: cls.id,
         title: "To Delete",
@@ -372,8 +388,8 @@ describeDb("exam service", () => {
       }),
     );
 
-    await withTx((tx) => deleteExam(tx, school.id, created.exam.id));
-    const result = await withTx((tx) => getExamById(tx, school.id, created.exam.id));
+    await withTx(school.id, (tx) => deleteExam(tx, school.id, created.exam.id));
+    const result = await withTx(school.id, (tx) => getExamById(tx, school.id, created.exam.id));
     expect(result).toBeUndefined();
   });
 
@@ -381,7 +397,7 @@ describeDb("exam service", () => {
     const school = await createSchool(db.sql);
 
     await expect(
-      withTx((tx) => deleteExam(tx, school.id, "00000000-0000-0000-0000-000000000000")),
+      withTx(school.id, (tx) => deleteExam(tx, school.id, "00000000-0000-0000-0000-000000000000")),
     ).rejects.toThrow();
   });
 
@@ -401,7 +417,7 @@ describeDb("exam service", () => {
       roomId: room.id,
     });
 
-    const created = await withTx((tx) =>
+    const created = await withTx(school.id, (tx) =>
       createExam(tx, school.id, teacher.userId, {
         class_id: cls.id,
         title: "Open Exam",
@@ -413,20 +429,20 @@ describeDb("exam service", () => {
     );
 
     // Transition draft -> scheduled -> open
-    const updated = await withTx((tx) =>
+    const updated = await withTx(school.id, (tx) =>
       updateExam(tx, school.id, created.exam.id, teacher.userId, {
         status: "scheduled",
       }),
     );
-    await withTx((tx) =>
+    await withTx(school.id, (tx) =>
       updateExam(tx, school.id, updated.exam.id, teacher.userId, {
         status: "open",
       }),
     );
 
-    await expect(withTx((tx) => deleteExam(tx, school.id, created.exam.id))).rejects.toThrow(
-      "Only draft or scheduled exams can be deleted",
-    );
+    await expect(
+      withTx(school.id, (tx) => deleteExam(tx, school.id, created.exam.id)),
+    ).rejects.toThrow("Only draft or scheduled exams can be deleted");
   });
 });
 
@@ -464,20 +480,22 @@ describeDb("timetable conflict detection", () => {
       VALUES (${school.id}, ${version!.id}, ${cls.id}, ${teacher.id}, ${room.id}, 1::smallint, 2::smallint)
     `;
 
-    // Approve the version (bypass trigger by going direct as admin)
+    // Approve the version the only way app.enforce_timetable_version_transition allows: submit it
+    // (draft -> pending), then approve it (pending -> approved). The trigger stamps the times.
     await db.sql`
       UPDATE app.timetable_versions
-      SET status = 'approved',
-          submitted_at = CURRENT_TIMESTAMP,
-          submitted_by_user_id = ${teacher.userId},
-          approved_at = CURRENT_TIMESTAMP,
-          approved_by_user_id = ${teacher.userId}
+      SET status = 'pending', submitted_by_user_id = ${teacher.userId}
+      WHERE id = ${version!.id} AND school_id = ${school.id}
+    `;
+    await db.sql`
+      UPDATE app.timetable_versions
+      SET status = 'approved', approved_by_user_id = ${teacher.userId}
       WHERE id = ${version!.id} AND school_id = ${school.id}
     `;
 
     // Check conflicts for a Monday exam (weekday=1)
     const mondayDate = weekdayDate(1, 9);
-    const warnings = await withTx((tx) =>
+    const warnings = await withTx(school.id, (tx) =>
       checkTimetableConflicts(tx, school.id, cls.id, null, new Date(mondayDate)),
     );
 
@@ -528,19 +546,21 @@ describeDb("timetable conflict detection", () => {
       VALUES (${school.id}, ${version!.id}, ${cls2.id}, ${teacher.id}, ${room.id}, 1::smallint, 3::smallint)
     `;
 
+    // Submit, then approve: the only path app.enforce_timetable_version_transition allows.
     await db.sql`
       UPDATE app.timetable_versions
-      SET status = 'approved',
-          submitted_at = CURRENT_TIMESTAMP,
-          submitted_by_user_id = ${teacher.userId},
-          approved_at = CURRENT_TIMESTAMP,
-          approved_by_user_id = ${teacher.userId}
+      SET status = 'pending', submitted_by_user_id = ${teacher.userId}
+      WHERE id = ${version!.id} AND school_id = ${school.id}
+    `;
+    await db.sql`
+      UPDATE app.timetable_versions
+      SET status = 'approved', approved_by_user_id = ${teacher.userId}
       WHERE id = ${version!.id} AND school_id = ${school.id}
     `;
 
     // Exam for cls1 in room1 on Monday — cls2 also uses room1 on Monday
     const mondayDate = weekdayDate(1, 9);
-    const warnings = await withTx((tx) =>
+    const warnings = await withTx(school.id, (tx) =>
       checkTimetableConflicts(tx, school.id, cls1.id, room.id, new Date(mondayDate)),
     );
 
@@ -568,7 +588,7 @@ describeDb("timetable conflict detection", () => {
     });
 
     const mondayDate = weekdayDate(1, 9);
-    const warnings = await withTx((tx) =>
+    const warnings = await withTx(school.id, (tx) =>
       checkTimetableConflicts(tx, school.id, cls.id, null, new Date(mondayDate)),
     );
 

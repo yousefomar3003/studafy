@@ -174,6 +174,59 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
       gatewayConfirm: false,
     },
   ],
+  // The file behind a document field on a staff member's record (000181): a teaching licence, a
+  // signed contract. Uploaded by whoever edits staff records (staffRecord:update, ORG_ADMIN) and
+  // confirmed by the records module inside the write that attaches it. Same types and cap as
+  // record.document; a sensitive one is staffRecord.sensitiveDocument.
+  [
+    "staffRecord.document",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png", "image/heic"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.STAFF_RECORD_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
+  // A sensitive document on a staff record (an ID card scan, a medical certificate): as
+  // record.sensitiveDocument -- PDF and two image types, a 5 MiB cap, the sensitive-documents KMS
+  // key, one-minute audited downloads that need staffRecord:readSensitive (ADR-019).
+  [
+    "staffRecord.sensitiveDocument",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png"]),
+      maxSizeBytes: 5 * MIB,
+      requiredPermission: PERMISSIONS.STAFF_RECORD_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
+  // The file behind a document field on a class's record (a seating plan, a trip consent sheet).
+  // Uploaded by whoever keeps the classes (timetable:manage) and confirmed by the records module.
+  // A class field is never sensitive, so there is no sensitive variant.
+  [
+    "classRecord.document",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png", "image/heic"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.TIMETABLE_MANAGE,
+      gatewayConfirm: false,
+    },
+  ],
+  // The original file a school uploaded to the student import (000179), kept so nothing in it is
+  // lost: staff map its unmapped columns later without a re-upload, and download it back. Staged
+  // through the generic request-upload route, then confirmed by the import upload itself, which
+  // checks the stored bytes are the bytes it parsed and promotes them under the sensitive-documents
+  // KMS key: a school's file can hold ID numbers and medical notes. The web client always sends
+  // text/csv. Readable only with student:import, through a one-minute audited URL.
+  [
+    "import.source",
+    {
+      allowedContentTypes: new Set(["text/csv"]),
+      // A 10,000-row export with many columns can pass 10 MiB; the row cap is the real limit.
+      maxSizeBytes: 25 * MIB,
+      requiredPermission: PERMISSIONS.STUDENT_IMPORT,
+      gatewayConfirm: false,
+    },
+  ],
   [
     "user.avatar",
     {

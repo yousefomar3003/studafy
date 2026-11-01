@@ -30,6 +30,11 @@
       "where": "Account › Delete account",
       "keywords": "delete account, close account, remove my data, erase, privacy, gdpr, deactivate"
     },
+    "my-staff-record": {
+      "title": "My staff record",
+      "where": "Account › My staff record",
+      "keywords": "my record, staff record, my file, qualifications, contract, employment details, personnel file"
+    },
     "help": {
       "title": "Help center",
       "where": "Help",
@@ -69,6 +74,11 @@
       "title": "AI usage",
       "where": "Studafy platform › AI usage",
       "keywords": "ai usage, tokens, model cost, ai spend, llm, ai budget, assistant usage"
+    },
+    "platform-import-signals": {
+      "title": "Unused import columns",
+      "where": "Platform › Import columns",
+      "keywords": "import columns, unmapped headers, unused columns, product signal, csv headers, schools import"
     },
     "platform-plans": {
       "title": "Plans & pricing",
@@ -170,6 +180,11 @@
       "where": "Admin › Students › Import",
       "keywords": "import, csv, excel, spreadsheet, upload students, bulk add, student list file, migrate data"
     },
+    "import-history": {
+      "title": "Import history",
+      "where": "Admin › Students › Import history",
+      "keywords": "import history, past imports, original file, download csv, unmapped columns, unused columns, extra columns, map columns, uploaded files"
+    },
     "build-timetable": {
       "title": "Build the timetable",
       "where": "Admin › Timetable",
@@ -193,7 +208,7 @@
     "build-record-templates": {
       "title": "Build record templates",
       "where": "Admin › Settings › Records",
-      "keywords": "record templates, custom fields, student form, parent form, medical information, emergency contact, data fields, registration form"
+      "keywords": "record templates, custom fields, student form, parent form, medical information, emergency contact, data fields, registration form, staff form, class form, staff record, class record, qualification, contract type"
     },
     "missing-information": {
       "title": "Missing information",
@@ -308,7 +323,7 @@
     "build-record-templates-principal": {
       "title": "Build record templates",
       "where": "Principal › School › Records",
-      "keywords": "record templates, custom fields, student form, parent form, medical information, emergency contact, data fields, registration form"
+      "keywords": "record templates, custom fields, student form, parent form, medical information, emergency contact, data fields, registration form, staff form, class form, staff record, class record, qualification, contract type"
     },
     "missing-information-principal": {
       "title": "Missing information",
@@ -411,9 +426,9 @@
       "keywords": "record payment, receive payment, cash payment, bank transfer, receipt, collect fees, pay invoice"
     },
     "refunds": {
-      "title": "Refunds",
+      "title": "Refunds and corrections",
       "where": "Finance › Refunds",
-      "keywords": "refunds, refund list, pending refunds, approve refund, refund status, money returned"
+      "keywords": "refunds, refund list, pending refunds, approve refund, refund status, money returned, cancel invoice, void invoice, write off, bad debt, reverse payment, undo payment, corrections"
     },
     "issue-refund": {
       "title": "Issue a refund",
@@ -444,6 +459,56 @@
       "title": "Record an expense",
       "where": "Finance › Expenses › New",
       "keywords": "record expense, new expense, add expense, purchase, receipt, spending, petty cash, supplier bill"
+    },
+    "invoice-batches": {
+      "title": "Invoice batch history",
+      "where": "Finance › Invoices › Batches",
+      "keywords": "batch history, past batches, invoice runs, failed invoices, billing run, generated invoices, batch results"
+    },
+    "tax-settings": {
+      "title": "Sales tax (VAT) settings",
+      "where": "Finance › Settings › Tax",
+      "keywords": "vat, tax, sales tax, tax rate, trn, tax registration number, tax exempt, zero-rated, value added tax"
+    },
+    "school-years": {
+      "title": "School years & terms",
+      "where": "Principal › School years & terms",
+      "keywords": "academic year, school year, terms, semesters, term dates, add term, term 2, edit year, year dates, quarters, trimesters"
+    },
+    "start-new-school-year": {
+      "title": "Start a new school year",
+      "where": "Principal › School years & terms",
+      "keywords": "rollover, roll over, new academic year, next year, end of year, close year, promote year, year end, start year"
+    },
+    "audit-log": {
+      "title": "Audit log",
+      "where": "Admin › Audit log",
+      "keywords": "audit log, audit trail, activity log, history, who changed, changes, logins, export audit, security log, compliance"
+    },
+    "privacy-requests": {
+      "title": "Privacy requests",
+      "where": "Admin › Privacy requests",
+      "keywords": "privacy, GDPR, data request, export data, erase data, delete personal data, right to be forgotten, subject access request, DSR, data protection"
+    },
+    "ai-content-reports": {
+      "title": "AI content reports",
+      "where": "Admin › AI content reports",
+      "keywords": "AI reports, AI moderation, reported AI answer, safety filter, child safety, safeguarding, harmful content, flagged content, AI review queue"
+    },
+    "report-incident": {
+      "title": "Report a discipline incident",
+      "where": "Principal › Discipline",
+      "keywords": "report incident, new incident, behaviour, behavior, misconduct, fight, bullying, cheating, discipline report, log incident"
+    },
+    "subjects-courses": {
+      "title": "Subjects & courses",
+      "where": "Principal › Subjects & courses",
+      "keywords": "subjects, courses, course catalog, curriculum, rename subject, archive course, credit hours, course codes, edit subject"
+    },
+    "teacher-employment": {
+      "title": "Teachers' employment",
+      "where": "Admin › Teachers",
+      "keywords": "teachers, staff, employee number, on leave, hire date, end date, teacher left, suspend teacher, employment status, HR"
     }
   }
 }

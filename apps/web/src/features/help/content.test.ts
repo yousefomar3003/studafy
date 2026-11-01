@@ -378,6 +378,8 @@ describe("published docs", () => {
       "create-invoice-batch",
       "record-payment",
       "issue-refund",
+      "correct-invoice-or-payment",
+      "payment-plans-and-vat",
       "subscriptions",
     ]);
     for (const article of articles) {
@@ -401,6 +403,7 @@ describe("published docs", () => {
       "create-invoice-batch": "create-invoice-batch",
       "record-payment": "record-payment",
       "issue-refund": "issue-refund",
+      "payment-plans-and-vat": "add-fee-structure",
     });
   });
 

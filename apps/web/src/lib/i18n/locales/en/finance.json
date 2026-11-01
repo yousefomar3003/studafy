@@ -45,7 +45,8 @@
   "paymentStatus": {
     "pending": "Pending",
     "confirmed": "Confirmed",
-    "failed": "Failed"
+    "failed": "Failed",
+    "reversed": "Reversed"
   },
   "dashboard": {
     "title": "Finance overview",
@@ -59,7 +60,8 @@
       "scholarships": "Scholarships →",
       "reports": "Reports →",
       "expenses": "Expenses →",
-      "families": "Families →"
+      "families": "Families →",
+      "tax": "Sales tax (VAT)"
     }
   },
   "overdue": {
@@ -136,7 +138,12 @@
       "invoiceNumber": "Invoice #",
       "caption": "Invoices",
       "loadError": "Unable to load invoices.",
-      "empty": "No invoices match this filter."
+      "empty": "No invoices match this filter.",
+      "batchHistory": "Batch history",
+      "issuedFrom": "Issued from",
+      "issuedTo": "Issued to",
+      "dueFrom": "Due from",
+      "dueTo": "Due to"
     },
     "detail": {
       "loadError": "Couldn't load this invoice. Please try again.",
@@ -148,7 +155,13 @@
       "noLines": "No line items on this invoice.",
       "feeCategory": "Fee category",
       "lineDescription": "Description",
-      "quantity": "Qty"
+      "quantity": "Qty",
+      "cancelInvoice": "Cancel invoice",
+      "creditNote": "Credit note",
+      "writeOff": "Write off balance",
+      "taxRegistration": "Tax registration number",
+      "netTotal": "Net total",
+      "corrections": "Refunds and corrections"
     },
     "batch": {
       "title": "Generate invoices",
@@ -192,6 +205,19 @@
         "back": "Go back",
         "confirm": "Generate anyway"
       }
+    },
+    "history": {
+      "title": "Invoice batch history",
+      "intro": "Every batch run, newest first. Open one to see which students were billed and which failed.",
+      "caption": "Invoice batch runs",
+      "started": "Started",
+      "period": "Billing period",
+      "feeStructure": "Fee structure",
+      "results": "Results",
+      "counts": "{{succeeded}} of {{total}} billed · {{failed}} failed",
+      "loadError": "Unable to load batch runs.",
+      "empty": "No batch has been run yet.",
+      "detailTitle": "Invoice batch"
     }
   },
   "payments": {
@@ -201,7 +227,17 @@
       "receipt": "Receipt",
       "caption": "Payments",
       "loadError": "Unable to load payments.",
-      "empty": "No payments match this filter."
+      "empty": "No payments match this filter.",
+      "allMethods": "All methods",
+      "actions": "Actions",
+      "reverse": "Reverse",
+      "search": "Search",
+      "searchPlaceholder": "Payment or invoice number, student name or ID",
+      "dateFrom": "Paid from",
+      "dateTo": "Paid to",
+      "noConfirmedTotal": "No confirmed payments match these filters.",
+      "confirmedTotal_one": "Confirmed: {{amount}} {{currency}} from {{count}} payment",
+      "confirmedTotal_other": "Confirmed: {{amount}} {{currency}} from {{count}} payments"
     },
     "record": {
       "back": "← Back to payments",
@@ -301,6 +337,33 @@
       "scholarships": "Scholarships ({{names}})",
       "noScholarships": "No approved scholarships",
       "studentTotal": "Total for {{name}}"
+    },
+    "plan": {
+      "title": "Payment plan",
+      "intro": "Split this structure into installments for the students it is for. ERPNext divides the total over the due dates.",
+      "notSubmitted": "Submit this structure in ERPNext before scheduling installments.",
+      "noStudents": "Save the students this structure is for first.",
+      "forStudents_one": "For {{count}} student.",
+      "forStudents_other": "For {{count}} students.",
+      "scheduleTypeLabel": "Schedule",
+      "scheduleType": {
+        "term_wise": "By term",
+        "monthly": "Monthly",
+        "quarterly": "Quarterly",
+        "yearly": "Yearly"
+      },
+      "dueDates": "Due dates",
+      "dueDate": "Due date {{number}}",
+      "addDate": "Add a due date",
+      "removeDate": "Remove",
+      "duplicateDate": "Each due date can be used once.",
+      "generate": "Create installments",
+      "error": "The installments could not be created.",
+      "createdToast_one": "{{count}} installment created",
+      "createdToast_other": "{{count}} installments created",
+      "created_one": "{{count}} installment created.",
+      "created_other": "{{count}} installments created.",
+      "viewOverdue": "View overdue installments"
     }
   },
   "expenses": {
@@ -339,7 +402,12 @@
       "loadError": "Unable to load this expense.",
       "label": "Expense detail",
       "viewReceipt": "View receipt",
-      "noReceipt": "No receipt attached."
+      "noReceipt": "No receipt attached.",
+      "edit": "Edit expense",
+      "attachReceipt": "Attach a receipt",
+      "uploading": "Uploading…",
+      "attachedToast": "Receipt attached",
+      "attachError": "The receipt could not be attached."
     },
     "new": {
       "title": "Record an expense",
@@ -360,6 +428,12 @@
     "import": {
       "title": "Import expenses",
       "amountPositive": "Amount must be greater than zero."
+    },
+    "edit": {
+      "label": "Edit expense",
+      "save": "Save changes",
+      "savedToast": "Expense updated",
+      "error": "The expense could not be updated."
     }
   },
   "invoiceStatus": {
@@ -529,6 +603,28 @@
     "unlinked": {
       "summary": "Not in any family — enrolled students with no guardian: {{students}} · parents with no children: {{parents}}.",
       "review": "Review and link them"
+    },
+    "manage": {
+      "title": "Manage household",
+      "intro": "Rename the family, choose who invoices are addressed to, or move a child's guardian to another household.",
+      "name": "Family name",
+      "primary": "Primary guardian",
+      "save": "Save",
+      "savedToast": "Household updated",
+      "saveError": "The household could not be updated.",
+      "links": "Guardians and children",
+      "noLinks": "No one is linked to this family any more.",
+      "delete": "Delete family",
+      "deletedToast": "Family deleted",
+      "deleteError": "The family could not be deleted.",
+      "link": "{{guardian}} → {{child}}",
+      "move": "Move",
+      "remove": "Remove",
+      "moveTo": "Move {{link}} to the family named",
+      "movedToast": "Moved to the other family",
+      "moveError": "The link could not be moved.",
+      "removedToast": "Link removed",
+      "removeError": "The link could not be removed."
     }
   },
   "unlinked": {
@@ -568,5 +664,57 @@
       "partial_one": "{{count}} child was linked before the error.",
       "partial_other": "{{count}} children were linked before the error."
     }
+  },
+  "studentAccount": {
+    "loadError": "Unable to load this student's account.",
+    "owed": "Owed",
+    "noFamily": "No family linked",
+    "kind": "Type",
+    "invoices": "Invoices",
+    "noInvoices": "No invoices yet.",
+    "installments": "Installment plan",
+    "noInstallments": "No installments scheduled.",
+    "installmentsError": "Unable to load installments.",
+    "payments": "Payments",
+    "noPayments": "No payments yet.",
+    "corrections": "Refunds and corrections",
+    "noCorrections": "None requested.",
+    "correctionsError": "Unable to load refunds and corrections.",
+    "installmentStatus": {
+      "pending": "Pending",
+      "partially_paid": "Partly paid",
+      "paid": "Paid",
+      "overdue": "Overdue"
+    },
+    "status": {
+      "applicant": "Applicant",
+      "enrolled": "Enrolled",
+      "suspended": "Suspended",
+      "graduated": "Graduated",
+      "withdrawn": "Withdrawn",
+      "archived": "Archived"
+    }
+  },
+  "taxSettings": {
+    "title": "Sales tax (VAT)",
+    "intro": "Whether invoices carry VAT, at what rate, and which fees are exempt. Off unless the school turns it on.",
+    "readOnly": "Only a school admin can change these settings.",
+    "enabled": "Charge tax on new invoices",
+    "name": "Tax name on invoices",
+    "rate": "Rate",
+    "rateInvalid": "Enter a rate between 0 and 100.",
+    "account": "ERPNext tax account",
+    "accountHelp": "The account the tax posts to, e.g. VAT 5% - SCH.",
+    "registration": "Tax registration number",
+    "registrationHelp": "Printed on invoices and receipts.",
+    "inclusive": "Fee amounts already include tax",
+    "exempt": "Exempt fee categories",
+    "exemptHelp": "One fee category per line (as named in ERPNext). These lines are not taxed.",
+    "needRateAndAccount": "Turning tax on needs a rate above 0 and the ERPNext tax account.",
+    "notRetroactive": "Changes apply to invoices generated from now on. Issued invoices are not changed; correct one with a credit note.",
+    "save": "Save tax settings",
+    "savedToast": "Tax settings saved",
+    "saveError": "The tax settings could not be saved.",
+    "loadError": "Unable to load the tax settings."
   }
 }

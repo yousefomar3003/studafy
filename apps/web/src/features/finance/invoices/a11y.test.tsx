@@ -5,7 +5,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, mock, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { AuthProvider } from "../../../lib/auth";
 import { expectNoA11yViolations } from "../../../lib/test/axe";
+import { createTestSessionStore } from "../../../lib/test/session";
 
 import type { ComponentType } from "react";
 
@@ -33,6 +35,9 @@ const INVOICE = {
 const INVOICE_DETAIL = {
   ...INVOICE,
   lines: [{ fee_category: "Tuition", description: null, quantity: 1, amount: 1000 }],
+  net_total: 1000,
+  taxes: [{ description: "VAT 5%", rate: 5, amount: 50 }],
+  tax_registration_number: "100234567800003",
 };
 
 const FEE_STRUCTURE = {
@@ -69,20 +74,24 @@ mock.module("../../../lib/api", () => ({
   api: { GET: getMock, POST: mock(() => Promise.resolve({ data: undefined })) },
 }));
 
-function renderInPortal(Page: ComponentType, initialPath: string, routePath: string) {
+async function renderInPortal(Page: ComponentType, initialPath: string, routePath: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  // FINANCE: the pages check `billing:update` before offering corrections.
+  const store = await createTestSessionStore(["FINANCE"]);
   return render(
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <MemoryRouter initialEntries={[initialPath]}>
-          <main>
-            <Routes>
-              <Route path={routePath} element={<Page />} />
-            </Routes>
-          </main>
-        </MemoryRouter>
-      </ToastProvider>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <MemoryRouter initialEntries={[initialPath]}>
+            <main>
+              <Routes>
+                <Route path={routePath} element={<Page />} />
+              </Routes>
+            </main>
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -94,7 +103,7 @@ afterEach(() => {
 describe("invoice screens accessibility", () => {
   test("invoice list, populated", async () => {
     const Page = (await import("./InvoiceListPage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/invoices",
       "/portal/finance/invoices",
@@ -107,7 +116,7 @@ describe("invoice screens accessibility", () => {
 
   test("invoice detail", async () => {
     const Page = (await import("./InvoiceDetailPage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/invoices/invoice-1",
       "/portal/finance/invoices/:invoiceId",
@@ -119,7 +128,7 @@ describe("invoice screens accessibility", () => {
 
   test("batch generation form", async () => {
     const Page = (await import("./InvoiceBatchPage")).default;
-    const { container } = renderInPortal(
+    const { container } = await renderInPortal(
       Page,
       "/portal/finance/invoices/batches/new",
       "/portal/finance/invoices/batches/new",

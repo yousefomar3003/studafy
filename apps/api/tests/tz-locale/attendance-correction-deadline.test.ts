@@ -100,7 +100,8 @@ const cases: Case[] = [
   {
     zone: "Europe/London",
     sessionDate: "2026-10-25",
-    deadlineUtc: "2026-10-27T00:00:00.000Z",
+    // Local midnight is still BST (2026-10-24T23:00Z); +48 real hours lands at 23:00 GMT.
+    deadlineUtc: "2026-10-26T23:00:00.000Z",
     deadlineLocalLabel: "2026-10-26 23:00 GMT",
   },
   // Europe/Berlin — EU (CET/CEST)
@@ -113,7 +114,8 @@ const cases: Case[] = [
   {
     zone: "Europe/Berlin",
     sessionDate: "2026-10-25",
-    deadlineUtc: "2026-10-26T23:00:00.000Z",
+    // Local midnight is still CEST (2026-10-24T22:00Z); +48 real hours lands at 23:00 CET.
+    deadlineUtc: "2026-10-26T22:00:00.000Z",
     deadlineLocalLabel: "2026-10-26 23:00 CET",
   },
   // Controls — no DST: local deadline is exactly "00:00 two calendar days later", always

@@ -100,6 +100,34 @@ async function seedTenant(sql: Sql) {
   return { school, teacherA, teacherB, class: cls, student, term, year, subject, course, room };
 }
 
+/**
+ * Seed active categories straight into the table, past the service's weight check. The service
+ * requires active weights to total exactly 100% after every single change
+ * (docs/api/gradebook-config-api.md "Weight validation"), so a gradebook with more than one category
+ * cannot be built one service call at a time. A test that starts from such a gradebook seeds it here,
+ * then exercises the one operation it is about through the service.
+ */
+async function seedCategories(
+  schoolId: string,
+  userId: string,
+  gradebookId: string,
+  rows: { name: string; weight: number; sort_order?: number }[],
+): Promise<{ id: string }[]> {
+  return asUser(schoolId, userId, async (tx) => {
+    const created: { id: string }[] = [];
+    for (const row of rows) {
+      const [inserted] = await tx<{ id: string }[]>`
+        INSERT INTO app.assessment_categories (school_id, gradebook_id, name, weight, sort_order)
+        VALUES (${schoolId}::uuid, ${gradebookId}::uuid, ${row.name}, ${row.weight}::numeric(5,2),
+                ${row.sort_order ?? 0})
+        RETURNING id
+      `;
+      created.push(inserted!);
+    }
+    return created;
+  });
+}
+
 function auditRowsFor(
   sql: TransactionSql,
   schoolId: string,
@@ -168,10 +196,10 @@ describeDb("category weight validation", () => {
       getGradebookByClassId(tx, t.school.id, t.class.id).then((g) => g.id),
     );
 
-    // First category: 60%
-    await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "Midterm", weight: 60 }),
-    );
+    // An existing category at 60%.
+    await seedCategories(t.school.id, t.teacherA.userId, gradebookId, [
+      { name: "Midterm", weight: 60 },
+    ]);
 
     // Second at 50% would sum to 110% — rejected
     await expect(
@@ -200,12 +228,11 @@ describeDb("category weight validation", () => {
       getGradebookByClassId(tx, t.school.id, t.class.id).then((g) => g.id),
     );
 
-    await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "A", weight: 33.33 }),
-    );
-    await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "B", weight: 33.33 }),
-    );
+    await seedCategories(t.school.id, t.teacherA.userId, gradebookId, [
+      { name: "A", weight: 33.33 },
+      { name: "B", weight: 33.33 },
+    ]);
+    // The third brings the total to 100.00 through the service's own check.
     await asUser(t.school.id, t.teacherA.userId, (tx) =>
       createCategory(tx, t.school.id, gradebookId, { name: "C", weight: 33.34 }),
     );
@@ -222,12 +249,10 @@ describeDb("category weight validation", () => {
       getGradebookByClassId(tx, t.school.id, t.class.id).then((g) => g.id),
     );
 
-    const a = await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "A", weight: 60 }),
-    );
-    const b = await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "B", weight: 40 }),
-    );
+    const [, b] = await seedCategories(t.school.id, t.teacherA.userId, gradebookId, [
+      { name: "A", weight: 60 },
+      { name: "B", weight: 40 },
+    ]);
 
     // Update B from 40 to 30 — would sum to 90%, rejected
     await expect(
@@ -287,15 +312,11 @@ describeDb("category lifecycle", () => {
       getGradebookByClassId(tx, t.school.id, t.class.id).then((g) => g.id),
     );
 
-    await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "Final", weight: 50, sort_order: 2 }),
-    );
-    await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "Midterm", weight: 30, sort_order: 1 }),
-    );
-    await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "Homework", weight: 20, sort_order: 0 }),
-    );
+    await seedCategories(t.school.id, t.teacherA.userId, gradebookId, [
+      { name: "Final", weight: 50, sort_order: 2 },
+      { name: "Midterm", weight: 30, sort_order: 1 },
+      { name: "Homework", weight: 20, sort_order: 0 },
+    ]);
 
     const { categories } = await asUser(t.school.id, t.teacherA.userId, (tx) =>
       listCategories(tx, t.school.id, gradebookId),
@@ -334,12 +355,10 @@ describeDb("category lifecycle", () => {
       getGradebookByClassId(tx, t.school.id, t.class.id).then((g) => g.id),
     );
 
-    const a = await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "A", weight: 60 }),
-    );
-    await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "B", weight: 40 }),
-    );
+    const [a] = await seedCategories(t.school.id, t.teacherA.userId, gradebookId, [
+      { name: "A", weight: 60 },
+      { name: "B", weight: 40 },
+    ]);
 
     // Deleting A would leave B at 40% — invalid
     await expect(
@@ -568,7 +587,11 @@ describeDb("scheme linking", () => {
 
   test("rejects linking a scheme from a different term", async () => {
     const t = await seedTenant(db.sql);
-    const otherTerm = await createTerm(db.sql, t.school.id, t.year.id, { code: "T2" });
+    // A second term of the same year: sequence 2 (seedTenant's term holds 1).
+    const otherTerm = await createTerm(db.sql, t.school.id, t.year.id, {
+      code: "T2",
+      sequenceNumber: 2,
+    });
 
     const gradebookId = await asUser(t.school.id, t.teacherA.userId, (tx) =>
       getGradebookByClassId(tx, t.school.id, t.class.id).then((g) => g.id),
@@ -601,13 +624,11 @@ describeDb("gradebook config", () => {
       getGradebookByClassId(tx, t.school.id, t.class.id).then((g) => g.id),
     );
 
-    // Add categories summing to 100
-    await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "A", weight: 60 }),
-    );
-    await asUser(t.school.id, t.teacherA.userId, (tx) =>
-      createCategory(tx, t.school.id, gradebookId, { name: "B", weight: 40 }),
-    );
+    // Categories summing to 100
+    await seedCategories(t.school.id, t.teacherA.userId, gradebookId, [
+      { name: "A", weight: 60 },
+      { name: "B", weight: 40 },
+    ]);
 
     const config = await asUser(t.school.id, t.teacherA.userId, (tx) =>
       getGradebookConfig(tx, t.school.id, gradebookId, t.teacherA.userId),

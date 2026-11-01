@@ -9,6 +9,7 @@ export type ExpenseSummary = components["schemas"]["ExpenseSummary"];
 export type ExpenseCategorySummary = components["schemas"]["ExpenseCategorySummary"];
 export type UploadUrlBody = components["schemas"]["UploadUrlBody"];
 export type UploadUrlResponse = components["schemas"]["UploadUrlResponse"];
+export type UpdateExpenseBody = components["schemas"]["UpdateExpenseBody"];
 
 const PAGE_SIZE = 20;
 

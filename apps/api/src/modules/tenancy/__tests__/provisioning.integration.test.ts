@@ -7,7 +7,11 @@
 
 import { describe, expect, test, beforeAll, afterAll } from "bun:test"; // eslint-disable-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 
-import { createTestDatabase, type TestDatabase } from "../../../../tests/harness/database";
+import {
+  createTestDatabase,
+  migrateDatabase,
+  type TestDatabase,
+} from "../../../../tests/harness/database";
 
 const integrationEnabled = Boolean(process.env.TEST_DATABASE_URL);
 const describeIntegration = describe.skipIf(!integrationEnabled);
@@ -17,6 +21,7 @@ describeIntegration("Tenant provisioning integration", () => {
 
   beforeAll(async () => {
     database = await createTestDatabase();
+    await migrateDatabase(database.url);
   });
 
   afterAll(async () => {

@@ -318,8 +318,8 @@ export async function deleteTemplate(
     action: "delete",
     targetTable: "evaluation_criteria_templates",
     targetId: templateId,
+    // ck_audit_logs_payload: a 'delete' row carries old_values only.
     oldValues: { is_active: true },
-    newValues: { is_active: false },
   });
 }
 
@@ -667,7 +667,7 @@ export async function upsertScore(
   }
 
   const [row] = await tx<Record<string, unknown>[]>`
-    INSERT INTO app.evaluation_scores
+    INSERT INTO app.evaluation_scores AS s
       (school_id, evaluation_id, criteria_template_id, score, comment)
     VALUES (
       ${schoolId}::uuid, ${evaluationId}::uuid,

@@ -72,6 +72,8 @@ void main() {
       'lib/src/core/auth/oauth_browser.dart': 'sign-in',
       'lib/src/features/auth/presentation/login_screen.dart': 'privacy policy',
       'lib/src/core/update/forced_update_screen.dart': 'store listing',
+      'lib/src/features/account/presentation/own_staff_record_screen.dart':
+          "file download — a staff member's own document from their school record",
       'lib/src/features/ai/presentation/widgets/ai_consent_disclosure.dart':
           "AI provider's privacy policy — informational, nothing sold",
       'lib/src/features/ai/store/ai_store_offer_card.dart':

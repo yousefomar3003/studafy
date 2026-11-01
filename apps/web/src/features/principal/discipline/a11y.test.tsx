@@ -5,7 +5,9 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, mock, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { AuthProvider } from "../../../lib/auth";
 import { expectNoA11yViolations } from "../../../lib/test/axe";
+import { createTestSessionStore } from "../../../lib/test/session";
 
 import type { ComponentType } from "react";
 
@@ -66,16 +68,21 @@ const loadIncidentListPage = async (): Promise<ComponentType> =>
 const loadIncidentDetailPage = async (): Promise<ComponentType> =>
   (await import("./IncidentDetailPage")).default;
 
-function renderListInMain(Page: ComponentType) {
+async function renderListInMain(Page: ComponentType) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const store = await createTestSessionStore(["PRINCIPAL"]);
   return render(
-    <QueryClientProvider client={queryClient}>
-      <MemoryRouter>
-        <main>
-          <Page />
-        </main>
-      </MemoryRouter>
-    </QueryClientProvider>,
+    <AuthProvider store={store}>
+      <QueryClientProvider client={queryClient}>
+        <ToastProvider>
+          <MemoryRouter>
+            <main>
+              <Page />
+            </main>
+          </MemoryRouter>
+        </ToastProvider>
+      </QueryClientProvider>
+    </AuthProvider>,
   );
 }
 
@@ -103,7 +110,7 @@ afterEach(() => {
 
 describe("discipline management accessibility", () => {
   test("incident list, inbox tab", async () => {
-    const { container } = renderListInMain(await loadIncidentListPage());
+    const { container } = await renderListInMain(await loadIncidentListPage());
     await screen.findByRole("heading", { name: "Discipline incidents" });
 
     await expectNoA11yViolations(container);

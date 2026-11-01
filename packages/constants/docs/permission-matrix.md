@@ -124,6 +124,10 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `studentRecord:read`             | ✅          | ✅        | ✅        |                    | ✅      | ✅         |         | ✅     |       |               |
 | `studentRecord:update`           | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `studentRecord:readSensitive`    | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
+| `staffRecord:read`               | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
+| `staffRecord:update`             | ✅          | ✅        |           |                    |         |            |         |        |       |               |
+| `staffRecord:readSensitive`      | ✅          | ✅        |           |                    |         |            |         |        |       |               |
+| `classRecord:read`               | ✅          | ✅        | ✅        |                    |         | ✅         |         |        |       |               |
 | `teacher:create`                 | ✅          | ✅        |           |                    |         |            |         |        |       |               |
 | `teacher:read`                   | ✅          | ✅        | ✅        |                    |         | ✅         |         |        |       |               |
 | `teacher:update`                 | ✅          | ✅        |           |                    |         |            |         |        |       |               |

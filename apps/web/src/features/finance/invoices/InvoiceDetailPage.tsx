@@ -1,8 +1,14 @@
+import { PERMISSIONS } from "@studafy/constants";
 import { Button, Card } from "@studafy/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { usePermissions } from "../../../lib/auth";
 import { useTranslation } from "../../../lib/i18n";
+import { CorrectionRequestModal } from "../adjustments/CorrectionRequestModal";
+import { REFUND_KIND_LABEL_KEYS, REFUND_STATUS_LABEL_KEYS } from "../adjustments/labels";
+import { fetchStudentRefunds } from "../adjustments/queries";
 
 import { invoiceStatusLabel, invoiceStatusTone } from "./labels";
 import { fetchInvoice, invoiceQueryKey } from "./queries";
@@ -19,15 +25,29 @@ import "./invoices.css";
  * to or proxy, so the print view is this same markup under `@media print` in `invoices.css`, driven
  * by `window.print()`. That satisfies "detail matches PDF" by construction — printing produces a PDF
  * of the exact DOM the detail view shows — rather than by reproducing ERPNext's own print template.
+ *
+ * Corrections (`billing:update`, each approved by a school admin in the refunds queue): cancel an
+ * invoice nothing has been paid against, issue a credit note, or write off what is still owed. The
+ * requests already made for this invoice are listed under it.
  */
 export default function InvoiceDetailPage() {
   const { t } = useTranslation();
   const { invoiceId } = useParams<{ invoiceId: string }>();
+  const canCorrect = usePermissions().has(PERMISSIONS.BILLING_UPDATE);
+  const queryClient = useQueryClient();
+  const [cancelling, setCancelling] = useState(false);
 
   const query = useQuery({
     queryKey: invoiceQueryKey(invoiceId ?? "none"),
     queryFn: () => fetchInvoice(invoiceId as string),
     enabled: Boolean(invoiceId),
+  });
+
+  const studentId = query.data?.student_id;
+  const corrections = useQuery({
+    queryKey: ["finance", "adjustments", "refunds", "student", studentId],
+    queryFn: () => fetchStudentRefunds(studentId as string),
+    enabled: Boolean(studentId),
   });
 
   function handlePrint() {
@@ -53,6 +73,15 @@ export default function InvoiceDetailPage() {
   // `RequirePermission`; this just decides whether a payment is even possible to record.
   const canRecordPayment =
     invoice.erpnext_status === "submitted" && invoice.outstanding_amount_minor > 0;
+  const submitted = invoice.erpnext_status === "submitted";
+  // Cancelling is only for an invoice nothing was paid against; the API also refuses one with a
+  // pending payment or a credit note, which this page cannot see.
+  const canCancel =
+    canCorrect && submitted && invoice.outstanding_amount_minor === invoice.total_amount_minor;
+  const canWriteOff = canCorrect && submitted && invoice.outstanding_amount_minor > 0;
+  const invoiceCorrections = (corrections.data ?? []).filter(
+    (request) => request.erpnext_invoice_id === invoice.erpnext_docname,
+  );
 
   return (
     <div className="invoices-detail">
@@ -60,7 +89,10 @@ export default function InvoiceDetailPage() {
         <div>
           <h1>{t("finance.invoices.detail.title", { number: invoice.erpnext_docname })}</h1>
           <p>
-            {invoice.student_name} &middot; {invoice.admission_number}
+            <Link to={`/portal/finance/students/${invoice.student_id}`}>
+              {invoice.student_name}
+            </Link>{" "}
+            &middot; {invoice.admission_number}
             {invoice.family_id ? (
               <>
                 {" "}
@@ -90,9 +122,41 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
+      {canCorrect && submitted ? (
+        <div className="invoices-detail__corrections invoices-detail__no-print">
+          {canCancel ? (
+            <Button type="button" variant="tertiary" onClick={() => setCancelling(true)}>
+              {t("finance.invoices.detail.cancelInvoice")}
+            </Button>
+          ) : null}
+          <Link
+            to={`/portal/finance/adjustments/refunds/new?invoiceId=${invoice.id}&reason=error_correction`}
+          >
+            <Button type="button" variant="tertiary">
+              {t("finance.invoices.detail.creditNote")}
+            </Button>
+          </Link>
+          {canWriteOff ? (
+            <Link
+              to={`/portal/finance/adjustments/refunds/new?invoiceId=${invoice.id}&reason=write_off`}
+            >
+              <Button type="button" variant="tertiary">
+                {t("finance.invoices.detail.writeOff")}
+              </Button>
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
+
       <Card as="section" aria-label={t("finance.invoices.detail.summary")}>
         <Card.Body>
           <dl className="invoices-detail__summary">
+            {invoice.tax_registration_number ? (
+              <div>
+                <dt>{t("finance.invoices.detail.taxRegistration")}</dt>
+                <dd>{invoice.tax_registration_number}</dd>
+              </div>
+            ) : null}
             <div>
               <dt>{t("finance.common.issued")}</dt>
               <dd>{invoice.issued_date}</dd>
@@ -152,6 +216,27 @@ export default function InvoiceDetailPage() {
               ))}
             </tbody>
             <tfoot>
+              {invoice.taxes.length > 0 && invoice.net_total !== null ? (
+                <tr>
+                  <th scope="row" colSpan={3}>
+                    {t("finance.invoices.detail.netTotal")}
+                  </th>
+                  <td>
+                    {invoice.net_total} {invoice.currency}
+                  </td>
+                </tr>
+              ) : null}
+              {invoice.taxes.map((tax, index) => (
+                // Positional, like the lines: ERPNext's tax rows carry no id here.
+                <tr key={`tax-${index}`}>
+                  <th scope="row" colSpan={3}>
+                    {tax.description}
+                  </th>
+                  <td>
+                    {tax.amount} {invoice.currency}
+                  </td>
+                </tr>
+              ))}
               <tr>
                 <th scope="row" colSpan={3}>
                   {t("finance.common.total")}
@@ -164,6 +249,38 @@ export default function InvoiceDetailPage() {
           </table>
         )}
       </section>
+
+      {invoiceCorrections.length > 0 ? (
+        <section
+          aria-label={t("finance.invoices.detail.corrections")}
+          className="invoices-detail__no-print"
+        >
+          <h2>{t("finance.invoices.detail.corrections")}</h2>
+          <ul className="invoices-detail__correction-list">
+            {invoiceCorrections.map((request) => (
+              <li key={request.id}>
+                <Link to={`/portal/finance/adjustments/refunds/${request.id}`}>
+                  {t(REFUND_KIND_LABEL_KEYS[request.kind])}
+                </Link>{" "}
+                &middot; {request.amount} {request.currency} &middot;{" "}
+                {t(REFUND_STATUS_LABEL_KEYS[request.status])}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      <CorrectionRequestModal
+        key={cancelling ? invoice.id : "closed"}
+        kind="invoice_cancellation"
+        targetId={cancelling ? invoice.id : null}
+        summary={`${invoice.erpnext_docname} · ${invoice.total_amount} ${invoice.currency}`}
+        onClose={() => setCancelling(false)}
+        onRequested={() => {
+          setCancelling(false);
+          void queryClient.invalidateQueries({ queryKey: ["finance", "adjustments", "refunds"] });
+        }}
+      />
     </div>
   );
 }

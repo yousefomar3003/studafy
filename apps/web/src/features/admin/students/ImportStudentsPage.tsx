@@ -202,6 +202,11 @@ export default function ImportStudentsPage() {
     <>
       <h1>{t("adminPeople.students.import.page.title")}</h1>
       <p>{t("adminPeople.students.import.page.intro")}</p>
+      <p>
+        <Link to="/portal/admin/students/imports">
+          {t("adminPeople.students.import.page.history")}
+        </Link>
+      </p>
 
       {banner ? (
         <p role="alert" className="students-import__banner">
@@ -500,6 +505,11 @@ function CompletedPanel({ record, onReset }: CompletedPanelProps) {
             {t("adminPeople.students.import.completed.notImported", { count: record.error_rows })}
           </p>
         ) : null}
+        <p>
+          <Link to={`/portal/admin/students/imports/${record.id}`}>
+            {t("adminPeople.students.import.completed.leftoverColumns")}
+          </Link>
+        </p>
         <div className="students-import__actions">
           <Button type="button" onClick={onReset}>
             {t("adminPeople.students.import.completed.importAnother")}

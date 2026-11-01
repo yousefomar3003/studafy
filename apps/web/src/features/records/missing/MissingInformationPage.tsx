@@ -1,12 +1,16 @@
+import { PERMISSIONS } from "@studafy/constants";
 import { Button, DataGrid, Input, Select, Tabs } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import {
+  fetchMissingClasses,
   fetchMissingParents,
+  fetchMissingStaff,
   fetchMissingStudents,
   MISSING_KEY,
   MISSING_PAGE_SIZE,
@@ -19,7 +23,9 @@ import type {
   MissingPage,
   RecordMissingField,
   RecordMissingIssue,
+  RecordMissingClass,
   RecordMissingParent,
+  RecordMissingStaff,
   RecordMissingStudent,
 } from "./queries";
 import type { DataGridColumn } from "@studafy/ui";
@@ -31,11 +37,13 @@ export interface MissingInformationPageProps {
 
 const ISSUES: readonly RecordMissingIssue[] = ["missing", "expired", "expiring"];
 
-/** Where each portal shows one person's Records. */
+/** Where each portal shows one person's (or class's) Records. */
 export function recordsLinkFor(
   portal: "admin" | "principal",
-  subject: { kind: "student" | "parent"; id: string },
+  subject: { kind: "student" | "parent" | "staff" | "class"; id: string },
 ): string {
+  if (subject.kind === "staff") return `/portal/${portal}/staff/${subject.id}/records`;
+  if (subject.kind === "class") return `/portal/${portal}/classes/${subject.id}/records`;
   if (portal === "admin") {
     return subject.kind === "student"
       ? `/portal/admin/students/${subject.id}?tab=records`
@@ -48,14 +56,18 @@ export function recordsLinkFor(
 
 /**
  * Missing information (`/portal/admin/records/missing`, `/portal/principal/records/missing`), gated
- * on `studentRecord:read`: current students and parents whose required fields or documents are
- * missing, and documents that have expired or expire within 30 days. Field labels only, never a
- * value, and only the fields the caller may read (the API narrows by visibility). Each row opens
- * that person's Records, where staff fix it. Laid out like Finance > Unlinked.
+ * on `studentRecord:read`: current students and parents -- and, for whoever holds
+ * `staffRecord:read` / `classRecord:read`, staff and classes -- whose required fields or documents
+ * are missing, and documents that have expired or expire within 30 days. Field labels only, never a
+ * value, and only the fields the caller may read (the API narrows by visibility and sensitivity).
+ * Each row opens that Records page, where staff fix it. Laid out like Finance > Unlinked.
  */
 export default function MissingInformationPage({ portal = "admin" }: MissingInformationPageProps) {
   const { t, i18n } = useTranslation();
   const { formatDate } = useFormatters();
+  const permissions = usePermissions();
+  const showStaff = permissions.has(PERMISSIONS.STAFF_RECORD_READ);
+  const showClasses = permissions.has(PERMISSIONS.CLASS_RECORD_READ);
   const [issue, setIssue] = useState<RecordMissingIssue | null>(null);
 
   const labelOf = (field: RecordMissingField) =>
@@ -155,6 +167,60 @@ export default function MissingInformationPage({ portal = "admin" }: MissingInfo
     },
   ];
 
+  const staffColumns: DataGridColumn<RecordMissingStaff>[] = [
+    {
+      id: "staff",
+      header: t("recordTemplates.missing.columns.staff"),
+      renderCell: (row) => (
+        <div className="families-cell">
+          <span>{row.name}</span>
+          {row.email ? <span className="families-cell__muted">{row.email}</span> : null}
+        </div>
+      ),
+    },
+    {
+      id: "issues",
+      header: t("recordTemplates.missing.columns.issues"),
+      renderCell: renderIssues,
+    },
+    {
+      id: "open",
+      header: t("recordTemplates.missing.columns.open"),
+      renderCell: (row) => (
+        <Link to={recordsLinkFor(portal, { kind: "staff", id: row.user_id })}>
+          {t("recordTemplates.missing.openRecord", { name: row.name })}
+        </Link>
+      ),
+    },
+  ];
+
+  const classColumns: DataGridColumn<RecordMissingClass>[] = [
+    {
+      id: "class",
+      header: t("recordTemplates.missing.columns.class"),
+      renderCell: (row) => (
+        <div className="families-cell">
+          <span>{row.code}</span>
+          <span className="families-cell__muted">{row.course_name}</span>
+        </div>
+      ),
+    },
+    {
+      id: "issues",
+      header: t("recordTemplates.missing.columns.issues"),
+      renderCell: renderIssues,
+    },
+    {
+      id: "open",
+      header: t("recordTemplates.missing.columns.open"),
+      renderCell: (row) => (
+        <Link to={recordsLinkFor(portal, { kind: "class", id: row.class_id })}>
+          {t("recordTemplates.missing.openClassRecord", { code: row.code })}
+        </Link>
+      ),
+    },
+  ];
+
   const issueOptions = [
     { value: "all", label: t("recordTemplates.missing.issueAll") },
     ...ISSUES.map((value) => ({ value, label: t(`recordTemplates.missing.issues.${value}`) })),
@@ -182,6 +248,12 @@ export default function MissingInformationPage({ portal = "admin" }: MissingInfo
         <Tabs.List aria-label={t("recordTemplates.missing.subjects")}>
           <Tabs.Tab value="students">{t("recordTemplates.missing.students.tab")}</Tabs.Tab>
           <Tabs.Tab value="parents">{t("recordTemplates.missing.parents.tab")}</Tabs.Tab>
+          {showStaff ? (
+            <Tabs.Tab value="staff">{t("recordTemplates.missing.staff.tab")}</Tabs.Tab>
+          ) : null}
+          {showClasses ? (
+            <Tabs.Tab value="classes">{t("recordTemplates.missing.classes.tab")}</Tabs.Tab>
+          ) : null}
         </Tabs.List>
         <Tabs.Panel value="students">
           <MissingSection<RecordMissingStudent>
@@ -211,13 +283,45 @@ export default function MissingInformationPage({ portal = "admin" }: MissingInfo
             getRowLabel={(row) => row.name}
           />
         </Tabs.Panel>
+        {showStaff ? (
+          <Tabs.Panel value="staff">
+            <MissingSection<RecordMissingStaff>
+              kind="staff"
+              issue={issue}
+              title={t("recordTemplates.missing.staff.title")}
+              searchLabel={t("recordTemplates.missing.staff.search")}
+              caption={t("recordTemplates.missing.staff.caption")}
+              empty={t("recordTemplates.missing.staff.empty")}
+              fetchPage={fetchMissingStaff}
+              columns={staffColumns}
+              getRowId={(row) => row.user_id}
+              getRowLabel={(row) => row.name}
+            />
+          </Tabs.Panel>
+        ) : null}
+        {showClasses ? (
+          <Tabs.Panel value="classes">
+            <MissingSection<RecordMissingClass>
+              kind="classes"
+              issue={issue}
+              title={t("recordTemplates.missing.classes.title")}
+              searchLabel={t("recordTemplates.missing.classes.search")}
+              caption={t("recordTemplates.missing.classes.caption")}
+              empty={t("recordTemplates.missing.classes.empty")}
+              fetchPage={fetchMissingClasses}
+              columns={classColumns}
+              getRowId={(row) => row.class_id}
+              getRowLabel={(row) => row.code}
+            />
+          </Tabs.Panel>
+        ) : null}
       </Tabs>
     </>
   );
 }
 
 interface MissingSectionProps<T> {
-  kind: "students" | "parents";
+  kind: "students" | "parents" | "staff" | "classes";
   issue: RecordMissingIssue | null;
   title: string;
   searchLabel: string;

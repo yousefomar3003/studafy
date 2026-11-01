@@ -40,12 +40,15 @@ export async function loadReceipt(
   const [details] = await tx<
     {
       school_name: string;
+      tax_registration_number: string | null;
       student_name: string;
       admission_number: string;
       family_name: string | null;
     }[]
   >`
     SELECT school.name AS school_name,
+           (SELECT tax.registration_number FROM app.school_tax_settings AS tax
+            WHERE tax.school_id = school.id) AS tax_registration_number,
            coalesce(student.preferred_name, student.first_name) || ' ' || student.last_name
              AS student_name,
            student.admission_number,
@@ -64,6 +67,7 @@ export async function loadReceipt(
   return {
     locale,
     schoolName: details?.school_name ?? "",
+    taxRegistrationNumber: details?.tax_registration_number ?? null,
     receiptNumber: payment.erpnext_payment_entry_id ?? payment.id,
     paymentDate: payment.payment_date,
     status: payment.status,

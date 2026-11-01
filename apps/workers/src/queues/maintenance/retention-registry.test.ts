@@ -81,6 +81,6 @@ describe("isPersonalDataColumn", () => {
 
 describe("SUBJECT_LINK_COLUMNS", () => {
   test("is the short, verified set this module's header documents", () => {
-    expect(SUBJECT_LINK_COLUMNS).toEqual(["user_id", "student_id", "teacher_id"]);
+    expect(SUBJECT_LINK_COLUMNS).toEqual(["user_id", "student_id", "teacher_id", "staff_user_id"]);
   });
 });

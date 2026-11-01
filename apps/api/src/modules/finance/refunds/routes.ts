@@ -11,6 +11,9 @@ import { standardResponses } from "../../../openapi/responses";
 
 import {
   approveRefundBodySchema,
+  correctionInvoiceParamSchema,
+  correctionPaymentParamSchema,
+  correctionRequestBodySchema,
   initiateRefundBodySchema,
   refundIdParamSchema,
   refundListSchema,
@@ -24,6 +27,8 @@ import {
   initiateRefund,
   listRefunds,
   rejectRefund,
+  requestInvoiceCancellation,
+  requestPaymentReversal,
   type RefundRow,
 } from "./service";
 
@@ -49,6 +54,7 @@ function toRefundResponse(row: RefundRow) {
   return {
     id: row.id,
     school_id: row.school_id,
+    kind: row.kind,
     payment_entry_id: row.payment_entry_id,
     erpnext_invoice_id: row.erpnext_invoice_id,
     erpnext_credit_note_id: row.erpnext_credit_note_id,
@@ -205,6 +211,57 @@ const rejectRouteDef = createRoute({
   ),
 });
 
+const cancelInvoiceRouteDef = createRoute({
+  method: "post",
+  path: "/api/finance/invoices/{invoiceId}/cancellation",
+  tags: ["Finance"],
+  operationId: "requestInvoiceCancellation",
+  summary: "Ask to cancel an invoice (maker step)",
+  description:
+    "Creates a pending `invoice_cancellation` request in the refund approval queue. Only a " +
+    "submitted invoice with nothing against it (no pending or confirmed payment, no credit note " +
+    "that is not rejected or failed) can be cancelled; anything else is corrected with a credit " +
+    "note. A second user with billing:refund approves it at the refund approve endpoint, which " +
+    "cancels the invoice in ERPNext. One open or completed cancellation per invoice (409).",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: correctionInvoiceParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: correctionRequestBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 201: { description: "The pending cancellation request.", schema: refundSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const reversePaymentRouteDef = createRoute({
+  method: "post",
+  path: "/api/finance/payments/{paymentId}/reversal",
+  tags: ["Finance"],
+  operationId: "requestPaymentReversal",
+  summary: "Ask to reverse a payment (maker step)",
+  description:
+    "Creates a pending `payment_reversal` request in the refund approval queue for a confirmed " +
+    "payment recorded by mistake. Approval cancels the Payment Entry in ERPNext, marks the " +
+    "payment `reversed`, and makes its invoice owed again. One open or completed reversal per " +
+    "payment (409).",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: correctionPaymentParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: correctionRequestBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 201: { description: "The pending reversal request.", schema: refundSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
 // ---------------------------------------------------------------------------
 // Route factory
 // ---------------------------------------------------------------------------
@@ -218,6 +275,11 @@ export function refundRoutes(
   routes.use("/api/finance/refunds/initiate", auditAction("insert", "refund_requests"));
   routes.use("/api/finance/refunds/:refundId/approve", auditAction("update", "refund_requests"));
   routes.use("/api/finance/refunds/:refundId/reject", auditAction("update", "refund_requests"));
+  routes.use(
+    "/api/finance/invoices/:invoiceId/cancellation",
+    auditAction("insert", "refund_requests"),
+  );
+  routes.use("/api/finance/payments/:paymentId/reversal", auditAction("insert", "refund_requests"));
 
   // ST-249: the `/*` slash matters — Hono's `.use()` only propagates a glued "prefix*" pattern
   // through `app.route()` composition when the app is invoked directly, not once mounted into the
@@ -232,6 +294,15 @@ export function refundRoutes(
   routes.use(
     "/api/finance/refunds/:refundId/reject",
     requirePermission(PERMISSIONS.BILLING_REFUND),
+  );
+  // Asking is the maker step, the same permission as initiating a refund.
+  routes.use(
+    "/api/finance/invoices/:invoiceId/cancellation",
+    requirePermission(PERMISSIONS.BILLING_UPDATE),
+  );
+  routes.use(
+    "/api/finance/payments/:paymentId/reversal",
+    requirePermission(PERMISSIONS.BILLING_UPDATE),
   );
 
   // --- List refunds ---
@@ -277,6 +348,22 @@ export function refundRoutes(
     const { row, replayed } = await initiateRefund(database, tenantFrom(c), body, idempotencyKey);
 
     return replayed ? c.json(toRefundResponse(row), 200) : c.json(toRefundResponse(row), 201);
+  });
+
+  // --- Ask to cancel an invoice / reverse a payment (maker) ---
+
+  routes.openapi(cancelInvoiceRouteDef, async (c) => {
+    const { invoiceId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const row = await requestInvoiceCancellation(database, tenantFrom(c), invoiceId, body);
+    return c.json(toRefundResponse(row), 201);
+  });
+
+  routes.openapi(reversePaymentRouteDef, async (c) => {
+    const { paymentId } = c.req.valid("param");
+    const body = c.req.valid("json");
+    const row = await requestPaymentReversal(database, tenantFrom(c), paymentId, body);
+    return c.json(toRefundResponse(row), 201);
   });
 
   // --- Approve refund (checker) ---

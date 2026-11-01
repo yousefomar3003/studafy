@@ -251,6 +251,72 @@
         "invalidOption": "{{field}} must be one of: {{options}}.",
         "tooLong": "{{field}} must be at most {{max}} characters."
       }
+    },
+    "keepColumn": {
+      "ignoredColumns": "These columns are not recognised: {{columns}}. After the import you can keep each one as a record field for the rows it creates.",
+      "sectionTitle": "Columns this import did not use",
+      "sectionIntro": "Keep a column as a record field: its values are written only for the rows this import created.",
+      "action": "Keep as a record field",
+      "actionLabel": "Keep the column {{column}} as a record field",
+      "title": "Keep “{{column}}” as a record field",
+      "intro_one": "{{count}} row this import created has a value in this column. Preview what would be written, then confirm.",
+      "intro_other": "{{count}} rows this import created have a value in this column. Preview what would be written, then confirm.",
+      "target": "Record field",
+      "newField": "Create a new field",
+      "existingField": "Use an existing field",
+      "labelEn": "Field label (English)",
+      "labelAr": "Field label (Arabic)",
+      "labelsRequired": "Give the field a label in English and in Arabic.",
+      "type": "Field type",
+      "guessType": "Guess from the values",
+      "guessed": "Guessed from the values: {{type}}.",
+      "types": {
+        "short_text": "Short text",
+        "long_text": "Long text",
+        "number": "Number",
+        "date": "Date",
+        "single_choice": "One choice",
+        "multi_choice": "Several choices",
+        "yes_no": "Yes or no",
+        "phone": "Phone",
+        "email": "Email"
+      },
+      "sensitive": "Sensitive (ID number, medical or pay information)",
+      "suggestedSensitive": "This column looks like ID numbers, medical or pay information, so it is marked sensitive: encrypted, masked by default and revealed only by the school admin, with every reveal recorded. Untick it if that is wrong.",
+      "field": "Field",
+      "chooseField": "Choose a field",
+      "preview": "Preview",
+      "previewTitle": "What would be written",
+      "previewError": "The preview could not be made.",
+      "applyError": "Nothing was written. Preview again and confirm.",
+      "summary": "{{write}} to write, {{skipped}} skipped, {{invalid}} not valid for this field.",
+      "columns": {
+        "line": "Line",
+        "name": "Name",
+        "value": "Value",
+        "outcome": "Outcome"
+      },
+      "status": {
+        "write": "Will be written",
+        "unchanged": "Already this value",
+        "kept": "Keeps its current answer",
+        "invalid": "Not valid",
+        "conflict": "Conflicting values",
+        "skipped": "Skipped"
+      },
+      "reasons": {
+        "NOT_CREATED_BY_IMPORT": "not created by this import",
+        "NOT_STAFF": "not a member of staff",
+        "conflict": "the file repeats it with a different value",
+        "invalid": "not a valid answer for this field"
+      },
+      "yes": "Yes",
+      "no": "No",
+      "confirm_one": "Write {{count}} value",
+      "confirm_other": "Write {{count}} values",
+      "done_one": "Kept “{{column}}”: {{count}} value written.",
+      "done_other": "Kept “{{column}}”: {{count}} values written.",
+      "back": "Back to the import"
     }
   },
   "home": {

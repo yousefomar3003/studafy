@@ -22,6 +22,7 @@ function makeRefund(overrides: Record<string, unknown> = {}) {
     amount_minor: 100000,
     currency: "JOD",
     currency_minor_unit: 3,
+    kind: "credit_note",
     reason_code: "overpayment",
     reason_notes: null,
     status: "pending_approval",

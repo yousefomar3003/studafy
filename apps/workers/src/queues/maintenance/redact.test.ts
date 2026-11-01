@@ -55,6 +55,7 @@ afterEach(async () => {
   // retention-registry.ts's header cites as why erasure redacts instead of deleting, demonstrated
   // here by needing to clear the child table before the parent.
   await sql!`DELETE FROM app.notification_preferences WHERE school_id = ${schoolId}::uuid`;
+  await sql!`DELETE FROM app.students WHERE school_id = ${schoolId}::uuid`;
   await sql!`DELETE FROM app.users WHERE school_id = ${schoolId}::uuid`;
 });
 
@@ -99,17 +100,40 @@ describe("redactPersonalColumns", () => {
     expect(outcome.rowsAffected).toBe(1);
     expect(outcome.columns.sort()).toEqual(["display_name", "email", "normalized_email"]);
 
+    // All three are nullable since member password login (000141): an account no longer needs an
+    // email, so an erased one keeps none rather than a placeholder.
     const [row] = await sql!<
-      { display_name: string | null; email: string; normalized_email: string }[]
+      { display_name: string | null; email: string | null; normalized_email: string | null }[]
     >`
       SELECT display_name, email, normalized_email FROM app.users WHERE school_id = ${schoolId}::uuid
     `;
-    expect(row!.display_name).toBeNull();
-    expect(row!.email).toStartWith("erased-");
-    expect(row!.normalized_email).toStartWith("erased-");
-    // ck_users_normalized_email: normalized_email must already be its own lower(btrim(...)) form.
-    expect(row!.normalized_email).toBe(row!.normalized_email.toLowerCase());
+    expect(row).toEqual({ display_name: null, email: null, normalized_email: null });
   });
+
+  dbTest(
+    "fills a NOT NULL personal column with a unique placeholder its CHECKs accept",
+    async () => {
+      const [user] = await sql!<{ id: string }[]>`
+      INSERT INTO app.users (school_id, email, normalized_email, status)
+      VALUES (${schoolId}::uuid, 'pupil@example.com', 'pupil@example.com', 'active')
+      RETURNING id
+    `;
+      await sql!`
+      INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name)
+      VALUES (${schoolId}::uuid, ${user!.id}::uuid, 'RED-1', 'Jane', 'Doe')
+    `;
+
+      const outcome = await sql!.begin((tx) => redactPersonalColumns(tx, "students", schoolId));
+      expect(outcome.columns).toContain("first_name");
+
+      const [student] = await sql!<{ first_name: string; last_name: string }[]>`
+      SELECT first_name, last_name FROM app.students WHERE school_id = ${schoolId}::uuid
+    `;
+      expect(student!.first_name).toStartWith("erased-");
+      expect(student!.last_name).toStartWith("erased-");
+      expect(student!.first_name).not.toBe(student!.last_name);
+    },
+  );
 
   dbTest("scoped to one subject leaves other users in the same school untouched", async () => {
     const targetId = await insertFixtureUser();

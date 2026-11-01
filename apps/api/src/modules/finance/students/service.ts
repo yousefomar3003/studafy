@@ -166,3 +166,39 @@ export async function studentFamilies(
   `;
   return new Map(rows.map(({ student_id, ...family }) => [student_id, family]));
 }
+
+export interface FinanceStudentIdentity {
+  id: string;
+  name: string;
+  admission_number: string;
+  status: string;
+  family_id: string | null;
+  family_name: string | null;
+}
+
+/**
+ * One student's identity and family for finance's per-student account page, including a withdrawn
+ * student (their balance may still be owed). Identity columns only; run it through
+ * `withStudentIdentityTx`.
+ */
+export async function getStudentIdentity(
+  tx: TransactionSql,
+  schoolId: string,
+  studentId: string,
+): Promise<FinanceStudentIdentity | null> {
+  const [row] = await tx<{ admission_number: string; status: string }[]>`
+    SELECT admission_number, status::text AS status
+    FROM app.students
+    WHERE school_id = ${schoolId}::uuid AND id = ${studentId}::uuid
+  `;
+  if (!row) return null;
+  const family = (await studentFamilies(tx, schoolId, [studentId])).get(studentId);
+  return {
+    id: studentId,
+    name: family?.student_name ?? "",
+    admission_number: row.admission_number,
+    status: row.status,
+    family_id: family?.family_id ?? null,
+    family_name: family?.family_name ?? null,
+  };
+}

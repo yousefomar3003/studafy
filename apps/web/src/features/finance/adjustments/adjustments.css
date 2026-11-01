@@ -43,6 +43,7 @@
 
 .adjustments-list__toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-16);
   margin-bottom: var(--space-16);
@@ -274,4 +275,18 @@
 .adjustments-sibling__header .sf-button {
   flex-shrink: 0;
   white-space: nowrap;
+}
+
+/* --- Request detail --- */
+
+.adjustments-detail {
+  display: grid;
+  gap: var(--space-24);
+  max-width: 720px;
+}
+
+.adjustments-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
 }

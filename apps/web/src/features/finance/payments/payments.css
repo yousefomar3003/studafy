@@ -43,6 +43,7 @@
 
 .payments-list__toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-16);
   margin-bottom: var(--space-16);
@@ -178,4 +179,9 @@
   align-items: center;
   gap: var(--space-16);
   margin-top: var(--space-16);
+}
+
+.payments-list__totals {
+  margin: 0 0 var(--space-16);
+  font-weight: var(--font-weight-medium);
 }

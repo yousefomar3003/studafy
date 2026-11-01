@@ -20,6 +20,7 @@ import { createHash } from "node:crypto";
 
 import { armAdminActor, resolveAdminActor } from "./admin-actor";
 import { FILE_TABLES, parseExportManifest } from "./export-manifest";
+import { IMPORT_FILES_EXPORT_GAP } from "./imports-dsr";
 import { RECORD_DATA_TABLES, exportRecordData } from "./records-dsr";
 import { assertSafeIdentifier } from "./redact";
 import { findSubjectPredicate, resolveSubjectIdentifiers } from "./subject-resolver";
@@ -182,6 +183,27 @@ export async function runTenantExport(
     });
     for (const file of records.files) {
       fileEntries.push({ table: "record_documents", ...file, checksumSha256: null });
+    }
+  }
+
+  // Original student import files: a closure's bundle lists every one still held (the school's own
+  // uploads); a person's bundle cannot search inside them, and says so.
+  if (resolvedSubject) {
+    knownGaps.push(IMPORT_FILES_EXPORT_GAP);
+  } else {
+    const sources = await tx<{ storage_key: string; file_name: string }[]>`
+      SELECT source_storage_key AS storage_key, source_file_name AS file_name
+      FROM app.student_imports
+      WHERE school_id = ${schoolId}::uuid AND source_storage_key IS NOT NULL
+      ORDER BY created_at
+    `;
+    for (const source of sources) {
+      fileEntries.push({
+        table: "student_imports",
+        storageKey: source.storage_key,
+        originalFileName: source.file_name,
+        checksumSha256: null,
+      });
     }
   }
 

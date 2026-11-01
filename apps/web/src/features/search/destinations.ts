@@ -108,6 +108,18 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("account", "page", "/account"),
   entry("account-sessions", "page", "/account/sessions"),
   entry("delete-account", "action", "/account/delete"),
+  // A member of staff's own record. Search has no role check, so it is offered to the permissions
+  // that between them every staff role holds and no family or platform role does: leadership
+  // (principalDashboard:view), finance (report:viewFinancial), teachers and the attendance office
+  // (attendanceDashboard:view). The page itself checks the staff role.
+  entry("my-staff-record", "page", "/account/staff-record", {
+    ...SCHOOL,
+    alsoRequiresAny: [
+      P.PRINCIPAL_DASHBOARD_VIEW,
+      P.REPORT_VIEW_FINANCIAL,
+      P.ATTENDANCE_DASHBOARD_VIEW,
+    ],
+  }),
   entry("help", "page", "/help"),
 
   // The Studafy platform console (SUPER_ADMIN).
@@ -118,6 +130,7 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("review-platform-refunds", "action", "/portal/platform/refunds", PLATFORM),
   entry("platform-finance", "page", "/portal/platform/finance", PLATFORM),
   entry("platform-ai-usage", "page", "/portal/platform/ai", PLATFORM),
+  entry("platform-import-signals", "page", "/portal/platform/import-signals", PLATFORM),
   entry("platform-plans", "page", "/portal/platform/plans", PLATFORM),
   entry("platform-settings", "page", "/portal/platform/settings", PLATFORM),
   entry("look-up-account", "action", "/portal/platform/users", PLATFORM),
@@ -153,6 +166,11 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     ...ADMIN,
     alsoRequires: [P.STUDENT_IMPORT],
   }),
+  // Its API is student:import only, like the import itself.
+  entry("import-history", "page", "/portal/admin/students/imports", {
+    ...ADMIN,
+    alsoRequires: [P.STUDENT_IMPORT],
+  }),
   entry("build-timetable", "action", "/portal/admin/timetable", ADMIN),
   entry("school-calendar", "page", "/portal/admin/calendar", {
     requiredPermission: P.CALENDAR_EVENT_READ,
@@ -179,6 +197,22 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     requiredPermission: P.NOTIFICATION_MANAGE,
     ...SCHOOL,
   }),
+  entry("teacher-employment", "page", "/portal/admin/teachers", {
+    ...ADMIN,
+    alsoRequires: [P.TEACHER_UPDATE],
+  }),
+  entry("audit-log", "page", "/portal/admin/audit", {
+    requiredPermission: P.AUDIT_LOG_READ,
+    ...SCHOOL,
+  }),
+  entry("privacy-requests", "page", "/portal/admin/privacy", {
+    requiredPermission: P.PRIVACY_DSR_MANAGE,
+    ...SCHOOL,
+  }),
+  entry("ai-content-reports", "page", "/portal/admin/ai-reports", {
+    requiredPermission: P.AI_CONTENT_MODERATE,
+    ...SCHOOL,
+  }),
   // Linking is the school admin's job: Unlinked only offers it with these three (see UnlinkedPage).
   entry("link-parent", "action", "/portal/finance/unlinked", {
     ...BILLING_READ,
@@ -188,6 +222,10 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   // School leadership.
   entry("principal-dashboard", "page", "/portal/principal", PRINCIPAL),
   entry("discipline", "page", "/portal/principal/discipline", PRINCIPAL),
+  entry("report-incident", "action", "/portal/principal/discipline?report=1", {
+    ...PRINCIPAL,
+    alsoRequires: [P.DISCIPLINE_INCIDENT_CREATE],
+  }),
   entry("message-reports", "page", "/portal/principal/message-reports", {
     requiredPermission: P.MESSAGE_REPORT_REVIEW,
     ...SCHOOL,
@@ -218,6 +256,18 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   }),
   entry("principal-classes", "page", "/portal/principal/classes", PRINCIPAL),
   entry("grades-sections", "page", "/portal/principal/sections", {
+    requiredPermission: P.TIMETABLE_MANAGE,
+    ...SCHOOL,
+  }),
+  entry("school-years", "page", "/portal/principal/years", {
+    requiredPermission: P.TIMETABLE_MANAGE,
+    ...SCHOOL,
+  }),
+  entry("start-new-school-year", "action", "/portal/principal/years", {
+    requiredPermission: P.TIMETABLE_MANAGE,
+    ...SCHOOL,
+  }),
+  entry("subjects-courses", "page", "/portal/principal/catalog", {
     requiredPermission: P.TIMETABLE_MANAGE,
     ...SCHOOL,
   }),
@@ -281,6 +331,7 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("finance-overdue", "page", "/portal/finance/overdue", FINANCE_REPORTS),
   entry("add-fee-structure", "action", "/portal/finance/fees", BILLING_UPDATE),
   entry("invoices", "page", "/portal/finance/invoices", BILLING_READ),
+  entry("invoice-batches", "page", "/portal/finance/invoices/batches", BILLING_READ),
   entry("create-invoice-batch", "action", "/portal/finance/invoices/batches/new", BILLING_UPDATE),
   entry("families", "page", "/portal/finance/families", BILLING_READ),
   entry("unlinked", "page", "/portal/finance/unlinked", BILLING_READ),
@@ -297,6 +348,8 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("finance-reports", "page", "/portal/finance/reports", FINANCE_REPORTS),
   entry("expenses", "page", "/portal/finance/expenses", BILLING_READ),
   entry("record-expense", "action", "/portal/finance/expenses/new", BILLING_UPDATE),
+  // Readable by finance; saving is the school admin's, checked by the page.
+  entry("tax-settings", "page", "/portal/finance/settings/tax", BILLING_READ),
 ];
 
 const BY_ID = new Map(SEARCH_DESTINATIONS.map((destination) => [destination.id, destination]));

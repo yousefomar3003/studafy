@@ -1,17 +1,18 @@
 /**
- * One subject's record: reading, writing, revealing, and the documents behind document fields
- * (docs/modules/student-records.md).
+ * One subject's record -- a student's, a parent's, a staff member's or a class's: reading, writing,
+ * revealing, and the documents behind document fields (docs/modules/student-records.md).
  *
  * Who sees what is decided in three layers. Row scope is the database's: app.record_answers'
  * role_scope_visibility policy reuses app.can_read_student, so a teacher outside the student's
  * classes and a parent of another family read nothing (FINANCE, which cannot read students at all,
- * reads through the identity transaction instead). Field scope is this module's: an audience reads
- * only the fields whose visibility reaches it (isFieldVisibleTo), and never a sensitive one unless
- * it is leadership. Value scope is ADR-019's: a sensitive value leaves this module as its mask,
- * except through revealValue, which is audited like a write.
+ * reads through the identity transaction instead); a staff record is leadership's and the staff
+ * member's own, and a class record leadership's and its teachers' (000181). Field scope is this
+ * module's: an audience reads only the fields whose visibility reaches it (isFieldVisibleTo), and
+ * never a sensitive one unless it is the "staff" audience. Value scope is ADR-019's: a sensitive
+ * value leaves this module as its mask, except through revealValue, which is audited like a write.
  */
 
-import { ERROR_CODES, PERMISSIONS, ROLES } from "@studafy/constants";
+import { ERROR_CODES, PERMISSIONS, ROLES, SCHOOL_STAFF_ROLES } from "@studafy/constants";
 import {
   RecordKeyUnavailableError,
   RecordSealBrokenError,
@@ -65,6 +66,25 @@ export interface RecordSubject {
 /** Content classes (content-classes.ts) a document field's upload must have been staged under. */
 export const RECORD_DOCUMENT_CONTENT_CLASS = "record.document";
 export const RECORD_SENSITIVE_DOCUMENT_CONTENT_CLASS = "record.sensitiveDocument";
+export const STAFF_RECORD_DOCUMENT_CONTENT_CLASS = "staffRecord.document";
+export const STAFF_RECORD_SENSITIVE_DOCUMENT_CONTENT_CLASS = "staffRecord.sensitiveDocument";
+export const CLASS_RECORD_DOCUMENT_CONTENT_CLASS = "classRecord.document";
+
+/**
+ * The content class a document field's file is staged under. Each pairs the subject's own edit
+ * permission (studentRecord:update, staffRecord:update, timetable:manage), so the gateway refuses a
+ * staging request from someone who could not attach the file anyway. Class fields are never
+ * sensitive.
+ */
+export function recordDocumentContentClass(kind: RecordSubjectKind, sensitive: boolean): string {
+  if (kind === "staff") {
+    return sensitive
+      ? STAFF_RECORD_SENSITIVE_DOCUMENT_CONTENT_CLASS
+      : STAFF_RECORD_DOCUMENT_CONTENT_CLASS;
+  }
+  if (kind === "class") return CLASS_RECORD_DOCUMENT_CONTENT_CLASS;
+  return sensitive ? RECORD_SENSITIVE_DOCUMENT_CONTENT_CLASS : RECORD_DOCUMENT_CONTENT_CLASS;
+}
 
 /** Download URL lifetimes: ordinary documents as other downloads; sensitive ones a minute. */
 export const RECORD_DOCUMENT_DOWNLOAD_TTL_SECONDS = 5 * 60;
@@ -86,6 +106,39 @@ export function audienceFor(roles: readonly Role[]): RecordAudience | null {
   return null;
 }
 
+/**
+ * The audience for one kind of subject. Students and parents: audienceFor. A staff record: whoever
+ * may reveal its sensitive values (ORG_ADMIN) reads every field; whoever only reads it (PRINCIPAL)
+ * reads the non-sensitive ones. A class record: leadership reads every field, a teacher the
+ * teacher-visible ones of the classes they teach. A staff member's read of their own record is not
+ * here: it is the self-service route's, by role (SELF_STAFF_AUDIENCE).
+ */
+export function audienceForSubject(
+  kind: RecordSubjectKind,
+  roles: readonly Role[],
+): RecordAudience | null {
+  if (kind === "staff") {
+    if (hasPermission(roles, PERMISSIONS.STAFF_RECORD_READ_SENSITIVE)) return "staff";
+    if (hasPermission(roles, PERMISSIONS.STAFF_RECORD_READ)) return "standard";
+    return null;
+  }
+  if (kind === "class") {
+    if (!hasPermission(roles, PERMISSIONS.CLASS_RECORD_READ)) return null;
+    if (roles.some((role) => LEADERSHIP.includes(role))) return "staff";
+    if (roles.includes(ROLES.INSTRUCTOR)) return "teachers";
+    return null;
+  }
+  return audienceFor(roles);
+}
+
+/** A staff member reading their own record: every field except the sensitive ones. */
+export const SELF_STAFF_AUDIENCE: RecordAudience = "standard";
+
+/** Whether these roles make someone a member of the school's staff. */
+export function isSchoolStaff(roles: readonly Role[]): boolean {
+  return roles.some((role) => SCHOOL_STAFF_ROLES.includes(role));
+}
+
 function subjectNotFound(): never {
   throw new CodedHttpException(
     404,
@@ -97,7 +150,8 @@ function subjectNotFound(): never {
 /**
  * The subject exists and the caller may see it. Student visibility is the RLS policy on
  * app.students (or the identity transaction for finance); a parent's record is leadership's and
- * finance's only.
+ * finance's only; a staff record's subject is a user holding a staff role; a class's visibility is
+ * the RLS policy on app.classes (leadership, and its teachers among the roles that read records).
  */
 export async function assertSubjectReadable(
   tx: TransactionSql,
@@ -108,6 +162,27 @@ export async function assertSubjectReadable(
   if (subject.kind === "student") {
     const [row] = await tx<{ id: string }[]>`
       SELECT id FROM app.students WHERE school_id = ${schoolId}::uuid AND id = ${subject.id}::uuid
+    `;
+    if (!row) subjectNotFound();
+    return;
+  }
+  if (subject.kind === "class") {
+    const [row] = await tx<{ id: string }[]>`
+      SELECT id FROM app.classes WHERE school_id = ${schoolId}::uuid AND id = ${subject.id}::uuid
+    `;
+    if (!row) subjectNotFound();
+    return;
+  }
+  if (subject.kind === "staff") {
+    const [row] = await tx<{ id: string }[]>`
+      SELECT u.id
+      FROM app.users AS u
+      WHERE u.school_id = ${schoolId}::uuid AND u.id = ${subject.id}::uuid
+        AND EXISTS (
+          SELECT 1 FROM app.user_roles AS role
+          WHERE role.school_id = u.school_id AND role.user_id = u.id
+            AND role.role::text = ANY(${[...SCHOOL_STAFF_ROLES]}::text[])
+        )
     `;
     if (!row) subjectNotFound();
     return;
@@ -157,8 +232,16 @@ interface AnswerRow {
   document_expires_on: string | null;
 }
 
-function subjectColumn(subject: RecordSubject) {
-  return subject.kind === "student" ? "student_id" : "parent_user_id";
+const SUBJECT_COLUMNS: Readonly<Record<RecordSubjectKind, string>> = {
+  student: "student_id",
+  parent: "parent_user_id",
+  staff: "staff_user_id",
+  class: "class_id",
+};
+
+/** The app.record_answers column that links an answer to a subject of this kind. */
+export function subjectColumn(subject: { kind: RecordSubjectKind }): string {
+  return SUBJECT_COLUMNS[subject.kind];
 }
 
 async function loadAnswers(
@@ -366,15 +449,15 @@ async function upsertAnswerRow(
     mask: string | null;
   },
 ): Promise<{ id: string; inserted: boolean }> {
-  const studentId = subject.kind === "student" ? subject.id : null;
-  const parentUserId = subject.kind === "parent" ? subject.id : null;
+  const linked = (kind: RecordSubjectKind) => (subject.kind === kind ? subject.id : null);
   const [row] = await tx<{ id: string; inserted: boolean }[]>`
     INSERT INTO app.record_answers (
-      school_id, subject_kind, student_id, parent_user_id, field_id, field_version_id, value,
-      value_ciphertext, value_key_id, value_mask, updated_by
+      school_id, subject_kind, student_id, parent_user_id, staff_user_id, class_id, field_id,
+      field_version_id, value, value_ciphertext, value_key_id, value_mask, updated_by
     ) VALUES (
-      ${schoolId}::uuid, ${subject.kind}::app.record_subject_kind, ${studentId}::uuid,
-      ${parentUserId}::uuid, ${field.id}::uuid, ${field.field_version_id}::uuid,
+      ${schoolId}::uuid, ${subject.kind}::app.record_subject_kind, ${linked("student")}::uuid,
+      ${linked("parent")}::uuid, ${linked("staff")}::uuid, ${linked("class")}::uuid,
+      ${field.id}::uuid, ${field.field_version_id}::uuid,
       ${stored.value === null ? null : tx.json(stored.value as never)}::jsonb,
       ${stored.ciphertext}::bytea, ${stored.keyId}, ${stored.mask}, ${actorId}::uuid
     )
@@ -482,8 +565,8 @@ export async function writeAnswers(
 }
 
 /**
- * The full value of one sensitive answer. Leadership only (studentRecord:readSensitive, checked by
- * the route); audited as a read of the answer: who (the audit row's actor), when, which field --
+ * The full value of one sensitive answer. Leadership only (studentRecord:readSensitive, or
+ * staffRecord:readSensitive for a staff record, checked by the route); audited as a read of the answer: who (the audit row's actor), when, which field --
  * never the value.
  */
 export async function revealValue(
@@ -596,9 +679,7 @@ export async function attachDocument(
   const field = documentField(form, fieldId);
   assertExpiryAllowed(field, input.expires_on);
   const sensitive = field.sensitivity === "sensitive";
-  const contentClass = getContentClass(
-    sensitive ? RECORD_SENSITIVE_DOCUMENT_CONTENT_CLASS : RECORD_DOCUMENT_CONTENT_CLASS,
-  );
+  const contentClass = getContentClass(recordDocumentContentClass(subject.kind, sensitive));
 
   const upload = await inspectStagedUpload(storage, schoolId, contentClass, {
     storageKey: input.storage_key,
@@ -770,7 +851,7 @@ export async function removeDocument(
 
 /**
  * A download URL for the file behind a document field the audience may see. A sensitive document
- * is a sensitive value: it needs studentRecord:readSensitive, its URL lives a minute, and issuing
+ * is a sensitive value: it needs the subject's readSensitive permission, its URL lives a minute, and issuing
  * it is audited like a reveal.
  */
 export async function documentDownload(

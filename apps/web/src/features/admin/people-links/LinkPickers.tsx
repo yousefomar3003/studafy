@@ -46,7 +46,7 @@ function useRelationshipOptions(): SelectOption<GuardianRelationship>[] {
   );
 }
 
-interface SearchListProps<T> {
+export interface SearchListProps<T> {
   label: string;
   placeholder: string;
   noMatches: string;
@@ -59,7 +59,9 @@ interface SearchListProps<T> {
   onPick: (item: T) => void;
 }
 
-function SearchList<T>({
+/** A search-as-you-type list that hands back the item staff pick: nothing is ever picked for them.
+ * Also used outside this file wherever one person is chosen by search (reporting an incident). */
+export function SearchList<T>({
   label,
   placeholder,
   noMatches,

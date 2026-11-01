@@ -18,6 +18,19 @@ export const ROLES = {
 export type Role = (typeof ROLES)[keyof typeof ROLES];
 
 /**
+ * The roles that make someone a member of a school's staff: the people a staff record
+ * (docs/modules/student-records.md "Staff and class records") can be about, and who may read their
+ * own. Platform roles (SUPER_ADMIN, SUPPORT_AGENT) work for Studafy, not the school.
+ */
+export const SCHOOL_STAFF_ROLES: readonly Role[] = [
+  ROLES.ORG_ADMIN,
+  ROLES.PRINCIPAL,
+  ROLES.ATTENDANCE_OFFICER,
+  ROLES.FINANCE,
+  ROLES.INSTRUCTOR,
+];
+
+/**
  * Roles that use Studafy only through the mobile app. A session holding nothing but these is
  * refused a web session (`isMobileOnly`); one that also holds a web role — an admin who also
  * teaches — keeps web access through that role.

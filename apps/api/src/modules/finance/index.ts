@@ -17,6 +17,7 @@ export { financeReportRoutes } from "./reports/routes";
 export { familyFinancialViewRoutes } from "./family/routes";
 export { familyAccountRoutes } from "./family-accounts/routes";
 export { siblingDiscountRoutes } from "./sibling-discount/routes";
+export { taxSettingsRoutes } from "./tax-settings/routes";
 export { receiptRoutes } from "./receipts/routes";
 export { runGlobalReconciliation } from "./jobs/reconciliation.job";
 export { EnvCredentialResolver } from "./client/credential-resolver";

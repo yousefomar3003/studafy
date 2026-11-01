@@ -281,7 +281,10 @@ export function financeInvoiceRoutes(
     const auth = requireAuth(c);
     const query = c.req.valid("query");
 
-    const { rows, next_cursor } = await withTenantTx(database, tenantFrom(c), (tx) =>
+    // The identity transaction, not the caller's: invoice rows join the student's name, and a
+    // FINANCE caller (billing:read, no student:read) cannot see app.students under its own RLS, so
+    // the join would hide every invoice from the role this list is for.
+    const { rows, next_cursor } = await withStudentIdentityTx(database, auth.schoolId, (tx) =>
       listInvoices(tx, auth.schoolId, query),
     );
     const families = await familiesOf(
@@ -316,7 +319,8 @@ export function financeInvoiceRoutes(
     const auth = requireAuth(c);
     const { invoiceId } = c.req.valid("param");
 
-    const detail = await withTenantTx(database, tenantFrom(c), (tx) =>
+    // Identity transaction for the same reason as the list above.
+    const detail = await withStudentIdentityTx(database, auth.schoolId, (tx) =>
       getInvoiceDetail(tx, auth.schoolId, invoiceId),
     );
     const families = await familiesOf(database, auth.schoolId, [detail.student_id]);
@@ -422,7 +426,8 @@ export function financeInvoiceRoutes(
     const { batchId } = c.req.valid("param");
     const query = c.req.valid("query");
 
-    const { rows, next_cursor } = await withTenantTx(database, tenantFrom(c), (tx) =>
+    // Each item carries the student's name; identity transaction as for the invoice list.
+    const { rows, next_cursor } = await withStudentIdentityTx(database, auth.schoolId, (tx) =>
       getInvoiceBatchItems(tx, auth.schoolId, batchId, query),
     );
 

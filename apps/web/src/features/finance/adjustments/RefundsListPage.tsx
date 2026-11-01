@@ -10,7 +10,13 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { AdjustmentConfirmDialog } from "./AdjustmentConfirmDialog";
 import { AuditTrailModal } from "./AuditTrailModal";
-import { REASON_CODE_LABEL_KEYS, REFUND_STATUS_LABEL_KEYS, refundStatusTone } from "./labels";
+import {
+  REASON_CODE_LABEL_KEYS,
+  REFUND_KIND_EFFECT_KEYS,
+  REFUND_KIND_LABEL_KEYS,
+  REFUND_STATUS_LABEL_KEYS,
+  refundStatusTone,
+} from "./labels";
 import { useApproveRefund } from "./mutations";
 import { fetchRefundsPage, REFUNDS_PAGE_SIZE } from "./queries";
 import { RejectRefundModal } from "./RejectRefundModal";
@@ -18,7 +24,7 @@ import { RejectRefundModal } from "./RejectRefundModal";
 import "./adjustments.css";
 
 import type { AuditTrailTarget } from "./AuditTrailModal";
-import type { Refund, RefundFilters, RefundStatus } from "./queries";
+import type { Refund, RefundFilters, RefundKind, RefundStatus } from "./queries";
 import type { DataGridColumn, SelectOption } from "@studafy/ui";
 
 function apiErrorMessage(error: unknown, fallback: string): string {
@@ -27,7 +33,9 @@ function apiErrorMessage(error: unknown, fallback: string): string {
 }
 
 /**
- * Refund requests (`/portal/finance/adjustments/refunds`), gated by `billing:read`. Approving or
+ * Refunds and corrections (`/portal/finance/adjustments/refunds`), gated by `billing:read`: credit
+ * notes (refunds, fee corrections, write-offs), invoice cancellations and payment reversals, all
+ * through one maker-checker queue. Approving or
  * rejecting a pending refund (the checker step) requires `billing:refund` — deliberately stricter
  * than `billing:update`, which only the maker step needs (see `refunds/routes.ts`) — so FINANCE-role
  * users can see this list without being able to act on it; the row actions reflect that instead of
@@ -45,6 +53,7 @@ export default function RefundsListPage() {
   const approveRefund = useApproveRefund();
 
   const [status, setStatus] = useState<RefundStatus | "">("");
+  const [kind, setKind] = useState<RefundKind | "">("");
   const [offset, setOffset] = useState(0);
   const [approveTarget, setApproveTarget] = useState<Refund | null>(null);
   const [rejectTarget, setRejectTarget] = useState<Refund | null>(null);
@@ -57,9 +66,16 @@ export default function RefundsListPage() {
     ),
   ];
 
-  const filters: RefundFilters = { status };
+  const kindOptions: SelectOption<RefundKind | "">[] = [
+    { value: "", label: t("financeReports.adjustments.common.allKinds") },
+    ...(Object.entries(REFUND_KIND_LABEL_KEYS) as [RefundKind, string][]).map(
+      ([value, labelKey]) => ({ value, label: t(labelKey) }),
+    ),
+  ];
+
+  const filters: RefundFilters = { status, kind };
   const listQuery = useQuery({
-    queryKey: ["finance", "adjustments", "refunds", "list", status, offset],
+    queryKey: ["finance", "adjustments", "refunds", "list", status, kind, offset],
     queryFn: () => fetchRefundsPage(filters, offset),
   });
 
@@ -70,6 +86,11 @@ export default function RefundsListPage() {
 
   function changeStatus(next: RefundStatus | "") {
     setStatus(next);
+    setOffset(0);
+  }
+
+  function changeKind(next: RefundKind | "") {
+    setKind(next);
     setOffset(0);
   }
 
@@ -92,7 +113,16 @@ export default function RefundsListPage() {
     {
       id: "created_at",
       header: t("financeReports.adjustments.common.created"),
-      renderCell: (row) => formatDate(new Date(row.created_at)),
+      renderCell: (row) => (
+        <Link to={`/portal/finance/adjustments/refunds/${row.id}`}>
+          {formatDate(new Date(row.created_at))}
+        </Link>
+      ),
+    },
+    {
+      id: "kind",
+      header: t("financeReports.adjustments.common.kind"),
+      renderCell: (row) => t(REFUND_KIND_LABEL_KEYS[row.kind]),
     },
     {
       id: "invoice",
@@ -195,6 +225,12 @@ export default function RefundsListPage() {
           value={status}
           onChange={changeStatus}
         />
+        <Select
+          label={t("financeReports.adjustments.common.kind")}
+          options={kindOptions}
+          value={kind}
+          onChange={changeKind}
+        />
       </div>
 
       <DataGrid
@@ -231,7 +267,7 @@ export default function RefundsListPage() {
       <AdjustmentConfirmDialog
         open={approveTarget !== null}
         title={t("financeReports.adjustments.refunds.approveTitle")}
-        description={t("financeReports.adjustments.refunds.approveDescription")}
+        description={t(REFUND_KIND_EFFECT_KEYS[approveTarget?.kind ?? "credit_note"])}
         confirmLabel={t("financeReports.adjustments.refunds.approveLabel")}
         loading={approveRefund.isPending}
         error={
@@ -250,6 +286,10 @@ export default function RefundsListPage() {
             <div>
               <dt>{t("financeReports.adjustments.common.invoice")}</dt>
               <dd>{approveTarget.erpnext_invoice_id}</dd>
+            </div>
+            <div>
+              <dt>{t("financeReports.adjustments.common.kind")}</dt>
+              <dd>{t(REFUND_KIND_LABEL_KEYS[approveTarget.kind])}</dd>
             </div>
             <div>
               <dt>{t("financeReports.adjustments.common.refundAmount")}</dt>

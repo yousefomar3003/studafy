@@ -18,9 +18,13 @@ import timetable from "@docs/help/academics/timetable.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import subscriptions from "@docs/help/billing/subscriptions.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
+import correctInvoiceOrPayment from "@docs/help/finance/correct-invoice-or-payment.md?raw";
+// eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import createInvoiceBatch from "@docs/help/finance/create-invoice-batch.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import issueRefund from "@docs/help/finance/issue-refund.md?raw";
+// eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
+import paymentPlansAndVat from "@docs/help/finance/payment-plans-and-vat.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
 import recordPayment from "@docs/help/finance/record-payment.md?raw";
 // eslint-disable-next-line import-x/no-unresolved -- resolved at build time by Vite's `@docs` alias (see `vite.config.ts`)
@@ -50,7 +54,12 @@ const ARTICLE_SOURCES = [
   { path: "@docs/help/academics/timetable.md", raw: timetable },
   { path: "@docs/help/billing/subscriptions.md", raw: subscriptions },
   { path: "@docs/help/finance/create-invoice-batch.md", raw: createInvoiceBatch },
+  {
+    path: "@docs/help/finance/correct-invoice-or-payment.md",
+    raw: correctInvoiceOrPayment,
+  },
   { path: "@docs/help/finance/issue-refund.md", raw: issueRefund },
+  { path: "@docs/help/finance/payment-plans-and-vat.md", raw: paymentPlansAndVat },
   { path: "@docs/help/finance/record-payment.md", raw: recordPayment },
   { path: "@docs/help/finance/workflows.md", raw: workflows },
   { path: "@docs/help/getting-started/add-student.md", raw: addStudent },

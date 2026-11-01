@@ -1,4 +1,4 @@
-import { PERMISSIONS } from "@studafy/constants";
+import { PERMISSIONS, SCHOOL_STAFF_ROLES } from "@studafy/constants";
 import { Button, DataGrid, FilterBar, Select } from "@studafy/ui";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
@@ -124,8 +124,10 @@ export default function UsersListPage() {
     return key ? t(key) : role;
   }
 
-  // A PARENT's school-defined record has its own page (`studentRecord:read`).
+  // A PARENT's school-defined record has its own page (`studentRecord:read`), and so does a member
+  // of staff's (`staffRecord:read`).
   const canReadRecords = permissions.has(PERMISSIONS.STUDENT_RECORD_READ);
+  const canReadStaffRecords = permissions.has(PERMISSIONS.STAFF_RECORD_READ);
 
   const columns: DataGridColumn<UserWithRoles>[] = [
     {
@@ -182,6 +184,16 @@ export default function UsersListPage() {
               {t("records.admin.openRecords")}
             </Link>
           ) : null}
+          {canReadStaffRecords && user.roles.some((role) => SCHOOL_STAFF_ROLES.includes(role)) ? (
+            <Link
+              to={`/portal/admin/staff/${user.id}/records`}
+              aria-label={t("records.staff.openRecord", {
+                name: user.display_name ?? user.email ?? t("records.staff.fallback"),
+              })}
+            >
+              {t("records.staff.openShort")}
+            </Link>
+          ) : null}
           {user.status !== "suspended" && user.status !== "archived" ? (
             <Button variant="tertiary" onClick={() => setDeactivatingUser(user)}>
               {t("adminPeople.users.list.deactivate")}
@@ -233,6 +245,14 @@ export default function UsersListPage() {
       const { data } = await api.POST("/api/users", { body });
       if (!data) throw new Error("User creation returned no data.");
       return data;
+    },
+    // A column the import does not know can be kept as a staff record field, for the members of
+    // staff the import created (the API skips any created user who holds no staff role).
+    recordColumns: {
+      subjectKind: "staff",
+      idOf: (created) => (created as { id?: string } | undefined)?.id ?? null,
+      canKeep: permissions.has(PERMISSIONS.STAFF_RECORD_UPDATE),
+      canCreateField: permissions.has(PERMISSIONS.RECORD_TEMPLATE_MANAGE),
     },
   };
 

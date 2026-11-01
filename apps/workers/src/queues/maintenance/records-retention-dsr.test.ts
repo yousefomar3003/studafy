@@ -1,7 +1,7 @@
 /**
  * School-defined record data in the GDPR pipeline and the sensitive-record retention sweep
- * (docs/modules/student-records.md "DSR" and "Retention"). Requires a live, migrated PostgreSQL
- * instance, gated on TEST_DATABASE_URL.
+ * (docs/modules/student-records.md "DSR" and "Retention") -- for students and parents, and for staff
+ * and classes (000181). Requires a live, migrated PostgreSQL instance, gated on TEST_DATABASE_URL.
  */
 
 import {
@@ -19,6 +19,7 @@ import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { resealRecordValues } from "./record-key-rotation";
 import { purgeExpiredSensitiveRecords } from "./record-retention-sweep";
+import { eraseRecordData } from "./records-dsr";
 import { resolveSubjectIdentifiers } from "./subject-resolver";
 import { runTenantErasure } from "./tenant-erasure.worker";
 import { runTenantExport } from "./tenant-export.worker";
@@ -47,7 +48,10 @@ interface School {
   schoolId: string;
   adminId: string;
   /** Field ids by name. */
-  fields: Record<"passport" | "busStop" | "medical" | "parentId", string>;
+  fields: Record<
+    "passport" | "busStop" | "medical" | "parentId" | "staffId" | "qualification" | "busGroup",
+    string
+  >;
   /** Field version ids by field name. */
   versions: Record<string, string>;
 }
@@ -74,7 +78,7 @@ async function school(): Promise<School> {
 
     const fields = {} as School["fields"];
     const versions: Record<string, string> = {};
-    for (const kind of ["student", "parent"] as const) {
+    for (const kind of ["student", "parent", "staff", "class"] as const) {
       const [template] = await tx<{ id: string }[]>`
         INSERT INTO app.record_templates (school_id, subject_kind, published_version)
         VALUES (${schoolId}::uuid, ${kind}::app.record_subject_kind, 1) RETURNING id
@@ -83,14 +87,21 @@ async function school(): Promise<School> {
         INSERT INTO app.record_template_versions (school_id, template_id, version, published_by)
         VALUES (${schoolId}::uuid, ${template!.id}::uuid, 1, ${admin!.id}::uuid) RETURNING id
       `;
-      const defs =
-        kind === "student"
-          ? ([
-              ["passport", "short_text", "sensitive", null],
-              ["busStop", "short_text", "standard", null],
-              ["medical", "long_text", "sensitive", 6],
-            ] as const)
-          : ([["parentId", "short_text", "sensitive", null]] as const);
+      type FieldDef = readonly [keyof School["fields"], string, string, number | null];
+      const byKind: Record<typeof kind, readonly FieldDef[]> = {
+        student: [
+          ["passport", "short_text", "sensitive", null],
+          ["busStop", "short_text", "standard", null],
+          ["medical", "long_text", "sensitive", 6],
+        ],
+        parent: [["parentId", "short_text", "sensitive", null]],
+        staff: [
+          ["staffId", "short_text", "sensitive", null],
+          ["qualification", "short_text", "standard", null],
+        ],
+        class: [["busGroup", "short_text", "standard", null]],
+      };
+      const defs = byKind[kind];
       for (const [name, type, sensitivity, months] of defs) {
         const [field] = await tx<{ id: string }[]>`
           INSERT INTO app.record_fields (school_id, template_id, field_type, label_en, label_ar,
@@ -178,9 +189,77 @@ async function parent(s: School, childIds: string[]) {
   });
 }
 
+/** A member of staff; `archivedMonthsAgo` archives their account that long ago. */
+async function staffMember(s: School, archivedMonthsAgo: number | null) {
+  return withAdmin(s.schoolId, async (tx) => {
+    const email = `staff-${crypto.randomUUID().slice(0, 8)}@example.com`;
+    const [user] = await tx<{ id: string }[]>`
+      INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+      VALUES (${s.schoolId}::uuid, ${email}, ${email}, 'Teacher', 'active') RETURNING id
+    `;
+    await tx`INSERT INTO app.user_roles (school_id, user_id, role) VALUES (${s.schoolId}::uuid, ${user!.id}::uuid, 'INSTRUCTOR')`;
+    if (archivedMonthsAgo !== null) {
+      await tx`UPDATE app.users SET status = 'archived' WHERE id = ${user!.id}::uuid`;
+      await tx`
+        UPDATE app.users SET archived_at = ${new Date(Date.now() - archivedMonthsAgo * MONTH)}
+        WHERE id = ${user!.id}::uuid
+      `;
+    }
+    return user!.id;
+  });
+}
+
+/** A class, built on the minimum academic structure. */
+async function aClass(s: School) {
+  return withAdmin(s.schoolId, async (tx) => {
+    const tag = crypto.randomUUID().slice(0, 6);
+    const [teacherUser] = await tx<{ id: string }[]>`
+      INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+      VALUES (${s.schoolId}::uuid, ${tag + "-t@example.com"}, ${tag + "-t@example.com"}, 'Lead', 'active')
+      RETURNING id
+    `;
+    const [teacher] = await tx<{ id: string }[]>`
+      INSERT INTO app.teachers (school_id, user_id, employee_number)
+      VALUES (${s.schoolId}::uuid, ${teacherUser!.id}::uuid, ${"EMP-" + tag})
+      RETURNING id
+    `;
+    const [year] = await tx<{ id: string }[]>`
+      INSERT INTO app.academic_years (school_id, code, name, starts_on, ends_on)
+      VALUES (${s.schoolId}::uuid, ${"AY-" + tag}, 'Year', '2026-09-01', '2027-06-30') RETURNING id
+    `;
+    const [term] = await tx<{ id: string }[]>`
+      INSERT INTO app.terms (school_id, academic_year_id, code, name, starts_on, ends_on, sequence_number)
+      VALUES (${s.schoolId}::uuid, ${year!.id}::uuid, ${"T-" + tag}, 'Term', '2026-09-01', '2026-12-31', 1)
+      RETURNING id
+    `;
+    const [subject] = await tx<{ id: string }[]>`
+      INSERT INTO app.subjects (school_id, code, name) VALUES (${s.schoolId}::uuid, ${"S-" + tag}, 'Maths')
+      RETURNING id
+    `;
+    const [course] = await tx<{ id: string }[]>`
+      INSERT INTO app.courses (school_id, subject_id, code, name)
+      VALUES (${s.schoolId}::uuid, ${subject!.id}::uuid, ${"C-" + tag}, 'Maths 10') RETURNING id
+    `;
+    const [row] = await tx<{ id: string }[]>`
+      INSERT INTO app.classes (school_id, course_id, academic_year_id, term_id, lead_teacher_id, code)
+      VALUES (${s.schoolId}::uuid, ${course!.id}::uuid, ${year!.id}::uuid, ${term!.id}::uuid,
+              ${teacher!.id}::uuid, ${"CLS-" + tag})
+      RETURNING id
+    `;
+    return row!.id;
+  });
+}
+
+const SUBJECT_COLUMN = {
+  student: "student_id",
+  parent: "parent_user_id",
+  staff: "staff_user_id",
+  class: "class_id",
+} as const;
+
 async function answer(
   s: School,
-  subject: { kind: "student" | "parent"; id: string },
+  subject: { kind: "student" | "parent" | "staff" | "class"; id: string },
   field: keyof School["fields"],
   value: string,
   sensitive: boolean,
@@ -197,11 +276,10 @@ async function answer(
   await withAdmin(
     s.schoolId,
     (tx) => tx`
-    INSERT INTO app.record_answers (school_id, subject_kind, student_id, parent_user_id, field_id,
-      field_version_id, value, value_ciphertext, value_key_id, value_mask)
-    VALUES (${s.schoolId}::uuid, ${subject.kind}::app.record_subject_kind,
-      ${subject.kind === "student" ? subject.id : null}::uuid,
-      ${subject.kind === "parent" ? subject.id : null}::uuid, ${fieldId}::uuid,
+    INSERT INTO app.record_answers (school_id, subject_kind, ${tx(SUBJECT_COLUMN[subject.kind])},
+      field_id, field_version_id, value, value_ciphertext, value_key_id, value_mask)
+    VALUES (${s.schoolId}::uuid, ${subject.kind}::app.record_subject_kind, ${subject.id}::uuid,
+      ${fieldId}::uuid,
       ${s.versions[field]!}::uuid, ${sealed ? null : tx.json(value)}::jsonb,
       ${sealed?.ciphertext ?? null}::bytea, ${sealed?.keyId ?? null}, ${sealed?.mask ?? null})
   `,
@@ -344,6 +422,120 @@ describeDb("record data in the DSR pipeline", () => {
     expect(await remaining(s)).toEqual(
       [`${other.studentId}:${s.fields.busStop}`, `${guardian}:${s.fields.parentId}`].sort(),
     );
+  });
+});
+
+describeDb("staff and class records in retention and the DSR pipeline", () => {
+  test("a staff member's sensitive answers go once their account has been archived long enough", async () => {
+    const s = await school();
+    const current = await staffMember(s, null);
+    const leftLongAgo = await staffMember(s, 13);
+    const leftRecently = await staffMember(s, 2);
+    const classId = await aClass(s);
+    for (const id of [current, leftLongAgo, leftRecently]) {
+      await answer(s, { kind: "staff", id }, "staffId", PASSPORT, true);
+      await answer(s, { kind: "staff", id }, "qualification", "BEd", false);
+    }
+    await answer(s, { kind: "class", id: classId }, "busGroup", "Route 4", false);
+
+    expect(
+      (await purgeExpiredSensitiveRecords(sql!, { remove: async () => undefined })).failed,
+    ).toBe(0);
+    expect(await remaining(s)).toEqual(
+      [
+        `${current}:${s.fields.staffId}`,
+        `${current}:${s.fields.qualification}`,
+        // Archived 13 months ago: the sensitive ID is past the 12-month default; the rest stays.
+        `${leftLongAgo}:${s.fields.qualification}`,
+        `${leftRecently}:${s.fields.staffId}`,
+        `${leftRecently}:${s.fields.qualification}`,
+        `${classId}:${s.fields.busGroup}`,
+      ].sort(),
+    );
+  });
+
+  test("archiving a user stamps archived_at, and reactivating clears it", async () => {
+    const s = await school();
+    const id = await staffMember(s, null);
+    const stamp = async () =>
+      (
+        await withAdmin(
+          s.schoolId,
+          (tx) => tx<{ archived_at: Date | null }[]>`
+            SELECT archived_at FROM app.users WHERE id = ${id}::uuid
+          `,
+        )
+      )[0]!.archived_at;
+    expect(await stamp()).toBeNull();
+    await withAdmin(
+      s.schoolId,
+      (tx) => tx`UPDATE app.users SET status = 'archived' WHERE id = ${id}::uuid`,
+    );
+    expect(await stamp()).not.toBeNull();
+    await withAdmin(
+      s.schoolId,
+      (tx) => tx`UPDATE app.users SET status = 'active' WHERE id = ${id}::uuid`,
+    );
+    expect(await stamp()).toBeNull();
+  });
+
+  test("a staff member's export holds their answers opened; erasure takes them and never a class's", async () => {
+    const s = await school();
+    const teacher = await staffMember(s, null);
+    const colleague = await staffMember(s, null);
+    const classId = await aClass(s);
+    await answer(s, { kind: "staff", id: teacher }, "staffId", PASSPORT, true);
+    await answer(s, { kind: "staff", id: teacher }, "qualification", "BEd", false);
+    await answer(s, { kind: "staff", id: colleague }, "qualification", "MEd", false);
+    await answer(s, { kind: "class", id: classId }, "busGroup", "Route 4", false);
+
+    const objects = new Map<string, Uint8Array>();
+    const s3 = { put: async (key: string, body: Uint8Array) => void objects.set(key, body) };
+    const exported = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, (tx) =>
+      runTenantExport(tx, {
+        s3,
+        requestId: crypto.randomUUID(),
+        schoolId: s.schoolId,
+        subjectScope: "user",
+        subjectUserId: teacher,
+        now: new Date(),
+        recordKeyring: DEVELOPMENT_RECORD_KEYRING,
+      }),
+    );
+    const entry = exported.manifest.tables.find((table) => table.table === "record_answers")!;
+    expect(entry.rowCount).toBe(2);
+    const lines = new TextDecoder()
+      .decode(objects.get(entry.storageKey)!)
+      .split("\n")
+      .map(
+        (line) => JSON.parse(line) as { subject_kind: string; label_en: string; value: unknown },
+      );
+    expect(lines.map((line) => [line.subject_kind, line.label_en, line.value]).sort()).toEqual(
+      [
+        ["staff", "qualification", "BEd"],
+        ["staff", "staffId", PASSPORT],
+      ].sort(),
+    );
+
+    const erasure = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, async (tx) =>
+      runTenantErasure(tx, s.schoolId, await resolveSubjectIdentifiers(tx, s.schoolId, teacher)),
+    );
+    expect(erasure.redactedTables).toContainEqual({
+      table: "record_answers",
+      action: "hard_deleted",
+      columns: [],
+      rows: 2,
+    });
+    expect(await remaining(s)).toEqual(
+      [`${colleague}:${s.fields.qualification}`, `${classId}:${s.fields.busGroup}`].sort(),
+    );
+
+    // A tenant closure takes everything, the class's record included.
+    const closure = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, (tx) =>
+      eraseRecordData(tx, s.schoolId, undefined),
+    );
+    expect(closure.rows).toBe(2);
+    expect(await remaining(s)).toEqual([]);
   });
 });
 

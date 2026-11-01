@@ -10,7 +10,9 @@ import '../../../core/di/app_providers.dart';
 import '../../../core/localization/app_locales.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../account/application/account_settings_providers.dart';
 import '../../account/presentation/notification_preferences_screen.dart';
+import '../../account/presentation/own_staff_record_screen.dart';
 import '../../account/presentation/signed_in_devices_screen.dart';
 import '../../ai/store/ai_store_controller.dart';
 import '../../student/application/student_context_providers.dart';
@@ -143,6 +145,21 @@ class ProfileTabScreen extends ConsumerWidget {
                       ),
                     ),
                     if (isStudent) const _RestorePurchasesTile(),
+                    // A member of staff reads what the school keeps about them (non-sensitive fields).
+                    if (holdsStaffRole(roles)) ...[
+                      const Divider(height: 1, indent: 68),
+                      _SettingsRow(
+                        key: const Key('profileStaffRecord'),
+                        icon: Icons.badge_outlined,
+                        titleKey: 'account.staffRecord.title',
+                        trailing: Icons.chevron_right,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => const OwnStaffRecordScreen(),
+                          ),
+                        ),
+                      ),
+                    ],
                     const Divider(height: 1, indent: 68),
                     _SettingsRow(
                       key: const Key('profilePrivacyPolicy'),
@@ -490,7 +507,9 @@ class SignInSecurityScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text('shell.profile.signInSecurity.title'.tr())),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
+        padding: const EdgeInsets.all(
+          AppSpacing.space16,
+        ).withBottomInset(context),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 560),

@@ -10,6 +10,7 @@ import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { resolveSchoolCredentials } from "./credential-resolver";
 import { ErpNextClient, ErpNextError } from "./erpnext-client";
+import { applySalesTax, type SalesInvoiceItem, type SalesTaxSettings } from "./sales-tax";
 import { scholarshipDiscountMinor, type ApprovedScholarship } from "./scholarship-discount";
 
 import type { GenerateBatchInvoicesJobData, GenerateInvoiceJobData } from "./schemas";
@@ -246,6 +247,25 @@ async function approvedScholarships(
   }));
 }
 
+/** The school's sales tax settings (000178); null when it never configured them. */
+async function salesTaxSettings(
+  tx: TransactionSql,
+  schoolId: string,
+): Promise<SalesTaxSettings | null> {
+  const [row] = await tx<SalesTaxSettings[]>`
+    SELECT s.is_enabled, s.tax_name, s.rate::text AS rate, s.erpnext_account_head,
+           s.prices_include_tax,
+           coalesce(
+             (SELECT array_agg(e.fee_category) FROM app.school_tax_exempt_categories AS e
+              WHERE e.school_id = s.school_id),
+             '{}'
+           ) AS exempt_fee_categories
+    FROM app.school_tax_settings AS s
+    WHERE s.school_id = ${schoolId}::uuid
+  `;
+  return row ?? null;
+}
+
 /** The school's sibling rule for this student, shaped like a percentage scholarship; null if none. */
 async function siblingDiscount(
   tx: TransactionSql,
@@ -326,14 +346,14 @@ export async function generateInvoice(
 
   const customerId = await buildStudentCustomerId(tx, schoolId, params.studentId);
 
-  const items = components.map((c) => ({
+  const items: SalesInvoiceItem[] = components.map((c) => ({
     item_code: c.fee_category,
     qty: 1,
     rate: c.amount,
     description: c.description ?? undefined,
   }));
 
-  const payload: Record<string, unknown> = {
+  const payload: Record<string, unknown> & { items: SalesInvoiceItem[] } = {
     customer: customerId,
     currency: currencyCode,
     items,
@@ -367,6 +387,7 @@ export async function generateInvoice(
   if (params.dueDate) {
     payload.due_date = params.dueDate;
   }
+  applySalesTax(payload, await salesTaxSettings(tx, schoolId));
 
   let doc: ErpNextSalesInvoiceDoc;
   try {

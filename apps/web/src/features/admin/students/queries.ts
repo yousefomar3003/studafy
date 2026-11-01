@@ -398,10 +398,14 @@ function headersFromXhr(xhr: XMLHttpRequest): Headers {
 export function uploadStudentImportCsv(
   file: File,
   onProgress?: (progress: UploadProgress) => void,
+  sourceKey?: string,
 ): Promise<StudentImport> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", `${API_BASE_URL}/api/imports/students/upload`);
+    // `source_key` names the copy of this same file already staged in storage (see
+    // `stageImportSource` in mutations.ts): the API keeps it as the import's original file.
+    const query = sourceKey ? `?source_key=${encodeURIComponent(sourceKey)}` : "";
+    xhr.open("POST", `${API_BASE_URL}/api/imports/students/upload${query}`);
     xhr.setRequestHeader("Content-Type", "text/csv");
     xhr.setRequestHeader("X-File-Name", file.name);
 

@@ -129,3 +129,38 @@ export async function listDsrRequestsForSubject(
   `;
   return rows.map(parseRow);
 }
+
+export interface SchoolDataSubjectRequestRow extends DataSubjectRequestRow {
+  subjectDisplayName: string | null;
+}
+
+/**
+ * The school's per-person requests, most recent first -- the admin's view of every export and
+ * erasure filed,
+ * by them or by the subject, so a request filed last week can be followed up without its id. The
+ * subject's display name rides along for the list; an erased subject's name is already gone.
+ */
+export async function listDsrRequestsForSchool(
+  tx: TransactionSql,
+  schoolId: string,
+  options: { subjectUserId?: string; limit: number },
+): Promise<SchoolDataSubjectRequestRow[]> {
+  const rows = await tx<Record<string, unknown>[]>`
+    SELECT
+      dsr.id, dsr.request_type::text AS request_type, dsr.subject_user_id,
+      dsr.status::text AS status, dsr.storage_key, dsr.failure_message, dsr.created_at,
+      dsr.completed_at, dsr.sla_due_at, u.display_name AS subject_display_name
+    FROM app.data_subject_requests AS dsr
+    LEFT JOIN app.users AS u ON u.id = dsr.subject_user_id AND u.school_id = dsr.school_id
+    WHERE dsr.school_id = ${schoolId}::uuid
+      -- A school closure's whole-tenant request has no subject; it is the platform's, not this list's.
+      AND dsr.subject_scope = 'user'
+      ${options.subjectUserId ? tx`AND dsr.subject_user_id = ${options.subjectUserId}::uuid` : tx``}
+    ORDER BY dsr.created_at DESC
+    LIMIT ${options.limit}
+  `;
+  return rows.map((row) => ({
+    ...parseRow(row),
+    subjectDisplayName: (row.subject_display_name as string | null) ?? null,
+  }));
+}

@@ -47,9 +47,20 @@
 
 .invoices-list__toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   gap: var(--space-16);
   margin-bottom: var(--space-16);
+}
+
+.invoices-list__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.invoices-list__dates {
+  flex-wrap: wrap;
 }
 
 .invoices-list__search {
@@ -161,6 +172,19 @@
 
 /* --- Print view: the detail page's own markup, not a separate template. Everything not part of
    the invoice itself (nav, buttons, status pill) is hidden; the rest prints as-is. --- */
+
+.invoices-detail__corrections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.invoices-detail__correction-list {
+  margin: 0;
+  padding-inline-start: var(--space-20);
+  display: grid;
+  gap: var(--space-8);
+}
 
 @media print {
   .invoices-detail__no-print {

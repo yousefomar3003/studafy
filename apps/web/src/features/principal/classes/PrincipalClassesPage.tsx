@@ -22,7 +22,7 @@ import { sectionDisplayName, useSections } from "../sections/queries";
 import { CLASS_STATUSES, ClassFormModal } from "./ClassFormModal";
 import { useDeleteClass } from "./mutations";
 
-import type { ImportSpec } from "../../../lib/data-transfer";
+import type { ImportSpec, RecordColumnsOption } from "../../../lib/data-transfer";
 import type { Class, TeacherContact, Term } from "../../admin/timetable/queries";
 import type { Course } from "../school/queries";
 import type { components } from "@studafy/api-client";
@@ -56,8 +56,19 @@ function findBy<T>(items: readonly T[], value: string, keys: (item: T) => readon
  * and resolved to ids here against lookups loaded before the dialog opens. An unknown
  * reference rejects the row with a message naming the value.
  */
-function classImportSpec(t: TFunction, lookups: ClassImportLookups): ImportSpec<CreateClassInput> {
+function classImportSpec(
+  t: TFunction,
+  lookups: ClassImportLookups,
+  recordColumns: Pick<RecordColumnsOption, "canKeep" | "canCreateField">,
+): ImportSpec<CreateClassInput> {
   return {
+    // A column the import does not know can be kept as a class record field, for the classes the
+    // import created (the create call answers with the new class).
+    recordColumns: {
+      subjectKind: "class",
+      idOf: (created) => (created as { data?: { id?: string } } | undefined)?.data?.id ?? null,
+      ...recordColumns,
+    },
     templateName: "classes",
     fields: [
       {
@@ -159,7 +170,10 @@ export default function PrincipalClassesPage() {
   const classes = useClassesForTerm(selection.term?.id);
   const teachers = useTeacherContacts();
   const courses = useCourses(canManage);
-  const columnCount = canManage ? COLUMN_COUNT + 1 : COLUMN_COUNT;
+  // A class's record (classRecord:read) is opened from the same actions column.
+  const canReadRecords = permissions.has(PERMISSIONS.CLASS_RECORD_READ);
+  const showActions = canManage || canReadRecords;
+  const columnCount = showActions ? COLUMN_COUNT + 1 : COLUMN_COUNT;
 
   const classList = [...(classes.data ?? [])].sort((a, b) => a.code.localeCompare(b.code));
   const enrolled = useEnrollmentCounts(classList.map((klass) => klass.id));
@@ -207,12 +221,19 @@ export default function PrincipalClassesPage() {
         <div className="principal-school__actions">
           {canManage ? (
             <ImportCsvButton
-              spec={classImportSpec(t, {
-                terms: selection.terms,
-                defaultTerm: selection.term,
-                courses: courses.data ?? [],
-                teachers: teachers.data ?? [],
-              })}
+              spec={classImportSpec(
+                t,
+                {
+                  terms: selection.terms,
+                  defaultTerm: selection.term,
+                  courses: courses.data ?? [],
+                  teachers: teachers.data ?? [],
+                },
+                {
+                  canKeep: canManage,
+                  canCreateField: permissions.has(PERMISSIONS.RECORD_TEMPLATE_MANAGE),
+                },
+              )}
               title={t("principal.classes.import.title")}
               onImported={() => void queryClient.invalidateQueries({ queryKey: CLASSES_KEY_ROOT })}
               disabled={!lookupsReady}
@@ -234,7 +255,7 @@ export default function PrincipalClassesPage() {
             <Table.HeaderCell>{t("principal.classes.columns.section")}</Table.HeaderCell>
             <Table.HeaderCell>{t("principal.classes.columns.enrolled")}</Table.HeaderCell>
             <Table.HeaderCell>{t("principal.classes.columns.status")}</Table.HeaderCell>
-            {canManage ? (
+            {showActions ? (
               <Table.HeaderCell>{t("principal.classes.columns.actions")}</Table.HeaderCell>
             ) : null}
           </Table.Row>
@@ -267,25 +288,38 @@ export default function PrincipalClassesPage() {
                 <Table.Cell>
                   {t(`principal.classes.status.${klass.status}`, klass.status)}
                 </Table.Cell>
-                {canManage ? (
+                {showActions ? (
                   <Table.Cell>
                     <div className="principal-school__cell-action">
-                      <Button
-                        type="button"
-                        variant="tertiary"
-                        aria-label={t("principal.classes.editLabel", { code: klass.code })}
-                        onClick={() => setForm({ klass })}
-                      >
-                        {t("principal.classes.edit")}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="tertiary"
-                        aria-label={t("principal.classes.delete.label", { code: klass.code })}
-                        onClick={() => setPendingDelete(klass)}
-                      >
-                        {t("principal.classes.delete.action")}
-                      </Button>
+                      {canReadRecords ? (
+                        <LinkButton
+                          href={`/portal/principal/classes/${klass.id}/records`}
+                          variant="tertiary"
+                          aria-label={t("principal.classes.recordLabel", { code: klass.code })}
+                        >
+                          {t("principal.classes.record")}
+                        </LinkButton>
+                      ) : null}
+                      {canManage ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="tertiary"
+                            aria-label={t("principal.classes.editLabel", { code: klass.code })}
+                            onClick={() => setForm({ klass })}
+                          >
+                            {t("principal.classes.edit")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="tertiary"
+                            aria-label={t("principal.classes.delete.label", { code: klass.code })}
+                            onClick={() => setPendingDelete(klass)}
+                          >
+                            {t("principal.classes.delete.action")}
+                          </Button>
+                        </>
+                      ) : null}
                     </div>
                   </Table.Cell>
                 ) : null}

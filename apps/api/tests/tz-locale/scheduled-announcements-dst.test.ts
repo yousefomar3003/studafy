@@ -40,6 +40,8 @@ afterAll(async () => {
 
 interface Case {
   zone: string;
+  /** School-local calendar date the prompt is read on (a bare time has no instant without one). */
+  localDate: string;
   /** School-local wall prompt, e.g. "08:00" — the label school staff pick. */
   localPrompt: string;
   /** The absolute instant the worker resolves that wall label to on this date (catalog literal). */
@@ -49,13 +51,39 @@ interface Case {
 const cases: Case[] = [
   // America/New_York — the wall label "08:00" resolves to a different absolute instant across the
   // transition; the sweep compares only the resolved *instant*, so DST can't flip due/pending.
-  { zone: "America/New_York", localPrompt: "08:00", dueUtc: "2026-03-08T13:00:00.000Z" },
-  { zone: "America/New_York", localPrompt: "08:00", dueUtc: "2026-11-01T13:00:00.000Z" },
+  // 08:00 on spring-forward day is already EDT (UTC-4); on fall-back day it is already EST (UTC-5).
+  {
+    zone: "America/New_York",
+    localDate: "2026-03-08",
+    localPrompt: "08:00",
+    dueUtc: "2026-03-08T12:00:00.000Z",
+  },
+  {
+    zone: "America/New_York",
+    localDate: "2026-11-01",
+    localPrompt: "08:00",
+    dueUtc: "2026-11-01T13:00:00.000Z",
+  },
   // Europe/London — EU spring/fall
-  { zone: "Europe/London", localPrompt: "08:00", dueUtc: "2026-03-29T07:00:00.000Z" },
-  { zone: "Europe/London", localPrompt: "08:00", dueUtc: "2026-10-25T08:00:00.000Z" },
+  {
+    zone: "Europe/London",
+    localDate: "2026-03-29",
+    localPrompt: "08:00",
+    dueUtc: "2026-03-29T07:00:00.000Z",
+  },
+  {
+    zone: "Europe/London",
+    localDate: "2026-10-25",
+    localPrompt: "08:00",
+    dueUtc: "2026-10-25T08:00:00.000Z",
+  },
   // Control — no DST: the resolved instant is stable week to week
-  { zone: "Africa/Casablanca", localPrompt: "08:00", dueUtc: "2026-06-15T07:00:00.000Z" },
+  {
+    zone: "Africa/Casablanca",
+    localDate: "2026-06-15",
+    localPrompt: "08:00",
+    dueUtc: "2026-06-15T07:00:00.000Z",
+  },
 ];
 
 describeDb("announcement publish boundary is an absolute instant", () => {
@@ -63,7 +91,7 @@ describeDb("announcement publish boundary is an absolute instant", () => {
     for (const c of cases) {
       const [row] = await db!<{ utc: Date }[]>`
         SELECT
-          (${c.localPrompt}::time::timestamp AT TIME ZONE ${c.zone})::timestamptz AS utc
+          ((${c.localDate}::date + ${c.localPrompt}::time) AT TIME ZONE ${c.zone})::timestamptz AS utc
       `;
       expect(row!.utc.toISOString().slice(0, 19)).toBe(c.dueUtc.slice(0, 19));
     }
@@ -80,7 +108,8 @@ describeDb("announcement publish boundary is an absolute instant", () => {
         const now = new Date(due + delta);
         const [row] = await db!<{ ok: boolean }[]>`
           SELECT ${now}::timestamptz
-            <= (${c.localPrompt}::time::timestamp AT TIME ZONE ${c.zone})::timestamptz AS ok
+            <= ((${c.localDate}::date + ${c.localPrompt}::time) AT TIME ZONE ${c.zone})::timestamptz
+            AS ok
         `;
         expect(row!.ok).toBe(expected);
       }

@@ -3,6 +3,7 @@ import {
   MAX_RETENTION_MONTHS,
   MIN_RETENTION_MONTHS,
   RECORD_DOCUMENT_STATUSES,
+  RECORD_VALUE_ERRORS,
   RECORD_FIELD_SENSITIVITIES,
   RECORD_FIELD_TYPES,
   RECORD_FIELD_VISIBILITIES,
@@ -14,9 +15,9 @@ import { dateSchema, dateTimeSchema, uuidSchema } from "@studafy/shared-schemas"
 // Vocabulary
 // ---------------------------------------------------------------------------
 
-export const recordSubjectKindSchema = z
-  .enum(RECORD_SUBJECT_KINDS)
-  .openapi("RecordSubjectKind", { description: "Whose record: a student, or a parent." });
+export const recordSubjectKindSchema = z.enum(RECORD_SUBJECT_KINDS).openapi("RecordSubjectKind", {
+  description: "Whose record: a student, a parent, a member of staff, or a class.",
+});
 
 export const recordFieldTypeSchema = z.enum(RECORD_FIELD_TYPES).openapi("RecordFieldType", {
   description: "What kind of answer a field takes. A document field takes an uploaded file.",
@@ -105,6 +106,38 @@ export const parentRecordFieldParamSchema = z
     fieldId: uuidSchema.openapi({ param: { name: "fieldId", in: "path" } }),
   })
   .openapi("ParentRecordFieldParam");
+
+export const staffRecordParamSchema = z
+  .object({
+    staffUserId: uuidSchema.openapi({ param: { name: "staffUserId", in: "path" } }),
+  })
+  .openapi("StaffRecordParam");
+
+export const staffRecordFieldParamSchema = z
+  .object({
+    staffUserId: uuidSchema.openapi({ param: { name: "staffUserId", in: "path" } }),
+    fieldId: uuidSchema.openapi({ param: { name: "fieldId", in: "path" } }),
+  })
+  .openapi("StaffRecordFieldParam");
+
+export const classRecordParamSchema = z
+  .object({
+    classId: uuidSchema.openapi({ param: { name: "classId", in: "path" } }),
+  })
+  .openapi("ClassRecordParam");
+
+export const classRecordFieldParamSchema = z
+  .object({
+    classId: uuidSchema.openapi({ param: { name: "classId", in: "path" } }),
+    fieldId: uuidSchema.openapi({ param: { name: "fieldId", in: "path" } }),
+  })
+  .openapi("ClassRecordFieldParam");
+
+export const selfRecordFieldParamSchema = z
+  .object({
+    fieldId: uuidSchema.openapi({ param: { name: "fieldId", in: "path" } }),
+  })
+  .openapi("SelfRecordFieldParam");
 
 // ---------------------------------------------------------------------------
 // Template editor
@@ -344,9 +377,16 @@ export const recordMissingIssueSchema = z
 
 export const recordMissingQuerySchema = z
   .object({
-    search: z.string().trim().max(120).optional().openapi({
-      description: "A student's name or admission number, or a parent's name or email.",
-    }),
+    search: z
+      .string()
+      .trim()
+      .max(120)
+      .optional()
+      .openapi({
+        description:
+          "A student's name or admission number, a parent's or staff member's name or email, or a " +
+          "class's code or course name.",
+      }),
     issue: recordMissingIssueSchema.default("all"),
     limit: z.coerce.number().int().min(1).max(100).default(25),
     offset: z.coerce.number().int().min(0).default(0),
@@ -384,6 +424,28 @@ export const recordMissingParentSchema = z
   })
   .openapi("RecordMissingParent");
 
+export const recordMissingStaffSchema = z
+  .object({
+    user_id: uuidSchema,
+    name: z.string(),
+    email: z.string().nullable(),
+    missing: z.array(recordMissingFieldSchema),
+    expired: z.array(recordMissingFieldSchema),
+    expiring: z.array(recordMissingFieldSchema),
+  })
+  .openapi("RecordMissingStaff");
+
+export const recordMissingClassSchema = z
+  .object({
+    class_id: uuidSchema,
+    code: z.string(),
+    course_name: z.string(),
+    missing: z.array(recordMissingFieldSchema),
+    expired: z.array(recordMissingFieldSchema),
+    expiring: z.array(recordMissingFieldSchema),
+  })
+  .openapi("RecordMissingClass");
+
 export const recordMissingStudentListSchema = z
   .object({
     students: z.array(recordMissingStudentSchema),
@@ -400,6 +462,22 @@ export const recordMissingParentListSchema = z
   })
   .openapi("RecordMissingParentList");
 
+export const recordMissingStaffListSchema = z
+  .object({
+    staff: z.array(recordMissingStaffSchema),
+    total: z.number().int(),
+    issue: recordMissingIssueSchema,
+  })
+  .openapi("RecordMissingStaffList");
+
+export const recordMissingClassListSchema = z
+  .object({
+    classes: z.array(recordMissingClassSchema),
+    total: z.number().int(),
+    issue: recordMissingIssueSchema,
+  })
+  .openapi("RecordMissingClassList");
+
 export const recordMissingSummarySchema = z
   .object({
     students: z.number().int().openapi({ description: "Students with at least one issue." }),
@@ -408,6 +486,197 @@ export const recordMissingSummarySchema = z
     expiring_documents: z.number().int(),
   })
   .openapi("RecordMissingSummary");
+
+// ---------------------------------------------------------------------------
+// Imported columns kept as record fields (staff and class CSV imports)
+// ---------------------------------------------------------------------------
+
+/** The subjects whose CSV imports run in the browser: the users (staff) and classes imports. */
+export const recordImportSubjectKindSchema = z
+  .enum(["staff", "class"])
+  .openapi("RecordImportSubjectKind");
+
+export const recordImportParamSchema = z
+  .object({
+    subjectKind: recordImportSubjectKindSchema.openapi({
+      param: { name: "subjectKind", in: "path" },
+    }),
+  })
+  .openapi("RecordImportParam");
+
+/** Field types a column of text can fill: every type but document. */
+export const recordColumnFieldTypeSchema = z
+  .enum([
+    "short_text",
+    "long_text",
+    "number",
+    "date",
+    "single_choice",
+    "multi_choice",
+    "yes_no",
+    "phone",
+    "email",
+  ])
+  .openapi("RecordColumnFieldType");
+
+const recordImportNewFieldSchema = z
+  .object({
+    label_en: z.string().trim().min(1).max(200),
+    label_ar: z.string().trim().min(1).max(200),
+    // The enum as is: a description here would wrap the $ref, which the Dart client generator turns
+    // into a class it cannot compile. The object's description says what omitting it means.
+    field_type: recordColumnFieldTypeSchema.optional(),
+    options: z.array(recordFieldOptionSchema).max(100).optional(),
+    sensitivity: recordFieldSensitivitySchema.optional(),
+    visibility: recordFieldVisibilitySchema.default("staff_only"),
+  })
+  .openapi("RecordImportNewField", {
+    description:
+      "A record field to create (and publish) from the column. Omit field_type to have it " +
+      "guessed from the column's header and values (with its choices for a choice field, and " +
+      "sensitivity suggested for ID-, medical- or pay-like data).",
+  });
+
+const recordImportColumnShape = {
+  header: z.string().trim().min(1).max(500).openapi({
+    description: "The column's header in the imported file.",
+  }),
+  field_id: uuidSchema.optional().openapi({
+    description: "An existing field on the published form. Give this or new_field.",
+  }),
+  new_field: recordImportNewFieldSchema.optional(),
+  overwrite: z.boolean().default(false).openapi({
+    description: "Replace a different answer the subject already has. Default: keep it.",
+  }),
+  rows: z
+    .array(
+      z.object({
+        line: z.number().int().min(2).openapi({ description: "The line in the file." }),
+        subject_id: uuidSchema.openapi({
+          description:
+            "The id the create call for this line returned: a user (staff) or a class. Only " +
+            "subjects the caller created in the last 24 hours are written.",
+        }),
+        value: z.string().max(10_000),
+      }),
+    )
+    .min(1)
+    .max(1_000),
+};
+
+const oneRecordImportTarget = {
+  check: (body: { field_id?: string; new_field?: unknown }) =>
+    (body.field_id === undefined) !== (body.new_field === undefined),
+  message: "Give field_id or new_field, not both.",
+};
+
+export const recordImportColumnBodySchema = z
+  .object(recordImportColumnShape)
+  .refine(oneRecordImportTarget.check, { message: oneRecordImportTarget.message })
+  .openapi("RecordImportColumnBody", {
+    description:
+      "One unknown column of a staff or class CSV import, the rows the import created with each " +
+      "row's cell, and the record field to keep the column in.",
+  });
+
+export const applyRecordImportColumnBodySchema = z
+  .object({
+    ...recordImportColumnShape,
+    preview_token: z
+      .string()
+      .regex(/^[0-9a-f]{64}$/)
+      .openapi({
+        description: "The preview's token. A changed outcome since the preview is refused (409).",
+      }),
+  })
+  .refine(oneRecordImportTarget.check, { message: oneRecordImportTarget.message })
+  .openapi("ApplyRecordImportColumnBody", {
+    description: "RecordImportColumnBody plus the preview's token.",
+  });
+
+const recordImportRowStatusValues = [
+  "write",
+  "unchanged",
+  "kept",
+  "invalid",
+  "conflict",
+  "skipped",
+] as const;
+
+export const recordImportPreviewRowSchema = z
+  .object({
+    line_number: z.number().int().positive(),
+    subject_id: uuidSchema,
+    name: z.string(),
+    status: z.enum(recordImportRowStatusValues).openapi({
+      description:
+        "write: written. unchanged: already this value. kept: has a different answer, kept " +
+        "(overwrite off). invalid: not a valid answer for the field. conflict: the line repeats a " +
+        "subject with a different value. skipped: not a subject this import created (or, for " +
+        "staff, not a member of staff). (Empty cells are counted, not listed.)",
+    }),
+    replaces_existing: z.boolean(),
+    value: recordValueSchema.nullable().openapi({ description: "Null for a sensitive field." }),
+    mask: z.string().nullable().openapi({ description: "A sensitive value's mask." }),
+    current_value: recordValueSchema.nullable(),
+    current_mask: z.string().nullable(),
+    reason: z
+      .enum([...RECORD_VALUE_ERRORS, "CONFLICTING_VALUES", "NOT_CREATED_BY_IMPORT", "NOT_STAFF"])
+      .nullable()
+      .openapi({ description: "Why invalid, conflict or skipped. Never the value." }),
+  })
+  .openapi("RecordImportPreviewRow");
+
+const recordImportTotalsSchema = z
+  .object({
+    write: z.number().int(),
+    unchanged: z.number().int(),
+    kept: z.number().int(),
+    invalid: z.number().int(),
+    empty: z.number().int(),
+    conflict: z.number().int(),
+    skipped: z.number().int(),
+  })
+  .openapi("RecordImportTotals");
+
+export const recordImportPreviewSchema = z
+  .object({
+    subject_kind: recordImportSubjectKindSchema,
+    header: z.string(),
+    field: z.object({
+      id: uuidSchema.nullable().openapi({ description: "Null for a field to be created." }),
+      field_type: recordColumnFieldTypeSchema,
+      label_en: z.string(),
+      label_ar: z.string(),
+      options: z.array(recordFieldOptionSchema),
+      sensitivity: recordFieldSensitivitySchema,
+      visibility: recordFieldVisibilitySchema,
+    }),
+    suggested_sensitive: z.boolean().openapi({
+      description:
+        "The header or values look like an ID number, passport, medical or pay data. Always " +
+        "false for a class, whose fields cannot be sensitive.",
+    }),
+    sensitive_reason: z.enum(["label", "values"]).nullable(),
+    totals: recordImportTotalsSchema,
+    rows: z.array(recordImportPreviewRowSchema),
+    preview_token: z.string().openapi({ description: "Send back to apply exactly this outcome." }),
+  })
+  .openapi("RecordImportPreview");
+
+export const recordImportApplyResultSchema = z
+  .object({
+    subject_kind: recordImportSubjectKindSchema,
+    field_id: uuidSchema,
+    field_created: z.boolean(),
+    written: z.number().int(),
+    totals: recordImportTotalsSchema,
+  })
+  .openapi("RecordImportApplyResult");
+
+export type RecordImportColumnInput = z.infer<typeof recordImportColumnBodySchema>;
+export type RecordImportPreview = z.infer<typeof recordImportPreviewSchema>;
+export type RecordImportApplyResult = z.infer<typeof recordImportApplyResultSchema>;
 
 export type RecordTemplateFieldDto = z.infer<typeof recordTemplateFieldSchema>;
 export type RecordFieldDefinitionDto = z.infer<typeof recordFieldDefinitionSchema>;

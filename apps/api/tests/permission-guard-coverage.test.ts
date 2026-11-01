@@ -69,8 +69,7 @@ const EXPECTED_MUTATING_ROUTES = [
   // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
   // school context is sufficient — no cross-user row-level permission.
   "POST /api/schools/{schoolId}/provision",
-  // Academic year & term management (ST-091). Tenant-scoped CRUD protected by requireAuth; the
-  // school context is sufficient — there is no cross-user row-level permission to check.
+  // Academic year & term management (ST-091). Writes guarded by requirePermission(TIMETABLE_MANAGE).
   "POST /api/academics/years",
   "PATCH /api/academics/years/{yearId}",
   "DELETE /api/academics/years/{yearId}",
@@ -121,11 +120,14 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/imports/students/mappings",
   "PATCH /api/imports/students/mappings/{mappingId}",
   "DELETE /api/imports/students/mappings/{mappingId}",
+  "DELETE /api/imports/students/{importId}/source",
+  "POST /api/imports/students/{importId}/columns/preview",
+  "POST /api/imports/students/{importId}/columns/apply",
+  "PUT /api/imports/students/settings",
   // Bulk invitations. Admin dispatches invitations in batches; guarded by USER_INVITE permission.
   "POST /api/invitations/bulk",
   "POST /api/invitations/bulk/{bulkInviteId}/retry",
-  // Classes & enrollments (ST-100). Tenant-scoped CRUD protected by requireAuth; school-level
-  // catalog data with no cross-user row-level permission.
+  // Classes & enrollments (ST-100). Writes guarded by requirePermission(TIMETABLE_MANAGE).
   "POST /api/academics/classes",
   "PATCH /api/academics/classes/{classId}",
   "DELETE /api/academics/classes/{classId}",
@@ -325,6 +327,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/refunds/initiate",
   "POST /api/finance/refunds/{refundId}/approve",
   "POST /api/finance/refunds/{refundId}/reject",
+  "POST /api/finance/invoices/{invoiceId}/cancellation",
+  "POST /api/finance/payments/{paymentId}/reversal",
   "POST /api/finance/scholarships",
   "PATCH /api/finance/scholarships/{scholarshipId}",
   "POST /api/finance/scholarship-awards",
@@ -495,6 +499,18 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/parents/{parentUserId}/records/{fieldId}/document",
   "PATCH /api/parents/{parentUserId}/records/{fieldId}/document",
   "DELETE /api/parents/{parentUserId}/records/{fieldId}/document",
+  // Staff and class records (000181), and imported columns kept as record fields.
+  "PUT /api/staff/{staffUserId}/records",
+  "POST /api/staff/{staffUserId}/records/{fieldId}/reveal",
+  "PUT /api/staff/{staffUserId}/records/{fieldId}/document",
+  "PATCH /api/staff/{staffUserId}/records/{fieldId}/document",
+  "DELETE /api/staff/{staffUserId}/records/{fieldId}/document",
+  "PUT /api/classes/{classId}/records",
+  "PUT /api/classes/{classId}/records/{fieldId}/document",
+  "PATCH /api/classes/{classId}/records/{fieldId}/document",
+  "DELETE /api/classes/{classId}/records/{fieldId}/document",
+  "POST /api/record-imports/{subjectKind}/preview",
+  "POST /api/record-imports/{subjectKind}/apply",
 ];
 
 /**
@@ -556,25 +572,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",
   "POST /api/invitations/{id}/regenerate",
-  // Academic year & term management (ST-091) — tenant-scoped school-level access protected by
-  // requireAuth; no cross-user row-level permission to check.
-  "POST /api/academics/years",
-  "PATCH /api/academics/years/{yearId}",
-  "DELETE /api/academics/years/{yearId}",
-  "POST /api/academics/years/{yearId}/rollover",
-  "POST /api/academics/years/{yearId}/terms",
-  "PATCH /api/academics/terms/{termId}",
-  "DELETE /api/academics/terms/{termId}",
-  // Subjects, courses and classes are guarded by TIMETABLE_MANAGE (000147 follow-up). Enrollments
-  // (ST-100) remain tenant-scoped requireAuth only.
-  "POST /api/academics/classes/{classId}/enrollments",
-  "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
-  "POST /api/academics/classes/{classId}/enrollments/transfer",
-  // Exam scheduling (ST-102) — tenant-scoped school-level catalog data protected by
-  // requireAuth; no cross-user row-level permission to check.
-  "POST /api/academics/exams",
-  "PATCH /api/academics/exams/{examId}",
-  "DELETE /api/academics/exams/{examId}",
+  // Academic years, terms, class enrolments and exams are NOT exempt: RLS fences them to the
+  // school but not to a role, so without TIMETABLE_MANAGE any signed-in student or parent could
+  // roll the year over (archiving every enrolment) or delete an exam.
   // Learning materials (ST-106) — storage-triggered upload flow, authorized by
   // signed upload URL and row ownership, not by the permission guard.
   "POST /api/academics/materials/upload",

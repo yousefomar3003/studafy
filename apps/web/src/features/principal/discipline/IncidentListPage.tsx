@@ -1,8 +1,10 @@
-import { Select, Table, Tabs } from "@studafy/ui";
+import { PERMISSIONS } from "@studafy/constants";
+import { Button, Select, Table, Tabs } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
+import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { DATE_TIME_OPTIONS } from "../format";
 
@@ -12,6 +14,7 @@ import {
   DISCIPLINE_TYPE_LABEL_KEYS,
 } from "./labels";
 import { disciplineListKey, fetchIncidentsByFilter } from "./queries";
+import { ReportIncidentModal } from "./ReportIncidentModal";
 
 import type { DisciplineIncident, IncidentListFilter } from "./queries";
 import type { SelectOption } from "@studafy/ui";
@@ -90,6 +93,10 @@ function IncidentTable({ incidents, isPending, isError, emptyMessage }: Incident
  */
 export default function IncidentListPage() {
   const { t } = useTranslation();
+  const canReport = usePermissions().has(PERMISSIONS.DISCIPLINE_INCIDENT_CREATE);
+  // `?report=1` (the search palette's "Report an incident") opens the form straight away.
+  const [searchParams] = useSearchParams();
+  const [reporting, setReporting] = useState(canReport && searchParams.get("report") === "1");
   const [tab, setTab] = useState<string>(INBOX_TAB);
   const [allFilter, setAllFilter] = useState<IncidentListFilter>("open");
 
@@ -109,7 +116,14 @@ export default function IncidentListPage() {
 
   return (
     <>
-      <h1>{t("principal.discipline.list.title")}</h1>
+      <div className="discipline-list__header">
+        <h1>{t("principal.discipline.list.title")}</h1>
+        {canReport ? (
+          <Button type="button" onClick={() => setReporting(true)}>
+            {t("principal.discipline.report.open")}
+          </Button>
+        ) : null}
+      </div>
       <p>{t("principal.discipline.list.description")}</p>
 
       <Tabs defaultValue={INBOX_TAB} value={tab} onChange={setTab}>
@@ -147,6 +161,8 @@ export default function IncidentListPage() {
           />
         </Tabs.Panel>
       </Tabs>
+
+      <ReportIncidentModal open={reporting} onClose={() => setReporting(false)} />
     </>
   );
 }

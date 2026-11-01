@@ -3,6 +3,7 @@ import { Tabs } from "@studafy/ui";
 import { useTranslation } from "../../../lib/i18n";
 
 import ArAgingReportPanel from "./ArAgingReportPanel";
+import CollectionsByMethodReportPanel from "./CollectionsByMethodReportPanel";
 import CollectionsVsDueReportPanel from "./CollectionsVsDueReportPanel";
 import FamilyStatementReportPanel from "./FamilyStatementReportPanel";
 import GeneralLedgerReportPanel from "./GeneralLedgerReportPanel";
@@ -34,6 +35,9 @@ export default function ReportsCenterPage() {
           <Tabs.Tab value="collections_vs_due">
             {t("financeReports.reports.center.tabs.collections")}
           </Tabs.Tab>
+          <Tabs.Tab value="collections_by_method">
+            {t("financeReports.reports.center.tabs.collectionsByMethod")}
+          </Tabs.Tab>
           <Tabs.Tab value="general_ledger">
             {t("financeReports.reports.center.tabs.generalLedger")}
           </Tabs.Tab>
@@ -47,6 +51,9 @@ export default function ReportsCenterPage() {
         </Tabs.Panel>
         <Tabs.Panel value="collections_vs_due">
           <CollectionsVsDueReportPanel />
+        </Tabs.Panel>
+        <Tabs.Panel value="collections_by_method">
+          <CollectionsByMethodReportPanel />
         </Tabs.Panel>
         <Tabs.Panel value="general_ledger">
           <GeneralLedgerReportPanel />

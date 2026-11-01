@@ -2,7 +2,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { PERMISSIONS, ROLE_PERMISSIONS } from "./permissions";
-import { ROLES } from "./roles";
+import { ROLES, SCHOOL_STAFF_ROLES } from "./roles";
 
 describe("PERMISSIONS", () => {
   test("every permission value is unique", () => {
@@ -109,6 +109,40 @@ describe("ROLE_PERMISSIONS", () => {
         ROLES.PARENT,
         ROLES.PRINCIPAL,
         ROLES.SUPER_ADMIN,
+      ].sort(),
+    );
+  });
+
+  // Staff and class records: a colleague's file is the employer's (ORG_ADMIN), the principal reads
+  // its non-sensitive fields only, and a class's record is read by leadership and its teachers.
+  test("staff records: ORG_ADMIN edits and reveals; the principal only reads", () => {
+    const admins = [ROLES.ORG_ADMIN, ROLES.SUPER_ADMIN].sort();
+    expect(rolesHolding(PERMISSIONS.STAFF_RECORD_UPDATE)).toEqual(admins);
+    expect(rolesHolding(PERMISSIONS.STAFF_RECORD_READ_SENSITIVE)).toEqual(admins);
+    expect(rolesHolding(PERMISSIONS.STAFF_RECORD_READ)).toEqual(
+      [ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
+    );
+  });
+
+  test("class records: leadership and teachers read; editing comes with timetable:manage", () => {
+    expect(rolesHolding(PERMISSIONS.CLASS_RECORD_READ)).toEqual(
+      [ROLES.INSTRUCTOR, ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
+    );
+    expect(rolesHolding(PERMISSIONS.TIMETABLE_MANAGE)).toEqual(
+      [ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
+    );
+  });
+});
+
+describe("SCHOOL_STAFF_ROLES", () => {
+  test("is the school's own staff, never a platform role or a family member", () => {
+    expect([...SCHOOL_STAFF_ROLES].sort()).toEqual(
+      [
+        ROLES.ATTENDANCE_OFFICER,
+        ROLES.FINANCE,
+        ROLES.INSTRUCTOR,
+        ROLES.ORG_ADMIN,
+        ROLES.PRINCIPAL,
       ].sort(),
     );
   });

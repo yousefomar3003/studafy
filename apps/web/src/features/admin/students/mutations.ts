@@ -1,6 +1,8 @@
+import { ApiError } from "@studafy/api-client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
+import { uploadFileToPresignedUrl } from "../../../lib/upload";
 import { invalidateLinkViews } from "../people-links/queries";
 
 import {
@@ -252,11 +254,41 @@ export interface UploadStudentImportVariables {
   onProgress?: (progress: UploadProgress) => void;
 }
 
+/**
+ * Stage the file in object storage under the `import.source` content class, so the import keeps
+ * the school's original (docs/modules/student-import-mapping-guide.md "Import history and unmapped
+ * columns"). Sent as `text/csv` whatever the browser calls it (Windows often says
+ * `application/vnd.ms-excel`): the class accepts only that type, and the bytes are unchanged, which
+ * is what the API checks. Returns null only when the deployment has no object storage (503
+ * STORAGE_NOT_CONFIGURED): the import then works as before, without an original.
+ */
+async function stageImportSource(file: File): Promise<string | null> {
+  try {
+    const { data } = await api.POST("/api/storage/uploads/request-upload", {
+      body: {
+        content_class: "import.source",
+        file_name: file.name,
+        content_type: "text/csv",
+        size_bytes: file.size,
+      },
+    });
+    if (!data) throw new Error("Upload URL missing.");
+    await uploadFileToPresignedUrl(
+      data.upload_url,
+      new File([file], file.name, { type: "text/csv" }),
+    );
+    return data.storage_key;
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "STORAGE_NOT_CONFIGURED") return null;
+    throw error;
+  }
+}
+
 /** The dry-run upload — nothing is committed until `useConfirmStudentImport` runs. */
 export function useUploadStudentImport() {
   return useMutation({
-    mutationFn: ({ file, onProgress }: UploadStudentImportVariables) =>
-      uploadStudentImportCsv(file, onProgress),
+    mutationFn: async ({ file, onProgress }: UploadStudentImportVariables) =>
+      uploadStudentImportCsv(file, onProgress, (await stageImportSource(file)) ?? undefined),
   });
 }
 

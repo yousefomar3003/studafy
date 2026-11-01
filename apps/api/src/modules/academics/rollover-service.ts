@@ -143,9 +143,14 @@ async function executeRollover(
     action: "update",
     targetTable: "academic_years",
     targetId: targetYearId,
-    oldValues: activeYear
-      ? { prior_year_id: activeYear.id, prior_status: activeYear.status }
-      : null,
+    // An update's audit row must carry its old values (ck_audit_logs_payload), so the target year's
+    // own prior status is always recorded; a null here made a school's first rollover, with no
+    // active year to close, fail outright.
+    oldValues: {
+      status: targetYear.status,
+      prior_year_id: activeYear?.id ?? null,
+      prior_status: activeYear?.status ?? null,
+    },
     newValues: {
       activated_year_id: targetYearId,
       prior_year_id: activeYear?.id ?? null,

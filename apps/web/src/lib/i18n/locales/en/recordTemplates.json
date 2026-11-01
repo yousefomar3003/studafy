@@ -6,13 +6,15 @@
     "next": "Next"
   },
   "page": {
-    "title": "Student and parent records",
-    "intro": "Choose what your school records about each student and each parent. Staff fill the records in; parents never enter anything. Changes are drafts until you publish them.",
+    "title": "School records",
+    "intro": "Choose what your school records about each student, parent, member of staff and class. Staff fill the records in; parents never enter anything. Changes are drafts until you publish them.",
     "subjects": "Whose record",
     "student": "Student record",
     "parent": "Parent record",
     "backToSettings": "Back to school settings",
-    "backToDashboard": "Back to the dashboard"
+    "backToDashboard": "Back to the dashboard",
+    "staff": "Staff record",
+    "class": "Class record"
   },
   "editor": {
     "loadError": "This template could not be loaded. Try again in a moment.",
@@ -76,7 +78,9 @@
       "optionIncomplete": "Every choice needs a value and both labels",
       "optionDuplicate": "Each choice needs a different value",
       "retention": "Enter a whole number of months from 1 to 120"
-    }
+    },
+    "staffVisibility": "A staff record is read by the school admin, by the principal (fields that are not sensitive), and by the staff member themselves (fields that are not sensitive).",
+    "classVisibilityHelp": "Leadership always sees every field. \"Teachers\" also shows the field to the class's own teachers. A class field cannot be sensitive."
   },
   "sensitive": {
     "title": "This field is handled as sensitive:",
@@ -126,14 +130,14 @@
     "expiry": "Expiry date"
   },
   "links": {
-    "templates": "Student and parent records",
+    "templates": "School records",
     "templatesDescription": "Choose what your school records about each student and parent, which fields are required, and which are sensitive.",
     "openEditor": "Edit the record forms",
     "missing": "Missing information"
   },
   "missing": {
     "title": "Missing information",
-    "intro": "Current students and parents with a required field or document missing, or a document that has expired or expires within 30 days. Open a record to complete it.",
+    "intro": "Current students, parents, staff and classes with a required field or document missing, or a document that has expired or expires within 30 days. Open a record to complete it.",
     "subjects": "Whose records",
     "issueFilter": "Show",
     "issueAll": "Every issue",
@@ -150,7 +154,9 @@
       "student": "Student",
       "parent": "Parent",
       "issues": "What is missing",
-      "open": "Record"
+      "open": "Record",
+      "staff": "Staff member",
+      "class": "Class"
     },
     "students": {
       "tab": "Students",
@@ -165,6 +171,21 @@
       "search": "Search parents",
       "caption": "Parents with missing information",
       "empty": "No parent has missing information."
+    },
+    "openClassRecord": "Open the record of class {{code}}",
+    "staff": {
+      "tab": "Staff",
+      "title": "Staff with missing information",
+      "search": "Search staff",
+      "caption": "Staff with missing information",
+      "empty": "No member of staff has missing information."
+    },
+    "classes": {
+      "tab": "Classes",
+      "title": "Classes with missing information",
+      "search": "Search classes",
+      "caption": "Classes with missing information",
+      "empty": "No class has missing information."
     }
   },
   "dashboard": {

@@ -94,6 +94,11 @@
   "IMPORT_MAPPING_NOT_FOUND": "Saved column mapping not found",
   "IMPORT_MAPPING_NAME_EXISTS": "A saved column mapping with this name already exists",
   "IMPORT_MAPPING_INVALID": "The column mapping is missing required fields",
+  "IMPORT_SOURCE_NOT_FOUND": "The original file of this import is no longer stored",
+  "IMPORT_COLUMN_NOT_FOUND": "That column is not an unmapped column of this import",
+  "IMPORT_CELLS_UNAVAILABLE": "This import's leftover cells are no longer stored",
+  "IMPORT_COLUMN_PREVIEW_STALE": "What this column would write has changed since the preview. Preview it again.",
+  "IMPORT_RECORD_DRAFT_PENDING": "The record template has unpublished changes. Publish or undo them first.",
   "CLASS_HAS_ENROLLMENTS": "Cannot delete this class because it has enrollments. Cancel it instead.",
   "CLASS_CAPACITY_EXCEEDED": "This class has reached its maximum enrollment capacity.",
   "GRADE_LEVEL_HAS_SECTIONS": "This grade still has sections. Delete its sections first.",
@@ -311,5 +316,9 @@
   "RECORD_VALUE_INVALID": "One or more record answers are not valid for their fields",
   "RECORD_SUBJECT_NOT_FOUND": "No record found for that person",
   "RECORD_DOCUMENT_NOT_FOUND": "No document on file",
-  "RECORD_KEY_UNAVAILABLE": "This value cannot be opened right now. Contact support"
+  "RECORD_KEY_UNAVAILABLE": "This value cannot be opened right now. Contact support",
+  "INVOICE_NOT_CANCELLABLE": "This invoice cannot be cancelled. Only a submitted invoice with no payment or credit note against it can be.",
+  "PAYMENT_NOT_REVERSIBLE": "This payment cannot be reversed. Only a confirmed payment against an invoice can be.",
+  "WRITE_OFF_EXCEEDS_OUTSTANDING": "A write-off cannot be more than the invoice's outstanding balance",
+  "ADJUSTMENT_ALREADY_REQUESTED": "A correction for this is already waiting for approval or done"
 }

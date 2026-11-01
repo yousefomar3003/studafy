@@ -27,7 +27,11 @@ import type { Sql } from "postgres";
  */
 
 const TOPIC_ARN = "arn:aws:sns:us-east-1:123456789012:studafy-email-events";
-const CERT_URL = "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-test.pem";
+// Unique to this file: sns-signature.ts caches each certificate by URL for the process's lifetime
+// (a real SNS URL names one certificate), and every test file signs with its own generated key. A
+// URL shared with another file would hand this one the other file's cached key when both run in
+// one `bun test` process.
+const CERT_URL = "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-webhook-db.pem";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const PUBLIC_KEY_PEM = publicKey.export({ type: "spki", format: "pem" });

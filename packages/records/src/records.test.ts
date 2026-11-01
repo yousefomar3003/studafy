@@ -6,6 +6,7 @@ import { describe, expect, test } from "bun:test";
 import {
   DEVELOPMENT_RECORD_KEYS_JSON,
   DEVELOPMENT_RECORD_KEY_ID,
+  RECORD_SUBJECT_FIELD_RULES,
   RecordKeyUnavailableError,
   RecordSealBrokenError,
   isFieldVisibleTo,
@@ -134,6 +135,28 @@ describe("visibility", () => {
       false,
     );
     expect(visibilitiesFor("teachers")).toEqual(["teachers", "parent"]);
+  });
+
+  test("the standard audience reads every non-sensitive field, whatever its visibility", () => {
+    expect(
+      isFieldVisibleTo({ visibility: "staff_only", sensitivity: "standard" }, "standard"),
+    ).toBe(true);
+    expect(
+      isFieldVisibleTo({ visibility: "staff_only", sensitivity: "sensitive" }, "standard"),
+    ).toBe(false);
+    expect(visibilitiesFor("standard")).toEqual(["staff_only", "finance", "teachers", "parent"]);
+  });
+
+  test("staff fields are staff_only; class fields are never sensitive", () => {
+    expect(RECORD_SUBJECT_FIELD_RULES.staff).toEqual({
+      visibilities: ["staff_only"],
+      sensitive: true,
+    });
+    expect(RECORD_SUBJECT_FIELD_RULES.class).toEqual({
+      visibilities: ["staff_only", "teachers"],
+      sensitive: false,
+    });
+    expect(RECORD_SUBJECT_FIELD_RULES.student.visibilities).toHaveLength(4);
   });
 });
 

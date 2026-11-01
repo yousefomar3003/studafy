@@ -11,7 +11,8 @@
     "settings": "Platform settings",
     "users": "Account lookup",
     "refunds": "Refunds",
-    "applications": "Applications"
+    "applications": "Applications",
+    "importSignals": "Import columns"
   },
   "status": {
     "registered": "Awaiting email verification",
@@ -565,6 +566,21 @@
       "SCHOOL_APPLICATION_NOT_PENDING": "This application has already been reviewed. Reload to see the decision.",
       "SCHOOL_APPLICATION_ACCOUNT_EXISTS": "The applicant's sign-in account already belongs to a Studafy user, so it cannot become this school's administrator.",
       "SCHOOL_EMAIL_DUPLICATE": "A school with this email already exists."
+    }
+  },
+  "importSignals": {
+    "title": "Unused import columns",
+    "description_one": "Column headers schools' student imports bring that no Studafy field reads, across schools. Header text and counts only, and only headers at least {{count}} school shares.",
+    "description_other": "Column headers schools' student imports bring that no Studafy field reads, across schools. Header text and counts only, and only headers at least {{count}} schools share.",
+    "loading": "Loading…",
+    "error": "The import columns could not be loaded.",
+    "empty_one": "No unused column is shared by {{count}} school yet.",
+    "empty_other": "No unused column is shared by {{count}} schools yet.",
+    "caption": "Unused column headers",
+    "columns": {
+      "header": "Column header",
+      "schools": "Schools",
+      "imports": "Imports"
     }
   }
 }

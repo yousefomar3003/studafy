@@ -10,6 +10,7 @@
  *   TEST_DATABASE_URL=postgres://... bun test src/modules/academics/submissions/__tests__
  */
 
+import { ERROR_CODES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -299,7 +300,9 @@ describeDb("storage key tenant boundary", () => {
           content_type: "application/pdf",
         }),
       ),
-    ).rejects.toThrow(/forbidden|not permitted|403/i);
+      // Asserted on status and code, not wording: assertSchoolOwnedKey's message is user-facing
+      // copy, while 403 STORAGE_KEY_FORBIDDEN is the contract.
+    ).rejects.toMatchObject({ status: 403, code: ERROR_CODES.STORAGE_KEY_FORBIDDEN });
 
     // Nothing was copied into this school's prefix.
     expect([...storage.objects.keys()].some((k) => k.startsWith(`permanent/${t.school.id}/`))).toBe(
@@ -310,6 +313,10 @@ describeDb("storage key tenant boundary", () => {
   test("the database refuses a row claiming another school's key", async () => {
     // The other half of the boundary. Even as studafy_admin, bypassing the application check
     // entirely, ck_submission_attachments_storage_key rejects the row.
+    //
+    // .execute() is load-bearing: a postgres.js query is lazy and is only sent once something
+    // calls .then() on it, which expect().rejects does not -- without it the INSERT never leaves
+    // the client and the test hangs until its timeout.
     const t = await seedTenant(db.sql);
     const other = await seedTenant(db.sql);
     const { row } = await submitAs(t.school.id, t.studentA.userId, t.assignmentId);
@@ -323,7 +330,7 @@ describeDb("storage key tenant boundary", () => {
           ${t.school.id}, ${row.id}, ${t.studentA.userId},
           ${`permanent/${other.school.id}/obj/x.pdf`}, 'x.pdf', 'application/pdf', 10
         )
-      `,
+      `.execute(),
     ).rejects.toThrow(/ck_submission_attachments_storage_key/i);
   });
 });

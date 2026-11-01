@@ -35,6 +35,11 @@ import type { TenantErpNextFactory } from "../client/tenant-client";
 
 const integrationTest = test.skipIf(!integrationEnabled);
 
+// Tap is opt-in per deployment (`TAP_COUNTRIES`, empty by default: every school bills through
+// Stripe — see payment-provider-routing.ts). These tests run as a deployment that lists Jordan, the
+// seeded school's country, so the region routes to Tap.
+const TAP_REGION: ReadonlySet<string> = new Set(["JO"]);
+
 const silentLogger = {
   debug: () => undefined,
   info: () => undefined,
@@ -191,12 +196,18 @@ const start = (
   providers: { stripe: null; tap: PaymentProviderPort },
   auth = f.parent,
 ) =>
-  startOnlineFeePayment(database!.sql, providers, auth, undefined, {
-    student_id: f.studentId,
-    invoice_id: f.invoiceId,
-    success_url: "https://app.studafy.test/fees/return",
-    cancel_url: "https://app.studafy.test/fees",
-  });
+  startOnlineFeePayment(
+    database!.sql,
+    { ...providers, tapCountries: TAP_REGION },
+    auth,
+    undefined,
+    {
+      student_id: f.studentId,
+      invoice_id: f.invoiceId,
+      success_url: "https://app.studafy.test/fees/return",
+      cancel_url: "https://app.studafy.test/fees",
+    },
+  );
 
 /** The event the Tap normalizer would produce for this charge. */
 function tapFeeEvent(
@@ -321,7 +332,7 @@ describe("online fee payments", () => {
     const f = await seed();
     const error: unknown = await startOnlineFeePayment(
       database!.sql,
-      { stripe: fakeTapProvider().port, tap: null },
+      { stripe: fakeTapProvider().port, tap: null, tapCountries: TAP_REGION },
       f.parent,
       undefined,
       {

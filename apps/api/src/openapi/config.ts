@@ -148,6 +148,17 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "returned in full only by the audited reveal call (studentRecord:readSensitive).",
     },
     {
+      name: "Staff and class records",
+      description:
+        "School-defined records about members of staff and about classes " +
+        '(docs/modules/student-records.md "Staff and class records"). Staff records are read ' +
+        "with staffRecord:read (a PRINCIPAL sees non-sensitive fields only), edited with " +
+        "staffRecord:update and revealed with staffRecord:readSensitive, all held by ORG_ADMIN; " +
+        "each member of staff reads their own non-sensitive fields. Class records are read by " +
+        "leadership and the class's teachers (classRecord:read) and edited with timetable:manage. " +
+        "Unknown columns of the users and classes CSV imports can be kept as record fields.",
+    },
+    {
       name: "Teachers",
       description:
         "Teacher profile management. Authenticated and tenant-scoped. " +

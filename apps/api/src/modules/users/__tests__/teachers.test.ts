@@ -21,6 +21,7 @@ import {
   integrationEnabled,
   type TestDatabase,
 } from "../../../../tests/harness";
+import { withTenantTx } from "../../../db/tenant-tx";
 import {
   listTeachers,
   getTeacher,
@@ -57,13 +58,15 @@ afterAll(async () => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-async function withTx<T>(fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
-  let result: T | undefined;
-  await db.sql.begin(async (tx) => {
-    await tx`SELECT set_config('role', 'studafy_app', true)`;
-    result = await fn(tx);
-  });
-  return result as T;
+/**
+ * Run `fn` in the same tenant transaction production opens (`withTenantTx`): role studafy_app with
+ * `app.school_id` armed, so tenant_isolation RLS applies exactly as it does behind a route.
+ *
+ * No acting user is set: teachers, users, user_roles and audit_logs are guarded by tenant_isolation
+ * alone, with no policy reading `app.user_id`. Audit rows written here carry a NULL actor_id.
+ */
+function withTx<T>(schoolId: string, fn: (tx: TransactionSql) => Promise<T>): Promise<T> {
+  return withTenantTx(db.sql, { schoolId }, fn);
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +85,9 @@ describeDb("listTeachers", () => {
       employeeNumber: "EMP-002",
     });
 
-    const { rows, next_cursor } = await withTx((tx) => listTeachers(tx, school.id, { limit: 10 }));
+    const { rows, next_cursor } = await withTx(school.id, (tx) =>
+      listTeachers(tx, school.id, { limit: 10 }),
+    );
 
     expect(rows.length).toBe(2);
     expect(next_cursor).toBeNull();
@@ -105,7 +110,7 @@ describeDb("listTeachers", () => {
       `;
     });
 
-    const { rows } = await withTx((tx) =>
+    const { rows } = await withTx(school.id, (tx) =>
       listTeachers(tx, school.id, { limit: 10, status: "active" }),
     );
 
@@ -124,7 +129,7 @@ describeDb("listTeachers", () => {
       employeeNumber: "OTHER-001",
     });
 
-    const { rows } = await withTx((tx) =>
+    const { rows } = await withTx(school.id, (tx) =>
       listTeachers(tx, school.id, { limit: 10, search: "FINDME" }),
     );
 
@@ -140,11 +145,11 @@ describeDb("listTeachers", () => {
       });
     }
 
-    const page1 = await withTx((tx) => listTeachers(tx, school.id, { limit: 2 }));
+    const page1 = await withTx(school.id, (tx) => listTeachers(tx, school.id, { limit: 2 }));
     expect(page1.rows.length).toBe(2);
     expect(page1.next_cursor).not.toBeNull();
 
-    const page2 = await withTx((tx) =>
+    const page2 = await withTx(school.id, (tx) =>
       listTeachers(tx, school.id, { limit: 2, cursor: page1.next_cursor! }),
     );
     expect(page2.rows.length).toBe(2);
@@ -167,7 +172,7 @@ describeDb("getTeacher", () => {
       employeeNumber: "EMP-GET",
     });
 
-    const result = await withTx((tx) => getTeacher(tx, school.id, teacher.id));
+    const result = await withTx(school.id, (tx) => getTeacher(tx, school.id, teacher.id));
 
     expect(result).toBeDefined();
     expect(result!.employee_number).toBe("EMP-GET");
@@ -176,7 +181,7 @@ describeDb("getTeacher", () => {
 
   test("returns undefined for non-existent ID", async () => {
     const school = await createSchool(db.sql);
-    const result = await withTx((tx) =>
+    const result = await withTx(school.id, (tx) =>
       getTeacher(tx, school.id, "00000000-0000-0000-0000-000000000000"),
     );
     expect(result).toBeUndefined();
@@ -195,7 +200,9 @@ describeDb("getTeacherByUserId", () => {
       employeeNumber: "EMP-BYUSER",
     });
 
-    const result = await withTx((tx) => getTeacherByUserId(tx, school.id, teacher.userId));
+    const result = await withTx(school.id, (tx) =>
+      getTeacherByUserId(tx, school.id, teacher.userId),
+    );
 
     expect(result).toBeDefined();
     expect(result!.id).toBe(teacher.id);
@@ -206,7 +213,7 @@ describeDb("getTeacherByUserId", () => {
     const school = await createSchool(db.sql);
     const user = await createUserFactory(db.sql, school.id, { email: "noteach@test.local" });
 
-    const result = await withTx((tx) => getTeacherByUserId(tx, school.id, user.id));
+    const result = await withTx(school.id, (tx) => getTeacherByUserId(tx, school.id, user.id));
     expect(result).toBeUndefined();
   });
 });
@@ -219,7 +226,7 @@ describeDb("createTeacher", () => {
   test("creates a teacher with INSTRUCTOR role and emits audit", async () => {
     const school = await createSchool(db.sql);
 
-    const teacher = await withTx((tx) =>
+    const teacher = await withTx(school.id, (tx) =>
       createTeacher(tx, school.id, {
         email: "newteacher@test.local",
         employee_number: "EMP-NEW",
@@ -237,7 +244,7 @@ describeDb("createTeacher", () => {
     await createTeacherFactory(db.sql, school.id, { employeeNumber: "EMP-DUP" });
 
     await expect(
-      withTx((tx) =>
+      withTx(school.id, (tx) =>
         createTeacher(tx, school.id, {
           email: "dup@test.local",
           employee_number: "EMP-DUP",
@@ -251,7 +258,7 @@ describeDb("createTeacher", () => {
     const school1 = await createSchool(db.sql);
     const school2 = await createSchool(db.sql);
 
-    const t1 = await withTx((tx) =>
+    const t1 = await withTx(school1.id, (tx) =>
       createTeacher(tx, school1.id, {
         email: "shared1@test.local",
         employee_number: "EMP-SHARED",
@@ -259,7 +266,7 @@ describeDb("createTeacher", () => {
       }),
     );
 
-    const t2 = await withTx((tx) =>
+    const t2 = await withTx(school2.id, (tx) =>
       createTeacher(tx, school2.id, {
         email: "shared2@test.local",
         employee_number: "EMP-SHARED",
@@ -283,7 +290,7 @@ describeDb("updateTeacher", () => {
       employeeNumber: "EMP-UPD",
     });
 
-    const updated = await withTx((tx) =>
+    const updated = await withTx(school.id, (tx) =>
       updateTeacher(tx, school.id, teacher.id, { employment_status: "on_leave" }),
     );
 
@@ -298,7 +305,7 @@ describeDb("updateTeacher", () => {
       employeeNumber: "EMP-OLD",
     });
 
-    const updated = await withTx((tx) =>
+    const updated = await withTx(school.id, (tx) =>
       updateTeacher(tx, school.id, teacher.id, { employee_number: "EMP-NEW-NUM" }),
     );
 
@@ -311,7 +318,9 @@ describeDb("updateTeacher", () => {
     const t2 = await createTeacherFactory(db.sql, school.id, { employeeNumber: "EMP-SECOND" });
 
     await expect(
-      withTx((tx) => updateTeacher(tx, school.id, t2.id, { employee_number: "EMP-FIRST" })),
+      withTx(school.id, (tx) =>
+        updateTeacher(tx, school.id, t2.id, { employee_number: "EMP-FIRST" }),
+      ),
     ).rejects.toThrow();
   });
 
@@ -319,7 +328,7 @@ describeDb("updateTeacher", () => {
     const school = await createSchool(db.sql);
 
     await expect(
-      withTx((tx) =>
+      withTx(school.id, (tx) =>
         updateTeacher(tx, school.id, "00000000-0000-0000-0000-000000000000", {
           employment_status: "active",
         }),

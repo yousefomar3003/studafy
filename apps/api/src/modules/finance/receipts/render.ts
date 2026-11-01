@@ -22,9 +22,11 @@ import type { PDFFont, PDFPage, RGB } from "pdf-lib";
 export interface ReceiptInput {
   locale: "en" | "ar";
   schoolName: string;
+  /** The school's tax registration number (VAT settings), when it has one. */
+  taxRegistrationNumber: string | null;
   receiptNumber: string;
   paymentDate: string;
-  status: "pending" | "confirmed" | "failed";
+  status: "pending" | "confirmed" | "failed" | "reversed";
   studentName: string;
   admissionNumber: string;
   familyName: string | null;
@@ -38,6 +40,7 @@ export interface ReceiptInput {
 const LABELS = {
   en: {
     title: "Payment receipt",
+    taxRegistration: "Tax registration number",
     receiptNumber: "Receipt number",
     date: "Payment date",
     student: "Student",
@@ -52,11 +55,13 @@ const LABELS = {
       pending: "Recorded — awaiting confirmation",
       confirmed: "Confirmed",
       failed: "Not completed",
+      reversed: "Reversed — this payment was cancelled",
     },
     footer: "Issued by Studafy on {date}. Keep this receipt for your records.",
   },
   ar: {
     title: "إيصال دفع",
+    taxRegistration: "الرقم الضريبي",
     receiptNumber: "رقم الإيصال",
     date: "تاريخ الدفع",
     student: "الطالب",
@@ -67,7 +72,12 @@ const LABELS = {
     status: "الحالة",
     amount: "المبلغ المستلم",
     modes: { cash: "نقدًا", bank_transfer: "تحويل بنكي", card_external: "بطاقة" },
-    statuses: { pending: "مسجّلة — بانتظار التأكيد", confirmed: "مؤكدة", failed: "لم تكتمل" },
+    statuses: {
+      pending: "مسجّلة — بانتظار التأكيد",
+      confirmed: "مؤكدة",
+      failed: "لم تكتمل",
+      reversed: "مُلغاة — أُلغيت هذه الدفعة",
+    },
     footer: "صدر عن Studafy بتاريخ {date}. يرجى الاحتفاظ بهذا الإيصال.",
   },
 } as const;
@@ -265,6 +275,9 @@ export async function renderReceiptPdf(input: ReceiptInput): Promise<Uint8Array>
   y -= 36;
 
   const rows: [string, string][] = [
+    ...(input.taxRegistrationNumber
+      ? [[labels.taxRegistration, input.taxRegistrationNumber] as [string, string]]
+      : []),
     [labels.receiptNumber, input.receiptNumber],
     [labels.date, input.paymentDate],
     [labels.student, input.studentName],

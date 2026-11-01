@@ -78,6 +78,51 @@ function recordsFor(kind: "student" | "parent", value: string | null) {
   };
 }
 
+const RESULT = {
+  finalization_id: "fin-1",
+  academic_year_id: "year-1",
+  academic_year_name: "2025–2026",
+  section_name: "C",
+  grade_level_name: "Grade 9",
+  term_id: null,
+  term_name: null,
+  version: 1,
+  finalized_at: "2026-06-30T10:00:00.000Z",
+  result: {
+    student_id: "student-1",
+    first_name: "Amara",
+    last_name: "Chen",
+    admission_number: "",
+    status: "complete",
+    average_percentage: 84.5,
+    total_obtained: 845,
+    total_max: 1000,
+    grade_label: "B+",
+    subjects_failed: 1,
+    academic_status: "supplementary",
+    subjects: [],
+  },
+};
+const CERTIFICATE = {
+  id: "cert-1",
+  kind: "annual_certificate",
+  serial_number: "2026-0042",
+  status: "issued",
+  academic_year_id: "year-1",
+  student_id: "student-1",
+  finalization_id: "fin-1",
+  issued_at: "2026-07-01T10:00:00.000Z",
+};
+const INCIDENT = {
+  id: "incident-1",
+  student_id: "student-1",
+  incident_type: "behavioral",
+  severity: "minor",
+  status: "resolved",
+  title: "Late to class",
+  incident_at: "2026-09-10T08:00:00.000Z",
+};
+
 let studentRecords = recordsFor("student", null);
 
 interface RequestInit {
@@ -101,6 +146,15 @@ const getMock = mock((path: string, _init?: RequestInit) => {
   }
   if (path === "/api/parents/{parentUserId}/records") {
     return Promise.resolve<unknown>({ data: recordsFor("parent", "Al Noor Clinic") });
+  }
+  if (path === "/api/grading/students/{studentId}/results") {
+    return Promise.resolve<unknown>({ data: { results: [RESULT] } });
+  }
+  if (path === "/api/grading/students/{studentId}/certificates") {
+    return Promise.resolve<unknown>({ data: { certificates: [CERTIFICATE] } });
+  }
+  if (path === "/api/discipline/incidents") {
+    return Promise.resolve<unknown>({ data: { incidents: [INCIDENT], total: 3 } });
   }
   return Promise.resolve<unknown>({ data: {} });
 });
@@ -197,5 +251,33 @@ describe("Principal > Students", () => {
     expect(screen.getByRole("link", { name: "Back" }).getAttribute("href")).toBe(
       "/portal/principal/students/student-1",
     );
+  });
+  test("the student page sums up results, certificates, discipline and attendance", async () => {
+    await renderAsPrincipal("/portal/principal/students/student-1");
+
+    const results = await screen.findByRole("region", { name: "Results" });
+    expect(await within(results).findByText("Whole year 2025–2026")).toBeTruthy();
+    expect(within(results).getByText("B+")).toBeTruthy();
+    expect(within(results).getByText(/1 subject failed/)).toBeTruthy();
+
+    const certificates = screen.getByRole("region", { name: "Report cards & certificates" });
+    expect(
+      (
+        await within(certificates).findByRole("link", { name: /^Certificate 2026-0042/ })
+      ).getAttribute("href"),
+    ).toBe("/portal/principal/academic-setup/certificates/cert-1?year=year-1");
+
+    const discipline = screen.getByRole("region", { name: "Discipline" });
+    expect(await within(discipline).findByRole("link", { name: "Late to class" })).toBeTruthy();
+    expect(within(discipline).getByText("And 2 older incidents.")).toBeTruthy();
+    expect(getMock).toHaveBeenCalledWith("/api/discipline/incidents", {
+      params: { query: { student_id: "student-1", limit: 10, offset: 0 } },
+    });
+
+    expect(
+      screen
+        .getByRole("link", { name: "Open this student's attendance history" })
+        .getAttribute("href"),
+    ).toBe("/portal/attendance/students/student-1");
   });
 });

@@ -23,6 +23,8 @@ export interface ExamRow {
   status: ExamStatus;
   starts_at: Date;
   ends_at: Date;
+  // numeric(10, 2) columns, read as `::float8` so they leave the API as the numbers the contract
+  // promises; postgres.js returns a bare numeric as a string ("2.00").
   max_score: number;
   room_id: string | null;
   weight: number;
@@ -84,8 +86,8 @@ async function getExam(
     SELECT id, school_id, class_id,
            created_by_user_id, last_edited_by_user_id,
            title, description, status,
-           starts_at, ends_at, max_score,
-           room_id, weight,
+           starts_at, ends_at, max_score::float8 AS max_score,
+           room_id, weight::float8 AS weight,
            created_at, updated_at
     FROM app.exams
     WHERE id = ${examId} AND school_id = ${schoolId}
@@ -229,8 +231,8 @@ export async function listExams(
       SELECT e.id, e.school_id, e.class_id,
              e.created_by_user_id, e.last_edited_by_user_id,
              e.title, e.description, e.status,
-             e.starts_at, e.ends_at, e.max_score,
-             e.room_id, e.weight,
+             e.starts_at, e.ends_at, e.max_score::float8 AS max_score,
+             e.room_id, e.weight::float8 AS weight,
              e.created_at, e.updated_at
       FROM app.exams e
       WHERE e.school_id = ${schoolId}
@@ -307,8 +309,8 @@ export async function createExam(
     RETURNING id, school_id, class_id,
               created_by_user_id, last_edited_by_user_id,
               title, description, status,
-              starts_at, ends_at, max_score,
-              room_id, weight,
+              starts_at, ends_at, max_score::float8 AS max_score,
+              room_id, weight::float8 AS weight,
               created_at, updated_at
   `;
 
@@ -402,8 +404,8 @@ export async function updateExam(
     RETURNING id, school_id, class_id,
               created_by_user_id, last_edited_by_user_id,
               title, description, status,
-              starts_at, ends_at, max_score,
-              room_id, weight,
+              starts_at, ends_at, max_score::float8 AS max_score,
+              room_id, weight::float8 AS weight,
               created_at, updated_at
   `;
 

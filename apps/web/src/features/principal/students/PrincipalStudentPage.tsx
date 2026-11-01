@@ -14,12 +14,15 @@ import {
 import { RecordsPanel } from "../../records/RecordsPanel";
 import { studentDisplayName } from "../school/queries";
 
+import { StudentOverviewPanels } from "./StudentOverviewPanels";
+
 import "../school/principal-school.css";
 
 /**
  * One student from Principal > Students (`/portal/principal/students/:studentId`): who they are,
  * their school-defined record (which a principal fills in and corrects, and whose sensitive values
- * they may reveal), and their guardians, each opening that parent's record. Everything else stays
+ * they may reveal), their guardians, each opening that parent's record, and an overview of their
+ * results, report cards, discipline and attendance (`StudentOverviewPanels`). Everything else stays
  * read-only as on the roll: no admission data, no enrolment changes — those are the admin's.
  */
 export default function PrincipalStudentPage() {
@@ -101,6 +104,8 @@ export default function PrincipalStudentPage() {
             )}
           </Card.Body>
         </Card>
+
+        <StudentOverviewPanels studentId={profile.id} />
       </div>
     </>
   );

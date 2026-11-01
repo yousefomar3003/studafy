@@ -1,9 +1,12 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { createExam, deleteExam, getExamById, listExams, updateExam } from "../exam-service";
@@ -155,6 +158,12 @@ export function examRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // Audit declarations
+  // Writes need timetable:manage (ORG_ADMIN, PRINCIPAL): exams sit on the school calendar every
+  // class sees. Reading them stays open to every school member.
+  const manage = requirePermission(PERMISSIONS.TIMETABLE_MANAGE);
+  routes.use("/api/academics/exams", onlyMethods(["POST"], manage));
+  routes.use("/api/academics/exams/:examId", onlyMethods(["PATCH", "DELETE"], manage));
+
   routes.use("/api/academics/exams", auditAction("insert", "exams"));
   routes.use("/api/academics/exams/:examId", auditAction("update", "exams"));
 

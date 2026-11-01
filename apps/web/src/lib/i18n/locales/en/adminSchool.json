@@ -17,9 +17,14 @@
       "users": "Manage users →",
       "students": "Manage students →",
       "timetable": "Build timetable →",
+      "classes": "Classes and class records →",
       "calendar": "School calendar →",
       "settings": "School settings →",
-      "announcements": "Announcements →"
+      "announcements": "Announcements →",
+      "audit": "Audit log →",
+      "privacy": "Privacy requests →",
+      "aiReports": "AI content reports →",
+      "teachers": "Teachers' employment →"
     }
   },
   "tiles": {
@@ -392,6 +397,238 @@
       "approvals_other": "{{count}} grade approvals are waiting on you",
       "invited_one": "{{count}} invited user hasn't activated yet",
       "invited_other": "{{count}} invited users haven't activated yet"
+    }
+  },
+  "audit": {
+    "actions": {
+      "insert": "Created",
+      "update": "Updated",
+      "delete": "Deleted",
+      "login": "Logged in",
+      "logout": "Logged out",
+      "export": "Exported",
+      "permission_change": "Permission changed",
+      "read": "Viewed"
+    },
+    "allActions": "All actions",
+    "exportStatus": {
+      "queued": "Queued",
+      "processing": "Processing",
+      "completed": "Ready",
+      "failed": "Failed"
+    },
+    "title": "Audit log",
+    "intro": "Search the school’s audit trail by actor, action, resource, and date.",
+    "exportCsv": "Export CSV",
+    "filters": {
+      "action": "Action",
+      "resourceTable": "Resource table",
+      "resourceTablePlaceholder": "e.g. students, grades, users",
+      "from": "From",
+      "to": "To",
+      "clear": "Clear filters"
+    },
+    "actor": {
+      "label": "Actor",
+      "clear": "Clear",
+      "placeholder": "Search by name or email",
+      "noMatches": "No users match."
+    },
+    "export": {
+      "statusLabel": "Export status",
+      "download": "Download CSV",
+      "failedFallback": "The export could not be completed.",
+      "ready": "Audit export ready",
+      "readyDescription": "Download it below.",
+      "failed": "Audit export failed",
+      "queued": "Audit export queued",
+      "queuedDescription": "We'll let you know when it's ready.",
+      "startFailed": "Couldn't start export",
+      "tryAgain": "Please try again."
+    },
+    "columns": {
+      "timestamp": "Timestamp",
+      "actor": "Actor",
+      "action": "Action",
+      "resource": "Resource",
+      "ipAddress": "IP address",
+      "diff": "Diff"
+    },
+    "system": "System",
+    "viewDiff": "View diff",
+    "caption": "Audit log entries",
+    "rowLabel": "{{action}} on {{table}}",
+    "loadError": "Unable to load the audit log.",
+    "empty": "No entries match these filters.",
+    "previous": "Previous",
+    "next": "Next",
+    "diff": {
+      "title": "Audit entry diff",
+      "description": "{{action}} · {{table}}",
+      "empty": "No field-level changes recorded for this entry.",
+      "caption": "Before and after values",
+      "field": "Field",
+      "before": "Before",
+      "after": "After",
+      "close": "Close"
+    }
+  },
+  "privacy": {
+    "title": "Privacy requests",
+    "description": "Give a person a copy of everything the school holds about them, or erase it. Each request runs in the background and must be finished within 30 days of filing.",
+    "newRequest": "New request",
+    "caption": "Every privacy request, newest first",
+    "columns": {
+      "person": "Person",
+      "type": "Request",
+      "status": "Status",
+      "filed": "Filed",
+      "due": "Due by",
+      "result": "Result"
+    },
+    "type": {
+      "export": "Data export",
+      "erasure": "Erasure"
+    },
+    "status": {
+      "queued": "Waiting",
+      "processing": "In progress",
+      "completed": "Done",
+      "failed": "Failed"
+    },
+    "completedOn": "Done {{date}}",
+    "removedPerson": "Erased person",
+    "download": "Download",
+    "downloadLabel": "Download the data export for {{name}}",
+    "downloadFailed": "Couldn't get the download link. Try again.",
+    "failedFallback": "The request failed. File it again, or contact Studafy support.",
+    "empty": "No privacy requests yet.",
+    "loadError": "Couldn't load the privacy requests.",
+    "new": {
+      "title": "New privacy request",
+      "person": "Person",
+      "type": "What do they want?",
+      "explain": {
+        "export": "Collects everything the school holds about this person into one file, which you can download here once it's ready. Nothing is changed.",
+        "erasure": "Removes this person's name, contact details and other personal data from the school's records, and signs them out of every device. Financial and audit records the school must keep by law stay as they are. This can't be undone."
+      },
+      "understandErasure": "I understand this person's data will be erased for good",
+      "submit": {
+        "export": "Request export",
+        "erasure": "Erase their data"
+      },
+      "cancel": "Cancel",
+      "filed": {
+        "export": "Export requested for {{name}}",
+        "erasure": "Erasure requested for {{name}}"
+      },
+      "failed": "Couldn't file the request",
+      "alreadyPending": "A request of this kind is already waiting or in progress for this person.",
+      "unavailable": "Privacy requests can't be processed on this server right now. Contact Studafy support."
+    }
+  },
+  "aiReports": {
+    "title": "AI content reports",
+    "description": "What students reported about AI answers, quizzes and summaries, and what the safety filter escalated. Child-safety reports must be answered within 24 hours.",
+    "filter": "Show",
+    "openReports": "Open reports",
+    "caption": "AI content reports, most urgent first",
+    "columns": {
+      "reason": "Reason",
+      "priority": "Priority",
+      "student": "Student",
+      "content": "Content",
+      "status": "Status",
+      "filed": "Reported"
+    },
+    "reason": {
+      "child_safety": "Child safety",
+      "unsafe": "Unsafe content",
+      "inappropriate": "Inappropriate content",
+      "inaccurate": "Inaccurate content",
+      "other": "Other"
+    },
+    "priority": {
+      "urgent": "Urgent",
+      "high": "High",
+      "normal": "Normal"
+    },
+    "status": {
+      "pending": "New",
+      "in_review": "In review",
+      "escalated": "Escalated",
+      "actioned": "Actioned",
+      "dismissed": "Dismissed"
+    },
+    "source": {
+      "user_report": "Reported by a student",
+      "safety_filter": "Flagged by the safety filter"
+    },
+    "contentType": {
+      "ask_question": "Question to the AI",
+      "ask_answer": "AI answer",
+      "quiz": "Quiz",
+      "flashcard_deck": "Flashcards",
+      "summary": "Summary"
+    },
+    "respondBy": "Respond by {{time}}",
+    "overdueSince": "Overdue since {{time}}",
+    "overdueWarning": "This report is overdue. It should have been answered by {{time}}.",
+    "emptyOpen": "No open reports. Nothing needs your attention.",
+    "empty": "No reports with this status.",
+    "loadError": "Couldn't load the reports.",
+    "loading": "Loading…",
+    "notFound": "This report doesn't exist or isn't in your school.",
+    "previous": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{pages}}",
+    "back": "← All AI content reports",
+    "cancel": "Cancel",
+    "conflict": "Someone else updated this report first. It now shows their change.",
+    "updateFailed": "Couldn't update the report",
+    "toast": {
+      "in_review": "Review started",
+      "escalated": "Report escalated",
+      "actioned": "Report marked actioned",
+      "dismissed": "Report dismissed"
+    },
+    "detail": {
+      "respondBy": "Respond by",
+      "source": "Source",
+      "studentSaid": "What the student said",
+      "noReason": "No details given.",
+      "content": "Reported content",
+      "showContent": "Show the content",
+      "hideContent": "Hide the content",
+      "contentHidden": "Hidden because it may be harmful. Opening this report was recorded in the audit log.",
+      "review": "Review",
+      "note": "Note: {{note}}",
+      "reviewedAt": "Last reviewed {{time}}",
+      "startReview": "Start review",
+      "action": {
+        "escalated": "Escalate",
+        "actioned": "Mark actioned",
+        "dismissed": "Dismiss"
+      }
+    },
+    "note": {
+      "label": "Note",
+      "required": "Write a note before you continue.",
+      "title": {
+        "escalated": "Escalate this report",
+        "actioned": "Mark as actioned",
+        "dismissed": "Dismiss this report"
+      },
+      "description": {
+        "escalated": "Say who you escalated it to (the police, a social worker, Studafy) and any reference number.",
+        "actioned": "Say what was done, for example that the student and their parents were contacted.",
+        "dismissed": "Say why nothing needs doing."
+      },
+      "submit": {
+        "escalated": "Escalate",
+        "actioned": "Mark actioned",
+        "dismissed": "Dismiss"
+      }
     }
   }
 }

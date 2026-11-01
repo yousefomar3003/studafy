@@ -102,7 +102,8 @@ export async function listStudents(
     LIMIT ${limit}
   `;
 
-  const hasMore = rows.length > limit;
+  // `limit` already includes the probe row; more exist only past the page the caller asked for.
+  const hasMore = rows.length > params.limit;
   const sliced = hasMore ? rows.slice(0, params.limit) : rows;
   const next_cursor =
     hasMore && sliced.length > 0

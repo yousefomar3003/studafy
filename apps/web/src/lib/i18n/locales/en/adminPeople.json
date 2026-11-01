@@ -384,7 +384,8 @@
         "templateError": "Couldn't download the template. Please try again.",
         "validateError": "Couldn't validate that file. Please try again.",
         "applyError": "Couldn't apply the mapping. Please try again.",
-        "confirmError": "Couldn't confirm the import. Please try again."
+        "confirmError": "Couldn't confirm the import. Please try again.",
+        "history": "Import history"
       },
       "report": {
         "region": "Validation report",
@@ -424,12 +425,190 @@
         "importAnother": "Import another file",
         "backToStudents": "Back to students",
         "parentConflicts": "Parents to link by hand",
-        "recordAnswers": "Record answers"
+        "recordAnswers": "Record answers",
+        "leftoverColumns": "See the columns Studafy did not use, and map them to records"
       },
       "failed": {
         "region": "Import failed",
         "body": "The import failed while processing. No students were created from this file.",
         "startNew": "Start a new import"
+      }
+    },
+    "importHistory": {
+      "common": {
+        "loading": "Loading…",
+        "cancel": "Cancel",
+        "close": "Close"
+      },
+      "page": {
+        "title": "Import history",
+        "intro": "Every student import, newest first. Studafy keeps each original file and the columns it did not use, so nothing in a school's file is lost.",
+        "newImport": "Import a new file"
+      },
+      "list": {
+        "heading": "Past imports",
+        "loadError": "The import history could not be loaded.",
+        "empty": "No imports yet.",
+        "loadMore": "Show more",
+        "caption": "Student imports",
+        "columns": {
+          "uploaded": "Uploaded",
+          "file": "File",
+          "status": "Status",
+          "rows": "Rows",
+          "result": "Result",
+          "by": "Uploaded by",
+          "original": "Original file",
+          "unmapped": "Unused columns"
+        },
+        "rowCounts": "{{valid}} of {{total}} valid",
+        "errorRows_one": "{{count}} row with errors",
+        "errorRows_other": "{{count}} rows with errors",
+        "summary": "{{created}} created, {{updated}} updated",
+        "unknownUser": "Unknown",
+        "unmappedCount_one": "{{count}} unused column",
+        "unmappedCount_other": "{{count}} unused columns",
+        "allMapped": "All used"
+      },
+      "status": {
+        "uploaded": "Needs review",
+        "validated": "Ready to confirm",
+        "confirmed": "Queued",
+        "processing": "Importing",
+        "completed": "Completed",
+        "failed": "Failed"
+      },
+      "file": {
+        "notKept": "Not kept (uploaded before originals were kept)",
+        "removed": {
+          "deleted": "Deleted on {{date}}",
+          "retention": "Deleted on {{date}} when its retention period ended",
+          "erasure": "Deleted on {{date}} when the school's data was erased"
+        },
+        "download": "Download original file",
+        "downloadNamed": "Download original file {{name}}",
+        "downloadError": "The file could not be downloaded.",
+        "delete": "Delete original file",
+        "deleteNamed": "Delete original file {{name}}",
+        "deleteError": "The file could not be deleted.",
+        "expires": "Deleted automatically on {{date}}",
+        "confirmTitle": "Delete the original file?",
+        "confirmBody": "{{name}} will be deleted now and cannot be downloaded again. The import, its history and its unused columns are kept.",
+        "confirmDelete": "Delete file"
+      },
+      "retention": {
+        "heading": "How long files are kept",
+        "body": "Original files and unused columns hold many people's data, so they are deleted automatically after this many days (at most {{max}}).",
+        "label": "Days to keep",
+        "invalid": "Enter a whole number from 1 to {{max}}.",
+        "save": "Save",
+        "saveError": "The retention period could not be saved.",
+        "saved_one": "Saved. Files are kept for {{count}} day.",
+        "saved_other": "Saved. Files are kept for {{count}} days."
+      },
+      "detail": {
+        "loadError": "This import could not be loaded.",
+        "back": "Back to import history",
+        "title": "Import: {{name}}",
+        "uploadedOn": "Uploaded {{date}}",
+        "originalHeading": "Original file",
+        "columnsHeading": "Columns Studafy did not use",
+        "columnsError": "The columns could not be loaded."
+      },
+      "columns": {
+        "none": "Every column in this file was used.",
+        "expires": "You can map these columns until {{date}}, when their values are deleted.",
+        "cellsGone": "These columns' values are no longer stored, so they can no longer be mapped.",
+        "notCompleted": "Columns can be mapped once the import has completed.",
+        "looksSensitive": "Looks sensitive",
+        "values_one": "{{count}} value",
+        "values_other": "{{count}} values",
+        "suggested": "Looks like: {{type}}",
+        "applied_one": "Written to “{{field}}” for {{count}} person on {{date}}",
+        "applied_other": "Written to “{{field}}” for {{count}} people on {{date}}",
+        "map": "Map column",
+        "mapNamed": "Map column {{header}}"
+      },
+      "map": {
+        "title": "Map “{{header}}”",
+        "intro": "Choose the record field to write this column to. Only the people this import created or updated are written. Nothing is saved until you preview and confirm.",
+        "subject": "Whose record",
+        "subjectStudent_one": "Students ({{count}} with a value)",
+        "subjectStudent_other": "Students ({{count}} with a value)",
+        "subjectParent_one": "Parents this import created ({{count}} with a value)",
+        "subjectParent_other": "Parents this import created ({{count}} with a value)",
+        "target": "Field",
+        "targetNew": "Create a new record field from this column",
+        "targetExisting": "Use an existing record field",
+        "field": "Record field",
+        "fieldPlaceholder": "Choose a field",
+        "noFields": "This record form has no published fields that take values yet.",
+        "sensitiveField": "{{label}} (sensitive)",
+        "labelEn": "Field name (English)",
+        "labelAr": "Field name (Arabic)",
+        "type": "Field type",
+        "typeSuggested": "Suggested from the values: {{type}}",
+        "sensitive": "Sensitive field (encrypted, shown masked, kept only for the retention period)",
+        "sensitiveHint": {
+          "label": "The column name suggests an ID number, passport, medical or pay data. We suggest a sensitive field.",
+          "values": "The values look like ID numbers. We suggest a sensitive field."
+        },
+        "overwrite": "Replace answers people already have",
+        "incomplete": "Choose a field, or give the new field a name in both languages.",
+        "previewError": "The preview could not be made.",
+        "applyError": "Nothing was written. Preview again and confirm.",
+        "done_one": "Written for {{count}} person.",
+        "done_other": "Written for {{count}} people.",
+        "preview": "Preview",
+        "apply_one": "Write to {{count}} person",
+        "apply_other": "Write to {{count}} people"
+      },
+      "preview": {
+        "heading": "Preview",
+        "totals": {
+          "write_one": "{{count}} to write",
+          "write_other": "{{count}} to write",
+          "unchanged_one": "{{count}} already the same",
+          "unchanged_other": "{{count}} already the same",
+          "kept_one": "{{count}} existing answer kept",
+          "kept_other": "{{count}} existing answers kept",
+          "invalid_one": "{{count}} not valid for this field",
+          "invalid_other": "{{count}} not valid for this field",
+          "conflict_one": "{{count}} with disagreeing values",
+          "conflict_other": "{{count}} with disagreeing values",
+          "empty_one": "{{count}} empty",
+          "empty_other": "{{count}} empty"
+        },
+        "caption": "What “{{header}}” would write",
+        "columns": {
+          "line": "Line",
+          "person": "Person",
+          "value": "Value",
+          "current": "Current answer",
+          "outcome": "Outcome"
+        },
+        "yes": "Yes",
+        "no": "No",
+        "status": {
+          "write": "Will be written",
+          "unchanged": "Already the same",
+          "kept": "Existing answer kept",
+          "invalid": "Not written",
+          "conflict": "Not written",
+          "empty": "Empty"
+        },
+        "replaces": "replaces the current answer",
+        "reason": {
+          "RECORD_VALUE_WRONG_TYPE": "not a valid answer for this field",
+          "RECORD_VALUE_TOO_LONG": "too long",
+          "RECORD_VALUE_INVALID_NUMBER": "not a number",
+          "RECORD_VALUE_INVALID_DATE": "not a YYYY-MM-DD date",
+          "RECORD_VALUE_INVALID_CHOICE": "not one of the field's choices",
+          "RECORD_VALUE_INVALID_PHONE": "not a valid phone number",
+          "RECORD_VALUE_INVALID_EMAIL": "not a valid email address",
+          "RECORD_VALUE_DOCUMENT_FIELD": "document fields take files",
+          "CONFLICTING_VALUES": "their children's lines disagree"
+        }
       }
     }
   },
@@ -527,5 +706,40 @@
       "searchPlaceholder": "Search by name or admission number",
       "noMatches": "No students match."
     }
+  },
+  "teachers": {
+    "title": "Teachers",
+    "description": "Each teacher's employment record: employee number, status, and when they started or left. Sign-in and roles are on Users; new teachers are added on Members.",
+    "caption": "Every teacher, by name",
+    "columns": {
+      "name": "Name",
+      "actions": "Actions"
+    },
+    "employeeNumber": "Employee number",
+    "status": "Employment status",
+    "statuses": {
+      "pending": "Starting soon",
+      "active": "Active",
+      "on_leave": "On leave",
+      "suspended": "Suspended",
+      "terminated": "Left the school",
+      "archived": "Archived"
+    },
+    "hireDate": "Hire date",
+    "terminationDate": "End date",
+    "terminationHelper": "Set when the teacher leaves. Needs a hire date.",
+    "datesInvalid": "The end date needs a hire date, on or before it.",
+    "edit": "Edit",
+    "editLabel": "Edit {{name}}'s employment",
+    "editTitle": "{{name}}: employment",
+    "save": "Save",
+    "cancel": "Cancel",
+    "saved": "Saved {{name}}'s employment record",
+    "saveFailed": "Couldn't save the employment record",
+    "numberTaken": "Another teacher already has this employee number.",
+    "empty": "No teachers yet. Add them on Members.",
+    "loadError": "Couldn't load the teachers.",
+    "record": "Staff record",
+    "recordLabel": "Open {{name}}'s staff record"
   }
 }
