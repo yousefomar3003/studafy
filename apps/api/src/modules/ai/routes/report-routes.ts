@@ -10,6 +10,7 @@ import { getLocalizedMessage } from "../../../middleware/locale";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { AI_SUMMARY_LENGTHS, type AiSummaryLength } from "../config";
+import { isStudentSelf } from "../gate/student-self-gate";
 import { insertUserReport, isUniqueViolation } from "../moderation/persistence";
 import {
   REPORT_PRIORITIES,
@@ -186,19 +187,19 @@ export function aiReportRoutes(deps: {
     const auth = requireAuth(c);
     const locale = (c.get("locale") ?? "en") as SupportedLocale;
 
-    if (auth.userId !== input.studentId) {
-      throw new CodedHttpException(
-        403,
-        ERROR_CODES.AUTHZ_FORBIDDEN,
-        getLocalizedMessage(ERROR_CODES.AUTHZ_FORBIDDEN, locale),
-      );
-    }
-
     const priority = reportPriority(input.reasonCategory);
     const respondBy = reportRespondBy(priority, new Date());
     const tenant = { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
 
     const reportId = await withTenantTx(database, tenant, async (tx) => {
+      // `studentId` is a student record id, not the caller's user id.
+      if (!(await isStudentSelf(tx, input.studentId, auth.userId))) {
+        throw new CodedHttpException(
+          403,
+          ERROR_CODES.AUTHZ_FORBIDDEN,
+          getLocalizedMessage(ERROR_CODES.AUTHZ_FORBIDDEN, locale),
+        );
+      }
       const snapshot = await loadContentSnapshot(tx, summaryCache, input);
       if (snapshot === null) {
         throw new CodedHttpException(

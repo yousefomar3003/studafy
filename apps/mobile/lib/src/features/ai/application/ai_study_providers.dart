@@ -48,8 +48,9 @@ final aiUsageProvider = FutureProvider.autoDispose<AiUsage>((ref) async {
 /// The key concepts for one material, keyed by material id. One-shot (no preset), so a plain
 /// family provider rather than a controller. Re-fetched on `ref.invalidate`.
 ///
-/// Reuses [askAiStudentIdProvider] — the AI routes' `{studentId}` is the signed-in student's user
-/// id, which is exactly that seam. Throws when signed out; the screen guards that path first.
+/// Reuses [askAiStudentIdProvider] — the AI routes' `{studentId}` is the signed-in student's
+/// student record id, which is exactly that seam. Throws when signed out; the screen guards that
+/// path first.
 final keyConceptsProvider = FutureProvider.autoDispose.family<List<AiConcept>, String>((
   ref,
   materialId,

@@ -41,6 +41,7 @@ export { aiPhotoTextRoutes } from "./routes/photo-text-routes";
 export type { PhotoTextReader } from "./routes/photo-text-routes";
 export { aiUsageRoutes } from "./routes/usage-routes";
 export { aiConsentGate } from "./gate/consent-gate";
+export { aiStudentSelfGate, isStudentSelf } from "./gate/student-self-gate";
 export { aiConsentRoutes } from "./routes/consent-routes";
 export {
   AI_DATA_CATEGORIES,

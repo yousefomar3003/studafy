@@ -55,6 +55,7 @@ import {
   aiMetricsRoutes,
   aiRetrievalRoutes,
   aiSummaryRoutes,
+  aiStudentSelfGate,
   aiPhotoTextRoutes,
   aiUsageRoutes,
   createAiTokenMeter,
@@ -1263,6 +1264,9 @@ export function createApp({
   // would spend unbilled budget, so the whole surface is absent rather than un-metered.
   if (database && redis && entitlements && featureService) {
     const aiMeter = createAiTokenMeter({ redis });
+    // A per-student AI route is the student's own: refused for anyone else in the school before
+    // consent, quota or the handler run.
+    app.use("/api/ai/students/:studentId/*", aiStudentSelfGate({ database }));
     // Third-party data-sharing consent (ST-305). Registered first so a route that would send user
     // data to the model provider is refused before quota is reserved or a prompt is built.
     app.use("/api/ai/*", aiConsentGate({ database }));

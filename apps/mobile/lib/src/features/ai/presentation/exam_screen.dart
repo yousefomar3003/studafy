@@ -18,7 +18,7 @@ import 'widgets/exam_setup_view.dart';
 /// weak-topic study links.
 ///
 /// Route-only (`/me/exam-mode`), like Quiz and Ask AI. Reuses [askAiStudentIdProvider] — every
-/// `/api/ai/*` route takes the same `{studentId}` path convention (the session's own user id).
+/// `/api/ai/*` route takes the same `{studentId}` path convention (the session's own student record id).
 class ExamScreen extends ConsumerStatefulWidget {
   const ExamScreen({this.initialMaterialIds = const {}, super.key});
 

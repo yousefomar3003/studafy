@@ -19,7 +19,7 @@ import 'widgets/flashcard_streak_badge.dart';
 /// a swipe or the button row, each rating synced to the server immediately.
 ///
 /// Route-only (`/me/flashcards`), like Quiz and Ask AI. Reuses [askAiStudentIdProvider] — every
-/// `/api/ai/*` route takes the same `{studentId}` path convention (the session's own user id).
+/// `/api/ai/*` route takes the same `{studentId}` path convention (the session's own student record id).
 class FlashcardsScreen extends ConsumerStatefulWidget {
   const FlashcardsScreen({super.key});
 
