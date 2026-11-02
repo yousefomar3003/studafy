@@ -27,6 +27,10 @@ abstract final class RoutePaths {
   /// The signed-in student's AI-generated flashcard deck browser and review flow.
   static const flashcards = '/me/flashcards';
 
+  /// The signed-in student's "Explain it simply": a topic from their materials, rewritten in plain
+  /// language at the reading level they pick.
+  static const explain = '/me/explain';
+
   /// The signed-in student's AI usage meter: remaining monthly budget, reset date, and the
   /// nearing-limit warning ahead of the quota hard stop. Reached by tapping the compact meter on
   /// the AI hub.

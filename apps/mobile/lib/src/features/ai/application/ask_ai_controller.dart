@@ -7,6 +7,7 @@ import '../../../core/api/api_exception.dart';
 import '../data/ask_ai_client.dart';
 import '../data/ask_ai_events.dart';
 import '../domain/ask_ai_conversation.dart';
+import '../domain/ask_ai_history.dart';
 
 /// The endpoint's hard cap on question length (`AI_ASK_QUESTION_MAX_CHARS`). Mirrored here so the
 /// composer can stop an over-long question before the round trip.
@@ -50,6 +51,10 @@ class AskAiController extends ChangeNotifier {
   AskAiConversation get state => _state;
 
   StreamSubscription<AskAiEvent>? _subscription;
+
+  /// Completes the in-flight [send]'s future. Held so dropping the stream early (a new chat, a
+  /// chat reopened from history) settles it instead of leaving the caller awaiting forever.
+  Completer<void>? _pendingSend;
 
   AskAiMaterialScope? _materialScope;
 
@@ -103,7 +108,7 @@ class AskAiController extends ChangeNotifier {
       ),
     );
 
-    final completer = Completer<void>();
+    final completer = _pendingSend = Completer<void>();
     _subscription =
         _client
             .ask(
@@ -225,6 +230,29 @@ class AskAiController extends ChangeNotifier {
     'AI_LLM_REQUEST_REJECTED' => 'aiLlmRequestRejected',
     _ => 'aiLlmUnavailable',
   };
+
+  /// Starts a fresh chat: cancels any answer still streaming and forgets the conversation id, so
+  /// the next question opens a new conversation server-side. The material scope is kept — it is
+  /// the student's choice, shown in the composer, and removable there.
+  void startNewChat() {
+    _dropStream();
+    _emit(const AskAiConversation());
+  }
+
+  /// Replaces the current chat with [conversation] reopened from history; the next question is
+  /// threaded onto it. Cancels any answer still streaming, like [startNewChat].
+  void restore(AskAiStoredConversation conversation) {
+    _dropStream();
+    _emit(AskAiConversation(turns: conversation.turns, conversationId: conversation.id));
+  }
+
+  void _dropStream() {
+    _subscription?.cancel();
+    _subscription = null;
+    _retryableQuestion = null;
+    final pending = _pendingSend;
+    if (pending != null && !pending.isCompleted) pending.complete();
+  }
 
   /// Clears the send-error banner (e.g. the user dismissed it).
   void dismissSendError() {

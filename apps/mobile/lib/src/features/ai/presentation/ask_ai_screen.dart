@@ -10,6 +10,7 @@ import '../domain/ai_content_report.dart';
 import '../domain/ask_ai_conversation.dart';
 import 'widgets/ai_report_button.dart';
 import 'widgets/ask_ai_composer.dart';
+import 'widgets/ask_ai_history_sheet.dart';
 import 'widgets/ask_ai_turn_view.dart';
 import '../../../core/features/feature_gate.dart';
 
@@ -33,12 +34,16 @@ class AskAiScreen extends ConsumerStatefulWidget {
 
 class _AskAiScreenState extends ConsumerState<AskAiScreen> {
   AskAiController? _controller;
+  String? _studentId;
   final _scrollController = ScrollController();
+
+  /// True while a chat picked from history is being fetched.
+  bool _openingChat = false;
 
   @override
   void initState() {
     super.initState();
-    final studentId = ref.read(askAiStudentIdProvider);
+    final studentId = _studentId = ref.read(askAiStudentIdProvider);
     if (studentId != null) {
       _controller = AskAiController(client: ref.read(askAiClientProvider), studentId: studentId)
         ..materialScope = widget.initialMaterial
@@ -68,6 +73,41 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
     super.dispose();
   }
 
+  Future<void> _openHistory() async {
+    final controller = _controller;
+    final studentId = _studentId;
+    if (controller == null || studentId == null) return;
+
+    final choice = await showAskAiHistorySheet(
+      context,
+      studentId: studentId,
+      currentConversationId: controller.state.conversationId,
+    );
+    if (!mounted || choice == null) return;
+
+    switch (choice) {
+      case AskAiNewChatChoice():
+        controller.startNewChat();
+      case AskAiOpenChatChoice(:final conversationId):
+        if (conversationId == controller.state.conversationId) return;
+        setState(() => _openingChat = true);
+        try {
+          final conversation = await ref
+              .read(askAiHistoryClientProvider)
+              .get(studentId: studentId, conversationId: conversationId);
+          if (!mounted) return;
+          controller.restore(conversation);
+        } catch (_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('askAi.history.openError'.tr())));
+        } finally {
+          if (mounted) setState(() => _openingChat = false);
+        }
+    }
+  }
+
   Future<void> _reportAnswer(String messageId) => showAiReportFlow(context, ref, AiReportTarget.askAnswer(messageId));
 
   @override
@@ -75,7 +115,33 @@ class _AskAiScreenState extends ConsumerState<AskAiScreen> {
     final controller = _controller;
 
     return Scaffold(
-      appBar: AppBar(title: Text('askAi.title'.tr())),
+      appBar: AppBar(
+        title: Text('askAi.title'.tr()),
+        actions: controller == null
+            ? null
+            : [
+                IconButton(
+                  onPressed: _openingChat ? null : _openHistory,
+                  icon: const Icon(Icons.history_rounded),
+                  tooltip: 'askAi.history.title'.tr(),
+                ),
+                IconButton(
+                  // Nothing to leave on an empty chat.
+                  onPressed: _openingChat || controller.state.isEmpty
+                      ? null
+                      : controller.startNewChat,
+                  icon: const Icon(Icons.add_comment_outlined),
+                  tooltip: 'askAi.history.newChat'.tr(),
+                ),
+                const SizedBox(width: AppSpacing.space4),
+              ],
+        bottom: _openingChat
+            ? const PreferredSize(
+                preferredSize: Size.fromHeight(2),
+                child: LinearProgressIndicator(minHeight: 2),
+              )
+            : null,
+      ),
       body: controller == null
           ? const _SignedOutNotice()
           : Column(

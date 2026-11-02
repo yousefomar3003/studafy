@@ -7,6 +7,7 @@ import 'package:studafy_mobile/src/features/ai/application/ask_ai_controller.dar
 import 'package:studafy_mobile/src/features/ai/data/ask_ai_client.dart';
 import 'package:studafy_mobile/src/features/ai/data/ask_ai_events.dart';
 import 'package:studafy_mobile/src/features/ai/domain/ask_ai_conversation.dart';
+import 'package:studafy_mobile/src/features/ai/domain/ask_ai_history.dart';
 
 /// Hand-written fake — same rationale as `_FakeSubmissionsClient`
 /// (`submission_form_controller_test.dart`): [AskAiClient] is a thin wrapper over Dio, and a
@@ -228,6 +229,70 @@ void main() {
 
       expect(client.askCalls, 0);
       expect(controller.state.turns, isEmpty);
+    });
+  });
+
+  group('AskAiController history', () {
+    AskAiController answeredController() => _controllerFor(
+      _FakeAskAiClient(
+        () => Stream.fromIterable([
+          const AskAiSourcesEvent(conversationId: 'conv-1', sources: []),
+          const AskAiDoneEvent(messageId: 'msg-1', text: 'Answer.', citations: []),
+        ]),
+      ),
+    );
+
+    test('startNewChat clears the turns and the conversation id', () async {
+      final controller = answeredController();
+      await controller.send('first');
+
+      controller.startNewChat();
+
+      expect(controller.state.turns, isEmpty);
+      expect(controller.state.conversationId, isNull);
+    });
+
+    test('startNewChat settles a send still streaming', () async {
+      final events = StreamController<AskAiEvent>();
+      final controller = _controllerFor(_FakeAskAiClient(() => events.stream));
+      final pending = controller.send('slow question');
+      events.add(const AskAiDeltaEvent('Par'));
+      await Future<void>.delayed(Duration.zero);
+
+      controller.startNewChat();
+
+      await expectLater(pending, completes);
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.turns, isEmpty);
+      await events.close();
+    });
+
+    test('restore reopens a stored chat and threads the next question onto it', () async {
+      final client = _FakeAskAiClient(
+        () => Stream.fromIterable([
+          const AskAiDoneEvent(messageId: 'msg-3', text: 'Follow-up answer.', citations: []),
+        ]),
+      );
+      final controller = _controllerFor(client);
+
+      controller.restore(
+        const AskAiStoredConversation(
+          id: 'conv-old',
+          turns: [
+            AskAiTurn(
+              question: 'Earlier question',
+              answer: AskAiAnswerComplete(messageId: 'msg-2', text: 'Earlier.', citations: []),
+            ),
+          ],
+        ),
+      );
+      expect(controller.state.turns.single.question, 'Earlier question');
+      expect(controller.state.conversationId, 'conv-old');
+
+      await controller.send('And then?');
+
+      expect(client.conversationIdsSeen, ['conv-old']);
+      expect(controller.state.turns, hasLength(2));
     });
   });
 }

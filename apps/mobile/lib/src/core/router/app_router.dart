@@ -6,6 +6,7 @@ import '../../features/ai/presentation/ai_data_sharing_screen.dart';
 import '../../features/ai/presentation/ai_usage_screen.dart';
 import '../../features/ai/presentation/ask_ai_screen.dart';
 import '../../features/ai/presentation/exam_screen.dart';
+import '../../features/ai/presentation/explain_screen.dart';
 import '../../features/ai/presentation/flashcards_screen.dart';
 import '../../features/ai/presentation/quiz_screen.dart';
 import '../../features/ai/presentation/widgets/ai_consent_gate.dart';
@@ -95,6 +96,17 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
       GoRoute(
         path: RoutePaths.flashcards,
         builder: (context, state) => _paid(FeatureKeys.studyTools, const FlashcardsScreen()),
+      ),
+
+      // The signed-in student's "Explain it simply". Study tools pay for the explanation, and the
+      // passage it explains is found with the AI tutor's search, so it needs both.
+      GoRoute(
+        path: RoutePaths.explain,
+        builder: (context, state) => FeatureGate(
+          featureKey: FeatureKeys.studyTools,
+          whenPurchasable: (_) => const AiPaywall(),
+          child: _paid(FeatureKeys.aiTutor, const ExplainScreen()),
+        ),
       ),
 
       // The signed-in student's AI usage meter.

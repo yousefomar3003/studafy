@@ -141,7 +141,8 @@ enum AiStudyError {
   /// 404 `RESOURCE_NOT_FOUND` — the material isn't AI-visible or the school can't see it.
   notFound,
 
-  /// 503 `AI_CONCEPTS_GENERATION_FAILED` — the model's output failed validation or grounding.
+  /// 503 `AI_CONCEPTS_GENERATION_FAILED` / `AI_EXPLAIN_GENERATION_FAILED` — the model's output
+  /// failed validation or grounding.
   generationFailed,
 
   /// 401 / `AUTHZ_FORBIDDEN` — the session isn't allowed to act on this student's behalf.
@@ -170,7 +171,8 @@ enum AiStudyError {
         'AI_QUOTA_UNAVAILABLE' => AiStudyError.temporarilyUnavailable,
         'VALIDATION_FAILED' => AiStudyError.notReady,
         'RESOURCE_NOT_FOUND' => AiStudyError.notFound,
-        'AI_CONCEPTS_GENERATION_FAILED' => AiStudyError.generationFailed,
+        'AI_CONCEPTS_GENERATION_FAILED' ||
+        'AI_EXPLAIN_GENERATION_FAILED' => AiStudyError.generationFailed,
         'AUTHZ_FORBIDDEN' => AiStudyError.notAllowed,
         _ => api.status == 401 ? AiStudyError.notAllowed : AiStudyError.unknown,
       };

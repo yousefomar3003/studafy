@@ -549,6 +549,26 @@
     "studyMaterials": "Study materials"
   },
   "askAi": {
+    "history": {
+      "title": "Chat history",
+      "newChat": "New chat",
+      "current": "Current",
+      "groups": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "week": "Previous 7 days",
+        "older": "Older"
+      },
+      "questions": {
+        "one": "1 question",
+        "other": "{} questions"
+      },
+      "emptyTitle": "No chats yet",
+      "emptyBody": "Your conversations with the study assistant appear here for 90 days.",
+      "error": "Couldn't load your chat history.",
+      "retry": "Try again",
+      "openError": "Couldn't open that chat. It may have expired."
+    },
     "title": "Ask AI",
     "attach": {
       "tooltip": "Add a photo or material",
@@ -832,6 +852,34 @@
       "reviewedCount": "{count} cards reviewed",
       "backToDecks": "Back to decks"
     }
+  },
+  "aiExplain": {
+    "title": "Explain it simply",
+    "intro": {
+      "title": "Make any topic easy",
+      "body": "Type a topic from your class materials and choose how simple you want the explanation."
+    },
+    "topicLabel": "Topic",
+    "topicHint": "e.g. photosynthesis, fractions, the water cycle",
+    "levelLabel": "Explain it",
+    "levels": {
+      "elementary": "Very simple",
+      "middle": "Simple",
+      "high": "Detailed"
+    },
+    "action": "Explain",
+    "searching": "Finding the right part of your materials…",
+    "explaining": "Writing a simple explanation…",
+    "noMatch": {
+      "title": "Nothing found on that topic",
+      "body": "Your materials don't seem to cover it yet. Try different words or a broader topic."
+    },
+    "resultTitle": "Simple explanation",
+    "basedOn": "Based on",
+    "copy": "Copy explanation",
+    "copied": "Explanation copied",
+    "original": "Show the original passage",
+    "others": "Explain a different passage"
   },
   "aiStudy": {
     "signedOut": "Sign in to use the AI study tools.",

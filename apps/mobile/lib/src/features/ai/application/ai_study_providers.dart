@@ -6,6 +6,7 @@ import '../../../core/api/auth_interceptor.dart';
 import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/di/app_providers.dart';
+import '../data/ai_explain_client.dart';
 import '../data/ai_study_client.dart';
 import '../domain/ai_hub_status.dart';
 import '../domain/ai_study.dart';
@@ -22,6 +23,16 @@ final aiStudyClientProvider = Provider<AiStudyClient>((ref) {
     ..interceptors.add(AuthInterceptor(() => session.tokenProvider))
     ..interceptors.add(ErrorMappingInterceptor());
   return AiStudyClient(dio);
+});
+
+/// [AiExplainClient] on the same kind of standalone [Dio] as [aiStudyClientProvider].
+final aiExplainClientProvider = Provider<AiExplainClient>((ref) {
+  final baseUrl = ref.watch(networkConfigProvider).apiBaseUrl;
+  final session = ref.watch(authSessionProvider);
+  final dio = Dio(BaseOptions(baseUrl: baseUrl.toString()))
+    ..interceptors.add(AuthInterceptor(() => session.tokenProvider))
+    ..interceptors.add(ErrorMappingInterceptor());
+  return AiExplainClient(dio);
 });
 
 /// The quota a student without AI access has: nothing budgeted, nothing spent. [AiQuotaMeter]

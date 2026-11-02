@@ -1,6 +1,5 @@
-/// One AI capability the hub links to, once its own screen ships — this ticket builds the hub
-/// and not-active notice, not the feature screens themselves (each tile opens a "coming soon"
-/// placeholder today; see `presentation/widgets/ai_feature_grid.dart`).
+/// One AI capability the hub links to; each tile's destination is in
+/// `presentation/widgets/ai_feature_grid.dart`.
 ///
 /// Identifiers and ordering mirror `AI_FEATURES` (`apps/api/src/modules/ai/llm/routing.ts`)
 /// exactly, so a feature reads the same name across the stack. `summary` matches that list

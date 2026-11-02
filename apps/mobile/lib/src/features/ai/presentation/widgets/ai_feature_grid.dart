@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../domain/ai_feature.dart';
-import '../../../shell/presentation/shell_tab_placeholder.dart';
 import '../../../student/presentation/materials_screen.dart';
 
 /// The subscribed-state feature hub: one tile per [AiFeature], in the same order as the backend's
@@ -45,9 +44,7 @@ class _AiFeatureTile extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         // Summaries and key concepts are per-material, so their tiles open the Lessons library,
-        // where each AI-visible material's viewer offers both. `explain` still has no mobile
-        // screen; opening the same "coming soon" placeholder the shell already uses for an
-        // unshipped tab keeps this honest rather than pretending the tile does something it doesn't.
+        // where each AI-visible material's viewer offers both.
         onTap: () => switch (feature) {
           AiFeature.ask => GoRouter.of(context).push(RoutePaths.askAi),
           AiFeature.quiz => GoRouter.of(context).push(RoutePaths.quiz),
@@ -55,16 +52,9 @@ class _AiFeatureTile extends StatelessWidget {
             context,
           ).push(RoutePaths.flashcards),
           AiFeature.exam => GoRouter.of(context).push(RoutePaths.examMode),
+          AiFeature.explain => GoRouter.of(context).push(RoutePaths.explain),
           AiFeature.summary || AiFeature.concepts => Navigator.of(context).push(
             MaterialPageRoute<void>(builder: (_) => const MaterialsScreen()),
-          ),
-          _ => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => Scaffold(
-                appBar: AppBar(title: Text(feature.labelKey.tr())),
-                body: ShellTabPlaceholder(titleKey: feature.labelKey),
-              ),
-            ),
           ),
         },
         child: Padding(
