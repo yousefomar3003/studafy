@@ -18,15 +18,47 @@ Status: draft, 2026-11-02. Baseline commit: `fa3fe414` (`dev`).
 
 ### Baseline (local, 2026-11-02)
 
-| Suite                       | Pass | Skip | Fail | Note                                                                             |
-| --------------------------- | ---- | ---- | ---- | -------------------------------------------------------------------------------- |
-| `apps/api` (`bun test src`) | 1612 | 566  | 1    | Skips need Postgres/Redis. The fail is a stale local, gitignored `openapi.json`. |
-| `apps/workers`              | 282  | 151  | 0    | Skips need Postgres/Redis.                                                       |
-| `apps/realtime`             | 84   | 0    | 0    |                                                                                  |
-| `apps/web`                  | 1061 | 0    | 0    |                                                                                  |
+| Suite                       | Pass | Skip | Fail | Note                                                                                |
+| --------------------------- | ---- | ---- | ---- | ----------------------------------------------------------------------------------- |
+| `apps/api` (`bun test src`) | 2183 | 1    | 0    | With DB + Redis (QA-01). Skip is `tap-sandbox`: needs a real `TAP_TEST_SECRET_KEY`. |
+| `apps/workers`              | 433  | 0    | 0    | With DB + Redis (QA-01).                                                            |
+| `apps/realtime`             | 84   | 0    | 0    | Not re-run in QA-01 (no DB dependency).                                             |
+| `apps/web`                  | 1061 | 0    | 0    | Not re-run in QA-01 (no DB dependency).                                             |
 
-DB-backed suites (`tests/security`, `tests/auth`, cross-tenant, RLS coverage) were **not** run in
-this pass: they need the test Postgres/Redis containers (QA-01).
+#### DB-backed suites (QA-01, 2026-11-02)
+
+Run against `bun run db:up` (`test-postgres` on `127.0.0.1:54329`, `test-redis` on `127.0.0.1:6390`;
+nothing on 5173/5432) after `bun run db:migrate` and `bunx turbo run build --filter=@studafy/api^...`,
+with:
+
+```sh
+TEST_DATABASE_URL=postgresql://studafy_test:studafy_test@127.0.0.1:54329/postgres?sslmode=disable
+TEST_REDIS_URL=redis://127.0.0.1:6390
+REDIS_URL=redis://127.0.0.1:6390
+```
+
+| Suite                                   | Pass | Skip | Fail | Note                                                           |
+| --------------------------------------- | ---- | ---- | ---- | -------------------------------------------------------------- |
+| `bun run db:test:rls-coverage`          | PASS | —    | —    | 206/223 relations tenant-scoped; catalog audit p95 16.89 ms.   |
+| `bun run test:security`                 | 757  | 0    | 0    |                                                                |
+| `apps/api` `test:auth`                  | 183  | 0    | 0    | Was 161/22 skip without `TEST_REDIS_URL`; see gaps below.      |
+| `apps/api` `test:cross-tenant`          | 4    | 0    | 0    |                                                                |
+| `apps/workers` (`bun test`, DB + Redis) | 433  | 0    | 0    | Was 425/8 skip without `REDIS_URL` (entitlements invalidator). |
+
+Gaps found while getting to zero skips:
+
+- **`tests/auth/revocation.test.ts` never ran in CI.** It needs `TEST_REDIS_URL`, which no workflow
+  sets, so all 22 cases self-skip. Run locally, 2 failed: both `createApp` instances share Redis and
+  therefore the per-IP auth limit (5/window), so the 5th+ logout in the file got 429 and never
+  denylisted. Test bug, not a product bug; fixed by passing `rateLimitDisabled: true` in that suite.
+  Fixed: `TEST_REDIS_URL` is now set on the `api-integration` CI job.
+- **`apps/workers` DB tests never run in CI.** No workflow sets `TEST_DATABASE_URL` for
+  `apps/workers`, and `invalidator.test.ts` additionally needs `REDIS_URL` (Bun reads `.env` from the
+  cwd, so the root `.env` does not apply under `apps/workers`). Fixed: `api-integration` now migrates
+  the shared test database and runs `apps/workers` `bun test` with both set.
+- `.env` already points `DATABASE_*` at `test-postgres`; do not also export `DATABASE_URL`, or
+  `db:migrate` refuses to run. `POSTGRES_PASSWORD` must match `.env`'s `DATABASE_PASSWORD` (default
+  `studafy_test`).
 
 ### What already exists (and is good)
 
@@ -94,7 +126,7 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
 **QA-01 — Runnable DB-backed test environment**
 
 - Depends on: —
-- Do: bring up `test-postgres`/`test-redis` (`bun run db:up`, ports 54330/…) and run
+- Do: bring up `test-postgres`/`test-redis` (`bun run db:up`, ports 54329/6390) and run
   `bun run test:security`, `bun --cwd apps/api run test:auth`, `test:cross-tenant`,
   `db:test:rls-coverage`, `apps/workers` DB tests. Record results in this file's baseline table.
 - Acceptance:
