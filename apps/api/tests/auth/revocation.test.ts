@@ -95,6 +95,10 @@ beforeAll(async () => {
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
+    // Both instances share this Redis, and with it the per-IP auth limit (5/window). This file sends
+    // more logouts than that from one in-process "IP", so later ones would be answered 429 and never
+    // reach the denylist. Rate limiting has its own suite; it is not what these tests measure.
+    rateLimitDisabled: true,
   };
 
   app = createApp({ ...options, tracker: createInflightTracker() });
