@@ -176,6 +176,11 @@ export const envSchema = z
     // 'review' identities of the single school flagged is_review_tenant. Held in the secret manager,
     // never in the repository (docs/runbooks/app-review-access.md).
     REVIEW_LOGIN_PASSWORD: z.string().min(16).optional(),
+    // Shared password for the staging QA tenants (QA-02, qa-login-service.ts). Unset means
+    // POST /api/auth/login/qa answers 404. Unlike the reviewer password it reaches SUPER_ADMIN, so the
+    // refinement below refuses to boot with it set when APP_ENV is production. Held in the secret
+    // manager, never in the repository (docs/runbooks/qa-staging-access.md).
+    QA_LOGIN_PASSWORD: z.preprocess(emptyAsUnset, z.string().min(24).optional()),
     // Where to redirect after a successful OAuth callback. Not setting it disables the redirect.
     FRONTEND_URL: z.string().url().optional(),
     // Base URL for the pay-online redirect entry point served on outstanding invoices in the family
@@ -469,6 +474,16 @@ export const envSchema = z
         code: "custom",
         path: ["MOCK_OAUTH_ISSUER_URL"],
         message: "Mock OAuth variables must not be set when NODE_ENV or APP_ENV is production",
+      });
+    }
+
+    // The QA password signs in to every role, platform staff included. It must never exist where real
+    // schools live; staging (NODE_ENV=production, APP_ENV=staging) is exactly where it is meant to.
+    if (env.QA_LOGIN_PASSWORD !== undefined && env.APP_ENV === "production") {
+      context.addIssue({
+        code: "custom",
+        path: ["QA_LOGIN_PASSWORD"],
+        message: "QA_LOGIN_PASSWORD must not be set when APP_ENV is production",
       });
     }
 

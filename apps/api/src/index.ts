@@ -247,6 +247,7 @@ const app = createApp({
   jwtAccessTtlSeconds: env.JWT_ACCESS_TTL_SECONDS,
   jwtRefreshTtlSeconds: env.JWT_REFRESH_TTL_SECONDS,
   reviewLoginPassword: env.REVIEW_LOGIN_PASSWORD,
+  qaLoginPassword: env.QA_LOGIN_PASSWORD,
   rateLimitDisabled: env.RATE_LIMIT_DISABLED === "true",
   securityEventSink,
   storage,

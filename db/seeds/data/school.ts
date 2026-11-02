@@ -64,6 +64,7 @@ export async function seedSchool(sql: Sql, tenant: TenantProfile): Promise<Schoo
       normalized_email: schoolContactEmail(tenant.slug),
       status: "active",
       is_review_tenant: tenant.isReviewTenant,
+      is_qa_tenant: tenant.isQaTenant,
       country_id: country.id,
       default_currency_id: currency.id,
     })}

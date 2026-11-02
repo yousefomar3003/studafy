@@ -50,9 +50,10 @@ export function normalizeReviewEmail(email: string): string {
 
 /**
  * Constant-time password comparison. Both sides are hashed first so the comparison runs over equal
- * lengths and leaks neither the configured password's length nor a matching prefix.
+ * lengths and leaks neither the configured password's length nor a matching prefix. Shared with the
+ * staging QA login (qa-login-service.ts).
  */
-function passwordMatches(presented: string, expected: string): boolean {
+export function passwordMatches(presented: string, expected: string): boolean {
   const digest = (value: string) => createHash("sha256").update(value, "utf8").digest();
   return timingSafeEqual(digest(presented), digest(expected));
 }

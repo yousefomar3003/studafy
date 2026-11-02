@@ -401,6 +401,26 @@ describe("loadEnv", () => {
     expect(env.MOBILE_LATEST_VERSION_ANDROID).toBeUndefined();
   });
 
+  test("allows the QA login password on staging, never in production (QA-02)", () => {
+    const deployed = {
+      CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
+      TURNSTILE_SECRET_KEY: "s",
+      ...RECORD_SECRETS,
+    };
+    const password = "q".repeat(24);
+    expect(
+      loadEnv({ ...deployed, APP_ENV: "staging", QA_LOGIN_PASSWORD: password }).QA_LOGIN_PASSWORD,
+    ).toBe(password);
+    expect(() =>
+      loadEnv({ ...deployed, APP_ENV: "production", QA_LOGIN_PASSWORD: password }),
+    ).toThrow(/QA_LOGIN_PASSWORD/);
+    expect(() => loadEnv({ QA_LOGIN_PASSWORD: "q".repeat(23) })).toThrow(EnvValidationError);
+    // The secret manager injects "" for a key nobody has supplied yet: unset, even in production.
+    expect(
+      loadEnv({ ...deployed, APP_ENV: "production", QA_LOGIN_PASSWORD: "" }).QA_LOGIN_PASSWORD,
+    ).toBeUndefined();
+  });
+
   test("rejects a mobile release version that is not x.y.z", () => {
     expect(() => loadEnv({ MOBILE_MIN_SUPPORTED_VERSION_IOS: "1.2" })).toThrow(EnvValidationError);
     expect(() => loadEnv({ MOBILE_LATEST_VERSION_IOS: "1.2.3-beta" })).toThrow(EnvValidationError);

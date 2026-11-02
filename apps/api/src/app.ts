@@ -92,6 +92,7 @@ import {
   providerLinkRoutes,
   returningUserLoginRoutes,
   reviewLoginRoutes,
+  qaLoginRoutes,
   sessionRoutes,
 } from "./modules/auth";
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
@@ -289,6 +290,12 @@ export interface AppOptions {
    * env.REVIEW_LOGIN_PASSWORD. Absent keeps POST /api/auth/login/review registered but answering 404.
    */
   reviewLoginPassword?: string;
+  /**
+   * Shared password for the staging QA tenants' email/password login (QA-02), threaded from
+   * env.QA_LOGIN_PASSWORD, which env.ts refuses in production. Absent keeps POST /api/auth/login/qa
+   * registered but answering 404.
+   */
+  qaLoginPassword?: string;
   /** Skips the rate limiter. Local development only (env.RATE_LIMIT_DISABLED, refused elsewhere). */
   rateLimitDisabled?: boolean;
   /**
@@ -368,6 +375,7 @@ export function createApp({
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
   reviewLoginPassword,
+  qaLoginPassword,
   rateLimitDisabled = false,
   storage = null,
   stripeProvider = null,
@@ -850,6 +858,25 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         reviewLoginPassword,
+      ),
+    );
+  }
+
+  // Staging QA tenant login (QA-02). Email + shared password, only for schools flagged is_qa_tenant;
+  // same post-authentication path as the review login above.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      qaLoginRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        qaLoginPassword,
       ),
     );
   }

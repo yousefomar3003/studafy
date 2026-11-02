@@ -76,6 +76,9 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/auth/refresh": "auth-strict",
   "/api/auth/logout": "auth-strict",
   "/api/auth/login/review": "auth-strict",
+  // Staging only (env.ts refuses it in production). `auth` rather than `auth-strict` so one tester
+  // can sign in as all 15 documented QA accounts well inside the QA-02 five-minute budget from one IP.
+  "/api/auth/login/qa": "auth",
   "/api/auth/login/member": "auth-strict",
   "/api/auth/password/change": "auth-strict",
   // Auth — authenticated, IP-scoped, sensitive mutations

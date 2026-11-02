@@ -142,6 +142,13 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   or `curl` collection checked into `infra/load-tests` or a new `qa/` folder.
 - Acceptance: a tester can obtain a bearer token for every role in both schools in < 5 minutes
   without DB access.
+- Built (2026-11-02): staging-only `POST /api/auth/login/qa` (refused at boot when
+  `APP_ENV=production`), migration 000183 `is_qa_tenant`, `bun run db:seed:qa` (platform school +
+  QA Schools A/B), and `qa/` (curl `get-tokens.sh` + Bruno). Runbook:
+  [`qa-staging-access.md`](../runbooks/qa-staging-access.md). Verified locally against a real API
+  with the rate limiter on: 15 tokens (8 roles × 2 schools, SUPER_ADMIN in the platform school) in
+  30 s. **Not yet done on staging itself**: set `QA_LOGIN_PASSWORD` and run the seed there
+  (runbook "Provisioning").
 
 ### Phase 1 — Reproduce and fix Critical/High (release blockers)
 

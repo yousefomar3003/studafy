@@ -12,14 +12,17 @@ import type { ReservedSql } from "../../packages/db/src/client";
 export type Sql = ReservedSql;
 
 // Everything that differs between the tenants this directory can seed: the local demo tenant
-// (seed.ts) and the App Store / Play reviewer tenant (review-tenant.ts). The data modules are shared;
-// only this profile changes.
+// (seed.ts), the App Store / Play reviewer tenant (review-tenant.ts), and the staging QA tenants
+// (qa-tenant.ts). The data modules are shared; only this profile changes.
 export interface TenantProfile {
   readonly slug: string;
   readonly name: string;
   // Sets app.schools.is_review_tenant (migration 000116): non-billable, and the only school the
   // review email/password login accepts.
   readonly isReviewTenant: boolean;
+  // Sets app.schools.is_qa_tenant (migration 000183): the only schools the staging QA
+  // email/password login accepts.
+  readonly isQaTenant: boolean;
   readonly plan: {
     readonly code: string;
     readonly displayName: string;

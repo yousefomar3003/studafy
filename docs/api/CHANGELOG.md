@@ -13,6 +13,11 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Staging QA login (QA-02; [qa-staging-access.md](../runbooks/qa-staging-access.md)):
+  `POST /api/auth/login/qa` (`QaLoginRequest`), answering with the existing login response. Signs in
+  only the `qa` identities of schools flagged `is_qa_tenant` (migration 000183) with the shared
+  `QA_LOGIN_PASSWORD`. Answers 404 when that password is unset, which is always the case in
+  production.
 - Custom lists (migration 000182; [custom-lists.md](../modules/custom-lists.md)), under the new
   "Custom lists" tag. School-defined tables with typed columns (`RecordColumnFieldType`: every record
   field type but `document`, and `RecordFieldSensitivity`) whose rows may link to a student, parent,
