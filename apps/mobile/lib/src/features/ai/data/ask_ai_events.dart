@@ -155,7 +155,9 @@ Stream<SseFrame> parseSseFrames(Stream<List<int>> byteStream) async* {
     return frame;
   }
 
-  await for (final chunk in byteStream.transform(utf8.decoder)) {
+  // bind, not transform: Dio hands over a Stream<Uint8List>, and `transform(utf8.decoder)` on it
+  // fails the runtime check `Utf8Decoder is StreamTransformer<Uint8List, String>`.
+  await for (final chunk in utf8.decoder.bind(byteStream)) {
     pending.write(chunk);
     var rest = pending.toString();
     var newline = rest.indexOf('\n');
