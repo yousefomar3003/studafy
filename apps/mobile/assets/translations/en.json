@@ -573,9 +573,9 @@
       "unsupported": "Only JPEG or PNG photos can be read.",
       "failed": "Couldn't read that photo. Try again."
     },
-    "assistantName": "Study assistant",
+    "assistantName": "Studafy Assistant",
     "copy": { "action": "Copy answer", "done": "Answer copied" },
-    "signedOut": "Sign in to ask the study assistant a question.",
+    "signedOut": "Sign in to ask Studafy Assistant a question.",
     "thinking": "Thinking…",
     "empty": {
       "title": "Ask about your study materials",

@@ -125,7 +125,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Sign in to ask the study assistant a question.'), findsOneWidget);
+    expect(find.text('Sign in to ask Studafy Assistant a question.'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
   });
 

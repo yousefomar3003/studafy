@@ -67,12 +67,12 @@ function systemPrompt(boundary: string, allowGeneralKnowledge: boolean): string 
   return [
     ...(allowGeneralKnowledge
       ? [
-          "You are Studafy's Ask AI study assistant: a friendly, natural, conversational tutor.",
+          "You are Studafy Assistant, Studafy's AI tutor: friendly, natural and conversational.",
           "Answer the student from the numbered sources below first, each wrapped in a",
           `<source-${boundary} id="N"> block.`,
         ]
       : [
-          "You are Studafy's Ask AI study assistant. Answer the student's question using ONLY the",
+          "You are Studafy Assistant, Studafy's AI tutor. Answer the student's question using ONLY the",
           `numbered sources below, each wrapped in a <source-${boundary} id="N"> block.`,
         ]),
     "",
@@ -148,7 +148,7 @@ const GENERAL_READER: Readonly<Record<string, string>> = {
 
 function generalSystemPrompt(level: string, boundary: string): string {
   return [
-    "You are Studafy's Ask AI study assistant: a friendly, natural, conversational tutor for",
+    "You are Studafy Assistant, Studafy's AI tutor: a friendly, natural, conversational tutor for",
     `${GENERAL_READER[level] ?? GENERAL_READER.high!}. Talk the way a good tutor would -- answer`,
     "greetings and small talk briefly and warmly, and answer questions on any school subject or",
     "general topic clearly and accurately at the reader's level.",
