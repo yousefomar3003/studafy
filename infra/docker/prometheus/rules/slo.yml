@@ -1,0 +1,260 @@
+# SLO burn-rate rules for apps/api (ST-262).
+#
+# ## What a burn rate is, and why the alerts read `> 14.4` rather than `> 0.0144`
+#
+# An SLO gives you an error budget: at 99.9% availability over 30 days, 0.1% of requests may fail.
+# A *burn rate* is how fast you are spending it — `1` means you will exhaust the budget exactly at
+# the end of the window and no sooner, `14.4` means you will exhaust it in 1/14.4 of the window
+# (about two days), and so on.
+#
+# The recording rules below therefore do the division by the budget themselves: each one emits a
+# plain burn-rate number. That puts every SLO objective in this file in exactly one place — the
+# `/ 0.001` and `/ 0.01` at the bottom of each recording rule — instead of scattering it across
+# eight alert thresholds where a change would have to be made eight times and would be wrong in
+# seven of them.
+#
+# ## Why two windows per alert
+#
+# The multiwindow, multi-burn-rate scheme from the Google SRE Workbook (chapter 5, "Alerting on
+# SLOs"). The long window decides whether the burn is real; the short window decides whether it is
+# still happening. Without the short window an alert stays firing for hours after an incident is
+# over; without the long window a 30-second blip pages someone.
+#
+#   burn   long / short   budget consumed   severity
+#   14.4     1h  /  5m           2%         critical  (page: at this rate the month is gone in ~2d)
+#    6       6h  / 30m           5%         critical  (page)
+#    3       1d  /  2h          10%         warning   (ticket)
+#    1       3d  /  6h          10%         warning   (ticket)
+#
+# The two critical tiers are combined into one alert and the two warning tiers into another,
+# because they are the same page and the same ticket — the tiers exist to catch fast and slow
+# burns of the same budget, not to be triaged differently.
+#
+# ## Why only apps/api
+#
+# `http.server.request.duration` is recorded by the same middleware in apps/realtime, but that
+# service's headline route is `/ws`, whose "request duration" is the lifetime of a WebSocket
+# connection — minutes or hours, by design. A latency objective over that measures nothing, and an
+# availability objective over a handful of handshakes is noise. Realtime's own SLO is the ST-149
+# synthetic probe (`modules/monitoring/main.tf`), which measures end-to-end propagation and alarms
+# on it directly. apps/workers serves no HTTP traffic at all.
+#
+# `/healthz` and `/readyz` are excluded from both SLOs: they are ALB health checks, they dominate
+# the request count, and a health check succeeding says nothing about whether users are served.
+
+groups:
+  # --- Availability: 99.9% of API requests over 30 days are not 5xx -----------------------------
+  #
+  # Error budget 0.001. `http_response_status_code=~"5.."` is the numerator: a 4xx is the client
+  # being told "no" correctly, which is the service working, not failing.
+  #
+  # Both ratios are NaN when there is no traffic at all (0/0), and NaN satisfies no comparison, so
+  # a genuinely idle service cannot page on this. A service that *should* have traffic and has none
+  # is what `ServiceMetricsTargetDown` / `ServiceMetricsTargetsAbsent` in platform.yml are for.
+  - name: slo-api-availability-burn-rate
+    rules:
+      - record: slo:api_availability:burn_rate5m
+        expr: |
+          (
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz",http_response_status_code=~"5.."}[5m]))
+            /
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[5m]))
+          ) / 0.001
+
+      - record: slo:api_availability:burn_rate30m
+        expr: |
+          (
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz",http_response_status_code=~"5.."}[30m]))
+            /
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[30m]))
+          ) / 0.001
+
+      - record: slo:api_availability:burn_rate1h
+        expr: |
+          (
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz",http_response_status_code=~"5.."}[1h]))
+            /
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[1h]))
+          ) / 0.001
+
+      - record: slo:api_availability:burn_rate2h
+        expr: |
+          (
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz",http_response_status_code=~"5.."}[2h]))
+            /
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[2h]))
+          ) / 0.001
+
+      - record: slo:api_availability:burn_rate6h
+        expr: |
+          (
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz",http_response_status_code=~"5.."}[6h]))
+            /
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[6h]))
+          ) / 0.001
+
+      - record: slo:api_availability:burn_rate1d
+        expr: |
+          (
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz",http_response_status_code=~"5.."}[1d]))
+            /
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[1d]))
+          ) / 0.001
+
+      - record: slo:api_availability:burn_rate3d
+        expr: |
+          (
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz",http_response_status_code=~"5.."}[3d]))
+            /
+              sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[3d]))
+          ) / 0.001
+
+  # --- Latency: 99% of API requests over 30 days complete within 500ms --------------------------
+  #
+  # Error budget 0.01. "Slower than the objective" is the error, so the ratio is
+  # `1 - (requests at or under 0.5s / all requests)`.
+  #
+  # `le="0.5"` is a real bucket boundary only because metricsServer.ts's HISTOGRAM_VIEWS puts one
+  # there (`packages/observability/src/metricsServer.ts`). Under the OTel SDK's default boundaries —
+  # which are millisecond-shaped, while this histogram records seconds — the lowest non-zero edge is
+  # `le="5"`, and this objective could not be written at all. If the objective ever moves, it must
+  # move to another boundary in that list, or this rule silently measures a different number.
+  - name: slo-api-latency-burn-rate
+    rules:
+      - record: slo:api_latency:burn_rate5m
+        expr: |
+          (
+            1 - (
+                sum(rate(http_server_request_duration_bucket{job="api",http_route!~"/healthz|/readyz",le="0.5"}[5m]))
+              /
+                sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[5m]))
+            )
+          ) / 0.01
+
+      - record: slo:api_latency:burn_rate30m
+        expr: |
+          (
+            1 - (
+                sum(rate(http_server_request_duration_bucket{job="api",http_route!~"/healthz|/readyz",le="0.5"}[30m]))
+              /
+                sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[30m]))
+            )
+          ) / 0.01
+
+      - record: slo:api_latency:burn_rate1h
+        expr: |
+          (
+            1 - (
+                sum(rate(http_server_request_duration_bucket{job="api",http_route!~"/healthz|/readyz",le="0.5"}[1h]))
+              /
+                sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[1h]))
+            )
+          ) / 0.01
+
+      - record: slo:api_latency:burn_rate2h
+        expr: |
+          (
+            1 - (
+                sum(rate(http_server_request_duration_bucket{job="api",http_route!~"/healthz|/readyz",le="0.5"}[2h]))
+              /
+                sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[2h]))
+            )
+          ) / 0.01
+
+      - record: slo:api_latency:burn_rate6h
+        expr: |
+          (
+            1 - (
+                sum(rate(http_server_request_duration_bucket{job="api",http_route!~"/healthz|/readyz",le="0.5"}[6h]))
+              /
+                sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[6h]))
+            )
+          ) / 0.01
+
+      - record: slo:api_latency:burn_rate1d
+        expr: |
+          (
+            1 - (
+                sum(rate(http_server_request_duration_bucket{job="api",http_route!~"/healthz|/readyz",le="0.5"}[1d]))
+              /
+                sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[1d]))
+            )
+          ) / 0.01
+
+      - record: slo:api_latency:burn_rate3d
+        expr: |
+          (
+            1 - (
+                sum(rate(http_server_request_duration_bucket{job="api",http_route!~"/healthz|/readyz",le="0.5"}[3d]))
+              /
+                sum(rate(http_server_request_duration_count{job="api",http_route!~"/healthz|/readyz"}[3d]))
+            )
+          ) / 0.01
+
+  # --- The four alerts --------------------------------------------------------------------------
+  #
+  # No `for:` on any of them, deliberately. The short window *is* the debounce — a burn rate
+  # averaged over five minutes has already waited five minutes — and a `for:` on top of it would
+  # only delay a page the scheme has already decided is real.
+  - name: slo-api-alerts
+    rules:
+      - alert: ApiAvailabilityFastBurn
+        expr: |
+          (slo:api_availability:burn_rate1h > 14.4 and slo:api_availability:burn_rate5m > 14.4)
+          or
+          (slo:api_availability:burn_rate6h > 6 and slo:api_availability:burn_rate30m > 6)
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "apps/api is burning its 99.9% availability budget fast"
+          description: >-
+            The 5xx rate is consuming the 30-day availability error budget at least 6x faster than
+            sustainable, and is still doing so right now. At this rate the whole month of budget is
+            gone within days.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#apiavailabilityfastburn"
+
+      - alert: ApiAvailabilitySlowBurn
+        expr: |
+          (slo:api_availability:burn_rate1d > 3 and slo:api_availability:burn_rate2h > 3)
+          or
+          (slo:api_availability:burn_rate3d > 1 and slo:api_availability:burn_rate6h > 1)
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "apps/api is burning its 99.9% availability budget faster than sustainable"
+          description: >-
+            A low but persistent 5xx rate will exhaust the 30-day availability error budget before
+            the month ends. Nothing is on fire; something is chronically broken.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#apiavailabilityslowburn"
+
+      - alert: ApiLatencyFastBurn
+        expr: |
+          (slo:api_latency:burn_rate1h > 14.4 and slo:api_latency:burn_rate5m > 14.4)
+          or
+          (slo:api_latency:burn_rate6h > 6 and slo:api_latency:burn_rate30m > 6)
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "apps/api is burning its 500ms latency budget fast"
+          description: >-
+            Requests slower than the 500ms objective are consuming the 30-day latency error budget
+            at least 6x faster than sustainable, and are still doing so right now.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#apilatencyfastburn"
+
+      - alert: ApiLatencySlowBurn
+        expr: |
+          (slo:api_latency:burn_rate1d > 3 and slo:api_latency:burn_rate2h > 3)
+          or
+          (slo:api_latency:burn_rate3d > 1 and slo:api_latency:burn_rate6h > 1)
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "apps/api is burning its 500ms latency budget faster than sustainable"
+          description: >-
+            A persistent tail of requests slower than 500ms will exhaust the 30-day latency error
+            budget before the month ends.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#apilatencyslowburn"

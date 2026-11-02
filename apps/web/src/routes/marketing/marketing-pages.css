@@ -1,0 +1,471 @@
+/**
+ * Shared layout primitives for marketing pages: container, section rhythm, hero, feature/pricing
+ * grids. Kept as plain utility-ish classes rather than one class per page — the pages share the same
+ * few shapes (container, section, grid-of-cards), so factoring those out is DRY; anything page-
+ * specific stays scoped with a page-name prefix below.
+ */
+
+.marketing-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--space-24);
+}
+
+.marketing-section {
+  padding: var(--space-64) 0;
+}
+
+.marketing-section--muted {
+  background-color: var(--color-surface);
+}
+
+.marketing-section__heading {
+  max-width: 640px;
+  margin: 0 0 var(--space-40);
+}
+
+.marketing-section__eyebrow {
+  display: inline-block;
+  margin: 0 0 var(--space-12);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.marketing-section__title {
+  margin: 0 0 var(--space-12);
+  font-size: var(--font-size-3xl);
+  line-height: var(--line-height-3xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-foreground);
+}
+
+.marketing-section__lede {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
+  color: var(--color-muted-foreground);
+}
+
+/* Hero */
+
+.marketing-hero {
+  padding: var(--space-80) 0 var(--space-64);
+  text-align: center;
+}
+
+.marketing-hero__title {
+  margin: 0 auto var(--space-16);
+  max-width: 780px;
+  font-size: var(--font-size-5xl);
+  line-height: var(--line-height-5xl);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-foreground);
+}
+
+.marketing-hero__subtitle {
+  margin: 0 auto var(--space-32);
+  max-width: 620px;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-xl);
+  color: var(--color-muted-foreground);
+}
+
+.marketing-hero__actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+/* Card grids */
+
+.marketing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-24);
+}
+
+/* `Card` doesn't accept a className prop (see packages/ui/src/components/card/card.tsx), so grid
+   cards are shaped via its stable `.sf-card` class rather than a prop that doesn't exist. */
+.marketing-grid > .sf-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.marketing-grid > .sf-card > .sf-card__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.marketing-feature-card__title {
+  margin: 0 0 var(--space-8);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+}
+
+.marketing-feature-card__body {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+.marketing-feature-card__list {
+  margin: var(--space-12) 0 0;
+  padding-inline-start: var(--space-20);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+.marketing-feature-card__list li + li {
+  margin-top: var(--space-4);
+}
+
+/* Features index (FeaturesPage): one ruled row per module — number, title + summary, then the
+   module's capabilities in two columns. Hairlines carry the structure, so no card chrome. */
+
+.features-index {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.features-index__row {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 5fr) minmax(0, 7fr);
+  column-gap: var(--space-32);
+  padding: var(--space-32) 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.features-index__number {
+  padding-top: 0.2em;
+  color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.features-index__title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  line-height: var(--line-height-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-foreground);
+}
+
+.features-index__body {
+  margin: var(--space-8) 0 0;
+  max-width: 34ch;
+  color: var(--color-muted-foreground);
+  line-height: var(--line-height-base);
+}
+
+/* Two columns of capabilities, each on its own hairline, so short and long modules share one rhythm. */
+.features-index__items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-32);
+  align-content: start;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.features-index__items li {
+  padding: var(--space-12) 0;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* The first row of items sits level with the title, without a rule above it. */
+.features-index__items li:nth-child(-n + 2) {
+  padding-top: 0.35em;
+  border-top: none;
+}
+
+@media (max-width: 900px) {
+  .features-index__row {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+    row-gap: var(--space-20);
+  }
+
+  .features-index__items {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 560px) {
+  .features-index__row {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-12);
+    padding: var(--space-24) 0;
+  }
+
+  .features-index__items {
+    grid-column: auto;
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: var(--space-8);
+  }
+
+  .features-index__items li:nth-child(2) {
+    padding-top: var(--space-12);
+    border-top: 1px solid var(--color-border);
+  }
+}
+
+/* Steps */
+
+.marketing-steps {
+  counter-reset: marketing-step;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-32);
+}
+
+.marketing-step {
+  position: relative;
+  padding-inline-start: var(--space-48);
+}
+
+.marketing-step::before {
+  counter-increment: marketing-step;
+  content: counter(marketing-step);
+  position: absolute;
+  inset-inline-start: 0;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+  color: var(--color-accent-foreground);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+}
+
+.marketing-step__title {
+  margin: 0 0 var(--space-8);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+}
+
+.marketing-step__body {
+  margin: 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-base);
+}
+
+/* CTA band */
+
+.marketing-cta-band {
+  text-align: center;
+}
+
+.marketing-cta-band__title {
+  margin: 0 0 var(--space-12);
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-foreground);
+}
+
+.marketing-cta-band__body {
+  margin: 0 auto var(--space-24);
+  max-width: 520px;
+  color: var(--color-muted-foreground);
+}
+
+.marketing-cta-band__actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+/* Pricing */
+
+.marketing-pricing-card__name {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-foreground);
+}
+
+.marketing-pricing-card__price {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin-bottom: var(--space-20);
+}
+
+.marketing-pricing-card__amount {
+  font-size: var(--font-size-4xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-foreground);
+  letter-spacing: var(--tracking-tight);
+}
+
+.marketing-pricing-card__list {
+  flex: 1;
+  margin: 0 0 var(--space-24);
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.marketing-pricing-card__list li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-8);
+  color: var(--color-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.marketing-pricing-card__list svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-success);
+}
+
+.marketing-ai-callout {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.marketing-ai-callout .marketing-feature-card__title {
+  margin-top: var(--space-12);
+}
+
+.marketing-pricing-note {
+  margin-top: var(--space-16);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+/* About / contact */
+
+.marketing-about-body p {
+  color: var(--color-muted-foreground);
+  line-height: var(--line-height-base);
+}
+
+.marketing-about-body p + p {
+  margin-top: var(--space-16);
+}
+
+.marketing-contact-card {
+  margin: var(--space-24) 0 0;
+  text-align: center;
+}
+
+.marketing-contact-card__label {
+  display: block;
+  margin-bottom: var(--space-4);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.marketing-contact-card__email {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent);
+}
+
+@media (max-width: 480px) {
+  .marketing-hero__title {
+    font-size: var(--font-size-4xl);
+  }
+
+  .marketing-section {
+    padding: var(--space-48) 0;
+  }
+
+  .marketing-hero {
+    padding: var(--space-48) 0;
+  }
+}
+
+/* Contact section: heading, form card and email line share one centered column. */
+.marketing-contact__heading {
+  margin-inline: auto;
+  text-align: center;
+}
+
+.marketing-contact__card {
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.marketing-contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.marketing-contact-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-20) var(--space-24);
+}
+
+.marketing-contact-form__textarea textarea {
+  resize: vertical;
+  min-height: 140px;
+}
+
+.marketing-contact-form__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-16);
+  padding-top: var(--space-8);
+}
+
+.marketing-contact-form__footer .sf-button {
+  width: 100%;
+  max-width: 320px;
+}
+
+.marketing-contact-form__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .marketing-contact-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .marketing-contact-form__footer .sf-button {
+    max-width: none;
+  }
+}
+
+.marketing-contact-form__sent {
+  text-align: center;
+}
+
+.marketing-contact-form__sent h3 {
+  margin: 0 0 var(--space-8);
+}

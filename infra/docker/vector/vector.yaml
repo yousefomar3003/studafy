@@ -1,0 +1,147 @@
+# Vector pipeline for log aggregation (ST-261). Baked into infra/docker/vector.Dockerfile.
+#
+# Vector interpolates environment-variable placeholders from the process environment at load time —
+# no entrypoint templating needed. Every placeholder below is set by
+# infra/terraform/modules/logging/vector.tf's container `environment` block:
+#   AWS_REGION                region for the S3 + SQS clients
+#   VECTOR_INGEST_QUEUE_URL   SQS queue fed by archive-bucket ObjectCreated notifications
+#   VECTOR_LOKI_ENDPOINT      http://loki.logging.internal:<port> (static — discovery.tf)
+#   VECTOR_SECURITY_BUCKET    write-once bucket for per-line security events
+#   VECTOR_ENV_FALLBACK       env label for lines that arrive without their own `env` field
+#   VECTOR_DATA_DIR           on-disk buffer/checkpoint dir (ephemeral; /tmp on Fargate)
+#
+# Note: Vector expands the placeholder syntax everywhere, comments included — so this file's prose
+# must never use a dollar-brace literal. (The Loki config avoids the same trap structurally: its
+# entrypoint passes envsubst an explicit whitelist, so only the four intended values expand there.)
+#
+# Input shape: Firehose has already run Decompression + CloudWatchLogProcessing +
+# AppendDelimiterToRecord (infra/terraform/modules/logging/ingest.tf), so each S3 object is a
+# gzipped, newline-delimited stream of raw log lines — for app traffic, the NDJSON that SAD §28
+# defines. Vector never has to touch a CloudWatch envelope or fan out a logEvents[] array.
+
+data_dir: "${VECTOR_DATA_DIR:-/var/lib/vector}"
+
+api:
+  enabled: true
+  address: "127.0.0.1:8686"
+
+sources:
+  archive_objects:
+    type: aws_s3
+    region: "${AWS_REGION}"
+    compression: gzip
+    sqs:
+      queue_url: "${VECTOR_INGEST_QUEUE_URL}"
+      poll_secs: 15
+      visibility_timeout_secs: 300
+      delete_message: true
+
+transforms:
+  # Parse the line, derive the label set, classify the stream. Labels are written to underscore-
+  # prefixed root fields so the Loki sink can use them and then strip them (remove_label_fields),
+  # leaving the stored line byte-for-byte the original app JSON — which is what makes
+  # `| json | request_id="..."` work unchanged across every service.
+  normalize:
+    type: remap
+    inputs: ["archive_objects"]
+    drop_on_error: true
+    reroute_dropped: false
+    source: |
+      raw = to_string(.message) ?? ""
+      parsed, err = parse_json(raw)
+
+      if err != null || !is_object(parsed) {
+        # Non-JSON line — rare on the app path (a runtime crash before the logger initialises,
+        # say). Keep it, flagged, with coarse labels so it is still findable.
+        . = {
+          "message": raw,
+          "malformed": true,
+          "_service": "unknown",
+          "_tenant": "none",
+          "_env": "${VECTOR_ENV_FALLBACK}",
+          "_level": "unknown",
+          "_stream_class": "app",
+        }
+      } else {
+        event = object(parsed) ?? {}
+
+        service = to_string(event.service) ?? "api"
+        env = to_string(event.env) ?? "${VECTOR_ENV_FALLBACK}"
+
+        school_id = to_string(event.school_id) ?? ""
+        tenant = if school_id == "" || school_id == "null" { "none" } else { school_id }
+
+        # pino integer levels (SAD §28): 10 trace .. 60 fatal.
+        level_num = to_int(event.level) ?? 0
+        level = if level_num >= 60 {
+          "fatal"
+        } else if level_num >= 50 {
+          "error"
+        } else if level_num >= 40 {
+          "warn"
+        } else if level_num >= 30 {
+          "info"
+        } else if level_num >= 20 {
+          "debug"
+        } else if level_num >= 10 {
+          "trace"
+        } else {
+          "unknown"
+        }
+
+        kind = to_string(event.kind) ?? ""
+
+        event._service = service
+        event._tenant = tenant
+        event._env = env
+        event._level = level
+        event._stream_class = if kind == "security" { "security" } else { "app" }
+
+        # Use the line's own emit time (epoch ms) as the Loki entry timestamp, not the S3 object's
+        # last-modified time that the source stamps by default.
+        ts = to_int(event.time) ?? 0
+        if ts > 0 {
+          event.timestamp = from_unix_timestamp(ts, unit: "milliseconds") ?? now()
+        }
+
+        . = event
+      }
+
+  split_streams:
+    type: route
+    inputs: ["normalize"]
+    route:
+      security: '._stream_class == "security"'
+
+sinks:
+  # Every line — app and security alike — is searchable in Loki (the hot, 30d store).
+  loki:
+    type: loki
+    inputs: ["normalize"]
+    endpoint: "${VECTOR_LOKI_ENDPOINT}"
+    out_of_order_action: accept
+    remove_label_fields: true
+    encoding:
+      codec: json
+    labels:
+      service: "{{ _service }}"
+      tenant: "{{ _tenant }}"
+      env: "{{ _env }}"
+      level: "{{ _level }}"
+      stream_class: "{{ _stream_class }}"
+
+  # Security events emitted as individual app log lines (kind == "security") get a write-once
+  # copy. Whole security log groups do NOT depend on this path — ingest.tf's dedicated security
+  # Firehose mirrors those straight to the same bucket with no collector in the way.
+  security_worm:
+    type: aws_s3
+    inputs: ["split_streams.security"]
+    bucket: "${VECTOR_SECURITY_BUCKET}"
+    region: "${AWS_REGION}"
+    key_prefix: "app-events/date=%F/"
+    compression: gzip
+    filename_append_uuid: true
+    encoding:
+      codec: json
+    batch:
+      timeout_secs: 60

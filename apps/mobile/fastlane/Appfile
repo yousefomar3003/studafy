@@ -1,0 +1,17 @@
+# Identifiers for the store-bound (prod-flavour) app. The dev/staging Flutter flavours carry
+# `.dev` / `.staging` suffixes and are never store-distributed, so they are absent here.
+#
+# Everything that differs per machine or per CI run comes from the environment — this file holds
+# only the two stable public identifiers. See docs/runbooks/mobile-release.md.
+
+for_platform :ios do
+  app_identifier(ENV["IOS_APP_IDENTIFIER"] || "com.studafy.studafyMobile")
+  apple_id(ENV["APPLE_ID"])
+  team_id(ENV["APPLE_DEVELOPER_TEAM_ID"])
+  itc_team_id(ENV["APP_STORE_CONNECT_TEAM_ID"])
+end
+
+for_platform :android do
+  package_name(ENV["ANDROID_PACKAGE_NAME"] || "com.studafy.studafy_mobile")
+  json_key_file(ENV["PLAY_STORE_JSON_KEY_FILE"] || "fastlane/play-store-key.json")
+end

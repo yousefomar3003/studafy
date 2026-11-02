@@ -1,0 +1,118 @@
+# BullMQ queue-health rules for apps/workers (ST-262).
+#
+# ## Depth and age are two different questions, and only one of them pages
+#
+# A queue 10,000 jobs deep that is draining is healthy. A queue three jobs deep whose oldest has
+# been waiting an hour is not. Depth measures *how much* work is outstanding and is a load signal;
+# age measures *how long* it has been outstanding and is the only one of the two that distinguishes
+# a busy consumer from a stopped one.
+#
+# So age carries the critical tier and depth stays a warning. Both come from
+# `startQueueGauges()` (`packages/observability/src/queueMetrics.ts`), observed lazily on every
+# scrape from one set of read-only `Queue` handles.
+#
+# `bullmq_queue_backlog_age` measures from the oldest waiting job's *eligibility* instant
+# (`timestamp + delay`), not its creation instant — otherwise every daily Job Scheduler entry
+# (`RUN_DUNNING`, `RUN_SEAT_RECONCILIATION`, and the rest) would report ~24 hours of backlog every
+# day and page for it. See that function's own comment.
+#
+# ## Thresholds are uniform across queues, and that is a starting point, not a conclusion
+#
+# One threshold for every `QUEUE_NAMES` entry, because a per-queue threshold table is a config
+# surface that drifts from reality the moment a queue's workload changes and nobody remembers the
+# table exists. The queues most likely to trip these legitimately under load are the LLM-bound ones
+# (`ai-ingestion`, `ai-exam-generation`) and `reports`; if one of them becomes a recurring false
+# page, the first tuning lever is a per-queue rule for that queue specifically, added here with its
+# own justification. That is the noisy-alert review process, not an exception to it — see
+# `docs/runbooks/alert-catalog.md`.
+
+groups:
+  - name: queue-backlog
+    rules:
+      # `state="waiting"` only. `delayed` deliberately excluded: a scheduled job sitting out its
+      # cron interval is in `delayed` by design, so including it would report a floor of roughly
+      # one job per Job Scheduler entry as permanent backlog.
+      - alert: QueueDepthHigh
+        expr: bullmq_queue_jobs{job="workers",state="waiting"} > 1000
+        for: 15m
+        labels:
+          severity: warning
+          service: workers
+        annotations:
+          summary: "{{ $labels.messaging_destination_name }} has over 1000 jobs waiting"
+          description: >-
+            {{ $value | printf "%.0f" }} jobs are waiting on the
+            {{ $labels.messaging_destination_name }} queue and have been for 15 minutes. Check
+            QueueBacklogAgeHigh before acting: a deep queue that is draining needs capacity, a deep
+            queue that is not draining needs a consumer.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#queuedepthhigh"
+
+      - alert: QueueBacklogAgeHigh
+        expr: bullmq_queue_backlog_age{job="workers"} > 300
+        for: 10m
+        labels:
+          severity: warning
+          service: workers
+        annotations:
+          summary: "{{ $labels.messaging_destination_name }} jobs are waiting over 5 minutes"
+          description: >-
+            The oldest eligible job on the {{ $labels.messaging_destination_name }} queue has been
+            waiting {{ $value | printf "%.0f" }}s. The consumer is behind, not stopped.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#queuebacklogagehigh"
+
+      - alert: QueueBacklogStalled
+        expr: bullmq_queue_backlog_age{job="workers"} > 1800
+        for: 10m
+        labels:
+          severity: critical
+          service: workers
+        annotations:
+          summary: "{{ $labels.messaging_destination_name }} has not been consumed in 30 minutes"
+          description: >-
+            The oldest eligible job on the {{ $labels.messaging_destination_name }} queue has been
+            waiting {{ $value | printf "%.0f" }}s. At this duration the queue is not slow, it is
+            stopped — a wedged worker, an exhausted Redis connection, or a processor deadlock.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#queuebacklogstalled"
+
+  # --- Dead letters ------------------------------------------------------------------------------
+  #
+  # These fire on *arrivals* over the last 30 minutes, not on the standing size of either store.
+  # The reason is structural rather than a simplification: `app.notification_dead_letters` is
+  # RLS-forced per school, so a global "how many are undrained right now" reading would be one
+  # query per tenant on every scrape. What the pager needs — "something was parked and nobody has
+  # looked at it" — an arrival rate answers exactly. The standing backlog is a drain-time question
+  # and the runbook answers it with SQL.
+  #
+  # The consequence to know while on call: these auto-resolve 30 minutes after the last arrival,
+  # whether or not anything was drained. Resolution here means "no new dead letters", never "the
+  # store is empty".
+  - name: queue-dead-letters
+    rules:
+      - alert: NotificationDeadLetterArrived
+        expr: sum(increase(dead_letter_entries_total{source="notifications"}[30m])) > 0
+        labels:
+          severity: warning
+          service: workers
+        annotations:
+          summary: "Notification dispatch jobs have exhausted their retries"
+          description: >-
+            {{ $value | printf "%.0f" }} notification dispatch job(s) were parked in
+            app.notification_dead_letters in the last 30 minutes. Recipients did not get what they
+            were owed, and nothing retries them without an operator.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#notificationdeadletterarrived"
+
+      # Critical where its notifications counterpart is a warning: a parked provider event means a
+      # school's subscription state now disagrees with what Stripe believes was paid for, and that
+      # divergence does not heal on its own.
+      - alert: BillingDeadLetterArrived
+        expr: sum(increase(dead_letter_entries_total{source="billing"}[30m])) > 0
+        labels:
+          severity: critical
+          service: workers
+        annotations:
+          summary: "Stripe billing events have exhausted their retries"
+          description: >-
+            {{ $value | printf "%.0f" }} Stripe billing event(s) were parked at
+            app.billing_events.status = 'dlq' in the last 30 minutes. Each one is a subscription
+            transition that was accepted from the provider and never applied.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#billingdeadletterarrived"

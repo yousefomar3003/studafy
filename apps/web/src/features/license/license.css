@@ -1,0 +1,307 @@
+/**
+ * The school's license pages (`/portal/license/*`). Loaded only with them, like every feature's
+ * stylesheet; built on the same design tokens as the principal's pages.
+ */
+
+.license-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.license-header h1 {
+  margin: 0;
+}
+
+.license-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-block: var(--space-16);
+  padding: 0;
+  list-style: none;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.license-nav a {
+  display: inline-block;
+  padding: var(--space-8) var(--space-12);
+  color: var(--color-muted-foreground);
+  text-decoration: none;
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+}
+
+.license-nav a[aria-current="page"] {
+  color: var(--color-foreground);
+  border-block-end-color: var(--color-accent);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* --- Banners: expiring soon, invoice overdue, seats almost full --- */
+
+.license-banners {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin-block-end: var(--space-16);
+}
+
+.license-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-12) var(--space-16);
+}
+
+.license-banner[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  border-color: var(--color-warning);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.license-banner[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  border-color: var(--color-danger);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.license-banner[data-tone="neutral"] {
+  background-color: var(--color-surface);
+}
+
+.license-banner__title {
+  margin: 0 0 var(--space-4);
+  font-weight: var(--font-weight-semibold);
+}
+
+.license-banner__body {
+  margin: 0;
+}
+
+/* --- Blocks and figures --- */
+
+.license-section {
+  margin-block: var(--space-24);
+}
+
+.license-section__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  margin-block-end: var(--space-12);
+}
+
+.license-section__head h2 {
+  margin: 0;
+}
+
+.license-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-12);
+  margin: 0;
+}
+
+.license-facts > div {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-12);
+}
+
+.license-facts dt {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.license-facts dd {
+  margin: var(--space-4) 0 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.license-muted {
+  color: var(--color-muted-foreground);
+}
+
+.license-pill {
+  display: inline-block;
+  padding: var(--space-2, 2px) var(--space-8);
+  border-radius: var(--radius-full, 999px);
+  font-size: var(--font-size-sm);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.license-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+  border-color: transparent;
+}
+
+.license-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+  border-color: transparent;
+}
+
+.license-pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+  border-color: transparent;
+}
+
+.license-meter {
+  display: block;
+  inline-size: 100%;
+  max-inline-size: 12rem;
+  block-size: 0.375rem;
+  margin-block-start: var(--space-4);
+  border-radius: var(--radius-full, 999px);
+  background-color: var(--color-border);
+  overflow: hidden;
+}
+
+.license-meter__fill {
+  display: block;
+  block-size: 100%;
+  background-color: var(--color-accent);
+}
+
+.license-meter__fill[data-tone="warning"] {
+  background-color: var(--color-warning);
+}
+
+.license-features {
+  margin: 0;
+  padding-inline-start: var(--space-16);
+}
+
+.license-amount {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+/* --- Seats --- */
+
+.license-note {
+  border-inline-start: 3px solid var(--color-accent);
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-md);
+  margin-block: var(--space-12);
+}
+
+.license-note p {
+  margin: 0;
+}
+
+.license-note p + p {
+  margin-block-start: var(--space-4);
+}
+
+.license-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-12);
+  margin-block: var(--space-12);
+}
+
+.license-toolbar > * {
+  min-inline-size: 180px;
+  flex: 0 1 220px;
+}
+
+.license-toolbar > .license-toolbar__actions {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  min-inline-size: 0;
+}
+
+.license-counter {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.license-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-8);
+  margin-block-start: var(--space-12);
+}
+
+.license-list {
+  margin: 0;
+  padding-inline-start: var(--space-16);
+}
+
+/* --- Invoices --- */
+
+.license-pay {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-8) var(--space-16);
+  margin: 0;
+}
+
+.license-pay dt {
+  color: var(--color-muted-foreground);
+}
+
+.license-pay dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.license-reference {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.04em;
+}
+
+.license-totals {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-24);
+  margin-block: var(--space-12);
+}
+
+.license-totals strong {
+  display: block;
+  font-size: var(--font-size-lg);
+}
+
+.license-savings {
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media print {
+  .license-nav,
+  .license-banners,
+  .license-no-print {
+    display: none !important;
+  }
+}

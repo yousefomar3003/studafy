@@ -1,0 +1,122 @@
+.sf-toast-viewport {
+  position: fixed;
+  inset-block-end: var(--space-24);
+  inset-inline-end: var(--space-24);
+  z-index: var(--z-toast);
+
+  display: flex;
+  flex-direction: column;
+  /* 8px control spacing */
+  gap: var(--space-8);
+
+  /* The viewport is always mounted so screen readers observe insertions into it; it must never
+     intercept pointer events over the page behind it. Each toast opts back in. */
+  pointer-events: none;
+}
+
+.sf-toast {
+  pointer-events: auto;
+
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-12);
+
+  box-sizing: border-box;
+  min-width: 18rem;
+  max-width: 26rem;
+  padding: var(--space-16);
+
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-3);
+
+  font-family: var(--font-family-sans);
+
+  animation: sf-toast-enter var(--duration-base) var(--easing-emphasized);
+}
+
+@keyframes sf-toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-8));
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.sf-toast--success {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+  border-color: var(--color-success);
+}
+
+.sf-toast--error {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+  border-color: var(--color-danger);
+}
+
+.sf-toast--warning {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+  border-color: var(--color-warning);
+}
+
+.sf-toast--info {
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+  border-color: var(--color-accent);
+}
+
+.sf-toast__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.sf-toast__title {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.sf-toast__description {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-xs);
+  font-weight: var(--font-weight-regular);
+}
+
+.sf-toast__dismiss {
+  flex-shrink: 0;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 0;
+  width: var(--space-16);
+  height: var(--space-16);
+
+  background: none;
+  border: none;
+  border-radius: var(--radius-full);
+  color: inherit;
+  cursor: pointer;
+
+  transition: background-color var(--duration-fast) var(--easing-standard);
+}
+
+.sf-toast__dismiss:hover {
+  background-color: var(--color-border);
+}
+
+.sf-toast__dismiss:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}

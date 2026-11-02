@@ -1,0 +1,421 @@
+import { resolve } from "node:path";
+
+import { DOMAIN_EVENTS, type DomainEvent } from "@studafy/constants";
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+
+import { runMigrationCommand } from "../../../../../packages/db/src/runner";
+import {
+  integrationEnabled,
+  runnerEnv,
+  testDatabase,
+} from "../../../../../packages/db/tests/helpers";
+import { createSchool } from "../../../tests/harness";
+
+import { emit } from "./emitter";
+import { eventPayloadSchemas } from "./schemas";
+
+const integrationTest = test.skipIf(!integrationEnabled);
+const repositoryMigrations = resolve(import.meta.dir, "../../../../../db/migrations");
+
+type TestDatabase = Awaited<ReturnType<typeof testDatabase>>;
+let database: TestDatabase | undefined;
+
+beforeAll(async () => {
+  if (!integrationEnabled) return;
+  database = await testDatabase();
+  await runMigrationCommand("migrate", {
+    env: runnerEnv(database.url, repositoryMigrations),
+    log: () => undefined,
+  });
+}, 60_000);
+
+afterAll(async () => {
+  await database?.cleanup();
+});
+
+// ── Schema coverage ────────────────────────────────────────────────────────
+
+describe("eventPayloadSchemas", () => {
+  test("has a schema for every DOMAIN_EVENTS value", () => {
+    const allEvents = Object.values(DOMAIN_EVENTS);
+    const schemaKeys = Object.keys(eventPayloadSchemas);
+
+    expect(schemaKeys).toHaveLength(allEvents.length);
+
+    for (const event of allEvents) {
+      expect(eventPayloadSchemas[event]).toBeDefined();
+    }
+  });
+
+  test("rejects invalid payloads for single-id events", () => {
+    const schema = eventPayloadSchemas[DOMAIN_EVENTS.USER_CREATED];
+    expect(() => schema.parse({ userId: "not-a-uuid" })).toThrow();
+  });
+
+  test("accepts valid payloads for single-id events", () => {
+    const schema = eventPayloadSchemas[DOMAIN_EVENTS.USER_CREATED];
+    const result = schema.parse({ userId: crypto.randomUUID() });
+    expect(result).toEqual({ userId: expect.any(String) });
+  });
+
+  test("rejects invalid payloads for multi-id events", () => {
+    const schema = eventPayloadSchemas[DOMAIN_EVENTS.ENROLLMENT_CREATED];
+    expect(() =>
+      schema.parse({
+        enrollmentId: crypto.randomUUID(),
+        courseId: "not-a-uuid",
+        studentId: crypto.randomUUID(),
+      }),
+    ).toThrow();
+  });
+
+  test("accepts valid payloads for multi-id events", () => {
+    const schema = eventPayloadSchemas[DOMAIN_EVENTS.SUBMISSION_GRADED];
+    const result = schema.parse({
+      submissionId: crypto.randomUUID(),
+      assignmentId: crypto.randomUUID(),
+      studentId: crypto.randomUUID(),
+    });
+    expect(result).toEqual({
+      submissionId: expect.any(String),
+      assignmentId: expect.any(String),
+      studentId: expect.any(String),
+    });
+  });
+
+  test("erpnext schemas accept arbitrary record payloads", () => {
+    const schema = eventPayloadSchemas[DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED];
+    const result = schema.parse({ grand_total: 100, name: "INV-001", custom_school_id: "x" });
+    expect(result).toEqual({ grand_total: 100, name: "INV-001", custom_school_id: "x" });
+  });
+});
+
+// ── Emit integration tests ─────────────────────────────────────────────────
+
+describe("emit", () => {
+  integrationTest("inserts a row into outbox_events inside a transaction", async () => {
+    const { id: schoolId } = await createSchool(database!.sql);
+    const userId = crypto.randomUUID();
+    const event = DOMAIN_EVENTS.USER_CREATED;
+
+    await database!.sql.begin(async (tx) => {
+      await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+      await emit(tx, event, { userId });
+    });
+
+    const [row] = await database!.sql`
+      SELECT event_name, payload
+      FROM app.outbox_events
+      WHERE school_id = ${schoolId}
+    `;
+    expect(row).toBeDefined();
+    expect(row!.event_name).toBe(event);
+    expect(row!.payload).toEqual({ userId });
+  });
+
+  integrationTest("throws when app.school_id GUC is not set", async () => {
+    const userId = crypto.randomUUID();
+
+    await expect(
+      database!.sql.begin(async (tx) => {
+        await emit(tx, DOMAIN_EVENTS.USER_CREATED, { userId });
+      }),
+    ).rejects.toThrow();
+  });
+
+  integrationTest("throws on invalid payload", async () => {
+    const { id: schoolId } = await createSchool(database!.sql);
+
+    await expect(
+      database!.sql.begin(async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+        await emit(tx, DOMAIN_EVENTS.USER_CREATED, { userId: "bad" } as never);
+      }),
+    ).rejects.toThrow();
+  });
+
+  integrationTest(
+    "emits every event name without throwing",
+    async () => {
+      const { id: schoolId } = await createSchool(database!.sql);
+      const uid = crypto.randomUUID();
+
+      const payloads: Record<DomainEvent, unknown> = {
+        [DOMAIN_EVENTS.USER_CREATED]: { userId: uid },
+        [DOMAIN_EVENTS.USER_SUSPENDED]: { userId: uid },
+        [DOMAIN_EVENTS.USER_INVITED]: { userId: uid },
+        [DOMAIN_EVENTS.INVITATION_SENT]: {
+          invitationId: uid,
+          email: "test@example.com",
+          role: "STUDENT",
+          expiresAt: new Date().toISOString(),
+          invitedByUserId: uid,
+          token: "tok_abc123",
+        },
+        [DOMAIN_EVENTS.INVITATION_REVOKED]: {
+          invitationId: uid,
+          email: "test@example.com",
+          role: "STUDENT",
+        },
+        [DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED]: {
+          email: "test@example.com",
+          expiresAt: new Date().toISOString(),
+          schoolNames: ["Test School"],
+          token: "tok_abc123",
+        },
+        [DOMAIN_EVENTS.ACCOUNT_DELETED]: {
+          userId: uid,
+          email: "test@example.com",
+          completesBy: new Date().toISOString(),
+        },
+        [DOMAIN_EVENTS.SCHOOL_REGISTERED]: {
+          schoolId: uid,
+          adminUserId: uid,
+          email: "test@example.com",
+          slug: "test-school",
+        },
+        [DOMAIN_EVENTS.SCHOOL_VERIFICATION_EMAIL_SENT]: {
+          schoolId: uid,
+          email: "test@example.com",
+          expiresAt: new Date().toISOString(),
+          token: "tok_abc123",
+        },
+        [DOMAIN_EVENTS.SCHOOL_EMAIL_VERIFIED]: {
+          schoolId: uid,
+          email: "test@example.com",
+          slug: "test-school",
+        },
+        [DOMAIN_EVENTS.SCHOOL_CREATED]: {
+          schoolId: uid,
+          slug: "test-school",
+          name: "Test School",
+          countryId: uid,
+          defaultCurrencyId: uid,
+        },
+        [DOMAIN_EVENTS.ORGANIZATION_CREATED]: { organizationId: uid },
+        [DOMAIN_EVENTS.ORGANIZATION_UPDATED]: { organizationId: uid },
+        [DOMAIN_EVENTS.COURSE_CREATED]: { courseId: uid },
+        [DOMAIN_EVENTS.COURSE_PUBLISHED]: { courseId: uid },
+        [DOMAIN_EVENTS.COURSE_ARCHIVED]: { courseId: uid },
+        [DOMAIN_EVENTS.ENROLLMENT_CREATED]: {
+          enrollmentId: uid,
+          courseId: uid,
+          studentId: uid,
+        },
+        [DOMAIN_EVENTS.ENROLLMENT_APPROVED]: {
+          enrollmentId: uid,
+          courseId: uid,
+          studentId: uid,
+        },
+        [DOMAIN_EVENTS.ENROLLMENT_CANCELLED]: {
+          enrollmentId: uid,
+          courseId: uid,
+          studentId: uid,
+        },
+        [DOMAIN_EVENTS.ASSIGNMENT_PUBLISHED]: { assignmentId: uid, courseId: uid },
+        [DOMAIN_EVENTS.ASSIGNMENT_DEADLINE_EXTENDED]: { assignmentId: uid, courseId: uid },
+        [DOMAIN_EVENTS.SUBMISSION_CREATED]: {
+          submissionId: uid,
+          assignmentId: uid,
+          studentId: uid,
+        },
+        [DOMAIN_EVENTS.SUBMISSION_GRADED]: {
+          submissionId: uid,
+          assignmentId: uid,
+          studentId: uid,
+        },
+        [DOMAIN_EVENTS.SUBMISSION_RESUBMISSION_REQUESTED]: {
+          submissionId: uid,
+          assignmentId: uid,
+          studentId: uid,
+        },
+        [DOMAIN_EVENTS.DISCUSSION_POSTED]: { discussionId: uid },
+        [DOMAIN_EVENTS.DISCUSSION_MODERATED]: { discussionId: uid },
+        [DOMAIN_EVENTS.MATERIAL_UPLOADED]: { materialId: uid, classId: uid },
+        [DOMAIN_EVENTS.MATERIAL_AI_ENABLED]: { materialId: uid },
+        [DOMAIN_EVENTS.MATERIAL_AI_DISABLED]: { materialId: uid },
+        [DOMAIN_EVENTS.MATERIAL_QUARANTINED]: {
+          materialId: uid,
+          schoolId: uid,
+          virus: "Eicar-Test-Signature",
+        },
+        [DOMAIN_EVENTS.STUDY_GROUP_CREATED]: { groupId: uid },
+        [DOMAIN_EVENTS.STUDY_GROUP_JOINED]: { groupId: uid },
+        [DOMAIN_EVENTS.CERTIFICATE_ISSUED]: { certificateId: uid, studentId: uid },
+        [DOMAIN_EVENTS.CERTIFICATE_REVOKED]: { certificateId: uid, studentId: uid },
+        [DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED]: {
+          studentId: uid,
+          ruleType: "consecutive_days",
+          thresholdValue: 3,
+          absentDays: 3,
+          boundaryDate: "2026-07-29",
+          parentUserIds: [uid],
+        },
+        [DOMAIN_EVENTS.DIGEST_SENT]: {
+          parentUserId: uid,
+          email: "test@example.com",
+          digestDate: "2026-07-30",
+          items: [
+            {
+              kind: "attendance_alert",
+              studentName: "Amina",
+              text: "Amina has been absent for 3 consecutive school days.",
+              occurredAt: "2026-07-29T10:00:00.000Z",
+            },
+          ],
+        },
+        [DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT]: {
+          userId: uid,
+          email: "test@example.com",
+          digestDate: "2026-07-30",
+          items: [
+            {
+              notificationType: "COURSE_PUBLISHED",
+              title: "New course published",
+              body: "Intro to Biology is now available.",
+              occurredAt: "2026-07-29T10:00:00.000Z",
+            },
+          ],
+        },
+        [DOMAIN_EVENTS.TIMETABLE_APPROVED]: {
+          timetableVersionId: uid,
+          termId: uid,
+          approvedByUserId: uid,
+          slotCount: 5,
+        },
+        [DOMAIN_EVENTS.TIMETABLE_REJECTED]: {
+          timetableVersionId: uid,
+          termId: uid,
+          rejectedReason: "Missing Monday periods",
+        },
+        [DOMAIN_EVENTS.EXAM_SCHEDULED]: {
+          examId: uid,
+          classId: uid,
+          scheduledByUserId: uid,
+        },
+        [DOMAIN_EVENTS.EXAM_UPDATED]: {
+          examId: uid,
+          classId: uid,
+          updatedByUserId: uid,
+        },
+        [DOMAIN_EVENTS.EXAM_CANCELLED]: {
+          examId: uid,
+          classId: uid,
+        },
+        [DOMAIN_EVENTS.ERPNEXT_INVOICE_SUBMITTED]: { name: "INV-001" },
+        [DOMAIN_EVENTS.ERPNEXT_FEE_DUE]: { name: "FEE-001" },
+        [DOMAIN_EVENTS.ERPNEXT_PAYMENT_RECEIVED]: { name: "PAY-001" },
+        [DOMAIN_EVENTS.ERPNEXT_CREDIT_NOTE_ISSUED]: { name: "CN-001" },
+        [DOMAIN_EVENTS.ERPNEXT_FEE_STRUCTURE_SUBMITTED]: { name: "FS-001" },
+        [DOMAIN_EVENTS.GRADES_SUBMITTED]: { submissionId: uid, gradebookId: uid, studentId: uid },
+        [DOMAIN_EVENTS.GRADES_PUBLISHED]: {
+          submissionId: uid,
+          gradebookId: uid,
+          studentId: uid,
+          approvedByUserId: uid,
+        },
+        [DOMAIN_EVENTS.FEE_INSTALLMENT_OVERDUE]: {
+          studentId: uid,
+          scheduleId: uid,
+          dueDate: "2026-06-15",
+          outstandingAmountMinor: 100000,
+        },
+        [DOMAIN_EVENTS.FINANCE_RECONCILIATION_DIVERGENCE]: {
+          schoolId: uid,
+          studentId: uid,
+          erpnextFeeScheduleId: "FS-001",
+          erpnextOutstanding: 5000,
+          localOutstanding: 8000,
+        },
+        [DOMAIN_EVENTS.NOTIFICATION_DISPATCH_FAILED]: {
+          deadLetterId: uid,
+          jobId: "42",
+          jobName: "dispatch-notification",
+          queueName: "notifications",
+          attemptsMade: 5,
+          errorClass: "Error",
+          failedAt: new Date().toISOString(),
+        },
+        [DOMAIN_EVENTS.NOTIFICATION_READ]: {
+          userId: uid,
+          notificationId: uid,
+          unreadCount: 1,
+        },
+        [DOMAIN_EVENTS.NOTIFICATION_ALL_READ]: {
+          userId: uid,
+          unreadCount: 0,
+        },
+        [DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED]: {
+          schoolId: uid,
+          subscriptionId: uid,
+          previousStatus: "trialing",
+          status: "active",
+          entitlementsVersion: 2,
+        },
+        [DOMAIN_EVENTS.AI_SUBSCRIPTION_STATUS_CHANGED]: {
+          schoolId: uid,
+          studentId: uid,
+          aiSubscriptionId: uid,
+          previousStatus: "active",
+          status: "canceled",
+          entitlementsVersion: 2,
+        },
+        [DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED]: {
+          schoolId: uid,
+          userId: uid,
+          entitlementsVersion: 2,
+        },
+        [DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT]: {
+          schoolId: uid,
+          subscriptionId: uid,
+          email: "test@example.com",
+          planName: "Standard Plan",
+          dueDate: new Date().toISOString(),
+          gracePeriodEndsAt: new Date().toISOString(),
+        },
+        [DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED]: {
+          schoolId: uid,
+          subscriptionId: uid,
+          email: "test@example.com",
+          planName: "Standard Plan",
+          activeSeatCount: 3,
+          billedSeatCount: 2,
+          delta: 1,
+          direction: "upgrade",
+          proratedAmountMinor: 9_999,
+          currency: "usd",
+          effectivePeriodEnd: null,
+        },
+        [DOMAIN_EVENTS.AI_SUBSCRIPTION_PAUSED]: {
+          schoolId: uid,
+          aiSubscriptionId: uid,
+          studentId: uid,
+          email: "test@example.com",
+        },
+        [DOMAIN_EVENTS.AI_SUBSCRIPTION_RESUMED]: {
+          schoolId: uid,
+          aiSubscriptionId: uid,
+          studentId: uid,
+          email: "test@example.com",
+        },
+      };
+
+      await database!.sql.begin(async (tx) => {
+        await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+
+        for (const [event, payload] of Object.entries(payloads) as [DomainEvent, unknown][]) {
+          await emit(tx, event, payload as never);
+        }
+      });
+
+      const rows = await database!.sql`
+        SELECT event_name FROM app.outbox_events WHERE school_id = ${schoolId}
+      `;
+      const emitted = rows.map((r) => r.event_name).sort();
+      const expected = Object.values(DOMAIN_EVENTS).sort();
+      expect(emitted).toEqual(expected);
+    },
+    30_000,
+  );
+});

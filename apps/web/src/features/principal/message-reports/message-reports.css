@@ -1,0 +1,252 @@
+/**
+ * Message report review screens (queue + detail with evidence transcript). `@studafy/ui`'s Table,
+ * Select and Modal supply their own chrome; everything here is feature layout on the shared design
+ * tokens, mirroring `features/principal/discipline/discipline.css`.
+ */
+
+.message-reports__filter {
+  margin-bottom: var(--space-16);
+  max-width: 320px;
+}
+
+.message-reports__pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.message-reports__pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.message-reports__pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.message-reports__pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.message-reports__pill[data-tone="neutral"] {
+  background-color: var(--color-surface);
+  color: var(--color-foreground);
+  border: 1px solid var(--color-border);
+}
+
+.message-reports__priority {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.message-reports__respond-by {
+  flex-basis: 100%;
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.message-reports__respond-by[data-overdue="true"],
+.message-reports__summary dd[data-overdue="true"] {
+  color: var(--color-danger-subtle-foreground);
+  font-weight: var(--font-weight-semibold);
+}
+
+.message-reports__pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  margin-top: var(--space-16);
+}
+
+.message-reports__pagination .message-reports__hint {
+  margin-inline-end: auto;
+}
+
+.message-reports__hint {
+  margin: 0 0 var(--space-8);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.message-reports__overdue-banner {
+  margin: 0 0 var(--space-16);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+  font-weight: var(--font-weight-medium);
+}
+
+.message-reports__summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  margin: 0 0 var(--space-16);
+}
+
+.message-reports__summary dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.message-reports__summary dd {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.message-reports__section {
+  margin-bottom: var(--space-24);
+}
+
+.message-reports__section-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.message-reports__details-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-reports__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-bottom: var(--space-8);
+}
+
+/* Evidence transcript — chat-like: the reported user's messages on one side, the reporter's on
+ * the other, the reported message itself outlined. */
+
+.message-reports__transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.message-reports__message {
+  max-width: min(36rem, 90%);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.message-reports__message[data-side="reporter"] {
+  align-self: flex-end;
+}
+
+.message-reports__message[data-side="reported"],
+.message-reports__message[data-side="other"] {
+  align-self: flex-start;
+}
+
+.message-reports__message[data-reported="true"] {
+  border: 2px solid var(--color-danger);
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.message-reports__message-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+  font-size: var(--font-size-sm);
+}
+
+.message-reports__message-sender {
+  font-weight: var(--font-weight-semibold);
+}
+
+.message-reports__message-body {
+  margin: var(--space-4) 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message-reports__attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.message-reports__thumbnail {
+  display: block;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  line-height: 0;
+}
+
+.message-reports__thumbnail img {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+}
+
+.message-reports__image-unavailable {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 120px;
+  height: 120px;
+  padding: var(--space-8);
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+  text-align: center;
+  background-color: var(--color-background);
+}
+
+.message-reports__error {
+  margin: var(--space-8) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger-subtle-foreground);
+}
+
+/* Resolution-note textarea — reuses Input's `.sf-input` chrome, as `discipline-resolution-input`
+ * does, since the design system has no Textarea primitive. */
+.message-reports__note-input {
+  align-items: stretch;
+  padding-block: var(--space-8);
+}
+
+.message-reports__note-input .sf-input__control {
+  resize: vertical;
+  min-height: 5lh;
+  padding-block: 0;
+}
+
+/* Dashboard tile preview list */
+
+.message-reports-tile__list {
+  list-style: none;
+  margin: var(--space-8) 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.message-reports-tile__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}

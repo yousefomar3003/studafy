@@ -1,0 +1,786 @@
+/**
+ * CI gate: every mutating route must declare an audit action.
+ *
+ * This test scans source files under src/ for mutating route registrations and verifies each is
+ * accompanied by an auditAction() call. A missing declaration means an un-audited mutation could
+ * ship to production, which violates SAD section 15.
+ *
+ * Health endpoints are excluded -- they are GET-only and carry no mutation.
+ *
+ * ## Two registration styles, both scanned (ST-060)
+ *
+ * 1. `routes.post("/path", auditAction(...), handler)` -- plain Hono; verb and path are arguments.
+ * 2. `createRoute({ method: "post", path: "/path" })` + `routes.openapi(route, handler)` --
+ *    @hono/zod-openapi, where the verb and path live in a config object and middleware is attached
+ *    separately with `routes.use("/path", auditAction(...))`.
+ *
+ * Style 2 is why this scanner cannot only look for `routes.post(`. When the ERPNext webhook moved to
+ * style 1 -> 2, a `routes.post(`-only scan stopped seeing the codebase's only real mutating route,
+ * and still passed -- because its two "matches" were the @example lines in auditEmitter.ts's own
+ * doc comment. The gate was green while protecting nothing. Hence: comments are stripped before
+ * scanning, and EXPECTED_MUTATING_ROUTES below pins the count so a scanner that goes blind fails
+ * instead of passing quietly.
+ */
+
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
+import { describe, expect, test } from "bun:test";
+
+const SRC_DIR = resolve(import.meta.dir, "../src");
+
+// Files matching these patterns are excluded from the scan.
+const EXCLUDE_PATTERNS = [/\.test\.ts$/, /\.d\.ts$/, /__tests__/];
+
+// Mutating HTTP methods that require audit coverage.
+const MUTATING_METHODS = ["post", "put", "patch", "delete"] as const;
+
+// Patterns that explicitly exempt a route from audit coverage (e.g. health endpoints).
+const EXEMPT_ROUTES = ["/healthz", "/readyz"];
+
+/**
+ * Every mutating route that currently exists, by "METHOD path".
+ *
+ * A pinned list, not a lower bound. `expect(routes.length).toBeGreaterThan(0)` cannot tell "the
+ * scanner works" from "the scanner matched a code sample in a comment", which is exactly how this
+ * gate silently stopped covering the webhook. Adding a mutating route means adding it here, and the
+ * failure names what to do.
+ */
+const EXPECTED_MUTATING_ROUTES = [
+  "POST /api/invitations",
+  "POST /api/invitations/{id}/revoke",
+  "POST /api/invitations/{id}/regenerate",
+  // School self-registration (ST-081). Public unauthenticated endpoint; audit rows are written
+  // from inside the service transaction.
+  "POST /api/schools/register",
+  // Account activation (ST-078). Consumes the invitation and activates the user in one transaction;
+  // the audit rows are written from inside that transaction — see
+  // src/modules/auth/services/activation-service.ts.
+  "POST /api/auth/invitations/{token}/activate",
+  // Returning-user OAuth login (ST-079). Public self-service login via Microsoft OIDC id_token.
+  // Audit rows are written from the route's service transaction.
+  "POST /api/auth/login/oauth",
+  "POST /erpnext/webhooks",
+  // Stripe billing webhook (ST-132). Global, pre-tenant surface authenticated by signature.
+  // auditAction declares the mutation; the app.audit_logs rows are written from inside the
+  // processor's own transaction — see src/modules/subscriptions/webhooks/webhook-processor.ts — so a
+  // status transition and its record commit or roll back together. Declared against `subscriptions`
+  // although the same processor also writes `ai_subscriptions` rows via the school→AI cascade; the
+  // service emits the action that actually occurred, as the submissions routes below already do.
+  //
+  // NOTE: the other five /api/subscriptions/* mutating routes are invisible to this scanner. Their
+  // files build their sub-app as `const app = new OpenAPIHono(...)` and register with
+  // `app.openapi(...)`, and findMutatingRoutes only inspects style-2 routes in files containing
+  // `routes.openapi(`. Naming the variable `routes` — as this webhook module and erpnext/webhook.ts
+  // both do — is what puts a route in front of the gate. Bringing the rest into coverage means
+  // renaming them and deciding an audit action for each, which is its own change.
+  "POST /api/subscriptions/webhook/stripe",
+  // Tap billing webhook (ST-298). Same processor, same in-transaction audit rows as Stripe above;
+  // authenticated by the `hashstring` HMAC.
+  "POST /api/subscriptions/webhook/tap",
+  // SES → SNS email-event webhook (deliverability R-08). Global, pre-tenant surface: auditAction
+  // declares the intent, but no app.audit_logs row is written because the ledger insert into
+  // app.email_events *is* the audit record — see src/email/webhook.ts.
+  "POST /email/webhooks/sns",
+  // Session lifecycle (ST-071). All four mutate app.refresh_tokens. The revocation paths write
+  // their audit rows from inside the service transaction rather than from the route, so that a
+  // revocation and its audit record commit or roll back together — see
+  // src/modules/auth/services/session-service.ts.
+  "POST /api/auth/refresh",
+  "POST /api/auth/logout",
+  "DELETE /api/auth/sessions/{sessionId}",
+  // Self-service "sign out other sessions" (ST-280). Revokes every family the caller holds except
+  // the one behind the presented refresh token; audit row written from inside
+  // revokeAndDenylist's transaction, same as the other revocation paths above.
+  "POST /api/auth/sessions/revoke-others",
+  "DELETE /api/auth/devices/{deviceId}/sessions",
+  // Device token registration (ST-218). Self-service upsert on the caller's own user_devices
+  // row; auditAction("register", "user_devices") is declared in session-routes.ts.
+  "POST /api/auth/devices",
+  // Device revocation (ST-072). Same contract as the ST-071 routes above: the audit row is written
+  // from inside the revoking transaction in services/revocation-service.ts, so a teardown and its
+  // record commit or roll back together. The two admin paths act on a user other than the caller and
+  // are additionally gated on PERMISSIONS.USER_SUSPEND by middleware/authz.ts.
+  "DELETE /api/auth/devices/{deviceId}",
+  "DELETE /api/admin/users/{userId}/devices",
+  "DELETE /api/admin/users/{userId}/devices/{deviceId}",
+  // Provider linking (R-03). Link start creates an oauth_identities row; unlink and admin unlink
+  // delete one. Audit rows are written from inside the service transactions.
+  "POST /api/auth/providers/link/start",
+  "DELETE /api/auth/providers/{provider}",
+  "DELETE /api/admin/users/{userId}/providers/{provider}",
+  // School email verification (ST-088). Resends the verification email for a pending school.
+  "POST /api/schools/resend-verification",
+  // School settings (ST-090). PATCH updates school_settings with full before/after audit.
+  "PATCH /api/schools/current/settings",
+  // School closure by its administrator. Archives the school, revokes every session and bumps the
+  // entitlement version in one transaction; the audit rows are written from inside it — see
+  // src/modules/tenancy/closure/service.ts.
+  "POST /api/schools/current/closure",
+  // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
+  // audit rows are written by the auditAction middleware on the route.
+  "POST /api/schools/{schoolId}/provision",
+  // Academic year & term management (ST-091). Authenticated, tenant-scoped CRUD and rollover.
+  "POST /api/academics/years",
+  "PATCH /api/academics/years/{yearId}",
+  "DELETE /api/academics/years/{yearId}",
+  "POST /api/academics/years/{yearId}/rollover",
+  "POST /api/academics/years/{yearId}/terms",
+  "PATCH /api/academics/terms/{termId}",
+  "DELETE /api/academics/terms/{termId}",
+  // Subjects & courses (ST-099). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/subjects",
+  "PATCH /api/academics/subjects/{subjectId}",
+  "DELETE /api/academics/subjects/{subjectId}",
+  "POST /api/academics/subjects/{subjectId}/courses",
+  "PATCH /api/academics/courses/{courseId}",
+  "DELETE /api/academics/courses/{courseId}",
+  // User management & administration (ST-093). Authenticated, tenant-scoped CRUD and deactivation.
+  "POST /api/users",
+  "PATCH /api/users/{userId}",
+  "PATCH /api/users/{userId}/role",
+  "PATCH /api/users/{userId}/deactivate",
+  // Member password reset (000141). Audit row written from inside resetMemberPassword's transaction.
+  "POST /api/users/{userId}/password/reset",
+  // Student profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards.
+  // Audit rows are written from inside the service transactions.
+  "POST /api/students",
+  "PATCH /api/students/{studentId}",
+  // Student guardians. Link/unlink parent-child relationships with audit trails.
+  "POST /api/students/{studentId}/guardians",
+  "DELETE /api/students/{studentId}/guardians/{userId}",
+  // Family households and family-scoped guardian links (ST-126).
+  "POST /api/families",
+  "PATCH /api/families/{familyId}",
+  "DELETE /api/families/{familyId}",
+  "POST /api/families/{familyId}/links",
+  "PATCH /api/families/{familyId}/links/{parentUserId}/{studentId}",
+  "DELETE /api/families/{familyId}/links/{parentUserId}/{studentId}",
+  // Teacher profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards.
+  // Audit rows are written from inside the service transactions.
+  "POST /api/teachers",
+  "PATCH /api/teachers/{teacherId}",
+  // Student CSV imports. Upload and confirm are mutating; audit rows written from the route.
+  "POST /api/imports/students/upload",
+  "POST /api/imports/students/{importId}/confirm",
+  // ST-299: re-map a staged import, and saved-mapping CRUD. Audit rows written from inside the
+  // service transactions (import-service.ts).
+  "PUT /api/imports/students/{importId}/mapping",
+  "POST /api/imports/students/mappings",
+  "PATCH /api/imports/students/mappings/{mappingId}",
+  "DELETE /api/imports/students/mappings/{mappingId}",
+  // Original files and unmapped columns: deleting a file, applying a column (one audit row per
+  // record answer written plus one for the column) and changing retention are audited.
+  "DELETE /api/imports/students/{importId}/source",
+  // The column preview writes nothing; it declares the table its apply audits.
+  "POST /api/imports/students/{importId}/columns/preview",
+  "POST /api/imports/students/{importId}/columns/apply",
+  "PUT /api/imports/students/settings",
+  // Bulk invitations. Admin dispatches invitations in batches; audit rows written by
+  // auditAction middleware in bulk-invite-routes.ts.
+  "POST /api/invitations/bulk",
+  "POST /api/invitations/bulk/{bulkInviteId}/retry",
+  // Classes & enrollments (ST-100). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/classes",
+  "PATCH /api/academics/classes/{classId}",
+  "DELETE /api/academics/classes/{classId}",
+  "POST /api/academics/classes/{classId}/enrollments",
+  "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
+  "POST /api/academics/classes/{classId}/enrollments/transfer",
+  // Grades & sections (000147), and placing students in a section.
+  "POST /api/academics/grade-levels",
+  "PATCH /api/academics/grade-levels/{gradeLevelId}",
+  "DELETE /api/academics/grade-levels/{gradeLevelId}",
+  "POST /api/academics/sections",
+  "PATCH /api/academics/sections/{sectionId}",
+  "DELETE /api/academics/sections/{sectionId}",
+  "POST /api/academics/sections/{sectionId}/students",
+  "DELETE /api/academics/sections/{sectionId}/students/{studentId}",
+  // Academic grading (000160): configuration, marks, mark-sheet approval, finalization, corrections
+  // and certificates. Every mutation writes its app.audit_logs row inside the service transaction
+  // (modules/grading/*-service.ts), mark changes with their old and new values.
+  "POST /api/grading/years/{yearId}/status",
+  "POST /api/grading/years/{yearId}/copy",
+  "POST /api/grading/years/{yearId}/scales",
+  "PUT /api/grading/scales/{scaleId}",
+  "DELETE /api/grading/scales/{scaleId}",
+  "PUT /api/grading/years/{yearId}/programs/{gradeLevelId}",
+  "POST /api/grading/years/{yearId}/programs/{gradeLevelId}/subjects",
+  "PUT /api/grading/subject-configs/{configId}",
+  "DELETE /api/grading/subject-configs/{configId}",
+  "POST /api/grading/subject-configs/{configId}/reset",
+  "POST /api/grading/subject-configs/{configId}/keep",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/override",
+  "PUT /api/grading/sections/{sectionId}/subject-enrollments",
+  "POST /api/grading/teacher-assignments",
+  "DELETE /api/grading/teacher-assignments/{assignmentId}",
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/marks",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/assessments",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/mark-sheets/submit",
+  "POST /api/grading/mark-sheets/{sheetId}/decision",
+  "POST /api/grading/assessments/{assessmentId}/decision",
+  "POST /api/grading/sections/{sectionId}/results/finalize",
+  "POST /api/grading/finalizations/{finalizationId}/corrections",
+  "POST /api/grading/finalizations/{finalizationId}/certificates",
+  "POST /api/grading/certificates/{certificateId}/reissue",
+  "POST /api/grading/certificates/{certificateId}/revoke",
+  "POST /api/grading/exam-structure/apply",
+  // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
+  "POST /api/academics/timetable-versions",
+  "PATCH /api/academics/timetable-versions/{versionId}",
+  "DELETE /api/academics/timetable-versions/{versionId}",
+  "POST /api/academics/timetable-versions/{versionId}/submit",
+  "POST /api/academics/timetable-versions/{versionId}/approve",
+  "POST /api/academics/timetable-versions/{versionId}/reject",
+  "POST /api/academics/timetable-versions/copy",
+  "POST /api/academics/timetable-versions/{versionId}/slots",
+  "PATCH /api/academics/slots/{slotId}",
+  "DELETE /api/academics/slots/{slotId}",
+  "POST /api/academics/timetable-versions/{versionId}/publish",
+  "PUT /api/academics/timetable-settings",
+  // Assignments (ST-103). Every mutation writes an app.audit_logs row from inside its own service
+  // transaction — see modules/academics/assignments/assignment-service.ts and attachment-service.ts.
+  "POST /api/academics/assignments",
+  "PATCH /api/academics/assignments/{assignmentId}",
+  "DELETE /api/academics/assignments/{assignmentId}",
+  "POST /api/academics/assignments/{assignmentId}/attachments/upload-url",
+  "POST /api/academics/assignments/{assignmentId}/attachments",
+  "DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  "PUT /api/academics/assignments/{assignmentId}/questions",
+  // Submissions (ST-104). Same contract as the assignments routes above: every mutation writes its
+  // app.audit_logs row from inside its own service transaction, so a hand-in, a grade change or a
+  // superseded attempt and its record commit or roll back together — see
+  // modules/academics/submissions/submission-service.ts and submission-attachment-service.ts. The
+  // POST is declared "insert" although a resubmission updates in place; the service emits the
+  // action that actually occurred.
+  "POST /api/academics/assignments/{assignmentId}/submissions",
+  "PATCH /api/academics/submissions/{submissionId}/grade",
+  "POST /api/academics/submissions/{submissionId}/attachments/upload-url",
+  "POST /api/academics/submissions/{submissionId}/attachments",
+  "DELETE /api/academics/submissions/{submissionId}/attachments/{attachmentId}",
+  // Exam scheduling (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission. Audit rows written by auditAction middleware.
+  "POST /api/academics/exams",
+  "PATCH /api/academics/exams/{examId}",
+  "DELETE /api/academics/exams/{examId}",
+  // Gradebook configuration (ST-112). Assessment category and grading scheme mutations
+  // each write an app.audit_logs row from inside the service transaction — see
+  // modules/grades/config/gradebook-config-service.ts.
+  "POST /api/grades/config/gradebooks/{gradebookId}/categories",
+  "PATCH /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+  "DELETE /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+  "POST /api/grades/config/gradebooks/{gradebookId}/scheme/link",
+  "POST /api/grades/config/schemes",
+  // Attendance sessions. Tenant-scoped session management with auditAction middleware.
+  "POST /api/attendance/records/batch",
+  "POST /api/attendance/reports/export",
+  "POST /api/attendance/sessions",
+  "PATCH /api/attendance/sessions/{sessionId}",
+  // Attendance corrections (ST-109). Amends a submitted record; the before/after diff reaches
+  // audit_logs from the service, alongside the immutable version-chain row.
+  "PATCH /api/attendance/records/{recordId}",
+  // Grade entry (ST-113). Bulk update grades and submission status transitions.
+  // Audit rows are written by auditAction middleware in grade-entry-routes.ts.
+  "POST /api/grades/gradebooks/{gradebookId}/assessments",
+  "PATCH /api/grades/gradebooks/{gradebookId}/grades",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+  "POST /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/revisions",
+  "PATCH /api/grades/gradebooks/{gradebookId}/revisions/{revisionId}/withdraw",
+  // Learning materials (ST-106). Storage-triggered upload flow with AI visibility.
+  "POST /api/academics/materials/upload",
+  "POST /api/academics/materials/{materialId}/confirm",
+  "PATCH /api/academics/materials/{materialId}",
+  "PATCH /api/academics/materials/{materialId}/ai-visible",
+  "DELETE /api/academics/materials/{materialId}",
+  // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm.
+  // auditAction declares the mutation, but no app.audit_logs row is written: the staged object
+  // under temp/ IS the audit record, an infra-level event with no database row to pair it with —
+  // the same precedent as the SES email webhook above. The object's lifecycle is itself traceable
+  // via the school-prefixed key, which is the application half of the storage tenant boundary.
+  "POST /api/storage/uploads/request-upload",
+  "POST /api/storage/uploads/confirm",
+  // Discipline incidents and actions (ST-XXX). Teacher reporting, principal management,
+  // parent visibility. Audit rows written by auditAction middleware.
+  // Finance gateway (ST-119). Both writes call ERPNext synchronously; the audit row records the
+  // resulting fee_structure_cache projection with its before/after amounts.
+  "POST /api/finance/fee-structures",
+  "PATCH /api/finance/fee-structures/{feeStructureId}",
+  "PUT /api/finance/fee-structures/{feeStructureId}/students",
+  "POST /api/finance/expenses",
+  "PATCH /api/finance/expenses/{expenseId}",
+  "POST /api/finance/expenses/upload-url",
+  "POST /api/finance/expenses/{expenseId}/attachments",
+  "POST /api/finance/reports/export",
+  // Audit explorer (ST-046x). Queues the async CSV export; auditAction("insert",
+  // "audit_export_jobs") declares the intent, and like the finance/attendance export routes the
+  // enqueue itself emits no app.audit_logs row.
+  "POST /api/audit/logs/export",
+  // Announcement management (ST-194). auditAction("insert", "announcements") declares the intent;
+  // emitAuditLog writes the row inside the compose/publish transaction in announcements/service.ts
+  // (ST-238), tagged restrict_to_taught_class for the scoped teacher path.
+  "POST /api/announcements",
+  // School calendar entries (000121). auditAction declares each intent; emitAuditLog writes the row
+  // inside the same transaction in school-events/service.ts.
+  "POST /api/school-events",
+  "PATCH /api/school-events/{eventId}",
+  "DELETE /api/school-events/{eventId}",
+  // Parent<->teacher messaging (000127). Opening a thread and sending a message each write their
+  // app.audit_logs row inside the same transaction in messaging/service.ts (a message's row records
+  // its id and length, never its body). Marking read declares the intent only: the read marker is
+  // the caller's own state and writes no audit row.
+  "POST /api/messaging/conversations",
+  "POST /api/messaging/conversations/{conversationId}/messages",
+  "POST /api/messaging/conversations/{conversationId}/read",
+  // Teacher-initiated threads (000130): same get-or-create, same audit row on insert.
+  "POST /api/messaging/teacher-conversations",
+  // Blocks (000135) and reports (000136). Each writes its app.audit_logs row inside the same
+  // transaction in messaging/service.ts / reports.ts (a block's insert and delete; a report's insert
+  // with no free text; a review's status change). An idempotent no-op block/unblock writes none.
+  "POST /api/messaging/conversations/{conversationId}/block",
+  "DELETE /api/messaging/conversations/{conversationId}/block",
+  "POST /api/messaging/conversations/{conversationId}/reports",
+  "PATCH /api/messaging/reports/{reportId}",
+  // Fee schedule generation (ST-122). Per-student installments derived from a fee structure.
+  // Audit row written by auditAction middleware in installments/routes.ts.
+  "POST /api/finance/fee-schedules/generate",
+  // Daily finance reconciliation (ST-122). Internal API-key-authenticated job that logs each run
+  // to finance_reconciliation_logs. Audit row written by auditAction middleware in
+  // finance/jobs/reconciliation.routes.ts.
+  "POST /api/finance/reconciliation/run",
+  // ST-121. auditAction("insert", "payment_cache") declares the intent; emitAuditLog writes the row
+  // inside the forwarder's own transaction so it commits with the payment or not at all.
+  "POST /api/finance/payments",
+  // Online fee collection (ST-298). auditAction("insert", "online_fee_payments") declares the
+  // intent; emitAuditLog writes the row inside startOnlineFeePayment's transaction.
+  "POST /api/finance/online-payments",
+  // Batch invoice generation (ST-202). auditAction("insert", "invoice_batches") declares the
+  // intent; emitAuditLog writes the row inside the batch-creation transaction in
+  // finance/invoices/routes.ts.
+  "POST /api/finance/invoices/batches",
+  // The batch preflight writes nothing; it declares the batch table, as the quote calculator does.
+  "POST /api/finance/invoices/batches/preflight",
+  "POST /api/discipline/incidents",
+  "PATCH /api/discipline/incidents/{incidentId}",
+  "POST /api/discipline/incidents/{incidentId}/resolve",
+  "POST /api/discipline/incidents/{incidentId}/actions",
+  "PATCH /api/discipline/incidents/{incidentId}/actions/{actionId}",
+  // Teacher evaluations: criteria templates, scoring, narrative, share-with-teacher.
+  // Principal-only mutations. Audit rows written by auditAction middleware.
+  "POST /api/evaluations/templates",
+  "PATCH /api/evaluations/templates/{templateId}",
+  "DELETE /api/evaluations/templates/{templateId}",
+  "POST /api/evaluations",
+  "PATCH /api/evaluations/{evaluationId}",
+  "POST /api/evaluations/{evaluationId}/submit",
+  "POST /api/evaluations/{evaluationId}/share",
+  "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  // Approval queue (ST-115). Unified pending-approvals feed + bulk approve/reject decisions.
+  "POST /api/approvals/bulk-decision",
+  // Refund processing (ST-124). Maker-checker workflow for ERPNext Credit Note refunds.
+  // Audit rows written by auditAction middleware in routes.ts.
+  "POST /api/finance/refunds/initiate",
+  "POST /api/finance/refunds/{refundId}/approve",
+  "POST /api/finance/refunds/{refundId}/reject",
+  "POST /api/finance/invoices/{invoiceId}/cancellation",
+  "POST /api/finance/payments/{paymentId}/reversal",
+  // Scholarships: finance requests an award, the school admin decides it (finance/scholarships).
+  "POST /api/finance/scholarships",
+  "PATCH /api/finance/scholarships/{scholarshipId}",
+  "POST /api/finance/scholarship-awards",
+  "POST /api/finance/scholarship-awards/{awardId}/approve",
+  "POST /api/finance/scholarship-awards/{awardId}/reject",
+  "POST /api/finance/scholarship-awards/{awardId}/revoke",
+  // Family finance (finance/family-accounts): one payment split across a family's invoices (each
+  // share audited by the payment forwarder too), and reminders and statements to its guardians.
+  "POST /api/finance/families/{familyId}/payments",
+  "POST /api/finance/families/{familyId}/reminders",
+  "POST /api/finance/families/{familyId}/statements",
+  "POST /api/finance/reminders",
+  // In-app inbox (ST-142). Personal per-user read state: RLS already fences every row to
+  // user_id = app.current_user_id(), so the mutation is self-service on the caller's own rows.
+  // Audit rows are written from inside the service transactions alongside the read-state change
+  // and the notification.read / notification.allRead outbox events — see
+  // modules/notifications/notification-service.ts.
+  "POST /api/notifications/{notificationId}/read",
+  "POST /api/notifications/read-all",
+  // Data subject requests (ST-268). Filing inserts app.data_subject_requests inside a tenant
+  // transaction — see modules/privacy/routes.ts.
+  "POST /api/privacy/dsr",
+  // Self-service account deletion/export. Same insert, filed by the caller about themselves —
+  // see modules/privacy/routes.ts.
+  "POST /api/privacy/me/dsr",
+  // Self-service account deletion (000143). Scheduling and cancelling write their 'update' audit
+  // rows on app.users inside their own transactions — see
+  // modules/account/account-deletion-service.ts.
+  "POST /api/account/deletion",
+  "DELETE /api/account/deletion",
+  // Public account deletion (ST-302). The request writes no audit row (it is anonymous until the
+  // emailed link is used); confirm runs scheduleAccountDeletion, whose 'update' row carries
+  // source: "web_request" — see modules/account/deletion-request-service.ts.
+  "POST /api/account/deletion-requests",
+  "POST /api/account/deletion-requests/confirm",
+  // Public "Talk to us" sales inquiry. Writes no audit row: it is anonymous and global (there is no
+  // school to audit in). The row itself is the record; status changes made from the platform
+  // console are audited by PATCH /api/platform/inquiries/{inquiryId}.
+  "POST /api/inquiries",
+  // School sign-up applicants (Google/Microsoft-signed-in, no account yet). Write no audit row for
+  // the same reason as the inquiry above: anonymous to Studafy and global. The application row is
+  // the record; the decision is audited by the platform approve/reject routes below.
+  "POST /api/school-applications/me",
+  "POST /api/school-applications/me/proof-upload-url",
+  "POST /api/school-applications/me/sign-out",
+  // Notification preferences (ST-143). Audit rows are written from inside
+  // notification-preferences-service.ts's updatePreferences, alongside the preference writes — see
+  // routes/notification-preferences-routes.ts.
+  "PATCH /api/notification-preferences",
+  // School billing portal (ST-137). Cancellation is the one mutating pair in this feature; the
+  // GET overview/invoices and the POST portal-session route stay on the `app` naming convention the
+  // rest of the subscriptions module uses (see the NOTE above), matching the checkout routes'
+  // existing, documented blind spot. Audit rows are written from inside the service transactions in
+  // cancellation-service.ts, alongside the cancel_at_period_end / retention_state change.
+  "POST /api/subscriptions/current/cancel",
+  "POST /api/subscriptions/current/cancel/reverse",
+  // Subscription refund requests. Filing one writes its app.audit_logs row inside the inserting
+  // transaction; a console approval or rejection writes one in the request's school (system actor)
+  // and one in the operator's home school -- see subscriptions/services/refund-service.ts.
+  "POST /api/subscriptions/current/refund-requests",
+  "POST /api/subscriptions/ai/refund-requests",
+  "POST /api/platform/refund-requests/{schoolId}/{requestId}/approve",
+  "POST /api/platform/refund-requests/{schoolId}/{requestId}/reject",
+  // Hybrid retrieval (ST-162). POST carries the search query; the route's one write is the durable
+  // per-student usage meter. auditAction("update", "ai_usage_meters") declares that intent, and like
+  // the storage-upload precedent the declaration is metadata — no app.audit_logs row is written.
+  "POST /api/ai/students/{studentId}/search",
+  // LLM gateway (ST-164). POST carries the generation request; the route's one write is the durable
+  // per-student usage meter, recorded with the same declaration as the retrieval route above.
+  "POST /api/ai/students/{studentId}/generate",
+  // Ask AI streaming (ST-165). POST carries the question; the route's writes are the conversation,
+  // message, and citation rows, recorded with the storage-upload precedent (the interaction's own
+  // rows are its audit record), plus the durable usage meter.
+  "POST /api/ai/students/{studentId}/ask",
+  // Study-material summarizer. POST carries the material id; the route's one write is the durable
+  // per-student usage meter, recorded with the same declaration as the retrieval route above.
+  "POST /api/ai/students/{studentId}/summarize",
+  // Key-concept extraction (ST-169). POST carries the material id; the route's one write is the
+  // durable per-student usage meter, recorded with the same declaration as the retrieval route above.
+  "POST /api/ai/students/{studentId}/concepts",
+  // Simplified explanations (ST-170). POST carries the chunk id; the route's one write is the
+  // durable per-student usage meter, recorded with the same declaration as the retrieval route above.
+  "POST /api/ai/students/{studentId}/explain",
+  // Quiz generation and grading (ST-167). Generation's writes are app.quizzes, app.quiz_questions,
+  // and the durable usage meter, declared "insert" on quiz_questions. Grading writes nothing --
+  // it reads the persisted answer key and scores in memory -- so it is declared "read" rather than
+  // borrowing a write verb that did not happen; see routes/quiz-routes.ts.
+  "POST /api/ai/students/{studentId}/quizzes",
+  "POST /api/ai/students/{studentId}/quizzes/{quizId}/grade",
+  // Ask AI photo text. POST carries the photo; it is read in memory and only its text is returned,
+  // so nothing is written and it is declared "read" against ai_messages, like quiz grading.
+  "POST /api/ai/photo-text",
+  // Flashcard deck generation and spaced-repetition reviews (ST-168). Generation's writes are
+  // app.flashcard_decks, app.flashcards, and the durable usage meter, declared "insert" on
+  // flashcards. Review submission's one write is the student's per-card SM-2 progress row,
+  // declared "update" on flashcard_reviews; the due-cards GET makes no write and is not listed.
+  "POST /api/ai/students/{studentId}/decks",
+  "POST /api/ai/students/{studentId}/decks/{deckId}/review",
+  // Exam mode (ST-171). Create's write is the exam session (generation itself runs in a worker, off
+  // the request path), declared "insert" on exam_sessions. Start's write is the session's
+  // status/timer columns, declared "update" on exam_sessions. Submit's substantive write is one
+  // exam_item_answers row per item, declared "insert" on exam_item_answers; the GET status poll
+  // makes no write and is declared "read", not listed here.
+  "POST /api/ai/students/{studentId}/exams",
+  "POST /api/ai/students/{studentId}/exams/{examId}/start",
+  "POST /api/ai/students/{studentId}/exams/{examId}/submit",
+  // Answer report (ST-172). Student flags their own AI answer for teacher review; self-service on
+  // the caller's own message. Audit row written by auditAction middleware on the route.
+  "POST /api/ai/students/{studentId}/messages/{messageId}/report",
+  // AI content reports and moderation queue (ST-306). Filing a report is self-service on the
+  // caller's own AI output; the review PATCH writes its app.audit_logs row inside the same
+  // transaction (moderation/persistence.ts's reviewContentReport).
+  "POST /api/ai/students/{studentId}/reports",
+  "PATCH /api/ai/moderation/reports/{reportId}",
+  // AI data-sharing consent (ST-305). Grant inserts an app.ai_data_sharing_consents row, withdrawal
+  // stamps its withdrawn_at; both write their app.audit_logs row inside the same transaction —
+  // see modules/ai/consent/persistence.ts.
+  "PUT /api/ai/consent",
+  "DELETE /api/ai/consent",
+  // Studafy platform console (modules/platform/routes.ts). Each writes its audit rows from inside the
+  // service transaction: one in the affected school (system actor) and one in the operator's home
+  // school (operator as actor) -- see the header of modules/platform/service.ts.
+  "PATCH /api/platform/schools/{schoolId}/status",
+  "PUT /api/platform/schools/{schoolId}/feature-flags/{flagName}",
+  "PATCH /api/platform/plans/{planId}",
+  "PATCH /api/platform/plans/{planId}/prices/{priceId}",
+  "PATCH /api/platform/settings/{key}",
+  "PATCH /api/platform/inquiries/{inquiryId}",
+  // School application decisions: audited in the operator's home school; approval also writes
+  // system-attributed rows in the new school -- see modules/school-applications/service.ts.
+  "POST /api/platform/school-applications/{applicationId}/approve",
+  "POST /api/platform/school-applications/{applicationId}/reject",
+  // School licenses (modules/licensing). Licenses, seats, overlaps and change requests are audited
+  // from inside the service transaction; a super admin's change writes the console's two rows
+  // (system actor in the school, operator in their home school) -- see modules/licensing/context.ts.
+  "POST /api/platform/schools/{schoolId}/licenses",
+  "PATCH /api/platform/schools/{schoolId}/licenses/{licenseId}",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/status",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/extend",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/seats",
+  "DELETE /api/platform/schools/{schoolId}/licenses/{licenseId}/seats/{seatId}",
+  "POST /api/platform/schools/{schoolId}/license-requests/{requestId}/resolve",
+  "POST /api/school/license/seats",
+  "DELETE /api/school/license/seats/{seatId}",
+  "POST /api/school/license/change-requests",
+  // License billing (session 3). Quotes, invoices, payments and receipts are audited from inside the
+  // service transaction (the console's two rows for a super admin); price settings and bank details
+  // in the operator's home school. The calculator and the upload URL write nothing (declared for
+  // this gate, as the other upload-url routes are).
+  "PUT /api/platform/licenses/price-settings/{currencyCode}",
+  "PUT /api/platform/licenses/bank-details",
+  "POST /api/platform/licenses/quote",
+  "POST /api/platform/schools/{schoolId}/license-quotes",
+  "PUT /api/platform/schools/{schoolId}/license-quotes/{quoteId}",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/send",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/accept",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/withdraw",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/void",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payments",
+  "POST /api/platform/schools/{schoolId}/license-payments/{paymentId}/void",
+  "POST /api/platform/schools/{schoolId}/license-payments/upload-url",
+  "POST /api/platform/schools/{schoolId}/license-receipts/{receiptId}/match",
+  "POST /api/school/license/quotes/{quoteId}/accept",
+  "POST /api/school/license/invoices/{invoiceId}/receipts",
+  // The license console's catalog (session 4): features and tiers are global, audited in the
+  // operator's home school.
+  "PATCH /api/platform/features/{featureKey}",
+  "POST /api/platform/tiers",
+  "PUT /api/platform/tiers/{planId}",
+  // School-defined student and parent records (modules/records/routes.ts): the template editor
+  // (recordTemplate:manage), filling records in and documents (studentRecord:update), and the
+  // sensitive reveal (studentRecord:readSensitive), which is audited as a read.
+  "POST /api/record-templates/{subjectKind}/fields",
+  "PATCH /api/record-templates/{subjectKind}/fields/{fieldId}",
+  "PUT /api/record-templates/{subjectKind}/field-order",
+  "POST /api/record-templates/{subjectKind}/publish",
+  "PUT /api/students/{studentId}/records",
+  "POST /api/students/{studentId}/records/{fieldId}/reveal",
+  "PUT /api/students/{studentId}/records/{fieldId}/document",
+  "PATCH /api/students/{studentId}/records/{fieldId}/document",
+  "DELETE /api/students/{studentId}/records/{fieldId}/document",
+  "PUT /api/parents/{parentUserId}/records",
+  "POST /api/parents/{parentUserId}/records/{fieldId}/reveal",
+  "PUT /api/parents/{parentUserId}/records/{fieldId}/document",
+  "PATCH /api/parents/{parentUserId}/records/{fieldId}/document",
+  "DELETE /api/parents/{parentUserId}/records/{fieldId}/document",
+  // Staff and class records (000181), and imported columns kept as record fields.
+  "PUT /api/staff/{staffUserId}/records",
+  "POST /api/staff/{staffUserId}/records/{fieldId}/reveal",
+  "PUT /api/staff/{staffUserId}/records/{fieldId}/document",
+  "PATCH /api/staff/{staffUserId}/records/{fieldId}/document",
+  "DELETE /api/staff/{staffUserId}/records/{fieldId}/document",
+  "PUT /api/classes/{classId}/records",
+  "PUT /api/classes/{classId}/records/{fieldId}/document",
+  "PATCH /api/classes/{classId}/records/{fieldId}/document",
+  "DELETE /api/classes/{classId}/records/{fieldId}/document",
+  "POST /api/record-imports/{subjectKind}/preview",
+  "POST /api/record-imports/{subjectKind}/apply",
+  // Custom lists (000182): shaping a list (customList:manage), its rows (customList:use, narrowed
+  // by the list's audience), the audited sensitive-cell reveal, and imports from a sheet.
+  "POST /api/custom-lists",
+  "POST /api/custom-lists/imports/preview",
+  "POST /api/custom-lists/imports/apply",
+  "PATCH /api/custom-lists/{listId}",
+  "DELETE /api/custom-lists/{listId}",
+  "POST /api/custom-lists/{listId}/columns",
+  "PATCH /api/custom-lists/{listId}/columns/{columnId}",
+  "PUT /api/custom-lists/{listId}/column-order",
+  "POST /api/custom-lists/{listId}/rows",
+  "PATCH /api/custom-lists/{listId}/rows/{rowId}",
+  "DELETE /api/custom-lists/{listId}/rows/{rowId}",
+  "POST /api/custom-lists/{listId}/rows/{rowId}/cells/{columnId}/reveal",
+];
+
+function collectSourceFiles(dir: string): string[] {
+  const entries = readdirSync(dir);
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const fullPath = join(dir, entry);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is built from a readdir of our own src tree
+    const stat = statSync(fullPath);
+
+    if (stat.isDirectory()) {
+      files.push(...collectSourceFiles(fullPath));
+    } else if (entry.endsWith(".ts") && !EXCLUDE_PATTERNS.some((p) => p.test(entry))) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
+/**
+ * Blank out comments, preserving line numbers so reported positions stay accurate.
+ *
+ * Without this the scanner reads documentation as code: auditEmitter.ts's own doc block contains
+ * `routes.post("/students", auditAction("insert", "students"), handler);` as an @example, which a
+ * naive scan counts as a covered mutating route in a file that registers no routes at all.
+ */
+function stripComments(source: string): string[] {
+  let inBlockComment = false;
+
+  return source.split("\n").map((line) => {
+    const trimmed = line.trim();
+
+    if (inBlockComment) {
+      if (trimmed.includes("*/")) inBlockComment = false;
+      return "";
+    }
+    if (trimmed.startsWith("/*")) {
+      if (!trimmed.includes("*/")) inBlockComment = true;
+      return "";
+    }
+    if (trimmed.startsWith("//") || trimmed.startsWith("*")) return "";
+
+    return line;
+  });
+}
+
+interface MutatingRoute {
+  file: string;
+  line: number;
+  method: string;
+  path: string;
+  hasAuditAction: boolean;
+}
+
+/**
+ * True when auditAction() is declared for `path` in this file.
+ *
+ * Both styles put the two on one line -- `routes.post(path, auditAction(...), handler)` and
+ * `routes.use(path, auditAction(...))` -- but a 15-line window around any mention of the path keeps
+ * this working if a declaration is wrapped across lines. Anchoring on the path rather than on
+ * proximity alone is what stops one audited route from vouching for an unaudited neighbour.
+ *
+ * `path` always comes from a `createRoute({ path: "...{param}..." })` config, in the OpenAPI
+ * `{param}` style. A `routes.use(...)` mounting `auditAction()` for that same route must instead be
+ * written in Hono's own `:param` style (ST-249: `.use()` never matches a literal `{param}` path —
+ * see route-guard-wiring.test.ts), so both spellings of every param segment are searched for here.
+ */
+function hasAuditActionForPath(lines: readonly string[], path: string): boolean {
+  const colonPath = path.replace(/\{([^}]+)\}/g, ":$1");
+  // Hono's constrained form, `:param{regex}` (e.g. a UUID-only `:teacherId` that must not match
+  // a sibling literal like `/me`), is the same route and must count too.
+  const escapedPath = colonPath.replace(/[.*+?^$()|[\]\\]/g, "\\$&");
+  const constrainedPath = new RegExp(`"${escapedPath.replace(/:(\w+)/g, ':$1(?:\\{[^"]*\\})?')}"`);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    if (!line.includes(`"${path}"`) && !constrainedPath.test(line)) continue;
+
+    const window = lines.slice(Math.max(0, i - 15), Math.min(lines.length, i + 16)).join("\n");
+    if (/\bauditAction\s*\(/.test(window)) return true;
+  }
+
+  return false;
+}
+
+function findMutatingRoutes(files: string[]): MutatingRoute[] {
+  const routes: MutatingRoute[] = [];
+  const methods = MUTATING_METHODS.join("|");
+
+  for (const file of files) {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path comes from our own src tree
+    const lines = stripComments(readFileSync(file, "utf-8"));
+    const relFile = relative(SRC_DIR, file);
+    const source = lines.join("\n");
+
+    const record = (line: number, method: string, path: string) => {
+      if (EXEMPT_ROUTES.includes(path)) return;
+      routes.push({
+        file: relFile,
+        line,
+        method: method.toUpperCase(),
+        path,
+        hasAuditAction: hasAuditActionForPath(lines, path),
+      });
+    };
+
+    // Style 1: plain Hono -- routes.post("/path", ...)
+    const directPattern = new RegExp(
+      "routes\\.(" + methods + ")\\s*\\(\\s*[\"'`](/[^\"'`]+)[\"'`]",
+      "g",
+    );
+    for (let i = 0; i < lines.length; i++) {
+      directPattern.lastIndex = 0;
+      const match = directPattern.exec(lines[i]!);
+      if (match) record(i + 1, match[1]!, match[2]!);
+    }
+
+    // Style 2: @hono/zod-openapi -- createRoute({ method: "post", path: "/path", ... }).
+    // Only routes actually registered with routes.openapi() count; a createRoute config that is
+    // never mounted serves no traffic and so audits nothing.
+    if (/routes\.openapi\s*\(/.test(source)) {
+      const createRoutePattern = /createRoute\s*\(\s*\{([\s\S]*?)\n\}\s*\)/g;
+      let block: RegExpExecArray | null;
+
+      while ((block = createRoutePattern.exec(source)) !== null) {
+        const body = block[1]!;
+        const method = new RegExp(`method:\\s*["'\`](${methods})["'\`]`).exec(body);
+        const path = /path:\s*["'`](\/[^"'`]*)["'`]/.exec(body);
+        if (!method || !path) continue;
+
+        record(source.slice(0, block.index).split("\n").length, method[1]!, path[1]!);
+      }
+    }
+  }
+
+  return routes;
+}
+
+describe("audit route coverage", () => {
+  test("every mutating route has a declared audit action", () => {
+    const files = collectSourceFiles(SRC_DIR);
+    const routes = findMutatingRoutes(files);
+
+    const uncovered = routes.filter((r) => !r.hasAuditAction);
+
+    if (uncovered.length > 0) {
+      const detail = uncovered
+        .map((r) => `  ${r.file}:${r.line}  ${r.method} ${r.path}`)
+        .join("\n");
+      throw new Error(
+        `Mutating routes without auditAction():\n${detail}\n\n` +
+          "Every mutating route must declare auditAction(action, table) as middleware.\n" +
+          "See apps/api/src/middleware/auditEmitter.ts for the decorator API.",
+      );
+    }
+
+    expect(uncovered).toHaveLength(0);
+  }, 30_000);
+
+  // The guard that actually guards. A scanner blinded by a refactor reports zero routes; a pinned
+  // list turns that into a failure, where "greater than 0" would let a comment's code sample pass
+  // for coverage of a route nobody is scanning any more.
+  test("sees exactly the mutating routes that exist", () => {
+    const files = collectSourceFiles(SRC_DIR);
+    const routes = findMutatingRoutes(files);
+
+    expect(routes.map((r) => `${r.method} ${r.path}`).sort()).toEqual(
+      [...EXPECTED_MUTATING_ROUTES].sort(),
+    );
+  }, 30_000);
+
+  // Proves the scanner reads code rather than documentation. auditEmitter.ts registers no routes; it
+  // only describes how to. Before ST-060 it was the only file this gate "found" anything in.
+  test("does not mistake doc-comment examples for routes", () => {
+    const routes = findMutatingRoutes(collectSourceFiles(SRC_DIR));
+
+    expect(routes.filter((r) => r.file.includes("auditEmitter"))).toEqual([]);
+  }, 30_000);
+});

@@ -1,0 +1,42 @@
+# Baked into infra/docker/tempo.Dockerfile at build time — static, not templated at container
+# start, for the same reason infra/docker/prometheus/prometheus.yml and infra/docker/otel-collector/
+# config.yaml are: nothing in here is genuinely per-environment.
+#
+# Single-binary mode (no separate distributor/ingester/querier/compactor processes) — this stack's
+# whole trace volume is one Fargate task's worth, the same "one process is enough" call
+# modules/monitoring's README already makes for Prometheus.
+
+server:
+  http_listen_port: 3200
+
+distributor:
+  receivers:
+    # HTTP only — this repo's OTel collector (infra/docker/otel-collector/config.yaml) is Tempo's
+    # only writer, and it forwards over OTLP/HTTP exclusively. 4318 matches
+    # module.network's otel_collector_port, reused here rather than inventing a second port: it's
+    # "the fixed OTLP/HTTP port this pipeline speaks", not specifically "the collector's own port".
+    otlp:
+      protocols:
+        http:
+          endpoint: 0.0.0.0:4318
+
+ingester:
+  max_block_duration: 5m
+
+compactor:
+  compaction:
+    # Short on purpose: like Prometheus (see modules/monitoring/README.md's "What this module does
+    # not do"), Tempo's blocks live on Fargate's own ephemeral task storage, so a task replacement
+    # already resets history to nothing — a long retention number would promise durability the
+    # storage backend cannot keep. Traces are also a debugging aid for a specific incident window,
+    # not a long-lived record the way metrics/logs are, so 24h is enough to chase down anything
+    # still being actively investigated.
+    block_retention: 24h
+
+storage:
+  trace:
+    backend: local
+    local:
+      path: /var/tempo/traces
+    wal:
+      path: /var/tempo/wal

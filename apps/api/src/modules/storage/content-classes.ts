@@ -1,0 +1,326 @@
+/**
+ * Content classes: the single source of truth for "what may be uploaded and downloaded, and by
+ * whom".
+ *
+ * Each upload class pairs a policy (allowed MIME types + maximum size, both checked against the
+ * object that actually lands in the bucket, not the request body) with the permission a caller
+ * must hold to use it. The permission is what makes the storage gateway RBAC-aware without a
+ * static mount-time guard: the required permission depends on the body, so it is asserted per
+ * request via requirePermissionIn() rather than requirePermission() middleware.
+ *
+ * Enforcement model (docs/runbooks/storage-conventions.md):
+ *   - request-upload rejects a class-invalid type or oversize claim before signing anything, and
+ *     signs a PUT bound to the approved content type, so an attacker cannot smuggle a different
+ *     file onto the signed URL.
+ *   - confirm re-checks the *stored* object's type and size against the class before promoting it
+ *     from temp/ to permanent/, closing the "claim small, upload big" gap.
+ *   - a caller can only confirm under classes their roles permit, and only into their own school's
+ *     prefix (assertSchoolOwnedKey), which is the tenant boundary on the return leg.
+ *
+ * The download classes below are the read leg of the same gateway. They pair a read permission
+ * with an audit flag; the row-scope check that keeps a student out of another class's material is
+ * the tenant-scoped resolver in download-service.ts running under RLS, not a static list here.
+ */
+
+import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
+
+import { CodedHttpException } from "../../coded-http-exception";
+
+import type { Permission } from "@studafy/constants";
+
+export interface ContentClass {
+  /** MIME types this class accepts, matching the Content-Type bound to the pre-signed PUT. */
+  readonly allowedContentTypes: ReadonlySet<string>;
+  /** Hard ceiling; enforced at request-upload and again against the stored object at confirm. */
+  readonly maxSizeBytes: number;
+  /** Permission required to request and confirm an upload of this class. */
+  readonly requiredPermission: Permission;
+  /**
+   * False when the owning feature confirms the staged object itself, inside its own write (the
+   * object and the row that references it then commit together), so the generic confirm route
+   * refuses it. Omitted means the generic confirm route serves the class.
+   */
+  readonly gatewayConfirm?: false;
+}
+
+const KIB = 1024;
+const MIB = 1024 * KIB;
+
+/**
+ * Initial registry. These are deliberate, conservative defaults drawn from the existing
+ * per-module upload flows (ST-103 assignments, ST-104 submissions, materials, finance expenses);
+ * tightening a class is a one-line change that applies to every consumer at once.
+ */
+const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
+  [
+    "assignment.attachment",
+    {
+      allowedContentTypes: new Set([
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-powerpoint",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/zip",
+        "image/jpeg",
+        "image/png",
+      ]),
+      maxSizeBytes: 25 * MIB,
+      requiredPermission: PERMISSIONS.ASSIGNMENT_UPDATE,
+    },
+  ],
+  [
+    "submission.attachment",
+    {
+      allowedContentTypes: new Set([
+        "application/pdf",
+        "application/zip",
+        "image/jpeg",
+        "image/png",
+      ]),
+      maxSizeBytes: 25 * MIB,
+      requiredPermission: PERMISSIONS.SUBMISSION_CREATE,
+    },
+  ],
+  [
+    "material.file",
+    {
+      allowedContentTypes: new Set([
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/plain",
+        "text/markdown",
+        "image/jpeg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "video/mp4",
+        "audio/mpeg",
+      ]),
+      maxSizeBytes: 100 * MIB,
+      requiredPermission: PERMISSIONS.MATERIAL_CREATE,
+    },
+  ],
+  [
+    "expense.attachment",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.BILLING_UPDATE,
+    },
+  ],
+  [
+    // Images on a parent<->teacher message (000134). Staged through the generic request-upload
+    // route, then confirmed and promoted by the messaging send itself (one transaction with the
+    // message), not by /api/storage/uploads/confirm. Mirrors ck_message_attachments_mime_type.
+    "message.attachment",
+    {
+      allowedContentTypes: new Set(["image/jpeg", "image/png", "image/webp", "image/heic"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.MESSAGE_SEND,
+      gatewayConfirm: false,
+    },
+  ],
+  [
+    // The picture on a question in a questions assignment (000169). Staged through the generic
+    // request-upload route, then confirmed and promoted by the question save itself (one
+    // transaction with the question set). Mirrors ck_assignment_questions_image_mime_type.
+    "assignment.question_image",
+    {
+      allowedContentTypes: new Set(["image/jpeg", "image/png", "image/webp"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.ASSIGNMENT_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
+  // A bank transfer receipt for a license invoice (docs/billing/feature-licensing.md, session 3).
+  // Uploaded by the school (license:manage) and confirmed by the licensing module inside the write
+  // that records it; the super admin's own uploads go through the license console's upload route.
+  [
+    "license.receipt",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.LICENSE_MANAGE,
+      gatewayConfirm: false,
+    },
+  ],
+  // The file behind a document field on a student's or parent's record (000170): a birth
+  // certificate, a vaccination record, a previous school's report. Uploaded by school leadership
+  // only (parents enter nothing) and confirmed by the records module inside the write that attaches
+  // it; mirrors ck_record_documents_mime_type. Phone photos arrive as HEIC.
+  [
+    "record.document",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png", "image/heic"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.STUDENT_RECORD_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
+  // A document field the school marked sensitive (a passport scan, a medical certificate). Stricter
+  // than record.document: PDF and the two common image types only, a smaller cap, promoted under the
+  // sensitive-documents KMS key, downloaded through one-minute URLs that need
+  // studentRecord:readSensitive and are audited (ADR-019).
+  [
+    "record.sensitiveDocument",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png"]),
+      maxSizeBytes: 5 * MIB,
+      requiredPermission: PERMISSIONS.STUDENT_RECORD_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
+  // The file behind a document field on a staff member's record (000181): a teaching licence, a
+  // signed contract. Uploaded by whoever edits staff records (staffRecord:update, ORG_ADMIN) and
+  // confirmed by the records module inside the write that attaches it. Same types and cap as
+  // record.document; a sensitive one is staffRecord.sensitiveDocument.
+  [
+    "staffRecord.document",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png", "image/heic"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.STAFF_RECORD_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
+  // A sensitive document on a staff record (an ID card scan, a medical certificate): as
+  // record.sensitiveDocument -- PDF and two image types, a 5 MiB cap, the sensitive-documents KMS
+  // key, one-minute audited downloads that need staffRecord:readSensitive (ADR-019).
+  [
+    "staffRecord.sensitiveDocument",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png"]),
+      maxSizeBytes: 5 * MIB,
+      requiredPermission: PERMISSIONS.STAFF_RECORD_UPDATE,
+      gatewayConfirm: false,
+    },
+  ],
+  // The file behind a document field on a class's record (a seating plan, a trip consent sheet).
+  // Uploaded by whoever keeps the classes (timetable:manage) and confirmed by the records module.
+  // A class field is never sensitive, so there is no sensitive variant.
+  [
+    "classRecord.document",
+    {
+      allowedContentTypes: new Set(["application/pdf", "image/jpeg", "image/png", "image/heic"]),
+      maxSizeBytes: 10 * MIB,
+      requiredPermission: PERMISSIONS.TIMETABLE_MANAGE,
+      gatewayConfirm: false,
+    },
+  ],
+  // The original file a school uploaded to the student import (000179), kept so nothing in it is
+  // lost: staff map its unmapped columns later without a re-upload, and download it back. Staged
+  // through the generic request-upload route, then confirmed by the import upload itself, which
+  // checks the stored bytes are the bytes it parsed and promotes them under the sensitive-documents
+  // KMS key: a school's file can hold ID numbers and medical notes. The web client always sends
+  // text/csv. Readable only with student:import, through a one-minute audited URL.
+  [
+    "import.source",
+    {
+      allowedContentTypes: new Set(["text/csv"]),
+      // A 10,000-row export with many columns can pass 10 MiB; the row cap is the real limit.
+      maxSizeBytes: 25 * MIB,
+      requiredPermission: PERMISSIONS.STUDENT_IMPORT,
+      gatewayConfirm: false,
+    },
+  ],
+  [
+    "user.avatar",
+    {
+      allowedContentTypes: new Set(["image/jpeg", "image/png", "image/webp"]),
+      maxSizeBytes: 2 * MIB,
+      requiredPermission: PERMISSIONS.USER_UPDATE,
+    },
+  ],
+]);
+
+export const CONTENT_CLASS_KEYS = [...CONTENT_CLASSES.keys()] as const;
+export type ContentClassKey = (typeof CONTENT_CLASS_KEYS)[number];
+
+/**
+ * Resolve a content class from a client-supplied key, or reject the request.
+ *
+ * Unknown classes are a client error (typo, or a feature not enabled on this deployment), not a
+ * security condition, so they answer 400 VALIDATION_FAILED rather than 403.
+ */
+export function getContentClass(key: string): ContentClass {
+  const contentClass = CONTENT_CLASSES.get(key);
+  if (!contentClass) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      `Unknown content class: ${key}`,
+    );
+  }
+  return contentClass;
+}
+
+// ---------------------------------------------------------------------------
+// Download classes
+// ---------------------------------------------------------------------------
+
+/**
+ * A download class: what a caller needs to be able to hold before the gateway will mint a GET URL
+ * for an object of this class.
+ *
+ * Row scope is deliberately not a field here. Each class resolves its object through a
+ * tenant-scoped query that runs under RLS (download-service.ts), so a caller can only ever resolve
+ * rows their roles can read; the resolver is the row-scope check, and this registry is only the
+ * RBAC + audit policy layered on top of it.
+ */
+export interface DownloadClass {
+  /**
+   * Any one of these grants access. Most classes need exactly one; export is the union of the two
+   * export-job tables (attendance and finance), so it lists both and either suffices.
+   */
+  readonly requiredPermissions: readonly Permission[];
+  /**
+   * Whether issuing a URL is written to app.audit_logs. Materials and submissions are ordinary
+   * coursework and stay off the log like their uploads do; receipts and exports are finance-
+   * adjacent, so their issuance is audited with the "export" action.
+   */
+  readonly audit: boolean;
+}
+
+/**
+ * The download classes the gateway serves. Exactly the four the upload flow feeds: coursework
+ * files (materials, submissions), finance evidence (receipts), and generated report files
+ * (exports). Keys are single words on purpose: a download class is a read of an existing object,
+ * not a sibling of the dotted upload classes, and reusing a dotted key would blur which leg a
+ * caller meant.
+ */
+const DOWNLOAD_CLASSES: ReadonlyMap<string, DownloadClass> = new Map([
+  ["material", { requiredPermissions: [PERMISSIONS.MATERIAL_READ], audit: false }],
+  ["submission", { requiredPermissions: [PERMISSIONS.SUBMISSION_READ], audit: false }],
+  ["receipt", { requiredPermissions: [PERMISSIONS.BILLING_READ], audit: true }],
+  [
+    "export",
+    {
+      requiredPermissions: [PERMISSIONS.ATTENDANCE_REPORT_EXPORT, PERMISSIONS.REPORT_EXPORT],
+      audit: true,
+    },
+  ],
+]);
+
+export const DOWNLOAD_CLASS_KEYS = [...DOWNLOAD_CLASSES.keys()] as const;
+export type DownloadClassKey = (typeof DOWNLOAD_CLASS_KEYS)[number];
+
+/**
+ * Resolve a download class from a client-supplied key, or reject the request. Unknown classes are
+ * a client error (typo, or a feature not enabled on this deployment), not a security condition, so
+ * they answer 400 VALIDATION_FAILED rather than 403 — the same call the upload leg makes.
+ */
+export function getDownloadClass(key: string): DownloadClass {
+  const downloadClass = DOWNLOAD_CLASSES.get(key);
+  if (!downloadClass) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      `Unknown download class: ${key}`,
+    );
+  }
+  return downloadClass;
+}

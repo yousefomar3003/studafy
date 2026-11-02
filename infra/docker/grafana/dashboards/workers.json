@@ -1,0 +1,123 @@
+{
+  "uid": "studafy-workers",
+  "title": "Workers — queue metrics",
+  "tags": ["studafy", "workers", "queue"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "ecs_service",
+        "type": "query",
+        "label": "ECS service",
+        "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+        "query": "dimension_values(default,AWS/ECS,CPUUtilization,ServiceName)",
+        "regex": "/.*-workers$/",
+        "refresh": 2,
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Job throughput by queue and outcome",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (messaging_destination_name, outcome) (rate(bullmq_job_outcomes_total{job=\"workers\"}[5m]))",
+          "legendFormat": "{{messaging_destination_name}} ({{outcome}})"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Failure rate by queue",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (messaging_destination_name) (rate(bullmq_job_outcomes_total{job=\"workers\",outcome=\"failed\"}[5m]))",
+          "legendFormat": "{{messaging_destination_name}}"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "p95 job processing duration by queue",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, messaging_destination_name) (rate(bullmq_job_duration_bucket{job=\"workers\"}[5m])))",
+          "legendFormat": "{{messaging_destination_name}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Queue depth by state",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "description": "waiting/active/delayed/failed/completed job counts per queue (bullmq_queue_jobs) — observed live on every scrape, see packages/observability/src/queueMetrics.ts.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "bullmq_queue_jobs{job=\"workers\"}",
+          "legendFormat": "{{messaging_destination_name}} ({{state}})"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Backlog (waiting + delayed) by queue",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (messaging_destination_name) (bullmq_queue_jobs{job=\"workers\",state=~\"waiting|delayed\"})",
+          "legendFormat": "{{messaging_destination_name}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "ECS CPU / memory (Container Insights)",
+      "type": "timeseries",
+      "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "targets": [
+        {
+          "namespace": "AWS/ECS",
+          "metricName": "CPUUtilization",
+          "dimensions": { "ServiceName": "$ecs_service" },
+          "statistic": "Average",
+          "region": "default",
+          "refId": "A"
+        },
+        {
+          "namespace": "AWS/ECS",
+          "metricName": "MemoryUtilization",
+          "dimensions": { "ServiceName": "$ecs_service" },
+          "statistic": "Average",
+          "region": "default",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}

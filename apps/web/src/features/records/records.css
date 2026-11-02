@@ -1,0 +1,102 @@
+/**
+ * School-defined student and parent records (RecordsPanel, the create modals' Records step). Layout
+ * only, on the portal's design tokens; @studafy/ui supplies the controls' own chrome.
+ */
+
+.records-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.records-panel__meta {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.records-panel__missing {
+  font-weight: 600;
+  margin: var(--space-4) 0 0;
+}
+
+.records-list {
+  display: grid;
+  gap: var(--space-12);
+  margin: 0;
+}
+
+.records-list__item {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) 2fr;
+  gap: var(--space-8);
+}
+
+.records-list__item dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  font-weight: 600;
+}
+
+.records-list__item dd {
+  margin: 0;
+}
+
+@media (max-width: 40rem) {
+  .records-list__item {
+    grid-template-columns: 1fr;
+  }
+}
+
+.records-value,
+.records-document__actions,
+.records-document__expiry,
+.records-form__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.records-document p {
+  margin: 0;
+}
+
+.records-archived {
+  margin-top: var(--space-16);
+}
+
+.records-form {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.records-form__actions {
+  justify-content: flex-end;
+}
+
+.records-choices {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: var(--space-4);
+}
+
+.records-textarea textarea {
+  resize: vertical;
+  width: 100%;
+}
+
+.records-form-section {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.records-page__sections {
+  display: grid;
+  gap: var(--space-16);
+}

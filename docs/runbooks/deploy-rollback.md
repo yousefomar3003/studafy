@@ -1,0 +1,229 @@
+# Deploy + rollback runbook
+
+Source of the resources this doc describes: [`infra/deploy`](../../infra/deploy) (ECS Fargate
+task-definition/service manifests, one pair per service, and the `render`/`deploy`/`rollback`
+scripts that apply them). `infra/deploy/README.md` covers what each manifest field is and why;
+this doc is the operational walkthrough — deploying, rolling back, and verifying the two
+acceptance criteria — plus what's still missing to actually run any of it, which is more than
+usual: see "Status" immediately below before reading further as if this were exercisable today.
+
+## Status
+
+**Not runnable yet.** `infra/deploy/README.md`'s "Known gaps / prerequisites" is the authoritative
+list; the short version: no ECS cluster, execution role, or ALB target group exists anywhere in
+`infra/terraform`, and `modules/registry`'s ECR repository policy actively denies pulls to any
+principal other than `ci_push`/`deploy_pull` — the ECS task execution role is neither, so it will
+be denied until that policy is widened. Everything below describes the intended flow and is
+written to be accurate once those prerequisites land, in the same spirit
+`docs/runbooks/supply-chain-security.md` and `docs/runbooks/secrets-conventions.md` already
+describe mechanisms ahead of the infrastructure that uses them.
+
+## Deploying
+
+Building, pushing and signing an image is `docs/runbooks/supply-chain-security.md`'s job, not
+this doc's — start here once an image is signed and sitting in ECR.
+
+```bash
+cd infra/deploy
+./scripts/deploy.sh api staging "$(git rev-parse --short HEAD)"
+```
+
+What it does, in order:
+
+1. Resolves the image's ECR URL from `terraform output registry_repository_urls` and verifies its
+   cosign signature against `registry_signing_key_alias` — refuses to proceed if verification
+   fails (`docs/runbooks/supply-chain-security.md`'s "pull, verify, reject if unsigned" step,
+   finally implemented rather than just documented).
+2. Renders `ecs/api/task-definition.json.tpl` (`environments/staging.env` + live `terraform output`
+   values) and registers it as a new task-definition revision.
+3. Renders `ecs/api/service.json.tpl` and either creates the service (first deploy) or updates it in
+   place with the new revision, `--force-new-deployment`.
+4. `aws ecs wait services-stable`, printing elapsed seconds when it returns.
+
+Repeat for `realtime` and `workers` — there is no "deploy everything" wrapper; each service is
+built, signed and deployed independently, and nothing here assumes they move in lockstep.
+
+## Rolling back
+
+Two distinct mechanisms, for two distinct failure shapes:
+
+**A deploy that never becomes healthy** (new revision crash-loops, or never passes its container
+health check) — no operator action needed. Every `service.json.tpl` sets
+`deploymentConfiguration.deploymentCircuitBreaker: { enable: true, rollback: true }`; ECS detects
+the failure to stabilize and reverts to the previous revision on its own. Watch it happen:
+
+```bash
+aws ecs describe-services --cluster "$ECS_CLUSTER" --services studafy-staging-api \
+  --query 'services[0].deployments[].{status:status,taskDef:taskDefinition,rolloutState:rolloutState}'
+```
+
+**A deploy that passes health checks but is wrong some other way** (bad business logic, a
+migration mismatch, anything a `/healthz`/`/readyz` 200 can't see) — manual rollback:
+
+```bash
+cd infra/deploy
+./scripts/rollback.sh api staging          # rolls back one revision by default
+./scripts/rollback.sh api staging 41       # or to a specific revision number
+```
+
+`rollback.sh` looks up the service's current task-definition revision, confirms the target
+revision still exists (`aws ecs describe-task-definition`, so a typo'd revision number fails
+before touching the live service, not mid-rollback), points the service at it with
+`--force-new-deployment`, waits for `services-stable`, and prints the elapsed wall-clock time.
+
+## Staging auto-deploy
+
+`.github/workflows/staging-deploy.yml` (ST-255) runs everything above automatically on every merge
+to `main`, with no human dispatch — `deploy.yml` above stays the manual, any-environment path;
+this is staging's own continuous counterpart, the same relationship `build-and-sign.yml` already
+has to `release.yml` for dev. Job order:
+
+```
+build (release.yml, environment: staging) → migrate → deploy [api, realtime, workers] → smoke → (rollback if smoke fails) → annotate
+```
+
+**Migration gate.** `migrate` runs before either `deploy` job; `migrate.sh`'s own non-zero exit
+(a failed statement, or `packages/db/src/runner.ts`'s `pg_try_advisory_lock` finding another
+migration process already holding the lock) fails that job, and every downstream job that
+`needs: migrate` is skipped — the pipeline halts with nothing touched. An `alert-migration-failed`
+job opens a GitHub issue (label `deploy-failure`) linking the failed run: no Slack/PagerDuty/SNS
+topic exists in this repo to page into yet (the same gap `docs/runbooks/pgbouncer-conventions.md`'s
+"Known gaps" already flags for the `ClientsWaiting` alarm), so a durable, assignable GitHub issue
+is the interim alert rather than a stand-in for a channel that doesn't exist.
+
+**Post-deploy smoke**, two legs:
+
+- _Synthetics_ — the real edge domain's `/healthz`/`/readyz` (api), retried for up to 30s, plus a
+  check that the synthetic realtime probe (`modules/monitoring`, already running every minute in
+  staging) reported a fresh `RealtimeProbeLatency` datapoint through the deploy window, rather than
+  this job re-implementing its own WebSocket check.
+- _E2E smoke tag_ — `apps/web`'s `playwright.smoke.config.ts` (`bun run e2e:smoke`), run against
+  the real deployed `SMOKE_WEB_URL`/`SMOKE_API_URL`, distinct from `e2e/critical`'s own full-stack
+  suite (that one stands up a disposable Postgres/Redis/api and is meant for pre-release
+  verification, not for asserting the real staging origin still answers post-deploy).
+
+A smoke failure triggers `rollback.sh` for all three services (the same manual command above,
+run automatically) and a second GitHub issue. **This reverts the service images only — not the
+migration.** `packages/db`'s migration runner has no "down" command by design (see
+`infra/deploy/README.md`'s "Staging auto-deploy pipeline"), so every migration must stay
+backward-compatible with the code it might get rolled back to underneath.
+
+**Deploy annotations.** Regardless of outcome, an `annotate` job writes one line
+(`infra/deploy/scripts/annotate-deploy.sh`) to `modules/monitoring`'s deploy log group, rendered as
+the operations dashboard's "Recent deploys" table — the acceptance criterion "deploy annotations
+appear in monitoring."
+
+## Production deploy
+
+`.github/workflows/prod-deploy.yml` — `workflow_dispatch` only, never triggered by a merge. The
+deliberate, approval-gated counterpart to the staging pipeline above; it reuses the same
+`migrate.sh` → `deploy.sh` → `rollback.sh` scripts in the same order. Dispatch it with the image
+`tag` to release (normally a commit SHA on `main`); optionally override `verification_window_minutes`
+(default `10`) and `error_rate_threshold` (default `0.02`).
+
+Job order:
+
+```
+gate ──▶ build (release.yml, environment: prod) ──▶ migrate ──▶ deploy [api, realtime, workers] ──┐
+                                                            └──▶ synthetics ─────────────────────┤
+                                                                                                 ▼
+                                    annotate ◀── (rollback, if synthetics/verify failed) ◀── verify
+dora runs last regardless of outcome.
+```
+
+**Approval gate.** The `gate` job targets the `prod` GitHub Environment. Configure that environment
+with required reviewers (Settings → Environments → `prod` → Required reviewers); until a reviewer
+approves the run, no job after `gate` starts. This is the only enforcement of "prod deploy requires
+approval" — there is deliberately no second check in the YAML to keep in sync. `gate` is also the
+one job not guarded by `AWS_DEPLOYMENTS_ENABLED`, so the approval is exercised even on a dispatch
+that will then no-op.
+
+**Migration gate.** Identical to staging: `migrate` runs before any `deploy`, its non-zero exit
+halts the run with nothing touched, and `alert-migration-failed` opens a `deploy-failure` issue.
+
+**Synthetic checks during the rollout.** `synthetics` runs alongside `deploy`, polling the prod
+edge's `/healthz`+`/readyz` and the realtime probe every 10s until all three services report a
+settled deployment. Any non-200 or stale probe seen while the rollout is in flight fails the job →
+`rollback`. This is the "synthetic checks stay green during rolling update" criterion.
+
+**Verification window + auto-halt.** After the rollout settles, `verify` watches the api+realtime
+ALB target groups' 5xx rate for `verification_window_minutes`. Two consecutive one-minute samples
+over `error_rate_threshold`, or one hard `/healthz` failure, exit the job non-zero → `rollback` +
+`alert-rollout-halted`. **Game-day test:** deploy a knowingly-broken revision (or lower
+`error_rate_threshold` for a run), and the error rate crosses the threshold and the deploy
+auto-halts and rolls back with no operator action.
+
+**Rollback scope.** Same as staging — `rollback.sh` reverts api/realtime/workers one
+task-definition revision; it does **not** revert the migration. A `deploy` job that never
+stabilizes is instead auto-reverted by the ECS deployment circuit breaker, so `rollback` here
+covers only the synthetics/verify failure shapes.
+
+**DORA metrics.** `dora` always runs and emits to the `Studafy/DORA` CloudWatch namespace, dimension
+`Environment=prod`: `Deployments` (frequency), `DeploymentFailed` (change-failure rate is its
+average), `LeadTimeForChangesSeconds`, `TimeToRestoreServiceSeconds` (only when a rollback ran), and
+`DeploymentDurationSeconds`. Nothing graphs them yet — they are emitted so the history exists when a
+dashboard or query is added, and the assuming role needs `cloudwatch:PutMetricData` (see
+`infra/deploy/README.md`'s "Known gaps" #5).
+
+## Verifying the acceptance criteria
+
+**"Rolling deploy in staging keeps availability (0 failed synthetic checks during deploy)"** — run
+a synthetic check loop against the ALB in one terminal while `deploy.sh` runs in another:
+
+```bash
+DOMAIN="$(terraform -chdir=infra/terraform output -raw edge_domain_name)"
+while true; do
+  code=$(curl -s -o /dev/null -w '%{http_code}' "https://$DOMAIN/healthz")
+  ts=$(date +%H:%M:%S)
+  [ "$code" = "200" ] || echo "$ts FAILED: $code"
+  sleep 1
+done
+```
+
+```bash
+# separate terminal
+cd infra/deploy && ./scripts/deploy.sh api staging "$NEW_IMAGE_TAG"
+```
+
+Zero `FAILED` lines during the deploy is the criterion. This is a direct consequence of
+`minimumHealthyPercent: 100` (staging/prod — see `environments/staging.env`): ECS never drops
+below `desiredCount` healthy tasks behind the target group during the rollout, because it starts
+and health-checks replacements before stopping the tasks they replace.
+
+**"Rollback to previous image in <5 min demonstrated"**:
+
+```bash
+time ./scripts/rollback.sh api staging
+```
+
+`rollback.sh` itself prints elapsed seconds (`rollback complete in Ns`); `time` is redundant
+confirmation. This is measured, not asserted — there's no hardcoded "we're done in under 5
+minutes" anywhere in the scripts. For context on why it's realistically fast:
+`healthCheckGracePeriodSeconds: 30` plus a 10s `startPeriod`/30s `interval`/3 `retries` container
+health check means a task can be confirmed healthy in well under a minute once it's running; `aws
+ecs wait services-stable` polls every 15s. The 5-minute budget is generous relative to those
+numbers for a `desiredCount` of 2–3, not a target the configuration is tuned to just barely hit.
+
+## Troubleshooting
+
+A task that registers but never goes healthy:
+
+```bash
+aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$(aws ecs list-tasks --cluster "$ECS_CLUSTER" \
+  --service-name studafy-staging-api --query 'taskArns[0]' --output text)" \
+  --query 'tasks[0].{lastStatus:lastStatus,healthStatus:healthStatus,stoppedReason:stoppedReason}'
+
+aws logs tail "/studafy-staging/ecs/api" --follow   # awslogs-group from task-definition.json.tpl
+```
+
+A service stuck `PENDING` at the ECR pull step specifically (`CannotPullContainerError` in
+`stoppedReason`) is most likely prerequisite #1 in `infra/deploy/README.md`'s "Known gaps" — the
+registry's `Deny` statement not yet widened to include the execution role.
+
+## Known gaps
+
+See `infra/deploy/README.md`'s "Known gaps / prerequisites" — not duplicated here to avoid the two
+drifting apart. The one-line summary: this runbook is accurate for the deploy/rollback _mechanics_,
+but nothing in `infra/terraform` yet provisions the cluster, execution role, or target groups these
+scripts point at, and the ECR repository policy needs a scoped widening before the execution role
+can pull at all.

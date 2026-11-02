@@ -1,0 +1,33 @@
+name: Build and sign images
+
+# Continuous delivery to dev's own registry only (infra/terraform provisions module.registry once
+# per environment — dev/staging/prod each get separate repositories and signing keys). staging has
+# its own equivalent continuous pipeline (staging-deploy.yml, ST-255), which builds staging's
+# images via this same release.yml rather than promoting dev's; prod has its own deliberate,
+# approval-gated pipeline (prod-deploy.yml), never picked automatically from a main merge.
+on:
+  push:
+    branches: [main]
+    paths:
+      [
+        "apps/**",
+        "packages/**",
+        "db/**",
+        "infra/docker/**",
+        "bun.lock",
+        ".github/workflows/release.yml",
+        ".github/workflows/build-and-sign.yml",
+      ]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  build-and-sign:
+    uses: ./.github/workflows/release.yml
+    with:
+      environment: dev
+      tag: ${{ github.sha }}
+    secrets:
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The splash navy; mirrors `brandNavy` in lib/src/features/launch/presentation/brand_splash.dart. -->
+    <color name="launch_navy">#161551</color>
+</resources>

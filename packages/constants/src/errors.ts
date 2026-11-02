@@ -1,0 +1,640 @@
+/**
+ * Typed, unique error codes shared across services. Uniqueness of values (not just keys) is
+ * enforced by a unit test — see errors.test.ts.
+ */
+export const ERROR_CODES = {
+  // Authentication — identity of the caller could not be established.
+  AUTH_INVALID_CREDENTIALS: "AUTH_INVALID_CREDENTIALS",
+  AUTH_TOKEN_EXPIRED: "AUTH_TOKEN_EXPIRED",
+  AUTH_TOKEN_INVALID: "AUTH_TOKEN_INVALID",
+  AUTH_SESSION_NOT_FOUND: "AUTH_SESSION_NOT_FOUND",
+  // The token is cryptographically valid and unrevoked, but its entitlements_ver claim predates the
+  // subject's current entitlement version (ST-133) — a subscription changed after it was minted.
+  // Distinct from AUTH_TOKEN_INVALID so a client can tell "refresh and retry" apart from "your
+  // credential is bad"; the remedy is one call to POST /api/auth/refresh.
+  AUTH_ENTITLEMENTS_STALE: "AUTH_ENTITLEMENTS_STALE",
+  // Member-code sign-in (000141). The account is still on the default password: no session until the
+  // request also carries a new one.
+  AUTH_PASSWORD_CHANGE_REQUIRED: "AUTH_PASSWORD_CHANGE_REQUIRED",
+  // Too many wrong passwords; sign-in is refused until the lockout window passes.
+  AUTH_ACCOUNT_LOCKED: "AUTH_ACCOUNT_LOCKED",
+  // The proposed new password breaks the password policy (too short, the default, the username, …).
+  AUTH_PASSWORD_REJECTED: "AUTH_PASSWORD_REJECTED",
+
+  // Invitation verification — public invitation lifecycle resolution.
+  INVITATION_INVALID: "INVITATION_INVALID",
+  EXPIRED: "EXPIRED",
+  REVOKED: "REVOKED",
+  CONSUMED: "CONSUMED",
+  SCHOOL_SUSPENDED: "SCHOOL_SUSPENDED",
+  // The account's roles are mobile-only (students, parents, teachers, attendance officers): no web
+  // session is issued or refreshed for it. See `MOBILE_ONLY_ROLES` in roles.ts.
+  WEB_ACCESS_MOBILE_ONLY: "WEB_ACCESS_MOBILE_ONLY",
+
+  // OAuth — external identity provider flow.
+  OAUTH_STATE_INVALID: "OAUTH_STATE_INVALID",
+  OAUTH_EMAIL_NOT_VERIFIED: "OAUTH_EMAIL_NOT_VERIFIED",
+  OAUTH_PROVIDER_ERROR: "OAUTH_PROVIDER_ERROR",
+  OAUTH_LAST_PROVIDER: "OAUTH_LAST_PROVIDER",
+  OAUTH_IDENTITY_EXISTS: "OAUTH_IDENTITY_EXISTS",
+  // The user declined the provider's consent screen (the provider bounced `error=access_denied`
+  // instead of a code). Never emitted as a problem+json `code` — the OAuth callbacks redirect it to
+  // the frontend `/auth/error` page so the UI can say "you cancelled" rather than "something broke".
+  OAUTH_CANCELLED: "OAUTH_CANCELLED",
+
+  // Returning-user login — no matching OAuth identity found for the incoming (provider, sub) pair.
+  NO_ACCOUNT: "NO_ACCOUNT",
+
+  // Account activation — the OAuth identity diverged from the invitation's bound email, so
+  // automatic provisioning is withheld pending an administrator's decision.
+  REQUIRES_ADMIN_APPROVAL: "REQUIRES_ADMIN_APPROVAL",
+
+  // Authorization — caller is known, but not permitted.
+  AUTHZ_FORBIDDEN: "AUTHZ_FORBIDDEN",
+  ACCESS_DENIED: "ACCESS_DENIED",
+  AUTHZ_ROLE_NOT_FOUND: "AUTHZ_ROLE_NOT_FOUND",
+  AUTHZ_PERMISSION_NOT_FOUND: "AUTHZ_PERMISSION_NOT_FOUND",
+
+  // Channel policy — the caller's session channel is not authorized for this operation.
+  CHANNEL_NOT_AUTHORIZED: "CHANNEL_NOT_AUTHORIZED",
+
+  // Validation — caller input was malformed.
+  VALIDATION_FAILED: "VALIDATION_FAILED",
+  VALIDATION_REQUIRED_FIELD_MISSING: "VALIDATION_REQUIRED_FIELD_MISSING",
+
+  // Resource — the requested entity does not exist or was already removed.
+  RESOURCE_NOT_FOUND: "RESOURCE_NOT_FOUND",
+  RESOURCE_ALREADY_DELETED: "RESOURCE_ALREADY_DELETED",
+
+  // School registration — duplicate school email or slug on registration.
+  SCHOOL_EMAIL_DUPLICATE: "SCHOOL_EMAIL_DUPLICATE",
+  SCHOOL_SLUG_DUPLICATE: "SCHOOL_SLUG_DUPLICATE",
+
+  // School sign-up applications — the website's Google/Microsoft sign-up flow for a school owner.
+  // The applicant has no session cookie (never signed in, or it expired).
+  SCHOOL_APPLICATION_SESSION_REQUIRED: "SCHOOL_APPLICATION_SESSION_REQUIRED",
+  // This sign-in identity already has an application awaiting review.
+  SCHOOL_APPLICATION_ALREADY_PENDING: "SCHOOL_APPLICATION_ALREADY_PENDING",
+  // This sign-in identity already belongs to a Studafy account; the person should sign in instead.
+  SCHOOL_APPLICATION_ACCOUNT_EXISTS: "SCHOOL_APPLICATION_ACCOUNT_EXISTS",
+  // The proof-of-ownership upload is missing, of the wrong type, or too large.
+  SCHOOL_APPLICATION_PROOF_INVALID: "SCHOOL_APPLICATION_PROOF_INVALID",
+  // Approve/reject on an application that has already been decided.
+  SCHOOL_APPLICATION_NOT_PENDING: "SCHOOL_APPLICATION_NOT_PENDING",
+
+  // School closure — the typed confirmation did not match the school's name.
+  SCHOOL_CLOSURE_NAME_MISMATCH: "SCHOOL_CLOSURE_NAME_MISMATCH",
+
+  // School email verification — the presented token failed server-side verification.
+  VERIFICATION_TOKEN_INVALID: "VERIFICATION_TOKEN_INVALID",
+  VERIFICATION_TOKEN_EXPIRED: "VERIFICATION_TOKEN_EXPIRED",
+  VERIFICATION_TOKEN_CONSUMED: "VERIFICATION_TOKEN_CONSUMED",
+
+  // Captcha — the presented token failed server-side verification.
+  CAPTCHA_INVALID: "CAPTCHA_INVALID",
+
+  // Conflict — the request contradicts current server state.
+  CONFLICT_DUPLICATE_ENTRY: "CONFLICT_DUPLICATE_ENTRY",
+  CONFLICT_STATE_MISMATCH: "CONFLICT_STATE_MISMATCH",
+  CONFLICT_IDEMPOTENCY_KEY_MISMATCH: "CONFLICT_IDEMPOTENCY_KEY_MISMATCH",
+
+  // User management — duplicate email or invalid role assignment within a school.
+  USER_EMAIL_DUPLICATE: "USER_EMAIL_DUPLICATE",
+  INVALID_ROLE_ASSIGNMENT: "INVALID_ROLE_ASSIGNMENT",
+
+  // Student — duplicate admission number within a school.
+  STUDENT_ADMISSION_DUPLICATE: "STUDENT_ADMISSION_DUPLICATE",
+
+  // Teacher — duplicate employee number within a school.
+  TEACHER_EMPLOYEE_NUMBER_DUPLICATE: "TEACHER_EMPLOYEE_NUMBER_DUPLICATE",
+
+  // Parent-child linking — link/unlink constraints.
+  PARENT_LINK_EXISTS: "PARENT_LINK_EXISTS",
+  PARENT_NOT_LINKED: "PARENT_NOT_LINKED",
+  PARENT_INVALID_ROLE: "PARENT_INVALID_ROLE",
+
+  // Academic — year/term lifecycle violations.
+  ACADEMIC_YEAR_ACTIVE_EXISTS: "ACADEMIC_YEAR_ACTIVE_EXISTS",
+  ACADEMIC_YEAR_DATE_OVERLAP: "ACADEMIC_YEAR_DATE_OVERLAP",
+
+  // Subject / course — catalog entity lifecycle.
+  SUBJECT_HAS_COURSES: "SUBJECT_HAS_COURSES",
+  COURSE_HAS_CLASSES: "COURSE_HAS_CLASSES",
+
+  // Class — delivery entity lifecycle.
+  CLASS_HAS_ENROLLMENTS: "CLASS_HAS_ENROLLMENTS",
+  CLASS_CAPACITY_EXCEEDED: "CLASS_CAPACITY_EXCEEDED",
+
+  // Grade level / section — the year groups a timetable is built for.
+  GRADE_LEVEL_HAS_SECTIONS: "GRADE_LEVEL_HAS_SECTIONS",
+  SECTION_IN_USE: "SECTION_IN_USE",
+
+  // Academic grading configuration, marks, results and certificates (000160).
+  // ACADEMIC_CONFIG_INVALID: a configuration fails @studafy/grading-engine validation (weights not
+  // totalling 100%, a contradictory scale...). ACADEMIC_CONFIG_LOCKED: the year's configuration is
+  // finalized or archived. ACADEMIC_CONFIG_IMPACT_UNCONFIRMED: the change touches recorded marks or
+  // assessments and must be resent with confirm_impact after the admin has reviewed the impact.
+  ACADEMIC_CONFIG_INVALID: "ACADEMIC_CONFIG_INVALID",
+  ACADEMIC_CONFIG_LOCKED: "ACADEMIC_CONFIG_LOCKED",
+  ACADEMIC_CONFIG_IMPACT_UNCONFIRMED: "ACADEMIC_CONFIG_IMPACT_UNCONFIRMED",
+  ACADEMIC_YEAR_NOT_ACTIVE: "ACADEMIC_YEAR_NOT_ACTIVE",
+  GRADE_PROGRAM_NOT_FOUND: "GRADE_PROGRAM_NOT_FOUND",
+  SUBJECT_CONFIG_NOT_FOUND: "SUBJECT_CONFIG_NOT_FOUND",
+  SUBJECT_CONFIG_DUPLICATE: "SUBJECT_CONFIG_DUPLICATE",
+  SUBJECT_CONFIG_IN_USE: "SUBJECT_CONFIG_IN_USE",
+  SECTION_OVERRIDE_HAS_MARKS: "SECTION_OVERRIDE_HAS_MARKS",
+  TEACHER_ASSIGNMENT_DUPLICATE: "TEACHER_ASSIGNMENT_DUPLICATE",
+  MARKS_LOCKED: "MARKS_LOCKED",
+  MARK_SCORE_OUT_OF_RANGE: "MARK_SCORE_OUT_OF_RANGE",
+  RESULTS_INCOMPLETE: "RESULTS_INCOMPLETE",
+  RESULTS_ALREADY_FINALIZED: "RESULTS_ALREADY_FINALIZED",
+  RESULT_FINALIZATION_NOT_FOUND: "RESULT_FINALIZATION_NOT_FOUND",
+  CERTIFICATE_BLOCKED: "CERTIFICATE_BLOCKED",
+  CERTIFICATE_NOT_FOUND: "CERTIFICATE_NOT_FOUND",
+
+  // Enrollment — student-class binding.
+  ENROLLMENT_DUPLICATE: "ENROLLMENT_DUPLICATE",
+  ENROLLMENT_NOT_ACTIVE: "ENROLLMENT_NOT_ACTIVE",
+
+  // Tenant lifecycle — subscription state machine enforcement (ST-092).
+  LIMIT_EXCEEDED_STUDENT_CAP: "LIMIT_EXCEEDED_STUDENT_CAP",
+  TENANT_SUSPENDED: "TENANT_SUSPENDED",
+  TENANT_CLOSED: "TENANT_CLOSED",
+
+  // Rate limiting.
+  RATE_LIMIT_EXCEEDED: "RATE_LIMIT_EXCEEDED",
+
+  // Tenant provisioning — multi-step pipeline failures.
+  PROVISIONING_FAILED: "PROVISIONING_FAILED",
+  PROVISIONING_IN_PROGRESS: "PROVISIONING_IN_PROGRESS",
+  ERPNEXT_SITE_CREATION_FAILED: "ERPNEXT_SITE_CREATION_FAILED",
+  ERPNEXT_COMPANY_CREATION_FAILED: "ERPNEXT_COMPANY_CREATION_FAILED",
+
+  // ERPNext gateway — upstream availability, distinguished from each other because a client can act
+  // on the difference: a timeout is worth retrying, an open circuit is not (ST-119).
+  ERPNEXT_NOT_CONFIGURED: "ERPNEXT_NOT_CONFIGURED",
+  FINANCE_REPORT_NOT_FOUND: "FINANCE_REPORT_NOT_FOUND",
+  FINANCE_REPORT_EXPORT_UNAVAILABLE: "FINANCE_REPORT_EXPORT_UNAVAILABLE",
+  JOINVOICE_INVOICE_NOT_FOUND: "JOINVOICE_INVOICE_NOT_FOUND",
+  JOINVOICE_INVALID_INVOICE: "JOINVOICE_INVALID_INVOICE",
+  JOINVOICE_INVOICE_CHANGED: "JOINVOICE_INVOICE_CHANGED",
+  ERPNEXT_UNAVAILABLE: "ERPNEXT_UNAVAILABLE",
+  ERPNEXT_TIMEOUT: "ERPNEXT_TIMEOUT",
+  ERPNEXT_CIRCUIT_OPEN: "ERPNEXT_CIRCUIT_OPEN",
+
+  // Finance gateway — fee structures (ST-119).
+  FEE_STRUCTURE_NOT_FOUND: "FEE_STRUCTURE_NOT_FOUND",
+
+  // Finance gateway — fee schedules / installments (ST-122).
+  FEE_SCHEDULE_NOT_FOUND: "FEE_SCHEDULE_NOT_FOUND",
+
+  // Finance reconciliation — cache drift that could not be auto-healed (ST-122).
+  RECONCILIATION_DIVERGENCE: "RECONCILIATION_DIVERGENCE",
+
+  // Invoice generation — billing worker.
+  INVOICE_ALREADY_EXISTS: "INVOICE_ALREADY_EXISTS",
+  INVOICE_GENERATION_FAILED: "INVOICE_GENERATION_FAILED",
+  INVOICE_STUDENT_NOT_FOUND: "INVOICE_STUDENT_NOT_FOUND",
+
+  // Finance gateway — invoice list/detail/batch generation (ST-202).
+  INVOICE_NOT_FOUND: "INVOICE_NOT_FOUND",
+  INVOICE_BATCH_NOT_FOUND: "INVOICE_BATCH_NOT_FOUND",
+  INVOICE_BATCH_NO_STUDENTS: "INVOICE_BATCH_NO_STUDENTS",
+  INVOICE_BATCH_TOO_LARGE: "INVOICE_BATCH_TOO_LARGE",
+
+  // Finance gateway — expenses.
+  EXPENSE_NOT_FOUND: "EXPENSE_NOT_FOUND",
+
+  // Finance gateway — payments (ST-121). Reusing a key for a different body is reported with the
+  // existing CONFLICT_IDEMPOTENCY_KEY_MISMATCH above rather than a payment-specific twin; the
+  // condition is not payment-specific and one code for it keeps client handling uniform.
+  PAYMENT_NOT_FOUND: "PAYMENT_NOT_FOUND",
+  // Distinct from a mismatch, because the client acts differently: an earlier request with this key
+  // reached ERPNext and its outcome is not yet known, so the answer is to wait and re-read rather
+  // than to change anything. Never retry-with-a-new-key on this one — that is the double charge.
+  PAYMENT_IN_PROGRESS: "PAYMENT_IN_PROGRESS",
+  PAYMENT_IDEMPOTENCY_KEY_REQUIRED: "PAYMENT_IDEMPOTENCY_KEY_REQUIRED",
+  // One payment from a family split across its children's invoices: the split names an invoice
+  // that is not the family's, pays an invoice more than it owes, or does not add up to the amount.
+  FAMILY_PAYMENT_ALLOCATION_INVALID: "FAMILY_PAYMENT_ALLOCATION_INVALID",
+  // The family owes less than the amount paid; ERPNext would record the excess as an advance with
+  // no invoice, which is a decision for finance to make in ERPNext, not a side effect of this form.
+  FAMILY_PAYMENT_EXCEEDS_BALANCE: "FAMILY_PAYMENT_EXCEEDS_BALANCE",
+  FAMILY_NOT_FOUND: "FAMILY_NOT_FOUND",
+
+  // Finance gateway — refunds (ST-124).
+  REFUND_NOT_FOUND: "REFUND_NOT_FOUND",
+  REFUND_INVALID_STATUS: "REFUND_INVALID_STATUS",
+  REFUND_CONFIRM_SELF: "REFUND_CONFIRM_SELF",
+  REFUND_IN_PROGRESS: "REFUND_IN_PROGRESS",
+  REFUND_IDEMPOTENCY_KEY_REQUIRED: "REFUND_IDEMPOTENCY_KEY_REQUIRED",
+  // Corrections through the same queue (000177). INVOICE_NOT_CANCELLABLE: the invoice is not
+  // submitted, or money or a credit note is already against it (use a credit note).
+  // PAYMENT_NOT_REVERSIBLE: the payment is not confirmed or names no invoice.
+  // WRITE_OFF_EXCEEDS_OUTSTANDING: a write-off may clear at most what is still owed.
+  // ADJUSTMENT_ALREADY_REQUESTED: a cancellation or reversal for it is already open or done.
+  INVOICE_NOT_CANCELLABLE: "INVOICE_NOT_CANCELLABLE",
+  PAYMENT_NOT_REVERSIBLE: "PAYMENT_NOT_REVERSIBLE",
+  WRITE_OFF_EXCEEDS_OUTSTANDING: "WRITE_OFF_EXCEEDS_OUTSTANDING",
+  ADJUSTMENT_ALREADY_REQUESTED: "ADJUSTMENT_ALREADY_REQUESTED",
+
+  // Finance — scholarships and their per-student awards.
+  SCHOLARSHIP_NOT_FOUND: "SCHOLARSHIP_NOT_FOUND",
+  SCHOLARSHIP_NAME_TAKEN: "SCHOLARSHIP_NAME_TAKEN",
+  SCHOLARSHIP_INACTIVE: "SCHOLARSHIP_INACTIVE",
+  SCHOLARSHIP_AWARD_NOT_FOUND: "SCHOLARSHIP_AWARD_NOT_FOUND",
+  SCHOLARSHIP_AWARD_DUPLICATE: "SCHOLARSHIP_AWARD_DUPLICATE",
+  SCHOLARSHIP_AWARD_INVALID_STATUS: "SCHOLARSHIP_AWARD_INVALID_STATUS",
+
+  // Import — CSV import lifecycle.
+  IMPORT_NOT_FOUND: "IMPORT_NOT_FOUND",
+  IMPORT_INVALID_STATE: "IMPORT_INVALID_STATE",
+  IMPORT_VALIDATION_FAILED: "IMPORT_VALIDATION_FAILED",
+  IMPORT_ROWS_EXCEED_LIMIT: "IMPORT_ROWS_EXCEED_LIMIT",
+  IMPORT_IDEMPOTENCY_KEY_EXISTS: "IMPORT_IDEMPOTENCY_KEY_EXISTS",
+  IMPORT_MAPPING_NOT_FOUND: "IMPORT_MAPPING_NOT_FOUND",
+  IMPORT_MAPPING_NAME_EXISTS: "IMPORT_MAPPING_NAME_EXISTS",
+  IMPORT_MAPPING_INVALID: "IMPORT_MAPPING_INVALID",
+  IMPORT_SOURCE_NOT_FOUND: "IMPORT_SOURCE_NOT_FOUND",
+  IMPORT_COLUMN_NOT_FOUND: "IMPORT_COLUMN_NOT_FOUND",
+  IMPORT_CELLS_UNAVAILABLE: "IMPORT_CELLS_UNAVAILABLE",
+  IMPORT_COLUMN_PREVIEW_STALE: "IMPORT_COLUMN_PREVIEW_STALE",
+  IMPORT_RECORD_DRAFT_PENDING: "IMPORT_RECORD_DRAFT_PENDING",
+
+  // Exam — scheduling and lifecycle.
+  EXAM_NOT_FOUND: "EXAM_NOT_FOUND",
+  EXAM_INVALID_STATE: "EXAM_INVALID_STATE",
+
+  // Timetable — scheduling conflicts and state-machine violations.
+  TIMETABLE_TEACHER_CONFLICT: "TIMETABLE_TEACHER_CONFLICT",
+  TIMETABLE_ROOM_CONFLICT: "TIMETABLE_ROOM_CONFLICT",
+  TIMETABLE_VERSION_NOT_DRAFT: "TIMETABLE_VERSION_NOT_DRAFT",
+
+  // Assignments — class-scope violations and lifecycle constraints.
+  ASSIGNMENT_CLASS_FORBIDDEN: "ASSIGNMENT_CLASS_FORBIDDEN",
+  ASSIGNMENT_INVALID_STATUS_TRANSITION: "ASSIGNMENT_INVALID_STATUS_TRANSITION",
+  // Question assignments: the question set is edited on a written assignment, is edited after a
+  // student has answered it, or is empty when the assignment is published.
+  ASSIGNMENT_KIND_MISMATCH: "ASSIGNMENT_KIND_MISMATCH",
+  ASSIGNMENT_QUESTIONS_LOCKED: "ASSIGNMENT_QUESTIONS_LOCKED",
+  ASSIGNMENT_QUESTIONS_REQUIRED: "ASSIGNMENT_QUESTIONS_REQUIRED",
+
+  // Attendance — session lifecycle, timetable tie, and record management.
+  ATTENDANCE_SESSION_NOT_FOUND: "ATTENDANCE_SESSION_NOT_FOUND",
+  ATTENDANCE_SESSION_DUPLICATE: "ATTENDANCE_SESSION_DUPLICATE",
+  ATTENDANCE_NO_TIMETABLE_SLOT: "ATTENDANCE_NO_TIMETABLE_SLOT",
+  ATTENDANCE_INVALID_STATUS_TRANSITION: "ATTENDANCE_INVALID_STATUS_TRANSITION",
+  ATTENDANCE_RECORD_FORBIDDEN: "ATTENDANCE_RECORD_FORBIDDEN",
+  ATTENDANCE_SESSION_NOT_OPEN: "ATTENDANCE_SESSION_NOT_OPEN",
+  ATTENDANCE_STUDENT_NOT_IN_CLASS: "ATTENDANCE_STUDENT_NOT_IN_CLASS",
+  ATTENDANCE_BATCH_TOO_LARGE: "ATTENDANCE_BATCH_TOO_LARGE",
+
+  // Attendance corrections — window, correctability, and no-op guards (ST-109).
+  ATTENDANCE_RECORD_NOT_FOUND: "ATTENDANCE_RECORD_NOT_FOUND",
+  ATTENDANCE_CORRECTION_WINDOW_EXPIRED: "ATTENDANCE_CORRECTION_WINDOW_EXPIRED",
+  ATTENDANCE_CORRECTION_NOT_CORRECTABLE: "ATTENDANCE_CORRECTION_NOT_CORRECTABLE",
+  ATTENDANCE_CORRECTION_NO_CHANGE: "ATTENDANCE_CORRECTION_NO_CHANGE",
+  ATTENDANCE_REPORT_RESOURCE_NOT_FOUND: "ATTENDANCE_REPORT_RESOURCE_NOT_FOUND",
+  ATTENDANCE_EXPORT_NOT_FOUND: "ATTENDANCE_EXPORT_NOT_FOUND",
+  ATTENDANCE_EXPORT_UNAVAILABLE: "ATTENDANCE_EXPORT_UNAVAILABLE",
+
+  // Audit explorer (ST-046x) — async audit-log CSV export lifecycle.
+  AUDIT_LOG_EXPORT_NOT_FOUND: "AUDIT_LOG_EXPORT_NOT_FOUND",
+  AUDIT_LOG_EXPORT_UNAVAILABLE: "AUDIT_LOG_EXPORT_UNAVAILABLE",
+
+  // Data subject requests (ST-268) — GDPR export/erasure pipeline.
+  DSR_NOT_FOUND: "DSR_NOT_FOUND",
+  DSR_UNAVAILABLE: "DSR_UNAVAILABLE",
+  // The subject already has a queued or processing request of this type — filing a second would
+  // race the first's claim rather than usefully queue behind it.
+  DSR_ALREADY_PENDING: "DSR_ALREADY_PENDING",
+  DSR_SUBJECT_NOT_FOUND: "DSR_SUBJECT_NOT_FOUND",
+
+  // Self-service account deletion. Apple's /auth/revoke rejected or could not be reached; the
+  // deletion is rolled back so the user can retry rather than end up deleted with a live Apple grant.
+  APPLE_TOKEN_REVOCATION_FAILED: "APPLE_TOKEN_REVOCATION_FAILED",
+  // The account has a deletion scheduled (000143's 14-day grace period). Every route but the few
+  // that show or cancel it refuses the session until the deletion is cancelled.
+  ACCOUNT_DELETION_SCHEDULED: "ACCOUNT_DELETION_SCHEDULED",
+  // A deletion is already scheduled for this account; cancel it or wait for it to run.
+  ACCOUNT_DELETION_ALREADY_SCHEDULED: "ACCOUNT_DELETION_ALREADY_SCHEDULED",
+  // Cancelling, but no deletion is scheduled (never asked, already cancelled, or already run).
+  ACCOUNT_DELETION_NOT_SCHEDULED: "ACCOUNT_DELETION_NOT_SCHEDULED",
+  // A member-ID account confirmed deletion with a member ID that is not theirs, or a wrong password.
+  ACCOUNT_DELETION_VERIFICATION_FAILED: "ACCOUNT_DELETION_VERIFICATION_FAILED",
+
+  // Announcement management (ST-194). The audience class named at compose time doesn't exist in
+  // this school.
+  ANNOUNCEMENT_CLASS_NOT_FOUND: "ANNOUNCEMENT_CLASS_NOT_FOUND",
+  // A caller composing on the scoped teacher path (notification:send, not notification:manage,
+  // ST-238) tried to send something the scoped path forbids: a non-class audience, a mandatory
+  // notice, or a class they do not teach.
+  ANNOUNCEMENT_SCOPE_FORBIDDEN: "ANNOUNCEMENT_SCOPE_FORBIDDEN",
+
+  // Submissions — hand-in window, enrollment scope, and grading state (ST-104).
+  SUBMISSION_NOT_FOUND: "SUBMISSION_NOT_FOUND",
+  SUBMISSION_FORBIDDEN: "SUBMISSION_FORBIDDEN",
+  SUBMISSION_NOT_ENROLLED: "SUBMISSION_NOT_ENROLLED",
+  SUBMISSION_WINDOW_CLOSED: "SUBMISSION_WINDOW_CLOSED",
+  SUBMISSION_ALREADY_GRADED: "SUBMISSION_ALREADY_GRADED",
+  SUBMISSION_INVALID_STATE: "SUBMISSION_INVALID_STATE",
+  SUBMISSION_SCORE_EXCEEDS_MAX: "SUBMISSION_SCORE_EXCEEDS_MAX",
+  // A question-assignment hand-in names a question or option that is not part of the assignment,
+  // answers a question twice, or a written hand-in carries answers at all.
+  SUBMISSION_INVALID_ANSWERS: "SUBMISSION_INVALID_ANSWERS",
+
+  // Object storage — pre-signed URL generation and tenant-prefix enforcement.
+  STORAGE_KEY_FORBIDDEN: "STORAGE_KEY_FORBIDDEN",
+  STORAGE_OBJECT_NOT_FOUND: "STORAGE_OBJECT_NOT_FOUND",
+  STORAGE_NOT_CONFIGURED: "STORAGE_NOT_CONFIGURED",
+  // The object's server-computed SHA-256 did not match the checksum the client supplied at confirm.
+  STORAGE_CHECKSUM_MISMATCH: "STORAGE_CHECKSUM_MISMATCH",
+  // The tenant's storage usage is at its plan's cap; new uploads are blocked.
+  STORAGE_QUOTA_EXCEEDED: "STORAGE_QUOTA_EXCEEDED",
+
+  // Materials — upload, ingestion, and AI visibility.
+  MATERIAL_NOT_FOUND: "MATERIAL_NOT_FOUND",
+  MATERIAL_STORAGE_CONFIRM_FAILED: "MATERIAL_STORAGE_CONFIRM_FAILED",
+  MATERIAL_INGEST_IN_PROGRESS: "MATERIAL_INGEST_IN_PROGRESS",
+
+  // Gradebook configuration — category weights and scheme versioning (ST-112).
+  INVALID_GRADEBOOK_WEIGHT_TOTAL: "INVALID_GRADEBOOK_WEIGHT_TOTAL",
+  GRADEBOOK_NOT_FOUND: "GRADEBOOK_NOT_FOUND",
+  GRADING_SCHEME_NOT_FOUND: "GRADING_SCHEME_NOT_FOUND",
+  GRADING_SCHEME_IMMUTABLE: "GRADING_SCHEME_IMMUTABLE",
+  ASSESSMENT_CATEGORY_NOT_FOUND: "ASSESSMENT_CATEGORY_NOT_FOUND",
+
+  // Grade entry — grade submissions and grade records (ST-113).
+  GRADE_SUBMISSION_NOT_FOUND: "GRADE_SUBMISSION_NOT_FOUND",
+  GRADE_SHEET_ITEM_NOT_FOUND: "GRADE_SHEET_ITEM_NOT_FOUND",
+  GRADE_CONCURRENT_EDIT: "GRADE_CONCURRENT_EDIT",
+  GRADE_SCORE_EXCEEDS_MAX: "GRADE_SCORE_EXCEEDS_MAX",
+  GRADE_INVALID_STATUS_TRANSITION: "GRADE_INVALID_STATUS_TRANSITION",
+  // Grade revisions — corrections to published grades awaiting approval.
+  GRADE_REVISION_NOT_FOUND: "GRADE_REVISION_NOT_FOUND",
+  GRADE_REVISION_ALREADY_PENDING: "GRADE_REVISION_ALREADY_PENDING",
+
+  // Discipline — incident and action lifecycle.
+  DISCIPLINE_INCIDENT_NOT_FOUND: "DISCIPLINE_INCIDENT_NOT_FOUND",
+  DISCIPLINE_INCIDENT_INVALID_STATUS_TRANSITION: "DISCIPLINE_INCIDENT_INVALID_STATUS_TRANSITION",
+  DISCIPLINE_INCIDENT_CANNOT_RESOLVE: "DISCIPLINE_INCIDENT_CANNOT_RESOLVE",
+  DISCIPLINE_INCIDENT_PARENT_VISIBILITY_DISABLED: "DISCIPLINE_INCIDENT_PARENT_VISIBILITY_DISABLED",
+  DISCIPLINE_ACTION_NOT_FOUND: "DISCIPLINE_ACTION_NOT_FOUND",
+  DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION: "DISCIPLINE_ACTION_INVALID_STATUS_TRANSITION",
+
+  // Teacher evaluations — lifecycle and visibility.
+  EVALUATION_NOT_FOUND: "EVALUATION_NOT_FOUND",
+  EVALUATION_INVALID_STATUS_TRANSITION: "EVALUATION_INVALID_STATUS_TRANSITION",
+  EVALUATION_ALREADY_SHARED: "EVALUATION_ALREADY_SHARED",
+  EVALUATION_NOT_SHARED: "EVALUATION_NOT_SHARED",
+  EVALUATION_TEMPLATE_NOT_FOUND: "EVALUATION_TEMPLATE_NOT_FOUND",
+  EVALUATION_SCORE_NOT_FOUND: "EVALUATION_SCORE_NOT_FOUND",
+
+  // Stripe billing gateway (ST-xxx).
+  STRIPE_NOT_CONFIGURED: "STRIPE_NOT_CONFIGURED",
+  STRIPE_API_ERROR: "STRIPE_API_ERROR",
+  STRIPE_WEBHOOK_INVALID: "STRIPE_WEBHOOK_INVALID",
+  STRIPE_PRICE_SYNC_FAILED: "STRIPE_PRICE_SYNC_FAILED",
+  STRIPE_LIVE_KEY_IN_DEV: "STRIPE_LIVE_KEY_IN_DEV",
+
+  // Tap Payments billing gateway (ST-298).
+  TAP_NOT_CONFIGURED: "TAP_NOT_CONFIGURED",
+  TAP_API_ERROR: "TAP_API_ERROR",
+  TAP_WEBHOOK_INVALID: "TAP_WEBHOOK_INVALID",
+
+  // App Store / Google Play in-app purchase of the AI add-on.
+  STORE_BILLING_NOT_CONFIGURED: "STORE_BILLING_NOT_CONFIGURED",
+  STORE_PURCHASE_INVALID: "STORE_PURCHASE_INVALID",
+  STORE_PURCHASE_NOT_ACTIVE: "STORE_PURCHASE_NOT_ACTIVE",
+  STORE_PURCHASE_ACCOUNT_MISMATCH: "STORE_PURCHASE_ACCOUNT_MISMATCH",
+  STORE_PURCHASE_ALREADY_CLAIMED: "STORE_PURCHASE_ALREADY_CLAIMED",
+  STORE_WEBHOOK_INVALID: "STORE_WEBHOOK_INVALID",
+
+  // The App Store / Play reviewer demo tenant (ST-303) is never billable; checkout is refused.
+  REVIEW_TENANT_BILLING_DISABLED: "REVIEW_TENANT_BILLING_DISABLED",
+
+  // A PaymentProviderPort operation the selected provider has no equivalent for.
+  PAYMENT_PROVIDER_OPERATION_UNSUPPORTED: "PAYMENT_PROVIDER_OPERATION_UNSUPPORTED",
+
+  // Billing — subscription lifecycle.
+  SUBSCRIPTION_NOT_FOUND: "SUBSCRIPTION_NOT_FOUND",
+  SUBSCRIPTION_CHECKOUT_FAILED: "SUBSCRIPTION_CHECKOUT_FAILED",
+  AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE: "AI_SUBSCRIPTION_SCHOOL_NOT_ACTIVE",
+  // The student holds a school-license seat (docs/billing/feature-licensing.md, session 6): the
+  // school provides their paid features, so they are never sold a personal purchase.
+  AI_SUBSCRIPTION_COVERED_BY_SCHOOL: "AI_SUBSCRIPTION_COVERED_BY_SCHOOL",
+
+  // AI quota gate (ST-155). The gate answers with one distinct code per stage of the decision flow
+  // -- school active, AI add-on active, quota available -- so a client can branch on exactly why a
+  // request was refused: reactivate to fix 403, renew the add-on to fix 402, wait for the budget
+  // reset to fix 429. AI_QUOTA_UNAVAILABLE is the fail-closed arm: quota could not be verified (for
+  // example the entitlement cache predates the period fields), and the safe answer is to retry.
+  AI_SCHOOL_INACTIVE: "AI_SCHOOL_INACTIVE",
+  AI_SUBSCRIPTION_INACTIVE: "AI_SUBSCRIPTION_INACTIVE",
+  AI_QUOTA_EXCEEDED: "AI_QUOTA_EXCEEDED",
+  AI_QUOTA_UNAVAILABLE: "AI_QUOTA_UNAVAILABLE",
+
+  // Paid features (requireFeature, docs/billing/feature-licensing.md). One code per reason a
+  // feature is refused, so a client can branch: FEATURE_NOT_INCLUDED -- no active grant covers the
+  // person for this feature (or the super admin paused it); offer an upgrade. FEATURE_EXPIRED -- a
+  // grant covered it and has ended; offer a renewal. FEATURE_LIMIT_REACHED -- this month's usage
+  // limit is used up; it resets on the 1st (UTC). A school that is not active keeps answering
+  // AI_SCHOOL_INACTIVE on the AI routes, as before.
+  FEATURE_NOT_INCLUDED: "FEATURE_NOT_INCLUDED",
+  FEATURE_EXPIRED: "FEATURE_EXPIRED",
+  FEATURE_LIMIT_REACHED: "FEATURE_LIMIT_REACHED",
+
+  // School feature licenses and seats (session 2 of docs/billing/feature-licensing.md).
+  // LICENSE_NONE: the school has no license it can assign seats on. LICENSE_ALREADY_ACTIVE: the
+  // school already has an active license (one at a time). LICENSE_NOT_EDITABLE: the change is not
+  // allowed in the license's status. LICENSE_TIER_INVALID: a tier is not a tier of that audience, or
+  // an audience has seats without a tier. LICENSE_AUDIENCE_NOT_LICENSED: the license sells no seats to
+  // that audience (or, for parents, does not include Family+). LICENSE_SEAT_LIMIT_REACHED: every
+  // purchased seat of that audience is assigned. LICENSE_SEATS_BELOW_ASSIGNED: a seat count cannot
+  // drop below the seats already assigned. LICENSE_SEAT_NOT_ELIGIBLE: the person is not a member of
+  // the school in that audience.
+  LICENSE_NOT_FOUND: "LICENSE_NOT_FOUND",
+  LICENSE_NONE: "LICENSE_NONE",
+  LICENSE_INVALID_TRANSITION: "LICENSE_INVALID_TRANSITION",
+  LICENSE_ALREADY_ACTIVE: "LICENSE_ALREADY_ACTIVE",
+  LICENSE_NOT_EDITABLE: "LICENSE_NOT_EDITABLE",
+  LICENSE_TIER_INVALID: "LICENSE_TIER_INVALID",
+  LICENSE_AUDIENCE_NOT_LICENSED: "LICENSE_AUDIENCE_NOT_LICENSED",
+  LICENSE_SEAT_LIMIT_REACHED: "LICENSE_SEAT_LIMIT_REACHED",
+  LICENSE_SEATS_BELOW_ASSIGNED: "LICENSE_SEATS_BELOW_ASSIGNED",
+  LICENSE_SEAT_NOT_FOUND: "LICENSE_SEAT_NOT_FOUND",
+  LICENSE_SEAT_NOT_ELIGIBLE: "LICENSE_SEAT_NOT_ELIGIBLE",
+
+  // License pricing, quotes, invoices and payments (session 3 of docs/billing/feature-licensing.md).
+  // LICENSE_PRICE_MISSING: a tier on the quote has no monthly price in its currency.
+  // LICENSE_PRICING_INVALID: the calculator refused the input (a bracket, a missing adjustment reason,
+  // a total below zero). LICENSE_QUOTE_NOT_EDITABLE: the quote's status does not allow the change.
+  // LICENSE_QUOTE_EXPIRED: it is past its valid-until date. LICENSE_QUOTE_STALE: the license or its
+  // credits changed since the quote was priced -- price a new one. LICENSE_INVOICE_NOT_PAYABLE: the
+  // invoice is paid or void. LICENSE_INVOICE_HAS_PAYMENTS: void its payments first.
+  // LICENSE_PAYMENT_EXCEEDS_BALANCE: the amount is more than the invoice's balance.
+  LICENSE_PRICE_MISSING: "LICENSE_PRICE_MISSING",
+  LICENSE_PRICING_INVALID: "LICENSE_PRICING_INVALID",
+  LICENSE_QUOTE_NOT_FOUND: "LICENSE_QUOTE_NOT_FOUND",
+  LICENSE_QUOTE_NOT_EDITABLE: "LICENSE_QUOTE_NOT_EDITABLE",
+  LICENSE_QUOTE_EXPIRED: "LICENSE_QUOTE_EXPIRED",
+  LICENSE_QUOTE_STALE: "LICENSE_QUOTE_STALE",
+  LICENSE_INVOICE_NOT_FOUND: "LICENSE_INVOICE_NOT_FOUND",
+  LICENSE_INVOICE_NOT_PAYABLE: "LICENSE_INVOICE_NOT_PAYABLE",
+  LICENSE_INVOICE_HAS_PAYMENTS: "LICENSE_INVOICE_HAS_PAYMENTS",
+  LICENSE_PAYMENT_NOT_FOUND: "LICENSE_PAYMENT_NOT_FOUND",
+  LICENSE_PAYMENT_EXCEEDS_BALANCE: "LICENSE_PAYMENT_EXCEEDS_BALANCE",
+  LICENSE_PAYMENT_VOIDED: "LICENSE_PAYMENT_VOIDED",
+  LICENSE_RECEIPT_NOT_FOUND: "LICENSE_RECEIPT_NOT_FOUND",
+  LICENSE_RECEIPT_ALREADY_MATCHED: "LICENSE_RECEIPT_ALREADY_MATCHED",
+
+  // Third-party AI data-sharing consent (ST-305). AI_CONSENT_REQUIRED is the consent gate's refusal:
+  // the caller has no live consent for the current disclosure, so nothing was sent to the model
+  // provider -- show the consent modal. AI_CONSENT_DISCLOSURE_OUTDATED is a grant that named a
+  // disclosure version other than the one currently served -- refetch it and ask again.
+  AI_CONSENT_REQUIRED: "AI_CONSENT_REQUIRED",
+  // Ask AI photo text (POST /api/ai/photo-text): a photo is read on the server and only its text is
+  // returned. Too large refuses before the bytes are read; anything but JPEG or PNG is refused unread.
+  AI_PHOTO_TOO_LARGE: "AI_PHOTO_TOO_LARGE",
+  AI_PHOTO_UNSUPPORTED_TYPE: "AI_PHOTO_UNSUPPORTED_TYPE",
+  AI_CONSENT_DISCLOSURE_OUTDATED: "AI_CONSENT_DISCLOSURE_OUTDATED",
+
+  // LLM gateway (ST-164). The generate route answers with one of three provider-stage codes:
+  // AI_LLM_DISABLED when the kill switch is off (the feature is deliberately absent, not broken);
+  // AI_LLM_UNAVAILABLE when the provider or the network around it is failing (transient -- retry,
+  // honoring Retry-After); AI_LLM_REQUEST_REJECTED when the provider answered but refused the
+  // request itself (non-transient 4xx -- retrying would repeat the rejection).
+  AI_LLM_DISABLED: "AI_LLM_DISABLED",
+  AI_LLM_UNAVAILABLE: "AI_LLM_UNAVAILABLE",
+  AI_LLM_REQUEST_REJECTED: "AI_LLM_REQUEST_REJECTED",
+
+  // Ask AI streaming endpoint (ST-165).
+  AI_CONVERSATION_NOT_FOUND: "AI_CONVERSATION_NOT_FOUND",
+  // Not an HTTP status -- this is the refusal path's SSE payload message, resolved through the same
+  // localization catalog as every coded error so the client-facing text stays translated.
+  AI_ASK_INSUFFICIENT_GROUNDING: "AI_ASK_INSUFFICIENT_GROUNDING",
+
+  // Quiz generation and grading (ST-167). AI_QUIZ_GENERATION_FAILED is the model-output-stage
+  // counterpart to AI_LLM_UNAVAILABLE above: the provider answered, but its JSON did not validate
+  // against the quiz schema (malformed options, or a citation the model invented) -- a client can
+  // retry the same request. AI_QUIZ_NOT_FOUND covers the grading endpoint's quiz lookup, on the same
+  // terms AI_CONVERSATION_NOT_FOUND covers Ask AI's.
+  AI_QUIZ_GENERATION_FAILED: "AI_QUIZ_GENERATION_FAILED",
+  AI_QUIZ_NOT_FOUND: "AI_QUIZ_NOT_FOUND",
+
+  // Flashcard deck generation and spaced-repetition reviews (ST-168). AI_FLASHCARD_GENERATION_FAILED
+  // is the model-output-stage counterpart to AI_QUIZ_GENERATION_FAILED: the provider answered, but
+  // its JSON did not validate against the flashcard schema -- a client can retry the same request.
+  // AI_FLASHCARD_DECK_NOT_FOUND covers the review endpoints' deck lookup, on the same terms
+  // AI_QUIZ_NOT_FOUND covers quiz grading's.
+  AI_FLASHCARD_GENERATION_FAILED: "AI_FLASHCARD_GENERATION_FAILED",
+  AI_FLASHCARD_DECK_NOT_FOUND: "AI_FLASHCARD_DECK_NOT_FOUND",
+
+  // Key-concept extraction (ST-169). AI_CONCEPTS_GENERATION_FAILED is the model-output-stage
+  // counterpart to the quiz/flashcard generation failures: the provider answered, but its JSON did
+  // not validate against the concepts schema, cited a source it was never given, or named a concept
+  // that the grounding validator could not tie to the corpus -- a client can retry the same request.
+  AI_CONCEPTS_GENERATION_FAILED: "AI_CONCEPTS_GENERATION_FAILED",
+
+  // Simplified explanations (ST-170). AI_EXPLAIN_GENERATION_FAILED is the model-output-stage
+  // counterpart to the concepts failure above: the provider answered, but the rewrite came back
+  // empty or the grounding validator could not tie every sentence back to the retrieved passage --
+  // a client can retry the same request.
+  AI_EXPLAIN_GENERATION_FAILED: "AI_EXPLAIN_GENERATION_FAILED",
+
+  // Exam mode (ST-171). Generation runs in a worker, not the request path, so
+  // AI_EXAM_GENERATION_FAILED is never thrown from an HTTP handler -- it is the reason string the
+  // GET status endpoint reports once a session's status has settled to `failed` (the same
+  // model-output-stage meaning AI_QUIZ_GENERATION_FAILED has for quiz's synchronous path).
+  // AI_EXAM_NOT_FOUND covers a session lookup, scoped to school AND student on the same terms
+  // AI_QUIZ_NOT_FOUND is. AI_EXAM_INVALID_STATE is start/submit called from a session status that
+  // does not allow it (e.g. submit before start, start twice). AI_EXAM_EXPIRED is the
+  // acceptance-criterion timer enforcement: submit refused because `now() > expires_at`.
+  // AI_EXAM_GENERATION_UNAVAILABLE is create refused because the generation queue or its Redis
+  // connection is not configured, on the same terms FINANCE_REPORT_EXPORT_UNAVAILABLE is.
+  AI_EXAM_GENERATION_FAILED: "AI_EXAM_GENERATION_FAILED",
+  AI_EXAM_NOT_FOUND: "AI_EXAM_NOT_FOUND",
+  AI_EXAM_INVALID_STATE: "AI_EXAM_INVALID_STATE",
+  AI_EXAM_EXPIRED: "AI_EXAM_EXPIRED",
+  AI_EXAM_GENERATION_UNAVAILABLE: "AI_EXAM_GENERATION_UNAVAILABLE",
+
+  // AI content moderation. AI_MODERATION_INPUT_BLOCKED is the question-side guard: the student's
+  // text violated the age-appropriate content policy before the LLM was called.
+  // AI_MODERATION_OUTPUT_BLOCKED is the generation-side guard: the model's answer violated the
+  // same policy and was withheld from the student. Both carry a category key (profanity,
+  // hate_speech, self_harm, sexual_content, violence, pii_sharing) so the client can show
+  // the matching guidance. AI_ANSWER_REPORTED is the confirmation a student's report landed (and
+  // the 409 when they already reported that item); AI_REPORT_NOT_FOUND covers a lookup on the
+  // moderation queue (ST-306); AI_REPORT_INVALID_TRANSITION is a queue status change the review
+  // workflow does not allow (e.g. reopening a closed report).
+  AI_MODERATION_INPUT_BLOCKED: "AI_MODERATION_INPUT_BLOCKED",
+  AI_MODERATION_OUTPUT_BLOCKED: "AI_MODERATION_OUTPUT_BLOCKED",
+  AI_ANSWER_REPORTED: "AI_ANSWER_REPORTED",
+  AI_REPORT_NOT_FOUND: "AI_REPORT_NOT_FOUND",
+  AI_REPORT_INVALID_TRANSITION: "AI_REPORT_INVALID_TRANSITION",
+
+  // Billing portal (ST-137): the cancellation-flow guards. The first two are distinct from each
+  // other because a client acts differently -- one means "nothing to do", the other "cancel first".
+  SUBSCRIPTION_ALREADY_CANCELED: "SUBSCRIPTION_ALREADY_CANCELED",
+  SUBSCRIPTION_CANCELLATION_NOT_PENDING: "SUBSCRIPTION_CANCELLATION_NOT_PENDING",
+  SUBSCRIPTION_NOT_LINKED_TO_PROVIDER: "SUBSCRIPTION_NOT_LINKED_TO_PROVIDER",
+
+  // Subscription refund requests: a school's plan or a student's AI add-on, reviewed by Studafy
+  // staff. Distinct from the REFUND_* codes above, which are school-fee refunds in ERPNext.
+  // ALREADY_REQUESTED is the one-open-request rule; PAYMENT_NOT_REFUNDABLE means the named
+  // payment is not a paid charge on the school's provider account; AMOUNT_EXCEEDS_PAYMENT and
+  // PAYMENT_REQUIRED are the approval-time checks on what is actually sent to the provider.
+  SUBSCRIPTION_REFUND_NOT_FOUND: "SUBSCRIPTION_REFUND_NOT_FOUND",
+  SUBSCRIPTION_REFUND_ALREADY_REQUESTED: "SUBSCRIPTION_REFUND_ALREADY_REQUESTED",
+  SUBSCRIPTION_REFUND_INVALID_TRANSITION: "SUBSCRIPTION_REFUND_INVALID_TRANSITION",
+  SUBSCRIPTION_REFUND_PAYMENT_NOT_REFUNDABLE: "SUBSCRIPTION_REFUND_PAYMENT_NOT_REFUNDABLE",
+  SUBSCRIPTION_REFUND_PAYMENT_REQUIRED: "SUBSCRIPTION_REFUND_PAYMENT_REQUIRED",
+  SUBSCRIPTION_REFUND_AMOUNT_EXCEEDS_PAYMENT: "SUBSCRIPTION_REFUND_AMOUNT_EXCEEDS_PAYMENT",
+
+  // Parent<->teacher messaging (000135/000136). MESSAGING_BLOCKED is a send or a new thread refused
+  // because a block stands between the two users (either direction); history stays readable.
+  // MESSAGE_REPORT_ALREADY_OPEN is the one-open-report rule (same reporter, same message or, for a
+  // general report, same thread). MESSAGE_REPORT_NOT_FOUND covers a review-queue lookup and
+  // MESSAGE_REPORT_INVALID_TRANSITION a status change the review workflow does not allow.
+  MESSAGING_BLOCKED: "MESSAGING_BLOCKED",
+  MESSAGE_REPORT_ALREADY_OPEN: "MESSAGE_REPORT_ALREADY_OPEN",
+  MESSAGE_REPORT_NOT_FOUND: "MESSAGE_REPORT_NOT_FOUND",
+  MESSAGE_REPORT_INVALID_TRANSITION: "MESSAGE_REPORT_INVALID_TRANSITION",
+
+  // School-defined student and parent records (docs/modules/student-records.md, 000170).
+  // TEMPLATE_NOT_PUBLISHED: no published version to fill in yet. FIELD_LOCKED: a published field's
+  // type cannot change, nor can a sensitive field be made standard again (ADR-019). VALUE_INVALID
+  // names the field, never echoes the value. NOT_SENSITIVE: a reveal of a field that is not
+  // sensitive. KEY_UNAVAILABLE: the sealing key for a stored value is not in the keyring (fails
+  // closed). SUBJECT_NOT_FOUND covers a student or parent the caller cannot see as well as one that
+  // does not exist, so the endpoints cannot be used to probe.
+  RECORD_TEMPLATE_NOT_PUBLISHED: "RECORD_TEMPLATE_NOT_PUBLISHED",
+  RECORD_NOTHING_TO_PUBLISH: "RECORD_NOTHING_TO_PUBLISH",
+  RECORD_FIELD_NOT_FOUND: "RECORD_FIELD_NOT_FOUND",
+  RECORD_FIELD_INVALID: "RECORD_FIELD_INVALID",
+  RECORD_FIELD_LOCKED: "RECORD_FIELD_LOCKED",
+  RECORD_FIELD_NOT_DOCUMENT: "RECORD_FIELD_NOT_DOCUMENT",
+  RECORD_FIELD_NOT_SENSITIVE: "RECORD_FIELD_NOT_SENSITIVE",
+  RECORD_VALUE_INVALID: "RECORD_VALUE_INVALID",
+  RECORD_SUBJECT_NOT_FOUND: "RECORD_SUBJECT_NOT_FOUND",
+  RECORD_DOCUMENT_NOT_FOUND: "RECORD_DOCUMENT_NOT_FOUND",
+  RECORD_KEY_UNAVAILABLE: "RECORD_KEY_UNAVAILABLE",
+
+  // Custom lists (docs/modules/custom-lists.md, 000182). NOT_FOUND covers a list, column or row the
+  // caller cannot see (outside the list's audience) as well as one that does not exist, so the
+  // endpoints cannot be used to probe. LIMIT_REACHED: a per-school or per-list cap. LINK_INVALID: a
+  // link the list does not allow, or a person or class that is not there. PREVIEW_STALE: an import
+  // confirmed with a preview token that no longer matches what would be written. Cell values reuse
+  // RECORD_VALUE_INVALID, RECORD_FIELD_NOT_SENSITIVE and RECORD_KEY_UNAVAILABLE.
+  CUSTOM_LIST_NOT_FOUND: "CUSTOM_LIST_NOT_FOUND",
+  CUSTOM_LIST_INVALID: "CUSTOM_LIST_INVALID",
+  CUSTOM_LIST_NAME_TAKEN: "CUSTOM_LIST_NAME_TAKEN",
+  CUSTOM_LIST_LIMIT_REACHED: "CUSTOM_LIST_LIMIT_REACHED",
+  CUSTOM_LIST_LINK_INVALID: "CUSTOM_LIST_LINK_INVALID",
+  CUSTOM_LIST_PREVIEW_STALE: "CUSTOM_LIST_PREVIEW_STALE",
+
+  // Uncategorized server-side failure.
+  INTERNAL_ERROR: "INTERNAL_ERROR",
+} as const;
+
+export type ErrorCode = (typeof ERROR_CODES)[keyof typeof ERROR_CODES];

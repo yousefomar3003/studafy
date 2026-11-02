@@ -1,0 +1,65 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Mobile release lane (ST-257) — see docs/runbooks/mobile-release.md.
+# Signing material and store credentials are injected from CI secrets at run time; none of it is
+# ever committed. The lane writes these paths, and fastlane writes its own run reports.
+# (Gemfile.lock is deliberately NOT ignored — commit it once `bundle install` has produced one.)
+/android/key.properties
+/android/app/*.jks
+/android/app/*.keystore
+/ios/fastlane/report.xml
+/fastlane/report.xml
+/fastlane/README.md
+/fastlane/play-store-key.json
+/fastlane/mobile-release-floor.env
+/fastlane/*.p8
+**/*.mobileprovision
+
+# Firebase client config (docs/runbooks/fcm-setup.md). Not a credential, but the repository is
+# public: each developer and CI writes it from the Firebase console / the GOOGLE_SERVICES_JSON secret.
+/android/app/google-services.json
+/ios/Runner/GoogleService-Info.plist

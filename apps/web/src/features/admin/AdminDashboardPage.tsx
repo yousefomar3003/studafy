@@ -1,0 +1,169 @@
+import { PERMISSIONS } from "@studafy/constants";
+
+import { useApprovalQueueQuery } from "../../components/ApprovalQueueBadge";
+import { HomeHeader, useSummarySentence } from "../../components/home/HomeHeader";
+import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip";
+import { usePermissions } from "../../lib/auth";
+import { useFormatters, useTranslation } from "../../lib/i18n";
+import { LicenseTile } from "../license/LicenseTile";
+import { useMissingSummaryQuery } from "../records/missing/queries";
+
+import { useAttendanceTodayQuery, useUserStatusCountsQuery } from "./queries";
+import { StorageUsageTile } from "./tiles/StorageUsageTile";
+
+import type { SummaryItem } from "../../components/home/SummaryStrip";
+import type { UseQueryResult } from "@tanstack/react-query";
+
+import "../../components/dashboard-tile.css";
+import "./admin-dashboard.css";
+
+const ADMIN_LINKS = [
+  { key: "users", to: "/portal/admin/users" },
+  { key: "students", to: "/portal/admin/students" },
+  { key: "teachers", to: "/portal/admin/teachers" },
+  { key: "timetable", to: "/portal/admin/timetable" },
+  // The school's classes and each one's record. The admin console has no class list of its own:
+  // ORG_ADMIN holds principalDashboard:view, so the shared Classes page serves both.
+  { key: "classes", to: "/portal/principal/classes" },
+  { key: "calendar", to: "/portal/admin/calendar" },
+  { key: "settings", to: "/portal/admin/settings" },
+  { key: "announcements", to: "/portal/admin/announcements" },
+  { key: "audit", to: "/portal/admin/audit" },
+  { key: "privacy", to: "/portal/admin/privacy" },
+  { key: "aiReports", to: "/portal/admin/ai-reports" },
+] as const;
+
+const statusOf = (query: UseQueryResult) =>
+  query.isPending ? "pending" : query.isError ? "error" : "ready";
+
+/**
+ * Admin home (`/portal/admin`), gated by `organization:manageSettings` (see `RequirePermission`
+ * in `app/routes.tsx`) — the same permission `SetupWizardPage` uses, since both are org-admin-only
+ * surfaces. Opens with who is signed in, a one-line summary of what needs attention, and the
+ * headline figures; the school's storage use follows. Every figure owns its own
+ * query and loading/error state, so one failing endpoint never blocks the others from rendering.
+ */
+export default function AdminDashboardPage() {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  const permissions = usePermissions();
+  const userCounts = useUserStatusCountsQuery();
+  const attendance = useAttendanceTodayQuery();
+  const approvals = useApprovalQueueQuery();
+  const canReadRecords = permissions.has(PERMISSIONS.STUDENT_RECORD_READ);
+  const missingRecords = useMissingSummaryQuery(canReadRecords);
+
+  const invited = userCounts.data?.invited ?? 0;
+  const active = userCounts.data?.active ?? 0;
+  const pendingApprovals = approvals.data?.total ?? 0;
+  const totals = attendance.data?.totals;
+  const hasAttendance = Boolean(totals && totals.total_records > 0);
+
+  const summary = useSummarySentence(
+    [
+      pendingApprovals > 0
+        ? t("adminSchool.home.summary.approvals", { count: pendingApprovals })
+        : null,
+      invited > 0 ? t("adminSchool.home.summary.invited", { count: invited }) : null,
+    ],
+    {
+      loading: userCounts.isPending || approvals.isPending,
+      failed: userCounts.isError || approvals.isError,
+    },
+  );
+
+  const items: SummaryItem[] = [
+    {
+      key: "active",
+      label: t("adminSchool.home.stats.active"),
+      value: formatNumber(active),
+      hint: t("adminSchool.home.stats.activeHint"),
+      to: "/portal/admin/users",
+      status: statusOf(userCounts),
+      errorMessage: t("adminSchool.tiles.activation.error"),
+    },
+    {
+      key: "invited",
+      label: t("adminSchool.tiles.activation.invited"),
+      value: formatNumber(invited),
+      hint: t("adminSchool.home.stats.invitedHint"),
+      to: "/portal/admin/users",
+      attention: invited > 0,
+      status: statusOf(userCounts),
+      errorMessage: t("adminSchool.tiles.activation.error"),
+    },
+    {
+      key: "attendance",
+      label: t("adminSchool.tiles.attendance.title"),
+      // Nothing marked yet today reads as a dash, not "0%": nothing was measured.
+      value:
+        hasAttendance && totals
+          ? formatNumber(Math.round(totals.present_percent) / 100, { style: "percent" })
+          : "—",
+      hint:
+        hasAttendance && totals
+          ? t("adminSchool.tiles.attendance.summary", {
+              count: totals.total_records,
+              present: formatNumber(totals.present_count),
+              total: formatNumber(totals.total_records),
+            })
+          : t("adminSchool.tiles.attendance.empty"),
+      status: statusOf(attendance),
+      errorMessage: t("adminSchool.tiles.attendance.error"),
+    },
+    {
+      key: "approvals",
+      label: t("adminSchool.tiles.approvals.title"),
+      value: formatNumber(pendingApprovals),
+      hint:
+        pendingApprovals === 0
+          ? t("adminSchool.tiles.approvals.empty")
+          : t("adminSchool.home.stats.approvalsHint"),
+      to: "/portal/approvals",
+      attention: pendingApprovals > 0,
+      status: statusOf(approvals),
+      errorMessage: t("adminSchool.tiles.approvals.error"),
+    },
+  ];
+
+  // School-defined records: how many people still have missing information (features/records).
+  if (canReadRecords) {
+    const people = (missingRecords.data?.students ?? 0) + (missingRecords.data?.parents ?? 0);
+    items.push({
+      key: "missingRecords",
+      label: t("recordTemplates.dashboard.missing"),
+      value: formatNumber(people),
+      hint: t("recordTemplates.dashboard.missingHint", {
+        count: missingRecords.data?.expired_documents ?? 0,
+      }),
+      to: "/portal/admin/records/missing",
+      attention: people > 0,
+      status: statusOf(missingRecords),
+      errorMessage: t("recordTemplates.tile.error"),
+    });
+  }
+
+  return (
+    <>
+      <HomeHeader title={t("adminSchool.dashboard.title")} summary={summary} />
+      <SummaryStrip items={items} />
+
+      <HomeShortcuts
+        links={ADMIN_LINKS.map((link) => ({
+          ...link,
+          label: t(`adminSchool.dashboard.links.${link.key}`),
+        }))}
+      />
+
+      <section className="home-section" aria-labelledby="admin-account-heading">
+        <h2 id="admin-account-heading" className="home-section-heading">
+          {t("adminSchool.home.accountHeading")}
+        </h2>
+        <div className="admin-dashboard-grid">
+          <StorageUsageTile />
+          {permissions.has(PERMISSIONS.LICENSE_READ) ? <LicenseTile /> : null}
+        </div>
+      </section>
+    </>
+  );
+}

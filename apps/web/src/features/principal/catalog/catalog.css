@@ -1,0 +1,19 @@
+/**
+ * Subjects & courses page: each course sits indented under its subject, and the catalog's own
+ * statuses (draft, inactive) get the same labels the year statuses use.
+ */
+
+.catalog-page__course {
+  display: inline-block;
+  padding-inline-start: var(--space-16);
+}
+
+.years-page__status[data-status="draft"] {
+  border-color: transparent;
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+}
+
+.years-page__status[data-status="inactive"] {
+  color: var(--color-muted-foreground);
+}

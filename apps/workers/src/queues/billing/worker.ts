@@ -1,0 +1,345 @@
+import { CloudWatchClient } from "@aws-sdk/client-cloudwatch";
+import { JOB_NAMES } from "@studafy/constants";
+import { TapClient } from "@studafy/tap-payments";
+import postgres from "postgres";
+import Stripe from "stripe";
+
+import { workerLogger } from "../../log";
+
+import { retryBillingEvent } from "./billing-event.service";
+import { COST_METRIC_NAMESPACE, runCostReport } from "./cost-report";
+import { runDunningSweep } from "./dunning-sweep";
+import { runFinanceReconciliation } from "./finance-reconciliation";
+import { generateInvoice, generateBatchInvoices } from "./invoice.service";
+import { runLicenseLifecycle } from "./license-lifecycle";
+import { runLicenseReminders } from "./license-reminders";
+import {
+  generateInvoiceSchema,
+  generateBatchInvoicesSchema,
+  processBillingEventSchema,
+} from "./schemas";
+import { runSeatReconciliation } from "./seat-reconciliation";
+import { runStorageQuotaReconciliation } from "./storage-quota-reconciliation";
+import { createStorageQuotaS3 } from "./storage-quota-s3";
+import { StripeSeatSubscriptionProvider } from "./stripe-seat-provider";
+import { runTapRenewals } from "./tap-renewal";
+import { runUsagePeriodStart } from "./usage-period-start";
+
+import type {
+  BillingJobData,
+  GenerateInvoiceJobData,
+  GenerateBatchInvoicesJobData,
+} from "./schemas";
+import type { Job } from "bullmq";
+
+export const BILLING_QUEUE = JOB_NAMES.GENERATE_INVOICE;
+
+/** S3 connectivity the storage-quota reconciliation sweep needs, supplied by the registry. */
+export interface StorageReconciliationOptions {
+  s3Region?: string;
+  s3Endpoint?: string;
+  bucket?: string;
+}
+
+export async function processBillingJob(
+  job: Job<BillingJobData>,
+  databaseUrl: string,
+  storageOptions?: StorageReconciliationOptions,
+): Promise<unknown> {
+  if (job.name === JOB_NAMES.GENERATE_INVOICE) {
+    const parsed = generateInvoiceSchema.safeParse(job.data);
+    if (!parsed.success) {
+      return { processed: false, reason: "invalid job data", errors: parsed.error.issues };
+    }
+    return processSingleInvoice(parsed.data, databaseUrl);
+  }
+
+  if (job.name === JOB_NAMES.GENERATE_BATCH_INVOICES) {
+    const parsed = generateBatchInvoicesSchema.safeParse(job.data);
+    if (!parsed.success) {
+      return { processed: false, reason: "invalid job data", errors: parsed.error.issues };
+    }
+    return processBatchInvoices(parsed.data, databaseUrl, job);
+  }
+
+  // Payment-provider webhook retry (ST-132). Shares this queue because it is billing work and the queue is
+  // named for what it carries, not for which provider it talks to; it shares nothing else with the
+  // ERPNext invoice jobs above, which are untouched by it.
+  if (job.name === JOB_NAMES.PROCESS_BILLING_EVENT) {
+    const parsed = processBillingEventSchema.safeParse(job.data);
+    if (!parsed.success) {
+      return { processed: false, reason: "invalid job data", errors: parsed.error.issues };
+    }
+    return retryBillingEvent(parsed.data, databaseUrl, workerLogger);
+  }
+
+  // Daily grace-period sweep (ST-134). Carries no payload -- the scheduler registers it with no
+  // data, and the sweep reads every school's grace state straight from the database. The sweep
+  // owns its own postgres connection rather than running inside the job's, because it spans many
+  // tenant transactions and each school commits on its own.
+  if (job.name === JOB_NAMES.RUN_DUNNING) {
+    return processDunningSweep(databaseUrl);
+  }
+
+  // Daily Tap renewals (ST-298). Same no-payload shape as the sweeps. A deployment with no Tap
+  // credentials has no Tap-billed subscriptions to renew, so an absent key is a logged skip -- but a
+  // key without a webhook URL is a thrown error, because a renewal nobody hears about never
+  // advances the period it paid for.
+  if (job.name === JOB_NAMES.RUN_TAP_RENEWALS) {
+    return processTapRenewals(databaseUrl);
+  }
+
+  // Nightly seat reconciliation (ST-136). Same shape as the dunning sweep: no payload, its own
+  // postgres connection, one tenant transaction per school. Unlike the dunning sweep it talks to
+  // Stripe, so it also needs the Stripe secret -- billing must not silently skip reconciliation,
+  // so a missing key is a thrown error (the registry re-queues it) rather than a dry run.
+  if (job.name === JOB_NAMES.RUN_SEAT_RECONCILIATION) {
+    return processSeatReconciliation(databaseUrl);
+  }
+
+  // Daily storage-quota reconciliation (ST-16x). Same shape as the dunning and seat sweeps: no
+  // payload, its own postgres connection, one system tenant transaction per school. Unlike them it
+  // talks to S3 (the bucket that holds the school's objects), so it needs the storage options — and
+  // a missing S3 region/bucket is a thrown error (the registry re-queues it) rather than a silent
+  // skip, because a meter that never reconciles drifts without limit.
+  if (job.name === JOB_NAMES.RUN_STORAGE_QUOTA_RECONCILIATION) {
+    return processStorageQuotaReconciliation(databaseUrl, storageOptions);
+  }
+
+  // Daily finance reconciliation: triggers apps/api's run (finance-reconciliation.ts). Without a
+  // service key the deployment has no ERPNext integration to reconcile, so that is a logged skip;
+  // a key without the API's address is a thrown error, because then reconciliation silently never
+  // happens.
+  if (job.name === JOB_NAMES.RUN_FINANCE_RECONCILIATION) {
+    const apiKey = process.env.RECONCILIATION_API_KEY;
+    const apiBaseUrl = process.env.API_BASE_URL;
+    if (!apiKey) {
+      workerLogger.info({}, "RECONCILIATION_API_KEY not set; no finance reconciliation to run");
+      return { processed: false, reason: "finance reconciliation not configured" };
+    }
+    if (!apiBaseUrl) {
+      throw new Error("API_BASE_URL is required to run finance reconciliation");
+    }
+    const result = await runFinanceReconciliation({ apiBaseUrl, apiKey });
+    workerLogger.info({ ...result }, "finance reconciliation complete");
+    return result;
+  }
+
+  // Cost & budget reporting sweep (ST-293). Same no-payload-but-mode shape as the sweeps above,
+  // except a missing STRIPE_SECRET_KEY is a soft skip (logged, AI metrics still publish) rather
+  // than a thrown error — unlike seat reconciliation this job never moves money, so a report
+  // missing one cost line is not worth failing the whole sweep over. See cost-report.ts's header.
+  if (job.name === JOB_NAMES.RUN_COST_REPORT) {
+    const mode = (job.data as { mode?: unknown })?.mode === "monthly" ? "monthly" : "daily";
+    return processCostReport(databaseUrl, mode);
+  }
+
+  // School license jobs (session 3 of docs/billing/feature-licensing.md). No payload, their own
+  // postgres connection, one system tenant transaction per school -- the dunning sweep's shape.
+  if (
+    job.name === JOB_NAMES.RUN_LICENSE_LIFECYCLE ||
+    job.name === JOB_NAMES.RUN_LICENSE_REMINDERS ||
+    job.name === JOB_NAMES.RUN_USAGE_PERIOD_START
+  ) {
+    return processLicenseJob(job.name, databaseUrl);
+  }
+
+  return { processed: false, reason: "unknown billing job" };
+}
+
+async function processLicenseJob(name: string, databaseUrl: string): Promise<unknown> {
+  const sql = postgres(databaseUrl, { max: 2 });
+  try {
+    const now = new Date();
+    if (name === JOB_NAMES.RUN_LICENSE_LIFECYCLE) {
+      return await runLicenseLifecycle(sql, now, workerLogger);
+    }
+    if (name === JOB_NAMES.RUN_LICENSE_REMINDERS) {
+      return await runLicenseReminders(sql, now, workerLogger);
+    }
+    return await runUsagePeriodStart(sql, now, workerLogger);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function processTapRenewals(databaseUrl: string): Promise<unknown> {
+  const secretKey = process.env.TAP_SECRET_KEY;
+  const webhookUrl = process.env.TAP_WEBHOOK_URL;
+  if (!secretKey) {
+    workerLogger.info({}, "TAP_SECRET_KEY not set; no Tap renewals to run");
+    return { processed: false, reason: "tap not configured" };
+  }
+  if (!webhookUrl) {
+    throw new Error("TAP_WEBHOOK_URL is required to run Tap renewals");
+  }
+
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    return await runTapRenewals(
+      sql,
+      new TapClient({ secretKey }),
+      webhookUrl,
+      new Date(),
+      workerLogger,
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function processSeatReconciliation(databaseUrl: string): Promise<unknown> {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    // Seats are only reconciled against Stripe subscriptions; Tap-billed schools (Jordan, the Gulf,
+    // Egypt) have none. A deployment without Stripe therefore skips -- unless some subscription is
+    // billed through Stripe after all, which must never stop reconciling silently.
+    if (!secretKey) {
+      const [row] = await sql<{ count: number }[]>`
+        SELECT count(*)::int AS count
+        FROM app.subscriptions
+        WHERE status = 'active' AND stripe_subscription_id IS NOT NULL
+      `;
+      if ((row?.count ?? 0) > 0) {
+        throw new Error(
+          `STRIPE_SECRET_KEY is required: ${row!.count} active subscription(s) are billed through Stripe`,
+        );
+      }
+      workerLogger.info(
+        {},
+        "STRIPE_SECRET_KEY not set and no Stripe-billed subscriptions; skipping",
+      );
+      return { processed: false, reason: "no stripe-billed subscriptions" };
+    }
+
+    // Awaited, not returned bare: the finally below would otherwise close the connection while the
+    // reconciliation is still running on it.
+    return await runSeatReconciliation(
+      sql,
+      new StripeSeatSubscriptionProvider(secretKey),
+      new Date(),
+      workerLogger,
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function processCostReport(databaseUrl: string, mode: "daily" | "monthly"): Promise<unknown> {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const stripe = secretKey ? new Stripe(secretKey, { apiVersion: "2026-07-29.dahlia" }) : undefined;
+  const cloudwatch = new CloudWatchClient({});
+  const monthlyBudgetUsd = process.env.AI_MONTHLY_SPEND_BUDGET_USD
+    ? Number(process.env.AI_MONTHLY_SPEND_BUDGET_USD)
+    : undefined;
+
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    return await runCostReport(
+      {
+        sql,
+        cloudwatch,
+        stripe,
+        log: workerLogger,
+        monthlyBudgetUsd,
+        metricNamespace: COST_METRIC_NAMESPACE,
+      },
+      mode,
+      new Date(),
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function processStorageQuotaReconciliation(
+  databaseUrl: string,
+  options?: StorageReconciliationOptions,
+): Promise<unknown> {
+  if (!options?.s3Region || !options.bucket) {
+    throw new Error(
+      "S3_REGION and S3_APP_FILES_BUCKET are required to run storage quota reconciliation",
+    );
+  }
+
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    return runStorageQuotaReconciliation(
+      sql,
+      createStorageQuotaS3({
+        region: options.s3Region,
+        endpoint: options.s3Endpoint,
+        bucket: options.bucket,
+      }),
+      workerLogger,
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function processDunningSweep(databaseUrl: string): Promise<unknown> {
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  try {
+    return runDunningSweep(sql, new Date(), workerLogger);
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function processSingleInvoice(
+  data: GenerateInvoiceJobData,
+  databaseUrl: string,
+): Promise<unknown> {
+  const sql = postgres(databaseUrl, { max: 1 });
+
+  try {
+    return sql.begin(async (tx) => {
+      await tx`SELECT set_config('app.school_id', ${data.schoolId}, true)`.execute();
+      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+
+      return generateInvoice(
+        tx,
+        data.schoolId,
+        data,
+        process.env.ERPNEXT_API_URL,
+        process.env.ERPNEXT_API_KEY,
+      );
+    });
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}
+
+async function processBatchInvoices(
+  data: GenerateBatchInvoicesJobData,
+  databaseUrl: string,
+  job: Job<BillingJobData>,
+): Promise<unknown> {
+  const sql = postgres(databaseUrl, { max: 2 });
+
+  // `generateBatchInvoices` opens its own per-step transactions (see its doc comment in
+  // invoice.service.ts) rather than running inside one held open for the whole batch, so there is
+  // no outer `sql.begin(...)` here the way the single-invoice path above has.
+  const attempts = job.opts.attempts ?? 1;
+  const isFinalAttempt = job.attemptsMade + 1 >= attempts;
+
+  try {
+    return await generateBatchInvoices(
+      sql,
+      data.schoolId,
+      data,
+      process.env.ERPNEXT_API_URL,
+      process.env.ERPNEXT_API_KEY,
+      isFinalAttempt,
+    );
+  } finally {
+    await sql.end({ timeout: 5 });
+  }
+}

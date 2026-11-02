@@ -1,0 +1,121 @@
+import { z } from "zod";
+
+/**
+ * Client-side form schemas for the settings screens, each mirroring the request body its section
+ * submits — `localeTimezoneSchema` / `attendanceAlertsSchema` against
+ * `UpdateSchoolSettings` (apps/api/src/modules/tenancy/settings/schemas.ts), `profileSchema` against
+ * `UpdateUserBody` (apps/api/src/modules/users/schemas.ts). Grading scheme has no schema of its own —
+ * it's a closed `Select` over `GRADING_SCHEME_TYPES`, so there's no invalid state to reject client-side.
+ *
+ * `LOCALE_OPTIONS` / `GRADING_SCHEME_TYPES` mirror the onboarding setup wizard's copies
+ * (routes/onboarding-setup/schema.ts) rather than importing them — routes compose features, not the
+ * reverse, and each feature owning its small enum mirror is the existing convention (see that file's
+ * own header comment on `schoolProfileSchema`).
+ */
+
+export const LOCALE_OPTIONS = ["en", "fr", "ar", "es", "pt", "de"] as const;
+
+/** Each language's own name (endonym), deliberately not translated: a language picker lists every
+ * option in its own script so a reader can find theirs regardless of the current UI language. */
+export const LOCALE_LABELS: Record<(typeof LOCALE_OPTIONS)[number], string> = {
+  en: "English",
+  fr: "Français",
+  ar: "العربية",
+  es: "Español",
+  pt: "Português",
+  de: "Deutsch",
+};
+
+export const GRADING_SCHEME_TYPES = [
+  "letter",
+  "percentage",
+  "gpa",
+  "numeric",
+  "pass_fail",
+] as const;
+
+/**
+ * The schemes an admin can switch to from settings. GPA is no longer offered; it stays in
+ * `GRADING_SCHEME_TYPES` only so a school already on it still renders (and keeps) its current value.
+ */
+export const SELECTABLE_GRADING_SCHEME_TYPES = GRADING_SCHEME_TYPES.filter(
+  (scheme) => scheme !== "gpa",
+);
+
+/** Translation key for a grading scheme's display name, resolved with `t()` at render time. */
+export function gradingSchemeLabelKey(scheme: (typeof GRADING_SCHEME_TYPES)[number]): string {
+  return `adminSchool.settings.grading.schemes.${scheme}`;
+}
+
+// Mirrors apps/api/src/modules/tenancy/settings/schemas.ts's `timezoneSchema` exactly.
+const TIMEZONE_PATTERN = /^[A-Za-z]+\/[A-Za-z_]+$/;
+
+export const profileSchema = z.object({
+  display_name: z
+    .string()
+    .trim()
+    .min(1, "adminSchool.settings.validation.nameRequired")
+    .max(200, "adminSchool.settings.validation.nameTooLong"),
+});
+export type ProfileValues = z.infer<typeof profileSchema>;
+
+export const localeTimezoneSchema = z.object({
+  locale: z.enum(LOCALE_OPTIONS),
+  timezone: z
+    .string()
+    .trim()
+    .regex(TIMEZONE_PATTERN, "adminSchool.settings.validation.invalidTimezone"),
+});
+export type LocaleTimezoneValues = z.infer<typeof localeTimezoneSchema>;
+
+export const attendanceAlertsSchema = z.object({
+  attendance_alert_threshold: z.coerce
+    .number()
+    .min(0, "adminSchool.settings.validation.percentRange")
+    .max(100, "adminSchool.settings.validation.percentRange"),
+  absence_alert_threshold: z.coerce
+    .number()
+    .min(0, "adminSchool.settings.validation.percentRange")
+    .max(100, "adminSchool.settings.validation.percentRange"),
+  attendance_correction_window_hours: z.coerce
+    .number()
+    .int("adminSchool.settings.validation.wholeHours")
+    .min(1, "adminSchool.settings.validation.minHours")
+    .max(8760, "adminSchool.settings.validation.maxHours"),
+  parent_discipline_visibility: z.boolean(),
+});
+export type AttendanceAlertsValues = z.infer<typeof attendanceAlertsSchema>;
+
+/** First validation message per top-level field, for rendering against `Input`/`Select` `error` props.
+ * Schema messages above are translation keys — resolve them with `t()` where they are displayed. */
+export function fieldErrors(error: z.ZodError): Record<string, string> {
+  const errors: Record<string, string> = {};
+  for (const issue of error.issues) {
+    const field = String(issue.path[0] ?? "");
+    if (field && !(field in errors)) {
+      // eslint-disable-next-line security/detect-object-injection -- `field` comes from this module's own Zod schema issues, and `errors` is a fresh local object, not a shared/prototype-bearing one
+      errors[field] = issue.message;
+    }
+  }
+  return errors;
+}
+
+/**
+ * The school's exam system, mirroring apps/api/src/modules/grading/exam-structure.ts: which parts a
+ * term has, in the order a term shows them, and the weights a newly picked system starts from.
+ */
+export const EXAM_STRUCTURES = ["midterm", "periods"] as const;
+export type ExamStructure = (typeof EXAM_STRUCTURES)[number];
+export type ExamPart =
+  "first_period" | "second_period" | "midterm" | "final_exam" | "quiz" | "homework";
+export type ExamWeights = Partial<Record<ExamPart, number>>;
+
+export const EXAM_STRUCTURE_PARTS: Record<ExamStructure, readonly ExamPart[]> = {
+  midterm: ["midterm", "final_exam", "quiz", "homework"],
+  periods: ["first_period", "second_period", "final_exam", "quiz", "homework"],
+};
+
+export const DEFAULT_EXAM_WEIGHTS: Record<ExamStructure, ExamWeights> = {
+  midterm: { midterm: 30, final_exam: 40, quiz: 15, homework: 15 },
+  periods: { first_period: 20, second_period: 20, final_exam: 30, quiz: 15, homework: 15 },
+};

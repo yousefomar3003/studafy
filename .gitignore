@@ -1,0 +1,59 @@
+node_modules/
+dist/
+storybook-static/
+.turbo/
+*.tsbuildinfo
+playwright-report/
+test-results/
+coverage/
+# Lighthouse CI local runs — regenerated on demand; CI uploads them as artifacts
+.lighthouseci/
+
+# Terraform — see infra/terraform/README.md
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform.tfstate.lock.info
+crash.log
+crash.*.log
+# Local overrides used for offline planning; never committed.
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# Variable files may carry secrets, so they are ignored by default. The committed
+# environment overlays are non-secret by construction and re-included explicitly.
+*.tfvars
+*.tfvars.json
+!infra/terraform/environments/**/*.tfvars
+# .terraform.lock.hcl is deliberately NOT ignored: it pins provider checksums.
+# Lambda deployment zips are built by the archive provider at plan/apply time.
+infra/terraform/modules/monitoring/lambda/realtime-probe/index.zip
+infra/terraform/modules/monitoring/lambda/cloudwatch-alert-bridge/index.zip
+infra/terraform/modules/monitoring/lambda/synthetics-probe/index.zip
+infra/terraform/modules/monitoring/lambda/status-page-sync/index.zip
+infra/terraform/modules/monitoring/lambda/status-page-incident/index.zip
+infra/terraform/modules/monitoring/lambda/status-page-subscribe/index.zip
+infra/terraform/modules/monitoring/lambda/status-page-subscription/index.zip
+
+# Environment
+.env
+
+# Database backups
+backups/
+
+# Generated — regenerated on demand or in CI; avoid merge conflicts
+apps/api/openapi.json
+packages/api-client/src/generated-types.ts
+apps/mobile/lib/src/core/api/generated/
+*.lnk
+
+# macOS Finder metadata
+.DS_Store
+
+# Local production secrets file fed to TF_VAR_secrets_app_secret_values — never commit
+prod-secerts.json
+prod-secrets.json

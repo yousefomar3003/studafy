@@ -1,0 +1,626 @@
+// Measures the ST-060 acceptance target: the build script parses every endpoint, runs its type
+// assertions, emits the schema artifact, and completes in under 2 seconds.
+//
+// This is an ABSOLUTE wall-clock budget, and it is the only one in this directory. The two
+// benchmarks beside it assert a delta for a documented reason -- an absolute budget on a shared CI
+// runner measures the host as much as the code, and the NFR-05 probe had to be widened twice
+// (500ms -> 600ms -> 1000ms) because it asserted a number within ~2x of its real cost. That reasoning
+// still holds. It simply does not apply here: there is no "the same script without OpenAPI
+// generation" arm to subtract, because generating the document is the entire program. The ticket
+// promises a wall clock, so a wall clock is what this measures.
+//
+// What makes it defensible where NFR-05 was not:
+//   - it reports a MEDIAN of several spawns, not one shot;
+//   - the margin is several times the budget rather than ~2x;
+//   - it measures the whole `bun run` -- process spawn and module import dominate, and those are
+//     exactly where a regression would come from (someone adding a heavy import to the graph).
+//
+// Timing buildOpenApiDocument() in-process instead would report single-digit milliseconds against a
+// 2000ms budget: true, meaningless, and blind to the regression that matters.
+//
+// If this flaps on CI, widen TARGET_MS or split spawn cost from generation cost. Do not lower
+// MEASURED_ITERATIONS -- the median is what makes the number trustworthy.
+//
+// Gated in-file as well as in CI: `bun test` in this app globs every directory, and without the
+// skipIf this would spawn subprocesses on every local unit-test invocation.
+
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
+import { expect, test } from "bun:test";
+
+const benchmarkTest = test.skipIf(process.env.OPENAPI_BENCHMARK !== "1");
+
+const WARMUP_ITERATIONS = 1;
+const MEASURED_ITERATIONS = 5;
+const TARGET_MS = 2_000;
+
+/** Routes the document must contain, so a script that wrote nothing cannot pass by doing nothing. */
+// Mirrors the list in src/openapi/document.test.ts. Two copies is one too many, and the duplication
+// is why this file failed in CI while the whole local suite was green: it is gated on
+// OPENAPI_BENCHMARK, so a new route updates the assertion nobody runs locally and misses this one.
+// ST-071 and ST-073 both tripped over it independently, which is about as clear a signal as this
+// kind of thing gives. Kept as its own list anyway rather than imported, because this benchmark
+// deliberately asserts against a document produced by a *separate process spawn* — importing the
+// expectation from the in-process suite would couple the two and weaken what this one proves.
+const EXPECTED_PATHS = [
+  // School-defined student and parent records (modules/records).
+  "/api/parents/{parentUserId}/records",
+  "/api/parents/{parentUserId}/records/{fieldId}/document",
+  "/api/parents/{parentUserId}/records/{fieldId}/document/download",
+  "/api/parents/{parentUserId}/records/{fieldId}/reveal",
+  "/api/record-forms/{subjectKind}",
+  "/api/record-templates/{subjectKind}",
+  "/api/record-templates/{subjectKind}/field-order",
+  "/api/record-templates/{subjectKind}/fields",
+  "/api/record-templates/{subjectKind}/fields/{fieldId}",
+  "/api/record-templates/{subjectKind}/publish",
+  "/api/records/missing/parents",
+  "/api/records/missing/students",
+  "/api/records/missing/summary",
+  "/api/students/{studentId}/records",
+  "/api/students/{studentId}/records/{fieldId}/document",
+  "/api/students/{studentId}/records/{fieldId}/document/download",
+  "/api/students/{studentId}/records/{fieldId}/reveal",
+  // Staff and class records (modules/records), and imported columns kept as fields.
+  "/api/classes/{classId}/records",
+  "/api/classes/{classId}/records/{fieldId}/document",
+  "/api/classes/{classId}/records/{fieldId}/document/download",
+  "/api/me/staff-record",
+  "/api/me/staff-record/{fieldId}/document/download",
+  "/api/record-imports/{subjectKind}/apply",
+  "/api/record-imports/{subjectKind}/preview",
+  // Custom lists (modules/custom-lists).
+  "/api/custom-lists",
+  "/api/custom-lists/imports/apply",
+  "/api/custom-lists/imports/preview",
+  "/api/custom-lists/linked/{subjectKind}/{subjectId}",
+  "/api/custom-lists/{listId}",
+  "/api/custom-lists/{listId}/column-order",
+  "/api/custom-lists/{listId}/columns",
+  "/api/custom-lists/{listId}/columns/{columnId}",
+  "/api/custom-lists/{listId}/export",
+  "/api/custom-lists/{listId}/link-candidates",
+  "/api/custom-lists/{listId}/rows",
+  "/api/custom-lists/{listId}/rows/{rowId}",
+  "/api/custom-lists/{listId}/rows/{rowId}/cells/{columnId}/reveal",
+  "/api/records/missing/classes",
+  "/api/records/missing/staff",
+  "/api/staff/{staffUserId}/records",
+  "/api/staff/{staffUserId}/records/{fieldId}/document",
+  "/api/staff/{staffUserId}/records/{fieldId}/document/download",
+  "/api/staff/{staffUserId}/records/{fieldId}/reveal",
+  "/.well-known/jwks.json",
+  "/api/academics/assignments",
+  "/api/academics/assignments/{assignmentId}",
+  "/api/academics/assignments/{assignmentId}/attachments",
+  "/api/academics/assignments/{assignmentId}/attachments/upload-url",
+  "/api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  "/api/academics/assignments/{assignmentId}/questions",
+  "/api/academics/assignments/{assignmentId}/submissions",
+  "/api/academics/classes",
+  "/api/academics/classes/{classId}",
+  "/api/academics/classes/{classId}/enrollments",
+  "/api/academics/classes/{classId}/enrollments/transfer",
+  "/api/academics/classes/{classId}/enrollments/{studentId}",
+  "/api/academics/courses/{courseId}",
+  "/api/academics/exams",
+  "/api/academics/exams/{examId}",
+  "/api/academics/grade-levels",
+  "/api/academics/grade-levels/{gradeLevelId}",
+  "/api/academics/materials",
+  "/api/academics/materials/upload",
+  "/api/academics/materials/{materialId}",
+  "/api/academics/materials/{materialId}/ai-visible",
+  "/api/academics/materials/{materialId}/confirm",
+  "/api/academics/rooms",
+  "/api/academics/sections",
+  "/api/academics/sections/{sectionId}",
+  "/api/academics/sections/{sectionId}/students",
+  "/api/academics/sections/{sectionId}/students/{studentId}",
+  "/api/academics/slots/{slotId}",
+  "/api/academics/subjects",
+  "/api/academics/subjects/{subjectId}",
+  "/api/academics/subjects/{subjectId}/courses",
+  "/api/academics/submissions",
+  "/api/academics/submissions/{submissionId}",
+  "/api/academics/submissions/{submissionId}/attachments",
+  "/api/academics/submissions/{submissionId}/attachments/upload-url",
+  "/api/academics/submissions/{submissionId}/attachments/{attachmentId}",
+  "/api/academics/submissions/{submissionId}/grade",
+  "/api/academics/terms/{termId}",
+  "/api/academics/timetable-settings",
+  "/api/academics/timetable-versions",
+  "/api/academics/timetable-versions/copy",
+  "/api/academics/timetable-versions/{versionId}",
+  "/api/academics/timetable-versions/{versionId}/approve",
+  "/api/academics/timetable-versions/{versionId}/publish",
+  "/api/academics/timetable-versions/{versionId}/reject",
+  "/api/academics/timetable-versions/{versionId}/slots",
+  "/api/academics/timetable-versions/{versionId}/submit",
+  "/api/academics/years",
+  "/api/academics/years/{yearId}",
+  "/api/academics/years/{yearId}/rollover",
+  "/api/academics/years/{yearId}/terms",
+  "/api/account/deletion",
+  "/api/account/deletion-requests",
+  "/api/account/deletion-requests/confirm",
+  "/api/account/profile",
+  "/api/admin/subscriptions/sync-prices",
+  "/api/admin/users/{userId}/devices",
+  "/api/admin/users/{userId}/devices/{deviceId}",
+  "/api/admin/users/{userId}/providers/{provider}",
+  "/api/admin/users/{userId}/sessions",
+  "/api/ai/admin/metrics",
+  "/api/ai/consent",
+  "/api/ai/health",
+  "/api/ai/moderation/reports",
+  "/api/ai/moderation/reports/{reportId}",
+  "/api/ai/students/{studentId}/ask",
+  "/api/ai/students/{studentId}/concepts",
+  "/api/ai/students/{studentId}/decks",
+  "/api/ai/students/{studentId}/decks/{deckId}/review",
+  "/api/ai/students/{studentId}/exams",
+  "/api/ai/students/{studentId}/exams/{examId}",
+  "/api/ai/students/{studentId}/exams/{examId}/start",
+  "/api/ai/students/{studentId}/exams/{examId}/submit",
+  "/api/ai/students/{studentId}/explain",
+  "/api/ai/students/{studentId}/generate",
+  "/api/ai/students/{studentId}/messages/{messageId}/report",
+  "/api/ai/students/{studentId}/quizzes",
+  "/api/ai/students/{studentId}/quizzes/{quizId}/grade",
+  "/api/ai/students/{studentId}/reports",
+  "/api/ai/students/{studentId}/search",
+  "/api/ai/students/{studentId}/summarize",
+  "/api/ai/usage",
+  "/api/announcements",
+  "/api/approvals/bulk-decision",
+  "/api/approvals/queue",
+  "/api/attendance/classes/{classId}/roster",
+  "/api/attendance/records/batch",
+  "/api/attendance/records/{recordId}",
+  "/api/attendance/records/{recordId}/history",
+  "/api/attendance/reports/export",
+  "/api/attendance/reports/export/{jobId}",
+  "/api/attendance/reports/summary",
+  "/api/attendance/reports/trends",
+  "/api/attendance/sessions",
+  "/api/attendance/sessions/{sessionId}",
+  "/api/attendance/sessions/{sessionId}/records",
+  "/api/attendance/students/{studentId}/records",
+  "/api/audit/logs",
+  "/api/audit/logs/export",
+  "/api/audit/logs/export/{jobId}",
+  "/api/auth/devices",
+  "/api/auth/devices/{deviceId}",
+  "/api/auth/devices/{deviceId}/sessions",
+  "/api/auth/invitations/{token}/activate",
+  "/api/auth/invitations/{token}/oauth/google/mobile-exchange",
+  "/api/auth/invitations/{token}/oauth/google/mobile-start",
+  "/api/auth/invitations/{token}/oauth/microsoft/mobile-exchange",
+  "/api/auth/invitations/{token}/oauth/microsoft/mobile-start",
+  "/api/auth/invitations/{token}/oauth/mock/mobile-exchange",
+  "/api/auth/invitations/{token}/oauth/mock/mobile-start",
+  "/api/auth/invitations/{token}/verify",
+  "/api/auth/login/member",
+  "/api/auth/login/oauth",
+  "/api/auth/login/review",
+  "/api/auth/logout",
+  "/api/auth/oauth/google/mobile-exchange",
+  "/api/auth/oauth/google/mobile-start",
+  "/api/auth/oauth/microsoft/mobile-exchange",
+  "/api/auth/oauth/microsoft/mobile-start",
+  "/api/auth/oauth/mock/mobile-exchange",
+  "/api/auth/oauth/mock/mobile-start",
+  "/api/auth/password/change",
+  "/api/auth/providers",
+  "/api/auth/providers/link/start",
+  "/api/auth/providers/{provider}",
+  "/api/auth/refresh",
+  "/api/auth/sessions",
+  "/api/auth/sessions/revoke-others",
+  "/api/auth/sessions/{sessionId}",
+  "/api/discipline/incidents",
+  "/api/discipline/incidents/{incidentId}",
+  "/api/discipline/incidents/{incidentId}/actions",
+  "/api/discipline/incidents/{incidentId}/actions/{actionId}",
+  "/api/discipline/incidents/{incidentId}/resolve",
+  "/api/evaluations",
+  "/api/evaluations/templates",
+  "/api/evaluations/templates/{templateId}",
+  "/api/evaluations/{evaluationId}",
+  "/api/evaluations/{evaluationId}/scores",
+  "/api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  "/api/evaluations/{evaluationId}/share",
+  "/api/evaluations/{evaluationId}/submit",
+  "/api/families",
+  "/api/families/{familyId}",
+  "/api/families/{familyId}/links",
+  "/api/families/{familyId}/links/{parentUserId}/{studentId}",
+  "/api/finance/expenses",
+  "/api/finance/expenses/summary",
+  "/api/finance/expenses/upload-url",
+  "/api/finance/expenses/{expenseId}",
+  "/api/finance/expenses/{expenseId}/attachments",
+  "/api/finance/families/{familyId}",
+  "/api/finance/fee-schedules/generate",
+  "/api/finance/fee-structures",
+  "/api/finance/fee-structures/{feeStructureId}",
+  "/api/finance/fee-structures/{feeStructureId}/students",
+  "/api/finance/invoices",
+  "/api/finance/invoices/batches",
+  "/api/finance/invoices/batches/preflight",
+  "/api/finance/invoices/batches/{batchId}",
+  "/api/finance/invoices/batches/{batchId}/items",
+  "/api/finance/invoices/{invoiceId}",
+  "/api/finance/online-payments",
+  "/api/finance/online-payments/{paymentId}",
+  "/api/finance/payments",
+  "/api/finance/payments/{paymentId}",
+  "/api/finance/reconciliation/run",
+  "/api/finance/refunds",
+  "/api/finance/refunds/initiate",
+  "/api/finance/refunds/{refundId}",
+  "/api/finance/refunds/{refundId}/approve",
+  "/api/finance/refunds/{refundId}/reject",
+  // Corrections through the refund queue (000177) and the VAT settings (000178).
+  "/api/finance/invoices/{invoiceId}/cancellation",
+  "/api/finance/payments/{paymentId}/reversal",
+  "/api/finance/tax-settings",
+  "/api/finance/students/{studentId}",
+  "/api/finance/scholarships",
+  "/api/finance/scholarships/{scholarshipId}",
+  "/api/finance/scholarship-awards",
+  "/api/finance/students",
+  "/api/finance/unlinked/parents",
+  "/api/finance/unlinked/students",
+  "/api/finance/unlinked/summary",
+  "/api/finance/scholarship-awards/{awardId}/approve",
+  "/api/finance/scholarship-awards/{awardId}/reject",
+  "/api/finance/scholarship-awards/{awardId}/revoke",
+  "/api/finance/reports/ar-aging",
+  "/api/finance/reports/collections-vs-due",
+  "/api/finance/reports/collections-by-method",
+  "/api/finance/reports/export",
+  "/api/finance/reports/export/{jobId}",
+  "/api/finance/reports/family-statement/{familyId}",
+  "/api/finance/reports/general-ledger",
+  "/api/finance/reports/joinvoice/{invoiceId}",
+  "/api/finance/students/{studentId}/installments",
+  "/api/finance/webhooks/erpnext/payment-confirmed",
+  "/api/finance/webhooks/erpnext/refund-processed",
+  "/api/grades/config/gradebooks/{gradebookId}/categories",
+  "/api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+  "/api/grades/config/gradebooks/{gradebookId}/scheme",
+  "/api/grades/config/gradebooks/{gradebookId}/scheme/link",
+  "/api/grades/config/schemes",
+  "/api/grades/config/schemes/{schemeId}",
+  "/api/grades/gradebooks",
+  "/api/grades/gradebooks/{gradebookId}/assessments",
+  "/api/grades/gradebooks/{gradebookId}/entry",
+  "/api/grades/gradebooks/{gradebookId}/grades",
+  "/api/grades/gradebooks/{gradebookId}/revisions/{revisionId}/withdraw",
+  "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+  "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/revisions",
+  "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+  "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+  "/api/grades/published/students/{studentId}/terms/{termId}",
+  "/api/imports/students",
+  "/api/imports/students/mappings",
+  "/api/imports/students/mappings/{mappingId}",
+  "/api/imports/students/settings",
+  "/api/imports/students/template",
+  "/api/imports/students/upload",
+  "/api/imports/students/{importId}",
+  "/api/imports/students/{importId}/confirm",
+  "/api/imports/students/{importId}/diff",
+  "/api/imports/students/{importId}/mapping",
+  "/api/imports/students/{importId}/source",
+  "/api/imports/students/{importId}/columns",
+  "/api/imports/students/{importId}/columns/apply",
+  "/api/imports/students/{importId}/columns/preview",
+  "/api/inquiries",
+  "/api/invitations",
+  "/api/invitations/bulk",
+  "/api/invitations/bulk/{bulkInviteId}",
+  "/api/invitations/bulk/{bulkInviteId}/recipients",
+  "/api/invitations/bulk/{bulkInviteId}/retry",
+  "/api/invitations/{id}/regenerate",
+  "/api/invitations/{id}/revoke",
+  "/api/lookups/countries",
+  "/api/lookups/currencies",
+  "/api/me/features",
+  "/api/school/license",
+  "/api/school/license/change-requests",
+  "/api/school/license/eligible",
+  "/api/school/license/people",
+  "/api/school/license/tiers",
+  "/api/school/license/seats",
+  "/api/school/license/seats/{seatId}",
+  "/api/platform/schools/{schoolId}/license-requests",
+  "/api/platform/schools/{schoolId}/license-requests/{requestId}/resolve",
+  "/api/platform/schools/{schoolId}/licenses",
+  "/api/platform/schools/{schoolId}/licenses/{licenseId}",
+  "/api/platform/schools/{schoolId}/licenses/{licenseId}/extend",
+  "/api/platform/schools/{schoolId}/licenses/{licenseId}/seats",
+  "/api/platform/schools/{schoolId}/licenses/{licenseId}/seats/{seatId}",
+  "/api/platform/schools/{schoolId}/licenses/{licenseId}/status",
+  "/api/messaging/contacts",
+  "/api/messaging/conversations",
+  "/api/messaging/conversations/{conversationId}",
+  "/api/messaging/conversations/{conversationId}/block",
+  "/api/messaging/conversations/{conversationId}/messages",
+  "/api/messaging/conversations/{conversationId}/profile",
+  "/api/messaging/conversations/{conversationId}/read",
+  "/api/messaging/conversations/{conversationId}/reports",
+  "/api/messaging/reports",
+  "/api/messaging/reports/{reportId}",
+  "/api/messaging/teacher-contacts",
+  "/api/messaging/teacher-conversations",
+  "/api/mobile/config",
+  "/api/notification-preferences",
+  "/api/notifications",
+  "/api/notifications/read-all",
+  "/api/notifications/unread-count",
+  "/api/notifications/{notificationId}/read",
+  "/api/platform/finance",
+  "/api/platform/import-signals/unmapped-headers",
+  "/api/platform/inquiries",
+  "/api/platform/inquiries/{inquiryId}",
+  "/api/platform/overview",
+  "/api/platform/plans",
+  "/api/platform/plans/{planId}",
+  "/api/platform/plans/{planId}/prices/{priceId}",
+  "/api/platform/refund-requests",
+  "/api/platform/refund-requests/{schoolId}/{requestId}",
+  "/api/platform/refund-requests/{schoolId}/{requestId}/approve",
+  "/api/platform/refund-requests/{schoolId}/{requestId}/reject",
+  "/api/platform/school-applications",
+  "/api/platform/school-applications/{applicationId}",
+  "/api/platform/school-applications/{applicationId}/approve",
+  "/api/platform/school-applications/{applicationId}/reject",
+  "/api/platform/schools",
+  "/api/platform/schools/{schoolId}",
+  "/api/platform/schools/{schoolId}/feature-flags/{flagName}",
+  "/api/platform/schools/{schoolId}/members",
+  "/api/platform/schools/{schoolId}/status",
+  "/api/platform/settings",
+  "/api/platform/settings/{key}",
+  "/api/platform/users/lookup",
+  "/api/privacy/dsr",
+  "/api/privacy/dsr/{requestId}",
+  "/api/privacy/me/dsr",
+  "/api/reports/children/comparison",
+  "/api/reports/children/{studentId}/breakdown",
+  "/api/reports/children/{studentId}/timetable",
+  "/api/school-applications/me",
+  "/api/school-applications/me/proof-upload-url",
+  "/api/school-applications/me/sign-out",
+  "/api/school-events",
+  "/api/school-events/{eventId}",
+  "/api/schools/current",
+  "/api/schools/current/closure",
+  "/api/schools/current/settings",
+  "/api/schools/register",
+  "/api/schools/resend-verification",
+  "/api/schools/verify-email/{token}",
+  "/api/schools/{schoolId}/provision",
+  "/api/schools/{schoolId}/provisioning-status",
+  "/api/search",
+  "/api/storage/downloads/{contentClass}/{objectId}",
+  "/api/storage/uploads/confirm",
+  "/api/storage/uploads/request-upload",
+  "/api/students",
+  "/api/students/me",
+  "/api/students/{studentId}",
+  "/api/students/{studentId}/guardians",
+  "/api/students/{studentId}/guardians/{userId}",
+  "/api/subscriptions/ai/checkout",
+  "/api/subscriptions/ai/offer",
+  "/api/subscriptions/ai/refund-requests",
+  "/api/subscriptions/ai/store/config",
+  "/api/subscriptions/ai/store/purchases",
+  "/api/subscriptions/checkout",
+  "/api/subscriptions/current",
+  "/api/subscriptions/current/cancel",
+  "/api/subscriptions/current/cancel/reverse",
+  "/api/subscriptions/current/invoices",
+  "/api/subscriptions/current/refund-requests",
+  "/api/subscriptions/plans",
+  "/api/subscriptions/portal",
+  "/api/subscriptions/school/checkout",
+  "/api/subscriptions/webhook/apple",
+  "/api/subscriptions/webhook/google",
+  "/api/subscriptions/webhook/stripe",
+  "/api/subscriptions/webhook/tap",
+  "/api/teachers",
+  "/api/teachers/me",
+  "/api/teachers/{teacherId}",
+  "/api/users",
+  "/api/users/member-summary",
+  "/api/users/status-counts",
+  "/api/users/{userId}",
+  "/api/users/{userId}/deactivate",
+  "/api/users/{userId}/password/reset",
+  "/api/users/{userId}/role",
+  "/email/webhooks/sns",
+  "/erpnext/webhooks",
+  "/healthz",
+  "/meta/mobile-versions",
+  "/readyz",
+  // Finance family accounts, receipts and sibling discounts; year-scoped academic grading.
+  "/api/finance/families",
+  "/api/finance/families/{familyId}/payments",
+  "/api/finance/families/{familyId}/profile",
+  "/api/finance/families/{familyId}/reminders",
+  "/api/finance/families/{familyId}/statements",
+  "/api/finance/payments/{paymentId}/receipt",
+  "/api/finance/reminders",
+  "/api/finance/sibling-discount",
+  "/api/grading/assessments/{assessmentId}/decision",
+  "/api/grading/certificates",
+  "/api/grading/certificates/{certificateId}",
+  "/api/grading/certificates/{certificateId}/reissue",
+  "/api/grading/certificates/{certificateId}/revoke",
+  "/api/grading/exam-structure/apply",
+  "/api/grading/finalizations",
+  "/api/grading/finalizations/{finalizationId}",
+  "/api/grading/finalizations/{finalizationId}/certificates",
+  "/api/grading/finalizations/{finalizationId}/certificates/readiness",
+  "/api/grading/finalizations/{finalizationId}/corrections",
+  "/api/grading/mark-sheets/{sheetId}/decision",
+  "/api/grading/my-assignments",
+  "/api/grading/scales/{scaleId}",
+  "/api/grading/sections/{sectionId}/results/finalize",
+  "/api/grading/sections/{sectionId}/results/preview",
+  "/api/grading/sections/{sectionId}/subject-enrollments",
+  "/api/grading/sections/{sectionId}/subjects",
+  "/api/grading/sections/{sectionId}/subjects/{subjectId}/assessments",
+  "/api/grading/sections/{sectionId}/subjects/{subjectId}/mark-sheets/submit",
+  "/api/grading/sections/{sectionId}/subjects/{subjectId}/marks",
+  "/api/grading/sections/{sectionId}/subjects/{subjectId}/override",
+  "/api/grading/students/{studentId}/certificates",
+  "/api/grading/students/{studentId}/marks",
+  "/api/grading/students/{studentId}/results",
+  "/api/grading/subject-configs/{configId}",
+  "/api/grading/subject-configs/{configId}/impact",
+  "/api/grading/subject-configs/{configId}/keep",
+  "/api/grading/subject-configs/{configId}/reset",
+  "/api/grading/teacher-assignments",
+  "/api/grading/teacher-assignments/{assignmentId}",
+  "/api/grading/years/{yearId}/copy",
+  "/api/grading/years/{yearId}/exam-template",
+  "/api/grading/years/{yearId}/mark-sheets",
+  "/api/grading/years/{yearId}/overview",
+  "/api/grading/years/{yearId}/programs",
+  "/api/grading/years/{yearId}/programs/{gradeLevelId}",
+  "/api/grading/years/{yearId}/programs/{gradeLevelId}/subjects",
+  "/api/grading/years/{yearId}/proposed-assessments",
+  "/api/grading/years/{yearId}/publish-check",
+  "/api/grading/years/{yearId}/scales",
+  "/api/grading/years/{yearId}/status",
+  "/api/grading/years/{yearId}/teacher-assignments",
+  // License billing (docs/billing/feature-licensing.md, session 3).
+  "/api/platform/licenses/bank-details",
+  "/api/platform/licenses/finance",
+  "/api/platform/licenses/invoices",
+  "/api/platform/licenses/price-settings",
+  "/api/platform/licenses/price-settings/{currencyCode}",
+  "/api/platform/licenses/quote",
+  "/api/platform/licenses/receipts",
+  "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}",
+  "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
+  "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payments",
+  "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/void",
+  "/api/platform/schools/{schoolId}/license-payments/upload-url",
+  "/api/platform/schools/{schoolId}/license-payments/{paymentId}/receipt-file",
+  "/api/platform/schools/{schoolId}/license-payments/{paymentId}/void",
+  "/api/platform/schools/{schoolId}/license-quotes",
+  "/api/platform/schools/{schoolId}/license-quotes/{quoteId}",
+  "/api/platform/schools/{schoolId}/license-quotes/{quoteId}/accept",
+  "/api/platform/schools/{schoolId}/license-quotes/{quoteId}/send",
+  "/api/platform/schools/{schoolId}/license-quotes/{quoteId}/withdraw",
+  "/api/platform/schools/{schoolId}/license-receipts/{receiptId}/file",
+  "/api/platform/schools/{schoolId}/license-receipts/{receiptId}/match",
+  "/api/school/license/invoices",
+  "/api/school/license/invoices/{invoiceId}",
+  "/api/school/license/invoices/{invoiceId}/receipts",
+  "/api/school/license/payments",
+  "/api/school/license/quotes",
+  "/api/school/license/quotes/{quoteId}",
+  "/api/school/license/quotes/{quoteId}/accept",
+  "/api/school/license/receipts/{receiptId}/file",
+  // The license console (session 4).
+  "/api/platform/features",
+  "/api/platform/features/{featureKey}",
+  "/api/platform/tiers",
+  "/api/platform/tiers/{planId}",
+  "/api/platform/licenses",
+  "/api/platform/licenses/change-requests",
+  "/api/platform/licenses/usage",
+  "/api/platform/schools/{schoolId}/license-console",
+];
+
+const SCRIPT = path.join(import.meta.dir, "..", "..", "scripts", "generate-openapi.ts");
+const CWD = path.join(import.meta.dir, "..", "..");
+
+function percentile(sorted: readonly number[], fraction: number): number {
+  const index = Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1);
+  return sorted[Math.max(0, index)]!;
+}
+
+function report(label: string, samples: number[]): number {
+  const sorted = [...samples].sort((a, b) => a - b);
+  const median = percentile(sorted, 0.5);
+  console.log(
+    `${label}: min=${sorted[0]!.toFixed(1)}ms median=${median.toFixed(1)}ms ` +
+      `p95=${percentile(sorted, 0.95).toFixed(1)}ms max=${sorted[sorted.length - 1]!.toFixed(1)}ms`,
+  );
+  return median;
+}
+
+/**
+ * Run the real script exactly as `bun run openapi:generate` does, writing to a scratch path.
+ *
+ * OPENAPI_OUT keeps the benchmark from overwriting the regular output path.
+ */
+async function generate(outPath: string): Promise<number> {
+  const startedAt = performance.now();
+  const proc = Bun.spawn(["bun", "run", SCRIPT], {
+    cwd: CWD,
+    env: { ...process.env, OPENAPI_OUT: outPath },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  const exitCode = await proc.exited;
+  const elapsed = performance.now() - startedAt;
+
+  if (exitCode !== 0) {
+    throw new Error(
+      `generate-openapi.ts exited ${exitCode}: ${await new Response(proc.stderr).text()}`,
+    );
+  }
+
+  return elapsed;
+}
+
+benchmarkTest(
+  `generate-openapi.ts emits the document in under ${TARGET_MS}ms`,
+  async () => {
+    const scratch = await mkdtemp(path.join(tmpdir(), "studafy-openapi-"));
+    const outPath = path.join(scratch, "openapi.json");
+
+    try {
+      // One spawn to warm the filesystem cache for Bun's module graph. Unlike the in-process
+      // benchmarks there is no JIT to warm: every iteration is a cold process, which is the honest
+      // shape of what CI and a developer actually run.
+      for (let index = 0; index < WARMUP_ITERATIONS; index += 1) {
+        await generate(outPath);
+      }
+
+      const samples: number[] = [];
+      for (let index = 0; index < MEASURED_ITERATIONS; index += 1) {
+        samples.push(await generate(outPath));
+      }
+
+      // Proof the script did the work: a generator that wrote `{}` would otherwise post an
+      // excellent time.
+      const document = JSON.parse(await readFile(outPath, "utf8")) as {
+        openapi: string;
+        paths: Record<string, unknown>;
+      };
+      expect(document.openapi).toBe("3.1.0");
+      expect(Object.keys(document.paths).sort()).toEqual([...EXPECTED_PATHS].sort());
+
+      const median = report("generate-openapi.ts", samples);
+      console.log(`openapi generation: ${median.toFixed(1)}ms (target < ${TARGET_MS}ms)`);
+
+      expect(median).toBeLessThan(TARGET_MS);
+    } finally {
+      await rm(scratch, { recursive: true, force: true });
+    }
+  },
+  120_000,
+);

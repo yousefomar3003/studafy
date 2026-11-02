@@ -1,0 +1,74 @@
+# ERPNext + Frappe Education, on top of the official frappe/erpnext image.
+#
+# Build from the repo root, same convention as the other three Dockerfiles in this directory
+# (infra/docker/README.md's "Why the build context is the repo root") — this one doesn't touch the
+# Bun workspace, but it does need infra/deploy/erpnext/seed/, which only exists in a repo-root
+# context:
+#   docker build -f infra/docker/erpnext.Dockerfile -t studafy/erpnext .
+#
+# This image is used by the backend/websocket/queue/scheduler ECS services
+# (infra/terraform/modules/erpnext) — every bench role that runs Python/Node bench commands. The
+# frontend role deliberately does NOT use this image; it runs the stock upstream
+# frappe/erpnext-nginx image unmodified, since nginx doesn't run bench and doesn't need the
+# Education app installed (see modules/erpnext/README.md).
+#
+# No custom build/runtime split like api/realtime/workers/web's Dockerfiles: there is no slim
+# final artifact to copy things into here — frappe/erpnext's own image is already the runtime,
+# `bench get-app` layers a Python/Node app onto it in place, and every role that uses this image
+# needs the full bench, not a trimmed subset of it.
+
+# Pinned by digest, not just the version-15 tag: upstream republishes that tag in place, and a
+# republish on 2026-09-28 grew the base enough to break this image's 3072MB CI size budget with no
+# change on our side. The digest makes builds reproducible; Renovate proposes each new upstream
+# digest as its own PR, where the size budget and scan run before it can merge.
+FROM frappe/erpnext:version-15@sha256:de8e0068467b4ea5a9d1b0a7c07e37b1ed8d2ea8d2f9d02c316bfd4d5a80f5f3
+
+# The backup/restore-drill ECS tasks (infra/terraform/modules/backup, ST-265) reuse this same bench
+# image to run `bench backup`/`bench restore`/`bench doctor` against a real Frappe site — no separate
+# image exists for that purpose (KISS: one bench-capable image, not two nearly-identical ones). AWS
+# CLI is added here, as root before the switch to the unprivileged frappe user below, purely so
+# those tasks can `aws s3 cp`/`aws s3 sync` backups to/from the backups-archive bucket and read the
+# MariaDB root credential from Secrets Manager, without vendoring a second S3/Secrets Manager client.
+#
+# frappe/erpnext's own image already ends on `USER frappe` (not root), so we have to switch back to
+# root explicitly here or apt-get fails with "Permission denied" on /var/lib/apt/lists/partial
+# (exit code 100) instead of ever reaching a package-resolution error.
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends awscli jq && rm -rf /var/lib/apt/lists/*
+
+USER frappe
+WORKDIR /home/frappe/frappe-bench
+
+# The officially documented way to layer a third-party Frappe app onto a prebuilt bench image
+# without rebuilding it from frappe_docker's own multi-stage pipeline: `get-app` fetches the app's
+# source and installs its Python requirements into the bench's shared virtualenv; `build --app`
+# compiles its front-end assets. frappe/education dropped the plain "version-15" branch in favor
+# of per-minor branches, so we pin to the latest v15 line (version-15.2) to stay on the same major
+# line as the base image without drifting onto an incompatible Frappe framework version.
+# line as ERPNEXT_VERSION without drifting onto an incompatible Frappe framework version.
+#
+# The trailing rm drops what only the build needed — the pip/yarn/npm download caches and the
+# app's git history (frappe_docker's own images strip apps' .git the same way). It has to be in
+# this same RUN: deleting them in a later layer would still ship them in this one. Keeps the image
+# under containers.yml's size budget, which the floating base tag above slowly grows into.
+RUN bench get-app education --branch version-15.2 https://github.com/frappe/education && \
+    bench build --app education && \
+    rm -rf /home/frappe/.cache /home/frappe/.npm apps/education/.git
+
+# infra/deploy/scripts/erpnext-new-site.sh's --seed flag runs `bench --site <hostname> execute
+# erpnext_seed.load_fixtures` against whichever role picks up the run-task override — placed on
+# PYTHONPATH (below) rather than installed as a proper bench app, since it's a one-shot loader
+# script, not a Frappe app with its own doctypes/migrations.
+COPY --chown=frappe:frappe infra/deploy/erpnext/seed/ /home/frappe/frappe-bench/erpnext_seed/
+ENV PYTHONPATH=/home/frappe/frappe-bench
+
+# infra/terraform/modules/backup's site-backup/restore-drill task definitions override `command` to
+# run one of these directly (e.g. ["bash", "erpnext-backup.sh"]) — same "COPY the script in, select
+# it via the task's own command override" shape as erpnext_seed/ above, not a bench app.
+COPY --chown=frappe:frappe infra/deploy/erpnext/backup/*.sh /home/frappe/frappe-bench/
+RUN chmod +x /home/frappe/frappe-bench/erpnext-backup.sh /home/frappe/frappe-bench/erpnext-restore-drill.sh
+
+# No EXPOSE, no ENTRYPOINT/CMD override: modules/erpnext's task-definition templates set the
+# actual command per role (gunicorn for backend, node for websocket, bench worker/schedule for
+# queue/scheduler) — this image is a shared base for all four, not a single-role image the way
+# api/realtime/workers/web's Dockerfiles are.

@@ -1,0 +1,714 @@
+import { keyringHoldsDevelopmentKey, parseRecordKeyring } from "@studafy/records";
+import { z } from "zod";
+
+import { LOG_LEVEL_NAMES } from "./logger";
+import { TAP_MARKETS } from "./modules/subscriptions/payment-provider-routing";
+
+/**
+ * Split a comma-separated origin list into trimmed, non-empty entries.
+ *
+ * Exported so the security config parses the variable exactly the way the schema validated it —
+ * one parser, so a value that passes bootstrap validation cannot be read back differently.
+ */
+export function parseOriginList(raw: string | undefined): string[] {
+  if (!raw) return [];
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+}
+
+/**
+ * True when the value is a bare origin: scheme, host, optional port, and nothing else.
+ *
+ * Rejects trailing paths and wildcards. The allowlist is compared by exact match, so an entry
+ * carrying a path would never match a real `Origin` header and would sit in the config looking
+ * like protection it does not provide.
+ */
+export function isAbsoluteOrigin(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+
+  if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+  if (url.username !== "" || url.password !== "") return false;
+  if (url.pathname !== "/" || url.search !== "" || url.hash !== "") return false;
+  if (value.includes("*")) return false;
+  // new URL() normalizes a trailing slash in, so compare against the origin it derived rather than
+  // the raw string, which may or may not have carried one.
+  return value.replace(/\/$/, "") === url.origin;
+}
+
+/**
+ * Environment configuration for the API. It is parsed and validated once at bootstrap so that an
+ * invalid environment fails fast — before the server binds a port — with a named, readable error.
+ */
+/**
+ * An empty environment variable is an unset one: it is present only because a deployment template
+ * always injects the key.
+ */
+function emptyAsUnset(value: unknown): unknown {
+  return value === "" ? undefined : value;
+}
+
+export const envSchema = z
+  .object({
+    NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+    // The deployment tier, which NODE_ENV cannot express: staging runs a production build
+    // (NODE_ENV=production) against non-production origins and secrets. Terraform already models
+    // the three tiers (infra/terraform/environments/{dev,staging,prod}), so the application needs a
+    // matching axis to resolve its CORS allowlist against.
+    APP_ENV: z.enum(["development", "staging", "production"]).default("development"),
+    // Comma-separated absolute origins permitted by the CORS allowlist. Deliberately data, not a
+    // compiled-in table: the previous hardcoded map had already drifted from infra, listing
+    // studafy.com/www.studafy.com while prod.tfvars provisions app.studafy.com. Required in
+    // staging/production by the refinement below, so a deployed tier cannot fall back to the
+    // localhost defaults and quietly accept credentialed cross-origin requests it should not.
+    CORS_ALLOWED_ORIGINS: z.string().optional(),
+    PORT: z.coerce.number().int().min(1).max(65535).default(3000),
+    HOST: z.string().min(1).default("0.0.0.0"),
+    // A separate port from PORT, on purpose (ST-259): the Prometheus-format /metrics endpoint
+    // (@studafy/observability's startMetricsServer) must never be reachable through the public ALB
+    // path api's own PORT is, since it carries no auth of its own — only the monitoring security
+    // group can route to it. 9464 is Prometheus's own registered default port.
+    METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+    // Distributed tracing (ST-260): base URL of the OTel collector's OTLP/HTTP receiver, e.g.
+    // "http://otel-collector.metrics.internal:4318" (infra/terraform/modules/monitoring/tracing.tf).
+    // Optional and unset by default — dev, test and the OpenAPI generator all run with no collector
+    // reachable, the same nullable-producer shape REDIS_URL/S3_* already use. `.or(z.literal(""))`:
+    // dev's task definition sets this key to an empty string rather than omitting it (render.sh
+    // substitutes an unset infra/deploy/environments/dev.env value into the JSON literally), and
+    // index.ts's `|| undefined` is what turns that back into "disabled" for startTracing(). See
+    // @studafy/observability's tracing.ts for why sampling happens at the collector, not here.
+    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional().or(z.literal("")),
+    SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
+    // Upper bound on the /readyz dependency probe (src/readiness.ts). A hung check — a busted pool
+    // slot, an ioredis command retrying in the offline queue — must flip readiness within this
+    // bound, which the acceptance criterion ties to 10 seconds; the cap enforces that contract in
+    // the schema itself. Defaults below the ALB target group's own 5s probe timeout
+    // (infra/terraform/modules/compute/main.tf) so this service answers 503 in time for the edge.
+    READINESS_TIMEOUT_MS: z.coerce.number().int().positive().max(10_000).default(5_000),
+    // Derived from the logger's own level names, so an added level cannot drift out of the
+    // environment contract. The dependency runs one way: env knows the logger, never the reverse.
+    LOG_LEVEL: z.enum(LOG_LEVEL_NAMES).default("info"),
+    SERVICE_NAME: z.string().min(1).default("api"),
+    // Names the running build in every log line. Deliberately absent from the production block
+    // below: "unknown" is a diagnosable log value, whereas a container that refuses to boot over a
+    // logging field is an outage. Deployments set it from IMAGE_TAG.
+    RELEASE_VERSION: z.string().min(1).default("unknown"),
+    // Sentry error monitoring (@studafy/observability's initErrorMonitoring). Unset disables it —
+    // the normal state in dev and test. Empty is unset: the task definition always injects the key
+    // from the tier's infra/deploy/environments/*.env, where empty turns monitoring off.
+    SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // The deploy tier events are grouped under. Falls back to APP_ENV (index.ts).
+    SENTRY_ENVIRONMENT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    DATABASE_HOST: z.string().min(1).optional(),
+    DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    DATABASE_NAME: z.string().min(1).optional(),
+    DATABASE_USER: z.string().min(1).optional(),
+    DATABASE_PASSWORD: z.string().min(1).optional(),
+    DATABASE_CA_CERT: z.string().min(1).optional(),
+    // Local development only: `disable` connects to the plain docker-compose Postgres (compose.yml test profile)
+    // without TLS. Refused below outside APP_ENV=development / NODE_ENV!=production, so a deployed
+    // API always verifies the database certificate.
+    DATABASE_SSL_MODE: z.enum(["disable", "verify-full"]).optional(),
+    // Local development only: skips the Redis token-bucket rate limiter, whose IP-scoped auth budget
+    // (5 refreshes, ~1 more per 12s) is shared by every request from localhost and is exhausted by
+    // a few page reloads or account switches. Refused below outside APP_ENV=development.
+    RATE_LIMIT_DISABLED: z.enum(["true", "false"]).optional(),
+    // Analytics are isolated on a dedicated PgBouncer database backed by an RDS read replica.
+    // Local development and tests may omit these values and reuse the primary pool.
+    READ_DATABASE_HOST: z.string().min(1).optional(),
+    READ_DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
+    READ_DATABASE_NAME: z.string().min(1).optional(),
+    REDIS_URL: z.string().min(1).optional(),
+    ERPNEXT_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // SNS topic ARN for SES email-event webhook ingestion (deliverability R-08). Optional: when
+    // absent, the webhook route answers 500 so a misconfigured topic cannot silently pass as secure.
+    EMAIL_EVENTS_SNS_TOPIC_ARN: z.string().min(1).optional(),
+    // ERPNext integration (ST-089). All optional — activates only when both are set.
+    ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    ERPNEXT_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // ERPNext site domain for auto-provisioned sites (e.g., "erpnext.studafy.com").
+    ERPNEXT_SITE_DOMAIN: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // JWT access-token signing
+    JWT_ISSUER: z.string().min(1).default("studafy"),
+    JWT_AUDIENCE: z.string().min(1).default("studafy-api"),
+    JWT_ACCESS_TTL_SECONDS: z.coerce.number().int().positive().default(900),
+    // Refresh-token lifetime, reapplied in full on every rotation — the window slides forward as
+    // long as a session stays in use, and 30 days of inactivity ends it. There is deliberately no
+    // absolute cap on a family's total age; see the follow-up noted in
+    // docs/architecture/SAD_13_session_model.md.
+    JWT_REFRESH_TTL_SECONDS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30 * 24 * 60 * 60),
+    JWT_KEY_ROTATION_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(7 * 24 * 60 * 60 * 1000),
+    // Google OAuth (OIDC). All optional — the feature activates only when the client id and secret
+    // are set, and then the redirect URI must be too (refinement below). Deployed tiers always render
+    // the redirect URI (derived from the tier's API origin) and inject the client id/secret from the
+    // secret manager, where an empty string means "not configured yet" — the same convention as
+    // TAP_SECRET_KEY. So an empty value is treated as unset, and a redirect URI alone means "off".
+    GOOGLE_OAUTH_CLIENT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_OAUTH_CLIENT_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_OAUTH_REDIRECT_URI: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Microsoft OAuth (OIDC). Same shape and conventions as Google above.
+    MICROSOFT_OAUTH_CLIENT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    MICROSOFT_OAUTH_CLIENT_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    MICROSOFT_OAUTH_REDIRECT_URI: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Mock OAuth (OIDC) — dev and E2E only (mock-config.ts, dev/mock-idp.ts). Both optional — the
+    // "mock" login/activation provider activates only when both are set, and the refinement below
+    // additionally refuses to boot at all with either set in a staging/production deployment, so a
+    // misconfiguration is a loud failure to start rather than a quietly-inert route.
+    MOCK_OAUTH_ISSUER_URL: z.string().url().optional(),
+    MOCK_OAUTH_REDIRECT_URI: z.string().url().optional(),
+    // Shared password for the App Store / Play reviewer demo tenant (ST-303,
+    // review-login-service.ts). Unset means POST /api/auth/login/review is not mounted at all. Allowed
+    // in production by design -- that is where reviewers sign in -- and only ever authenticates the
+    // 'review' identities of the single school flagged is_review_tenant. Held in the secret manager,
+    // never in the repository (docs/runbooks/app-review-access.md).
+    REVIEW_LOGIN_PASSWORD: z.string().min(16).optional(),
+    // Where to redirect after a successful OAuth callback. Not setting it disables the redirect.
+    FRONTEND_URL: z.string().url().optional(),
+    // Base URL for the pay-online redirect entry point served on outstanding invoices in the family
+    // financial view (ST-127). Optional: when absent, pay_online_url comes back null and the client
+    // simply has no redirect target to navigate to.
+    PAYMENT_REDIRECT_BASE_URL: z.string().url().optional(),
+    // Cloudflare Turnstile secret key for captcha verification on public endpoints (school
+    // self-registration, public account-deletion requests). When absent, captcha checks are skipped —
+    // allowed only in development: the refinement below refuses to boot a staging/production tier
+    // without it. Empty means unset (secret-manager default, as with TAP_SECRET_KEY).
+    TURNSTILE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The keyring that seals sensitive student and parent record values (ADR-019):
+    // {"<key id>": "<base64 32 bytes>"} plus the id new writes use. Required together on a
+    // deployed tier, which also refuses the in-repository development key; development and test
+    // fall back to that development key (resolveRecordKeyring).
+    RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // KMS key for sensitive record documents (ADR-019): applied when a staged upload is promoted to
+    // permanent/. Required on a deployed tier; local rustfs has no KMS, so development falls back
+    // to the bucket default.
+    STORAGE_SENSITIVE_KMS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // S3-compatible object storage for the app-files bucket (ST-103). All optional and validated
+    // as a group below: the feature activates only when the whole set is present, so dev and test
+    // boot without object storage and attachment endpoints answer 503 instead of the app failing to
+    // start. S3_ENDPOINT is optional even within the group — absent means AWS S3 proper; set it for
+    // MinIO or any other S3-compatible provider.
+    S3_ENDPOINT: z.string().url().optional(),
+    S3_REGION: z.string().min(1).optional(),
+    S3_ACCESS_KEY_ID: z.string().min(1).optional(),
+    S3_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    S3_APP_FILES_BUCKET: z.string().min(1).optional(),
+    // Lifetime of a pre-signed URL. Bounded to the 15–60 minute window ST-103 specifies: short
+    // enough that a leaked URL expires before it is useful, long enough to survive a slow upload.
+    S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(900).max(3600).default(900),
+    // Stripe billing integration. All optional — activates only when both are set.
+    STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    STRIPE_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Tap Payments (ST-298), for schools in Tap's MENA countries. Optional; activates only when both
+    // are set. TAP_WEBHOOK_URL is the public URL of POST /api/subscriptions/webhook/tap. An empty
+    // string means unset: the ECS task definition always injects both keys, and Terraform defaults
+    // them to "" where Tap is off (module.secrets' app_secret_defaults).
+    TAP_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().startsWith("sk_").optional()),
+    TAP_WEBHOOK_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Countries whose schools are billed through Tap, comma separated (e.g. "JO,SA"); every other
+    // school is billed through Stripe. Empty (the default) means none: Tap only takes merchants
+    // registered in its own markets, and Studafy's company is Irish. Only Tap's markets may be
+    // listed (payment-provider-routing.ts TAP_MARKETS).
+    TAP_COUNTRIES: z.preprocess(
+      emptyAsUnset,
+      z
+        .string()
+        .optional()
+        .transform(
+          (value) =>
+            new Set(
+              (value ?? "")
+                .split(",")
+                .map((code) => code.trim().toUpperCase())
+                .filter(Boolean),
+            ),
+        ),
+    ),
+    // In-app purchase of the AI add-on in the mobile app (Apple / Google require their own billing
+    // for digital goods there; the website keeps Tap/Stripe). AI_STORE_PRODUCT_ID is the
+    // subscription's product id, the same in App Store Connect and the Play Console. Each store is
+    // on only when its own values are set; an empty string means unset. See
+    // docs/runbooks/in-app-purchase-setup.md.
+    AI_STORE_PRODUCT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    APPLE_IAP_BUNDLE_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The app's numeric Apple id (App Store Connect > App Information). Apple needs it to verify
+    // production purchases, so production refuses an Apple setup without it.
+    APPLE_IAP_APP_APPLE_ID: z.preprocess(
+      emptyAsUnset,
+      z.coerce.number().int().positive().optional(),
+    ),
+    GOOGLE_PLAY_PACKAGE_NAME: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The Play Console service account's JSON key (a secret), and the secret `token` in the Pub/Sub
+    // push endpoint's URL that authenticates Google's notifications (a secret).
+    GOOGLE_PLAY_SERVICE_ACCOUNT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_PLAY_RTDN_TOKEN: z.preprocess(emptyAsUnset, z.string().min(16).optional()),
+    // Cross-encoder re-ranking (ST-163) kill switch. Off by default: an unset or "false" value leaves
+    // the retrieval route on the raw RRF ranking with zero re-ranking cost. Validated as an explicit
+    // two-value string so a typo ("yes") fails bootstrap instead of silently flipping the feature on.
+    AI_RERANK_ENABLED: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) => value === "true"),
+    // LLM gateway (ST-164) kill switch. Off by default: the generate route registers but answers
+    // 503 AI_LLM_DISABLED until a deployment opts in with AI_LLM_ENABLED=true and an API key.
+    AI_LLM_ENABLED: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) => value === "true"),
+    // Which API the LLM gateway speaks: the Anthropic Messages API (ANTHROPIC_* below), or an
+    // OpenAI-compatible chat-completions host such as Together AI (AI_LLM_API_KEY / AI_LLM_BASE_URL).
+    // See docs/runbooks/anthropic-provider-config.md.
+    AI_LLM_PROVIDER: z.preprocess(
+      emptyAsUnset,
+      z.enum(["anthropic", "openai-compatible"]).default("anthropic"),
+    ),
+    // Anthropic API key for the LLM gateway. Required by the refinement below when AI_LLM_ENABLED
+    // with the anthropic provider. Treated as a credential: never logged, and error payloads are
+    // scrubbed for its literal value. The same holds for AI_LLM_API_KEY.
+    ANTHROPIC_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Override the Anthropic API endpoint (gateway/proxy). Defaults to https://api.anthropic.com/v1.
+    ANTHROPIC_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Credential and API root (…/v1) for AI_LLM_PROVIDER=openai-compatible.
+    AI_LLM_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    AI_LLM_BASE_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
+    // Model ids for the small and large routing tiers. Defaults are the catalog ids current when
+    // ST-164 shipped (modules/ai/config.ts); see docs/runbooks/anthropic-provider-config.md. Those
+    // defaults are Claude ids, so the openai-compatible provider requires both to be set.
+    AI_LLM_SMALL_MODEL: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    AI_LLM_LARGE_MODEL: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Server default for max_tokens when a request omits it. Bounded to the route's ceiling so the
+    // reservation math in config.ts (AI_LLM_MAX_RESERVE_TOKENS) stays valid.
+    AI_LLM_MAX_TOKENS: z.coerce.number().int().min(1).max(16_384).optional(),
+    // Whole-call timeout (connect + wait + read). Bounded so a hung provider cannot pin a worker.
+    AI_LLM_TIMEOUT_MS: z.coerce.number().int().min(1000).max(300_000).optional(),
+    // Zero-retention posture: never send the metadata.user_id field the provider retains for abuse
+    // monitoring. See docs/runbooks/anthropic-provider-config.md.
+    AI_LLM_ZERO_RETENTION: z
+      .enum(["true", "false"])
+      .optional()
+      .transform((value) => value === "true"),
+    // OCR for Ask AI photo text (POST /api/ai/photo-text), the workers' engine and settings
+    // (packages/ocr). OCR_WORKER_PATH and OCR_LANG_PATH point at the bundled tesseract worker-script
+    // and the traineddata in the image, which has no node_modules; unset in development, where the
+    // engine resolves tesseract.js's own worker and the checked-in traineddata.
+    OCR_WORKER_PATH: z.string().min(1).optional(),
+    OCR_LANG_PATH: z.string().min(1).optional(),
+    // Mobile release floor / latest versions, served verbatim at GET /api/mobile/config (ST-257).
+    // Operational config, not code: the mobile app polls the endpoint and blocks itself below
+    // MIN_SUPPORTED, so raising the floor mid-rollout is an env change on this service, never an
+    // app release. All optional — an unset value resolves to "0.0.0" in the route (mobileConfigRoutes),
+    // which the client reads as "no floor" / "no newer build advertised". `x.y.z` only, matching
+    // Flutter's `pubspec.yaml` version-name grammar (the `+build` suffix is not part of the compare).
+    // See docs/runbooks/mobile-release.md#forced-update-floor.
+    MOBILE_MIN_SUPPORTED_VERSION_IOS: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, "expected a x.y.z version")
+      .optional(),
+    MOBILE_MIN_SUPPORTED_VERSION_ANDROID: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, "expected a x.y.z version")
+      .optional(),
+    MOBILE_LATEST_VERSION_IOS: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, "expected a x.y.z version")
+      .optional(),
+    MOBILE_LATEST_VERSION_ANDROID: z
+      .string()
+      .regex(/^\d+\.\d+\.\d+$/, "expected a x.y.z version")
+      .optional(),
+  })
+  .superRefine((env, context) => {
+    // Checked before the NODE_ENV gate below: this constraint keys off the deployment tier, and a
+    // staging box may legitimately run with either NODE_ENV.
+    if (env.APP_ENV !== "development") {
+      const origins = parseOriginList(env.CORS_ALLOWED_ORIGINS);
+      if (origins.length === 0) {
+        context.addIssue({
+          code: "custom",
+          path: ["CORS_ALLOWED_ORIGINS"],
+          message: `CORS_ALLOWED_ORIGINS is required and must be non-empty when APP_ENV is ${env.APP_ENV}`,
+        });
+      }
+
+      for (const origin of origins) {
+        if (!isAbsoluteOrigin(origin)) {
+          context.addIssue({
+            code: "custom",
+            path: ["CORS_ALLOWED_ORIGINS"],
+            message: `"${origin}" is not a bare absolute origin (expected scheme://host[:port], no path and no wildcard)`,
+          });
+        }
+      }
+    }
+
+    // Google / Microsoft OAuth: a provider is configured once its client id or secret is set, and
+    // then all three values are required. A redirect URI on its own is not a half-configuration —
+    // deployed tiers always render it, and it simply goes unused until the credentials arrive.
+    for (const [label, prefix, clientId, clientSecret, redirectUri] of [
+      [
+        "Google",
+        "GOOGLE_OAUTH",
+        env.GOOGLE_OAUTH_CLIENT_ID,
+        env.GOOGLE_OAUTH_CLIENT_SECRET,
+        env.GOOGLE_OAUTH_REDIRECT_URI,
+      ],
+      [
+        "Microsoft",
+        "MICROSOFT_OAUTH",
+        env.MICROSOFT_OAUTH_CLIENT_ID,
+        env.MICROSOFT_OAUTH_CLIENT_SECRET,
+        env.MICROSOFT_OAUTH_REDIRECT_URI,
+      ],
+    ] as const) {
+      if (clientId === undefined && clientSecret === undefined) continue;
+      const missing = [
+        clientId === undefined && `${prefix}_CLIENT_ID`,
+        clientSecret === undefined && `${prefix}_CLIENT_SECRET`,
+        redirectUri === undefined && `${prefix}_REDIRECT_URI`,
+      ].filter(Boolean);
+      if (missing.length > 0) {
+        context.addIssue({
+          code: "custom",
+          path: [`${prefix}_CLIENT_ID`],
+          message: `All ${label} OAuth variables must be set together. Missing: ${missing.join(", ")}`,
+        });
+      }
+    }
+
+    // Bot protection on the public forms is not optional on a deployed tier: without a Turnstile
+    // secret, apps/api's captcha check passes every request (verifyCaptcha), so a staging or
+    // production deploy without one fails to boot instead of silently accepting scripted sign-ups.
+    if (env.APP_ENV !== "development" && env.TURNSTILE_SECRET_KEY === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["TURNSTILE_SECRET_KEY"],
+        message: `TURNSTILE_SECRET_KEY is required when APP_ENV is ${env.APP_ENV}`,
+      });
+    }
+
+    // Sensitive record values are sealed with a real, deployment-held key or not written at all.
+    const recordKeyVars = [env.RECORDS_ENCRYPTION_KEYS, env.RECORDS_ENCRYPTION_CURRENT_KEY_ID];
+    const recordKeySetCount = recordKeyVars.filter((v) => v !== undefined).length;
+    if (recordKeySetCount === 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["RECORDS_ENCRYPTION_KEYS"],
+        message:
+          "RECORDS_ENCRYPTION_KEYS and RECORDS_ENCRYPTION_CURRENT_KEY_ID must be set together",
+      });
+    } else if (recordKeySetCount === 2) {
+      try {
+        const keyring = parseRecordKeyring(
+          env.RECORDS_ENCRYPTION_KEYS!,
+          env.RECORDS_ENCRYPTION_CURRENT_KEY_ID!,
+        );
+        if (env.APP_ENV !== "development" && keyringHoldsDevelopmentKey(keyring)) {
+          context.addIssue({
+            code: "custom",
+            path: ["RECORDS_ENCRYPTION_KEYS"],
+            message: `RECORDS_ENCRYPTION_KEYS must not hold the development key when APP_ENV is ${env.APP_ENV}`,
+          });
+        }
+      } catch (error) {
+        context.addIssue({
+          code: "custom",
+          path: ["RECORDS_ENCRYPTION_KEYS"],
+          message: (error as Error).message,
+        });
+      }
+    } else if (env.APP_ENV !== "development") {
+      context.addIssue({
+        code: "custom",
+        path: ["RECORDS_ENCRYPTION_KEYS"],
+        message: `RECORDS_ENCRYPTION_KEYS is required when APP_ENV is ${env.APP_ENV}`,
+      });
+    }
+    if (env.APP_ENV !== "development" && env.STORAGE_SENSITIVE_KMS_KEY_ID === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["STORAGE_SENSITIVE_KMS_KEY_ID"],
+        message: `STORAGE_SENSITIVE_KMS_KEY_ID is required when APP_ENV is ${env.APP_ENV}`,
+      });
+    }
+
+    // Mock OAuth: both must be present or both absent, exactly like Google/Microsoft above.
+    const mockOAuthVars = [env.MOCK_OAUTH_ISSUER_URL, env.MOCK_OAUTH_REDIRECT_URI];
+    const mockOAuthSetCount = mockOAuthVars.filter((v) => v !== undefined).length;
+    if (mockOAuthSetCount > 0 && mockOAuthSetCount < 2) {
+      const missing = [
+        !env.MOCK_OAUTH_ISSUER_URL && "MOCK_OAUTH_ISSUER_URL",
+        !env.MOCK_OAUTH_REDIRECT_URI && "MOCK_OAUTH_REDIRECT_URI",
+      ]
+        .filter(Boolean)
+        .join(", ");
+      context.addIssue({
+        code: "custom",
+        path: ["MOCK_OAUTH_ISSUER_URL"],
+        message: `Both mock OAuth variables must be set together. Missing: ${missing}`,
+      });
+    }
+    // A misconfigured mock provider must fail loud, not fail inert: mock-config.ts already refuses
+    // to activate outside dev/test on its own, but a deploy that somehow set these in staging or
+    // production should never boot at all rather than silently carry a dead route.
+    if (mockOAuthSetCount > 0 && (env.NODE_ENV === "production" || env.APP_ENV === "production")) {
+      context.addIssue({
+        code: "custom",
+        path: ["MOCK_OAUTH_ISSUER_URL"],
+        message: "Mock OAuth variables must not be set when NODE_ENV or APP_ENV is production",
+      });
+    }
+
+    if (
+      env.DATABASE_SSL_MODE === "disable" &&
+      (env.NODE_ENV === "production" || env.APP_ENV !== "development")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["DATABASE_SSL_MODE"],
+        message: "DATABASE_SSL_MODE=disable is only allowed in local development",
+      });
+    }
+
+    if (
+      env.RATE_LIMIT_DISABLED === "true" &&
+      (env.NODE_ENV === "production" || env.APP_ENV !== "development")
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["RATE_LIMIT_DISABLED"],
+        message: "RATE_LIMIT_DISABLED is only allowed in local development",
+      });
+    }
+
+    // ERPNext API: both URL and key must be present or both absent.
+    if (env.ERPNEXT_API_URL !== undefined && env.ERPNEXT_API_KEY === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["ERPNEXT_API_KEY"],
+        message: "ERPNEXT_API_KEY is required when ERPNEXT_API_URL is set",
+      });
+    }
+    if (env.ERPNEXT_API_KEY !== undefined && env.ERPNEXT_API_URL === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["ERPNEXT_API_URL"],
+        message: "ERPNEXT_API_URL is required when ERPNEXT_API_KEY is set",
+      });
+    }
+
+    // LLM gateway: the kill switch is opt-in, but it must never be armed without a credential to
+    // call — that would mount a route that only ever answers 503 AI_LLM_DISABLED while claiming to
+    // be enabled.
+    const requiredForProvider =
+      env.AI_LLM_PROVIDER === "openai-compatible"
+        ? ([
+            "AI_LLM_API_KEY",
+            "AI_LLM_BASE_URL",
+            "AI_LLM_SMALL_MODEL",
+            "AI_LLM_LARGE_MODEL",
+          ] as const)
+        : (["ANTHROPIC_API_KEY"] as const);
+    if (env.AI_LLM_ENABLED) {
+      for (const key of requiredForProvider) {
+        if (env[key] === undefined) {
+          context.addIssue({
+            code: "custom",
+            path: [key],
+            message: `${key} is required when AI_LLM_ENABLED is true with AI_LLM_PROVIDER=${env.AI_LLM_PROVIDER}`,
+          });
+        }
+      }
+    }
+    for (const key of ["ANTHROPIC_API_KEY", "AI_LLM_API_KEY"] as const) {
+      if (!env.AI_LLM_ENABLED && env[key] !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is set but AI_LLM_ENABLED is not true`,
+        });
+      }
+    }
+
+    // Bucket and region activate storage. Access keys are optional because production uses an ECS
+    // task role; when supplied for local S3-compatible storage they must remain a complete pair.
+    const storageVars = [
+      ["S3_REGION", env.S3_REGION],
+      ["S3_APP_FILES_BUCKET", env.S3_APP_FILES_BUCKET],
+    ] as const;
+    const storageSetCount = storageVars.filter(([, value]) => value !== undefined).length;
+    if (storageSetCount > 0 && storageSetCount < storageVars.length) {
+      const missing = storageVars
+        .filter(([, value]) => value === undefined)
+        .map(([key]) => key)
+        .join(", ");
+      context.addIssue({
+        code: "custom",
+        path: ["S3_APP_FILES_BUCKET"],
+        message: `All object storage variables must be set together. Missing: ${missing}`,
+      });
+    }
+    if ((env.S3_ACCESS_KEY_ID === undefined) !== (env.S3_SECRET_ACCESS_KEY === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["S3_ACCESS_KEY_ID"],
+        message: "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set together",
+      });
+    }
+
+    // Stripe: both SK and webhook secret must be present or both absent.
+    if (env.STRIPE_SECRET_KEY !== undefined && env.STRIPE_WEBHOOK_SECRET === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["STRIPE_WEBHOOK_SECRET"],
+        message: "STRIPE_WEBHOOK_SECRET is required when STRIPE_SECRET_KEY is set",
+      });
+    }
+    if (env.STRIPE_WEBHOOK_SECRET !== undefined && env.STRIPE_SECRET_KEY === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["STRIPE_SECRET_KEY"],
+        message: "STRIPE_SECRET_KEY is required when STRIPE_WEBHOOK_SECRET is set",
+      });
+    }
+
+    for (const country of env.TAP_COUNTRIES) {
+      if (!TAP_MARKETS.has(country)) {
+        context.addIssue({
+          code: "custom",
+          path: ["TAP_COUNTRIES"],
+          message: `${country} is not a Tap market (${[...TAP_MARKETS].join(", ")})`,
+        });
+      }
+    }
+
+    // Tap: same both-or-neither rule as Stripe.
+    if ((env.TAP_SECRET_KEY === undefined) !== (env.TAP_WEBHOOK_URL === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: [env.TAP_SECRET_KEY === undefined ? "TAP_SECRET_KEY" : "TAP_WEBHOOK_URL"],
+        message: "TAP_SECRET_KEY and TAP_WEBHOOK_URL must be set together",
+      });
+    }
+
+    // In-app purchase: a store needs the product id, and Google needs all three of its values.
+    const appleStore = env.APPLE_IAP_BUNDLE_ID !== undefined;
+    const googleValues = [
+      ["GOOGLE_PLAY_PACKAGE_NAME", env.GOOGLE_PLAY_PACKAGE_NAME],
+      ["GOOGLE_PLAY_SERVICE_ACCOUNT", env.GOOGLE_PLAY_SERVICE_ACCOUNT],
+      ["GOOGLE_PLAY_RTDN_TOKEN", env.GOOGLE_PLAY_RTDN_TOKEN],
+    ] as const;
+    const googleSet = googleValues.filter(([, value]) => value !== undefined).length;
+    if (googleSet > 0 && googleSet < googleValues.length) {
+      for (const [name, value] of googleValues) {
+        if (value === undefined) {
+          context.addIssue({
+            code: "custom",
+            path: [name],
+            message:
+              "GOOGLE_PLAY_PACKAGE_NAME, GOOGLE_PLAY_SERVICE_ACCOUNT and GOOGLE_PLAY_RTDN_TOKEN must be set together",
+          });
+        }
+      }
+    }
+    if (env.GOOGLE_PLAY_SERVICE_ACCOUNT !== undefined) {
+      try {
+        JSON.parse(env.GOOGLE_PLAY_SERVICE_ACCOUNT);
+      } catch {
+        context.addIssue({
+          code: "custom",
+          path: ["GOOGLE_PLAY_SERVICE_ACCOUNT"],
+          message: "GOOGLE_PLAY_SERVICE_ACCOUNT must be the service account's JSON key",
+        });
+      }
+    }
+    if ((appleStore || googleSet > 0) && env.AI_STORE_PRODUCT_ID === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["AI_STORE_PRODUCT_ID"],
+        message: "AI_STORE_PRODUCT_ID is required when App Store or Google Play billing is set",
+      });
+    }
+
+    if (env.NODE_ENV !== "production") return;
+
+    if (appleStore && env.APPLE_IAP_APP_APPLE_ID === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["APPLE_IAP_APP_APPLE_ID"],
+        message: "APPLE_IAP_APP_APPLE_ID is required in production when APPLE_IAP_BUNDLE_ID is set",
+      });
+    }
+
+    const requiredDatabaseValues = [
+      ["DATABASE_HOST", env.DATABASE_HOST],
+      ["DATABASE_PORT", env.DATABASE_PORT],
+      ["DATABASE_NAME", env.DATABASE_NAME],
+      ["DATABASE_USER", env.DATABASE_USER],
+      ["DATABASE_PASSWORD", env.DATABASE_PASSWORD],
+      ["DATABASE_CA_CERT", env.DATABASE_CA_CERT],
+    ] as const;
+
+    for (const [key, value] of requiredDatabaseValues) {
+      if (value === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: [key],
+          message: `${key} is required in production`,
+        });
+      }
+    }
+
+    if (env.READ_DATABASE_HOST === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["READ_DATABASE_HOST"],
+        message: "READ_DATABASE_HOST is required in production",
+      });
+    }
+    if (env.READ_DATABASE_NAME === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["READ_DATABASE_NAME"],
+        message: "READ_DATABASE_NAME is required in production",
+      });
+    }
+  });
+
+export type Env = z.infer<typeof envSchema>;
+
+/**
+ * Thrown when environment variables fail validation. The distinct name makes a bootstrap failure
+ * unambiguous in logs and in tests.
+ */
+export class EnvValidationError extends Error {
+  constructor(details: string) {
+    super(`Invalid environment configuration:\n${details}`);
+    this.name = "EnvValidationError";
+  }
+}
+
+/**
+ * Parse and validate environment variables. Throws {@link EnvValidationError} on any invalid
+ * value; returns a fully typed, defaulted {@link Env} on success.
+ */
+export function loadEnv(source: Record<string, string | undefined> = process.env): Env {
+  const result = envSchema.safeParse(source);
+  if (!result.success) {
+    throw new EnvValidationError(z.prettifyError(result.error));
+  }
+  return result.data;
+}

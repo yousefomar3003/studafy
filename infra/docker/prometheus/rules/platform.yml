@@ -1,0 +1,93 @@
+# Scrape-health and alerting-pipeline rules (ST-262).
+#
+# Every other rules file in this directory asks "is the system healthy". These ask the prior
+# question: "is anything still telling us". An alerting stack that silently stops evaluating is
+# worse than no alerting stack, because it looks exactly like a quiet night.
+
+groups:
+  - name: scrape-health
+    rules:
+      # A target Prometheus knows about and cannot scrape. Critical for the three application
+      # services: apps/api's and apps/realtime's `/metrics` endpoints are served by the same process
+      # that serves traffic, so a scrape failure that is not a transient network blip usually means
+      # the process is wedged, not that metrics broke.
+      - alert: ServiceMetricsTargetDown
+        expr: up{job=~"api|realtime|workers"} == 0
+        for: 10m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "{{ $labels.job }} task at {{ $labels.instance }} cannot be scraped"
+          description: >-
+            Prometheus has failed to scrape this task for 10 minutes. The metrics endpoint shares a
+            process with the service itself, so this is more often a wedged task than a broken
+            exporter — and while it lasts, every SLO and queue rule is blind to that task.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#servicemetricstargetdown"
+
+      # `up == 0` cannot fire for a target that no longer exists. Cloud Map returns zero A records
+      # when a service has no running task, Prometheus then has zero targets for that job, and every
+      # `up` series for it disappears — the exact shape of a total outage, and the one state a
+      # threshold on `up` cannot see.
+      #
+      # `absent()` propagates the equality matchers from its selector, so each disjunct carries its
+      # own `job` label into the alert and the notification still names which service vanished.
+      - alert: ServiceMetricsTargetsAbsent
+        expr: absent(up{job="api"}) or absent(up{job="realtime"}) or absent(up{job="workers"})
+        for: 10m
+        labels:
+          severity: critical
+          service: "{{ $labels.job }}"
+        annotations:
+          summary: "{{ $labels.job }} has no scrape targets at all"
+          description: >-
+            Cloud Map is returning no addresses for {{ $labels.job }}.metrics.internal, which means
+            the service has no running task registered — not that its metrics are broken. Confirm
+            against the ECS service's desired/running count before assuming a discovery fault.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#servicemetricstargetsabsent"
+
+      # Warning, not critical, and with a longer `for:`: an exporter being down costs visibility
+      # into the database, not availability of it. RDS's own CloudWatch alarms are unaffected.
+      #
+      # Deliberately no `absent()` companion: mysqld-exporter legitimately has zero targets in every
+      # environment without the ERPNext plane (`mariadb_exporter_enabled = false`), so absence there
+      # is the normal state rather than a fault.
+      - alert: ExporterTargetDown
+        expr: up{job=~"postgres-exporter|mysqld-exporter"} == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: monitoring
+        annotations:
+          summary: "{{ $labels.job }} cannot be scraped"
+          description: >-
+            Prometheus has failed to scrape {{ $labels.job }} for 15 minutes. Database dashboards
+            are blind; the database itself is not necessarily affected. Its DSN comes from the
+            `monitoring` secret container, so a rotated credential is the first thing to check.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#exportertargetdown"
+
+  # --- The alerting pipeline's own heartbeat -----------------------------------------------------
+  - name: alerting-pipeline
+    rules:
+      # Always firing, by construction. Its whole purpose is to be *absent*: it is routed to a
+      # heartbeat receiver (`infra/docker/alertmanager/alertmanager.yml`'s `watchdog` route) that
+      # expects a ping every few minutes, and the on-call provider raises an incident when the pings
+      # stop. That is the only mechanism that can tell you Prometheus crashed, the rules stopped
+      # evaluating, Alertmanager lost its receiver config, or the webhook URL was rotated out from
+      # under it — none of which any alert inside this system can report, because the thing that
+      # would report them is the thing that is broken.
+      #
+      # `info` severity so it is never routed anywhere a human sees; see the severity matrix in
+      # `docs/runbooks/alert-catalog.md`.
+      - alert: Watchdog
+        expr: vector(1)
+        labels:
+          severity: info
+          service: monitoring
+        annotations:
+          summary: "Alerting pipeline heartbeat"
+          description: >-
+            This alert is always firing. An incident is raised by the *absence* of these pings at
+            the heartbeat receiver, not by their presence — if you are reading this in a
+            notification meant for a human, the watchdog route is misconfigured.
+          runbook_url: "https://github.com/yousefomar3003/studafy/blob/main/docs/runbooks/alert-catalog.md#watchdog"

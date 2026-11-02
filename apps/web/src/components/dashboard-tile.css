@@ -1,0 +1,120 @@
+/**
+ * Dashboard tile chrome, shared by every `DashboardTile` consumer (admin dashboard, principal
+ * dashboard, ...). `@studafy/ui`'s Card supplies the border/radius/elevation chrome
+ * (packages/ui/src/components/card/card.css); everything here is the tile-specific content inside
+ * it, styled with the same design tokens the rest of the portal shell uses.
+ */
+
+.dashboard-tile__title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+
+.dashboard-tile__status {
+  color: var(--color-muted-foreground);
+  margin: 0;
+}
+
+.dashboard-tile__status--error {
+  color: var(--color-danger);
+}
+
+.dashboard-tile__value {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
+.dashboard-tile__caption {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: var(--space-4) 0 0;
+}
+
+.dashboard-tile__stat-list {
+  display: flex;
+  gap: var(--space-24);
+  margin: 0;
+}
+
+.dashboard-tile__stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.dashboard-tile__stat dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.dashboard-tile__stat dd {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  margin: 0;
+}
+
+.dashboard-tile__status-pill {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  margin: 0;
+}
+
+.dashboard-tile__status-pill[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.dashboard-tile__status-pill[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.dashboard-tile__status-pill[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.dashboard-tile__meter {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface);
+  overflow: hidden;
+}
+
+.dashboard-tile__meter-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--duration-base) var(--easing-standard);
+}
+
+.dashboard-tile__meter-fill[data-tone="success"] {
+  background-color: var(--color-success);
+}
+
+.dashboard-tile__meter-fill[data-tone="warning"] {
+  background-color: var(--color-warning);
+}
+
+.dashboard-tile__meter-fill[data-tone="danger"] {
+  background-color: var(--color-danger);
+}
+
+.dashboard-tile__link {
+  display: inline-block;
+  margin-top: var(--space-8);
+  font-size: var(--font-size-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-tile__meter-fill {
+    transition: none;
+  }
+}

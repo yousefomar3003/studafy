@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and below (android:fullBackupContent). Session tokens live in the
+     FlutterSecureStorage prefs file, encrypted with a Keystore key that never leaves this device:
+     backing it up would ship tokens off-device and restore a file nothing can decrypt. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+</full-backup-content>

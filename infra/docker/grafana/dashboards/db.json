@@ -1,0 +1,166 @@
+{
+  "uid": "studafy-db",
+  "title": "Database",
+  "tags": ["studafy", "db"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "postgres_instance",
+        "type": "query",
+        "label": "Postgres instance",
+        "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+        "query": "dimension_values(default,AWS/RDS,CPUUtilization,DBInstanceIdentifier)",
+        "regex": "/.*-postgres$/",
+        "refresh": 2,
+        "current": {}
+      },
+      {
+        "name": "mariadb_instance",
+        "type": "query",
+        "label": "MariaDB instance (ERPNext plane only)",
+        "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+        "query": "dimension_values(default,AWS/RDS,CPUUtilization,DBInstanceIdentifier)",
+        "regex": "/.*-mariadb$/",
+        "refresh": 2,
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "postgres_exporter up",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN" }, "1": { "text": "UP" } } }
+          ],
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [{ "expr": "pg_up{job=\"postgres-exporter\"}" }]
+    },
+    {
+      "id": 2,
+      "title": "mysqld_exporter up (ERPNext plane only)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "type": "value", "options": { "0": { "text": "DOWN" }, "1": { "text": "UP" } } }
+          ],
+          "thresholds": {
+            "steps": [
+              { "color": "red", "value": 0 },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [{ "expr": "mysql_up{job=\"mysqld-exporter\"}" }]
+    },
+    {
+      "id": 3,
+      "title": "Postgres active backends",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (datname) (pg_stat_database_numbackends{job=\"postgres-exporter\"})",
+          "legendFormat": "{{datname}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Postgres commit / rollback rate",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "ops" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(pg_stat_database_xact_commit{job=\"postgres-exporter\"}[5m]))",
+          "legendFormat": "commit"
+        },
+        {
+          "expr": "sum(rate(pg_stat_database_xact_rollback{job=\"postgres-exporter\"}[5m]))",
+          "legendFormat": "rollback"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "MySQL/MariaDB connections (ERPNext plane only)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "targets": [{ "expr": "mysql_global_status_threads_connected{job=\"mysqld-exporter\"}" }]
+    },
+    {
+      "id": 6,
+      "title": "RDS replica lag (Postgres reporting replica)",
+      "type": "timeseries",
+      "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+      "description": "The same signal modules/monitoring's CloudWatch operations dashboard alarms on (postgres_replica_lag) — mirrored here so Grafana has the full DB picture in one place.",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "namespace": "AWS/RDS",
+          "metricName": "ReplicaLag",
+          "dimensions": { "DBInstanceIdentifier": "$postgres_instance" },
+          "statistic": "Average",
+          "region": "default",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "RDS CPU / free storage",
+      "type": "timeseries",
+      "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "targets": [
+        {
+          "namespace": "AWS/RDS",
+          "metricName": "CPUUtilization",
+          "dimensions": { "DBInstanceIdentifier": "$postgres_instance" },
+          "statistic": "Average",
+          "region": "default",
+          "refId": "A"
+        },
+        {
+          "namespace": "AWS/RDS",
+          "metricName": "CPUUtilization",
+          "dimensions": { "DBInstanceIdentifier": "$mariadb_instance" },
+          "statistic": "Average",
+          "region": "default",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}

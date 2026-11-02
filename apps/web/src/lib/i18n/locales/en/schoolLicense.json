@@ -1,0 +1,358 @@
+{
+  "common": {
+    "actions": "Actions",
+    "cancel": "Cancel",
+    "loading": "Loading…",
+    "loadError": "This could not be loaded. Try again.",
+    "saveError": "The change was not saved."
+  },
+  "nav": {
+    "label": "License sections",
+    "overview": "Overview",
+    "seats": "Seats",
+    "quotes": "Quotes",
+    "invoices": "Invoices and payments"
+  },
+  "audience": {
+    "student": "Students",
+    "teacher": "Teachers",
+    "parent": "Parents (Family+)"
+  },
+  "unit": {
+    "messages": "messages",
+    "generations": "generations",
+    "pages": "pages",
+    "submissions": "submissions"
+  },
+  "status": {
+    "draft": "Draft",
+    "awaiting_payment": "Awaiting payment",
+    "active": "Active",
+    "suspended": "Suspended",
+    "expired": "Expired",
+    "cancelled": "Cancelled"
+  },
+  "banners": {
+    "expiringTitle_zero": "Your license ends today",
+    "expiringTitle_one": "Your license ends in {{count}} day",
+    "expiringTitle_other": "Your license ends in {{count}} days",
+    "expiringBody": "It ends on {{date}}. Ask Studafy for a renewal quote so your seats keep working.",
+    "overdueTitle_one": "An invoice is overdue",
+    "overdueTitle_other": "{{count}} invoices are overdue",
+    "overdueBody": "{{amount}} is still due on {{number}}.",
+    "overdueLink": "See how to pay",
+    "almostFullTitle": {
+      "student": "Student seats are almost full",
+      "teacher": "Teacher seats are almost full",
+      "parent": "Parent seats are almost full"
+    },
+    "almostFullBody": "{{assigned}} of {{purchased}} seats are in use.",
+    "almostFullLink": "Request more seats"
+  },
+  "overview": {
+    "title": "License",
+    "description": "Your school's Studafy license: who is covered, what they get and what is due.",
+    "requestChange": "Request more seats or a different tier",
+    "noLicense": "Your school has no license yet. Request one and Studafy will send you a quote.",
+    "status": "Status",
+    "period": "Dates",
+    "periodValue": "{{from}} – {{to}}",
+    "familyPlus": "Family+",
+    "familyPlusIncluded": "Included",
+    "familyPlusNotIncluded": "Not included",
+    "balance": "Balance due",
+    "nothingDue": "Nothing due",
+    "audiencesTitle": "Seats and what each group gets",
+    "manageSeats": "Manage seats",
+    "columns": {
+      "audience": "Group",
+      "tier": "Tier",
+      "seats": "Seats",
+      "gets": "What they get",
+      "feature": "Feature",
+      "used": "Used this month"
+    },
+    "noTier": "None",
+    "seatsUsed": "{{assigned}} used of {{purchased}}",
+    "getsLabel": "What {{audience}} get",
+    "usageTitle": "Usage this month",
+    "usageHelp": "Counted over everyone holding a seat, since the 1st of the month.",
+    "usedValue": "{{used}} {{unit}}",
+    "noUsage": "Nothing used yet this month."
+  },
+  "tiers": {
+    "perMonth": "{{limit}} {{unit}} a month",
+    "unlimited": "Unlimited",
+    "included": "Included",
+    "paused": "paused by Studafy"
+  },
+  "requests": {
+    "title": "Requests waiting for Studafy",
+    "help": "Studafy answers a request with a quote. Nothing changes until you accept it.",
+    "seats": {
+      "student_one": "{{count}} student seat",
+      "student_other": "{{count}} student seats",
+      "teacher_one": "{{count}} teacher seat",
+      "teacher_other": "{{count}} teacher seats",
+      "parent_one": "{{count}} parent seat",
+      "parent_other": "{{count}} parent seats"
+    },
+    "tier": "{{tier}} for {{audience}}",
+    "familyPlusOn": "Family+ on",
+    "familyPlusOff": "Family+ off"
+  },
+  "request": {
+    "title": "Request more seats or a different tier",
+    "description": "Tell Studafy what you need. You will get a quote to accept; your license does not change until then.",
+    "seatsLabel": "{{audience}}: seats wanted in total",
+    "seatsNow_one": "You have {{count}} seat now. Leave empty for no change.",
+    "seatsNow_other": "You have {{count}} seats now. Leave empty for no change.",
+    "seatsError": "A whole number of seats.",
+    "tierLabel": "{{audience}}: tier",
+    "keepTier": "Keep {{tier}}",
+    "noTierChange": "No change",
+    "familyPlusLabel": "Family+ (parent seats)",
+    "familyPlusKeepOn": "Keep Family+",
+    "familyPlusKeepOff": "No Family+",
+    "familyPlusAdd": "Add Family+",
+    "familyPlusRemove": "Remove Family+",
+    "noteLabel": "Note for Studafy",
+    "noteHelp": "Why you need the change, and from when.",
+    "submit": "Send request",
+    "sent": "Request sent to Studafy.",
+    "error": "The request was not sent."
+  },
+  "seats": {
+    "title": "Seats",
+    "description": "Only people who hold a seat are covered by the license. Assign seats one by one, to a selection, or to a whole grade, section or class.",
+    "personalNote": "Giving a seat to someone who already pays for a personal subscription turns that subscription's renewal off, so they never pay twice. App Store subscribers are asked to turn renewal off themselves.",
+    "personalNotePrice": "Until their personal subscription ends, your school pays a reduced price for that seat: the overlap is credited on your next invoice. Afterwards they continue on the school's seat with no gap.",
+    "tabsLabel": "Seats by group",
+    "counter": "{{left}} of {{purchased}} seats left for {{audience}}",
+    "filters": "Find people",
+    "search": "Search by name or email",
+    "show": "Show",
+    "showOption": {
+      "all": "Everyone",
+      "seated": "With a seat",
+      "unseated": "Without a seat",
+      "personal": "Paying personally"
+    },
+    "grade": "Grade",
+    "anyGrade": "Any grade",
+    "section": "Section",
+    "anySection": "Any section",
+    "sectionName": "{{grade}} – {{section}}",
+    "class": "Class",
+    "anyClass": "Any class",
+    "bulk": "Bulk actions",
+    "assignSelected_one": "Assign seat to {{count}} selected",
+    "assignSelected_other": "Assign seats to {{count}} selected",
+    "unassignSelected_one": "Unassign {{count}} selected",
+    "unassignSelected_other": "Unassign {{count}} selected",
+    "assignScope": "Assign everyone eligible in {{scope}}",
+    "assignAll": "Assign all eligible",
+    "caption": "{{audience}} and their seats",
+    "selectPage": "Select everyone on this page",
+    "selectPerson": "Select {{name}}",
+    "columns": {
+      "person": "Person",
+      "seat": "Seat",
+      "personal": "Personal subscription"
+    },
+    "empty": "No one matches.",
+    "hasSeat": "Seat since {{date}}",
+    "noSeat": "No seat",
+    "notEligible": "Can't hold a seat",
+    "personalUntil": "Until {{date}}",
+    "assign": "Assign",
+    "assignNamed": "Assign a seat to {{name}}",
+    "unassign": "Unassign",
+    "unassignNamed": "Unassign {{name}}",
+    "assignedToast_one": "{{count}} seat assigned.",
+    "assignedToast_other": "{{count}} seats assigned.",
+    "unassignedToast_one": "{{count}} seat freed.",
+    "unassignedToast_other": "{{count}} seats freed.",
+    "page": "{{from}}–{{to}} of {{total}}",
+    "previous": "Previous",
+    "next": "Next",
+    "confirm": {
+      "assignTitle_one": "Assign a seat to {{count}} person?",
+      "assignTitle_other": "Assign seats to {{count}} people?",
+      "scopeTitle": "Assign everyone eligible in {{scope}}?",
+      "allTitle": "Assign every eligible person in {{audience}}?",
+      "scopeBody": "Seats go in name order until they run out: {{left}} left for {{audience}}. Anyone left without one will be listed.",
+      "notEnough_one": "You selected {{count}} person but only {{left}} seats are left.",
+      "notEnough_other": "You selected {{count}} people but only {{left}} seats are left. The rest will be listed without a seat.",
+      "personalNamed_one": "{{names}} pays for a personal subscription.",
+      "personalNamed_other": "{{count}} of them pay for a personal subscription: {{names}}.",
+      "assignConfirm": "Assign",
+      "unassignTitle_one": "Unassign {{count}} seat?",
+      "unassignTitle_other": "Unassign {{count}} seats?",
+      "unassignBody": "They lose the license's features straight away. You can assign the seats to someone else.",
+      "unassignConfirm": "Unassign"
+    },
+    "outcome": {
+      "assigned_one": "{{count}} seat assigned.",
+      "assigned_other": "{{count}} seats assigned.",
+      "renewalsStopped_one": "Renewal was turned off for {{count}} personal subscription.",
+      "renewalsStopped_other": "Renewal was turned off for {{count}} personal subscriptions.",
+      "no_seats_left_one": "Seats ran out before {{count}} person got one:",
+      "no_seats_left_other": "Seats ran out before {{count}} people got one:",
+      "not_eligible_one": "{{count}} person can't hold a seat:",
+      "not_eligible_other": "{{count}} people can't hold a seat:",
+      "already_assigned_one": "{{count}} person already had a seat:",
+      "already_assigned_other": "{{count}} people already had a seat:",
+      "unnamed": "Unnamed person",
+      "dismiss": "Dismiss"
+    }
+  },
+  "quoteKind": {
+    "new": "New license term",
+    "seat_increase": "More seats",
+    "extension": "Extension"
+  },
+  "quoteStatus": {
+    "draft": "Draft",
+    "sent": "Waiting for you",
+    "accepted": "Accepted",
+    "expired": "Expired",
+    "withdrawn": "Withdrawn"
+  },
+  "quotes": {
+    "title": "Quotes",
+    "description": "Prices Studafy sent you. Open one to see the full breakdown and accept it.",
+    "empty": "No quotes yet.",
+    "columns": {
+      "quote": "Quote",
+      "period": "Period",
+      "total": "Total",
+      "validUntil": "Valid until",
+      "status": "Status"
+    }
+  },
+  "quote": {
+    "title": "Quote: {{kind}}",
+    "accept": "Accept quote",
+    "breakdownTitle": "Price breakdown",
+    "columns": {
+      "item": "Item",
+      "amount": "Amount"
+    },
+    "seatLine": "{{tier}}: {{seats}} {{audience}}",
+    "forMonths_one": "For {{count}} month",
+    "forMonths_other": "For {{count}} months",
+    "forDays_one": "For the {{count}} day left in the term",
+    "forDays_other": "For the {{count}} days left in the term",
+    "perSeat": "{{before}} → {{after}} per seat per month",
+    "volumeDiscount": "Volume discount ({{percent}})",
+    "durationDiscount": "Duration discount ({{percent}})",
+    "adjustment": "Adjustment: {{reason}}",
+    "listTotal": "List price",
+    "discountTotal": "Discounts",
+    "creditTotal": "Credits",
+    "total": "Total",
+    "youSave": "You save {{amount}} ({{percent}}) compared with the list price.",
+    "creditHelp": "Credits are for people who already pay for a personal subscription: the school pays less for their seat until it ends.",
+    "acceptTitle": "Accept this quote?",
+    "acceptBody": "Total: {{total}}.",
+    "acceptHelp": "Your license is updated straight away and an invoice is issued with the bank details and payment reference to pay it.",
+    "acceptConfirm": "Accept and get the invoice",
+    "accepted": "Quote accepted. Invoice {{number}} is ready.",
+    "acceptError": "The quote was not accepted."
+  },
+  "invoiceFilter": {
+    "all": "All invoices",
+    "unpaid": "Unpaid",
+    "overdue": "Overdue",
+    "issued": "Issued",
+    "partially_paid": "Partly paid",
+    "paid": "Paid",
+    "void": "Void"
+  },
+  "invoiceStatus": {
+    "issued": "Unpaid",
+    "partially_paid": "Partly paid",
+    "paid": "Paid",
+    "void": "Void",
+    "overdue": "Overdue"
+  },
+  "receiptStatus": {
+    "pending": "Waiting for Studafy",
+    "matched": "Matched to a payment"
+  },
+  "invoices": {
+    "title": "Invoices and payments",
+    "description": "Pay each invoice by bank transfer with its payment reference, then upload the receipt.",
+    "filter": "Show",
+    "listTitle": "Invoices",
+    "empty": "No invoices.",
+    "columns": {
+      "number": "Invoice",
+      "issued": "Issued",
+      "due": "Due",
+      "total": "Total",
+      "balance": "Balance",
+      "status": "Status"
+    }
+  },
+  "payments": {
+    "title": "Payment history",
+    "empty": "No payments recorded yet.",
+    "columns": {
+      "received": "Received",
+      "reference": "Bank reference",
+      "amount": "Amount",
+      "status": "Status"
+    },
+    "recorded": "Recorded",
+    "voided": "Voided: {{reason}}"
+  },
+  "invoice": {
+    "title": "Invoice {{number}}",
+    "print": "Print or download",
+    "paid": "Paid",
+    "linesTitle": "Invoice lines",
+    "voided": "Voided: {{reason}}",
+    "howToPay": "How to pay",
+    "howToPayBody": "Transfer {{amount}} to the account below and write the payment reference on the transfer.",
+    "reference": "Payment reference",
+    "copy": "Copy",
+    "copyReference": "Copy payment reference {{reference}}",
+    "copied": "Payment reference copied.",
+    "copyFailed": "Could not copy. Select the reference and copy it yourself.",
+    "referenceHelp": "The reference is how Studafy finds your transfer. Partial payments are fine: the balance is updated as each one arrives.",
+    "bankName": "Bank",
+    "accountName": "Account name",
+    "iban": "IBAN",
+    "swift": "SWIFT / BIC",
+    "bankCurrency": "Account currency",
+    "noBankDetails": "Studafy will send the bank details.",
+    "receiptsTitle": "Transfer receipts",
+    "uploadTitle": "Upload a transfer receipt",
+    "fileLabel": "Receipt (PDF, JPEG or PNG, up to 10 MB)",
+    "fileType": "Upload a PDF, JPEG or PNG.",
+    "fileSize": "The file is larger than 10 MB.",
+    "noteLabel": "Note (optional)",
+    "upload": "Upload receipt",
+    "uploaded": "Receipt uploaded. Studafy will match it to your payment.",
+    "uploadError": "The receipt was not uploaded.",
+    "noReceipts": "No receipts uploaded.",
+    "receiptColumns": {
+      "file": "File",
+      "uploaded": "Uploaded",
+      "status": "Status"
+    },
+    "open": "Open",
+    "openReceipt": "Open {{file}}",
+    "paymentsTitle": "Payments on this invoice"
+  },
+  "tile": {
+    "title": "License",
+    "error": "The license could not be loaded.",
+    "none": "No license yet.",
+    "status": "{{status}} until {{date}}",
+    "seats": "{{audience}}: {{assigned}} of {{purchased}} seats",
+    "link": "Open license"
+  }
+}

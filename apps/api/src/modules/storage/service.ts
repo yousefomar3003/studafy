@@ -1,0 +1,201 @@
+/**
+ * Storage service: the two-step pre-signed upload flow, content-class aware.
+ *
+ * Request-upload mints a signed PUT under temp/<schoolId>/<objectId>/<filename> -- the objectId is
+ * generated here, so the key is always tenant-prefixed and can never collide across schools.
+ * Confirm proves the object really exists, re-checks its stored type and size against the content
+ * class (a request body is a claim; the bucket is the truth), optionally verifies the SHA-256 the
+ * client computed, then promotes temp/ -> permanent/.
+ *
+ * This module is database-free by design: it is the storage half of the flow. Consumers persist the
+ * returned permanent key on their own rows, and the DB constraint family from ST-103
+ * (ck_*_storage_key) pins any persisted key to its own row's school_id -- the second half of the
+ * tenant boundary.
+ */
+
+import { randomUUID } from "node:crypto";
+
+import { ERROR_CODES } from "@studafy/constants";
+
+import { CodedHttpException } from "../../coded-http-exception";
+import { assertSchoolOwnedKey, buildPermanentKey, buildTempKey } from "../../lib/storage/keys";
+import { promoteTempObject } from "../../lib/storage/promote";
+
+import type { ContentClass } from "./content-classes";
+import type { ParsedStorageKey, PresignedUrl, StorageService } from "../../lib/storage";
+
+export interface RequestUploadParams {
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+}
+
+export interface RequestUploadResult {
+  storageKey: string;
+  presigned: PresignedUrl;
+}
+
+/**
+ * Validate the caller's claims against the content class, then sign a PUT for a fresh temp key.
+ *
+ * The order is load-bearing: type and size are rejected BEFORE presign runs, so nothing is signed
+ * for a request that cannot succeed, and the signed PUT carries the approved Content-Type -- S3
+ * will refuse a body of any other type at upload time.
+ */
+export async function requestUpload(
+  storage: StorageService,
+  schoolId: string,
+  contentClass: ContentClass,
+  params: RequestUploadParams,
+): Promise<RequestUploadResult> {
+  if (!contentClass.allowedContentTypes.has(params.contentType)) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      `Content type ${params.contentType} is not allowed for this content class`,
+    );
+  }
+  if (params.sizeBytes > contentClass.maxSizeBytes) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      "File exceeds the maximum size for this content class",
+    );
+  }
+
+  const storageKey = buildTempKey(schoolId, randomUUID(), params.fileName);
+  const presigned = await storage.presign(storageKey, "PUT", params.contentType);
+  return { storageKey, presigned };
+}
+
+export interface ConfirmUploadParams {
+  storageKey: string;
+  checksumSha256?: string;
+}
+
+export interface ConfirmUploadOptions {
+  /**
+   * Called with the *stored* size once it has been re-read from the bucket, before the object is
+   * promoted out of temp/. Injected by the confirm route so the storage-quota hard stop can be
+   * enforced against reality -- a caller who claimed a small size at request-upload cannot slip a
+   * large object past the cap. This module stays database-free by design; the hook is the seam.
+   */
+  assertCanPromote?: (sizeBytes: number) => Promise<void>;
+}
+
+export interface ConfirmedUpload {
+  /** The permanent key the object now lives at. Persist this, not the temp key. */
+  storageKey: string;
+  originalFileName: string;
+  /** Stored Content-Type -- the value S3 bound at upload, not what the client claimed. */
+  contentType: string;
+  sizeBytes: number;
+  checksumSha256: string | null;
+}
+
+/** A staged temp/ object that has passed every confirm-time check but has not been promoted. */
+export interface InspectedStagedUpload {
+  /** The validated temp/ key, decomposed. */
+  parsed: ParsedStorageKey;
+  /** Stored Content-Type -- the value S3 bound at upload, not what the client claimed. */
+  contentType: string;
+  /** Stored size, re-read from the bucket. */
+  sizeBytes: number;
+  checksumSha256: string | null;
+}
+
+/**
+ * Every confirm-time check, without the promotion: the key is this school's temp/ key, the object
+ * exists, its *stored* type and size satisfy the content class, and (when supplied) its SHA-256
+ * matches. Read-only against storage, so a caller confirming several objects together (a message
+ * with images) can inspect them all before promoting any -- one bad file then leaves every staged
+ * object in place for a retry.
+ */
+export async function inspectStagedUpload(
+  storage: StorageService,
+  schoolId: string,
+  contentClass: ContentClass,
+  params: ConfirmUploadParams,
+): Promise<InspectedStagedUpload> {
+  // The key arrives from the client (it was echoed back in the upload-url response), so it is
+  // untrusted: it must parse as the four-segment scheme, live under temp/, and belong to this
+  // school before it is ever handed to storage. Raising 403 here rather than 404 keeps a caller
+  // from probing which foreign keys exist.
+  const parsed = assertSchoolOwnedKey(params.storageKey, schoolId, "temp");
+
+  const metadata = await storage.head(params.storageKey);
+  if (!metadata) {
+    throw new CodedHttpException(
+      404,
+      ERROR_CODES.STORAGE_OBJECT_NOT_FOUND,
+      "No staged upload found for that storage key",
+    );
+  }
+
+  if (metadata.sizeBytes <= 0) {
+    throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Staged upload is empty");
+  }
+  if (metadata.sizeBytes > contentClass.maxSizeBytes) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      "File exceeds the maximum size for this content class",
+    );
+  }
+  if (!contentClass.allowedContentTypes.has(metadata.contentType)) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      "Uploaded file type is not allowed for this content class",
+    );
+  }
+
+  // Verify only when the client supplies a checksum. The check is expensive (a full read of the
+  // staged object), so it is opt-in: the caller decides how strong the integrity guarantee must be.
+  let checksum: string | null = null;
+  if (params.checksumSha256) {
+    checksum = await storage.checksumSha256(params.storageKey);
+    if (checksum !== params.checksumSha256) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.STORAGE_CHECKSUM_MISMATCH,
+        "Uploaded file checksum does not match the checksum you provided",
+      );
+    }
+  }
+
+  return {
+    parsed,
+    contentType: metadata.contentType,
+    sizeBytes: metadata.sizeBytes,
+    checksumSha256: checksum,
+  };
+}
+
+export async function confirmUpload(
+  storage: StorageService,
+  schoolId: string,
+  contentClass: ContentClass,
+  params: ConfirmUploadParams,
+  options: ConfirmUploadOptions = {},
+): Promise<ConfirmedUpload> {
+  const inspected = await inspectStagedUpload(storage, schoolId, contentClass, params);
+
+  // Quota is checked against the stored size, not the request's claim, before the object leaves
+  // temp/ -- the same "the bucket is the truth" ordering as the content-class re-checks above.
+  if (options.assertCanPromote) {
+    await options.assertCanPromote(inspected.sizeBytes);
+  }
+
+  const { parsed } = inspected;
+  const permanentKey = buildPermanentKey(schoolId, parsed.objectId, parsed.filename);
+  const { sizeBytes } = await promoteTempObject(storage, params.storageKey, permanentKey);
+
+  return {
+    storageKey: permanentKey,
+    originalFileName: parsed.filename,
+    contentType: inspected.contentType,
+    sizeBytes,
+    checksumSha256: inspected.checksumSha256,
+  };
+}

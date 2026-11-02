@@ -1,0 +1,27 @@
+{
+  "name": "@studafy/realtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "PORT=${REALTIME_PORT:-3001} bun --env-file=../../.env --watch src/index.ts",
+    "build": "bun build ./src/index.ts --outdir dist --target bun",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "bun test",
+    "smoke-test": "bun run scripts/smoke-test.ts"
+  },
+  "dependencies": {
+    "@studafy/constants": "workspace:*",
+    "@studafy/observability": "workspace:*",
+    "hono": "4.12.34",
+    "ioredis": "5.10.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@studafy/config": "workspace:*",
+    "@studafy/tsconfig": "workspace:*",
+    "@types/bun": "1.3.14",
+    "typescript": "^5.9.3"
+  }
+}

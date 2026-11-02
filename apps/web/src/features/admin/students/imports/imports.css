@@ -1,0 +1,91 @@
+/**
+ * Import history, one import's detail, and the column mapping panel. Feature-specific layout only,
+ * on the portal's design tokens; `@studafy/ui` components bring their own chrome.
+ */
+
+.import-history__banner {
+  color: var(--color-danger-subtle-foreground);
+  background-color: var(--color-danger-subtle-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-8) var(--space-12);
+  margin: var(--space-16) 0;
+}
+
+.import-history__notice,
+.import-history__hint {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.import-history__table-wrap {
+  overflow-x: auto;
+  margin-block: var(--space-12);
+}
+
+.import-history__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.import-history__caption {
+  text-align: start;
+  font-weight: var(--font-weight-semibold);
+  padding-block-end: var(--space-8);
+}
+
+.import-history__table th,
+.import-history__table td {
+  padding: var(--space-8);
+  text-align: start;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.import-history__table th {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-muted-foreground);
+}
+
+.import-history__file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.import-history__retention {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-12);
+}
+
+.import-history__columns {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.import-history__column {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding-block: var(--space-12);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.import-history__new-field {
+  display: grid;
+  gap: var(--space-12);
+  margin-block: var(--space-12);
+}
+
+.import-history__totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8) var(--space-16);
+  padding: 0;
+  list-style: none;
+}

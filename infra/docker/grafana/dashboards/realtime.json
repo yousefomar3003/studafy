@@ -1,0 +1,125 @@
+{
+  "uid": "studafy-realtime",
+  "title": "Realtime — RED",
+  "tags": ["studafy", "realtime", "red"],
+  "timezone": "utc",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "ecs_service",
+        "type": "query",
+        "label": "ECS service",
+        "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+        "query": "dimension_values(default,AWS/ECS,CPUUtilization,ServiceName)",
+        "regex": "/.*-realtime$/",
+        "refresh": 2,
+        "current": {}
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "title": "/ws handshake rate, by outcome",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "description": "http_response_status_code 101 is a successful upgrade; 401 is a missing/invalid handshake token (src/app.ts's /ws route).",
+      "targets": [
+        {
+          "expr": "sum by (http_response_status_code) (rate(http_server_request_duration_count{job=\"realtime\",http_route=\"/ws\"}[5m]))",
+          "legendFormat": "{{http_response_status_code}}"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Handshake failure rate (non-101)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum(rate(http_server_request_duration_count{job=\"realtime\",http_route=\"/ws\",http_response_status_code!=\"101\"}[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "p95 handshake duration",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(http_server_request_duration_bucket{job=\"realtime\",http_route=\"/ws\"}[5m])))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Request rate, health routes",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "Prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] },
+      "targets": [
+        {
+          "expr": "sum by (http_route) (rate(http_server_request_duration_count{job=\"realtime\",http_route!=\"/ws\"}[5m]))",
+          "legendFormat": "{{http_route}}"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Realtime probe latency (synthetic, SLO 2000ms)",
+      "type": "timeseries",
+      "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+      "description": "The same ST-149 synthetic probe the CloudWatch operations dashboard already plots (modules/monitoring/main.tf) — repeated here so realtime's whole health picture is in one place.",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "targets": [
+        {
+          "namespace": "Studafy/Realtime",
+          "metricName": "RealtimeProbeLatency",
+          "statistic": "Maximum",
+          "region": "default",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "ECS CPU / memory (Container Insights)",
+      "type": "timeseries",
+      "datasource": { "type": "cloudwatch", "uid": "CloudWatch" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "fieldConfig": { "defaults": { "unit": "percent" }, "overrides": [] },
+      "targets": [
+        {
+          "namespace": "AWS/ECS",
+          "metricName": "CPUUtilization",
+          "dimensions": { "ServiceName": "$ecs_service" },
+          "statistic": "Average",
+          "region": "default",
+          "refId": "A"
+        },
+        {
+          "namespace": "AWS/ECS",
+          "metricName": "MemoryUtilization",
+          "dimensions": { "ServiceName": "$ecs_service" },
+          "statistic": "Average",
+          "region": "default",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}

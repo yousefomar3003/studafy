@@ -1,0 +1,38 @@
+/**
+ * Paid-feature notices (lib/features): who provides a feature, a personal subscription that will
+ * not renew, the monthly limit, or why the feature is not available. Same tokens as the billing
+ * banner (features/billing/billing.css).
+ */
+
+.feature-notice {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-12) var(--space-16);
+  margin-bottom: var(--space-16);
+  background-color: var(--color-surface);
+}
+
+.feature-notice[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  border-color: transparent;
+  color: var(--color-success-subtle-foreground);
+}
+
+.feature-notice[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  border-color: var(--color-warning);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.feature-notice__title {
+  margin: 0 0 var(--space-4);
+  font-weight: var(--font-weight-semibold);
+}
+
+.feature-notice p {
+  margin: 0;
+}
+
+.feature-notice p + p {
+  margin-top: var(--space-4);
+}

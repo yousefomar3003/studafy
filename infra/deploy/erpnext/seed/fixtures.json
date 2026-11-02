@@ -1,0 +1,24 @@
+{
+  "programs": [{ "program_name": "Test Program", "department": null }],
+  "instructors": [{ "instructor_name": "Test Instructor One", "status": "Active" }],
+  "students": [
+    {
+      "first_name": "Test",
+      "last_name": "Student One",
+      "student_email_id": "test.student.one@example.invalid",
+      "gender": "Other",
+      "student_mobile_number": "+10000000001"
+    },
+    {
+      "first_name": "Test",
+      "last_name": "Student Two",
+      "student_email_id": "test.student.two@example.invalid",
+      "gender": "Other",
+      "student_mobile_number": "+10000000002"
+    }
+  ],
+  "student_group": {
+    "student_group_name": "Test Program - Seed Cohort",
+    "program": "Test Program"
+  }
+}

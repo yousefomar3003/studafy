@@ -1,0 +1,2213 @@
+{
+  "app": {
+    "title": "Studafy"
+  },
+  "auth": {
+    "login": {
+      "savedAccounts": {
+        "title": "Accounts on this phone",
+        "remove": "Remove {name} from this phone",
+        "orSignIn": "Or sign in to another account"
+      },
+      "subtitle": "Sign in with your school account to continue.",
+      "mock": "Continue with Mock",
+      "mockSheetTitle": "Choose a demo persona",
+      "failed": "Sign-in was cancelled or failed.",
+      "signingIn": "Signing in",
+      "signingInHint": "Securely connecting to your school…",
+      "privacyPolicy": "Privacy policy",
+      "roles": {
+        "student": "Student",
+        "teacher": "Teacher",
+        "parent": "Parent",
+        "attendanceOfficer": "Attendance officer"
+      },
+      "schoolClosed": "This app is no longer available for your school."
+    },
+    "emailForm": {
+      "password": "Password",
+      "passwordRequired": "Enter your password.",
+      "rateLimited": "Too many attempts. Wait a minute and try again.",
+      "genericError": "Couldn't sign in. Check your connection and try again."
+    },
+    "memberForm": {
+      "username": "Your ID",
+      "usernameHint": "e.g. STU-100001",
+      "usernameRequired": "Enter the ID your school gave you",
+      "submit": "Sign in",
+      "invalidCredentials": "That ID or password is not correct.",
+      "locked": "Too many wrong passwords. Wait 15 minutes or ask your school to reset your password.",
+      "passwordRejected": "Choose a different password.",
+      "newPasswordTitle": "Choose your own password",
+      "newPasswordBody": "You're signing in for the first time with the starting password from your school. Choose a new password that only you know.",
+      "newPassword": "New password",
+      "newPasswordHelp": "At least 8 characters. Not the starting password or your ID.",
+      "confirmPassword": "Confirm new password",
+      "tooShort": "Use at least 8 characters",
+      "mismatch": "The passwords don't match",
+      "saveAndSignIn": "Save and sign in",
+      "back": "Back"
+    }
+  },
+  "notifications": {
+    "destination": {
+      "title": "Notification",
+      "heading": "Deep link target",
+      "body": "This screen is a placeholder for the real destination."
+    }
+  },
+  "shell": {
+    "switchLanguage": "Switch language",
+    "viewOnlyBanner": "View only — this account can’t make changes on Studafy Mobile.",
+    "pushPermission": {
+      "body": "Get a notification when a grade is posted, an assignment is due soon, or your school sends an announcement or attendance alert. Your phone will ask for permission next.",
+      "continue": "Continue"
+    },
+    "placeholderBody": "This section is coming soon.",
+    "tabs": {
+      "home": "Home",
+      "timetable": "Timetable",
+      "courses": "Courses",
+      "ai": "AI",
+      "classes": "Classes",
+      "children": "Children",
+      "messages": "Messages",
+      "profile": "Profile",
+      "registers": "Registers",
+      "notifications": "Notifications",
+      "lessons": "Lessons",
+      "work": "Work",
+      "news": "News"
+    },
+    "profile": {
+      "deleteAccount": {
+        "action": "Delete my account",
+        "title": "Delete account",
+        "warningTitle": "Your account will be deleted in 14 days",
+        "consequences": {
+          "signedOut": "You're signed out of Studafy on every device right away.",
+          "grace": "Your account is deleted 14 days from now. Until then, you can sign in and cancel the deletion.",
+          "removed": "After that, it's removed from your school and you can't sign in with it again.",
+          "erased": "Your personal data is then erased. Only records the law requires us to keep are retained."
+        },
+        "credentialsPrompt": "To confirm it's you, enter your member ID and password.",
+        "memberIdLabel": "Member ID",
+        "passwordLabel": "Password",
+        "acknowledge": "I understand that my account and personal data will be permanently deleted.",
+        "typePrompt": "Type {word} to confirm.",
+        "typeWord": "DELETE",
+        "typeLabel": "Confirmation",
+        "confirm": "Delete my account",
+        "deleting": "Deleting account",
+        "dialog": {
+          "title": "Delete your account?",
+          "body": "You'll be signed out now, and your account will be deleted in 14 days unless you sign in and cancel.",
+          "cancel": "Cancel",
+          "confirm": "Delete"
+        },
+        "done": {
+          "title": "Deletion scheduled",
+          "body": "Your account will be deleted on {date}. Sign in before then if you want to cancel.",
+          "ok": "OK"
+        },
+        "alreadyPending": "A deletion is already scheduled for your account.",
+        "wrongCredentials": "The member ID or password is incorrect.",
+        "locked": "Too many wrong passwords. Try again later.",
+        "failed": "Your account couldn't be deleted. Check your connection and try again."
+      },
+      "deletionPending": {
+        "title": "Account scheduled for deletion",
+        "body": "Your account will be deleted on {date}. Cancel the deletion to keep using Studafy.",
+        "cancel": "Cancel deletion",
+        "cancelling": "Cancelling deletion",
+        "signOut": "Sign out",
+        "failed": "The deletion couldn't be cancelled. Check your connection and try again."
+      },
+      "deleteSchool": {
+        "action": "Delete school",
+        "title": "Delete school",
+        "warningTitle": "This closes your school for everyone",
+        "consequences": {
+          "signedOut": "Everyone at your school — staff, teachers, students and parents — is signed out immediately.",
+          "noSignIn": "Nobody at your school can sign in to Studafy again.",
+          "dataKept": "Your school's data is kept. Nothing is deleted."
+        },
+        "confirmPrompt": "To confirm, type your school's name exactly as shown:",
+        "nameLabel": "School name",
+        "confirm": "Delete school",
+        "deleting": "Deleting school",
+        "nameMismatch": "The name you typed doesn't match your school's name.",
+        "failed": "The school couldn't be deleted. Check your connection and try again.",
+        "loadFailed": "Your school's details couldn't be loaded.",
+        "retry": "Try again"
+      },
+      "testCrash": "Send test crash (dev only)",
+      "privacyPolicy": "Privacy policy",
+      "signedIn": "Signed in to Studafy",
+      "switchAccount": {
+        "title": "Switch account",
+        "subtitle": "Add your account at another school",
+        "add": "Add account",
+        "current": "Current account"
+      },
+      "signInSecurity": {
+        "title": "Sign-in & security"
+      },
+      "sections": {
+        "preferences": "Preferences",
+        "account": "Account"
+      },
+      "language": "Language",
+      "logout": "Log out",
+      "logoutDialog": {
+        "title": "Log out?",
+        "body": "You'll need to sign in again to use Studafy on this device. Data saved on this device will be removed.",
+        "bodyOtherAccounts": "You'll be logged out of this account only. Your other accounts stay signed in on this phone.",
+        "confirm": "Log out",
+        "cancel": "Cancel"
+      },
+      "roles": {
+        "superAdmin": "Super admin",
+        "orgAdmin": "School admin",
+        "finance": "Finance",
+        "instructor": "Teacher",
+        "student": "Student",
+        "parent": "Parent",
+        "guest": "Guest",
+        "supportAgent": "Support agent",
+        "attendanceOfficer": "Attendance officer",
+        "unknown": "Member"
+      },
+      "changePassword": {
+        "title": "Change password",
+        "current": "Current password",
+        "submit": "Save new password",
+        "saved": "Your password was changed.",
+        "wrongCurrent": "Your current password is not correct.",
+        "error": "Couldn't change your password. Try again."
+      }
+    }
+  },
+  "offline": {
+    "stalenessBanner": "Showing saved data — updated {time}.",
+    "justNow": "just now",
+    "minutesAgo": "{count}m ago",
+    "hoursAgo": "{count}h ago",
+    "daysAgo": "{count}d ago"
+  },
+  "update": {
+    "required": {
+      "title": "Update required",
+      "body": "This version of Studafy is no longer supported. Update to the latest version to keep going.",
+      "action": "Update now",
+      "error": "Couldn’t open the store. Search for “Studafy” in your app store to update."
+    }
+  },
+  "today": {
+    "aiPromo": {
+      "title": "Studafy AI",
+      "body": "Quizzes, flashcards and answers from your class materials.",
+      "action": "Explore"
+    },
+    "greeting": {
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening"
+    },
+    "timetable": {
+      "title": "Today's timetable",
+      "empty": "No classes scheduled for today.",
+      "unavailable": "Today's timetable isn't available yet.",
+      "error": "Couldn't load today's timetable.",
+      "unknownClass": "Class",
+      "viewWeek": "Full week"
+    },
+    "assignments": {
+      "title": "Due soon",
+      "empty": "Nothing due soon.",
+      "error": "Couldn't load due-soon assignments.",
+      "viewAll": "View all"
+    },
+    "grades": {
+      "title": "New grades",
+      "empty": "No grades published yet this term.",
+      "unavailable": "Grades aren't available yet.",
+      "error": "Couldn't load grades."
+    },
+    "announcements": {
+      "title": "Announcements",
+      "empty": "No announcements yet.",
+      "error": "Couldn't load announcements."
+    }
+  },
+  "assignments": {
+    "questions": {
+      "points": "{points} pts",
+      "unanswered": "Not answered",
+      "correct": "Correct",
+      "incorrect": "Incorrect",
+      "rightAnswer": "Right answer",
+      "yourAnswer": "Your answer",
+      "progress": "{answered} of {total} answered",
+      "answerAll": "Answer every question to submit",
+      "count": "{count} questions",
+      "start": "Start answering",
+      "retake": "Change answers",
+      "errors": {
+        "invalid": "Your answers don't match this assignment's questions. Reopen it and try again."
+      },
+      "number": "Question {number}",
+      "picture": "Picture for question {number}",
+      "result": {
+        "title": "Quiz submitted",
+        "score": "{score} / {max}",
+        "percent": "{percent}%",
+        "pending": "Your answers were handed in.",
+        "review": "Your answers are marked. See which ones were right on the next screen.",
+        "seeAnswers": "See my answers"
+      }
+    },
+    "list": {
+      "title": "Assignments",
+      "tabs": {
+        "due": "Due",
+        "submitted": "Submitted",
+        "graded": "Graded"
+      },
+      "dueAt": "Due {date}",
+      "empty": {
+        "due": "Nothing due right now.",
+        "submitted": "You haven't submitted anything yet.",
+        "graded": "Nothing graded yet."
+      },
+      "error": "Couldn't load assignments."
+    },
+    "status": {
+      "late": "Late",
+      "submitted": "Submitted",
+      "graded": "Graded"
+    },
+    "detail": {
+      "title": "Assignment",
+      "error": "Couldn't load this assignment.",
+      "dueAt": "Due {date}",
+      "maxScore": "Worth {score} points",
+      "attachments": "Attachments",
+      "submissionSection": "Your submission",
+      "submissionError": "Couldn't load your submission.",
+      "notSubmitted": "You haven't submitted this yet.",
+      "submit": "Submit assignment",
+      "resubmit": "Resubmit",
+      "attempt": "Attempt {number}",
+      "submittedAt": "Submitted {date}",
+      "awaitingGrade": "Awaiting grade.",
+      "feedbackTitle": "Feedback",
+      "locked": "Your work has been marked, so it can't be changed. Ask your teacher to return it if you need to hand in again."
+    },
+    "submission": {
+      "title": "Submit assignment",
+      "contentLabel": "Your answer",
+      "contentHint": "Type your answer here (optional if you're only attaching files).",
+      "addFiles": "Add files",
+      "retry": "Retry",
+      "remove": "Remove",
+      "submit": "Submit",
+      "errors": {
+        "closed": "This assignment is no longer accepting submissions.",
+        "attachmentsFailed": "Some files failed to upload. Retry them, then submit again.",
+        "network": "Couldn't reach the server. Check your connection and try again.",
+        "unknown": "Something went wrong. Please try again."
+      },
+      "takePhoto": "Take photo",
+      "sizeLimit": "Each file can be up to 10 MB.",
+      "tooLarge": "Files over 10 MB can't be handed in, so they were left out.",
+      "cameraDenied": "Camera access is off. Turn it on in Settings to take a photo.",
+      "cameraError": "The camera couldn't be opened."
+    }
+  },
+  "grades": {
+    "title": "Grades",
+    "error": "Couldn't load your grades.",
+    "unavailable": "Your grades aren't available yet.",
+    "emptyTerm": "No grades have been published for this term yet.",
+    "viewAll": "View all grades",
+    "termSummary": {
+      "title": "Term summary",
+      "average": "Term average",
+      "gpa": "Term GPA",
+      "credits": "Credits",
+      "cumulativeGpa": "Cumulative GPA"
+    },
+    "trend": {
+      "title": "Term average trend",
+      "empty": "Not enough published terms to show a trend yet."
+    },
+    "subject": {
+      "weightedAverage": "Weighted average",
+      "breakdown": "Category breakdown",
+      "entryWeight": "×{weight}",
+      "noScore": "Not scored"
+    },
+    "publishMoment": {
+      "title": "Your latest grades are in",
+      "body": "New results have just been published — here's where you stand this term.",
+      "dismiss": "Dismiss"
+    }
+  },
+  "timetable": {
+    "title": "Timetable",
+    "error": "Couldn't load your timetable.",
+    "unavailable": "Your timetable isn't available yet.",
+    "weeklySchedule": "Weekly schedule",
+    "lessonsPerWeek": {
+      "zero": "No lessons a week",
+      "one": "1 lesson a week",
+      "other": "{} lessons a week"
+    },
+    "emptySchedule": "There are no classes on your weekly schedule yet.",
+    "freeDay": "No classes on {day}.",
+    "freeDayHint": "Enjoy the free day.",
+    "period": "Period {period}",
+    "slot": {
+      "unknownClass": "Class"
+    },
+    "section": {
+      "gradeAndSection": "{grade} · Section {section}",
+      "sectionOnly": "Section {section}",
+      "semantics": "Grade and section: {label}",
+      "filterLabel": "Filter by section",
+      "all": "All"
+    }
+  },
+  "materials": {
+    "title": "Materials",
+    "unavailable": "Your materials aren't available yet.",
+    "unknownClass": "Class",
+    "error": "Couldn't load materials for this class.",
+    "empty": "No materials yet.",
+    "status": {
+      "pendingScan": "Pending scan",
+      "scanning": "Scanning",
+      "queued": "Queued",
+      "processing": "Processing",
+      "ready": "Ready",
+      "failed": "Processing failed",
+      "quarantined": "Blocked"
+    },
+    "viewer": {
+      "notReadyYet": "This file is still being processed. Check back soon.",
+      "failed": "Something went wrong preparing this file. Ask your teacher to re-upload it.",
+      "quarantined": "This file was blocked by a security scan and can't be opened.",
+      "aiVisible": "Included in the AI assistant's study materials.",
+      "downloadError": "Couldn't download this file. Check your connection and try again.",
+      "retry": "Retry",
+      "openExternally": "Open with another app",
+      "noPreview": "No in-app preview for this file type."
+    }
+  },
+  "attendance": {
+    "title": "Attendance",
+    "error": "Couldn't load your attendance.",
+    "unavailable": "Your attendance isn't available yet.",
+    "empty": "No attendance recorded yet.",
+    "rate": "{percent}% attendance",
+    "summary": "{present} present · {absent} absent · {late} late · {excused} excused",
+    "noAbsences": "Full attendance this month.",
+    "lateBy": "{minutes} min late",
+    "noReason": "No reason recorded",
+    "status": {
+      "present": "Present",
+      "absent": "Absent",
+      "late": "Late",
+      "excused": "Excused",
+      "remote": "Remote"
+    }
+  },
+  "ai": {
+    "hub": {
+      "title": "AI",
+      "unavailable": "AI features aren't available yet.",
+      "error": "Couldn't load your AI features.",
+      "usage": {
+        "title": "This month's AI usage",
+        "remaining": "{remaining} of {budget} tokens remaining",
+        "resets": "Resets {date}"
+      },
+      "features": {
+        "ask": { "label": "Ask AI" },
+        "exam": { "label": "Exam mode" },
+        "summary": { "label": "Summaries" },
+        "concepts": { "label": "Key concepts" },
+        "flashcards": { "label": "Flashcards" },
+        "quiz": { "label": "Quizzes" },
+        "explain": { "label": "Explain it simply" }
+      }
+    },
+    "usage": {
+      "title": "AI usage",
+      "warning": {
+        "nearingLimit": "You're nearing this month's AI limit. See the reset date below.",
+        "exhausted": "You've used this month's AI budget. It resets on the date below."
+      }
+    },
+    "notActive": {
+      "badge": "Subscription required",
+      "title": "Unlock the AI Study Assistant",
+      "body": "Your AI tools open up here as soon as an AI subscription is active on your account. No app update needed.",
+      "includedTitle": "What's included",
+      "features": {
+        "ask": {
+          "title": "Ask anything",
+          "body": "Grounded answers from your own class materials"
+        },
+        "practice": {
+          "title": "Quizzes & flashcards",
+          "body": "Practice sets generated from what you're studying"
+        },
+        "summaries": {
+          "title": "Summaries & key concepts",
+          "body": "The main ideas of any material at a glance"
+        },
+        "exam": {
+          "title": "Exam mode",
+          "body": "Full practice exams built from your materials"
+        }
+      }
+    },
+    "schoolInactive": {
+      "title": "AI features are paused",
+      "body": "Your school's Studafy subscription isn't active right now, so AI features are paused for everyone at your school. Contact your school to have it reactivated."
+    },
+    "consent": {
+      "title": "Share your data with {provider}?",
+      "intro": "Studafy's AI features are powered by {provider}, a third-party AI provider. When you use them, the following is sent to {provider}:",
+      "categories": {
+        "questions": "Your questions and prompts — the text you type into AI features.",
+        "studyMaterials": "Study material content — the title and text of the materials you use AI on, including any names or personal details written in them.",
+        "accountIdentifier": "A random account ID — not your name or email — that the provider uses for abuse monitoring."
+      },
+      "control": "Nothing is sent until you allow it. You can withdraw at any time from the AI tab's data sharing page.",
+      "privacyPolicy": "{provider} privacy policy",
+      "allow": "Allow",
+      "decline": "Don't allow",
+      "saveError": "Couldn't save your choice. Please try again.",
+      "loadError": "Couldn't check your AI data-sharing choice.",
+      "locked": {
+        "title": "AI features are off",
+        "message": "This feature sends data to {provider}. Allow data sharing to use it.",
+        "review": "Review and allow"
+      }
+    },
+    "dataSharing": {
+      "title": "AI data sharing",
+      "granted": "You allowed data sharing on {date}.",
+      "notGranted": "Data sharing is not allowed, so AI features are off.",
+      "allow": "Allow data sharing",
+      "withdraw": "Withdraw consent",
+      "withdrawError": "Couldn't withdraw consent. Please try again.",
+      "withdrawConfirm": {
+        "title": "Withdraw consent?",
+        "message": "AI features will stop working and nothing more will be sent to {provider}. Data already sent can't be recalled.",
+        "confirm": "Withdraw",
+        "cancel": "Cancel"
+      }
+    }
+  },
+  "aiStore": {
+    "title": "Studafy AI Study Assistant",
+    "price": "{price} per month",
+    "subscribe": "Subscribe",
+    "restore": {
+      "action": "Restore purchases",
+      "none": "No purchases to restore for this account."
+    },
+    "renewal": {
+      "apple": "Renews automatically every month until cancelled. Cancel anytime in your Apple account settings, at least 24 hours before the period ends.",
+      "google": "Renews automatically every month until cancelled. Cancel anytime in Google Play under Payments & subscriptions."
+    },
+    "links": {
+      "privacy": "Privacy policy",
+      "terms": "Terms of use"
+    },
+    "errors": {
+      "storeFailed": "The purchase didn't go through. You haven't been charged — please try again.",
+      "verifyLater": "Your purchase went through, but we couldn't confirm it yet. It will be confirmed automatically the next time you open the app.",
+      "otherAccount": "This purchase belongs to a different Studafy account.",
+      "notActive": "This purchase has ended. Subscribe again to continue.",
+      "invalid": "This purchase couldn't be verified."
+    }
+  },
+  "exams": {
+    "title": "Exams",
+    "error": "Couldn't load your exams.",
+    "unavailable": "Your exams aren't available yet.",
+    "empty": "No upcoming exams.",
+    "emptyHint": "You're all caught up.",
+    "scope": "Class {class}",
+    "room": "Room {room}",
+    "weight": "Weight {weight}",
+    "studyMaterials": "Study materials"
+  },
+  "askAi": {
+    "history": {
+      "title": "Chat history",
+      "newChat": "New chat",
+      "current": "Current",
+      "groups": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "week": "Previous 7 days",
+        "older": "Older"
+      },
+      "questions": {
+        "one": "1 question",
+        "other": "{} questions"
+      },
+      "emptyTitle": "No chats yet",
+      "emptyBody": "Your conversations with the study assistant appear here for 90 days.",
+      "error": "Couldn't load your chat history.",
+      "retry": "Try again",
+      "openError": "Couldn't open that chat. It may have expired."
+    },
+    "title": "Ask AI",
+    "attach": {
+      "tooltip": "Add a photo or material",
+      "camera": "Take a photo",
+      "gallery": "Choose a photo",
+      "material": "Ask about a material",
+      "materialHint": "Answers come only from the material you choose"
+    },
+    "material": {
+      "sheetTitle": "Ask about a material",
+      "sheetHint": "Answers will come only from the material you choose.",
+      "none": "You don't have any class materials yet.",
+      "chip": "Asking about: {title}",
+      "clear": "Ask about all materials"
+    },
+    "photo": {
+      "reading": "Reading the photo…",
+      "noText": "No text found in that photo. Try a clearer, closer shot.",
+      "checkText": "Some of the text may be wrong. Check it before sending.",
+      "truncated": "The photo had more text than fits in one question, so the end was cut.",
+      "tooLarge": "That photo is too large to read.",
+      "unsupported": "Only JPEG or PNG photos can be read.",
+      "failed": "Couldn't read that photo. Try again."
+    },
+    "assistantName": "Studafy Assistant",
+    "copy": { "action": "Copy answer", "done": "Answer copied" },
+    "signedOut": "Sign in to ask Studafy Assistant a question.",
+    "thinking": "Thinking…",
+    "empty": {
+      "title": "Ask about your study materials",
+      "hint": "Answers are drawn from your school's materials and cite where they came from.",
+      "scopedHint": "Answers come only from {title}.",
+      "suggestionsHeading": "Try asking",
+      "suggestions": {
+        "summarize": "Summarize the main ideas of my latest material",
+        "explain": "Explain a key term from my materials in simple words",
+        "review": "What should I review before my next test?"
+      }
+    },
+    "composer": {
+      "hint": "Ask a question…",
+      "send": "Send",
+      "tooLong": "That question is too long."
+    },
+    "citation": {
+      "heading": "Sources",
+      "fallback": "Study material",
+      "withPage": "{title} · p.{page}",
+      "openError": "Couldn't open that material."
+    },
+    "refusal": {
+      "title": "Not enough to answer that",
+      "body": "Nothing in your school's materials covers this closely enough for a grounded answer.",
+      "nearest": "Closest topics found:"
+    },
+    "blocked": {
+      "title": "Answer withheld",
+      "body": "This answer was withheld by the content filter."
+    },
+    "failed": {
+      "title": "Answer interrupted",
+      "body": "The assistant couldn't finish this answer.",
+      "retry": "Try again"
+    },
+    "report": {
+      "action": "Report answer"
+    },
+    "sendError": {
+      "quotaExceeded": "You've used up this month's AI questions.",
+      "subscriptionInactive": "Your school's AI assistant isn't active.",
+      "schoolInactive": "Your school's subscription is inactive.",
+      "llmDisabled": "The AI assistant is currently switched off.",
+      "temporarilyUnavailable": "The AI assistant is briefly unavailable. Try again.",
+      "questionBlocked": "That question can't be sent.",
+      "notAllowed": "You're not allowed to ask here.",
+      "network": "No connection. Check your network and try again.",
+      "unknown": "Something went wrong sending your question.",
+      "retry": "Retry",
+      "dismiss": "Dismiss"
+    }
+  },
+  "quiz": {
+    "title": "Quiz",
+    "signedOut": "Sign in to take a quiz.",
+    "newQuiz": "New quiz",
+    "abandon": {
+      "title": "Start a new quiz?",
+      "body": "Your current quiz is saved — you can come back to it later instead.",
+      "cancel": "Keep going",
+      "confirm": "Start new"
+    },
+    "setup": {
+      "title": "Choose your materials",
+      "hint": "Pick up to 5 materials to generate a quiz from.",
+      "materialsUnavailable": "Your materials aren't available yet.",
+      "materialCount": "{count} of {max} selected",
+      "questionCount": "Number of questions",
+      "start": "Generate quiz",
+      "generateError": {
+        "quotaExceeded": "You've used up this month's AI questions.",
+        "subscriptionInactive": "Your school's AI assistant isn't active.",
+        "schoolInactive": "Your school's subscription is inactive.",
+        "llmDisabled": "The AI assistant is currently switched off.",
+        "materialNotFound": "One of the selected materials couldn't be found.",
+        "materialNotReady": "One of the selected materials is still being processed.",
+        "generationFailed": "Couldn't generate a quiz right now. Try again.",
+        "network": "No connection. Check your network and try again.",
+        "unknown": "Something went wrong generating your quiz."
+      }
+    },
+    "player": {
+      "progress": "Question {position} of {total}",
+      "progressRetry": "Retry · Question {position} of {total}",
+      "endNow": "End quiz",
+      "checkAnswer": "Check answer",
+      "correct": "Correct",
+      "incorrect": "Not quite",
+      "correctAnswer": "Correct answer: {answer}",
+      "yourAnswer": "Your answer: {answer}",
+      "shortAnswerHint": "Type your answer…",
+      "gradeFailed": "Couldn't check that answer. It's saved — try again when you're back online.",
+      "retry": "Retry",
+      "next": "Next",
+      "seeResults": "See results"
+    },
+    "results": {
+      "score": "{correct} of {total} correct",
+      "retryRound": "Retry round {round}",
+      "retryWrongOnly": "Retry {count} missed",
+      "newQuiz": "New quiz",
+      "yourAnswer": "Your answer: {answer}",
+      "correctAnswer": "Correct answer: {answer}",
+      "notAnswered": "Not answered"
+    },
+    "citation": {
+      "fallback": "Study material",
+      "withPage": "{title} · p.{page}",
+      "openError": "Couldn't open that material."
+    }
+  },
+  "examMode": {
+    "title": "Exam mode",
+    "signedOut": "Sign in to take a timed exam.",
+    "newExam": "New exam",
+    "abandon": {
+      "title": "Start a new exam?",
+      "body": "You won't be able to resume your current exam after starting a new one.",
+      "cancel": "Keep going",
+      "confirm": "Start new"
+    },
+    "setup": {
+      "title": "Choose your materials",
+      "hint": "Pick up to 8 materials to build a timed exam from.",
+      "materialsUnavailable": "Your materials aren't available yet.",
+      "materialCount": "{count} of {max} selected",
+      "questionCount": "Number of questions",
+      "duration": "Time limit (minutes)",
+      "start": "Create exam",
+      "createError": {
+        "quotaExceeded": "You've used up this month's AI questions.",
+        "subscriptionInactive": "Your school's AI assistant isn't active.",
+        "schoolInactive": "Your school's subscription is inactive.",
+        "llmDisabled": "The AI assistant is currently switched off.",
+        "materialNotFound": "One of the selected materials couldn't be found.",
+        "materialNotReady": "One of the selected materials is still being processed.",
+        "generationUnavailable": "Exam generation is briefly unavailable. Try again.",
+        "network": "No connection. Check your network and try again.",
+        "unknown": "Something went wrong creating your exam."
+      },
+      "restoreFailed": "Couldn't resume your exam. Check your connection and try again.",
+      "retry": "Retry"
+    },
+    "generating": {
+      "title": "Building your exam…",
+      "hint": "This can take a moment for a longer exam."
+    },
+    "ready": {
+      "title": "Your exam is ready",
+      "summary": "{count} questions · {minutes} minutes",
+      "warning": "Once you start, the clock can't be paused. Make sure you're ready to focus.",
+      "start": "Start exam",
+      "startFailed": "Couldn't start the exam. Try again.",
+      "confirmTitle": "Start the timer now?",
+      "confirmBody": "You'll have {minutes} minutes once you confirm. There's no pausing.",
+      "confirmCancel": "Not yet",
+      "confirmStart": "Start now"
+    },
+    "player": {
+      "progress": "Question {position} of {total}",
+      "timeRemaining": "{time} left",
+      "timeUp": "Time's up",
+      "previous": "Previous",
+      "next": "Next",
+      "submit": "Submit exam",
+      "submitNow": "Submit now",
+      "shortAnswerHint": "Type your answer…",
+      "unanswered": "{count} unanswered",
+      "submitError": {
+        "expired": "Time ran out before this could be submitted.",
+        "network": "Couldn't submit. Check your connection and try again.",
+        "unknown": "Something went wrong submitting your exam."
+      },
+      "retry": "Retry",
+      "confirmSubmitTitle": "Submit your exam?",
+      "confirmSubmitBody": "{count} of {total} questions are unanswered. You won't be able to change your answers after submitting.",
+      "confirmSubmitCancel": "Keep going",
+      "confirmSubmitConfirm": "Submit"
+    },
+    "report": {
+      "score": "{correct} of {total} correct",
+      "topics": "By topic",
+      "weak": "Needs review",
+      "studyReferences": "Study these to catch up",
+      "newExam": "New exam"
+    },
+    "failed": {
+      "title": "Couldn't build this exam",
+      "body": "Something went wrong generating your exam. No time was spent — try again.",
+      "startNew": "Start a new exam"
+    },
+    "citation": {
+      "fallback": "Study material",
+      "withPage": "{title} · p.{page}",
+      "openError": "Couldn't open that material."
+    }
+  },
+  "flashcards": {
+    "title": "Flashcards",
+    "signedOut": "Sign in to review flashcards.",
+    "library": {
+      "generate": "New deck",
+      "empty": "No decks yet. Generate one from your study materials to start reviewing.",
+      "untitledDeck": "Flashcard deck",
+      "cardCount": "{count} cards",
+      "dueCountFailed": "Couldn't load due count.",
+      "studyDue": "Study {count} due",
+      "caughtUp": "All caught up",
+      "streak": "{count}-day streak",
+      "studyError": "Couldn't start this deck's review. Try again."
+    },
+    "generate": {
+      "title": "Choose your materials",
+      "hint": "Pick up to 5 materials to generate a flashcard deck from.",
+      "materialsUnavailable": "Your materials aren't available yet.",
+      "materialCount": "{count} of {max} selected",
+      "cardCount": "Number of cards",
+      "start": "Generate deck",
+      "generateError": {
+        "quotaExceeded": "You've used up this month's AI questions.",
+        "subscriptionInactive": "Your school's AI assistant isn't active.",
+        "schoolInactive": "Your school's subscription is inactive.",
+        "llmDisabled": "The AI assistant is currently switched off.",
+        "materialNotFound": "One of the selected materials couldn't be found.",
+        "materialNotReady": "One of the selected materials is still being processed.",
+        "generationFailed": "Couldn't generate a deck right now. Try again.",
+        "network": "No connection. Check your network and try again.",
+        "unknown": "Something went wrong generating your deck."
+      }
+    },
+    "review": {
+      "progress": "Card {position} of {total}",
+      "showAnswer": "Show answer",
+      "flipHint": "Flashcard. Double-tap to show the answer.",
+      "rating": {
+        "again": "Again",
+        "hard": "Hard",
+        "good": "Good",
+        "easy": "Easy"
+      },
+      "syncFailed": "Couldn't save that rating. It's safe to retry.",
+      "retry": "Retry",
+      "nothingDue": "Nothing due right now. Come back later, or study another deck.",
+      "backToDecks": "Back to decks"
+    },
+    "citation": {
+      "fallback": "Study material",
+      "withPage": "{title} · p.{page}",
+      "openError": "Couldn't open that material."
+    },
+    "summary": {
+      "reviewedCount": "{count} cards reviewed",
+      "backToDecks": "Back to decks"
+    }
+  },
+  "aiExplain": {
+    "title": "Explain it simply",
+    "intro": {
+      "title": "Make any topic easy",
+      "body": "Type a topic from your class materials and choose how simple you want the explanation."
+    },
+    "topicLabel": "Topic",
+    "topicHint": "e.g. photosynthesis, fractions, the water cycle",
+    "levelLabel": "Explain it",
+    "levels": {
+      "elementary": "Very simple",
+      "middle": "Simple",
+      "high": "Detailed"
+    },
+    "action": "Explain",
+    "searching": "Finding the right part of your materials…",
+    "explaining": "Writing a simple explanation…",
+    "noMatch": {
+      "title": "Nothing found on that topic",
+      "body": "Your materials don't seem to cover it yet. Try different words or a broader topic."
+    },
+    "resultTitle": "Simple explanation",
+    "basedOn": "Based on",
+    "copy": "Copy explanation",
+    "copied": "Explanation copied",
+    "original": "Show the original passage",
+    "others": "Explain a different passage"
+  },
+  "aiStudy": {
+    "signedOut": "Sign in to use the AI study tools.",
+    "retry": "Try again",
+    "openAskAi": "Ask AI",
+    "openSummary": "AI summary",
+    "openConcepts": "Key concepts",
+    "openQuiz": "Quiz",
+    "openExam": "Exam mode",
+    "summary": {
+      "subtitle": "AI summary",
+      "cached": "From cache"
+    },
+    "length": {
+      "brief": "Brief",
+      "standard": "Standard",
+      "detailed": "Detailed"
+    },
+    "concepts": {
+      "subtitle": "Key concepts",
+      "empty": "No key concepts were found in this material."
+    },
+    "sources": {
+      "heading": "Sources",
+      "page": "p.{page}",
+      "fallback": "Source {n}",
+      "openError": "Couldn't open that material."
+    },
+    "quota": {
+      "label": "{used} / {budget} AI tokens used this month"
+    },
+    "error": {
+      "quotaExceeded": "You've used up this month's AI allowance.",
+      "subscriptionInactive": "Your school's AI assistant isn't active.",
+      "schoolInactive": "Your school's subscription is inactive.",
+      "llmDisabled": "The AI assistant is currently switched off.",
+      "temporarilyUnavailable": "The AI assistant is briefly unavailable. Try again.",
+      "notReady": "This material is still being processed. Check back soon.",
+      "notFound": "This material isn't available to the AI assistant.",
+      "generationFailed": "The AI couldn't produce a reliable result. Try again.",
+      "notAllowed": "You're not allowed to use the AI tools here.",
+      "network": "No connection. Check your network and try again.",
+      "unknown": "Something went wrong. Try again."
+    }
+  },
+  "teacher": {
+    "questions": {
+      "title": "Questions",
+      "summary": "{count} questions · {points} points in total",
+      "add": "Add question",
+      "number": "Question {number}",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "remove": "Remove question",
+      "types": {
+        "multipleChoice": "Multiple choice",
+        "trueFalse": "True / False"
+      },
+      "prompt": "Question",
+      "points": "Points",
+      "markCorrect": "Select the correct answer",
+      "optionHint": "Option {number}",
+      "removeOption": "Remove option",
+      "addOption": "Add option",
+      "true": "True",
+      "false": "False",
+      "saveAndPublish": "Save and publish",
+      "saveDraft": "Save as draft",
+      "save": "Save questions",
+      "next": "Next: add questions",
+      "edit": "Edit questions ({count} · {points} points)",
+      "kinds": {
+        "written": "Written",
+        "questions": "Questions"
+      },
+      "errors": {
+        "empty": "Add at least one question before publishing.",
+        "locked": "Questions can't be changed after a student has submitted answers.",
+        "save": "Couldn't save the questions. Try again.",
+        "promptRequired": "Enter the question.",
+        "optionRequired": "Enter the option text.",
+        "imageUpload": "Couldn't upload a picture. Check your connection and try again."
+      },
+      "maxReached": "An assignment can have up to {max} questions.",
+      "image": {
+        "add": "Add picture",
+        "replace": "Replace",
+        "remove": "Remove picture",
+        "gallery": "Choose from photos",
+        "camera": "Take a photo",
+        "label": "Picture for question {number}",
+        "permission": "Studafy can't open your photos or camera. Allow access in Settings.",
+        "unsupported": "Use a JPEG, PNG or WebP picture.",
+        "tooLarge": "That picture is too large. Choose one under 10 MB."
+      }
+    },
+    "marks": {
+      "entry": {
+        "outOf": "Out of {max}",
+        "score": "Score",
+        "errorRange": "Enter 0–{max}",
+        "errorNumber": "Enter a number",
+        "missing": "Missing",
+        "retake": "Retake (attempt 2)",
+        "addRetake": "Add retake",
+        "statusMenu": "Mark status",
+        "markStatus": {
+          "graded": "Score",
+          "absent": "Absent",
+          "excused": "Excused",
+          "notApplicable": "Not applicable"
+        },
+        "clear": "Clear mark",
+        "cleared": "Will be cleared",
+        "unsaved": "Unsaved changes: {count}",
+        "fixErrors": "Fix the highlighted marks before saving.",
+        "allSaved": "All marks saved",
+        "save": "Save",
+        "saved": "Marks saved.",
+        "exempt": "Exempt from this subject",
+        "discardTitle": "Discard unsaved marks?",
+        "discardBody": "Your changes to this assessment haven't been saved.",
+        "discard": "Discard",
+        "keepEditing": "Keep editing"
+      },
+      "open": "Marks",
+      "openSubtitle": "Record marks by section and subject, then submit them for approval.",
+      "retry": "Try again",
+      "list": {
+        "title": "Marks",
+        "empty": "You aren't assigned to grade any subject this year.",
+        "error": "Couldn't load your subjects.",
+        "sectionLine": "{grade} · {section}",
+        "statusCount": "{status}: {count}"
+      },
+      "status": {
+        "draft": "Draft",
+        "submitted": "Awaiting approval",
+        "approved": "Approved",
+        "returned": "Returned",
+        "unknown": "Locked"
+      },
+      "period": {
+        "annual": "Annual"
+      },
+      "sheet": {
+        "error": "Couldn't load this mark sheet.",
+        "noPeriods": "No assessments are set up for this subject yet.",
+        "returned": "Returned by the reviewer: {reason}",
+        "returnedNoReason": "Returned by the reviewer. Correct the marks and submit again.",
+        "lockedSubmitted": "Submitted for approval. Marks for this period are read-only until they are approved or returned.",
+        "lockedApproved": "Approved. Marks for this period are locked; an administrator must reopen them before any change.",
+        "lockedUnknown": "Marks for this period are locked.",
+        "yearNotActive": "The grading year isn't active, so marks are read-only.",
+        "submittedOn": "Submitted {date}",
+        "decidedOn": "Reviewed {date}",
+        "submit": "Submit for approval",
+        "missingSummary": "Students with missing marks: {count}",
+        "allComplete": "Every student has a mark for each required assessment.",
+        "assessments": "Assessments",
+        "students": "Students",
+        "uncategorized": "Other",
+        "categoryWeight": "{name} · {weight}%",
+        "assessmentMeta": "Out of {max} · weight {weight}",
+        "recorded": "{count}/{total} recorded",
+        "missingCount": "Missing: {count}",
+        "optional": "Optional",
+        "proposed": "Awaiting approval",
+        "rejected": "Rejected",
+        "proposedHint": "Marks can be entered once this assessment is approved.",
+        "addAssessment": "Add assessment",
+        "noAssessmentsInPeriod": "No assessments in this period yet."
+      },
+      "preview": {
+        "subjectResult": "Subject result so far",
+        "provisional": "Provisional: {percentage}%",
+        "provisionalHint": "Not final — marks are still missing",
+        "noMarks": "No marks yet",
+        "passed": "Pass",
+        "failed": "Fail",
+        "incomplete": "Incomplete",
+        "exempt": "Exempt",
+        "missingInPeriod": "Missing marks: {count}"
+      },
+      "rules": {
+        "title": "Grading rules",
+        "method": "Method",
+        "methodWeighted": "Weighted categories",
+        "methodTotal": "Total points",
+        "maxMarks": "Maximum mark",
+        "passMark": "Pass mark",
+        "finalExamPass": "Final exam pass mark",
+        "percentValue": "{value}%",
+        "rounding": "Decimal places",
+        "missingPolicy": "Missing mark",
+        "absentPolicy": "Absence",
+        "policyIncomplete": "Result stays incomplete",
+        "policyZero": "Counts as zero",
+        "retakePolicy": "Retakes",
+        "retakeNone": "Not allowed",
+        "retakeReplace": "Retake replaces the first mark",
+        "retakeHighest": "The higher attempt counts",
+        "retakeCapped": "Retake counts, up to a cap",
+        "termWeights": "Term weights",
+        "categoryWeights": "Category weights",
+        "noWeight": "—",
+        "weightsInvalid": "These weights don't add up to 100%. Ask your school admin to correct the configuration.",
+        "instructions": "Instructions"
+      },
+      "errors": {
+        "locked": "These marks are locked — the period was submitted or the results are finalized.",
+        "outOfRange": "A mark is outside the allowed range.",
+        "conflict": "Someone else changed these marks. Reload to see the latest.",
+        "yearNotActive": "The grading year isn't active.",
+        "forbidden": "You're not allowed to grade this subject.",
+        "generic": "Something went wrong. Try again.",
+        "reload": "Reload"
+      },
+      "submit": {
+        "title": "Submit {period} for approval?",
+        "body": "Marks for this period will be locked until a reviewer approves or returns them.",
+        "confirm": "Submit",
+        "success": "Submitted for approval.",
+        "approved": "Submitted and approved.",
+        "incompleteTitle": "Marks are missing",
+        "incompleteBody": "Every student needs a mark for each required assessment before this period can be submitted:",
+        "ok": "OK"
+      },
+      "student": {
+        "periodMarks": "Marks in this period",
+        "byTerm": "By term",
+        "notRecorded": "Not recorded"
+      },
+      "addAssessment": {
+        "title": "Add assessment",
+        "name": "Name",
+        "nameRequired": "Enter a name.",
+        "category": "Category",
+        "maxMarks": "Maximum mark",
+        "weight": "Weight",
+        "positive": "Enter a number above 0.",
+        "mandatory": "Required for every student",
+        "submit": "Add",
+        "added": "Assessment added.",
+        "proposed": "Sent for approval. It can be marked once approved.",
+        "noCategory": "This period has no category that accepts new assessments."
+      }
+    },
+    "home": {
+      "attendance": {
+        "take": "Take attendance",
+        "pickClass": "Which class?",
+        "noClasses": "You have no active classes this term.",
+        "error": "Couldn't load your classes. Try again."
+      },
+      "sessions": {
+        "title": "Today's sessions",
+        "empty": "No sessions scheduled for today.",
+        "error": "Couldn't load today's sessions.",
+        "period": "Period {period}",
+        "attendanceNotTaken": "Not taken yet",
+        "attendanceInProgress": "Attendance in progress",
+        "attendanceRecorded": "Attendance recorded"
+      },
+      "grading": {
+        "title": "Pending grading",
+        "count": "{count} submissions awaiting a mark",
+        "empty": "Nothing waiting to be graded.",
+        "error": "Couldn't load the grading queue."
+      },
+      "recent": {
+        "title": "Recent submissions",
+        "empty": "No new submissions.",
+        "error": "Couldn't load recent submissions.",
+        "late": "Late"
+      },
+      "openWork": {
+        "title": "Open work",
+        "error": "Couldn't load your open assignments.",
+        "empty": "No assignments are open right now.",
+        "due": "Due {date}",
+        "drafts": "{count} draft assignments not yet published."
+      },
+      "exams": {
+        "title": "Upcoming exams",
+        "error": "Couldn't load upcoming exams.",
+        "empty": "No exams in the next two weeks."
+      }
+    },
+    "classes": {
+      "empty": "You don't lead any classes this term.",
+      "error": "Couldn't load your classes.",
+      "roster": "{count} students"
+    },
+    "content": {
+      "open": "Assignments and materials",
+      "tabs": {
+        "assignments": "Assignments",
+        "materials": "Materials"
+      },
+      "status": {
+        "draft": "Draft",
+        "published": "Published",
+        "closed": "Closed",
+        "archived": "Archived"
+      },
+      "assignments": {
+        "create": "Create assignment",
+        "edit": "Edit assignment",
+        "empty": "No assignments yet.",
+        "loadError": "Could not load assignments.",
+        "subtitle": "Due {date} · {points} points · {status}"
+      },
+      "materials": {
+        "upload": "Upload material",
+        "edit": "Edit material",
+        "empty": "No materials yet.",
+        "loadError": "Could not load materials."
+      },
+      "assignmentForm": {
+        "title": "Title",
+        "titleRequired": "Enter a title.",
+        "details": "Instructions (optional)",
+        "points": "Points",
+        "pointsInvalid": "Enter valid points.",
+        "dueDate": "Due date",
+        "lateAllowed": "Allow late submissions",
+        "status": "Status",
+        "addAttachments": "Add attachments",
+        "removeAttachment": "Remove attachment",
+        "publish": "Publish assignment",
+        "saveDraft": "Save as draft",
+        "save": "Save changes"
+      },
+      "materialForm": {
+        "title": "Title",
+        "titleRequired": "Enter a title.",
+        "description": "Description (optional)",
+        "chooseFile": "Choose file",
+        "camera": "Camera",
+        "cameraDenied": "Camera access is off. Turn it on in Settings > Studafy > Camera to take a photo.",
+        "cameraError": "Could not open the camera.",
+        "fileRequired": "Choose a file or take a photo.",
+        "uploading": "Uploading…",
+        "save": "Save changes"
+      },
+      "errors": {
+        "createAssignment": "Could not create the assignment. Try again.",
+        "upload": "Upload failed. Try again.",
+        "save": "Could not save your changes. Try again.",
+        "validation": "Check the details and try again.",
+        "forbidden": "You can only change content for classes you teach.",
+        "notFound": "This item no longer exists. Go back and refresh.",
+        "statusTransition": "A published assignment can't go back to draft."
+      }
+    },
+    "class": {
+      "rosterTitle": "Roster",
+      "rosterEmpty": "No students enrolled yet.",
+      "rosterError": "Couldn't load the roster.",
+      "enrolledOn": "Enrolled {date}",
+      "unknownStudent": "Student {id}"
+    },
+    "grades": {
+      "open": "Grade entry",
+      "loadError": "Couldn't load grades for this class.",
+      "retry": "Try again",
+      "list": {
+        "rosterCount": "{count} students",
+        "empty": "No assessments yet. Add one to start entering grades.",
+        "assessmentMeta": "Out of {max} · weight {weight}",
+        "addAssessment": "New assessment"
+      },
+      "entry": {
+        "overMax": "Above the maximum of {max}",
+        "rejectedHint": "Returned by the reviewer — tap to unlock and edit.",
+        "noStudents": "No students to grade for this assessment.",
+        "saving": "Saving…",
+        "unsaved": "Unsaved changes",
+        "saveConflict": "Someone else edited these grades. Reload to continue.",
+        "saveFailed": "Couldn't save your last change.",
+        "retry": "Retry",
+        "allSaved": "All changes saved",
+        "savedAt": "Saved at {time}",
+        "autosaveHint": "Grades save automatically as you type.",
+        "submitCount": "Submit {count}"
+      },
+      "keypad": {
+        "next": "Next",
+        "done": "Done",
+        "backspace": "Delete"
+      },
+      "status": {
+        "draft": "Draft",
+        "submitted": "Awaiting approval",
+        "approved": "Approved",
+        "rejected": "Returned",
+        "published": "Published"
+      },
+      "submit": {
+        "title": "Submit for approval?",
+        "body": "This submits {count} students' grades for approval and locks every assessment for them. A school admin reviews before publishing — you can't edit a submitted grade.",
+        "confirm": "Submit",
+        "success": "{count} submitted for approval.",
+        "partial": "{submitted} submitted, {failed} couldn't be submitted."
+      },
+      "createAssessment": {
+        "title": "New assessment",
+        "labelField": "Name",
+        "labelHint": "e.g. Midterm, Homework 3",
+        "labelRequired": "Give the assessment a name.",
+        "maxScoreField": "Max score",
+        "weightField": "Weight",
+        "positiveNumber": "Enter a number above 0.",
+        "submit": "Add assessment",
+        "errorForbidden": "You're not assigned to this class.",
+        "errorValidation": "Check the values and try again.",
+        "errorGeneric": "Couldn't add the assessment. Try again."
+      },
+      "correction": {
+        "title": "Correct published grade",
+        "published": "Published score: {score} / {max}",
+        "newScore": "Corrected score",
+        "reason": "Reason for the correction",
+        "reasonHint": "e.g. Mis-keyed the score, re-marked paper",
+        "reasonRequired": "Explain why the grade is changing.",
+        "approvalHint": "Students and parents keep seeing the published score until the principal or a school admin approves the correction.",
+        "submit": "Send for approval",
+        "pending": "Correction to {score} awaiting approval",
+        "reasonShown": "Reason: {reason}",
+        "pendingHint": "Withdraw it to send a different correction.",
+        "withdraw": "Withdraw correction",
+        "lastRejected": "Last correction was rejected: {reason}",
+        "updated": "Correction updated.",
+        "tapToCorrect": "Tap to correct",
+        "rowPending": "Correction to {score} awaiting approval",
+        "rowRejected": "Correction rejected — tap to see why",
+        "errorPending": "A correction is already awaiting approval.",
+        "errorOverMax": "That score is above the maximum.",
+        "errorNoChange": "Enter a score different from the published one.",
+        "errorGeneric": "Couldn't send the correction. Try again."
+      },
+      "unlock": {
+        "title": "Edit returned grades?",
+        "body": "The reviewer returned these grades. Unlocking moves them back to draft so you can edit and resubmit.",
+        "bodyWithReason": "The reviewer returned these grades: “{reason}”\n\nUnlocking moves them back to draft so you can edit and resubmit.",
+        "confirm": "Unlock and edit",
+        "success": "Grades unlocked. You can edit them now.",
+        "failed": "Couldn't unlock these grades. Try again."
+      }
+    },
+    "attendance": {
+      "dailyScope": "Daily attendance",
+      "submit": "Submit attendance",
+      "retrySubmit": "Retry submit",
+      "submitSuccess": "Attendance submitted.",
+      "savedOffline": "Saved on this device — it will sync when you're back online.",
+      "retrySync": "Retry now",
+      "stillOffline": "Still offline — attendance is saved and will sync later.",
+      "loadError": "Couldn't load this class's attendance.",
+      "retry": "Try again",
+      "minutesUnit": "min",
+      "minutesLateDecrease": "One minute less",
+      "minutesLateIncrease": "One minute more",
+      "offline": "No connection. Check your network and try again.",
+      "rejectedTitle": "Attendance not recorded",
+      "rejectedBody": "The server rejected this attendance submission ({code}). Check the roster and try again.",
+      "recordedBanner": "Attendance recorded. Tap a student to correct it within the correction window.",
+      "recordedElsewhere": "Attendance for today has already been submitted.",
+      "recordedNoDetail": "Attendance for today is recorded. Corrections can be made from the web.",
+      "correction": {
+        "title": "Correct attendance",
+        "newStatus": "New status",
+        "reason": "Reason (required)",
+        "save": "Save correction",
+        "saved": "Correction saved.",
+        "windowExpired": "The correction window for this session has closed.",
+        "forbidden": "You can't correct this record.",
+        "noChange": "That's already this student's status.",
+        "failed": "Couldn't save the correction. Try again.",
+        "notCorrectable": "This record can't be corrected."
+      }
+    },
+    "communication": {
+      "announce": {
+        "title": "Class announcement",
+        "audience": "Goes to everyone enrolled in {class}. Recipients can mute class announcements in their notification settings.",
+        "titleField": "Title",
+        "titleRequired": "Give the announcement a title.",
+        "bodyField": "Message",
+        "bodyRequired": "Write a message.",
+        "submit": "Send announcement",
+        "sent": "Announcement sent to {count} class members.",
+        "errorForbidden": "You can only announce to classes you teach.",
+        "errorValidation": "Check the announcement and try again.",
+        "errorGeneric": "Couldn't send the announcement. Try again."
+      },
+      "incident": {
+        "title": "Incident report",
+        "routing": "This goes to the Principal's discipline inbox for review. You can't triage or resolve it yourself.",
+        "studentField": "Student",
+        "studentRequired": "Choose the student involved.",
+        "typeField": "Type",
+        "severityField": "Severity",
+        "summaryField": "Summary",
+        "summaryRequired": "Give the incident a short summary.",
+        "detailField": "What happened (optional)",
+        "occurredAt": "When it happened",
+        "submit": "Send report",
+        "sent": "Incident report sent to the Principal.",
+        "errorForbidden": "You're not allowed to file an incident for this student.",
+        "errorValidation": "Check the report and try again.",
+        "errorGeneric": "Couldn't send the report. Try again.",
+        "type": {
+          "behavioral": "Behavioral",
+          "academicIntegrity": "Academic integrity",
+          "attendance": "Attendance",
+          "bullying": "Bullying",
+          "substance": "Substance",
+          "vandalism": "Vandalism",
+          "safety": "Safety",
+          "other": "Other"
+        },
+        "severity": {
+          "minor": "Minor",
+          "moderate": "Moderate",
+          "major": "Major",
+          "critical": "Critical"
+        }
+      }
+    },
+    "submissions": {
+      "open": "Submissions",
+      "summary": "{handedIn} of {total} students have handed in.",
+      "emptyRoster": "No students are enrolled in this class yet.",
+      "loadError": "Couldn't load the submissions. Pull down to try again.",
+      "attempt": "Attempt {number}",
+      "score": "{score} / {max}",
+      "status": {
+        "notHandedIn": "Not handed in",
+        "toMark": "To mark",
+        "draft": "Draft mark",
+        "published": "Published",
+        "returned": "Returned"
+      },
+      "publishAll": {
+        "action": "Publish ready marks ({count})",
+        "title": "Publish marks?",
+        "body": "{count} draft marks will be released to the students and their parents. A published mark can only be changed with a correction.",
+        "cancel": "Cancel",
+        "confirm": "Publish",
+        "done": "{count} marks published.",
+        "failed": "Some marks couldn't be published. Check your connection and try again."
+      }
+    },
+    "marking": {
+      "autoScore": "Automatic mark: {score} / {max}",
+      "loadError": "Couldn't load this submission.",
+      "answer": "Answer",
+      "noText": "No written answer.",
+      "scoreLabel": "Score",
+      "feedbackLabel": "Feedback for the student",
+      "publishedNote": "This mark is published. To change it, use a correction in the gradebook.",
+      "actions": {
+        "publish": "Publish mark",
+        "saveDraft": "Save as draft",
+        "returnToStudent": "Return for another attempt"
+      },
+      "confirm": {
+        "cancel": "Cancel",
+        "publish": {
+          "title": "Publish this mark?",
+          "body": "{name} and their parents will see the mark and your feedback.",
+          "action": "Publish"
+        },
+        "returnToStudent": {
+          "title": "Return this work?",
+          "body": "{name} can hand in again, even after the deadline. Any draft mark is cleared.",
+          "action": "Return"
+        }
+      },
+      "done": {
+        "saveDraft": "Draft mark saved. Only staff can see it.",
+        "publish": "Mark published.",
+        "returnToStudent": "Work returned to the student."
+      },
+      "errors": {
+        "score": "Enter a score from 0 to {max}.",
+        "scoreRequired": "Enter a score before publishing.",
+        "failed": "The mark couldn't be saved. Check your connection and try again."
+      }
+    }
+  },
+  "parent": {
+    "children": {
+      "empty": "No children are linked to your account yet.",
+      "error": "Couldn't load your children."
+    },
+    "switcher": {
+      "title": "Children"
+    },
+    "comparison": {
+      "title": "Compare children",
+      "error": "Couldn't load the comparison.",
+      "shareDisabled": "Sharing is turned off to keep each child's data within your account.",
+      "requiresTwoChildren": {
+        "message": "Comparison needs at least two linked children ({count} linked).",
+        "hint": "Once a second child is linked to your account, their grades, attendance, and assignment completion will appear here side by side."
+      },
+      "gradeTrend": {
+        "title": "Grade trend",
+        "empty": "Not enough terms yet to plot a trend."
+      },
+      "attendance": {
+        "title": "Attendance this term",
+        "presentShare": "{percent}% present"
+      },
+      "completion": {
+        "title": "Assignment completion",
+        "share": "{percent}% complete"
+      }
+    },
+    "attendance": {
+      "title": "Attendance",
+      "error": "Couldn't load attendance.",
+      "empty": "No attendance recorded this term yet.",
+      "summary": "{present}% present · {absent} absences this term",
+      "badge": {
+        "watch": "Watch",
+        "alert": "Needs attention"
+      }
+    },
+    "grades": {
+      "title": "Latest grades",
+      "error": "Couldn't load grades.",
+      "empty": "No grades published this term yet.",
+      "termAverage": "Term average",
+      "gpa": "GPA",
+      "trendUp": "Up {points} pts vs last term",
+      "trendDown": "Down {points} pts vs last term",
+      "trendFlat": "No change vs last term"
+    },
+    "fees": {
+      "title": "Fees due",
+      "error": "Couldn't load fees.",
+      "empty": "No billing information yet.",
+      "settled": "All fees settled.",
+      "due": "{amount} outstanding",
+      "asOf": "As of {date}"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "error": "Couldn't load notifications.",
+      "empty": "You're all caught up."
+    },
+    "communication": {
+      "title": "Messages & alerts",
+      "viewAll": "View all",
+      "tabs": {
+        "messages": "Messages",
+        "alerts": "Alerts"
+      },
+      "messages": {
+        "error": "Couldn't load school messages.",
+        "empty": "No school messages yet."
+      },
+      "alerts": {
+        "error": "Couldn't load attendance alerts.",
+        "empty": "No attendance alerts."
+      },
+      "threshold": {
+        "title": "Attendance alert threshold",
+        "description": "Get an alert after this many absences, in addition to the school's own threshold.",
+        "edit": "Edit",
+        "useSchoolDefault": "Use school default",
+        "usingSchoolDefault": "Using the school's default threshold.",
+        "customValue": "Alerting after {days} absences.",
+        "daysField": "Absences before alerting",
+        "daysInvalid": "Enter a number between {min} and {max}.",
+        "save": "Save",
+        "error": "Couldn't load this setting.",
+        "errorValidation": "That value isn't valid. Enter a number between 1 and 365.",
+        "errorGeneric": "Couldn't save this setting. Try again."
+      }
+    },
+    "childDetail": {
+      "error": "Couldn't load this term's detail.",
+      "tabs": {
+        "grades": "Grades",
+        "attendance": "Attendance",
+        "timetable": "Timetable",
+        "assignments": "Assignments",
+        "finance": "Finance"
+      },
+      "grades": {
+        "termSummary": "Term summary",
+        "termAverage": "Term average",
+        "gpa": "GPA",
+        "credits": "Credits",
+        "trend": "Average trend",
+        "empty": "No grades published this term yet."
+      },
+      "attendance": {
+        "title": "Attendance this term",
+        "empty": "No attendance recorded this term yet.",
+        "recordedDays": "{count} days recorded",
+        "present": "Present",
+        "absent": "Absent",
+        "late": "Late",
+        "excused": "Excused",
+        "countShare": "{count} ({percent}%)",
+        "weeklyTrend": "Weekly present rate",
+        "weekOf": "Week of {date}",
+        "presentShare": "{percent}% present"
+      },
+      "assignments": {
+        "title": "Assignment completion",
+        "empty": "No assignments this term yet.",
+        "submitted": "Submitted",
+        "onTime": "On time",
+        "late": "Late",
+        "note": "Counts every published assignment in the classes this child is enrolled in for the term."
+      },
+      "timetable": {
+        "unpublished": "No timetable has been published for this term yet.",
+        "unpublishedHint": "It will appear here as soon as the school approves this term's schedule.",
+        "empty": "No lessons are scheduled for this child yet.",
+        "emptyHint": "Lessons appear here once the child is placed in a class on the timetable.",
+        "error": "Couldn't load the timetable. Pull down to try again."
+      },
+      "finance": {
+        "error": "Couldn't load this child's finance details.",
+        "empty": "No invoices, installments, or receipts yet.",
+        "balance": {
+          "title": "Balance",
+          "due": "{amount} outstanding",
+          "settled": "All fees settled.",
+          "asOf": "As of {date}"
+        },
+        "invoices": {
+          "title": "Invoices",
+          "empty": "No invoices yet.",
+          "issued": "Issued {date}",
+          "issuedAndDue": "Issued {issued} · due {due}",
+          "totalPaid": "{amount} paid in full",
+          "outstandingOfTotal": "{outstanding} of {total} outstanding",
+          "paid": "Paid",
+          "due": "Due",
+          "overdue": "Overdue",
+          "payOnline": "Pay online"
+        },
+        "installments": {
+          "title": "Fee schedule",
+          "empty": "No fee-schedule installments yet.",
+          "due": "Due {date}",
+          "totalPaid": "{amount} paid in full",
+          "outstandingOfTotal": "{outstanding} of {total} outstanding",
+          "status": {
+            "pending": "Pending",
+            "partiallyPaid": "Partially paid",
+            "paid": "Paid",
+            "overdue": "Overdue"
+          }
+        },
+        "receipts": {
+          "title": "Receipts",
+          "empty": "No receipts yet.",
+          "paidOn": "Paid {date}",
+          "viewReceipt": "View receipt",
+          "unavailable": "No PDF is available for this receipt.",
+          "status": {
+            "pending": "Pending",
+            "confirmed": "Confirmed",
+            "failed": "Failed"
+          },
+          "viewer": {
+            "title": "Receipt",
+            "downloadError": "Couldn't download this receipt. Check your connection and try again.",
+            "retry": "Retry"
+          }
+        }
+      }
+    }
+  },
+  "viewer": {
+    "admin": {
+      "attendance": {
+        "title": "Attendance this term",
+        "empty": "No attendance recorded yet this term.",
+        "error": "Couldn't load attendance.",
+        "summary": "{present} present of {total} records"
+      },
+      "discipline": {
+        "title": "Open discipline incidents",
+        "empty": "No open incidents.",
+        "error": "Couldn't load discipline incidents.",
+        "count": "{count} incidents need attention"
+      },
+      "evaluations": {
+        "title": "Draft evaluations",
+        "empty": "No evaluations in progress.",
+        "error": "Couldn't load evaluations.",
+        "count": "{count} awaiting scoring, submission, or sharing"
+      },
+      "announcements": {
+        "title": "Recent announcements",
+        "empty": "No announcements published yet.",
+        "error": "Couldn't load announcements."
+      }
+    },
+    "finance": {
+      "payments": {
+        "title": "Recent payments",
+        "empty": "No payments recorded yet.",
+        "error": "Couldn't load recent payments.",
+        "mode": {
+          "cash": "Cash",
+          "bankTransfer": "Bank transfer",
+          "cardExternal": "Card (external)",
+          "unknown": "Unknown mode"
+        },
+        "status": {
+          "pending": "Pending",
+          "confirmed": "Confirmed",
+          "failed": "Failed",
+          "unknown": "Unknown"
+        }
+      }
+    }
+  },
+  "aiReport": {
+    "action": "Report",
+    "dialogTitle": "Report this content",
+    "detailsHint": "Anything else we should know? (optional)",
+    "cancel": "Cancel",
+    "submit": "Report",
+    "filed": "Thanks — your school will review this.",
+    "alreadyFiled": "You've already reported this.",
+    "failed": "Couldn't send the report. Try again.",
+    "reason": {
+      "childSafety": "Sexual content involving a child",
+      "unsafe": "Harmful or dangerous",
+      "inappropriate": "Offensive or inappropriate",
+      "inaccurate": "Wrong or misleading",
+      "other": "Something else"
+    }
+  },
+  "messaging": {
+    "title": "Messages",
+    "newMessage": "New message",
+    "list": {
+      "empty": "No conversations yet.",
+      "emptyParentHint": "Tap New message to write to one of {name}'s teachers.",
+      "emptyTeacherHint": "Tap New message to write to a parent of one of your students.",
+      "error": "Couldn't load your messages. Pull down to try again.",
+      "noMessagesYet": "No messages yet",
+      "you": "You: {body}",
+      "regarding": "re: {student}",
+      "unread": "{count} unread",
+      "photo": "📷 Photo",
+      "photos": "📷 Photos",
+      "blocked": "Blocked"
+    },
+    "contacts": {
+      "title": "New message",
+      "subtitle": "Teachers of {name}",
+      "empty": "There are no teachers to message for this child yet.",
+      "error": "Couldn't load teachers. Pull down to try again.",
+      "startError": "Couldn't open the conversation. Please try again."
+    },
+    "teacherContacts": {
+      "title": "New message",
+      "searchHint": "Search students or parents",
+      "empty": "None of your students have a parent you can message yet.",
+      "noMatches": "No students or parents match your search.",
+      "error": "Couldn't load your students. Pull down to try again."
+    },
+    "relationship": {
+      "mother": "Mother",
+      "father": "Father",
+      "guardian": "Guardian",
+      "step_parent": "Step-parent",
+      "grandparent": "Grandparent",
+      "sibling": "Sibling",
+      "other": "Family member",
+      "parent": "Parent"
+    },
+    "chat": {
+      "about": "About {student}",
+      "composerHint": "Message",
+      "send": "Send",
+      "empty": "No messages yet. Say hello!",
+      "error": "Couldn't load this conversation.",
+      "retry": "Try again",
+      "sending": "Sending…",
+      "failed": "Not sent. Tap to retry.",
+      "rateLimited": "You're sending messages too quickly. Wait a moment, then tap to retry.",
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "openProfile": "View {name}'s profile",
+      "moreActions": "More options",
+      "viewProfile": "View profile",
+      "report": "Report {name}",
+      "block": "Block",
+      "unblock": "Unblock",
+      "reportMessage": "Report message",
+      "blocked": "Not sent — messaging is blocked in this conversation.",
+      "quotaExceeded": "Not sent — your school's storage is full. Tap to retry.",
+      "storageUnavailable": "Not sent — photos can't be sent right now. Tap to retry.",
+      "invalid": "Not sent — this message couldn't be accepted. Tap to retry."
+    },
+    "attachments": {
+      "attach": "Attach photos",
+      "gallery": "Photo library",
+      "camera": "Take a photo",
+      "remove": "Remove photo",
+      "uploading": "Uploading photo, {percent}%",
+      "uploaded": "Photo ready to send",
+      "failed": "Photo upload failed. Tap to retry.",
+      "image": "Photo {index} of {count}",
+      "unavailable": "Photo unavailable",
+      "viewerClose": "Close",
+      "viewerPosition": "{index} / {count}",
+      "unsupportedType": "Only JPEG, PNG, WebP or HEIC photos can be sent.",
+      "tooLarge": "Photos must be 10 MB or smaller.",
+      "tooMany": "You can attach up to 4 photos to one message.",
+      "cameraDenied": "Camera access is off. Turn it on in Settings to take a photo.",
+      "cameraError": "Couldn't open the camera.",
+      "pickError": "Couldn't open your photos.",
+      "uploadFailed": "Couldn't upload a photo. Tap it to try again.",
+      "quotaExceeded": "Your school's storage is full, so photos can't be uploaded.",
+      "storageUnavailable": "Photos can't be sent right now.",
+      "rateLimited": "Too many uploads at once. Wait a moment, then tap the photo to retry."
+    },
+    "block": {
+      "confirmTitle": "Block {name}?",
+      "confirmBody": "{name} won't be able to message you in this conversation. Your message history stays, and you can unblock them at any time.",
+      "confirm": "Block",
+      "cancel": "Cancel",
+      "blockedBanner": "You blocked {name}. Unblock to send messages.",
+      "blockedByThem": "You can't reply in this conversation.",
+      "unblock": "Unblock",
+      "blockedDone": "{name} is blocked.",
+      "unblockedDone": "{name} is unblocked.",
+      "error": "Couldn't update the block. Please try again."
+    },
+    "report": {
+      "title": "Report {name}",
+      "messageTitle": "Report message",
+      "subtitle": "Your report goes to the school, which will review it.",
+      "reasonLabel": "What's the problem?",
+      "reason": {
+        "harassment": "Harassment or bullying",
+        "inappropriate": "Inappropriate content",
+        "spam": "Spam",
+        "safety_concern": "A safety concern",
+        "other": "Something else"
+      },
+      "detailsHint": "Add details (optional)",
+      "alsoBlock": "Also block {name}",
+      "submit": "Send report",
+      "cancel": "Cancel",
+      "sent": "Report sent to the school",
+      "alreadyOpen": "You've already reported this; the school is reviewing it.",
+      "error": "Couldn't send the report. Please try again."
+    },
+    "profile": {
+      "teacher": "Teacher",
+      "parent": "Parent",
+      "teaches": "Teaches {child}",
+      "noClasses": "No current classes with {child}.",
+      "subjects": "Subjects",
+      "relationshipTo": "{relationship} of {child}",
+      "children": "Children you teach",
+      "thisConversation": "This conversation",
+      "noChildClasses": "Not in your classes",
+      "error": "Couldn't load this profile.",
+      "retry": "Try again",
+      "block": "Block",
+      "unblock": "Unblock",
+      "report": "Report"
+    }
+  },
+  "attendanceOffice": {
+    "registers": {
+      "date": "Register date",
+      "changeDate": "Change register date",
+      "today": "Today",
+      "term": "Term",
+      "changeTerm": "Change term",
+      "noTerm": "No academic term is set up for this school yet.",
+      "count": {
+        "notStarted": "{count} not started",
+        "inProgress": "{count} in progress",
+        "submitted": "{count} submitted"
+      },
+      "searchHint": "Search by class code",
+      "empty": "No classes in this term.",
+      "noMatches": "No classes match \"{query}\".",
+      "error": "Couldn't load the registers.",
+      "retry": "Try again",
+      "rowLabel": "{class}, register {state}"
+    },
+    "state": {
+      "notStarted": "Not started",
+      "inProgress": "In progress",
+      "submitted": "Submitted"
+    },
+    "register": {
+      "description": "Everyone starts as present. Change anyone who isn't, then submit.",
+      "submittedDescription": "This register is submitted. Use Correct to change a record within the correction window.",
+      "submittedReadOnly": "This register is submitted. To change a record, ask the attendance office.",
+      "markAllPresent": "Mark all present",
+      "submit": "Submit register ({count})",
+      "confirmTitle": "Submit register?",
+      "confirmBody": "Record {count} students for {class} on {date}? After submitting, changes need a correction with a reason.",
+      "confirm": "Submit",
+      "cancel": "Cancel",
+      "submitted": "Register submitted.",
+      "submitFailed": "Couldn't submit the register ({code}). Try again.",
+      "submitFailedGeneric": "Couldn't submit the register. Try again.",
+      "offline": "You're offline, so nothing was submitted. Check your connection and try again.",
+      "cancelled": "This register was cancelled and can't be taken.",
+      "lateNeedsMinutes": "Enter the minutes late (1 or more) for every late student.",
+      "minutesLate": "Min late",
+      "minutesLateInvalid": "1 or more",
+      "alreadyRecorded": "Already recorded",
+      "notRecorded": "Not recorded",
+      "correct": "Correct",
+      "correctLabel": "Correct attendance for {student}",
+      "corrected": "Correction saved.",
+      "windowExpired": "The correction window has closed — ask the principal.",
+      "statusFor": "Attendance for {student}: {status}",
+      "empty": "No students are enrolled in this class.",
+      "error": "Couldn't load this register.",
+      "retry": "Try again"
+    }
+  },
+  "account": {
+    "retry": "Try again",
+    "restore": {
+      "done": "Your purchase was restored."
+    },
+    "devices": {
+      "title": "Signed-in devices",
+      "intro": "These are the devices and browsers signed in to your account. Sign out of any you don't recognise.",
+      "loadError": "Couldn't load your signed-in devices.",
+      "failed": "Couldn't sign out. Check your connection and try again.",
+      "signedIn": "Signed in {when}",
+      "thisDevice": "This device",
+      "signOut": "Sign out",
+      "channel": {
+        "web": "Web browser",
+        "mobile": "Mobile app",
+        "api": "Other app"
+      },
+      "signOutOthers": {
+        "action": "Sign out of all other devices",
+        "title": "Sign out everywhere else?",
+        "body": "Every other device and browser will be signed out. You stay signed in on this device.",
+        "cancel": "Cancel",
+        "confirm": "Sign out"
+      }
+    },
+    "notifications": {
+      "title": "Notifications",
+      "intro": "Choose how each kind of notification reaches you: in the app, as a push notification, or by email.",
+      "loadError": "Couldn't load your notification settings.",
+      "saveFailed": "Couldn't save that change. Check your connection and try again.",
+      "mandatory": "Your school requires this notification.",
+      "categories": {
+        "academic": "Academic",
+        "communications": "Communications",
+        "family": "Family",
+        "teaching": "Teaching materials"
+      },
+      "channels": {
+        "inApp": "In app",
+        "push": "Push",
+        "email": "Email"
+      },
+      "types": {
+        "assignmentDueSoon": "Assignment due soon",
+        "gradePosted": "Grade published",
+        "enrollmentApproved": "Enrolment approved",
+        "coursePublished": "Course published",
+        "discussionReply": "Discussion replies",
+        "studyGroupInvite": "Study group invitations",
+        "certificateIssued": "Certificate issued",
+        "supportMessage": "Support messages",
+        "attendanceAlert": "Attendance alerts",
+        "adminAnnouncement": "School announcements",
+        "announcement": "Class announcements",
+        "materialScanQuarantined": "File blocked by the safety scan",
+        "materialScanFailed": "File safety scan failed",
+        "materialOcrLowConfidence": "File text hard to read",
+        "materialIngested": "File ready for AI",
+        "materialIngestFailed": "File couldn't be prepared for AI",
+        "directMessage": "Messages"
+      }
+    },
+    "staffRecord": {
+      "title": "My staff record",
+      "intro": "What your school keeps on file about you, such as your qualifications or contract type. The school admin fills it in. Fields your school marks sensitive, such as a salary or an ID number, are not shown here.",
+      "loadError": "Couldn't load your staff record.",
+      "notPublished": "Your school hasn't set up staff records yet.",
+      "empty": "There is nothing in your staff record yet.",
+      "missing": {
+        "one": "1 required field is still empty. Ask your school admin to complete it.",
+        "other": "{} required fields are still empty. Ask your school admin to complete them."
+      },
+      "notFilledIn": "Not filled in",
+      "noFile": "No file yet",
+      "fileOnRecord": "File on record",
+      "verified": "Verified",
+      "expires": "Expires {date}",
+      "open": "Open",
+      "openLabel": "Open the file for {field}",
+      "openFailed": "Couldn't open the file. Check your connection and try again.",
+      "yes": "Yes",
+      "no": "No"
+    }
+  },
+  "customLists": {
+    "title": "Lists",
+    "intro": "Lists your school keeps, such as bus routes, library loans or lockers. Who can see each list is up to your school.",
+    "loadError": "Couldn't load your school's lists.",
+    "empty": "There are no lists you can see yet.",
+    "retry": "Try again",
+    "rows": {
+      "one": "1 row",
+      "other": "{} rows"
+    },
+    "audience": {
+      "admins": "School admins",
+      "leadership": "School leadership",
+      "staff": "All staff"
+    },
+    "linkKinds": {
+      "student": "Student",
+      "parent": "Parent",
+      "staff": "Staff",
+      "class": "Class"
+    },
+    "yes": "Yes",
+    "no": "No",
+    "list": {
+      "webOnly": "To add or change rows, use Studafy on the web.",
+      "search": "Search this list",
+      "sort": "Sort",
+      "sortCreated": "Date added",
+      "sortUpdated": "Last changed",
+      "sortLink": "Linked to",
+      "ascending": "Ascending",
+      "descending": "Descending",
+      "noRows": "This list has no rows yet.",
+      "noMatches": "No rows match your search.",
+      "loadError": "Couldn't load this list.",
+      "loadMoreError": "Couldn't load more rows.",
+      "notVisible": "Someone you can't see",
+      "emptyRow": "Nothing filled in",
+      "sensitive": "Sensitive, hidden"
+    },
+    "linked": {
+      "title": "Lists",
+      "empty": "No lists mention this student.",
+      "loadError": "Couldn't load lists.",
+      "more": {
+        "one": "And 1 more row in this list",
+        "other": "And {} more rows in this list"
+      }
+    }
+  },
+  "releasedMarks": {
+    "title": "Term marks",
+    "entry": "Term marks",
+    "entrySubtitle": "Midterm, final exam and other marks your school has approved",
+    "error": "Couldn't load marks.",
+    "unavailable": "Marks aren't available for this account.",
+    "empty": "No approved marks yet. A term's marks appear here once the school approves them.",
+    "retry": "Try again",
+    "annual": "Full year",
+    "approvedOn": "Approved {date}",
+    "retake": "{name} (retake)",
+    "status": {
+      "absent": "Absent",
+      "excused": "Excused",
+      "notApplicable": "N/A"
+    }
+  },
+  "academicResults": {
+    "title": "Results",
+    "entry": "Official results",
+    "entrySubtitle": "Finalized results, certificates and report cards",
+    "error": "Couldn't load results.",
+    "unavailable": "Results aren't available for this account.",
+    "empty": "No finalized results yet. They appear here once the school finalizes them.",
+    "retry": "Try again",
+    "annual": "Annual result",
+    "sectionLine": "{grade} · {section}",
+    "finalizedOn": "Finalized {date}",
+    "version": "Corrected version {version}",
+    "average": "Average",
+    "total": "Total",
+    "grade": "Grade",
+    "failed": "Subjects failed",
+    "status": {
+      "promoted": "Promoted",
+      "supplementary": "Supplementary exams",
+      "retained": "Retained",
+      "incomplete": "Incomplete"
+    },
+    "subjects": "Subjects",
+    "subjectCol": "Subject",
+    "marksCol": "Marks",
+    "percentCol": "%",
+    "gradeCol": "Grade",
+    "pass": "Pass",
+    "fail": "Fail",
+    "exempt": "Exempt",
+    "subjectIncomplete": "Incomplete",
+    "byTerm": "By term",
+    "certificates": "Certificates and report cards",
+    "certificatesEmpty": "No certificates or report cards issued yet.",
+    "certificatesError": "Couldn't load certificates.",
+    "kind": {
+      "annualCertificate": "Certificate",
+      "termReport": "Report card"
+    },
+    "certStatus": {
+      "issued": "Issued",
+      "superseded": "Superseded",
+      "revoked": "Revoked"
+    },
+    "serial": "Serial no. {serial}",
+    "issuedOn": "Issued {date}",
+    "certificate": {
+      "error": "Couldn't load this document.",
+      "supersededBanner": "This document was replaced by a newer version and is no longer valid.",
+      "revokedBanner": "This document was revoked and is no longer valid.",
+      "revokedOn": "Revoked {date}",
+      "reason": "Reason: {reason}",
+      "needsReissue": "Results were corrected after this was issued. The school will issue an updated version.",
+      "reissueOf": "Reissue of {serial}",
+      "school": "School",
+      "year": "Academic year",
+      "term": "Term",
+      "student": "Student",
+      "admission": "Admission no.",
+      "section": "Grade and section",
+      "overall": "Overall result",
+      "issuedBy": "Issued by",
+      "issueDate": "Issue date",
+      "serialLabel": "Serial number",
+      "finalization": "Results version {version}, finalized {date}"
+    }
+  },
+  "features": {
+    "askSchool": {
+      "title": "Ask your school for a seat",
+      "body": "{school} provides this through its Studafy license. Ask your school to give you a seat — there's nothing to buy.",
+      "bodyOtherTier": "Your seat from {school} doesn't include this. Ask your school whether it can move you to a plan that does."
+    },
+    "schoolInactive": {
+      "title": "Your school's Studafy plan isn't active",
+      "body": "Paid features are paused until your school renews its Studafy plan."
+    },
+    "unavailable": {
+      "title": "Temporarily unavailable",
+      "body": "Studafy has switched this off for now. Please try again later."
+    },
+    "notIncluded": {
+      "title": "Not included yet",
+      "body": "This isn't included in what you have now.",
+      "expired": "Your access ended on {date}."
+    },
+    "covered": {
+      "bySchool": "Provided by {school}",
+      "bothRenewal": "Your school now covers this. Your subscription won't renew after {date}.",
+      "bothRenewalNoDate": "Your school now covers this. Your own subscription won't renew.",
+      "appStoreSteps": "Apple doesn't let Studafy stop App Store renewals, so please turn it off yourself: on your iPhone or iPad open Settings, tap your name, then Subscriptions, choose Studafy and tap Cancel Subscription. You keep access until it ends."
+    },
+    "limit": {
+      "title": "Monthly limit reached",
+      "reached": "Monthly limit reached, resets on {date}.",
+      "usage": "{used} of {limit} {unit} used this month"
+    },
+    "units": {
+      "messages": "messages",
+      "generations": "generations",
+      "pages": "pages",
+      "submissions": "submissions"
+    },
+    "errors": {
+      "notIncluded": "This isn't included in what you have now.",
+      "expired": "Your access to this has ended.",
+      "limitReached": "Monthly limit reached, resets on {date}.",
+      "schoolInactive": "Your school's Studafy plan isn't active, so this is paused.",
+      "coveredBySchool": "Your school already provides this through a seat."
+    }
+  },
+  "familyPlus": {
+    "title": "Family+",
+    "personal": "Your Family+ covers all your children.",
+    "school": "{school} covers Family+ for your children at {school}.",
+    "schoolChildren": "{school} covers Family+ for your children at {school}: {children}.",
+    "otherSchools": "Children at other schools aren't covered by the {school} seat: they need your own Family+, or a seat from their school.",
+    "askSchool": "{school} offers Family+ through its license. Ask the school for a parent seat.",
+    "notCovered": "Family+ isn't active for your account at this school."
+  },
+  "launch": {
+    "guide": {
+      "skip": "Skip",
+      "next": "Next",
+      "getStarted": "Get started",
+      "progress": "Page {current} of {total}",
+      "school": {
+        "title": "Your whole school day, in one place",
+        "body": "Timetable, assignments, grades and attendance — always up to date, right on your phone."
+      },
+      "updates": {
+        "title": "Never miss what matters",
+        "body": "Announcements, messages and alerts from your school arrive the moment they're sent."
+      },
+      "family": {
+        "title": "One phone for the whole family",
+        "body": "Sign in as a student, a parent or a sibling, and switch between accounts in a tap."
+      }
+    }
+  }
+}
