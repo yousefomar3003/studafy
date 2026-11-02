@@ -41,6 +41,7 @@ import { accountRoutes } from "./modules/account";
 import {
   AI_EXAM_MAX_RESERVE_TOKENS,
   AI_LLM_MAX_RESERVE_TOKENS,
+  aiAskHistoryRoutes,
   aiAskRoutes,
   aiConceptsRoutes,
   aiConsentGate,
@@ -1354,6 +1355,8 @@ export function createApp({
         modelOverrides: aiLlmModelOverrides,
       }),
     );
+    // Ask AI chat history: read-only, so behind the feature check but not the token budget.
+    app.route("/", aiAskHistoryRoutes({ database }));
     // Study-material summarizer. Mounted under the same gate so a generated summary reserves and
     // commits the caller's AI quota, and only when the gate's dependencies exist — the summarize
     // surface must never run un-metered. The provider may be null on the same kill-switch terms as
