@@ -1,5 +1,5 @@
 import { z } from "@hono/zod-openapi";
-import { ROLES } from "@studafy/constants";
+import { ASSIGNABLE_ROLES, ROLES } from "@studafy/constants";
 import { uuidSchema, dateTimeSchema, dateSchema } from "@studafy/shared-schemas";
 
 import { userStatusSchema } from "../../openapi/components";
@@ -12,6 +12,13 @@ import { recordAnswerInputSchema } from "../records/schemas";
 const roleValues = Object.values(ROLES) as [string, ...string[]];
 
 export const roleSchema = z.enum(roleValues).openapi({ description: "Predefined platform role." });
+
+// What a school's user endpoints may assign. SUPER_ADMIN and SUPPORT_AGENT are Studafy staff roles:
+// an ORG_ADMIN who could assign them could make themselves SUPER_ADMIN (QA-10, finding F-01).
+export const assignableRoleSchema = z.enum(ASSIGNABLE_ROLES).openapi({
+  description:
+    "A school role. The platform roles SUPER_ADMIN and SUPPORT_AGENT cannot be assigned here.",
+});
 
 // ---------------------------------------------------------------------------
 // Parent relationship
@@ -88,7 +95,7 @@ export const createUserBodySchema = z
       .min(1)
       .max(200)
       .openapi({ description: "Human-readable name.", example: "Jamie Rivera" }),
-    role: roleSchema.openapi({ description: "Role to assign to the new user." }),
+    role: assignableRoleSchema.openapi({ description: "Role to assign to the new user." }),
     children: z
       .array(
         z
@@ -159,7 +166,9 @@ export type UpdateUserBody = z.infer<typeof updateUserBodySchema>;
 
 export const updateUserRoleBodySchema = z
   .object({
-    role: roleSchema.openapi({ description: "New role to assign. Replaces the existing role." }),
+    role: assignableRoleSchema.openapi({
+      description: "New role to assign. Replaces the existing role.",
+    }),
   })
   .openapi("UpdateUserRoleBody");
 

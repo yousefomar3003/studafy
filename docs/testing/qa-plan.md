@@ -163,6 +163,25 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - New test: caller cannot grant a role above their own (ORG_ADMIN cannot create another
     ORG_ADMIN unless that is an intended product rule — decide and document in the permission matrix).
   - Audit of every other endpoint taking a role in the body (`schemas.ts:55,263`, invitations, imports).
+- Built (2026-11-03), regression suite `apps/api/tests/security/role-escalation.test.ts`:
+  - API: `POST /api/users` and `PATCH /api/users/{userId}/role` (the finding says PUT; the route is
+    PATCH) accept only `ASSIGNABLE_ROLES` (every role but SUPER_ADMIN/SUPPORT_AGENT) → 400; the
+    service refuses a platform role with 403 for any other caller. Only a SUPER_ADMIN may re-role a
+    platform-role holder (`canChangeRoleOf`) → 403.
+  - DB (migration 000185): `schools.is_platform_tenant`, settable only by `studafy_admin` (trigger);
+    a trigger on `app.user_roles` refuses SUPER_ADMIN/SUPPORT_AGENT in any other school, for every
+    writer including `studafy_app`. Backfill flags each school that already holds a platform role
+    and lists it as a NOTICE. **On staging and production, check that NOTICE list against the real
+    platform school** — any other school on it held a platform role (possible F-01 exploitation).
+  - Decision: ORG_ADMIN may grant ORG_ADMIN (several admins per school; invitations always offered
+    it). Documented in `packages/constants/docs/permission-matrix.md` "Role grants".
+  - Audit: `schemas.ts:55` (response `roles`) and `:263` (list filter) only read roles. Invitations
+    (single and bulk) already allow only ORG_ADMIN, PRINCIPAL, FINANCE, ATTENDANCE_OFFICER,
+    INSTRUCTOR, STUDENT, GUEST, and activation writes that stored role (DB trigger behind it). The
+    import worker writes only STUDENT/PARENT. Registration, provisioning and school-application
+    approval write ORG_ADMIN; student/teacher services write STUDENT/INSTRUCTOR. The web picker
+    (`features/admin/users/schema.ts`) now uses the shared `ASSIGNABLE_ROLES` (it used to offer
+    SUPPORT_AGENT).
 
 **QA-11 — F-02 default-password account claim**
 

@@ -164,14 +164,42 @@ integrationTest(
       }
       const sql = database.sql;
 
-      const flags = await sql<{ slug: string; is_qa_tenant: boolean; is_review_tenant: boolean }[]>`
-        SELECT slug, is_qa_tenant, is_review_tenant FROM app.schools ORDER BY slug
+      const flags = await sql<
+        {
+          slug: string;
+          is_qa_tenant: boolean;
+          is_review_tenant: boolean;
+          is_platform_tenant: boolean;
+        }[]
+      >`
+        SELECT slug, is_qa_tenant, is_review_tenant, is_platform_tenant FROM app.schools ORDER BY slug
       `;
+      // Only the platform school may hold SUPER_ADMIN (000185), so it alone is a platform tenant.
       expect([...flags]).toEqual([
-        { slug: "studafy-qa-platform", is_qa_tenant: true, is_review_tenant: false },
-        { slug: "studafy-qa-school-a", is_qa_tenant: true, is_review_tenant: false },
-        { slug: "studafy-qa-school-b", is_qa_tenant: true, is_review_tenant: false },
-        { slug: REVIEW_TENANT.slug, is_qa_tenant: false, is_review_tenant: true },
+        {
+          slug: "studafy-qa-platform",
+          is_qa_tenant: true,
+          is_review_tenant: false,
+          is_platform_tenant: true,
+        },
+        {
+          slug: "studafy-qa-school-a",
+          is_qa_tenant: true,
+          is_review_tenant: false,
+          is_platform_tenant: false,
+        },
+        {
+          slug: "studafy-qa-school-b",
+          is_qa_tenant: true,
+          is_review_tenant: false,
+          is_platform_tenant: false,
+        },
+        {
+          slug: REVIEW_TENANT.slug,
+          is_qa_tenant: false,
+          is_review_tenant: true,
+          is_platform_tenant: false,
+        },
       ]);
 
       // Every documented login resolves, under the qa provider, to its role in its own school.

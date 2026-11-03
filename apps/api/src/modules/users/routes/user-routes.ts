@@ -172,7 +172,8 @@ const createUserRoute = createRoute({
   summary: "Create a user",
   description:
     "Creates a new user in the school with the specified role. The user is created with " +
-    "'invited' status. Fails with 409 if the email already exists in this school. A PARENT can " +
+    "'invited' status. The platform roles SUPER_ADMIN and SUPPORT_AGENT are refused with 400. " +
+    "Fails with 409 if the email already exists in this school. A PARENT can " +
     "be created already linked to `children` in the same transaction; that also needs " +
     "`parent:link`, and any child that cannot be linked fails the whole request.",
   security: [{ bearerAuth: [] }],
@@ -227,8 +228,10 @@ const updateUserRoleRoute = createRoute({
   operationId: "updateUserRole",
   summary: "Update a user's role",
   description:
-    "Replaces the user's current role with a new one. The role must be one of the 7 predefined " +
-    "platform roles. Emits an audit log with old and new role assignments.",
+    "Replaces the user's current role with a new one. The role must be a school role: the " +
+    "platform roles SUPER_ADMIN and SUPPORT_AGENT are refused with 400. Only a SUPER_ADMIN may " +
+    "change the role of a user who holds a platform role (403 otherwise). Emits an audit log " +
+    "with old and new role assignments.",
   security: [{ bearerAuth: [] }],
   request: {
     params: userIdParamSchema,
@@ -464,6 +467,7 @@ export function userRoutes(
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
       updateUserRoleService(tx, auth.schoolId, userId, {
         role: body.role as Role,
+        callerRoles: auth.roles,
       }),
     );
 

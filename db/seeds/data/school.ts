@@ -65,6 +65,9 @@ export async function seedSchool(sql: Sql, tenant: TenantProfile): Promise<Schoo
       status: "active",
       is_review_tenant: tenant.isReviewTenant,
       is_qa_tenant: tenant.isQaTenant,
+      // Migration 000185: only a platform school may hold SUPER_ADMIN, so a tenant seeding one (the
+      // local demo school, the QA platform school) is flagged. The review tenant never has one.
+      is_platform_tenant: tenant.personas.some((persona) => persona.role === "SUPER_ADMIN"),
       country_id: country.id,
       default_currency_id: currency.id,
     })}

@@ -35,8 +35,17 @@ export {
   REALTIME_TICKET,
   REALTIME_TICKET_USED_PREFIX,
 } from "./realtime-ticket";
-export { ROLES, MOBILE_ONLY_ROLES, SCHOOL_STAFF_ROLES, isMobileOnly } from "./roles";
-export type { Role } from "./roles";
+export {
+  ROLES,
+  ASSIGNABLE_ROLES,
+  MOBILE_ONLY_ROLES,
+  PLATFORM_ROLES,
+  SCHOOL_STAFF_ROLES,
+  canChangeRoleOf,
+  isMobileOnly,
+  isPlatformRole,
+} from "./roles";
+export type { AssignableRole, PlatformRole, Role } from "./roles";
 export {
   FEATURE_FLAGS,
   flagDefault,

@@ -1,3 +1,4 @@
+import { canChangeRoleOf, isPlatformRole } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../db/tenant-tx";
@@ -67,6 +68,18 @@ export interface UpdateUserParams {
 
 export interface UpdateUserRoleParams {
   role: Role;
+  /** The caller's roles: only a SUPER_ADMIN may re-role a platform-role holder. */
+  callerRoles: readonly string[];
+}
+
+// The request schemas already refuse platform roles (users/schemas.ts assignableRoleSchema); this is
+// the service's own floor for any other caller (QA-10, finding F-01).
+function assertAssignable(role: Role): void {
+  if (isPlatformRole(role)) {
+    throw new HTTPException(403, {
+      message: "SUPER_ADMIN and SUPPORT_AGENT cannot be assigned to a school user.",
+    });
+  }
 }
 
 export interface DeactivateUserParams {
@@ -268,6 +281,7 @@ export async function createUser(
   schoolId: string,
   params: CreateUserParams,
 ): Promise<UserListRow> {
+  assertAssignable(params.role);
   if (!params.email && !MEMBER_PASSWORD_ROLES.includes(params.role)) {
     throw new HTTPException(400, {
       message: "An email is required for roles that sign in with Google or Microsoft.",
@@ -386,9 +400,15 @@ export async function updateUserRole(
   userId: string,
   params: UpdateUserRoleParams,
 ): Promise<UserWithRolesRow> {
+  assertAssignable(params.role);
   const existing = await getUser(tx, schoolId, userId);
   if (!existing) {
     throw new HTTPException(404, { message: "User not found" });
+  }
+  if (!canChangeRoleOf(params.callerRoles, existing.roles)) {
+    throw new HTTPException(403, {
+      message: "Only a SUPER_ADMIN can change the role of a platform staff member.",
+    });
   }
 
   await tx`

@@ -7,6 +7,7 @@ export {
 
 export {
   createSchool,
+  registerPlatformSchool,
   createUser,
   assignRole,
   createStudent,
