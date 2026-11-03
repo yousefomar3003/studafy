@@ -215,13 +215,56 @@ export const userMemberSummarySchema = z
     teachers: z.number().int().nonnegative(),
     parents: z.number().int().nonnegative(),
     attendance_officers: z.number().int().nonnegative(),
-    default_password: z.string().openapi({
-      description:
-        "The starting password for new members and after a reset. They must replace it at their " +
-        "first sign-in.",
-    }),
   })
   .openapi("UserMemberSummary");
+
+// ---------------------------------------------------------------------------
+// Setup codes (QA-11)
+// ---------------------------------------------------------------------------
+
+const setupCodeField = z.string().openapi({
+  description:
+    "One-time code the member signs in with to choose their password. Shown only in this " +
+    "response; it cannot be retrieved again.",
+  example: "7K3M-Q9TZ-2HXR-B8WD",
+});
+
+const setupCodeExpiresField = z.string().datetime().openapi({
+  description: "When the setup code stops working.",
+});
+
+export const memberSetupCodeSchema = z
+  .object({
+    usernames: z.array(z.string()).openapi({ description: "The member IDs they sign in with." }),
+    setup_code: setupCodeField,
+    expires_at: setupCodeExpiresField,
+  })
+  .openapi("MemberSetupCode");
+
+export const issueSetupCodesBodySchema = z
+  .object({
+    role: z.enum(["STUDENT", "INSTRUCTOR", "PARENT", "ATTENDANCE_OFFICER"]).openapi({
+      description: "Which members to issue codes to.",
+    }),
+  })
+  .openapi("IssueMemberSetupCodesRequest");
+
+export const issuedSetupCodesSchema = z
+  .object({
+    issued: z.array(
+      z.object({
+        user_id: z.string().uuid(),
+        display_name: z.string().nullable(),
+        usernames: z.array(z.string()),
+        setup_code: setupCodeField,
+        expires_at: setupCodeExpiresField,
+      }),
+    ),
+    remaining: z.number().int().nonnegative().openapi({
+      description: "Members still waiting for a code; call again to issue the next batch.",
+    }),
+  })
+  .openapi("IssuedMemberSetupCodes");
 
 // ---------------------------------------------------------------------------
 // Deactivate response

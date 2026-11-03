@@ -9,7 +9,7 @@ import {
 import { emitRateLimitBlock } from "../modules/auth/auth-anomaly-events";
 
 import type { AppEnv } from "./requestId";
-import type { RouteClass } from "../config/rateLimits";
+import type { RateLimitBudget, RouteClass } from "../config/rateLimits";
 import type { SecurityEventSink } from "../lib/security/securityEventSink";
 import type { RedisClient } from "../redis";
 import type { MiddlewareHandler } from "hono";
@@ -169,6 +169,57 @@ async function ensureScript(redis: RedisClient): Promise<string> {
 }
 
 // ---------------------------------------------------------------------------
+// Bucket consumption
+// ---------------------------------------------------------------------------
+
+export interface TokenBucketResult {
+  remaining: number;
+  allowed: boolean;
+  retryAfter: number;
+}
+
+/**
+ * Atomically takes one token from the bucket at `key`. Throws on Redis errors; callers decide
+ * whether to fail open.
+ */
+export async function takeRateLimitToken(
+  redis: RedisClient,
+  key: string,
+  budget: RateLimitBudget,
+  nowSeconds: number,
+): Promise<TokenBucketResult> {
+  const ttl =
+    budget.windowSeconds +
+    (budget.refillRate > 0 ? Math.ceil(budget.maxTokens / budget.refillRate) : 0);
+  const run = async () =>
+    (await redis.evalsha(
+      await ensureScript(redis),
+      2,
+      `${key}:tokens`,
+      `${key}:ts`,
+      budget.maxTokens,
+      budget.refillRate,
+      nowSeconds,
+      ttl,
+    )) as [number, number, number];
+
+  let result: [number, number, number];
+  try {
+    result = await run();
+  } catch (err: unknown) {
+    // NOSCRIPT = script evicted from cache; re-load and retry once.
+    if (!(err instanceof Error) || !err.message.includes("NOSCRIPT")) throw err;
+    scriptSha = null;
+    result = await run();
+  }
+  return {
+    remaining: result[0],
+    allowed: result[1] === 1,
+    retryAfter: Number.isFinite(result[2]) ? result[2] : budget.windowSeconds,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Middleware factory
 // ---------------------------------------------------------------------------
 
@@ -206,64 +257,21 @@ export function rateLimiterMiddleware({
     const identity = buildIdentity(routeClass, auth, clientIp);
     const key = buildRateLimitKey(routeClass, identity);
     const now = Math.floor(nowFn() / 1000);
-    const ttl =
-      budget.windowSeconds +
-      (budget.refillRate > 0 ? Math.ceil(budget.maxTokens / budget.refillRate) : 0);
 
     let remaining: number;
-    let allowed: number;
+    let allowed: boolean;
     let retryAfter: number;
 
     try {
-      const sha = await ensureScript(redis);
-      const result = (await redis.evalsha(
-        sha,
-        2,
-        `${key}:tokens`,
-        `${key}:ts`,
-        budget.maxTokens,
-        budget.refillRate,
-        now,
-        ttl,
-      )) as [number, number, number];
-
-      remaining = result[0];
-      allowed = result[1];
-      retryAfter = Number.isFinite(result[2]) ? result[2] : budget.windowSeconds;
+      ({ remaining, allowed, retryAfter } = await takeRateLimitToken(redis, key, budget, now));
     } catch (err: unknown) {
-      // NOSCRIPT = script evicted from cache; re-load and retry once.
-      if (
-        typeof err === "object" &&
-        err !== null &&
-        "message" in err &&
-        typeof (err as { message: unknown }).message === "string" &&
-        (err as { message: string }).message.includes("NOSCRIPT")
-      ) {
-        scriptSha = null;
-        const sha = await ensureScript(redis);
-        const result = (await redis.evalsha(
-          sha,
-          2,
-          `${key}:tokens`,
-          `${key}:ts`,
-          budget.maxTokens,
-          budget.refillRate,
-          now,
-          ttl,
-        )) as [number, number, number];
-
-        remaining = result[0];
-        allowed = result[1];
-        retryAfter = result[2];
-      } else {
-        // Redis failure — fail open. Log and proceed.
-        const log = c.get("log");
-        if (log) {
-          log.warn({ err }, "rate limiter redis error, failing open");
-        }
-        await next();
-        return;
+      // Redis failure — fail open. Log and proceed.
+      const log = c.get("log");
+      if (log) {
+        log.warn({ err }, "rate limiter redis error, failing open");
       }
+      await next();
+      return;
     }
 
     c.header("X-RateLimit-Limit", String(budget.maxTokens));

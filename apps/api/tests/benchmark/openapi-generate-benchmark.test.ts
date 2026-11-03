@@ -440,6 +440,7 @@ const EXPECTED_PATHS = [
   "/api/teachers/me",
   "/api/teachers/{teacherId}",
   "/api/users",
+  "/api/users/member-setup-codes",
   "/api/users/member-summary",
   "/api/users/status-counts",
   "/api/users/{userId}",

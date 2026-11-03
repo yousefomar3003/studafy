@@ -882,17 +882,23 @@ export function createApp({
   }
 
   // Member-ID + password sign-in and password change for students, parents, teachers and attendance
-  // officers (000141); see routes/member-password-routes.ts.
+  // officers (000141); see routes/member-password-routes.ts. Redis also backs its per-member-ID and
+  // platform-wide sign-in budgets (QA-11), on top of the per-IP limiter above.
   if (database && keyStore) {
     app.route(
       "/",
-      memberPasswordRoutes(database, {
-        keyStore,
-        issuer: jwtIssuer,
-        audience: jwtAudience,
-        accessTtlSeconds: jwtAccessTtlSeconds,
-        refreshTtlSeconds: jwtRefreshTtlSeconds,
-      }),
+      memberPasswordRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        rateLimitDisabled ? null : (redis ?? null),
+        eventSink,
+      ),
     );
   }
 

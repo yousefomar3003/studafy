@@ -175,6 +175,14 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - Per-username and global rate limits on member login, independent of IP.
   - `member-password-login.test.ts` updated: the old "default password works" case now asserts failure.
   - Migration/rollout plan for already-issued accounts that have never signed in.
+- Built (2026-11-03): migration 000184 (per-member setup codes: 80-bit, SHA-256 digest, 14-day
+  expiry, consumed on first password); `DEFAULT_MEMBER_PASSWORD` removed; admin reset and Add member
+  issue a code shown once; `POST /api/users/member-setup-codes` bulk-issues codes to members who
+  cannot sign in yet (CSV in `/portal/members`); per-member-ID and global Redis buckets on
+  `/api/auth/login/member`. Rollout plan: [`member-setup-codes.md`](../runbooks/member-setup-codes.md).
+  Verified locally against Postgres 17: `member-password-login.test.ts` (incl. the retired default
+  now refused), account-deletion, and `member-codes` DB tests pass. **Not yet run:** the Redis
+  rate-limit case (needs `TEST_REDIS_URL`); staging verification.
 
 **QA-12 — F-03 provision route self-promotion**
 

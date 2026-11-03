@@ -652,10 +652,12 @@
       "PARENT": "Parent",
       "ATTENDANCE_OFFICER": "Attendance officer"
     },
-    "signInNote": "They sign in on the mobile app with their ID as the username. The starting password is {{password}}, and they must choose their own password the first time they sign in. They can change it later in Settings.",
+    "signInNote": "They sign in on the mobile app with their ID as the username. The first time, they use a one-time setup code from you to choose their own password. Codes last 14 days and are shown only once, when you issue them — when you add someone, reset their password, or issue codes for everyone who hasn't signed in yet.",
     "username": "Username",
-    "startingPassword": "Starting password",
-    "mustChangeNote": "Give them these details. They'll be asked to choose their own password when they first sign in.",
+    "setupCode": "Setup code",
+    "setupCodeExpires": "Expires",
+    "setupCodeNote": "Give them these details now: the code can't be shown again. They use it once, at their first sign-in, to choose their own password.",
+    "setupCodeMissing": "The account was created, but no setup code was issued. Use Reset password to issue one.",
     "add": {
       "open": "Add member",
       "title": "Add a member",
@@ -677,10 +679,23 @@
     "reset": {
       "action": "Reset password",
       "title": "Reset password?",
-      "explain": "Their password goes back to {{password}} and they're signed out on every device. They'll have to choose a new password when they next sign in.",
+      "explain": "Their current password and any earlier setup code stop working, and they're signed out on every device. You'll get a new one-time setup code to give them; they'll choose a new password with it.",
       "confirm": "Reset password",
-      "done": "Password reset. Username {{username}}, password {{password}}.",
+      "done": "Password reset. Give them this new setup code.",
       "error": "Couldn't reset the password."
+    },
+    "codes": {
+      "issue": {
+        "STUDENT": "Issue codes to students not signed up",
+        "INSTRUCTOR": "Issue codes to teachers not signed up",
+        "PARENT": "Issue codes to parents not signed up",
+        "ATTENDANCE_OFFICER": "Issue codes to attendance officers not signed up"
+      },
+      "none": "Everyone here already has a password or an unexpired setup code.",
+      "done_one": "Issued {{count}} setup code. The list has been downloaded.",
+      "done_other": "Issued {{count}} setup codes. The list has been downloaded.",
+      "keepSafe": "Anyone with this file can claim those accounts. Hand the codes out, then delete it.",
+      "error": "Couldn't issue setup codes."
     }
   },
   "links": {

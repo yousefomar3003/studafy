@@ -2,16 +2,19 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Card, DataGrid, Input, Modal, useToast } from "@studafy/ui";
 import { useEffect, useState } from "react";
 
+import { buildCsv, downloadCsv } from "../../../lib/csv";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { STATUS_LABEL_KEYS } from "../users/schema";
 
 import { AddMemberModal } from "./AddMemberModal";
-import { useResetMemberPassword } from "./mutations";
+import { useIssueUnclaimedSetupCodes, useResetMemberPassword } from "./mutations";
 import { MEMBER_KINDS, useMemberSummaryQuery, useMembersPageQuery } from "./queries";
+import { SetupCodeDetails } from "./SetupCodeDetails";
 
 import "../users/users.css";
 import "./members.css";
 
+import type { IssuedMember } from "./mutations";
 import type { MemberListItem, MemberRole } from "./queries";
 import type { DataGridColumn } from "@studafy/ui";
 
@@ -21,8 +24,9 @@ const SEARCH_DEBOUNCE_MS = 300;
  * School members (`/portal/members`, the sidebar item under "Admin"), gated by
  * `organization:manageSettings`. How many students, teachers, parents and attendance officers the
  * school has, each with their member ID — STU/TCH/PAR/ATT, then the school number and a sequence —
- * which is also their username. Adds members without an email and resets their password to the
- * starting one (000141).
+ * which is also their username. Adds members without an email, and issues one-time setup codes
+ * (QA-11) — to one member as a password reset, or to every member of a role who cannot sign in yet
+ * as a downloaded sheet.
  */
 export default function SchoolMembersPage() {
   const { t } = useTranslation();
@@ -30,9 +34,10 @@ export default function SchoolMembersPage() {
   const { show } = useToast();
   const summary = useMemberSummaryQuery();
   const reset = useResetMemberPassword();
+  const issueCodes = useIssueUnclaimedSetupCodes();
   const [adding, setAdding] = useState(false);
   const [resetting, setResetting] = useState<MemberListItem | null>(null);
-  const defaultPassword = summary.data?.default_password ?? "";
+  const [issued, setIssued] = useState<IssuedMember | null>(null);
 
   const [role, setRole] = useState<MemberRole>("STUDENT");
   const [searchInput, setSearchInput] = useState("");
@@ -105,24 +110,59 @@ export default function SchoolMembersPage() {
     },
   ];
 
+  function closeReset() {
+    setResetting(null);
+    setIssued(null);
+  }
+
   function confirmReset() {
     if (!resetting) return;
-    const target = resetting;
-    reset.mutate(target.id, {
-      onSuccess: (result) => {
-        show({
-          variant: "success",
-          title: t("adminPeople.members.reset.done", {
-            username: result.usernames.join(", "),
-            password: result.default_password,
-          }),
-        });
-        setResetting(null);
-      },
+    reset.mutate(resetting.id, {
+      // Shown in the dialog rather than a toast: the code cannot be fetched again.
+      onSuccess: (result) => setIssued(result),
       onError: (error) =>
         show({
           variant: "error",
           title: t("adminPeople.members.reset.error"),
+          description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
+        }),
+    });
+  }
+
+  function issueRoleCodes() {
+    const target = role;
+    issueCodes.mutate(target, {
+      onSuccess: (rows) => {
+        if (rows.length === 0) {
+          show({ variant: "success", title: t("adminPeople.members.codes.none") });
+          return;
+        }
+        const csv = buildCsv(
+          [
+            t("adminPeople.members.columns.name"),
+            t("adminPeople.members.username"),
+            t("adminPeople.members.setupCode"),
+            t("adminPeople.members.setupCodeExpires"),
+          ],
+          rows.map((row) => [
+            row.displayName,
+            row.usernames.join(" "),
+            row.setupCode,
+            row.expiresAt.slice(0, 10),
+          ]),
+        );
+        const today = new Date().toISOString().slice(0, 10);
+        downloadCsv(`setup-codes-${target.toLowerCase()}-${today}.csv`, csv);
+        show({
+          variant: "success",
+          title: t("adminPeople.members.codes.done", { count: rows.length }),
+          description: t("adminPeople.members.codes.keepSafe"),
+        });
+      },
+      onError: (error) =>
+        show({
+          variant: "error",
+          title: t("adminPeople.members.codes.error"),
           description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
         }),
     });
@@ -136,13 +176,14 @@ export default function SchoolMembersPage() {
           <p>{t("adminPeople.members.description")}</p>
         </div>
         <div className="users-list__header-actions">
+          <Button variant="secondary" loading={issueCodes.isPending} onClick={issueRoleCodes}>
+            {t(`adminPeople.members.codes.issue.${role}`)}
+          </Button>
           <Button onClick={() => setAdding(true)}>{t("adminPeople.members.add.open")}</Button>
         </div>
       </div>
 
-      <p className="members-signin-note">
-        {t("adminPeople.members.signInNote", { password: defaultPassword || "…" })}
-      </p>
+      <p className="members-signin-note">{t("adminPeople.members.signInNote")}</p>
 
       <div className="members-summary" role="group" aria-label={t("adminPeople.members.summary")}>
         {MEMBER_KINDS.map((kind) => (
@@ -220,30 +261,44 @@ export default function SchoolMembersPage() {
         </Button>
       </div>
 
-      <AddMemberModal
-        open={adding}
-        defaultRole={role}
-        defaultPassword={defaultPassword}
-        onClose={() => setAdding(false)}
-      />
+      <AddMemberModal open={adding} defaultRole={role} onClose={() => setAdding(false)} />
 
       <Modal
         open={resetting !== null}
-        onClose={() => setResetting(null)}
+        onClose={closeReset}
         title={t("adminPeople.members.reset.title")}
         description={resetting ? (resetting.display_name ?? resetting.member_codes[0]) : undefined}
       >
-        <Modal.Body>
-          <p>{t("adminPeople.members.reset.explain", { password: defaultPassword })}</p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button type="button" variant="tertiary" onClick={() => setResetting(null)}>
-            {t("adminPeople.common.cancel")}
-          </Button>
-          <Button type="button" loading={reset.isPending} onClick={confirmReset}>
-            {t("adminPeople.members.reset.confirm")}
-          </Button>
-        </Modal.Footer>
+        {issued ? (
+          <>
+            <Modal.Body>
+              <p role="status">{t("adminPeople.members.reset.done")}</p>
+              <SetupCodeDetails
+                usernames={issued.usernames}
+                setup={{ setupCode: issued.setupCode, expiresAt: issued.expiresAt }}
+              />
+            </Modal.Body>
+            <Modal.Footer>
+              <Button type="button" onClick={closeReset}>
+                {t("adminPeople.members.add.done")}
+              </Button>
+            </Modal.Footer>
+          </>
+        ) : (
+          <>
+            <Modal.Body>
+              <p>{t("adminPeople.members.reset.explain")}</p>
+            </Modal.Body>
+            <Modal.Footer>
+              <Button type="button" variant="tertiary" onClick={closeReset}>
+                {t("adminPeople.common.cancel")}
+              </Button>
+              <Button type="button" loading={reset.isPending} onClick={confirmReset}>
+                {t("adminPeople.members.reset.confirm")}
+              </Button>
+            </Modal.Footer>
+          </>
+        )}
       </Modal>
     </>
   );

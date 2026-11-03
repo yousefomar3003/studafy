@@ -57,6 +57,36 @@ export const RATE_LIMIT_BUDGETS: Record<RouteClass, RateLimitBudget> = {
   default: { maxTokens: 100, refillRate: 1.67, windowSeconds: 60 },
 };
 
+/**
+ * Member-ID sign-in (`/api/auth/login/member`) budgets that do not depend on the caller's IP
+ * (QA-11), on top of its per-IP `auth-strict` class, so rotating addresses buys an attacker nothing.
+ * Every attempt takes a token from both buckets before any password is checked.
+ *
+ * - `username`: one member ID, whoever asks. 10 burst, ~10 per 15 minutes sustained — above the
+ *   five-wrong-password lockout, so it never blocks someone the lockout would let through, and it
+ *   also covers IDs that do not exist, which have no lockout.
+ * - `global`: every member sign-in on the platform. A circuit breaker for a distributed spray across
+ *   many IDs, sized well above a whole school signing in at once (600 burst, 10/s sustained). An
+ *   attacker who drains it blocks member sign-in for everyone until it refills; that is the
+ *   intended trade against letting the spray continue, and it raises the auth anomaly alert.
+ */
+export const MEMBER_LOGIN_BUDGETS = {
+  username: { maxTokens: 10, refillRate: 10 / 900, windowSeconds: 900 },
+  global: { maxTokens: 600, refillRate: 10, windowSeconds: 60 },
+} as const satisfies Record<string, RateLimitBudget>;
+
+/** Redis key for a member sign-in bucket: per normalized member ID, or the one global bucket. */
+export function buildMemberLoginRateLimitKey(
+  scope: keyof typeof MEMBER_LOGIN_BUDGETS,
+  username?: string,
+): string {
+  // eslint-disable-next-line security/detect-object-injection -- `scope` is a closed union
+  const window = Math.floor(Date.now() / 1000 / MEMBER_LOGIN_BUDGETS[scope].windowSeconds);
+  return scope === "username"
+    ? `rl:member-login:user:${(username ?? "").trim().toUpperCase()}:${window}`
+    : `rl:member-login:global:${window}`;
+}
+
 // ---------------------------------------------------------------------------
 // Route-class registry
 // ---------------------------------------------------------------------------

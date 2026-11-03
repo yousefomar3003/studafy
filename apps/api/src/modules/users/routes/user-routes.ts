@@ -1,4 +1,4 @@
-import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
@@ -12,8 +12,9 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
 import {
-  DEFAULT_MEMBER_PASSWORD,
-  resetMemberPassword,
+  issueMemberSetupCode,
+  issueUnclaimedSetupCodes,
+  SETUP_CODE_TTL_DAYS,
 } from "../../auth/services/member-password-service";
 import {
   adminRevokeUserSessions,
@@ -22,6 +23,9 @@ import {
 import { writeAnswers } from "../../records/record-service";
 import {
   createUserBodySchema,
+  issueSetupCodesBodySchema,
+  issuedSetupCodesSchema,
+  memberSetupCodeSchema,
   userListQuerySchema,
   userListSchema,
   userIdParamSchema,
@@ -274,26 +278,40 @@ const resetPasswordRoute = createRoute({
   operationId: "resetMemberPassword",
   summary: "Reset a member's password",
   description:
-    "Returns a student, parent, teacher or attendance officer to the starting password, clears any " +
-    "lockout and signs them out everywhere. They must choose a new password at their next sign-in. " +
-    "404 for accounts that sign in with Google or Microsoft (no member ID).",
+    "Removes the password of a student, parent, teacher or attendance officer, clears any lockout " +
+    "and signs them out everywhere, and issues a one-time setup code (valid " +
+    `${SETUP_CODE_TTL_DAYS} days) that they sign in with to choose a new password. Also how a new ` +
+    "member gets their first sign-in. Any earlier setup code stops working. The code appears only " +
+    "in this response. 404 for accounts that sign in with Google or Microsoft (no member ID).",
   security: [{ bearerAuth: [] }],
   request: { params: userIdParamSchema },
   responses: standardResponses(
-    {
-      200: {
-        description: "Password reset.",
-        schema: z
-          .object({
-            usernames: z
-              .array(z.string())
-              .openapi({ description: "The member IDs they sign in with." }),
-            default_password: z.string().openapi({ description: "The password to give them." }),
-          })
-          .openapi("MemberPasswordReset"),
-      },
-    },
+    { 200: { description: "Setup code issued.", schema: memberSetupCodeSchema } },
     [401, 403, 404, 429, 500],
+  ),
+});
+
+const issueSetupCodesRoute = createRoute({
+  method: "post",
+  path: "/api/users/member-setup-codes",
+  tags: ["Users"],
+  operationId: "issueMemberSetupCodes",
+  summary: "Issue setup codes to members who cannot sign in yet",
+  description:
+    "Issues a one-time setup code to every active or invited member of `role` who has never set a " +
+    "password and holds no unexpired code — up to 500 per call; repeat while `remaining` is " +
+    "above zero. Members with a live code are skipped, so a sheet already handed out stays valid. " +
+    "The codes appear only in this response.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: issueSetupCodesBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "Setup codes issued.", schema: issuedSetupCodesSchema } },
+    [400, 401, 403, 429, 500],
   ),
 });
 
@@ -317,6 +335,7 @@ export function userRoutes(
   routes.use("/api/users/:userId/role", channelGuard);
   routes.use("/api/users/:userId/deactivate", channelGuard);
   routes.use("/api/users/:userId/password/reset", channelGuard);
+  routes.use("/api/users/member-setup-codes", channelGuard);
 
   // --- Permission guards ---
   routes.use("/api/users", requirePermission(PERMISSIONS.USER_READ));
@@ -331,6 +350,7 @@ export function userRoutes(
   routes.use("/api/users/:userId/role", requirePermission(PERMISSIONS.ROLE_ASSIGN));
   routes.use("/api/users/:userId/deactivate", requirePermission(PERMISSIONS.USER_SUSPEND));
   routes.use("/api/users/:userId/password/reset", requirePermission(PERMISSIONS.USER_UPDATE));
+  routes.use("/api/users/member-setup-codes", requirePermission(PERMISSIONS.USER_UPDATE));
 
   // --- Audit declarations ---
   routes.use("/api/users", auditAction("insert", "users"));
@@ -338,6 +358,7 @@ export function userRoutes(
   routes.use("/api/users/:userId/role", auditAction("update", "user_roles"));
   routes.use("/api/users/:userId/deactivate", auditAction("update", "users"));
   routes.use("/api/users/:userId/password/reset", auditAction("update", "member_credentials"));
+  routes.use("/api/users/member-setup-codes", auditAction("update", "member_credentials"));
 
   // --- Handlers ---
 
@@ -372,7 +393,7 @@ export function userRoutes(
       getUserMemberSummary(tx, auth.schoolId),
     );
 
-    return c.json({ ...summary, default_password: DEFAULT_MEMBER_PASSWORD }, 200);
+    return c.json(summary, 200);
   });
 
   routes.openapi(getUserRoute, async (c) => {
@@ -471,7 +492,7 @@ export function userRoutes(
     const { userId } = c.req.valid("param");
     const tenant = tenantFrom(c);
 
-    const reset = await withTenantTx(database, tenant, (tx) => resetMemberPassword(tx, userId));
+    const reset = await withTenantTx(database, tenant, (tx) => issueMemberSetupCode(tx, userId));
     if (!reset) {
       throw new HTTPException(404, { message: "This account has no member ID or password." });
     }
@@ -488,7 +509,39 @@ export function userRoutes(
       clientIp: clientIpFrom(c),
     });
 
-    return c.json({ usernames: reset.usernames, default_password: DEFAULT_MEMBER_PASSWORD }, 200);
+    c.header("Cache-Control", "no-store");
+    return c.json(
+      {
+        usernames: reset.usernames,
+        setup_code: reset.setupCode,
+        expires_at: reset.expiresAt.toISOString(),
+      },
+      200,
+    );
+  });
+
+  routes.openapi(issueSetupCodesRoute, async (c) => {
+    const { role } = c.req.valid("json");
+
+    // Only accounts that have never set a password are touched, so no one is signed out.
+    const batch = await withTenantTx(database, tenantFrom(c), (tx) =>
+      issueUnclaimedSetupCodes(tx, role as Role),
+    );
+
+    c.header("Cache-Control", "no-store");
+    return c.json(
+      {
+        issued: batch.issued.map((member) => ({
+          user_id: member.userId,
+          display_name: member.displayName,
+          usernames: member.usernames,
+          setup_code: member.setupCode,
+          expires_at: member.expiresAt.toISOString(),
+        })),
+        remaining: batch.remaining,
+      },
+      200,
+    );
   });
 
   return routes;

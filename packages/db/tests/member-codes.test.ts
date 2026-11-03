@@ -275,6 +275,39 @@ integrationTest(
           await tx`UPDATE app.member_credentials SET password_hash = 'plain' WHERE user_id = ${userId}`;
         }),
       ).rejects.toThrow();
+      // Setup codes (000184): a SHA-256 digest with an expiry, and only on an unclaimed account.
+      const digest = "a".repeat(64);
+      await expect(
+        asRole(database, "studafy_app", async (tx) => {
+          await tx`SELECT set_config('app.school_id', ${school}, true)`;
+          await tx`
+            UPDATE app.member_credentials
+            SET setup_code_hash = ${digest}, setup_code_expires_at = CURRENT_TIMESTAMP
+            WHERE user_id = ${userId}
+          `;
+        }),
+      ).rejects.toThrow();
+      await expect(
+        asRole(database, "studafy_app", async (tx) => {
+          await tx`SELECT set_config('app.school_id', ${school}, true)`;
+          await tx`
+            UPDATE app.member_credentials
+            SET password_hash = NULL, password_changed_at = NULL, setup_code_hash = 'pass@1234',
+                setup_code_expires_at = CURRENT_TIMESTAMP
+            WHERE user_id = ${userId}
+          `;
+        }),
+      ).rejects.toThrow();
+      await expect(
+        asRole(database, "studafy_app", async (tx) => {
+          await tx`SELECT set_config('app.school_id', ${school}, true)`;
+          await tx`
+            UPDATE app.member_credentials
+            SET password_hash = NULL, password_changed_at = NULL, setup_code_hash = ${digest}
+            WHERE user_id = ${userId}
+          `;
+        }),
+      ).rejects.toThrow();
 
       const visibleFromOther = await asRole(database, "studafy_app", async (tx) => {
         await tx`SELECT set_config('app.school_id', ${other}, true)`;

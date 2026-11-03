@@ -91,8 +91,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/users/{userId}",
   "PATCH /api/users/{userId}/role",
   "PATCH /api/users/{userId}/deactivate",
-  // Member password reset (000141), gated on USER_UPDATE.
+  // Member password reset and bulk setup codes (000141, 000184), gated on USER_UPDATE.
   "POST /api/users/{userId}/password/reset",
+  "POST /api/users/member-setup-codes",
   // Student profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards
   // for STUDENT_READ, STUDENT_CREATE, and STUDENT_UPDATE.
   "POST /api/students",
