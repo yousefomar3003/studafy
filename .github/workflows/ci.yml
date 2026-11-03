@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [dev]
+    # stage carries the QA fix tasks (docs/testing/qa-plan.md), pushed directly; "done" there is CI green.
+    branches: [dev, stage]
 
 permissions:
   contents: read
