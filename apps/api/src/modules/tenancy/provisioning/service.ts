@@ -383,6 +383,9 @@ async function markCompleted(
       action: "update",
       targetTable: "subscriptions",
       targetId: params.schoolId,
+      // provisionLocal moved it to 'in_progress' just before this, and ck_audit_logs_payload requires
+      // an 'update' row to carry both sides of the change.
+      oldValues: { provisioning_status: "in_progress" },
       newValues: { provisioning_status: "completed" },
     });
   });

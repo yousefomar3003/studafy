@@ -581,8 +581,6 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // School email verification (ST-088) — public self-service endpoint; authorized by a one-time
   // verification token, not by a bearer permission; no other user's data to protect.
   "POST /api/schools/resend-verification",
-  // Tenant provisioning (ST-089) — school admin self-service on their own school's provisioning.
-  "POST /api/schools/{schoolId}/provision",
   // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
   "POST /api/invitations",
   "POST /api/invitations/{id}/revoke",

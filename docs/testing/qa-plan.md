@@ -194,6 +194,13 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - Removed from `GUARD_EXEMPT_ROUTES`.
   - Tests: STUDENT/INSTRUCTOR → 403; ORG_ADMIN of school A on school B → 403/404; no `user_roles`
     write and no `provisioning_status` change in either case.
+- Status: both provisioning routes (`POST …/provision` and `GET …/provisioning-status`) are behind
+  `requirePermission(ORGANIZATION_MANAGE_SETTINGS)` (SUPER_ADMIN holds it), and another school's id
+  gets 404. The route is no longer in `GUARD_EXEMPT_ROUTES`. Also fixed: the completion audit row
+  had no `old_values`, so `ck_audit_logs_payload` rejected it and every legitimate provision
+  returned 500. Verified locally against Postgres 16 with
+  `tests/security/provision-route-authz.test.ts` (7 pass; against the old route, 5 of 7 fail).
+  **Not yet done:** staging verification.
 
 **QA-13 — F-04 / F-16 realtime room authorization and limits**
 
