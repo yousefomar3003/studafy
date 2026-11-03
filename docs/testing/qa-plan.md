@@ -210,6 +210,17 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - Per-kind policy table in `apps/realtime` with a test per room kind; unknown kinds rejected.
   - `maxPayloadLength` ≤ 16 KB, ≤ N rooms per socket, control-frame rate limit, Origin allowlist —
     each with a test.
+- Status: room joins and leaves go through a per-kind policy table
+  (`apps/realtime/src/room-policy.ts`). A socket may join only its own school room, its own role's
+  room and its own user room; unknown kinds are denied. The gateway now caps frames at 16 KB
+  (`maxPayloadLength`), rooms per socket at 8, and client frames at a burst of 20 refilled at 2/s
+  (then close 1008). The `/ws` handshake checks `Origin` against `WS_ALLOWED_ORIGINS`, which is
+  required when `NODE_ENV=production`; the ECS task sets it to `${WEB_ORIGIN}`. Tests:
+  `room-policy.test.ts` (one block per kind plus unknown kinds), `limits.test.ts`, and
+  `app.ws.test.ts` over a real socket (user U → `user:V` and student → `role:INSTRUCTOR` refused,
+  oversized frame, room cap, rate limit, origin 403). `bun test` in `apps/realtime`: 131 pass.
+  The smoke test now checks that a student is refused the instructor room. **Not yet done:**
+  staging verification.
 
 **QA-14 — F-05 realtime handshake contract**
 

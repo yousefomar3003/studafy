@@ -4,9 +4,8 @@ import {
   startTracing,
   withErrorMonitoringScope,
 } from "@studafy/observability";
-import { websocket } from "hono/bun";
 
-import { createApp } from "./app";
+import { createApp, realtimeWebSocket } from "./app";
 import { createRedisSubscriber } from "./connection";
 import { loadEnv } from "./env";
 import { createConnectionTracker, gracefulShutdown } from "./lifecycle";
@@ -78,6 +77,7 @@ const app = createApp({
   rooms,
   tracker,
   metrics: snapshot,
+  allowedOrigins: env.WS_ALLOWED_ORIGINS,
 });
 
 const server = Bun.serve({
@@ -85,7 +85,7 @@ const server = Bun.serve({
   hostname: env.HOST,
   // One Sentry scope per handshake request; see apps/api/src/index.ts's own Bun.serve.
   fetch: (request, bunServer) => withErrorMonitoringScope(() => app.fetch(request, bunServer)),
-  websocket,
+  websocket: realtimeWebSocket,
 });
 
 console.log(

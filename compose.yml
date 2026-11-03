@@ -158,6 +158,7 @@ services:
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       WS_JWT_SECRET: ${WS_JWT_SECRET:-dev-insecure-secret-change-me}
+      WS_ALLOWED_ORIGINS: http://localhost:8080
     ports:
       - "127.0.0.1:3001:3001"
     depends_on:

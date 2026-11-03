@@ -19,6 +19,7 @@ upgrading:
 
 | Outcome                               | Response                                                                    |
 | ------------------------------------- | --------------------------------------------------------------------------- |
+| `Origin` not in `WS_ALLOWED_ORIGINS`  | `403 { "error": "origin not allowed", "code": "ORIGIN_NOT_ALLOWED" }`       |
 | Missing `token`                       | `401 { "error": "missing token query parameter", "code": "TOKEN_MISSING" }` |
 | Expired token                         | `401 { "error": "<reason>", "code": "TOKEN_EXPIRED" }`                      |
 | Malformed / mis-signed / unknown role | `401 { "error": "<reason>", "code": "TOKEN_INVALID" }`                      |
@@ -91,17 +92,24 @@ boundary (`src/protocol.ts`'s `parseRoomKeyParts` is the only place this grammar
 | `school:{schoolId}:role:{ROLE}`   | every connection with that role, within the tenant            |
 | `school:{schoolId}:user:{userId}` | a single user's connection(s) — for direct, targeted delivery |
 
-**A client may only join or leave rooms within its own `schoolId`** — the gateway rejects a
-`join`/`leave` for any other school's room with a `system.error`. This is the tenant-isolation
-boundary: it is enforced regardless of room kind, and is what makes cross-tenant room subscription
-impossible (see `src/app.ws.test.ts`'s probe tests). It does not further restrict which role's or
-user's room a client may join within its own school (e.g. an instructor can subscribe to the
-student room in the same school); that is a coarser authorization model than the platform's full
-permission matrix (`docs/adr/0002-fixed-roles-authorization.md`) and is a known simplification — a
-future ticket can tighten it if a concrete requirement needs to.
+**Who may join or leave which room is decided per room kind** (F-04), by the policy table in
+[`src/room-policy.ts`](../src/room-policy.ts). Every kind first requires the room's `schoolId` to
+be the caller's own (the tenant-isolation boundary — see `src/app.ws.test.ts`'s probe tests), then
+adds its own rule:
 
-Every connection auto-joins all three of its home rooms at handshake. It can join additional rooms
-(in the same school) with a control message:
+| Kind     | Allowed when                                              | Denied with                                  |
+| -------- | --------------------------------------------------------- | -------------------------------------------- |
+| `school` | the room is the caller's school                           | `cannot join a room outside your own school` |
+| `role`   | same school **and** the room's role is the token's `role` | `not authorized for this room`               |
+| `user`   | same school **and** the room's user is the token's `sub`  | `not authorized for this room`               |
+| other    | never — a kind with no row in the table is denied         | `unknown room kind` (or a schema error)      |
+
+So a student cannot subscribe to `school:S:role:INSTRUCTOR`, and no one can subscribe to another
+user's `school:S:user:V` room. In practice the policy allows exactly the three home rooms; a new
+room kind (e.g. a class room) must add a row to the table to be joinable at all.
+
+Every connection auto-joins all three of its home rooms at handshake. It can leave a room and join
+it again, subject to the policy above, with a control message:
 
 ```json
 { "type": "join", "room": "school:123:role:INSTRUCTOR" }
@@ -109,7 +117,23 @@ Every connection auto-joins all three of its home rooms at handshake. It can joi
 ```
 
 The gateway acks with a system message (`system.joined` / `system.left`), or `system.error` if the
-room is malformed or outside the client's school.
+room is malformed or the policy denies it.
+
+## Limits
+
+Per-connection limits (F-16), defined in [`src/limits.ts`](../src/limits.ts):
+
+| Limit              | Value                                  | When exceeded                                                                                      |
+| ------------------ | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Frame size         | 16 KB (`maxPayloadLength`)             | Bun drops the connection before any handler runs (the client sees close code 1006 or 1009).        |
+| Rooms per socket   | 8, home rooms included                 | The `join` is refused with `system.error` `room limit reached`; re-joining a current room is fine. |
+| Client frame rate  | burst of 20, refilled at 2 per second  | `system.error` `rate limit exceeded`, then close code **1008**. Every frame counts, valid or not.  |
+| Handshake `Origin` | `WS_ALLOWED_ORIGINS` (comma-separated) | `403 ORIGIN_NOT_ALLOWED` before the token is read.                                                 |
+
+The Origin allowlist is required when `NODE_ENV=production` (the ECS task sets it to the tier's
+`WEB_ORIGIN`); unset in development turns the check off. A handshake **without** an `Origin` header
+is accepted: browsers always send one on a WebSocket handshake, so its absence means a non-browser
+client such as the mobile app, which cross-site WebSocket hijacking cannot come from.
 
 ## Message envelopes
 
@@ -128,7 +152,7 @@ mean different things (control-plane ack vs. domain event) and grow independentl
 ```json
 { "type": "system.joined", "room": "school:123:role:STUDENT" }
 { "type": "system.left", "room": "school:123:role:STUDENT" }
-{ "type": "system.error", "message": "cannot join a room outside your own school" }
+{ "type": "system.error", "message": "not authorized for this room" }
 { "type": "system.reauth_required", "reason": "token expired" }
 ```
 

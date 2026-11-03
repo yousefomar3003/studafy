@@ -5,16 +5,25 @@ import {
   resolveRoute,
 } from "@studafy/observability";
 import { Hono } from "hono";
-import { upgradeWebSocket } from "hono/bun";
+import { upgradeWebSocket, websocket } from "hono/bun";
 import { HTTPException } from "hono/http-exception";
 
 import { TokenVerificationError, verifyToken } from "./auth";
 import { healthRoutes } from "./health";
+import {
+  createTokenBucket,
+  DEFAULT_LIMITS,
+  isOriginAllowed,
+  MAX_PAYLOAD_BYTES,
+  RATE_LIMITED_CLOSE_CODE,
+} from "./limits";
 import { clientMessageSchema, REAUTH_REQUIRED_CLOSE_CODE } from "./protocol";
-import { parseRoomKey, roleRoomKey, schoolRoomKey, userRoomKey } from "./rooms";
+import { authorizeRoom } from "./room-policy";
+import { roleRoomKey, schoolRoomKey, userRoomKey } from "./rooms";
 
 import type { AuthClaims } from "./auth";
 import type { ConnectionTracker } from "./lifecycle";
+import type { RealtimeLimits, TokenBucket } from "./limits";
 import type { FanoutMetrics } from "./metrics";
 import type { ClientMessage, RoomKey, SystemMessage } from "./protocol";
 import type { RoomManager } from "./rooms";
@@ -37,6 +46,13 @@ export interface RawSocket {
   send(data: string, compress?: boolean): void;
   close(code?: number, reason?: string): void;
 }
+
+/**
+ * Bun's WebSocket handler for `Bun.serve`: Hono's, plus the frame-size cap (F-16). Bun closes a
+ * socket that sends a bigger frame with 1009 before any handler sees it. Production and the tests
+ * must both serve this, not Hono's bare `websocket`, or the cap goes untested.
+ */
+export const realtimeWebSocket = { ...websocket, maxPayloadLength: MAX_PAYLOAD_BYTES };
 
 function raw(ws: WSContext): RawSocket {
   return ws.raw as RawSocket;
@@ -75,6 +91,13 @@ export interface AppOptions {
   rooms: RoomManager<RawSocket>;
   tracker: ConnectionTracker<RawSocket>;
   metrics: () => FanoutMetrics;
+  /**
+   * Browser origins allowed to open a socket; see src/limits.ts's isOriginAllowed. Empty turns the
+   * check off (development only — env.ts requires a list in production).
+   */
+  allowedOrigins?: readonly string[];
+  /** Overrides for {@link DEFAULT_LIMITS}; tests lower them to exercise each limit. */
+  limits?: Partial<RealtimeLimits>;
   /**
    * Error monitoring seam. Injected by tests; defaults to @studafy/observability's captureError,
    * itself a no-op unless SENTRY_DSN is configured.
@@ -123,9 +146,12 @@ export function createApp({
   rooms,
   tracker,
   metrics,
+  allowedOrigins = [],
+  limits: limitOverrides,
   reportError = captureError,
 }: AppOptions): Hono<Bindings> {
   const app = new Hono<Bindings>();
+  const limits: RealtimeLimits = { ...DEFAULT_LIMITS, ...limitOverrides };
 
   // Hono's own default handler, plus a report: an unexpected throw from the handshake or a health
   // route is a 500 nobody would otherwise hear about. HTTPExceptions keep their own response and
@@ -155,6 +181,11 @@ export function createApp({
   app.get(
     "/ws",
     async (c, next) => {
+      // Before the token: a page on another site must not be able to open a socket at all, even
+      // with a token it somehow holds (cross-site WebSocket hijacking).
+      if (!isOriginAllowed(c.req.header("origin"), allowedOrigins)) {
+        return c.json({ error: "origin not allowed", code: "ORIGIN_NOT_ALLOWED" }, 403);
+      }
       const token = c.req.query("token");
       if (!token) {
         return c.json({ error: "missing token query parameter", code: "TOKEN_MISSING" }, 401);
@@ -177,6 +208,7 @@ export function createApp({
         userRoomKey(claims.schoolId, claims.userId),
       ];
       let reauthTimer: ReturnType<typeof setTimeout> | undefined;
+      const controlFrames = createTokenBucket(limits.controlBurst, limits.controlRefillPerSecond);
 
       return {
         onOpen(_event, ws) {
@@ -192,7 +224,7 @@ export function createApp({
         },
         onMessage(event, ws) {
           monitored(reportError, "message", claims, () => {
-            handleClientMessage(event.data, ws, claims, rooms);
+            handleClientMessage(event.data, ws, { claims, rooms, limits, controlFrames });
           });
         },
         onClose(_event, ws) {
@@ -210,13 +242,30 @@ export function createApp({
   return app;
 }
 
-/** Handles a `ClientMessage` frame: join/leave, restricted to rooms in the caller's own school. */
+interface MessageContext {
+  claims: AuthClaims;
+  rooms: RoomManager<RawSocket>;
+  limits: RealtimeLimits;
+  controlFrames: TokenBucket;
+}
+
+/**
+ * Handles one client frame. Every frame — valid or not — spends a control-frame token first, so a
+ * flood of garbage is limited exactly like a flood of joins; an empty bucket closes the socket.
+ * A join/leave must then pass the room policy (src/room-policy.ts), and a join must fit under the
+ * per-socket room cap.
+ */
 function handleClientMessage(
   data: unknown,
   ws: WSContext,
-  claims: AuthClaims,
-  rooms: RoomManager<RawSocket>,
+  { claims, rooms, limits, controlFrames }: MessageContext,
 ): void {
+  if (!controlFrames.take()) {
+    send(ws, { type: "system.error", message: "rate limit exceeded" });
+    raw(ws).close(RATE_LIMITED_CLOSE_CODE, "rate limit exceeded");
+    return;
+  }
+
   if (typeof data !== "string") {
     send(ws, { type: "system.error", message: "binary frames are not supported" });
     return;
@@ -237,13 +286,19 @@ function handleClientMessage(
   }
 
   const message: ClientMessage = result.data;
-  if (parseRoomKey(message.room).schoolId !== claims.schoolId) {
-    send(ws, { type: "system.error", message: "cannot join a room outside your own school" });
+  const decision = authorizeRoom(message.room, claims);
+  if (!decision.allowed) {
+    send(ws, { type: "system.error", message: decision.reason });
     return;
   }
 
   const socket = raw(ws);
   if (message.type === "join") {
+    const joined = rooms.roomsOf(socket);
+    if (!joined.has(message.room) && joined.size >= limits.maxRoomsPerSocket) {
+      send(ws, { type: "system.error", message: "room limit reached" });
+      return;
+    }
     rooms.join(message.room, socket);
     send(ws, { type: "system.joined", room: message.room });
   } else {

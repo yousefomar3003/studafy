@@ -77,7 +77,8 @@ templates' `${VAR}` placeholders. Values that `terraform output` can supply are 
 
 The templates map `APP_ENV` and `WEB_ORIGIN` as follows: the api task gets `APP_ENV`,
 `CORS_ALLOWED_ORIGINS=${WEB_ORIGIN}`, and `FRONTEND_URL=${WEB_ORIGIN}`; the workers task gets
-`FRONTEND_URL=${WEB_ORIGIN}` (links in emails). `task-definitions.test.ts` fails if an env file
+`FRONTEND_URL=${WEB_ORIGIN}` (links in emails); the realtime task gets
+`WS_ALLOWED_ORIGINS=${WEB_ORIGIN}` (its handshake Origin allowlist). `task-definitions.test.ts` fails if an env file
 drops either key. `preview.env` is separate; see "PR preview environments".
 
 ## Rolling update strategy (the ticket's core ask)

@@ -97,7 +97,7 @@ interface FullTaskDefinition {
 }
 
 /** Renders like render.sh does: every ${VAR} replaced, here with its own name so values are traceable. */
-async function renderNamed(service: "api" | "workers"): Promise<FullTaskDefinition> {
+async function renderNamed(service: "api" | "workers" | "realtime"): Promise<FullTaskDefinition> {
   const template = await readFile(
     join(import.meta.dir, "ecs", service, "task-definition.json.tpl"),
     "utf8",
@@ -116,6 +116,15 @@ describe("production readiness of the ECS task definitions", () => {
       CORS_ALLOWED_ORIGINS: "<WEB_ORIGIN>",
       GOOGLE_OAUTH_REDIRECT_URI: "<API_ORIGIN>/api/auth/oauth/google/callback",
       MICROSOFT_OAUTH_REDIRECT_URI: "<API_ORIGIN>/api/auth/oauth/microsoft/callback",
+    });
+  });
+
+  test("the realtime gateway only accepts browser sockets from the web origin (F-16)", async () => {
+    const realtime = (await renderNamed("realtime")).containerDefinitions[0]!;
+    // NODE_ENV=production makes apps/realtime/src/env.ts refuse to start without the allowlist.
+    expect(values(realtime.environment!)).toMatchObject({
+      NODE_ENV: "production",
+      WS_ALLOWED_ORIGINS: "<WEB_ORIGIN>",
     });
   });
 

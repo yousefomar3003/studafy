@@ -1,7 +1,6 @@
-import { websocket } from "hono/bun";
 import IORedis from "ioredis";
 
-import { createApp } from "../src/app";
+import { createApp, realtimeWebSocket } from "../src/app";
 import { signToken } from "../src/auth";
 import { createRedisSubscriber } from "../src/connection";
 import { loadEnv } from "../src/env";
@@ -78,7 +77,7 @@ async function main(): Promise<void> {
     metrics: snapshot,
   });
 
-  const server = Bun.serve({ port: 0, fetch: app.fetch, websocket });
+  const server = Bun.serve({ port: 0, fetch: app.fetch, websocket: realtimeWebSocket });
   const baseUrl = `ws://localhost:${server.port}`;
 
   const broadcast = (evt: EventEnvelope): void => {
@@ -133,27 +132,23 @@ async function main(): Promise<void> {
     }
     console.log("Client B correctly did not receive another school's room message.");
 
-    console.log(`Client A explicitly joining "${instructorRoom}"…`);
+    // F-04: a student may not subscribe to another role's room in its own school.
+    console.log(`Client A (a student) trying to join "${instructorRoom}"…`);
     clientA.socket.send(JSON.stringify({ type: "join", room: instructorRoom }));
     await waitUntil(
-      () =>
-        clientA.received.data.some(
-          (msg) => msg.includes('"system.joined"') && msg.includes(instructorRoom),
-        ),
-      "client A to ack joining the instructor room",
+      () => clientA.received.data.some((msg) => msg.includes("not authorized for this room")),
+      "client A's join of the instructor room to be refused",
     );
 
     await publisher.publish(
       instructorRoom,
       JSON.stringify(envelope(instructorRoom, "hello instructors")),
     );
-    await waitUntil(
-      () => clientA.received.data.some((msg) => msg.includes("hello instructors")),
-      "client A to receive the second room's fanned-out message",
-    );
-    console.log(
-      "Client A received the second room's message after an explicit join. Room abstraction works.",
-    );
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    if (clientA.received.data.some((msg) => msg.includes("hello instructors"))) {
+      throw new Error("client A (a student) received the instructor room's message");
+    }
+    console.log("Client A was refused the instructor room and did not receive its message.");
 
     console.log("Connecting client C (smoke-school/PARENT)…");
     const parentToken = signToken(
