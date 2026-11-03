@@ -30,6 +30,11 @@ export {
   QUEUE_NAMES,
 } from "./queues";
 export type { DeadLetterQueueName, JobName, QueueName } from "./queues";
+export {
+  JTI_DENYLIST_PREFIX,
+  REALTIME_TICKET,
+  REALTIME_TICKET_USED_PREFIX,
+} from "./realtime-ticket";
 export { ROLES, MOBILE_ONLY_ROLES, SCHOOL_STAFF_ROLES, isMobileOnly } from "./roles";
 export type { Role } from "./roles";
 export {

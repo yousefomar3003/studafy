@@ -20,6 +20,7 @@ import {
 import { clientMessageSchema, REAUTH_REQUIRED_CLOSE_CODE } from "./protocol";
 import { authorizeRoom } from "./room-policy";
 import { roleRoomKey, schoolRoomKey, userRoomKey } from "./rooms";
+import { createSessionRegistry } from "./session-guard";
 
 import type { AuthClaims } from "./auth";
 import type { ConnectionTracker } from "./lifecycle";
@@ -27,6 +28,7 @@ import type { RealtimeLimits, TokenBucket } from "./limits";
 import type { FanoutMetrics } from "./metrics";
 import type { ClientMessage, RoomKey, SystemMessage } from "./protocol";
 import type { RoomManager } from "./rooms";
+import type { SessionGuard, SessionRegistry } from "./session-guard";
 import type { CaptureContext } from "@studafy/observability";
 import type { Context } from "hono";
 import type { WSContext } from "hono/ws";
@@ -63,31 +65,36 @@ function send(ws: WSContext, message: SystemMessage): void {
 }
 
 /**
- * Re-auth protocol: `verifyToken` only proves the token was valid *at handshake time*. Without
- * this, a socket that connected with a token carrying an `exp` would stay a member of its rooms
- * indefinitely after that `exp` passes, since nothing re-checks it. If the claims carry an `exp`,
- * schedule a timer for exactly that instant that warns the client (`system.reauth_required`) and
- * closes the socket (see docs/protocol.md#re-auth-protocol) so it must reconnect with a fresh
- * token rather than staying authorized past its stated expiry. Tokens without `exp` never expire,
- * so there is nothing to schedule.
+ * Tells the client to re-authenticate and closes the socket with 4401 (docs/protocol.md#re-auth-protocol).
+ * The client mints a fresh ticket and reconnects; if its session is gone, minting fails and it stops.
  */
-function scheduleReauth(
-  claims: AuthClaims,
-  ws: WSContext,
-): ReturnType<typeof setTimeout> | undefined {
-  if (claims.exp === undefined) {
-    return undefined;
-  }
-  const msUntilExpiry = Math.max(0, claims.exp * 1000 - Date.now());
-  return setTimeout(() => {
-    send(ws, { type: "system.reauth_required", reason: "token expired" });
-    raw(ws).close(REAUTH_REQUIRED_CLOSE_CODE, "token expired");
-  }, msUntilExpiry);
+function closeForReauth(ws: WSContext, reason: string): void {
+  send(ws, { type: "system.reauth_required", reason });
+  raw(ws).close(REAUTH_REQUIRED_CLOSE_CODE, reason);
+}
+
+/**
+ * Re-auth protocol: the ticket proves the session was valid *at handshake time*, and lives only
+ * seconds. The socket must not outlive the session it was opened for, so a timer closes it when the
+ * session's access token expires (`sessionExp`). Revocation before then is the sweep's job
+ * (src/session-guard.ts).
+ */
+function scheduleReauth(claims: AuthClaims, ws: WSContext): ReturnType<typeof setTimeout> {
+  const msUntilExpiry = Math.max(0, claims.sessionExp * 1000 - Date.now());
+  return setTimeout(() => closeForReauth(ws, "session expired"), msUntilExpiry);
 }
 
 export interface AppOptions {
   isReady: () => boolean;
+  /** `WS_JWT_SECRET`: the key the API signs handshake tickets with. */
   jwtSecret: string;
+  /** Spends tickets and checks revocation at handshake; see src/session-guard.ts. */
+  sessionGuard: SessionGuard;
+  /**
+   * Open sockets by session, for the revocation sweep (src/session-guard.ts). index.ts passes the
+   * one it sweeps; tests pass one to sweep directly.
+   */
+  sessions?: SessionRegistry<RawSocket>;
   rooms: RoomManager<RawSocket>;
   tracker: ConnectionTracker<RawSocket>;
   metrics: () => FanoutMetrics;
@@ -133,16 +140,18 @@ export function monitored(
 
 /**
  * Builds the Hono application: health routes plus the `/ws` handshake. The handshake is plain
- * Hono middleware (`GET /ws?token=...`) that verifies the JWT stub and rejects with 401 *before*
- * upgrading — an invalid token never reaches the WebSocket layer. On a valid token the connection
- * auto-joins its three home rooms, all derived from the token's claims: the school-wide room
- * (`school:{schoolId}`), its role room (`school:{schoolId}:role:{role}`), and its user room
- * (`school:{schoolId}:user:{userId}`). A token carrying `exp` also gets a re-auth timer (see
- * `scheduleReauth`) so authorization doesn't silently outlive what the token actually granted.
+ * Hono middleware (`GET /ws?ticket=...`) that verifies the API-minted ticket, spends it, and checks
+ * its session is not revoked, all *before* upgrading, so a bad ticket never reaches the WebSocket
+ * layer. On success the connection auto-joins its home rooms, all derived from the ticket's claims:
+ * the school-wide room (`school:{schoolId}`), one role room per role
+ * (`school:{schoolId}:role:{role}`), and its user room (`school:{schoolId}:user:{userId}`). The
+ * socket closes with 4401 when the session expires (`scheduleReauth`) or is revoked (the sweep).
  */
 export function createApp({
   isReady,
   jwtSecret,
+  sessionGuard,
+  sessions = createSessionRegistry<RawSocket>(),
   rooms,
   tracker,
   metrics,
@@ -186,25 +195,43 @@ export function createApp({
       if (!isOriginAllowed(c.req.header("origin"), allowedOrigins)) {
         return c.json({ error: "origin not allowed", code: "ORIGIN_NOT_ALLOWED" }, 403);
       }
-      const token = c.req.query("token");
-      if (!token) {
-        return c.json({ error: "missing token query parameter", code: "TOKEN_MISSING" }, 401);
+      // The ticket is a credential for its few seconds of life: it is never logged, and no error
+      // below echoes it.
+      const ticket = c.req.query("ticket");
+      if (!ticket) {
+        return c.json({ error: "missing ticket query parameter", code: "TOKEN_MISSING" }, 401);
       }
+      let claims: AuthClaims;
       try {
-        c.set("claims", verifyToken(token, jwtSecret));
+        claims = verifyToken(ticket, jwtSecret);
       } catch (error) {
         if (error instanceof TokenVerificationError) {
           return c.json({ error: error.message, code: error.code }, 401);
         }
         throw error;
       }
+      let admission: Awaited<ReturnType<SessionGuard["admit"]>>;
+      try {
+        admission = await sessionGuard.admit(claims);
+      } catch (error) {
+        // Fail closed, as the API's denylist does: an unchecked ticket would be replayable.
+        reportError(error, { tags: { route: "/ws", stage: "session_guard" } });
+        return c.json({ error: "session check unavailable", code: "UNAVAILABLE" }, 503);
+      }
+      if (admission === "replayed") {
+        return c.json({ error: "ticket already used", code: "TOKEN_INVALID" }, 401);
+      }
+      if (admission === "revoked") {
+        return c.json({ error: "session revoked", code: "TOKEN_INVALID" }, 401);
+      }
+      c.set("claims", claims);
       await next();
     },
     upgradeWebSocket((c: Context<Bindings>) => {
       const claims = c.get("claims");
       const homeRooms: readonly RoomKey[] = [
         schoolRoomKey(claims.schoolId),
-        roleRoomKey(claims.schoolId, claims.role),
+        ...claims.roles.map((role) => roleRoomKey(claims.schoolId, role)),
         userRoomKey(claims.schoolId, claims.userId),
       ];
       let reauthTimer: ReturnType<typeof setTimeout> | undefined;
@@ -219,6 +246,15 @@ export function createApp({
               rooms.join(room, socket);
               send(ws, { type: "system.joined", room });
             }
+            let closed = false;
+            sessions.add(socket, {
+              sessionId: claims.sessionId,
+              close: (reason) => {
+                if (closed) return;
+                closed = true;
+                closeForReauth(ws, reason);
+              },
+            });
             reauthTimer = scheduleReauth(claims, ws);
           });
         },
@@ -232,6 +268,7 @@ export function createApp({
             clearTimeout(reauthTimer);
             const socket = raw(ws);
             tracker.remove(socket);
+            sessions.remove(socket);
             rooms.leaveAll(socket);
           });
         },

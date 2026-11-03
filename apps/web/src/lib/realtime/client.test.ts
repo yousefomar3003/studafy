@@ -106,7 +106,7 @@ function createFakeTimers() {
 }
 
 function createHarness(options: {
-  token: () => string | null;
+  token: () => string | null | Promise<string | null>;
   maxConnectFailures?: number;
   queryClient?: QueryClient;
   onAuthError?: (reason: string) => void;
@@ -123,7 +123,7 @@ function createHarness(options: {
 
   const client = new RealtimeClient({
     baseUrl: "ws://localhost:3001",
-    getToken: options.token,
+    getTicket: options.token,
     queryClient,
     setTimeoutFn: timers.setTimeout,
     clearTimeoutFn: timers.clearTimeout,
@@ -153,7 +153,7 @@ describe("RealtimeClient", () => {
     await flush();
 
     expect(h.client.getStatus()).toBe("connecting");
-    expect(h.urls).toEqual(["ws://localhost:3001/ws?token=jwt"]);
+    expect(h.urls).toEqual(["ws://localhost:3001/ws?ticket=jwt"]);
 
     h.sockets[0].emitOpen();
     expect(h.client.getStatus()).toBe("connected");
@@ -240,6 +240,32 @@ describe("RealtimeClient", () => {
       [{ queryKey: ["me", "features"] }],
       [{ queryKey: ["ai-offer"] }],
     ]);
+  });
+
+  test("a failed ticket request backs off and retries instead of sticking at connecting", async () => {
+    let calls = 0;
+    const authErrors: string[] = [];
+    const warn = console.warn;
+    console.warn = () => undefined;
+    try {
+      const h = createHarness({
+        token: () => (++calls === 1 ? Promise.reject(new Error("offline")) : "ticket"),
+        onAuthError: (reason) => authErrors.push(reason),
+      });
+      h.client.connect();
+      await flush();
+      expect(h.client.getStatus()).toBe("reconnecting");
+      expect(h.sockets).toHaveLength(0);
+      expect(authErrors).toEqual([]);
+
+      h.timers.advance(30_000);
+      await flush();
+      expect(h.urls).toEqual(["ws://localhost:3001/ws?ticket=ticket"]);
+      h.sockets[0].emitOpen();
+      expect(h.client.getStatus()).toBe("connected");
+    } finally {
+      console.warn = warn;
+    }
   });
 
   test("reauth close (4401) fetches a fresh token and reconnects immediately", async () => {

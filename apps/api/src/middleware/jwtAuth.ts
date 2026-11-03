@@ -406,6 +406,7 @@ export function jwtAuthMiddleware({
       roles: payload.roles,
       channel: payload.channel,
       jti: payload.jti,
+      exp: payload.exp,
       entitlementsVer: payload.entitlements_ver,
       subscriptionStatus: payload.subscription_status,
       ...(payload.deletion_pending ? { deletionPending: true } : {}),

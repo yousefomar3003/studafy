@@ -243,6 +243,7 @@ beforeAll(async () => {
     roles: [ROLES.STUDENT],
     channel: AUTH_CHANNELS.API,
     jti: "jti-retrieval",
+    exp: Math.floor(Date.now() / 1000) + 900,
     entitlementsVer: 1,
     subscriptionStatus: "active",
   };

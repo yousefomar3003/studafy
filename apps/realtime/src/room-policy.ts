@@ -25,7 +25,8 @@ export const ROOM_POLICIES: { readonly [K in RoomKind]: RoomPolicy<K> } = {
   /** Every connection in the tenant: any member of the school. */
   school: (room, claims) => room.schoolId === claims.schoolId,
   /** One role's connections: only a holder of that role. */
-  role: (room, claims) => room.schoolId === claims.schoolId && room.role === claims.role,
+  role: (room, claims) =>
+    room.schoolId === claims.schoolId && (claims.roles as readonly string[]).includes(room.role),
   /** One user's connections: only that user. */
   user: (room, claims) => room.schoolId === claims.schoolId && room.userId === claims.userId,
 };

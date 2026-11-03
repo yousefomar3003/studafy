@@ -61,7 +61,9 @@ Future<MockAuthorizationCode> resolveMockAuthorizationCode(
     }
     next = redirected;
   }
-  throw StateError('sign-in did not reach $mockOAuthRedirectUri within $_maxRedirects redirects');
+  throw StateError(
+    'sign-in did not reach $mockOAuthRedirectUri within $_maxRedirects redirects',
+  );
 }
 
 /// The URL the system browser opens for a mobile `mobile-start` response, exactly as

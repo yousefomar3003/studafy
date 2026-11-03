@@ -1,13 +1,14 @@
 import IORedis from "ioredis";
 
 import { createApp, realtimeWebSocket } from "../src/app";
-import { signToken } from "../src/auth";
+import { signToken, ticketPayload } from "../src/auth";
 import { createRedisSubscriber } from "../src/connection";
 import { loadEnv } from "../src/env";
 import { createConnectionTracker } from "../src/lifecycle";
 import { snapshot } from "../src/metrics";
 import { subscribeToOutboxEvents } from "../src/outbox-fanout";
 import { createRoomManager } from "../src/rooms";
+import { createRedisSessionGuard } from "../src/session-guard";
 import { subscribeToRooms } from "../src/subscriber";
 
 import type { RawSocket } from "../src/app";
@@ -15,7 +16,7 @@ import type { EventEnvelope } from "../src/protocol";
 
 /**
  * Manual, Redis-required smoke test covering two acceptance criteria end-to-end: (1) "client
- * connects with a valid token stub and joins rooms; a message published to Redis fans out to room
+ * connects with a valid handshake ticket and joins rooms; a message published to Redis fans out to room
  * members", and (2) ST-146's "grades.published reaches connected affected clients <2s end-to-end"
  * — published directly to the outbox-relay's own channel shape (`events:{schoolId}:{event_name}`,
  * a raw payload, no envelope), exactly as apps/workers/src/queues/outbox-relay/relay.ts publishes
@@ -69,9 +70,12 @@ async function main(): Promise<void> {
 
   const rooms = createRoomManager<RawSocket>();
   const tracker = createConnectionTracker<RawSocket>();
+  // The real Redis-backed guard, so the smoke test exercises single-use tickets against Redis too.
+  const authRedis = new IORedis(env.AUTH_REDIS_URL ?? env.REDIS_URL, { lazyConnect: true });
   const app = createApp({
     isReady: () => true,
     jwtSecret: env.WS_JWT_SECRET,
+    sessionGuard: createRedisSessionGuard(authRedis),
     rooms,
     tracker,
     metrics: snapshot,
@@ -99,21 +103,21 @@ async function main(): Promise<void> {
     const instructorRoom = "school:smoke-school:role:INSTRUCTOR";
 
     const studentToken = signToken(
-      { sub: "student-1", schoolId: "smoke-school", role: "STUDENT" },
+      ticketPayload({ sub: "student-1", school_id: "smoke-school", roles: ["STUDENT"] }),
       env.WS_JWT_SECRET,
     );
     const otherSchoolToken = signToken(
-      { sub: "student-2", schoolId: "other-school", role: "STUDENT" },
+      ticketPayload({ sub: "student-2", school_id: "other-school", roles: ["STUDENT"] }),
       env.WS_JWT_SECRET,
     );
 
     console.log("Connecting client A (smoke-school/STUDENT)…");
-    const clientA = await connect(`${baseUrl}/ws?token=${studentToken}`);
+    const clientA = await connect(`${baseUrl}/ws?ticket=${studentToken}`);
     await waitUntil(() => clientA.received.data.length >= 1, "client A handshake ack");
     console.log(
       "Connecting client B (other-school/STUDENT, must not receive smoke-school fan-out)…",
     );
-    const clientB = await connect(`${baseUrl}/ws?token=${otherSchoolToken}`);
+    const clientB = await connect(`${baseUrl}/ws?ticket=${otherSchoolToken}`);
     await waitUntil(() => clientB.received.data.length >= 1, "client B handshake ack");
 
     console.log(`Publishing to Redis channel "${studentRoom}"…`);
@@ -152,10 +156,10 @@ async function main(): Promise<void> {
 
     console.log("Connecting client C (smoke-school/PARENT)…");
     const parentToken = signToken(
-      { sub: "parent-1", schoolId: "smoke-school", role: "PARENT" },
+      ticketPayload({ sub: "parent-1", school_id: "smoke-school", roles: ["PARENT"] }),
       env.WS_JWT_SECRET,
     );
-    const clientC = await connect(`${baseUrl}/ws?token=${parentToken}`);
+    const clientC = await connect(`${baseUrl}/ws?ticket=${parentToken}`);
     await waitUntil(() => clientC.received.data.length >= 1, "client C handshake ack");
 
     const gradesPayload = {
@@ -189,6 +193,7 @@ async function main(): Promise<void> {
     redisSubscriber.disconnect();
     outboxSubscriber.disconnect();
     publisher.disconnect();
+    authRedis.disconnect();
     server.stop();
   }
 

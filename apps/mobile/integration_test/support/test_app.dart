@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/app.dart';
 import 'package:studafy_mobile/src/core/auth/auth_notifier.dart';
+import 'package:studafy_mobile/src/core/auth/authenticated_dio.dart';
 import 'package:studafy_mobile/src/core/config/app_config.dart';
 import 'package:studafy_mobile/src/core/config/app_environment.dart';
 import 'package:studafy_mobile/src/core/di/app_providers.dart';
@@ -13,6 +14,7 @@ import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/core/monitoring/monitoring_providers.dart';
 import 'package:studafy_mobile/src/core/push/push_providers.dart';
 import 'package:studafy_mobile/src/core/realtime/realtime_providers.dart';
+import 'package:studafy_mobile/src/core/realtime/realtime_ticket.dart';
 
 import '../../test/support/fake_crash_reporter.dart';
 import '../../test/support/fake_push_service.dart';
@@ -23,7 +25,8 @@ import 'fake_oauth_browser.dart';
 /// docs/testing/mobile-integration-suite.md for how CI/local runs supply these. `AppEnvironment.dev`
 /// both matches those loopback-friendly defaults and is what gates the "Continue with Mock" button
 /// visible (`LoginScreen`'s `showMockLogin`).
-AppConfig integrationTestAppConfig() => AppConfig.fromEnvironment(AppEnvironment.dev);
+AppConfig integrationTestAppConfig() =>
+    AppConfig.fromEnvironment(AppEnvironment.dev);
 
 /// Pumps the real [StudafyApp] — router, auth guard, theme, localization, all wired exactly as
 /// `bootstrapApp` does — against a real device/emulator's real network, real secure storage
@@ -34,7 +37,12 @@ AppConfig integrationTestAppConfig() => AppConfig.fromEnvironment(AppEnvironment
 /// Crashlytics/FCM (no vendor project configured for CI-run devices), and [FakeOAuthBrowser]
 /// stands in for launching a system browser (see that class's own doc comment).
 class IntegrationTestApp {
-  IntegrationTestApp._(this.container, this.appConfig, this._extraOverrides, this.pushService);
+  IntegrationTestApp._(
+    this.container,
+    this.appConfig,
+    this._extraOverrides,
+    this.pushService,
+  );
 
   final ProviderContainer container;
   AppConfig appConfig;
@@ -93,7 +101,12 @@ class IntegrationTestApp {
     );
     await tester.pumpAndSettle();
 
-    return IntegrationTestApp._(container, appConfig, extraOverrides, pushService);
+    return IntegrationTestApp._(
+      container,
+      appConfig,
+      extraOverrides,
+      pushService,
+    );
   }
 
   static List<dynamic> _baselineOverrides({
@@ -107,10 +120,9 @@ class IntegrationTestApp {
       crashReporterProvider.overrideWithValue(FakeCrashReporter()),
       pushServiceProvider.overrideWithValue(pushService),
       mockLoginHintProvider.overrideWithValue(mockLoginHint),
-      // Mirrors `bootstrapApp`'s own override — see `realtime_providers.dart`'s doc comment for
-      // why this seam exists at all (no session/auth feature existed when it was written).
+      // Mirrors `bootstrapApp`'s own override: a handshake ticket from the API per attempt (QA-14).
       realtimeTokenProvider.overrideWith(
-        (ref) => () => ref.watch(authSessionProvider).tokenProvider,
+        (ref) => realtimeTicketProvider(authenticatedDio(ref)),
       ),
     ];
   }
@@ -142,12 +154,16 @@ class IntegrationTestApp {
     expect(
       button,
       findsOneWidget,
-      reason: 'mock login button not found — not on the login screen, or not AppEnvironment.dev',
+      reason:
+          'mock login button not found — not on the login screen, or not AppEnvironment.dev',
     );
     await tester.tap(button);
     // The mock round trip is a handful of real HTTP calls; pumpAndSettle alone can time out
     // waiting on network I/O between frames, so poll explicitly instead.
-    await pumpUntil(tester, () => find.byKey(const Key('mockLoginButton')).evaluate().isEmpty);
+    await pumpUntil(
+      tester,
+      () => find.byKey(const Key('mockLoginButton')).evaluate().isEmpty,
+    );
     await tester.pumpAndSettle();
   }
 }

@@ -27,7 +27,8 @@ and PostgreSQL replica lag, plus the probe's latency widget when the probe is en
 (`rate(1 minute)`) that measures the realtime propagation SLO end-to-end:
 
 1. Connects a probe WebSocket client to the **public** ALB endpoint (`wss://…/ws`) — the real
-   client path, DNS → ALB → TLS → gateway — signing its handshake JWT with `WS_JWT_SECRET`.
+   client path, DNS → ALB → TLS → gateway — signing its own handshake ticket with `WS_JWT_SECRET` (the same contract `apps/api` mints to;
+   `apps/realtime/docs/protocol.md#handshake-ticket`).
 2. Once joined to its own user room (`school:probe:user:probe`), publishes a `synthetic.probe`
    envelope through Redis on that room's channel.
 3. Measures the time until the envelope comes back over its own socket and publishes

@@ -32,10 +32,13 @@ export interface RealtimeSocket {
 }
 
 export interface RealtimeClientOptions {
-  /** Gateway origin, e.g. `ws://localhost:3001` (the `/ws?token=` path is appended). */
+  /** Gateway origin, e.g. `ws://localhost:3001` (the `/ws?ticket=` path is appended). */
   readonly baseUrl: string;
-  /** Resolves the handshake token on every connect attempt, and again on a re-auth close. */
-  readonly getToken: () => string | null | undefined | Promise<string | null | undefined>;
+  /**
+   * Resolves a fresh handshake ticket (`./ticket.ts`) on every connect attempt, including the one
+   * after a re-auth close. `null` means no session; a throw is treated as transient and retried.
+   */
+  readonly getTicket: () => string | null | undefined | Promise<string | null | undefined>;
   /** The app's TanStack Query client — receives the invalidations. */
   readonly queryClient: QueryClient;
   /** Called when the connection gives up on authentication (no token, or rejected handshake). */
@@ -95,7 +98,7 @@ function createWebSocketSocket(url: string): RealtimeSocket {
 function buildSocketUrl(baseUrl: string, token: string): string {
   const normalized = baseUrl.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
   const url = new URL("/ws", normalized);
-  url.searchParams.set("token", token);
+  url.searchParams.set("ticket", token);
   return url.toString();
 }
 
@@ -191,7 +194,20 @@ export class RealtimeClient {
     this.setStatus("connecting");
 
     const generation = this.generation;
-    const token = await this.options.getToken();
+    let token: string | null | undefined;
+    try {
+      token = await this.options.getTicket();
+    } catch (error) {
+      // The ticket request itself failed (network, 5xx): not an auth verdict, so back off and retry
+      // rather than leaving the status stuck at `connecting`.
+      if (!this.started || generation !== this.generation) {
+        return;
+      }
+      console.warn("[realtime] could not get a handshake ticket", error);
+      this.setStatus("reconnecting");
+      this.scheduleReconnect(this.backoffDelay(this.connectAttempt++));
+      return;
+    }
     if (!this.started || generation !== this.generation) {
       return;
     }
@@ -255,7 +271,8 @@ export class RealtimeClient {
     }
 
     if (code === REAUTH_REQUIRED_CLOSE_CODE) {
-      // Token expired mid-connection: fetch a fresh token and reconnect right away.
+      // Session expired or revoked mid-connection: fetch a fresh ticket and reconnect right away. If
+      // the session is gone, the ticket request answers 401 and the status becomes `unauthorized`.
       this.setStatus("reconnecting");
       this.scheduleReconnect(0);
       return;

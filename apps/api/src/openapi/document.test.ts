@@ -485,6 +485,7 @@ describe("structure", () => {
         // Self-service account deletion/export (ST-268 extension). Bearer-authenticated only --
         // the caller may only ever act on their own account.
         "/api/privacy/me/dsr",
+        "/api/realtime/ticket",
         "/api/platform/finance",
         "/api/platform/import-signals/unmapped-headers",
         "/api/platform/inquiries",
@@ -1108,6 +1109,8 @@ describe("security", () => {
         "GET /api/platform/users/lookup",
         // Self-service account deletion/export history. Bearer-authenticated only.
         "GET /api/privacy/me/dsr",
+        // Realtime handshake ticket (QA-14): minted for the bearer's own session only.
+        "GET /api/realtime/ticket",
         // Parent child comparison reports (ST-177). Bearer-authenticated, then PARENT-role-gated.
         "GET /api/reports/children/comparison",
         "GET /api/reports/children/{studentId}/breakdown",
@@ -1412,6 +1415,7 @@ describe("the generated artifact", () => {
       redis: createUnusableRedis(),
       database: createUnusableDatabase(),
       keyStore,
+      realtimeTicketSecret: "openapi-document-placeholder",
       docsEnabled: true,
     });
 

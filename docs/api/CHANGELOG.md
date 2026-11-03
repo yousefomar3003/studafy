@@ -13,6 +13,10 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Realtime handshake tickets (QA-14, F-05; [protocol.md](../../apps/realtime/docs/protocol.md#handshake-ticket)),
+  under the new "Realtime" tag: `GET /api/realtime/ticket` (`RealtimeTicket`). Bearer-authenticated;
+  returns a single-use, 30-second ticket for the caller's own session, which the realtime gateway's
+  `/ws?ticket=` handshake requires. The gateway no longer accepts the access token itself.
 - Staging QA login (QA-02; [qa-staging-access.md](../runbooks/qa-staging-access.md)):
   `POST /api/auth/login/qa` (`QaLoginRequest`), answering with the existing login response. Signs in
   only the `qa` identities of schools flagged `is_qa_tenant` (migration 000183) with the shared

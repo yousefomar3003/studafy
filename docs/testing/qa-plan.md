@@ -234,6 +234,41 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - Gateway refuses to boot in production with the default secret (env test).
   - Revocation: a revoked session's socket is closed within a bounded time (state the bound, test it).
   - Contract test that runs the real API token issuer against the real gateway verifier.
+- Do-first result (2026-11-03): **not run against staging.** The AWS session on the machine that did
+  the fix had expired, so the gateway logs could not be read. The code shows the 401 regardless: the
+  web client sent the API's RS256 access token as `?token=` and the gateway verified it as HS256
+  with `WS_JWT_SECRET`, a secret the API never held, so every deployed web socket got
+  `401 TOKEN_INVALID`. Mobile did the same. The grade-publish mobile journey was `skip: true` for
+  exactly this reason.
+- Status: `GET /api/realtime/ticket` (`apps/api/src/modules/realtime`) mints a ticket for the bearer's
+  session: HS256 with `WS_JWT_SECRET`, `aud=studafy-realtime`, `iss=studafy-api`, 30 s lifetime
+  (the gateway refuses `exp - iat > 60`), single-use `jti`, plus `sid`/`sexp` (the access token's
+  `jti`/`exp`). Contract constants live in `@studafy/constants` (`REALTIME_TICKET`). A shared key,
+  not the API's JWKS, because the API's RSA keys are generated in memory per task, so a JWKS
+  fetched through the ALB can come from another task. Terraform writes realtime's effective
+  `WS_JWT_SECRET` into the api app secret too, so they cannot differ.
+  The gateway handshake is now `/ws?ticket=`. It spends the `jti` in Redis (`SET NX`; replay → 401)
+  and checks `sid` against the API's denylist before upgrading; Redis down → 503. The socket closes
+  with 4401 at `sexp`, and a sweep closes revoked sessions' sockets with 4401: **bound 15 s**
+  (`REVOCATION_SWEEP_INTERVAL_MS`) plus one Redis round trip, while Redis is reachable. The
+  denylist is in the API's Redis database (`queue_url`, db 1), not the pub/sub one, so the
+  gateway has `AUTH_REDIS_URL` (required in production; the ECS task sets it to `queue_url`).
+  Production refuses the default or a < 32-character `WS_JWT_SECRET` in both services. The gateway
+  never logs the ticket (tracing records the route only; a test captures console output through a
+  real handshake). Web and mobile fetch a ticket per connect attempt; the synthetic probe mints a
+  contract-valid ticket. Tests: `apps/api/tests/realtime/ticket-contract.test.ts` (the real issuer
+  against the real verifier, and the whole route → handshake journey; the access token is refused
+  in either query parameter), `apps/realtime/src/{auth,session-guard,env,app.ws}.test.ts`
+  (replay, revoked at handshake, sweep closes within one interval, fail-closed 503, multi-role
+  rooms, default-secret boot refusal). Results: `apps/realtime` 159 pass, `apps/api` 2143 pass
+  (DB suites skipped locally), `apps/web` 1068 pass, mobile `test/core/realtime` 48 pass,
+  `infra/deploy` 19 pass. The grade-publish mobile journey is unskipped.
+  **Not yet done:** the staging do-first check; the ALB access-log check (after deploy,
+  `?token=` should not appear on `/ws` requests, and `?ticket=` values are single-use and expire
+  in 30 s); the mobile integration suite on an emulator. Known limits: refresh-token reuse does not
+  denylist the access `jti` (F-08, QA-21), so such a socket lives until `sexp` (≤ 15 min); and
+  rotating `WS_JWT_SECRET` fails new handshakes until both services are redeployed (open sockets
+  are unaffected).
 
 **QA-15 — F-06 production embeddings decision**
 

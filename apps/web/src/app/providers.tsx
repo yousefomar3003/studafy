@@ -3,9 +3,10 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, useState, type PropsWithChildren } from "react";
 
 import { AuthProvider, sessionStore, useAuthStatus } from "../lib/auth";
+import { API_BASE_URL } from "../lib/config";
 import { LocaleProvider, useTranslation } from "../lib/i18n";
 import { MonitoringUserSync } from "../lib/monitoring";
-import { RealtimeClient, RealtimeProvider } from "../lib/realtime";
+import { fetchRealtimeTicket, RealtimeClient, RealtimeProvider } from "../lib/realtime";
 
 import { createQueryClient } from "./query-client";
 
@@ -36,9 +37,12 @@ export function AppProviders({
   children,
   sessionStore: sessionStoreOverride,
   realtimeSocketFactory,
+  realtimeGetTicket,
 }: PropsWithChildren<{
   sessionStore?: SessionStore;
   realtimeSocketFactory?: RealtimeClientOptions["socketFactory"];
+  /** Test seam, beside `realtimeSocketFactory`: replaces the ticket request to the API. */
+  realtimeGetTicket?: RealtimeClientOptions["getTicket"];
 }>) {
   const store = sessionStoreOverride ?? sessionStore;
   const [queryClient] = useState(createQueryClient);
@@ -46,7 +50,14 @@ export function AppProviders({
     () =>
       new RealtimeClient({
         baseUrl: import.meta.env.VITE_REALTIME_BASE_URL ?? "ws://localhost:3001",
-        getToken: () => store.getToken(),
+        // A fresh single-use ticket per attempt (QA-14); the access token never goes to the gateway.
+        getTicket:
+          realtimeGetTicket ??
+          (() =>
+            fetchRealtimeTicket({
+              apiBaseUrl: API_BASE_URL,
+              getAccessToken: () => store.getToken(),
+            })),
         queryClient,
         ...(realtimeSocketFactory ? { socketFactory: realtimeSocketFactory } : {}),
       }),

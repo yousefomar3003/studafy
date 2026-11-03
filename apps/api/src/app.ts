@@ -146,6 +146,7 @@ import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobil
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { platformRoutes } from "./modules/platform";
 import { privacyRoutes } from "./modules/privacy";
+import { realtimeTicketRoutes } from "./modules/realtime";
 import { DEVELOPMENT_RECORD_KEYRING, recordRoutes } from "./modules/records";
 import { childComparisonRoutes } from "./modules/reports";
 import {
@@ -230,6 +231,11 @@ export interface AppOptions {
   jwtAccessTtlSeconds?: number;
   /** Refresh-token lifetime in seconds, reapplied on every rotation. From env.JWT_REFRESH_TTL_SECONDS. */
   jwtRefreshTtlSeconds?: number;
+  /**
+   * Key for realtime handshake tickets (env.WS_JWT_SECRET, shared with apps/realtime). Unset leaves
+   * `GET /api/realtime/ticket` unmounted, as in tests that do not exercise it.
+   */
+  realtimeTicketSecret?: string | null;
   /**
    * Where CORS and CSRF rejections are persisted (app.security_events).
    *
@@ -367,6 +373,7 @@ export function createApp({
   jwtAudience = "studafy-api",
   jwtAccessTtlSeconds = 900,
   jwtRefreshTtlSeconds = 30 * 24 * 60 * 60,
+  realtimeTicketSecret = null,
   securityEventSink,
   docsEnabled = false,
   flags = null,
@@ -651,6 +658,12 @@ export function createApp({
   // JWKS endpoint — public, no authentication required. Clients fetch this to verify access tokens.
   if (keyStore) {
     app.route("/", jwksRoutes(keyStore));
+  }
+
+  // Realtime handshake tickets (QA-14). Behind the JWT boundary like every /api route, so a ticket
+  // is only ever minted for a session that is valid, unrevoked and current right now.
+  if (keyStore && realtimeTicketSecret) {
+    app.route("/", realtimeTicketRoutes(realtimeTicketSecret));
   }
 
   // Invitation routes — requires database for persistence and outbox event emission.

@@ -34,6 +34,10 @@
         {
           "name": "REDIS_URL",
           "valueFrom": "${REDIS_SECRET_ARN}:pubsub_url::"
+        },
+        {
+          "name": "AUTH_REDIS_URL",
+          "valueFrom": "${REDIS_SECRET_ARN}:queue_url::"
         }
       ],
       "healthCheck": {

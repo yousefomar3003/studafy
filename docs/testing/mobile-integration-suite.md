@@ -29,37 +29,19 @@ tree against a real backend end to end.
 | 1   | Login                       | `login_test.dart`                     | Real UI, real mock-OAuth round trip, real backend.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 2   | Invitation activation       | `activation_deep_link_test.dart`      | **API-only for the activation itself** — there is no invitation-activation screen anywhere in the Flutter app yet (`InvitationActivationResult`/`MobileAuthClient.startInvitationOAuth`/`exchangeInvitationCode` exist; no `AuthNotifier.activateInvitation` method, screen, or route calls them). This test proves the real backend contract (ST-247's new mock mobile-activation routes) end-to-end via the API, then signs the freshly-created account into the real app to prove it's genuinely usable. Building the actual mobile activation screen is a separate, substantial feature ticket, not something to improvise as a side effect of a test suite. |
 | 3   | Attendance offline replay   | `attendance_offline_replay_test.dart` | Real UI throughout: navigate to a real class, go offline (see table above), submit, see the real offline snackbar and outbox row, go back online, retry, see the real success snackbar and an emptied outbox.                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| 4   | Grade view on publish event | `grade_publish_realtime_test.dart`    | **Skipped — see "Known blocker" below.**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 4   | Grade view on publish event | `grade_publish_realtime_test.dart`    | Real UI: the open grades screen updates on the `grades.published` realtime event. Unskipped by QA-14 (see "Former blocker" below).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | 5   | AI not-active round trip    | `ai_not_active_round_trip_test.dart`  | Real UI: an unsubscribed student's AI tab shows the not-active notice with no control inside it, and tapping it launches nothing (the AI add-on is a digital good sold on the web only; see `apps/mobile/docs/store_payment_routing.md`). Return half: an add-on activated outside the app reaches it through a push-notification tap (`PushService.onNotificationTap`), the one real out-of-app signal the app has, and that lands on the AI usage screen.                                                                                                                                                                                                      |
 
-## Known blocker: grade-publish is skipped, not flaky
+## Former blocker: grade-publish was skipped (fixed by QA-14)
 
-`grade_publish_realtime_test.dart` is `skip: true`, not merely slow or occasionally red. Root cause,
-verified by reading both sides:
-
-- `bootstrapApp` wires the realtime handshake token to the session's real RS256 access token
-  (`realtimeTokenProvider.overrideWithValue(() => session.tokenProvider)`,
-  `core/config/app_bootstrap.dart`).
-- `apps/realtime/src/auth.ts` verifies only its own HS256 "stub" tokens, signed with a shared
-  `WS_JWT_SECRET` it both issues and checks — its own file header says plainly: "there is no real
-  identity provider yet... replace `signToken` with a call to the real issuer, and `verifyToken`'s
-  secret lookup with JWKS verification, in the ticket that wires up real authentication."
-
-A real mobile session's bearer token is therefore rejected by the gateway with `TOKEN_INVALID` in
-every environment today, dev included — this is not a CI-only quirk. Two ways to make the test
-"pass" were considered and rejected:
-
-1. Mint a gateway-shaped HS256 token instead of the app's real bearer token for the test's
-   handshake. This would make the test green while hiding that production's real wiring is broken
-   — worse than an honest skip.
-2. Fix `apps/realtime`'s auth to accept real RS256 tokens (e.g. via JWKS) as part of this ticket.
-   That is a cross-service authentication change with its own review and risk surface, explicitly
-   deferred to "the ticket that wires up real authentication" by the code that already exists — not
-   something a test-suite ticket should do as a side effect.
-
-The API sequence the test already runs (submit → approve/publish via
-`POST /api/approvals/bulk-decision`) needs no changes once the realtime ticket lands — only
-`skip: true` needs to come off.
+`grade_publish_realtime_test.dart` was `skip: true` because the app sent its RS256 access token to a
+gateway that verified only HS256 tokens signed with `WS_JWT_SECRET`, so no real session could open
+a socket in any environment (finding F-05). QA-14 fixed the wiring rather than the test: the app now
+asks the API for a single-use handshake ticket (`GET /api/realtime/ticket`,
+`core/realtime/realtime_ticket.dart`) and the gateway verifies that. `bootstrapApp` and the
+integration harness (`support/test_app.dart`) both use it, so the journey exercises the production
+path. The API sequence (submit → approve/publish via `POST /api/approvals/bulk-decision`) is
+unchanged.
 
 ## Backend additions this ticket made
 

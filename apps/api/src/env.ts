@@ -4,6 +4,9 @@ import { z } from "zod";
 import { LOG_LEVEL_NAMES } from "./logger";
 import { TAP_MARKETS } from "./modules/subscriptions/payment-provider-routing";
 
+/** The development value of WS_JWT_SECRET, shared with apps/realtime/src/env.ts. Refused when deployed. */
+export const DEV_WS_JWT_SECRET = "dev-insecure-secret-change-me";
+
 /**
  * Split a comma-separated origin list into trimmed, non-empty entries.
  *
@@ -181,6 +184,11 @@ export const envSchema = z
     // refinement below refuses to boot with it set when APP_ENV is production. Held in the secret
     // manager, never in the repository (docs/runbooks/qa-staging-access.md).
     QA_LOGIN_PASSWORD: z.preprocess(emptyAsUnset, z.string().min(24).optional()),
+    // Signs realtime handshake tickets (QA-14, modules/realtime). The realtime gateway verifies them
+    // with the same value: both task definitions read it from the same Terraform-generated secret.
+    // Defaults to the gateway's own development value so the two agree locally with no setup; the
+    // refinement below refuses that value, or anything under 32 characters, on a deployed tier.
+    WS_JWT_SECRET: z.string().min(1).default(DEV_WS_JWT_SECRET),
     // Where to redirect after a successful OAuth callback. Not setting it disables the redirect.
     FRONTEND_URL: z.string().url().optional(),
     // Base URL for the pay-online redirect entry point served on outstanding invoices in the family
@@ -403,6 +411,23 @@ export const envSchema = z
         path: ["TURNSTILE_SECRET_KEY"],
         message: `TURNSTILE_SECRET_KEY is required when APP_ENV is ${env.APP_ENV}`,
       });
+    }
+
+    // A deployed API signing tickets with the well-known development key would let anyone mint them.
+    if (env.APP_ENV !== "development") {
+      if (env.WS_JWT_SECRET === DEV_WS_JWT_SECRET) {
+        context.addIssue({
+          code: "custom",
+          path: ["WS_JWT_SECRET"],
+          message: `WS_JWT_SECRET must not be the development default when APP_ENV is ${env.APP_ENV}`,
+        });
+      } else if (env.WS_JWT_SECRET.length < 32) {
+        context.addIssue({
+          code: "custom",
+          path: ["WS_JWT_SECRET"],
+          message: `WS_JWT_SECRET must be at least 32 characters when APP_ENV is ${env.APP_ENV}`,
+        });
+      }
     }
 
     // Sensitive record values are sealed with a real, deployment-held key or not written at all.

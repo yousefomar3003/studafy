@@ -97,6 +97,9 @@ interface FullTaskDefinition {
 }
 
 /** Renders like render.sh does: every ${VAR} replaced, here with its own name so values are traceable. */
+/** API app-secret keys Terraform writes itself (main.tf), rather than seeding as "" defaults. */
+const TERRAFORM_GENERATED_API_KEYS = ["WS_JWT_SECRET"];
+
 async function renderNamed(service: "api" | "workers" | "realtime"): Promise<FullTaskDefinition> {
   const template = await readFile(
     join(import.meta.dir, "ecs", service, "task-definition.json.tpl"),
@@ -153,9 +156,26 @@ describe("production readiness of the ECS task definitions", () => {
       .map((s) => s.valueFrom.split(":")[1]!);
     const mainTf = await readFile(join(import.meta.dir, "..", "terraform", "main.tf"), "utf8");
     const defaults = /app_secret_defaults = \{\s*api = \{([\s\S]*?)\}/.exec(mainTf)?.[1] ?? "";
-    for (const key of keys) {
+    for (const key of keys.filter((k) => !TERRAFORM_GENERATED_API_KEYS.includes(k))) {
       expect(defaults).toMatch(new RegExp(`\\b${key}\\s*=\\s*""`));
     }
+    // Generated keys are always written, so they need no default; this pins that they still are.
+    expect(mainTf).toMatch(
+      /api = merge\([\s\S]*?WS_JWT_SECRET = local\.realtime_app_secret_values\.WS_JWT_SECRET/,
+    );
+  });
+
+  test("the API and the gateway read the same ticket key; the gateway reads the API's auth Redis (QA-14)", async () => {
+    const api = (await renderNamed("api")).containerDefinitions[0]!;
+    const realtime = (await renderNamed("realtime")).containerDefinitions[0]!;
+    const apiSecrets = Object.fromEntries(api.secrets!.map((s) => [s.name, s.valueFrom]));
+    const gatewaySecrets = Object.fromEntries(realtime.secrets!.map((s) => [s.name, s.valueFrom]));
+
+    expect(apiSecrets.WS_JWT_SECRET).toBe("<API_APP_SECRETS_ARN>:WS_JWT_SECRET::");
+    expect(gatewaySecrets.WS_JWT_SECRET).toBe("<REALTIME_APP_SECRETS_ARN>:WS_JWT_SECRET::");
+    // The gateway's denylist reads must hit the database the API writes it to, not the pub/sub one.
+    expect(gatewaySecrets.AUTH_REDIS_URL).toBe(apiSecrets.REDIS_URL);
+    expect(gatewaySecrets.REDIS_URL).toBe("<REDIS_SECRET_ARN>:pubsub_url::");
   });
 
   test("the API and workers get the AI provider settings and its key from their app secrets", async () => {

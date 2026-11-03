@@ -2,6 +2,12 @@ import { z } from "zod";
 
 import { isBareOrigin, parseOriginList } from "./limits";
 
+/** The development default for WS_JWT_SECRET. Production refuses to boot with it. */
+export const DEV_WS_JWT_SECRET = "dev-insecure-secret-change-me";
+
+/** Shortest WS_JWT_SECRET production accepts: 256 bits of HMAC key, as hex or base64 or longer. */
+export const MIN_PRODUCTION_SECRET_LENGTH = 32;
+
 /**
  * An empty environment variable is an unset one: it is present only because a deployment template
  * always injects the key. Same helper as apps/api/src/env.ts.
@@ -39,11 +45,19 @@ export const envSchema = z
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional().or(z.literal("")),
     REDIS_URL: z.string().min(1).default("redis://localhost:6379"),
     /**
-     * Shared HMAC secret for the JWT handshake stub (see src/auth.ts). This is a placeholder for
-     * the real identity provider — it defaults to a well-known value so `bun run dev` works without
-     * extra setup, but production deployments must override it.
+     * The Redis database holding the API's auth keys: its access-token denylist, which the gateway
+     * reads to close revoked sessions, and the spent-ticket markers it writes (src/session-guard.ts).
+     * Deployed tiers point REDIS_URL at the pub/sub database and the API at another, so a gateway
+     * reading the denylist through REDIS_URL would find nothing and never revoke anything. Required
+     * in production for that reason; defaults to REDIS_URL elsewhere, where there is one database.
      */
-    WS_JWT_SECRET: z.string().min(1).default("dev-insecure-secret-change-me"),
+    AUTH_REDIS_URL: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    /**
+     * HMAC key for handshake tickets (src/auth.ts, F-05). The API signs with the same value, which
+     * both read from Secrets Manager. Defaults to a well-known value so `bun run dev` works without
+     * setup; production refuses that value, and anything shorter than 32 characters.
+     */
+    WS_JWT_SECRET: z.string().min(1).default(DEV_WS_JWT_SECRET),
     /**
      * Comma-separated browser origins allowed to open a socket (F-16), e.g. the web app's origin.
      * A handshake whose `Origin` header is not listed gets 403; one with no `Origin` (non-browser
@@ -53,6 +67,28 @@ export const envSchema = z
     WS_ALLOWED_ORIGINS: z.string().optional().transform(parseOriginList),
   })
   .superRefine((env, context) => {
+    if (env.NODE_ENV === "production") {
+      if (env.WS_JWT_SECRET === DEV_WS_JWT_SECRET) {
+        context.addIssue({
+          code: "custom",
+          path: ["WS_JWT_SECRET"],
+          message: "WS_JWT_SECRET must not be the development default when NODE_ENV is production",
+        });
+      } else if (env.WS_JWT_SECRET.length < MIN_PRODUCTION_SECRET_LENGTH) {
+        context.addIssue({
+          code: "custom",
+          path: ["WS_JWT_SECRET"],
+          message: `WS_JWT_SECRET must be at least ${MIN_PRODUCTION_SECRET_LENGTH} characters when NODE_ENV is production`,
+        });
+      }
+      if (env.AUTH_REDIS_URL === undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["AUTH_REDIS_URL"],
+          message: "AUTH_REDIS_URL is required when NODE_ENV is production",
+        });
+      }
+    }
     if (env.NODE_ENV === "production" && env.WS_ALLOWED_ORIGINS.length === 0) {
       context.addIssue({
         code: "custom",

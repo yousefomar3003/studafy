@@ -32,6 +32,7 @@ const auth: AuthContext = {
   roles: [ROLES.INSTRUCTOR],
   channel: AUTH_CHANNELS.API,
   jti: "jti-1",
+  exp: Math.floor(Date.now() / 1000) + 900,
   entitlementsVer: 1,
   subscriptionStatus: "active",
 };

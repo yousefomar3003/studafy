@@ -12,7 +12,11 @@ import { roleRoomKey, schoolRoomKey, userRoomKey } from "./rooms";
 
 import type { AuthClaims } from "./auth";
 
-const user: AuthClaims = { userId: "user-u", schoolId: "school-s", role: "STUDENT" };
+const user = {
+  userId: "user-u",
+  schoolId: "school-s",
+  roles: ["STUDENT"],
+} as unknown as AuthClaims;
 
 describe("room policy table (F-04)", () => {
   test("has exactly one row per room kind the protocol defines", () => {
@@ -46,6 +50,15 @@ describe("room policy table (F-04)", () => {
         });
       },
     );
+
+    test("allows each role a multi-role caller holds, and no other", () => {
+      const teacherParent: AuthClaims = { ...user, roles: ["INSTRUCTOR", "PARENT"] };
+      expect(authorizeRoom(roleRoomKey("school-s", "INSTRUCTOR"), teacherParent).allowed).toBe(
+        true,
+      );
+      expect(authorizeRoom(roleRoomKey("school-s", "PARENT"), teacherParent).allowed).toBe(true);
+      expect(authorizeRoom(roleRoomKey("school-s", "STUDENT"), teacherParent).allowed).toBe(false);
+    });
 
     test("denies the caller's own role in another school", () => {
       expect(authorizeRoom(roleRoomKey("school-t", "STUDENT"), user)).toEqual({

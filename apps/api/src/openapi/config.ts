@@ -57,6 +57,13 @@ export const OPENAPI_DOCUMENT_CONFIG = {
         "service's environment, so raising the forced-update floor is a config change, not a deploy.",
     },
     {
+      name: "Realtime",
+      description:
+        "Handshake tickets for the realtime gateway (QA-14). A ticket is a single-use, 30-second " +
+        "credential that opens one WebSocket, so the access token never appears in a socket URL. " +
+        "The handshake contract is apps/realtime/docs/protocol.md#handshake-ticket.",
+    },
+    {
       name: "ERPNext",
       description:
         "Inbound webhook ingestion from ERPNext. Authenticated by an HMAC signature over the raw " +

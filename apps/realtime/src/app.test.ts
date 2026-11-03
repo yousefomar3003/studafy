@@ -2,10 +2,11 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 
 import { createApp } from "./app";
-import { signToken } from "./auth";
+import { signToken, ticketPayload } from "./auth";
 import { createConnectionTracker } from "./lifecycle";
 import { resetMetrics, snapshot } from "./metrics";
 import { createRoomManager } from "./rooms";
+import { createMemorySessionGuard } from "./session-guard.testing";
 
 const SECRET = "test-secret";
 
@@ -32,6 +33,7 @@ const buildApp = () =>
   createApp({
     isReady: () => true,
     jwtSecret: SECRET,
+    sessionGuard: createMemorySessionGuard(),
     rooms: createRoomManager(),
     tracker: createConnectionTracker(),
     metrics: snapshot,
@@ -48,6 +50,7 @@ describe("health routes", () => {
     const notReadyApp = createApp({
       isReady: () => false,
       jwtSecret: SECRET,
+      sessionGuard: createMemorySessionGuard(),
       rooms: createRoomManager(),
       tracker: createConnectionTracker(),
       metrics: snapshot,
@@ -64,38 +67,50 @@ describe("health routes", () => {
 });
 
 describe("GET /ws handshake", () => {
-  test("rejects a connection with no token", async () => {
+  test("rejects a connection with no ticket", async () => {
     const res = await buildApp().request("/ws");
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({
-      error: "missing token query parameter",
+      error: "missing ticket query parameter",
       code: "TOKEN_MISSING",
     });
   });
 
-  test("rejects a connection with a malformed token", async () => {
-    const res = await buildApp().request("/ws?token=not-a-jwt");
-    expect(res.status).toBe(401);
-    expect((await jsonBody(res)).code).toBe("TOKEN_INVALID");
-  });
-
-  test("rejects a connection with a token signed by a different secret", async () => {
-    const token = signToken(
-      { sub: "user-1", schoolId: "school-1", role: "STUDENT" },
-      "other-secret",
-    );
-    const res = await buildApp().request(`/ws?token=${token}`);
-    expect(res.status).toBe(401);
-    expect((await jsonBody(res)).code).toBe("TOKEN_INVALID");
-  });
-
-  test("rejects an expired token with the re-auth error code", async () => {
-    const expired = Math.floor(Date.now() / 1000) - 3600;
-    const token = signToken(
-      { sub: "user-1", schoolId: "school-1", role: "STUDENT", exp: expired },
+  test("ignores the retired ?token= parameter, so a session token is never accepted there", async () => {
+    const ticket = signToken(
+      ticketPayload({ sub: "user-1", school_id: "school-1", roles: ["STUDENT"] }),
       SECRET,
     );
-    const res = await buildApp().request(`/ws?token=${token}`);
+    const res = await buildApp().request(`/ws?token=${ticket}`);
+    expect(res.status).toBe(401);
+    expect((await jsonBody(res)).code).toBe("TOKEN_MISSING");
+  });
+
+  test("rejects a connection with a malformed ticket", async () => {
+    const res = await buildApp().request("/ws?ticket=not-a-jwt");
+    expect(res.status).toBe(401);
+    expect((await jsonBody(res)).code).toBe("TOKEN_INVALID");
+  });
+
+  test("rejects a connection with a ticket signed by a different secret", async () => {
+    const token = signToken(
+      ticketPayload({ sub: "user-1", school_id: "school-1", roles: ["STUDENT"] }),
+      "other-secret",
+    );
+    const res = await buildApp().request(`/ws?ticket=${token}`);
+    expect(res.status).toBe(401);
+    expect((await jsonBody(res)).code).toBe("TOKEN_INVALID");
+  });
+
+  test("rejects an expired ticket with the re-auth error code", async () => {
+    const token = signToken(
+      ticketPayload(
+        { sub: "user-1", school_id: "school-1", roles: ["STUDENT"] },
+        Date.now() - 3_600_000,
+      ),
+      SECRET,
+    );
+    const res = await buildApp().request(`/ws?ticket=${token}`);
     expect(res.status).toBe(401);
     expect((await jsonBody(res)).code).toBe("TOKEN_EXPIRED");
   });

@@ -246,6 +246,7 @@ const app = createApp({
   jwtAudience: env.JWT_AUDIENCE,
   jwtAccessTtlSeconds: env.JWT_ACCESS_TTL_SECONDS,
   jwtRefreshTtlSeconds: env.JWT_REFRESH_TTL_SECONDS,
+  realtimeTicketSecret: env.WS_JWT_SECRET,
   reviewLoginPassword: env.REVIEW_LOGIN_PASSWORD,
   qaLoginPassword: env.QA_LOGIN_PASSWORD,
   rateLimitDisabled: env.RATE_LIMIT_DISABLED === "true",

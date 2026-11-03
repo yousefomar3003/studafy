@@ -112,9 +112,12 @@ The bearer `api` client in `lib/api.ts` reads the store through its `getToken` s
 
 ## Realtime
 
-The socket client (`src/app/providers.tsx`) authenticates with the same access token:
-`getToken: () => store.getToken()`. Signed out, it stays `unauthorized` and never dials the
-gateway. Note that a socket created before sign-in does not retry once a session appears — a
+The socket client (`src/app/providers.tsx`) never sends the access token to the gateway. On every
+connect attempt it exchanges it for a single-use handshake ticket (`fetchRealtimeTicket`,
+`src/lib/realtime/ticket.ts`: `GET /api/realtime/ticket` with the bearer token from
+`store.getToken()`) and dials `/ws?ticket=` with that (QA-14; contract in
+`apps/realtime/docs/protocol.md#handshake-ticket`). Signed out, or if the API refuses the ticket, it
+stays `unauthorized` and never dials the gateway. Note that a socket created before sign-in does not retry once a session appears — a
 realtime follow-up (tracked separately) should reconnect on the `authenticated` transition.
 
 ## Logout
