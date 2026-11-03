@@ -25,6 +25,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { openApiValidationHook } from "../../openapi/hook";
+import { bindBrowser, isBoundBrowser } from "../auth/oauth/browser-binding";
 import {
   GOOGLE_AUTH_ENDPOINT,
   GOOGLE_SCOPES,
@@ -223,7 +224,13 @@ export function schoolApplicationOAuthRoutes(
     const state = generateState();
     const nonce = generateNonce();
     const codeVerifier = generateCodeVerifier();
-    await stateStore.set(state, { flow: "school-application", provider, codeVerifier, nonce });
+    await stateStore.set(state, {
+      flow: "school-application",
+      provider,
+      codeVerifier,
+      nonce,
+      browserBinding: bindBrowser(c),
+    });
 
     const params = new URLSearchParams({
       client_id: config.clientId,
@@ -262,7 +269,15 @@ export function schoolApplicationOAuthRoutes(
       const entry = state
         ? await takeStateFor(stateStore, state, "school-application", provider)
         : undefined;
-      if (!code || !state || !entry) {
+      // Transitional (QA-20): a state minted before browser binding shipped is discarded unexchanged
+      // and the flow restarted, so a deploy does not fail applicants mid-sign-in. See
+      // UnboundStateRestart in callback-flows.ts; safe to delete with it.
+      if (code && entry && entry.browserBinding === undefined) {
+        return c.redirect(`/api/auth/oauth/${provider}/school-application/start`, 302);
+      }
+      // Bound to the browser that started the flow (browser-binding.ts): otherwise an attacker's
+      // callback URL would sign a victim's browser in as the attacker's applicant identity.
+      if (!code || !state || !entry || !isBoundBrowser(c, entry.browserBinding)) {
         throw new CodedHttpException(
           400,
           ERROR_CODES.OAUTH_STATE_INVALID,

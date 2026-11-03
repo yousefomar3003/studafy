@@ -4,6 +4,8 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { errorHandlerMiddleware } from "../../middleware/errorHandler";
 import { KeyStore } from "../auth/jwt/key-store";
 import { signAccessToken } from "../auth/jwt/sign";
+import { OAUTH_BINDING_COOKIE_NAME } from "../auth/oauth/browser-binding";
+import { createMemoryStateStore } from "../auth/oauth/state-store";
 
 import {
   APPLICANT_COOKIE_NAME,
@@ -114,14 +116,22 @@ describe("sign-up OAuth", () => {
     });
   }
 
-  async function startFlow(app: ReturnType<typeof appWith>): Promise<string> {
+  /** Start a flow; returns its state and the binding `Cookie` header the browser would send back. */
+  async function startFlow(
+    app: ReturnType<typeof appWith>,
+  ): Promise<{ state: string; cookie: string }> {
     const res = await app.request("/api/auth/oauth/google/school-application/start");
     expect(res.status).toBe(302);
     const location = new URL(res.headers.get("location")!);
     expect(location.searchParams.get("redirect_uri")).toBe(
       "https://api.test/api/auth/oauth/google/school-application/callback",
     );
-    return location.searchParams.get("state")!;
+    const binding = /studafy_oauth_binding=([^;]+)/.exec(res.headers.get("set-cookie") ?? "");
+    expect(binding).not.toBeNull();
+    return {
+      state: location.searchParams.get("state")!,
+      cookie: `${OAUTH_BINDING_COOKIE_NAME}=${binding![1]!}`,
+    };
   }
 
   test("derives the application callback from the login callback's origin", () => {
@@ -132,9 +142,10 @@ describe("sign-up OAuth", () => {
 
   test("a verified identity gets the applicant cookie and lands on the form", async () => {
     const app = appWith();
-    const state = await startFlow(app);
+    const { state, cookie: binding } = await startFlow(app);
     const res = await app.request(
       `/api/auth/oauth/google/school-application/callback?code=abc&state=${state}`,
+      { headers: { Cookie: binding } },
     );
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toBe("https://web.example/signup/apply");
@@ -155,9 +166,10 @@ describe("sign-up OAuth", () => {
 
   test("an identity that already has an account is sent back to sign in, without a cookie", async () => {
     const app = appWith({ identityExists: () => Promise.resolve(true) });
-    const state = await startFlow(app);
+    const { state, cookie } = await startFlow(app);
     const res = await app.request(
       `/api/auth/oauth/google/school-application/callback?code=abc&state=${state}`,
+      { headers: { Cookie: cookie } },
     );
     expect(res.headers.get("location")).toBe(
       "https://web.example/signup?error=SCHOOL_APPLICATION_ACCOUNT_EXISTS",
@@ -170,6 +182,77 @@ describe("sign-up OAuth", () => {
       "/api/auth/oauth/google/school-application/callback?code=abc&state=forged",
     );
     expect(res.headers.get("location")).toBe(
+      "https://web.example/signup?error=OAUTH_STATE_INVALID",
+    );
+  });
+
+  test("a valid state without the binding cookie is rejected, with no applicant cookie", async () => {
+    let verified = false;
+    const app = appWith({
+      verifyIdentity: () => {
+        verified = true;
+        return Promise.resolve({ sub: "attacker-sub", email: "attacker@example.com" });
+      },
+    });
+    const { state } = await startFlow(app);
+    const res = await app.request(
+      `/api/auth/oauth/google/school-application/callback?code=abc&state=${state}`,
+    );
+    expect(res.headers.get("location")).toBe(
+      "https://web.example/signup?error=OAUTH_STATE_INVALID",
+    );
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(verified).toBe(false);
+  });
+
+  test("a valid state with another browser's binding cookie is rejected, with no applicant cookie", async () => {
+    let verified = false;
+    const app = appWith({
+      verifyIdentity: () => {
+        verified = true;
+        return Promise.resolve({ sub: "attacker-sub", email: "attacker@example.com" });
+      },
+    });
+    const attacker = await startFlow(app);
+    const victim = await startFlow(app);
+    const res = await app.request(
+      `/api/auth/oauth/google/school-application/callback?code=abc&state=${attacker.state}`,
+      { headers: { Cookie: victim.cookie } },
+    );
+    expect(res.headers.get("location")).toBe(
+      "https://web.example/signup?error=OAUTH_STATE_INVALID",
+    );
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(verified).toBe(false);
+  });
+
+  // Transitional: a state minted before binding shipped (in flight across the deploy).
+  test("a pre-binding state restarts the flow without verifying the code", async () => {
+    let verified = false;
+    const stateStore = createMemoryStateStore();
+    const app = appWith({
+      stateStore,
+      verifyIdentity: () => {
+        verified = true;
+        return Promise.resolve({ sub: "attacker-sub", email: "attacker@example.com" });
+      },
+    });
+    await stateStore.set("unbound", {
+      flow: "school-application",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "n",
+    });
+    const callback = "/api/auth/oauth/google/school-application/callback?code=abc&state=unbound";
+
+    const res = await app.request(callback);
+    expect(res.status).toBe(302);
+    expect(res.headers.get("location")).toBe("/api/auth/oauth/google/school-application/start");
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(verified).toBe(false);
+
+    // Consumed: it restarts once, then is a plain invalid state.
+    expect((await app.request(callback)).headers.get("location")).toBe(
       "https://web.example/signup?error=OAUTH_STATE_INVALID",
     );
   });

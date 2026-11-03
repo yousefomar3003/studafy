@@ -28,6 +28,7 @@ import { deliverTokenPair } from "../delivery";
 import { findOAuthIdentity } from "../services/returning-user-login-service";
 import { issueTokenPair } from "../services/session-service";
 
+import { bindBrowser } from "./browser-binding";
 import {
   cancelledRedirect,
   failureRedirect,
@@ -89,7 +90,13 @@ export function mockOAuthRoutes(
     const codeChallenge = generateCodeChallenge(codeVerifier);
     const loginHint = c.req.query("login_hint");
 
-    await stateStore.set(state, { flow: "login", provider: "mock", codeVerifier, nonce });
+    await stateStore.set(state, {
+      flow: "login",
+      provider: "mock",
+      codeVerifier,
+      nonce,
+      browserBinding: bindBrowser(c),
+    });
 
     const params = new URLSearchParams({
       client_id: MOCK_OAUTH_CLIENT_ID,
@@ -136,7 +143,7 @@ export function mockOAuthRoutes(
         );
       }
 
-      entry = await takeAuthorization(ctx, state);
+      entry = await takeAuthorization(c, ctx, state);
 
       const accessToken = await exchangeCode(oauthConfig.issuer, code, entry.codeVerifier);
       const claims = await validateMockIdToken(

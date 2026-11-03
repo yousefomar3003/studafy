@@ -1,15 +1,22 @@
+import { createHash } from "node:crypto";
+
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { Hono } from "hono";
 
+import { OAUTH_BINDING_COOKIE_NAME } from "./browser-binding";
+import { takeAuthorization } from "./callback-flows";
 import { googleOAuthRoutes } from "./google-route";
 import { microsoftOAuthRoutes } from "./microsoft-route";
 import { redeemHandoff } from "./mobile-handoff";
 import { createMemoryStateStore } from "./state-store";
 
+import type { CallbackContext } from "./callback-flows";
 import type { GoogleOAuthDependencies } from "./google-route";
 import type { MicrosoftOAuthDependencies } from "./microsoft-route";
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
+import type { AppEnv } from "../../../middleware/requestId";
 import type { SessionTokenConfig } from "../services/session-service";
 
 const GOOGLE_CONFIG = {
@@ -85,6 +92,28 @@ afterEach(() => {
   globalThis.fetch = originalFetch;
 });
 
+/** The `Cookie` header a browser would send back after this start response set the binding. */
+function bindingCookieFrom(start: Response): string {
+  const match = /studafy_oauth_binding=([^;]+)/.exec(start.headers.get("set-cookie") ?? "");
+  expect(match).not.toBeNull();
+  return `${OAUTH_BINDING_COOKIE_NAME}=${match![1]!}`;
+}
+
+/** A browser's binding secret and the hash a start would have stored for it. */
+const BROWSER_SECRET = "b".repeat(43);
+const BROWSER_COOKIE = `${OAUTH_BINDING_COOKIE_NAME}=${BROWSER_SECRET}`;
+const BROWSER_BINDING = createHash("sha256").update(BROWSER_SECRET).digest("base64url");
+
+async function startFlow(
+  app: typeof googleApp,
+  provider: "google" | "microsoft",
+): Promise<{ state: string; cookie: string }> {
+  const start = await app.request(`/api/auth/oauth/${provider}/start`);
+  expect(start.status).toBe(302);
+  const state = new URL(start.headers.get("location")!).searchParams.get("state")!;
+  return { state, cookie: bindingCookieFrom(start) };
+}
+
 function expectRedirectToError(response: Response, code: string): void {
   expect(response.status).toBe(302);
   expect(response.headers.get("location")).toBe(`https://web.example/auth/error?code=${code}`);
@@ -129,13 +158,11 @@ describe("OAuth callback failure redirects", () => {
 
     // Start a real flow so the state store holds a valid entry, then replay the callback with a
     // code. The id-token validation is a stub above and the identity lookup answers no rows.
-    const start = await googleApp.request("/api/auth/oauth/google/start");
-    expect(start.status).toBe(302);
-    const state = new URL(start.headers.get("location")!).searchParams.get("state");
-    expect(state).not.toBeNull();
+    const { state, cookie } = await startFlow(googleApp, "google");
 
     const callback = await googleApp.request(
       `/api/auth/oauth/google/callback?code=fake-code&state=${state}`,
+      { headers: { Cookie: cookie } },
     );
     expectRedirectToError(callback, "AUTHZ_FORBIDDEN");
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -143,6 +170,7 @@ describe("OAuth callback failure redirects", () => {
     // Single use: replaying the same callback finds no state and never reaches the provider again.
     const replay = await googleApp.request(
       `/api/auth/oauth/google/callback?code=fake-code&state=${state}`,
+      { headers: { Cookie: cookie } },
     );
     expectRedirectToError(replay, "OAUTH_STATE_INVALID");
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -167,10 +195,12 @@ describe("OAuth callback flow dispatch", () => {
       codeVerifier: "v",
       nonce: "n",
       token: "not-a-real-invitation-token",
+      browserBinding: BROWSER_BINDING,
     });
 
     const res = await googleApp.request(
       "/api/auth/oauth/google/callback?code=fake-code&state=activation-state",
+      { headers: { Cookie: BROWSER_COOKIE } },
     );
 
     // activateAccount rejects the malformed token before touching the database, and the activation
@@ -323,13 +353,170 @@ describe("OAuth callback flow dispatch", () => {
       googleDeps,
     );
 
-    const start = await instanceA.request("/api/auth/oauth/google/start");
-    const state = new URL(start.headers.get("location")!).searchParams.get("state");
+    const { state, cookie } = await startFlow(instanceA, "google");
 
     const callback = await instanceB.request(
       `/api/auth/oauth/google/callback?code=fake-code&state=${state}`,
+      { headers: { Cookie: cookie } },
     );
     // Reaching the identity lookup (no account) means instance B found instance A's state.
     expectRedirectToError(callback, "AUTHZ_FORBIDDEN");
   });
 });
+
+describe("OAuth browser binding (QA-20 / F-07 login CSRF)", () => {
+  for (const [app, provider] of [
+    [googleApp, "google"],
+    [microsoftApp, "microsoft"],
+  ] as const) {
+    test(`${provider}: start binds the flow with an HttpOnly, Lax cookie scoped to the callbacks`, async () => {
+      const start = await app.request(`/api/auth/oauth/${provider}/start`);
+      const setCookie = start.headers.get("set-cookie")!;
+      expect(setCookie).toContain(`${OAUTH_BINDING_COOKIE_NAME}=`);
+      expect(setCookie).toContain("HttpOnly");
+      expect(setCookie).toContain("SameSite=Lax");
+      expect(setCookie).toContain("Path=/api/auth/oauth");
+      expect(setCookie).toContain("Max-Age=300");
+
+      // A second start in the same browser keeps its secret, so two tabs can both finish.
+      const cookie = bindingCookieFrom(start);
+      const again = await app.request(`/api/auth/oauth/${provider}/start`, {
+        headers: { Cookie: cookie },
+      });
+      expect(bindingCookieFrom(again)).toBe(cookie);
+    });
+
+    test(`${provider}: a valid state without the binding cookie is rejected and sets no cookie`, async () => {
+      stubTokenEndpointForBinding();
+      const { state } = await startFlow(app, provider);
+
+      const res = await app.request(
+        `/api/auth/oauth/${provider}/callback?code=attacker-code&state=${state}`,
+      );
+      expectRedirectToError(res, "OAUTH_STATE_INVALID");
+      expect(res.headers.get("set-cookie")).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    test(`${provider}: a valid state with another browser's binding cookie is rejected and sets no cookie`, async () => {
+      stubTokenEndpointForBinding();
+      // The attacker starts the flow in their browser and sends the callback URL to the victim,
+      // whose browser has its own binding cookie from a flow of its own.
+      const attacker = await startFlow(app, provider);
+      const victim = await startFlow(app, provider);
+      expect(victim.cookie).not.toBe(attacker.cookie);
+
+      const res = await app.request(
+        `/api/auth/oauth/${provider}/callback?code=attacker-code&state=${attacker.state}`,
+        { headers: { Cookie: victim.cookie } },
+      );
+      expectRedirectToError(res, "OAUTH_STATE_INVALID");
+      expect(res.headers.get("set-cookie")).toBeNull();
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      // The rejected state is consumed: the attacker cannot retry it from their own browser either.
+      const retry = await app.request(
+        `/api/auth/oauth/${provider}/callback?code=attacker-code&state=${attacker.state}`,
+        { headers: { Cookie: attacker.cookie } },
+      );
+      expectRedirectToError(retry, "OAUTH_STATE_INVALID");
+    });
+  }
+
+  // Transitional: states minted before binding shipped (in flight across the deploy).
+  test("a pre-binding login or activation state restarts its flow without exchanging the code", async () => {
+    const unbound = { provider: "google", codeVerifier: "v", nonce: "n" } as const;
+    const cases = [
+      [{ ...unbound, flow: "login" }, "/api/auth/oauth/google/start"],
+      [
+        { ...unbound, flow: "activation", token: "a/b" },
+        "/api/auth/invitations/a%2Fb/oauth/google/start",
+      ],
+    ] as const;
+
+    for (const [entry, location] of cases) {
+      // With or without a cookie — the old state can never be redeemed, only restarted.
+      for (const headers of [{}, { Cookie: BROWSER_COOKIE }] as Record<string, string>[]) {
+        await stateStore.set("unbound", entry);
+        const callback = "/api/auth/oauth/google/callback?code=attacker-code&state=unbound";
+
+        const res = await googleApp.request(callback, { headers });
+        expect(res.status).toBe(302);
+        expect(res.headers.get("location")).toBe(location);
+        expect(res.headers.get("set-cookie")).toBeNull();
+
+        // Consumed: presenting it again is a plain invalid state, so a flow restarts at most once.
+        expectRedirectToError(
+          await googleApp.request(callback, { headers }),
+          "OAUTH_STATE_INVALID",
+        );
+      }
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("a pre-binding link state cannot restart (it needs a bearer token) and is rejected", async () => {
+    await stateStore.set("unbound-link", {
+      flow: "link",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "n",
+      userId: "u",
+      schoolId: "s",
+    });
+    const res = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=unbound-link",
+      { headers: { Cookie: BROWSER_COOKIE } },
+    );
+    expectRedirectToError(res, "OAUTH_STATE_INVALID");
+    expect(res.headers.get("set-cookie")).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // The mock provider's routes read their config from env (no injection seam), so its callback's
+  // binding check is exercised here through the same takeAuthorization every callback calls.
+  test("every provider's callback enforces the binding through takeAuthorization", async () => {
+    for (const provider of ["google", "microsoft", "mock"] as const) {
+      const ctx: CallbackContext = {
+        db: emptyDb,
+        sessionConfig: {} as SessionTokenConfig,
+        logger: silentLogger,
+        stateStore,
+        provider,
+        frontendUrl: "https://web.example",
+      };
+      const probe = new Hono<AppEnv>().get("/take", async (c) => {
+        try {
+          await takeAuthorization(c, ctx, c.req.query("state")!);
+          return c.text("accepted");
+        } catch {
+          return c.text("rejected");
+        }
+      });
+      const entry = { flow: "login", provider, codeVerifier: "v", nonce: "n" } as const;
+
+      await stateStore.set(`${provider}-bound`, { ...entry, browserBinding: BROWSER_BINDING });
+      const accepted = await probe.request(`/take?state=${provider}-bound`, {
+        headers: { Cookie: BROWSER_COOKIE },
+      });
+      expect(await accepted.text()).toBe("accepted");
+
+      await stateStore.set(`${provider}-missing`, { ...entry, browserBinding: BROWSER_BINDING });
+      const missing = await probe.request(`/take?state=${provider}-missing`);
+      expect(await missing.text()).toBe("rejected");
+
+      await stateStore.set(`${provider}-mismatch`, { ...entry, browserBinding: BROWSER_BINDING });
+      const mismatch = await probe.request(`/take?state=${provider}-mismatch`, {
+        headers: { Cookie: `${OAUTH_BINDING_COOKIE_NAME}=${"x".repeat(43)}` },
+      });
+      expect(await mismatch.text()).toBe("rejected");
+    }
+  });
+});
+
+function stubTokenEndpointForBinding(): void {
+  fetchMock.mockImplementation(() =>
+    Promise.resolve(new Response(JSON.stringify({ id_token: "anything" }), { status: 200 })),
+  );
+  globalThis.fetch = fetchMock as unknown as typeof fetch;
+}
