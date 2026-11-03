@@ -181,8 +181,10 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   cannot sign in yet (CSV in `/portal/members`); per-member-ID and global Redis buckets on
   `/api/auth/login/member`. Rollout plan: [`member-setup-codes.md`](../runbooks/member-setup-codes.md).
   Verified locally against Postgres 17: `member-password-login.test.ts` (incl. the retired default
-  now refused), account-deletion, and `member-codes` DB tests pass. **Not yet run:** the Redis
-  rate-limit case (needs `TEST_REDIS_URL`); staging verification.
+  now refused), account-deletion, and `member-codes` DB tests pass. With Redis 8 (`TEST_REDIS_URL`
+  and `REDIS_URL`), the per-member-ID limit case (10 attempts from 10 IPs, then 429) and the
+  rate limiter, revocation, app and entitlement suites pass with no skips. **Not yet done:** staging
+  verification.
 
 **QA-12 — F-03 provision route self-promotion**
 
