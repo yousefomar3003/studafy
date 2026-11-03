@@ -66,10 +66,10 @@ export const AI_LLM_RETRY_AFTER_SECONDS = 30;
 export const AI_ASK_QUESTION_MAX_CHARS = 2000;
 
 /**
- * Minimum fused RRF score a grounded answer requires from its best retrieval hit, AND-ed with that
- * hit having matched the keyword leg (see `ask/refusal.ts` for why the AND is load-bearing: the
- * semantic leg here is a deterministic mock, not a real embedding, so its score alone cannot carry
- * a relevance verdict). Below this, the route refuses rather than answers from noise.
+ * Minimum fused RRF score a grounded answer requires from its best retrieval hit in **hybrid** mode,
+ * AND-ed with that hit having matched the keyword leg (see `ask/refusal.ts` for why the AND is
+ * load-bearing). Below this, the route refuses rather than answers from noise. It is unreachable by
+ * one leg alone (max `1/61` ≈ 0.0164), so lexical-only retrieval (ADR-020) does not apply it.
  */
 export const AI_ASK_MIN_RELEVANCE_SCORE = 0.02;
 

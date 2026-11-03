@@ -61,7 +61,6 @@ import {
   aiUsageRoutes,
   createAiTokenMeter,
   createConceptsCache,
-  createDeterministicQueryEmbedder,
   createSummaryCache,
   isAiModelCallPath,
   provideAiTokenBudget,
@@ -189,7 +188,7 @@ import type { StorageService } from "./lib/storage";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
-import type { AiModelTier, LlmProvider, PhotoTextReader } from "./modules/ai";
+import type { AiModelTier, LlmProvider, PhotoTextReader, QueryEmbedder } from "./modules/ai";
 import type { KeyStore } from "./modules/auth";
 import type { FlagsService } from "./modules/flags";
 import type { MobileReleaseConfig } from "./modules/mobile";
@@ -1311,6 +1310,12 @@ export function createApp({
   // would spend unbilled budget, so the whole surface is absent rather than un-metered.
   if (database && redis && entitlements && featureService) {
     const aiMeter = createAiTokenMeter({ redis });
+    // Retrieval is lexical-only (ADR-020, QA-15/F-06). The only embedder in the repository is the
+    // deterministic mock, whose vectors carry no meaning, so no query embedder is wired and both
+    // retrieval surfaces below run the keyword leg alone. Re-enabling the semantic leg means
+    // wiring a real provider here AND in the ingestion worker under one model id, then running the
+    // re-embed procedure — see the ADR — never passing createDeterministicQueryEmbedder() here.
+    const aiQueryEmbedder: QueryEmbedder | null = null;
     // A per-student AI route is the student's own: refused for anyone else in the school before
     // consent, quota or the handler run.
     app.use("/api/ai/students/:studentId/*", aiStudentSelfGate({ database }));
@@ -1360,9 +1365,9 @@ export function createApp({
     // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Not behind
     // requireFeature -- it never reaches the provider, and withdrawal must work without an add-on.
     app.route("/", aiConsentRoutes({ database }));
-    // Hybrid retrieval (ST-162). Mounted under the same gate so a search reserves and commits the
-    // caller's AI quota, and only when the gate's dependencies (a database for entitlements, Redis
-    // for the meter) exist — the retrieval surface must never run un-metered. Cross-encoder
+    // Retrieval (ST-162; lexical-only per ADR-020). Mounted under the same gate so a search
+    // reserves and commits the caller's AI quota, and only when the gate's dependencies (a database
+    // for entitlements, Redis for the meter) exist — the retrieval surface must never run un-metered. Cross-encoder
     // re-ranking (ST-163) rides the `ai.rerank` feature flag: off (the default), the route returns
     // the raw RRF ranking; on, the deterministic re-ranker is constructed inside the route factory
     // and applied per request, so a flipped per-tenant override lands on the next read.
@@ -1370,7 +1375,7 @@ export function createApp({
       "/",
       aiRetrievalRoutes({
         database,
-        embedder: createDeterministicQueryEmbedder(),
+        embedder: aiQueryEmbedder,
         flags,
       }),
     );
@@ -1397,7 +1402,7 @@ export function createApp({
         database,
         provider: aiLlmProvider,
         flags,
-        embedder: createDeterministicQueryEmbedder(),
+        embedder: aiQueryEmbedder,
         modelOverrides: aiLlmModelOverrides,
       }),
     );
