@@ -31,10 +31,13 @@ import { isSchoolClosed, schoolClosedException } from "../school-access";
 import { hashSecret, mintOpaqueToken, parseOpaqueToken } from "../tokens/opaque-token";
 import { isWebSessionRefused, mobileOnlyWebException } from "../web-access";
 
+import { denylistRevoked, REVOCATION_REASONS } from "./revocation-service";
+
 import type { Database } from "../../../db/client";
 import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
 import type { Logger } from "../../../logger";
 import type { AuthChannel } from "../channels";
+import type { JtiDenylist } from "../denylist";
 import type { KeyStore } from "../jwt/key-store";
 import type { Role, SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -277,6 +280,11 @@ export interface RotateParams {
   log?: Logger;
   /** Where auth anomaly events are persisted. Omitted in tests. */
   eventSink?: SecurityEventSink | null;
+  /**
+   * Where a reused family's outstanding access tokens are denied (F-08). Null when Redis is
+   * unconfigured; the family is then revoked in Postgres only, and its access tokens age out.
+   */
+  denylist?: JtiDenylist | null;
 }
 
 /**
@@ -475,6 +483,16 @@ export async function rotateRefreshToken(
     clientIp: params.device?.ipAddress,
     userAgent: params.device?.userAgent,
   });
+
+  // F-08: the Postgres revocation above stops the family from refreshing, but the access token it
+  // last minted — possibly the attacker's — is stateless and would otherwise live out its TTL.
+  // Commit-then-denylist, as in revocation-service.ts. A Redis failure surfaces as a 503, and the
+  // client's retry re-enters this branch and denylists again (see revokeReusedSession).
+  await denylistRevoked(params.denylist ?? null, outcome.event.accessTokens, {
+    reason: REVOCATION_REASONS.REFRESH_TOKEN_REUSE,
+    subject: { familyId: outcome.event.familyId },
+    log: params.log,
+  });
   throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Invalid refresh token");
 }
 
@@ -496,6 +514,17 @@ async function revokeReusedSession(tx: TransactionSql, session: SessionRow): Pro
      WHERE family_id = ${session.family_id}
        AND revoked_at IS NULL
     RETURNING id
+  `;
+
+  // Every access token the family minted that has not yet expired, not just those on rows the
+  // UPDATE above just revoked. A family already revoked by an earlier reuse (or by a reuse whose
+  // denylist write failed) yields no rows above, and this is what lets a retry still deny them.
+  const accessTokens = await tx<SessionAccessRow[]>`
+    SELECT access_jti, access_expires_at
+      FROM app.refresh_tokens
+     WHERE family_id = ${session.family_id}
+       AND access_jti IS NOT NULL
+       AND access_expires_at > CURRENT_TIMESTAMP
   `;
 
   if (session.device_id !== null) {
@@ -529,6 +558,7 @@ async function revokeReusedSession(tx: TransactionSql, session: SessionRow): Pro
     sessionId: session.id,
     deviceId: session.device_id,
     revokedTokenCount: revoked.length,
+    accessTokens,
   };
 }
 
@@ -893,11 +923,18 @@ interface RotationSessionRow extends SessionRow {
   roles: Role[];
 }
 
+interface SessionAccessRow {
+  access_jti: string | null;
+  access_expires_at: Date | null;
+}
+
 interface ReuseEvent {
   familyId: string;
   sessionId: string;
   deviceId: string | null;
   revokedTokenCount: number;
+  /** The family's unexpired access tokens, denylisted after the transaction commits. */
+  accessTokens: SessionAccessRow[];
 }
 
 type RotationOutcome =
