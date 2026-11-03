@@ -6,6 +6,8 @@ import { seedDate, uuid } from "../support";
 
 import type { FullCtx, MaterialsCtx, Sql } from "../support";
 
+const AI_MESSAGE_RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
+
 const MODEL = "claude-sonnet-5";
 
 export async function seedAi(sql: Sql, ctx: FullCtx, materials: MaterialsCtx): Promise<void> {
@@ -66,7 +68,10 @@ export async function seedAi(sql: Sql, ctx: FullCtx, materials: MaterialsCtx): P
           prompt_tokens: promptTokens,
           completion_tokens: completionTokens,
           total_tokens: promptTokens + completionTokens,
-          expires_at: seedDate(120),
+          // From the wall clock, not SEED_EPOCH: created_at defaults to now(), and
+          // ck_ai_messages_expires_at needs expires_at after it. A fixed date (seedDate(120)) failed
+          // every seed run after 2026-11-03.
+          expires_at: new Date(Date.now() + AI_MESSAGE_RETENTION_MS),
         };
       }),
       "id",
