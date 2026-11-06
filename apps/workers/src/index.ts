@@ -29,7 +29,7 @@ import {
   scheduleClosureSweepJob,
 } from "./queues/maintenance";
 import {
-  createSesSender,
+  createEmailSender,
   scheduleDigestJob,
   scheduleNotificationDigestJob,
   startEmailDispatcher,
@@ -153,7 +153,7 @@ const emailLogger = {
 };
 const emailDispatcher = startEmailDispatcher({
   db: emailDb,
-  sender: createSesSender(env, emailLogger),
+  sender: createEmailSender(env, emailLogger),
   limiter: new TokenBucket(env.EMAIL_MAX_RATE_PER_SECOND),
   config: {
     batchSize: env.EMAIL_BATCH_SIZE,

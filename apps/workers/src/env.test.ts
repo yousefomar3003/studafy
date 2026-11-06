@@ -30,6 +30,7 @@ describe("loadEnv", () => {
       FRONTEND_URL: "http://localhost:5180",
       EMAIL_MAX_RATE_PER_SECOND: 5,
       EMAIL_POLL_INTERVAL_MS: 1_000,
+      EMAIL_PROVIDER: "ses",
       EMAIL_BATCH_SIZE: 25,
       ENTITLEMENT_POLL_INTERVAL_MS: 500,
       ENTITLEMENT_BATCH_SIZE: 100,
@@ -65,6 +66,7 @@ describe("loadEnv", () => {
       FRONTEND_URL: "http://localhost:5180",
       EMAIL_MAX_RATE_PER_SECOND: 5,
       EMAIL_POLL_INTERVAL_MS: 1_000,
+      EMAIL_PROVIDER: "ses",
       EMAIL_BATCH_SIZE: 25,
       ENTITLEMENT_POLL_INTERVAL_MS: 500,
       ENTITLEMENT_BATCH_SIZE: 100,
@@ -155,6 +157,22 @@ describe("loadEnv", () => {
       const env = loadEnv({ ...deployed, SES_REGION: "eu-central-1" });
       expect(env.SES_FROM_ADDRESS).toBe("no-reply@send.studafy.com");
       expect(env.SES_FROM_NAME).toBe("Studafy");
+    });
+
+    test("sends with Resend instead of SES when EMAIL_PROVIDER=resend", () => {
+      const env = loadEnv({ ...deployed, EMAIL_PROVIDER: "resend", RESEND_API_KEY: "re_test" });
+      expect(env.EMAIL_PROVIDER).toBe("resend");
+      expect(env.SES_REGION).toBeUndefined();
+    });
+
+    test("refuses Resend without its key, unless dry-run is chosen on purpose", () => {
+      expect(() => loadEnv({ ...deployed, EMAIL_PROVIDER: "resend" })).toThrow(EnvValidationError);
+      expect(() => loadEnv({ ...deployed, EMAIL_PROVIDER: "resend", RESEND_API_KEY: "" })).toThrow(
+        EnvValidationError,
+      );
+      expect(
+        loadEnv({ ...deployed, EMAIL_PROVIDER: "resend", EMAIL_DRY_RUN: "true" }).EMAIL_DRY_RUN,
+      ).toBe(true);
     });
   });
 

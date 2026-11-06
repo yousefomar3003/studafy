@@ -129,6 +129,9 @@ export const envSchema = z
     // SNS topic ARN for SES email-event webhook ingestion (deliverability R-08). Optional: when
     // absent, the webhook route answers 500 so a misconfigured topic cannot silently pass as secure.
     EMAIL_EVENTS_SNS_TOPIC_ARN: z.string().min(1).optional(),
+    // Signing secret (whsec_...) of the Resend webhook endpoint, for /email/webhooks/resend when the
+    // workers send through Resend. Optional: when absent that route answers 500, like the SNS one.
+    RESEND_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // ERPNext integration (ST-089). All optional — activates only when both are set.
     ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
     ERPNEXT_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),

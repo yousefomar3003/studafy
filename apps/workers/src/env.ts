@@ -85,6 +85,11 @@ export const envSchema = z
     ),
     SES_FROM_NAME: z.preprocess(emptyAsUnset, z.string().min(1).default("Studafy")),
     SES_CONFIGURATION_SET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Which service sends email: "ses" (default) or "resend". Resend needs RESEND_API_KEY and a
+    // domain verified in Resend for SES_FROM_ADDRESS; its bounces and complaints reach the API's
+    // /email/webhooks/resend. Without the key the dispatcher is a dry run, the same rule as SES.
+    EMAIL_PROVIDER: z.preprocess(emptyAsUnset, z.enum(["ses", "resend"]).default("ses")),
+    RESEND_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     EMAIL_DRY_RUN: z.preprocess(
       emptyAsUnset,
       z
@@ -211,12 +216,20 @@ export const envSchema = z
       });
     }
 
-    if (env.SES_REGION === undefined && !env.EMAIL_DRY_RUN) {
+    if (env.EMAIL_PROVIDER === "ses" && env.SES_REGION === undefined && !env.EMAIL_DRY_RUN) {
       context.addIssue({
         code: "custom",
         path: ["SES_REGION"],
         message:
           "SES_REGION is required in production (set EMAIL_DRY_RUN=true to run without sending on purpose)",
+      });
+    }
+    if (env.EMAIL_PROVIDER === "resend" && env.RESEND_API_KEY === undefined && !env.EMAIL_DRY_RUN) {
+      context.addIssue({
+        code: "custom",
+        path: ["RESEND_API_KEY"],
+        message:
+          "RESEND_API_KEY is required in production when EMAIL_PROVIDER=resend (set EMAIL_DRY_RUN=true to run without sending on purpose)",
       });
     }
 

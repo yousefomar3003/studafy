@@ -5,11 +5,13 @@ import { auditAction } from "../middleware/auditEmitter";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
 
+import { ResendEventError, parseResendEvent, verifyResendSignature } from "./resend-events";
 import { SesEventError, parseSesEvent } from "./ses-events";
 import { SnsSignatureError, verifySnsSignature } from "./sns-signature";
 
 import type { Database } from "../db";
 import type { Logger } from "../logger";
+import type { ParsedSesEvent } from "./ses-events";
 import type { SnsEnvelope } from "./sns-signature";
 import type { AppEnv, AppVariables } from "../middleware/requestId";
 import type { Context } from "hono";
@@ -103,6 +105,58 @@ const webhookRoute = createRoute({
     // 400: malformed JSON envelope or SES event document. 401: signature missing/invalid, or the
     // topic is not the configured one. 500: EMAIL_EVENTS_SNS_TOPIC_ARN unconfigured, the
     // subscription confirmation fetch failed, or ingestion failed.
+    [400, 401, 500],
+  ),
+});
+
+const resendEventSchema = z
+  .object({
+    type: z.string().openapi({
+      description:
+        "Resend event type; email.bounced, email.complained and email.delivered are acted on.",
+    }),
+    created_at: z.string().optional(),
+    data: z
+      .object({
+        email_id: z.string().openapi({ description: "Resend's id for the sent email." }),
+        to: z.array(z.string()).optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough()
+  .openapi("ResendEmailEvent");
+
+const resendWebhookRoute = createRoute({
+  method: "post",
+  path: "/email/webhooks/resend",
+  tags: ["Email"],
+  operationId: "ingestResendEmailEvent",
+  summary: "Ingest an email event from Resend",
+  description:
+    "Receives bounce, complaint and delivery events from Resend, the email provider used instead " +
+    "of SES when the workers run with EMAIL_PROVIDER=resend. Authenticates by Resend's Svix " +
+    "signature (svix-id, svix-timestamp, svix-signature headers) with RESEND_WEBHOOK_SECRET; " +
+    "nothing else is trusted.\n\n" +
+    "Recorded exactly like the SES webhook: each (message_id, event_type) once in " +
+    "app.email_events, hard bounces and complaints added to the global suppression list, and the " +
+    "matching deliveries advanced to bounced or complained. Other event types answer 200 and are " +
+    "ignored.",
+  security: [],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: resendEventSchema } },
+    },
+  },
+  responses: standardResponses(
+    {
+      200: {
+        description: "Event accepted, deduplicated, or knowingly ignored.",
+        schema: webhookAcceptedSchema,
+      },
+    },
+    // 400: malformed event. 401: signature missing, invalid or stale. 500: RESEND_WEBHOOK_SECRET
+    // unconfigured, or ingestion failed.
     [400, 401, 500],
   ),
 });
@@ -221,6 +275,52 @@ export function emailEventWebhookRoutes(
     return c.json({ ok: true } as const, 200);
   });
 
+  // Same audit posture as the SNS route above: the app.email_events insert is the audit record.
+  routes.use("/email/webhooks/resend", auditAction("insert", "email_events"));
+
+  routes.use("/email/webhooks/resend", async (c, next) => {
+    const secret = process.env.RESEND_WEBHOOK_SECRET;
+    if (!secret) {
+      throw new HTTPException(500, { message: "RESEND_WEBHOOK_SECRET is not configured" });
+    }
+
+    // Authenticate over the exact bytes Resend signed, before the validator parses them.
+    const rawBody = await c.req.text();
+    const verified = verifyResendSignature(
+      rawBody,
+      {
+        id: c.req.header("svix-id"),
+        timestamp: c.req.header("svix-timestamp"),
+        signature: c.req.header("svix-signature"),
+      },
+      secret,
+    );
+    if (!verified) {
+      logger.warn({ svix_id: c.req.header("svix-id") }, "Resend signature verification failed");
+      throw new HTTPException(401, { message: "Invalid webhook signature" });
+    }
+    await next();
+  });
+
+  routes.openapi(resendWebhookRoute, async (c) => {
+    const log = c.get("log");
+    let event: ParsedSesEvent | null;
+    try {
+      event = parseResendEvent(c.req.valid("json"));
+    } catch (err) {
+      if (err instanceof ResendEventError) {
+        throw new HTTPException(400, { message: err.message });
+      }
+      throw err;
+    }
+    if (event === null) {
+      log.info({ type: c.req.valid("json").type }, "Resend event type knowingly ignored");
+    } else {
+      await recordEmailEvent(db, event, log);
+    }
+    return c.json({ ok: true } as const, 200);
+  });
+
   return routes;
 }
 
@@ -273,6 +373,18 @@ async function ingestNotification(
     return;
   }
 
+  await recordEmailEvent(db, event, logger);
+}
+
+/**
+ * Record one provider email event (SES or Resend) and apply it: the ledger row, the suppression of
+ * hard-bounced or complaining addresses, and the deliveries' terminal state, in one transaction.
+ */
+async function recordEmailEvent(
+  db: Database,
+  event: ParsedSesEvent,
+  logger: Logger,
+): Promise<void> {
   try {
     await db.begin(async (tx) => {
       // The unique (message_id, event_type) constraint is the dedup arbiter: a redelivered SNS
@@ -286,7 +398,7 @@ async function ingestNotification(
       if (inserted.length === 0) {
         logger.info(
           { message_id: event.messageId, event_type: event.eventType },
-          "SES event already recorded; ignoring redelivery",
+          "Email event already recorded; ignoring redelivery",
         );
         return;
       }
@@ -306,10 +418,10 @@ async function ingestNotification(
       }
     });
   } catch (err) {
-    logger.error({ err, message_id: event.messageId }, "SES event ingestion failed");
+    logger.error({ err, message_id: event.messageId }, "Email event ingestion failed");
     // Detail is withheld from the client by the 5xx arm of errorHandlerMiddleware; the cause is in
     // the line above, correlated by request_id.
-    throw new HTTPException(500, { message: "SES event ingestion failed" });
+    throw new HTTPException(500, { message: "Email event ingestion failed" });
   }
 }
 
@@ -326,10 +438,7 @@ async function ingestNotification(
  * user). The per-school set_config keeps each update tenant-shaped for any future connection that
  * does not bypass RLS.
  */
-async function transitionDeliveries(
-  tx: TransactionSql,
-  event: NonNullable<ReturnType<typeof parseSesEvent>>,
-): Promise<void> {
+async function transitionDeliveries(tx: TransactionSql, event: ParsedSesEvent): Promise<void> {
   const status = event.eventType === "bounce" ? "bounced" : "complained";
 
   const schools = await tx`

@@ -13,7 +13,12 @@ export { processNotificationDigest } from "./notification-digest-producer";
 export type { NotificationDigestResult } from "./notification-digest-producer";
 export { TokenBucket } from "./rate-limiter";
 export type { Now, RateLimiter } from "./rate-limiter";
-export { createSesSender, isRetryableSendError } from "./sender";
+export {
+  createEmailSender,
+  createResendSender,
+  createSesSender,
+  isRetryableSendError,
+} from "./sender";
 export type { EmailSender, OutboundEmail, SentEmail, SenderLogger } from "./sender";
 export {
   renderAlertEmail,
