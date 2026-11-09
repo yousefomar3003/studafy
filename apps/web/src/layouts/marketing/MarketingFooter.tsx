@@ -8,8 +8,8 @@ import { MARKETING_NAV_ITEMS } from "./nav-items";
 const YEAR = new Date().getFullYear();
 
 /**
- * Public site footer: sitemap, the same two entry points as the header, and the two legal pages
- * both app stores require to be reachable from the website.
+ * Public site footer: what Studafy is in one line, then three plain columns: the site, the way into
+ * the app, and the two legal pages both app stores require to be reachable from the website.
  */
 export function MarketingFooter() {
   const { t } = useTranslation();
@@ -25,18 +25,44 @@ export function MarketingFooter() {
         </div>
 
         <nav aria-label={t("site.marketing.footer.navAriaLabel")} className="marketing-footer__nav">
-          {MARKETING_NAV_ITEMS.map((item) => (
-            <Link key={item.to} to={item.to}>
-              {t(item.labelKey)}
-            </Link>
-          ))}
-          {signedIn ? (
-            <Link to="/portal">{t("site.marketing.footer.portal")}</Link>
-          ) : (
-            <Link to="/auth/login">{t("site.marketing.footer.signIn")}</Link>
-          )}
-          <Link to="/privacy">{t("site.marketing.footer.privacy")}</Link>
-          <Link to="/legal/delete-account">{t("site.marketing.footer.deleteAccount")}</Link>
+          <div className="marketing-footer__column">
+            <h2 className="marketing-footer__heading">{t("site.marketing.footer.siteHeading")}</h2>
+            <ul>
+              {MARKETING_NAV_ITEMS.map((item) => (
+                <li key={item.to}>
+                  <Link to={item.to}>{t(item.labelKey)}</Link>
+                </li>
+              ))}
+              <li>
+                <Link to="/about#contact">{t("site.marketing.footer.contact")}</Link>
+              </li>
+            </ul>
+          </div>
+          <div className="marketing-footer__column">
+            <h2 className="marketing-footer__heading">
+              {t("site.marketing.footer.accountHeading")}
+            </h2>
+            <ul>
+              <li>
+                {signedIn ? (
+                  <Link to="/portal">{t("site.marketing.footer.portal")}</Link>
+                ) : (
+                  <Link to="/auth/login">{t("site.marketing.footer.signIn")}</Link>
+                )}
+              </li>
+            </ul>
+          </div>
+          <div className="marketing-footer__column">
+            <h2 className="marketing-footer__heading">{t("site.marketing.footer.legalHeading")}</h2>
+            <ul>
+              <li>
+                <Link to="/privacy">{t("site.marketing.footer.privacy")}</Link>
+              </li>
+              <li>
+                <Link to="/legal/delete-account">{t("site.marketing.footer.deleteAccount")}</Link>
+              </li>
+            </ul>
+          </div>
         </nav>
       </div>
 

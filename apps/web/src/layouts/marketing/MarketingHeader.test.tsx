@@ -84,7 +84,7 @@ describe("MarketingHeader", () => {
     expect(screen.getByRole("link", { name: "Sign in" })).toBeTruthy();
   });
 
-  test("the header switches to the floating pill once the page region scrolls, and back at the top", () => {
+  test("the header shrinks once the page region scrolls, and grows back at the top", () => {
     renderHeader(() => Promise.reject(new Error("no session")));
     const header = screen.getByRole("banner");
     expect(header.getAttribute("data-scrolled")).toBe("false");

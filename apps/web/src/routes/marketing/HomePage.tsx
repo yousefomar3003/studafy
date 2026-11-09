@@ -1,16 +1,51 @@
-import { Card } from "@studafy/ui";
+import { Link } from "react-router-dom";
 
 import { LinkButton } from "../../components/LinkButton";
 import { useSeo } from "../../components/Seo";
-import { useTranslation } from "../../lib/i18n";
+import { useFormatters, useTranslation } from "../../lib/i18n";
 
-// Translation keys only — the copy lives in `locales/{en,ar}/site.json` under `site.marketing.home`.
-const VALUE_PROPS = ["academics", "grades", "finance", "family"] as const;
-const STEPS = ["onboard", "staff", "families"] as const;
+import { ClosingBand } from "./ClosingBand";
+import { LanguageFlip } from "./demos/LanguageFlip";
+import { RegisterDemo } from "./demos/RegisterDemo";
+import { RoleTour } from "./demos/RoleTour";
+import { SensitiveDemo } from "./demos/SensitiveDemo";
+import { reveal } from "./reveal";
+import { SchoolDay } from "./SchoolDay";
+
+// Translation keys only: the copy lives in `locales/{en,ar}/site.json` under `site.marketing.home`.
+
+const MODULES = [
+  "academics",
+  "attendance",
+  "homework",
+  "exams",
+  "finance",
+  "families",
+  "announcements",
+  "discipline",
+  "records",
+  "imports",
+] as const;
+
+const PRIVACY = ["separate", "sensitive", "history", "requests"] as const;
+
+/**
+ * The same interface words in both languages. Deliberately not translated: the point of the table is
+ * to show both scripts side by side, whichever language the page is read in.
+ */
+const LANGUAGE_PAIRS = [
+  ["Attendance", "الحضور"],
+  ["Homework due Thursday", "واجب يُسلَّم يوم الخميس"],
+  ["Term marks released", "تمت إتاحة درجات الفصل"],
+  ["Fee instalment paid", "تم دفع القسط"],
+  ["Absent today", "غائب اليوم"],
+] as const;
 
 /** Marketing landing page (`/`). Eagerly loaded so the initial route paints without a chunk fetch. */
 export default function HomePage() {
   const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  const number = (index: number) => formatNumber(index + 1, { minimumIntegerDigits: 2 });
 
   useSeo({
     title: t("site.marketing.home.seoTitle"),
@@ -20,84 +55,174 @@ export default function HomePage() {
 
   return (
     <>
-      <section className="marketing-hero">
+      <section className="mk-hero mk-hero--split">
+        <div className="marketing-container mk-hero__grid">
+          <div className="mk-hero__text">
+            <h1 className="mk-hero__title">{t("site.marketing.home.heroTitle")}</h1>
+            <p className="mk-hero__body">{t("site.marketing.home.heroBody")}</p>
+            <div className="mk-actions">
+              <LinkButton href="/about#contact" variant="primary">
+                {t("site.marketing.cta.talkToUs")}
+              </LinkButton>
+              <Link className="mk-link" to="/features">
+                {t("site.marketing.cta.exploreFeatures")}
+              </Link>
+            </div>
+          </div>
+
+          <SchoolDay />
+        </div>
+      </section>
+
+      <section className="mk-section mk-section--alt" aria-labelledby="mk-register">
         <div className="marketing-container">
-          <h1 className="marketing-hero__title">{t("site.marketing.home.heroTitle")}</h1>
-          <p className="marketing-hero__subtitle">{t("site.marketing.home.heroSubtitle")}</p>
-          <div className="marketing-hero__actions">
-            <LinkButton href="/about#contact" variant="primary">
-              {t("site.marketing.cta.talkToUs")}
-            </LinkButton>
-            <LinkButton href="/pricing" variant="secondary">
-              {t("site.marketing.cta.seePricing")}
-            </LinkButton>
+          <header className="mk-section__header" {...reveal()}>
+            <h2 id="mk-register" className="mk-section__title">
+              {t("site.marketing.home.demo.register.title")}
+            </h2>
+            <div>
+              <p className="mk-section__lede">{t("site.marketing.home.demo.register.lede")}</p>
+              <p className="mk-example">{t("site.marketing.home.demo.exampleNote")}</p>
+            </div>
+          </header>
+          <div {...reveal(1)}>
+            <RegisterDemo />
           </div>
         </div>
       </section>
 
-      <section className="marketing-section">
+      <section className="mk-section" aria-labelledby="mk-roles">
         <div className="marketing-container">
-          <div className="marketing-section__heading">
-            <span className="marketing-section__eyebrow">
-              {t("site.marketing.home.includedEyebrow")}
-            </span>
-            <h2 className="marketing-section__title">{t("site.marketing.home.includedTitle")}</h2>
-            <p className="marketing-section__lede">{t("site.marketing.home.includedLede")}</p>
+          <header className="mk-section__header" {...reveal()}>
+            <h2 id="mk-roles" className="mk-section__title">
+              {t("site.marketing.home.rolesTitle")}
+            </h2>
+            <p className="mk-section__lede">{t("site.marketing.home.rolesLede")}</p>
+          </header>
+          <div {...reveal(1)}>
+            <RoleTour />
           </div>
+        </div>
+      </section>
 
-          <div className="marketing-grid">
-            {VALUE_PROPS.map((id) => (
-              <Card key={id}>
-                <Card.Body>
-                  <h3 className="marketing-feature-card__title">
-                    {t(`site.marketing.home.valueProps.${id}.title`)}
+      <section className="mk-section mk-section--alt" aria-labelledby="mk-modules">
+        <div className="marketing-container">
+          <header className="mk-section__header" {...reveal()}>
+            <h2 id="mk-modules" className="mk-section__title">
+              {t("site.marketing.home.modulesTitle")}
+            </h2>
+            <p className="mk-section__lede">{t("site.marketing.home.modulesLede")}</p>
+          </header>
+
+          <ol className="mk-index">
+            {MODULES.map((id, index) => (
+              <li key={id} className="mk-index__item" {...reveal(index)}>
+                <span className="mk-index__number" aria-hidden="true">
+                  {number(index)}
+                </span>
+                <div>
+                  <h3 className="mk-index__title">
+                    {t(`site.marketing.home.modules.${id}.title`)}
                   </h3>
-                  <p className="marketing-feature-card__body">
-                    {t(`site.marketing.home.valueProps.${id}.body`)}
-                  </p>
-                </Card.Body>
-              </Card>
+                  <p className="mk-index__body">{t(`site.marketing.home.modules.${id}.body`)}</p>
+                </div>
+              </li>
             ))}
-          </div>
-        </div>
-      </section>
+          </ol>
 
-      <section className="marketing-section marketing-section--muted">
-        <div className="marketing-container">
-          <div className="marketing-section__heading">
-            <span className="marketing-section__eyebrow">
-              {t("site.marketing.home.howEyebrow")}
-            </span>
-            <h2 className="marketing-section__title">{t("site.marketing.home.howTitle")}</h2>
-          </div>
-
-          <div className="marketing-steps">
-            {STEPS.map((id) => (
-              <div className="marketing-step" key={id}>
-                <h3 className="marketing-step__title">
-                  {t(`site.marketing.home.steps.${id}.title`)}
-                </h3>
-                <p className="marketing-step__body">{t(`site.marketing.home.steps.${id}.body`)}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="marketing-section">
-        <div className="marketing-container marketing-cta-band">
-          <h2 className="marketing-cta-band__title">{t("site.marketing.home.ctaTitle")}</h2>
-          <p className="marketing-cta-band__body">{t("site.marketing.home.ctaBody")}</p>
-          <div className="marketing-cta-band__actions">
-            <LinkButton href="/about#contact" variant="primary">
-              {t("site.marketing.cta.talkToUs")}
-            </LinkButton>
-            <LinkButton href="/features" variant="tertiary">
+          <p className="mk-section__more">
+            <Link className="mk-link" to="/features">
               {t("site.marketing.cta.exploreFeatures")}
-            </LinkButton>
+            </Link>
+          </p>
+        </div>
+      </section>
+
+      <section className="mk-section" aria-labelledby="mk-language">
+        <div className="marketing-container mk-split">
+          <div {...reveal()}>
+            <h2 id="mk-language" className="mk-section__title">
+              {t("site.marketing.home.languageTitle")}
+            </h2>
+            <p className="mk-section__lede">{t("site.marketing.home.languageBody")}</p>
+          </div>
+
+          <div className="mk-language" {...reveal(1)}>
+            <LanguageFlip />
+            <table className="mk-pairs">
+              <caption className="mk-pairs__caption">
+                {t("site.marketing.home.languageCaption")}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col" lang="en" dir="ltr">
+                    English
+                  </th>
+                  <th scope="col" lang="ar" dir="rtl">
+                    العربية
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {LANGUAGE_PAIRS.map(([english, arabic]) => (
+                  <tr key={english}>
+                    <td lang="en" dir="ltr">
+                      {english}
+                    </td>
+                    <td lang="ar" dir="rtl">
+                      {arabic}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
+
+      <section className="mk-section mk-section--alt" aria-labelledby="mk-privacy">
+        <div className="marketing-container">
+          <header className="mk-section__header" {...reveal()}>
+            <h2 id="mk-privacy" className="mk-section__title">
+              {t("site.marketing.home.privacyTitle")}
+            </h2>
+          </header>
+
+          <div className="mk-privacy">
+            <div className="mk-privacy__demo" {...reveal()}>
+              <SensitiveDemo />
+            </div>
+            <ul className="mk-facts mk-facts--stacked">
+              {PRIVACY.map((id, index) => (
+                <li key={id} className="mk-facts__item" {...reveal(index)}>
+                  <h3 className="mk-facts__title">
+                    {t(`site.marketing.home.privacy.${id}.title`)}
+                  </h3>
+                  <p className="mk-facts__body">{t(`site.marketing.home.privacy.${id}.body`)}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section className="mk-section" aria-labelledby="mk-pricing">
+        <div className="marketing-container mk-split mk-split--center" {...reveal()}>
+          <h2 id="mk-pricing" className="mk-section__title">
+            {t("site.marketing.home.pricingTitle")}
+          </h2>
+          <div>
+            <p className="mk-section__lede">{t("site.marketing.home.pricingBody")}</p>
+            <p className="mk-section__more">
+              <Link className="mk-link" to="/pricing">
+                {t("site.marketing.home.pricingLink")}
+              </Link>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <ClosingBand />
     </>
   );
 }

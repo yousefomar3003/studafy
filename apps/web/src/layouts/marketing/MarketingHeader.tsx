@@ -9,7 +9,6 @@ import { useScrolled } from "../../lib/use-scrolled";
 import { UserMenu } from "../portal/UserMenu";
 
 import { MARKETING_NAV_ITEMS } from "./nav-items";
-import { NavCat } from "./NavCat";
 
 export interface MarketingHeaderProps {
   /** DOM id of the nav list this header's toggle controls. */
@@ -19,10 +18,10 @@ export interface MarketingHeaderProps {
 }
 
 /**
- * Public site header: brand, primary nav, and the two real entry points into the app — sign in for
- * existing schools (replaced by the account menu once signed in), and a contact link for prospects. There is no self-serve signup route yet (only
- * `/auth/login` and invitation-based onboarding exist), so the primary CTA goes to the contact
- * section on the About page rather than a page that doesn't exist.
+ * Public site header: brand, primary nav, and the entry points into the app: sign in for existing
+ * schools (replaced by the account menu once signed in), sign-up, and a contact link for prospects.
+ * A full-width bar at the top of the page that shrinks into a narrower rounded bar once the page
+ * scrolls (`data-scrolled`, marketing-shell.css), and grows back at the top.
  */
 export function MarketingHeader({ navId, navOpen, onToggleNav }: MarketingHeaderProps) {
   const { t } = useTranslation();
@@ -32,7 +31,6 @@ export function MarketingHeader({ navId, navOpen, onToggleNav }: MarketingHeader
   return (
     <header className="marketing-header" data-scrolled={scrolled}>
       <div className="marketing-header__row">
-        <NavCat />
         <NavLink to="/" className="marketing-header__brand" end>
           <BrandLogo />
         </NavLink>

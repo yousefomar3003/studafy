@@ -15,6 +15,16 @@ import type { FormEvent } from "react";
 const inquirySchema = z.object({
   fullName: z.string().trim().min(1).max(200),
   email: z.email().max(320),
+  // The API's own rule: digits with + - ( ) . and spaces, 6 to 20 digits in all.
+  phone: z
+    .string()
+    .trim()
+    .max(50)
+    .regex(/^\+?[\d\s\-().]+$/)
+    .refine((value) => {
+      const digits = value.replace(/\D/g, "").length;
+      return digits >= 6 && digits <= 20;
+    }),
   schoolName: z.string().trim().min(1).max(200),
   studentCount: z.union([z.literal(""), z.coerce.number().int().min(0).max(1_000_000)]),
 });
@@ -67,6 +77,7 @@ export function ContactForm() {
     const parsed = inquirySchema.safeParse({
       fullName: fields.fullName,
       email: fields.email.trim(),
+      phone: fields.phone,
       schoolName: fields.schoolName,
       studentCount: fields.studentCount.trim(),
     });
@@ -92,7 +103,7 @@ export function ContactForm() {
         body: {
           full_name: fields.fullName.trim(),
           email: fields.email.trim(),
-          phone: optional(fields.phone),
+          phone: parsed.data.phone,
           school_name: fields.schoolName.trim(),
           country: optional(fields.country),
           student_count: parsed.data.studentCount === "" ? undefined : parsed.data.studentCount,
@@ -159,7 +170,9 @@ export function ContactForm() {
           autoComplete="tel"
           value={fields.phone}
           onChange={(e) => set("phone")(e.target.value)}
+          error={errors.phone}
           maxLength={50}
+          required
         />
         <Input
           label={t("site.marketing.contactForm.schoolName")}

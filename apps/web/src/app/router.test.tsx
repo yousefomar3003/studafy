@@ -54,7 +54,7 @@ describe("app shell", () => {
     renderAt("/");
     expect(await screen.findByRole("main")).toBeTruthy();
     expect(
-      await screen.findByRole("heading", { name: /school operations/i, level: 1 }),
+      await screen.findByRole("heading", { name: /whole school day, in one system/i, level: 1 }),
     ).toBeTruthy();
   });
 
@@ -63,7 +63,7 @@ describe("app shell", () => {
     expect(
       await screen.findByRole(
         "heading",
-        { name: /whole school day/i, level: 1 },
+        { name: /everything in studafy/i, level: 1 },
         { timeout: 5000 },
       ),
     ).toBeTruthy();
