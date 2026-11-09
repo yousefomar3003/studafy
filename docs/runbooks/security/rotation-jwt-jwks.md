@@ -10,10 +10,14 @@ Source: `apps/api/src/modules/auth/jwt/key-store.ts` (`KeyStore`), wired in
 (`apps/api/src/modules/auth/jwks/route.ts`). Verification architecture:
 [`docs/security/JWT_verification_architecture.md`](../../security/JWT_verification_architecture.md).
 
-Boundary: `apps/realtime`'s `WS_JWT_SECRET` (HMAC `HS256`, `apps/realtime/src/auth.ts`) is a
-**different class** — an application secret held in Secrets Manager, not a JWT signing key pair.
-Rotate it through the application-secret procedure
-([`rotation-provider-api-keys.md`](rotation-provider-api-keys.md)).
+Boundary: `WS_JWT_SECRET` (HMAC `HS256`), the realtime handshake-ticket key that `apps/api` signs
+with and `apps/realtime/src/auth.ts` verifies, is a **different class**: an application secret held
+in Secrets Manager, not a JWT signing key pair. Rotate it through the application-secret procedure
+([`rotation-provider-api-keys.md`](rotation-provider-api-keys.md)) as a **realtime** key
+(`rotate-app-secret.sh <env> realtime WS_JWT_SECRET --generate`); Terraform copies the new value
+into the api secret in the same apply. Then redeploy `api` and `realtime` back to back: until both
+run the new value, new handshakes fail and clients retry. Open sockets are not affected, since the
+key is checked only at handshake.
 
 ## What already rotates itself
 

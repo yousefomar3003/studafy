@@ -108,3 +108,61 @@ export function assertReviewSeedAllowed(env: ReviewGuardEnv, expectedSlug: strin
     );
   }
 }
+
+export interface QaGuardEnv {
+  // NODE_ENV is deliberately not read: staging runs NODE_ENV=production, so it cannot tell the two
+  // apart. APP_ENV can.
+  readonly APP_ENV?: string;
+  // Must equal QA_SEED_CONFIRMATION (qa-credentials.ts): an explicit, per-invocation statement of
+  // intent, like the reviewer seed's.
+  readonly QA_TENANT_SEED_CONFIRM?: string;
+}
+
+// Host shapes the QA seed may target: staging's RDS instance is `<project>-staging-postgres` (the
+// naming module's name_prefix), and an SSM tunnel to it arrives on a loopback host.
+const QA_HOST_PATTERNS: readonly RegExp[] = [
+  /(^|[.\-_])staging([.\-_]|$)/i,
+  /(^|[.\-_])stage([.\-_]|$)/i,
+];
+
+const PRODUCTION_HOST_PATTERNS: readonly RegExp[] = [
+  /(^|[.\-_])prod([.\-_]|$)/i,
+  /(^|[.\-_])production([.\-_]|$)/i,
+];
+
+// Guard for db/seeds/qa-tenant.ts. The QA tenants hold a SUPER_ADMIN that the QA login signs in to
+// with a shared password, so unlike the reviewer seed this one must never reach production: the API
+// refusing QA_LOGIN_PASSWORD in production is the primary rail, and this keeps the accounts from
+// existing there at all. Layered like assertSeedAllowed: confirmation, environment, then host
+// allowlist (local or staging-shaped only; production-shaped is always refused).
+export function assertQaSeedAllowed(
+  env: QaGuardEnv,
+  config: MigrationConfig,
+  expectedConfirmation: string,
+): void {
+  if (env.QA_TENANT_SEED_CONFIRM !== expectedConfirmation) {
+    throw new SeedSafetyError(
+      `Refusing to seed the QA tenants: set QA_TENANT_SEED_CONFIRM=${expectedConfirmation} ` +
+        "to confirm the target database.",
+    );
+  }
+
+  if (env.APP_ENV === "production") {
+    throw new SeedSafetyError(
+      "CRITICAL SAFETY VIOLATION: the QA tenants must never be seeded in production!",
+    );
+  }
+
+  const host = resolveHost(config);
+  if (PRODUCTION_HOST_PATTERNS.some((pattern) => pattern.test(host))) {
+    throw new SeedSafetyError(
+      `CRITICAL SAFETY VIOLATION: refusing to seed the QA tenants against a production-shaped host "${host}"`,
+    );
+  }
+  if (!LOCAL_HOSTS.has(host) && !QA_HOST_PATTERNS.some((pattern) => pattern.test(host))) {
+    throw new SeedSafetyError(
+      `Refusing to seed the QA tenants against "${host}": only a local or staging-shaped host is ` +
+        "allowed. Tunnel to staging and connect through localhost if its host name does not say so.",
+    );
+  }
+}

@@ -35,11 +35,20 @@ void main() {
       await app.signInWithMock(tester);
 
       await tester.tap(find.text('AI'));
-      await pumpUntil(tester, () => find.byType(AiNotActiveCard).evaluate().isNotEmpty);
+      await pumpUntil(
+        tester,
+        () => find.byType(AiNotActiveCard).evaluate().isNotEmpty,
+      );
 
       final card = find.byType(AiNotActiveCard);
-      expect(find.descendant(of: card, matching: find.byType(ButtonStyleButton)), findsNothing);
-      expect(find.descendant(of: card, matching: find.byType(InkWell)), findsNothing);
+      expect(
+        find.descendant(of: card, matching: find.byType(ButtonStyleButton)),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: card, matching: find.byType(InkWell)),
+        findsNothing,
+      );
       await tester.tap(card);
       await tester.pumpAndSettle();
       expect(urlLauncher.launches, isEmpty);

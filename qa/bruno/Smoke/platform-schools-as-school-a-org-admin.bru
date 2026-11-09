@@ -1,0 +1,19 @@
+meta {
+  name: Platform schools (School A ORG_ADMIN, expect 403)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/platform/schools
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{QA_TOKEN_A_ORG_ADMIN}}
+}
+
+tests {
+  test("no platform access", () => expect(res.status).to.equal(403));
+}

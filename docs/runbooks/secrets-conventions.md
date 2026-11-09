@@ -39,10 +39,10 @@ never being an output.
 
 ## Application secrets: what exists today, and how to set one
 
-`apps/realtime/src/env.ts` is the one genuine application secret in this repo today —
-`WS_JWT_SECRET`, which defaults to `"dev-insecure-secret-change-me"` and is explicitly flagged
-there as something "production deployments must override." `apps/api` and `apps/workers` have no
-secret-shaped environment variable at all yet (`apps/api/src/env.ts`, `apps/workers/src/env.ts`).
+`WS_JWT_SECRET` signs (`apps/api`) and verifies (`apps/realtime`) realtime handshake tickets. Both
+default it to `"dev-insecure-secret-change-me"` for local work and refuse to start with that value,
+or one under 32 characters, in production (QA-14). Terraform generates it, and writes realtime's
+value into the api secret as well, so set or rotate it under `realtime` only.
 
 To set a real value for an environment:
 

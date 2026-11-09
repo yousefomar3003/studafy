@@ -177,7 +177,9 @@ export async function processIngestJob(
     try {
       // The stage over the repository's mock provider is the single swap point for a real
       // embedding client: batching, rate limiting, 429 retries and per-tenant metering are all
-      // inside the stage, so the worker never changes when the provider does.
+      // inside the stage, so the worker never changes when the provider does. The mock's vectors
+      // only satisfy `embedding NOT NULL`: the API reads none of them while retrieval is
+      // lexical-only (ADR-020, QA-15/F-06).
       const embedder = createEmbeddingStage(createMockEmbeddingProvider());
       ({ chunks, ocrReport, embeddingTokens } = await buildIngestChunks(
         bytes,

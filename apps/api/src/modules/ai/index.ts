@@ -253,6 +253,7 @@ export {
   type HybridSearchHit,
   type HybridSearchInput,
   type HybridSearchResult,
+  type RetrievalMode,
 } from "./retrieval/search";
 export {
   createDeterministicCrossEncoderReranker,

@@ -37,6 +37,7 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { AUTH_CHANNELS } from "../channels";
 import { deliverTokenPair } from "../delivery";
+import { bindBrowser } from "../oauth/browser-binding";
 import { GOOGLE_AUTH_ENDPOINT, GOOGLE_SCOPES, getGoogleOAuthConfig } from "../oauth/config";
 import {
   MICROSOFT_AUTH_ENDPOINT,
@@ -131,7 +132,14 @@ export function activationOAuthRoutes({
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    await stateStore.set(state, { flow: "activation", provider, codeVerifier, nonce, token });
+    await stateStore.set(state, {
+      flow: "activation",
+      provider,
+      codeVerifier,
+      nonce,
+      token,
+      browserBinding: bindBrowser(c),
+    });
 
     const params = new URLSearchParams({
       client_id: config.clientId,

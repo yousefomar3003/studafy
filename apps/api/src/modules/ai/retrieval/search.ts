@@ -14,6 +14,12 @@
  *
  * The query vector arrives as a pgvector literal or bound parameter — never joined from a table,
  * which would make the ORDER BY non-constant and silently disable the HNSW index.
+ *
+ * Lexical-only mode (ADR-020, QA-15/F-06): when the caller has no real embedding provider it passes
+ * `queryVector: null`, and the semantic leg is not run at all — no HNSW settings, no ANN probe, an
+ * empty semantic CTE. The fusion SQL is unchanged, so every hit's `semanticRank` is null and its
+ * `rrfScore` is the keyword leg's `1 / (k + rank)` alone. Production runs this way until a real
+ * provider is wired for both ingestion and query under one model id.
  */
 
 import type { TransactionSql } from "postgres";
@@ -30,11 +36,20 @@ export const HYBRID_RRF_K = 60;
 export const HYBRID_DEFAULT_LIMIT = 10;
 export const HYBRID_MAX_LIMIT = 20;
 
+/**
+ * Which legs a retrieval pass ran. `lexical` is the keyword leg alone (no query vector);
+ * `hybrid` fuses it with the pgvector semantic leg.
+ */
+export type RetrievalMode = "hybrid" | "lexical";
+
 export interface HybridSearchInput {
   /** The raw query text; the FTS leg runs it through `websearch_to_tsquery`. */
   query: string;
-  /** The query vector as a pgvector literal, from the route's embedder. */
-  queryVector: string;
+  /**
+   * The query vector as a pgvector literal, from the route's embedder — or null for a lexical-only
+   * pass (no embedding provider wired; ADR-020), which skips the semantic leg entirely.
+   */
+  queryVector: string | null;
   /** How many fused results to return (default `HYBRID_DEFAULT_LIMIT`). */
   limit?: number;
   /**
@@ -61,9 +76,11 @@ export interface HybridSearchHit {
 
 export interface HybridSearchResult {
   hits: HybridSearchHit[];
+  /** Which legs ran: `lexical` when the input carried no query vector. */
+  mode: RetrievalMode;
   /**
    * How many rows the semantic leg returned on its final attempt. Surfaces the RLS+ANN hazard so a
-   * caller can see that a short semantic leg was not a fusion artifact.
+   * caller can see that a short semantic leg was not a fusion artifact. Always 0 in lexical mode.
    */
   semanticLegCount: number;
   /** True when the semantic leg under-returned and was retried at `HYBRID_EF_SEARCH_RETRY`. */
@@ -112,15 +129,20 @@ function semanticLegCount(
  */
 function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<HybridSearchHit[]> {
   const limit = clampLimit(input.limit);
-  const { materialId } = input;
-  return tx<RawHit[]>`
-    WITH semantic AS (
-      SELECT id, row_number() OVER (ORDER BY embedding <=> ${input.queryVector}::public.vector) AS rank
+  const { materialId, queryVector } = input;
+  // Lexical mode: an empty, correctly-typed semantic leg, so the fusion below is the keyword leg's
+  // ranking alone and no ANN scan runs.
+  const semantic =
+    queryVector === null
+      ? tx`SELECT NULL::uuid AS id, NULL::bigint AS rank WHERE FALSE`
+      : tx`
+      SELECT id, row_number() OVER (ORDER BY embedding <=> ${queryVector}::public.vector) AS rank
       FROM app.material_chunks
       WHERE ${materialId === undefined ? tx`TRUE` : tx`material_id = ${materialId}::uuid`}
-      ORDER BY embedding <=> ${input.queryVector}::public.vector
-      LIMIT ${HYBRID_LEG_LIMIT}
-    ), keyword AS (
+      ORDER BY embedding <=> ${queryVector}::public.vector
+      LIMIT ${HYBRID_LEG_LIMIT}`;
+  return tx<RawHit[]>`
+    WITH semantic AS (${semantic}), keyword AS (
       SELECT c.id, row_number() OVER (ORDER BY ts_rank(c.content_tsv, q.query) DESC) AS rank
       FROM app.material_chunks c,
            websearch_to_tsquery('english', ${input.query}) AS q(query)
@@ -173,7 +195,8 @@ export function clampLimit(limit: number | undefined): number {
 }
 
 /**
- * One hybrid retrieval pass: assert the semantic leg, retry it once when short, then fuse.
+ * One retrieval pass. Hybrid (a query vector given): assert the semantic leg, retry it once when
+ * short, then fuse. Lexical (`queryVector: null`): the keyword leg alone, through the same fusion.
  *
  * `tx` must be an open tenant transaction (see `withTenantTx`), because the RRF query depends on the
  * `app.school_id` GUC for row-level security on both legs.
@@ -182,16 +205,21 @@ export async function hybridSearch(
   tx: TransactionSql,
   input: HybridSearchInput,
 ): Promise<HybridSearchResult> {
+  const { queryVector } = input;
+  if (queryVector === null) {
+    const hits = await runHybridQuery(tx, input);
+    return { hits, mode: "lexical", semanticLegCount: 0, retried: false };
+  }
   await setHnswSettings(tx, HYBRID_EF_SEARCH);
-  let count = await semanticLegCount(tx, input.queryVector, input.materialId);
+  let count = await semanticLegCount(tx, queryVector, input.materialId);
   let retried = false;
   // One material legitimately has fewer chunks than a leg's limit, so a short semantic leg there
   // says nothing about recall; the retry is only for the corpus-wide search.
   if (count < HYBRID_LEG_LIMIT && input.materialId === undefined) {
     await setHnswSettings(tx, HYBRID_EF_SEARCH_RETRY);
-    count = await semanticLegCount(tx, input.queryVector);
+    count = await semanticLegCount(tx, queryVector);
     retried = true;
   }
   const hits = await runHybridQuery(tx, input);
-  return { hits, semanticLegCount: count, retried };
+  return { hits, mode: "hybrid", semanticLegCount: count, retried };
 }

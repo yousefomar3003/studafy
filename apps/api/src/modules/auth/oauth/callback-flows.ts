@@ -14,6 +14,7 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { completeWebActivation } from "../routes/activation-oauth-routes";
 import { completeWebLink } from "../routes/provider-link-routes";
 
+import { isBoundBrowser } from "./browser-binding";
 import { oauthErrorUrl } from "./error-redirect";
 import { appErrorRedirect, handOffToApp } from "./mobile-handoff";
 import { isAuthorizationEntry, isMobileFlow } from "./state-store";
@@ -44,13 +45,54 @@ function invalidState(): CodedHttpException {
   );
 }
 
-/** Take the state and accept it only as an authorization this provider's callback may redeem. */
+/**
+ * Transitional (QA-20). A browser-flow state minted before browser binding shipped carries no
+ * `browserBinding`, so it can never pass the check below. Rather than failing the user who was
+ * mid-sign-in during the deploy, the callback discards that state — the code is never exchanged, so
+ * nothing is issued from it — and sends the browser back to the same flow's start, which mints a
+ * bound state. The new state is bound, so this restarts a flow at most once. Safe to delete once
+ * no unbound state can remain: one state TTL (5 minutes) after every instance runs this code.
+ */
+export class UnboundStateRestart extends Error {
+  constructor(readonly location: string) {
+    super("OAuth state predates browser binding; restarting the flow");
+  }
+}
+
+/** Where to restart a pre-binding browser flow, or undefined when it cannot restart on its own. */
+function restartLocation(entry: AuthorizationEntry): string | undefined {
+  if (entry.flow === "login") return `/api/auth/oauth/${entry.provider}/start`;
+  if (entry.flow === "activation" && entry.token) {
+    return `/api/auth/invitations/${encodeURIComponent(entry.token)}/oauth/${entry.provider}/start`;
+  }
+  // `link` needs the user's bearer token to start, which a browser redirect cannot carry.
+  return undefined;
+}
+
+/**
+ * Take the state and accept it only as an authorization this provider's callback may redeem — and,
+ * for a browser flow, only in the browser that started it (browser-binding.ts). A state presented
+ * from another browser is consumed and refused before the code is exchanged, so no session, link
+ * or activation can result from it.
+ */
 export async function takeAuthorization(
+  c: Context<AppEnv>,
   ctx: CallbackContext,
   state: string,
 ): Promise<AuthorizationEntry> {
   const entry = await ctx.stateStore.take(state);
   if (!entry || !isAuthorizationEntry(entry) || entry.provider !== ctx.provider) {
+    throw invalidState();
+  }
+  if (!isMobileFlow(entry.flow) && entry.browserBinding === undefined) {
+    const location = restartLocation(entry);
+    if (location) throw new UnboundStateRestart(location);
+  }
+  if (!isMobileFlow(entry.flow) && !isBoundBrowser(c, entry.browserBinding)) {
+    ctx.logger.warn(
+      { provider: ctx.provider, flow: entry.flow },
+      "OAuth callback without the browser binding of its start",
+    );
     throw invalidState();
   }
   return entry;
@@ -121,6 +163,8 @@ export function failureRedirect(
   entry: AuthorizationEntry | undefined,
   error: unknown,
 ): Response {
+  if (error instanceof UnboundStateRestart) return c.redirect(error.location, 302);
+
   let code: ErrorCode;
   if (error instanceof CodedHttpException) code = error.code;
   else if (error instanceof HTTPException) code = ERROR_CODES.OAUTH_PROVIDER_ERROR;

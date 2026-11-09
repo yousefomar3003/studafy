@@ -18,6 +18,7 @@
         { "name": "NODE_ENV", "value": "production" },
         { "name": "PORT", "value": "3001" },
         { "name": "HOST", "value": "0.0.0.0" },
+        { "name": "WS_ALLOWED_ORIGINS", "value": "${WEB_ORIGIN}" },
         { "name": "SERVICE_NAME", "value": "realtime" },
         { "name": "RELEASE_VERSION", "value": "${IMAGE_TAG}" },
         { "name": "SENTRY_ENVIRONMENT", "value": "${SENTRY_ENVIRONMENT}" },
@@ -33,6 +34,10 @@
         {
           "name": "REDIS_URL",
           "valueFrom": "${REDIS_SECRET_ARN}:pubsub_url::"
+        },
+        {
+          "name": "AUTH_REDIS_URL",
+          "valueFrom": "${REDIS_SECRET_ARN}:queue_url::"
         }
       ],
       "healthCheck": {

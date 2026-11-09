@@ -205,7 +205,7 @@ export default function UsersListPage() {
   ];
 
   // One `POST /api/users` per row; each row is re-checked against the create modal's schema, so
-  // the CSV can't assign a role the picker hides (`SUPER_ADMIN`).
+  // the CSV can't assign a role the picker hides (`SUPER_ADMIN`, `SUPPORT_AGENT`).
   const importSpec: ImportSpec<CreateUserValues> = {
     templateName: "users",
     fields: [

@@ -1,11 +1,11 @@
 # @studafy/realtime
 
 Bun + [Hono](https://hono.dev) WebSocket gateway for Studafy. It authenticates a connection with a
-JWT handshake stub, joins it to its three home rooms (`school:{schoolId}`,
-`school:{schoolId}:role:{role}`, `school:{schoolId}:user:{userId}`), and fans out messages
-published to Redis — both direct room publishes and outbox-relayed domain events — to every member
-of the target room. A connection whose token expires is warned and closed (re-auth protocol)
-rather than left silently authorized past its stated expiry.
+single-use handshake ticket minted by `apps/api` (`GET /api/realtime/ticket`), joins it to its home
+rooms (`school:{schoolId}`, one `school:{schoolId}:role:{role}` per role,
+`school:{schoolId}:user:{userId}`), and fans out messages published to Redis — both direct room
+publishes and outbox-relayed domain events — to every member of the target room. A connection whose
+session expires or is revoked is warned and closed (re-auth protocol).
 
 See [`docs/protocol.md`](docs/protocol.md) for the full protocol spec (handshake, room naming,
 message envelopes, Redis wiring), and [`docs/event-routing.md`](docs/event-routing.md) for which
@@ -18,16 +18,18 @@ domain events fan out to which rooms.
 | `GET`  | `/healthz` | Liveness            | `200 { "status": "ok" }` while the process is alive                               |
 | `GET`  | `/readyz`  | Readiness           | `200 { "status": "ready" }`, or `503 { "status": "shutting_down" }`               |
 | `GET`  | `/metrics` | Fan-out counters    | `200` JSON snapshot of `src/metrics.ts` (`received`, `roomDeliveries`, `dropped`) |
-| `GET`  | `/ws`      | WebSocket handshake | `101` upgrade on a valid `?token=`, `401` otherwise                               |
+| `GET`  | `/ws`      | WebSocket handshake | `101` upgrade on a valid `?ticket=`, `401`/`403`/`503` otherwise                  |
 
 ## Architecture
 
 - [`src/env.ts`](src/env.ts) — validates the environment once at startup (fail fast, mirrors
   `apps/api`/`apps/workers`).
-- [`src/auth.ts`](src/auth.ts) — the JWT handshake stub: HS256 sign/verify against
-  `WS_JWT_SECRET`. Documented limitations and the follow-up ticket are in
-  [`docs/protocol.md`](docs/protocol.md#jwt-handshake-stub-and-its-limits). `TokenVerificationError`
-  carries a `code` (`TOKEN_EXPIRED` vs `TOKEN_INVALID`) that drives the re-auth protocol.
+- [`src/auth.ts`](src/auth.ts) — verifies handshake tickets (HS256, `WS_JWT_SECRET`, audience and
+  lifetime checks); the contract is [`docs/protocol.md`](docs/protocol.md#handshake-ticket).
+  `TokenVerificationError` carries a `code` (`TOKEN_EXPIRED` vs `TOKEN_INVALID`) that drives the
+  re-auth protocol. `signToken` exists for tests and the smoke test only.
+- [`src/session-guard.ts`](src/session-guard.ts) — spends each ticket once and checks the API's
+  denylist at handshake; the revocation sweep that closes revoked sessions' sockets every 15 s.
 - [`src/protocol.ts`](src/protocol.ts) — `parseRoomKeyParts` (the room key grammar, three kinds:
   school/role/user) and the four Zod-validated message shapes (`ClientMessage`, `SystemMessage`,
   `EventEnvelope`, plus `REAUTH_REQUIRED_CLOSE_CODE`).
@@ -55,13 +57,14 @@ domain events fan out to which rooms.
 
 ## Environment
 
-| Variable        | Type                                    | Default                         | Notes                                                                |
-| --------------- | --------------------------------------- | ------------------------------- | -------------------------------------------------------------------- |
-| `NODE_ENV`      | `development` \| `test` \| `production` | `development`                   |                                                                      |
-| `PORT`          | integer `1`–`65535`                     | `3001`                          |                                                                      |
-| `HOST`          | string                                  | `0.0.0.0`                       | interface to bind                                                    |
-| `REDIS_URL`     | string                                  | `redis://localhost:6379`        | pub/sub subscriber connection                                        |
-| `WS_JWT_SECRET` | string                                  | `dev-insecure-secret-change-me` | HS256 secret for the JWT stub — **must** be overridden in production |
+| Variable         | Type                                    | Default                         | Notes                                                                             |
+| ---------------- | --------------------------------------- | ------------------------------- | --------------------------------------------------------------------------------- |
+| `NODE_ENV`       | `development` \| `test` \| `production` | `development`                   |                                                                                   |
+| `PORT`           | integer `1`–`65535`                     | `3001`                          |                                                                                   |
+| `HOST`           | string                                  | `0.0.0.0`                       | interface to bind                                                                 |
+| `REDIS_URL`      | string                                  | `redis://localhost:6379`        | pub/sub subscriber connection                                                     |
+| `AUTH_REDIS_URL` | string                                  | `REDIS_URL`                     | the API's auth database (denylist, spent tickets); required in production         |
+| `WS_JWT_SECRET`  | string                                  | `dev-insecure-secret-change-me` | ticket key, shared with `apps/api`; production refuses the default and < 32 chars |
 
 ## Commands
 
@@ -83,11 +86,13 @@ Redis — only the fan-out step does. So the split is by Redis dependency, not b
 not":
 
 - `bun test` covers everything that doesn't require Redis, including real WebSocket upgrades:
-  env validation, the JWT stub, protocol schemas, room membership, the Redis message subscriber
-  (against a fake emitter), the handshake's _rejection_ path (missing/invalid/expired token —
-  those return a plain HTTP 401 before ever reaching the upgrade), and — in
-  [`src/app.ws.test.ts`](src/app.ws.test.ts), against a real `Bun.serve` — the cross-tenant room
-  probe tests and the re-auth close-and-reconnect flow. These run in CI on every push.
+  env validation, ticket verification, protocol schemas, room membership, the Redis message
+  subscriber (against a fake emitter), the handshake's _rejection_ path (missing/invalid/expired
+  ticket — those return a plain HTTP 401 before ever reaching the upgrade), and — in
+  [`src/app.ws.test.ts`](src/app.ws.test.ts), against a real `Bun.serve` with an in-memory session
+  guard — the cross-tenant room probe tests, ticket replay, revocation, and the re-auth close. The
+  API↔gateway contract is in `apps/api/tests/realtime/ticket-contract.test.ts`. These run in CI on
+  every push.
 - `scripts/smoke-test.ts` covers what's left: a real Redis `PUBLISH` fanning out to the right room
   members (and _not_ to a client in a different school). This mirrors `apps/workers`' split
   between its unit tests and its Redis-required `smoke-test.ts`.

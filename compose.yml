@@ -141,6 +141,8 @@ services:
       # follows, so they use the published host port.
       MOCK_OAUTH_ISSUER_URL: http://localhost:3000/mock-idp
       MOCK_OAUTH_REDIRECT_URI: http://localhost:3000/api/auth/oauth/mock/callback
+      # Signs realtime handshake tickets; must equal the realtime service's value below (QA-14).
+      WS_JWT_SECRET: ${WS_JWT_SECRET:-dev-insecure-secret-change-me}
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
@@ -158,6 +160,7 @@ services:
       NODE_ENV: development
       REDIS_URL: redis://redis:6379
       WS_JWT_SECRET: ${WS_JWT_SECRET:-dev-insecure-secret-change-me}
+      WS_ALLOWED_ORIGINS: http://localhost:8080
     ports:
       - "127.0.0.1:3001:3001"
     depends_on:

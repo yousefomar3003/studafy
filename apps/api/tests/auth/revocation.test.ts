@@ -95,6 +95,10 @@ beforeAll(async () => {
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
+    // Both instances share this Redis, and with it the per-IP auth limit (5/window). This file sends
+    // more logouts than that from one in-process "IP", so later ones would be answered 429 and never
+    // reach the denylist. Rate limiting has its own suite; it is not what these tests measure.
+    rateLimitDisabled: true,
   };
 
   app = createApp({ ...options, tracker: createInflightTracker() });
@@ -228,6 +232,64 @@ describe("POST /api/auth/logout", () => {
       SELECT revoked_at FROM app.refresh_tokens WHERE id = ${seed.sessionId}
     `;
     expect(row!.revoked_at).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Refresh-token reuse (F-08, QA-21)
+// ---------------------------------------------------------------------------
+
+describe("refresh-token reuse", () => {
+  async function refresh(token: string): Promise<Response> {
+    return await app.request("/api/auth/refresh", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: token }),
+    });
+  }
+
+  integrationTest(
+    "denies the family's current access token on the next request after reuse",
+    async () => {
+      const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.STUDENT.id, {
+        channel: "mobile",
+      });
+
+      // A real rotation, so the access token under test is one the production signer minted and
+      // the session row recorded — the family's current tip.
+      const rotated = await refresh(seed.token);
+      expect(rotated.status).toBe(200);
+      const pair = (await rotated.json()) as { access_token: string; refresh_token: string };
+      const authorization = `Bearer ${pair.access_token}`;
+      expect((await probeProtected(peerApp, authorization)).status).toBe(200);
+
+      const [tip] = await sql<{ access_jti: string }[]>`
+        SELECT access_jti FROM app.refresh_tokens
+         WHERE family_id = ${seed.familyId} AND rotated_at IS NULL
+      `;
+
+      // Re-presenting the consumed token is the theft signal.
+      const reused = await refresh(seed.token);
+      expect(reused.status).toBe(401);
+
+      // The very next request, on an instance that never saw the reuse, is refused.
+      expect((await probeProtected(peerApp, authorization)).status).toBe(401);
+      expect(await isDenylisted(tip!.access_jti)).toBe(true);
+      // The parent's access token is denied too while it is still inside its own TTL.
+      expect(await isDenylisted(seed.accessJti!)).toBe(true);
+    },
+  );
+
+  integrationTest("denylists again when an already-revoked family is reused", async () => {
+    // The retry path after a denylist write failure: the family is already revoked in Postgres, so
+    // the revoking UPDATE matches nothing, yet the live access token must still be denied.
+    const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.STUDENT.id, {
+      channel: "mobile",
+      revokedAt: new Date(),
+    });
+
+    expect((await refresh(seed.token)).status).toBe(401);
+    expect(await isDenylisted(seed.accessJti!)).toBe(true);
   });
 });
 

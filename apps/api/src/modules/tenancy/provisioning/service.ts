@@ -140,7 +140,7 @@ export async function provisionTenant(
   }
 
   // ── 4. Complete ─────────────────────────────────────────────────────────
-  await markCompleted(database, params, logger);
+  await markCompleted(database, params);
 
   logger.info(
     { school_id: schoolId, slug: params.slug },
@@ -347,11 +347,7 @@ async function registerErpNextSite(
 // Internal: Status transitions
 // ---------------------------------------------------------------------------
 
-async function markCompleted(
-  database: Database,
-  params: ProvisionTenantParams,
-  logger: Logger,
-): Promise<void> {
+async function markCompleted(database: Database, params: ProvisionTenantParams): Promise<void> {
   await withTenantTx(database, params.tenantContext, async (tx) => {
     // Mark subscription as completed.
     await tx`
@@ -383,6 +379,9 @@ async function markCompleted(
       action: "update",
       targetTable: "subscriptions",
       targetId: params.schoolId,
+      // provisionLocal moved it to 'in_progress' just before this, and ck_audit_logs_payload requires
+      // an 'update' row to carry both sides of the change.
+      oldValues: { provisioning_status: "in_progress" },
       newValues: { provisioning_status: "completed" },
     });
   });

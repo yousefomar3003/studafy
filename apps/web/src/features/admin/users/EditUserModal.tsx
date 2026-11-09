@@ -17,10 +17,11 @@ const EMPTY_VALUES: EditUserValues = { display_name: "", role: ASSIGNABLE_ROLES[
 function valuesFor(user: UserWithRoles): EditUserValues {
   return {
     display_name: user.display_name ?? "",
-    // Assignable-role narrowing (see schema.ts) means an existing SUPER_ADMIN's role won't appear
-    // in the picker; falling back to their current role keeps the field truthful rather than
-    // silently substituting a different one the picker does offer.
-    role: (user.roles[0] as Role | undefined) ?? ASSIGNABLE_ROLES[0]!,
+    // Assignable-role narrowing (see schema.ts) means a platform role (SUPER_ADMIN, SUPPORT_AGENT)
+    // won't appear in the picker; falling back to their current role keeps the field truthful
+    // rather than silently substituting a different one the picker does offer. The cast is what
+    // lets a platform role sit here; editUserSchema then refuses to save it.
+    role: (user.roles[0] as EditUserValues["role"] | undefined) ?? ASSIGNABLE_ROLES[0]!,
   };
 }
 

@@ -5,6 +5,7 @@ import { createApp, monitored } from "./app";
 import { createConnectionTracker } from "./lifecycle";
 import { snapshot } from "./metrics";
 import { createRoomManager } from "./rooms";
+import { createMemorySessionGuard } from "./session-guard.testing";
 
 import type { AuthClaims } from "./auth";
 
@@ -19,6 +20,7 @@ describe("error monitoring", () => {
         throw error;
       },
       jwtSecret: SECRET,
+      sessionGuard: createMemorySessionGuard(),
       rooms: createRoomManager(),
       tracker: createConnectionTracker(),
       metrics: snapshot,
@@ -37,13 +39,14 @@ describe("error monitoring", () => {
     const app = createApp({
       isReady: () => true,
       jwtSecret: SECRET,
+      sessionGuard: createMemorySessionGuard(),
       rooms: createRoomManager(),
       tracker: createConnectionTracker(),
       metrics: snapshot,
       reportError,
     });
 
-    const res = await app.request("/ws?token=not-a-jwt");
+    const res = await app.request("/ws?ticket=not-a-jwt");
 
     expect(res.status).toBe(401);
     expect(reportError).not.toHaveBeenCalled();
@@ -52,7 +55,11 @@ describe("error monitoring", () => {
   test("a throwing WebSocket handler is reported with the event and the caller's ids, then rethrown", () => {
     const reportError = mock();
     const error = new Error("room registry corrupted");
-    const claims = { userId: "user-1", schoolId: "school-1", role: "STUDENT" } as AuthClaims;
+    const claims = {
+      userId: "user-1",
+      schoolId: "school-1",
+      roles: ["STUDENT"],
+    } as unknown as AuthClaims;
 
     expect(() =>
       monitored(reportError, "message", claims, () => {
@@ -67,7 +74,11 @@ describe("error monitoring", () => {
 
   test("a handler that completes is not reported", () => {
     const reportError = mock();
-    const claims = { userId: "user-1", schoolId: "school-1", role: "STUDENT" } as AuthClaims;
+    const claims = {
+      userId: "user-1",
+      schoolId: "school-1",
+      roles: ["STUDENT"],
+    } as unknown as AuthClaims;
 
     monitored(reportError, "close", claims, () => undefined);
 

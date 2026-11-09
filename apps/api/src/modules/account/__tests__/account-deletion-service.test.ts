@@ -21,6 +21,7 @@ import {
   migrateDatabase,
 } from "../../../../tests/harness";
 import { CodedHttpException } from "../../../coded-http-exception";
+import { hashMemberPassword } from "../../auth/services/member-password-service";
 import {
   cancelAccountDeletion,
   DELETION_GRACE_DAYS,
@@ -72,6 +73,18 @@ async function seedUser(role: Role) {
     (tx) => tx<{ code: string }[]>`SELECT code FROM app.member_codes WHERE user_id = ${user.id}`,
   );
   return { id: user.id, code: codes[0]?.code ?? null };
+}
+
+/** Gives a member-password account a chosen password, as claiming it with a setup code would. */
+async function setPassword(userId: string, password: string) {
+  const hash = await hashMemberPassword(password);
+  await asAdmin(
+    database!.sql,
+    (tx) => tx`
+      INSERT INTO app.member_credentials (school_id, user_id, password_hash, password_changed_at)
+      VALUES (${schoolId}, ${userId}, ${hash}, CURRENT_TIMESTAMP)
+    `,
+  );
 }
 
 async function accountState(userId: string) {
@@ -129,6 +142,7 @@ describe("scheduleAccountDeletion", () => {
     async () => {
       const parent = await seedUser(ROLES.PARENT);
       expect(parent.code).not.toBeNull();
+      await setPassword(parent.id, "Parent-Pass-1");
 
       expect(await codeOf(scheduleAccountDeletion(deps(), { schoolId, userId: parent.id }))).toBe(
         ERROR_CODES.ACCOUNT_DELETION_VERIFICATION_FAILED,
@@ -139,7 +153,7 @@ describe("scheduleAccountDeletion", () => {
             schoolId,
             userId: parent.id,
             memberId: "PAR-NOT-MINE",
-            password: "pass@1234",
+            password: "Parent-Pass-1",
           }),
         ),
       ).toBe(ERROR_CODES.ACCOUNT_DELETION_VERIFICATION_FAILED);
@@ -155,12 +169,24 @@ describe("scheduleAccountDeletion", () => {
       ).toBe(ERROR_CODES.ACCOUNT_DELETION_VERIFICATION_FAILED);
       expect((await accountState(parent.id)).due).toBeNull();
 
-      // Never-changed accounts still have the default password; the member ID is case-insensitive.
+      // The retired shared default password is no password at all (F-02).
+      expect(
+        await codeOf(
+          scheduleAccountDeletion(deps(), {
+            schoolId,
+            userId: parent.id,
+            memberId: parent.code!,
+            password: "pass@1234",
+          }),
+        ),
+      ).toBe(ERROR_CODES.ACCOUNT_DELETION_VERIFICATION_FAILED);
+
+      // The member ID is case-insensitive.
       await scheduleAccountDeletion(deps(), {
         schoolId,
         userId: parent.id,
         memberId: ` ${parent.code!.toLowerCase()} `,
-        password: "pass@1234",
+        password: "Parent-Pass-1",
       });
       expect((await accountState(parent.id)).due).not.toBeNull();
     },

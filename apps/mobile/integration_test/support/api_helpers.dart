@@ -28,12 +28,17 @@ Future<String> apiLoginAs(Dio dio, String email) async {
 
   final exchanged = await dio.post<Map<String, dynamic>>(
     '/api/auth/oauth/mock/mobile-exchange',
-    data: {'code': authCode.code, 'state': authCode.state, 'nonce': start['nonce']},
+    data: {
+      'code': authCode.code,
+      'state': authCode.state,
+      'nonce': start['nonce'],
+    },
   );
   return exchanged.data!['access_token'] as String;
 }
 
-Options _bearer(String token) => Options(headers: {'Authorization': 'Bearer $token'});
+Options _bearer(String token) =>
+    Options(headers: {'Authorization': 'Bearer $token'});
 
 class ScienceClass {
   ScienceClass({required this.id, required this.termId});
@@ -54,10 +59,14 @@ Future<ScienceClass> resolveScienceClass(Dio dio, String accessToken) async {
   );
   final classes = response.data!['classes'] as List<dynamic>;
   final match = classes.cast<Map<String, dynamic>>().firstWhere(
-        (c) => c['code'] == scienceClassCode,
-        orElse: () => throw StateError('no seeded class with code $scienceClassCode found'),
-      );
-  return ScienceClass(id: match['id'] as String, termId: match['term_id'] as String);
+    (c) => c['code'] == scienceClassCode,
+    orElse: () =>
+        throw StateError('no seeded class with code $scienceClassCode found'),
+  );
+  return ScienceClass(
+    id: match['id'] as String,
+    termId: match['term_id'] as String,
+  );
 }
 
 /// Creates an invitation (admin-only, `POST /api/invitations`) and returns its raw one-time
@@ -112,7 +121,11 @@ Future<Map<String, dynamic>> activateInvitationViaMock(
 
   final exchanged = await dio.post<Map<String, dynamic>>(
     '/api/auth/invitations/$token/oauth/mock/mobile-exchange',
-    data: {'code': authCode.code, 'state': authCode.state, 'nonce': start['nonce']},
+    data: {
+      'code': authCode.code,
+      'state': authCode.state,
+      'nonce': start['nonce'],
+    },
   );
   return exchanged.data!;
 }
@@ -185,7 +198,8 @@ Future<(GradeSubmission submission, String label)> submitFreshGrade(
   );
   final gradebookId = gradebook.data!['id'] as String;
 
-  final label = 'Integration Test Quiz ${DateTime.now().microsecondsSinceEpoch}';
+  final label =
+      'Integration Test Quiz ${DateTime.now().microsecondsSinceEpoch}';
   final assessment = await dio.post<Map<String, dynamic>>(
     '/api/grades/gradebooks/$gradebookId/assessments',
     data: {'label': label, 'max_score': 100},
@@ -197,11 +211,15 @@ Future<(GradeSubmission submission, String label)> submitFreshGrade(
   ];
   final submission = submissions.firstWhere(
     (s) => s.status == 'draft',
-    orElse: () => throw StateError('expected at least one draft submission after seeding drafts'),
+    orElse: () => throw StateError(
+      'expected at least one draft submission after seeding drafts',
+    ),
   );
   final grade = submission.grades.firstWhere(
     (g) => g.label == label,
-    orElse: () => throw StateError('expected a "$label" grade record on the draft submission'),
+    orElse: () => throw StateError(
+      'expected a "$label" grade record on the draft submission',
+    ),
   );
 
   await dio.patch<void>(
@@ -227,7 +245,8 @@ Future<(GradeSubmission submission, String label)> submitFreshGrade(
   ];
   final freshSubmission = freshDrafts.firstWhere(
     (s) => s.id == submission.id,
-    orElse: () => throw StateError('draft submission disappeared after scoring'),
+    orElse: () =>
+        throw StateError('draft submission disappeared after scoring'),
   );
 
   final submitted = await dio.patch<Map<String, dynamic>>(
@@ -236,7 +255,9 @@ Future<(GradeSubmission submission, String label)> submitFreshGrade(
     options: _bearer(teacherToken),
   );
   if (submitted.data!['status'] != 'submitted') {
-    throw StateError('expected submission to move to submitted, got ${submitted.data}');
+    throw StateError(
+      'expected submission to move to submitted, got ${submitted.data}',
+    );
   }
 
   return (submission, label);
@@ -256,7 +277,11 @@ Future<void> approveGradeSubmission(
     '/api/approvals/bulk-decision',
     data: {
       'items': [
-        {'item_type': 'grade_submission', 'id': submissionId, 'action': 'approve'},
+        {
+          'item_type': 'grade_submission',
+          'id': submissionId,
+          'action': 'approve',
+        },
       ],
     },
     options: _bearer(adminToken),
@@ -277,10 +302,12 @@ Future<String> findStudentIdByName(
     queryParameters: {'search': '$firstName $lastName'},
     options: _bearer(adminToken),
   );
-  final students = (response.data!['students'] as List<dynamic>).cast<Map<String, dynamic>>();
+  final students = (response.data!['students'] as List<dynamic>)
+      .cast<Map<String, dynamic>>();
   final match = students.firstWhere(
     (s) => s['first_name'] == firstName && s['last_name'] == lastName,
-    orElse: () => throw StateError('no seeded student named $firstName $lastName found'),
+    orElse: () =>
+        throw StateError('no seeded student named $firstName $lastName found'),
   );
   return match['id'] as String;
 }

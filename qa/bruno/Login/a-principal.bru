@@ -1,0 +1,27 @@
+meta {
+  name: Studafy QA School A · PRINCIPAL
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/auth/login/qa
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "principal@qa-a.studafy.test",
+    "password": "{{qaPassword}}",
+    "channel": "web"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) bru.setEnvVar("QA_TOKEN_A_PRINCIPAL", res.body.access_token);
+}
+
+tests {
+  test("signed in", () => expect(res.status).to.equal(200));
+}

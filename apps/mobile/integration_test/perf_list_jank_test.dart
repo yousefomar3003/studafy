@@ -38,7 +38,9 @@ const _scrollPasses = 8;
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('scrolling a 60-student roster stays inside the frame budget', (tester) async {
+  testWidgets('scrolling a 60-student roster stays inside the frame budget', (
+    tester,
+  ) async {
     final binding = tester.binding as IntegrationTestWidgetsFlutterBinding;
     await ensureDateFormattingInitialized();
     await EasyLocalization.ensureInitialized();
@@ -61,11 +63,16 @@ void main() {
       ProviderScope(
         overrides: [
           classRosterProvider.overrideWith((ref, classId) async => enrollments),
-          classCourseNameProvider.overrideWith((ref, classId) async => 'Algebra I'),
+          classCourseNameProvider.overrideWith(
+            (ref, classId) async => 'Algebra I',
+          ),
         ],
         child: wrapWithLocalization(
           MaterialApp(
-            home: const TeacherClassDetailScreen(classId: 'class-1', classCode: 'MA-101'),
+            home: const TeacherClassDetailScreen(
+              classId: 'class-1',
+              classCode: 'MA-101',
+            ),
           ),
         ),
       ),
@@ -74,19 +81,25 @@ void main() {
     expect(
       find.byType(CustomScrollView),
       findsOneWidget,
-      reason: 'roster should be lazily rendered by a sliver list, not an eager ListView/Column',
+      reason:
+          'roster should be lazily rendered by a sliver list, not an eager ListView/Column',
     );
 
     Future<void> scrollRoster() async {
       for (var pass = 0; pass < _scrollPasses; pass++) {
-        await tester.fling(find.byType(CustomScrollView), const Offset(0, -800), 3000);
+        await tester.fling(
+          find.byType(CustomScrollView),
+          const Offset(0, -800),
+          3000,
+        );
         await tester.pumpAndSettle();
       }
     }
 
     if (kProfileMode || kReleaseMode) {
       await binding.watchPerformance(scrollRoster, reportKey: 'roster_scroll');
-      final summary = binding.reportData!['roster_scroll']! as Map<String, dynamic>;
+      final summary =
+          binding.reportData!['roster_scroll']! as Map<String, dynamic>;
       _assertWithinBudget(summary);
     } else {
       await scrollRoster();
@@ -101,7 +114,8 @@ void main() {
 void _assertWithinBudget(Map<String, dynamic> summary) {
   final frameCount = summary['frame_count']! as int;
   final avgBuildMs = summary['average_frame_build_time_millis']! as double;
-  final avgRasterMs = summary['average_frame_rasterizer_time_millis']! as double;
+  final avgRasterMs =
+      summary['average_frame_rasterizer_time_millis']! as double;
   final p90TotalMs =
       (summary['90th_percentile_frame_build_time_millis']! as double) +
       (summary['90th_percentile_frame_rasterizer_time_millis']! as double);
@@ -117,11 +131,16 @@ void _assertWithinBudget(Map<String, dynamic> summary) {
     'worst raster ${summary['worst_frame_rasterizer_time_millis']!.toStringAsFixed(2)} ms',
   );
 
-  expect(frameCount, greaterThan(0), reason: 'no frames captured during the scroll');
+  expect(
+    frameCount,
+    greaterThan(0),
+    reason: 'no frames captured during the scroll',
+  );
   expect(
     avgBuildMs + avgRasterMs < _frameBudgetMs && p90TotalMs < _frameBudgetMs,
     isTrue,
-    reason: 'average and p90 frame time (build + raster) must stay under the '
+    reason:
+        'average and p90 frame time (build + raster) must stay under the '
         '$_frameBudgetMs ms 60fps budget',
   );
 }

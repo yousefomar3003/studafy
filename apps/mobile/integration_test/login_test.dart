@@ -17,17 +17,24 @@ import 'support/test_app.dart';
 void main() {
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('signs in via the real mock OAuth round trip and lands on the app shell', (
-    tester,
-  ) async {
-    final app = await IntegrationTestApp.pump(tester, mockLoginHint: Personas.orgAdmin);
+  testWidgets(
+    'signs in via the real mock OAuth round trip and lands on the app shell',
+    (tester) async {
+      final app = await IntegrationTestApp.pump(
+        tester,
+        mockLoginHint: Personas.orgAdmin,
+      );
 
-    expect(find.byType(AppShell), findsNothing);
-    expect(app.container.read(authStatusProvider), AuthStatus.unauthenticated);
+      expect(find.byType(AppShell), findsNothing);
+      expect(
+        app.container.read(authStatusProvider),
+        AuthStatus.unauthenticated,
+      );
 
-    await app.signInWithMock(tester);
+      await app.signInWithMock(tester);
 
-    expect(app.container.read(authStatusProvider), AuthStatus.authenticated);
-    expect(find.byType(AppShell), findsOneWidget);
-  });
+      expect(app.container.read(authStatusProvider), AuthStatus.authenticated);
+      expect(find.byType(AppShell), findsOneWidget);
+    },
+  );
 }
