@@ -46,6 +46,9 @@ export const envSchema = z
     DATABASE_USER: z.string().min(1).optional(),
     DATABASE_PASSWORD: z.string().optional(),
     DATABASE_CA_CERT: z.string().min(1).optional(),
+    // verify-full: TLS with certificate verification on every pool (databaseUrlFrom), for a
+    // database reached over the internet. Unset keeps the plain connection a private PgBouncer used.
+    DATABASE_SSL_MODE: z.preprocess(emptyAsUnset, z.enum(["verify-full"]).optional()),
     READ_DATABASE_URL: z.string().min(1).optional(),
     READ_DATABASE_HOST: z.string().min(1).optional(),
     READ_DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
@@ -287,6 +290,9 @@ export type Env = z.infer<typeof envSchema>;
  *
  * The password is URL-encoded: Secrets Manager generates passwords containing characters that are
  * structural in a URI (`@`, `/`, `:`), and one of those would otherwise truncate the host.
+ *
+ * DATABASE_SSL_MODE=verify-full is carried in the URL (`sslmode`), so every pool built from it
+ * verifies the server certificate, against the system store plus NODE_EXTRA_CA_CERTS.
  */
 export function databaseUrlFrom(env: Env): string {
   if (env.DATABASE_HOST === undefined || env.DATABASE_USER === undefined) {
@@ -298,7 +304,7 @@ export function databaseUrlFrom(env: Env): string {
   const password = env.DATABASE_PASSWORD ?? "";
   const credentials = `${encodeURIComponent(env.DATABASE_USER)}:${encodeURIComponent(password)}`;
 
-  return `postgresql://${credentials}@${env.DATABASE_HOST}:${port}/${name}`;
+  return `postgresql://${credentials}@${env.DATABASE_HOST}:${port}/${name}${sslQuery(env)}`;
 }
 
 export function readDatabaseUrlFrom(env: Env): string {
@@ -309,7 +315,11 @@ export function readDatabaseUrlFrom(env: Env): string {
   const name = env.READ_DATABASE_NAME ?? env.DATABASE_NAME ?? "api_read";
   const username = env.DATABASE_USER ?? "";
   const password = env.DATABASE_PASSWORD ?? "";
-  return `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${env.READ_DATABASE_HOST}:${port}/${name}`;
+  return `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${env.READ_DATABASE_HOST}:${port}/${name}${sslQuery(env)}`;
+}
+
+function sslQuery(env: Env): string {
+  return env.DATABASE_SSL_MODE === "verify-full" ? "?sslmode=verify-full" : "";
 }
 
 /**

@@ -1,0 +1,32 @@
+# Studafy web app (https://app.studafy.com) on fly.io (production): the static build behind nginx.
+# The Vite settings are baked in at build time. VITE_TURNSTILE_SITE_KEY is public but kept out of
+# the repository, so pass it on the command line. Deploy from the repo root:
+#   fly deploy . --config infra/fly/web.toml --remote-only \
+#     --build-arg VITE_TURNSTILE_SITE_KEY=<site key>
+app = "studafy-core-web"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../docker/web.Dockerfile"
+
+  [build.args]
+    VITE_API_BASE_URL = "https://api.studafy.com"
+    VITE_REALTIME_BASE_URL = "wss://api.studafy.com"
+    VITE_SENTRY_ENVIRONMENT = "production"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "3s"
+    grace_period = "5s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

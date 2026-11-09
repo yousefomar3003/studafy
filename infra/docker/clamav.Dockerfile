@@ -15,7 +15,9 @@
 # The upstream image already ships a signature database and runs freshclam to keep it current
 # (outbound HTTPS through the private subnets' NAT). Overrides, applied by rewriting the upstream
 # clamd.conf rather than appending, because clamd rejects a directive defined twice:
-#   - TCPSocket/TCPAddr: task-local only, as above.
+#   - TCPSocket/TCPAddr: task-local only, as above. CLAMAV_TCP_ADDRS (space separated) overrides
+#     the bind addresses for a deployment where clamd is its own service: fly.io builds with
+#     "0.0.0.0 ::" and reaches it over the organisation's private network (infra/fly/scanner.toml).
 #   - StreamMaxLength: 26M, just above the workers' CLAMAV_MAX_FILE_BYTES default (25 MiB), so clamd
 #     never truncates a stream the worker considers in bounds.
 #   - ConcurrentDatabaseReload no: a signature update reloads in place instead of holding a second
@@ -29,12 +31,14 @@ ARG CLAMAV_VERSION=1.4
 
 FROM clamav/clamav:${CLAMAV_VERSION}
 
+ARG CLAMAV_TCP_ADDRS="127.0.0.1"
+
 RUN set -eu; \
     conf=/etc/clamav/clamd.conf; \
     sed -i -E '/^#?[[:space:]]*(TCPSocket|TCPAddr|StreamMaxLength|ConcurrentDatabaseReload)[[:space:]]/d' "$conf"; \
+    printf '%s\n' 'TCPSocket 3310' >> "$conf"; \
+    for addr in $CLAMAV_TCP_ADDRS; do printf 'TCPAddr %s\n' "$addr" >> "$conf"; done; \
     printf '%s\n' \
-      'TCPSocket 3310' \
-      'TCPAddr 127.0.0.1' \
       'StreamMaxLength 26M' \
       'ConcurrentDatabaseReload no' >> "$conf"
 

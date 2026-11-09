@@ -214,6 +214,15 @@ export const envSchema = z
     // Lifetime of a pre-signed URL. Bounded to the 15–60 minute window ST-103 specifies: short
     // enough that a leaked URL expires before it is useful, long enough to survive a slow upload.
     S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(900).max(3600).default(900),
+    // fly.io only: the app running apps/realtime, which this API hands `/ws` handshakes to
+    // (app.ts realtimeFlyApp). Unset everywhere else.
+    REALTIME_FLY_APP: z.preprocess(
+      emptyAsUnset,
+      z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .optional(),
+    ),
     // Stripe billing integration. All optional — activates only when both are set.
     STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     STRIPE_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),

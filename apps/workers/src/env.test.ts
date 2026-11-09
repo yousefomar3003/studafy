@@ -1,7 +1,7 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import { EnvValidationError, loadEnv } from "./env";
+import { EnvValidationError, databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
 
 // Production seals sensitive import columns with a real records keyring (ADR-019).
 const RECORD_KEYS = {
@@ -228,6 +228,34 @@ describe("loadEnv", () => {
     ).toThrow(/development key/);
     expect(loadEnv({ ...production, ...RECORD_KEYS }).RECORDS_ENCRYPTION_CURRENT_KEY_ID).toBe(
       "prod-1",
+    );
+  });
+});
+
+describe("database URL", () => {
+  const discrete = {
+    DATABASE_HOST: "pooler.example.com",
+    DATABASE_PORT: "6543",
+    DATABASE_NAME: "postgres",
+    DATABASE_USER: "postgres.ref",
+    DATABASE_PASSWORD: "p@ss",
+  };
+
+  test("carries verify-full TLS on the primary and read URLs when asked", () => {
+    const env = loadEnv({
+      ...discrete,
+      DATABASE_SSL_MODE: "verify-full",
+      READ_DATABASE_HOST: "r.example.com",
+    });
+    expect(databaseUrlFrom(env)).toBe(
+      "postgresql://postgres.ref:p%40ss@pooler.example.com:6543/postgres?sslmode=verify-full",
+    );
+    expect(readDatabaseUrlFrom(env)).toEndWith("@r.example.com:6543/postgres?sslmode=verify-full");
+  });
+
+  test("stays a plain URL when no TLS mode is set", () => {
+    expect(databaseUrlFrom(loadEnv(discrete))).toBe(
+      "postgresql://postgres.ref:p%40ss@pooler.example.com:6543/postgres",
     );
   });
 });

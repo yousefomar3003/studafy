@@ -337,6 +337,12 @@ export interface AppOptions {
    * deployment's own.
    */
   recordKeyring?: RecordKeyring;
+  /**
+   * On fly.io, the name of the app running apps/realtime. Clients open the realtime socket at this
+   * host's `/ws` (on AWS the ALB's path rule sends it to realtime); here a `fly-replay` header has
+   * fly's proxy hand the handshake to that app before it is upgraded. Unset: no `/ws` route.
+   */
+  realtimeFlyApp?: string;
 }
 
 /**
@@ -376,6 +382,7 @@ export function createApp({
   storeBilling = null,
   mobileReleaseConfig = EMPTY_MOBILE_RELEASE_CONFIG,
   recordKeyring = DEVELOPMENT_RECORD_KEYRING,
+  realtimeFlyApp,
 }: AppOptions): OpenAPIHono<AppEnv> {
   const eventSink = securityEventSink ?? createNoopSecurityEventSink();
   // The defaultHook makes request-validation failures throw into errorHandlerMiddleware instead of
@@ -395,6 +402,13 @@ export function createApp({
       tracker.end();
     }
   });
+
+  // Before every other middleware: the handshake belongs to apps/realtime, which does its own
+  // auth, logging and metrics. fly's proxy acts on the header and never shows this 503 to the
+  // client unless the realtime app cannot be reached.
+  if (realtimeFlyApp) {
+    app.get("/ws", (c) => c.body(null, 503, { "fly-replay": `app=${realtimeFlyApp}` }));
+  }
 
   // Distributed tracing (ST-260): one SERVER span per request, made active for the rest of the
   // request's async chain. Before requestIdMiddleware, which reads activeTraceFields() while
