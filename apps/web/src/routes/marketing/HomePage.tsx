@@ -1,16 +1,57 @@
+import { lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 
 import { LinkButton } from "../../components/LinkButton";
 import { useSeo } from "../../components/Seo";
-import { useFormatters, useTranslation } from "../../lib/i18n";
+import { loadCatalogAreas, useFormatters, useTranslation } from "../../lib/i18n";
 
 import { ClosingBand } from "./ClosingBand";
-import { LanguageFlip } from "./demos/LanguageFlip";
-import { RegisterDemo } from "./demos/RegisterDemo";
-import { RoleTour } from "./demos/RoleTour";
-import { SensitiveDemo } from "./demos/SensitiveDemo";
 import { reveal } from "./reveal";
 import { SchoolDay } from "./SchoolDay";
+
+import type { CatalogArea } from "../../lib/i18n";
+import type { ReactNode } from "react";
+
+// The live demos sit below the hero, so they load in their own chunk (with their own CSS and their
+// copy's catalog area) instead of riding in the bundle every page downloads, sign-in included. Each placeholder reserves roughly
+// the demo's height, so nothing below moves when it arrives.
+const MARKETING_CATALOGS: readonly CatalogArea[] = ["marketingPages"];
+const RegisterDemo = lazy(() =>
+  Promise.all([import("./demos/RegisterDemo"), loadCatalogAreas(MARKETING_CATALOGS)]).then(
+    ([module]) => ({
+      default: module.RegisterDemo,
+    }),
+  ),
+);
+const RoleTour = lazy(() =>
+  Promise.all([import("./demos/RoleTour"), loadCatalogAreas(MARKETING_CATALOGS)]).then(
+    ([module]) => ({
+      default: module.RoleTour,
+    }),
+  ),
+);
+const LanguageFlip = lazy(() =>
+  Promise.all([import("./demos/LanguageFlip"), loadCatalogAreas(MARKETING_CATALOGS)]).then(
+    ([module]) => ({
+      default: module.LanguageFlip,
+    }),
+  ),
+);
+const SensitiveDemo = lazy(() =>
+  Promise.all([import("./demos/SensitiveDemo"), loadCatalogAreas(MARKETING_CATALOGS)]).then(
+    ([module]) => ({
+      default: module.SensitiveDemo,
+    }),
+  ),
+);
+
+function DemoSlot({ height, children }: { height: number; children: ReactNode }) {
+  return (
+    <Suspense fallback={<div className="mk-demo-slot" style={{ minBlockSize: height }} />}>
+      {children}
+    </Suspense>
+  );
+}
 
 // Translation keys only: the copy lives in `locales/{en,ar}/site.json` under `site.marketing.home`.
 
@@ -78,15 +119,17 @@ export default function HomePage() {
         <div className="marketing-container">
           <header className="mk-section__header" {...reveal()}>
             <h2 id="mk-register" className="mk-section__title">
-              {t("site.marketing.home.demo.register.title")}
+              {t("site.marketing.home.registerTitle")}
             </h2>
             <div>
-              <p className="mk-section__lede">{t("site.marketing.home.demo.register.lede")}</p>
-              <p className="mk-example">{t("site.marketing.home.demo.exampleNote")}</p>
+              <p className="mk-section__lede">{t("site.marketing.home.registerLede")}</p>
+              <p className="mk-example">{t("site.marketing.home.exampleNote")}</p>
             </div>
           </header>
           <div {...reveal(1)}>
-            <RegisterDemo />
+            <DemoSlot height={440}>
+              <RegisterDemo />
+            </DemoSlot>
           </div>
         </div>
       </section>
@@ -100,7 +143,9 @@ export default function HomePage() {
             <p className="mk-section__lede">{t("site.marketing.home.rolesLede")}</p>
           </header>
           <div {...reveal(1)}>
-            <RoleTour />
+            <DemoSlot height={480}>
+              <RoleTour />
+            </DemoSlot>
           </div>
         </div>
       </section>
@@ -148,7 +193,9 @@ export default function HomePage() {
           </div>
 
           <div className="mk-language" {...reveal(1)}>
-            <LanguageFlip />
+            <DemoSlot height={150}>
+              <LanguageFlip />
+            </DemoSlot>
             <table className="mk-pairs">
               <caption className="mk-pairs__caption">
                 {t("site.marketing.home.languageCaption")}
@@ -190,7 +237,9 @@ export default function HomePage() {
 
           <div className="mk-privacy">
             <div className="mk-privacy__demo" {...reveal()}>
-              <SensitiveDemo />
+              <DemoSlot height={300}>
+                <SensitiveDemo />
+              </DemoSlot>
             </div>
             <ul className="mk-facts mk-facts--stacked">
               {PRIVACY.map((id, index) => (

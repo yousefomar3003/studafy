@@ -85,13 +85,13 @@ export function ContactForm() {
       const next: FieldErrors = {};
       for (const issue of parsed.error.issues) {
         const key = issue.path[0] as keyof Fields;
-        next[key] = t(`site.marketing.contactForm.errors.${key}`);
+        next[key] = t(`marketingPages.contactForm.errors.${key}`);
       }
       setErrors(next);
       return;
     }
     if (!captchaToken) {
-      setFormError(t("site.marketing.contactForm.errors.captcha"));
+      setFormError(t("marketingPages.contactForm.errors.captcha"));
       return;
     }
 
@@ -117,10 +117,10 @@ export function ContactForm() {
       const code = caught instanceof ApiError ? caught.code : null;
       setFormError(
         code === "RATE_LIMIT_EXCEEDED"
-          ? t("site.marketing.contactForm.errors.rateLimited")
+          ? t("marketingPages.contactForm.errors.rateLimited")
           : code === "CAPTCHA_INVALID"
-            ? t("site.marketing.contactForm.errors.captchaExpired")
-            : t("site.marketing.contactForm.errors.generic"),
+            ? t("marketingPages.contactForm.errors.captchaExpired")
+            : t("marketingPages.contactForm.errors.generic"),
       );
       // Turnstile tokens are single-use.
       setCaptchaToken("");
@@ -133,8 +133,8 @@ export function ContactForm() {
   if (sent) {
     return (
       <div className="marketing-contact-form__sent" role="status">
-        <h3>{t("site.marketing.contactForm.sentTitle")}</h3>
-        <p>{t("site.marketing.contactForm.sentBody", { email: fields.email.trim() })}</p>
+        <h3>{t("marketingPages.contactForm.sentTitle")}</h3>
+        <p>{t("marketingPages.contactForm.sentBody", { email: fields.email.trim() })}</p>
       </div>
     );
   }
@@ -144,11 +144,11 @@ export function ContactForm() {
       className="marketing-contact-form"
       onSubmit={handleSubmit}
       noValidate
-      aria-label={t("site.marketing.contactForm.ariaLabel")}
+      aria-label={t("marketingPages.contactForm.ariaLabel")}
     >
       <div className="marketing-contact-form__grid">
         <Input
-          label={t("site.marketing.contactForm.fullName")}
+          label={t("marketingPages.contactForm.fullName")}
           autoComplete="name"
           value={fields.fullName}
           onChange={(e) => set("fullName")(e.target.value)}
@@ -156,7 +156,7 @@ export function ContactForm() {
           required
         />
         <Input
-          label={t("site.marketing.contactForm.email")}
+          label={t("marketingPages.contactForm.email")}
           type="email"
           autoComplete="email"
           value={fields.email}
@@ -165,7 +165,7 @@ export function ContactForm() {
           required
         />
         <Input
-          label={t("site.marketing.contactForm.phone")}
+          label={t("marketingPages.contactForm.phone")}
           type="tel"
           autoComplete="tel"
           value={fields.phone}
@@ -175,7 +175,7 @@ export function ContactForm() {
           required
         />
         <Input
-          label={t("site.marketing.contactForm.schoolName")}
+          label={t("marketingPages.contactForm.schoolName")}
           autoComplete="organization"
           value={fields.schoolName}
           onChange={(e) => set("schoolName")(e.target.value)}
@@ -183,14 +183,14 @@ export function ContactForm() {
           required
         />
         <Input
-          label={t("site.marketing.contactForm.country")}
+          label={t("marketingPages.contactForm.country")}
           autoComplete="country-name"
           value={fields.country}
           onChange={(e) => set("country")(e.target.value)}
           maxLength={120}
         />
         <Input
-          label={t("site.marketing.contactForm.studentCount")}
+          label={t("marketingPages.contactForm.studentCount")}
           type="number"
           inputMode="numeric"
           min={0}
@@ -201,7 +201,7 @@ export function ContactForm() {
       </div>
 
       <MessageField
-        label={t("site.marketing.contactForm.message")}
+        label={t("marketingPages.contactForm.message")}
         value={fields.message}
         onChange={set("message")}
       />
@@ -220,8 +220,8 @@ export function ContactForm() {
         ) : null}
         <Button type="submit" variant="primary" disabled={submitting}>
           {submitting
-            ? t("site.marketing.contactForm.submitting")
-            : t("site.marketing.contactForm.submit")}
+            ? t("marketingPages.contactForm.submitting")
+            : t("marketingPages.contactForm.submit")}
         </Button>
       </div>
     </form>

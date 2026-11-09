@@ -5,7 +5,9 @@ import { useTranslation } from "../../lib/i18n";
 import { SchoolSize } from "./demos/SchoolSize";
 import { reveal } from "./reveal";
 
-/** Keys under `site.marketing.pricing.included`, translated at render time. */
+import "./marketing-subpages.css";
+
+/** Keys under `marketingPages.pricing.included`, translated at render time. */
 const INCLUDED_FOR_EVERY_SCHOOL = [
   "academics",
   "homework",
@@ -26,8 +28,8 @@ export default function PricingPage() {
   const { t } = useTranslation();
 
   useSeo({
-    title: t("site.marketing.pricing.seoTitle"),
-    description: t("site.marketing.pricing.seoDescription"),
+    title: t("marketingPages.pricing.seoTitle"),
+    description: t("marketingPages.pricing.seoDescription"),
     path: "/pricing",
   });
 
@@ -35,8 +37,8 @@ export default function PricingPage() {
     <>
       <section className="mk-hero">
         <div className="marketing-container">
-          <h1 className="mk-hero__title">{t("site.marketing.pricing.heroTitle")}</h1>
-          <p className="mk-hero__body">{t("site.marketing.pricing.heroBody")}</p>
+          <h1 className="mk-hero__title">{t("marketingPages.pricing.heroTitle")}</h1>
+          <p className="mk-hero__body">{t("marketingPages.pricing.heroBody")}</p>
         </div>
       </section>
 
@@ -44,9 +46,9 @@ export default function PricingPage() {
         <div className="marketing-container mk-split mk-split--center">
           <div {...reveal()}>
             <h2 id="mk-size" className="mk-section__title">
-              {t("site.marketing.pricing.sizeTitle")}
+              {t("marketingPages.pricing.sizeTitle")}
             </h2>
-            <p className="mk-section__lede">{t("site.marketing.pricing.sizeNote")}</p>
+            <p className="mk-section__lede">{t("marketingPages.pricing.sizeNote")}</p>
           </div>
           <div {...reveal(1)}>
             <SchoolSize />
@@ -58,29 +60,29 @@ export default function PricingPage() {
         <div className="marketing-container mk-plans">
           <article className="mk-plan mk-plan--main" aria-labelledby="mk-plan-school" {...reveal()}>
             <h2 id="mk-plan-school" className="mk-plan__name">
-              {t("site.marketing.pricing.schoolTitle")}
+              {t("marketingPages.pricing.schoolTitle")}
             </h2>
-            <p className="mk-plan__price">{t("site.marketing.pricing.schoolPrice")}</p>
-            <p className="mk-plan__note">{t("site.marketing.pricing.schoolNote")}</p>
+            <p className="mk-plan__price">{t("marketingPages.pricing.schoolPrice")}</p>
+            <p className="mk-plan__note">{t("marketingPages.pricing.schoolNote")}</p>
             <ul className="mk-plan__list">
               {INCLUDED_FOR_EVERY_SCHOOL.map((item, index) => (
                 <li key={item} {...reveal(index + 1)}>
-                  {t(`site.marketing.pricing.included.${item}`)}
+                  {t(`marketingPages.pricing.included.${item}`)}
                 </li>
               ))}
             </ul>
             <LinkButton href="/about#contact" variant="primary">
-              {t("site.marketing.pricing.contactUs")}
+              {t("marketingPages.pricing.contactUs")}
             </LinkButton>
           </article>
 
           <article className="mk-plan" aria-labelledby="mk-plan-ai" {...reveal(1)}>
-            <p className="mk-label">{t("site.marketing.pricing.addOnLabel")}</p>
+            <p className="mk-label">{t("marketingPages.pricing.addOnLabel")}</p>
             <h2 id="mk-plan-ai" className="mk-plan__name">
-              {t("site.marketing.pricing.addOnTitle")}
+              {t("marketingPages.pricing.addOnTitle")}
             </h2>
-            <p className="mk-plan__note">{t("site.marketing.pricing.addOnBody")}</p>
-            <p className="mk-plan__aside">{t("site.marketing.pricing.addOnNote")}</p>
+            <p className="mk-plan__note">{t("marketingPages.pricing.addOnBody")}</p>
+            <p className="mk-plan__aside">{t("marketingPages.pricing.addOnNote")}</p>
           </article>
         </div>
       </section>
@@ -88,15 +90,15 @@ export default function PricingPage() {
       <section className="mk-section mk-section--alt" aria-labelledby="mk-faq">
         <div className="marketing-container mk-split">
           <h2 id="mk-faq" className="mk-section__title" {...reveal()}>
-            {t("site.marketing.pricing.faqTitle")}
+            {t("marketingPages.pricing.faqTitle")}
           </h2>
           <div className="mk-faq">
             {FAQ.map((id, index) => (
               <details key={id} className="mk-faq__item" {...reveal(index)}>
                 <summary className="mk-faq__question">
-                  {t(`site.marketing.pricing.faq.${id}.q`)}
+                  {t(`marketingPages.pricing.faq.${id}.q`)}
                 </summary>
-                <p className="mk-faq__answer">{t(`site.marketing.pricing.faq.${id}.a`)}</p>
+                <p className="mk-faq__answer">{t(`marketingPages.pricing.faq.${id}.a`)}</p>
               </details>
             ))}
           </div>

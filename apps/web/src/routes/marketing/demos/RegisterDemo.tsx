@@ -6,6 +6,8 @@ import { prefersReducedMotion, useInView } from "./motion";
 
 import type { CSSProperties } from "react";
 
+import "./demos.css";
+
 const STUDENTS = ["omar", "lina", "yousef", "sara", "adam"] as const;
 const STATUSES = ["present", "late", "absent"] as const;
 
@@ -89,17 +91,15 @@ export function RegisterDemo() {
     count: STUDENTS.filter((student) => marks[student] === status).length,
   }));
   const latest = notices[0];
-  const name = (student: Student) => t(`site.marketing.home.demo.students.${student}`);
+  const name = (student: Student) => t(`marketingPages.demo.students.${student}`);
 
   return (
     <div className="mk-demo-register" ref={rootRef}>
       <section className="mk-pane" aria-labelledby={`${baseId}-teacher`}>
         <header className="mk-pane__head">
-          <span className="mk-pane__role">
-            {t("site.marketing.home.demo.register.teacherRole")}
-          </span>
+          <span className="mk-pane__role">{t("marketingPages.demo.register.teacherRole")}</span>
           <h3 id={`${baseId}-teacher`} className="mk-pane__title">
-            {t("site.marketing.home.demo.register.teacherPanel")}
+            {t("marketingPages.demo.register.teacherPanel")}
           </h3>
         </header>
         <ul className="mk-register">
@@ -119,7 +119,7 @@ export function RegisterDemo() {
                         mark(student, status);
                       }}
                     />
-                    <span>{t(`site.marketing.home.demo.register.status.${status}`)}</span>
+                    <span>{t(`marketingPages.demo.register.status.${status}`)}</span>
                   </label>
                 ))}
               </span>
@@ -127,17 +127,17 @@ export function RegisterDemo() {
           ))}
         </ul>
         <button type="button" className="mk-text-button" onClick={reset}>
-          {t("site.marketing.home.demo.register.reset")}
+          {t("marketingPages.demo.register.reset")}
         </button>
       </section>
 
       <section className="mk-pane mk-pane--phone" aria-labelledby={`${baseId}-parent`}>
         <header className="mk-pane__head">
-          <span className="mk-pane__role">{t("site.marketing.home.demo.register.parentRole")}</span>
+          <span className="mk-pane__role">{t("marketingPages.demo.register.parentRole")}</span>
           <h3 id={`${baseId}-parent`} className="mk-pane__title">
             {latest
-              ? t("site.marketing.home.demo.register.parentPanel", { name: name(latest.student) })
-              : t("site.marketing.home.demo.register.parentIdle")}
+              ? t("marketingPages.demo.register.parentPanel", { name: name(latest.student) })
+              : t("marketingPages.demo.register.parentIdle")}
           </h3>
         </header>
         <div className="mk-phone">
@@ -148,20 +148,18 @@ export function RegisterDemo() {
           </div>
           <ol className="mk-phone__list" aria-live="polite">
             {notices.length === 0 ? (
-              <li className="mk-phone__empty">
-                {t("site.marketing.home.demo.register.parentEmpty")}
-              </li>
+              <li className="mk-phone__empty">{t("marketingPages.demo.register.parentEmpty")}</li>
             ) : (
               notices.map((notice) => (
                 <li key={notice.id} className="mk-notice" data-status={notice.status}>
                   <span className="mk-notice__app">Studafy</span>
                   <span className="mk-notice__body">
-                    {t(`site.marketing.home.demo.register.notice.${notice.status}`, {
+                    {t(`marketingPages.demo.register.notice.${notice.status}`, {
                       name: name(notice.student),
                     })}
                   </span>
                   <span className="mk-notice__time">
-                    {t("site.marketing.home.demo.register.justNow")}
+                    {t("marketingPages.demo.register.justNow")}
                   </span>
                 </li>
               ))
@@ -172,15 +170,15 @@ export function RegisterDemo() {
 
       <section className="mk-pane" aria-labelledby={`${baseId}-office`}>
         <header className="mk-pane__head">
-          <span className="mk-pane__role">{t("site.marketing.home.demo.register.officeRole")}</span>
+          <span className="mk-pane__role">{t("marketingPages.demo.register.officeRole")}</span>
           <h3 id={`${baseId}-office`} className="mk-pane__title">
-            {t("site.marketing.home.demo.register.officePanel")}
+            {t("marketingPages.demo.register.officePanel")}
           </h3>
         </header>
         <dl className="mk-counts">
           {counts.map(({ status, count }) => (
             <div key={status} className="mk-counts__item" data-status={status}>
-              <dt>{t(`site.marketing.home.demo.register.status.${status}`)}</dt>
+              <dt>{t(`marketingPages.demo.register.status.${status}`)}</dt>
               <dd>
                 <span className="mk-counts__number">{count}</span>
                 <span

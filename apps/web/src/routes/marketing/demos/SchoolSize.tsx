@@ -4,6 +4,8 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import type { CSSProperties } from "react";
 
+import "./demos.css";
+
 const MIN = 50;
 const MAX = 3000;
 
@@ -18,7 +20,7 @@ export function SchoolSize() {
   const id = useId();
   const [students, setStudents] = useState(450);
   // `count` picks the plural form; `students` is the same number, written for the reader's locale.
-  const studentsText = t("site.marketing.pricing.sizeStudents", {
+  const studentsText = t("marketingPages.pricing.sizeStudents", {
     count: students,
     students: formatNumber(students),
   });
@@ -26,7 +28,7 @@ export function SchoolSize() {
   return (
     <div className="mk-size">
       <label htmlFor={id} className="mk-size__label">
-        {t("site.marketing.pricing.sizeLabel")}
+        {t("marketingPages.pricing.sizeLabel")}
       </label>
       <input
         id={id}
@@ -46,7 +48,7 @@ export function SchoolSize() {
           <output htmlFor={id} className="mk-size__amount">
             {formatCurrency(0, "JOD", { maximumFractionDigits: 0 })}
           </output>
-          <span className="mk-size__per">{t("site.marketing.pricing.perYear")}</span>
+          <span className="mk-size__per">{t("marketingPages.pricing.perYear")}</span>
         </p>
       </div>
     </div>

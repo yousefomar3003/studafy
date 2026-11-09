@@ -61,9 +61,7 @@ export function SchoolDay() {
             className="mk-text-button"
             onClick={() => setStopped((current) => !current)}
           >
-            {stopped
-              ? t("site.marketing.home.demo.dayPlay")
-              : t("site.marketing.home.demo.dayPause")}
+            {stopped ? t("site.marketing.home.dayPlay") : t("site.marketing.home.dayPause")}
           </button>
         ) : null}
       </figcaption>

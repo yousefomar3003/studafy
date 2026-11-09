@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
+import "./demos.css";
+
 /** Example data: a made-up ID, shown as Studafy masks it (the last four characters only). */
 const NATIONAL_ID = "9881204471";
 const MASK = "•••• 4471";
@@ -33,42 +35,42 @@ export function SensitiveDemo() {
 
   return (
     <div className="mk-secret">
-      <p className="mk-screen__title">{t("site.marketing.home.demo.sensitive.recordTitle")}</p>
+      <p className="mk-screen__title">{t("marketingPages.demo.sensitive.recordTitle")}</p>
       <dl className="mk-secret__fields">
         <div>
-          <dt>{t("site.marketing.home.demo.sensitive.bloodType")}</dt>
+          <dt>{t("marketingPages.demo.sensitive.bloodType")}</dt>
           <dd>A+</dd>
         </div>
         <div>
-          <dt>{t("site.marketing.home.demo.sensitive.nationalId")}</dt>
+          <dt>{t("marketingPages.demo.sensitive.nationalId")}</dt>
           <dd className="mk-secret__value">
             <span className="mk-secret__text" data-shown={shown} dir="ltr">
               {shown ? NATIONAL_ID : MASK}
             </span>
             <button type="button" className="mk-mini-button" onClick={toggle}>
               {shown
-                ? t("site.marketing.home.demo.sensitive.hide")
-                : t("site.marketing.home.demo.sensitive.reveal")}
+                ? t("marketingPages.demo.sensitive.hide")
+                : t("marketingPages.demo.sensitive.reveal")}
             </button>
           </dd>
         </div>
       </dl>
 
-      <p className="mk-screen__title">{t("site.marketing.home.demo.sensitive.auditTitle")}</p>
+      <p className="mk-screen__title">{t("marketingPages.demo.sensitive.auditTitle")}</p>
       <ol className="mk-secret__log" aria-live="polite">
         {log.length === 0 ? (
-          <li className="mk-screen__meta">{t("site.marketing.home.demo.sensitive.auditEmpty")}</li>
+          <li className="mk-screen__meta">{t("marketingPages.demo.sensitive.auditEmpty")}</li>
         ) : (
           log.map((entry) => (
             <li key={entry.getTime()} className="mk-secret__entry">
-              {t("site.marketing.home.demo.sensitive.auditEntry", {
+              {t("marketingPages.demo.sensitive.auditEntry", {
                 time: formatDate(entry, { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
               })}
             </li>
           ))
         )}
       </ol>
-      <p className="mk-screen__meta">{t("site.marketing.home.demo.sensitive.hint")}</p>
+      <p className="mk-screen__meta">{t("marketingPages.demo.sensitive.hint")}</p>
     </div>
   );
 }

@@ -4,13 +4,15 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import type { ComponentType, CSSProperties } from "react";
 
+import "./demos.css";
+
 /**
  * One small working example per area of the features page, beside its description: each does the
  * thing the area is about (places a lesson, corrects a register, weighs a term mark), so the page
  * shows the product instead of listing it. Example data only; nothing is sent anywhere.
  */
 
-const F = "site.marketing.features.demos";
+const F = "marketingPages.features.demos";
 
 // --- Academics: place a lesson in the first free slot --------------------------------------------
 
@@ -108,7 +110,7 @@ function AttendanceDemo() {
   const [next, setNext] = useState<AttendanceStatus>("late");
   const [reason, setReason] = useState<(typeof REASONS)[number]>("bus");
   const [history, setHistory] = useState<string[]>([]);
-  const label = (value: AttendanceStatus) => t(`site.marketing.home.demo.register.status.${value}`);
+  const label = (value: AttendanceStatus) => t(`marketingPages.demo.register.status.${value}`);
 
   return (
     <div className="mk-mini">
@@ -199,7 +201,7 @@ function HomeworkDemo() {
   const { t } = useTranslation();
   const [scores, setScores] = useState<Record<string, number>>({});
   const handedIn = 18;
-  const name = (student: string) => t(`site.marketing.home.demo.students.${student}`);
+  const name = (student: string) => t(`marketingPages.demo.students.${student}`);
 
   return (
     <div className="mk-mini">

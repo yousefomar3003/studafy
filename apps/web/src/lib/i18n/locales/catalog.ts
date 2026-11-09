@@ -17,6 +17,7 @@ import arAttendanceOffice from "./ar/attendanceOffice.json";
 import arCustomLists from "./ar/customLists.json";
 import arFinance from "./ar/finance.json";
 import arFinanceReports from "./ar/financeReports.json";
+import arMarketingPages from "./ar/marketingPages.json";
 import arOnboarding from "./ar/onboarding.json";
 import arPlatform from "./ar/platform.json";
 import arPlatformLicensing from "./ar/platformLicensing.json";
@@ -34,6 +35,7 @@ import enAttendanceOffice from "./en/attendanceOffice.json";
 import enCustomLists from "./en/customLists.json";
 import enFinance from "./en/finance.json";
 import enFinanceReports from "./en/financeReports.json";
+import enMarketingPages from "./en/marketingPages.json";
 import enOnboarding from "./en/onboarding.json";
 import enPlatform from "./en/platform.json";
 import enPlatformLicensing from "./en/platformLicensing.json";
@@ -62,6 +64,7 @@ export const enCatalog = {
   recordTemplates: enRecordTemplates,
   search: enSearch,
   customLists: enCustomLists,
+  marketingPages: enMarketingPages,
   site: enSite,
 };
 
@@ -82,5 +85,6 @@ export const arCatalog = {
   recordTemplates: arRecordTemplates,
   search: arSearch,
   customLists: arCustomLists,
+  marketingPages: arMarketingPages,
   site: arSite,
 };

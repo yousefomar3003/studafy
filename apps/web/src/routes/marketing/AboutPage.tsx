@@ -6,6 +6,8 @@ import { ContactForm } from "./ContactForm";
 import { StartSteps } from "./demos/StartSteps";
 import { reveal } from "./reveal";
 
+import "./marketing-subpages.css";
+
 const PRINCIPLES = ["oneRecord", "languages", "schoolData", "trail"] as const;
 const NEXT = ["read", "reply", "setup"] as const;
 
@@ -18,8 +20,8 @@ export default function AboutPage() {
   const { formatNumber } = useFormatters();
 
   useSeo({
-    title: t("site.marketing.about.seoTitle"),
-    description: t("site.marketing.about.seoDescription"),
+    title: t("marketingPages.about.seoTitle"),
+    description: t("marketingPages.about.seoDescription"),
     path: "/about",
   });
 
@@ -27,8 +29,8 @@ export default function AboutPage() {
     <>
       <section className="mk-hero">
         <div className="marketing-container">
-          <h1 className="mk-hero__title">{t("site.marketing.about.heroTitle")}</h1>
-          <p className="mk-hero__body">{t("site.marketing.about.heroBody")}</p>
+          <h1 className="mk-hero__title">{t("marketingPages.about.heroTitle")}</h1>
+          <p className="mk-hero__body">{t("marketingPages.about.heroBody")}</p>
         </div>
       </section>
 
@@ -36,9 +38,9 @@ export default function AboutPage() {
         {/* Left-aligned with the headings; the legal pages keep the centred reading column. */}
         <div className="marketing-container">
           <div className="marketing-about-body">
-            <p {...reveal(0)}>{t("site.marketing.about.body1")}</p>
-            <p {...reveal(1)}>{t("site.marketing.about.body2")}</p>
-            <p {...reveal(2)}>{t("site.marketing.about.body3")}</p>
+            <p {...reveal(0)}>{t("marketingPages.about.body1")}</p>
+            <p {...reveal(1)}>{t("marketingPages.about.body2")}</p>
+            <p {...reveal(2)}>{t("marketingPages.about.body3")}</p>
           </div>
         </div>
       </section>
@@ -47,9 +49,9 @@ export default function AboutPage() {
         <div className="marketing-container">
           <header className="mk-section__header" {...reveal()}>
             <h2 id="mk-start" className="mk-section__title">
-              {t("site.marketing.about.startTitle")}
+              {t("marketingPages.about.startTitle")}
             </h2>
-            <p className="mk-section__lede">{t("site.marketing.about.startLede")}</p>
+            <p className="mk-section__lede">{t("marketingPages.about.startLede")}</p>
           </header>
           <div {...reveal(1)}>
             <StartSteps />
@@ -61,7 +63,7 @@ export default function AboutPage() {
         <div className="marketing-container">
           <header className="mk-section__header" {...reveal()}>
             <h2 id="mk-principles" className="mk-section__title">
-              {t("site.marketing.about.principlesTitle")}
+              {t("marketingPages.about.principlesTitle")}
             </h2>
           </header>
           <ol className="mk-principles">
@@ -71,9 +73,9 @@ export default function AboutPage() {
                   {formatNumber(index + 1, { minimumIntegerDigits: 2 })}
                 </span>
                 <h3 className="mk-facts__title">
-                  {t(`site.marketing.about.principles.${id}.title`)}
+                  {t(`marketingPages.about.principles.${id}.title`)}
                 </h3>
-                <p className="mk-facts__body">{t(`site.marketing.about.principles.${id}.body`)}</p>
+                <p className="mk-facts__body">{t(`marketingPages.about.principles.${id}.body`)}</p>
               </li>
             ))}
           </ol>
@@ -84,18 +86,18 @@ export default function AboutPage() {
         <div className="marketing-container mk-contact">
           <header className="mk-contact__intro" {...reveal()}>
             <h2 id="mk-contact" className="mk-section__title">
-              {t("site.marketing.about.contactTitle")}
+              {t("marketingPages.about.contactTitle")}
             </h2>
-            <p className="mk-section__lede">{t("site.marketing.about.contactLede")}</p>
-            <h3 className="mk-contact__next-title">{t("site.marketing.about.nextTitle")}</h3>
+            <p className="mk-section__lede">{t("marketingPages.about.contactLede")}</p>
+            <h3 className="mk-contact__next-title">{t("marketingPages.about.nextTitle")}</h3>
             <ol className="mk-contact__next">
               {NEXT.map((id) => (
-                <li key={id}>{t(`site.marketing.about.next.${id}`)}</li>
+                <li key={id}>{t(`marketingPages.about.next.${id}`)}</li>
               ))}
             </ol>
             {MARKETING_CONTACT_EMAIL ? (
               <p className="mk-contact__email">
-                <span className="mk-label">{t("site.marketing.about.emailLabel")}</span>
+                <span className="mk-label">{t("marketingPages.about.emailLabel")}</span>
                 <a className="mk-link" href={`mailto:${MARKETING_CONTACT_EMAIL}`}>
                   {MARKETING_CONTACT_EMAIL}
                 </a>

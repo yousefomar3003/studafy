@@ -4,10 +4,12 @@ import { useTranslation } from "../../../lib/i18n";
 
 import type { CSSProperties, KeyboardEvent } from "react";
 
+import "./demos.css";
+
 const STEPS = ["talk", "setup", "import", "invite", "run"] as const;
 type Step = (typeof STEPS)[number];
 
-const A = "site.marketing.about";
+const A = "marketingPages.about";
 
 /**
  * "How a school starts": five steps from the first message to a full school day, on a line that

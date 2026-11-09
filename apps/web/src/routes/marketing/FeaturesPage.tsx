@@ -7,8 +7,10 @@ import { ClosingBand } from "./ClosingBand";
 import { FEATURE_DEMOS } from "./demos/FeatureDemos";
 import { reveal } from "./reveal";
 
+import "./marketing-subpages.css";
+
 interface FeatureGroup {
-  /** Key under `site.marketing.features.groups`: title, body, and `items.<id>` live there. */
+  /** Key under `marketingPages.features.groups`: title, body, and `items.<id>` live there. */
   id: string;
   items: string[];
 }
@@ -33,8 +35,8 @@ export default function FeaturesPage() {
   const { formatNumber } = useFormatters();
 
   useSeo({
-    title: t("site.marketing.features.seoTitle"),
-    description: t("site.marketing.features.seoDescription"),
+    title: t("marketingPages.features.seoTitle"),
+    description: t("marketingPages.features.seoDescription"),
     path: "/features",
   });
 
@@ -42,8 +44,8 @@ export default function FeaturesPage() {
     <>
       <section className="mk-hero">
         <div className="marketing-container">
-          <h1 className="mk-hero__title">{t("site.marketing.features.heroTitle")}</h1>
-          <p className="mk-hero__body">{t("site.marketing.features.heroBody")}</p>
+          <h1 className="mk-hero__title">{t("marketingPages.features.heroTitle")}</h1>
+          <p className="mk-hero__body">{t("marketingPages.features.heroBody")}</p>
         </div>
       </section>
 
@@ -61,15 +63,15 @@ export default function FeaturesPage() {
                   </span>
                   <div className="features-index__intro">
                     <h2 className="features-index__title">
-                      {t(`site.marketing.features.groups.${group.id}.title`)}
+                      {t(`marketingPages.features.groups.${group.id}.title`)}
                     </h2>
                     <p className="features-index__body">
-                      {t(`site.marketing.features.groups.${group.id}.body`)}
+                      {t(`marketingPages.features.groups.${group.id}.body`)}
                     </p>
                     <ul className="features-index__items">
                       {group.items.map((item) => (
                         <li key={item}>
-                          {t(`site.marketing.features.groups.${group.id}.items.${item}`)}
+                          {t(`marketingPages.features.groups.${group.id}.items.${item}`)}
                         </li>
                       ))}
                     </ul>
@@ -78,11 +80,11 @@ export default function FeaturesPage() {
                     <div
                       className="features-index__demo"
                       role="group"
-                      aria-label={`${t("site.marketing.features.demos.tryIt")}: ${t(
-                        `site.marketing.features.groups.${group.id}.title`,
+                      aria-label={`${t("marketingPages.features.demos.tryIt")}: ${t(
+                        `marketingPages.features.groups.${group.id}.title`,
                       )}`}
                     >
-                      <p className="mk-pane__role">{t("site.marketing.features.demos.tryIt")}</p>
+                      <p className="mk-pane__role">{t("marketingPages.features.demos.tryIt")}</p>
                       <Demo />
                     </div>
                   ) : null}
@@ -96,14 +98,14 @@ export default function FeaturesPage() {
       <section className="mk-section mk-section--alt" aria-labelledby="mk-ai">
         <div className="marketing-container mk-split" {...reveal()}>
           <div>
-            <p className="mk-label">{t("site.marketing.features.aiLabel")}</p>
+            <p className="mk-label">{t("marketingPages.features.aiLabel")}</p>
             <h2 id="mk-ai" className="mk-section__title">
-              {t("site.marketing.features.aiTitle")}
+              {t("marketingPages.features.aiTitle")}
             </h2>
           </div>
           <p className="mk-section__lede">
             <Trans
-              i18nKey="site.marketing.features.aiBody"
+              i18nKey="marketingPages.features.aiBody"
               t={t}
               components={[<Link key="pricing" className="mk-link" to="/pricing" />]}
             />
@@ -111,7 +113,7 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      <ClosingBand titleKey="site.marketing.features.ctaTitle" />
+      <ClosingBand titleKey="marketingPages.features.ctaTitle" />
     </>
   );
 }

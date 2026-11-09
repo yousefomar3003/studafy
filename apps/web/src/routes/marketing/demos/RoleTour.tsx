@@ -4,6 +4,8 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import type { CSSProperties, KeyboardEvent } from "react";
 
+import "./demos.css";
+
 /** Each role, and where it works: MOBILE_ONLY_ROLES (packages/constants) use the phone app. */
 const ROLES = [
   { id: "admin", where: "web" },
@@ -17,7 +19,7 @@ const ROLES = [
 
 type RoleId = (typeof ROLES)[number]["id"];
 
-const T = "site.marketing.home.demo.tour";
+const T = "marketingPages.demo.tour";
 
 /**
  * "Every role sees its own part of the school", as a set of tabs: pick a role and see the screen
@@ -72,10 +74,10 @@ export function RoleTour() {
             onKeyDown={(event) => onKeyDown(event, index)}
           >
             <span className="mk-tour__tab-name">
-              {t(`site.marketing.home.roles.${candidate.id}.name`)}
+              {t(`marketingPages.roles.${candidate.id}.name`)}
             </span>
             <span className="mk-tour__tab-where">
-              {t(`site.marketing.home.where.${candidate.where}`)}
+              {t(`marketingPages.where.${candidate.where}`)}
             </span>
           </button>
         ))}
@@ -89,13 +91,13 @@ export function RoleTour() {
         key={active}
       >
         <div className="mk-tour__text">
-          <h3 className="mk-tour__name">{t(`site.marketing.home.roles.${active}.name`)}</h3>
+          <h3 className="mk-tour__name">{t(`marketingPages.roles.${active}.name`)}</h3>
           <p className="mk-tour__where">
-            {t(`${T}.where`, { where: t(`site.marketing.home.where.${role.where}`) })}
+            {t(`${T}.where`, { where: t(`marketingPages.where.${role.where}`) })}
           </p>
           <ul className="mk-tour__does">
             {(["a", "b", "c"] as const).map((item) => (
-              <li key={item}>{t(`site.marketing.home.roles.${active}.${item}`)}</li>
+              <li key={item}>{t(`marketingPages.roles.${active}.${item}`)}</li>
             ))}
           </ul>
         </div>
@@ -136,11 +138,9 @@ function AdminScreen() {
         {people.map((person) => (
           <li key={person} className="mk-screen__row">
             <span className="mk-avatar" aria-hidden="true">
-              {t(`site.marketing.home.demo.students.${person}`).slice(0, 1)}
+              {t(`marketingPages.demo.students.${person}`).slice(0, 1)}
             </span>
-            <span className="mk-screen__grow">
-              {t(`site.marketing.home.demo.students.${person}`)}
-            </span>
+            <span className="mk-screen__grow">{t(`marketingPages.demo.students.${person}`)}</span>
             <span className="mk-chip">{t(`${T}.admin.people.${person}`)}</span>
           </li>
         ))}

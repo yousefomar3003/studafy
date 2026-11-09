@@ -44,9 +44,21 @@ function lazyWithCatalogs<T extends ComponentType>(
   return lazy(() => Promise.all([importPage(), loadCatalogAreas(areas)]).then(([page]) => page));
 }
 
-const FeaturesPage = lazy(() => import("../routes/marketing/FeaturesPage"));
-const PricingPage = lazy(() => import("../routes/marketing/PricingPage"));
-const AboutPage = lazy(() => import("../routes/marketing/AboutPage"));
+// The marketing pages' copy (and the home page demos') is its own catalog area, so it stays out of
+// the English shell every public page downloads, sign-in included (lighthouserc.json's budgets).
+const MARKETING_CATALOGS: readonly CatalogArea[] = ["marketingPages"];
+const FeaturesPage = lazyWithCatalogs(
+  MARKETING_CATALOGS,
+  () => import("../routes/marketing/FeaturesPage"),
+);
+const PricingPage = lazyWithCatalogs(
+  MARKETING_CATALOGS,
+  () => import("../routes/marketing/PricingPage"),
+);
+const AboutPage = lazyWithCatalogs(
+  MARKETING_CATALOGS,
+  () => import("../routes/marketing/AboutPage"),
+);
 const AuthLoginPage = lazy(() => import("../routes/auth/LoginPage"));
 const AuthCallbackPage = lazy(() => import("../routes/auth/CallbackPage"));
 const AuthErrorPage = lazy(() => import("../routes/auth/ErrorPage"));

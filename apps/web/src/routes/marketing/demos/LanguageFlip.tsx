@@ -4,6 +4,8 @@ import { useTranslation } from "../../../lib/i18n";
 
 import { prefersReducedMotion, useInView } from "./motion";
 
+import "./demos.css";
+
 /**
  * One notification, exactly as each reader gets it. Deliberately not translated with the page: the
  * point is to show both languages, whichever one the page is read in.
@@ -60,7 +62,7 @@ export function LanguageFlip() {
       <div
         className="mk-flip__toggle"
         role="group"
-        aria-label={t("site.marketing.home.demo.flip.toggleLabel")}
+        aria-label={t("marketingPages.demo.flip.toggleLabel")}
       >
         {(Object.keys(NOTIFICATION) as Language[]).map((code) => (
           <button
