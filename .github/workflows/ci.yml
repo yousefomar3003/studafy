@@ -675,7 +675,7 @@ jobs:
       # absolute wall clock: there is no baseline arm to subtract, because generating the document is
       # the whole program. Median of five spawns, several times the budget in headroom -- see the
       # file header. Needs no database.
-      - name: OpenAPI generation benchmark (<2s)
+      - name: OpenAPI generation benchmark (<3.5s)
         env:
           OPENAPI_BENCHMARK: "1"
         run: bun test tests/benchmark/openapi-generate-benchmark.test.ts
