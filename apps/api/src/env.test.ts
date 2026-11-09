@@ -224,9 +224,9 @@ describe("loadEnv", () => {
       S3_ENDPOINT: "https://account.r2.cloudflarestorage.com",
     };
     expect(
-      loadEnv({ ...r2, ...RECORD_SECRETS, STORAGE_SENSITIVE_KMS_KEY_ID: "" }).S3_ENDPOINT,
+      loadEnv({ ...r2, ...DEPLOYED_SECRETS, STORAGE_SENSITIVE_KMS_KEY_ID: "" }).S3_ENDPOINT,
     ).toBe("https://account.r2.cloudflarestorage.com");
-    expect(() => loadEnv({ ...r2, ...RECORD_SECRETS })).toThrow(/needs AWS S3/);
+    expect(() => loadEnv({ ...r2, ...DEPLOYED_SECRETS })).toThrow(/needs AWS S3/);
   });
 
   test('treats a deployed tier with only OAuth redirect URIs as "provider off", not half-configured', () => {
