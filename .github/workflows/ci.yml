@@ -451,6 +451,9 @@ jobs:
       # (GitHub Advanced Security must also be enabled for a private repo to get PR-line
       # annotations from this -- see docs/testing/ci-pipeline.md).
       security-events: write
+      # upload-sarif reads this workflow run to attach the results; in a private repo that needs
+      # actions: read, without which the upload answers 403 "Resource not accessible by integration".
+      actions: read
     container:
       image: semgrep/semgrep:1.176.0
     steps:
@@ -492,6 +495,12 @@ jobs:
   # as synthetic test fixtures (ST-249's security pass report has the detail).
   secret-scan-history:
     runs-on: ubuntu-latest
+    # On a pull_request, gitleaks-action lists the PR's commits through the API to know what to scan,
+    # which needs pull-requests: read; with only the workflow's contents: read it answers 403
+    # "Resource not accessible by integration".
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       # Pinned to a commit SHA, not the mutable `v7` tag: this repo's SAST job (ST-251) flags any
       # action reference that isn't (a floating tag can be silently repointed by the action owner).
