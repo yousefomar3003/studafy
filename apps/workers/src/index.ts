@@ -218,8 +218,11 @@ void scheduleFinanceReconciliationJob(financeReconciliationRedis).then(() =>
 // Cost-report scheduler (ST-293): idempotently register the daily 06:15 cost-metric publish and
 // the monthly 07:30-on-the-1st full cost report on the billing queue, after the dunning, seat and
 // storage-quota sweeps so its AI-usage totals reflect the day's post-reconciliation state.
-const costReportRedis = createRedisConnection(env);
-void scheduleCostReportJobs(costReportRedis).then(() => costReportRedis.disconnect());
+// Skipped outside AWS, where there is no CloudWatch to publish to (COST_REPORT_ENABLED=false).
+if (env.COST_REPORT_ENABLED) {
+  const costReportRedis = createRedisConnection(env);
+  void scheduleCostReportJobs(costReportRedis).then(() => costReportRedis.disconnect());
+}
 
 // Report-expiry scheduler (ST-175): idempotently register the daily 07:00 purge of expired report
 // artifacts on the reports queue. Attendance objects are already covered by the `reports/` bucket

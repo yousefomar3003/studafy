@@ -197,8 +197,9 @@ export const envSchema = z
     RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // KMS key for sensitive record documents (ADR-019): applied when a staged upload is promoted to
-    // permanent/. Required on a deployed tier; local rustfs has no KMS, so development falls back
-    // to the bucket default.
+    // permanent/. Required on a deployed tier backed by AWS S3. SSE-KMS is AWS-only, so it is
+    // refused alongside S3_ENDPOINT: an S3-compatible provider (Cloudflare R2, local rustfs) keeps
+    // the bucket's own at-rest encryption instead.
     STORAGE_SENSITIVE_KMS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // S3-compatible object storage for the app-files bucket (ST-103). All optional and validated
     // as a group below: the feature activates only when the whole set is present, so dev and test
@@ -440,7 +441,15 @@ export const envSchema = z
         message: `RECORDS_ENCRYPTION_KEYS is required when APP_ENV is ${env.APP_ENV}`,
       });
     }
-    if (env.APP_ENV !== "development" && env.STORAGE_SENSITIVE_KMS_KEY_ID === undefined) {
+    if (env.S3_ENDPOINT !== undefined) {
+      if (env.STORAGE_SENSITIVE_KMS_KEY_ID !== undefined) {
+        context.addIssue({
+          code: "custom",
+          path: ["STORAGE_SENSITIVE_KMS_KEY_ID"],
+          message: "STORAGE_SENSITIVE_KMS_KEY_ID needs AWS S3; unset it when S3_ENDPOINT is set",
+        });
+      }
+    } else if (env.APP_ENV !== "development" && env.STORAGE_SENSITIVE_KMS_KEY_ID === undefined) {
       context.addIssue({
         code: "custom",
         path: ["STORAGE_SENSITIVE_KMS_KEY_ID"],

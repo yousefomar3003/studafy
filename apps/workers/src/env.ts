@@ -71,6 +71,15 @@ export const envSchema = z
     RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The ST-293 cost report publishes to CloudWatch, so a deployment outside AWS sets
+    // COST_REPORT_ENABLED=false and the daily/monthly sweeps are never scheduled. On by default.
+    COST_REPORT_ENABLED: z.preprocess(
+      emptyAsUnset,
+      z
+        .enum(["true", "false"])
+        .optional()
+        .transform((value) => value !== "false"),
+    ),
     // SES transactional email (deliverability R-08). When SES_REGION is unset the email dispatcher
     // runs in dry-run mode: it renders, dedups, and records deliveries exactly as in production but
     // never calls AWS — the dev/test path. A production worker refuses to boot that way unless

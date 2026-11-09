@@ -192,6 +192,19 @@ describe("loadEnv", () => {
     expect(loadEnv({ APP_ENV: "development" }).RECORDS_ENCRYPTION_KEYS).toBeUndefined();
   });
 
+  test("drops the KMS requirement on S3-compatible storage and refuses a KMS key there", () => {
+    const r2 = {
+      CORS_ALLOWED_ORIGINS: "https://app.studafy.com",
+      TURNSTILE_SECRET_KEY: "s",
+      APP_ENV: "production",
+      S3_ENDPOINT: "https://account.r2.cloudflarestorage.com",
+    };
+    expect(
+      loadEnv({ ...r2, ...RECORD_SECRETS, STORAGE_SENSITIVE_KMS_KEY_ID: "" }).S3_ENDPOINT,
+    ).toBe("https://account.r2.cloudflarestorage.com");
+    expect(() => loadEnv({ ...r2, ...RECORD_SECRETS })).toThrow(/needs AWS S3/);
+  });
+
   test('treats a deployed tier with only OAuth redirect URIs as "provider off", not half-configured', () => {
     // What a tier renders before anyone has pasted client credentials: redirect URIs from the API
     // origin, and empty-string client id/secret from the secret manager defaults.

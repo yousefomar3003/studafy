@@ -23,6 +23,7 @@ describe("loadEnv", () => {
       SES_FROM_ADDRESS: "no-reply@send.studafy.com",
       SES_FROM_NAME: "Studafy",
       EMAIL_DRY_RUN: false,
+      COST_REPORT_ENABLED: true,
       PUSH_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
@@ -59,6 +60,7 @@ describe("loadEnv", () => {
       SES_FROM_ADDRESS: "no-reply@send.studafy.com",
       SES_FROM_NAME: "Studafy",
       EMAIL_DRY_RUN: false,
+      COST_REPORT_ENABLED: true,
       PUSH_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
@@ -151,6 +153,13 @@ describe("loadEnv", () => {
 
     test("boots without SES only when dry-run is chosen on purpose", () => {
       expect(loadEnv({ ...deployed, EMAIL_DRY_RUN: "true" }).EMAIL_DRY_RUN).toBe(true);
+    });
+
+    test("turns the CloudWatch cost report off only on an explicit false", () => {
+      const base = { ...deployed, EMAIL_DRY_RUN: "true" };
+      expect(loadEnv(base).COST_REPORT_ENABLED).toBe(true);
+      expect(loadEnv({ ...base, COST_REPORT_ENABLED: "" }).COST_REPORT_ENABLED).toBe(true);
+      expect(loadEnv({ ...base, COST_REPORT_ENABLED: "false" }).COST_REPORT_ENABLED).toBe(false);
     });
 
     test("sends from the verified domain by default", () => {
