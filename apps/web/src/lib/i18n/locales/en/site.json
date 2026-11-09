@@ -38,197 +38,153 @@
     },
     "header": {
       "signIn": "Sign in",
-      "talkToUs": "Talk to us",
-      "signUp": "Sign up"
+      "signUp": "Sign up",
+      "talkToUs": "Talk to us"
     },
     "footer": {
-      "tagline": "School operations, in one system.",
+      "tagline": "Studafy runs the school day for staff and families, in English and Arabic.",
       "navAriaLabel": "Footer",
+      "siteHeading": "Studafy",
+      "accountHeading": "Your account",
+      "legalHeading": "Legal",
       "signIn": "Sign in",
+      "portal": "Go to your portal",
+      "contact": "Contact us",
       "privacy": "Privacy policy",
       "deleteAccount": "Delete your account",
-      "copyright": "© {{year}} Studafy. All rights reserved.",
-      "portal": "Portal"
+      "copyright": "© {{year}} Studafy. All rights reserved."
     },
     "cta": {
       "talkToUs": "Talk to us",
       "seePricing": "See pricing",
-      "exploreFeatures": "Explore features"
+      "exploreFeatures": "See all features"
     },
-    "addOnChip": "Add-on",
     "home": {
-      "seoTitle": "School operations, in one system",
-      "seoDescription": "Studafy brings academics, attendance, grades, discipline, finance, and family communication into one school management platform.",
-      "heroTitle": "School operations, in one system",
-      "heroSubtitle": "Academics, attendance, grades, discipline, finance, and family communication — one platform your staff and families both actually use.",
-      "includedEyebrow": "What’s included",
-      "includedTitle": "Everything a school runs on",
-      "includedLede": "Not a bolt-on gradebook or a standalone fee tracker — the modules below share the same student, class, and school records.",
-      "valueProps": {
-        "academics": {
-          "title": "Academics & attendance",
-          "body": "Terms, subjects, classes, timetables, enrollment, and daily attendance — with corrections that keep an audit trail instead of silently overwriting a record."
+      "seoTitle": "School management in English and Arabic",
+      "seoDescription": "Studafy keeps attendance, timetables, homework, marks, fees and family updates in one system for school staff, parents and students, in English and Arabic.",
+      "heroTitle": "The whole school day, in one system.",
+      "heroBody": "Attendance, timetables, homework, marks, fees and updates for families. Studafy gives each person in the school the part they need, in English and Arabic, on the web and on their phone.",
+      "dayTitle": "A Tuesday at a school on Studafy",
+      "dayColumns": {
+        "time": "Time",
+        "what": "What happens",
+        "who": "Who"
+      },
+      "day": {
+        "register": {
+          "time": "07:50",
+          "what": "Register taken for Grade 8B",
+          "who": "Teacher"
         },
-        "grades": {
-          "title": "Grades & discipline",
-          "body": "Gradebooks, assignments, submissions, and exam results staff can enter and publish, plus discipline records and evaluations in the same system."
+        "late": {
+          "time": "09:20",
+          "what": "A late arrival corrected, with the reason kept",
+          "who": "Attendance office"
         },
-        "finance": {
-          "title": "Finance & billing",
-          "body": "Fee structures, installments, payments, refunds, and reconciliation — with reporting that adds up for finance staff, not just for parents."
+        "homework": {
+          "time": "11:05",
+          "what": "Science homework set, due Thursday",
+          "who": "Teacher"
         },
-        "family": {
-          "title": "Family portal & notifications",
-          "body": "Guardians see attendance, grades, and balances for each child, and get notified through the channels your school already uses."
+        "marks": {
+          "time": "13:30",
+          "what": "Term marks approved and released to families",
+          "who": "Principal"
+        },
+        "payment": {
+          "time": "14:10",
+          "what": "A fee instalment recorded against an invoice",
+          "who": "Finance"
+        },
+        "home": {
+          "time": "16:45",
+          "what": "Today's attendance and homework checked at home",
+          "who": "Parent"
+        },
+        "study": {
+          "time": "19:30",
+          "what": "Quiz on today's lesson, made from the class's own notes",
+          "who": "Student"
         }
       },
-      "howEyebrow": "How it works",
-      "howTitle": "Set up once, run every term",
-      "steps": {
-        "onboard": {
-          "title": "Your school onboards",
-          "body": "We set up your school as its own tenant with its own data, roles, and permissions."
-        },
-        "staff": {
-          "title": "Staff run the school day-to-day",
-          "body": "Teachers, admins, and finance staff work in one system instead of switching between spreadsheets and separate tools."
-        },
-        "families": {
-          "title": "Families stay in the loop",
-          "body": "Guardians get a live portal and notifications — no more chasing down a printed report card."
-        }
-      },
-      "ctaTitle": "See it against your own school’s numbers",
-      "ctaBody": "Tell us about your school and we’ll walk you through Studafy — including where it won’t be a fit, if that’s the case."
-    },
-    "features": {
-      "seoTitle": "Features",
-      "seoDescription": "Academics, attendance, grades, discipline, finance, family portal, and an optional AI add-on — see what's included in Studafy.",
-      "heroTitle": "One system for the whole school day",
-      "heroSubtitle": "Every group below shares the same student, class, and school records — nothing here is a separate tool bolted on afterward.",
-      "groups": {
+      "rolesTitle": "Every role sees its own part of the school",
+      "rolesLede": "Permissions follow the job. A teacher sees their classes, a parent sees their children, finance sees the accounts, and the school decides who can do what.",
+      "modulesTitle": "What Studafy covers",
+      "modulesLede": "Each part works from the same students, classes and staff, so nothing is typed twice.",
+      "modules": {
         "academics": {
-          "title": "Academics",
-          "body": "The structure everything else hangs off of.",
-          "items": {
-            "years": "Academic years and terms",
-            "subjects": "Subjects, courses, and classes",
-            "enrollment": "Enrollment",
-            "timetabling": "Timetabling"
-          }
+          "title": "Academics and timetable",
+          "body": "Years, terms, subjects and classes, and a timetable built for each term."
         },
         "attendance": {
           "title": "Attendance",
-          "body": "Daily records with a real audit trail.",
-          "items": {
-            "sessions": "Attendance sessions per class",
-            "corrections": "Corrections logged, not overwritten",
-            "reporting": "Attendance reporting for admins"
-          }
+          "body": "A register for every lesson, corrections with a reason, and reports for the attendance office."
         },
-        "grades": {
-          "title": "Grades & assessments",
-          "body": "From assignment to published result.",
-          "items": {
-            "assignments": "Assignments and student submissions",
-            "exams": "Exams and gradebook configuration",
-            "entry": "Grade entry with a publish step",
-            "reporting": "Grade reporting"
-          }
+        "homework": {
+          "title": "Homework",
+          "body": "Assignments with due dates, work handed in from the phone, and marking."
         },
-        "discipline": {
-          "title": "Discipline",
-          "body": "Incidents and evaluations on the student record.",
-          "items": {
-            "cases": "Discipline case records",
-            "evaluations": "Student evaluations"
-          }
+        "exams": {
+          "title": "Exams and marks",
+          "body": "Your school's own exam structure and weights, mark entry, and approval before release."
         },
         "finance": {
-          "title": "Finance & billing",
-          "body": "Fees through to reconciliation.",
-          "items": {
-            "fees": "Fee structures and installments",
-            "payments": "Payments and refunds",
-            "reconciliation": "Reconciliation and finance reporting"
-          }
+          "title": "Fees and finance",
+          "body": "Fee plans, instalments, invoices, payments, refunds and VAT, with one account per family."
         },
-        "family": {
-          "title": "Family portal & notifications",
-          "body": "What guardians see, and how they hear about it.",
-          "items": {
-            "perChild": "Per-child attendance, grades, and balances",
-            "siblings": "Multi-child comparison for guardians with siblings enrolled",
-            "preferences": "Notification preferences per channel"
-          }
+        "families": {
+          "title": "Families",
+          "body": "Every child in a family under one account, with the notifications each parent chooses."
         },
-        "approvals": {
-          "title": "Approvals & audit",
-          "body": "A record of who changed what, and who signed off.",
-          "items": {
-            "queue": "A shared approval queue for review-gated actions",
-            "audit": "An audit trail across modules"
-          }
+        "announcements": {
+          "title": "Announcements",
+          "body": "To the whole school, one role or one class, sent now or scheduled for later."
+        },
+        "discipline": {
+          "title": "Discipline and evaluations",
+          "body": "Incidents, the actions taken, and staff evaluations, kept on the record."
+        },
+        "records": {
+          "title": "School records and lists",
+          "body": "The details your school collects on students, parents, staff and classes, and lists for anything else."
+        },
+        "imports": {
+          "title": "Imports",
+          "body": "Students, staff and classes brought in from a spreadsheet, with every change checked before it is saved."
         }
       },
-      "aiTitle": "Ask AI & summaries",
-      "aiBody": "A grounded question-and-answer assistant that cites the school records it draws from, plus a study-material summarizer. It’s opt-in on top of a school subscription, purchased per student, and metered against a monthly usage budget rather than sold as unlimited — see <0>pricing</0> for how it’s billed.",
-      "ctaTitle": "Want to see it against your data?"
-    },
-    "pricing": {
-      "seoTitle": "Pricing",
-      "seoDescription": "Studafy is free for schools. Students can add the AI study assistant for themselves.",
-      "heroTitle": "Free for schools",
-      "heroSubtitle": "Every school gets all of Studafy at no cost: no plan to pick, no seats to count, no end date.",
-      "freePlanName": "Studafy for schools",
-      "freePlanPrice": "Free",
-      "included": {
-        "academics": "Academics, attendance, grades, and discipline",
-        "finance": "Finance and billing",
-        "family": "Family portal and notifications",
-        "approvals": "Approvals and audit trail"
+      "languageTitle": "Made for English and Arabic",
+      "languageBody": "Every screen works in both languages, with a right-to-left layout in Arabic. Each person picks their own language, so a teacher can work in English while a parent reads in Arabic.",
+      "languageCaption": "The same words, as each person sees them",
+      "privacyTitle": "Careful with school data",
+      "privacy": {
+        "separate": {
+          "title": "Each school's data stays separate",
+          "body": "Schools never see each other's records, and the database enforces it, not only the app."
+        },
+        "sensitive": {
+          "title": "Sensitive details stay hidden",
+          "body": "ID numbers and medical notes are encrypted and hidden by default, and each time someone opens one is recorded."
+        },
+        "history": {
+          "title": "Changes leave a trail",
+          "body": "Corrections to marks, attendance and fees record who made them and when."
+        },
+        "requests": {
+          "title": "People can ask for their data",
+          "body": "Staff and families can ask for a copy of their data or for it to be deleted, and the school can act on it."
+        }
       },
-      "contactUs": "Talk to us about your school",
-      "addOnTitle": "AI study assistant",
-      "addOnBody": "Ask AI, quizzes, flashcards and summaries built from the student's own class materials. Each student can add it for themselves in the Android app.",
-      "addOnNote": "The school never pays for it."
-    },
-    "about": {
-      "seoTitle": "About & contact",
-      "seoDescription": "What Studafy is, and how to get in touch about bringing it to your school.",
-      "heroTitle": "About Studafy",
-      "heroSubtitle": "A school operations platform, built as one system rather than a bundle of separate tools.",
-      "body1": "Studafy runs the day-to-day of a school in a single system: academics and timetabling, attendance, grades and assessments, discipline, finance and billing, and a family portal with notifications — all sharing the same student, class, and school records instead of syncing between separate tools.",
-      "body2": "Actions that need a second set of eyes — grade publishing, discipline decisions, and other review-gated changes — go through a shared approval queue with an audit trail, so there’s a record of who signed off and when.",
-      "body3": "Each school is provisioned as its own tenant, with its own data, roles, and permissions. An optional AI add-on (grounded question-answering and study-material summaries) is available on top of a school subscription.",
-      "contactEyebrow": "Contact",
-      "contactTitle": "Talk to us",
-      "contactLede": "Tell us about your school and we’ll walk you through Studafy.",
-      "emailLabel": "Email"
-    },
-    "contactForm": {
-      "ariaLabel": "Talk to us",
-      "fullName": "Full name",
-      "email": "Work email",
-      "phone": "Phone (optional)",
-      "schoolName": "School name",
-      "country": "Country (optional)",
-      "studentCount": "Number of students (optional)",
-      "message": "How can we help? (optional)",
-      "submit": "Send",
-      "submitting": "Sending…",
-      "sentTitle": "Thanks — we've got your message",
-      "sentBody": "Someone from the Studafy team will reply to {{email}} shortly.",
-      "errors": {
-        "fullName": "Enter your name.",
-        "email": "Enter a valid email address.",
-        "schoolName": "Enter your school's name.",
-        "studentCount": "Enter a whole number.",
-        "captcha": "Complete the verification check before sending.",
-        "captchaExpired": "The verification check expired. Complete it again and resend.",
-        "rateLimited": "Too many messages from your network. Wait a minute and try again.",
-        "generic": "We couldn't send your message. Check your connection and try again."
-      }
+      "pricingTitle": "Free for schools",
+      "pricingBody": "Every school gets all of Studafy at no cost. Students can add the AI study assistant for themselves if they want it.",
+      "pricingLink": "How pricing works",
+      "closingTitle": "Bring Studafy to your school",
+      "closingBody": "Tell us about your school. We'll show you around and help you set it up.",
+      "dayPause": "Pause",
+      "dayPlay": "Play",
+      "registerTitle": "Take the register. Watch the school hear about it.",
+      "registerLede": "Mark a student late or absent. Their parent hears about it straight away, and the attendance office's numbers move with it. Try it.",
+      "exampleNote": "Example data"
     }
   },
   "login": {
