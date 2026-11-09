@@ -421,6 +421,7 @@ export function sessionRoutes(
       device: deviceContextFrom(c),
       log: c.get("log"),
       eventSink,
+      denylist,
     });
 
     return c.json(deliverTokenPair(c, issued), 200);

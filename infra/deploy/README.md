@@ -77,7 +77,8 @@ templates' `${VAR}` placeholders. Values that `terraform output` can supply are 
 
 The templates map `APP_ENV` and `WEB_ORIGIN` as follows: the api task gets `APP_ENV`,
 `CORS_ALLOWED_ORIGINS=${WEB_ORIGIN}`, and `FRONTEND_URL=${WEB_ORIGIN}`; the workers task gets
-`FRONTEND_URL=${WEB_ORIGIN}` (links in emails). `task-definitions.test.ts` fails if an env file
+`FRONTEND_URL=${WEB_ORIGIN}` (links in emails); the realtime task gets
+`WS_ALLOWED_ORIGINS=${WEB_ORIGIN}` (its handshake Origin allowlist). `task-definitions.test.ts` fails if an env file
 drops either key. `preview.env` is separate; see "PR preview environments".
 
 ## Rolling update strategy (the ticket's core ask)
@@ -124,11 +125,13 @@ raw TCP check against `REDIS_URL`), and it has no target group at all — it's n
 
 - **`api`**: `DATABASE_USER`/`DATABASE_PASSWORD`/`DATABASE_CA_CERT` from the PgBouncer secret,
   `REDIS_URL` from the Redis secret's `queue_url`, and `TAP_SECRET_KEY`/`TAP_WEBHOOK_URL`/`SENTRY_DSN`
-  from `<name_prefix>/api/app-secrets`.
+  from `<name_prefix>/api/app-secrets`. `WS_JWT_SECRET` (realtime ticket key) too: Terraform writes
+  realtime's value into the api secret, so the two never differ.
 - **`workers`**: the same database and `REDIS_URL` (`queue_url`) keys, plus
   `STRIPE_SECRET_KEY`/`TAP_SECRET_KEY`/`TAP_WEBHOOK_URL`/`SENTRY_DSN` from its own app-secrets.
-- **`realtime`**: `WS_JWT_SECRET` and `SENTRY_DSN` from its app-secrets, and `REDIS_URL` from the
-  Redis secret's `pubsub_url`.
+- **`realtime`**: `WS_JWT_SECRET` and `SENTRY_DSN` from its app-secrets, `REDIS_URL` from the
+  Redis secret's `pubsub_url`, and `AUTH_REDIS_URL` from its `queue_url` (the API's database, where
+  the gateway reads the session denylist; QA-14).
 - **`migrations`**: `DATABASE_HOST`/`PORT`/`NAME`/`USER`/`PASSWORD` from the Postgres connection
   secret (it connects directly to RDS, not PgBouncer).
 

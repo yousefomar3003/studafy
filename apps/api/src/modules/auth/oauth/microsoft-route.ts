@@ -28,6 +28,7 @@ import { deliverTokenPair } from "../delivery";
 import { findOAuthIdentity } from "../services/returning-user-login-service";
 import { issueTokenPair } from "../services/session-service";
 
+import { bindBrowser } from "./browser-binding";
 import {
   cancelledRedirect,
   failureRedirect,
@@ -88,7 +89,13 @@ export function microsoftOAuthRoutes(
     const codeVerifier = generateCodeVerifier();
     const codeChallenge = generateCodeChallenge(codeVerifier);
 
-    await stateStore.set(state, { flow: "login", provider: "microsoft", codeVerifier, nonce });
+    await stateStore.set(state, {
+      flow: "login",
+      provider: "microsoft",
+      codeVerifier,
+      nonce,
+      browserBinding: bindBrowser(c),
+    });
 
     const params = new URLSearchParams({
       client_id: oauthConfig.clientId,
@@ -138,7 +145,7 @@ export function microsoftOAuthRoutes(
       }
 
       // 1. Validate state — single use, and only an authorization minted for Microsoft.
-      entry = await takeAuthorization(ctx, state);
+      entry = await takeAuthorization(c, ctx, state);
 
       // 2. Exchange authorization code for tokens
       const idToken = await exchangeCode(code, oauthConfig, entry.codeVerifier);

@@ -34,6 +34,8 @@ export async function buildOpenApiDocument() {
     redis: createUnusableRedis(),
     database: createUnusableDatabase(),
     keyStore,
+    // Mounts GET /api/realtime/ticket, which createApp leaves out without a key. Nothing is signed.
+    realtimeTicketSecret: "openapi-document-placeholder",
     // /docs and /openapi.json are tooling for reading the API, not part of the API's contract.
     docsEnabled: false,
   });

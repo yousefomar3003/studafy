@@ -7,6 +7,10 @@ Fusion — under forced Row-Level Security.
 
 Measured on PostgreSQL **16.14** with pgvector **0.8.5** (`pgvector/pgvector:pg16`).
 
+> **Production runs lexical-only ([ADR-020](../adr/0020-lexical-only-retrieval.md)).** No real
+> embedding provider is wired, so `app.ts` passes no query vector and `hybridSearch` runs the
+> full-text leg alone. The hybrid design below is what a real provider brings back.
+
 ## Stated assumptions
 
 - **The embedding model and dimension are chosen here for the first time.** Nothing in the repository

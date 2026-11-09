@@ -64,7 +64,7 @@ void main() {
   );
 
   test(
-    'opens a socket with the token in the query string and connects',
+    'opens a socket with the ticket in the query string and connects',
     () async {
       final client = buildClient();
       client.connect();
@@ -72,8 +72,12 @@ void main() {
 
       expect(socketFactory.created, hasLength(1));
       expect(
-        socketFactory.created.single.url.queryParameters['token'],
+        socketFactory.created.single.url.queryParameters['ticket'],
         'token-1',
+      );
+      expect(
+        socketFactory.created.single.url.queryParameters.containsKey('token'),
+        isFalse,
       );
       expect(socketFactory.created.single.url.path, '/ws');
       expect(client.status, RealtimeConnectionStatus.connecting);
@@ -86,6 +90,33 @@ void main() {
         RealtimeConnectionStatus.connecting,
         RealtimeConnectionStatus.connected,
       ]);
+    },
+  );
+
+  test(
+    'a failed ticket request backs off and retries instead of sticking at connecting',
+    () async {
+      var calls = 0;
+      final client = buildClient(
+        getToken: () async {
+          calls++;
+          if (calls == 1) throw StateError('offline');
+          return 'ticket-2';
+        },
+      );
+      client.connect();
+      await settle();
+
+      expect(client.status, RealtimeConnectionStatus.reconnecting);
+      expect(socketFactory.created, isEmpty);
+
+      timerScheduler.latest.fire();
+      await settle();
+
+      expect(
+        socketFactory.created.single.url.queryParameters['ticket'],
+        'ticket-2',
+      );
     },
   );
 

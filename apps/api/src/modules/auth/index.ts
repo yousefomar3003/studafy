@@ -107,6 +107,7 @@ export {
 export { adminDeviceRoutes } from "./routes/admin-device-routes";
 export { returningUserLoginRoutes } from "./routes/returning-user-login-routes";
 export { reviewLoginRoutes } from "./routes/review-login-routes";
+export { qaLoginRoutes } from "./routes/qa-login-routes";
 export { memberPasswordRoutes } from "./routes/member-password-routes";
 export {
   loginReviewUser,
@@ -114,6 +115,12 @@ export {
   type ReviewLoginParams,
   type ReviewLoginResult,
 } from "./services/review-login-service";
+export {
+  loginQaUser,
+  QA_LOGIN_PROVIDER,
+  type QaLoginParams,
+  type QaLoginResult,
+} from "./services/qa-login-service";
 export {
   loginReturningUser,
   type ReturningUserLoginParams,

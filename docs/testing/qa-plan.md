@@ -18,15 +18,47 @@ Status: draft, 2026-11-02. Baseline commit: `fa3fe414` (`dev`).
 
 ### Baseline (local, 2026-11-02)
 
-| Suite                       | Pass | Skip | Fail | Note                                                                             |
-| --------------------------- | ---- | ---- | ---- | -------------------------------------------------------------------------------- |
-| `apps/api` (`bun test src`) | 1612 | 566  | 1    | Skips need Postgres/Redis. The fail is a stale local, gitignored `openapi.json`. |
-| `apps/workers`              | 282  | 151  | 0    | Skips need Postgres/Redis.                                                       |
-| `apps/realtime`             | 84   | 0    | 0    |                                                                                  |
-| `apps/web`                  | 1061 | 0    | 0    |                                                                                  |
+| Suite                       | Pass | Skip | Fail | Note                                                                                |
+| --------------------------- | ---- | ---- | ---- | ----------------------------------------------------------------------------------- |
+| `apps/api` (`bun test src`) | 2183 | 1    | 0    | With DB + Redis (QA-01). Skip is `tap-sandbox`: needs a real `TAP_TEST_SECRET_KEY`. |
+| `apps/workers`              | 433  | 0    | 0    | With DB + Redis (QA-01).                                                            |
+| `apps/realtime`             | 84   | 0    | 0    | Not re-run in QA-01 (no DB dependency).                                             |
+| `apps/web`                  | 1061 | 0    | 0    | Not re-run in QA-01 (no DB dependency).                                             |
 
-DB-backed suites (`tests/security`, `tests/auth`, cross-tenant, RLS coverage) were **not** run in
-this pass: they need the test Postgres/Redis containers (QA-01).
+#### DB-backed suites (QA-01, 2026-11-02)
+
+Run against `bun run db:up` (`test-postgres` on `127.0.0.1:54329`, `test-redis` on `127.0.0.1:6390`;
+nothing on 5173/5432) after `bun run db:migrate` and `bunx turbo run build --filter=@studafy/api^...`,
+with:
+
+```sh
+TEST_DATABASE_URL=postgresql://studafy_test:studafy_test@127.0.0.1:54329/postgres?sslmode=disable
+TEST_REDIS_URL=redis://127.0.0.1:6390
+REDIS_URL=redis://127.0.0.1:6390
+```
+
+| Suite                                   | Pass | Skip | Fail | Note                                                           |
+| --------------------------------------- | ---- | ---- | ---- | -------------------------------------------------------------- |
+| `bun run db:test:rls-coverage`          | PASS | —    | —    | 206/223 relations tenant-scoped; catalog audit p95 16.89 ms.   |
+| `bun run test:security`                 | 757  | 0    | 0    |                                                                |
+| `apps/api` `test:auth`                  | 183  | 0    | 0    | Was 161/22 skip without `TEST_REDIS_URL`; see gaps below.      |
+| `apps/api` `test:cross-tenant`          | 4    | 0    | 0    |                                                                |
+| `apps/workers` (`bun test`, DB + Redis) | 433  | 0    | 0    | Was 425/8 skip without `REDIS_URL` (entitlements invalidator). |
+
+Gaps found while getting to zero skips:
+
+- **`tests/auth/revocation.test.ts` never ran in CI.** It needs `TEST_REDIS_URL`, which no workflow
+  sets, so all 22 cases self-skip. Run locally, 2 failed: both `createApp` instances share Redis and
+  therefore the per-IP auth limit (5/window), so the 5th+ logout in the file got 429 and never
+  denylisted. Test bug, not a product bug; fixed by passing `rateLimitDisabled: true` in that suite.
+  Fixed: `TEST_REDIS_URL` is now set on the `api-integration` CI job.
+- **`apps/workers` DB tests never run in CI.** No workflow sets `TEST_DATABASE_URL` for
+  `apps/workers`, and `invalidator.test.ts` additionally needs `REDIS_URL` (Bun reads `.env` from the
+  cwd, so the root `.env` does not apply under `apps/workers`). Fixed: `api-integration` now migrates
+  the shared test database and runs `apps/workers` `bun test` with both set.
+- `.env` already points `DATABASE_*` at `test-postgres`; do not also export `DATABASE_URL`, or
+  `db:migrate` refuses to run. `POSTGRES_PASSWORD` must match `.env`'s `DATABASE_PASSWORD` (default
+  `studafy_test`).
 
 ### What already exists (and is good)
 
@@ -45,28 +77,28 @@ precondition or exposes secrets to insiders. **Low** = hardening / cost abuse.
 
 ### Confirmed
 
-| ID   | Sev               | Finding                                                                                                                                                                                                                                                                                                                                                                            | Evidence                                                                                                                                                                                    |
-| ---- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F-01 | Critical          | ORG_ADMIN can assign `SUPER_ADMIN` / `SUPPORT_AGENT` to any user in their school (including themselves). `roleSchema` accepts every role; `updateUserRole` writes it with no allowlist or rank check; no DB guard. After refresh the token carries `SUPER_ADMIN` → `/api/platform/*` runs as `studafy_admin` across all schools. Same schema backs create-user.                    | `apps/api/src/modules/users/schemas.ts:14,91,162`, `users/routes/user-routes.ts:331,438`, `users/user-service.ts:383-412`, `packages/constants/src/permissions.ts:290`                      |
-| F-02 | Critical          | Unclaimed member accounts can be taken over with a global default password. Accounts with no stored hash accept `pass@1234` and let the caller set a new password and get a session. Usernames are sequential (`STU-100001`). Admin password reset reopens the window. Only per-IP rate limit applies.                                                                             | `apps/api/src/modules/auth/services/member-password-service.ts:36,121-123,310-315`, `db/migrations/000140_add_member_codes.sql`                                                             |
-| F-03 | High              | `POST /api/schools/{schoolId}/provision` has no permission check and no `schoolId === auth.schoolId` check; it inserts `ORG_ADMIN` for the caller. Any authenticated user of a school whose provisioning is not `completed`/`in_progress` becomes ORG_ADMIN. Route is on the guard-coverage exempt list.                                                                           | `apps/api/src/modules/tenancy/provisioning/route.ts:81,98-145`, `provisioning/service.ts:85-109,264-271`, `apps/api/tests/permission-guard-coverage.test.ts:71,584`                         |
-| F-04 | High              | Realtime room join only checks `schoolId`. Any socket can join `school:<own>:user:<anyId>` or `school:<own>:role:admin` and receive that user's/role's events.                                                                                                                                                                                                                     | `apps/realtime/src/app.ts:240-248`                                                                                                                                                          |
-| F-05 | High (functional) | Web→realtime handshake cannot work in deployed envs: web sends the API's RS256 session token as `?token=`, gateway verifies HS256 against a separate Terraform random secret. Also: `WS_JWT_SECRET` defaults to `dev-insecure-secret-change-me` with no prod guard; revocation never re-checked mid-connection; token without `exp` never expires; token in URL lands in ALB logs. | `apps/web/src/lib/realtime/client.ts:95-98`, `apps/realtime/src/auth.ts:73-77`, `apps/realtime/src/env.ts:43`, `apps/api/src/middleware/jwtAuth.ts:19`, `infra/terraform/main.tf:153`       |
-| F-06 | High (functional) | Production RAG uses a hash-based pseudo-embedder for both ingestion and query. The vector half of hybrid search is semantically meaningless while `AI_LLM_ENABLED=true` in prod. Documented as intentional; still a product-quality defect.                                                                                                                                        | `apps/api/src/modules/ai/retrieval/embeddings.ts:72`, `apps/api/src/app.ts:1326,1353`, `apps/workers/src/queues/ai-ingestion/worker.ts:181`                                                 |
-| F-07 | Medium            | OAuth `state` is not bound to the browser (Redis-only). Login CSRF: attacker sends victim their own callback URL; victim is signed into attacker's account.                                                                                                                                                                                                                        | `apps/api/src/modules/auth/oauth/google-route.ts:96,181`, `microsoft-route.ts:91,176`, `callback-flows.ts:48-56`                                                                            |
-| F-08 | Medium            | Refresh-token reuse detection revokes the family in Postgres but never denylists its `access_jti`; the attacker's access token stays valid up to 15 min. Contradicts `docs/security/device_revocation_and_logout.md`.                                                                                                                                                              | `apps/api/src/modules/auth/services/session-service.ts:492-533`                                                                                                                             |
-| F-09 | Medium            | Request logger writes the full query string unredacted: OAuth `code`/`state`, Google Play RTDN `?token=` shared secret. Path redaction misses `/api/auth/invitations/{token}/activate` and `/api/schools/verify-email/{token}`. Anyone with CloudWatch read can verify a school email or replay the RTDN secret.                                                                   | `apps/api/src/middleware/logger.ts:48`, `apps/api/src/lib/security/sensitive-path.ts`, `modules/subscriptions/store/routes.ts:131,218`                                                      |
-| F-10 | Medium            | Web app served with no CSP/HSTS/XFO/nosniff from CloudFront (header policies set only `Cache-Control`). Container nginx loses server-level headers in `location = /index.html` (`add_header` inheritance).                                                                                                                                                                         | `infra/terraform/modules/cdn/distribution.tf:87-148`, `infra/docker/web/nginx.conf:24-39`                                                                                                   |
-| F-11 | Medium            | CSV formula injection in audit-log export (user-agent is attacker-controlled) and finance-reporting export. Custom lists and web already have the guard.                                                                                                                                                                                                                           | `packages/audit-reporting/src/index.ts:324-346`, `packages/finance-reporting/src/index.ts:112-116`                                                                                          |
-| F-12 | Medium            | SNS signature uses the Notification field list for every type. Real `SubscriptionConfirmation` messages (signed over `SubscribeURL`, `Token`) can never verify, so auto-confirm is dead; tests share the bug. `SubscribeURL` is fetched with no host allowlist.                                                                                                                    | `apps/api/src/email/sns-signature.ts:59`, `apps/api/src/email/webhook.ts:232-240`                                                                                                           |
-| F-13 | Medium            | Idempotency key is global (`idem:<key>`): not scoped to school/user/method/path. Same key + same body from another user/tenant replays the stored response. In-flight lock is a per-process Map, so two instances can both execute.                                                                                                                                                | `apps/api/src/middleware/idempotency.ts:90-91,156-187`                                                                                                                                      |
-| F-14 | Medium            | Only study materials go through ClamAV. Submission, assignment, expense, message, record and staff-document attachments are served without any scan.                                                                                                                                                                                                                               | `apps/api/src/modules/storage/download-service.ts:57-70`                                                                                                                                    |
-| F-15 | Medium            | Three sign-in routes store raw `X-Forwarded-For` (possibly multi-hop) into `inet` columns → 500 on sign-in for users behind a proxy that sets XFF. Two other routes take the client-controlled first hop for session/audit IPs.                                                                                                                                                    | `apps/api/src/modules/auth/routes/member-password-routes.ts:153`, `review-login-routes.ts:105`, `returning-user-login-routes.ts:200`, `session-routes.ts:617`, `admin-device-routes.ts:267` |
-| F-16 | Medium            | Realtime has no `maxPayloadLength`, no per-socket room cap, no message rate limit, no Origin check. One token can grow room maps until OOM.                                                                                                                                                                                                                                        | `apps/realtime/src/app.ts:214-253`, `apps/realtime/src/index.ts:83`, `rooms.ts:56-70`                                                                                                       |
-| F-17 | Medium            | Provisioning-status read and several provisioning/price-sync/bulk-invite queries use the raw pool outside any tenant tx, with no ownership check. Impact depends on S-01.                                                                                                                                                                                                          | `tenancy/provisioning/route.ts:83-86`, `provisioning/service.ts:156-182,400-410`, `price-sync-service.ts:46,88`, `apps/workers/.../bulk-invite-processor.ts:57-111`                         |
-| F-18 | Medium            | Third-party GitHub Actions pinned by mutable tag in jobs holding credentials / `id-token: write` (`configure-aws-credentials@v4`, `cosign-installer@v3`, `docker/login-action@v3`, `trivy-action@v0.36.0` in containers/terraform).                                                                                                                                                | `.github/workflows/{containers,deploy,release,terraform,build-and-sign}.yml`                                                                                                                |
-| F-19 | Low               | Presigned upload PUT does not bind size; objects up to 5 GB can land in the temp prefix (24h cleanup).                                                                                                                                                                                                                                                                             | `apps/api/src/modules/storage/service.ts:66`                                                                                                                                                |
-| F-20 | Low               | CSV import reads the whole body (up to Bun's 128 MB) and parses inside a tenant tx; row cap applies after parsing.                                                                                                                                                                                                                                                                 | `apps/api/src/modules/imports/routes/import-routes.ts:669-683`                                                                                                                              |
+| ID   | Sev               | Finding                                                                                                                                                                                                                                                                                                                                                                            | Evidence                                                                                                                                                                                                               |
+| ---- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| F-01 | Critical          | ORG_ADMIN can assign `SUPER_ADMIN` / `SUPPORT_AGENT` to any user in their school (including themselves). `roleSchema` accepts every role; `updateUserRole` writes it with no allowlist or rank check; no DB guard. After refresh the token carries `SUPER_ADMIN` → `/api/platform/*` runs as `studafy_admin` across all schools. Same schema backs create-user.                    | `apps/api/src/modules/users/schemas.ts:14,91,162`, `users/routes/user-routes.ts:331,438`, `users/user-service.ts:383-412`, `packages/constants/src/permissions.ts:290`                                                 |
+| F-02 | Critical          | Unclaimed member accounts can be taken over with a global default password. Accounts with no stored hash accept `pass@1234` and let the caller set a new password and get a session. Usernames are sequential (`STU-100001`). Admin password reset reopens the window. Only per-IP rate limit applies.                                                                             | `apps/api/src/modules/auth/services/member-password-service.ts:36,121-123,310-315`, `db/migrations/000140_add_member_codes.sql`                                                                                        |
+| F-03 | High              | `POST /api/schools/{schoolId}/provision` has no permission check and no `schoolId === auth.schoolId` check; it inserts `ORG_ADMIN` for the caller. Any authenticated user of a school whose provisioning is not `completed`/`in_progress` becomes ORG_ADMIN. Route is on the guard-coverage exempt list.                                                                           | `apps/api/src/modules/tenancy/provisioning/route.ts:81,98-145`, `provisioning/service.ts:85-109,264-271`, `apps/api/tests/permission-guard-coverage.test.ts:71,584`                                                    |
+| F-04 | High              | Realtime room join only checks `schoolId`. Any socket can join `school:<own>:user:<anyId>` or `school:<own>:role:admin` and receive that user's/role's events.                                                                                                                                                                                                                     | `apps/realtime/src/app.ts:240-248`                                                                                                                                                                                     |
+| F-05 | High (functional) | Web→realtime handshake cannot work in deployed envs: web sends the API's RS256 session token as `?token=`, gateway verifies HS256 against a separate Terraform random secret. Also: `WS_JWT_SECRET` defaults to `dev-insecure-secret-change-me` with no prod guard; revocation never re-checked mid-connection; token without `exp` never expires; token in URL lands in ALB logs. | `apps/web/src/lib/realtime/client.ts:95-98`, `apps/realtime/src/auth.ts:73-77`, `apps/realtime/src/env.ts:43`, `apps/api/src/middleware/jwtAuth.ts:19`, `infra/terraform/main.tf:153`                                  |
+| F-06 | High (functional) | Production RAG uses a hash-based pseudo-embedder for both ingestion and query. The vector half of hybrid search is semantically meaningless while `AI_LLM_ENABLED=true` in prod. Documented as intentional; still a product-quality defect.                                                                                                                                        | `apps/api/src/modules/ai/retrieval/embeddings.ts:72`, `apps/api/src/app.ts:1326,1353`, `apps/workers/src/queues/ai-ingestion/worker.ts:181`                                                                            |
+| F-07 | Medium            | OAuth `state` is not bound to the browser (Redis-only). Login CSRF: attacker sends victim their own callback URL; victim is signed into attacker's account.                                                                                                                                                                                                                        | `apps/api/src/modules/auth/oauth/google-route.ts:96,181`, `microsoft-route.ts:91,176`, `callback-flows.ts:48-56`                                                                                                       |
+| F-08 | Medium            | Refresh-token reuse detection revokes the family in Postgres but never denylists its `access_jti`; the attacker's access token stays valid up to 15 min. Contradicts `docs/security/device_revocation_and_logout.md`.                                                                                                                                                              | `apps/api/src/modules/auth/services/session-service.ts:492-533`                                                                                                                                                        |
+| F-09 | Medium            | Request logger writes the full query string unredacted: OAuth `code`/`state`, Google Play RTDN `?token=` shared secret. Path redaction misses `/api/auth/invitations/{token}/activate` and `/api/schools/verify-email/{token}`. Anyone with CloudWatch read can verify a school email or replay the RTDN secret.                                                                   | `apps/api/src/middleware/logger.ts:48`, `apps/api/src/lib/security/sensitive-path.ts`, `modules/subscriptions/store/routes.ts:131,218`                                                                                 |
+| F-10 | Medium            | Web app served with no CSP/HSTS/XFO/nosniff from CloudFront (header policies set only `Cache-Control`). Container nginx loses server-level headers in `location = /index.html` (`add_header` inheritance).                                                                                                                                                                         | `infra/terraform/modules/cdn/distribution.tf:87-148`, `infra/docker/web/nginx.conf:24-39`                                                                                                                              |
+| F-11 | Medium            | CSV formula injection in audit-log export (user-agent is attacker-controlled) and finance-reporting export. Custom lists and web already have the guard.                                                                                                                                                                                                                           | `packages/audit-reporting/src/index.ts:324-346`, `packages/finance-reporting/src/index.ts:112-116`                                                                                                                     |
+| F-12 | Medium            | SNS signature uses the Notification field list for every type. Real `SubscriptionConfirmation` messages (signed over `SubscribeURL`, `Token`) can never verify, so auto-confirm is dead; tests share the bug. `SubscribeURL` is fetched with no host allowlist.                                                                                                                    | `apps/api/src/email/sns-signature.ts:59`, `apps/api/src/email/webhook.ts:232-240`                                                                                                                                      |
+| F-13 | Medium            | Idempotency key is global (`idem:<key>`): not scoped to school/user/method/path. Same key + same body from another user/tenant replays the stored response. In-flight lock is a per-process Map, so two instances can both execute.                                                                                                                                                | `apps/api/src/middleware/idempotency.ts:90-91,156-187`                                                                                                                                                                 |
+| F-14 | Medium            | Only study materials go through ClamAV. Submission, assignment, expense, message, record and staff-document attachments are served without any scan.                                                                                                                                                                                                                               | `apps/api/src/modules/storage/download-service.ts:57-70`                                                                                                                                                               |
+| F-15 | Medium            | Three sign-in routes store raw `X-Forwarded-For` (possibly multi-hop) into `inet` columns → 500 on sign-in for users behind a proxy that sets XFF. Two other routes take the client-controlled first hop for session/audit IPs.                                                                                                                                                    | `apps/api/src/modules/auth/routes/member-password-routes.ts:153`, `review-login-routes.ts:105`, `returning-user-login-routes.ts:200`, `session-routes.ts:617`, `admin-device-routes.ts:267`                            |
+| F-16 | Medium            | Realtime has no `maxPayloadLength`, no per-socket room cap, no message rate limit, no Origin check. One token can grow room maps until OOM.                                                                                                                                                                                                                                        | `apps/realtime/src/app.ts:214-253`, `apps/realtime/src/index.ts:83`, `rooms.ts:56-70`                                                                                                                                  |
+| F-17 | Medium            | Provisioning-status read and several provisioning/price-sync/bulk-invite queries use the raw pool outside any tenant tx, with no ownership check. Impact depends on S-01.                                                                                                                                                                                                          | `tenancy/provisioning/route.ts:83-86`, `provisioning/service.ts:156-182,400-410`, `price-sync-service.ts:46,88`, `apps/workers/.../bulk-invite-processor.ts:57-111`, `tenancy/verification/service.ts:119,151` (QA-16) |
+| F-18 | Medium            | Third-party GitHub Actions pinned by mutable tag in jobs holding credentials / `id-token: write` (`configure-aws-credentials@v4`, `cosign-installer@v3`, `docker/login-action@v3`, `trivy-action@v0.36.0` in containers/terraform).                                                                                                                                                | `.github/workflows/{containers,deploy,release,terraform,build-and-sign}.yml`                                                                                                                                           |
+| F-19 | Low               | Presigned upload PUT does not bind size; objects up to 5 GB can land in the temp prefix (24h cleanup).                                                                                                                                                                                                                                                                             | `apps/api/src/modules/storage/service.ts:66`                                                                                                                                                                           |
+| F-20 | Low               | CSV import reads the whole body (up to Bun's 128 MB) and parses inside a tenant tx; row cap applies after parsing.                                                                                                                                                                                                                                                                 | `apps/api/src/modules/imports/routes/import-routes.ts:669-683`                                                                                                                                                         |
 
 ### Suspected (needs verification, not a fix yet)
 
@@ -94,7 +126,7 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
 **QA-01 — Runnable DB-backed test environment**
 
 - Depends on: —
-- Do: bring up `test-postgres`/`test-redis` (`bun run db:up`, ports 54330/…) and run
+- Do: bring up `test-postgres`/`test-redis` (`bun run db:up`, ports 54329/6390) and run
   `bun run test:security`, `bun --cwd apps/api run test:auth`, `test:cross-tenant`,
   `db:test:rls-coverage`, `apps/workers` DB tests. Record results in this file's baseline table.
 - Acceptance:
@@ -110,6 +142,13 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   or `curl` collection checked into `infra/load-tests` or a new `qa/` folder.
 - Acceptance: a tester can obtain a bearer token for every role in both schools in < 5 minutes
   without DB access.
+- Built (2026-11-02): staging-only `POST /api/auth/login/qa` (refused at boot when
+  `APP_ENV=production`), migration 000183 `is_qa_tenant`, `bun run db:seed:qa` (platform school +
+  QA Schools A/B), and `qa/` (curl `get-tokens.sh` + Bruno). Runbook:
+  [`qa-staging-access.md`](../runbooks/qa-staging-access.md). Verified locally against a real API
+  with the rate limiter on: 15 tokens (8 roles × 2 schools, SUPER_ADMIN in the platform school) in
+  30 s. **Not yet done on staging itself**: set `QA_LOGIN_PASSWORD` and run the seed there
+  (runbook "Provisioning").
 
 ### Phase 1 — Reproduce and fix Critical/High (release blockers)
 
@@ -124,6 +163,25 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - New test: caller cannot grant a role above their own (ORG_ADMIN cannot create another
     ORG_ADMIN unless that is an intended product rule — decide and document in the permission matrix).
   - Audit of every other endpoint taking a role in the body (`schemas.ts:55,263`, invitations, imports).
+- Built (2026-11-03), regression suite `apps/api/tests/security/role-escalation.test.ts`:
+  - API: `POST /api/users` and `PATCH /api/users/{userId}/role` (the finding says PUT; the route is
+    PATCH) accept only `ASSIGNABLE_ROLES` (every role but SUPER_ADMIN/SUPPORT_AGENT) → 400; the
+    service refuses a platform role with 403 for any other caller. Only a SUPER_ADMIN may re-role a
+    platform-role holder (`canChangeRoleOf`) → 403.
+  - DB (migration 000185): `schools.is_platform_tenant`, settable only by `studafy_admin` (trigger);
+    a trigger on `app.user_roles` refuses SUPER_ADMIN/SUPPORT_AGENT in any other school, for every
+    writer including `studafy_app`. Backfill flags each school that already holds a platform role
+    and lists it as a NOTICE. **On staging and production, check that NOTICE list against the real
+    platform school** — any other school on it held a platform role (possible F-01 exploitation).
+  - Decision: ORG_ADMIN may grant ORG_ADMIN (several admins per school; invitations always offered
+    it). Documented in `packages/constants/docs/permission-matrix.md` "Role grants".
+  - Audit: `schemas.ts:55` (response `roles`) and `:263` (list filter) only read roles. Invitations
+    (single and bulk) already allow only ORG_ADMIN, PRINCIPAL, FINANCE, ATTENDANCE_OFFICER,
+    INSTRUCTOR, STUDENT, GUEST, and activation writes that stored role (DB trigger behind it). The
+    import worker writes only STUDENT/PARENT. Registration, provisioning and school-application
+    approval write ORG_ADMIN; student/teacher services write STUDENT/INSTRUCTOR. The web picker
+    (`features/admin/users/schema.ts`) now uses the shared `ASSIGNABLE_ROLES` (it used to offer
+    SUPPORT_AGENT).
 
 **QA-11 — F-02 default-password account claim**
 
@@ -136,6 +194,16 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - Per-username and global rate limits on member login, independent of IP.
   - `member-password-login.test.ts` updated: the old "default password works" case now asserts failure.
   - Migration/rollout plan for already-issued accounts that have never signed in.
+- Built (2026-11-03): migration 000184 (per-member setup codes: 80-bit, SHA-256 digest, 14-day
+  expiry, consumed on first password); `DEFAULT_MEMBER_PASSWORD` removed; admin reset and Add member
+  issue a code shown once; `POST /api/users/member-setup-codes` bulk-issues codes to members who
+  cannot sign in yet (CSV in `/portal/members`); per-member-ID and global Redis buckets on
+  `/api/auth/login/member`. Rollout plan: [`member-setup-codes.md`](../runbooks/member-setup-codes.md).
+  Verified locally against Postgres 17: `member-password-login.test.ts` (incl. the retired default
+  now refused), account-deletion, and `member-codes` DB tests pass. With Redis 8 (`TEST_REDIS_URL`
+  and `REDIS_URL`), the per-member-ID limit case (10 attempts from 10 IPs, then 429) and the
+  rate limiter, revocation, app and entitlement suites pass with no skips. **Not yet done:** staging
+  verification.
 
 **QA-12 — F-03 provision route self-promotion**
 
@@ -145,6 +213,13 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - Removed from `GUARD_EXEMPT_ROUTES`.
   - Tests: STUDENT/INSTRUCTOR → 403; ORG_ADMIN of school A on school B → 403/404; no `user_roles`
     write and no `provisioning_status` change in either case.
+- Status: both provisioning routes (`POST …/provision` and `GET …/provisioning-status`) are behind
+  `requirePermission(ORGANIZATION_MANAGE_SETTINGS)` (SUPER_ADMIN holds it), and another school's id
+  gets 404. The route is no longer in `GUARD_EXEMPT_ROUTES`. Also fixed: the completion audit row
+  had no `old_values`, so `ck_audit_logs_payload` rejected it and every legitimate provision
+  returned 500. Verified locally against Postgres 16 with
+  `tests/security/provision-route-authz.test.ts` (7 pass; against the old route, 5 of 7 fail).
+  **Not yet done:** staging verification.
 
 **QA-13 — F-04 / F-16 realtime room authorization and limits**
 
@@ -154,6 +229,17 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - Per-kind policy table in `apps/realtime` with a test per room kind; unknown kinds rejected.
   - `maxPayloadLength` ≤ 16 KB, ≤ N rooms per socket, control-frame rate limit, Origin allowlist —
     each with a test.
+- Status: room joins and leaves go through a per-kind policy table
+  (`apps/realtime/src/room-policy.ts`). A socket may join only its own school room, its own role's
+  room and its own user room; unknown kinds are denied. The gateway now caps frames at 16 KB
+  (`maxPayloadLength`), rooms per socket at 8, and client frames at a burst of 20 refilled at 2/s
+  (then close 1008). The `/ws` handshake checks `Origin` against `WS_ALLOWED_ORIGINS`, which is
+  required when `NODE_ENV=production`; the ECS task sets it to `${WEB_ORIGIN}`. Tests:
+  `room-policy.test.ts` (one block per kind plus unknown kinds), `limits.test.ts`, and
+  `app.ws.test.ts` over a real socket (user U → `user:V` and student → `role:INSTRUCTOR` refused,
+  oversized frame, room cap, rate limit, origin 403). `bun test` in `apps/realtime`: 131 pass.
+  The smoke test now checks that a student is refused the instructor room. **Not yet done:**
+  staging verification.
 
 **QA-14 — F-05 realtime handshake contract**
 
@@ -167,6 +253,41 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
   - Gateway refuses to boot in production with the default secret (env test).
   - Revocation: a revoked session's socket is closed within a bounded time (state the bound, test it).
   - Contract test that runs the real API token issuer against the real gateway verifier.
+- Do-first result (2026-11-03): **not run against staging.** The AWS session on the machine that did
+  the fix had expired, so the gateway logs could not be read. The code shows the 401 regardless: the
+  web client sent the API's RS256 access token as `?token=` and the gateway verified it as HS256
+  with `WS_JWT_SECRET`, a secret the API never held, so every deployed web socket got
+  `401 TOKEN_INVALID`. Mobile did the same. The grade-publish mobile journey was `skip: true` for
+  exactly this reason.
+- Status: `GET /api/realtime/ticket` (`apps/api/src/modules/realtime`) mints a ticket for the bearer's
+  session: HS256 with `WS_JWT_SECRET`, `aud=studafy-realtime`, `iss=studafy-api`, 30 s lifetime
+  (the gateway refuses `exp - iat > 60`), single-use `jti`, plus `sid`/`sexp` (the access token's
+  `jti`/`exp`). Contract constants live in `@studafy/constants` (`REALTIME_TICKET`). A shared key,
+  not the API's JWKS, because the API's RSA keys are generated in memory per task, so a JWKS
+  fetched through the ALB can come from another task. Terraform writes realtime's effective
+  `WS_JWT_SECRET` into the api app secret too, so they cannot differ.
+  The gateway handshake is now `/ws?ticket=`. It spends the `jti` in Redis (`SET NX`; replay → 401)
+  and checks `sid` against the API's denylist before upgrading; Redis down → 503. The socket closes
+  with 4401 at `sexp`, and a sweep closes revoked sessions' sockets with 4401: **bound 15 s**
+  (`REVOCATION_SWEEP_INTERVAL_MS`) plus one Redis round trip, while Redis is reachable. The
+  denylist is in the API's Redis database (`queue_url`, db 1), not the pub/sub one, so the
+  gateway has `AUTH_REDIS_URL` (required in production; the ECS task sets it to `queue_url`).
+  Production refuses the default or a < 32-character `WS_JWT_SECRET` in both services. The gateway
+  never logs the ticket (tracing records the route only; a test captures console output through a
+  real handshake). Web and mobile fetch a ticket per connect attempt; the synthetic probe mints a
+  contract-valid ticket. Tests: `apps/api/tests/realtime/ticket-contract.test.ts` (the real issuer
+  against the real verifier, and the whole route → handshake journey; the access token is refused
+  in either query parameter), `apps/realtime/src/{auth,session-guard,env,app.ws}.test.ts`
+  (replay, revoked at handshake, sweep closes within one interval, fail-closed 503, multi-role
+  rooms, default-secret boot refusal). Results: `apps/realtime` 159 pass, `apps/api` 2143 pass
+  (DB suites skipped locally), `apps/web` 1068 pass, mobile `test/core/realtime` 48 pass,
+  `infra/deploy` 19 pass. The grade-publish mobile journey is unskipped.
+  **Not yet done:** the staging do-first check; the ALB access-log check (after deploy,
+  `?token=` should not appear on `/ws` requests, and `?ticket=` values are single-use and expire
+  in 30 s); the mobile integration suite on an emulator. Known limits: refresh-token reuse does not
+  denylist the access `jti` (F-08, QA-21), so such a socket lives until `sexp` (≤ 15 min); and
+  rotating `WS_JWT_SECRET` fails new handshakes until both services are redeployed (open sockets
+  are unaffected).
 
 **QA-15 — F-06 production embeddings decision**
 
@@ -186,6 +307,18 @@ the fix, then the test passes in CI. "Done" means merged to `dev` with CI green 
     for the PgBouncer login in staging and prod.
   - If the login can bypass RLS: ticket to introduce a least-privilege login role, and F-17 raised to High.
   - Lint/test forbidding direct `database\`` use in `apps/api/src/modules/**` outside an allowlist.
+- Built (2026-11-03):
+  - Lint: `studafy/no-raw-pool-query` (error in `apps/api/src/modules/**`): a tagged template or
+    `.unsafe()` on `database`/`db`/`primary`/`readReplica`. The 9 files that still do (21 queries)
+    are in the root `eslint.config.js` `RAW_POOL_QUERY_ALLOWLIST_COUNTS`, each with a reason and an
+    exact count; `apps/api/tests/security/raw-pool-query-lint.test.ts` fails if a count changes.
+    Two touch tenant tables unscoped: `provisioning/service.ts` (F-17) and, newly found,
+    `verification/service.ts:119,151` (`app.users`), added to F-17.
+  - Runtime login: from infra, every PgBouncer pool logs in as the RDS master user (no other login
+    exists). Read-only audit script and steps:
+    [`S-01-database-role-verification.md`](../security/S-01-database-role-verification.md), with
+    the least-privilege ticket drafted for the bypass case. **Not yet run on staging/prod**: needs
+    bastion access to each environment; results go in that file.
 
 ### Phase 2 — Medium security fixes
 

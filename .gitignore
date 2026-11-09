@@ -57,3 +57,6 @@ apps/mobile/lib/src/core/api/generated/
 # Local production secrets file fed to TF_VAR_secrets_app_secret_values — never commit
 prod-secerts.json
 prod-secrets.json
+
+# QA-02 token output (qa/get-tokens.sh)
+qa/.tokens.env

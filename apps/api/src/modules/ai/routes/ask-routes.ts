@@ -354,8 +354,11 @@ export function aiAskRoutes(deps: {
    * flag cache TTL without a deploy.
    */
   flags?: FlagsService | null;
-  /** The query embedder for the retrieval leg, the same one the search endpoint uses. */
-  embedder: QueryEmbedder;
+  /**
+   * The query embedder for the semantic leg, the same one the search endpoint uses — or null for
+   * lexical-only retrieval (ADR-020; production today, since no real embedding provider is wired).
+   */
+  embedder: QueryEmbedder | null;
   /** Environment overrides for the routing table's model ids (`AI_LLM_LARGE_MODEL`). */
   modelOverrides?: Partial<Record<AiModelTier, string>>;
 }): OpenAPIHono<AppEnv> {
@@ -426,7 +429,7 @@ export function aiAskRoutes(deps: {
     const preflight = await withTenantTx(database, tenantFrom(c), async (tx) => {
       const search = await hybridSearch(tx, {
         query: body.question,
-        queryVector: embedder.embed(body.question),
+        queryVector: embedder ? embedder.embed(body.question) : null,
         limit: AI_ASK_SOURCE_LIMIT,
         ...(body.material_id !== undefined ? { materialId: body.material_id } : {}),
       });
@@ -444,7 +447,7 @@ export function aiAskRoutes(deps: {
       return { search, conversationId, history };
     });
 
-    const grounding = assessGrounding(preflight.search.hits);
+    const grounding = assessGrounding(preflight.search.hits, preflight.search.mode);
     // The school's `ai.ask.general` flag (on by default) makes Ask AI a general study assistant:
     // a message the materials do not cover is answered conversationally with no sources or
     // citations (`grounded: false`), and a grounded answer may complete what its sources only

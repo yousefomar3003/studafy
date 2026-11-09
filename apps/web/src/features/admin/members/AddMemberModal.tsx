@@ -6,6 +6,7 @@ import { useTranslation } from "../../../lib/i18n";
 
 import { useCreateMember } from "./mutations";
 import { MEMBER_KINDS } from "./queries";
+import { SetupCodeDetails } from "./SetupCodeDetails";
 
 import type { CreatedMember, NewMemberValues } from "./mutations";
 import type { MemberRole } from "./queries";
@@ -35,20 +36,15 @@ const REQUIRED: Record<MemberRole, FieldKey[]> = {
 export interface AddMemberModalProps {
   open: boolean;
   defaultRole: MemberRole;
-  defaultPassword: string;
   onClose: () => void;
 }
 
 /**
  * Adds a student, teacher, parent or attendance officer without an email address. On success it
- * shows the ID they sign in with and the starting password, which they must change at first sign-in.
+ * shows the ID they sign in with and their one-time setup code, with which they choose their own
+ * password at first sign-in.
  */
-export function AddMemberModal({
-  open,
-  defaultRole,
-  defaultPassword,
-  onClose,
-}: AddMemberModalProps) {
+export function AddMemberModal({ open, defaultRole, onClose }: AddMemberModalProps) {
   const { t } = useTranslation();
   const { show } = useToast();
   const create = useCreateMember();
@@ -119,17 +115,7 @@ export function AddMemberModal({
         <>
           <Modal.Body>
             <p role="status">{t("adminPeople.members.add.created")}</p>
-            <dl className="members-credentials">
-              <dt>{t("adminPeople.members.username")}</dt>
-              <dd>
-                <code>{created.usernames.join(", ")}</code>
-              </dd>
-              <dt>{t("adminPeople.members.startingPassword")}</dt>
-              <dd>
-                <code>{defaultPassword}</code>
-              </dd>
-            </dl>
-            <p>{t("adminPeople.members.mustChangeNote")}</p>
+            <SetupCodeDetails usernames={created.usernames} setup={created.setup} />
           </Modal.Body>
           <Modal.Footer>
             <Button type="button" variant="tertiary" onClick={() => setCreated(null)}>

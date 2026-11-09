@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 // The unified demo-tenant seed entrypoint: `bun run db:seed`. Also exports seedTenant, the shared
-// envelope review-tenant.ts runs for the App Store / Play reviewer tenant.
+// envelope review-tenant.ts runs for the App Store / Play reviewer tenant and qa-tenant.ts for the
+// staging QA tenants.
 //
 // Envelope (mirrors packages/db/src/partitions.ts): caller's guard -> connect with the administrative
 // identity -> reserve one connection -> take the shared migration advisory lock -> abort if the
@@ -29,7 +30,7 @@ import { assertSeedAllowed, SeedSafetyError } from "./guard";
 import { checkIndexHealth, formatIndexHealthReport } from "./index-health";
 import { DEMO_TENANT } from "./tenants";
 
-import type { FullCtx, TenantProfile } from "./support";
+import type { FullCtx, SchoolCtx, Sql, TenantProfile } from "./support";
 import type { ReservedSql } from "../../packages/db/src/client";
 import type { MigrationConfig } from "../../packages/db/src/config";
 
@@ -104,6 +105,31 @@ export interface SeedOptions {
 // Throws SeedSafetyError when this tenant must not be seeded against this target.
 export type SeedGuard = (env: Record<string, string | undefined>, config: MigrationConfig) => void;
 
+// Writes the tenant's dataset once its school row exists and app.school_id is set. Runs inside the
+// envelope's single transaction as studafy_admin.
+export type SeedPopulate = (sql: Sql, school: SchoolCtx, tenant: TenantProfile) => Promise<void>;
+
+// The full demo school: every data module in dependency order.
+export async function populateSchoolDataset(
+  sql: Sql,
+  school: SchoolCtx,
+  tenant: TenantProfile,
+): Promise<void> {
+  const people = await seedPeople(sql, school, tenant);
+  const academics = await seedAcademics(sql, { ...school, ...people });
+  const ctx: FullCtx = { ...school, ...people, ...academics };
+
+  await seedTimetableAndAttendance(sql, ctx);
+  await seedAssessments(sql, ctx);
+  const materials = await seedMaterials(sql, ctx);
+  await seedFinance(sql, ctx);
+  await seedAi(sql, ctx, materials);
+  await seedEngagement(sql, ctx);
+  await seedSchoolEvents(sql, ctx);
+  await seedMessaging(sql, ctx);
+  if (tenant.localFixtures) await seedLocalFixtures(sql, ctx);
+}
+
 async function tableCounts(sql: ReservedSql): Promise<TableCount[]> {
   // SUMMARY_TABLES is a closed, in-repo constant list, never caller input.
   const query =
@@ -121,6 +147,7 @@ export async function seedTenant(
   tenant: TenantProfile,
   guard: SeedGuard,
   options: SeedOptions = {},
+  populate: SeedPopulate = populateSchoolDataset,
 ): Promise<SeedResult> {
   const env = options.env ?? process.env;
   const config = loadMigrationConfig(env);
@@ -155,20 +182,8 @@ export async function seedTenant(
 
       const school = await seedSchool(reserved, tenant);
       schoolId = school.schoolId;
-      const people = await seedPeople(reserved, school, tenant);
-      const academics = await seedAcademics(reserved, { ...school, ...people });
-      const ctx: FullCtx = { ...school, ...people, ...academics };
-
-      await seedTimetableAndAttendance(reserved, ctx);
-      await seedAssessments(reserved, ctx);
-      const materials = await seedMaterials(reserved, ctx);
-      await seedFinance(reserved, ctx);
-      await seedAi(reserved, ctx, materials);
-      await seedEngagement(reserved, ctx);
-      await seedSchoolEvents(reserved, ctx);
-      await seedMessaging(reserved, ctx);
-      if (tenant.localFixtures) await seedLocalFixtures(reserved, ctx);
-      if (tenant.isReviewTenant) await suppressTenantEmail(reserved, tenant);
+      await populate(reserved, school, tenant);
+      if (tenant.isReviewTenant || tenant.isQaTenant) await suppressTenantEmail(reserved, tenant);
 
       counts = await tableCounts(reserved);
       await reserved.unsafe("COMMIT");

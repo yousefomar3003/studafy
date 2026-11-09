@@ -144,8 +144,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/users/{userId}",
   "PATCH /api/users/{userId}/role",
   "PATCH /api/users/{userId}/deactivate",
-  // Member password reset (000141). Audit row written from inside resetMemberPassword's transaction.
+  // Member password reset and bulk setup codes (000141, 000184). Audit rows written from inside
+  // writeSetupCode's transaction, one per member.
   "POST /api/users/{userId}/password/reset",
+  "POST /api/users/member-setup-codes",
   // Student profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards.
   // Audit rows are written from inside the service transactions.
   "POST /api/students",

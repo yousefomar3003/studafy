@@ -358,7 +358,7 @@ describeDb("updateUserRole", () => {
     await assignRole(db.sql, school.id, user.id, "STUDENT");
 
     const updated = await withTx(school.id, (tx) =>
-      updateUserRole(tx, school.id, user.id, { role: "INSTRUCTOR" }),
+      updateUserRole(tx, school.id, user.id, { role: "INSTRUCTOR", callerRoles: ["ORG_ADMIN"] }),
     );
 
     expect(updated.roles).toContain("INSTRUCTOR");
@@ -372,6 +372,7 @@ describeDb("updateUserRole", () => {
       withTx(school.id, (tx) =>
         updateUserRole(tx, school.id, "00000000-0000-0000-0000-000000000000", {
           role: "STUDENT",
+          callerRoles: ["ORG_ADMIN"],
         }),
       ),
     ).rejects.toThrow();

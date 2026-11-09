@@ -80,7 +80,12 @@ const retrievalResponseSchema = z.object({
   query: z.string(),
   results: z.array(retrievalHitSchema),
   meta: z.object({
-    /** Rows the semantic leg returned on its final attempt — asserted, never assumed. */
+    /**
+     * Which legs ran: `lexical` (keyword full-text search only — production today, ADR-020) or
+     * `hybrid` (keyword fused with the pgvector semantic leg).
+     */
+    retrieval_mode: z.enum(["hybrid", "lexical"]),
+    /** Rows the semantic leg returned on its final attempt — asserted, never assumed; 0 when lexical. */
     semantic_leg_count: z.number().int(),
     /** True when the semantic leg under-returned and was retried at a higher `ef_search`. */
     retried: z.boolean(),
@@ -128,8 +133,9 @@ const retrievalSearchRoute = createRoute({
   operationId: "searchAiCorpus",
   summary: "Search the school's AI corpus",
   description:
-    "Hybrid retrieval over the school's ingested materials: a pgvector ANN semantic leg fused " +
-    "with a full-text keyword leg via Reciprocal Rank Fusion, tenant-isolated by RLS. When the " +
+    "Retrieval over the school's ingested materials, tenant-isolated by RLS: a full-text keyword " +
+    "leg, fused via Reciprocal Rank Fusion with a pgvector ANN semantic leg when an embedding " +
+    "provider is configured (`meta.retrieval_mode` says which ran; production is lexical-only). When the " +
     "cross-encoder re-ranker (ST-163) is enabled, the fused top-20 is re-scored and cut to the top 6. " +
     "Returns the top-ranked chunks with the citation anchors (material, page, section) a chat answer " +
     "renders from. Consumes this student's AI quota.",
@@ -163,7 +169,11 @@ function tenantFrom(c: Context<AppEnv>): {
 
 export function aiRetrievalRoutes(deps: {
   database: Database;
-  embedder: QueryEmbedder;
+  /**
+   * The query embedder for the semantic leg, or null for lexical-only retrieval (ADR-020): the
+   * keyword leg alone, and `meta.retrieval_mode: "lexical"`.
+   */
+  embedder: QueryEmbedder | null;
   /**
    * Feature-flag service evaluating `ai.rerank` (ST-163). Off, or null when nothing wired the
    * service (bare route tests, the OpenAPI generator), the route returns the fused RRF ranking
@@ -201,7 +211,7 @@ export function aiRetrievalRoutes(deps: {
     // bounded by the flag cache TTL. Without a flags service (no db/redis) the stage stays off.
     const rerankEnabled = flags ? await flags.get("ai.rerank", { schoolId: auth.schoolId }) : false;
 
-    const queryVector = embedder.embed(body.query);
+    const queryVector = embedder ? embedder.embed(body.query) : null;
     const tokensUsed = estimateQueryTokens(body.query);
 
     const result: HybridSearchResult = await withTenantTx(database, tenantFrom(c), async (tx) => {
@@ -222,12 +232,14 @@ export function aiRetrievalRoutes(deps: {
 
     const requestedLimit = clampLimit(body.limit);
     const meta: {
+      retrieval_mode: HybridSearchResult["mode"];
       semantic_leg_count: number;
       retried: boolean;
       tokens_used: number;
       reranked: boolean;
       rerank_model: string | null;
     } = {
+      retrieval_mode: result.mode,
       semantic_leg_count: result.semanticLegCount,
       retried: result.retried,
       tokens_used: tokensUsed,

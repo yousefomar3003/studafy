@@ -1,18 +1,24 @@
 import {
+  captureError,
   initErrorMonitoring,
   startMetricsServer,
   startTracing,
   withErrorMonitoringScope,
 } from "@studafy/observability";
-import { websocket } from "hono/bun";
+import IORedis from "ioredis";
 
-import { createApp } from "./app";
+import { createApp, realtimeWebSocket } from "./app";
 import { createRedisSubscriber } from "./connection";
 import { loadEnv } from "./env";
 import { createConnectionTracker, gracefulShutdown } from "./lifecycle";
 import { snapshot } from "./metrics";
 import { subscribeToOutboxEvents } from "./outbox-fanout";
 import { createRoomManager } from "./rooms";
+import {
+  createRedisSessionGuard,
+  createSessionRegistry,
+  startRevocationSweep,
+} from "./session-guard";
 import { subscribeToRooms } from "./subscriber";
 
 import type { RawSocket } from "./app";
@@ -71,13 +77,33 @@ const unsubscribe = async (): Promise<void> => {
   await Promise.all([unsubscribeRooms(), unsubscribeOutbox()]);
 };
 
+// Ordinary commands against the API's auth database (env.ts's AUTH_REDIS_URL): spending tickets
+// and reading the denylist. Its own connection, since the two above are in subscriber mode.
+const authRedis = new IORedis(env.AUTH_REDIS_URL ?? env.REDIS_URL, { lazyConnect: true });
+const sessionGuard = createRedisSessionGuard(authRedis);
+const sessions = createSessionRegistry<RawSocket>();
+
+// Closes revoked sessions' sockets within REVOCATION_SWEEP_INTERVAL_MS (F-05). A failed sweep is
+// reported and retried on the next tick; it never closes sockets on its own.
+const stopRevocationSweep = startRevocationSweep({
+  registry: sessions,
+  guard: sessionGuard,
+  onError: (error) => {
+    console.error("revocation sweep failed", error);
+    captureError(error, { tags: { component: "revocation_sweep" } });
+  },
+});
+
 const state = { ready: true };
 const app = createApp({
   isReady: () => state.ready,
   jwtSecret: env.WS_JWT_SECRET,
+  sessionGuard,
+  sessions,
   rooms,
   tracker,
   metrics: snapshot,
+  allowedOrigins: env.WS_ALLOWED_ORIGINS,
 });
 
 const server = Bun.serve({
@@ -85,7 +111,7 @@ const server = Bun.serve({
   hostname: env.HOST,
   // One Sentry scope per handshake request; see apps/api/src/index.ts's own Bun.serve.
   fetch: (request, bunServer) => withErrorMonitoringScope(() => app.fetch(request, bunServer)),
-  websocket,
+  websocket: realtimeWebSocket,
 });
 
 console.log(
@@ -103,6 +129,7 @@ const shutdown = (signal: string) => {
   void gracefulShutdown({
     onStart: () => {
       state.ready = false;
+      stopRevocationSweep();
       console.log(`Received ${signal}, closing ${tracker.size()} open connection(s)…`);
     },
     unsubscribe,
@@ -111,6 +138,7 @@ const shutdown = (signal: string) => {
     server.stop();
     redisSubscriber.disconnect();
     outboxSubscriber.disconnect();
+    authRedis.disconnect();
     await metricsServer.shutdown();
     await tracing?.shutdown();
     // Last, so anything reported while connections were closing still goes out before the exit.

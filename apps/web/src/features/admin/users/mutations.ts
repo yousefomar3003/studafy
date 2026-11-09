@@ -8,7 +8,7 @@ import { USERS_LIST_KEY } from "./queries";
 import type { UserWithRoles } from "./queries";
 import type { CreateUserValues } from "./schema";
 import type { components } from "@studafy/api-client";
-import type { Role } from "@studafy/constants";
+import type { AssignableRole, Role } from "@studafy/constants";
 import type { QueryClient, QueryKey } from "@tanstack/react-query";
 
 interface UsersListResult {
@@ -158,7 +158,7 @@ export function useUpdateUser() {
 
 export interface UpdateUserRoleVariables {
   userId: string;
-  role: Role;
+  role: AssignableRole;
 }
 
 export function useUpdateUserRole() {

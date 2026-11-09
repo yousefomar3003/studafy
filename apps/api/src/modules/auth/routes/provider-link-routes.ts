@@ -26,6 +26,7 @@ import { requireChannel } from "../../../middleware/channelGuard";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../channels";
+import { bindBrowser } from "../oauth/browser-binding";
 import { getGoogleOAuthConfig, GOOGLE_AUTH_ENDPOINT, GOOGLE_SCOPES } from "../oauth/config";
 import {
   getMicrosoftOAuthConfig,
@@ -225,6 +226,10 @@ export function providerLinkRoutes(
       nonce,
       userId: auth.userId,
       schoolId: auth.schoolId,
+      // The callback finishes the link in whichever browser presents the state, so without this an
+      // attacker could hand their own link callback to a victim and attach the victim's provider
+      // identity to the attacker's account. The SPA calls this with credentials: "include".
+      browserBinding: bindBrowser(c),
     });
 
     let redirectUrl: string;

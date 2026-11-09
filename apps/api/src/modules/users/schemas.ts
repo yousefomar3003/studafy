@@ -1,5 +1,5 @@
 import { z } from "@hono/zod-openapi";
-import { ROLES } from "@studafy/constants";
+import { ASSIGNABLE_ROLES, ROLES } from "@studafy/constants";
 import { uuidSchema, dateTimeSchema, dateSchema } from "@studafy/shared-schemas";
 
 import { userStatusSchema } from "../../openapi/components";
@@ -12,6 +12,13 @@ import { recordAnswerInputSchema } from "../records/schemas";
 const roleValues = Object.values(ROLES) as [string, ...string[]];
 
 export const roleSchema = z.enum(roleValues).openapi({ description: "Predefined platform role." });
+
+// What a school's user endpoints may assign. SUPER_ADMIN and SUPPORT_AGENT are Studafy staff roles:
+// an ORG_ADMIN who could assign them could make themselves SUPER_ADMIN (QA-10, finding F-01).
+export const assignableRoleSchema = z.enum(ASSIGNABLE_ROLES).openapi({
+  description:
+    "A school role. The platform roles SUPER_ADMIN and SUPPORT_AGENT cannot be assigned here.",
+});
 
 // ---------------------------------------------------------------------------
 // Parent relationship
@@ -88,7 +95,7 @@ export const createUserBodySchema = z
       .min(1)
       .max(200)
       .openapi({ description: "Human-readable name.", example: "Jamie Rivera" }),
-    role: roleSchema.openapi({ description: "Role to assign to the new user." }),
+    role: assignableRoleSchema.openapi({ description: "Role to assign to the new user." }),
     children: z
       .array(
         z
@@ -159,7 +166,9 @@ export type UpdateUserBody = z.infer<typeof updateUserBodySchema>;
 
 export const updateUserRoleBodySchema = z
   .object({
-    role: roleSchema.openapi({ description: "New role to assign. Replaces the existing role." }),
+    role: assignableRoleSchema.openapi({
+      description: "New role to assign. Replaces the existing role.",
+    }),
   })
   .openapi("UpdateUserRoleBody");
 
@@ -215,13 +224,56 @@ export const userMemberSummarySchema = z
     teachers: z.number().int().nonnegative(),
     parents: z.number().int().nonnegative(),
     attendance_officers: z.number().int().nonnegative(),
-    default_password: z.string().openapi({
-      description:
-        "The starting password for new members and after a reset. They must replace it at their " +
-        "first sign-in.",
-    }),
   })
   .openapi("UserMemberSummary");
+
+// ---------------------------------------------------------------------------
+// Setup codes (QA-11)
+// ---------------------------------------------------------------------------
+
+const setupCodeField = z.string().openapi({
+  description:
+    "One-time code the member signs in with to choose their password. Shown only in this " +
+    "response; it cannot be retrieved again.",
+  example: "7K3M-Q9TZ-2HXR-B8WD",
+});
+
+const setupCodeExpiresField = z.string().datetime().openapi({
+  description: "When the setup code stops working.",
+});
+
+export const memberSetupCodeSchema = z
+  .object({
+    usernames: z.array(z.string()).openapi({ description: "The member IDs they sign in with." }),
+    setup_code: setupCodeField,
+    expires_at: setupCodeExpiresField,
+  })
+  .openapi("MemberSetupCode");
+
+export const issueSetupCodesBodySchema = z
+  .object({
+    role: z.enum(["STUDENT", "INSTRUCTOR", "PARENT", "ATTENDANCE_OFFICER"]).openapi({
+      description: "Which members to issue codes to.",
+    }),
+  })
+  .openapi("IssueMemberSetupCodesRequest");
+
+export const issuedSetupCodesSchema = z
+  .object({
+    issued: z.array(
+      z.object({
+        user_id: z.string().uuid(),
+        display_name: z.string().nullable(),
+        usernames: z.array(z.string()),
+        setup_code: setupCodeField,
+        expires_at: setupCodeExpiresField,
+      }),
+    ),
+    remaining: z.number().int().nonnegative().openapi({
+      description: "Members still waiting for a code; call again to issue the next batch.",
+    }),
+  })
+  .openapi("IssuedMemberSetupCodes");
 
 // ---------------------------------------------------------------------------
 // Deactivate response

@@ -52,6 +52,11 @@ beforeAll(async () => {
     tier = plan!.id;
   });
   const home = await school("Studafy HQ (jobs)");
+  // Only a platform school may hold SUPER_ADMIN (000185).
+  await admin(
+    null,
+    (tx) => tx`UPDATE app.schools SET is_platform_tenant = true WHERE id = ${home}::uuid`,
+  );
   const superAdmin = await user(home, "SUPER_ADMIN");
   hq = { schoolId: home, superAdmin };
 });

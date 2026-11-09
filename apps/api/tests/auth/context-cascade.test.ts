@@ -74,6 +74,7 @@ describe("protected routes in the real stack", () => {
         roles: ["ORG_ADMIN"],
         channel: "web",
         jti: expect.any(String),
+        exp: expect.any(Number),
         entitlementsVer: 1,
         subscriptionStatus: "active",
       },

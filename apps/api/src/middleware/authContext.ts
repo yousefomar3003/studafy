@@ -31,6 +31,11 @@ export interface AuthContext {
   channel: AuthChannel;
   /** The token's unique id, used for revocation. See modules/auth/denylist.ts. */
   jti: string;
+  /**
+   * The token's `exp` (seconds since the epoch). A realtime ticket carries it, so the gateway closes
+   * the socket when the session it was opened for runs out (modules/realtime).
+   */
+  exp: number;
   /** Entitlement version counter, for cache invalidation without revocation. */
   entitlementsVer: number;
   /** The tenant's current subscription lifecycle state. Drives tenantLifecycleGuard middleware. */

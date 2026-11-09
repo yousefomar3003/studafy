@@ -5,8 +5,10 @@ import { describe, expect, test } from "bun:test";
 import { EnvValidationError, loadEnv } from "./env";
 import { LOG_LEVEL_NAMES } from "./logger";
 
-// A deployed tier needs a real records keyring and a KMS key for sensitive documents (ADR-019).
-const RECORD_SECRETS = {
+// A deployed tier needs a real records keyring and a KMS key for sensitive documents (ADR-019), and a
+// real realtime ticket key (QA-14).
+const DEPLOYED_SECRETS = {
+  WS_JWT_SECRET: "w".repeat(32),
   RECORDS_ENCRYPTION_KEYS: JSON.stringify({ "prod-1": Buffer.alloc(32, 3).toString("base64") }),
   RECORDS_ENCRYPTION_CURRENT_KEY_ID: "prod-1",
   STORAGE_SENSITIVE_KMS_KEY_ID: "alias/studafy-records",
@@ -36,6 +38,7 @@ describe("loadEnv", () => {
       AI_LLM_ZERO_RETENTION: false,
       AI_LLM_PROVIDER: "anthropic",
       TAP_COUNTRIES: new Set(),
+      WS_JWT_SECRET: "dev-insecure-secret-change-me",
     });
   });
 
@@ -46,7 +49,7 @@ describe("loadEnv", () => {
         APP_ENV: "staging",
         CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
         TURNSTILE_SECRET_KEY: "turnstile-secret",
-        ...RECORD_SECRETS,
+        ...DEPLOYED_SECRETS,
         PORT: "8080",
         HOST: "127.0.0.1",
         SHUTDOWN_TIMEOUT_MS: "5000",
@@ -59,7 +62,7 @@ describe("loadEnv", () => {
       APP_ENV: "staging",
       CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
       TURNSTILE_SECRET_KEY: "turnstile-secret",
-      ...RECORD_SECRETS,
+      ...DEPLOYED_SECRETS,
       PORT: 8080,
       HOST: "127.0.0.1",
       METRICS_PORT: 9464,
@@ -139,14 +142,31 @@ describe("loadEnv", () => {
         APP_ENV: "production",
         CORS_ALLOWED_ORIGINS: " https://app.studafy.com , https://api.studafy.com ",
         TURNSTILE_SECRET_KEY: "turnstile-secret",
-        ...RECORD_SECRETS,
+        ...DEPLOYED_SECRETS,
         NODE_ENV: "development",
       }).CORS_ALLOWED_ORIGINS,
     ).toBe(" https://app.studafy.com , https://api.studafy.com ");
   });
 
+  test("refuses the development realtime ticket key, or a short one, on a deployed tier (QA-14)", () => {
+    const deployed = {
+      CORS_ALLOWED_ORIGINS: "https://app.studafy.com",
+      TURNSTILE_SECRET_KEY: "s",
+      ...DEPLOYED_SECRETS,
+    };
+    for (const APP_ENV of ["staging", "production"]) {
+      expect(() => loadEnv({ ...deployed, APP_ENV, WS_JWT_SECRET: undefined })).toThrow(
+        /WS_JWT_SECRET must not be the development default/,
+      );
+      expect(() => loadEnv({ ...deployed, APP_ENV, WS_JWT_SECRET: "x".repeat(31) })).toThrow(
+        /WS_JWT_SECRET must be at least 32 characters/,
+      );
+      expect(loadEnv({ ...deployed, APP_ENV }).WS_JWT_SECRET).toBe("w".repeat(32));
+    }
+  });
+
   test("requires a Turnstile secret on every deployed tier, never in development", () => {
-    const deployed = { CORS_ALLOWED_ORIGINS: "https://app.studafy.com", ...RECORD_SECRETS };
+    const deployed = { CORS_ALLOWED_ORIGINS: "https://app.studafy.com", ...DEPLOYED_SECRETS };
     expect(() => loadEnv({ ...deployed, APP_ENV: "staging" })).toThrow(EnvValidationError);
     // The secret manager injects "" for a key nobody has supplied yet: still missing.
     expect(() => loadEnv({ ...deployed, APP_ENV: "production", TURNSTILE_SECRET_KEY: "" })).toThrow(
@@ -165,27 +185,31 @@ describe("loadEnv", () => {
       TURNSTILE_SECRET_KEY: "s",
       APP_ENV: "production",
     };
-    expect(loadEnv({ ...deployed, ...RECORD_SECRETS }).RECORDS_ENCRYPTION_CURRENT_KEY_ID).toBe(
+    expect(loadEnv({ ...deployed, ...DEPLOYED_SECRETS }).RECORDS_ENCRYPTION_CURRENT_KEY_ID).toBe(
       "prod-1",
     );
-    expect(() => loadEnv({ ...deployed, ...RECORD_SECRETS, RECORDS_ENCRYPTION_KEYS: "" })).toThrow(
-      /RECORDS_ENCRYPTION_KEYS/,
-    );
     expect(() =>
-      loadEnv({ ...deployed, ...RECORD_SECRETS, STORAGE_SENSITIVE_KMS_KEY_ID: "" }),
+      loadEnv({ ...deployed, ...DEPLOYED_SECRETS, RECORDS_ENCRYPTION_KEYS: "" }),
+    ).toThrow(/RECORDS_ENCRYPTION_KEYS/);
+    expect(() =>
+      loadEnv({ ...deployed, ...DEPLOYED_SECRETS, STORAGE_SENSITIVE_KMS_KEY_ID: "" }),
     ).toThrow(/STORAGE_SENSITIVE_KMS_KEY_ID/);
     // The in-repository development key never seals real data.
     expect(() =>
       loadEnv({
         ...deployed,
-        ...RECORD_SECRETS,
+        ...DEPLOYED_SECRETS,
         RECORDS_ENCRYPTION_KEYS: DEVELOPMENT_RECORD_KEYS_JSON,
         RECORDS_ENCRYPTION_CURRENT_KEY_ID: DEVELOPMENT_RECORD_KEY_ID,
       }),
     ).toThrow(/development key/);
     // A malformed keyring is named, never echoed.
     const malformed = () =>
-      loadEnv({ ...deployed, ...RECORD_SECRETS, RECORDS_ENCRYPTION_KEYS: '{"prod-1":"c2hvcnQ="}' });
+      loadEnv({
+        ...deployed,
+        ...DEPLOYED_SECRETS,
+        RECORDS_ENCRYPTION_KEYS: '{"prod-1":"c2hvcnQ="}',
+      });
     expect(malformed).toThrow(/32 bytes/);
     expect(malformed).not.toThrow(/c2hvcnQ=/);
     // Development needs neither.
@@ -412,6 +436,26 @@ describe("loadEnv", () => {
 
     expect(env.MOBILE_MIN_SUPPORTED_VERSION_IOS).toBeUndefined();
     expect(env.MOBILE_LATEST_VERSION_ANDROID).toBeUndefined();
+  });
+
+  test("allows the QA login password on staging, never in production (QA-02)", () => {
+    const deployed = {
+      CORS_ALLOWED_ORIGINS: "https://staging.studafy.com",
+      TURNSTILE_SECRET_KEY: "s",
+      ...DEPLOYED_SECRETS,
+    };
+    const password = "q".repeat(24);
+    expect(
+      loadEnv({ ...deployed, APP_ENV: "staging", QA_LOGIN_PASSWORD: password }).QA_LOGIN_PASSWORD,
+    ).toBe(password);
+    expect(() =>
+      loadEnv({ ...deployed, APP_ENV: "production", QA_LOGIN_PASSWORD: password }),
+    ).toThrow(/QA_LOGIN_PASSWORD/);
+    expect(() => loadEnv({ QA_LOGIN_PASSWORD: "q".repeat(23) })).toThrow(EnvValidationError);
+    // The secret manager injects "" for a key nobody has supplied yet: unset, even in production.
+    expect(
+      loadEnv({ ...deployed, APP_ENV: "production", QA_LOGIN_PASSWORD: "" }).QA_LOGIN_PASSWORD,
+    ).toBeUndefined();
   });
 
   test("rejects a mobile release version that is not x.y.z", () => {

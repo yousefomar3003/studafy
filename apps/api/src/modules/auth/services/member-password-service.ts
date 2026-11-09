@@ -3,11 +3,12 @@
  * officers, who are signed up without email addresses.
  *
  * Username: the member code (STU/TCH/PAR/ATT-<school number><sequence>, 000140).
- * Password: starts as DEFAULT_MEMBER_PASSWORD. A member still on it gets NO session: sign-in answers
- * PASSWORD_CHANGE_REQUIRED until the same request also carries `newPassword`, which is stored before
- * tokens are issued. The rule is enforced here, not by the client, because the default is shared and
- * codes are sequential — a session on the default password would make every unchanged account open
- * to anyone who can count.
+ * Password: none until the member claims the account with a setup code (000184) — a random,
+ * per-member, one-time secret an administrator issues, valid for SETUP_CODE_TTL_DAYS. A setup code
+ * gets NO session: sign-in answers PASSWORD_CHANGE_REQUIRED until the same request also carries
+ * `newPassword`, which is stored (consuming the code) before tokens are issued. Codes are sequential,
+ * so nothing a stranger could know or guess — such as a shared default password — may ever open an
+ * account.
  *
  * Accounts holding a privileged role (school leadership, platform staff) never sign in this way;
  * they keep Google / Microsoft. Five wrong passwords lock the account for fifteen minutes. Unknown
@@ -15,7 +16,7 @@
  * each path pays for one argon2 verification so timing does not tell them apart.
  */
 
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 
 import { ROLES } from "@studafy/constants";
 
@@ -31,9 +32,6 @@ import type { Logger } from "../../../logger";
 import type { AuthChannel } from "../channels";
 import type { Role } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
-
-/** Every member's starting password, and what an admin reset returns them to. */
-export const DEFAULT_MEMBER_PASSWORD = "pass@1234";
 
 /** Roles that sign in with a member code and password. */
 export const MEMBER_PASSWORD_ROLES: readonly Role[] = [
@@ -59,13 +57,42 @@ export const PASSWORD_MAX_LENGTH = 128;
 
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
 
-/** Constant-time comparison with the default; both sides hashed so lengths do not leak. */
-function isDefaultPassword(password: string): boolean {
-  const digest = (value: string) => createHash("sha256").update(value, "utf8").digest();
-  return timingSafeEqual(digest(password), digest(DEFAULT_MEMBER_PASSWORD));
+// ---------------------------------------------------------------------------
+// Setup codes
+// ---------------------------------------------------------------------------
+
+export const SETUP_CODE_TTL_DAYS = 14;
+
+/** Crockford base32: 32 symbols, so each is exactly 5 random bits, and no I, L, O or U to misread. */
+const SETUP_CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+/** 16 symbols × 5 bits = 80 bits, printed as XXXX-XXXX-XXXX-XXXX. */
+const SETUP_CODE_LENGTH = 16;
+
+export function generateSetupCode(): string {
+  const symbols = Array.from(randomBytes(SETUP_CODE_LENGTH), (byte) =>
+    SETUP_CODE_ALPHABET.charAt(byte & 31),
+  ).join("");
+  return symbols.match(/.{4}/g)!.join("-");
 }
 
-export type PasswordPolicyViolation = "TOO_SHORT" | "TOO_LONG" | "IS_DEFAULT" | "SAME_AS_USERNAME";
+/**
+ * The canonical form a setup code is hashed in: case, spaces and dashes ignored, and the letters
+ * people type for the digits they resemble read as those digits.
+ */
+export function normalizeSetupCode(input: string): string {
+  return input.toUpperCase().replace(/[\s-]/g, "").replace(/O/g, "0").replace(/[IL]/g, "1");
+}
+
+function hashSetupCode(code: string): string {
+  return createHash("sha256").update(normalizeSetupCode(code), "utf8").digest("hex");
+}
+
+function setupCodeMatches(input: string, storedHash: string): boolean {
+  return timingSafeEqual(Buffer.from(hashSetupCode(input), "hex"), Buffer.from(storedHash, "hex"));
+}
+
+export type PasswordPolicyViolation =
+  "TOO_SHORT" | "TOO_LONG" | "IS_SETUP_CODE" | "SAME_AS_USERNAME";
 
 /** Null when acceptable; otherwise why not. */
 export function checkNewPassword(
@@ -74,7 +101,6 @@ export function checkNewPassword(
 ): PasswordPolicyViolation | null {
   if (password.length < PASSWORD_MIN_LENGTH) return "TOO_SHORT";
   if (password.length > PASSWORD_MAX_LENGTH) return "TOO_LONG";
-  if (isDefaultPassword(password)) return "IS_DEFAULT";
   if (password.trim().toUpperCase() === username.trim().toUpperCase()) return "SAME_AS_USERNAME";
   return null;
 }
@@ -92,21 +118,27 @@ function burnVerification(password: string): Promise<boolean> {
 
 interface CredentialRow {
   password_hash: string | null;
+  /** Null when there is no setup code or it has expired. */
+  live_setup_code_hash: string | null;
   failed_attempts: number;
   locked: boolean;
 }
 
 /**
- * Verifies `password` for the user in the armed tenant, updating the lockout counters. The caller's
- * transaction must commit even on a wrong password so the failure is counted.
+ * Verifies `password` for the user in the armed tenant, updating the lockout counters: against the
+ * stored password, or — for an account with none yet — against its unexpired setup code ("OK_SETUP").
+ * An account with neither matches nothing. The caller's transaction must commit even on a wrong
+ * password so the failure is counted.
  */
 async function verifyStoredPassword(
   tx: TransactionSql,
   userId: string,
   password: string,
-): Promise<"OK_DEFAULT" | "OK" | "WRONG" | "LOCKED"> {
+): Promise<"OK_SETUP" | "OK" | "WRONG" | "LOCKED"> {
   const [row] = await tx<CredentialRow[]>`
     SELECT password_hash, failed_attempts,
+           CASE WHEN setup_code_expires_at > CURRENT_TIMESTAMP THEN setup_code_hash END
+             AS live_setup_code_hash,
            coalesce(locked_until > CURRENT_TIMESTAMP, false) AS locked
     FROM app.member_credentials
     WHERE user_id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
@@ -118,9 +150,12 @@ async function verifyStoredPassword(
   }
 
   const hash = row?.password_hash ?? null;
+  const setupHash = row?.live_setup_code_hash ?? null;
+  // Every branch pays for one argon2 verification so timing does not reveal which one ran.
   const matches =
     hash === null
-      ? (await burnVerification(password), isDefaultPassword(password))
+      ? (await burnVerification(password),
+        setupHash !== null && setupCodeMatches(password, setupHash))
       : await Bun.password.verify(password, hash);
 
   if (!matches) {
@@ -148,9 +183,10 @@ async function verifyStoredPassword(
       WHERE user_id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
     `;
   }
-  return hash === null ? "OK_DEFAULT" : "OK";
+  return hash === null ? "OK_SETUP" : "OK";
 }
 
+/** Stores the member's password, consuming any setup code. */
 async function storePassword(tx: TransactionSql, userId: string, password: string): Promise<void> {
   const hash = await hashMemberPassword(password);
   await tx`
@@ -159,6 +195,8 @@ async function storePassword(tx: TransactionSql, userId: string, password: strin
     ON CONFLICT (school_id, user_id) DO UPDATE SET
       password_hash = EXCLUDED.password_hash,
       password_changed_at = EXCLUDED.password_changed_at,
+      setup_code_hash = NULL,
+      setup_code_expires_at = NULL,
       failed_attempts = 0,
       locked_until = NULL,
       updated_at = CURRENT_TIMESTAMP
@@ -171,8 +209,9 @@ async function storePassword(tx: TransactionSql, userId: string, password: strin
 
 export interface MemberLoginParams {
   username: string;
+  /** The member's password, or their setup code while they have none. */
   password: string;
-  /** Required when the account is still on the default password. */
+  /** Required when `password` is a setup code. */
   newPassword?: string;
   channel: AuthChannel;
   device?: DeviceContext;
@@ -233,8 +272,9 @@ export async function isMemberPasswordAccount(
 
 /**
  * Re-authenticates a member-password account for a destructive action: `memberId` must be one of
- * the user's own member codes and `password` their current password. A wrong password counts
- * toward the sign-in lockout, so the caller's transaction must commit on "WRONG" as well.
+ * the user's own member codes and `password` their current password (a setup code is not one). A
+ * wrong password counts toward the sign-in lockout, so the caller's transaction must commit on
+ * "WRONG" as well.
  */
 export async function verifyMemberCredentials(
   tx: TransactionSql,
@@ -250,7 +290,7 @@ export async function verifyMemberCredentials(
   // Verified even when the code is wrong, so both mistakes take the same time and count the same.
   const outcome = await verifyStoredPassword(tx, userId, password);
   if (outcome === "LOCKED") return "LOCKED";
-  return ownsCode && outcome !== "WRONG" ? "OK" : "WRONG";
+  return ownsCode && outcome === "OK" ? "OK" : "WRONG";
 }
 
 export async function loginMember(
@@ -307,9 +347,13 @@ export async function loginMember(
       return { outcome: "SCHOOL_SUSPENDED" };
     }
 
-    if (verdict === "OK_DEFAULT") {
+    if (verdict === "OK_SETUP") {
       if (params.newPassword === undefined) return { outcome: "PASSWORD_CHANGE_REQUIRED" };
-      const violation = checkNewPassword(params.newPassword, username);
+      const violation =
+        checkNewPassword(params.newPassword, username) ??
+        (normalizeSetupCode(params.newPassword) === normalizeSetupCode(params.password)
+          ? "IS_SETUP_CODE"
+          : null);
       if (violation) return { outcome: "PASSWORD_REJECTED", reason: violation };
       await storePassword(tx, member.userId, params.newPassword);
     }
@@ -329,7 +373,7 @@ export async function loginMember(
     });
     await audit(
       tx,
-      verdict === "OK_DEFAULT" ? "LOGIN_SUCCESS_PASSWORD_SET" : "LOGIN_SUCCESS",
+      verdict === "OK_SETUP" ? "LOGIN_SUCCESS_PASSWORD_SET" : "LOGIN_SUCCESS",
       tokens.sessionId,
     );
     params.logger?.info(
@@ -366,9 +410,10 @@ export async function changeMemberPassword(
     `;
     if (codes.length === 0) return { outcome: "NOT_ELIGIBLE" };
 
+    // A setup code is for claiming the account at sign-in, not for proving who is signed in.
     const verdict = await verifyStoredPassword(tx, tenant.userId, currentPassword);
-    if (verdict === "WRONG") return { outcome: "WRONG_PASSWORD" };
     if (verdict === "LOCKED") return { outcome: "LOCKED" };
+    if (verdict !== "OK") return { outcome: "WRONG_PASSWORD" };
 
     for (const { code } of codes) {
       const violation = checkNewPassword(newPassword, code);
@@ -379,48 +424,146 @@ export async function changeMemberPassword(
       action: "update",
       targetTable: "member_credentials",
       targetId: tenant.userId,
-      oldValues: { password_default: verdict === "OK_DEFAULT" },
-      newValues: { event: "password_changed", password_default: false },
+      oldValues: { had_password: true },
+      newValues: { event: "password_changed", had_password: true },
     });
     return { outcome: "CHANGED" };
   });
 }
 
+export interface IssuedSetupCode {
+  /** The member IDs they sign in with. */
+  usernames: string[];
+  /** Plaintext, returned to the issuing administrator only; never stored or retrievable again. */
+  setupCode: string;
+  expiresAt: Date;
+}
+
 /**
- * Returns the member to the default password (forcing a change at next sign-in) and clears any
- * lockout. Runs in the administrator's tenant transaction. Undefined when the user has no member
- * code, i.e. is not someone who signs in with a password.
+ * Removes the member's password and clears any lockout, replacing both with a fresh setup code, so
+ * the next sign-in must choose a new password. Any earlier setup code stops working. The caller
+ * signs the member out everywhere.
  */
-export async function resetMemberPassword(
+async function writeSetupCode(
   tx: TransactionSql,
   userId: string,
-): Promise<{ usernames: string[] } | undefined> {
+): Promise<{ setupCode: string; expiresAt: Date }> {
+  const setupCode = generateSetupCode();
+  const [before] = await tx<{ had_password: boolean }[]>`
+    SELECT password_hash IS NOT NULL AS had_password FROM app.member_credentials
+    WHERE user_id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
+  `;
+  const [row] = await tx<{ expires_at: Date }[]>`
+    INSERT INTO app.member_credentials (school_id, user_id, setup_code_hash, setup_code_expires_at)
+    VALUES (
+      current_setting('app.school_id')::uuid, ${userId}::uuid, ${hashSetupCode(setupCode)},
+      CURRENT_TIMESTAMP + make_interval(days => ${SETUP_CODE_TTL_DAYS})
+    )
+    ON CONFLICT (school_id, user_id) DO UPDATE SET
+      password_hash = NULL,
+      password_changed_at = NULL,
+      setup_code_hash = EXCLUDED.setup_code_hash,
+      setup_code_expires_at = EXCLUDED.setup_code_expires_at,
+      failed_attempts = 0,
+      locked_until = NULL,
+      updated_at = CURRENT_TIMESTAMP
+    RETURNING setup_code_expires_at AS expires_at
+  `;
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "member_credentials",
+    targetId: userId,
+    oldValues: { had_password: before?.had_password ?? false },
+    newValues: { event: "setup_code_issued", expires_at: row!.expires_at.toISOString() },
+  });
+  return { setupCode, expiresAt: row!.expires_at };
+}
+
+/**
+ * An administrator's password reset: issues the member a new setup code (see writeSetupCode). Runs
+ * in the administrator's tenant transaction. Undefined when the user has no member code, i.e. is
+ * not someone who signs in with a password.
+ */
+export async function issueMemberSetupCode(
+  tx: TransactionSql,
+  userId: string,
+): Promise<IssuedSetupCode | undefined> {
   const codes = await tx<{ code: string }[]>`
     SELECT code FROM app.member_codes
     WHERE user_id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
     ORDER BY kind
   `;
   if (codes.length === 0) return undefined;
-  const [before] = await tx<{ was_default: boolean }[]>`
-    SELECT password_hash IS NULL AS was_default FROM app.member_credentials
-    WHERE user_id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
+  const { setupCode, expiresAt } = await writeSetupCode(tx, userId);
+  return { usernames: codes.map((row) => row.code), setupCode, expiresAt };
+}
+
+/** Most setup codes one bulk call issues; the caller repeats until `remaining` is zero. */
+export const SETUP_CODE_BATCH_LIMIT = 500;
+
+const MEMBER_CODE_KINDS: Partial<Record<Role, string>> = {
+  [ROLES.STUDENT]: "STU",
+  [ROLES.INSTRUCTOR]: "TCH",
+  [ROLES.PARENT]: "PAR",
+  [ROLES.ATTENDANCE_OFFICER]: "ATT",
+};
+
+export interface IssuedSetupCodeBatch {
+  issued: (IssuedSetupCode & { userId: string; displayName: string | null })[];
+  /** Members still waiting for a code because the batch was full. */
+  remaining: number;
+}
+
+/**
+ * Issues setup codes to the school's members of `role` who cannot sign in yet: an active or invited
+ * account that has never set a password and holds no unexpired setup code. Members who already have
+ * a live code are skipped, so re-running never invalidates a sheet already handed out; a lost code
+ * is replaced one member at a time with issueMemberSetupCode. This is how a school hands out first
+ * sign-ins in bulk, and how accounts created under the old default password are brought back.
+ */
+export async function issueUnclaimedSetupCodes(
+  tx: TransactionSql,
+  role: Role,
+): Promise<IssuedSetupCodeBatch> {
+  // eslint-disable-next-line security/detect-object-injection -- `role` is a validated Role
+  const kind = MEMBER_CODE_KINDS[role];
+  if (!kind) return { issued: [], remaining: 0 };
+
+  const candidates = await tx<{ user_id: string; display_name: string | null; total: number }[]>`
+    SELECT u.id AS user_id, u.display_name, count(*) OVER ()::int AS total
+    FROM app.users u
+    JOIN app.member_codes mc ON mc.user_id = u.id AND mc.school_id = u.school_id AND mc.kind = ${kind}
+    LEFT JOIN app.member_credentials cr ON cr.user_id = u.id AND cr.school_id = u.school_id
+    WHERE u.school_id = current_setting('app.school_id')::uuid
+      AND u.status IN ('active', 'invited')
+      AND cr.password_hash IS NULL
+      AND coalesce(cr.setup_code_expires_at <= CURRENT_TIMESTAMP, true)
+      AND NOT EXISTS (
+        SELECT 1 FROM app.user_roles r
+        WHERE r.user_id = u.id AND r.school_id = u.school_id
+          AND r.role::text = ANY(${[...PRIVILEGED_ROLES]}::text[])
+      )
+    ORDER BY mc.code
+    LIMIT ${SETUP_CODE_BATCH_LIMIT}
   `;
-  await tx`
-    INSERT INTO app.member_credentials (school_id, user_id)
-    VALUES (current_setting('app.school_id')::uuid, ${userId}::uuid)
-    ON CONFLICT (school_id, user_id) DO UPDATE SET
-      password_hash = NULL,
-      password_changed_at = NULL,
-      failed_attempts = 0,
-      locked_until = NULL,
-      updated_at = CURRENT_TIMESTAMP
+  if (candidates.length === 0) return { issued: [], remaining: 0 };
+
+  const codes = await tx<{ user_id: string; code: string }[]>`
+    SELECT user_id, code FROM app.member_codes
+    WHERE school_id = current_setting('app.school_id')::uuid
+      AND user_id = ANY(${candidates.map((row) => row.user_id)}::uuid[])
+    ORDER BY kind
   `;
-  await emitAuditLog(tx, {
-    action: "update",
-    targetTable: "member_credentials",
-    targetId: userId,
-    oldValues: { password_default: before?.was_default ?? true },
-    newValues: { event: "password_reset_to_default", password_default: true },
-  });
-  return { usernames: codes.map((row) => row.code) };
+  const issued: IssuedSetupCodeBatch["issued"] = [];
+  for (const candidate of candidates) {
+    const { setupCode, expiresAt } = await writeSetupCode(tx, candidate.user_id);
+    issued.push({
+      userId: candidate.user_id,
+      displayName: candidate.display_name,
+      usernames: codes.filter((row) => row.user_id === candidate.user_id).map((row) => row.code),
+      setupCode,
+      expiresAt,
+    });
+  }
+  return { issued, remaining: candidates[0]!.total - issued.length };
 }

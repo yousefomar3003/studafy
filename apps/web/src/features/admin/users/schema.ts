@@ -1,18 +1,14 @@
-import { ROLES } from "@studafy/constants";
+import { ASSIGNABLE_ROLES } from "@studafy/constants";
 import { z } from "zod";
 
 import type { Role } from "@studafy/constants";
 
 /**
- * Assignable roles for this UI, deliberately narrower than `ROLES`. `SUPER_ADMIN` holds every
- * permission in the matrix (`packages/constants/src/permissions.ts`), and the create/update-role
- * endpoints place no ceiling on which role a caller may assign — an `ORG_ADMIN` can mint another
- * `SUPER_ADMIN` today. Excluding it from the picker is a UI-layer guardrail against that, not a fix
- * for the underlying gap; the API itself still needs a role-assignment ceiling.
+ * Assignable roles for this UI: every school role, never the platform roles SUPER_ADMIN and
+ * SUPPORT_AGENT. The same list the create/update-role endpoints accept, which refuse anything else
+ * with 400 (QA-10, finding F-01).
  */
-export const ASSIGNABLE_ROLES = Object.values(ROLES).filter(
-  (role) => role !== ROLES.SUPER_ADMIN,
-) as Role[];
+export { ASSIGNABLE_ROLES };
 
 /**
  * Translation keys for each role's display name, resolved with `t()` at render time so the label
@@ -46,7 +42,7 @@ export type UserStatus = keyof typeof STATUS_LABEL_KEYS;
  * as-is and the form translates them with `t()` where the error renders.
  */
 
-const roleEnum = z.enum(ASSIGNABLE_ROLES as [Role, ...Role[]]);
+const roleEnum = z.enum(ASSIGNABLE_ROLES);
 
 export const createUserSchema = z.object({
   email: z

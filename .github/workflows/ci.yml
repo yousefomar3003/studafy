@@ -3,7 +3,8 @@ name: CI
 on:
   pull_request:
   push:
-    branches: [dev]
+    # stage carries the QA fix tasks (docs/testing/qa-plan.md), pushed directly; "done" there is CI green.
+    branches: [dev, stage]
 
 permissions:
   contents: read
@@ -43,13 +44,16 @@ jobs:
       # compose.yml test profile already starts Redis for this job; without the URL exported, every
       # Redis-gated suite silently skips. ST-116's cache-invalidation SLA test is one of them.
       REDIS_URL: redis://127.0.0.1:6390
+      # tests/auth/revocation.test.ts (logout/device teardown denylist propagation) gates on this
+      # name rather than REDIS_URL; without it all 22 cases silently skip.
+      TEST_REDIS_URL: redis://127.0.0.1:6390
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start disposable PostgreSQL + Redis
         run: docker compose up -d --wait test-postgres test-redis
       - uses: ./.github/actions/setup-bun-workspace
-      - name: Build the workspace packages the API imports
-        run: bunx turbo run build --filter=@studafy/api^...
+      - name: Build the workspace packages the API and workers import
+        run: bunx turbo run build --filter=@studafy/api^... --filter=@studafy/workers^...
       - name: Run API integration tests
         run: bun run test:integration
         working-directory: apps/api
@@ -105,6 +109,18 @@ jobs:
           REFRESH_ROTATION_BENCHMARK: "1"
         run: bun test tests/benchmark/refresh-rotation-benchmark.test.ts --timeout 180000
         working-directory: apps/api
+      # The workers' DB-backed sweeps/processors (billing, maintenance, imports, entitlements
+      # invalidator, ...) self-skip without TEST_DATABASE_URL and so never ran in any job. Unlike the
+      # API harness they do not create their own database: they query TEST_DATABASE_URL directly, so
+      # it is migrated first.
+      - name: Migrate the shared test database for the workers suite
+        env:
+          DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+          DATABASE_SSL_MODE: disable
+        run: bun run db:migrate
+      - name: Workers DB-backed tests
+        run: bun test
+        working-directory: apps/workers
       - name: Stop disposable PostgreSQL + Redis
         if: always()
         run: docker compose rm -sfv test-postgres test-redis

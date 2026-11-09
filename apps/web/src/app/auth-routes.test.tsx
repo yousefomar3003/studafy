@@ -10,6 +10,9 @@ import { routes } from "./routes";
 
 import type { SessionStore } from "../lib/auth";
 
+/** No ticket request leaves the test: the socket factory above is inert anyway. */
+const inertTicket = () => "inert-ticket";
+
 // These tests assert the web auth flow (guard -> login -> OAuth callback -> return-to), not data.
 // Stub the API client so pages that issue a query resolve in-memory.
 mock.module("../lib/api", () => ({
@@ -57,7 +60,11 @@ function createStore(): {
 const renderAt = (path: string, store: SessionStore) => {
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   const result = render(
-    <AppProviders sessionStore={store} realtimeSocketFactory={createInertRealtimeSocket}>
+    <AppProviders
+      sessionStore={store}
+      realtimeSocketFactory={createInertRealtimeSocket}
+      realtimeGetTicket={inertTicket}
+    >
       <RouterProvider router={router} />
     </AppProviders>,
   );

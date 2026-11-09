@@ -103,6 +103,20 @@ await tx.unsafe("SELECT id FROM app.users WHERE id = " + id);
 `SET` / `SET LOCAL` cannot take a parameter. To set a runtime value transaction-locally, use
 `` tx`SELECT set_config('<name>', ${value}, true)` `` instead.
 
+Query inside a transaction, never on the pool itself. The API reaches Postgres as one database login
+through PgBouncer; a query on the pool (`` database`...` ``, `database.unsafe(...)`) runs as that
+login with no `SET LOCAL ROLE studafy_app` and no `app.school_id`, so Row-Level Security either does
+not apply or matches nothing (S-01, [findings register](docs/security/findings-register.md)). Use
+`withTenantTx` (tenant data) or `withSystemTx` (work across schools).
+
+```ts
+// ✅ Role and tenant set for the transaction.
+await withTenantTx(database, tenant, (tx) => tx`SELECT id FROM app.users`);
+
+// ❌ Raw pool — lint error in apps/api/src/modules.
+await database`SELECT id FROM app.users WHERE school_id = ${schoolId}`;
+```
+
 ### Enforcement
 
 - **Lint** — `studafy/no-interpolated-sql`
@@ -111,6 +125,14 @@ await tx.unsafe("SELECT id FROM app.users WHERE id = " + id);
   call must be static: a string literal, a template whose every `${}` is static, a `+` of static
   parts, or a `const` bound to one of those. Anything known only at runtime — a parameter, a
   `let`, a call result, a property read — is reported. CI's lint step fails on it.
+- **Lint** — `studafy/no-raw-pool-query`
+  ([`packages/config/rules/no-raw-pool-query.js`](packages/config/rules/no-raw-pool-query.js)) is
+  an error for `apps/api/src/modules/**` (test files excluded): a tagged template or `.unsafe()` on
+  `database`, `db`, `primary` or `readReplica` (or `x.database`, ...). Files that still need one are
+  listed in the root `eslint.config.js` `RAW_POOL_QUERY_ALLOWLIST_COUNTS` with a reason and an
+  exact count; [`raw-pool-query-lint.test.ts`](apps/api/tests/security/raw-pool-query-lint.test.ts)
+  fails if a file's count changes, so a new raw query cannot hide in a listed file. It matches
+  names, not types: aliasing the pool (`const sql = pool(database)`) slips past it.
 - **Seeded violation** — [`apps/api/tests/security/interpolated-sql-lint.test.ts`](apps/api/tests/security/interpolated-sql-lint.test.ts)
   lints a known violation through the real root config. If the rule is removed, downgraded to a
   warning, or stops covering `apps/api/src`, that test fails CI.

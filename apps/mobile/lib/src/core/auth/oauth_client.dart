@@ -127,9 +127,9 @@ class MobileAuthClient {
   }
 
   /// Member-ID + password sign-in for students, parents, teachers and attendance officers
-  /// (`member-password-routes.ts`). While the account is still on its starting password the API
-  /// answers 403 `AUTH_PASSWORD_CHANGE_REQUIRED` and issues no session; repeat the call with
-  /// [newPassword] to set one and sign in.
+  /// (`member-password-routes.ts`). While the member is signing in with their one-time setup code
+  /// the API answers 403 `AUTH_PASSWORD_CHANGE_REQUIRED` and issues no session; repeat the call
+  /// with [newPassword] to set one and sign in.
   Future<MobileTokenResponse> loginWithMember({
     required String username,
     required String password,

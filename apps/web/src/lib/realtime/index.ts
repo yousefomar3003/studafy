@@ -11,6 +11,7 @@ export { RealtimeClient } from "./client";
 export type { RealtimeClientOptions, RealtimeConnectionStatus, RealtimeSocket } from "./client";
 
 export { RealtimeProvider, useRealtime, useRealtimeConnection } from "./connection";
+export { fetchRealtimeTicket } from "./ticket";
 
 export {
   EVENT_QUERY_INVALIDATIONS,

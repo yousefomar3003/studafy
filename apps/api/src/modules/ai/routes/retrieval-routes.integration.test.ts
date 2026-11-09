@@ -49,7 +49,7 @@ import {
   RETRIEVAL_EMBEDDING_MODEL,
 } from "../retrieval/embeddings";
 import { RERANK_K, RERANK_MODEL } from "../retrieval/rerank";
-import { HYBRID_LEG_LIMIT, hybridSearch } from "../retrieval/search";
+import { HYBRID_LEG_LIMIT, HYBRID_RRF_K, hybridSearch } from "../retrieval/search";
 
 import { aiRetrievalRoutes } from "./retrieval-routes";
 
@@ -58,6 +58,7 @@ import type { AuthContext } from "../../../middleware/authContext";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { FlagsService } from "../../flags";
 import type { AiQuotaHandle } from "../gate/token-budget";
+import type { QueryEmbedder } from "../retrieval/embeddings";
 import type { TransactionSql } from "postgres";
 
 const RETRIEVAL_DIMENSIONS = 1536;
@@ -118,6 +119,7 @@ function quotaHandle(): AiQuotaHandle {
 function buildRetrievalApp(
   handle: AiQuotaHandle,
   flags?: FlagsService | null,
+  embedder: QueryEmbedder | null = createDeterministicQueryEmbedder(),
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
   app.use("*", async (c, next) => {
@@ -131,7 +133,7 @@ function buildRetrievalApp(
     "/",
     aiRetrievalRoutes({
       database: tenantClient!,
-      embedder: createDeterministicQueryEmbedder(),
+      embedder,
       flags,
     }),
   );
@@ -243,6 +245,7 @@ beforeAll(async () => {
     roles: [ROLES.STUDENT],
     channel: AUTH_CHANNELS.API,
     jti: "jti-retrieval",
+    exp: Math.floor(Date.now() / 1000) + 900,
     entitlementsVer: 1,
     subscriptionStatus: "active",
   };
@@ -331,6 +334,7 @@ describeDb("POST /api/ai/students/{studentId}/search", () => {
         rerank_score: number | null;
       }[];
       meta: {
+        retrieval_mode: string;
         semantic_leg_count: number;
         retried: boolean;
         tokens_used: number;
@@ -341,6 +345,7 @@ describeDb("POST /api/ai/students/{studentId}/search", () => {
 
     expect(body.query).toBe(query);
     expect(body.results.length).toBeGreaterThan(0);
+    expect(body.meta.retrieval_mode).toBe("hybrid");
 
     // The kill switch is off in this mount: no re-ranker, raw RRF ranking, no rerank score anywhere.
     expect(body.meta.reranked).toBe(false);
@@ -508,5 +513,56 @@ describeDb("POST /api/ai/students/{studentId}/search", () => {
       body: JSON.stringify({ query: "zirconium" }),
     });
     expect(res.status).toBe(500);
+  });
+});
+
+describeDb("lexical-only retrieval (ADR-020, QA-15/F-06)", () => {
+  test("the route with no embedder runs the keyword leg alone and says so", async () => {
+    const app = buildRetrievalApp(quotaHandle(), null, null);
+    const query = "zirconium metallurgical corrosion resistance";
+    const res = await app.request(`/api/ai/students/${tenant.students[0]!.id}/search`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      results: {
+        chunk_id: string;
+        rrf_score: number;
+        semantic_rank: number | null;
+        keyword_rank: number | null;
+      }[];
+      meta: { retrieval_mode: string; semantic_leg_count: number; retried: boolean };
+    };
+
+    expect(body.meta.retrieval_mode).toBe("lexical");
+    expect(body.meta.semantic_leg_count).toBe(0);
+    expect(body.meta.retried).toBe(false);
+    // Only the chunk that actually contains the words comes back: the photosynthesis chunk the mock
+    // vector leg used to drag in as a "semantic" neighbour is gone, and so is the foreign tenant's.
+    expect(body.results.map((hit) => hit.chunk_id)).toEqual([tenantChunkIds[0]]);
+    expect(body.results[0]!.semantic_rank).toBeNull();
+    expect(body.results[0]!.keyword_rank).toBe(1);
+    expect(body.results[0]!.rrf_score).toBeCloseTo(1 / (HYBRID_RRF_K + 1), 10);
+  });
+
+  test("hybridSearch with a null vector reports lexical mode and never touches HNSW", async () => {
+    const result = await withTenantTx(
+      tenantClient!,
+      { schoolId: tenant.schoolId, userId: auth.userId },
+      async (tx) => {
+        const search = await hybridSearch(tx, { query: "photosynthesis light", queryVector: null });
+        const [setting] = await tx<{ ef: string | null }[]>`
+          SELECT current_setting('hnsw.ef_search', true) AS ef`;
+        return { search, ef: setting?.ef ?? null };
+      },
+    );
+
+    expect(result.search.mode).toBe("lexical");
+    expect(result.search.hits.map((hit) => hit.chunkId)).toEqual([tenantChunkIds[1]]);
+    // No transaction-local ef_search was set: the semantic leg's SET LOCAL never ran.
+    expect(result.ef === null || result.ef === "" || result.ef === "40").toBe(true);
   });
 });

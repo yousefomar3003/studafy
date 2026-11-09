@@ -1,0 +1,27 @@
+meta {
+  name: Studafy QA School A · STUDENT
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/auth/login/qa
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "yara.khalil@qa-a.studafy.test",
+    "password": "{{qaPassword}}",
+    "channel": "mobile"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) bru.setEnvVar("QA_TOKEN_A_STUDENT", res.body.access_token);
+}
+
+tests {
+  test("signed in", () => expect(res.status).to.equal(200));
+}

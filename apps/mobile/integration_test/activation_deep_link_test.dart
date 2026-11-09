@@ -45,7 +45,11 @@ void main() {
       final beforeActivation = await verifyInvitation(dio, token);
       expect(beforeActivation.statusCode, 200);
 
-      final activation = await activateInvitationViaMock(dio, token: token, email: inviteeEmail);
+      final activation = await activateInvitationViaMock(
+        dio,
+        token: token,
+        email: inviteeEmail,
+      );
       expect(activation['status'], 'active');
       expect(activation['access_token'], isA<String>());
 
@@ -57,7 +61,10 @@ void main() {
       expect(afterActivation.data!['code'], 'CONSUMED');
 
       // Prove the account this just created is real: sign into the actual app as it.
-      final app = await IntegrationTestApp.pump(tester, mockLoginHint: inviteeEmail);
+      final app = await IntegrationTestApp.pump(
+        tester,
+        mockLoginHint: inviteeEmail,
+      );
       await app.signInWithMock(tester);
 
       expect(app.container.read(authStatusProvider), AuthStatus.authenticated);

@@ -8,6 +8,9 @@ import { createSessionStore } from "../lib/auth";
 import { AppProviders, createInertRealtimeSocket } from "./providers";
 import { routes } from "./routes";
 
+/** No ticket request leaves the test: the socket factory above is inert anyway. */
+const inertTicket = () => "inert-ticket";
+
 // These tests assert routing, not data. Stub the API client so the /portal page's health query
 // resolves in-memory instead of reaching for a server that is not running under the test. The
 // license pages read typed lists, so they get empty ones of the right shape.
@@ -43,7 +46,11 @@ const renderAt = (path: string) => {
   // Wrap in the real app providers: pages such as /portal now consume the API client via a query,
   // which needs the QueryClientProvider, and the route guards need the AuthProvider.
   return render(
-    <AppProviders sessionStore={sessionStore} realtimeSocketFactory={createInertRealtimeSocket}>
+    <AppProviders
+      sessionStore={sessionStore}
+      realtimeSocketFactory={createInertRealtimeSocket}
+      realtimeGetTicket={inertTicket}
+    >
       <RouterProvider router={router} />
     </AppProviders>,
   );
@@ -157,7 +164,11 @@ describe("app shell for a session holding approval:review", () => {
 
     const router = createMemoryRouter(routes, { initialEntries: ["/portal/approvals"] });
     render(
-      <AppProviders sessionStore={orgAdminStore} realtimeSocketFactory={createInertRealtimeSocket}>
+      <AppProviders
+        sessionStore={orgAdminStore}
+        realtimeSocketFactory={createInertRealtimeSocket}
+        realtimeGetTicket={inertTicket}
+      >
         <RouterProvider router={router} />
       </AppProviders>,
     );
@@ -199,7 +210,11 @@ describe("the school license area", () => {
 
     const router = createMemoryRouter(routes, { initialEntries: ["/portal/license"] });
     render(
-      <AppProviders sessionStore={principalStore} realtimeSocketFactory={createInertRealtimeSocket}>
+      <AppProviders
+        sessionStore={principalStore}
+        realtimeSocketFactory={createInertRealtimeSocket}
+        realtimeGetTicket={inertTicket}
+      >
         <RouterProvider router={router} />
       </AppProviders>,
     );

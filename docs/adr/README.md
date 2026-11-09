@@ -48,6 +48,7 @@ code no longer matches must be superseded before the code, not after.
 | [ADR-017](0017-year-scoped-grading-with-snapshots.md) | Grade-level subject defaults with section overrides, one grading engine, immutable result snapshots    | Academic grading     |
 | [ADR-018](0018-feature-licensing.md)                  | Paid features as code-registered keys, granted through tiers and resolved per person, `requireFeature` | Billing / licensing  |
 | [ADR-019](0019-sensitive-record-field-encryption.md)  | App-level AES-256-GCM for sensitive record values, keyring app secret, stored masks; SSE-KMS documents | Data protection      |
+| [ADR-020](0020-lexical-only-retrieval.md)             | Lexical-only retrieval in production until a real embedding provider is wired (F-06)                   | AI retrieval         |
 
 ## Platform decision coverage
 
