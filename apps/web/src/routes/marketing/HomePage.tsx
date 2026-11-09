@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { LinkButton } from "../../components/LinkButton";
@@ -45,12 +45,89 @@ const SensitiveDemo = lazy(() =>
   ),
 );
 
+let firstContentfulPaint: Promise<void> | undefined;
+
+/**
+ * Resolves once the browser reports the page's first contentful paint (at once if it already has,
+ * as after a client-side navigation), or after three seconds where the Paint Timing API is
+ * missing or never reports.
+ */
+function afterFirstContentfulPaint(): Promise<void> {
+  firstContentfulPaint ??= new Promise<void>((resolve) => {
+    const done = () => setTimeout(resolve, 0);
+    const fallback = setTimeout(resolve, 3000);
+    try {
+      if (performance.getEntriesByName("first-contentful-paint").length > 0) {
+        clearTimeout(fallback);
+        done();
+        return;
+      }
+      const observer = new PerformanceObserver((list) => {
+        if (list.getEntriesByName("first-contentful-paint").length > 0) {
+          observer.disconnect();
+          clearTimeout(fallback);
+          done();
+        }
+      });
+      observer.observe({ type: "paint", buffered: true });
+    } catch {
+      clearTimeout(fallback);
+      done();
+    }
+  });
+  return firstContentfulPaint;
+}
+
+/**
+ * Holds a demo's place, and only starts loading it once the slot comes within 600px of the visible
+ * part of the page. Rendering the lazy demos straight away would request their chunks, their CSS and
+ * their catalog during the first render, ahead of the first paint, so the hero (the page's LCP)
+ * would wait on files for content nobody can see yet. Without IntersectionObserver (unit tests, old
+ * browsers) the demo loads at once.
+ */
 function DemoSlot({ height, children }: { height: number; children: ReactNode }) {
-  return (
-    <Suspense fallback={<div className="mk-demo-slot" style={{ minBlockSize: height }} />}>
-      {children}
-    </Suspense>
+  const slotRef = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(false);
+
+  useEffect(() => {
+    const slot = slotRef.current;
+    if (!slot) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setNear(true);
+      return;
+    }
+    // The marketing layout scrolls in its own region, not the window; the margin only stretches
+    // the root it is given, so observe against that region.
+    const root = slot.closest<HTMLElement>("[data-scroll-root]");
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setNear(true);
+          observer.disconnect();
+        }
+      },
+      { root, rootMargin: "600px 0px" },
+    );
+    // Not before the first contentful paint: a slot already near the screen would otherwise ask for
+    // its files while the hero is still waiting to paint, and its stylesheet would hold that back.
+    let cancelled = false;
+    void afterFirstContentfulPaint().then(() => {
+      if (!cancelled) observer.observe(slot);
+    });
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, []);
+
+  const placeholder = (
+    <div
+      ref={near ? undefined : slotRef}
+      className="mk-demo-slot"
+      style={{ minBlockSize: height }}
+    />
   );
+  return near ? <Suspense fallback={placeholder}>{children}</Suspense> : placeholder;
 }
 
 // Translation keys only: the copy lives in `locales/{en,ar}/site.json` under `site.marketing.home`.
