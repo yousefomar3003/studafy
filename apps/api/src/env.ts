@@ -4,6 +4,9 @@ import { z } from "zod";
 import { LOG_LEVEL_NAMES } from "./logger";
 import { TAP_MARKETS } from "./modules/subscriptions/payment-provider-routing";
 
+/** The development value of WS_JWT_SECRET, shared with apps/realtime/src/env.ts. Refused when deployed. */
+export const DEV_WS_JWT_SECRET = "dev-insecure-secret-change-me";
+
 /**
  * Split a comma-separated origin list into trimmed, non-empty entries.
  *
@@ -179,6 +182,16 @@ export const envSchema = z
     // 'review' identities of the single school flagged is_review_tenant. Held in the secret manager,
     // never in the repository (docs/runbooks/app-review-access.md).
     REVIEW_LOGIN_PASSWORD: z.string().min(16).optional(),
+    // Shared password for the staging QA tenants (QA-02, qa-login-service.ts). Unset means
+    // POST /api/auth/login/qa answers 404. Unlike the reviewer password it reaches SUPER_ADMIN, so the
+    // refinement below refuses to boot with it set when APP_ENV is production. Held in the secret
+    // manager, never in the repository (docs/runbooks/qa-staging-access.md).
+    QA_LOGIN_PASSWORD: z.preprocess(emptyAsUnset, z.string().min(24).optional()),
+    // Signs realtime handshake tickets (QA-14, modules/realtime). The realtime gateway verifies them
+    // with the same value: both task definitions read it from the same Terraform-generated secret.
+    // Defaults to the gateway's own development value so the two agree locally with no setup; the
+    // refinement below refuses that value, or anything under 32 characters, on a deployed tier.
+    WS_JWT_SECRET: z.string().min(1).default(DEV_WS_JWT_SECRET),
     // Where to redirect after a successful OAuth callback. Not setting it disables the redirect.
     FRONTEND_URL: z.string().url().optional(),
     // Base URL for the pay-online redirect entry point served on outstanding invoices in the family
@@ -413,6 +426,23 @@ export const envSchema = z
       });
     }
 
+    // A deployed API signing tickets with the well-known development key would let anyone mint them.
+    if (env.APP_ENV !== "development") {
+      if (env.WS_JWT_SECRET === DEV_WS_JWT_SECRET) {
+        context.addIssue({
+          code: "custom",
+          path: ["WS_JWT_SECRET"],
+          message: `WS_JWT_SECRET must not be the development default when APP_ENV is ${env.APP_ENV}`,
+        });
+      } else if (env.WS_JWT_SECRET.length < 32) {
+        context.addIssue({
+          code: "custom",
+          path: ["WS_JWT_SECRET"],
+          message: `WS_JWT_SECRET must be at least 32 characters when APP_ENV is ${env.APP_ENV}`,
+        });
+      }
+    }
+
     // Sensitive record values are sealed with a real, deployment-held key or not written at all.
     const recordKeyVars = [env.RECORDS_ENCRYPTION_KEYS, env.RECORDS_ENCRYPTION_CURRENT_KEY_ID];
     const recordKeySetCount = recordKeyVars.filter((v) => v !== undefined).length;
@@ -490,6 +520,16 @@ export const envSchema = z
         code: "custom",
         path: ["MOCK_OAUTH_ISSUER_URL"],
         message: "Mock OAuth variables must not be set when NODE_ENV or APP_ENV is production",
+      });
+    }
+
+    // The QA password signs in to every role, platform staff included. It must never exist where real
+    // schools live; staging (NODE_ENV=production, APP_ENV=staging) is exactly where it is meant to.
+    if (env.QA_LOGIN_PASSWORD !== undefined && env.APP_ENV === "production") {
+      context.addIssue({
+        code: "custom",
+        path: ["QA_LOGIN_PASSWORD"],
+        message: "QA_LOGIN_PASSWORD must not be set when APP_ENV is production",
       });
     }
 

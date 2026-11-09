@@ -6,14 +6,11 @@ import '../di/app_providers.dart';
 import 'protocol.dart';
 import 'realtime_client.dart';
 
-/// Supplies the realtime handshake token for the active session. Reuses the API client's
-/// [TokenProvider] shape (`core/api/auth_interceptor.dart`'s `TokenProvider` typedef — see
-/// `RealtimeTokenProvider`'s doc comment for why this isn't just that same type re-exported).
-///
-/// No session/auth feature exists in this app yet, so this resolves no token: [realtimeClientProvider]
-/// stays [RealtimeConnectionStatus.unauthorized], same as being signed out. Override this provider
-/// once a session store exists, e.g. `realtimeTokenProvider.overrideWithValue(() => session.getToken())`
-/// at app bootstrap — mirrors how `appConfigProvider` is overridden today.
+/// Supplies the realtime handshake ticket for the active session (QA-14). Unoverridden it resolves
+/// none, so [realtimeClientProvider] stays [RealtimeConnectionStatus.unauthorized], same as being
+/// signed out; that is the state tests start in. App bootstrap (`core/config/app_bootstrap.dart`)
+/// overrides it with [realtimeTicketProvider] over the authenticated Dio, which asks the API for a
+/// fresh ticket on every connect attempt.
 final realtimeTokenProvider = Provider<RealtimeTokenProvider>((ref) {
   return () async => null;
 });

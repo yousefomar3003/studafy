@@ -110,12 +110,14 @@ beforeAll(async () => {
   await assignRole(sql, tenant.schoolId, attendanceOfficerUser.id, ROLES.ATTENDANCE_OFFICER);
   attendanceOfficerUserId = attendanceOfficerUser.id;
 
-  // Tier A hits every route including the three webhook endpoints; without these two vars they'd
-  // each hit their own "not configured" 500 before ever reaching signature verification, which
-  // masks the thing actually worth fuzzing (does an unsigned/wrong-signature request get a clean
-  // 401, not a crash) behind a config gap that's specific to this harness, not to production.
+  // Tier A hits every route including the four webhook endpoints; without these vars they'd each
+  // hit their own "not configured" 500 before ever reaching signature verification, which masks
+  // the thing actually worth fuzzing (does an unsigned/wrong-signature request get a clean 401, not
+  // a crash) behind a config gap that's specific to this harness, not to production. The Resend
+  // secret is in Svix's `whsec_<base64>` form, as verifyResendSignature decodes it.
   process.env.ERPNEXT_WEBHOOK_SECRET ??= "test-erpnext-webhook-secret";
   process.env.EMAIL_EVENTS_SNS_TOPIC_ARN ??= "arn:aws:sns:us-east-1:000000000000:test-topic";
+  process.env.RESEND_WEBHOOK_SECRET ??= `whsec_${Buffer.from("test-resend-webhook-secret").toString("base64")}`;
 
   keyStore = new KeyStore(60_000);
   await keyStore.init();

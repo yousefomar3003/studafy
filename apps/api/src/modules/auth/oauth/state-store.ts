@@ -24,7 +24,8 @@
 
 import type { RedisClient } from "../../../redis";
 
-const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
+/** How long a minted state stays redeemable. Also the browser-binding cookie's lifetime. */
+export const OAUTH_STATE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const SWEEP_INTERVAL = 10;
 
 /** Key prefix for OAuth state entries on Redis DB 0 — see docs/runbooks/redis-conventions.md. */
@@ -59,6 +60,11 @@ export interface AuthorizationEntry {
   schoolId?: string;
   /** `activation` / `mobile-activation` only: the invitation bearer token this flow activates. */
   token?: string;
+  /**
+   * Browser flows only (`login`, `activation`, `link`, `school-application`): the hash of the
+   * binding cookie set by the start, which the callback must be presented (browser-binding.ts).
+   */
+  browserBinding?: string;
 }
 
 /**
@@ -121,7 +127,7 @@ export async function takeStateFor<F extends StateFlow>(
 type EntryFor<F extends StateFlow> = F extends "mobile-handoff" ? HandoffEntry : AuthorizationEntry;
 
 /** In-process store for a process with no Redis. Not shared across instances. */
-export function createMemoryStateStore(ttlMs = DEFAULT_TTL_MS): StateStore {
+export function createMemoryStateStore(ttlMs = OAUTH_STATE_TTL_MS): StateStore {
   const map = new Map<string, { entry: StateEntry; createdAt: number }>();
   let callCount = 0;
 
@@ -156,7 +162,7 @@ export function createMemoryStateStore(ttlMs = DEFAULT_TTL_MS): StateStore {
  * Fails closed: a Redis error rejects, so a flow cannot start (or complete) without its state
  * being durably recorded and atomically consumed. The global error handler turns that into a 5xx.
  */
-export function createRedisStateStore(redis: RedisClient, ttlMs = DEFAULT_TTL_MS): StateStore {
+export function createRedisStateStore(redis: RedisClient, ttlMs = OAUTH_STATE_TTL_MS): StateStore {
   return {
     async set(state, entry) {
       await redis.set(stateKey(state), JSON.stringify(entry), "PX", ttlMs);

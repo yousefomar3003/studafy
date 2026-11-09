@@ -24,9 +24,10 @@ enum RealtimeConnectionStatus {
   unauthorized,
 }
 
-/// Resolves the handshake token on every connect attempt, and again on a re-auth close. Reuses
-/// the API client's [TokenProvider] shape (`core/api/auth_interceptor.dart`) — same contract,
-/// same "no session/auth feature exists yet" seam.
+/// Resolves a fresh handshake ticket on every connect attempt, and again on a re-auth close
+/// (`realtime_ticket.dart`; QA-14). `null` means no session; a throw is treated as transient and
+/// retried with backoff. Same shape as the API client's [TokenProvider]
+/// (`core/api/auth_interceptor.dart`).
 typedef RealtimeTokenProvider = Future<String?> Function();
 
 const int _defaultMaxConnectFailures = 3;
@@ -96,7 +97,7 @@ class RealtimeClient {
         );
   }
 
-  /// Gateway origin, e.g. `ws://10.0.2.2:3001` (the `/ws?token=` path is appended).
+  /// Gateway origin, e.g. `ws://10.0.2.2:3001` (the `/ws?ticket=` path is appended).
   final Uri baseUrl;
   final RealtimeTokenProvider getToken;
 
@@ -187,7 +188,19 @@ class RealtimeClient {
     _setStatus(RealtimeConnectionStatus.connecting);
 
     final generation = _generation;
-    final token = await getToken();
+    final String? token;
+    try {
+      token = await getToken();
+    } on Object {
+      // The ticket request failed (no network, 5xx): not an auth verdict, so back off and retry
+      // rather than leaving the status stuck at connecting.
+      if (!_started || generation != _generation) {
+        return;
+      }
+      _setStatus(RealtimeConnectionStatus.reconnecting);
+      _scheduleReconnect(_backoffDelay(_connectAttempt++));
+      return;
+    }
     if (!_started || generation != _generation) {
       return;
     }
@@ -207,7 +220,7 @@ class RealtimeClient {
     return baseUrl.replace(
       scheme: scheme,
       path: '/ws',
-      queryParameters: {'token': token},
+      queryParameters: {'ticket': token},
     );
   }
 

@@ -168,3 +168,16 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `evaluationScore:read`           | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `evaluationScore:update`         | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `evaluationScore:delete`         | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
+
+## Role grants
+
+`user:create` and `role:assign` let a caller give a user a role, but not any role (QA-10,
+finding F-01). Source: `src/roles.ts` (`ASSIGNABLE_ROLES`, `PLATFORM_ROLES`, `canChangeRoleOf`).
+
+- The school user endpoints assign only `ORG_ADMIN`, `PRINCIPAL`, `ATTENDANCE_OFFICER`, `FINANCE`, `INSTRUCTOR`, `STUDENT`, `PARENT`, `GUEST`.
+- `SUPER_ADMIN` and `SUPPORT_AGENT` are platform roles: no school endpoint grants them, and
+  the database accepts them only in a school flagged `is_platform_tenant` (migration 000185), a
+  flag only `studafy_admin` can set.
+- `ORG_ADMIN` may grant `ORG_ADMIN`. This is intended: a school may have several admins, and
+  invitations have always offered it. It is not a grant above the caller's own role.
+- Only `SUPER_ADMIN` may change the role of a user who holds a platform role.

@@ -35,6 +35,8 @@
     "db:test:rls-coverage": "bun packages/db/src/cli.ts rls-coverage",
     "db:seed": "bun db/seeds/seed.ts",
     "db:seed:review": "bun db/seeds/review-tenant.ts",
+    "db:seed:qa": "bun db/seeds/qa-tenant.ts",
+    "qa:generate": "bun qa/generate.ts",
     "db:seed:index-check": "bun db/seeds/index-health.ts",
     "test:security": "bun run --cwd apps/api test:security",
     "check:alerts": "bun run scripts/check-alert-rules.ts",

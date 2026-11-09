@@ -97,6 +97,13 @@ locals {
   # only gates the recurring pieces, not the task definition), so
   # infra/deploy/scripts/run-postgres-restore-verify.sh can demonstrate PITR there by hand.
   backup_automation_enabled = var.environment != "dev"
+
+  # realtime's app secrets as the secrets module receives them: the generated WS_JWT_SECRET unless an
+  # operator overrode it. The api's copy of WS_JWT_SECRET is taken from here; see module "secrets".
+  realtime_app_secret_values = merge(
+    { WS_JWT_SECRET = random_password.realtime_jwt.result },
+    lookup(var.secrets_app_secret_values, "realtime", {}),
+  )
   # Vector + Loki log-aggregation pipeline (ST-261) — same condition again: `aws logs tail` over
   # the per-service CloudWatch groups already covers a single-developer environment, and there is
   # no separate on-call to correlate a request across. staging/prod get the pipeline.
@@ -146,12 +153,18 @@ module "secrets" {
   #
   # merge() is shallow, so the generated realtime secret is merged per key: an operator supplying any
   # realtime value (e.g. SENTRY_DSN) must add to WS_JWT_SECRET, not replace the whole realtime map.
+  #
+  # The api signs realtime handshake tickets with the same WS_JWT_SECRET the gateway verifies them
+  # with (QA-14). It gets realtime's *effective* value, written after any api override, so the two can
+  # never differ: rotating realtime's WS_JWT_SECRET (rotate-app-secret.sh) rotates the api's copy in
+  # the same apply. Supplying WS_JWT_SECRET under api has no effect.
   app_secret_values = merge(
     var.secrets_app_secret_values,
     {
-      realtime = merge(
-        { WS_JWT_SECRET = random_password.realtime_jwt.result },
-        lookup(var.secrets_app_secret_values, "realtime", {}),
+      realtime = local.realtime_app_secret_values
+      api = merge(
+        lookup(var.secrets_app_secret_values, "api", {}),
+        { WS_JWT_SECRET = local.realtime_app_secret_values.WS_JWT_SECRET },
       )
     },
     local.erpnext_plane_enabled ? {

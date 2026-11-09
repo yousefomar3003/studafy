@@ -451,7 +451,7 @@ class _SigningIn extends StatelessWidget {
 }
 
 /// Member-ID + password sign-in (`member-password-routes.ts`). Two steps: ID and password, then —
-/// only while the account is still on the starting password the school handed out — choosing a new
+/// only when the "password" was the one-time setup code the school handed out — choosing a new
 /// password, which the API requires before it issues a session.
 class _MemberSignInForm extends ConsumerStatefulWidget {
   const _MemberSignInForm();

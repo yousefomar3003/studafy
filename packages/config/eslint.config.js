@@ -9,6 +9,7 @@ import tseslint from "typescript-eslint";
 
 import noAnalyticsPii from "./rules/no-analytics-pii.js";
 import noInterpolatedSql from "./rules/no-interpolated-sql.js";
+import noRawPoolQuery from "./rules/no-raw-pool-query.js";
 import noSessionSet from "./rules/no-session-set.js";
 import noUnsafeHtmlRender from "./rules/no-unsafe-html-render.js";
 
@@ -18,6 +19,7 @@ const studafyPlugin = {
     "no-analytics-pii": noAnalyticsPii,
     "no-unsafe-html-render": noUnsafeHtmlRender,
     "no-interpolated-sql": noInterpolatedSql,
+    "no-raw-pool-query": noRawPoolQuery,
   },
 };
 

@@ -172,6 +172,7 @@ function authAs(userId: string, roles: AuthContext["roles"], jti: string): void 
     roles,
     channel: AUTH_CHANNELS.API,
     jti,
+    exp: Math.floor(Date.now() / 1000) + 900,
     entitlementsVer: 1,
     subscriptionStatus: "active",
   };

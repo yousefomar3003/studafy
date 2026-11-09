@@ -1,3 +1,5 @@
+import { JTI_DENYLIST_PREFIX } from "@studafy/constants";
+
 import type { RedisClient } from "../../redis";
 
 /**
@@ -22,8 +24,11 @@ import type { RedisClient } from "../../redis";
  * construction and a revocation check happens before any tenant is established.
  */
 
-/** Key prefix for revoked token ids. One key per revoked `jti`. */
-export const JTI_DENYLIST_PREFIX = "auth:jti:denylist:";
+/**
+ * Key prefix for revoked token ids. One key per revoked `jti`. Defined in @studafy/constants because
+ * the realtime gateway reads the same keys to close a revoked session's socket (QA-14).
+ */
+export { JTI_DENYLIST_PREFIX };
 
 /** Build the Redis key for a token id. */
 export function jtiDenylistKey(jti: string): string {

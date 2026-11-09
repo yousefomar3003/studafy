@@ -1,0 +1,27 @@
+meta {
+  name: Studafy QA School A · ATTENDANCE_OFFICER
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{baseUrl}}/api/auth/login/qa
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "attendance@qa-a.studafy.test",
+    "password": "{{qaPassword}}",
+    "channel": "mobile"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) bru.setEnvVar("QA_TOKEN_A_ATTENDANCE_OFFICER", res.body.access_token);
+}
+
+tests {
+  test("signed in", () => expect(res.status).to.equal(200));
+}

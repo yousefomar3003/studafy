@@ -64,7 +64,7 @@ class FakeSocket implements RealtimeSocket {
 function createClient(socket: FakeSocket): RealtimeClient {
   return new RealtimeClient({
     baseUrl: "ws://localhost:3001",
-    getToken: () => "jwt",
+    getTicket: () => "jwt",
     queryClient: new QueryClient(),
     socketFactory: () => socket,
   });
@@ -120,7 +120,7 @@ describe("useRealtimeConnection", () => {
     let tokenRequests = 0;
     const client = new RealtimeClient({
       baseUrl: "ws://localhost:3001",
-      getToken: () => {
+      getTicket: () => {
         tokenRequests += 1;
         return "jwt";
       },

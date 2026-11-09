@@ -1,0 +1,6 @@
+{
+  "version": "1",
+  "name": "Studafy QA",
+  "type": "collection",
+  "ignore": ["node_modules", ".git"]
+}

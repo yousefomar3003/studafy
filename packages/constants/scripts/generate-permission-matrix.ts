@@ -2,7 +2,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { PERMISSIONS, ROLE_PERMISSIONS } from "../src/permissions";
-import { ROLES } from "../src/roles";
+import { ASSIGNABLE_ROLES, PLATFORM_ROLES, ROLES } from "../src/roles";
 
 /**
  * Regenerates docs/permission-matrix.md straight from PERMISSIONS/ROLE_PERMISSIONS so the
@@ -37,7 +37,24 @@ function buildMarkdown(): string {
     divider,
     ...rows,
     "",
+    "## Role grants",
+    "",
+    "`user:create` and `role:assign` let a caller give a user a role, but not any role (QA-10,",
+    "finding F-01). Source: `src/roles.ts` (`ASSIGNABLE_ROLES`, `PLATFORM_ROLES`, `canChangeRoleOf`).",
+    "",
+    `- The school user endpoints assign only ${codeList(ASSIGNABLE_ROLES, ", ")}.`,
+    `- ${codeList(PLATFORM_ROLES, " and ")} are platform roles: no school endpoint grants them, and`,
+    "  the database accepts them only in a school flagged `is_platform_tenant` (migration 000185), a",
+    "  flag only `studafy_admin` can set.",
+    "- `ORG_ADMIN` may grant `ORG_ADMIN`. This is intended: a school may have several admins, and",
+    "  invitations have always offered it. It is not a grant above the caller's own role.",
+    "- Only `SUPER_ADMIN` may change the role of a user who holds a platform role.",
+    "",
   ].join("\n");
+}
+
+function codeList(roles: readonly string[], separator: string): string {
+  return roles.map((role) => `\`${role}\``).join(separator);
 }
 
 async function main(): Promise<void> {

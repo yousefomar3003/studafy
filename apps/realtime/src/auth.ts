@@ -1,41 +1,63 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { ROLES } from "@studafy/constants";
+import { REALTIME_TICKET, ROLES } from "@studafy/constants";
 import { z } from "zod";
 
 import type { Role } from "@studafy/constants";
 
 /**
- * JWT handshake stub. Real signature verification (HS256) and expiry checking, so a connection
- * still requires a validly-signed, unexpired token — but there is no real identity provider yet,
- * so this module is both issuer and verifier of a single shared secret (`WS_JWT_SECRET`). It
- * deliberately does not do: issuer/audience checks, JWKS/RS256 rotation, or revocation — those
- * need the real auth service and are out of scope for this ticket. Replace `signToken` with a
- * call to the real issuer, and `verifyToken`'s secret lookup with JWKS verification, in the ticket
- * that wires up real authentication.
+ * Handshake ticket verification (F-05, QA-14). The contract is in docs/protocol.md#handshake-ticket
+ * and its constants in @studafy/constants' REALTIME_TICKET.
+ *
+ * `apps/api` mints the ticket (`POST /api/realtime/tickets`, apps/api/src/modules/realtime) for a
+ * caller holding a valid session, signed HS256 with `WS_JWT_SECRET`, which both services read from
+ * Secrets Manager. The gateway checks it here and never sees the session's access token.
+ *
+ * Why a shared key rather than the API's JWKS: the API generates its RSA keys in memory, per task
+ * (apps/api/src/modules/auth/jwt/key-store.ts), so a JWKS fetched through the load balancer can come
+ * from a different task than the one that signed the ticket. An agreed key has no such window and
+ * no network dependency at handshake time.
+ *
+ * Single use and revocation are not this module's job: it is pure. The handshake in app.ts spends
+ * `ticketId` and checks `sessionId` against the API's denylist through src/session-guard.ts.
  */
 
 export interface AuthClaims {
   userId: string;
   schoolId: string;
-  role: Role;
-  /** Seconds since epoch. Undefined means the token never expires — see the re-auth protocol in app.ts. */
-  exp?: number;
+  /** Every role the session holds in the school. Never empty. */
+  roles: readonly Role[];
+  /** The session's access-token `jti`, which the API denylists on revocation. */
+  sessionId: string;
+  /** When the session's access token expires (seconds since epoch). The socket closes then. */
+  sessionExp: number;
+  /** This ticket's own `jti`. Spent at handshake, so a ticket opens one socket. */
+  ticketId: string;
+  /** The ticket's own expiry (seconds since epoch). Bounds the handshake only. */
+  exp: number;
 }
 
 const claimsSchema = z.object({
+  iss: z.literal(REALTIME_TICKET.issuer),
+  aud: z.literal(REALTIME_TICKET.audience),
   sub: z.string().min(1),
-  schoolId: z.string().min(1),
-  role: z.enum(ROLES),
-  /** Seconds since epoch, per the JWT spec's `exp` claim. */
-  exp: z.number().int().positive().optional(),
+  school_id: z.string().min(1),
+  roles: z.array(z.enum(ROLES)).min(1),
+  sid: z.string().min(1),
+  sexp: z.number().int().positive(),
+  jti: z.string().min(1),
+  iat: z.number().int().positive(),
+  exp: z.number().int().positive(),
 });
+
+const headerSchema = z.object({ alg: z.literal("HS256") });
 
 /**
  * `code` drives the re-auth protocol (see docs/protocol.md#re-auth-protocol): `TOKEN_EXPIRED` tells
- * the client its credentials are merely stale — get a fresh token and reconnect. Every other cause
- * is `TOKEN_INVALID` — the token itself is untrustworthy (bad signature, wrong shape, unknown
- * role), so blindly retrying the same token is pointless.
+ * the client its credentials are merely stale, so it should get a fresh ticket and reconnect. Every
+ * other cause is `TOKEN_INVALID`: the ticket itself is untrustworthy, so retrying it is pointless.
+ * The codes keep their `TOKEN_` names so that clients built against the previous handshake still
+ * branch correctly.
  */
 export type TokenVerificationErrorCode = "TOKEN_EXPIRED" | "TOKEN_INVALID";
 
@@ -43,7 +65,7 @@ export class TokenVerificationError extends Error {
   readonly code: TokenVerificationErrorCode;
 
   constructor(reason: string, code: TokenVerificationErrorCode = "TOKEN_INVALID") {
-    super(`Token verification failed: ${reason}`);
+    super(`Ticket verification failed: ${reason}`);
     this.name = "TokenVerificationError";
     this.code = code;
   }
@@ -61,16 +83,33 @@ function sign(headerAndPayload: string, secret: string): Buffer {
   return createHmac("sha256", secret).update(headerAndPayload).digest();
 }
 
+function parseJson(segment: string, what: string): unknown {
+  try {
+    return JSON.parse(base64UrlDecode(segment).toString("utf8"));
+  } catch {
+    throw new TokenVerificationError(`${what} is not valid JSON`);
+  }
+}
+
 /**
- * Verifies an HS256-signed token against `secret` and checks `exp` if present. Throws
- * {@link TokenVerificationError} for any malformed, mis-signed, or expired token.
+ * Verifies a handshake ticket and returns its claims. Throws {@link TokenVerificationError} when it
+ * is malformed, signed with another key or algorithm, addressed to anyone else, issued for longer
+ * than {@link REALTIME_TICKET.maxTtlSeconds}, issued in the future, or expired.
+ *
+ * The error message names the failed check and never includes the ticket.
  */
-export function verifyToken(token: string, secret: string): AuthClaims {
+export function verifyToken(token: string, secret: string, nowMs: number = Date.now()): AuthClaims {
   const parts = token.split(".");
   if (parts.length !== 3) {
     throw new TokenVerificationError("expected header.payload.signature");
   }
   const [headerB64, payloadB64, signatureB64] = parts;
+
+  // Checked before the signature only to refuse another algorithm by name; the HMAC below is what
+  // actually proves the ticket, and it is computed with HS256 whatever the header claims.
+  if (!headerSchema.safeParse(parseJson(headerB64, "header")).success) {
+    throw new TokenVerificationError("unsupported algorithm");
+  }
 
   const expected = sign(`${headerB64}.${payloadB64}`, secret);
   const actual = base64UrlDecode(signatureB64);
@@ -78,41 +117,80 @@ export function verifyToken(token: string, secret: string): AuthClaims {
     throw new TokenVerificationError("invalid signature");
   }
 
-  let payload: unknown;
-  try {
-    payload = JSON.parse(base64UrlDecode(payloadB64).toString("utf8"));
-  } catch {
-    throw new TokenVerificationError("payload is not valid JSON");
-  }
-
-  const parsed = claimsSchema.safeParse(payload);
+  const parsed = claimsSchema.safeParse(parseJson(payloadB64, "payload"));
   if (!parsed.success) {
     throw new TokenVerificationError(z.prettifyError(parsed.error));
   }
+  const claims = parsed.data;
 
-  if (parsed.data.exp !== undefined && parsed.data.exp * 1000 < Date.now()) {
-    throw new TokenVerificationError("token expired", "TOKEN_EXPIRED");
+  const nowSeconds = nowMs / 1000;
+  if (claims.exp - claims.iat > REALTIME_TICKET.maxTtlSeconds) {
+    throw new TokenVerificationError("ticket lifetime exceeds the maximum");
+  }
+  if (claims.iat > nowSeconds + REALTIME_TICKET.clockSkewSeconds) {
+    throw new TokenVerificationError("ticket issued in the future");
+  }
+  if (claims.exp <= nowSeconds) {
+    throw new TokenVerificationError("ticket expired", "TOKEN_EXPIRED");
+  }
+  if (claims.sexp <= nowSeconds) {
+    throw new TokenVerificationError("session expired", "TOKEN_EXPIRED");
   }
 
   return {
-    userId: parsed.data.sub,
-    schoolId: parsed.data.schoolId,
-    role: parsed.data.role,
-    exp: parsed.data.exp,
+    userId: claims.sub,
+    schoolId: claims.school_id,
+    roles: claims.roles,
+    sessionId: claims.sid,
+    sessionExp: claims.sexp,
+    ticketId: claims.jti,
+    exp: claims.exp,
   };
 }
 
+/** The claims a ticket carries, as the API mints them. */
+export interface TicketPayload {
+  iss: string;
+  aud: string;
+  sub: string;
+  school_id: string;
+  roles: readonly Role[];
+  sid: string;
+  sexp: number;
+  jti: string;
+  iat: number;
+  exp: number;
+}
+
 /**
- * Mints a token this module's own {@link verifyToken} accepts. Stands in for the future identity
- * provider — used by tests and `scripts/smoke-test.ts`, not meant to survive real auth
- * integration.
+ * Mints a ticket this module accepts. For the gateway's own tests and `scripts/smoke-test.ts`
+ * only: the issuer in production is apps/api, and the contract test
+ * (apps/api/tests/realtime/ticket-contract.test.ts) proves the two agree.
  */
-export function signToken(
-  claims: { sub: string; schoolId: string; role: Role; exp?: number },
-  secret: string,
-): string {
+export function signToken(payload: TicketPayload, secret: string): string {
   const header = base64UrlEncode(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const payload = base64UrlEncode(JSON.stringify(claims));
-  const signature = base64UrlEncode(sign(`${header}.${payload}`, secret));
-  return `${header}.${payload}.${signature}`;
+  const body = base64UrlEncode(JSON.stringify(payload));
+  const signature = base64UrlEncode(sign(`${header}.${body}`, secret));
+  return `${header}.${body}.${signature}`;
+}
+
+/**
+ * A ticket payload with every claim valid now, for tests and the smoke test. Overrides replace
+ * individual claims.
+ */
+export function ticketPayload(
+  claims: { sub: string; school_id: string; roles: readonly Role[] } & Partial<TicketPayload>,
+  nowMs: number = Date.now(),
+): TicketPayload {
+  const iat = Math.floor(nowMs / 1000);
+  return {
+    iss: REALTIME_TICKET.issuer,
+    aud: REALTIME_TICKET.audience,
+    sid: crypto.randomUUID(),
+    sexp: iat + 900,
+    jti: crypto.randomUUID(),
+    iat,
+    exp: iat + REALTIME_TICKET.ttlSeconds,
+    ...claims,
+  };
 }

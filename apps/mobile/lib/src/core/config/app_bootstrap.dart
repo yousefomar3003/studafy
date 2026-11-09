@@ -13,6 +13,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../app.dart';
 import '../auth/auth_notifier.dart';
 import '../auth/auth_session.dart';
+import '../auth/authenticated_dio.dart';
 import '../auth/oauth_client.dart';
 import '../auth/secure_token_store.dart';
 import '../../features/launch/application/launch_intro.dart';
@@ -26,6 +27,7 @@ import '../monitoring/monitoring_providers.dart';
 import '../monitoring/sentry_reporter.dart';
 import '../push/push_providers.dart';
 import '../realtime/realtime_providers.dart';
+import '../realtime/realtime_ticket.dart';
 import 'app_config.dart';
 import 'app_environment.dart';
 import 'provider_retry_policy.dart';
@@ -57,7 +59,8 @@ void bootstrapApp(AppEnvironment environment) {
       final packageInfo = await PackageInfo.fromPlatform();
       final monitoringConfig = MonitoringConfig.fromEnvironment(
         environment,
-        release: '${packageInfo.packageName}@${packageInfo.version}+${packageInfo.buildNumber}',
+        release:
+            '${packageInfo.packageName}@${packageInfo.version}+${packageInfo.buildNumber}',
       );
       crashReporter = CompositeCrashReporter([
         SentryCrashReporter(monitoringConfig),
@@ -73,12 +76,19 @@ void bootstrapApp(AppEnvironment environment) {
         return true;
       };
 
-      final authClient = MobileAuthClient(baseUrl: appConfig.apiBaseUrl.toString());
+      final authClient = MobileAuthClient(
+        baseUrl: appConfig.apiBaseUrl.toString(),
+      );
       final secureStore = SecureTokenStore();
       await secureStore.discardIfReinstalled();
-      final session = AuthSession(authClient: authClient, secureStore: secureStore);
+      final session = AuthSession(
+        authClient: authClient,
+        secureStore: secureStore,
+      );
       await session.restore();
-      final launchIntro = await resolveLaunchIntro(isAuthenticated: session.isAuthenticated);
+      final launchIntro = await resolveLaunchIntro(
+        isAuthenticated: session.isAuthenticated,
+      );
 
       runApp(
         EasyLocalization(
@@ -93,8 +103,10 @@ void bootstrapApp(AppEnvironment environment) {
               authSessionProvider.overrideWithValue(session),
               launchIntroProvider.overrideWithValue(launchIntro),
               crashReporterProvider.overrideWithValue(crashReporter!),
-              realtimeTokenProvider.overrideWithValue(
-                () => session.tokenProvider,
+              // A single-use handshake ticket per attempt (QA-14), fetched with the session's
+              // bearer token; the access token itself never goes to the gateway.
+              realtimeTokenProvider.overrideWith(
+                (ref) => realtimeTicketProvider(authenticatedDio(ref)),
               ),
             ],
             child: const StudafyApp(),

@@ -8,76 +8,110 @@ source of truth.
 ## Handshake
 
 ```
-GET /ws?token=<jwt> HTTP/1.1
+GET /api/realtime/ticket            (apps/api, Authorization: Bearer <access token>)
+  → 200 { "ticket": "<ticket>", "expires_at": "…" }
+
+GET /ws?ticket=<ticket> HTTP/1.1    (this gateway)
 Upgrade: websocket
 ```
 
-The token is passed as a query parameter, not a header — browsers cannot set arbitrary headers on
-a WebSocket handshake request, so a query parameter is the standard way to authenticate one. The
-gateway verifies the token (see [JWT stub](#jwt-handshake-stub-and-its-limits) below) **before**
-upgrading:
+A client never sends its access token to the gateway. It asks the API for a **handshake ticket**
+(see [Handshake ticket](#handshake-ticket)) on every connection attempt and passes that as the
+`ticket` query parameter. A query parameter, not a header, because browsers cannot set arbitrary
+headers on a WebSocket handshake. That puts the ticket in load-balancer access logs, which is
+acceptable because it is single-use and expires in 30 seconds. The retired `?token=` parameter is
+ignored, so a session token sent there gets `TOKEN_MISSING`.
 
-| Outcome                               | Response                                                                    |
-| ------------------------------------- | --------------------------------------------------------------------------- |
-| Missing `token`                       | `401 { "error": "missing token query parameter", "code": "TOKEN_MISSING" }` |
-| Expired token                         | `401 { "error": "<reason>", "code": "TOKEN_EXPIRED" }`                      |
-| Malformed / mis-signed / unknown role | `401 { "error": "<reason>", "code": "TOKEN_INVALID" }`                      |
-| Valid token                           | `101 Switching Protocols`, connection upgrades                              |
+The gateway checks, in order, **before** upgrading:
 
-`code` is what a client should branch on, not the free-text `error` (which is for logs):
-`TOKEN_EXPIRED` means the credentials are merely stale — get a fresh token and retry the handshake.
-`TOKEN_MISSING` / `TOKEN_INVALID` mean the request itself is broken; retrying with the same token
-is pointless. See [Re-auth protocol](#re-auth-protocol) for the full flow, including what happens
-when a token expires _after_ a successful upgrade.
+| Outcome                                                             | Response                                                                     |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `Origin` not in `WS_ALLOWED_ORIGINS`                                | `403 { "error": "origin not allowed", "code": "ORIGIN_NOT_ALLOWED" }`        |
+| Missing `ticket`                                                    | `401 { "error": "missing ticket query parameter", "code": "TOKEN_MISSING" }` |
+| Ticket or session expired                                           | `401 { "error": "<reason>", "code": "TOKEN_EXPIRED" }`                       |
+| Malformed, mis-signed, wrong `aud`/`iss`, lifetime > 60 s, bad role | `401 { "error": "<reason>", "code": "TOKEN_INVALID" }`                       |
+| Ticket already used                                                 | `401 { "error": "ticket already used", "code": "TOKEN_INVALID" }`            |
+| Session revoked                                                     | `401 { "error": "session revoked", "code": "TOKEN_INVALID" }`                |
+| Session check unavailable (Redis down)                              | `503 { "error": "session check unavailable", "code": "UNAVAILABLE" }`        |
+| Valid                                                               | `101 Switching Protocols`, connection upgrades                               |
 
-On a successful upgrade the connection is automatically joined to three **home rooms**, all
-derived from the token's claims:
+`code` is what a client should branch on, not the free-text `error` (which is for logs). The codes
+keep their `TOKEN_` names from the previous handshake. `TOKEN_EXPIRED` means get a fresh ticket and
+retry. `TOKEN_MISSING` / `TOKEN_INVALID` mean that ticket will never work. In practice a browser
+cannot read the status of a refused handshake, so the clients simply fetch a new ticket per
+attempt and give up after a few refusals in a row.
+
+On a successful upgrade the connection is automatically joined to its **home rooms**, all derived
+from the ticket's claims:
 
 | Room                              | Membership                                                |
 | --------------------------------- | --------------------------------------------------------- |
 | `school:{schoolId}`               | every connection for the tenant, regardless of role       |
-| `school:{schoolId}:role:{role}`   | every connection with that role, within the tenant        |
+| `school:{schoolId}:role:{role}`   | one per role the session holds, within the tenant         |
 | `school:{schoolId}:user:{userId}` | this user's connection(s) — for direct, targeted delivery |
 
 The gateway sends one `system.joined` message per room, immediately after upgrading.
 
-### JWT handshake stub and its limits
+### Handshake ticket
 
-There is no identity provider integrated yet, so `src/auth.ts` is both issuer (`signToken`, used
-by tests and the smoke test) and verifier (`verifyToken`) of a single HS256 shared secret
-(`WS_JWT_SECRET`). It genuinely checks the signature and `exp` — a connection cannot be established
-with a token that isn't validly signed by that secret — but it does **not** do issuer/audience
-validation, JWKS rotation, or revocation. Replacing it with real auth is out of scope for this
-ticket; that ticket should swap `verifyToken`'s secret lookup for JWKS verification against the
-real identity provider and delete `signToken`.
+The contract between `apps/api` (issuer, `src/modules/realtime/ticket.ts`) and this gateway
+(verifier, [`src/auth.ts`](../src/auth.ts)) (F-05, QA-14). Its constants are `REALTIME_TICKET` in
+`@studafy/constants`, and `apps/api/tests/realtime/ticket-contract.test.ts` runs the real issuer
+against the real verifier.
 
-Claims (JWT payload):
+- **Format:** a JWT, `alg: HS256`. Any other `alg` is refused.
+- **Key:** `WS_JWT_SECRET`, read by both services from Secrets Manager. Terraform generates it once
+  and writes the same value into the realtime and api app secrets (`infra/terraform/main.tf`).
+  Both services refuse to start in production with the development default or a key under 32
+  characters.
+- **Why not the API's JWKS:** the API generates its RSA signing keys in memory, per task, so a
+  JWKS fetched through the load balancer can come from a different task than the one that signed
+  the ticket. A shared key has no such window and no network call at handshake time.
+- **Lifetime:** minted for 30 s. The gateway refuses `exp - iat > 60`, an `iat` more than 5 s in
+  the future, and an `exp` in the past. The ticket's `exp` bounds the handshake only; the socket's
+  life is bounded by `sexp` (below).
+- **Single use:** the gateway records each `jti` in Redis (`realtime:ticket:used:{jti}`, `SET NX`,
+  expiring with the ticket) and refuses a second handshake with it.
 
-| Claim      | Type                                  | Required | Meaning                                     |
-| ---------- | ------------------------------------- | -------- | ------------------------------------------- |
-| `sub`      | string                                | yes      | user id                                     |
-| `schoolId` | string                                | yes      | tenant boundary — see [rooms](#rooms)       |
-| `role`     | one of `ROLES` (`@studafy/constants`) | yes      | the role the room key's `role` segment uses |
-| `exp`      | number (seconds since epoch)          | no       | standard JWT expiry                         |
+| Claim       | Type                          | Meaning                                                                    |
+| ----------- | ----------------------------- | -------------------------------------------------------------------------- |
+| `iss`       | `"studafy-api"`               | issuer                                                                     |
+| `aud`       | `"studafy-realtime"`          | this gateway only; the API's access tokens carry another audience and fail |
+| `sub`       | string                        | user id                                                                    |
+| `school_id` | string                        | tenant boundary — see [rooms](#rooms)                                      |
+| `roles`     | non-empty array of `ROLES`    | every role the session holds; one role room each                           |
+| `sid`       | string                        | the session's access-token `jti`, which the API denylists on revocation    |
+| `sexp`      | number (seconds since epoch)  | the access token's `exp`: the socket closes then                           |
+| `jti`       | string                        | this ticket's id, spent at handshake                                       |
+| `iat`/`exp` | numbers (seconds since epoch) | issue time and ticket expiry                                               |
+
+The API mints a ticket only behind its normal JWT boundary, so the session is valid, unrevoked and
+on current entitlements at that moment. Neither service logs the ticket: the gateway's tracing
+records the route, not the URL, and no handshake error echoes it.
 
 ### Re-auth protocol
 
-`verifyToken` only proves a token was valid _at handshake time_. Without a follow-up mechanism, a
-connection that opened with a token carrying `exp` would stay a member of its rooms forever after
-that `exp` passes — nothing would ever re-check it. Instead:
+A ticket only proves the session was valid _at handshake time_. Two mechanisms keep the socket
+from outliving it:
 
-1. If the claims carry `exp`, the gateway schedules a timer for exactly that instant. A token with
-   no `exp` never expires and gets no timer.
-2. When the timer fires, the gateway sends `{ "type": "system.reauth_required", "reason": "token
-expired" }`, then closes the socket with close code **`4401`** (reason `"token expired"`).
-3. The client is expected to obtain a fresh token (however it does that outside this protocol) and
-   reconnect via a normal `GET /ws?token=<new token>` handshake — there is no in-place token swap
-   on an existing socket. A reconnect after a `4401` close, or after a `401` with `code:
-"TOKEN_EXPIRED"`, is the entire "expired-token reconnect flow": the client is not expected to
-   distinguish the two: both mean "the token expired, not the connection request itself, so get a
-   new one and retry."
-4. A `401` with `code: "TOKEN_MISSING"` or `"TOKEN_INVALID"`, or any WebSocket close code other
-   than `4401`, is not part of this protocol — don't retry those with the same token.
+1. **Expiry.** A timer fires at `sexp`. The gateway sends
+   `{ "type": "system.reauth_required", "reason": "session expired" }` and closes with **`4401`**.
+2. **Revocation.** Every 15 s (`REVOCATION_SWEEP_INTERVAL_MS`, `src/session-guard.ts`) the gateway
+   looks up every open socket's `sid` in the API's access-token denylist
+   (`auth:jti:denylist:{jti}`, one `MGET` per 500 sessions). A revoked session's sockets get
+   `system.reauth_required` with reason `"session revoked"` and close with **`4401`**. **Bound: a
+   revoked session's sockets close within 15 s of the API writing the denylist entry**, plus one
+   Redis round trip. A failed sweep is reported and retried on the next tick, so revocation is late
+   during a Redis outage, never skipped. The denylist lives in the API's Redis database, which is
+   why the gateway has `AUTH_REDIS_URL` separate from its pub/sub `REDIS_URL`.
+
+After a `4401` the client fetches a fresh ticket and reconnects; there is no in-place swap. If the
+session is gone, the ticket request itself answers 401 and the client stops. Any close code other
+than `4401` is not part of this protocol.
+
+Known gap: when refresh-token reuse is detected, the API revokes the family but does not denylist
+its access token (F-08, QA-21), so a socket opened with that session lives until `sexp`
+(≤ 15 minutes).
 
 ## Rooms
 
@@ -91,17 +125,24 @@ boundary (`src/protocol.ts`'s `parseRoomKeyParts` is the only place this grammar
 | `school:{schoolId}:role:{ROLE}`   | every connection with that role, within the tenant            |
 | `school:{schoolId}:user:{userId}` | a single user's connection(s) — for direct, targeted delivery |
 
-**A client may only join or leave rooms within its own `schoolId`** — the gateway rejects a
-`join`/`leave` for any other school's room with a `system.error`. This is the tenant-isolation
-boundary: it is enforced regardless of room kind, and is what makes cross-tenant room subscription
-impossible (see `src/app.ws.test.ts`'s probe tests). It does not further restrict which role's or
-user's room a client may join within its own school (e.g. an instructor can subscribe to the
-student room in the same school); that is a coarser authorization model than the platform's full
-permission matrix (`docs/adr/0002-fixed-roles-authorization.md`) and is a known simplification — a
-future ticket can tighten it if a concrete requirement needs to.
+**Who may join or leave which room is decided per room kind** (F-04), by the policy table in
+[`src/room-policy.ts`](../src/room-policy.ts). Every kind first requires the room's `schoolId` to
+be the caller's own (the tenant-isolation boundary — see `src/app.ws.test.ts`'s probe tests), then
+adds its own rule:
 
-Every connection auto-joins all three of its home rooms at handshake. It can join additional rooms
-(in the same school) with a control message:
+| Kind     | Allowed when                                                   | Denied with                                  |
+| -------- | -------------------------------------------------------------- | -------------------------------------------- |
+| `school` | the room is the caller's school                                | `cannot join a room outside your own school` |
+| `role`   | same school **and** the room's role is in the ticket's `roles` | `not authorized for this room`               |
+| `user`   | same school **and** the room's user is the ticket's `sub`      | `not authorized for this room`               |
+| other    | never — a kind with no row in the table is denied              | `unknown room kind` (or a schema error)      |
+
+So a student cannot subscribe to `school:S:role:INSTRUCTOR`, and no one can subscribe to another
+user's `school:S:user:V` room. In practice the policy allows exactly the three home rooms; a new
+room kind (e.g. a class room) must add a row to the table to be joinable at all.
+
+Every connection auto-joins all three of its home rooms at handshake. It can leave a room and join
+it again, subject to the policy above, with a control message:
 
 ```json
 { "type": "join", "room": "school:123:role:INSTRUCTOR" }
@@ -109,7 +150,23 @@ Every connection auto-joins all three of its home rooms at handshake. It can joi
 ```
 
 The gateway acks with a system message (`system.joined` / `system.left`), or `system.error` if the
-room is malformed or outside the client's school.
+room is malformed or the policy denies it.
+
+## Limits
+
+Per-connection limits (F-16), defined in [`src/limits.ts`](../src/limits.ts):
+
+| Limit              | Value                                  | When exceeded                                                                                      |
+| ------------------ | -------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Frame size         | 16 KB (`maxPayloadLength`)             | Bun drops the connection before any handler runs (the client sees close code 1006 or 1009).        |
+| Rooms per socket   | 8, home rooms included                 | The `join` is refused with `system.error` `room limit reached`; re-joining a current room is fine. |
+| Client frame rate  | burst of 20, refilled at 2 per second  | `system.error` `rate limit exceeded`, then close code **1008**. Every frame counts, valid or not.  |
+| Handshake `Origin` | `WS_ALLOWED_ORIGINS` (comma-separated) | `403 ORIGIN_NOT_ALLOWED` before the ticket is read.                                                |
+
+The Origin allowlist is required when `NODE_ENV=production` (the ECS task sets it to the tier's
+`WEB_ORIGIN`); unset in development turns the check off. A handshake **without** an `Origin` header
+is accepted: browsers always send one on a WebSocket handshake, so its absence means a non-browser
+client such as the mobile app, which cross-site WebSocket hijacking cannot come from.
 
 ## Message envelopes
 
@@ -128,8 +185,8 @@ mean different things (control-plane ack vs. domain event) and grow independentl
 ```json
 { "type": "system.joined", "room": "school:123:role:STUDENT" }
 { "type": "system.left", "room": "school:123:role:STUDENT" }
-{ "type": "system.error", "message": "cannot join a room outside your own school" }
-{ "type": "system.reauth_required", "reason": "token expired" }
+{ "type": "system.error", "message": "not authorized for this room" }
+{ "type": "system.reauth_required", "reason": "session expired" }
 ```
 
 `system.reauth_required` always precedes a `4401` close — see [Re-auth
@@ -195,12 +252,14 @@ off the same `"pmessage"` event stream:
 
 ## Example flow
 
-1. Client connects: `GET /ws?token=<signed JWT for sub=user-1, schoolId=123, role=STUDENT>`.
-2. Gateway verifies the token, upgrades, joins the connection to `school:123`,
+1. Client gets a ticket from `GET /api/realtime/ticket` and connects:
+   `GET /ws?ticket=<ticket for sub=user-1, school_id=123, roles=[STUDENT]>`.
+2. Gateway verifies and spends the ticket, upgrades, joins the connection to `school:123`,
    `school:123:role:STUDENT`, and `school:123:user:user-1`, sending a `system.joined` for each.
 3. `apps/api` (or any publisher) runs `PUBLISH school:123:role:STUDENT '{"id":"...","type":"announcement.posted","room":"school:123:role:STUDENT","payload":{...},"publishedAt":"..."}'`.
 4. The gateway's subscriber receives it on the pattern subscription, validates it, and sends the
    envelope verbatim to every member of `school:123:role:STUDENT` — including the client from
    step 1.
-5. Later, that connection's token reaches its `exp`. The gateway sends `system.reauth_required`
-   and closes the socket with code `4401`. The client fetches a fresh token and repeats step 1.
+5. Later, that session's access token reaches its `exp` (or the session is revoked). The gateway
+   sends `system.reauth_required` and closes the socket with code `4401`. The client fetches a
+   fresh ticket and repeats step 1.

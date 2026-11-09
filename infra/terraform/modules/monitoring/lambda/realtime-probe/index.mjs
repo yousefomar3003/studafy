@@ -55,7 +55,12 @@ function base64UrlEncode(input) {
   return Buffer.from(input).toString("base64url");
 }
 
-/** HS256-signs a JWT the realtime gateway's stub accepts (apps/realtime/src/auth.ts). */
+/**
+ * HS256-signs a handshake ticket the gateway accepts (apps/realtime/src/auth.ts; contract in
+ * apps/realtime/docs/protocol.md#handshake-ticket). In production apps/api mints tickets; the probe
+ * mints its own with the same secret so that it measures the gateway's fan-out without depending
+ * on the API.
+ */
 function signJwt(claims, secret) {
   const header = { alg: "HS256", typ: "JWT" };
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
@@ -168,7 +173,7 @@ function runProbe({ jwt, room, redisUrl }) {
       return;
     }
 
-    const url = `${WS_URL}?token=${jwt}`;
+    const url = `${WS_URL}?ticket=${jwt}`;
     let ws;
     try {
       ws = new WebSocket(url);
@@ -257,14 +262,22 @@ export const handler = async () => {
       getSecretValue(REDIS_AUTH_SECRET_ARN),
     ]);
 
+    const iat = Math.floor(Date.now() / 1000);
     const jwt = signJwt(
       {
+        // Must match @studafy/constants' REALTIME_TICKET.
+        iss: "studafy-api",
+        aud: "studafy-realtime",
         sub: PROBE_USER_ID,
-        schoolId: PROBE_SCHOOL_ID,
-        role: "GUEST",
-        // 5 minutes: far beyond this run, but present so the token is a realistic client token
-        // and the gateway schedules its (irrelevant here) re-auth timer.
-        exp: Math.floor(Date.now() / 1000) + 300,
+        school_id: PROBE_SCHOOL_ID,
+        roles: ["GUEST"],
+        // A session id nothing ever denylists, valid for 5 minutes: far beyond this run.
+        sid: crypto.randomUUID(),
+        sexp: iat + 300,
+        // Single use: a fresh ticket per run.
+        jti: crypto.randomUUID(),
+        iat,
+        exp: iat + 30,
       },
       realtimeSecret.WS_JWT_SECRET,
     );

@@ -9,7 +9,11 @@
  * between them.
  *
  * A real provider is a one-function swap: {@link QueryEmbedder} is the whole contract the route
- * depends on, and `createDeterministicQueryEmbedder()` is the single construction site in `app.ts`.
+ * depends on, and `aiQueryEmbedder` in `app.ts` is the single construction site.
+ *
+ * Production does NOT use this mock (ADR-020, QA-15/F-06): `app.ts` wires no embedder, so retrieval
+ * runs lexical-only. The mock stays for tests and local hybrid-path coverage only, because its
+ * vectors are a content hash — cosine distance between them carries no meaning.
  */
 
 export const RETRIEVAL_EMBEDDING_MODEL = "mock-embedding-3-small@1";

@@ -61,7 +61,6 @@ import {
   aiUsageRoutes,
   createAiTokenMeter,
   createConceptsCache,
-  createDeterministicQueryEmbedder,
   createSummaryCache,
   isAiModelCallPath,
   provideAiTokenBudget,
@@ -92,6 +91,7 @@ import {
   providerLinkRoutes,
   returningUserLoginRoutes,
   reviewLoginRoutes,
+  qaLoginRoutes,
   sessionRoutes,
 } from "./modules/auth";
 import { bulkInviteRoutes } from "./modules/auth/invitation/bulk-invite-routes";
@@ -145,6 +145,7 @@ import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobil
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { platformRoutes } from "./modules/platform";
 import { privacyRoutes } from "./modules/privacy";
+import { realtimeTicketRoutes } from "./modules/realtime";
 import { DEVELOPMENT_RECORD_KEYRING, recordRoutes } from "./modules/records";
 import { childComparisonRoutes } from "./modules/reports";
 import {
@@ -187,7 +188,7 @@ import type { StorageService } from "./lib/storage";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
-import type { AiModelTier, LlmProvider, PhotoTextReader } from "./modules/ai";
+import type { AiModelTier, LlmProvider, PhotoTextReader, QueryEmbedder } from "./modules/ai";
 import type { KeyStore } from "./modules/auth";
 import type { FlagsService } from "./modules/flags";
 import type { MobileReleaseConfig } from "./modules/mobile";
@@ -229,6 +230,11 @@ export interface AppOptions {
   jwtAccessTtlSeconds?: number;
   /** Refresh-token lifetime in seconds, reapplied on every rotation. From env.JWT_REFRESH_TTL_SECONDS. */
   jwtRefreshTtlSeconds?: number;
+  /**
+   * Key for realtime handshake tickets (env.WS_JWT_SECRET, shared with apps/realtime). Unset leaves
+   * `GET /api/realtime/ticket` unmounted, as in tests that do not exercise it.
+   */
+  realtimeTicketSecret?: string | null;
   /**
    * Where CORS and CSRF rejections are persisted (app.security_events).
    *
@@ -289,6 +295,12 @@ export interface AppOptions {
    * env.REVIEW_LOGIN_PASSWORD. Absent keeps POST /api/auth/login/review registered but answering 404.
    */
   reviewLoginPassword?: string;
+  /**
+   * Shared password for the staging QA tenants' email/password login (QA-02), threaded from
+   * env.QA_LOGIN_PASSWORD, which env.ts refuses in production. Absent keeps POST /api/auth/login/qa
+   * registered but answering 404.
+   */
+  qaLoginPassword?: string;
   /** Skips the rate limiter. Local development only (env.RATE_LIMIT_DISABLED, refused elsewhere). */
   rateLimitDisabled?: boolean;
   /**
@@ -366,6 +378,7 @@ export function createApp({
   jwtAudience = "studafy-api",
   jwtAccessTtlSeconds = 900,
   jwtRefreshTtlSeconds = 30 * 24 * 60 * 60,
+  realtimeTicketSecret = null,
   securityEventSink,
   docsEnabled = false,
   flags = null,
@@ -374,6 +387,7 @@ export function createApp({
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
   reviewLoginPassword,
+  qaLoginPassword,
   rateLimitDisabled = false,
   storage = null,
   stripeProvider = null,
@@ -659,6 +673,12 @@ export function createApp({
     app.route("/", jwksRoutes(keyStore));
   }
 
+  // Realtime handshake tickets (QA-14). Behind the JWT boundary like every /api route, so a ticket
+  // is only ever minted for a session that is valid, unrevoked and current right now.
+  if (keyStore && realtimeTicketSecret) {
+    app.route("/", realtimeTicketRoutes(realtimeTicketSecret));
+  }
+
   // Invitation routes — requires database for persistence and outbox event emission.
   if (database) {
     app.route("/", invitationRoutes(database, logger));
@@ -868,18 +888,43 @@ export function createApp({
     );
   }
 
-  // Member-ID + password sign-in and password change for students, parents, teachers and attendance
-  // officers (000141); see routes/member-password-routes.ts.
+  // Staging QA tenant login (QA-02). Email + shared password, only for schools flagged is_qa_tenant;
+  // same post-authentication path as the review login above.
   if (database && keyStore) {
     app.route(
       "/",
-      memberPasswordRoutes(database, {
-        keyStore,
-        issuer: jwtIssuer,
-        audience: jwtAudience,
-        accessTtlSeconds: jwtAccessTtlSeconds,
-        refreshTtlSeconds: jwtRefreshTtlSeconds,
-      }),
+      qaLoginRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        qaLoginPassword,
+      ),
+    );
+  }
+
+  // Member-ID + password sign-in and password change for students, parents, teachers and attendance
+  // officers (000141); see routes/member-password-routes.ts. Redis also backs its per-member-ID and
+  // platform-wide sign-in budgets (QA-11), on top of the per-IP limiter above.
+  if (database && keyStore) {
+    app.route(
+      "/",
+      memberPasswordRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        rateLimitDisabled ? null : (redis ?? null),
+        eventSink,
+      ),
     );
   }
 
@@ -1279,6 +1324,12 @@ export function createApp({
   // would spend unbilled budget, so the whole surface is absent rather than un-metered.
   if (database && redis && entitlements && featureService) {
     const aiMeter = createAiTokenMeter({ redis });
+    // Retrieval is lexical-only (ADR-020, QA-15/F-06). The only embedder in the repository is the
+    // deterministic mock, whose vectors carry no meaning, so no query embedder is wired and both
+    // retrieval surfaces below run the keyword leg alone. Re-enabling the semantic leg means
+    // wiring a real provider here AND in the ingestion worker under one model id, then running the
+    // re-embed procedure — see the ADR — never passing createDeterministicQueryEmbedder() here.
+    const aiQueryEmbedder: QueryEmbedder | null = null;
     // A per-student AI route is the student's own: refused for anyone else in the school before
     // consent, quota or the handler run.
     app.use("/api/ai/students/:studentId/*", aiStudentSelfGate({ database }));
@@ -1328,9 +1379,9 @@ export function createApp({
     // AI data-sharing consent (ST-305): the disclosure, grant, and withdrawal. Not behind
     // requireFeature -- it never reaches the provider, and withdrawal must work without an add-on.
     app.route("/", aiConsentRoutes({ database }));
-    // Hybrid retrieval (ST-162). Mounted under the same gate so a search reserves and commits the
-    // caller's AI quota, and only when the gate's dependencies (a database for entitlements, Redis
-    // for the meter) exist — the retrieval surface must never run un-metered. Cross-encoder
+    // Retrieval (ST-162; lexical-only per ADR-020). Mounted under the same gate so a search
+    // reserves and commits the caller's AI quota, and only when the gate's dependencies (a database
+    // for entitlements, Redis for the meter) exist — the retrieval surface must never run un-metered. Cross-encoder
     // re-ranking (ST-163) rides the `ai.rerank` feature flag: off (the default), the route returns
     // the raw RRF ranking; on, the deterministic re-ranker is constructed inside the route factory
     // and applied per request, so a flipped per-tenant override lands on the next read.
@@ -1338,7 +1389,7 @@ export function createApp({
       "/",
       aiRetrievalRoutes({
         database,
-        embedder: createDeterministicQueryEmbedder(),
+        embedder: aiQueryEmbedder,
         flags,
       }),
     );
@@ -1365,7 +1416,7 @@ export function createApp({
         database,
         provider: aiLlmProvider,
         flags,
-        embedder: createDeterministicQueryEmbedder(),
+        embedder: aiQueryEmbedder,
         modelOverrides: aiLlmModelOverrides,
       }),
     );

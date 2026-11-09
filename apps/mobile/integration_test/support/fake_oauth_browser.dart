@@ -20,7 +20,10 @@ class FakeOAuthBrowser extends OAuthBrowser {
   @override
   Future<OAuthCallback> authorize(Uri authorizationUrl) async {
     try {
-      final resolved = await resolveMockAuthorizationCode(_dio, authorizationUrl);
+      final resolved = await resolveMockAuthorizationCode(
+        _dio,
+        authorizationUrl,
+      );
       return OAuthCallback(code: resolved.code, state: resolved.state);
     } on StateError catch (error) {
       throw OAuthCancelledException(error.message);

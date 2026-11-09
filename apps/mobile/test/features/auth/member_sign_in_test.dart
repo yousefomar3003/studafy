@@ -13,7 +13,7 @@ import '../../support/pump_studafy_app.dart';
 
 /// Member-ID + password sign-in driven through the real app: login screen, [AuthNotifier],
 /// [MobileAuthClient] and the auth guard. Only the network is faked. The API refuses a session on
-/// the starting password, so the form must collect a new one and resend.
+/// a setup code, so the form must collect a new password and resend.
 void main() {
   testWidgets('first sign-in asks for a new password, then signs in with it', (
     tester,
@@ -42,13 +42,13 @@ void main() {
     });
 
     await _enter(tester, 'memberSignInUsername', ' stu-100001 ');
-    await _enter(tester, 'memberSignInPassword', 'pass@1234');
+    await _enter(tester, 'memberSignInPassword', '7K3M-Q9TZ-2HXR-B8WD');
     await _tap(tester, 'memberSignInSubmit');
 
     expect(find.byKey(const Key('memberSignInChangeRequired')), findsOneWidget);
     expect(sent.single, {
       'username': 'stu-100001',
-      'password': 'pass@1234',
+      'password': '7K3M-Q9TZ-2HXR-B8WD',
       'channel': 'mobile',
     });
 
@@ -58,7 +58,7 @@ void main() {
 
     expect(sent.last, {
       'username': 'stu-100001',
-      'password': 'pass@1234',
+      'password': '7K3M-Q9TZ-2HXR-B8WD',
       'new_password': 'Blue-Kite-42',
       'channel': 'mobile',
     });
@@ -79,7 +79,7 @@ void main() {
     });
 
     await _enter(tester, 'memberSignInUsername', 'PAR-100001');
-    await _enter(tester, 'memberSignInPassword', 'pass@1234');
+    await _enter(tester, 'memberSignInPassword', '7K3M-Q9TZ-2HXR-B8WD');
     await _tap(tester, 'memberSignInSubmit');
     expect(requests, 1);
 

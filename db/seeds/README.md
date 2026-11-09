@@ -20,6 +20,7 @@ in one place, [`mock-credentials.ts`](./mock-credentials.ts); this README does n
 | Command                       | Entry point        | What it does                                                                                                                                                                     |
 | ----------------------------- | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `bun run db:seed`             | `seed.ts`          | Seeds the local demo tenant, prints a per-table row-count summary, then runs the index health check.                                                                             |
+| `bun run db:seed:qa`          | `qa-tenant.ts`     | Provisions the staging QA tenants (a platform school and QA Schools A and B) for QA-02. Staging only; see [QA tenants](#qa-tenants-staging).                                     |
 | `bun run db:seed:index-check` | `index-health.ts`  | Re-runs the index health check on its own (read-only, rolled back): every `app` index valid and ready, and representative tenant queries served by an index.                     |
 | `bun run db:seed:review`      | `review-tenant.ts` | Provisions the App Store / Play reviewer tenant (`studafy-review-academy`) from the same data modules. Meant for production; see [Reviewer tenant](#reviewer-tenant-production). |
 
@@ -63,6 +64,16 @@ release. Roster: [`review-credentials.ts`](./review-credentials.ts); profiles:
 [`docs/runbooks/app-review-access.md`](../../docs/runbooks/app-review-access.md). The local
 `db:seed` never creates it.
 
+## QA tenants (staging)
+
+`bun run db:seed:qa` provisions three schools flagged `is_qa_tenant` (migration 000183): a platform
+school holding only a SUPER_ADMIN, and QA Schools A and B, each with the full demo roster and
+dataset. Every persona gets a `qa` login. It requires `QA_TENANT_SEED_CONFIRM=studafy-qa` and
+refuses `APP_ENV=production` and any host that is not local or staging-shaped. Each school is its
+own transaction, and existing schools are skipped. Roster:
+[`qa-credentials.ts`](./qa-credentials.ts); profiles: [`tenants.ts`](./tenants.ts). For credentials
+and tooling, see [`docs/runbooks/qa-staging-access.md`](../../docs/runbooks/qa-staging-access.md).
+
 ## Files
 
 | Path                       | Purpose                                                                                                                   |
@@ -72,6 +83,8 @@ release. Roster: [`review-credentials.ts`](./review-credentials.ts); profiles:
 | `tenants.ts`               | The two tenant profiles (demo, reviewer).                                                                                 |
 | `mock-credentials.ts`      | Demo personas: the single source for seeded users, roles, OAuth identities, and parent links.                             |
 | `review-credentials.ts`    | Reviewer-tenant personas.                                                                                                 |
+| `qa-tenant.ts`             | Staging QA tenants seed (QA-02).                                                                                          |
+| `qa-credentials.ts`        | QA-tenant personas and the documented login per role.                                                                     |
 | `support.ts`               | Shared types and deterministic helpers.                                                                                   |
 | `data/*.ts`                | One module per domain (school, people, academics, timetable, assessments, materials, finance, ai, engagement, messaging). |
 | `index-health.ts`          | Post-seed index validity and usability check.                                                                             |

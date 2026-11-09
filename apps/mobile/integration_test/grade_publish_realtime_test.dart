@@ -9,21 +9,10 @@ import 'support/test_app.dart';
 
 /// Journey 4/5 (ST-247): grade view live-updates on a publish event.
 ///
-/// SKIPPED — not flaky, genuinely blocked. `bootstrapApp` wires the realtime handshake token to
-/// the session's real RS256 access token (`realtimeTokenProvider.overrideWithValue(() =>
-/// session.tokenProvider)`), but `apps/realtime/src/auth.ts` only verifies its own HS256 stub
-/// tokens signed with `WS_JWT_SECRET` — a documented, deliberately deferred gap (see that file's
-/// header: "there is no real identity provider yet... replace signToken... in the ticket that
-/// wires up real authentication"). A mobile session's real bearer token is therefore rejected by
-/// the gateway with `TOKEN_INVALID` in every environment today, dev included — not a test
-/// environment quirk. `grade_providers.dart`'s `grades.published` live-refresh can never fire
-/// without a working handshake, so there is nothing this test could pass against without either
-/// (a) minting a gateway-shaped HS256 token instead of the real bearer token, which would make
-/// this test pass while silently hiding that production's real wiring is broken, or (b) this
-/// ticket quietly fixing a separate service's core authentication as a side effect of a test
-/// suite. Both are worse than an honest skip. Unskip once the realtime-auth ticket lands; the API
-/// sequence below (submit -> approve -> publish) already exercises the rest of the journey and
-/// needs no changes.
+/// Unskipped by QA-14. It was skipped while the app sent its RS256 access token to a gateway that
+/// only verified HS256 stub tokens, so no real session could open a socket. The app now fetches a
+/// handshake ticket from `GET /api/realtime/ticket` (`core/realtime/realtime_ticket.dart`), which the
+/// gateway verifies, so this journey exercises the real production wiring end to end.
 ///
 /// Also overrides `currentStudentIdProvider` to the resolved student's real id — the documented,
 /// test-sanctioned seam for a *separate* currently-unfillable gap (no self-resolving
@@ -56,19 +45,22 @@ void main() {
       final app = await IntegrationTestApp.pump(
         tester,
         mockLoginHint: studentEmail,
-        extraOverrides: [currentStudentIdProvider.overrideWithValue(submission.studentId)],
+        extraOverrides: [
+          currentStudentIdProvider.overrideWithValue(submission.studentId),
+        ],
       );
       await app.signInWithMock(tester);
 
       // The student shell's Home tab already renders "Today"'s grades card off the same realtime
       // subscription `today_providers.dart` documents — no extra navigation needed.
-      await approveGradeSubmission(dio, adminToken: adminToken, submissionId: submission.id);
+      await approveGradeSubmission(
+        dio,
+        adminToken: adminToken,
+        submissionId: submission.id,
+      );
 
       await pumpUntil(tester, () => find.text(label).evaluate().isNotEmpty);
       expect(find.text(label), findsOneWidget);
     },
-    // Reason lives in the file-level doc comment above (testWidgets' skip is bool-only in this
-    // Flutter/flutter_test version — no String-reason overload).
-    skip: true,
   );
 }

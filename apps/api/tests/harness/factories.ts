@@ -1,3 +1,5 @@
+import { isPlatformRole } from "../../../../packages/constants/src/roles";
+
 import type { Role } from "../../../../packages/constants/src/roles";
 import type { Sql, TransactionSql } from "postgres";
 
@@ -49,6 +51,17 @@ export async function createSchool(
   });
 }
 
+/**
+ * Flag a school as a platform tenant, the only kind allowed to hold SUPER_ADMIN or SUPPORT_AGENT
+ * (000185). Idempotent. assignRole calls it for a platform role, so fixtures that put platform staff
+ * in a test school keep working.
+ */
+export async function registerPlatformSchool(sql: Sql, schoolId: string): Promise<void> {
+  await asAdmin(sql, async (tx) => {
+    await tx`UPDATE app.schools SET is_platform_tenant = true WHERE id = ${schoolId}::uuid`;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // User + Role
 // ---------------------------------------------------------------------------
@@ -93,6 +106,7 @@ export async function assignRole(
   userId: string,
   role: Role,
 ): Promise<void> {
+  if (isPlatformRole(role)) await registerPlatformSchool(sql, schoolId);
   await asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
     await tx.unsafe("SET LOCAL ROLE studafy_app");

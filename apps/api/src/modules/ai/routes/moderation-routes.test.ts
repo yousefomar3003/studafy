@@ -98,6 +98,7 @@ function buildApp(database: Database, role: Role = ROLES.ORG_ADMIN) {
     roles: [role],
     channel: AUTH_CHANNELS.API,
     jti: "jti-1",
+    exp: Math.floor(Date.now() / 1000) + 900,
     entitlementsVer: 1,
     subscriptionStatus: "active",
   };

@@ -23,6 +23,7 @@ function contextFor(deletionPending: boolean): AuthContext {
     roles: [ROLES.PARENT],
     channel: "mobile",
     jti: "33333333-3333-4333-8333-333333333333",
+    exp: Math.floor(Date.now() / 1000) + 900,
     entitlementsVer: 1,
     subscriptionStatus: "active",
     deletionPending,

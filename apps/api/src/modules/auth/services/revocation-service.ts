@@ -65,6 +65,11 @@ export const REVOCATION_REASONS = {
   ADMIN_REVOKE_ALL_DEVICES: "admin_revoke_all_devices",
   ACCOUNT_DELETION: "account_deletion",
   SCHOOL_CLOSURE: "school_closure",
+  /**
+   * Reuse detection in rotateRefreshToken (session-service.ts). Not a revokeAndDenylist scope — the
+   * family is revoked inside the rotation transaction — but it shares the denylist step below.
+   */
+  REFRESH_TOKEN_REUSE: "refresh_token_reuse_detected",
 } as const;
 
 export type RevocationReason = (typeof REVOCATION_REASONS)[keyof typeof REVOCATION_REASONS];
@@ -164,7 +169,11 @@ export async function revokeAndDenylist(params: RevokeParams): Promise<Revocatio
   });
 
   // --- 2. Redis: denylist the orphaned access tokens ------------------------
-  const denylisted = await denylistRevoked(denylist, revoked, { reason, targetUserId, log });
+  const denylisted = await denylistRevoked(denylist, revoked, {
+    reason,
+    subject: { targetUserId },
+    log,
+  });
 
   return { revokedTokens: revoked.length, denylistedJtis: denylisted };
 }
@@ -239,10 +248,26 @@ function revokeScope(
  * never persisted. They are still revoked in Postgres, so the session cannot extend itself; only the
  * outstanding access token has to age out on its own.
  */
-async function denylistRevoked(
+function subjectFields(
+  subject: { targetUserId: string } | { familyId: string },
+): Record<string, string> {
+  return "familyId" in subject
+    ? { family_id: subject.familyId }
+    : { target_user_id: subject.targetUserId };
+}
+
+export async function denylistRevoked(
   denylist: JtiDenylist | null,
-  revoked: readonly RevokedRow[],
-  context: { reason: RevocationReason; targetUserId: string; log?: Logger },
+  revoked: readonly Pick<RevokedRow, "access_jti" | "access_expires_at">[],
+  context: {
+    reason: RevocationReason;
+    /**
+     * Who the log lines name. Reuse detection passes the family instead of the user: its breach line
+     * is keyed by family and deliberately carries nothing that is part of the presented token.
+     */
+    subject: { targetUserId: string } | { familyId: string };
+    log?: Logger;
+  },
 ): Promise<number> {
   const entries: DenylistEntry[] = [];
   for (const row of revoked) {
@@ -264,7 +289,7 @@ async function denylistRevoked(
       {
         event: "denylist_unavailable",
         reason: context.reason,
-        target_user_id: context.targetUserId,
+        ...subjectFields(context.subject),
         pending_jti_count: entries.length,
       },
       "access tokens not denylisted — no Redis configured; revocation is Postgres-only",
@@ -284,7 +309,7 @@ async function denylistRevoked(
       {
         event: "denylist_write_failed",
         reason: context.reason,
-        target_user_id: context.targetUserId,
+        ...subjectFields(context.subject),
         pending_jti_count: entries.length,
         err: error instanceof Error ? error.message : String(error),
       },
@@ -364,7 +389,11 @@ export async function adminRevokeUserSessions(
     return rows;
   });
 
-  const denylisted = await denylistRevoked(denylist, revoked, { reason, targetUserId, log });
+  const denylisted = await denylistRevoked(denylist, revoked, {
+    reason,
+    subject: { targetUserId },
+    log,
+  });
 
   return { revokedTokens: revoked.length, denylistedJtis: denylisted };
 }

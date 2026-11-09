@@ -1,6 +1,6 @@
 import { AI_ASK_MIN_RELEVANCE_SCORE } from "../config";
 
-import type { HybridSearchHit } from "../retrieval/search";
+import type { HybridSearchHit, RetrievalMode } from "../retrieval/search";
 
 /**
  * Grounding refusal for Ask AI (ST-165).
@@ -12,12 +12,16 @@ import type { HybridSearchHit } from "../retrieval/search";
  *   - the best hit's fused RRF score must clear {@link AI_ASK_MIN_RELEVANCE_SCORE}, AND
  *   - that same hit must have matched the keyword leg (`keywordRank !== null`).
  *
- * The keyword-leg arm is load-bearing, not a nicety. The semantic leg in this repository is a
- * deterministic mock embedder (see `retrieval/embeddings.ts`), so a semantic-only hit means only
- * the mock's cosine distance said "nearby" — which cannot carry a relevance verdict on its own.
- * The keyword leg is real PostgreSQL full-text search: a hit it found genuinely mentions the
- * question's words. Requiring both keeps a mock-embedding false positive from producing a
- * confident-looking answer.
+ * The keyword-leg arm is load-bearing, not a nicety. The only embedder in this repository is a
+ * deterministic mock (see `retrieval/embeddings.ts`), so a semantic-only hit means only the mock's
+ * cosine distance said "nearby" — which cannot carry a relevance verdict on its own. The keyword
+ * leg is real PostgreSQL full-text search: a hit it found genuinely mentions the question's words.
+ *
+ * Lexical mode (ADR-020 — production today): retrieval runs the keyword leg alone, so the best
+ * hit's RRF score is exactly `1 / (60 + 1)` ≈ 0.0164 whenever anything matched — below the hybrid
+ * floor by construction, since that floor was sized for two fused legs. There the RRF arm is
+ * dropped and the verdict is the keyword arm alone: the best hit matched `websearch_to_tsquery`,
+ * which ANDs the question's content words, so every one of them appears in that chunk.
  *
  * When the verdict refuses, the caller sends the refusal path's payload, which carries the nearest
  * topics the retrieval did find — the materials that were closest to the question, so the student
@@ -64,10 +68,15 @@ export function nearestTopics(
   return topics;
 }
 
-export function assessGrounding(hits: readonly HybridSearchHit[]): GroundingVerdict {
+export function assessGrounding(
+  hits: readonly HybridSearchHit[],
+  mode: RetrievalMode = "hybrid",
+): GroundingVerdict {
   const best = hits[0];
   const grounded =
-    best !== undefined && best.rrfScore >= AI_ASK_MIN_RELEVANCE_SCORE && best.keywordRank !== null;
+    best !== undefined &&
+    best.keywordRank !== null &&
+    (mode === "lexical" || best.rrfScore >= AI_ASK_MIN_RELEVANCE_SCORE);
 
   return { grounded, topics: grounded ? [] : nearestTopics(hits) };
 }

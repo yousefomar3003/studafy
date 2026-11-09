@@ -1,28 +1,34 @@
 /**
  * Member-code + password sign-in (migration 000141). See services/member-password-service.ts.
  *
- *   POST /api/auth/login/member     public: member code + password (+ new_password on first use)
+ *   POST /api/auth/login/member     public: member code + password, or setup code + new_password
  *   POST /api/auth/password/change  bearer: the signed-in member replaces their own password
  *
  * Sign-in outcomes:
  *   - 200                                   session tokens
- *   - 401 AUTH_INVALID_CREDENTIALS          unknown code, wrong password or an account that does not
- *                                           sign in this way -- deliberately indistinguishable
- *   - 403 AUTH_PASSWORD_CHANGE_REQUIRED     still on the default password; resend with new_password
+ *   - 401 AUTH_INVALID_CREDENTIALS          unknown code, wrong password, expired or used setup code,
+ *                                           or an account that does not sign in this way --
+ *                                           deliberately indistinguishable
+ *   - 403 AUTH_PASSWORD_CHANGE_REQUIRED     signed in with a setup code; resend with new_password
  *   - 403 AUTH_ACCOUNT_LOCKED               too many wrong passwords; try again later
  *   - 403 SCHOOL_SUSPENDED
  *   - 422 AUTH_PASSWORD_REJECTED            new_password breaks the policy
+ *   - 429                                   per-IP, per-member-ID or platform-wide sign-in budget spent
  */
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES } from "@studafy/constants";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { buildMemberLoginRateLimitKey, MEMBER_LOGIN_BUDGETS } from "../../../config/rateLimits";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { extractClientIp, takeRateLimitToken } from "../../../middleware/rateLimiter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { emitRateLimitBlock } from "../auth-anomaly-events";
 import { deliverTokenPair } from "../delivery";
 import {
   changeMemberPassword,
@@ -35,9 +41,12 @@ import {
 import { loginResponseSchema } from "./returning-user-login-routes";
 
 import type { Database } from "../../../db";
+import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
 import type { AppEnv } from "../../../middleware/requestId";
+import type { RedisClient } from "../../../redis";
 import type { PasswordPolicyViolation } from "../services/member-password-service";
 import type { SessionTokenConfig } from "../services/session-service";
+import type { Context } from "hono";
 
 export const MEMBER_LOGIN_PATH = "/api/auth/login/member";
 export const MEMBER_PASSWORD_CHANGE_PATH = "/api/auth/password/change";
@@ -45,9 +54,50 @@ export const MEMBER_PASSWORD_CHANGE_PATH = "/api/auth/password/change";
 const POLICY_MESSAGES: Record<PasswordPolicyViolation, string> = {
   TOO_SHORT: `The new password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
   TOO_LONG: `The new password must be at most ${PASSWORD_MAX_LENGTH} characters.`,
-  IS_DEFAULT: "Choose a password other than the starting password.",
+  IS_SETUP_CODE: "Choose a password other than your setup code.",
   SAME_AS_USERNAME: "The new password cannot be your ID.",
 };
+
+/**
+ * Takes a token from the member ID's bucket and the platform-wide bucket (config/rateLimits.ts
+ * MEMBER_LOGIN_BUDGETS), throwing 429 when either is empty. Fails open without Redis, like the
+ * per-IP limiter, so the account lockout remains the backstop.
+ */
+async function throttleMemberLogin(
+  c: Context<AppEnv>,
+  redis: RedisClient | null,
+  eventSink: SecurityEventSink | null,
+  username: string,
+): Promise<void> {
+  if (!redis) return;
+  const now = Math.floor(Date.now() / 1000);
+  for (const scope of ["username", "global"] as const) {
+    let result;
+    try {
+      result = await takeRateLimitToken(
+        redis,
+        buildMemberLoginRateLimitKey(scope, username),
+        // eslint-disable-next-line security/detect-object-injection -- `scope` is a literal from the tuple above
+        MEMBER_LOGIN_BUDGETS[scope],
+        now,
+      );
+    } catch (err: unknown) {
+      c.get("log")?.warn({ err }, "member login rate limiter redis error, failing open");
+      return;
+    }
+    if (!result.allowed) {
+      c.header("Retry-After", String(result.retryAfter));
+      emitRateLimitBlock(c.get("log"), eventSink, {
+        routeClass: `member-login-${scope}`,
+        path: c.req.path,
+        clientIp: extractClientIp(c),
+        requestId: c.get("requestId"),
+        userAgent: c.req.header("User-Agent"),
+      });
+      throw new HTTPException(429);
+    }
+  }
+}
 
 function rejected(reason: PasswordPolicyViolation): never {
   // eslint-disable-next-line security/detect-object-injection -- `reason` is a closed union from the policy check
@@ -70,11 +120,15 @@ const memberLoginBodySchema = z
       description: "The member ID issued by the school (STU-, TCH-, PAR- or ATT-).",
       example: "STU-100001",
     }),
-    password: passwordField.openapi({ description: "Current password." }),
+    password: passwordField.openapi({
+      description:
+        "Current password, or — for a member who has not chosen one yet — the one-time setup code " +
+        "their school issued (XXXX-XXXX-XXXX-XXXX; case and dashes ignored).",
+    }),
     new_password: passwordField.optional().openapi({
       description:
-        "Required while the account is still on its starting password: the password to replace it " +
-        "with. Ignored otherwise.",
+        "Required when `password` is a setup code: the password to replace it with. Ignored " +
+        "otherwise.",
     }),
     channel: z
       .enum(["web", "mobile", "api"])
@@ -101,9 +155,10 @@ const memberLoginRoute = createRoute({
   operationId: "memberLogin",
   summary: "Sign in with a member ID and password",
   description:
-    "For students, parents, teachers and attendance officers. An account still on its starting " +
-    "password receives 403 AUTH_PASSWORD_CHANGE_REQUIRED and no session until the request also " +
-    "carries new_password. School leadership signs in with Google or Microsoft instead.",
+    "For students, parents, teachers and attendance officers. A member signing in with a setup " +
+    "code receives 403 AUTH_PASSWORD_CHANGE_REQUIRED and no session until the request also " +
+    "carries new_password, which consumes the code. Rate-limited per IP, per member ID and " +
+    "platform-wide. School leadership signs in with Google or Microsoft instead.",
   security: [],
   request: {
     body: { required: true, content: { "application/json": { schema: memberLoginBodySchema } } },
@@ -142,6 +197,8 @@ const changePasswordRoute = createRoute({
 export function memberPasswordRoutes(
   db: Database,
   config: SessionTokenConfig,
+  redis: RedisClient | null = null,
+  eventSink: SecurityEventSink | null = null,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
@@ -150,6 +207,7 @@ export function memberPasswordRoutes(
 
   routes.openapi(memberLoginRoute, async (c) => {
     const body = c.req.valid("json");
+    await throttleMemberLogin(c, redis, eventSink, body.username);
     const clientIp = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? null;
     const userAgent = c.req.header("user-agent") ?? null;
 

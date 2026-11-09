@@ -1,0 +1,27 @@
+meta {
+  name: Studafy QA School B · PARENT
+  type: http
+  seq: 13
+}
+
+post {
+  url: {{baseUrl}}/api/auth/login/qa
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "khalil.parent@qa-b.studafy.test",
+    "password": "{{qaPassword}}",
+    "channel": "mobile"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) bru.setEnvVar("QA_TOKEN_B_PARENT", res.body.access_token);
+}
+
+tests {
+  test("signed in", () => expect(res.status).to.equal(200));
+}

@@ -5,11 +5,14 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import * as realCsv from "../../../lib/csv";
+
 import type { ComponentType } from "react";
 
 /**
- * School members: counts of students, teachers and parents with the school's ID range, and a list
- * of each role's members with their member IDs.
+ * School members: counts of students, teachers and parents with the school's ID range, a list of
+ * each role's members with their member IDs, and one-time setup codes (QA-11) in place of a shared
+ * starting password.
  */
 
 function user(id: string, name: string, role: string, code: string) {
@@ -38,7 +41,6 @@ const getMock = mock(
           teachers: 12,
           parents: 95,
           attendance_officers: 3,
-          default_password: "pass@1234",
         },
       });
     }
@@ -53,14 +55,38 @@ const getMock = mock(
   },
 );
 
+const SETUP_CODE = "7K3M-Q9TZ-2HXR-B8WD";
+const EXPIRES_AT = "2026-11-17T09:00:00.000Z";
+
 const postMock = mock((path: string, _init?: unknown) => {
   if (path === "/api/users/{userId}/password/reset") {
-    return Promise.resolve({ data: { usernames: ["STU-100001"], default_password: "pass@1234" } });
+    return Promise.resolve({
+      data: { usernames: ["STU-100001"], setup_code: SETUP_CODE, expires_at: EXPIRES_AT },
+    });
+  }
+  if (path === "/api/users/member-setup-codes") {
+    return Promise.resolve({
+      data: {
+        issued: [
+          {
+            user_id: "11111111-1111-4111-8111-111111111111",
+            display_name: "=Sara",
+            usernames: ["STU-100001"],
+            setup_code: SETUP_CODE,
+            expires_at: EXPIRES_AT,
+          },
+        ],
+        remaining: 0,
+      },
+    });
   }
   throw new Error(`Unhandled POST ${path}`);
 });
 
+const downloadMock = mock((_filename: string, _csv: string) => undefined);
+
 mock.module("../../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }));
+mock.module("../../../lib/csv", () => ({ ...realCsv, downloadCsv: downloadMock }));
 
 const loadPage = async (): Promise<ComponentType> => (await import("./SchoolMembersPage")).default;
 
@@ -82,6 +108,7 @@ afterEach(() => {
   cleanup();
   getMock.mockClear();
   postMock.mockClear();
+  downloadMock.mockClear();
 });
 
 describe("SchoolMembersPage", () => {
@@ -100,10 +127,11 @@ describe("SchoolMembersPage", () => {
     const officers = within(summary).getByRole("region", { name: "Attendance officers" });
     expect(within(officers).getByText("3")).toBeTruthy();
     expect(within(officers).getByText("IDs ATT-1xxxxx")).toBeTruthy();
-    expect(screen.getByText(/The starting password is pass@1234/)).toBeTruthy();
+    expect(screen.getByText(/one-time setup code/)).toBeTruthy();
+    expect(screen.queryByText(/pass@1234/)).toBeNull();
   });
 
-  test("resets a member's password after confirmation", async () => {
+  test("resets a member's password after confirmation and shows the new setup code", async () => {
     await renderPage();
     const table = await screen.findByRole("table", { name: "Students" });
     fireEvent.click(await within(table).findByRole("button", { name: "Reset password" }));
@@ -115,6 +143,23 @@ describe("SchoolMembersPage", () => {
         params: { path: { userId: "11111111-1111-4111-8111-111111111111" } },
       }),
     );
+    // Shown in the dialog, where it can be copied, because it cannot be fetched again.
+    expect(await within(dialog).findByText(SETUP_CODE)).toBeTruthy();
+    expect(within(dialog).getByText("STU-100001")).toBeTruthy();
+  });
+
+  test("issues codes to the role's members who cannot sign in yet and downloads them", async () => {
+    await renderPage();
+    await screen.findByRole("table", { name: "Students" });
+    fireEvent.click(screen.getByRole("button", { name: "Issue codes to students not signed up" }));
+    await waitFor(() => expect(downloadMock).toHaveBeenCalledTimes(1));
+    expect(postMock).toHaveBeenCalledWith("/api/users/member-setup-codes", {
+      body: { role: "STUDENT" },
+    });
+    const [filename, csv] = downloadMock.mock.calls[0]!;
+    expect(filename).toMatch(/^setup-codes-student-\d{4}-\d{2}-\d{2}\.csv$/);
+    // A name that looks like a formula is neutralised for spreadsheets.
+    expect(csv).toContain(`'=Sara,STU-100001,${SETUP_CODE},2026-11-17`);
   });
 
   test("lists students with their IDs, and switches to teachers", async () => {
