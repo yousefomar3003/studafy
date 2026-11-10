@@ -1,0 +1,3 @@
+# school-agreement
+
+Draft (en).

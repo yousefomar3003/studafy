@@ -527,10 +527,7 @@ const DeleteAccountPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../features/account/privacy/DeleteAccountPage"),
 );
-const PrivacyPolicyPage = lazyWithCatalogs(
-  ONBOARDING_CATALOGS,
-  () => import("../routes/legal/PrivacyPolicyPage"),
-);
+const LegalDocumentPage = lazy(() => import("../routes/legal/LegalDocumentPage"));
 const DeleteAccountInfoPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../routes/legal/DeleteAccountInfoPage"),
@@ -561,8 +558,11 @@ export const routes: RouteObject[] = [
           { path: "pricing", element: <PricingPage /> },
           { path: "about", element: <AboutPage /> },
           // Public: both app stores' listing forms require these to be reachable without an
-          // account. See apps/mobile/store/review-checklist.md and privacy-labels.md.
-          { path: "privacy", element: <PrivacyPolicyPage /> },
+          // account. The documents' text is in /docs/legal/{en,ar}. See apps/mobile/store/review-checklist.md and privacy-labels.md.
+          { path: "privacy", element: <LegalDocumentPage document="privacy" /> },
+          { path: "terms", element: <LegalDocumentPage document="terms" /> },
+          // The agreement a school accepts when it applies, including the data-processing terms.
+          { path: "school-agreement", element: <LegalDocumentPage document="school-agreement" /> },
           { path: "legal/delete-account", element: <DeleteAccountInfoPage /> },
           // Where the emailed deletion link lands (ST-302).
           { path: "legal/delete-account/confirm", element: <ConfirmAccountDeletionPage /> },

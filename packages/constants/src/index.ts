@@ -13,6 +13,7 @@ export {
 export { DOMAIN_EVENTS, ERPNEXT_DOC_EVENT_MAP } from "./events";
 export type { DomainEvent } from "./events";
 export { ERROR_CODES } from "./errors";
+export { LEGAL_DOCUMENT_VERSIONS } from "./legal";
 export type { ErrorCode } from "./errors";
 export {
   NOTIFICATION_TYPES,

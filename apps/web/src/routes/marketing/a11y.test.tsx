@@ -33,8 +33,18 @@ const loadFeaturesPage = async (): Promise<ComponentType> =>
   (await import("./FeaturesPage")).default;
 const loadPricingPage = async (): Promise<ComponentType> => (await import("./PricingPage")).default;
 const loadAboutPage = async (): Promise<ComponentType> => (await import("./AboutPage")).default;
-const loadPrivacyPolicyPage = async (): Promise<ComponentType> =>
-  (await import("../legal/PrivacyPolicyPage")).default;
+// The documents are raw Markdown imports, which only Vite resolves; a fixture stands in for each.
+const LEGAL_FIXTURE =
+  "# Document\n\nLast updated: 2026-11-11\n\n## Section\n\nText with a [link](/privacy).\n";
+mock.module("../legal/legal-documents", () => ({
+  LEGAL_DOCUMENTS: {
+    privacy: { en: LEGAL_FIXTURE, ar: LEGAL_FIXTURE },
+    terms: { en: LEGAL_FIXTURE, ar: LEGAL_FIXTURE },
+    "school-agreement": { en: LEGAL_FIXTURE, ar: LEGAL_FIXTURE },
+  },
+}));
+const loadLegalDocumentPage = async (): Promise<ComponentType<{ document: "privacy" }>> =>
+  (await import("../legal/LegalDocumentPage")).default;
 const loadDeleteAccountInfoPage = async (): Promise<ComponentType> =>
   (await import("../legal/DeleteAccountInfoPage")).default;
 const loadConfirmAccountDeletionPage = async (): Promise<ComponentType> =>
@@ -97,8 +107,9 @@ describe("marketing site accessibility", () => {
     await expectNoA11yViolations(container);
   });
 
-  test("privacy policy page", async () => {
-    const { container } = renderPage(await loadPrivacyPolicyPage());
+  test("legal document page", async () => {
+    const LegalDocumentPage = await loadLegalDocumentPage();
+    const { container } = renderPage(() => <LegalDocumentPage document="privacy" />);
     await expectNoA11yViolations(container);
   });
 

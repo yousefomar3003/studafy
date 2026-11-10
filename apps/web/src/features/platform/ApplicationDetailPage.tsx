@@ -157,6 +157,16 @@ function ApplicantCard({ application }: { application: PlatformApplication }) {
           <dd>{when(application.createdAt)}</dd>
           <dt>{t("platform.applications.detail.teamEmailed")}</dt>
           <dd>{when(application.teamNotifiedAt)}</dd>
+          <dt>{t("platform.applications.detail.termsAccepted")}</dt>
+          <dd>
+            {application.termsAcceptance
+              ? t("platform.applications.detail.termsAcceptedValue", {
+                  when: when(application.termsAcceptance.acceptedAt),
+                  terms: application.termsAcceptance.termsVersion,
+                  agreement: application.termsAcceptance.schoolAgreementVersion,
+                })
+              : t("platform.applications.detail.termsNotRecorded")}
+          </dd>
         </dl>
       </Card.Body>
     </Card>
