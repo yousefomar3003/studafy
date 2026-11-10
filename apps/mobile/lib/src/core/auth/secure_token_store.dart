@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,6 +30,11 @@ class SecureTokenStore {
   /// The other accounts signed in on this device, as JSON (`saved_account.dart`). They hold
   /// refresh tokens, so they live here rather than in SharedPreferences.
   static const _keySavedAccounts = 'saved_accounts';
+
+  /// Member ID -> the device token the API gave this device when that member signed in, as JSON.
+  /// Kept across sign-out on purpose: it is what lets this phone sign in while strangers' wrong
+  /// guesses have the account locked (`member-password-service.ts`, trusted devices).
+  static const _keyMemberDeviceTokens = 'member_device_tokens';
 
   /// Plain SharedPreferences flag (not a secret) marking that this install has run before.
   static const _keyInstallMarker = 'secure_token_store.installed';
@@ -64,6 +71,39 @@ class SecureTokenStore {
       ? _storage.delete(key: _keySavedAccounts)
       : _storage.write(key: _keySavedAccounts, value: json);
 
+  /// The device token for [memberId] (case-insensitive), or null if this device has none.
+  Future<String?> readMemberDeviceToken(String memberId) async =>
+      (await _readMemberDeviceTokens())[_normalizeMemberId(memberId)];
+
+  /// Stores [token] as this device's token for [memberId].
+  Future<void> writeMemberDeviceToken(String memberId, String token) async {
+    final tokens = await _readMemberDeviceTokens();
+    tokens[_normalizeMemberId(memberId)] = token;
+    await _storage.write(
+      key: _keyMemberDeviceTokens,
+      value: jsonEncode(tokens),
+    );
+  }
+
+  Future<Map<String, String>> _readMemberDeviceTokens() async {
+    final raw = await _storage.read(key: _keyMemberDeviceTokens);
+    if (raw == null) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return {};
+      return {
+        for (final entry in decoded.entries)
+          if (entry.key is String && entry.value is String)
+            entry.key as String: entry.value as String,
+      };
+    } on FormatException {
+      return {};
+    }
+  }
+
+  static String _normalizeMemberId(String memberId) =>
+      memberId.trim().toUpperCase();
+
   /// Drops tokens left behind by a previous install. Call once at bootstrap, before reading.
   ///
   /// The iOS Keychain outlives an uninstall, so without this a reinstalled app (or one on a phone
@@ -72,7 +112,11 @@ class SecureTokenStore {
   Future<void> discardIfReinstalled() async {
     final prefs = await SharedPreferences.getInstance();
     if (prefs.getBool(_keyInstallMarker) ?? false) return;
-    await Future.wait([clear(), writeSavedAccounts(null)]);
+    await Future.wait([
+      clear(),
+      writeSavedAccounts(null),
+      _storage.delete(key: _keyMemberDeviceTokens),
+    ]);
     await prefs.setBool(_keyInstallMarker, true);
   }
 }

@@ -11,7 +11,9 @@
  * account.
  *
  * Accounts holding a privileged role (school leadership, platform staff) never sign in this way;
- * they keep Google / Microsoft. Five wrong passwords lock the account for fifteen minutes. Unknown
+ * they keep Google / Microsoft. Five wrong passwords lock the account for fifteen minutes -- except
+ * against a device that has already signed in to it (000186), which keeps its own count instead, so
+ * a stranger who knows the ID cannot lock its owner out (see TRUSTED DEVICES below). Unknown
  * codes, ineligible accounts and wrong passwords are one indistinguishable INVALID_CREDENTIALS, and
  * each path pays for one argon2 verification so timing does not tell them apart.
  */
@@ -22,6 +24,7 @@ import { ROLES } from "@studafy/constants";
 
 import { withTenantTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
+import { AUTH_CHANNELS } from "../channels";
 import { isLoginPermitted } from "../school-access";
 
 import { isCommonPassword } from "./password-blocklist";
@@ -57,6 +60,69 @@ export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
 
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
+
+// ---------------------------------------------------------------------------
+// Trusted devices (000186)
+// ---------------------------------------------------------------------------
+//
+// A device that signs in successfully on a non-web channel receives a random device token
+// (app.member_trusted_devices). When it presents that token again with the password, the attempt is
+// judged on the device's own record: the account-wide lockout and the per-member-ID budget, which
+// anyone who knows the ID can exhaust, do not apply; TRUSTED_DEVICE_MAX_FAILURES wrong passwords in
+// a row delete the device instead. Only the token's SHA-256 is stored -- it is 256 random bits, so it
+// needs no slow hash.
+
+/** Wrong passwords in a row after which a device is no longer trusted. */
+export const TRUSTED_DEVICE_MAX_FAILURES = 5;
+/** Devices kept per member; the least recently used beyond this are deleted. */
+export const TRUSTED_DEVICES_PER_MEMBER = 10;
+
+export function generateDeviceToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+export function hashDeviceToken(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
+}
+
+/**
+ * Whether `deviceToken` is one of the member's trusted devices. Read before the sign-in budgets are
+ * spent, to decide which budgets apply; loginMember checks again under a row lock.
+ */
+export async function isTrustedMemberDevice(
+  db: Database,
+  username: string,
+  deviceToken: string,
+): Promise<boolean> {
+  const member = await resolveMemberCode(db, username.trim().toUpperCase());
+  if (!member) return false;
+  const tenant = { schoolId: member.schoolId, userId: member.userId };
+  return withTenantTx(db, tenant, async (tx) => {
+    const rows = await tx<{ found: number }[]>`
+      SELECT 1 AS found FROM app.member_trusted_devices
+      WHERE school_id = current_setting('app.school_id')::uuid
+        AND user_id = ${member.userId}::uuid
+        AND token_hash = ${hashDeviceToken(deviceToken)}
+    `;
+    return rows.length > 0;
+  });
+}
+
+/** The trusted device row for `deviceHash`, locked for this transaction; undefined if none. */
+async function lockTrustedDevice(
+  tx: TransactionSql,
+  userId: string,
+  deviceHash: string,
+): Promise<{ failed_attempts: number } | undefined> {
+  const [row] = await tx<{ failed_attempts: number }[]>`
+    SELECT failed_attempts FROM app.member_trusted_devices
+    WHERE school_id = current_setting('app.school_id')::uuid
+      AND user_id = ${userId}::uuid
+      AND token_hash = ${deviceHash}
+    FOR UPDATE
+  `;
+  return row;
+}
 
 // ---------------------------------------------------------------------------
 // Setup codes
@@ -137,11 +203,16 @@ interface CredentialRow {
  * stored password, or — for an account with none yet — against its unexpired setup code ("OK_SETUP").
  * An account with neither matches nothing. The caller's transaction must commit even on a wrong
  * password so the failure is counted.
+ *
+ * With `deviceHash` naming one of the member's trusted devices, the account lockout is neither
+ * checked nor advanced: a wrong password counts against that device, which is dropped after
+ * TRUSTED_DEVICE_MAX_FAILURES in a row.
  */
 async function verifyStoredPassword(
   tx: TransactionSql,
   userId: string,
   password: string,
+  deviceHash?: string,
 ): Promise<"OK_SETUP" | "OK" | "WRONG" | "LOCKED"> {
   const [row] = await tx<CredentialRow[]>`
     SELECT password_hash, failed_attempts,
@@ -152,7 +223,9 @@ async function verifyStoredPassword(
     WHERE user_id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
     FOR UPDATE
   `;
-  if (row?.locked) {
+  const device =
+    deviceHash === undefined ? undefined : await lockTrustedDevice(tx, userId, deviceHash);
+  if (row?.locked && !device) {
     await burnVerification(password);
     return "LOCKED";
   }
@@ -165,6 +238,24 @@ async function verifyStoredPassword(
       ? (await burnVerification(password),
         setupHash !== null && setupCodeMatches(password, setupHash))
       : await Bun.password.verify(password, hash);
+
+  if (!matches && device) {
+    if (device.failed_attempts + 1 >= TRUSTED_DEVICE_MAX_FAILURES) {
+      await tx`
+        DELETE FROM app.member_trusted_devices
+        WHERE school_id = current_setting('app.school_id')::uuid
+          AND user_id = ${userId}::uuid AND token_hash = ${deviceHash!}
+      `;
+    } else {
+      await tx`
+        UPDATE app.member_trusted_devices
+        SET failed_attempts = failed_attempts + 1, updated_at = CURRENT_TIMESTAMP
+        WHERE school_id = current_setting('app.school_id')::uuid
+          AND user_id = ${userId}::uuid AND token_hash = ${deviceHash!}
+      `;
+    }
+    return "WRONG";
+  }
 
   if (!matches) {
     const attempts = (row?.failed_attempts ?? 0) + 1;
@@ -184,7 +275,15 @@ async function verifyStoredPassword(
     return lock ? "LOCKED" : "WRONG";
   }
 
-  if (row && row.failed_attempts > 0) {
+  if (device) {
+    await tx`
+      UPDATE app.member_trusted_devices
+      SET failed_attempts = 0, updated_at = CURRENT_TIMESTAMP
+      WHERE school_id = current_setting('app.school_id')::uuid
+        AND user_id = ${userId}::uuid AND token_hash = ${deviceHash!}
+    `;
+  }
+  if (row && (row.failed_attempts > 0 || row.locked)) {
     await tx`
       UPDATE app.member_credentials
       SET failed_attempts = 0, locked_until = NULL, updated_at = CURRENT_TIMESTAMP
@@ -221,6 +320,8 @@ export interface MemberLoginParams {
   password: string;
   /** Required when `password` is a setup code. */
   newPassword?: string;
+  /** The device token this device was given at an earlier sign-in, if any. */
+  deviceToken?: string;
   channel: AuthChannel;
   device?: DeviceContext;
   requestId?: string;
@@ -230,7 +331,12 @@ export interface MemberLoginParams {
 }
 
 export type MemberLoginResult =
-  | { outcome: "LOGIN_SUCCESS"; tokens: IssuedTokenPair }
+  | {
+      outcome: "LOGIN_SUCCESS";
+      tokens: IssuedTokenPair;
+      /** For a non-web channel: the token that marks this device as trusted from now on. */
+      deviceToken?: string;
+    }
   | { outcome: "INVALID_CREDENTIALS" }
   | { outcome: "LOCKED" }
   | { outcome: "PASSWORD_CHANGE_REQUIRED" }
@@ -344,7 +450,9 @@ export async function loginMember(
       return { outcome: "INVALID_CREDENTIALS" };
     }
 
-    const verdict = await verifyStoredPassword(tx, member.userId, params.password);
+    const deviceHash =
+      params.deviceToken === undefined ? undefined : hashDeviceToken(params.deviceToken);
+    const verdict = await verifyStoredPassword(tx, member.userId, params.password, deviceHash);
     if (verdict === "WRONG" || verdict === "LOCKED") {
       await audit(tx, verdict === "LOCKED" ? "LOGIN_FAILED_LOCKED" : "LOGIN_FAILED_PASSWORD");
       return { outcome: verdict === "LOCKED" ? "LOCKED" : "INVALID_CREDENTIALS" };
@@ -379,6 +487,11 @@ export async function loginMember(
       channel: params.channel,
       device: params.device,
     });
+    // A browser gets no device token: it would have to live where page script can read it.
+    const deviceToken =
+      params.channel === AUTH_CHANNELS.WEB
+        ? undefined
+        : await trustDevice(tx, member.userId, deviceHash);
     await audit(
       tx,
       verdict === "OK_SETUP" ? "LOGIN_SUCCESS_PASSWORD_SET" : "LOGIN_SUCCESS",
@@ -388,8 +501,40 @@ export async function loginMember(
       { user_id: member.userId, school_id: member.schoolId, session_id: tokens.sessionId },
       "member password login successful",
     );
-    return { outcome: "LOGIN_SUCCESS", tokens };
+    return { outcome: "LOGIN_SUCCESS", tokens, deviceToken };
   });
+}
+
+/**
+ * After a successful sign-in, makes sure this device is trusted. A device that presented a trusted
+ * token keeps it (undefined: nothing new to store); any other gets a fresh one, and the member's
+ * least recently used devices beyond TRUSTED_DEVICES_PER_MEMBER are deleted.
+ */
+async function trustDevice(
+  tx: TransactionSql,
+  userId: string,
+  presentedHash: string | undefined,
+): Promise<string | undefined> {
+  if (presentedHash !== undefined && (await lockTrustedDevice(tx, userId, presentedHash))) {
+    return undefined;
+  }
+  const token = generateDeviceToken();
+  await tx`
+    INSERT INTO app.member_trusted_devices (school_id, user_id, token_hash)
+    VALUES (current_setting('app.school_id')::uuid, ${userId}::uuid, ${hashDeviceToken(token)})
+  `;
+  await tx`
+    DELETE FROM app.member_trusted_devices
+    WHERE school_id = current_setting('app.school_id')::uuid
+      AND user_id = ${userId}::uuid
+      AND token_hash NOT IN (
+        SELECT token_hash FROM app.member_trusted_devices
+        WHERE school_id = current_setting('app.school_id')::uuid AND user_id = ${userId}::uuid
+        ORDER BY updated_at DESC, created_at DESC
+        LIMIT ${TRUSTED_DEVICES_PER_MEMBER}
+      )
+  `;
+  return token;
 }
 
 // ---------------------------------------------------------------------------
@@ -476,6 +621,11 @@ async function writeSetupCode(
       locked_until = NULL,
       updated_at = CURRENT_TIMESTAMP
     RETURNING setup_code_expires_at AS expires_at
+  `;
+  // A reset is how an account is taken back; no device keeps a way around its lockout.
+  await tx`
+    DELETE FROM app.member_trusted_devices
+    WHERE school_id = current_setting('app.school_id')::uuid AND user_id = ${userId}::uuid
   `;
   await emitAuditLog(tx, {
     action: "update",

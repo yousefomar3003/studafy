@@ -14,6 +14,10 @@
  *   - 403 SCHOOL_SUSPENDED
  *   - 422 AUTH_PASSWORD_REJECTED            new_password breaks the policy
  *   - 429                                   per-IP, per-member-ID or platform-wide sign-in budget spent
+ *
+ * A device that has signed in before sends back the `device_token` it was given (000186). Its
+ * attempts skip the per-member-ID and platform-wide budgets and the account lockout -- the things a
+ * stranger who knows the ID can exhaust -- and are limited by the device's own failure count.
  */
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
@@ -32,6 +36,7 @@ import { emitRateLimitBlock } from "../auth-anomaly-events";
 import { deliverTokenPair } from "../delivery";
 import {
   changeMemberPassword,
+  isTrustedMemberDevice,
   loginMember,
   LOCKOUT_MINUTES,
   PASSWORD_MAX_LENGTH,
@@ -39,6 +44,20 @@ import {
 } from "../services/member-password-service";
 
 import { loginResponseSchema } from "./returning-user-login-routes";
+
+const memberLoginResponseSchema = loginResponseSchema
+  .extend({
+    device_token: z
+      .string()
+      .optional()
+      .openapi({
+        description:
+          "Present for non-web channels when this device is newly trusted: store it securely and " +
+          "send it as `device_token` on later sign-ins to this account. Absent when the device " +
+          "token sent is still valid.",
+      }),
+  })
+  .openapi("MemberLoginResponse");
 
 import type { Database } from "../../../db";
 import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
@@ -62,7 +81,8 @@ const POLICY_MESSAGES: Record<PasswordPolicyViolation, string> = {
 /**
  * Takes a token from the member ID's bucket and the platform-wide bucket (config/rateLimits.ts
  * MEMBER_LOGIN_BUDGETS), throwing 429 when either is empty. Fails open without Redis, like the
- * per-IP limiter, so the account lockout remains the backstop.
+ * per-IP limiter, so the account lockout remains the backstop. Not called for a trusted device,
+ * whose own failure count limits it (member-password-service.ts, TRUSTED DEVICES).
  */
 async function throttleMemberLogin(
   c: Context<AppEnv>,
@@ -131,6 +151,16 @@ const memberLoginBodySchema = z
         "Required when `password` is a setup code: the password to replace it with. Ignored " +
         "otherwise.",
     }),
+    device_token: z
+      .string()
+      .min(1)
+      .max(128)
+      .optional()
+      .openapi({
+        description:
+          "The device token an earlier successful sign-in on this device returned. Lets the device " +
+          "sign in while the account is locked by someone else's wrong guesses.",
+      }),
     channel: z
       .enum(["web", "mobile", "api"])
       .default("mobile")
@@ -165,7 +195,7 @@ const memberLoginRoute = createRoute({
     body: { required: true, content: { "application/json": { schema: memberLoginBodySchema } } },
   },
   responses: standardResponses(
-    { 200: { description: "Signed in.", schema: loginResponseSchema } },
+    { 200: { description: "Signed in.", schema: memberLoginResponseSchema } },
     [400, 401, 403, 422, 429, 500],
   ),
 });
@@ -208,7 +238,10 @@ export function memberPasswordRoutes(
 
   routes.openapi(memberLoginRoute, async (c) => {
     const body = c.req.valid("json");
-    await throttleMemberLogin(c, redis, eventSink, body.username);
+    const trustedDevice =
+      body.device_token !== undefined &&
+      (await isTrustedMemberDevice(db, body.username, body.device_token));
+    if (!trustedDevice) await throttleMemberLogin(c, redis, eventSink, body.username);
     const clientIp = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? null;
     const userAgent = c.req.header("user-agent") ?? null;
 
@@ -216,6 +249,8 @@ export function memberPasswordRoutes(
       username: body.username,
       password: body.password,
       newPassword: body.new_password,
+      // Only a token that was trusted when the budgets were chosen; loginMember re-checks it.
+      deviceToken: trustedDevice ? body.device_token : undefined,
       channel: body.channel,
       device: { userAgent, ipAddress: clientIp },
       requestId: c.get("requestId"),
@@ -226,7 +261,13 @@ export function memberPasswordRoutes(
 
     switch (result.outcome) {
       case "LOGIN_SUCCESS":
-        return c.json(deliverTokenPair(c, result.tokens), 200);
+        return c.json(
+          {
+            ...deliverTokenPair(c, result.tokens),
+            ...(result.deviceToken === undefined ? {} : { device_token: result.deviceToken }),
+          },
+          200,
+        );
       case "INVALID_CREDENTIALS":
         throw new CodedHttpException(
           401,
