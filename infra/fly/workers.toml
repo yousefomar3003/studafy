@@ -34,7 +34,10 @@ primary_region = "fra"
   AI_LLM_PROVIDER = "openai-compatible"
   AI_LLM_BASE_URL = "https://api.together.xyz/v1"
   EMAIL_PROVIDER = "resend"
-  SES_FROM_ADDRESS = "no-reply@studafy.com"
+  # Resend sends only from a domain verified with it, and the verified one is send.studafy.com
+  # (resend._domainkey.send and the send.send return path in Vercel DNS). From studafy.com every
+  # email was refused. A sending subdomain also keeps bulk mail off the root domain's reputation.
+  SES_FROM_ADDRESS = "no-reply@send.studafy.com"
   SES_FROM_NAME = "Studafy"
   EMAIL_DRY_RUN = "false"
   PUSH_DRY_RUN = "false"
