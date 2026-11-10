@@ -278,8 +278,11 @@ either stays attributable to its source. This figure is host-independent and is 
 **Arm B — parallel stress.** 1,000 rotations at 16-way concurrency against a pool with the same
 sixteen-connection capacity as the production API, so the contention represents the deployed
 configuration rather than the four-connection default of ordinary integration tests. What is asserted
-is a **throughput floor** of 400 rotations/sec, calibrated against ~760/s observed on a GitHub
-`ubuntu-latest` runner. Latency is printed and gated on nothing.
+is a **throughput floor** that scales with the host's CPU speed: 350 rotations/sec on a host whose
+RS256 signature (timed by the same file, pure CPU) takes 0.5 ms, lowered in proportion on a slower
+one. A flat 400/s, set against an inferred ~760/s, failed on GitHub `ubuntu-latest` runners that
+were simply slower: measured runs printed 317–533/s, and the low ones were exactly the slow-CPU
+ones. Latency is printed and gated on nothing.
 
 **The two wall-clock figures — Arm A's end-to-end median and Arm B's throughput — are asserted only
 when the host can support them.** The benchmark calibrates a floor by timing a rotation-_shaped_

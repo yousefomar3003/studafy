@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { PAGINATION_DEFAULT_LIMIT, PAGINATION_MAX_LIMIT } from "./limits";
+
 /**
  * Cursor-based pagination primitives. The cursor is an opaque forward token (its encoding is
  * the caller's concern); `limit` is capped at 100. See docs/schema-conventions.md.
@@ -9,8 +11,7 @@ import { z } from "zod";
 export const cursorSchema = z.string().min(1);
 export type Cursor = z.infer<typeof cursorSchema>;
 
-export const PAGINATION_DEFAULT_LIMIT = 20;
-export const PAGINATION_MAX_LIMIT = 100;
+export { PAGINATION_DEFAULT_LIMIT, PAGINATION_MAX_LIMIT };
 
 /**
  * Pagination query parameters. `limit` is coerced (query-string / form values arrive as
