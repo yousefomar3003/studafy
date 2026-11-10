@@ -41,6 +41,9 @@ concurrency:
 env:
   FLUTTER_VERSION: "3.44.8" # in step with ci.yml / mobile-integration.yml
   RUBY_VERSION: "3.3"
+  # Sentry project `flutter` (studafy-limited) — the Fastfile bakes it in as --dart-define=SENTRY_DSN.
+  # A public client key; empty leaves crash reporting to Sentry off.
+  SENTRY_DSN: ${{ vars.MOBILE_SENTRY_DSN }}
 
 jobs:
   # --- Android: internal track on every merge to main -----------------------------------------

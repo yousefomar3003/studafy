@@ -117,7 +117,7 @@ there **and** leave `AI_LLM_API_KEY` empty — the api refuses a key while AI is
 | `VITE_REALTIME_BASE_URL`  | the realtime WebSocket URL, once the edge routing for apps/realtime is decided (`infra/terraform/modules/edge`) |
 | `VITE_TURNSTILE_SITE_KEY` | the Turnstile widget's **Site Key** (public)                                                                    |
 | `VITE_SENTRY_DSN`         | Sentry project `studafy-web` → Client Keys (DSN); public, it can only send events                               |
-| `SENTRY_ORG`              | `studafy`                                                                                                       |
+| `SENTRY_ORG`              | `studafy-limited`                                                                                               |
 | `SENTRY_PROJECT`          | `studafy-web`                                                                                                   |
 
 One Environment **secret** belongs with them: `SENTRY_AUTH_TOKEN`, a Sentry organization token
