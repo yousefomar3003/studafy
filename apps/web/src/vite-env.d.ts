@@ -19,6 +19,12 @@ interface ImportMetaEnv {
    */
   readonly VITE_TURNSTILE_SITE_KEY?: string;
   /**
+   * The public site's origin (`https://studafy.com`), which every page names as its canonical
+   * address. The same build also serves `app.studafy.com`, so without it a crawler would file each
+   * marketing page twice. Unset (local, tests) falls back to the page's own origin.
+   */
+  readonly VITE_SITE_ORIGIN?: string;
+  /**
    * Sentry DSN for the web app's error monitoring (`lib/monitoring`). Unset in local dev and in the
    * `containers.yml` validation build — monitoring stays disabled rather than failing without one.
    */

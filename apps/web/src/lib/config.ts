@@ -5,6 +5,9 @@
  */
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
+/** The public site's origin for canonical links; `undefined` falls back to the page's own origin. */
+export const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN;
+
 /** Contact address for the marketing site. `undefined` when not configured — see vite-env.d.ts. */
 export const MARKETING_CONTACT_EMAIL = import.meta.env.VITE_MARKETING_CONTACT_EMAIL;
 

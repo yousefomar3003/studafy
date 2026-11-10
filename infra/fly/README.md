@@ -91,6 +91,22 @@ Build-time values for the web app come from the environment's **variables**: `VI
 `apps/api/src/env.ts`, `apps/workers/src/env.ts` and `apps/realtime/src/env.ts` are the source of
 truth: a service that is missing a required secret refuses to boot and names it.
 
+## The first Studafy operator
+
+An empty database has no account to sign in with, and every other account is created from the
+product by someone already in it. `apps/api/scripts/bootstrap-platform-operator.ts` creates the
+platform school (`studafy`) and a three-day SUPER_ADMIN invitation for one address, and refuses to
+run once any SUPER_ADMIN exists. It uses only Bun's built-in client, so it runs inside the API
+container with the API's own connection settings:
+
+```sh
+echo "put apps/api/scripts/bootstrap-platform-operator.ts /app/bootstrap.ts" | fly ssh sftp shell -a studafy-core-api
+fly ssh console -a studafy-core-api -C "sh -c 'cd /app && bun bootstrap.ts --email <address> --confirm-production; rm -f bootstrap.ts'"
+```
+
+Open the printed link and sign in with Google or Microsoft as that address. Production's first
+operator was created this way on 2026-11-10.
+
 ## Domains
 
 DNS for studafy.com is hosted by Vercel; mail is Zoho (MX/SPF records there must be left alone).

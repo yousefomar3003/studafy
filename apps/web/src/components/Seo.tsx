@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 
+import { SITE_ORIGIN } from "../lib/config";
+
 export interface SeoProps {
   /** Page title. Rendered as "{title} | Studafy" — see SITE_NAME below. */
   title: string;
@@ -53,7 +55,10 @@ export function useSeo({ title, description, path }: SeoProps): void {
     upsertMeta("name", "twitter:title", fullTitle);
     upsertMeta("name", "twitter:description", description);
 
+    // One canonical site (studafy.com) for every host this build is served on (app., www.).
     const canonicalPath = path ?? window.location.pathname;
-    upsertCanonical(`${window.location.origin}${canonicalPath}`);
+    const canonicalUrl = `${SITE_ORIGIN ?? window.location.origin}${canonicalPath}`;
+    upsertCanonical(canonicalUrl);
+    upsertMeta("property", "og:url", canonicalUrl);
   }, [title, description, path]);
 }

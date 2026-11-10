@@ -71,6 +71,18 @@ export const envSchema = z
     // staging/production by the refinement below, so a deployed tier cannot fall back to the
     // localhost defaults and quietly accept credentialed cross-origin requests it should not.
     CORS_ALLOWED_ORIGINS: z.string().optional(),
+    // The request header that carries the visitor's address, set by the platform's own proxy and
+    // never passed through from the client: `fly-client-ip` on fly.io. Unset (AWS behind an ALB),
+    // the last X-Forwarded-For entry is used. Rate limits, audit rows and security events all key on
+    // this, so the wrong source puts every visitor in one bucket (it did on fly, 2026-11-10).
+    CLIENT_IP_HEADER: z.preprocess(
+      emptyAsUnset,
+      z
+        .string()
+        .regex(/^[a-z0-9-]+$/i)
+        .transform((name) => name.toLowerCase())
+        .optional(),
+    ),
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     HOST: z.string().min(1).default("0.0.0.0"),
     // A separate port from PORT, on purpose (ST-259): the Prometheus-format /metrics endpoint
