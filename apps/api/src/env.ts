@@ -208,8 +208,9 @@ export const envSchema = z
     RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // KMS key for sensitive record documents (ADR-019): applied when a staged upload is promoted to
-    // permanent/. Required on a deployed tier backed by AWS S3; refused with S3_ENDPOINT (Tigris,
-    // local rustfs), which has no KMS and keeps the provider's encryption at rest.
+    // permanent/. Required on a deployed tier backed by AWS S3. SSE-KMS is AWS-only, so it is
+    // refused alongside S3_ENDPOINT: an S3-compatible provider (Cloudflare R2, local rustfs) keeps
+    // the bucket's own at-rest encryption instead.
     STORAGE_SENSITIVE_KMS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // S3-compatible object storage for the app-files bucket (ST-103). All optional and validated
     // as a group below: the feature activates only when the whole set is present, so dev and test
@@ -224,6 +225,15 @@ export const envSchema = z
     // Lifetime of a pre-signed URL. Bounded to the 15–60 minute window ST-103 specifies: short
     // enough that a leaked URL expires before it is useful, long enough to survive a slow upload.
     S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(900).max(3600).default(900),
+    // fly.io only: the app running apps/realtime, which this API hands `/ws` handshakes to
+    // (app.ts realtimeFlyApp). Unset everywhere else.
+    REALTIME_FLY_APP: z.preprocess(
+      emptyAsUnset,
+      z
+        .string()
+        .regex(/^[a-z0-9-]+$/)
+        .optional(),
+    ),
     // Stripe billing integration. All optional — activates only when both are set.
     STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     STRIPE_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),

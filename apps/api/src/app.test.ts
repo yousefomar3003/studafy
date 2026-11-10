@@ -29,6 +29,25 @@ describe("security headers", () => {
   });
 });
 
+describe("realtime handoff on fly.io", () => {
+  test("/ws answers with a fly-replay to the realtime app when one is named", async () => {
+    const app = createApp({
+      isReady: () => true,
+      tracker: createInflightTracker(),
+      logger: silentLogger(),
+      realtimeFlyApp: "studafy-core-realtime",
+    });
+    const res = await app.request("/ws?token=t");
+    expect(res.headers.get("fly-replay")).toBe("app=studafy-core-realtime");
+  });
+
+  test("/ws is not a route when no realtime app is named", async () => {
+    const res = await buildApp(() => true).request("/ws");
+    expect(res.headers.get("fly-replay")).toBeNull();
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("rate limiter coverage", () => {
   test("every registered non-health route has a resolvable route class", () => {
     const app = buildApp(() => true);

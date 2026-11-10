@@ -1,14 +1,13 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
+import { parseRoomKeyParts, REAUTH_REQUIRED_CLOSE_CODE } from "./protocol";
 import {
   eventEnvelopeSchema,
   parseIncomingMessage,
-  parseRoomKeyParts,
-  REAUTH_REQUIRED_CLOSE_CODE,
   roomKeySchema,
   systemMessageSchema,
-} from "./protocol";
+} from "./protocol-schemas";
 
 const ENVELOPE = {
   id: "3fa85f64-5717-4562-b3fc-2c963f66afa6",

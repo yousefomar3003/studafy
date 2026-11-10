@@ -17,11 +17,23 @@ const optionalText = (max: number) =>
     .optional()
     .transform((value) => (value ? value : undefined));
 
+/** A phone number as people type it: digits with + - ( ) . and spaces, 6 to 20 digits in all. */
+const phoneSchema = z
+  .string()
+  .trim()
+  .max(50)
+  .regex(/^\+?[\d\s\-().]+$/)
+  .refine((value) => {
+    const digits = value.replace(/\D/g, "").length;
+    return digits >= 6 && digits <= 20;
+  });
+
 export const submitInquiryBodySchema = z
   .object({
     full_name: z.string().trim().min(1).max(200).openapi({ example: "Sara Al-Ahmad" }),
     email: z.string().trim().email().max(320).openapi({ example: "sara@school.example" }),
-    phone: optionalText(50),
+    // Required: the sales team calls schools back, and an email alone is too easy to miss.
+    phone: phoneSchema.openapi({ example: "+962 7 9123 4567" }),
     school_name: z.string().trim().min(1).max(200).openapi({ example: "Al Noor International" }),
     job_title: optionalText(120),
     country: optionalText(120),

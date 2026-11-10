@@ -1,0 +1,19 @@
+# Database migrations for fly.io (production). This app never serves anything: its image is built
+# and pushed, then run once as a throwaway machine, which reads the app's secrets and exits:
+#   fly deploy . --config infra/fly/migrate.toml --remote-only --build-only --push --image-label <tag>
+#   fly machine run registry.fly.io/studafy-core-migrate:<tag> --app studafy-core-migrate \
+#     --region fra --rm --restart no
+# It connects through Supabase's session pooler (port 5432), not the transaction pooler the
+# services use, so DDL runs on one session from start to finish.
+app = "studafy-core-migrate"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../docker/migrations.Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  DATABASE_HOST = "aws-1-eu-central-1.pooler.supabase.com"
+  DATABASE_PORT = "5432"
+  DATABASE_NAME = "postgres"
+  DATABASE_SSL_MODE = "verify-full"

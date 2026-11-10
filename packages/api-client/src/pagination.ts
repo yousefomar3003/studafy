@@ -1,4 +1,4 @@
-import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas";
+import { PAGINATION_MAX_LIMIT } from "@studafy/shared-schemas/limits";
 
 /**
  * Client-side pagination contract that keeps front-end list calls on the indexed, cursor-paginated

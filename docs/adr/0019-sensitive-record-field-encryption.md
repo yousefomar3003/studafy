@@ -104,6 +104,8 @@ The API (reveal, DSR export) needs to decrypt. Retention deletes only rows and n
    record. What remains: a private bucket, one-minute pre-signed URLs gated on
    `studentRecord:readSensitive`, audited downloads, and Tigris encryption at rest. Application-
    level file encryption stays the upgrade path if a school or regulator requires a separate key.
+   The same holds for Cloudflare R2, which production uses since the move to fly.io: SSE-KMS is
+   refused there too and sensitive documents rely on R2's AES-256 encryption at rest.
 
 ## Alternatives considered
 

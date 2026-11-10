@@ -29,7 +29,9 @@ const GATING_IMPACTS = new Set(["critical", "serious"]);
 // it on is what a motion-sensitive visitor's browser actually renders, and it also makes the audit
 // deterministic: without it, axe can sample a mid-transition frame (the modal blended with the
 // overlay behind it) and report a false `color-contrast` violation for a state no user ever reads.
-test.use({ reducedMotion: "reduce" });
+// The same goes for the marketing pages' rise-in. It has to be set through `contextOptions`:
+// `reducedMotion` is not a top-level `use` option, so `test.use({ reducedMotion })` is ignored.
+test.use({ contextOptions: { reducedMotion: "reduce" } });
 
 function fakeAccessToken(roles: string[]): string {
   const segment = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
