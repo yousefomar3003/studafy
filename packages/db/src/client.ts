@@ -15,7 +15,10 @@ export function createClient(config: MigrationConfig, applicationName: string): 
     ssl: config.ssl,
     max: 1,
     prepare: false,
-    connect_timeout: 10,
+    // Generous for an administrative one-shot: Supabase's pooler holds back a failed login for
+    // ~11 s once a tenant has seen several, and starts a tenant's session pool on first use. At
+    // 10 s the driver gave up first and reported a bare CONNECT_TIMEOUT instead of the real cause.
+    connect_timeout: 30,
     idle_timeout: 10,
     target_session_attrs: "primary" as const,
     connection: { application_name: applicationName },
