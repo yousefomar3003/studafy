@@ -20,7 +20,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, LEGAL_DOCUMENT_VERSIONS } from "@studafy/constants";
 
 import { openTenantTx, withTenantTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
@@ -165,6 +165,7 @@ export async function issueTokenPair(
       channel: params.channel,
       subscription_status: claims.status,
       deletion_pending: claims.deletionPending,
+      legal_acceptance_pending: claims.legalAcceptancePending,
     },
     {
       issuer: config.issuer,
@@ -213,6 +214,11 @@ interface SessionClaims {
   schoolStatus: string | null;
   /** Whether the user has a self-service deletion scheduled (000143): the `deletion_pending` claim. */
   deletionPending: boolean;
+  /**
+   * Whether the user has yet to accept the current Terms of Service and Privacy Policy
+   * (LEGAL_DOCUMENT_VERSIONS; 000187): the `legal_acceptance_pending` claim.
+   */
+  legalAcceptancePending: boolean;
 }
 
 /**
@@ -240,6 +246,7 @@ async function readSessionClaims(tx: TransactionSql, userId: string): Promise<Se
       version: string;
       school_status: string | null;
       deletion_pending: boolean | null;
+      legal_acceptance_pending: boolean | null;
     }[]
   >`
     SELECT
@@ -258,7 +265,10 @@ async function readSessionClaims(tx: TransactionSql, userId: string): Promise<Se
       (SELECT status::text FROM app.schools
         WHERE id = current_setting('app.school_id')::uuid) AS school_status,
       (SELECT deletion_due_at IS NOT NULL FROM app.users
-        WHERE id = ${userId}::uuid) AS deletion_pending
+        WHERE id = ${userId}::uuid) AS deletion_pending,
+      (SELECT terms_version IS DISTINCT FROM ${LEGAL_DOCUMENT_VERSIONS.terms}
+              OR privacy_version IS DISTINCT FROM ${LEGAL_DOCUMENT_VERSIONS.privacy}
+         FROM app.users WHERE id = ${userId}::uuid) AS legal_acceptance_pending
   `;
 
   return {
@@ -266,6 +276,7 @@ async function readSessionClaims(tx: TransactionSql, userId: string): Promise<Se
     entitlementsVersion: Number(row?.version ?? 1),
     schoolStatus: row?.school_status ?? null,
     deletionPending: row?.deletion_pending ?? false,
+    legalAcceptancePending: row?.legal_acceptance_pending ?? false,
   };
 }
 
@@ -387,6 +398,7 @@ export async function rotateRefreshToken(
           channel: session.channel,
           subscription_status: claims.status,
           deletion_pending: claims.deletionPending,
+          legal_acceptance_pending: claims.legalAcceptancePending,
         },
         {
           issuer: config.issuer,

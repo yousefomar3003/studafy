@@ -56,6 +56,9 @@ describeDb("getAccountProfile", () => {
       member_ids: [],
       deletion_due_at: null,
       deletion_requires_member_credentials: false,
+      terms_version: null,
+      privacy_version: null,
+      legal_accepted_at: null,
       school_id: school.id,
       school_name: "Al-Noor Academy",
     });

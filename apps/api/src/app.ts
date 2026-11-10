@@ -21,6 +21,7 @@ import {
   jwtAuthMiddleware,
   tenantLifecycleGuard,
   accountDeletionGuard,
+  legalAcceptanceGuard,
 } from "./middleware";
 import {
   academicYearRoutes,
@@ -527,6 +528,11 @@ export function createApp({
   // Account deletion guard (000143): a session signed in during a deletion's grace period may only
   // read its profile, cancel the deletion or log out. Claim-only, like the lifecycle guard.
   app.use("/api/*", accountDeletionGuard());
+
+  // Legal acceptance guard (000187): until the user accepts the current Terms of Service and
+  // Privacy Policy, the session may only read its profile, accept, manage its own deletion or log
+  // out. Claim-only, like the deletion guard.
+  app.use("/api/*", legalAcceptanceGuard());
 
   // Rate limiter middleware: token-bucket rate limiting via Redis. Registered after the logger
   // so rate-limited requests are still logged for observability, but before routes so they

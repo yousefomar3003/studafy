@@ -15,7 +15,14 @@ final appConfigProvider = Provider<AppConfig>((ref) {
 
 /// The public privacy policy, opened in the system browser. See [buildPrivacyPolicyUrl].
 final privacyPolicyUrlProvider = Provider<Uri>((ref) {
-  return buildPrivacyPolicyUrl(webBaseUrl: ref.watch(appConfigProvider).webBaseUrl);
+  return buildPrivacyPolicyUrl(
+    webBaseUrl: ref.watch(appConfigProvider).webBaseUrl,
+  );
+});
+
+/// The public terms of service, opened in the system browser. See [buildTermsUrl].
+final termsUrlProvider = Provider<Uri>((ref) {
+  return buildTermsUrl(webBaseUrl: ref.watch(appConfigProvider).webBaseUrl);
 });
 
 final networkConfigProvider = Provider<NetworkConfig>((ref) {
@@ -39,7 +46,10 @@ final routerProvider = Provider<GoRouter>((ref) {
   final routerRefresh = _RouterRefreshListenable(ref);
   ref.onDispose(routerRefresh.dispose);
 
-  return createAppRouter(appConfig: appConfig, refreshListenable: routerRefresh);
+  return createAppRouter(
+    appConfig: appConfig,
+    refreshListenable: routerRefresh,
+  );
 });
 
 /// Bridges the providers the router's redirect reads — [authStatusProvider] and

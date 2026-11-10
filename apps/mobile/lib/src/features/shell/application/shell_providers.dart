@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/auth/auth_state.dart';
 import '../../../core/api/generated/models/account_deletion_confirmation.dart';
+import '../../../core/api/generated/models/accept_legal_documents.dart';
 import '../../../core/api/generated/models/account_profile.dart';
+import '../../../core/api/generated/models/legal_acceptance_status.dart';
 import '../../../core/config/legal_links.dart';
 import '../../../core/di/app_providers.dart';
 import '../domain/shell_role.dart';
@@ -56,6 +58,33 @@ final cancelAccountDeletionProvider = Provider<Future<void> Function()>((ref) {
     await session.refresh();
     ref.invalidate(accountProfileProvider);
   };
+});
+
+/// Records that the signed-in user accepts the current Terms of Service and has read the Privacy
+/// Policy (`POST /api/account/legal-acceptance`, the versions from the profile), then renews the
+/// token — the old one still carries `legal_acceptance_pending` — and reloads the profile, so
+/// [AppShell] shows the shell. Throws the API's error on refusal.
+final acceptLegalDocumentsProvider =
+    Provider<Future<void> Function(LegalAcceptanceStatus versions)>((ref) {
+      final api = ref.watch(apiClientProvider);
+      final session = ref.watch(authSessionProvider);
+      return (versions) async {
+        await api.account.acceptLegalDocuments(
+          body: AcceptLegalDocuments(
+            termsVersion: versions.termsVersion,
+            privacyVersion: versions.privacyVersion,
+          ),
+        );
+        await session.refresh();
+        ref.invalidate(accountProfileProvider);
+      };
+    });
+
+/// The public deletion page, for a session that may not reach the signed-in deletion flow.
+final publicAccountDeleteUrlProvider = Provider<Uri>((ref) {
+  return buildPublicAccountDeleteUrl(
+    webBaseUrl: ref.watch(appConfigProvider).webBaseUrl,
+  );
 });
 
 /// The shell the current session resolves to. See [resolveShellRole].
