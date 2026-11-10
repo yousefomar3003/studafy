@@ -343,6 +343,12 @@ when it required the `version-bump` label.
 
 ### Changed
 
+- **(breaking)** `POST /api/inquiries` (`SubmitInquiry`): `phone` is now required. It must look like
+  a phone number: digits with `+`, `-`, `(`, `)`, `.` and spaces, 6 to 20 digits in all; anything
+  else answers 400. The sales team calls schools back, and an email address alone was too easy to
+  miss. The only client, the website's "Talk to us" form, now asks for it. Migration: send a phone
+  number.
+
 - The student import's column calls take `ImportSubjectKind` (`student` | `parent`) for
   `subject_kind` in `ImportColumnTarget`, `ApplyImportColumnBody`, `ImportColumnPreview` and
   `UnmappedColumn.applied`, rather than `RecordSubjectKind`, which now also lists `staff` and

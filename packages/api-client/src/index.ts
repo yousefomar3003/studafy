@@ -1,7 +1,9 @@
 export { createApiClient } from "./client";
 export type { ApiClient, ApiClientOptions } from "./client";
 
-export { ApiError, clientProblemSchema } from "./errors";
+// `clientProblemSchema` is deliberately not re-exported: a static export would put zod back in
+// every bundle that imports this package. ApiError loads it when a request fails (problem-schema.ts).
+export { ApiError } from "./errors";
 export type { ApiErrorFields, ClientProblem } from "./errors";
 
 export { authMiddleware } from "./interceptors/auth";

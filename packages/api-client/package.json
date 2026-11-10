@@ -15,7 +15,7 @@
     "generate": "bun run scripts/build-api-client.ts",
     "check-drift": "bun run scripts/check-drift.ts",
     "verify": "bun run scripts/verify-pipeline.ts",
-    "build": "bun build ./src/index.ts --outdir dist --packages=external && tsc --project tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist --noEmit false",
+    "build": "bun build ./src/index.ts --outdir dist --packages=external --splitting && tsc --project tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist --noEmit false",
     "check-types": "tsc --noEmit",
     "lint": "eslint .",
     "test": "bun test"

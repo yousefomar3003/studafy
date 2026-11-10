@@ -15,7 +15,7 @@ import type { Database } from "../../db/client";
 export interface SubmitInquiryParams {
   fullName: string;
   email: string;
-  phone?: string;
+  phone: string;
   schoolName: string;
   jobTitle?: string;
   country?: string;
@@ -51,7 +51,7 @@ export async function submitInquiry(
         full_name, email, phone, school_name, job_title, country, student_count, message,
         source_path
       ) VALUES (
-        ${params.fullName}, ${params.email.toLowerCase()}, ${params.phone ?? null},
+        ${params.fullName}, ${params.email.toLowerCase()}, ${params.phone},
         ${params.schoolName}, ${params.jobTitle ?? null}, ${params.country ?? null},
         ${params.studentCount ?? null}, ${params.message ?? null}, ${params.sourcePath ?? null}
       )

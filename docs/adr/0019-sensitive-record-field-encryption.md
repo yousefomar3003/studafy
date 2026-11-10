@@ -90,8 +90,10 @@ The API (reveal, DSR export) needs to decrypt. Retention deletes only rows and n
    Keys keep KMS request charges negligible next to the $1/month for the key. Only the API task
    role holds `kms:GenerateDataKey`/`kms:Decrypt` (`infra/terraform/modules/compute`), and
    CloudTrail records every use of the key. `STORAGE_SENSITIVE_KMS_KEY_ID` is required on staging
-   and production. Local development (rustfs) has no KMS, so there the class falls back to the
-   bucket default.
+   and production when they run on AWS S3. Local development (rustfs) has no KMS, so there the
+   class falls back to the bucket default. The same holds for a deployed tier on an S3-compatible
+   provider (`S3_ENDPOINT` set, e.g. Cloudflare R2): SSE-KMS is AWS-only, so the key is refused
+   there and sensitive documents rely on the provider's at-rest encryption (AES-256 on R2).
 
 ## Alternatives considered
 

@@ -72,18 +72,29 @@ const ARM_B_ITERATIONS = 1_000;
 const ARM_B_CONCURRENCY = 16;
 
 /**
- * Rotations/sec Arm B must sustain.
+ * Rotations/sec Arm B must sustain on a host whose RS256 signature takes REFERENCE_SIGN_MS.
  *
- * Set against ~760/s, which is inferred rather than directly observed: the previous revision of this
- * file recorded a 20.985 ms median at this concurrency on a GitHub ubuntu-latest runner, and at
- * N == pool size Little's Law gives X = N / L = 16 / 20.985 ms. A floor of 400 therefore tolerates a
- * host ~1.9x slower before failing, which covers runner variance while still catching every
- * regression this arm exists to detect — a lost uq_refresh_tokens_token_hash, a policy that stops
- * being index-supported, an accidental serialization on the family row, an extra round trip on the
- * path — since all of those cost far more than 1.9x. Tighten it once a run of this revision has
- * printed the throughput directly; the log line below reports it whether or not the gate binds.
+ * The first revision set a flat 400/s against an inferred ~760/s. Measured on GitHub's
+ * ubuntu-latest runners it is lower and moves with the runner's CPU: seven runs in November 2026
+ * printed 317–533 rot/s, and the three that fell under 400 were exactly the three with the slowest
+ * signature (0.64–0.76 ms against 0.47–0.65 ms), with the database and the code unchanged. A flat
+ * floor was therefore measuring which machine the job landed on.
+ *
+ * So the floor scales with the host's own CPU speed, taken from the signature this file already
+ * times (pure CPU, no database): floor = THROUGHPUT_FLOOR_AT_REFERENCE x REFERENCE_SIGN_MS / sign,
+ * never above THROUGHPUT_FLOOR_AT_REFERENCE. Against those seven runs that leaves at least 1.3x
+ * headroom on every one, while a regression this arm exists to catch — a lost
+ * uq_refresh_tokens_token_hash, a policy that stops being index-supported, an accidental
+ * serialization on the family row, an extra round trip on the path — costs far more than that on
+ * any host.
  */
-const THROUGHPUT_FLOOR_PER_SECOND = 400;
+const THROUGHPUT_FLOOR_AT_REFERENCE = 350;
+const REFERENCE_SIGN_MS = 0.5;
+
+/** The throughput floor for a host whose median RS256 signature took `signMs`. */
+function throughputFloorFor(signMs: number): number {
+  return THROUGHPUT_FLOOR_AT_REFERENCE * Math.min(1, REFERENCE_SIGN_MS / signMs);
+}
 
 const SIGN_SAMPLES = 200;
 const TRANSPORT_PROBES = 30;
@@ -118,7 +129,7 @@ function summarize(samples: readonly number[]): {
 const round = (value: number): number => Math.round(value * 100) / 100;
 
 benchmarkTest(
-  `refresh rotation completes in under ${TARGET_MS}ms and sustains ${THROUGHPUT_FLOOR_PER_SECOND} rotations/sec`,
+  `refresh rotation completes in under ${TARGET_MS}ms and sustains its host-scaled throughput floor`,
   async () => {
     const database = await createTestDatabase({ maxConnections: DATABASE_MAX_CONNECTIONS });
     const keyStore = new KeyStore(3_600_000);
@@ -325,6 +336,7 @@ benchmarkTest(
 
       const armBStats = summarize(armB.samples);
       const throughput = armB.rotations / (armB.elapsedMs / 1000);
+      const throughputFloor = throughputFloorFor(signMs);
 
       // ---- Report, then assert ------------------------------------------------------------------
       //
@@ -349,8 +361,8 @@ benchmarkTest(
           `e2e ${round(armAStats.median)}ms < ${round(budgetMs)}ms\n` +
           `rotation, arm B (${ARM_B_CONCURRENCY}-way, ${armB.rotations} rotations, ` +
           `${DATABASE_MAX_CONNECTIONS}-connection pool)\n` +
-          `  throughput: ${round(throughput)} rot/s (floor ${THROUGHPUT_FLOOR_PER_SECOND}/s, ` +
-          `headroom ${round(throughput / THROUGHPUT_FLOOR_PER_SECOND)}x)\n` +
+          `  throughput: ${round(throughput)} rot/s (floor ${round(throughputFloor)}/s for a ` +
+          `${round(signMs)}ms signature, headroom ${round(throughput / throughputFloor)}x)\n` +
           `  latency:    median ${round(armBStats.median)}ms p95 ${round(armBStats.p95)}ms ` +
           `<- saturation artefact at N == pool size (L = N/X), not gated`,
       );
@@ -394,7 +406,7 @@ benchmarkTest(
         // Parallel stress, asserted as the quantity that is well defined at saturation. The median
         // and p95 printed above are deliberately never gated: at N == pool size they are queue-depth
         // artefacts that move with the runner's core count rather than with this code.
-        expect(throughput).toBeGreaterThan(THROUGHPUT_FLOOR_PER_SECOND);
+        expect(throughput).toBeGreaterThan(throughputFloor);
       } else {
         console.log(
           `  note:       wall-clock gates skipped — host floor ${round(hostFloorMs)}ms exceeds the ` +

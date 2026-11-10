@@ -6,6 +6,7 @@ import { resetSecurityConfig } from "../../src/config/security";
 import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { hashInvitationToken, KeyStore } from "../../src/modules/auth";
+import { createUnusableRedis } from "../../src/redis-unusable";
 import {
   createSchool,
   createTestDatabase,
@@ -308,23 +309,39 @@ describe("GET invitation verification", () => {
   );
 });
 
+/**
+ * The rate limiter's two commands, answered from memory; everything else falls through to the
+ * inert stand-in from src/redis-unusable.ts. The fall-through matters: createApp hands this client
+ * to every BullMQ queue it registers, and a bare object with only `script`/`evalsha` does not pass
+ * BullMQ's client duck-typing, so BullMQ read it as connection *options* and opened its own client
+ * on the default 127.0.0.1:6379, retrying in the background for the rest of the test process.
+ */
 function createMemoryRateLimitRedis(): RedisClient {
   const buckets = new Map<string, number>();
-  return {
-    script: () => Promise.resolve("invitation-rate-limit-script"),
-    evalsha: (
-      _sha: string,
-      _numberOfKeys: number,
-      tokenKey: string,
-      _timestampKey: string,
-      maxTokens: number,
-    ) => {
-      const remaining = buckets.has(tokenKey) ? buckets.get(tokenKey)! : maxTokens;
-      if (remaining < 1) return Promise.resolve([0, 0, 1]);
-      buckets.set(tokenKey, remaining - 1);
-      return Promise.resolve([remaining - 1, 1, 0]);
+  const commands = new Map<string, unknown>([
+    ["script", () => Promise.resolve("invitation-rate-limit-script")],
+    [
+      "evalsha",
+      (
+        _sha: string,
+        _numberOfKeys: number,
+        tokenKey: string,
+        _timestampKey: string,
+        maxTokens: number,
+      ) => {
+        const remaining = buckets.has(tokenKey) ? buckets.get(tokenKey)! : maxTokens;
+        if (remaining < 1) return Promise.resolve([0, 0, 1]);
+        buckets.set(tokenKey, remaining - 1);
+        return Promise.resolve([remaining - 1, 1, 0]);
+      },
+    ],
+  ]);
+  return new Proxy(createUnusableRedis(), {
+    get(target, prop, receiver) {
+      if (typeof prop === "string" && commands.has(prop)) return commands.get(prop);
+      return Reflect.get(target, prop, receiver);
     },
-  } as unknown as RedisClient;
+  });
 }
 
 describe("invitation verification rate limit", () => {

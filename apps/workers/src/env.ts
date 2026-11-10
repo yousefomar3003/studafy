@@ -46,6 +46,9 @@ export const envSchema = z
     DATABASE_USER: z.string().min(1).optional(),
     DATABASE_PASSWORD: z.string().optional(),
     DATABASE_CA_CERT: z.string().min(1).optional(),
+    // verify-full: TLS with certificate verification on every pool (databaseUrlFrom), for a
+    // database reached over the internet. Unset keeps the plain connection a private PgBouncer used.
+    DATABASE_SSL_MODE: z.preprocess(emptyAsUnset, z.enum(["verify-full"]).optional()),
     READ_DATABASE_URL: z.string().min(1).optional(),
     READ_DATABASE_HOST: z.string().min(1).optional(),
     READ_DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
@@ -71,6 +74,15 @@ export const envSchema = z
     RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // The ST-293 cost report publishes to CloudWatch, so a deployment outside AWS sets
+    // COST_REPORT_ENABLED=false and the daily/monthly sweeps are never scheduled. On by default.
+    COST_REPORT_ENABLED: z.preprocess(
+      emptyAsUnset,
+      z
+        .enum(["true", "false"])
+        .optional()
+        .transform((value) => value !== "false"),
+    ),
     // SES transactional email (deliverability R-08). When SES_REGION is unset the email dispatcher
     // runs in dry-run mode: it renders, dedups, and records deliveries exactly as in production but
     // never calls AWS — the dev/test path. A production worker refuses to boot that way unless
@@ -85,6 +97,11 @@ export const envSchema = z
     ),
     SES_FROM_NAME: z.preprocess(emptyAsUnset, z.string().min(1).default("Studafy")),
     SES_CONFIGURATION_SET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Which service sends email: "ses" (default) or "resend". Resend needs RESEND_API_KEY and a
+    // domain verified in Resend for SES_FROM_ADDRESS; its bounces and complaints reach the API's
+    // /email/webhooks/resend. Without the key the dispatcher is a dry run, the same rule as SES.
+    EMAIL_PROVIDER: z.preprocess(emptyAsUnset, z.enum(["ses", "resend"]).default("ses")),
+    RESEND_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     EMAIL_DRY_RUN: z.preprocess(
       emptyAsUnset,
       z
@@ -211,12 +228,20 @@ export const envSchema = z
       });
     }
 
-    if (env.SES_REGION === undefined && !env.EMAIL_DRY_RUN) {
+    if (env.EMAIL_PROVIDER === "ses" && env.SES_REGION === undefined && !env.EMAIL_DRY_RUN) {
       context.addIssue({
         code: "custom",
         path: ["SES_REGION"],
         message:
           "SES_REGION is required in production (set EMAIL_DRY_RUN=true to run without sending on purpose)",
+      });
+    }
+    if (env.EMAIL_PROVIDER === "resend" && env.RESEND_API_KEY === undefined && !env.EMAIL_DRY_RUN) {
+      context.addIssue({
+        code: "custom",
+        path: ["RESEND_API_KEY"],
+        message:
+          "RESEND_API_KEY is required in production when EMAIL_PROVIDER=resend (set EMAIL_DRY_RUN=true to run without sending on purpose)",
       });
     }
 
@@ -265,6 +290,9 @@ export type Env = z.infer<typeof envSchema>;
  *
  * The password is URL-encoded: Secrets Manager generates passwords containing characters that are
  * structural in a URI (`@`, `/`, `:`), and one of those would otherwise truncate the host.
+ *
+ * DATABASE_SSL_MODE=verify-full is carried in the URL (`sslmode`), so every pool built from it
+ * verifies the server certificate, against the system store plus NODE_EXTRA_CA_CERTS.
  */
 export function databaseUrlFrom(env: Env): string {
   if (env.DATABASE_HOST === undefined || env.DATABASE_USER === undefined) {
@@ -276,7 +304,7 @@ export function databaseUrlFrom(env: Env): string {
   const password = env.DATABASE_PASSWORD ?? "";
   const credentials = `${encodeURIComponent(env.DATABASE_USER)}:${encodeURIComponent(password)}`;
 
-  return `postgresql://${credentials}@${env.DATABASE_HOST}:${port}/${name}`;
+  return `postgresql://${credentials}@${env.DATABASE_HOST}:${port}/${name}${sslQuery(env)}`;
 }
 
 export function readDatabaseUrlFrom(env: Env): string {
@@ -287,7 +315,11 @@ export function readDatabaseUrlFrom(env: Env): string {
   const name = env.READ_DATABASE_NAME ?? env.DATABASE_NAME ?? "api_read";
   const username = env.DATABASE_USER ?? "";
   const password = env.DATABASE_PASSWORD ?? "";
-  return `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${env.READ_DATABASE_HOST}:${port}/${name}`;
+  return `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${env.READ_DATABASE_HOST}:${port}/${name}${sslQuery(env)}`;
+}
+
+function sslQuery(env: Env): string {
+  return env.DATABASE_SSL_MODE === "verify-full" ? "?sslmode=verify-full" : "";
 }
 
 /**

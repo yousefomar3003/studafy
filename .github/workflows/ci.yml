@@ -451,6 +451,9 @@ jobs:
       # (GitHub Advanced Security must also be enabled for a private repo to get PR-line
       # annotations from this -- see docs/testing/ci-pipeline.md).
       security-events: write
+      # upload-sarif reads this workflow run to attach the results; in a private repo that needs
+      # actions: read, without which the upload answers 403 "Resource not accessible by integration".
+      actions: read
     container:
       image: semgrep/semgrep:1.176.0
     steps:
@@ -479,8 +482,13 @@ jobs:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PUSH_BEFORE_SHA: ${{ github.event.before }}
+      # Reporting only: the gate is semgrep's --error above. Code scanning is not enabled for this
+      # private repo (it needs GitHub Code Security), so the upload answers "Code scanning is not
+      # enabled for this repository"; that must not fail a job whose scan passed. Once code
+      # scanning is turned on, the upload simply starts landing in the Security tab.
       - name: Upload SARIF to code scanning
         if: always()
+        continue-on-error: true
         uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
         with:
           sarif_file: semgrep.sarif
@@ -492,6 +500,12 @@ jobs:
   # as synthetic test fixtures (ST-249's security pass report has the detail).
   secret-scan-history:
     runs-on: ubuntu-latest
+    # On a pull_request, gitleaks-action lists the PR's commits through the API to know what to scan,
+    # which needs pull-requests: read; with only the workflow's contents: read it answers 403
+    # "Resource not accessible by integration".
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       # Pinned to a commit SHA, not the mutable `v7` tag: this repo's SAST job (ST-251) flags any
       # action reference that isn't (a floating tag can be silently repointed by the action owner).
@@ -661,7 +675,7 @@ jobs:
       # absolute wall clock: there is no baseline arm to subtract, because generating the document is
       # the whole program. Median of five spawns, several times the budget in headroom -- see the
       # file header. Needs no database.
-      - name: OpenAPI generation benchmark (<2s)
+      - name: OpenAPI generation benchmark (<3.5s)
         env:
           OPENAPI_BENCHMARK: "1"
         run: bun test tests/benchmark/openapi-generate-benchmark.test.ts

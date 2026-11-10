@@ -1,5 +1,6 @@
 // Measures the ST-060 acceptance target: the build script parses every endpoint, runs its type
-// assertions, emits the schema artifact, and completes in under 2 seconds.
+// assertions, emits the schema artifact, and completes in under 2 seconds on a developer machine
+// (about 1.0 s on an Apple-silicon laptop). On CI the budget is wider; see TARGET_MS.
 //
 // This is an ABSOLUTE wall-clock budget, and it is the only one in this directory. The two
 // benchmarks beside it assert a delta for a documented reason -- an absolute budget on a shared CI
@@ -35,7 +36,16 @@ const benchmarkTest = test.skipIf(process.env.OPENAPI_BENCHMARK !== "1");
 
 const WARMUP_ITERATIONS = 1;
 const MEASURED_ITERATIONS = 5;
-const TARGET_MS = 2_000;
+/**
+ * The CI budget. 2 s, the ticket's figure, no longer fits GitHub's shared runners: with 626 routes the
+ * same generation measured a 2194-2596 ms spread (median 2285 ms) on CI, while it takes about 1008 ms
+ * on a laptop -- and dev without stage's three routes about 943 ms, so the spec itself grew by ~7%.
+ * The runner is roughly 2.3x slower than a laptop, which put a 2 s budget within ~1x of its own cost:
+ * it measured the host, not the code. Widened as this file prescribes for a flapping absolute budget
+ * (as client-build-benchmark.test.ts was): 3.5 s keeps ~1.5x headroom over the CI median while still
+ * failing a real regression of the kind this guards (a heavy import, a much fatter spec).
+ */
+const TARGET_MS = 3_500;
 
 /** Routes the document must contain, so a script that wrote nothing cannot pass by doing nothing. */
 // Mirrors the list in src/openapi/document.test.ts. Two copies is one too many, and the duplication
@@ -450,6 +460,7 @@ const EXPECTED_PATHS = [
   "/api/users/{userId}/deactivate",
   "/api/users/{userId}/password/reset",
   "/api/users/{userId}/role",
+  "/email/webhooks/resend",
   "/email/webhooks/sns",
   "/erpnext/webhooks",
   "/healthz",

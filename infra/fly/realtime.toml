@@ -1,0 +1,42 @@
+# Studafy realtime gateway on fly.io (production). Clients connect to wss://api.studafy.com/ws; the
+# API answers that path with a fly-replay header naming this app (REALTIME_FLY_APP in api.toml), so
+# this app needs no domain of its own. Deploy from the repo root:
+#   fly deploy . --config infra/fly/realtime.toml --remote-only
+app = "studafy-core-realtime"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../docker/realtime.Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  HOST = "0.0.0.0"
+  SERVICE_NAME = "realtime"
+  SENTRY_ENVIRONMENT = "production"
+  # Browser origins allowed to open a socket (required in production): every domain the web app is
+  # served on (web.toml). AUTH_REDIS_URL and WS_JWT_SECRET are secrets.
+  WS_ALLOWED_ORIGINS = "https://studafy.com,https://www.studafy.com,https://app.studafy.com,https://school.studafy.com"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  # Sockets are long-lived: a stopped machine would drop every connected client.
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 1000
+    hard_limit = 1500
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

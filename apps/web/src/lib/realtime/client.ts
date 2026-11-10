@@ -1,8 +1,8 @@
 import { computeBackoffDelay } from "./backoff";
 import { allInvalidationKeys, invalidationKeysFor } from "./invalidations";
-import { isSystemMessage, parseIncomingMessage, REAUTH_REQUIRED_CLOSE_CODE } from "./protocol";
+import { isSystemMessage, REAUTH_REQUIRED_CLOSE_CODE } from "./protocol";
 
-import type { ClientMessage, EventEnvelope, RoomKey } from "./protocol";
+import type { ClientMessage, EventEnvelope, IncomingMessage, RoomKey } from "./protocol";
 import type { QueryClient } from "@tanstack/react-query";
 
 /**
@@ -130,6 +130,13 @@ export class RealtimeClient {
   private everConnected = false;
   private readonly joinedRooms = new Set<string>();
   private readonly seenEventIds: string[] = [];
+  /**
+   * The frame parser, from protocol-schemas.ts. Loaded on the first connect attempt rather than
+   * imported: it brings zod with it, and this client is constructed on every page, signed out
+   * included, so a static import would put zod on the path to every first paint. The socket only
+   * opens once it has loaded, so no frame ever arrives without it.
+   */
+  private parse: ((text: string) => IncomingMessage | undefined) | null = null;
 
   constructor(options: RealtimeClientOptions) {
     this.options = options;
@@ -196,10 +203,10 @@ export class RealtimeClient {
     const generation = this.generation;
     let token: string | null | undefined;
     try {
-      token = await this.options.getTicket();
+      [token] = await Promise.all([this.options.getTicket(), this.loadParser()]);
     } catch (error) {
-      // The ticket request itself failed (network, 5xx): not an auth verdict, so back off and retry
-      // rather than leaving the status stuck at `connecting`.
+      // The ticket request (network, 5xx) or the parser's chunk failed to load: not an auth
+      // verdict, so back off and retry rather than leaving the status stuck at `connecting`.
       if (!this.started || generation !== this.generation) {
         return;
       }
@@ -217,6 +224,14 @@ export class RealtimeClient {
       return;
     }
     this.openSocket(buildSocketUrl(this.options.baseUrl, token));
+  }
+
+  private async loadParser(): Promise<void> {
+    if (this.parse) {
+      return;
+    }
+    const { parseIncomingMessage } = await import("./protocol-schemas");
+    this.parse = parseIncomingMessage;
   }
 
   private openSocket(url: string): void {
@@ -247,7 +262,7 @@ export class RealtimeClient {
     if (typeof data !== "string") {
       return;
     }
-    const message = parseIncomingMessage(data);
+    const message = this.parse?.(data);
     if (!message) {
       console.warn("[realtime] dropped malformed frame", data);
       return;

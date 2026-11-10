@@ -1,471 +1,652 @@
 /**
- * Shared layout primitives for marketing pages: container, section rhythm, hero, feature/pricing
- * grids. Kept as plain utility-ish classes rather than one class per page — the pages share the same
- * few shapes (container, section, grid-of-cards), so factoring those out is DRY; anything page-
- * specific stays scoped with a page-name prefix below.
+ * Marketing pages. Palette and type tokens (`--mk-*`) come from marketing-shell.css.
+ *
+ * The pages are typographic: large left-aligned headings, ruled lists and tables, one navy band.
+ * No cards, shadows, gradients, icons or images, so every section reads as information about the
+ * product rather than decoration. Motion (at the end) only ever settles things into place. Arabic gets normal letter spacing and roomier lines:
+ * tightened tracking breaks the joins between Arabic letters.
  */
 
-.marketing-container {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 var(--space-24);
-}
+/* Type ------------------------------------------------------------------------------------------ */
 
-.marketing-section {
-  padding: var(--space-64) 0;
-}
-
-.marketing-section--muted {
-  background-color: var(--color-surface);
-}
-
-.marketing-section__heading {
-  max-width: 640px;
-  margin: 0 0 var(--space-40);
-}
-
-.marketing-section__eyebrow {
-  display: inline-block;
-  margin: 0 0 var(--space-12);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-accent);
-}
-
-.marketing-section__title {
-  margin: 0 0 var(--space-12);
-  font-size: var(--font-size-3xl);
-  line-height: var(--line-height-3xl);
+.mk-hero__title,
+.mk-section__title,
+.mk-band__title {
+  color: var(--mk-ink);
   font-weight: var(--font-weight-bold);
-  letter-spacing: var(--tracking-tight);
-  color: var(--color-foreground);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
 }
 
-.marketing-section__lede {
-  margin: 0;
-  font-size: var(--font-size-lg);
-  line-height: var(--line-height-lg);
-  color: var(--color-muted-foreground);
+:lang(ar) .mk-hero__title,
+:lang(ar) .mk-section__title,
+:lang(ar) .mk-band__title {
+  letter-spacing: 0;
+  line-height: 1.35;
 }
 
-/* Hero */
-
-.marketing-hero {
-  padding: var(--space-80) 0 var(--space-64);
-  text-align: center;
-}
-
-.marketing-hero__title {
-  margin: 0 auto var(--space-16);
-  max-width: 780px;
-  font-size: var(--font-size-5xl);
-  line-height: var(--line-height-5xl);
-  font-weight: var(--font-weight-bold);
-  letter-spacing: var(--tracking-tight);
-  color: var(--color-foreground);
-}
-
-.marketing-hero__subtitle {
-  margin: 0 auto var(--space-32);
-  max-width: 620px;
-  font-size: var(--font-size-xl);
-  line-height: var(--line-height-xl);
-  color: var(--color-muted-foreground);
-}
-
-.marketing-hero__actions {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-12);
-  flex-wrap: wrap;
-}
-
-/* Card grids */
-
-.marketing-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: var(--space-24);
-}
-
-/* `Card` doesn't accept a className prop (see packages/ui/src/components/card/card.tsx), so grid
-   cards are shaped via its stable `.sf-card` class rather than a prop that doesn't exist. */
-.marketing-grid > .sf-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.marketing-grid > .sf-card > .sf-card__body {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-
-.marketing-feature-card__title {
+.mk-label {
   margin: 0 0 var(--space-8);
-  font-size: var(--font-size-lg);
+  color: var(--mk-mark);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-foreground);
 }
 
-.marketing-feature-card__body {
+.mk-link {
+  color: var(--mk-ink);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.mk-link {
+  transition:
+    text-decoration-thickness var(--duration-base) ease,
+    text-underline-offset var(--duration-base) ease;
+}
+
+.mk-link:hover {
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+
+.mk-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: 2px;
+}
+
+.mk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-16) var(--space-24);
+  margin-top: var(--space-32);
+}
+
+/* Hero ------------------------------------------------------------------------------------------ */
+
+.mk-hero {
+  padding-block: var(--space-80) var(--space-64);
+  border-bottom: 1px solid var(--mk-rule);
+}
+
+.mk-hero__title {
+  max-inline-size: 18ch;
   margin: 0;
-  color: var(--color-muted-foreground);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-base);
+  font-size: clamp(2.25rem, 4.6vw + 0.5rem, 4rem);
+  line-height: 1.05;
 }
 
-.marketing-feature-card__list {
-  margin: var(--space-12) 0 0;
-  padding-inline-start: var(--space-20);
-  color: var(--color-muted-foreground);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-base);
+.mk-hero__body {
+  max-inline-size: 38rem;
+  margin: var(--space-24) 0 0;
+  color: var(--mk-muted);
+  font-size: clamp(1.0625rem, 0.6vw + 0.9rem, 1.25rem);
+  line-height: 1.6;
 }
 
-.marketing-feature-card__list li + li {
-  margin-top: var(--space-4);
-}
-
-/* Features index (FeaturesPage): one ruled row per module — number, title + summary, then the
-   module's capabilities in two columns. Hairlines carry the structure, so no card chrome. */
-
-.features-index {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.features-index__row {
+.mk-hero__grid {
   display: grid;
-  grid-template-columns: 3rem minmax(0, 5fr) minmax(0, 7fr);
-  column-gap: var(--space-32);
-  padding: var(--space-32) 0;
-  border-top: 1px solid var(--color-border);
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: var(--space-64);
+  align-items: start;
 }
 
-.features-index__number {
-  padding-top: 0.2em;
-  color: var(--color-accent);
+/* A day in the school: a plain table, ruled top and bottom, part of the hero rather than a frame
+ * laid over it. */
+.mk-day {
+  margin: var(--space-8) 0 0;
+  border-top: 2px solid var(--mk-ink);
+}
+
+.mk-day__title {
+  padding-block: var(--space-12);
+  border-bottom: 1px solid var(--mk-rule);
+  color: var(--mk-text);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+}
+
+.mk-day__table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.mk-day__table td {
+  padding-block: var(--space-12);
+  border-bottom: 1px solid var(--mk-rule);
+  vertical-align: top;
+  text-align: start;
+}
+
+.mk-day__time {
+  inline-size: 4.75rem;
+  padding-inline-start: var(--space-8);
+  color: var(--mk-mark);
   font-variant-numeric: tabular-nums;
-}
-
-.features-index__title {
-  margin: 0;
-  font-size: var(--font-size-xl);
-  line-height: var(--line-height-xl);
   font-weight: var(--font-weight-semibold);
-  letter-spacing: var(--tracking-tight);
-  color: var(--color-foreground);
 }
 
-.features-index__body {
-  margin: var(--space-8) 0 0;
-  max-width: 34ch;
-  color: var(--color-muted-foreground);
-  line-height: var(--line-height-base);
+.mk-day__what {
+  padding-inline-end: var(--space-16);
+  color: var(--mk-text);
+  line-height: 1.5;
 }
 
-/* Two columns of capabilities, each on its own hairline, so short and long modules share one rhythm. */
-.features-index__items {
+.mk-day__who {
+  inline-size: 8.5rem;
+  color: var(--mk-muted);
+  text-align: end;
+}
+
+/* Sections -------------------------------------------------------------------------------------- */
+
+.mk-section,
+.marketing-section {
+  padding-block: var(--space-80);
+}
+
+.mk-section--alt {
+  background-color: var(--mk-paper-alt);
+  border-block: 1px solid var(--mk-rule);
+}
+
+.mk-section--flush {
+  padding-top: var(--space-48);
+}
+
+.mk-section__header {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: var(--space-24) var(--space-64);
+  align-items: end;
+  margin-bottom: var(--space-48);
+}
+
+.mk-section__title {
+  margin: 0;
+  font-size: clamp(1.75rem, 2.2vw + 0.9rem, 2.5rem);
+  line-height: 1.12;
+}
+
+.mk-section__lede {
+  max-inline-size: 36rem;
+  margin: 0;
+  color: var(--mk-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1.6;
+}
+
+.mk-section__title + .mk-section__lede {
+  margin-top: var(--space-16);
+}
+
+.mk-section__more {
+  margin: var(--space-32) 0 0;
+}
+
+/* Two columns: a heading on one side, its content on the other. */
+.mk-split {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: var(--space-32) var(--space-64);
+  align-items: start;
+}
+
+.mk-split--center {
+  align-items: center;
+}
+
+/* A numbered, ruled index in two columns: the modules on the home page. */
+.mk-index {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: var(--space-32);
-  align-content: start;
-  list-style: none;
+  column-gap: var(--space-64);
   margin: 0;
   padding: 0;
+  list-style: none;
 }
 
-.features-index__items li {
-  padding: var(--space-12) 0;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-foreground);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-sm);
-}
-
-/* The first row of items sits level with the title, without a rule above it. */
-.features-index__items li:nth-child(-n + 2) {
-  padding-top: 0.35em;
-  border-top: none;
-}
-
-@media (max-width: 900px) {
-  .features-index__row {
-    grid-template-columns: 2.5rem minmax(0, 1fr);
-    row-gap: var(--space-20);
-  }
-
-  .features-index__items {
-    grid-column: 2;
-  }
-}
-
-@media (max-width: 560px) {
-  .features-index__row {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: var(--space-12);
-    padding: var(--space-24) 0;
-  }
-
-  .features-index__items {
-    grid-column: auto;
-    grid-template-columns: minmax(0, 1fr);
-    margin-top: var(--space-8);
-  }
-
-  .features-index__items li:nth-child(2) {
-    padding-top: var(--space-12);
-    border-top: 1px solid var(--color-border);
-  }
-}
-
-/* Steps */
-
-.marketing-steps {
-  counter-reset: marketing-step;
+.mk-index__item {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: var(--space-16);
+  padding-block: var(--space-20);
+  border-top: 1px solid var(--mk-rule);
+}
+
+.mk-index__number {
+  color: var(--mk-mark);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.6;
+}
+
+.mk-index__title {
+  margin: 0;
+  color: var(--mk-text);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-index__body {
+  margin: var(--space-4) 0 0;
+  color: var(--mk-muted);
+  line-height: 1.55;
+}
+
+/* The same words in English and Arabic, side by side. */
+.mk-pairs {
+  inline-size: 100%;
+  border-collapse: collapse;
+  border-top: 2px solid var(--mk-ink);
+}
+
+.mk-pairs__caption {
+  padding-block: var(--space-12);
+  color: var(--mk-muted);
+  font-size: var(--font-size-sm);
+  text-align: start;
+  caption-side: bottom;
+}
+
+.mk-pairs th,
+.mk-pairs td {
+  padding: var(--space-12) var(--space-8);
+  border-bottom: 1px solid var(--mk-rule);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-regular);
+  text-align: start;
+  inline-size: 50%;
+}
+
+.mk-pairs th {
+  color: var(--mk-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-pairs td {
+  color: var(--mk-text);
+}
+
+/* Facts: titled paragraphs in two columns, each under its own rule. */
+.mk-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-40) var(--space-64);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mk-facts__item {
+  padding-top: var(--space-20);
+  border-top: 1px solid var(--mk-ink);
+}
+
+.mk-facts__title {
+  margin: 0;
+  color: var(--mk-text);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-facts__body {
+  margin: var(--space-8) 0 0;
+  color: var(--mk-muted);
+  line-height: 1.6;
+}
+
+/* The closing band: a flat navy block, one sentence and one button. */
+.mk-band {
+  padding-block: var(--space-64);
+  background-color: var(--mk-band);
+  color: var(--mk-band-text);
+}
+
+.mk-band__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-32);
 }
 
-.marketing-step {
-  position: relative;
-  padding-inline-start: var(--space-48);
-}
-
-.marketing-step::before {
-  counter-increment: marketing-step;
-  content: counter(marketing-step);
-  position: absolute;
-  inset-inline-start: 0;
-  top: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-full);
-  background-color: var(--color-accent);
-  color: var(--color-accent-foreground);
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--font-size-sm);
-}
-
-.marketing-step__title {
-  margin: 0 0 var(--space-8);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-foreground);
-}
-
-.marketing-step__body {
+.mk-band__title {
   margin: 0;
-  color: var(--color-muted-foreground);
-  font-size: var(--font-size-sm);
-  line-height: var(--line-height-base);
+  color: var(--mk-band-text);
+  font-size: clamp(1.75rem, 2vw + 1rem, 2.5rem);
+  line-height: 1.15;
 }
 
-/* CTA band */
-
-.marketing-cta-band {
-  text-align: center;
-}
-
-.marketing-cta-band__title {
-  margin: 0 0 var(--space-12);
-  font-size: var(--font-size-2xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-foreground);
-}
-
-.marketing-cta-band__body {
-  margin: 0 auto var(--space-24);
-  max-width: 520px;
-  color: var(--color-muted-foreground);
-}
-
-.marketing-cta-band__actions {
-  display: flex;
-  justify-content: center;
-  gap: var(--space-12);
-  flex-wrap: wrap;
-}
-
-/* Pricing */
-
-.marketing-pricing-card__name {
-  margin: 0 0 var(--space-4);
+.mk-band__body {
+  max-inline-size: 34rem;
+  margin: var(--space-12) 0 0;
+  color: var(--mk-band-muted);
   font-size: var(--font-size-lg);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-foreground);
+  line-height: 1.6;
 }
 
-.marketing-pricing-card__price {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-4);
-  margin-bottom: var(--space-20);
+/* On the navy band the secondary button is the light one: paper on navy. */
+.mk-band .sf-button--secondary {
+  border-color: var(--mk-band-text);
+  background-color: var(--mk-band-text);
+  color: #161551;
 }
 
-.marketing-pricing-card__amount {
-  font-size: var(--font-size-4xl);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-foreground);
-  letter-spacing: var(--tracking-tight);
+.mk-band .sf-button--secondary:hover {
+  background-color: transparent;
+  color: var(--mk-band-text);
 }
 
-.marketing-pricing-card__list {
-  flex: 1;
-  margin: 0 0 var(--space-24);
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-8);
+.mk-band .sf-button:focus-visible {
+  outline-color: var(--mk-band-text);
 }
 
-.marketing-pricing-card__list li {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-8);
-  color: var(--color-foreground);
-  font-size: var(--font-size-sm);
-}
+/* About and contact ------------------------------------------------------------------------------ */
 
-.marketing-pricing-card__list svg {
-  flex-shrink: 0;
-  margin-top: 2px;
-  color: var(--color-success);
+.marketing-about-body {
+  max-inline-size: 44rem;
 }
-
-.marketing-ai-callout {
-  max-width: 720px;
-  margin: 0 auto;
-}
-
-.marketing-ai-callout .marketing-feature-card__title {
-  margin-top: var(--space-12);
-}
-
-.marketing-pricing-note {
-  margin-top: var(--space-16);
-  color: var(--color-muted-foreground);
-  font-size: var(--font-size-sm);
-}
-
-/* About / contact */
 
 .marketing-about-body p {
-  color: var(--color-muted-foreground);
-  line-height: var(--line-height-base);
+  margin: 0;
+  color: var(--mk-text);
+  font-size: var(--font-size-lg);
+  line-height: 1.7;
 }
 
 .marketing-about-body p + p {
-  margin-top: var(--space-16);
+  margin-top: var(--space-20);
 }
 
-.marketing-contact-card {
-  margin: var(--space-24) 0 0;
-  text-align: center;
+/* The highlighted moment of the day (SchoolDay.tsx): a tint and a navy edge, nothing that moves. */
+.mk-day__row {
+  transition:
+    background-color 600ms var(--easing-standard),
+    box-shadow 600ms var(--easing-standard);
 }
 
-.marketing-contact-card__label {
-  display: block;
-  margin-bottom: var(--space-4);
-  color: var(--color-muted-foreground);
+.mk-day__row[data-active="true"] {
+  background-color: color-mix(in srgb, var(--mk-ink) 7%, transparent);
+  box-shadow: inset 3px 0 0 var(--mk-ink);
+}
+
+:dir(rtl) .mk-day__row[data-active="true"] {
+  box-shadow: inset -3px 0 0 var(--mk-ink);
+}
+
+.mk-day__row[data-active="true"] .mk-day__what {
+  color: var(--mk-ink);
+}
+
+/* Live demos (demos/*.tsx) ---------------------------------------------------------------------
+ * Small working pieces of the product, in the page's flow: panes with a hairline border, like the
+ * app's own screens. They change when the visitor uses them; nothing in them floats. */
+
+.mk-example {
+  margin: var(--space-12) 0 0;
+  color: var(--mk-muted);
+  font-size: var(--font-size-xs);
+}
+
+.mk-text-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--mk-ink);
+  font: inherit;
   font-size: var(--font-size-sm);
-}
-
-.marketing-contact-card__email {
-  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }
 
-@media (max-width: 480px) {
-  .marketing-hero__title {
-    font-size: var(--font-size-4xl);
-  }
-
-  .marketing-section {
-    padding: var(--space-48) 0;
-  }
-
-  .marketing-hero {
-    padding: var(--space-48) 0;
-  }
+.mk-text-button:focus-visible,
+.mk-mini-button:focus-visible,
+.mk-tour__tab:focus-visible,
+.mk-flip__option:focus-visible,
+.mk-segmented__option:has(input:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
 }
 
-/* Contact section: heading, form card and email line share one centered column. */
-.marketing-contact__heading {
-  margin-inline: auto;
-  text-align: center;
-}
-
-.marketing-contact__card {
-  max-width: 760px;
-  margin-inline: auto;
-}
-
-.marketing-contact-form {
+.mk-day__title {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-20);
-}
-
-.marketing-contact-form__grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--space-20) var(--space-24);
-}
-
-.marketing-contact-form__textarea textarea {
-  resize: vertical;
-  min-height: 140px;
-}
-
-.marketing-contact-form__footer {
-  display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-16);
-  padding-top: var(--space-8);
 }
 
-.marketing-contact-form__footer .sf-button {
-  width: 100%;
-  max-width: 320px;
+.mk-pane__role {
+  color: var(--mk-mark);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
 }
 
-.marketing-contact-form__error {
-  margin: 0;
-  color: var(--color-danger);
-  font-size: var(--font-size-sm);
-  text-align: center;
+/* The language flip */
+.mk-language {
+  display: grid;
+  gap: var(--space-32);
 }
 
-@media (max-width: 640px) {
-  .marketing-contact-form__grid {
+/* The sensitive field */
+.mk-privacy {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: var(--space-48) var(--space-64);
+  align-items: start;
+}
+
+.mk-facts--stacked {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-24);
+}
+
+/* Entrances inside the demos: new things arrive, then sit still. */
+
+@keyframes mk-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-grow {
+  from {
+    inline-size: 0;
+  }
+}
+
+@keyframes mk-flip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-flip-in-rtl {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mk-mini__form select:focus-visible,
+.mk-mini__form input:focus-visible,
+.mk-mini__select:focus-visible,
+.mk-mini__check input:focus-visible,
+.mk-pills button:focus-visible,
+.mk-steps__step:focus-visible,
+.mk-size__range:focus-visible,
+.mk-weight input:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Motion ------------------------------------------------------------------------------------------
+ * Everything here settles once and stops: the hero rises in on load, the day's rule draws across and
+ * its rows follow one by one, and content further down rises a few pixels into place the first time
+ * it scrolls into view (data-reveal, layouts/marketing/use-reveal.ts). Nothing loops, drifts or
+ * hovers, and none of it runs for visitors who prefer reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  /* The headline only slides: it is the page's largest paint, and a fade would hold that paint
+   * back until it was visible (Lighthouse's LCP budget, lighthouserc.json). */
+  .mk-hero__title {
+    animation: mk-settle 900ms var(--easing-emphasized) both;
+  }
+
+  .mk-hero__body,
+  .mk-hero .mk-actions {
+    animation: mk-rise 900ms var(--easing-emphasized) both;
+  }
+
+  .mk-hero__body {
+    animation-delay: 120ms;
+  }
+
+  .mk-hero .mk-actions {
+    animation-delay: 240ms;
+  }
+
+  .mk-day {
+    border-top-color: transparent;
+  }
+
+  .mk-day::before {
+    content: "";
+    display: block;
+    block-size: 2px;
+    margin-block-start: -2px;
+    background-color: var(--mk-ink);
+    transform-origin: left;
+    animation: mk-draw 900ms var(--easing-emphasized) 200ms both;
+  }
+
+  :dir(rtl) .mk-day::before {
+    transform-origin: right;
+  }
+
+  .mk-day__title {
+    animation: mk-fade 700ms ease 350ms both;
+  }
+
+  .mk-day__row {
+    animation: mk-rise 700ms var(--easing-emphasized) both;
+    animation-delay: calc(450ms + var(--i, 0) * 90ms);
+  }
+
+  [data-reveal-ready] [data-reveal] {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 800ms var(--easing-standard),
+      transform 800ms var(--easing-emphasized);
+    transition-delay: calc(min(var(--reveal-index, 0), 8) * 70ms);
+  }
+
+  [data-reveal-ready] [data-reveal][data-revealed="true"] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-settle {
+  from {
+    transform: translateY(18px);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@keyframes mk-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mk-draw {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Narrow screens --------------------------------------------------------------------------------- */
+
+@media (max-width: 960px) {
+  .mk-privacy,
+  .mk-hero__grid,
+  .mk-section__header,
+  .mk-split {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .marketing-contact-form__footer .sf-button {
-    max-width: none;
+  .mk-hero__grid {
+    gap: var(--space-48);
   }
 }
 
-.marketing-contact-form__sent {
-  text-align: center;
+@media (max-width: 640px) {
+  .mk-hero {
+    padding-block: var(--space-48);
+  }
+
+  .mk-section,
+  .marketing-section {
+    padding-block: var(--space-48);
+  }
+
+  .mk-index,
+  .mk-facts,
+  .mk-day__who {
+    inline-size: auto;
+  }
 }
 
-.marketing-contact-form__sent h3 {
-  margin: 0 0 var(--space-8);
+/* Where a home page demo will appear, while its chunk loads. */
+.mk-demo-slot {
+  border: 1px dashed var(--mk-rule);
+  border-radius: var(--radius-lg);
 }

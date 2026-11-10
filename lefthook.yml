@@ -14,7 +14,9 @@ pre-commit:
 commit-msg:
   commands:
     commitlint:
-      run: node_modules/.bin/commitlint --edit {1}
+      # No {1}: commitlint finds COMMIT_EDITMSG itself (linked worktrees included), and lefthook
+      # splits {1} on spaces, which breaks a worktree whose absolute path contains one.
+      run: node_modules/.bin/commitlint --edit
 
 # Mirrors the fast half of CI (.github/workflows/ci.yml's "quality" job: format, lint, check-types,
 # test, build, plus the OpenAPI/client/permission-matrix drift checks) so those failures surface

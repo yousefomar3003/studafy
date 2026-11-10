@@ -83,6 +83,8 @@ const EXPECTED_MUTATING_ROUTES = [
   // declares the intent, but no app.audit_logs row is written because the ledger insert into
   // app.email_events *is* the audit record — see src/email/webhook.ts.
   "POST /email/webhooks/sns",
+  // Resend email-event webhook: the same posture as the SNS route above.
+  "POST /email/webhooks/resend",
   // Session lifecycle (ST-071). All four mutate app.refresh_tokens. The revocation paths write
   // their audit rows from inside the service transaction rather than from the route, so that a
   // revocation and its audit record commit or roll back together — see

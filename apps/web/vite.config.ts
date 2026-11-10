@@ -58,12 +58,15 @@ export default defineConfig({
         // splitting they arrive as a dozen tiny files -- each shared by the entry and some lazy
         // page -- and the extra requests alone pushed LCP over budget. These groups only name
         // modules that are already in that first load, so they merge requests without adding bytes.
+        // LinkButton and the marketing reveal helper are shared by the eager home page and the lazy
+        // marketing pages; split out on their own they put two more round trips on sign-in's first
+        // load, which alone took its Time to Interactive over budget.
         codeSplitting: {
           groups: [
             { name: "react-query", test: /[\\/]@tanstack[\\/](react-query|query-core)[\\/]/ },
             {
               name: "app-core",
-              test: /([\\/]packages[\\/]ui[\\/]dist[\\/]internal[\\/](cx|merge-refs|ui-strings)\.js$)|([\\/]packages[\\/]constants[\\/]src[\\/](events|notifications|roles|permissions|features)\.ts$)|([\\/]src[\\/]lib[\\/](api|retry-rejected-token|config)\.ts$)|([\\/]src[\\/]lib[\\/]auth[\\/])/,
+              test: /([\\/]packages[\\/]ui[\\/]dist[\\/]internal[\\/](cx|merge-refs|ui-strings)\.js$)|([\\/]packages[\\/]constants[\\/]src[\\/](events|notifications|roles|permissions|features)\.ts$)|([\\/]src[\\/]lib[\\/](api|retry-rejected-token|config)\.ts$)|([\\/]src[\\/]lib[\\/]auth[\\/])|([\\/]src[\\/]components[\\/]LinkButton\.tsx$)|([\\/]src[\\/]routes[\\/]marketing[\\/]reveal\.ts$)/,
             },
           ],
         },
