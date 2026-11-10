@@ -30,6 +30,20 @@ const USAGE =
   "Usage: db-migrate <migrate|status|validate|pending|" +
   "attendance-partitions [months-ahead 0-24]|audit-partitions [months-ahead 0-24]|rls-coverage>";
 
+/**
+ * The cause of a failure that happened outside a migration (connecting, TLS, authentication, the
+ * advisory lock, the history table), which an operator otherwise cannot see: the driver's error
+ * code (a SQLSTATE such as 28P01, or a Node code such as SELF_SIGNED_CERT_IN_CHAIN) and its
+ * message. The runner and partition maintenance have already redacted the password and the
+ * connection URL from that message before it reaches here.
+ */
+function describeCause(error: unknown): string {
+  if (!(error instanceof Error)) return "";
+  const code = (error as { code?: unknown }).code;
+  const parts = [typeof code === "string" ? code : undefined, error.message].filter(Boolean);
+  return parts.length > 0 ? ` (${parts.join(": ")})` : "";
+}
+
 async function runRlsCoverageCommand(): Promise<number> {
   const config = loadMigrationConfig();
   const client = createClient(config, "studafy-rls-coverage");
@@ -87,9 +101,9 @@ export async function main(args: string[] = Bun.argv.slice(2)): Promise<number> 
       console.error(`${error.name}: ${error.message}`);
     } else {
       console.error(
-        family
+        (family
           ? `MigrationExecutionError: ${family.label} partition maintenance failed`
-          : "MigrationExecutionError: database migration failed",
+          : "MigrationExecutionError: database migration failed") + describeCause(error),
       );
     }
     return 1;
