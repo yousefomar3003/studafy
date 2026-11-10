@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 
 import '../api/api_exception.dart';
 import 'jwt_payload.dart';
@@ -212,9 +213,12 @@ class AuthSession {
       return true;
     } on DioException catch (error) {
       // Only the server rejecting the refresh token ends the session. A timeout or lost
-      // connection must not sign an offline user out; the caller just retries later.
+      // connection must not sign an offline user out; the caller just retries later. Nor must
+      // being rate-limited (429) or the server timing out (408): those say nothing about the
+      // token, and a school's devices share one IP, so a busy morning would otherwise sign a
+      // whole school out at once.
       final status = error.response?.statusCode;
-      if (status != null && status >= 400 && status < 500) {
+      if (status != null && isSessionRejection(status)) {
         _lastRefreshErrorCode = error.apiError?.code;
         await clear();
       }
@@ -230,6 +234,12 @@ class AuthSession {
   }
 
   Completer<bool>? _refreshCompleter;
+
+  /// Whether a refresh answered with [status] means the session is over: any 4xx except the two
+  /// that are about the request's timing rather than the token (408 timeout, 429 rate limit).
+  @visibleForTesting
+  static bool isSessionRejection(int status) =>
+      status >= 400 && status < 500 && status != 408 && status != 429;
 
   /// Whether the access token is close to expiring (within [window]).
   ///

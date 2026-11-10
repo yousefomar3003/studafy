@@ -126,18 +126,24 @@ class AuthNotifier extends Notifier<AuthStatus> {
     required String password,
     String? newPassword,
   }) async {
+    final store = ref.read(secureTokenStoreProvider);
     final MobileTokenResponse tokens;
     try {
       tokens = await _authClient.loginWithMember(
         username: username,
         password: password,
         newPassword: newPassword,
+        deviceToken: await store.readMemberDeviceToken(username),
       );
     } catch (error) {
       if (isSchoolClosedError(error)) {
         ref.read(schoolClosedNoticeProvider.notifier).show();
       }
       rethrow;
+    }
+    final deviceToken = tokens.deviceToken;
+    if (deviceToken != null) {
+      await store.writeMemberDeviceToken(username, deviceToken);
     }
     await _completeLogin(tokens);
   }
