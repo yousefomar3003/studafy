@@ -8,18 +8,19 @@ without touching the other.
 
 ## Overview
 
-|                      |                                                                                  |
-| -------------------- | -------------------------------------------------------------------------------- |
-| Parent table         | `app.audit_logs`                                                                 |
-| Partitioning         | declarative `PARTITION BY RANGE (created_at)`, one partition per calendar month  |
-| Partition names      | `audit_logs_y2026m07`                                                            |
-| Boundaries           | half-open, UTC: `FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')`  |
-| Default partition    | none, deliberately                                                               |
-| Initial range        | 2026-06 through 2027-01, created by migration `000018`                           |
-| Maintenance command  | `bun run db:audit:partitions [months-ahead]` (default 3)                         |
-| Required role        | the administrative/migration identity; the command runs as `studafy_admin`       |
-| Grants on partitions | `SELECT, INSERT` for `studafy_app` — **never** `UPDATE`, `DELETE`, or `TRUNCATE` |
-| Retention            | out of scope — nothing is ever dropped automatically                             |
+|                      |                                                                                                            |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Parent table         | `app.audit_logs`                                                                                           |
+| Partitioning         | declarative `PARTITION BY RANGE (created_at)`, one partition per calendar month                            |
+| Partition names      | `audit_logs_y2026m07`                                                                                      |
+| Boundaries           | half-open, UTC: `FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')`                            |
+| Default partition    | none, deliberately                                                                                         |
+| Initial range        | 2026-06 through 2027-01, created by migration `000018`                                                     |
+| Maintenance command  | `bun run db:audit:partitions [months-ahead]` (default 3)                                                   |
+| Automated            | daily 02:15 UTC by the workers (`ensure-table-partitions` job, `partition-maintenance.ts`), 3 months ahead |
+| Required role        | the administrative/migration identity; the command runs as `studafy_admin`                                 |
+| Grants on partitions | `SELECT, INSERT` for `studafy_app` — **never** `UPDATE`, `DELETE`, or `TRUNCATE`                           |
+| Retention            | out of scope — nothing is ever dropped automatically                                                       |
 
 An audit log is unbounded-growth, write-heavy, read-sparse data. Monthly partitioning keeps vacuum,
 index maintenance, and investigation queries bounded, and makes an eventual archive strategy a metadata

@@ -12,17 +12,18 @@ attendance partitions do. The unresolved in-VPC scheduling work below is common 
 
 ## Overview
 
-|                     |                                                                                 |
-| ------------------- | ------------------------------------------------------------------------------- |
-| Parent tables       | `app.attendance_sessions`, `app.attendance_records`                             |
-| Partitioning        | declarative `PARTITION BY RANGE (created_at)`, one partition per calendar month |
-| Partition names     | `attendance_sessions_y2026m07`, `attendance_records_y2026m07`                   |
-| Boundaries          | half-open, UTC: `FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')` |
-| Default partition   | none, deliberately                                                              |
-| Initial range       | 2026-06 through 2027-01, created by migration `000012`                          |
-| Maintenance command | `bun run db:attendance:partitions [months-ahead]` (default 3)                   |
-| Required role       | the administrative/migration identity; the command runs as `studafy_admin`      |
-| Retention           | out of scope — nothing is ever dropped automatically                            |
+|                     |                                                                                                            |
+| ------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Parent tables       | `app.attendance_sessions`, `app.attendance_records`                                                        |
+| Partitioning        | declarative `PARTITION BY RANGE (created_at)`, one partition per calendar month                            |
+| Partition names     | `attendance_sessions_y2026m07`, `attendance_records_y2026m07`                                              |
+| Boundaries          | half-open, UTC: `FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')`                            |
+| Default partition   | none, deliberately                                                                                         |
+| Initial range       | 2026-06 through 2027-01, created by migration `000012`                                                     |
+| Maintenance command | `bun run db:attendance:partitions [months-ahead]` (default 3)                                              |
+| Automated           | daily 02:15 UTC by the workers (`ensure-table-partitions` job, `partition-maintenance.ts`), 3 months ahead |
+| Required role       | the administrative/migration identity; the command runs as `studafy_admin`                                 |
+| Retention           | out of scope — nothing is ever dropped automatically                                                       |
 
 Attendance is the highest-volume table in the product. Monthly partitioning keeps vacuum, index
 maintenance, and history queries bounded, and makes an eventual archive strategy a metadata operation
