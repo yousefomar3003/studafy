@@ -16,6 +16,9 @@ primary_region = "fra"
   LOG_LEVEL = "info"
   SERVICE_NAME = "api"
   SENTRY_ENVIRONMENT = "production"
+  # fly's proxy puts the visitor's address in Fly-Client-IP (and its own address last in
+  # X-Forwarded-For), so rate limits, audit rows and security events key on this header.
+  CLIENT_IP_HEADER = "fly-client-ip"
   CORS_ALLOWED_ORIGINS = "https://studafy.com,https://www.studafy.com,https://app.studafy.com,https://school.studafy.com"
   FRONTEND_URL = "https://app.studafy.com"
   GOOGLE_OAUTH_REDIRECT_URI = "https://api.studafy.com/api/auth/oauth/google/callback"
