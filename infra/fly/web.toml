@@ -1,6 +1,7 @@
-# Studafy web app (https://app.studafy.com) on fly.io (production): the static build behind nginx.
-# The Vite settings are baked in at build time. VITE_TURNSTILE_SITE_KEY is public but kept out of
-# the repository, so pass it on the command line. Deploy from the repo root:
+# Studafy web app on fly.io (production): the static build behind nginx. It serves the marketing site
+# and the school portal on studafy.com, www, app and school.studafy.com (README: Domains). The Vite
+# settings are baked in at build time. VITE_TURNSTILE_SITE_KEY is public but kept out of
+# the repository, so the deploy workflow passes it from the prod environment. By hand, from the repo root:
 #   fly deploy . --config infra/fly/web.toml --remote-only \
 #     --build-arg VITE_TURNSTILE_SITE_KEY=<site key>
 app = "studafy-core-web"

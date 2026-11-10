@@ -34,41 +34,64 @@ docs/security/S-01-database-role-verification.md.
 
 1. Create the apps (once):
    `fly apps create studafy-core-api` and the same for `-realtime`, `-workers`, `-scanner`, `-web`,
-   `-migrate`.
+   `-migrate`. (Done 2026-11-10.)
 2. Give the scanner a private address only: `fly ips allocate-v6 --private --app studafy-core-scanner`.
-3. Set the secrets (below) with `fly secrets set --stage --app <app> KEY=value ...`.
-4. Deploy in this order: scanner, migrate (build and run), api, realtime, workers, web.
-5. Point DNS at fly and issue certificates: `fly certs add api.studafy.com --app studafy-core-api`,
-   `fly certs add app.studafy.com --app studafy-core-web`, then add the records `fly certs show`
-   prints in Vercel DNS.
+   (Done 2026-11-10.)
+3. Put the secrets (below) in the repository's `prod` GitHub Environment, plus `FLY_API_TOKEN`: one
+   `fly tokens create deploy` token per app above, joined with commas after a single `FlyV1 `
+   prefix, so the deploy can touch these apps and nothing else in the organisation.
+4. Run **Production deploy (fly.io)** (`.github/workflows/fly-production-deploy.yml`) from the
+   Actions tab. The services come up on their `*.fly.dev` addresses.
+5. Point the domains at fly (see Domains).
 
 ## Secrets
 
-| Secret                                                                    | api | workers             | realtime | migrate |
-| ------------------------------------------------------------------------- | --- | ------------------- | -------- | ------- |
-| `DATABASE_USER`, `DATABASE_PASSWORD`                                      | ✓   | ✓                   |          | ✓       |
-| `DATABASE_CA_CERT` (PEM)                                                  | ✓   |                     |          | ✓       |
-| `SUPABASE_CA_CERT_B64` (the same PEM, base64; written to a file)          |     | ✓                   |          |         |
-| `REDIS_URL` (`rediss://…`)                                                | ✓   | ✓                   | ✓        |         |
-| `S3_ENDPOINT`                                                             | ✓   | ✓                   |          |         |
-| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (R2 token)                     | ✓   |                     |          |         |
-| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` (same R2 token)              |     | ✓                   |          |         |
-| `SENTRY_DSN`                                                              | ✓   | ✓                   | ✓        |         |
-| `RECORDS_ENCRYPTION_KEYS`, `RECORDS_ENCRYPTION_CURRENT_KEY_ID`            | ✓   | ✓                   |          |         |
-| `AI_LLM_API_KEY` (Together)                                               | ✓   | ✓                   |          |         |
-| `RESEND_API_KEY`                                                          |     | ✓                   |          |         |
-| `RESEND_WEBHOOK_SECRET`                                                   | ✓   |                     |          |         |
-| `WS_JWT_SECRET`                                                           |     |                     | ✓        |         |
-| `TURNSTILE_SECRET_KEY`                                                    | ✓   |                     |          |         |
-| `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, `MICROSOFT_OAUTH_CLIENT_ID`/`_SECRET` | ✓   |                     |          |         |
-| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`                              | ✓   | `STRIPE_SECRET_KEY` |          |         |
-| `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_RTDN_TOKEN`                   | ✓   |                     |          |         |
-| `FIREBASE_SERVICE_ACCOUNT`                                                |     | ✓                   |          |         |
+The `prod` GitHub Environment is the single source of truth. Every run of the deploy workflow copies
+the secrets onto the fly apps (staged, so they apply with that deploy), so a secret is changed in
+GitHub and released by rerunning the workflow — never with `fly secrets set` by hand, which the next
+run would overwrite. The workflow checks the required ones up front and names any that are missing.
 
-`apps/api/src/env.ts` and `apps/workers/src/env.ts` are the source of truth: a service that is
-missing a required secret refuses to boot and names it.
+| GitHub secret                                                                                                                     | api | workers                          | realtime                   | migrate |
+| --------------------------------------------------------------------------------------------------------------------------------- | --- | -------------------------------- | -------------------------- | ------- |
+| `DATABASE_USER` (`postgres.<project ref>`), `DATABASE_PASSWORD`                                                                   | ✓   | ✓                                |                            | ✓       |
+| `DATABASE_CA_CERT` (PEM)                                                                                                          | ✓   | as `SUPABASE_CA_CERT_B64`        |                            | ✓       |
+| `REDIS_URL` (`rediss://…`)                                                                                                        | ✓   | ✓                                | ✓, and as `AUTH_REDIS_URL` |         |
+| `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (R2 token)                                                              | ✓   | as `AWS_ACCESS_KEY_ID`/`_SECRET` |                            |         |
+| `SENTRY_DSN` (optional)                                                                                                           | ✓   | ✓                                | ✓                          |         |
+| `RECORDS_ENCRYPTION_KEYS` (`{"<id>":"<base64 32 bytes>"}`), `RECORDS_ENCRYPTION_CURRENT_KEY_ID`                                   | ✓   | ✓                                |                            |         |
+| `WS_JWT_SECRET` (32+ characters)                                                                                                  | ✓   |                                  | ✓                          |         |
+| `AI_LLM_API_KEY` (Together)                                                                                                       | ✓   | ✓                                |                            |         |
+| `RESEND_API_KEY`                                                                                                                  |     | ✓                                |                            |         |
+| `RESEND_WEBHOOK_SECRET`                                                                                                           | ✓   |                                  |                            |         |
+| `TURNSTILE_SECRET_KEY`                                                                                                            | ✓   |                                  |                            |         |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_RTDN_TOKEN`                                                                           | ✓   |                                  |                            |         |
+| `FIREBASE_SERVICE_ACCOUNT`                                                                                                        |     | ✓                                |                            |         |
+| Optional: `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, `MICROSOFT_OAUTH_CLIENT_ID`/`_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓   | `STRIPE_SECRET_KEY`              |                            |         |
+
+Build-time values for the web app come from the environment's **variables**: `VITE_TURNSTILE_SITE_KEY`,
+`VITE_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` (and the `SENTRY_AUTH_TOKEN` secret, for source maps).
+
+`apps/api/src/env.ts`, `apps/workers/src/env.ts` and `apps/realtime/src/env.ts` are the source of
+truth: a service that is missing a required secret refuses to boot and names it.
+
+## Domains
+
+DNS for studafy.com is hosted by Vercel; mail is Zoho (MX/SPF records there must be left alone).
+The web app serves every browser-facing domain, and the API keeps its own:
+
+| Domain                                                                    | fly app            |
+| ------------------------------------------------------------------------- | ------------------ |
+| `api.studafy.com`                                                         | `studafy-core-api` |
+| `studafy.com`, `www.studafy.com`, `app.studafy.com`, `school.studafy.com` | `studafy-core-web` |
+
+For each: `fly certs add <domain> --app <app>`, then create the records `fly certs show` prints in
+Vercel DNS (A/AAAA, or the `_acme-challenge` CNAME to issue the certificate before switching).
+`CORS_ALLOWED_ORIGINS` (api.toml) and `WS_ALLOWED_ORIGINS` (realtime.toml) list the same browser
+domains; keep the three lists in step.
 
 ## Deploying
+
+Normally: run **Production deploy (fly.io)** from the Actions tab. By hand, the same steps:
 
 ```sh
 fly deploy . --config infra/fly/scanner.toml --remote-only

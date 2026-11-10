@@ -15,6 +15,11 @@ primary_region = "fra"
   DATABASE_HOST = "aws-1-eu-central-1.pooler.supabase.com"
   DATABASE_PORT = "6543"
   DATABASE_NAME = "postgres"
+  # Required in production (src/env.ts). Supabase has no separate read replica here, so reads use
+  # the same transaction pooler as writes.
+  READ_DATABASE_HOST = "aws-1-eu-central-1.pooler.supabase.com"
+  READ_DATABASE_PORT = "6543"
+  READ_DATABASE_NAME = "postgres"
   # Every pool verifies the pooler's certificate; Bun adds Supabase's root CA (written below) to
   # its trust store.
   DATABASE_SSL_MODE = "verify-full"
