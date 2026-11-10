@@ -1,6 +1,7 @@
 import { HTTPException } from "hono/http-exception";
 
 import {
+  IP_SCOPED_ROUTE_CLASSES,
   RATE_LIMIT_BUDGETS,
   RATE_LIMIT_EXEMPT_PATHS,
   buildRateLimitKey,
@@ -108,7 +109,7 @@ function buildIdentity(
   auth: { schoolId: string; userId: string } | undefined,
   clientIp: string,
 ): string {
-  if (routeClass === "auth" || routeClass === "auth-strict") return clientIp;
+  if (IP_SCOPED_ROUTE_CLASSES.has(routeClass)) return clientIp;
   if (auth) return `${auth.schoolId}:${auth.userId}`;
   return clientIp;
 }
@@ -293,7 +294,7 @@ export function rateLimiterMiddleware({
 
       // Emit anomaly telemetry for auth endpoints so monitoring can count and alert.
       // Non-auth routes are not recorded here: a 429 on /api/ai is operational, not adversarial.
-      if (routeClass === "auth" || routeClass === "auth-strict") {
+      if (IP_SCOPED_ROUTE_CLASSES.has(routeClass)) {
         emitRateLimitBlock(c.get("log"), eventSink, {
           routeClass,
           path: c.req.path,

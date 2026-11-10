@@ -15,7 +15,8 @@
  * ## Key construction
  *
  * Keys follow the convention `rl:{scope}:{identity}:{window}` where:
- * - `scope` is `auth` (IP-scoped) or `sch` (tenant-scoped for ai/default).
+ * - `scope` is the class name for IP-scoped classes (see {@link IP_SCOPED_ROUTE_CLASSES}) or `sch`
+ *   (tenant-scoped for ai/messaging/default).
  * - `identity` is the client IP (auth) or `schoolId:userId` (ai/default).
  * - `window` is `floor(now / windowSeconds)` — rotates automatically.
  */
@@ -33,14 +34,35 @@ export interface RateLimitBudget {
   windowSeconds: number;
 }
 
-export type RouteClass = "auth" | "auth-strict" | "ai" | "messaging" | "default";
+export type RouteClass =
+  "auth" | "auth-strict" | "auth-login" | "auth-session" | "ai" | "messaging" | "default";
+
+/**
+ * Classes keyed on the caller's IP rather than on a signed-in user, because they serve requests
+ * made before (or instead of) authentication. Their 429s are also reported as auth anomalies.
+ */
+export const IP_SCOPED_ROUTE_CLASSES: ReadonlySet<RouteClass> = new Set([
+  "auth",
+  "auth-strict",
+  "auth-login",
+  "auth-session",
+]);
 
 /**
  * Per-class token-bucket budgets.
  *
  * - `auth-strict`: Unauthenticated endpoints with brute-force or enumeration risk.
- *   5 tokens burst, ~5 req/min sustained. Applies to `/api/auth/refresh` (token rotation)
- *   and `/api/auth/logout` (session termination).
+ *   5 tokens burst, ~5 req/min sustained.
+ * - `auth-session`: `/api/auth/refresh` and `/api/auth/logout`. A whole school's devices usually
+ *   share one public IP (the school's NAT), and every signed-in device refreshes about every 13
+ *   minutes (15-minute access tokens), so a per-IP budget sized for one person 429s a school at the
+ *   start of the day. Brute force is not what bounds these: a refresh token is a 256-bit random
+ *   secret, single-use, with reuse detection revoking its family. 300 burst, 5/s sustained -- about
+ *   3,900 active devices per address.
+ * - `auth-login`: `/api/auth/login/member`. A class signing in together shares one IP. Guessing is
+ *   bounded by the per-member-ID and platform-wide budgets below and by the account lockout, so the
+ *   per-IP budget only has to stop one address dominating the platform-wide one. 30 burst,
+ *   30/min sustained.
  * - `auth`: Authenticated admin-mutating endpoints (invitations). 10 tokens burst,
  *   ~10 req/min sustained.
  * - `ai`: Metered tenant+user scoped (existing).
@@ -51,6 +73,8 @@ export type RouteClass = "auth" | "auth-strict" | "ai" | "messaging" | "default"
  */
 export const RATE_LIMIT_BUDGETS: Record<RouteClass, RateLimitBudget> = {
   "auth-strict": { maxTokens: 5, refillRate: 0.08, windowSeconds: 60 },
+  "auth-session": { maxTokens: 300, refillRate: 5, windowSeconds: 60 },
+  "auth-login": { maxTokens: 30, refillRate: 0.5, windowSeconds: 60 },
   auth: { maxTokens: 10, refillRate: 0.17, windowSeconds: 60 },
   ai: { maxTokens: 30, refillRate: 0.5, windowSeconds: 60 },
   messaging: { maxTokens: 20, refillRate: 0.33, windowSeconds: 60 },
@@ -59,7 +83,7 @@ export const RATE_LIMIT_BUDGETS: Record<RouteClass, RateLimitBudget> = {
 
 /**
  * Member-ID sign-in (`/api/auth/login/member`) budgets that do not depend on the caller's IP
- * (QA-11), on top of its per-IP `auth-strict` class, so rotating addresses buys an attacker nothing.
+ * (QA-11), on top of its per-IP `auth-login` class, so rotating addresses buys an attacker nothing.
  * Every attempt takes a token from both buckets before any password is checked.
  *
  * - `username`: one member ID, whoever asks. 10 burst, ~10 per 15 minutes sustained — above the
@@ -103,13 +127,14 @@ export function buildMemberLoginRateLimitKey(
  */
 export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   // Auth — unauthenticated, IP-scoped, brute-force targets (strictest budget)
-  "/api/auth/refresh": "auth-strict",
-  "/api/auth/logout": "auth-strict",
+  // Called by every signed-in device behind a school's shared IP; see `auth-session`.
+  "/api/auth/refresh": "auth-session",
+  "/api/auth/logout": "auth-session",
   "/api/auth/login/review": "auth-strict",
   // Staging only (env.ts refuses it in production). `auth` rather than `auth-strict` so one tester
   // can sign in as all 15 documented QA accounts well inside the QA-02 five-minute budget from one IP.
   "/api/auth/login/qa": "auth",
-  "/api/auth/login/member": "auth-strict",
+  "/api/auth/login/member": "auth-login",
   "/api/auth/password/change": "auth-strict",
   // Auth — authenticated, IP-scoped, sensitive mutations
   "/api/auth/sessions": "auth",
@@ -227,7 +252,7 @@ export function buildRateLimitKey(routeClass: RouteClass, identity: string): str
   const budget = RATE_LIMIT_BUDGETS[routeClass];
   const window = Math.floor(Date.now() / 1000 / budget.windowSeconds);
 
-  if (routeClass === "auth" || routeClass === "auth-strict") {
+  if (IP_SCOPED_ROUTE_CLASSES.has(routeClass)) {
     return `rl:${routeClass}:${identity}:${window}`;
   }
 
