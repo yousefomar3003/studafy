@@ -14,6 +14,9 @@ primary_region = "fra"
   HOST = "0.0.0.0"
   SERVICE_NAME = "realtime"
   SENTRY_ENVIRONMENT = "production"
+  # Browser origins allowed to open a socket (required in production): every domain the web app is
+  # served on (web.toml). AUTH_REDIS_URL and WS_JWT_SECRET are secrets.
+  WS_ALLOWED_ORIGINS = "https://studafy.com,https://www.studafy.com,https://app.studafy.com,https://school.studafy.com"
 
 [http_service]
   internal_port = 3001
