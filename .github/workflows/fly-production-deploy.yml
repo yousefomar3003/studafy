@@ -169,13 +169,14 @@ jobs:
             exit 1
           fi
           flyctl machine wait "$id" --app "$app" --state stopped --wait-timeout 15m
-          # The machine can report "stopped" a moment before its exit event is listed: a run with
-          # nothing to apply stops within a second, and reading at once found no event ("unknown")
-          # on a run that had exited 0. So wait for the event, up to 30 seconds, before deciding.
+          # fly omits exit_code from the exit event when it is 0 (a clean run's event carries only
+          # the signal and the time), so an exit event without one means success; no exit event at
+          # all stays "unknown". The machine can also report "stopped" a moment before its exit
+          # event is listed, so wait for the event, up to 30 seconds, before deciding.
           code=unknown
           for _ in $(seq 1 10); do
             code="$(flyctl machine list --app "$app" --json | jq -r --arg id "$id" \
-              '[.[] | select(.id == $id) | .events[]? | select(.type == "exit") | .request.exit_event.exit_code][0] // "unknown"')"
+              '[.[] | select(.id == $id) | .events[]? | select(.type == "exit") | (.request.exit_event.exit_code // 0)][0] // "unknown"')"
             if [ "$code" != "unknown" ]; then break; fi
             sleep 3
           done
