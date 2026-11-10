@@ -1,7 +1,7 @@
-import { problemDetailsSchema } from "@studafy/shared-schemas";
-import { z } from "zod";
-
+import type { ClientProblem } from "./problem-schema";
 import type { ErrorCode } from "@studafy/constants";
+
+export type { ClientProblem } from "./problem-schema";
 
 /**
  * Typed, catchable client-side representation of an API failure.
@@ -15,20 +15,6 @@ import type { ErrorCode } from "@studafy/constants";
 
 const PROBLEM_JSON_MEDIA_TYPE = "application/problem+json";
 const REQUEST_ID_HEADER = "x-request-id";
-
-/**
- * Client-side view of the problem envelope: the shared RFC 9457 shape reused from
- * {@link @studafy/shared-schemas} plus the API's `request_id` extension. Not redefined here — the
- * base shape is single-sourced. `request_id` is lenient (a non-empty string, parsed optional) so a
- * body that omits it still parses and we fall back to the response header, and a body that carries a
- * non-uuid id is not discarded wholesale.
- */
-export const clientProblemSchema = problemDetailsSchema.extend({
-  request_id: z.string().min(1).optional(),
-});
-
-/** A fully parsed problem+json body. */
-export type ClientProblem = z.infer<typeof clientProblemSchema>;
 
 /** The flat, always-present surface an error boundary reads off an {@link ApiError}. */
 export interface ApiErrorFields {
@@ -89,6 +75,8 @@ export class ApiError extends Error implements ApiErrorFields {
     let problem: ClientProblem | null = null;
     if (contentType.includes(PROBLEM_JSON_MEDIA_TYPE) || contentType.includes("application/json")) {
       try {
+        // Loaded here rather than at the top: see problem-schema.ts.
+        const { clientProblemSchema } = await import("./problem-schema");
         const parsed = clientProblemSchema.safeParse(await response.clone().json());
         if (parsed.success) {
           problem = parsed.data;
