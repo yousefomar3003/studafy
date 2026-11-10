@@ -130,7 +130,7 @@
         "consequences": {
           "signedOut": "Everyone at your school — staff, teachers, students and parents — is signed out immediately.",
           "noSignIn": "Nobody at your school can sign in to Studafy again.",
-          "dataKept": "Your school's data is kept. Nothing is deleted."
+          "dataDeleted": "We prepare a copy of your school's data, then permanently delete it 30 days after the copy is ready. Email hello@studafy.com before then if you need the copy, or if this was a mistake."
         },
         "confirmPrompt": "To confirm, type your school's name exactly as shown:",
         "nameLabel": "School name",
