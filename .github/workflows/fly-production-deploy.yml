@@ -129,28 +129,43 @@ jobs:
           flyctl deploy . --config infra/fly/migrate.toml --remote-only --build-only --push \
             --image-label "$RELEASE"
 
+          # `machine run` applies the app's secrets but not migrate.toml's [env] (only `fly deploy`
+          # does), so pass that table explicitly; migrate.toml stays its single source.
+          env_args=()
+          while IFS= read -r pair; do env_args+=(--env "$pair"); done < <(python3 -c '
+          import sys, tomllib
+          with open("infra/fly/migrate.toml", "rb") as f:
+              for key, value in tomllib.load(f).get("env", {}).items():
+                  print(f"{key}={value}")
+          ')
+          if [ "${#env_args[@]}" -eq 0 ]; then
+            echo "::error::No [env] read from infra/fly/migrate.toml."
+            exit 1
+          fi
+
           # A named, non-restarting machine, kept until its exit code has been read.
           name="migrate-${RELEASE:0:12}-${GITHUB_RUN_ATTEMPT}"
-          # Retried: the image was pushed seconds ago, and the registry region serving the launch
-          # can still answer MANIFEST_UNKNOWN for it (seen on the first production run).
-          launched=""
+          machine_id() {
+            flyctl machine list --app "$app" --json | jq -r --arg n "$name" '.[] | select(.name == $n) | .id'
+          }
+          # The image was pushed seconds ago, and the registry region serving the launch can still
+          # answer MANIFEST_UNKNOWN for it (seen on the first production run), creating no machine;
+          # only then is the launch retried. `machine run` also reports a failure when a run with
+          # nothing to apply exits before it is seen started, so a machine that exists counts as
+          # launched, and its exit code below decides the outcome; migrations never run twice.
+          id=""
           for attempt in 1 2 3 4 5 6; do
-            if flyctl machine run "registry.fly.io/$app:$RELEASE" --app "$app" --region fra \
-              --name "$name" --restart no --detach; then
-              launched=1
-              break
-            fi
-            # A failed launch can still leave a machine under the name; clear it before retrying.
-            stale="$(flyctl machine list --app "$app" --json | jq -r --arg n "$name" '.[] | select(.name == $n) | .id')"
-            if [ -n "$stale" ]; then flyctl machine destroy "$stale" --app "$app" --force; fi
+            flyctl machine run "registry.fly.io/$app:$RELEASE" --app "$app" --region fra \
+              --name "$name" --restart no --detach "${env_args[@]}" || true
+            id="$(machine_id)"
+            if [ -n "$id" ]; then break; fi
             echo "::warning::Migration machine did not launch (attempt $attempt); retrying."
             sleep $((attempt * 10))
           done
-          if [ -z "$launched" ]; then
+          if [ -z "$id" ]; then
             echo "::error::The migration machine never launched; nothing was released."
             exit 1
           fi
-          id="$(flyctl machine list --app "$app" --json | jq -r --arg n "$name" '.[] | select(.name == $n) | .id')"
           flyctl machine wait "$id" --app "$app" --state stopped --wait-timeout 15m
           code="$(flyctl machine list --app "$app" --json | jq -r --arg id "$id" \
             '[.[] | select(.id == $id) | .events[]? | select(.type == "exit") | .request.exit_event.exit_code][0] // "unknown"')"
