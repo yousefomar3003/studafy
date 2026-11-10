@@ -24,6 +24,7 @@ import { withTenantTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { isLoginPermitted } from "../school-access";
 
+import { isCommonPassword } from "./password-blocklist";
 import { issueTokenPair } from "./session-service";
 
 import type { DeviceContext, IssuedTokenPair, SessionTokenConfig } from "./session-service";
@@ -92,7 +93,7 @@ function setupCodeMatches(input: string, storedHash: string): boolean {
 }
 
 export type PasswordPolicyViolation =
-  "TOO_SHORT" | "TOO_LONG" | "IS_SETUP_CODE" | "SAME_AS_USERNAME";
+  "TOO_SHORT" | "TOO_LONG" | "IS_SETUP_CODE" | "SAME_AS_USERNAME" | "TOO_COMMON";
 
 /** Null when acceptable; otherwise why not. */
 export function checkNewPassword(
@@ -101,7 +102,14 @@ export function checkNewPassword(
 ): PasswordPolicyViolation | null {
   if (password.length < PASSWORD_MIN_LENGTH) return "TOO_SHORT";
   if (password.length > PASSWORD_MAX_LENGTH) return "TOO_LONG";
-  if (password.trim().toUpperCase() === username.trim().toUpperCase()) return "SAME_AS_USERNAME";
+  const normalizedId = username.trim().toUpperCase();
+  const normalized = password.trim().toUpperCase();
+  if (normalized === normalizedId) return "SAME_AS_USERNAME";
+  // The ID is public (sequential and printed on sheets), so a password built on it -- or on its
+  // number alone -- is one of the first guesses against that account.
+  const idNumber = normalizedId.replace(/^[A-Z]+-/u, "");
+  if (idNumber.length >= 4 && normalized.includes(idNumber)) return "SAME_AS_USERNAME";
+  if (isCommonPassword(password)) return "TOO_COMMON";
   return null;
 }
 

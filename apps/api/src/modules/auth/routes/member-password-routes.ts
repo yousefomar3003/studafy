@@ -56,6 +56,7 @@ const POLICY_MESSAGES: Record<PasswordPolicyViolation, string> = {
   TOO_LONG: `The new password must be at most ${PASSWORD_MAX_LENGTH} characters.`,
   IS_SETUP_CODE: "Choose a password other than your setup code.",
   SAME_AS_USERNAME: "The new password cannot be your ID.",
+  TOO_COMMON: "That password is too common and easy to guess. Choose something less predictable.",
 };
 
 /**
