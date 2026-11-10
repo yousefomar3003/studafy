@@ -165,6 +165,15 @@ def install_google_service_info
   project.save
 end
 
+# The Sentry DSN the release build bakes in (MonitoringConfig reads it via String.fromEnvironment).
+# CI sets SENTRY_DSN from the MOBILE_SENTRY_DSN repo variable — Sentry project `flutter` in
+# studafy-limited. A DSN only lets the app send events, so it is config, not a secret. Unset
+# leaves crash reporting to Sentry off, exactly as a local build has it.
+def sentry_dart_defines
+  dsn = ENV["SENTRY_DSN"].to_s.strip
+  dsn.empty? ? [] : ["--dart-define=SENTRY_DSN=#{dsn}"]
+end
+
 # Extra `--dart-define`s for a one-off test build (TestFlight / Play internal), from
 # MOBILE_EXTRA_DART_DEFINES as "KEY=value,KEY=value" — e.g. API_BASE_URL and SHOW_DEMO_LOGIN for a
 # build that talks to a developer's tunnelled API. The release workflows never set it.
@@ -188,6 +197,7 @@ def build_ios_ipa
     "--build-name=#{pubspec_version_name}",
     "--build-number=#{resolved_build_number}",
     "--export-options-plist=#{ios_export_options_plist}",
+    *sentry_dart_defines,
     *extra_dart_defines,
   )
   ipa = Dir.glob(File.join(MOBILE_DIR, "build/ios/ipa/*.ipa")).first ||
@@ -203,6 +213,7 @@ def build_android_aab
     "--flavor", FLAVOR, "-t", ENTRYPOINT,
     "--build-name=#{pubspec_version_name}",
     "--build-number=#{resolved_build_number}",
+    *sentry_dart_defines,
     *extra_dart_defines,
   )
   path = File.join(MOBILE_DIR, "build/app/outputs/bundle/#{FLAVOR}Release/app-#{FLAVOR}-release.aab")

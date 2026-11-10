@@ -89,6 +89,12 @@ committed; the workflow writes the file-shaped ones (`fastlane/play-store-key.js
 | `MATCH_GIT_URL`                                            | SSH/HTTPS URL of the private git repo holding the encrypted signing material.                       |
 | `MATCH_PASSWORD`                                           | Passphrase `match` uses to decrypt that repo.                                                       |
 
+### Variables
+
+| Variable            | What it is                                                                                                                                                                                                                       |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MOBILE_SENTRY_DSN` | Repository **variable** (not a secret): the DSN of Sentry project `flutter` in `studafy-limited` (Project Settings → Client Keys). The workflow exports it as `SENTRY_DSN` and the Fastfile bakes it into both store builds as `--dart-define=SENTRY_DSN=…`. Unset means the shipped app does not report to Sentry. |
+
 ## iOS signing
 
 Managed with [`match`](https://docs.fastlane.tools/actions/match/) (`fastlane/Matchfile`): the App
