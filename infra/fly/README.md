@@ -22,13 +22,29 @@ Every command below runs from the repository root.
 
 The services connect through Supabase's **transaction** pooler (port 6543), which plays the part
 PgBouncer played on AWS: every pool already runs `prepare: false` and nothing holds session state.
-Migrations use the **session** pooler (port 5432). Both are `aws-1-eu-central-1.pooler.supabase.com`
-with user `postgres.<project ref>`, over TLS verified against Supabase's root CA
-(`DATABASE_CA_CERT`, downloaded from Project Settings → Database → SSL configuration).
+That is `aws-1-eu-central-1.pooler.supabase.com` with user `postgres.<project ref>`. Migrations
+connect **directly** (`db.<project ref>.supabase.co:5432`, user `postgres`, IPv6 only, which fly
+machines have). Everything is TLS verified against Supabase's root CA (`DATABASE_CA_CERT`, from
+Project Settings → Database → SSL configuration; SHA-256 fingerprint `80:70:25:AD:…:E6:CA:FA`).
 
 The services log in as the project's `postgres` user, as they did with the RDS master user. Moving
 them to a dedicated `NOBYPASSRLS` login is the open follow-up in
 docs/security/S-01-database-role-verification.md.
+
+### Where Supabase differs from RDS
+
+Supabase's `postgres` is not a superuser, which the first migrations ran into once:
+
+- **PostgreSQL 16+ role grants.** A role created by a non-superuser is not automatically usable by
+  its creator, and most migrations `SET ROLE studafy_admin`. The `postgres` role therefore carries
+  `createrole_self_grant = 'set, inherit'` (`ALTER ROLE postgres SET …`, done once). The setting is
+  read when a session starts, which is why migrations connect directly: a pooled server session may
+  predate it.
+- **Migration 000003's monitoring grants.** Supabase keeps the admin option on `pg_read_all_stats`
+  and installs `pg_stat_statements` in its own `extensions` schema, so 000003's three grants for
+  `studafy_monitor` cannot run. Production applied 000003 without those three statements and
+  recorded it under the file's real checksum; everything else in it ran as written. The app does
+  not use `studafy_monitor`.
 
 ## First-time setup
 
@@ -53,7 +69,8 @@ run would overwrite. The workflow checks the required ones up front and names an
 
 | GitHub secret                                                                                                                     | api | workers                          | realtime                   | migrate |
 | --------------------------------------------------------------------------------------------------------------------------------- | --- | -------------------------------- | -------------------------- | ------- |
-| `DATABASE_USER` (`postgres.<project ref>`), `DATABASE_PASSWORD`                                                                   | ✓   | ✓                                |                            | ✓       |
+| `DATABASE_USER` (`postgres.<project ref>`; migrate logs in directly as `postgres`, migrate.toml)                                  | ✓   | ✓                                |                            |         |
+| `DATABASE_PASSWORD`                                                                                                               | ✓   | ✓                                |                            | ✓       |
 | `DATABASE_CA_CERT` (PEM)                                                                                                          | ✓   | as `SUPABASE_CA_CERT_B64`        |                            | ✓       |
 | `REDIS_URL` (`rediss://…`)                                                                                                        | ✓   | ✓                                | ✓, and as `AUTH_REDIS_URL` |         |
 | `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (R2 token)                                                              | ✓   | as `AWS_ACCESS_KEY_ID`/`_SECRET` |                            |         |
@@ -97,7 +114,11 @@ Normally: run **Production deploy (fly.io)** from the Actions tab. By hand, the 
 fly deploy . --config infra/fly/scanner.toml --remote-only
 fly deploy . --config infra/fly/migrate.toml --remote-only --build-only --push --image-label "$SHA"
 fly machine run "registry.fly.io/studafy-core-migrate:$SHA" --app studafy-core-migrate \
-  --region fra --rm --restart no
+  --region fra --rm --restart no --vm-memory 512 \
+  --env NODE_ENV=production --env DATABASE_HOST=db.pmrzcugyvviupfjzrrye.supabase.co \
+  --env DATABASE_PORT=5432 --env DATABASE_NAME=postgres --env DATABASE_USER=postgres \
+  --env DATABASE_SSL_MODE=verify-full
+fly logs --app studafy-core-migrate --no-tail   # "database is up to date"
 fly deploy . --config infra/fly/api.toml --remote-only
 fly deploy . --config infra/fly/realtime.toml --remote-only
 fly deploy . --config infra/fly/workers.toml --remote-only
