@@ -107,6 +107,35 @@ fly ssh console -a studafy-core-api -C "sh -c 'cd /app && bun bootstrap.ts --ema
 Open the printed link and sign in with Google or Microsoft as that address. Production's first
 operator was created this way on 2026-11-10.
 
+## File storage (R2) CORS
+
+Browsers upload straight to R2 through the API's pre-signed URLs, so the bucket must allow the web
+domains, or every upload from the site (school applications' proof of ownership, materials,
+receipts, record documents) fails in the browser while the API logs nothing. The mobile apps are
+not affected. In the Cloudflare dashboard: R2 → `studafy-prod-files` → Settings → CORS Policy:
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://studafy.com",
+      "https://www.studafy.com",
+      "https://app.studafy.com",
+      "https://school.studafy.com"
+    ],
+    "AllowedMethods": ["GET", "PUT", "POST", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+It is the rule the AWS bucket had (`infra/terraform/modules/storage`), with every browser domain.
+Check it with a preflight: `curl -X OPTIONS -H "Origin: https://studafy.com" -H
+"Access-Control-Request-Method: PUT" https://<account>.r2.cloudflarestorage.com/studafy-prod-files/x`
+answers 204 with `Access-Control-Allow-Origin`; an origin not listed gets 403.
+
 ## Domains
 
 DNS for studafy.com is hosted by Vercel; mail is Zoho (MX/SPF records there must be left alone).
