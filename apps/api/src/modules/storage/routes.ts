@@ -158,7 +158,7 @@ function attachQuotaHeaders(c: Context<AppEnv>, usage: StorageUsage | null): voi
  * registered only when `database` is provided; without one the path simply does not exist, the
  * same way every other database-backed route behaves.
  *
- * The auditAction declarations mirror the SES email webhook: they exist for the CI coverage gate
+ * The auditAction declarations mirror the Resend email webhook: they exist for the CI coverage gate
  * and name the intended mutation, but no app.audit_logs row is written because the staged object
  * in temp/ IS the audit record of the mutation — an infra-level event, not a database row.
  */

@@ -72,9 +72,8 @@ export const OPENAPI_DOCUMENT_CONFIG = {
     {
       name: "Email",
       description:
-        "Inbound SES event ingestion (deliverability R-08). Authenticated by Amazon SNS's RSA " +
-        "signature over the canonical message, verified against SNS's regional signing certificate, " +
-        "and gated on the configured topic ARN.",
+        "Inbound Resend email-event ingestion (deliverability R-08). Authenticated by the Svix " +
+        "HMAC-SHA256 signature over the raw request body, keyed by the endpoint's signing secret.",
     },
     {
       name: "Finance",

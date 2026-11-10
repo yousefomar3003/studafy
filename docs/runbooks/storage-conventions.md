@@ -113,7 +113,9 @@ write that attaches it (`gatewayConfirm: false`).
 - `record.document`: PDF, JPEG, PNG or HEIC, up to 10 MiB, downloaded through five-minute URLs.
 - `record.sensitiveDocument`: PDF, JPEG or PNG, up to 5 MiB. The promotion `CopyObject` re-encrypts
   the object with the sensitive-documents KMS key (`STORAGE_SENSITIVE_KMS_KEY_ID`, Bucket Key
-  enabled, ADR-019). Downloads are one-minute URLs that need `studentRecord:readSensitive` and are
+  enabled, ADR-019) on AWS S3. On Tigris and other S3-compatible endpoints there is no KMS; the key
+  is refused at startup and the object keeps the provider's encryption at rest (ADR-019, decision 7
+  amendment). Downloads are one-minute URLs that need `studentRecord:readSensitive` and are
   audited.
 
 A replaced or removed document's object is deleted after its row change commits. The retention

@@ -12,7 +12,7 @@ environment variable on the `workers` process. `apps/workers/src/env.ts` parses 
 the push channel runs in **dry-run mode** — it resolves devices, applies the per-user cap, prunes
 unregistered tokens and advances dispatch logs exactly as in production, but never calls FCM, and a
 `warn` is logged at first use. This is the local-development and CI path, mirroring how the email
-channel treats an unset `SES_REGION`. A deployed worker without the variable logs the same warning;
+channel treats an unset `RESEND_API_KEY`. A deployed worker without the variable logs the same warning;
 that is the signal the channel is not actually delivering.
 
 The workers ECS task's secret container is named per `secrets-conventions.md`

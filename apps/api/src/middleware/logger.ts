@@ -1,4 +1,4 @@
-import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
+import { sanitizeQueryParams, sanitizeSensitivePath } from "../lib/security/sensitive-path";
 
 import type { Logger } from "../logger";
 import type { MiddlewareHandler } from "hono";
@@ -45,7 +45,7 @@ export function loggerMiddleware({
     const requestInfo: Record<string, unknown> = {
       method: c.req.method,
       path,
-      query: Object.fromEntries(new URL(c.req.url).searchParams),
+      query: sanitizeQueryParams(new URL(c.req.url).searchParams),
       user_agent: c.req.header("User-Agent"),
       content_type: c.req.header("Content-Type"),
       accept_language: c.req.header("Accept-Language"),

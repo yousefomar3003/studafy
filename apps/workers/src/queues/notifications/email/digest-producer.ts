@@ -4,7 +4,7 @@
  * Runs as a repeatable BullMQ job (JOB_NAMES.SEND_DIGESTS) and collapses the parent-facing
  * outbox events that accumulated since the last run — attendance.alertRaised and
  * fee.installmentOverdue — into one digest.sent event per parent. The email dispatcher then sends
- * each digest through the ordinary channel, so delivery dedup, suppression, and SES correlation
+ * each digest through the ordinary channel, so delivery dedup, suppression, and Resend correlation
  * apply unchanged.
  *
  * Crash-safety is the same single-transaction trick as the dispatcher: each school's claim,

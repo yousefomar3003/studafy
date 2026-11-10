@@ -465,7 +465,7 @@ spends most of it.
 
 ### WebhookEndpointFailureRateHigh
 
-**Means.** A non-Stripe inbound webhook route (`/erpnext/webhooks`, `/email/webhooks/sns`, or any
+**Means.** A non-Stripe inbound webhook route (`/erpnext/webhooks`, `/email/webhooks/resend`, or any
 added later — the rule matches the pattern, not a list) is rejecting over 10% of deliveries.
 
 **Confirm.** The alert names the route in `{{ $labels.http_route }}`. Then:

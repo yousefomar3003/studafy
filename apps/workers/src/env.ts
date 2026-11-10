@@ -71,20 +71,19 @@ export const envSchema = z
     RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
-    // SES transactional email (deliverability R-08). When SES_REGION is unset the email dispatcher
-    // runs in dry-run mode: it renders, dedups, and records deliveries exactly as in production but
-    // never calls AWS — the dev/test path. A production worker refuses to boot that way unless
-    // EMAIL_DRY_RUN=true says so on purpose (dev/staging, which have no verified sending domain), so
-    // a missing region can never silently stop every invitation and password email. SES_FROM_ADDRESS
-    // must be on the SES-verified domain (prod.tfvars `dns_ses_domain`); SES_CONFIGURATION_SET routes
-    // bounces and complaints to the API's /email/webhooks/sns (Terraform module.email).
-    SES_REGION: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
-    SES_FROM_ADDRESS: z.preprocess(
+    // Transactional email through Resend (deliverability R-08). When RESEND_API_KEY is unset the
+    // email dispatcher runs in dry-run mode: it renders, dedups, and records deliveries exactly as in
+    // production but never calls Resend — the dev/test path. A production worker refuses to boot
+    // that way unless EMAIL_DRY_RUN=true says so on purpose (dev/staging, which have no verified
+    // sending domain), so a missing key can never silently stop every invitation and password
+    // email. EMAIL_FROM_ADDRESS must be on the domain verified in Resend (send.studafy.com, region
+    // eu-west-1); bounces and complaints come back to the API's /email/webhooks/resend.
+    RESEND_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    EMAIL_FROM_ADDRESS: z.preprocess(
       emptyAsUnset,
       z.string().email().default("no-reply@send.studafy.com"),
     ),
-    SES_FROM_NAME: z.preprocess(emptyAsUnset, z.string().min(1).default("Studafy")),
-    SES_CONFIGURATION_SET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    EMAIL_FROM_NAME: z.preprocess(emptyAsUnset, z.string().min(1).default("Studafy")),
     EMAIL_DRY_RUN: z.preprocess(
       emptyAsUnset,
       z
@@ -122,7 +121,9 @@ export const envSchema = z
     FRONTEND_URL: z.string().url().default("http://localhost:5180"),
     // Email dispatcher tunables. See queues/notifications/email/dispatcher.ts for how they bound
     // the polling loop.
-    EMAIL_MAX_RATE_PER_SECOND: z.coerce.number().positive().default(5),
+    // Resend's default API limit is 2 requests/second per team; a 429 is retried, but pacing under
+    // the limit keeps a burst (a digest run) from spending its cycles on rejected requests.
+    EMAIL_MAX_RATE_PER_SECOND: z.coerce.number().positive().default(2),
     EMAIL_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(1_000),
     EMAIL_BATCH_SIZE: z.coerce.number().int().positive().default(25),
     // ST-133. 500ms rather than the email dispatcher's 1s: this consumer carries the <5s entitlement
@@ -211,12 +212,12 @@ export const envSchema = z
       });
     }
 
-    if (env.SES_REGION === undefined && !env.EMAIL_DRY_RUN) {
+    if (env.RESEND_API_KEY === undefined && !env.EMAIL_DRY_RUN) {
       context.addIssue({
         code: "custom",
-        path: ["SES_REGION"],
+        path: ["RESEND_API_KEY"],
         message:
-          "SES_REGION is required in production (set EMAIL_DRY_RUN=true to run without sending on purpose)",
+          "RESEND_API_KEY is required in production (set EMAIL_DRY_RUN=true to run without sending on purpose)",
       });
     }
 

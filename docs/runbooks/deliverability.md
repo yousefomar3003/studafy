@@ -1,109 +1,108 @@
 # Email deliverability (R-08)
 
-Source: [`infra/terraform/modules/dns`](../../infra/terraform/modules/dns). This doc is the
-conventions and acceptance-criteria verification steps that don't fit in the module's own
-`README.md` — read that first for inputs/outputs and the auth-record table.
+Transactional email (invitations, password resets, notifications, digests) is sent through
+[Resend](https://resend.com) from `no-reply@send.studafy.com`. DNS for `studafy.com` is hosted on
+Vercel (`ns1/ns2.vercel-dns.com`); every record below is managed in Vercel → Domains → studafy.com →
+DNS Records, not in Terraform.
 
 ## Why a dedicated sending subdomain
 
-Transactional email (invitations, password resets, notifications) is sent from `send.studafy.com`
-(`dns_ses_domain` in `prod.tfvars`), never from `studafy.com` itself. Sending reputation is
+Mail is sent from `send.studafy.com`, never from `studafy.com` itself. Sending reputation is
 per-domain: if the transactional stream ever gets flagged as spam (a compromised sender, a bad
-send loop, a scraped mailing list), only `send.studafy.com`'s reputation takes the hit —
-`api.studafy.com`, `app.studafy.com`, and the apex stay unaffected. The bare apex additionally
-publishes `v=spf1 -all` and a `p=reject` DMARC record (when `dns_manage_zone` and
-`dns_protect_apex_from_spoofing` are both true) declaring it sends nothing at all — closing off
-apex spoofing without any risk of quarantining real mail, since there is no real mail from the
-apex to quarantine.
+send loop, a scraped mailing list), only `send.studafy.com`'s reputation takes the hit — the apex,
+`api.studafy.com`, and the staff mailboxes on Microsoft/Google stay unaffected.
 
-## What "authenticated" actually requires
+## Resend domain
 
-Three independent mechanisms, all three checked by Gmail and Outlook before a message lands in
-the inbox instead of spam:
+| Setting      | Value                                                                     |
+| ------------ | ------------------------------------------------------------------------- |
+| Domain       | `send.studafy.com`                                                        |
+| Region       | Ireland (`eu-west-1`) — keeps recipient data in the EU, next to Frankfurt |
+| Resend Forge | Enabled (Resend's own MTA; the return path points at `*.forge.rmta.net`)  |
+| Status       | Verified 2026-11-09                                                       |
 
-| Mechanism | What it proves                                                                       | Where it lives                                                 |
-| --------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| SPF       | The sending server is authorized to send for the envelope-from domain.               | TXT on `bounce.send.studafy.com` (the custom MAIL FROM domain) |
-| DKIM      | The message wasn't altered in transit; signed by a key the domain published.         | 3× CNAME on `<token>._domainkey.send.studafy.com` (Easy DKIM)  |
-| DMARC     | Ties SPF/DKIM to the visible From address and tells receivers what to do on failure. | TXT on `_dmarc.send.studafy.com`                               |
+A Resend domain's region cannot be changed. Moving region means deleting the domain, adding it
+again, and replacing the DKIM record (the new domain gets a new key).
 
-SPF alone is not enough — it's checked against the envelope-from (`Return-Path`) domain, which a
-forwarded or spoofed message can set to anything. DKIM alone is not enough either — a message can
-carry a valid signature from an unrelated domain. DMARC is what makes the other two mean
-something: it requires the domain that actually signed (DKIM) or actually sent (SPF) to match —
-under DMARC's default _relaxed_ alignment — the organizational domain in the visible `From:`
-header. That's why the custom MAIL FROM domain (`bounce.send.studafy.com`) is a subdomain of
-`send.studafy.com` rather than SES's own `amazonses.com`: relaxed alignment checks the
-organizational domain (`studafy.com`), and `bounce.send.studafy.com` shares it with
-`send.studafy.com`; `amazonses.com` does not.
+## What "authenticated" requires, and where it lives
 
-## `p=quarantine`, not `p=reject`
+| Mechanism | What it proves                                                                       | Record (Vercel name → value)                                                       |
+| --------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| DKIM      | The message wasn't altered in transit; signed by a key the domain published.         | TXT `resend._domainkey.send` → `p=MIGf…` (exactly one; copy from Resend → Records) |
+| SPF       | The sending server is authorized for the envelope-from (return-path) domain.         | `send.send` → CNAME to `send.forge.rmta.net` (Forge serves the SPF and bounce MX)  |
+| DMARC     | Ties SPF/DKIM to the visible From address and tells receivers what to do on failure. | TXT `_dmarc` → `v=DMARC1; p=none;`                                                 |
 
-This is the first DMARC policy `send.studafy.com` has ever had. `quarantine` tells receivers to
-route a failing message to spam instead of accepting it outright — but not to drop it silently the
-way `reject` does. That distinction matters here specifically because `reject` failures are often
-invisible to the sender (no bounce, no report you'd notice quickly), while `quarantine` failures
-still generate aggregate reports and land in a mailbox a human can eventually find. Tightening to
-`reject` is a deliberate follow-up once `dmarc_rua` reports show clean alignment across real
-traffic, not a default to reach for immediately.
+DMARC's relaxed alignment checks the organizational domain (`studafy.com`). The DKIM `d=` is
+`send.studafy.com` and the return path is `send.send.studafy.com`, both under `studafy.com`, so
+both align with the `From:` address.
 
-## Verifying "test invitation email passes Gmail/Outlook auth checks"
-
-No application code sends transactional email yet (see `modules/dns/README.md`'s "What this
-module does not do" — `apps/workers`' `notifications` queue is not wired to a sender). Until it
-is, verify the DNS side directly with a manual send through SES:
+Only one TXT record may exist at `resend._domainkey.send`. A stale key left behind (for example
+after re-creating the domain) makes DKIM fail intermittently at some receivers even while Resend
+still shows the domain as Verified. Check with:
 
 ```bash
-# One-time, if ses_domain isn't out of the SES sandbox yet: sandbox accounts can only send to
-# addresses that are themselves verified identities. Request production access first, or verify
-# the destination Gmail/Outlook address as a second SES identity for testing.
-aws ses send-email \
-  --from "no-reply@send.studafy.com" \
-  --destination "ToAddresses=your-test-address@gmail.com" \
-  --message "Subject={Data=Deliverability test},Body={Text={Data=test}}"
+dig +short TXT resend._domainkey.send.studafy.com @ns1.vercel-dns.com   # must print one key
+dig +short TXT _dmarc.studafy.com @ns1.vercel-dns.com
+dig +short CNAME send.send.studafy.com @ns1.vercel-dns.com              # send.forge.rmta.net.
 ```
 
-Then, in the received message:
+### DMARC policy
 
-- **Gmail**: open the message → ⋮ → "Show original". Look for `SPF: PASS`, `DKIM: 'PASS'`,
-  `DMARC: 'PASS'` in the header block Gmail renders at the top.
-- **Outlook**: open the message → "View" → "View message details" (or the "..." menu →
-  "Message details" in Outlook on the web). Look for `spf=pass`, `dkim=pass`, `dmarc=pass` in the
-  `Authentication-Results` header.
+`p=none` is monitoring only: receivers apply no policy to failing mail. Add
+`rua=mailto:<inbox>` to receive aggregate reports, and tighten to `p=quarantine` once a few weeks
+of reports show clean alignment across real traffic. Note the record sits at the apex, so it also
+covers mail the staff mailboxes send as `@studafy.com` — check those pass before tightening.
 
-A `dkim=pass` with a mismatched `d=` domain, or an `spf=pass` that isn't followed by `dmarc=pass`,
-means alignment is broken even though the individual mechanisms technically passed — re-check that
-the `From:` address is actually `@send.studafy.com` and not a different domain routed through the
-same sender.
+## Verifying a send passes Gmail/Outlook checks
 
-## Verifying "DMARC reports received"
+Send from Resend → Emails → Send test (from `no-reply@send.studafy.com`) to a Gmail and an Outlook
+address, then in the received message:
 
-Aggregate reports (`rua`) are sent by receivers roughly once a day per receiver, not per message —
-don't expect one immediately after a single test send. Point `dns_dmarc_rua` at a real inbox (or a
-DMARC report analyzer's ingestion address; this module provisions neither) and check it a few days
-after the first real send volume, not right after `terraform apply`.
+- **Gmail**: ⋮ → "Show original". Look for `SPF: PASS`, `DKIM: 'PASS'`, `DMARC: 'PASS'`.
+- **Outlook**: "View" → "View message details". Look for `spf=pass`, `dkim=pass`, `dmarc=pass` in
+  `Authentication-Results`.
+
+A `dkim=pass` with an unrelated `d=` domain, or an `spf=pass` not followed by `dmarc=pass`, means
+alignment is broken even though the individual mechanisms passed — check that the `From:` address
+is actually `@send.studafy.com`.
 
 ## How sending is wired
 
-- **Sender:** apps/workers (`queues/notifications/email/sender.ts`) sends as `"Studafy"
-<no-reply@send.studafy.com>` through SES in `SES_REGION`, using the configuration set in
-  `SES_CONFIGURATION_SET`. Per tier in `infra/deploy/environments/<tier>.env`; the configuration set
-  comes from Terraform output via `render.sh`.
-- **Never silent:** a production-mode worker refuses to boot without `SES_REGION` unless
-  `EMAIL_DRY_RUN=true` says on purpose that the tier only records emails (dev, staging — no
-  verified sending domain there).
-- **Permission:** `modules/email` grants the workers task role `ses:SendEmail`/`ses:SendRawEmail`
-  on exactly this identity and configuration set, and only from `*@send.studafy.com`.
-- **Bounces and complaints:** the configuration set publishes `BOUNCE` and `COMPLAINT` events to the
-  `<prefix>-email-events` SNS topic, subscribed to the API's `/email/webhooks/sns`, which verifies
-  the signature against `EMAIL_EVENTS_SNS_TOPIC_ARN`, confirms the subscription itself on first
-  deploy, and suppresses the address. SES's account-level suppression list is on as a backstop.
+- **Sender:** apps/workers (`queues/notifications/email/sender.ts`) posts to Resend's
+  `POST /emails` as `"Studafy" <no-reply@send.studafy.com>` with `RESEND_API_KEY` (a
+  sending-access key restricted to `send.studafy.com`). `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME`
+  override the defaults.
+- **No duplicates on retry:** every dispatcher send carries `Idempotency-Key: outbox-event-<id>`,
+  so a retry after a timeout returns the original send instead of mailing again (Resend keeps keys
+  for 24 hours).
+- **Retries:** 429, 5xx, timeouts, and connection errors roll the outbox row back for the next
+  cycle; any other error (validation, invalid key) records a terminal `failed` delivery.
+- **Pacing:** `EMAIL_MAX_RATE_PER_SECOND` (default 2, Resend's default team limit). Raise it only
+  after Resend raises the account's limit.
+- **Never silent:** a production-mode worker refuses to boot without `RESEND_API_KEY` unless
+  `EMAIL_DRY_RUN=true` says on purpose that the tier only records emails (dev, staging).
+- **Bounces and complaints:** a Resend webhook posts `email.delivered`, `email.bounced`,
+  `email.complained`, and `email.delivery_delayed` to the API's `/email/webhooks/resend`. The API
+  verifies the Svix signature with `RESEND_WEBHOOK_SECRET` (the endpoint's `whsec_…` signing
+  secret, five-minute replay window), records each event once in `app.email_events`, suppresses
+  permanent bounces and complaints in `app.email_suppressions`, and moves the delivery to
+  `bounced` / `complained`. `delivery_delayed` is acknowledged and ignored. Resend's own
+  suppression list also applies as a backstop.
+
+## Secrets
+
+| Variable                | Service | Where it comes from                                         |
+| ----------------------- | ------- | ----------------------------------------------------------- |
+| `RESEND_API_KEY`        | workers | Resend → API Keys (Sending access, domain send.studafy.com) |
+| `RESEND_WEBHOOK_SECRET` | api     | Resend → Webhooks → the endpoint → Signing secret           |
+
+Rotating the webhook secret: Resend keeps signing with both secrets for a while; deploy the new
+value, then let the old one expire. The verifier accepts any matching `v1` entry.
 
 ## Known gaps
 
-- **No mail-receiving infrastructure.** `dns_dmarc_rua` in `prod.tfvars` is currently a
-  placeholder address (`dmarc-reports@studafy.com`) with no MX record or inbox behind it anywhere
-  in this repo. DMARC reports will bounce, undetected, until that's wired to something real.
-- **SES sandbox.** A newly-verified SES identity starts in the sandbox (send only to other
-  verified identities, low rate limit). Request production access before the invitation-email
-  acceptance test needs to reach a real, unverified inbox at scale.
+- **No DMARC reports yet.** The `_dmarc` record has no `rua`, so failures are invisible until one
+  is added.
+- **AWS leftovers.** `infra/terraform/modules/email` (SES configuration set, SNS topic) and the
+  SES identity in `modules/dns` are no longer used by the app; they go away with the move off AWS.
+  The status-page Lambdas in `modules/monitoring` still send through SES.

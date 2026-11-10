@@ -5,131 +5,100 @@ import { auditAction } from "../middleware/auditEmitter";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
 
-import { SesEventError, parseSesEvent } from "./ses-events";
-import { SnsSignatureError, verifySnsSignature } from "./sns-signature";
+import { EmailEventError, parseResendEvent } from "./resend-events";
+import { ResendSignatureError, verifyResendSignature } from "./resend-signature";
 
 import type { Database } from "../db";
 import type { Logger } from "../logger";
-import type { SnsEnvelope } from "./sns-signature";
-import type { AppEnv, AppVariables } from "../middleware/requestId";
-import type { Context } from "hono";
+import type { ParsedEmailEvent } from "./resend-events";
+import type { AppEnv } from "../middleware/requestId";
 import type { JSONValue, TransactionSql } from "postgres";
 
 /**
- * SES → SNS email-event webhook ingestion (deliverability R-08).
+ * Resend email-event webhook ingestion (deliverability R-08).
  *
- * The configuration set publishes Bounce, Complaint, and Delivery notifications to an SNS topic;
- * the topic delivers them here. This endpoint is the feedback half of the email channel: it records
- * each event once in `app.email_events`, feeds permanent-bounce and complaint addresses into the
- * global `app.email_suppressions` list (which the workers' dispatcher consults before every send),
- * and advances the matching `app.email_deliveries` rows to their terminal feedback state.
+ * Resend posts delivered, bounced, and complained events here. This endpoint is the feedback half
+ * of the email channel: it records each event once in `app.email_events`, feeds permanent-bounce
+ * and complaint addresses into the global `app.email_suppressions` list (which the workers'
+ * dispatcher consults before every send), and advances the matching `app.email_deliveries` rows to
+ * their terminal feedback state.
  *
- * It is public by design — there is no session — and authenticates the way SNS itself does: by
- * verifying the RSA signature over the envelope's canonical message against SNS's own regional
- * signing certificate, then asserting the topic ARN is the one we configured. Both checks happen
- * before anything is parsed for handling, so an unsigned or wrong-topic notification never gets as
- * far as touching the database. At-least-once SNS delivery is absorbed by the unique
+ * It is public by design — there is no session — and authenticates the way Resend signs: an
+ * HMAC-SHA256 over the svix id, timestamp, and raw body, keyed by RESEND_WEBHOOK_SECRET, inside a
+ * five-minute replay window. That check runs before the body is parsed, so an unsigned request
+ * never gets as far as touching the database. At-least-once delivery is absorbed by the unique
  * (message_id, event_type) constraint on `app.email_events`: a redelivery inserts nothing, is
  * answered 200, and changes no state.
  */
 
-const snsEnvelopeSchema = z
+const resendEventSchema = z
   .object({
-    Type: z.string().openapi({
-      description:
-        "SNS message type: Notification, SubscriptionConfirmation, UnsubscribeConfirmation.",
+    type: z.string().openapi({
+      description: "Resend event type, e.g. email.delivered, email.bounced, email.complained.",
     }),
-    MessageId: z
-      .string()
-      .optional()
-      .openapi({ description: "SNS delivery id, unique per published message." }),
-    TopicArn: z.string().openapi({
-      description:
-        "The topic this message was published to; must equal the configured EMAIL_EVENTS_SNS_TOPIC_ARN.",
-    }),
-    Subject: z.string().optional(),
-    Message: z
-      .string()
-      .openapi({ description: "For Notification, a JSON string carrying the SES event document." }),
-    Timestamp: z.string().optional(),
-    SignatureVersion: z.string().optional(),
-    Signature: z
-      .string()
-      .optional()
-      .openapi({ description: "Base64 RSA-SHA1 signature over the canonical message." }),
-    SigningCertURL: z.string().optional().openapi({
-      description:
-        "HTTPS URL of the SNS signing certificate; host is pinned to sns.<region>.amazonaws.com.",
-    }),
-    SubscribeURL: z.string().optional().openapi({
-      description: "Present on SubscriptionConfirmation; fetching it activates the subscription.",
-    }),
-    UnsubscribeURL: z.string().optional(),
+    created_at: z.string().optional(),
+    data: z
+      .object({
+        // Optional here so contact.* / domain.* events (no email) are acknowledged and ignored,
+        // not answered 400 and retried; parseResendEvent requires it for the types acted on.
+        email_id: z
+          .string()
+          .optional()
+          .openapi({ description: "The Resend id of the email the event is about." }),
+        to: z.union([z.array(z.string()), z.string()]).optional(),
+        bounce: z
+          .object({
+            type: z.string().optional().openapi({
+              description: "Permanent, Transient, or Undetermined. Only Permanent suppresses.",
+            }),
+          })
+          .passthrough()
+          .optional(),
+      })
+      .passthrough(),
   })
-  .openapi("SnsEnvelope");
+  .passthrough()
+  .openapi("ResendEmailEvent");
 
 const webhookAcceptedSchema = z.object({ ok: z.literal(true) }).openapi("EmailWebhookAccepted");
 
 const webhookRoute = createRoute({
   method: "post",
-  path: "/email/webhooks/sns",
+  path: "/email/webhooks/resend",
   tags: ["Email"],
-  operationId: "ingestSesSnsEvent",
-  summary: "Ingest a SES event notification from SNS",
+  operationId: "ingestResendEmailEvent",
+  summary: "Ingest an email event from Resend",
   description:
-    "Receives Bounce, Complaint, and Delivery notifications from an SNS topic subscribed to the SES " +
-    "configuration set. Authenticates by SNS's RSA signature (verified against SNS's regional " +
-    "signing certificate) and a configured topic ARN allowlist; nothing else is trusted.\n\n" +
-    "Each (message_id, event_type) is recorded in app.email_events exactly once — SNS at-least-once " +
+    "Receives delivered, bounced, and complained events from Resend. Authenticates by the Svix " +
+    "signature headers (svix-id, svix-timestamp, svix-signature): an HMAC-SHA256 over the raw body " +
+    "keyed by the endpoint's signing secret, within a five-minute window; nothing else is trusted.\n\n" +
+    "Each (email_id, event_type) is recorded in app.email_events exactly once — at-least-once " +
     "delivery is absorbed by the unique constraint and a redelivery answers 200 without re-processing. " +
     "Permanent bounces and complaints suppress the affected addresses in the global suppression list, " +
-    "so the email dispatcher never mails them again. SubscriptionConfirmation is auto-confirmed by " +
-    "fetching the signed SubscribeURL.",
+    "so the email dispatcher never mails them again. Other event types are acknowledged and ignored.",
   security: [],
   request: {
     body: {
       required: true,
-      content: { "application/json": { schema: snsEnvelopeSchema } },
+      content: { "application/json": { schema: resendEventSchema } },
     },
   },
   responses: standardResponses(
     {
       200: {
-        description:
-          "Notification accepted, deduplicated, or knowingly ignored; subscription confirmed.",
+        description: "Event accepted, deduplicated, or knowingly ignored.",
         schema: webhookAcceptedSchema,
       },
     },
-    // 400: malformed JSON envelope or SES event document. 401: signature missing/invalid, or the
-    // topic is not the configured one. 500: EMAIL_EVENTS_SNS_TOPIC_ARN unconfigured, the
-    // subscription confirmation fetch failed, or ingestion failed.
+    // 400: malformed event document. 401: signature missing, invalid, or outside the replay window.
+    // 500: RESEND_WEBHOOK_SECRET unconfigured, or ingestion failed.
     [400, 401, 500],
   ),
 });
 
-/**
- * The signature middleware stamps the verified envelope on the request context. AppVariables does
- * not carry it — the key is private to this module — so access goes through this typed wrapper and
- * a local WebhookEnv rather than widening the shared AppEnv for one route's bookkeeping.
- */
-const ENVELOPE_KEY = "snsEnvelope";
-
-type WebhookEnv = AppEnv & { Variables: AppVariables & { snsEnvelope: SnsEnvelope } };
-
-function envelopeFrom(c: Context<AppEnv>): SnsEnvelope {
-  return (c as unknown as Context<WebhookEnv>).get(ENVELOPE_KEY);
-}
-
-function stampEnvelope(c: Context<AppEnv>, envelope: SnsEnvelope): void {
-  (c as unknown as Context<WebhookEnv>).set(ENVELOPE_KEY, envelope);
-}
-
 export interface EmailEventWebhookOptions {
-  /**
-   * Certificate fetcher for signature verification. Injected so tests can stub the network; app.ts
-   * omits it and verification uses the default cached fetch.
-   */
-  fetchCert?: (url: string) => Promise<string>;
+  /** Clock for the replay window, in Unix seconds. Injected by tests. */
+  nowSeconds?: () => number;
 }
 
 export function emailEventWebhookRoutes(
@@ -144,139 +113,66 @@ export function emailEventWebhookRoutes(
   // app.audit_logs.school_id is NOT NULL), and the insert into app.email_events IS the audit record
   // for the feedback event — it is written in the same transaction that mutates suppressions and
   // deliveries, so a partial ingestion can never be mistaken for a complete one.
-  routes.use("/email/webhooks/sns", auditAction("insert", "email_events"));
+  routes.use("/email/webhooks/resend", auditAction("insert", "email_events"));
 
-  routes.use("/email/webhooks/sns", async (c, next) => {
-    const topicArn = process.env.EMAIL_EVENTS_SNS_TOPIC_ARN;
-
-    if (!topicArn) {
+  routes.use("/email/webhooks/resend", async (c, next) => {
+    const secret = process.env.RESEND_WEBHOOK_SECRET;
+    if (!secret) {
       // The message reaches the log, never the client: errorHandlerMiddleware withholds detail on
       // every 5xx. An operator needs to know which variable is missing; a caller must not learn
-      // that our topic allowlist is unset.
-      throw new HTTPException(500, { message: "EMAIL_EVENTS_SNS_TOPIC_ARN is not configured" });
+      // that verification is off.
+      throw new HTTPException(500, { message: "RESEND_WEBHOOK_SECRET is not configured" });
     }
 
-    // Signature verification runs ahead of the request validator, mirroring the ERPNext webhook:
-    // authenticate, then parse. Reading the body here is safe — c.req.text() caches, and the
-    // validator's later c.req.json() reads the same bytes.
+    // Signature verification runs ahead of the request validator: authenticate, then parse.
+    // c.req.text() caches, so the validator's later c.req.json() reads the same bytes.
     const rawBody = await c.req.text();
-
-    let envelope: SnsEnvelope;
-    try {
-      const parsed: unknown = JSON.parse(rawBody);
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        throw new Error("envelope is not a JSON object");
-      }
-      envelope = parsed as SnsEnvelope;
-    } catch {
-      throw new HTTPException(400, { message: "SNS notification is not a valid JSON object" });
-    }
+    const headers = {
+      id: c.req.header("svix-id"),
+      timestamp: c.req.header("svix-timestamp"),
+      signature: c.req.header("svix-signature"),
+    };
 
     try {
-      const verified = await verifySnsSignature(envelope, options);
-      if (!verified) throw new SnsSignatureError("signature did not verify");
+      verifyResendSignature(secret, headers, rawBody, options.nowSeconds?.());
     } catch (err) {
-      logger.warn(
-        { err, message_id: envelope.MessageId, topic_arn: envelope.TopicArn },
-        "SNS signature verification failed",
-      );
-      // Same message for every authentication failure, so a caller cannot distinguish (and probe
-      // for) the individual checks.
+      if (!(err instanceof ResendSignatureError)) throw err;
+      logger.warn({ err, svix_id: headers.id }, "Resend webhook signature verification failed");
+      // Same message for every authentication failure, so a caller cannot probe the checks.
       throw new HTTPException(401, { message: "Invalid webhook signature" });
     }
 
-    if (envelope.TopicArn !== topicArn) {
-      logger.warn(
-        { topic_arn: envelope.TopicArn, expected_topic_arn: topicArn },
-        "SNS notification from an unexpected topic",
-      );
-      throw new HTTPException(401, { message: "Invalid webhook signature" });
-    }
-
-    stampEnvelope(c, envelope);
     await next();
   });
 
   routes.openapi(webhookRoute, async (c) => {
-    const envelope = envelopeFrom(c);
+    const document = c.req.valid("json");
     const log = c.get("log");
 
-    switch (envelope.Type) {
-      case "SubscriptionConfirmation":
-        await confirmSubscription(c, envelope, log);
-        break;
-      case "UnsubscribeConfirmation":
-        log.info({ message_id: envelope.MessageId }, "SNS subscription unsubscribed");
-        break;
-      case "Notification":
-        await ingestNotification(db, envelope, log);
-        break;
-      default:
-        // SNS only ever sends the three types above; a fourth means a third-party published to our
-        // topic. It signed it, so it is not an attacker, but we do not act on it.
-        log.info({ type: envelope.Type }, "SNS notification type ignored");
-        break;
+    let event: ParsedEmailEvent | null;
+    try {
+      event = parseResendEvent(document);
+    } catch (err) {
+      if (err instanceof EmailEventError) throw new HTTPException(400, { message: err.message });
+      throw err;
     }
 
+    if (event === null) {
+      log.info({ type: document.type }, "Resend event type knowingly ignored");
+    } else {
+      await ingestEvent(db, event, log);
+    }
     return c.json({ ok: true } as const, 200);
   });
 
   return routes;
 }
 
-async function confirmSubscription(
-  c: Context<AppEnv>,
-  envelope: SnsEnvelope,
-  logger: Logger,
-): Promise<void> {
-  const subscribeUrl = envelope.SubscribeURL;
-  if (!subscribeUrl) {
-    throw new HTTPException(400, { message: "SubscriptionConfirmation is missing SubscribeURL" });
-  }
-  try {
-    // The URL is signed envelope data verified above and points at SNS's own confirmation
-    // endpoint, so following it is safe. Confirming keeps the subscription active without a manual
-    // console step; failure surfaces as a 500 so SNS redelivers the confirmation.
-    const response = await fetch(subscribeUrl, { method: "GET" });
-    if (!response.ok) {
-      throw new Error(`SNS confirmation answered HTTP ${response.status}`);
-    }
-  } catch (err) {
-    logger.error({ err }, "SNS subscription confirmation failed");
-    throw new HTTPException(500, { message: "SNS subscription confirmation failed" });
-  }
-}
-
-async function ingestNotification(
-  db: Database,
-  envelope: SnsEnvelope,
-  logger: Logger,
-): Promise<void> {
-  let message: unknown;
-  try {
-    message = JSON.parse(envelope.Message);
-  } catch {
-    throw new HTTPException(400, { message: "SNS notification Message is not valid JSON" });
-  }
-
-  let event: ReturnType<typeof parseSesEvent>;
-  try {
-    event = parseSesEvent(message);
-  } catch (err) {
-    if (err instanceof SesEventError) {
-      throw new HTTPException(400, { message: err.message });
-    }
-    throw err;
-  }
-  if (event === null) {
-    logger.info({ message_id: envelope.MessageId }, "SES event type knowingly ignored");
-    return;
-  }
-
+async function ingestEvent(db: Database, event: ParsedEmailEvent, logger: Logger): Promise<void> {
   try {
     await db.begin(async (tx) => {
-      // The unique (message_id, event_type) constraint is the dedup arbiter: a redelivered SNS
-      // notification inserts nothing, and this transaction stops before it changes any state.
+      // The unique (message_id, event_type) constraint is the dedup arbiter: a redelivered event
+      // inserts nothing, and this transaction stops before it changes any state.
       const inserted = await tx`
         INSERT INTO app.email_events (message_id, event_type, payload)
         VALUES (${event.messageId}, ${event.eventType}, ${tx.json(event.payload as unknown as JSONValue)}::jsonb)
@@ -286,7 +182,7 @@ async function ingestNotification(
       if (inserted.length === 0) {
         logger.info(
           { message_id: event.messageId, event_type: event.eventType },
-          "SES event already recorded; ignoring redelivery",
+          "Email event already recorded; ignoring redelivery",
         );
         return;
       }
@@ -306,10 +202,10 @@ async function ingestNotification(
       }
     });
   } catch (err) {
-    logger.error({ err, message_id: event.messageId }, "SES event ingestion failed");
+    logger.error({ err, message_id: event.messageId }, "Email event ingestion failed");
     // Detail is withheld from the client by the 5xx arm of errorHandlerMiddleware; the cause is in
-    // the line above, correlated by request_id.
-    throw new HTTPException(500, { message: "SES event ingestion failed" });
+    // the line above, correlated by request_id. A 5xx makes Resend retry.
+    throw new HTTPException(500, { message: "Email event ingestion failed" });
   }
 }
 
@@ -326,10 +222,7 @@ async function ingestNotification(
  * user). The per-school set_config keeps each update tenant-shaped for any future connection that
  * does not bypass RLS.
  */
-async function transitionDeliveries(
-  tx: TransactionSql,
-  event: NonNullable<ReturnType<typeof parseSesEvent>>,
-): Promise<void> {
+async function transitionDeliveries(tx: TransactionSql, event: ParsedEmailEvent): Promise<void> {
   const status = event.eventType === "bounce" ? "bounced" : "complained";
 
   const schools = await tx`

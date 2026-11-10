@@ -30,7 +30,7 @@ export const eventPayloadSchemas = {
   [DOMAIN_EVENTS.ACCOUNT_DELETED]: z.object({
     userId: uid,
     // Not .email(): this is emitted inside the deletion transaction, and a stored address that
-    // fails Zod's format check must not be able to block a deletion. SES rejects it instead.
+    // fails Zod's format check must not be able to block a deletion. Resend rejects it instead.
     email: z.string().min(1),
     completesBy: z.string().datetime(),
   }),

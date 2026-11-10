@@ -129,9 +129,10 @@ export const envSchema = z
     READ_DATABASE_NAME: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1).optional(),
     ERPNEXT_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
-    // SNS topic ARN for SES email-event webhook ingestion (deliverability R-08). Optional: when
-    // absent, the webhook route answers 500 so a misconfigured topic cannot silently pass as secure.
-    EMAIL_EVENTS_SNS_TOPIC_ARN: z.string().min(1).optional(),
+    // Signing secret (whsec_...) of the Resend webhook endpoint for email events (deliverability
+    // R-08). Optional: when absent, /email/webhooks/resend answers 500 so a missing secret cannot
+    // silently pass as verified.
+    RESEND_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // ERPNext integration (ST-089). All optional — activates only when both are set.
     ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
     ERPNEXT_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
@@ -207,8 +208,8 @@ export const envSchema = z
     RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // KMS key for sensitive record documents (ADR-019): applied when a staged upload is promoted to
-    // permanent/. Required on a deployed tier; local rustfs has no KMS, so development falls back
-    // to the bucket default.
+    // permanent/. Required on a deployed tier backed by AWS S3; refused with S3_ENDPOINT (Tigris,
+    // local rustfs), which has no KMS and keeps the provider's encryption at rest.
     STORAGE_SENSITIVE_KMS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // S3-compatible object storage for the app-files bucket (ST-103). All optional and validated
     // as a group below: the feature activates only when the whole set is present, so dev and test
@@ -467,11 +468,27 @@ export const envSchema = z
         message: `RECORDS_ENCRYPTION_KEYS is required when APP_ENV is ${env.APP_ENV}`,
       });
     }
-    if (env.APP_ENV !== "development" && env.STORAGE_SENSITIVE_KMS_KEY_ID === undefined) {
+    // SSE-KMS exists only on AWS S3 proper (no S3_ENDPOINT). S3-compatible providers (Tigris,
+    // rustfs) accept the headers and silently store the object without KMS, so a key id there would
+    // claim protection the object does not have: refuse it. They rely on provider encryption at
+    // rest instead (ADR-019, decision 7).
+    if (env.S3_ENDPOINT !== undefined && env.STORAGE_SENSITIVE_KMS_KEY_ID !== undefined) {
       context.addIssue({
         code: "custom",
         path: ["STORAGE_SENSITIVE_KMS_KEY_ID"],
-        message: `STORAGE_SENSITIVE_KMS_KEY_ID is required when APP_ENV is ${env.APP_ENV}`,
+        message:
+          "STORAGE_SENSITIVE_KMS_KEY_ID is only supported on AWS S3; unset it when S3_ENDPOINT is set",
+      });
+    }
+    if (
+      env.APP_ENV !== "development" &&
+      env.S3_ENDPOINT === undefined &&
+      env.STORAGE_SENSITIVE_KMS_KEY_ID === undefined
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["STORAGE_SENSITIVE_KMS_KEY_ID"],
+        message: `STORAGE_SENSITIVE_KMS_KEY_ID is required on AWS S3 when APP_ENV is ${env.APP_ENV}`,
       });
     }
 

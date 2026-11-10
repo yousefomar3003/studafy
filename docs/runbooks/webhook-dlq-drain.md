@@ -150,6 +150,6 @@ same `error_class` within one retry cycle.
   growing `app.notification_dead_letters` or a `dlq`-heavy `app.billing_events`. A Prometheus
   alert on the DB-backed counts is future work alongside the first real on-call surface.
 - **Email/ERPNext intake failures have no durable record.** They fail open (5xx to the provider)
-  and rely on SNS/ERPNext redelivery; there is no replay handle if the provider gives up. The SNS
-  email path in particular (SES → SNS → `/email/webhooks/sns`) depends on SNS's retry schedule,
-  which this repo does not control.
+  and rely on Resend/ERPNext redelivery; there is no replay handle if the provider gives up. The
+  email path in particular (Resend → `/email/webhooks/resend`) depends on Resend's retry schedule,
+  which this repo does not control; a failed message can be replayed from Resend → Webhooks.

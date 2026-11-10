@@ -5,7 +5,7 @@
  * recipient's undigested in-app notifications into one digest.sent-shaped email per day, for
  * whichever (type, email) pairs that recipient has opted into via
  * app.notification_preferences.digest (ST-143). The email dispatcher then sends each digest
- * through the ordinary channel, so delivery dedup, suppression, and SES correlation apply
+ * through the ordinary channel, so delivery dedup, suppression, and Resend correlation apply
  * unchanged — see email/resolve.ts.
  *
  * Distinct from email/digest-producer.ts, which is the parent-specific attendance/fee digest.

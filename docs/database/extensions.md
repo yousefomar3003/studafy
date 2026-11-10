@@ -125,6 +125,10 @@ GRANT  pg_read_all_stats TO studafy_monitor;
   lets a non-superuser see the **full query text** of other roles' statements in
   `pg_stat_statements`. `pg_monitor` additionally bundles `pg_read_all_settings` and
   `pg_stat_scan_tables`, which monitoring here does not need.
+- **The `pg_read_all_stats` grant is skipped where it is refused.** On providers whose migration
+  login is not a superuser (Supabase), only the provider can grant it. The migration then raises a
+  `WARNING` and continues: `studafy_monitor` keeps call counts and timing but sees other roles' query
+  text as `<insufficient privilege>`. Use the provider's own query-performance view there.
 - **`studafy_app` and `PUBLIC` get nothing.** `studafy_app` cannot read the view (denied by
   privilege, before the view is evaluated).
 - **`pg_stat_statements_reset()` stays superuser-only** (its default). Resetting telemetry is an
@@ -182,7 +186,7 @@ SELECT count(*) FROM pg_stat_statements;
 -- 3. Access is restricted.
 SELECT has_table_privilege('studafy_app', 'public.pg_stat_statements', 'SELECT')      AS app_can_read,      -- expect false
        has_table_privilege('studafy_monitor', 'public.pg_stat_statements', 'SELECT')  AS monitor_can_read,  -- expect true
-       pg_has_role('studafy_monitor', 'pg_read_all_stats', 'USAGE')                   AS monitor_reads_stats; -- expect true
+       pg_has_role('studafy_monitor', 'pg_read_all_stats', 'USAGE')                   AS monitor_reads_stats; -- expect true (false on Supabase, see Access control)
 ```
 
 If step 2 raises `pg_stat_statements must be loaded via shared_preload_libraries`, the environment is

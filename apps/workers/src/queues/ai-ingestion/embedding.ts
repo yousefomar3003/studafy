@@ -152,7 +152,7 @@ export function createEmbeddingStage(
   const maxBackoffMs = options.maxBackoffMs ?? DEFAULT_MAX_BACKOFF_MS;
   const sleep = options.sleep ?? defaultSleep;
   // The bucket starts full, so the first batch in a burst is admitted immediately and the average
-  // settles to `requestsPerSecond` — the same pacing shape the SES sender uses.
+  // settles to `requestsPerSecond` — the same pacing shape the email sender uses.
   const limiter = requestsPerSecond > 0 ? new TokenBucket(requestsPerSecond, options.now) : null;
 
   return {

@@ -1,5 +1,5 @@
 /**
- * Email dispatcher — the polling loop that turns outbox events into SES sends.
+ * Email dispatcher — the polling loop that turns outbox events into Resend sends.
  *
  * Mirrors the outbox relay's shape (claim, work, mark, repeat) with its own cursor, and processes
  * each row in its own tenant transaction so the claim, the delivery claim, the send, and the
@@ -7,10 +7,11 @@
  * at-least-once without duplicates:
  *
  * - If the process crashes mid-send, the transaction rolls back and the row stays undispatched —
- *   the email is re-attempted next cycle. Duplicate mail is only possible in the window between
- *   SES accepting the message and the commit, which at-least-once semantics permit.
- * - Transient SES failures (throttle, 5xx, network) roll the row back so it retries next cycle.
- * - Permanent failures (MessageRejected) commit a terminal 'failed' delivery row and mark the
+ *   the email is re-attempted next cycle. A crash between Resend accepting the message and the
+ *   commit would otherwise send a duplicate, but every send carries an idempotency key derived from the
+ *   outbox event, so Resend answers the retry with the original send (within its 24h window).
+ * - Transient Resend failures (429, 5xx, network) roll the row back so it retries next cycle.
+ * - Permanent failures (validation, rejected address) commit a terminal 'failed' delivery row and mark the
  *   event dispatched, so a mailer that can never succeed does not spin forever.
  *
  * The dedup claim precedes the send: each recipient is claimed with INSERT ... ON CONFLICT DO
@@ -44,7 +45,7 @@ export interface EmailDispatcherConfig {
   batchSize: number;
   /** Milliseconds to sleep when an entire poll cycle finds zero claimable rows. */
   pollIntervalMs: number;
-  /** SES send pacing, sends per second. */
+  /** Resend send pacing, sends per second. */
   ratePerSecond: number;
   /** Base URL for the action links embedded in rendered emails. */
   frontendUrl: string;
@@ -141,7 +142,13 @@ async function processRow(
   }
 
   try {
-    const { messageId } = await ctx.sender.send({ to: resolved.recipient, ...resolved.content });
+    // Keyed on the outbox event, not the delivery row: a retryable failure rolls this transaction
+    // back, so the next attempt inserts a fresh delivery row but must reuse the same key.
+    const { messageId } = await ctx.sender.send({
+      to: resolved.recipient,
+      ...resolved.content,
+      idempotencyKey: `outbox-event-${row.id}`,
+    });
     await tx`
       UPDATE app.email_deliveries
       SET status = 'sent', message_id = ${messageId}, updated_at = CURRENT_TIMESTAMP

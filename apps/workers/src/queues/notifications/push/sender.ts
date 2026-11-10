@@ -4,7 +4,7 @@
  * The delivery worker depends on a narrow `PushSender` interface so tests inject a stub and the
  * process never touches Firebase. `createFcmSender` builds the real adapter, or a loud dry-run
  * substitute when no FIREBASE_SERVICE_ACCOUNT is configured (local development and CI) — the same
- * shape createSesSender in the email channel establishes.
+ * shape createEmailSender in the email channel establishes.
  *
  * ## Why the deep link rides in `data`, not `notification`
  *

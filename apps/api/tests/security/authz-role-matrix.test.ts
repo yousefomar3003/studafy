@@ -115,7 +115,7 @@ beforeAll(async () => {
   // masks the thing actually worth fuzzing (does an unsigned/wrong-signature request get a clean
   // 401, not a crash) behind a config gap that's specific to this harness, not to production.
   process.env.ERPNEXT_WEBHOOK_SECRET ??= "test-erpnext-webhook-secret";
-  process.env.EMAIL_EVENTS_SNS_TOPIC_ARN ??= "arn:aws:sns:us-east-1:000000000000:test-topic";
+  process.env.RESEND_WEBHOOK_SECRET ??= `whsec_${Buffer.from("authz-matrix").toString("base64")}`;
 
   keyStore = new KeyStore(60_000);
   await keyStore.init();

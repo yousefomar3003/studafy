@@ -194,6 +194,19 @@ describe("loadEnv", () => {
     expect(() =>
       loadEnv({ ...deployed, ...DEPLOYED_SECRETS, STORAGE_SENSITIVE_KMS_KEY_ID: "" }),
     ).toThrow(/STORAGE_SENSITIVE_KMS_KEY_ID/);
+    // S3-compatible providers (Tigris) have no KMS: the key is not required there, and refused
+    // because the provider would silently store the object without it.
+    const tigris = { S3_ENDPOINT: "https://fly.storage.tigris.dev" };
+    expect(
+      loadEnv({ ...deployed, ...DEPLOYED_SECRETS, ...tigris, STORAGE_SENSITIVE_KMS_KEY_ID: "" })
+        .STORAGE_SENSITIVE_KMS_KEY_ID,
+    ).toBeUndefined();
+    expect(() => loadEnv({ ...deployed, ...DEPLOYED_SECRETS, ...tigris })).toThrow(
+      /only supported on AWS S3/,
+    );
+    expect(() =>
+      loadEnv({ S3_ENDPOINT: "http://localhost:9000", STORAGE_SENSITIVE_KMS_KEY_ID: "k" }),
+    ).toThrow(/only supported on AWS S3/);
     // The in-repository development key never seals real data.
     expect(() =>
       loadEnv({

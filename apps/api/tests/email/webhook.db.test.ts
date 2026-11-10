@@ -1,40 +1,29 @@
-import { createSign, generateKeyPairSync } from "node:crypto";
-
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import { createApp } from "../../src/app";
-import { buildSnsCanonicalMessage } from "../../src/email/sns-signature";
+import { signResendPayload } from "../../src/email/resend-signature";
 import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { createSchool, createTestDatabase, integrationEnabled, migrateDatabase } from "../harness";
 
-import type { SnsEnvelope } from "../../src/email/sns-signature";
 import type { AppEnv } from "../../src/middleware";
 import type { TestDatabase } from "../harness";
 import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { Sql } from "postgres";
 
 /**
- * Database-backed SES → SNS webhook tests (deliverability R-08).
+ * Database-backed Resend webhook tests (deliverability R-08).
  *
  * The pre-DB suite (src/email/webhook.test.ts) covers everything that returns before the handler
  * touches Postgres. This suite exercises the three mutations the happy path makes — the ledger insert
- * into app.email_events, the suppression upsert, and the delivery transition — plus SNS at-least-once
+ * into app.email_events, the suppression upsert, and the delivery transition — plus at-least-once
  * redelivery against the real unique constraint. It creates a disposable database, migrates it from
  * the repository migrations, and drives the real app through its real route, exactly like the
  * ST-072 revocation suite. Gated on TEST_DATABASE_URL; runs in the `api-integration` job.
  */
 
-const TOPIC_ARN = "arn:aws:sns:us-east-1:123456789012:studafy-email-events";
-// Unique to this file: sns-signature.ts caches each certificate by URL for the process's lifetime
-// (a real SNS URL names one certificate), and every test file signs with its own generated key. A
-// URL shared with another file would hand this one the other file's cached key when both run in
-// one `bun test` process.
-const CERT_URL = "https://sns.us-east-1.amazonaws.com/SimpleNotificationService-webhook-db.pem";
-
-const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
-const PUBLIC_KEY_PEM = publicKey.export({ type: "spki", format: "pem" });
+const SECRET = `whsec_${Buffer.from("studafy-webhook-db-test-key-0001").toString("base64")}`;
 
 const integrationTest = test.skipIf(!integrationEnabled);
 
@@ -44,19 +33,8 @@ let app: OpenAPIHono<AppEnv>;
 let schoolA: { id: string; slug: string };
 let schoolB: { id: string; slug: string };
 
-let previousTopicArn: string | undefined;
-let previousFetch: typeof globalThis.fetch | undefined;
+let previousSecret: string | undefined;
 let outboxEventCounter = 0;
-
-/**
- * The webhook's default certificate fetcher uses global fetch; the stub answers SNS's own cert URL
- * with our generated key and rejects everything else. This suite never follows a SubscribeURL, so the
- * cert is the only network request the webhook makes.
- */
-function stubFetch(handler: (input: string) => Promise<Response>): void {
-  globalThis.fetch = (async (input: string | URL | Request) =>
-    handler(String(input))) as unknown as typeof globalThis.fetch;
-}
 
 beforeAll(async () => {
   if (!integrationEnabled) return;
@@ -68,13 +46,8 @@ beforeAll(async () => {
   schoolA = await createSchool(sql);
   schoolB = await createSchool(sql);
 
-  previousTopicArn = process.env.EMAIL_EVENTS_SNS_TOPIC_ARN;
-  process.env.EMAIL_EVENTS_SNS_TOPIC_ARN = TOPIC_ARN;
-  previousFetch = globalThis.fetch;
-  stubFetch(async (input) => {
-    if (input === CERT_URL) return new Response(PUBLIC_KEY_PEM, { status: 200 });
-    throw new Error(`unexpected network request in tests: ${input}`);
-  });
+  previousSecret = process.env.RESEND_WEBHOOK_SECRET;
+  process.env.RESEND_WEBHOOK_SECRET = SECRET;
 
   app = createApp({
     isReady: () => true,
@@ -86,12 +59,11 @@ beforeAll(async () => {
 }, 60_000);
 
 afterAll(async () => {
-  if (previousTopicArn === undefined) {
-    delete process.env.EMAIL_EVENTS_SNS_TOPIC_ARN;
+  if (previousSecret === undefined) {
+    delete process.env.RESEND_WEBHOOK_SECRET;
   } else {
-    process.env.EMAIL_EVENTS_SNS_TOPIC_ARN = previousTopicArn;
+    process.env.RESEND_WEBHOOK_SECRET = previousSecret;
   }
-  if (previousFetch !== undefined) globalThis.fetch = previousFetch;
   await database?.cleanup();
 });
 
@@ -110,64 +82,57 @@ async function seedDelivery(params: {
   `;
 }
 
-/** The `Message` SES publishes for a bounce — including SES's own `bouncedRecipients` key. */
-function sesBounce(messageId: string, recipients: string[], bounceType = "Permanent"): string {
-  return JSON.stringify({
-    eventType: "Bounce",
-    mail: { messageId, destination: recipients },
-    bounce: {
-      bounceType,
-      bouncedRecipients: recipients.map((emailAddress) => ({ emailAddress })),
-    },
-  });
-}
-
-function sesComplaint(messageId: string, recipients: string[]): string {
-  return JSON.stringify({
-    eventType: "Complaint",
-    mail: { messageId, destination: recipients },
-    complaint: { complaintRecipients: recipients.map((emailAddress) => ({ emailAddress })) },
-  });
-}
-
-function sesDelivery(messageId: string, recipients: string[]): string {
-  return JSON.stringify({
-    eventType: "Delivery",
-    mail: { messageId, destination: recipients },
-    delivery: { timestamp: "2026-07-31T00:00:00.000Z", recipients },
-  });
-}
-
-function notification(message: string, messageId = crypto.randomUUID()): SnsEnvelope {
+/** The event Resend posts for a bounce. */
+function resendBounce(emailId: string, recipients: string[], bounceType = "Permanent") {
   return {
-    Type: "Notification",
-    MessageId: messageId,
-    TopicArn: TOPIC_ARN,
-    Message: message,
-    Timestamp: "2026-07-31T00:00:00.000Z",
-    SignatureVersion: "1",
+    type: "email.bounced",
+    created_at: "2026-11-09T19:44:00.000Z",
+    data: {
+      email_id: emailId,
+      to: recipients,
+      bounce: { type: bounceType, subType: "General", message: "mailbox does not exist" },
+    },
   };
 }
 
-function sign(envelope: SnsEnvelope): SnsEnvelope {
-  const signer = createSign("RSA-SHA1");
-  signer.update(buildSnsCanonicalMessage(envelope));
-  signer.end();
-  return { ...envelope, Signature: signer.sign(privateKey, "base64"), SigningCertURL: CERT_URL };
+function resendComplaint(emailId: string, recipients: string[]) {
+  return {
+    type: "email.complained",
+    created_at: "2026-11-09T19:44:00.000Z",
+    data: { email_id: emailId, to: recipients },
+  };
 }
 
-const post = (envelope: object) =>
-  app.request("/email/webhooks/sns", {
+function resendDelivery(emailId: string, recipients: string[]) {
+  return {
+    type: "email.delivered",
+    created_at: "2026-11-09T19:44:00.000Z",
+    data: { email_id: emailId, to: recipients },
+  };
+}
+
+/** Sign and post an event exactly as Resend would, with a fresh svix-id per attempt. */
+const post = (event: object) => {
+  const body = JSON.stringify(event);
+  const id = `msg_${crypto.randomUUID()}`;
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  return app.request("/email/webhooks/resend", {
     method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(envelope),
+    headers: {
+      "content-type": "application/json",
+      "svix-id": id,
+      "svix-timestamp": timestamp,
+      "svix-signature": signResendPayload(SECRET, id, timestamp, body),
+    },
+    body,
   });
+};
 
 describe("bounce handling", () => {
   integrationTest(
     "records a permanent bounce, suppresses every bounced recipient (normalized), and transitions the deliveries",
     async () => {
-      const messageId = "amq-bounce-permanent-1";
+      const messageId = "re-bounce-permanent-1";
       // Mixed case and surrounding whitespace prove the suppression list stores the normalized address.
       const bounced = ["Parent1@Example.com ", "second-parent@example.com"];
       for (const recipient of bounced) {
@@ -178,7 +143,7 @@ describe("bounce handling", () => {
         });
       }
 
-      const res = await post(sign(notification(sesBounce(messageId, bounced))));
+      const res = await post(resendBounce(messageId, bounced));
 
       expect(res.status).toBe(200);
       expect(await res.json()).toEqual({ ok: true });
@@ -214,11 +179,11 @@ describe("bounce handling", () => {
   );
 
   integrationTest("records a transient bounce without suppressing the address", async () => {
-    const messageId = "amq-bounce-transient-1";
+    const messageId = "re-bounce-transient-1";
     const recipient = "parent2@example.com";
     await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
 
-    const res = await post(sign(notification(sesBounce(messageId, [recipient], "Transient"))));
+    const res = await post(resendBounce(messageId, [recipient], "Transient"));
 
     expect(res.status).toBe(200);
 
@@ -243,11 +208,11 @@ describe("complaint handling", () => {
   integrationTest(
     "suppresses complained addresses and transitions the delivery to complained",
     async () => {
-      const messageId = "amq-complaint-1";
+      const messageId = "re-complaint-1";
       const recipient = "parent3@example.com";
       await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
 
-      const res = await post(sign(notification(sesComplaint(messageId, [recipient]))));
+      const res = await post(resendComplaint(messageId, [recipient]));
 
       expect(res.status).toBe(200);
 
@@ -271,11 +236,11 @@ describe("complaint handling", () => {
 
 describe("delivery handling", () => {
   integrationTest("records a delivery event without suppressing or transitioning", async () => {
-    const messageId = "amq-delivery-1";
+    const messageId = "re-delivery-1";
     const recipient = "parent4@example.com";
     await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
 
-    const res = await post(sign(notification(sesDelivery(messageId, [recipient]))));
+    const res = await post(resendDelivery(messageId, [recipient]));
 
     expect(res.status).toBe(200);
 
@@ -292,14 +257,14 @@ describe("delivery handling", () => {
 });
 
 describe("deduplication", () => {
-  integrationTest("absorbs an SNS redelivery without re-recording or re-processing", async () => {
-    const messageId = "amq-dedup-1";
+  integrationTest("absorbs a redelivery without re-recording or re-processing", async () => {
+    const messageId = "re-dedup-1";
     const recipient = "parent5@example.com";
     await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
 
-    const signed = sign(notification(sesBounce(messageId, [recipient])));
-    const first = await post(signed);
-    const redelivery = await post(signed);
+    const event = resendBounce(messageId, [recipient]);
+    const first = await post(event);
+    const redelivery = await post(event);
 
     expect(first.status).toBe(200);
     expect(redelivery.status).toBe(200);
@@ -325,7 +290,7 @@ describe("delivery transitions", () => {
   integrationTest(
     "transitions only landed 'sent' rows and never walks a terminal row backwards",
     async () => {
-      const messageId = "amq-partial-1";
+      const messageId = "re-partial-1";
       const recipient = "parent6@example.com";
       await seedDelivery({ schoolId: schoolA.id, recipient, messageId, status: "sent" });
       await seedDelivery({
@@ -341,7 +306,7 @@ describe("delivery transitions", () => {
         status: "claimed",
       });
 
-      const res = await post(sign(notification(sesBounce(messageId, [recipient]))));
+      const res = await post(resendBounce(messageId, [recipient]));
 
       expect(res.status).toBe(200);
 
@@ -362,12 +327,12 @@ describe("delivery transitions", () => {
   );
 
   integrationTest("transitions deliveries in every school holding the message", async () => {
-    const messageId = "amq-cross-tenant-1";
+    const messageId = "re-cross-tenant-1";
     const recipient = "cross@example.com";
     await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
     await seedDelivery({ schoolId: schoolB.id, recipient, messageId });
 
-    const res = await post(sign(notification(sesBounce(messageId, [recipient]))));
+    const res = await post(resendBounce(messageId, [recipient]));
 
     expect(res.status).toBe(200);
 

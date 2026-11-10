@@ -12,7 +12,7 @@
  * nothing was handed to FCM would make the audit trail assert something false, which is the exact
  * question app.notification_dispatch_logs exists to answer.
  *
- * `email` still has no provider in this file: transactional email runs through the SES dispatcher
+ * `email` still has no provider in this file: transactional email runs through the Resend dispatcher
  * in email/, not through this delivery job, so a grade-posted email that lands here is recorded as
  * `no provider configured` at `warn` and left at `enqueued`. A status of `enqueued` that never
  * advances is a visible gap; a `delivered` that never happened is a lie. Same for a push recipient

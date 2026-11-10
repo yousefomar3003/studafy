@@ -97,7 +97,19 @@ $$;
 --    text of statements run by other roles in pg_stat_statements. pg_monitor is deliberately NOT
 --    used -- it also bundles pg_read_all_settings and pg_stat_scan_tables, which monitoring here
 --    does not need.
-GRANT pg_read_all_stats TO studafy_monitor;
+--    Managed providers whose migration login is not a superuser (Supabase) cannot grant this
+--    built-in role. Skip with a WARNING there rather than abort the whole migration chain: without
+--    it studafy_monitor still reads call counts and timing, but other roles' query text is
+--    "<insufficient privilege>". docs/database/extensions.md records the per-provider expectation.
+DO $$
+BEGIN
+  GRANT pg_read_all_stats TO studafy_monitor;
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    RAISE WARNING
+      'Cannot grant pg_read_all_stats to studafy_monitor (migration login lacks ADMIN on it); studafy_monitor will not see other roles'' query text. See docs/database/extensions.md.';
+END
+$$;
 
 -- The pg_stat_statements extension grants SELECT on its views to PUBLIC by default, which would
 -- expose call counts and timing (and, for own statements, query text) to studafy_app and every

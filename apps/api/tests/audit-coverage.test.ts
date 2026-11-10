@@ -79,10 +79,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // Tap billing webhook (ST-298). Same processor, same in-transaction audit rows as Stripe above;
   // authenticated by the `hashstring` HMAC.
   "POST /api/subscriptions/webhook/tap",
-  // SES → SNS email-event webhook (deliverability R-08). Global, pre-tenant surface: auditAction
+  // Resend email-event webhook (deliverability R-08). Global, pre-tenant surface: auditAction
   // declares the intent, but no app.audit_logs row is written because the ledger insert into
   // app.email_events *is* the audit record — see src/email/webhook.ts.
-  "POST /email/webhooks/sns",
+  "POST /email/webhooks/resend",
   // Session lifecycle (ST-071). All four mutate app.refresh_tokens. The revocation paths write
   // their audit rows from inside the service transaction rather than from the route, so that a
   // revocation and its audit record commit or roll back together — see
@@ -302,7 +302,7 @@ const EXPECTED_MUTATING_ROUTES = [
   // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm.
   // auditAction declares the mutation, but no app.audit_logs row is written: the staged object
   // under temp/ IS the audit record, an infra-level event with no database row to pair it with —
-  // the same precedent as the SES email webhook above. The object's lifecycle is itself traceable
+  // the same precedent as the Resend email webhook above. The object's lifecycle is itself traceable
   // via the school-prefixed key, which is the application half of the storage tenant boundary.
   "POST /api/storage/uploads/request-upload",
   "POST /api/storage/uploads/confirm",

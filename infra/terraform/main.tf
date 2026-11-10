@@ -198,6 +198,7 @@ module "secrets" {
       AI_LLM_API_KEY                = ""
       ERPNEXT_API_KEY               = ""
       ERPNEXT_WEBHOOK_SECRET        = ""
+      RESEND_WEBHOOK_SECRET         = ""
       RECONCILIATION_API_KEY        = ""
       STRIPE_SECRET_KEY             = ""
       STRIPE_WEBHOOK_SECRET         = ""
@@ -209,7 +210,7 @@ module "secrets" {
       RECORDS_ENCRYPTION_KEYS           = ""
       RECORDS_ENCRYPTION_CURRENT_KEY_ID = ""
     }
-    workers = { RECORDS_ENCRYPTION_KEYS = "", RECORDS_ENCRYPTION_CURRENT_KEY_ID = "", TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", AI_LLM_API_KEY = "", ERPNEXT_API_KEY = "", RECONCILIATION_API_KEY = "", STRIPE_SECRET_KEY = "", FIREBASE_SERVICE_ACCOUNT = "" }
+    workers = { RECORDS_ENCRYPTION_KEYS = "", RECORDS_ENCRYPTION_CURRENT_KEY_ID = "", TAP_SECRET_KEY = "", TAP_WEBHOOK_URL = "", AI_LLM_API_KEY = "", ERPNEXT_API_KEY = "", RECONCILIATION_API_KEY = "", STRIPE_SECRET_KEY = "", FIREBASE_SERVICE_ACCOUNT = "", RESEND_API_KEY = "" }
   }
 
   postgres_connection_secret_arn = module.postgres.connection_secret_arn
