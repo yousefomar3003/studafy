@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./limits": {
+      "types": "./dist/limits.d.ts",
+      "default": "./src/limits.ts"
     }
   },
   "scripts": {

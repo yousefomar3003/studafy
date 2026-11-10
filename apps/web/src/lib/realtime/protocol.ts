@@ -1,11 +1,14 @@
-import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
-import { z } from "zod";
-
 /**
  * Client-side mirror of the realtime gateway's wire grammar (`apps/realtime/src/protocol.ts`).
- * The gateway is the source of truth and validates everything it forwards; these schemas are the
- * client's own defense against malformed or foreign frames, and are intentionally kept in step
- * with that module. See `apps/realtime/docs/protocol.md` for the narrative spec.
+ * The gateway is the source of truth and validates everything it forwards; the schemas in
+ * `protocol-schemas.ts` are the client's own defense against malformed or foreign frames, and are
+ * intentionally kept in step with that module. See `apps/realtime/docs/protocol.md` for the
+ * narrative spec.
+ *
+ * This module holds only the types and the helpers that need no validation library: the realtime
+ * client is constructed on every page (signed out included), so anything imported here is on the
+ * path to the first paint. The zod schemas live in `protocol-schemas.ts`, which the client loads
+ * while it fetches its handshake ticket, before the socket opens.
  */
 
 export type ParsedRoomKey =
@@ -39,44 +42,33 @@ export function parseRoomKeyParts(value: string): ParsedRoomKey | undefined {
 }
 
 /** `school:{schoolId}`, `school:{schoolId}:role:{ROLE}`, or `school:{schoolId}:user:{userId}`. */
-export const roomKeySchema = z.string().refine((value) => parseRoomKeyParts(value) !== undefined, {
-  message:
-    "must be school:{schoolId}, school:{schoolId}:role:{ROLE}, or school:{schoolId}:user:{userId}",
-});
-export type RoomKey = z.infer<typeof roomKeySchema>;
+export type RoomKey = string;
 
 /**
  * Domain event envelope the gateway fans out verbatim from a room's Redis channel. `room` is the
  * room key it was delivered on; `payload` is arbitrary event-specific data the gateway does not
  * interpret. `id` is unique per publish and is what the client dedups on.
  */
-export const eventEnvelopeSchema = z.object({
-  id: uuidSchema,
-  type: z.string().min(1),
-  room: roomKeySchema,
-  payload: z.unknown(),
-  publishedAt: dateTimeSchema,
-});
-export type EventEnvelope = z.infer<typeof eventEnvelopeSchema>;
+export interface EventEnvelope {
+  id: string;
+  type: string;
+  room: RoomKey;
+  payload: unknown;
+  publishedAt: string;
+}
 
 /**
  * Gateway -> client acks/errors for the control channel, distinct from domain event envelopes.
  * `system.reauth_required` always precedes a close with `REAUTH_REQUIRED_CLOSE_CODE`.
  */
-export const systemMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("system.joined"), room: roomKeySchema }),
-  z.object({ type: z.literal("system.left"), room: roomKeySchema }),
-  z.object({ type: z.literal("system.error"), message: z.string() }),
-  z.object({ type: z.literal("system.reauth_required"), reason: z.string() }),
-]);
-export type SystemMessage = z.infer<typeof systemMessageSchema>;
+export type SystemMessage =
+  | { type: "system.joined"; room: RoomKey }
+  | { type: "system.left"; room: RoomKey }
+  | { type: "system.error"; message: string }
+  | { type: "system.reauth_required"; reason: string };
 
 /** Client -> gateway control messages: join/leave a room beyond the home rooms granted at handshake. */
-export const clientMessageSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("join"), room: roomKeySchema }),
-  z.object({ type: z.literal("leave"), room: roomKeySchema }),
-]);
-export type ClientMessage = z.infer<typeof clientMessageSchema>;
+export type ClientMessage = { type: "join"; room: RoomKey } | { type: "leave"; room: RoomKey };
 
 /** Anything the gateway may send the client over the socket. */
 export type IncomingMessage = SystemMessage | EventEnvelope;
@@ -92,28 +84,3 @@ export function isSystemMessage(message: IncomingMessage): message is SystemMess
 
 /** Close code the gateway uses when it closes a socket because its token expired mid-connection. */
 export const REAUTH_REQUIRED_CLOSE_CODE = 4401;
-
-/**
- * Parses and validates a raw text frame from the gateway. Returns `undefined` for malformed
- * frames or JSON that isn't a known message shape — the client logs and drops those rather than
- * crashing, matching the gateway's own validate-and-drop behavior.
- *
- * The two shapes are tried separately rather than as one `discriminatedUnion`: Zod 4 rejects a
- * discriminated union whose options are themselves discriminated unions, and the gateway's
- * `systemMessageSchema` is exactly that. Order is safe because system messages all carry a
- * `system.*` type while event envelopes carry a domain-event name.
- */
-export function parseIncomingMessage(text: string): IncomingMessage | undefined {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return undefined;
-  }
-  const system = systemMessageSchema.safeParse(parsed);
-  if (system.success) {
-    return system.data;
-  }
-  const envelope = eventEnvelopeSchema.safeParse(parsed);
-  return envelope.success ? envelope.data : undefined;
-}
