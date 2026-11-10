@@ -25,6 +25,7 @@ import { scheduleAbandonedImportSweepJob } from "./queues/imports";
 import {
   scheduleAccountDeletionSweepJob,
   scheduleAiMessageRetentionSweepJob,
+  schedulePartitionMaintenanceJob,
   scheduleRecordRetentionSweepJob,
   scheduleClosureSweepJob,
 } from "./queues/maintenance";
@@ -250,6 +251,13 @@ void scheduleAnnouncementPublishJob(announcementPublishRedis).then(() =>
 // already `closed` before this sweep looks for it.
 const closureSweepRedis = createRedisConnection(env);
 void scheduleClosureSweepJob(closureSweepRedis).then(() => closureSweepRedis.disconnect());
+
+// Partition maintenance scheduler: idempotently register the daily 02:15 creation of the coming
+// months' partitions of app.audit_logs and the attendance tables, which have no default partition.
+const partitionMaintenanceRedis = createRedisConnection(env);
+void schedulePartitionMaintenanceJob(partitionMaintenanceRedis).then(() =>
+  partitionMaintenanceRedis.disconnect(),
+);
 
 // Ask AI message retention scheduler (ST-309): idempotently register the daily 08:45 purge of
 // app.ai_messages rows past their 90-day `expires_at` on the maintenance queue.
