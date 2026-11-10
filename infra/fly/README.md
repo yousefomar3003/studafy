@@ -67,12 +67,31 @@ run would overwrite. The workflow checks the required ones up front and names an
 | `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_RTDN_TOKEN`                                                                           | ✓   |                                  |                            |         |
 | `FIREBASE_SERVICE_ACCOUNT`                                                                                                        |     | ✓                                |                            |         |
 | Optional: `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, `MICROSOFT_OAUTH_CLIENT_ID`/`_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓   | `STRIPE_SECRET_KEY`              |                            |         |
+| Optional: `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` (traces to Axiom, see Observability)                        | ✓   | ✓                                | ✓                          |         |
 
 Build-time values for the web app come from the environment's **variables**: `VITE_TURNSTILE_SITE_KEY`,
 `VITE_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` (and the `SENTRY_AUTH_TOKEN` secret, for source maps).
 
 `apps/api/src/env.ts`, `apps/workers/src/env.ts` and `apps/realtime/src/env.ts` are the source of
 truth: a service that is missing a required secret refuses to boot and names it.
+
+## Observability
+
+Errors go to Sentry (`SENTRY_DSN`, project `studafy-server` in the `studafy-limited` org). Logs and
+traces go to Axiom, in the organisation's EU Central edge deployment
+(`https://eu-central-1.aws.edge.axiom.co`), replacing CloudWatch and Tempo from the AWS stack.
+
+- **Logs → dataset `studafy-logs`.** The services write pino-format JSON lines to stdout; the
+  `studafy-log-shipper` app (`log-shipper.toml`) reads the organisation's log stream and posts every
+  line to Axiom. It sits outside the deploy workflow; its config and secrets are in that file.
+- **Traces → dataset `studafy-traces`.** api, workers and realtime export OTLP/HTTP when
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`packages/observability/src/tracing.ts`). The OTel exporter
+  reads its auth from `OTEL_EXPORTER_OTLP_HEADERS` itself, so both are `prod` secrets:
+  - `OTEL_EXPORTER_OTLP_ENDPOINT` = `https://eu-central-1.aws.edge.axiom.co`
+  - `OTEL_EXPORTER_OTLP_HEADERS` = `Authorization=Bearer <xaat token, ingest on studafy-traces only>,X-Axiom-Dataset=studafy-traces`
+
+  Leave both unset to turn tracing off. Axiom's EU edge accepts API tokens (`xaat-…`) only, not
+  personal tokens.
 
 ## Domains
 

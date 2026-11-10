@@ -1,0 +1,28 @@
+# Ships every fly app's stdout (the services' pino-format JSON lines) to Axiom, EU edge, dataset
+# studafy-logs. fly's own log-shipper image reads the organisation's log stream and posts it through
+# its generic `http` sink: the stock `axiom` sink has no endpoint setting and would send to Axiom's
+# US region, which an EU organisation rejects.
+#
+# Not part of the production deploy workflow (its FLY_API_TOKEN is scoped to the studafy-core-* apps
+# only). It rarely changes; deploy it by hand from the repo root:
+#   fly deploy --config infra/fly/log-shipper.toml
+# Secrets, set once with `fly secrets set --app studafy-log-shipper`:
+#   HTTP_TOKEN    Axiom API token with ingest on studafy-logs only (xaat-…)
+#   ACCESS_TOKEN  `fly tokens create readonly personal`, which lets it read the organisation's logs
+app = "studafy-log-shipper"
+primary_region = "fra"
+
+[build]
+  image = "ghcr.io/superfly/fly-log-shipper:latest@sha256:844d084753fa29f2f45e3fa37711615793816859929727fb4f01a11c62a3c642"
+
+[env]
+  ORG = "personal"
+  HTTP_URL = "https://eu-central-1.aws.edge.axiom.co/v1/ingest/studafy-logs"
+
+[[services]]
+  protocol = "tcp"
+  internal_port = 8686
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
