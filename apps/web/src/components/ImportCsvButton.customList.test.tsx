@@ -66,7 +66,7 @@ async function openWith(roles: string[], csv: string) {
       </QueryClientProvider>
     </AuthProvider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Import CSV" }));
+  fireEvent.click(screen.getByRole("button", { name: "Import file" }));
   const dialog = await screen.findByRole("dialog", { name: "Import classes" });
   const input = dialog.querySelector('input[type="file"]') as HTMLInputElement;
   fireEvent.change(input, { target: { files: [new File([csv], "buses.csv")] } });

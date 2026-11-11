@@ -790,7 +790,9 @@
     "empty": "No teachers yet. Add them on Members.",
     "loadError": "Couldn't load the teachers.",
     "record": "Staff record",
-    "recordLabel": "Open {{name}}'s staff record"
+    "recordLabel": "Open {{name}}'s staff record",
+    "importTitle": "Import teachers",
+    "emailOptional": "Email (optional)"
   },
   "importData": {
     "title": "Import data",
@@ -808,9 +810,9 @@
         "action": "Import students"
       },
       "teachers": {
-        "title": "Add teachers and staff",
-        "body": "Add your teachers one by one or import them from a file on the Users page.",
-        "action": "Users"
+        "title": "Import teachers",
+        "body": "On the Teachers page, choose Import file, download the template, and fill in each teacher's name and employee number. An email is optional: teachers get a TCH- ID to sign in with.",
+        "action": "Teachers"
       },
       "slips": {
         "title": "Print login slips",
