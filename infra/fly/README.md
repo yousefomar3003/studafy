@@ -3,14 +3,15 @@
 Production runs on fly.io instead of AWS ECS. Each service is its own fly app in `fra`
 (Frankfurt), next to the managed services it uses:
 
-| fly app                 | Config          | What                                                        |
-| ----------------------- | --------------- | ----------------------------------------------------------- |
-| `studafy-core-api`      | `api.toml`      | apps/api, public at `api.studafy.com`                       |
-| `studafy-core-realtime` | `realtime.toml` | apps/realtime; reached through the API's `/ws` (fly-replay) |
-| `studafy-core-workers`  | `workers.toml`  | apps/workers, no inbound traffic                            |
-| `studafy-core-scanner`  | `scanner.toml`  | clamd, private (Flycast) only                               |
-| `studafy-core-web`      | `web.toml`      | apps/web, public at `app.studafy.com`                       |
-| `studafy-core-migrate`  | `migrate.toml`  | db migrations, run as a one-off machine                     |
+| fly app                 | Config             | What                                                         |
+| ----------------------- | ------------------ | ------------------------------------------------------------ |
+| `studafy-core-api`      | `api.toml`         | apps/api, public at `api.studafy.com`                        |
+| `studafy-core-realtime` | `realtime.toml`    | apps/realtime; reached through the API's `/ws` (fly-replay)  |
+| `studafy-core-workers`  | `workers.toml`     | apps/workers, no inbound traffic                             |
+| `studafy-core-scanner`  | `scanner.toml`     | clamd, private (Flycast) only                                |
+| `studafy-core-web`      | `web.toml`         | apps/web, public at `app.studafy.com`                        |
+| `studafy-core-migrate`  | `migrate.toml`     | db migrations, run as a one-off machine                      |
+| `studafy-log-shipper`   | `log-shipper.toml` | ships every app's logs to Axiom (EU), dataset `studafy-logs` |
 
 What runs when:
 
