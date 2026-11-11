@@ -10,6 +10,7 @@ export {
   AI_EXAM_MIN_QUESTIONS,
   AI_EXAM_WEAK_TOPIC_THRESHOLD,
 } from "./ai-exam";
+export { dsrExportArchiveKey, dsrExportPrefix } from "./dsr-exports";
 export { DOMAIN_EVENTS, ERPNEXT_DOC_EVENT_MAP } from "./events";
 export type { DomainEvent } from "./events";
 export { ERROR_CODES } from "./errors";

@@ -93,11 +93,10 @@ export type {
 } from "./dsr-types";
 export { createMaintenancePool, processDsrJob } from "./dsr-processor";
 export type { MaintenanceRunnerConfig } from "./dsr-processor";
-export {
-  EXPORT_MANIFEST_SCHEMA_VERSION,
-  FILE_TABLES,
-  parseExportManifest,
-} from "./export-manifest";
+export { EXPORT_MANIFEST_SCHEMA_VERSION, parseExportManifest } from "./export-manifest";
+export { EXPORT_FILE_FOLDERS, listExportFiles } from "./export-files";
+export type { ExportFileSource } from "./export-files";
+export { createMaintenanceS3, exportPartSize } from "./export-storage";
 export type { ExportManifest } from "./export-manifest";
 export { processMaintenanceJob } from "./maintenance-registry";
 export {

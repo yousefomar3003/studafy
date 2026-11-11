@@ -25,13 +25,12 @@ off the claimed row and behaves accordingly.
    transition the billing state machine allows).
 2. The next daily closure sweep (08:30 UTC, `closure-sweep-scheduler.ts`) notices and files a
    **tenant-scope export** request, then enqueues it.
-3. `tenant-export.worker.ts` dumps every table `discoverTenantTables` finds for that school --
-   structured data as one NDJSON object per table, plus a **files manifest** for
-   `materials`/`assignment_attachments`/`submission_attachments` (storage key, original filename,
-   checksum -- not the file bytes themselves) -- and a `manifest.json` that
-   `export-manifest.ts`'s Zod schema validates before it is ever uploaded. A bundle that fails
-   validation is a thrown job error, never a request marked `completed` with an unverified
-   manifest -- this is what "schema-verified" means for the acceptance criterion.
+3. `tenant-export.worker.ts` writes the school's **export archive** (see "The export archive"
+   below): every table `discoverTenantTables` finds for that school as JSON, copies of every file
+   the school holds, a README and a `manifest.json` that `export-manifest.ts`'s Zod schema
+   validates before it is written. A bundle that fails validation is a thrown job error and an
+   abandoned upload, never a request marked `completed` with an unverified manifest -- this is
+   what "schema-verified" means for the acceptance criterion.
 4. Once that export is `completed`, a **retention hold** of
    `CLOSURE_ERASURE_RETENTION_HOLD_DAYS` (30 days, `closure-sweep.ts`) elapses before the sweep
    files the matching **tenant-scope erasure** request. This is deliberate breathing room for a
@@ -44,8 +43,10 @@ off the claimed row and behaves accordingly.
 
 `POST /api/privacy/dsr` (`PRIVACY_DSR_MANAGE`, ORG_ADMIN/SUPER_ADMIN only) files a `user`-scope
 request with `subject_user_id` and `request_type` (`export` or `erasure`). `GET
-/api/privacy/dsr/{requestId}` reports status and, once an export completes, a 15-minute pre-signed
-download URL for the manifest.
+/api/privacy/dsr/{requestId}` reports status and, once an export completes, a pre-signed download
+URL for its ZIP archive, valid for one hour. The route signs a fresh link on every call and only for
+a key under the request's own `dsr-exports/<school>/<request>/` prefix; the admin page fetches it
+when the download button is pressed, so the link never needs to outlive the start of a download.
 
 `sla_due_at` is stamped at filing time, 30 days out -- GDPR Art. 12(3)'s statutory response
 deadline. This pipeline's own processing (claim → dump/redact → complete) is expected to finish in
@@ -108,6 +109,46 @@ passes may miss rows this policy hides from whichever admin they resolved to act
 (`admin-actor.ts`). The export manifest's `knownGaps` field says so explicitly for every bundle
 that reaches this table, rather than silently shipping an incomplete one.
 
+## The export archive
+
+An export, whole-school or per-person, is one ZIP file at `dsr-exports/<school>/<request>/export.zip`
+(`dsrExportArchiveKey`, `@studafy/constants`); the request's `storage_key` points at it. Nothing else
+is written under the prefix.
+
+| Entry                   | What it holds                                                                                                                                                                                                                                 |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `README.txt`            | Whose data it is and when it was prepared, each data file's record count, each file folder's count, and everything the export could not include (`knownGaps`, files no longer in storage). English, with an Arabic summary                    |
+| `manifest.json`         | Schema version 2: every data file (`path`, `rowCount`, SHA-256) and every file (source table and row, original name, `path` in the archive or `null` if nothing was stored under its key, size, SHA-256, and the checksum recorded at upload) |
+| `data/<table>.json`     | One JSON array per table, one `row_to_json` row per line. `record_answers.json` and `custom_list_rows.json` hold the opened record answers and list rows (below)                                                                              |
+| `files/<folder>/<name>` | Copies of the stored files, under their upload names (made safe to extract, with ` (2)` added to a repeated name)                                                                                                                             |
+
+Which files are copied (`export-files.ts`, `records-dsr.ts`):
+
+- **Whole school:** class materials (`files/materials/`), assignment and submission attachments,
+  question images, record documents, expense attachments, the school's licence payment receipts and
+  the original student import files still held.
+- **One person:** attachments on their own submissions as a student, whoever attached them;
+  materials and assignment attachments they uploaded; documents attached to their student, parent
+  or staff record answers. Never another person's files: a parent's export does not carry their
+  child's submissions, and a teacher's does not carry the work they marked.
+- **Not copied:** files attached to private messages. `app.messages` and `app.message_attachments`
+  are readable only by the two people in a conversation, and no admin identity the pipeline acts as
+  is one of them; every bundle's `knownGaps` says so.
+
+**Streaming.** Nothing is held whole in memory. Table rows are read through a cursor 500 at a
+time; each file is streamed from storage into the archive; entries are written one after another,
+and the archive streams to storage as a multipart upload holding one part in memory
+(`export-storage.ts`). Parts are 8 MiB, larger when a school's files would need more than 10,000
+of them; every part but the last is the same size, as R2 requires. The archive library
+(`archiver`) writes ZIP64 records past 4 GiB or 65,535 entries. Files are stored uncompressed
+(most are compressed already); the data files are deflated. A failure aborts the upload rather
+than completing a truncated archive, and the job retries.
+
+**Transaction.** The whole export runs in the transaction that claimed the request, so a large
+school's export keeps that transaction open for as long as copying its files takes. Each cursor
+fetch is a separate statement, so a server `statement_timeout` applies per batch, not to the whole
+export.
+
 ## What a person wrote themselves
 
 Free text and files a person authored are out of reach of column-name redaction: a message body is
@@ -134,11 +175,11 @@ Student, parent, staff and class records (`app.record_answers`, `app.record_docu
 [docs/modules/student-records.md](../modules/student-records.md)) are handled outside the
 generic walk by `apps/workers/src/queues/maintenance/records-dsr.ts`:
 
-- **Export** writes `data/record_answers.ndjson`: every answer about the subject as a student
+- **Export** writes `data/record_answers.json`: every answer about the subject as a student
   (`student_id`), as a parent (`parent_user_id`) and as a member of staff (`staff_user_id`, the
   person's own user id; listed in `SUBJECT_LINK_COLUMNS` since 000181), sensitive values decrypted
   with the records keyring and labelled with the field as it read when answered. Document files are
-  listed in the manifest's `files`.
+  copied into `files/record-documents/` and listed in the manifest's `files`.
 - **Erasure** deletes the answers outright, with documents cascading (`hard_deleted` on
   `record_answers` in `redacted_tables`), and deletes the stored files after the erasure commits.
 - **Class records** (`class_id`) are about a class, not a person: no per-person request reaches
@@ -161,14 +202,14 @@ link to a student (`student_id`), a parent or member of staff (`user_id`), or a 
 A cell has no link column of its own and may be ciphertext, so rows and cells are handled by
 `records-dsr.ts` too:
 
-- **Per-person export** writes `data/custom_list_rows.ndjson`. It holds every row linked to the
+- **Per-person export** writes `data/custom_list_rows.json`. It holds every row linked to the
   subject as a student or by their user id, with the list's name, the link, and every cell labelled
   by its column. Sensitive cells are decrypted with the records keyring, under the AAD
   `custom_list_row | <row> | <column>`.
 - **Per-person erasure** deletes those rows outright. Their cells cascade, and the result records
   `hard_deleted` on `custom_list_rows` in `redacted_tables`.
 - **Class-linked and unlinked rows** are about no person. No per-person request reaches them.
-- **Tenant closure export** writes every row of every list to `custom_list_rows.ndjson`. The list,
+- **Tenant closure export** writes every row of every list to `custom_list_rows.json`. The list,
   column and choice definitions go through the generic walk.
 - **Tenant closure erasure** deletes every list, cascading to columns, choices, rows and cells.
   The result records `hard_deleted` on `custom_list_rows` and on `custom_lists`.
@@ -210,8 +251,8 @@ search nor redact inside it. So the risk is bounded by time, not by per-person h
 - **Per-person export.** Leftover cells tied to the person as a student are in the bundle
   (`app.student_import_rows`, reached by `student_id`). What is inside the original files is not,
   and the manifest's `knownGaps` says so, with the retention bound; cells tied to the person as a
-  parent are named in the same gap. A tenant-closure export lists every file still held in the
-  manifest's `files`.
+  parent are named in the same gap. A tenant-closure export copies every file still held into
+  `files/student-imports/`.
 
 Imported values are never sent to an AI model or any other service: column type and sensitivity
 suggestions are computed on the server from the cells
