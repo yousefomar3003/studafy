@@ -77,7 +77,8 @@ void main() {
       'lib/src/features/ai/presentation/widgets/ai_consent_disclosure.dart':
           "AI provider's privacy policy — informational, nothing sold",
       'lib/src/features/ai/store/ai_store_offer_card.dart':
-          'privacy policy and terms of use, required beside a store subscription (Apple 3.1.2)',
+          'privacy policy and terms of use, required beside a store subscription (Apple 3.1.2), and the '
+          'Terms of Service the withdrawal waiver refers to',
       'lib/src/features/parent/presentation/widgets/finance_invoice_tile.dart':
           'school fees — a real-world service, exempt from in-app purchase',
       'lib/src/features/shell/presentation/profile_tab_screen.dart':

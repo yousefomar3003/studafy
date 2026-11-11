@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:studafy_mobile/src/features/ai/store/ai_store_backend.dart';
 import 'package:studafy_mobile/src/features/ai/store/store_gateway.dart';
+import 'package:studafy_mobile/src/features/ai/store/withdrawal_waiver_store.dart';
 
 /// A store and a server for the in-app purchase flow, answering with what each test sets.
 
@@ -65,14 +66,36 @@ class FakeBackend implements AiStoreBackend {
 
   AiStoreSetup config;
   final registered = <(StorePlatform, String)>[];
+
+  /// The withdrawal waiver sent with each registration, in the same order as [registered].
+  final waivers = <DateTime?>[];
   Object? refusal;
 
   @override
   Future<AiStoreSetup> setup() async => config;
 
   @override
-  Future<void> register(StorePlatform platform, String verificationData) async {
+  Future<void> register(
+    StorePlatform platform,
+    String verificationData, {
+    DateTime? withdrawalWaiverAcknowledgedAt,
+  }) async {
     registered.add((platform, verificationData));
+    waivers.add(withdrawalWaiverAcknowledgedAt);
     if (refusal != null) throw refusal!;
   }
+}
+
+/// The device's kept waiver, in memory.
+class FakeWaiverStore implements WithdrawalWaiverStore {
+  DateTime? kept;
+
+  @override
+  Future<DateTime?> read() async => kept;
+
+  @override
+  Future<void> save(DateTime acknowledgedAt) async => kept = acknowledgedAt;
+
+  @override
+  Future<void> clear() async => kept = null;
 }
