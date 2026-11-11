@@ -20,6 +20,8 @@ export interface DataSubjectRequestRow {
   subjectUserId: string;
   status: DsrStatus;
   storageKey: string | null;
+  /** Set once the data retention sweep deleted the stored export bundle (000188). */
+  exportDeletedAt: Date | null;
   failureMessage: string | null;
   createdAt: Date;
   completedAt: Date | null;
@@ -28,7 +30,7 @@ export interface DataSubjectRequestRow {
 
 const ROW_COLUMNS = `
   id, request_type::text AS request_type, subject_user_id, status::text AS status,
-  storage_key, failure_message, created_at, completed_at, sla_due_at
+  storage_key, export_deleted_at, failure_message, created_at, completed_at, sla_due_at
 `;
 
 function parseRow(row: Record<string, unknown>): DataSubjectRequestRow {
@@ -38,6 +40,7 @@ function parseRow(row: Record<string, unknown>): DataSubjectRequestRow {
     subjectUserId: row.subject_user_id as string,
     status: row.status as DsrStatus,
     storageKey: row.storage_key as string | null,
+    exportDeletedAt: row.export_deleted_at as Date | null,
     failureMessage: row.failure_message as string | null,
     createdAt: row.created_at as Date,
     completedAt: row.completed_at as Date | null,

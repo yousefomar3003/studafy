@@ -337,8 +337,10 @@ export function privacyRoutes(
         "Data subject request not found",
       );
     }
+    // No link once the retention sweep deleted the bundle (30 days after completion): the key
+    // stays on the row as the record, but nothing is stored behind it any more.
     const presigned =
-      row.status === "completed" && row.storageKey
+      row.status === "completed" && row.storageKey && !row.exportDeletedAt
         ? await requireStorage(storage).presign(row.storageKey, "GET", undefined, 15 * 60)
         : null;
     return c.json(toResponse(row, presigned), 200);

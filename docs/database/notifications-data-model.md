@@ -256,9 +256,10 @@ Not built here, and deliberately out of scope for this migration:
   can, at the database level, address a notification to any other user in that school. Narrowing this
   is an application-layer authorization concern (`notification:send`), not an RLS one, for the reason
   given above.
-- **No retention or purge.** A mature inbox grows without bound; nothing archives or deletes read
-  notifications, and nothing prunes devices that have not been seen in months. Both want a scheduled
-  maintenance job in the shape of `db:attendance:partitions`.
+- **Devices are never pruned.** Notifications are deleted 12 months after they were created by the
+  workers' data retention sweep ([data-retention.md](../modules/data-retention.md)); the logs that
+  link to them keep their rows with the link cleared (000188). Nothing prunes devices that have not
+  been seen in months.
 - **No delivery receipts.** `notifications` records that a row was created, not that a push was
   accepted by FCM, delivered, or opened. A `notification_deliveries` table (per notification, per
   device, per attempt) is the natural next table and is what the `notifications` queue will need in

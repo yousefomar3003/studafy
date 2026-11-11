@@ -137,6 +137,10 @@ change to the other.
 The retention _period_ for grades and attendance is set by each school's education authority and
 is not encoded here.
 
+Data Studafy deletes on a fixed schedule regardless of any request (AI chats, sensitive record
+fields, imports, reports, notifications, security events, rejected applications, export bundles)
+is listed in [data-retention.md](./data-retention.md).
+
 ## Known gaps
 
 Stated plainly so they are not mistaken for done:
