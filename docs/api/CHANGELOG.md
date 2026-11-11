@@ -13,6 +13,15 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Student import without email, with families, two parents and placement (migration 000198;
+  [student-import-mapping-guide.md](../modules/student-import-mapping-guide.md#parents)):
+  `StudentImportColumnMapping` gains `grade`, `section`, `family`, `parent2_name`, `parent2_email`
+  and `parent2_relationship`, and `email` is no longer required. `ImportDiffRow` gains `parent2`
+  (`ImportDiffParent`), `family`, `grade`, `section`, `placement` and `placement_conflict`;
+  `parent` gains `kept` and `parent_conflict` gains `PARENT_EMAIL_IN_OTHER_FAMILY`. `ImportDiff`
+  totals and `ImportSummary` gain `placed` and `placement_conflicts`. The CSV template now shows
+  email-less students, a family and two parents.
+
 - Realtime handshake tickets (QA-14, F-05; [protocol.md](../../apps/realtime/docs/protocol.md#handshake-ticket)),
   under the new "Realtime" tag: `GET /api/realtime/ticket` (`RealtimeTicket`). Bearer-authenticated;
   returns a single-use, 30-second ticket for the caller's own session, which the realtime gateway's

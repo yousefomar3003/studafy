@@ -509,6 +509,14 @@ function CompletedPanel({ record, onReset }: CompletedPanelProps) {
             <dd>{summary?.parent_conflicts ?? 0}</dd>
           </div>
           <div>
+            <dt>{t("adminPeople.students.import.completed.placed")}</dt>
+            <dd>{summary?.placed ?? 0}</dd>
+          </div>
+          <div>
+            <dt>{t("adminPeople.students.import.completed.placementConflicts")}</dt>
+            <dd>{summary?.placement_conflicts ?? 0}</dd>
+          </div>
+          <div>
             <dt>{t("adminPeople.students.import.completed.recordAnswers")}</dt>
             <dd>{summary?.record_answers ?? 0}</dd>
           </div>

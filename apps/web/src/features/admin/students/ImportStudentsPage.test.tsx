@@ -356,21 +356,20 @@ describe("ImportStudentsPage", () => {
       valid_rows: 0,
       error_rows: 2,
       header_line: 3,
-      source_headers: ["Student ID", "Given Name", "Surname", "Contact"],
-      // What the server suggests from its alias list: everything but the email.
+      source_headers: ["Student ID", "Given Name", "Apellido", "Contact"],
+      // What the server suggests from its alias list: everything but the last name.
       column_mapping: {
         admission_number: "Student ID",
         first_name: "Given Name",
-        last_name: "Surname",
       },
-      errors: [{ line: 3, field: "email", message: 'Map a column to "email".' }],
+      errors: [{ line: 3, field: "last_name", message: 'Map a column to "last_name".' }],
     });
     putMock.mockImplementation((_path: string, init?: RequestInit) =>
       Promise.resolve<unknown>({
         data: importRecord({
           status: "validated",
           header_line: 3,
-          source_headers: ["Student ID", "Given Name", "Surname", "Contact"],
+          source_headers: ["Student ID", "Given Name", "Apellido", "Contact"],
           column_mapping: (init?.body as { column_mapping: unknown }).column_mapping,
           updated_at: "2026-08-01T00:01:00.000Z",
         }),
@@ -384,24 +383,22 @@ describe("ImportStudentsPage", () => {
     expect(
       mapping.getByText("4 columns found on line 3 of students.csv.", { exact: false }),
     ).toBeTruthy();
-    // "Given Name" and "Surname" are aliases the server matched; "Student ID" too.
-    expect(mapping.getAllByText("High: known alternative name")).toHaveLength(3);
-    expect(
-      mapping.getByText("3 of 4 required fields mapped. Missing: Student email."),
-    ).toBeTruthy();
+    // "Given Name" and "Student ID" are aliases the server matched.
+    expect(mapping.getAllByText("High: known alternative name")).toHaveLength(2);
+    expect(mapping.getByText("2 of 3 required fields mapped. Missing: Last name.")).toBeTruthy();
 
     const confirm = screen.getByRole("button", { name: /^Confirm import/ });
     expect(confirm.hasAttribute("disabled")).toBe(true);
     expect(
       screen.getByText(
-        "Map a column to every required field before confirming. Missing: Student email.",
+        "Map a column to every required field before confirming. Missing: Last name.",
       ),
     ).toBeTruthy();
     // No preview for a mapping that stages no records.
     expect(screen.queryByRole("region", { name: "Import preview" })).toBeNull();
 
-    choose("Student email", "Contact");
-    expect(mapping.getByText("4 of 4 required fields mapped.")).toBeTruthy();
+    choose("Last name", "Apellido");
+    expect(mapping.getByText("3 of 3 required fields mapped.")).toBeTruthy();
     expect(mapping.getByText("Chosen manually")).toBeTruthy();
     expect(
       screen.getByText("You changed the mapping. Apply it to re-check the file before confirming."),
@@ -415,9 +412,8 @@ describe("ImportStudentsPage", () => {
     expect(init?.body).toEqual({
       column_mapping: {
         admission_number: "Student ID",
-        email: "Contact",
         first_name: "Given Name",
-        last_name: "Surname",
+        last_name: "Apellido",
       },
       save_as: undefined,
     });

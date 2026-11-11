@@ -78,6 +78,24 @@ describe("header detection and suggested mapping", () => {
     });
   });
 
+  test("Arabic headers map, parent 2 and placement included", () => {
+    const { headers } = readCsvSource(
+      "رقم الطالب,الاسم الأول,اسم العائلة,الصف,الشعبة,رقم العائلة,اسم ولي الأمر 1,صلة القرابة 1,اسم ولي الأمر 2,صلة القرابة 2\n",
+    );
+    expect(suggestColumnMapping(headers)).toEqual({
+      admission_number: "رقم الطالب",
+      first_name: "الاسم الأول",
+      last_name: "اسم العائلة",
+      grade: "الصف",
+      section: "الشعبة",
+      family: "رقم العائلة",
+      parent_name: "اسم ولي الأمر 1",
+      parent_relationship: "صلة القرابة 1",
+      parent2_name: "اسم ولي الأمر 2",
+      parent2_relationship: "صلة القرابة 2",
+    });
+  });
+
   test("the fixed template maps onto itself", () => {
     const { headers } = readCsvSource(`${TEMPLATE_HEADER}\n`);
     const mapping = suggestColumnMapping(headers);
@@ -158,9 +176,15 @@ describe("stageRows", () => {
       preferred_name: null,
       date_of_birth: null,
       status: "enrolled",
+      grade: null,
+      section: null,
+      family: null,
       parent_email: "p1@example.edu",
       parent_name: null,
       parent_relationship: "step_parent",
+      parent2_email: null,
+      parent2_name: null,
+      parent2_relationship: null,
     });
     expect(staged.rows[1]!.record).toBeNull();
     expect(staged.issues.map((i) => [i.line, i.field])).toEqual([
@@ -196,9 +220,51 @@ describe("toStudentImportRecord", () => {
     expect(result.issues.map((i) => i.field)).toEqual(["parent_email"]);
   });
 
-  test("parent details without a parent email are rejected", () => {
+  test("a parent named without a relationship is rejected", () => {
     const result = toStudentImportRecord(2, { ...base, parent_name: "Pat" });
-    expect(result.issues.map((i) => i.field)).toEqual(["parent_email"]);
+    expect(result.issues.map((i) => i.field)).toEqual(["parent_relationship"]);
+  });
+
+  test("a relationship with no parent name or email is rejected", () => {
+    const result = toStudentImportRecord(2, { ...base, parent2_relationship: "father" });
+    expect(result.issues.map((i) => i.field)).toEqual(["parent2_name"]);
+  });
+
+  test("students and parents need no email", () => {
+    const result = toStudentImportRecord(2, {
+      admission_number: "A1",
+      first_name: "Ali",
+      last_name: "Hassan",
+      parent_name: "Mona Hassan",
+      parent_relationship: "الأم",
+      parent2_name: "Omar Hassan",
+      parent2_relationship: "أب",
+      status: "منتظم",
+    });
+    expect(result.issues).toEqual([]);
+    expect(result.record).toMatchObject({
+      email: null,
+      status: "enrolled",
+      parent_email: null,
+      parent_relationship: "mother",
+      parent2_relationship: "father",
+    });
+  });
+
+  test("parent 2's email must differ from parent 1's", () => {
+    const result = toStudentImportRecord(2, {
+      ...base,
+      parent_email: "p@x.edu",
+      parent_relationship: "mother",
+      parent2_email: "P@x.edu",
+      parent2_relationship: "father",
+    });
+    expect(result.issues.map((i) => i.field)).toEqual(["parent2_email"]);
+  });
+
+  test("a section without a grade is rejected", () => {
+    const result = toStudentImportRecord(2, { ...base, section: "A" });
+    expect(result.issues.map((i) => i.field)).toEqual(["grade"]);
   });
 });
 

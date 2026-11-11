@@ -7,6 +7,7 @@ import {
   stageRows,
   suggestColumnMapping,
   unmappedColumns,
+  withRecordDefaults,
 } from "@studafy/student-import";
 
 import { CodedHttpException } from "../../coded-http-exception";
@@ -495,8 +496,8 @@ export async function getImportDiff(
     schoolId,
     staged.map((row) => ({
       line_number: row.line_number,
-      // Rows staged before ST-299 (backfilled from rows_data) have no parent_name key.
-      record: { ...row.record, parent_name: row.record.parent_name ?? null },
+      // Rows staged by an earlier release lack the fields added since; missing means "not given".
+      record: withRecordDefaults(row.record),
     })),
   );
 
@@ -521,6 +522,22 @@ export async function getImportDiff(
         parent_email: row.record.parent_email,
         parent_name: row.record.parent_name,
         link: row.link,
+        parent2:
+          row.parent2 === null
+            ? null
+            : {
+                parent: row.parent2.parent,
+                parent_conflict: row.parent2.parent_conflict,
+                parent_group_line: row.parent2.parent_group_line,
+                parent_email: row.record.parent2_email,
+                parent_name: row.record.parent2_name,
+                link: row.parent2.link,
+              },
+        family: row.record.family,
+        grade: row.record.grade,
+        section: row.record.section,
+        placement: row.placement?.action ?? null,
+        placement_conflict: row.placement_conflict,
         // In form order: the staged answers are a jsonb object, which keeps no key order.
         records: [...fields.values()].flatMap((field) => {
           const fieldId = field.id;

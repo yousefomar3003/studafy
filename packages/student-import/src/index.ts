@@ -30,17 +30,32 @@ export type { ColumnMapping, CsvSource, SourceRow, StagedRow, StagedRows } from 
 export { guessColumn, unmappedColumns } from "./unmapped";
 export type { ColumnGuess, ImportableFieldType, UnmappedColumn } from "./unmapped";
 
-export { normalizeAdmissionNumber, normalizeEmail, toStudentImportRecord } from "./record";
-export type { StudentImportIssue, StudentImportRecord, StudentImportValues } from "./record";
+export {
+  normalizeAdmissionNumber,
+  normalizeEmail,
+  PARENT_SLOTS,
+  toStudentImportRecord,
+  withRecordDefaults,
+} from "./record";
+export type {
+  ParentSlot,
+  StudentImportIssue,
+  StudentImportRecord,
+  StudentImportValues,
+} from "./record";
 
-export { planStudentImport, UPDATABLE_STUDENT_FIELDS } from "./plan";
+export { nameKey, planStudentImport, UPDATABLE_STUDENT_FIELDS } from "./plan";
 export type {
   FieldChange,
+  PlannedParent,
+  PlannedParentOutcome,
+  PlannedPlacement,
   PlannedRow,
   StagedRecord,
   StudentImportAction,
   StudentImportConflict,
   StudentImportParentConflict,
+  StudentImportPlacementConflict,
   StudentImportPlan,
   StudentImportPlanTotals,
   UpdatableStudentField,
