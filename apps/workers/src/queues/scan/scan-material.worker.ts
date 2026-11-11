@@ -35,9 +35,9 @@
  */
 
 import { DOMAIN_EVENTS, NOTIFICATION_TYPES } from "@studafy/constants";
-import postgres from "postgres";
 import { z } from "zod";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 import {
   isTerminalFailure,
@@ -49,8 +49,9 @@ import {
 import { ClamdScanError, scanStream, type ClamdConfig, type ScanVerdict } from "./clamd";
 
 import type { ScanS3Client } from "./s3";
+import type { DatabaseSource } from "../../db/pool";
 import type { Job } from "bullmq";
-import type { TransactionSql } from "postgres";
+import type { Sql, TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -66,8 +67,11 @@ export const scanMaterialJobDataSchema = z.object({
 export type ScanMaterialJobData = z.infer<typeof scanMaterialJobDataSchema>;
 
 export interface ScanMaterialConfig {
+  /** Used only when `sql` is absent: a dedicated pool is opened for this job (tests). */
   databaseUrl: string;
   databaseCaCert?: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   s3: ScanS3Client | null;
   bucket?: string;
   clamd: ClamdConfig;
@@ -223,14 +227,10 @@ export async function processMaterialScan(
   if (!config.s3 || !config.bucket) throw new Error("scan storage is not configured");
   if (!config.clamd.host) throw new Error("clamd is not configured");
 
-  const sql = postgres(config.databaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
+  const sqlLease = leaseDatabase(config.sql ?? config.databaseUrl, {
+    databaseCaCert: config.databaseCaCert,
   });
+  const sql = sqlLease.sql;
   const s3 = config.s3;
 
   try {
@@ -374,7 +374,7 @@ export async function processMaterialScan(
 
     return { processed: true, outcome: "quarantined" };
   } finally {
-    await sql.end({ timeout: 5 });
+    await sqlLease.release();
   }
 }
 
@@ -391,12 +391,12 @@ export async function processMaterialScan(
  * alert path that survives the database being down.
  */
 export function materialScanFailedListener(
-  databaseUrl: string,
+  database: DatabaseSource,
   log: DeadLetterLogger,
 ): FailedHandler {
   return (job, error) => {
     if (!isTerminalFailure(job)) return;
-    void handleScanFailure({ job, error, databaseUrl, log }).catch((writeError: unknown) => {
+    void handleScanFailure({ job, error, database, log }).catch((writeError: unknown) => {
       log.error(
         {
           event: "material_scan_failure_write_failed",
@@ -412,10 +412,10 @@ export function materialScanFailedListener(
 async function handleScanFailure(params: {
   job: FailedJobLike;
   error: Error;
-  databaseUrl: string;
+  database: DatabaseSource;
   log: DeadLetterLogger;
 }): Promise<void> {
-  const { job, error, databaseUrl, log } = params;
+  const { job, error, database, log } = params;
   const data: Record<string, unknown> =
     typeof job.data === "object" && job.data !== null ? (job.data as Record<string, unknown>) : {};
   const schoolId = typeof data.schoolId === "string" ? data.schoolId : null;
@@ -435,7 +435,8 @@ async function handleScanFailure(params: {
 
   if (schoolId === null || materialId === null) return;
 
-  const sql = postgres(databaseUrl, { max: 1, idle_timeout: 20, prepare: false });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
   try {
     await withSystemTenantTx(sql, { schoolId }, async (tx) => {
       const [material] = await tx<{ original_file_name: string; uploaded_by_user_id: string }[]>`
@@ -467,6 +468,6 @@ async function handleScanFailure(params: {
       `;
     });
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }

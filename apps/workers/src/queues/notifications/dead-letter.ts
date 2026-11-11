@@ -41,10 +41,11 @@ import { DOMAIN_EVENTS, QUEUE_NAMES } from "@studafy/constants";
 // and the row are two different records of the same event, and the alias keeps which is which
 // readable at every call site.
 import { recordDeadLetter as recordDeadLetterMetric } from "@studafy/observability";
-import postgres from "postgres";
 
+import { withDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
+import type { DatabaseSource } from "../../db/pool";
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -213,7 +214,8 @@ async function emitDispatchFailed(
 export async function handleDeadLetter(params: {
   job: FailedJobLike;
   error: Error;
-  databaseUrl: string;
+  /** The process-wide pool, or a connection string for a dedicated one (tests). */
+  database: DatabaseSource;
   queueName: string;
   log: DeadLetterLogger;
 }): Promise<string | null> {
@@ -264,9 +266,8 @@ export async function handleDeadLetter(params: {
 
   const stack = job.stacktrace?.at(-1) ?? error.stack ?? null;
 
-  const sql = postgres(params.databaseUrl, { max: 1, idle_timeout: 20, prepare: false });
-  try {
-    return await withSystemTenantTx(sql, { schoolId }, async (tx) => {
+  return withDatabase(params.database, (sql) =>
+    withSystemTenantTx(sql, { schoolId }, async (tx) => {
       const deadLetterId = await recordDeadLetter(tx, {
         schoolId,
         queueName,
@@ -293,10 +294,8 @@ export async function handleDeadLetter(params: {
       });
 
       return deadLetterId;
-    });
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
+    }),
+  );
 }
 
 /**
@@ -307,7 +306,7 @@ export async function handleDeadLetter(params: {
  * worker process over a failure it was only trying to record.
  */
 export function deadLetterListener(
-  databaseUrl: string,
+  database: DatabaseSource,
   log: DeadLetterLogger,
   // The queue the job *failed on*, not the parking lot it is replayable through. A replay has to
   // re-enqueue onto the origin queue, so that is the name worth recording;
@@ -317,17 +316,15 @@ export function deadLetterListener(
   return (job, error) => {
     if (!isTerminalFailure(job)) return;
 
-    void handleDeadLetter({ job, error, databaseUrl, queueName, log }).catch(
-      (writeError: unknown) => {
-        log.error(
-          {
-            event: "notification_dead_letter_write_failed",
-            job_id: job.id ?? null,
-            err: writeError,
-          },
-          "could not record a dead-lettered notification dispatch",
-        );
-      },
-    );
+    void handleDeadLetter({ job, error, database, queueName, log }).catch((writeError: unknown) => {
+      log.error(
+        {
+          event: "notification_dead_letter_write_failed",
+          job_id: job.id ?? null,
+          err: writeError,
+        },
+        "could not record a dead-lettered notification dispatch",
+      );
+    });
   };
 }

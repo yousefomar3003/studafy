@@ -91,7 +91,7 @@ export type {
   RedactedTableEntry,
   RetainedTableEntry,
 } from "./dsr-types";
-export { createMaintenancePool, processDsrJob } from "./dsr-processor";
+export { leaseMaintenancePool, processDsrJob } from "./dsr-processor";
 export type { MaintenanceRunnerConfig } from "./dsr-processor";
 export { EXPORT_MANIFEST_SCHEMA_VERSION, parseExportManifest } from "./export-manifest";
 export { EXPORT_FILE_FOLDERS, listExportFiles } from "./export-files";
