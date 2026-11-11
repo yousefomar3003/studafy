@@ -15,9 +15,9 @@ unregistered tokens and advances dispatch logs exactly as in production, but nev
 channel treats an unset `RESEND_API_KEY`. A deployed worker without the variable logs the same warning;
 that is the signal the channel is not actually delivering.
 
-The workers ECS task's secret container is named per `secrets-conventions.md`
-(`<name_prefix>/workers/app-secrets`); add `FIREBASE_SERVICE_ACCOUNT` there. The credential is a
-secret and never belongs in the repo or in a plain ECS environment entry.
+In production it is the `FIREBASE_SERVICE_ACCOUNT` secret in the `prod` GitHub Environment, which
+the deploy workflow copies to the workers fly app (`infra/fly/README.md`). The credential is a
+secret and never belongs in the repo or in a fly.toml `[env]` entry.
 
 ## Provisioning Firebase
 
@@ -66,9 +66,8 @@ iOS (set up 2026-10-26):
 ## Dry run, on purpose only
 
 A production-mode worker refuses to boot without `FIREBASE_SERVICE_ACCOUNT` unless
-`PUSH_DRY_RUN=true` (per tier in `infra/deploy/environments/<tier>.env`): prod `false`, dev and
-staging `true` until they have their own service account. The secret lives in the workers app secret
-(`TF_VAR_secrets_app_secret_values` -> `workers.FIREBASE_SERVICE_ACCOUNT`).
+`PUSH_DRY_RUN=true`. Production sets `PUSH_DRY_RUN = "false"` (`infra/fly/workers.toml`), and the
+deploy workflow refuses to run without the `FIREBASE_SERVICE_ACCOUNT` secret.
 
 ## The push payload
 

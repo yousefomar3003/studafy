@@ -98,64 +98,67 @@ someone does that.
 
 ## Credentials and fixtures — the real gap
 
-This is the section to read before assuming this suite can just be pointed at staging. Three
+This is the section to read before assuming this suite can just be pointed at a deployed
+environment. Four
 findings from building it, none fixed here because each is a decision outside this ticket's scope:
 
-### 1. Staging has never actually run
+### 1. There is no staging environment
 
-Per `docs/runbooks/environment-matrix.md`'s own honesty note: nothing in `infra/terraform`/
-`infra/deploy` has been applied against a real AWS account from this repo's authoring environment.
-`staging-api.studafy.com` does not currently resolve to anything. This suite is written to run
-against it once it exists, not proof that it currently does.
+The suite was written against a planned AWS staging tier (`staging-api.studafy.com` in
+`infra/load-tests/config/environments.js`) that was never applied and was retired with the rest of
+the AWS stack. The only deployed environment is production on fly.io
+(`docs/runbooks/environment-matrix.md`). Pointing this suite at production is a separate decision
+nobody has made; until a load-test target exists, the suite runs locally only.
 
-### 2. This suite cannot self-provision staging credentials — by design
+### 2. This suite cannot self-provision credentials on a deployed environment — by design
 
 Studafy has no password login; authentication is OIDC only (Google, Microsoft, or a `mock` provider
 used by local dev and Playwright/Flutter E2E). The mock provider is hard-disabled the moment
 `NODE_ENV` or `APP_ENV` is production-shaped
 (`apps/api/src/modules/auth/oauth/mock-config.ts`'s `isMockOAuthSafeEnvironment`), and
 `apps/api/src/env.ts:271-277` goes further: the API **refuses to boot at all** if
-`MOCK_OAUTH_ISSUER_URL` is ever set alongside such an environment. Staging's own task definition
-(`infra/deploy/ecs/api/task-definition.json.tpl:16`) hardcodes `NODE_ENV=production` for every
-environment it deploys, staging included. This is a deliberate safety rail, confirmed intentional by
+`MOCK_OAUTH_ISSUER_URL` is ever set alongside such an environment. Every deployed API runs with
+`NODE_ENV=production` (`infra/fly/api.toml`), and the retired AWS task definition hardcoded the same
+for its planned staging tier. This is a deliberate safety rail, confirmed intentional by
 the code's own comments — not a gap for this suite to route around.
 
 **Consequence:** `infra/load-tests/lib/auth.js`'s `AUTH_MODE=token-pool` (the default, and the only
-mode staging can ever use) requires pre-minted, already-valid bearer tokens supplied via a data
+mode a deployed environment can ever use) requires pre-minted, already-valid bearer tokens supplied via a data
 file. Producing those requires either a real Microsoft/Google OIDC round trip per synthetic identity
 (heavy — needs real test accounts in a real tenant) or a token-minting path this repo does not
 currently have wired: `KeyStore.init()` (`apps/api/src/modules/auth/jwt/key-store.ts`) accepts an
 optional `privateKeyPem` so a signing key _could_ be persisted and shared, but
-`apps/api/src/index.ts:106` calls `keyStore.init()` with no arguments — every process, including
-each of staging's two API replicas (`API_DESIRED_COUNT=2`), generates its own ephemeral key today.
+`apps/api/src/index.ts:106` calls `keyStore.init()` with no arguments — every API process generates its own ephemeral key today.
 That is finding 3, below, and it blocks token-minting either way.
 
 ### 3. No shared JWT signing key across replicas
 
-`infra/deploy/ecs/api/task-definition.json.tpl`'s `secrets` array carries only database credentials
-and `REDIS_URL` — no signing-key secret. Combined with finding 2's unwired `keyStore.init()`
-argument, staging's two API tasks each mint tokens nobody else's process can verify: a token minted
-against the replica an ALB happened to route a request to will 401 roughly half the time against the
-other. This is a real correctness gap for staging generally, not specific to load testing — but it
+No signing-key secret is wired into the API (the `prod` secrets the deploy copies to
+`studafy-core-api`, `infra/fly/README.md`, include none). Combined with finding 2's unwired
+`keyStore.init()` argument, any two API machines each mint tokens nobody else's process can verify:
+with two machines behind fly's proxy, a token minted on one will 401 roughly half the time against
+the other. Production runs one API machine today (`min_machines_running = 1`), so this bites as soon
+as it is scaled out. It is a real correctness gap generally, not specific to load testing — but it
 means a load test run at scale would report a ~50% spurious auth failure rate that has nothing to do
 with real capacity, which would be actively misleading to run before this is fixed. Fixing it (wiring
-a persisted signing-key secret, the same way `PGBOUNCER_SECRET_ARN` is wired) is a prerequisite for
-_any_ accurate multi-replica load test, not just this suite's — and belongs to whoever owns
-`apps/api/src/index.ts`'s bootstrap and the ECS secrets wiring, not this ticket.
+a persisted signing-key secret, like the other `prod` secrets) is a prerequisite for _any_ accurate
+multi-replica load test, not just this suite's — and belongs to whoever owns
+`apps/api/src/index.ts`'s bootstrap and the deploy's secret wiring, not this ticket.
 
-### 4. Nothing automatically seeds staging, on purpose
+### 4. Nothing automatically seeds a deployed environment, on purpose
 
 `db/seeds/guard.ts`'s `FORBIDDEN_HOST_PATTERNS` rejects any staging-shaped hostname outright, even
 past its own `SEED_ALLOW_NONLOCAL` escape hatch, because "these are never a legitimate seed target."
 `infra/load-tests/seed/generate-local-fixtures.ts` reuses that exact guard, unmodified — it is
 **local-only** on purpose, useful only for proving the k6 suite mechanically correct. Provisioning
-thousands of synthetic teacher/student identities in staging (once findings 1–3 above are resolved)
+thousands of synthetic teacher/student identities in a deployed environment (once findings 1–3 above
+are resolved)
 is therefore a deliberate, human-run, one-off action — the same posture
 `infra/erpnext/seed`'s "seed tenant" already has (run explicitly via `--seed`, never
 automatic) — not something any script, this one included, should do unattended.
 
 **Bottom line:** this ticket delivers a complete, mechanically-verified k6 suite and the exact list
-of what has to be true before it can run for real against staging. It does not — and structurally
+of what has to be true before it can run for real against a deployed environment. It does not — and structurally
 should not, on this repo's own terms — provision that environment itself.
 
 ## Reports and regression comparison
@@ -184,17 +187,18 @@ percentage points) fails the run unless `REGRESSION_STRICT=0`.
 - **Not verified:** the suite has never been run against a real Postgres/API stack (this authoring
   environment has no running Docker daemon), so `seed/generate-local-fixtures.ts`'s SQL — written
   against the exact column names `db/seeds/data/people.ts` and `db/seeds/data/academics.ts` use —
-  has not executed for real. It has also, obviously, never run against staging, for the reasons
+  has not executed for real. It has also never run against a deployed environment, for the reasons
   above.
 
 ## Known gaps / follow-ups
 
 1. A shared, persisted JWT signing key across API replicas (finding 3 above) — blocks accurate
    multi-replica load testing generally, not just this suite.
-2. A real credential-provisioning path for staging load-test identities, once (1) is fixed — either
+2. A load-test target environment (finding 1) and a real credential-provisioning path for its
+   load-test identities, once (1) is fixed — either
    a token-minting script with access to that shared key, or real OIDC test accounts.
 3. The real NFR-01/NFR-02 numbers, to replace this doc's proposed defaults.
 4. `TARGET_RPS` and `AI_CONCURRENT_VUS` are sizing assumptions, not measured targets — revisit once
    real usage telemetry exists.
-5. This suite has not been run against a live Postgres or staging (see above) — do that before
+5. This suite has not been run against a live Postgres or a deployed environment (see above) — do that before
    trusting it blind on a first real run.

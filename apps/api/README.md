@@ -28,16 +28,17 @@ Validated once at startup by [`src/env.ts`](src/env.ts). An invalid value throws
 | `SHUTDOWN_TIMEOUT_MS` | integer `>= 0`                          | `10000`       | max time to drain in-flight requests |
 | `LOG_LEVEL`           | `trace`…`fatal`                         | `info`        | volume knob; below it costs nothing  |
 | `SERVICE_NAME`        | string                                  | `api`         | `service` field on every log line    |
-| `RELEASE_VERSION`     | string                                  | `unknown`     | `IMAGE_TAG` in deployments           |
+| `RELEASE_VERSION`     | string                                  | `unknown`     | the commit SHA in deployments        |
 | `DATABASE_HOST`       | string                                  | none          | required in production               |
-| `DATABASE_PORT`       | integer `1`-`65535`                     | none          | PgBouncer listener                   |
-| `DATABASE_NAME`       | string                                  | none          | PgBouncer service pool name          |
-| `DATABASE_USER`       | string                                  | none          | injected from Secrets Manager        |
-| `DATABASE_PASSWORD`   | string                                  | none          | injected from Secrets Manager        |
-| `DATABASE_CA_CERT`    | PEM string                              | none          | verifies PgBouncer TLS               |
+| `DATABASE_PORT`       | integer `1`-`65535`                     | none          | pooler port (6543 on Supabase)       |
+| `DATABASE_NAME`       | string                                  | none          | database name                        |
+| `DATABASE_USER`       | string                                  | none          | fly secret, from the `prod` env      |
+| `DATABASE_PASSWORD`   | string                                  | none          | fly secret, from the `prod` env      |
+| `DATABASE_CA_CERT`    | PEM string                              | none          | verifies the pooler's TLS            |
 
 The PostgreSQL client disables prepared statements for transaction pooling. In production,
-`/readyz` runs `SELECT 1` through PgBouncer before reporting ready.
+`/readyz` runs `SELECT 1` through the pooler (Supabase's transaction pooler, which stands in for
+PgBouncer; `infra/fly/README.md`) before reporting ready.
 
 `RELEASE_VERSION` is deliberately **not** required in production: `unknown` in a log line is a
 diagnosable state, whereas a container refusing to boot over a logging field is an outage.

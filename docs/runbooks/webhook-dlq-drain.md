@@ -10,7 +10,7 @@ DLQ at all and depend on provider redelivery instead. A "drain" is deciding each
 Mechanism source: `apps/workers/src/queues/notifications/dead-letter.ts`,
 `apps/workers/src/queues/billing/billing-event.service.ts`,
 [`packages/constants/src/queues.ts`](../../packages/constants/src/queues.ts),
-`apps/api/src/email/webhook.ts` (SES/SNS), `apps/api/src/erpnext/webhook.ts` (ERPNext).
+`apps/api/src/email/webhook.ts` (Resend, `/email/webhooks/resend`), `apps/api/src/erpnext/webhook.ts` (ERPNext).
 
 ## Detection
 
@@ -21,15 +21,17 @@ NOTHING` — a re-run of the handler is a no-op, not a duplicate alert) and emit
   marked `status = 'dlq'` on its `app.billing_events` row with the reason in `last_error`.
 - **The structured log lines.** `notification_dispatch_dead_lettered` /
   `billing_event_dead_lettered` are the unconditional, database-independent alert paths
-  (`apps/workers`' CloudWatch logs, `event` field above). These fire even when the database write
+  (`apps/workers`' logs in Axiom, dataset `studafy-logs` via `infra/fly/log-shipper.toml`, `event`
+  field above). These fire even when the database write
   itself fails.
-- **BullMQ metrics.** Prometheus `bullmq_job_outcomes_total{outcome="failed"}` per queue, and the
-  failed-set depth (`bullmq_queue_jobs{state="failed"}`), both on the Workers dashboard
-  (`docs/runbooks/metrics-dashboard-catalog.md`). A sustained failed rate with no corresponding
-  dead-letter rows means the dead-letter _writes_ are failing — see "Write failure" below.
+- **BullMQ metrics.** The workers still expose `bullmq_job_outcomes_total{outcome="failed"}` per
+  queue and the failed-set depth (`bullmq_queue_jobs{state="failed"}`), but nothing scrapes or
+  graphs them on fly yet — there is no metrics dashboard since the AWS Prometheus/Grafana stack was
+  retired. A sustained failed rate with no corresponding dead-letter rows means the dead-letter
+  _writes_ are failing — see "Write failure" below.
 
-No CloudWatch alarm targets DLQ depth today; the standing signal is dashboard drift + the log
-lines above. Known gap at the bottom.
+No alert targets DLQ depth today; the standing signal is the log lines above and the database
+queries below. Known gap at the bottom.
 
 ## What is and isn't the dead-letter record
 
@@ -50,7 +52,7 @@ substitute for the tool.
    billing events (`status='dlq'`) vs. **missing** dead letters for a job that visibly failed —
    the last is the "write failure" case (step 4), an infrastructure problem, not a drain.
 2. **Replay, drop, or investigate?** Default by surface:
-   - _Notifications_ — replay once after confirming the underlying cause is gone (Redis, SES,
+   - _Notifications_ — replay once after confirming the underlying cause is gone (Redis, Resend,
      FCM): a dispatch whose failure was an outage is worth re-running; a dispatch whose failure
      was permanent (bad recipient token, dead device, malformed channel config) must be dropped,
      or replay just refills the DLQ.
@@ -60,11 +62,12 @@ substitute for the tool.
      to `pending` and re-enqueue the job.
    - _Intake webhooks (email/ERPNext)_ — no DLQ at all; provider redelivery is the recovery path.
      Investigate only if redelivery is clearly exhausted (`app.email_events` gap for a known
-     SendId, or a silent school-side gap for ERPNext).
+     `message_id`, or a silent school-side gap for ERPNext).
 3. **Is the cause one failing code path or a broad outage?** One `error_class` dominating a batch
    is a code bug (fix + report as a deploy issue); a spread across classes with a recent deploy is
-   a regression (rollback per `deploy-rollback.md`); a spread across classes _without_ a deploy is
-   an upstream outage (SES, FCM, Stripe) — wait for it, don't drain into it.
+   a regression (no rollback procedure is defined for fly yet; ship a fix through the deploy workflow,
+   [`infra/fly/README.md`](../../infra/fly/README.md#deploying)); a spread across classes _without_
+   a deploy is an upstream outage (Resend, FCM, Stripe) — wait for it, don't drain into it.
 
 ## Procedure
 
@@ -147,8 +150,8 @@ same `error_class` within one retry cycle.
   that doesn't exist; every drain today is ad-hoc `job.retry()`/SQL. A
   `drain-dlq` CLI (siblings: `packages/db/src/cli.ts`) is the natural follow-up.
 - **No alarm on DLQ depth.** The dead-letter write is alarmed-by-log only; nothing pages on a
-  growing `app.notification_dead_letters` or a `dlq`-heavy `app.billing_events`. A Prometheus
-  alert on the DB-backed counts is future work alongside the first real on-call surface.
+  growing `app.notification_dead_letters` or a `dlq`-heavy `app.billing_events`. An alert on the
+  DB-backed counts is future work alongside the first real on-call surface.
 - **Email/ERPNext intake failures have no durable record.** They fail open (5xx to the provider)
   and rely on Resend/ERPNext redelivery; there is no replay handle if the provider gives up. The
   email path in particular (Resend → `/email/webhooks/resend`) depends on Resend's retry schedule,

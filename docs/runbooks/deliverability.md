@@ -103,6 +103,3 @@ value, then let the old one expire. The verifier accepts any matching `v1` entry
 
 - **No DMARC reports yet.** The `_dmarc` record has no `rua`, so failures are invisible until one
   is added.
-- **AWS leftovers.** `infra/terraform/modules/email` (SES configuration set, SNS topic) and the
-  SES identity in `modules/dns` are no longer used by the app; they go away with the move off AWS.
-  The status-page Lambdas in `modules/monitoring` still send through SES.

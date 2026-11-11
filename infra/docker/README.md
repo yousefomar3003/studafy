@@ -45,15 +45,14 @@ docker build -f infra/docker/web.Dockerfile      -t studafy/web      .
 
 ### Why the build context is the repo root
 
-`docs/runbooks/supply-chain-security.md`'s CI example currently shows
-`docker build -t "$DIGEST_TAG" apps/api` — a per-app build context. That works for `apps/api`
+A per-app build context (`docker build apps/api`) works for `apps/api`
 alone, which has zero workspace runtime dependencies, but not for `apps/workers` or
 `apps/realtime` (both depend on `@studafy/constants`) or `apps/web` (depends on `@studafy/ui`):
 none of those workspace packages exist inside `apps/<name>/` for a context scoped that narrowly.
 All four Dockerfiles need `bun.lock` and the `packages/*` workspace members to run
 `bun install --frozen-lockfile` and `turbo run build`, so the context has to be the repo root for
-every one of them, and the four `docker build` invocations above are what CI should actually run —
-this doc corrects that example; see "Known gaps" for the actual line changed.
+every one of them, and the four `docker build` invocations above are what CI actually runs
+(`containers.yml`; fly deploys build from the repo root too, `fly deploy .`).
 
 ## Running the whole stack locally
 
@@ -211,11 +210,6 @@ hosted ERPNext runs today.
   `frappe/erpnext` base. Whether the pinned `version-15` tags of `frappe/erpnext` and
   `frappe/education` behave correctly together is only proven by running the plane, not by the
   build.
-- **`docs/runbooks/supply-chain-security.md`'s build example was corrected**: its
-  `docker build -t "$DIGEST_TAG" apps/api` used a per-app build context, which — as explained
-  above — only happens to work for `apps/api`. Updated to
-  `docker build -f infra/docker/api.Dockerfile -t "$DIGEST_TAG" .` (repo-root context), and its
-  "Known gaps" no longer lists "no Dockerfile exists yet" for these three services.
 - **`apps/workers`' healthcheck proves Redis reachability, not job-processing health.** A worker
   that's connected to Redis but wedged on a specific job (stuck lock, infinite loop in a handler)
   reports `healthy` — see "Healthcheck instructions" above. Closing that gap needs an

@@ -4,11 +4,11 @@ QA-16 ([QA plan](../testing/qa-plan.md), [findings register](findings-register.m
 
 ## Why it matters
 
-The API and workers reach Postgres through PgBouncer, and every PgBouncer pool logs in as the **RDS
-master user**: it is the only credential that exists
-([`modules/pgbouncer/README.md`](../../infra/terraform/modules/pgbouncer/README.md) "It does not
-create a per-service Postgres role"; `user_data.sh.tftpl` writes `user=$PG_USER` from the master
-secret into every pool). Application code is meant to run each transaction as `studafy_app` with
+The API and workers reach Postgres through Supabase's transaction pooler, and they log in as the
+Supabase project's **`postgres` user** (`DATABASE_USER` = `postgres.<project ref>` in the `prod`
+GitHub Environment; see [`infra/fly/README.md`](../../infra/fly/README.md) "Database connections").
+It is the only runtime credential that exists, as the RDS master user was before AWS was retired.
+Application code is meant to run each transaction as `studafy_app` with
 `app.school_id` set (`withTenantTx`), which Row-Level Security then scopes to one school.
 
 Code that queries the pool directly skips both. What happens then depends on the login:
@@ -29,26 +29,23 @@ in the root `eslint.config.js`):
 - `tenancy/verification/service.ts:119,151`: the new school's admin read from `app.users` (new; added
   to F-17).
 
-## How to run the check (staging, then prod)
+## How to run the check (prod)
 
 The script is read-only: it opens a `READ ONLY` transaction, rolls it back, and reads only role
 metadata and row **counts**, no personal data.
 
-1. Connect to the environment's bastion (same access as
-   [`migration-failure.md`](../runbooks/migration-failure.md) step 3b).
-2. Get the runtime login's credentials from the Postgres connection secret
-   (`module.postgres` `connection_secret_arn`, the same secret PgBouncer reads): `host`, `port`,
-   `dbname`, `username`, `password`.
-3. Copy [`s01-db-role-audit.sql`](s01-db-role-audit.sql) to the bastion.
-4. Run it **as that login**, against the primary:
+1. Get the runtime login's connection settings: host and port from `infra/fly/api.toml`
+   (`DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_NAME`), user and password from the `DATABASE_USER`
+   and `DATABASE_PASSWORD` secrets of the `prod` GitHub Environment, and Supabase's root CA
+   (`DATABASE_CA_CERT`).
+2. Run [`s01-db-role-audit.sql`](s01-db-role-audit.sql) **as that login**:
 
    ```sh
-   psql "host=<host> port=<port> dbname=<dbname> user=<username> sslmode=require" \
-     -f s01-db-role-audit.sql > s01-<environment>.txt
+   psql "host=<host> port=<port> dbname=<dbname> user=<username> sslmode=verify-full sslrootcert=<ca.pem>" \
+     -f s01-db-role-audit.sql > s01-prod.txt
    ```
 
-5. Paste the output into "Results" below (staging and prod separately), then fill in the verdict.
-6. If the environment is not deployed yet, write "not deployed" with the date, and run it when it is.
+3. Paste the output into "Results" below, then fill in the verdict.
 
 ## Reading the output
 
@@ -63,16 +60,13 @@ login, with no role and no school set.
 | an error: `permission denied for table users`                    | The login cannot read the table at all. Same as `0`.              |
 
 Sections 2 to 4 explain the why: `rolsuper` or `rolbypassrls` true on the login, or on any role it
-holds (section 4), means it bypasses RLS. On RDS the master user is not a true superuser; its power
-comes from `rds_superuser` membership, which is why section 4 lists inherited roles.
+holds (section 4), means it bypasses RLS. Supabase's `postgres` is not a true superuser (as RDS's master user was
+not); whatever power it has comes from the roles it holds, which is why section 4 lists inherited
+roles.
 
 ## Results
 
-### Staging
-
-- Date / run by:
-- Output: (paste)
-- Verdict:
+There is no staging environment any more; prod is the only deployed database.
 
 ### Prod
 
@@ -87,13 +81,13 @@ comes from `rds_superuser` membership, which is why section 4 lists inherited ro
 
    > **Least-privilege runtime database login (S-01)**
    >
-   > The API and workers connect through PgBouncer as the RDS master user, which bypasses RLS, so any
+   > The API and workers connect through Supabase's pooler as `postgres`, which bypasses RLS, so any
    > query that skips `withTenantTx` reads across schools. Create a login role `studafy_runtime`
    > (`LOGIN NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOCREATEDB`, member of `studafy_app` only, plus
-   > `studafy_admin` only if a runtime path genuinely needs it), point every PgBouncer pool at it, and
-   > keep the master credential for migrations only. Acceptance: this script's section 6 shows `0`
-   > for the runtime login on staging and prod; the API and workers pass their smoke tests; the
-   > migration task still runs as the master user.
+   > `studafy_admin` only if a runtime path genuinely needs it), point the API and workers at it, and
+   > keep `postgres` for migrations only. Acceptance: this script's section 6 shows `0` for the
+   > runtime login on prod; the API and workers pass their smoke tests; the migrate machine still
+   > runs as `postgres`.
 
 3. Until it ships, fix the tenant-table raw queries above first (F-17, QA-29).
 

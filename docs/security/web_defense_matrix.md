@@ -86,11 +86,11 @@ APP_ENV=production
 (`NODE_ENV=production`) against non-production origins.
 
 An earlier revision hardcoded a per-environment origin map in `config/security.ts`. It had already
-drifted from the infrastructure that provisions the hosts — it listed `studafy.com` and
-`www.studafy.com` while `infra/terraform/environments/prod/prod.tfvars` provisions
-`app.studafy.com`. A table in application code can only ever be a second copy of a fact Terraform
-owns, so it is deliberately no longer one. **Keep `CORS_ALLOWED_ORIGINS` in step with
-`cdn_domain_name` / `edge_domain_name` in the tfvars for that tier.**
+drifted from the infrastructure that provisioned the hosts (the AWS-era Terraform, since removed).
+A table in application code can only ever be a second copy of a fact the deployment owns, so it is
+deliberately no longer one. **Keep `CORS_ALLOWED_ORIGINS` (`infra/fly/api.toml`) in step with the
+browser domains in [`infra/fly/README.md`](../../infra/fly/README.md)'s "Domains" table and with
+`WS_ALLOWED_ORIGINS` (`infra/fly/realtime.toml`).**
 
 Guardrails, enforced at bootstrap by `envSchema` in [`apps/api/src/env.ts`](../../apps/api/src/env.ts):
 

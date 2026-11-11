@@ -55,18 +55,11 @@ Everything is dated in the 2025–26 academic year (July 2026). See Known limita
 
 1. **Apply migrations.** `000116_add_review_tenant.sql` must be applied (`bun run db:migrate`).
 2. **Set the password.** Generate a value of at least 16 characters (use 24 or more; the API refuses
-   to boot with a shorter one) and add it to the API's application secrets as
-   `REVIEW_LOGIN_PASSWORD`. Follow
-   [`secrets-conventions.md`](./secrets-conventions.md), container `<name_prefix>/api/app-secrets`:
-
-   ```bash
-   export TF_VAR_secrets_app_secret_values='{"api":{"REVIEW_LOGIN_PASSWORD":"<generated value>"}}'
-   terraform apply -var-file=environments/<env>/<env>.tfvars
-   ```
-
-   (Merge with the existing `api`/`realtime` keys; the variable replaces the whole map.) As
-   `secrets-conventions.md` notes, injecting secrets into the running API is not wired end-to-end
-   yet. Until it is, set the variable wherever the API's production environment is defined. While
+   to boot with a shorter one) and make it the API's `REVIEW_LOGIN_PASSWORD`. In production that
+   means a secret in the `prod` GitHub Environment, copied to `studafy-core-api` by
+   `.github/workflows/fly-production-deploy.yml` (`infra/fly/README.md`). The workflow does not
+   copy `REVIEW_LOGIN_PASSWORD` today: add it to the api's secret list there, then rerun the deploy.
+   While
    `REVIEW_LOGIN_PASSWORD` is unset, `POST /api/auth/login/review` answers 404.
 
 3. **Seed the tenant**, using the migration/admin database credentials:

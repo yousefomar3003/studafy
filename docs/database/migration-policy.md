@@ -41,14 +41,16 @@ bun run db:migrate:validate
 bun run db:migrate:pending
 ```
 
-`DATABASE_URL` is the local/CI interface. ECS uses the existing `DATABASE_HOST`, `DATABASE_PORT`,
-`DATABASE_NAME`, `DATABASE_USER`, and `DATABASE_PASSWORD` fields injected from Secrets Manager.
+`DATABASE_URL` is the local/CI interface. Production (fly.io) uses the discrete `DATABASE_HOST`,
+`DATABASE_PORT`, `DATABASE_NAME` and `DATABASE_USER` from `infra/fly/migrate.toml` and
+`DATABASE_PASSWORD` from the app's fly secrets.
 Do not mix the URL and discrete forms. The CLI never prints either form.
 
 `DATABASE_SSL_MODE` accepts `disable`, `require`, `verify-ca`, or `verify-full` and defaults to
 `require`. The verified modes require `DATABASE_CA_CERT`. `disable` is for disposable local/CI
-PostgreSQL only. Production migrations connect directly to RDS on port 5432, not to transaction-mode
-PgBouncer on 6432.
+PostgreSQL only. Production migrations connect directly to Supabase Postgres
+(`db.<project ref>.supabase.co:5432`), not through Supabase's transaction pooler on 6543
+(`infra/fly/README.md`, "Database connections").
 
 For local PostgreSQL 16 verification, start Docker Desktop and use an operator-chosen disposable
 password; the database uses tmpfs and is destroyed with the container:
@@ -185,5 +187,6 @@ rebuilds `users.search_tsv` for the nullable email 000141 introduced, and revoke
 Version `000048` is a permanent gap. A duplicate `000047` was renumbered to `000048` in `c934a44f`
 and moved back to `000047` in `3094d5ee`, so no `000048` file exists. Never reuse it.
 
-During deployment the signed migrations image runs as a one-off Fargate task before ECS services
-roll. A non-zero exit stops the deployment; schema changes are never coupled to API process boot.
+During deployment the migrations image runs as a one-off fly machine (`studafy-core-migrate`)
+before the services deploy (`.github/workflows/fly-production-deploy.yml`, `infra/fly/README.md`).
+A non-zero exit stops the deployment; schema changes are never coupled to API process boot.

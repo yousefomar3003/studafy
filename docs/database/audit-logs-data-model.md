@@ -45,7 +45,7 @@ Three properties of this column that are load-bearing and easy to get wrong:
   the scheduled partition-maintenance job all legitimately write with no HTTP request behind them. A NULL
   `request_id` is a correct and expected state for those rows, forever. Do not add `NOT NULL`.
 - **It is not a foreign key,** and cannot be: there is no `requests` table. It points at a log line in
-  CloudWatch, which the database cannot constrain, so a `request_id` naming a request that never existed
+  the log store (Axiom in production), which the database cannot constrain, so a `request_id` naming a request that never existed
   is not caught here. This costs nothing in tenant safety — `request_id` is never a routing or ownership
   column, `school_id` remains `NOT NULL` and holds the boundary alone, and RLS scopes any lookup by
   `request_id` to one school regardless of what the value is.

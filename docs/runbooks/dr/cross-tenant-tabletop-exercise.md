@@ -15,14 +15,13 @@ tabletop-tested" is **not met**, and should not be reported as met.
 
 ## Why a tabletop and not a live drill
 
-Same honesty constraint the ST-266 drill report already led with: `infra/terraform` has never been
-applied to a real AWS account, there is no prod compute tier, and the only `test:security`
-executions so far are the CI job's and the local test suite against the local Docker Postgres. A
-live "trigger a cross-tenant leakage in staging" drill is impossible until a staging environment
-exists. What a tabletop _can_ do today, and what the ST-266 drill could not: rehearse the human
+There is no staging environment: production on fly.io is the only deployed one, and the only
+`test:security` executions so far are the CI job's and the local test suite against the local
+Docker Postgres. A live "trigger a cross-tenant leakage" drill would have to run against production
+data, which it must not. What a tabletop _can_ do today, and what the ST-266 drill could not: rehearse the human
 decision chain — severity declaration, evidence-before-action ordering, least-destructive
 containment, root-cause triage, and the recovery trade-off — which are all wrong-without-costly
-to get wrong and which no additional AWS account would change.
+to get wrong and which no additional environment would change.
 
 ## Roles
 
@@ -57,13 +56,13 @@ during the exercise.**
 Five injections, one per tabletop run. Each maps to one of the runbook's five failure shapes, plus
 a comms-only variant that tests severity discipline on a _suspected_ (not confirmed) report.
 
-| #   | Failure shape (runbook §"How RLS works")                         | Detection statement (read verbatim)                                                                                                                                             | Predetermined evidence the facilitator produces                                                                                                                                                                                    |
-| --- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | Shape 1 — RLS policy dropped                                     | "School A's staff say their roster page shows School B's class list. No deploy happened in the last hour. Slowness is not reported."                                            | A user report; `pg_policies` shows `app.class_groups` with no `class_groups_tenant_policy` row while `rowsecurity=false` in `pg_tables`; CI's `auditRlsCoverage` was green on `main` this morning                                  |
-| 2   | Shape 2 — GUC wrong / stale session leak                         | "Two teachers in School B report seeing School A's students in their gradebook for about five minutes, then it self-corrected after they reloaded."                             | `pg_stat_activity` shows two pooled connections where `current_setting('app.school_id', true)` holds School A's UUID while their `query` touches School B rows; `server_reset_query_always = 1` is present in the PgBouncer config |
-| 3   | Shape 3 — wrong `schoolId` passed in code                        | "Student Carer in School A has an attendance record in School B's slice per the audit log. No user report yet — found via audit query."                                         | `app.audit_logs` row in School B's slice whose `actor_id` belongs to School A; RLS coverage audit passes (policies present and forced)                                                                                             |
-| 4   | Shape 4 — trigger blocks `school_id` mutation (positive control) | "A script attempted to move a Student row from School A to School B and got an error. The request is being reported as a cross-tenant breach."                                  | Error `SQLSTATE 42501` in app logs; RLS coverage audit passes; this is a _working_ control — expected outcome is "not an incident", per the runbook's shape 4 note                                                                 |
-| 5   | Comms-only — suspected but unconfirmed                           | (No data yet.) "A school admin says they 'sometimes' see another school's name in a dropdown for a second, but can't reproduce it. They won't be able to follow up for a week." | Nothing — severity discipline test: does the IC declare SEV1, and how are comms paced while unconfirmed?                                                                                                                           |
+| #   | Failure shape (runbook §"How RLS works")                         | Detection statement (read verbatim)                                                                                                                                             | Predetermined evidence the facilitator produces                                                                                                                                                                          |
+| --- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | Shape 1 — RLS policy dropped                                     | "School A's staff say their roster page shows School B's class list. No deploy happened in the last hour. Slowness is not reported."                                            | A user report; `pg_policies` shows `app.class_groups` with no `class_groups_tenant_policy` row while `rowsecurity=false` in `pg_tables`; CI's `auditRlsCoverage` was green on `main` this morning                        |
+| 2   | Shape 2 — GUC wrong / stale session leak                         | "Two teachers in School B report seeing School A's students in their gradebook for about five minutes, then it self-corrected after they reloaded."                             | `pg_stat_activity` shows two pooled connections where `current_setting('app.school_id', true)` holds School A's UUID while their `query` touches School B rows; every `SET` of the GUC in the code path uses `SET LOCAL` |
+| 3   | Shape 3 — wrong `schoolId` passed in code                        | "Student Carer in School A has an attendance record in School B's slice per the audit log. No user report yet — found via audit query."                                         | `app.audit_logs` row in School B's slice whose `actor_id` belongs to School A; RLS coverage audit passes (policies present and forced)                                                                                   |
+| 4   | Shape 4 — trigger blocks `school_id` mutation (positive control) | "A script attempted to move a Student row from School A to School B and got an error. The request is being reported as a cross-tenant breach."                                  | Error `SQLSTATE 42501` in app logs; RLS coverage audit passes; this is a _working_ control — expected outcome is "not an incident", per the runbook's shape 4 note                                                       |
+| 5   | Comms-only — suspected but unconfirmed                           | (No data yet.) "A school admin says they 'sometimes' see another school's name in a dropdown for a second, but can't reproduce it. They won't be able to follow up for a week." | Nothing — severity discipline test: does the IC declare SEV1, and how are comms paced while unconfirmed?                                                                                                                 |
 
 ## Decision points this exercise specifically rehearses
 
@@ -85,15 +84,15 @@ The runbook's three decision points, in order, with the evaluation the facilitat
 
 The facilitator scores the run against the runbook's own procedure; correct behavior per step:
 
-| Runbook step            | Correct behavior to observe                                                                                                                                                                     |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1. Preserve evidence    | No reboot, no PgBouncer restart, no `ALTER` before the three read-only queries run. Evidence gathered _before_ any containment statement                                                        |
-| 2. Contain              | Write incident → least-destructive first (`REVOKE INSERT, UPDATE, DELETE ... FROM studafy_admin`), read-only escrow only as escalation; read-only incident → targeted revoke, not a blanket one |
-| 3. Identify             | Triage driven by the evidence the facilitator provided, in the runbook's order                                                                                                                  |
-| 4. Fix                  | Fix matches the shape (re-`CREATE POLICY` for shape 1, deploy-rollback for shape 2/3, PgBouncer config review for leaks) — and _not_ "rewrite all policies" for every shape                     |
-| 5. Verify               | `test:security` re-run against the prod URL before any re-deploy, and treated as a hard gate                                                                                                    |
-| 6. Recover (write only) | Options stated with their true cost (PITR rolls back every school; targeted deletion trusts audit completeness) and the chosen path recorded in the issue — no invented RPO/RTO                 |
-| 7. Close loop           | DR README resolution template posted; follow-up tickets named; a decision on expanding the probe for the shapes the probe missed                                                                |
+| Runbook step            | Correct behavior to observe                                                                                                                                                                            |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1. Preserve evidence    | No reboot, no pooler restart, no `ALTER` before the three read-only queries run. Evidence gathered _before_ any containment statement                                                                  |
+| 2. Contain              | Write incident → least-destructive first (`REVOKE INSERT, UPDATE, DELETE ... FROM studafy_admin`), read-only escrow only as escalation; read-only incident → targeted revoke, not a blanket one        |
+| 3. Identify             | Triage driven by the evidence the facilitator provided, in the runbook's order                                                                                                                         |
+| 4. Fix                  | Fix matches the shape (re-`CREATE POLICY` for shape 1, a code fix released through the deploy workflow for shape 2/3, `SET LOCAL` review for leaks) — and _not_ "rewrite all policies" for every shape |
+| 5. Verify               | `test:security` re-run against the prod URL before any re-deploy, and treated as a hard gate                                                                                                           |
+| 6. Recover (write only) | Options stated with their true cost (PITR rolls back every school; targeted deletion trusts audit completeness) and the chosen path recorded in the issue — no invented RPO/RTO                        |
+| 7. Close loop           | DR README resolution template posted; follow-up tickets named; a decision on expanding the probe for the shapes the probe missed                                                                       |
 
 ## Pass / fail criteria
 
@@ -111,7 +110,7 @@ Pass requires all of:
 
 Fail on any of:
 
-- Any containment or destructive action before the evidence stage (reboot, PgBouncer restart,
+- Any containment or destructive action before the evidence stage (reboot, pooler restart,
   `ALTER DATABASE SET default_transaction_read_only = ON` as the first move).
 - Re-deploy attempted without a passing verification run.
 - Injection 4 treated as an incident.
@@ -139,7 +138,7 @@ Run after each injection; the report captures each item's verdict, not just "pas
 
 - Minimum: annually, and after any change to `db/migrations/000006_create_rls_helper.sql`,
   `db/migrations/000012_create_attendance_tables_with_partitioning.sql`, `db/policies/*`,
-  `modules/pgbouncer`, or `apps/api/tests/security/cross-tenant.test.ts` — the five things that
+  the database pooler configuration, or `apps/api/tests/security/cross-tenant.test.ts` — the five things that
   define the failure shapes.
 - Add injection 6 (runtime-detection-dependent) the day a real-time cross-tenant probe exists, per
   the runbook's Known gaps.

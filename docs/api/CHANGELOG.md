@@ -353,7 +353,7 @@ when it required the `version-bump` label.
 - `GET /api/privacy/me/dsr` — the caller's own data subject request history, most recent first.
 - `GET /api/ai/health` — unauthenticated black-box check reporting whether the `AI_LLM_ENABLED`
   kill switch is on. Backs the public status page's `ai` component
-  (`infra/terraform/modules/monitoring`); deliberately does not call the Anthropic provider. ST-264.
+  (`infra/terraform/modules/monitoring`, since removed with the AWS stack); deliberately does not call the Anthropic provider. ST-264.
 - `GET /api/search` — role-scoped Postgres full-text search across students, users, invoices, and
   materials, grouped per type. A section is populated only when the caller holds that type's own
   read permission (`STUDENT_READ` / `USER_READ` / `BILLING_READ` / `MATERIAL_READ`); row-level

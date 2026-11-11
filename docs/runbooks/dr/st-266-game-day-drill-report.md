@@ -1,5 +1,10 @@
 # ST-266 game-day drill report
 
+> **Historical.** This report describes the retired AWS stack (Terraform, RDS, AWS Backup). AWS was
+> retired in November 2026 and the six scenario runbooks it drilled were removed with it; production
+> runs on fly.io with Supabase, Redis Cloud and R2 ([`infra/fly/README.md`](../../../infra/fly/README.md)).
+> The findings are kept as a record. See [README.md](README.md) for the current DR status.
+
 Date: 2026-09-08. Scope: first execution of the game-day drill this ticket's acceptance criteria
 call for, against the six runbooks in this directory.
 

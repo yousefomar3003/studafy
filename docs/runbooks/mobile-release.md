@@ -9,8 +9,7 @@ when), and the forced-update floor endpoint `GET /api/mobile/config`
 
 ## Status
 
-**The lanes are written, not yet exercised against real store accounts.** Same posture as
-`docs/runbooks/deploy-rollback.md` and `docs/runbooks/supply-chain-security.md`: the mechanism is
+**The lanes are written, not yet exercised against real store accounts.** The mechanism is
 complete and reviewable ahead of the credentials that make it runnable. Nothing here has uploaded a
 build to TestFlight or Play. Concretely still missing:
 
@@ -193,9 +192,9 @@ bundle exec fastlane update_floor floor:1.3.0 latest:1.4.1
 ```
 
 Prints the four `MOBILE_*` values (and writes them to the job summary in CI). Apply them to the API
-service's environment — via `TF_VAR_secrets_app_secret_values` once the compute tier exists (see
-`docs/runbooks/secrets-conventions.md`), or the ECS task environment directly — and restart the
-service. `GET /api/mobile/config` then serves the new floor and below-floor clients block on their
+service's environment — they are not secrets, so they go in `infra/fly/api.toml`'s `[env]` table
+(`infra/README.md`'s "Where to change X") — and release with **Production deploy (fly.io)**
+(`infra/fly/README.md`), which restarts the API. `GET /api/mobile/config` then serves the new floor and below-floor clients block on their
 next launch or resume.
 
 ## Verifying the acceptance criteria

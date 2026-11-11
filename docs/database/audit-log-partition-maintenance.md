@@ -103,20 +103,22 @@ app.ensure_audit_log_partitions(months_ahead integer DEFAULT 3) RETURNS text[]
 
 ### Recommended schedule
 
-Run **weekly**, keeping at least **3 months** of headroom, from an in-VPC ECS/EventBridge task using the
-signed migrations image and its existing Secrets Manager-backed administrative identity. The image's
-normal entry point is the database CLI, so the task command override is:
+The workers run this automatically: a daily BullMQ job scheduler (cron `15 2 * * *`,
+`apps/workers/src/queues/maintenance/partition-maintenance-scheduler.ts`) calls
+`app.ensure_audit_log_partitions` with 12 months of headroom (`MONTHS_AHEAD` in
+`partition-maintenance.ts`), alongside the attendance family. It takes the migration runner's
+advisory lock, so it never races a migration; a run that finds the lock held is skipped and the next
+day's run catches up.
+
+To run it by hand, the migrations image's entry point is the database CLI, so the command is:
 
 ```text
 audit-partitions 3
 ```
 
-ST-046 packages and verifies that command, but it does **not** deploy the EventBridge schedule — the
-same gap ST-040 left for attendance, and it should be closed once for both families. A GitHub-hosted
-cron was deliberately rejected: hosted runners cannot reach the private database, and putting a directly
-reachable administrative `DATABASE_URL` in GitHub would conflict with the repository's Secrets Manager
-and VPC conventions. Until an in-VPC scheduler is provisioned, run the command as a one-off migrations
-task during deployment or by an operator with approved connectivity.
+In production that means a one-off machine from the `studafy-core-migrate` image, the same way the
+deploy workflow runs migrations (`infra/fly/README.md`, "Deploying"), with this command in place of
+the default `migrate`.
 
 A database first migrated long after 2027-01 has no usable audit partition until the maintenance command
 has run at least once, and **every audited write will fail** until it does. This is a sharper failure
@@ -348,8 +350,8 @@ mislead you.
 
 ## Known limitations
 
-- Production scheduling is not deployed. The signed-image command and CI verification exist, but an
-  in-VPC ECS/EventBridge schedule remains an explicit infrastructure follow-up — shared with attendance.
+- No alert fires when the workers' daily maintenance job fails; the recommendations under
+  "Monitoring and alerting" are not wired to anything yet — shared with attendance.
 - Queries not bounded by `created_at` scan every partition. This is inherent to range partitioning, not a
   defect; see the pruning guide in the data-model doc.
 - `id` is not enforced unique across partitions. See

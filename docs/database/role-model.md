@@ -45,19 +45,21 @@ superuser; nothing in the current managed-Postgres design requires it to be.
 ## Login vs group-role decision
 
 Both roles are `NOLOGIN` **privilege/group roles**. The actual login identities are provisioned
-outside the repository in AWS Secrets Manager and receive membership:
+outside the repository and receive membership:
 
-- The runtime login (the PgBouncer `api` user — see
-  [`infra/deploy/ecs/api/task-definition.json.tpl`](../../infra/deploy/ecs/api/task-definition.json.tpl))
-  is granted membership in `studafy_app`.
-- The migration login (the RDS master user — see
-  [`infra/deploy/ecs/migrations/task-definition.json.tpl`](../../infra/deploy/ecs/migrations/task-definition.json.tpl))
-  is granted membership in `studafy_admin`.
+- The runtime login is granted membership in `studafy_app`.
+- The migration login is granted membership in `studafy_admin`.
+
+In production (Supabase) both the services and the migrations currently log in as the project's
+`postgres` user — the services through the transaction pooler as `postgres.<project ref>`, the
+migrations directly (`infra/fly/README.md`, "Database connections"). Moving the services to a
+dedicated `NOBYPASSRLS` login is the open follow-up in
+[`docs/security/S-01-database-role-verification.md`](../security/S-01-database-role-verification.md).
 
 This keeps the migration portable and free of credentials: **no password is ever written in SQL**,
 and rotating a login never touches the privilege model. The membership grant
 (`GRANT studafy_app TO <runtime_login>` / `GRANT studafy_admin TO <migration_login>`) is an external,
-deployment-time step because the login names live in Secrets Manager, not in the repo. In local and
+deployment-time step because the login names live outside the repo. In local and
 CI databases the superuser test connection exercises the roles with `SET ROLE`.
 
 ## Ownership model
@@ -87,12 +89,15 @@ is always subject to that policy. Granting `BYPASSRLS` would silently defeat eve
 The two connect with **different credentials from different secrets**, and the separation is
 structural rather than a naming convention:
 
-| Aspect        | Runtime (`apps/api`)                    | Migrations                     |
-| ------------- | --------------------------------------- | ------------------------------ |
-| Secret        | `PGBOUNCER_SECRET_ARN` (`api_*` fields) | `POSTGRES_SECRET_ARN` (master) |
-| Connects via  | PgBouncer, port 6432                    | RDS directly, port 5432        |
-| Role          | member of `studafy_app`                 | member of `studafy_admin`      |
-| Env variables | discrete `DATABASE_*`                   | discrete `DATABASE_*`          |
+| Aspect        | Runtime (`apps/api`)                                         | Migrations                                               |
+| ------------- | ------------------------------------------------------------ | -------------------------------------------------------- |
+| Secret        | `studafy-core-api` fly secrets (`DATABASE_USER`/`_PASSWORD`) | `studafy-core-migrate` fly secrets (`DATABASE_PASSWORD`) |
+| Connects via  | Supabase transaction pooler, port 6543                       | Supabase directly, port 5432                             |
+| Role          | member of `studafy_app`                                      | member of `studafy_admin`                                |
+| Env variables | discrete `DATABASE_*`                                        | discrete `DATABASE_*`                                    |
+
+In production both logins are currently Supabase's `postgres` user (see above), so the separation
+is in connection path and secret, not yet in login.
 
 ### Why not `MIGRATION_DATABASE_URL`
 
@@ -194,16 +199,18 @@ SELECT has_schema_privilege('public', 'app', 'CREATE'),
        has_schema_privilege('public', 'app', 'USAGE');
 ```
 
-## Managed PostgreSQL (RDS) limitations and assumptions
+## Managed PostgreSQL (Supabase) limitations and assumptions
 
-- The migration is verified against a local/CI **superuser** PostgreSQL 16 cluster. On RDS the
-  migration login is `rds_superuser`, not a true superuser. In PostgreSQL 16 a `CREATEROLE`/
-  `rds_superuser` role that creates another role automatically receives membership (with `SET`) in
-  it, which is what allows `ALTER DEFAULT PRIVILEGES FOR ROLE studafy_admin` and
-  `CREATE SCHEMA ... AUTHORIZATION studafy_admin` to run. If a future managed constraint prevents
-  this, grant the migration login membership in `studafy_admin` before running migrations.
-- `rds.force_ssl = 1` (see [postgres conventions](../runbooks/postgres-conventions.md)) requires
-  `sslmode=require` or stricter in every real connection; only the disposable local/CI database uses
+- The migration is verified against a local/CI **superuser** PostgreSQL 16 cluster. On Supabase the
+  migration login is `postgres`, which is not a superuser. In PostgreSQL 16+ a role created by a
+  non-superuser is not automatically usable by its creator, so the `postgres` role carries
+  `createrole_self_grant = 'set, inherit'` (set once); that is what lets migrations
+  `SET ROLE studafy_admin`, `ALTER DEFAULT PRIVILEGES FOR ROLE studafy_admin` and
+  `CREATE SCHEMA ... AUTHORIZATION studafy_admin`. The setting is read when a session starts, which
+  is one reason migrations connect directly rather than through the pooler (`infra/fly/README.md`,
+  "Where Supabase differs from RDS").
+- Every production connection is TLS, verified against Supabase's root CA
+  (`DATABASE_SSL_MODE=verify-full`, `DATABASE_CA_CERT`); only the disposable local/CI database uses
   `sslmode=disable`.
 
 ## Local and CI test setup
