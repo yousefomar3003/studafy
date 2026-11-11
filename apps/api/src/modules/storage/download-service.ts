@@ -22,6 +22,7 @@
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
+import { parseStorageKey } from "../../lib/storage/keys";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { getDownloadClass } from "./content-classes";
@@ -79,7 +80,10 @@ const RESOLVERS: Readonly<Record<DownloadClassKey, Resolver>> = {
       WHERE id = ${objectId} AND school_id = ${schoolId} AND attachment_storage_key IS NOT NULL
         AND attachment_scan_status IN ('clean', 'unscanned')
     `;
-    return row ? { storageKey: row.storage_key, targetTable: "expense_cache" } : null;
+    // The key could once be set from a request body without a school check; never sign another
+    // school's object, even from an old row.
+    if (!row || parseStorageKey(row.storage_key)?.schoolId !== schoolId) return null;
+    return { storageKey: row.storage_key, targetTable: "expense_cache" };
   },
   // The one class spanning two tables: an attendance export job or a finance report job. Attendance
   // first, finance second; both are school-scoped and completed-only, so the only thing the caller

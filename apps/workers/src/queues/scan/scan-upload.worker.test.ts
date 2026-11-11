@@ -587,10 +587,15 @@ describeDb("processUploadScan", () => {
   test("a row pointing at another school's object is failed, and that object left alone", async () => {
     const f = await seedFixture();
     const other = await seedFixture();
-    // expense_cache has no key constraint, so a row can be made to point anywhere.
+    // A row saved before migration 000197, which may still hold another school's key: the trigger
+    // trg_expense_cache_attachment_key_school stops new ones being written. Recreate one by
+    // disabling the trigger for this insert only, inside the same transaction.
     await sql.begin(async (tx) => {
       await tx.unsafe("SET LOCAL ROLE studafy_admin");
       await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+      await tx.unsafe(
+        "ALTER TABLE app.expense_cache DISABLE TRIGGER trg_expense_cache_attachment_key_school",
+      );
       await tx`
         INSERT INTO app.expense_cache (
           school_id, document_type, category, vendor, currency_id, amount_minor, erpnext_docname,
@@ -601,6 +606,9 @@ describeDb("processUploadScan", () => {
           ${other.submissionKey}, 'scanning', now()
         )
       `;
+      await tx.unsafe(
+        "ALTER TABLE app.expense_cache ENABLE TRIGGER trg_expense_cache_attachment_key_school",
+      );
     });
     const s3 = createFakeS3();
     s3.objects.set(other.submissionKey, Buffer.from(EICAR));
