@@ -16,7 +16,7 @@
  */
 
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { ERROR_CODES, PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
+import { ERROR_CODES, PERMISSIONS, QUEUE_NAMES, dsrExportPrefix } from "@studafy/constants";
 import { Queue } from "bullmq";
 
 import { CodedHttpException } from "../../coded-http-exception";
@@ -95,6 +95,21 @@ async function enqueueDsrJob(
   }
 }
 
+/**
+ * How long a completed export's download link works. The link is only ever returned by the
+ * admin-only status route, which signs a fresh one on every call, so it needs to outlive only the
+ * start of the download (and a browser resuming it), not the time an admin takes to get to it. An
+ * hour covers a large archive on a slow connection; a forwarded or leaked link dies soon after.
+ */
+export const DSR_EXPORT_LINK_TTL_SECONDS = 60 * 60;
+
+/** A completed export's storage key, when it is under the request's own export prefix. The worker
+ * only ever writes there; anything else is not signed. */
+function exportArchiveKey(row: DataSubjectRequestRow, schoolId: string): string | null {
+  if (row.status !== "completed" || row.requestType !== "export" || !row.storageKey) return null;
+  return row.storageKey.startsWith(dsrExportPrefix(schoolId, row.id)) ? row.storageKey : null;
+}
+
 function toResponse(
   row: DataSubjectRequestRow,
   presigned: { url: string; expiresAt: Date } | null = null,
@@ -158,7 +173,8 @@ const getDsrRoute = createRoute({
   responses: standardResponses(
     {
       200: {
-        description: "Request status and, for a completed export, a download URL.",
+        description:
+          "Request status and, for a completed export, a one-hour download URL for its ZIP archive.",
         schema: dsrResponseSchema,
       },
     },
@@ -337,10 +353,17 @@ export function privacyRoutes(
         "Data subject request not found",
       );
     }
-    const presigned =
-      row.status === "completed" && row.storageKey
-        ? await requireStorage(storage).presign(row.storageKey, "GET", undefined, 15 * 60)
-        : null;
+    // The export's ZIP archive (data, README and the subject's files); see the worker's
+    // tenant-export.worker.ts for its layout.
+    const archiveKey = exportArchiveKey(row, auth.schoolId);
+    const presigned = archiveKey
+      ? await requireStorage(storage).presign(
+          archiveKey,
+          "GET",
+          undefined,
+          DSR_EXPORT_LINK_TTL_SECONDS,
+        )
+      : null;
     return c.json(toResponse(row, presigned), 200);
   });
 

@@ -27,12 +27,13 @@ quarantine/<schoolId>/<objectId>/<filename>
 
 ## `app-files` bucket
 
-| Top-level prefix | Purpose                                                                                          | Lifecycle                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| `temp/`          | Staging area for pre-signed uploads before the app confirms/processes them                       | Expires after 1 day (24h)                                         |
-| `reports/`       | Generated exports (e.g. PDF/CSV reports) offered for download                                    | Expires after 7 days                                              |
-| `permanent/`     | Confirmed, long-lived user content (avatars, assignment attachments, etc.)                       | No expiration                                                     |
-| `quarantine/`    | Objects a malware scan flagged. Never served; copied here, then the `permanent/` copy is deleted | No expiration (retain for forensics; expiry is a future decision) |
+| Top-level prefix | Purpose                                                                                                                                                                                | Lifecycle                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `temp/`          | Staging area for pre-signed uploads before the app confirms/processes them                                                                                                             | Expires after 1 day (24h)                                         |
+| `reports/`       | Generated exports (e.g. PDF/CSV reports) offered for download                                                                                                                          | Expires after 7 days                                              |
+| `permanent/`     | Confirmed, long-lived user content (avatars, assignment attachments, etc.)                                                                                                             | No expiration                                                     |
+| `quarantine/`    | Objects a malware scan flagged. Never served; copied here, then the `permanent/` copy is deleted                                                                                       | No expiration (retain for forensics; expiry is a future decision) |
+| `dsr-exports/`   | Data subject request exports: one ZIP archive per request, `dsr-exports/<schoolId>/<requestId>/export.zip` ([policy](../security/data_retention_and_dsr_policy.md#the-export-archive)) | No bucket rule (see the policy)                                   |
 
 Flow for a pre-signed upload:
 

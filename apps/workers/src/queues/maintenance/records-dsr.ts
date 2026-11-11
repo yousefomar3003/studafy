@@ -60,6 +60,7 @@ interface AnswerExportRow {
   document_storage_key: string | null;
   document_file_name: string | null;
   document_mime_type: string | null;
+  document_size_bytes: string | number | null;
   document_expires_on: string | null;
   document_verified_at: Date | null;
 }
@@ -73,9 +74,10 @@ function subjectFilter(tx: TransactionSql, subject: SubjectIdentifiers | undefin
 }
 
 export interface RecordExport {
-  /** NDJSON lines, one per answer. */
+  /** One JSON object per answer. */
   lines: string[];
-  files: { storageKey: string; originalFileName: string }[];
+  /** The answers' stored documents; `sourceId` is the answer id. */
+  files: { sourceId: string; storageKey: string; originalFileName: string; sizeBytes: number }[];
 }
 
 export async function exportRecordData(
@@ -90,6 +92,7 @@ export async function exportRecordData(
            a.value_ciphertext, a.value_key_id, a.value_mask, a.updated_at,
            d.status::text AS document_status, d.storage_key AS document_storage_key,
            d.original_file_name AS document_file_name, d.mime_type AS document_mime_type,
+           d.size_bytes AS document_size_bytes,
            to_char(d.expires_on, 'YYYY-MM-DD') AS document_expires_on,
            d.verified_at AS document_verified_at
     FROM app.record_answers AS a
@@ -144,8 +147,10 @@ export async function exportRecordData(
     );
     if (row.document_storage_key && row.document_file_name) {
       files.push({
+        sourceId: row.answer_id,
         storageKey: row.document_storage_key,
         originalFileName: row.document_file_name,
+        sizeBytes: Number(row.document_size_bytes ?? 0),
       });
     }
   }

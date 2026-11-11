@@ -20,11 +20,12 @@ import {
   completeDsrExport,
   failDsrRequest,
 } from "./dsr-store";
+import { createMaintenanceS3 } from "./export-storage";
 import { resolveSubjectIdentifiers } from "./subject-resolver";
 import { runTenantErasure } from "./tenant-erasure.worker";
 import { runTenantExport } from "./tenant-export.worker";
 
-import type { MaintenanceS3Client } from "./tenant-export.worker";
+import type { MaintenanceS3Client } from "./export-storage";
 import type { RecordKeyring } from "@studafy/records";
 import type { Job } from "bullmq";
 import type { Sql } from "postgres";
@@ -57,13 +58,12 @@ export function createMaintenancePool(config: MaintenanceRunnerConfig): Sql {
   });
 }
 
-/** Reuses the reports queue's S3 adapter -- the interface it satisfies (put/remove/presignGet) is a
- * strict superset of MaintenanceS3Client, so no maintenance-specific client is needed. */
+/** Reads the stored files an export copies and streams its archive (export-storage.ts). */
 function createMaintenanceStorage(config: MaintenanceRunnerConfig): MaintenanceS3Client {
   const region = config.s3Region;
   const bucket = config.bucket;
   if (!region || !bucket) throw new Error("DSR export storage is not configured");
-  return createReportS3({ region, endpoint: config.s3Endpoint, bucket });
+  return createMaintenanceS3({ region, endpoint: config.s3Endpoint, bucket });
 }
 
 /** Delete erased record documents. A failure leaves an unreferenced object, never a dangling row. */
@@ -116,7 +116,7 @@ async function runDsrJob(
         const record = claim.record;
 
         if (job.name === JOB_NAMES.RUN_DATA_SUBJECT_EXPORT) {
-          const { manifestKey } = await runTenantExport(tx, {
+          const { archiveKey } = await runTenantExport(tx, {
             s3: createMaintenanceStorage(config),
             requestId,
             schoolId,
@@ -125,7 +125,7 @@ async function runDsrJob(
             now: new Date(),
             recordKeyring: config.recordKeyring,
           });
-          await completeDsrExport(tx, schoolId, requestId, manifestKey);
+          await completeDsrExport(tx, schoolId, requestId, archiveKey);
           return { processed: true };
         }
 
