@@ -25,6 +25,7 @@ import {
 } from "../harness";
 
 import type { StorageService } from "../../src/lib/storage";
+import type { UploadScanRequest } from "../../src/lib/storage/upload-scan";
 import type { TenantFixture, TestApp, TestDatabase } from "../harness";
 import type { Role } from "@studafy/constants";
 
@@ -86,12 +87,39 @@ function fakeStorage(): StorageService & {
 const storage = fakeStorage();
 let database: TestDatabase | undefined;
 let harness: TestApp | undefined;
+/** Every malware scan the app enqueued (F-14). */
+const scanJobs: UploadScanRequest[] = [];
+
+/** Apply the file-scan worker's verdict to a record document, as scan-upload.worker.ts writes it. */
+async function recordScanVerdict(
+  schoolId: string,
+  tempKey: string,
+  verdict: "clean" | "quarantined",
+): Promise<void> {
+  const storageKey = tempKey.replace(/^temp\//, "permanent/");
+  expect(scanJobs).toContainEqual({ target: "record_document", schoolId, storageKey });
+  await database!.sql.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    const result = await tx`
+      UPDATE app.record_documents SET scan_status = ${verdict}::app.upload_scan_status
+      WHERE storage_key = ${storageKey} AND scan_status = 'scanning'
+    `;
+    expect(result.count).toBe(1);
+  });
+}
 
 beforeAll(async () => {
   if (!integrationEnabled) return;
   database = await createTestDatabase();
   await migrateDatabase(database.url);
-  const created = createTestApp({ database: database.sql, storage });
+  const created = createTestApp({
+    database: database.sql,
+    storage,
+    uploadScanEnqueuer: async (requests) => {
+      scanJobs.push(...requests);
+    },
+  });
   await created.ready;
   harness = created;
 }, 60_000);
@@ -694,6 +722,10 @@ describeDb("documents", () => {
     `;
     expect(row).toEqual({ status: "verified", verified_by: w.admin.userId });
 
+    // Not downloadable until the malware scan clears it (F-14); an infected file never is.
+    expect((await call(w.admin, "GET", `${base}/download`)).status).toBe(404);
+    await recordScanVerdict(w.schoolId, key!, "clean");
+
     // The teacher may read a teachers-visible document; a parent may not.
     expect((await call(w.teacher, "GET", `${base}/download`)).status).toBe(200);
     expect((await call(w.parent, "GET", `${base}/download`)).status).toBe(404);
@@ -733,6 +765,9 @@ describeDb("documents", () => {
       storage.sensitiveCopies.some((dest) => dest.startsWith(`permanent/${w.schoolId}/`)),
     ).toBe(true);
 
+    // Held back until scanned; then served under its one-minute URL.
+    expect((await call(w.principal, "GET", `${base}/download`)).status).toBe(404);
+    await recordScanVerdict(w.schoolId, key!, "clean");
     const download = await call(w.principal, "GET", `${base}/download`);
     expect(download.status).toBe(200);
     expect(storage.presigned.at(-1)?.ttl).toBe(60);

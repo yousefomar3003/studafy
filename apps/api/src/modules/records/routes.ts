@@ -4,6 +4,7 @@ import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 import { CodedHttpException } from "../../coded-http-exception";
 import { setTenantScope, withSystemTx, withTenantTx } from "../../db/tenant-tx";
 import { requireStorage } from "../../lib/storage";
+import { enqueueUploadScans } from "../../lib/storage/upload-scan";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
 import { hasPermission, requirePermission, requirePermissionIn } from "../../middleware/authz";
@@ -1275,22 +1276,30 @@ export function recordRoutes(
       const params = paramsOf(c);
       const store = requireStorage(storage);
       const subject = subjectFrom(params);
-      const { records, replacedKey } = await withTenantTx(database, tenant, async (tx) => {
-        const { replacedKey } = await attachDocument(
-          tx,
-          store,
-          tenant.schoolId,
-          subject,
-          params.fieldId!,
-          tenant.userId,
-          c.req.valid("json"),
-        );
-        return {
-          records: await getSubjectRecords(tx, tenant.schoolId, subject, "staff"),
-          replacedKey,
-        };
-      });
+      const { records, replacedKey, storageKey } = await withTenantTx(
+        database,
+        tenant,
+        async (tx) => {
+          const { replacedKey, storageKey } = await attachDocument(
+            tx,
+            store,
+            tenant.schoolId,
+            subject,
+            params.fieldId!,
+            tenant.userId,
+            c.req.valid("json"),
+          );
+          return {
+            records: await getSubjectRecords(tx, tenant.schoolId, subject, "staff"),
+            replacedKey,
+            storageKey,
+          };
+        },
+      );
       await removeObject(store, replacedKey);
+      await enqueueUploadScans(c, [
+        { target: "record_document", schoolId: tenant.schoolId, storageKey },
+      ]);
       noStore(c);
       return c.json(records, 200);
     });

@@ -4,6 +4,10 @@ import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 import { CodedHttpException } from "../../../../coded-http-exception";
 import { withTenantTx } from "../../../../db/tenant-tx";
 import { requireStorage } from "../../../../lib/storage";
+import {
+  enqueueUploadScans,
+  isServableUploadScanStatus,
+} from "../../../../lib/storage/upload-scan";
 import { auditAction } from "../../../../middleware/auditEmitter";
 import { requireAuth } from "../../../../middleware/authContext";
 import { requirePermission } from "../../../../middleware/authz";
@@ -104,7 +108,12 @@ async function toAttachmentResponse(
   row: SubmissionAttachmentRow,
   storage: StorageService | null,
 ): Promise<SubmissionAttachment> {
-  const presigned = storage ? await storage.presign(row.storage_key, "GET") : null;
+  // No URL until the malware scan has cleared the file (F-14): a pending, infected or unscannable
+  // file is listed without one.
+  const presigned =
+    storage && isServableUploadScanStatus(row.scan_status)
+      ? await storage.presign(row.storage_key, "GET")
+      : null;
 
   return {
     id: row.id,
@@ -659,6 +668,9 @@ export function submissionRoutes(
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
       confirmSubmissionAttachment(tx, active, auth.schoolId, auth.userId, submissionId, body),
     );
+    await enqueueUploadScans(c, [
+      { target: "submission_attachment", schoolId: auth.schoolId, storageKey: row.storage_key },
+    ]);
 
     return c.json(await toAttachmentResponse(row, active), 201);
   });

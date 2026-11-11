@@ -15,7 +15,7 @@
  * with the import's leftover cells.
  */
 
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, isServableUploadScanStatus } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { buildPermanentKey, promoteTempObject } from "../../lib/storage";
@@ -79,6 +79,7 @@ export async function promoteSourceFile(
 interface HeldSource {
   storage_key: string;
   size_bytes: number;
+  scan_status: string;
 }
 
 async function heldSource(
@@ -87,8 +88,11 @@ async function heldSource(
   importId: string,
   lock: boolean,
 ): Promise<HeldSource> {
-  const [row] = await tx<{ storage_key: string | null; size_bytes: number | null }[]>`
-    SELECT source_storage_key AS storage_key, source_size_bytes::int AS size_bytes
+  const [row] = await tx<
+    { storage_key: string | null; size_bytes: number | null; scan_status: string }[]
+  >`
+    SELECT source_storage_key AS storage_key, source_size_bytes::int AS size_bytes,
+           source_scan_status::text AS scan_status
     FROM app.student_imports
     WHERE id = ${importId}::uuid AND school_id = ${schoolId}
     ${lock ? tx`FOR UPDATE` : tx``}
@@ -103,7 +107,7 @@ async function heldSource(
       "The original file of this import is no longer stored.",
     );
   }
-  return { storage_key: row.storage_key, size_bytes: row.size_bytes };
+  return { storage_key: row.storage_key, size_bytes: row.size_bytes, scan_status: row.scan_status };
 }
 
 /** A one-minute download URL for the original file. Every issue is audited as a read. */
@@ -114,6 +118,14 @@ export async function sourceDownload(
   importId: string,
 ): Promise<{ url: string; expires_at: string }> {
   const source = await heldSource(tx, schoolId, importId, false);
+  // Not handed out until the malware scan has cleared it (F-14): answered as not held.
+  if (!isServableUploadScanStatus(source.scan_status)) {
+    throw new CodedHttpException(
+      404,
+      ERROR_CODES.IMPORT_SOURCE_NOT_FOUND,
+      "The original file of this import is not available.",
+    );
+  }
   await emitAuditLog(tx, {
     action: "read",
     targetTable: "student_imports",

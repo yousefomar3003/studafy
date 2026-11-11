@@ -22,7 +22,16 @@ export interface ScanS3Client {
     Key: string;
   }): Promise<{ Body?: AsyncIterable<Uint8Array> | undefined }>;
   headObject(params: { Bucket: string; Key: string }): Promise<{ exists: boolean }>;
-  copyObject(params: { Bucket: string; Key: string; CopySource: string }): Promise<void>;
+  copyObject(params: {
+    Bucket: string;
+    Key: string;
+    CopySource: string;
+    /**
+     * Re-encrypt the copy under this KMS key. Set for a sensitive record document or an import file
+     * (ADR-019), so the quarantine copy is held under the same key as the original was.
+     */
+    SSEKMSKeyId?: string;
+  }): Promise<void>;
   deleteObject(params: { Bucket: string; Key: string }): Promise<void>;
 }
 
@@ -61,6 +70,13 @@ export function createScanS3(options: { region: string; endpoint?: string }): Sc
           Key: params.Key,
           // x-amz-copy-source must be URL-encoded; v3 does not do this for us.
           CopySource: encodeURIComponent(params.CopySource),
+          ...(params.SSEKMSKeyId
+            ? {
+                ServerSideEncryption: "aws:kms" as const,
+                SSEKMSKeyId: params.SSEKMSKeyId,
+                BucketKeyEnabled: true,
+              }
+            : {}),
         }),
       );
     },

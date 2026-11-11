@@ -33,6 +33,7 @@ import {
 } from "../harness";
 
 import type { StorageService } from "../../src/lib/storage";
+import type { UploadScanRequest } from "../../src/lib/storage/upload-scan";
 import type { TestApp, TestDatabase } from "../harness";
 import type { Role } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -91,12 +92,20 @@ function fakeStorage() {
 const storage = fakeStorage();
 let database: TestDatabase | undefined;
 let harness: TestApp | undefined;
+/** Every malware scan the app enqueued (F-14). */
+const scanJobs: UploadScanRequest[] = [];
 
 beforeAll(async () => {
   if (!integrationEnabled) return;
   database = await createTestDatabase();
   await migrateDatabase(database.url);
-  const created = createTestApp({ database: database.sql, storage });
+  const created = createTestApp({
+    database: database.sql,
+    storage,
+    uploadScanEnqueuer: async (requests) => {
+      scanJobs.push(...requests);
+    },
+  });
   await created.ready;
   harness = created;
 }, 120_000);
@@ -299,7 +308,23 @@ describeDb("original import files", () => {
       storage.sensitiveCopies.some((dest) => dest.startsWith(`permanent/${tenant.schoolId}/`)),
     ).toBe(true);
 
-    const download = await call(tenant.admin, "GET", `/api/imports/students/${record.id}/source`);
+    // Not handed out until the malware scan clears it (F-14); then the worker's clean verdict.
+    const sourcePath = `/api/imports/students/${record.id}/source`;
+    expect((await call(tenant.admin, "GET", sourcePath)).status).toBe(404);
+    const permanentKey = key.replace(/^temp\//, "permanent/");
+    expect(scanJobs).toContainEqual({
+      target: "import_source",
+      schoolId: tenant.schoolId,
+      storageKey: permanentKey,
+    });
+    await asSchool(tenant.schoolId, async (tx) => {
+      await tx`
+        UPDATE app.student_imports SET source_scan_status = 'clean'
+        WHERE id = ${record.id}::uuid AND source_scan_status = 'scanning'
+      `;
+    });
+
+    const download = await call(tenant.admin, "GET", sourcePath);
     expect(download.status).toBe(200);
     expect(download.headers.get("Cache-Control")).toBe("no-store");
     expect((await json<{ url: string }>(download)).url).toContain("storage.example");

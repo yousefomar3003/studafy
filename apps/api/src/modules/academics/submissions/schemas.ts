@@ -98,7 +98,8 @@ export const submissionAttachmentSchema = z
       .openapi({
         description:
           "Short-lived pre-signed GET URL. Null when object storage is not configured for this " +
-          "deployment. Treat it as opaque and do not cache it beyond `download_url_expires_at`.",
+          "deployment, and until the file has passed its malware scan (an infected file never " +
+          "gets one). Treat it as opaque and do not cache it beyond `download_url_expires_at`.",
       }),
     download_url_expires_at: dateTimeSchema.nullable().openapi({
       description: "When `download_url` stops working.",

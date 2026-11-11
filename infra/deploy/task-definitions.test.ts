@@ -67,6 +67,7 @@ describe("attendance report ECS task definitions", () => {
       READ_DATABASE_NAME: "workers_read",
       S3_REGION: "1",
       S3_APP_FILES_BUCKET: "1",
+      STORAGE_SENSITIVE_KMS_KEY_ID: "1",
       FRONTEND_URL: "1",
     });
     expect(values(container.secrets)).toHaveProperty("DATABASE_CA_CERT");

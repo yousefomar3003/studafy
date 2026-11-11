@@ -6,6 +6,7 @@ import { PERMISSIONS } from "@studafy/constants";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { requireStorage } from "../../../lib/storage/client";
 import { buildTempKey } from "../../../lib/storage/keys";
+import { enqueueUploadScans } from "../../../lib/storage/upload-scan";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
@@ -267,6 +268,15 @@ export function expenseRoutes(
       const erpnext = await erpnextFactory.forSchool(tx, auth.schoolId);
       return createExpense(tx, erpnext, auth.schoolId, body, acceptLanguage);
     });
+    if (body.attachment_storage_key) {
+      await enqueueUploadScans(c, [
+        {
+          target: "expense_attachment",
+          schoolId: auth.schoolId,
+          storageKey: body.attachment_storage_key,
+        },
+      ]);
+    }
 
     return c.json(toResponse(row), 201);
   });
@@ -281,6 +291,17 @@ export function expenseRoutes(
       const erpnext = await erpnextFactory.forSchool(tx, auth.schoolId);
       return updateExpense(tx, erpnext, auth.schoolId, expenseId, body, acceptLanguage);
     });
+    // A changed file is `scanning` (projectToCache); an unchanged one keeps its verdict and the
+    // worker skips it.
+    if (body.attachment_storage_key) {
+      await enqueueUploadScans(c, [
+        {
+          target: "expense_attachment",
+          schoolId: auth.schoolId,
+          storageKey: body.attachment_storage_key,
+        },
+      ]);
+    }
 
     return c.json(toResponse(row), 200);
   });
@@ -310,8 +331,17 @@ export function expenseRoutes(
     const body = c.req.valid("json");
     const s3 = requireStorage(storage);
 
+    const uploadedKeys: string[] = [];
     const row = await withTenantTx(database, tenantFrom(c), async (tx) =>
-      confirmAttachment(tx, s3, auth.schoolId, expenseId, body.storage_key),
+      confirmAttachment(tx, s3, auth.schoolId, expenseId, body.storage_key, uploadedKeys),
+    );
+    await enqueueUploadScans(
+      c,
+      uploadedKeys.map((storageKey) => ({
+        target: "expense_attachment" as const,
+        schoolId: auth.schoolId,
+        storageKey,
+      })),
     );
 
     return c.json(toResponse(row), 200);

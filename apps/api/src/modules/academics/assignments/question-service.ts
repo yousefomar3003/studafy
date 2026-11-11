@@ -14,6 +14,7 @@ import type { AssignmentRow } from "./assignment-service";
 import type { QuestionImageContentType, QuestionInput, QuestionType } from "./schemas";
 import type { StorageService } from "../../../lib/storage";
 import type { InspectedStagedUpload } from "../../storage/service";
+import type { UploadScanStatus } from "@studafy/constants";
 import type { JSONValue, TransactionSql } from "postgres";
 
 /**
@@ -66,6 +67,8 @@ export interface QuestionRow {
   image_mime_type: QuestionImageContentType | null;
   /** bigint, which postgres.js hands back as a string. */
   image_size_bytes: string | null;
+  /** The picture's malware scan state (000192); a URL is minted only for a servable one. */
+  image_scan_status: UploadScanStatus;
   /** Whether the caller is an admin or teaches the assignment's class, i.e. may see the key. */
   viewer_is_staff: boolean;
   options: QuestionOptionRow[];
@@ -94,6 +97,7 @@ export async function listQuestionsByAssignment(
     SELECT
       q.id, q.assignment_id, q.position, q.question_type, q.points, q.prompt,
       q.image_storage_key, q.image_mime_type, q.image_size_bytes::text AS image_size_bytes,
+      q.image_scan_status::text AS image_scan_status,
       (app.current_user_is_school_admin() OR app.teaches_assignment(q.assignment_id))
         AS viewer_is_staff,
       COALESCE(
@@ -163,6 +167,11 @@ export async function replaceQuestions(
   assignmentId: string,
   questions: QuestionInput[],
   storage: StorageService | null = null,
+  /**
+   * Receives the permanent key of every picture this save uploaded, for the caller to hand to the
+   * malware scanner once the transaction commits (F-14). Kept pictures keep their scan state.
+   */
+  uploadedImageKeys: string[] = [],
 ): Promise<AssignmentRow> {
   const existing = await getAssignmentForUpdate(tx, schoolId, assignmentId);
   if (!existing) {
@@ -222,7 +231,10 @@ export async function replaceQuestions(
     const questionRows: Record<string, JSONValue>[] = [];
     for (const [index, { id, position, question }] of prepared.entries()) {
       const image = await storeImage(storage, schoolId, images.at(index) ?? null);
-      if (image?.promoted) await recordStorageUpload(tx, image.size_bytes);
+      if (image?.promoted) {
+        await recordStorageUpload(tx, image.size_bytes);
+        uploadedImageKeys.push(image.storage_key);
+      }
       questionRows.push({
         id,
         position,
@@ -232,6 +244,7 @@ export async function replaceQuestions(
         image_storage_key: image?.storage_key ?? null,
         image_mime_type: image?.mime_type ?? null,
         image_size_bytes: image?.size_bytes ?? null,
+        image_scan_status: image?.scan_status ?? "unscanned",
       });
     }
 
@@ -247,14 +260,16 @@ export async function replaceQuestions(
     await tx`
       INSERT INTO app.assignment_questions
         (id, school_id, assignment_id, position, question_type, prompt, points,
-         image_storage_key, image_mime_type, image_size_bytes)
+         image_storage_key, image_mime_type, image_size_bytes, image_scan_status)
       SELECT
         x.id, ${schoolId}::uuid, ${assignmentId}::uuid, x.position,
         x.question_type::app.assignment_question_type, x.prompt, x.points,
-        x.image_storage_key, x.image_mime_type, x.image_size_bytes
+        x.image_storage_key, x.image_mime_type, x.image_size_bytes,
+        x.image_scan_status::app.upload_scan_status
       FROM jsonb_to_recordset(${tx.json(questionRows)}::jsonb)
         AS x(id uuid, position integer, question_type text, prompt text, points numeric,
-             image_storage_key text, image_mime_type text, image_size_bytes bigint)
+             image_storage_key text, image_mime_type text, image_size_bytes bigint,
+             image_scan_status text)
     `;
 
     await tx`
@@ -302,6 +317,7 @@ interface KeptImage {
   storage_key: string;
   mime_type: string;
   size_bytes: number;
+  scan_status: UploadScanStatus;
 }
 
 /** A staged upload that passed every confirm-time check and is promoted during the save. */
@@ -325,9 +341,16 @@ async function resolveImages(
   questions: QuestionInput[],
 ): Promise<(KeptImage | StagedImage | null)[]> {
   const current = await tx<
-    { id: string; image_storage_key: string; image_mime_type: string; image_size_bytes: string }[]
+    {
+      id: string;
+      image_storage_key: string;
+      image_mime_type: string;
+      image_size_bytes: string;
+      image_scan_status: UploadScanStatus;
+    }[]
   >`
-    SELECT id, image_storage_key, image_mime_type, image_size_bytes::text AS image_size_bytes
+    SELECT id, image_storage_key, image_mime_type, image_size_bytes::text AS image_size_bytes,
+           image_scan_status::text AS image_scan_status
     FROM app.assignment_questions
     WHERE school_id = ${schoolId}
       AND assignment_id = ${assignmentId}
@@ -356,6 +379,7 @@ async function resolveImages(
         storage_key: kept.image_storage_key,
         mime_type: kept.image_mime_type,
         size_bytes: Number(kept.image_size_bytes),
+        scan_status: kept.image_scan_status,
       });
     } else {
       // The schema guarantees exactly one of the two fields is set.
@@ -381,6 +405,7 @@ async function storeImage(
   storage_key: string;
   mime_type: string;
   size_bytes: number;
+  scan_status: UploadScanStatus;
   promoted: boolean;
 } | null> {
   if (!image) return null;
@@ -389,6 +414,7 @@ async function storeImage(
       storage_key: image.storage_key,
       mime_type: image.mime_type,
       size_bytes: image.size_bytes,
+      scan_status: image.scan_status,
       promoted: false,
     };
   }
@@ -404,6 +430,7 @@ async function storeImage(
     storage_key: permanentKey,
     mime_type: image.upload.contentType,
     size_bytes: promoted.sizeBytes,
+    scan_status: "scanning",
     promoted: true,
   };
 }
