@@ -17,7 +17,9 @@
  *      handoff ({@link redeemHandoff}) and signs the user in on the mobile channel.
  */
 
-import { MOBILE_OAUTH_REDIRECT_URI } from "./mobile-redirect";
+import { getSecurityConfig } from "../../../config/security";
+
+import { mobileAppRedirectUrl } from "./mobile-redirect";
 import { generateState } from "./pkce";
 import { takeStateFor } from "./state-store";
 
@@ -50,17 +52,22 @@ export async function handOffToApp(
     token: entry.token,
   });
 
-  const target = new URL(MOBILE_OAUTH_REDIRECT_URI);
-  target.searchParams.set("code", code);
-  target.searchParams.set("state", state);
-  return c.redirect(target.toString(), 302);
+  return redirectToApp(c, { code, state });
 }
 
 /** Send a failed mobile sign-in back to the app, which closes its sign-in sheet on `error`. */
 export function appErrorRedirect(c: Context<AppEnv>, errorCode: ErrorCode): Response {
-  const target = new URL(MOBILE_OAUTH_REDIRECT_URI);
-  target.searchParams.set("error", errorCode);
-  return c.redirect(target.toString(), 302);
+  return redirectToApp(c, { error: errorCode });
+}
+
+/** Sends the browser to the app's deep link, addressed so only our app can take it (mobile-redirect.ts). */
+function redirectToApp(c: Context<AppEnv>, params: Record<string, string>): Response {
+  const url = mobileAppRedirectUrl(
+    params,
+    c.req.header("user-agent"),
+    getSecurityConfig().environment,
+  );
+  return c.redirect(url, 302);
 }
 
 /**

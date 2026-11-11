@@ -33,6 +33,7 @@ class MobileTokenResponse {
     required this.expiresIn,
     required this.sessionId,
     this.refreshToken,
+    this.deviceToken,
   });
 
   factory MobileTokenResponse.fromJson(Map<String, dynamic> json) {
@@ -42,6 +43,7 @@ class MobileTokenResponse {
       expiresIn: json['expires_in'] as int,
       sessionId: json['session_id'] as String,
       refreshToken: json['refresh_token'] as String?,
+      deviceToken: json['device_token'] as String?,
     );
   }
 
@@ -50,6 +52,10 @@ class MobileTokenResponse {
   final int expiresIn;
   final String sessionId;
   final String? refreshToken;
+
+  /// Member sign-in only: a new token marking this device as trusted for that member, to send
+  /// back on later sign-ins. Null when the one sent is still valid, and for every other sign-in.
+  final String? deviceToken;
 }
 
 /// Thin HTTP client for the mobile OAuth endpoints. Uses plain [Dio] rather
@@ -129,11 +135,14 @@ class MobileAuthClient {
   /// Member-ID + password sign-in for students, parents, teachers and attendance officers
   /// (`member-password-routes.ts`). While the member is signing in with their one-time setup code
   /// the API answers 403 `AUTH_PASSWORD_CHANGE_REQUIRED` and issues no session; repeat the call
-  /// with [newPassword] to set one and sign in.
+  /// with [newPassword] to set one and sign in. [deviceToken] is the token an earlier sign-in to
+  /// this member on this device returned; with it, the attempt is not blocked by a lockout that
+  /// someone else's wrong guesses caused.
   Future<MobileTokenResponse> loginWithMember({
     required String username,
     required String password,
     String? newPassword,
+    String? deviceToken,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/auth/login/member',
@@ -141,6 +150,7 @@ class MobileAuthClient {
         'username': username,
         'password': password,
         'new_password': ?newPassword,
+        'device_token': ?deviceToken,
         'channel': 'mobile',
       },
     );

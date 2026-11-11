@@ -83,4 +83,24 @@ void main() {
     expect(await store.readRefreshToken(), 'r2');
     expect(await store.readSessionId(), 's2');
   });
+
+  test('a member device token outlives sign-out but not a reinstall', () async {
+    await store.discardIfReinstalled();
+    await store.writeMemberDeviceToken('stu-100001 ', 'device-1');
+    await store.writeMemberDeviceToken('PAR-200002', 'device-2');
+
+    // Matched however the member typed their ID.
+    expect(await store.readMemberDeviceToken('STU-100001'), 'device-1');
+    expect(await store.readMemberDeviceToken('par-200002'), 'device-2');
+    expect(await store.readMemberDeviceToken('STU-999999'), isNull);
+
+    // Signing out keeps it: that is what lets this phone in while the account is locked.
+    await store.clear();
+    expect(await store.readMemberDeviceToken('STU-100001'), 'device-1');
+
+    // A new install (or a phone that changed hands) starts untrusted.
+    SharedPreferences.setMockInitialValues({});
+    await store.discardIfReinstalled();
+    expect(await store.readMemberDeviceToken('STU-100001'), isNull);
+  });
 }

@@ -119,6 +119,11 @@ function expectRedirectToError(response: Response, code: string): void {
   expect(response.headers.get("location")).toBe(`https://web.example/auth/error?code=${code}`);
 }
 
+const IPHONE_USER_AGENT =
+  "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
+const ANDROID_USER_AGENT =
+  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36";
+
 describe("OAuth callback failure redirects", () => {
   test("a declined consent screen (provider `error` param) redirects to the cancelled state", async () => {
     for (const [app, provider] of [
@@ -225,6 +230,7 @@ describe("OAuth callback flow dispatch", () => {
 
     const res = await googleApp.request(
       "/api/auth/oauth/google/callback?code=fake-code&state=mobile-state",
+      { headers: { "user-agent": IPHONE_USER_AGENT } },
     );
 
     // Back to the app's deep link with a fresh code — never Google's own code — and the state.
@@ -290,6 +296,7 @@ describe("OAuth callback flow dispatch", () => {
     });
     const cancelled = await googleApp.request(
       "/api/auth/oauth/google/callback?error=access_denied&state=mobile-cancel",
+      { headers: { "user-agent": IPHONE_USER_AGENT } },
     );
     expect(cancelled.headers.get("location")).toBe("studafy://auth/callback?error=OAUTH_CANCELLED");
 
@@ -304,9 +311,45 @@ describe("OAuth callback flow dispatch", () => {
     });
     const failed = await googleApp.request(
       "/api/auth/oauth/google/callback?code=fake-code&state=mobile-fail",
+      { headers: { "user-agent": IPHONE_USER_AGENT } },
     );
     expect(failed.headers.get("location")).toBe(
       "studafy://auth/callback?error=OAUTH_PROVIDER_ERROR",
+    );
+  });
+
+  test("on Android the handoff is addressed to our package alone", async () => {
+    // Any Android app can claim studafy://, so a look-alike app that started its own sign-in could
+    // catch a plain deep link. An intent:// URL naming the package reaches only the real app.
+    stubTokenEndpoint();
+    await stateStore.set("android-state", {
+      flow: "mobile-login",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "n",
+    });
+    const res = await googleApp.request(
+      "/api/auth/oauth/google/callback?code=fake-code&state=android-state",
+      { headers: { "user-agent": ANDROID_USER_AGENT } },
+    );
+    expect(res.status).toBe(302);
+    const location = res.headers.get("location")!;
+    expect(location).toMatch(
+      /^intent:\/\/auth\/callback\?code=[^#&]+&state=android-state#Intent;scheme=studafy;package=com\.studafy\.studafy_mobile\.dev;end$/u,
+    );
+
+    // A browser with no user agent is not assumed to be an Apple one.
+    await stateStore.set("android-cancel", {
+      flow: "mobile-login",
+      provider: "google",
+      codeVerifier: "v",
+      nonce: "n",
+    });
+    const cancelled = await googleApp.request(
+      "/api/auth/oauth/google/callback?error=access_denied&state=android-cancel",
+    );
+    expect(cancelled.headers.get("location")).toBe(
+      "intent://auth/callback?error=OAUTH_CANCELLED#Intent;scheme=studafy;package=com.studafy.studafy_mobile.dev;end",
     );
   });
 
