@@ -23,7 +23,7 @@ import { loadSchoolIds } from "./schools";
 import type { TransactionSql } from "postgres";
 
 /** The parent-facing events a digest aggregates. Their payload schemas live in apps/api. */
-const DIGEST_SOURCE_EVENTS: readonly string[] = [
+export const DIGEST_SOURCE_EVENTS: readonly string[] = [
   DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED,
   DOMAIN_EVENTS.FEE_INSTALLMENT_OVERDUE,
 ];
