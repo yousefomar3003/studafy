@@ -7,18 +7,28 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 import { requireYear } from "./access";
 import {
   buildSnapshot,
-  loadConfigDetail,
+  effectiveSubjects,
+  loadConfigDetails,
   loadMarks,
-  loadRoster,
-  loadScale,
-  requireProgram,
+  loadPlacements,
+  loadSubjectChoices,
+  loadYearConfigs,
   requireSectionRow,
-  resolveSectionSubjects,
+  rosterFrom,
+  sectionConfigs,
   toEngineConfig,
   toMarkInputs,
 } from "./engine-config";
 
-import type { ConfigSnapshot, RosterStudent, SectionRow } from "./engine-config";
+import type {
+  ConfigDetails,
+  ConfigSnapshot,
+  MarkRow,
+  PlacedStudent,
+  RosterStudent,
+  SectionRow,
+  SubjectConfigRow,
+} from "./engine-config";
 import type {
   FailReason,
   MarkInput,
@@ -124,38 +134,105 @@ export async function computeSection(
         "Term not found in this year",
       );
   }
-  const program = await requireProgram(
-    tx,
-    schoolId,
-    section.academic_year_id,
-    section.grade_level_id,
-  );
-  const programScale = (await loadScale(tx, schoolId, program.grade_scale_id)).bands;
-  const subjects = (await resolveSectionSubjects(tx, schoolId, section)).filter(
+  const data = await loadSectionsGradingData(tx, schoolId, section.academic_year_id, [section]);
+  return computeLoadedSection(data, section, termId);
+}
+
+/** Everything {@link computeLoadedSection} reads, for every section of one year it will compute. */
+export interface SectionsGradingData {
+  configs: SubjectConfigRow[];
+  details: ConfigDetails;
+  placements: Map<string, PlacedStudent[]>;
+  choices: Map<string, string>;
+  marksByStudent: Map<string, MarkRow[]>;
+  sheets: Map<string, { subject_id: string; term_id: string | null; status: string }[]>;
+}
+
+/**
+ * Load, in a fixed number of queries, the configuration, rosters, marks and mark sheets of some
+ * sections of one year — instead of a round of queries per section and subject.
+ */
+export async function loadSectionsGradingData(
+  tx: TransactionSql,
+  schoolId: string,
+  yearId: string,
+  sections: readonly Pick<SectionRow, "id" | "grade_level_id">[],
+  /** The year's configs and their details when the caller already has them (any superset). */
+  preloaded?: Pick<SectionsGradingData, "configs" | "details">,
+): Promise<SectionsGradingData> {
+  const sectionIds = sections.map((section) => section.id);
+  const configs =
+    preloaded?.configs ??
+    (await loadYearConfigs(tx, schoolId, yearId, {
+      gradeLevelIds: [...new Set(sections.map((section) => section.grade_level_id))],
+      sectionIds,
+    }));
+  const [details, placements, sheetRows] = await Promise.all([
+    preloaded?.details ?? loadConfigDetails(tx, schoolId, yearId, configs),
+    loadPlacements(tx, schoolId, sectionIds),
+    sectionIds.length === 0
+      ? Promise.resolve(
+          [] as {
+            section_id: string;
+            subject_id: string;
+            term_id: string | null;
+            status: string;
+          }[],
+        )
+      : tx<{ section_id: string; subject_id: string; term_id: string | null; status: string }[]>`
+          SELECT section_id, subject_id, term_id, status FROM app.mark_sheets
+          WHERE school_id = ${schoolId}::uuid AND section_id = ANY (${sectionIds}::uuid[])
+        `,
+  ]);
+  const studentIds = [...placements.values()].flat().map((student) => student.student_id);
+  const assessmentIds = details.assessments
+    .filter((assessment) => assessment.status === "active")
+    .map((assessment) => assessment.id);
+  const [choices, marks] = await Promise.all([
+    loadSubjectChoices(tx, schoolId, yearId, studentIds),
+    loadMarks(tx, schoolId, assessmentIds, studentIds),
+  ]);
+  const marksByStudent = new Map<string, MarkRow[]>();
+  for (const mark of marks) {
+    const list = marksByStudent.get(mark.student_id);
+    if (list) list.push(mark);
+    else marksByStudent.set(mark.student_id, [mark]);
+  }
+  const sheets = new Map<
+    string,
+    { subject_id: string; term_id: string | null; status: string }[]
+  >();
+  for (const { section_id, ...sheet } of sheetRows) {
+    const list = sheets.get(section_id);
+    if (list) list.push(sheet);
+    else sheets.set(section_id, [sheet]);
+  }
+  return { configs, details, placements, choices, marksByStudent, sheets };
+}
+
+/** {@link computeSection} over loaded data: no queries. */
+export function computeLoadedSection(
+  data: SectionsGradingData,
+  section: SectionRow,
+  termId: string | null,
+): SectionComputation {
+  const sectionId = section.id;
+  const program = data.details.program(section.grade_level_id);
+  const programScale = data.details.scale(program.grade_scale_id).bands;
+  const subjects = effectiveSubjects(sectionConfigs(data.configs, section)).filter(
     (subject) => subject.config_id !== null,
   );
 
-  const placed = await tx<
-    { id: string; first_name: string; last_name: string; admission_number: string }[]
-  >`
-    SELECT student.id, student.first_name, student.last_name, student.admission_number
-    FROM app.student_sections AS placement
-    JOIN app.students AS student ON student.id = placement.student_id AND student.school_id = placement.school_id
-    WHERE placement.school_id = ${schoolId}::uuid AND placement.section_id = ${sectionId}::uuid
-    ORDER BY student.last_name, student.first_name, student.id
-  `;
-  const perStudent = new Map<string, StudentSubjectComputation[]>(placed.map((s) => [s.id, []]));
+  const placed = data.placements.get(sectionId) ?? [];
+  const perStudent = new Map<string, StudentSubjectComputation[]>(
+    placed.map((s) => [s.student_id, []]),
+  );
   const unapproved: string[] = [];
-  const sheets = await tx<{ subject_id: string; term_id: string | null; status: string }[]>`
-    SELECT subject_id, term_id, status FROM app.mark_sheets
-    WHERE school_id = ${schoolId}::uuid AND section_id = ${sectionId}::uuid
-  `;
-  const terms = await tx<{ id: string; name: string }[]>`
-    SELECT id, name FROM app.terms WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${section.academic_year_id}::uuid
-  `;
+  const sheets = data.sheets.get(sectionId) ?? [];
+  const terms = data.details.terms;
 
   for (const subject of subjects) {
-    const loaded = await loadConfigDetail(tx, schoolId, subject.config_id!);
+    const loaded = data.details.get(subject.config_id!);
     const engine = toEngineConfig(loaded, { sectionId });
     // A term report covers the subjects graded in that term; an annual-only subject has nothing to
     // report for a term and must not make every student's term result incomplete.
@@ -163,10 +240,9 @@ export async function computeSection(
       continue;
     }
     const snapshot = buildSnapshot(loaded, subject.source, engine, program, programScale);
-    const roster: RosterStudent[] = await loadRoster(
-      tx,
-      schoolId,
-      section,
+    const roster: RosterStudent[] = rosterFrom(
+      placed,
+      data.choices,
       subject.subject_id,
       subject.requirement,
     );
@@ -192,16 +268,14 @@ export async function computeSection(
       }
     }
 
-    const marks = await loadMarks(
-      tx,
-      schoolId,
-      engine.assessments.map((assessment) => assessment.id),
-      roster.map((student) => student.student_id),
-    );
+    const assessmentIds = new Set(engine.assessments.map((assessment) => assessment.id));
     for (const student of roster) {
       const list = perStudent.get(student.student_id);
       if (!list) continue;
       const exempt = student.status === "exempt";
+      const marks = (data.marksByStudent.get(student.student_id) ?? []).filter((mark) =>
+        assessmentIds.has(mark.assessment_id),
+      );
       list.push({
         subject_id: subject.subject_id,
         subject_name: subject.subject_name,
@@ -225,10 +299,10 @@ export async function computeSection(
     term_id: termId,
     unapproved_sheets: program.mark_approval_required ? unapproved : [],
     students: placed.map((student) => {
-      const subjectsOfStudent = perStudent.get(student.id) ?? [];
+      const subjectsOfStudent = perStudent.get(student.student_id) ?? [];
       return {
         student: {
-          id: student.id,
+          id: student.student_id,
           first_name: student.first_name,
           last_name: student.last_name,
           admission_number: student.admission_number,
@@ -262,48 +336,94 @@ async function currentFinalization(
   return row;
 }
 
+/** Rows per multi-row INSERT: snapshots are a few KB each, so this bounds one statement's payload. */
+const STORE_CHUNK = 200;
+
+function chunks<T>(rows: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < rows.length; i += size) out.push(rows.slice(i, i + size));
+  return out;
+}
+
+/**
+ * Write a computation's per-subject and overall rows: a few multi-row INSERTs per section
+ * (jsonb_to_recordset, like the attendance batch) instead of one INSERT per student and subject.
+ * Values are the same JS values the per-row INSERTs sent; numbers travel as JSON text, which
+ * Postgres parses exactly as it parsed the text parameters.
+ */
 async function storeComputation(
   tx: TransactionSql,
   schoolId: string,
   finalizationId: string,
   students: StudentComputation[],
 ): Promise<void> {
-  for (const student of students) {
-    for (const subject of student.subjects) {
+  const subjectRows = students.flatMap((student) =>
+    student.subjects.map((subject) => {
       const result = subject.result;
       const status = subject.exempt
         ? "exempt"
         : result?.status === "complete"
           ? "complete"
           : "incomplete";
-      await tx`
-        INSERT INTO app.student_subject_results (
-          school_id, finalization_id, student_id, subject_id, subject_config_id, status, percentage,
-          marks_obtained, max_marks, grade_label, gpa_points, passed, include_in_average,
-          include_on_certificate, config_snapshot, breakdown
-        ) VALUES (
-          ${schoolId}::uuid, ${finalizationId}::uuid, ${student.student.id}::uuid,
-          ${subject.subject_id}::uuid, ${subject.config_id}::uuid, ${status},
-          ${status === "complete" ? result!.percentage : null},
-          ${status === "complete" ? result!.marksObtained : null},
-          ${subject.snapshot.engine.maxMarks},
-          ${status === "complete" ? result!.gradeLabel : null},
-          ${status === "complete" ? result!.gpaPoints : null},
-          ${status === "complete" ? result!.passed : null},
-          ${subject.snapshot.include_in_average}, ${subject.snapshot.include_on_certificate},
-          ${tx.json(subject.snapshot as never)}, ${tx.json((result ?? { exempt: true }) as never)}
-        )
-      `;
-    }
-    const overall = student.overall;
+      return {
+        student_id: student.student.id,
+        subject_id: subject.subject_id,
+        subject_config_id: subject.config_id,
+        status,
+        percentage: status === "complete" ? result!.percentage : null,
+        marks_obtained: status === "complete" ? result!.marksObtained : null,
+        max_marks: subject.snapshot.engine.maxMarks,
+        grade_label: status === "complete" ? result!.gradeLabel : null,
+        gpa_points: status === "complete" ? result!.gpaPoints : null,
+        passed: status === "complete" ? result!.passed : null,
+        include_in_average: subject.snapshot.include_in_average,
+        include_on_certificate: subject.snapshot.include_on_certificate,
+        config_snapshot: subject.snapshot,
+        breakdown: result ?? { exempt: true },
+      };
+    }),
+  );
+  for (const chunk of chunks(subjectRows, STORE_CHUNK)) {
+    await tx`
+      INSERT INTO app.student_subject_results (
+        school_id, finalization_id, student_id, subject_id, subject_config_id, status, percentage,
+        marks_obtained, max_marks, grade_label, gpa_points, passed, include_in_average,
+        include_on_certificate, config_snapshot, breakdown
+      )
+      SELECT ${schoolId}::uuid, ${finalizationId}::uuid, x.student_id, x.subject_id,
+             x.subject_config_id, x.status, x.percentage, x.marks_obtained, x.max_marks,
+             x.grade_label, x.gpa_points, x.passed, x.include_in_average,
+             x.include_on_certificate, x.config_snapshot, x.breakdown
+      FROM jsonb_to_recordset(${tx.json(chunk as never)}::jsonb) AS x(
+        student_id uuid, subject_id uuid, subject_config_id uuid, status text, percentage numeric,
+        marks_obtained numeric, max_marks numeric, grade_label text, gpa_points numeric,
+        passed boolean, include_in_average boolean, include_on_certificate boolean,
+        config_snapshot jsonb, breakdown jsonb
+      )
+    `;
+  }
+  const overallRows = students.map((student) => ({
+    student_id: student.student.id,
+    status: student.overall.status,
+    average_percentage: student.overall.averagePercentage,
+    total_obtained: student.overall.totalObtained,
+    total_max: student.overall.totalMax,
+    grade_label: student.overall.gradeLabel,
+    subjects_failed: student.overall.subjectsFailed,
+    academic_status: student.overall.academicStatus,
+  }));
+  for (const chunk of chunks(overallRows, STORE_CHUNK * 5)) {
     await tx`
       INSERT INTO app.student_overall_results (
         school_id, finalization_id, student_id, status, average_percentage, total_obtained,
         total_max, grade_label, subjects_failed, academic_status
-      ) VALUES (
-        ${schoolId}::uuid, ${finalizationId}::uuid, ${student.student.id}::uuid, ${overall.status},
-        ${overall.averagePercentage}, ${overall.totalObtained}, ${overall.totalMax},
-        ${overall.gradeLabel}, ${overall.subjectsFailed}, ${overall.academicStatus}
+      )
+      SELECT ${schoolId}::uuid, ${finalizationId}::uuid, x.student_id, x.status,
+             x.average_percentage, x.total_obtained, x.total_max, x.grade_label,
+             x.subjects_failed, x.academic_status
+      FROM jsonb_to_recordset(${tx.json(chunk as never)}::jsonb) AS x(
+        student_id uuid, status text, average_percentage numeric, total_obtained numeric,
+        total_max numeric, grade_label text, subjects_failed int, academic_status text
       )
     `;
   }
