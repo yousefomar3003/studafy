@@ -399,6 +399,93 @@ export async function lastReminderAt(
   return row?.created_at ?? null;
 }
 
+/** Where a family stands for a reminder, read for many families at once. */
+export interface ReminderTriage {
+  familyId: string;
+  overdueInvoiceCount: number;
+  lastReminderAt: Date | null;
+}
+
+/**
+ * For each of `familyIds` that is this school's family: its overdue invoice count (as
+ * `familyBalance` counts it) and when it was last reminded (as `lastReminderAt` reads it) -- one
+ * statement, so a bulk run only opens a transaction for the families it will actually remind.
+ * Unknown families are left out. `sendFamilyReminder` still re-checks each family it sends to.
+ */
+export async function reminderTriage(
+  tx: TransactionSql,
+  schoolId: string,
+  familyIds: readonly string[],
+): Promise<ReminderTriage[]> {
+  if (familyIds.length === 0) return [];
+  const rows = await tx<
+    { family_id: string; overdue_count: number; last_reminder_at: Date | null }[]
+  >`
+    SELECT family.id AS family_id,
+           (SELECT count(*)::int
+            FROM app.invoice_cache AS ic
+            WHERE ic.school_id = family.school_id
+              AND lower(ic.erpnext_status) NOT IN ('draft', 'cancelled')
+              AND ic.outstanding_amount_minor > 0
+              AND ic.due_date < CURRENT_DATE
+              AND ic.student_id IN (
+                SELECT link.student_id FROM app.parent_child_links AS link
+                WHERE link.school_id = family.school_id AND link.family_id = family.id
+              )) AS overdue_count,
+           (SELECT max(comm.created_at)
+            FROM app.finance_communications AS comm
+            WHERE comm.school_id = family.school_id
+              AND comm.family_id = family.id
+              AND comm.kind = 'payment_reminder') AS last_reminder_at
+    FROM app.families AS family
+    WHERE family.school_id = ${schoolId}::uuid AND family.id = ANY(${familyIds as string[]}::uuid[])
+  `;
+  return rows.map((row) => ({
+    familyId: row.family_id,
+    overdueInvoiceCount: row.overdue_count,
+    lastReminderAt: row.last_reminder_at,
+  }));
+}
+
+/** Whether a reminder sent at `last` still blocks another one now. */
+export function withinReminderCooldown(last: Date | null, now: number = Date.now()): boolean {
+  return last !== null && now - last.getTime() < REMINDER_COOLDOWN_HOURS * 3_600_000;
+}
+
+export interface BulkReminderPlan {
+  /** The families to send to now, in request order. */
+  batch: string[];
+  /** Families still due a reminder beyond `limit`. */
+  remaining: number;
+  nothingOverdue: number;
+  recentlyReminded: number;
+}
+
+/**
+ * Sort a bulk run's families by their triage: nothing overdue and reminded within the cooldown are
+ * counted, unknown families are dropped, and at most `limit` of the rest are sent to now.
+ */
+export function planBulkReminders(
+  familyIds: readonly string[],
+  triage: readonly ReminderTriage[],
+  limit: number,
+  now: number = Date.now(),
+): BulkReminderPlan {
+  const byId = new Map(triage.map((row) => [row.familyId, row]));
+  const due: string[] = [];
+  let nothingOverdue = 0;
+  let recentlyReminded = 0;
+  for (const familyId of new Set(familyIds)) {
+    const state = byId.get(familyId);
+    if (!state) continue;
+    if (state.overdueInvoiceCount === 0) nothingOverdue += 1;
+    else if (withinReminderCooldown(state.lastReminderAt, now)) recentlyReminded += 1;
+    else due.push(familyId);
+  }
+  const batch = due.slice(0, Math.max(limit, 0));
+  return { batch, remaining: due.length - batch.length, nothingOverdue, recentlyReminded };
+}
+
 export type ReminderOutcome =
   | { status: "sent"; result: FamilySendResult }
   | { status: "nothing_overdue" }
@@ -421,7 +508,7 @@ export async function sendFamilyReminder(
   if (balance.overdueInvoiceCount === 0) return { status: "nothing_overdue" };
 
   const last = await lastReminderAt(tx, schoolId, familyId);
-  if (last && Date.now() - last.getTime() < REMINDER_COOLDOWN_HOURS * 3_600_000) {
+  if (last && withinReminderCooldown(last)) {
     return { status: "recently_reminded", lastReminderAt: last };
   }
 

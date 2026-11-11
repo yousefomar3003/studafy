@@ -98,7 +98,7 @@ export interface LicenseRecord {
   updatedAt: Date;
 }
 
-interface LicenseRow {
+export interface LicenseRow {
   id: string;
   school_id: string;
   status: LicenseStatus;
@@ -321,17 +321,29 @@ export async function platformLicenseView(
   };
 }
 
-export async function listLicenses(tx: TransactionSql): Promise<PlatformLicenseView[]> {
-  const rows = await tx<LicenseRow[]>`
+/** The armed school's licenses, newest first, as one statement. */
+export function schoolLicensesStatement(tx: TransactionSql) {
+  return tx<LicenseRow[]>`
     SELECT ${LICENSE_COLUMNS(tx)}
     FROM app.school_licenses AS l
     JOIN app.currencies AS c ON c.id = l.currency_id
     WHERE l.school_id = current_setting('app.school_id')::uuid
     ORDER BY l.created_at DESC
   `;
+}
+
+/** Views of license rows read by `schoolLicensesStatement`; the rows' school must be armed. */
+export async function platformLicenseViews(
+  tx: TransactionSql,
+  rows: readonly LicenseRow[],
+): Promise<PlatformLicenseView[]> {
   const views: PlatformLicenseView[] = [];
   for (const row of rows) views.push(await platformLicenseView(tx, toRecord(row)));
   return views;
+}
+
+export async function listLicenses(tx: TransactionSql): Promise<PlatformLicenseView[]> {
+  return platformLicenseViews(tx, await schoolLicensesStatement(tx));
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -1376,7 +1388,7 @@ export interface ChangeRequestView {
   resolutionNote: string | null;
 }
 
-interface ChangeRequestRow {
+export interface ChangeRequestRow {
   id: string;
   license_id: string | null;
   student_seats: number | null;
@@ -1395,7 +1407,7 @@ interface ChangeRequestRow {
 }
 
 /** The requested tiers' names, in one read for every row. */
-async function toChangeRequestViews(
+export async function toChangeRequestViews(
   tx: TransactionSql,
   rows: readonly ChangeRequestRow[],
 ): Promise<ChangeRequestView[]> {
@@ -1508,11 +1520,12 @@ export async function createChangeRequest(
   return (await toChangeRequestViews(tx, [row!]))[0]!;
 }
 
-export async function listChangeRequests(
+/** The armed school's change requests (newest first, the latest 200), as one statement. */
+export function schoolChangeRequestsStatement(
   tx: TransactionSql,
   status?: ChangeRequestView["status"],
-): Promise<ChangeRequestView[]> {
-  const rows = await tx<ChangeRequestRow[]>`
+) {
+  return tx<ChangeRequestRow[]>`
     SELECT ${CHANGE_REQUEST_COLUMNS(tx)}
     FROM app.license_change_requests
     WHERE school_id = current_setting('app.school_id')::uuid
@@ -1520,7 +1533,13 @@ export async function listChangeRequests(
     ORDER BY created_at DESC
     LIMIT 200
   `;
-  return toChangeRequestViews(tx, rows);
+}
+
+export async function listChangeRequests(
+  tx: TransactionSql,
+  status?: ChangeRequestView["status"],
+): Promise<ChangeRequestView[]> {
+  return toChangeRequestViews(tx, await schoolChangeRequestsStatement(tx, status));
 }
 
 /** The super admin closes a request (after changing the license, or not). */

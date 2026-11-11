@@ -1,17 +1,20 @@
 import { ERROR_CODES, FEATURE_KEYS, FEATURES } from "@studafy/constants";
 import postgres from "postgres";
 
+import { pipelinePerSchool, setTenantScope, withSystemTx } from "../../db/tenant-tx";
 import { usagePeriodStart } from "../features/resolve";
 
 import { licenseError } from "./context";
-import { forEachSchool, listPayments } from "./invoices";
+import { consoleSchools, forEachSchool, listPayments } from "./invoices";
 import { auditPlatformChange } from "./pricing";
 import {
   currentLicense,
   licenseUsage,
-  listChangeRequests,
-  listLicenses,
   platformLicenseView,
+  platformLicenseViews,
+  schoolChangeRequestsStatement,
+  schoolLicensesStatement,
+  toChangeRequestViews,
 } from "./service";
 
 import type { LicenseActor } from "./context";
@@ -203,12 +206,12 @@ export async function listTiers(tx: TransactionSql): Promise<ConsoleTier[]> {
     ORDER BY c.code
   `;
   // Usage is per school: licenses and personal subscriptions are tenant rows. A count of zero is
-  // what matters ("safe to change"), and the console is small, so walk the schools once.
+  // what matters ("safe to change"), so walk the schools once, all in one round trip
+  // (`pipelinePerSchool` clears the scope afterwards).
   const usage = new Map<string, number>();
   const schools = await tx<{ id: string }[]>`SELECT id::text AS id FROM app.schools`;
-  for (const school of schools) {
-    await tx`SELECT set_config('app.school_id', ${school.id}, true)`;
-    const rows = await tx<{ plan_id: string; n: number }[]>`
+  const perSchool = await pipelinePerSchool(tx, schools, () => [
+    tx<{ plan_id: string; n: number }[]>`
       SELECT plan_id::text AS plan_id, count(*)::int AS n FROM (
         SELECT unnest(ARRAY[student_plan_id, teacher_plan_id, parent_plan_id]) AS plan_id
         FROM app.school_licenses
@@ -219,10 +222,11 @@ export async function listTiers(tx: TransactionSql): Promise<ConsoleTier[]> {
       ) AS used
       WHERE plan_id = ANY(${ids}::uuid[])
       GROUP BY plan_id
-    `;
+    `,
+  ]);
+  for (const [rows] of perSchool) {
     for (const row of rows) usage.set(row.plan_id, (usage.get(row.plan_id) ?? 0) + row.n);
   }
-  await tx`SELECT set_config('app.school_id', '', true)`;
 
   return plans.map((plan) => ({
     id: plan.id,
@@ -438,32 +442,43 @@ export async function listLicensesAcrossSchools(
   filters: LicenseListFilters,
   now: Date = new Date(),
 ): Promise<ConsoleLicense[]> {
-  const all = await forEachSchool(database, null, async (tx, school) => {
-    const licenses = await listLicenses(tx);
-    if (licenses.length === 0) return [];
-    const balances = await tx<{ license_id: string; balance: string }[]>`
-      SELECT license_id::text AS license_id, sum(balance_minor)::text AS balance
-      FROM app.license_invoices
-      WHERE school_id = current_setting('app.school_id')::uuid
-        AND status IN ('issued', 'partially_paid')
-      GROUP BY license_id
-    `;
+  const all = await withSystemTx(database, async (tx) => {
+    const schools = await consoleSchools(tx, null);
+    // Every school's licenses and open balances in one round trip; only schools that have a
+    // license then need their seat counts read (under their own scope).
+    const perSchool = await pipelinePerSchool(tx, schools, () => [
+      schoolLicensesStatement(tx),
+      tx<{ license_id: string; balance: string }[]>`
+        SELECT license_id::text AS license_id, sum(balance_minor)::text AS balance
+        FROM app.license_invoices
+        WHERE school_id = current_setting('app.school_id')::uuid
+          AND status IN ('issued', 'partially_paid')
+        GROUP BY license_id
+      `,
+    ]);
     const minor = await tx<{ code: string; minor_unit: number }[]>`
       SELECT code, minor_unit::int AS minor_unit FROM app.currencies
     `;
-    return licenses.map((license) => {
-      const use = license.audiences
-        .filter((a) => a.purchased > 0)
-        .map((a) => a.assigned / a.purchased);
-      return {
-        ...license,
-        schoolName: school.name,
-        balanceMinor: Number(balances.find((b) => b.license_id === license.id)?.balance ?? 0),
-        minorUnit: minor.find((m) => m.code === license.currencyCode)?.minor_unit ?? 2,
-        daysLeft: Math.ceil((Date.parse(license.endsAt) - now.getTime()) / DAY_MS),
-        seatUse: use.length > 0 ? Math.max(...use) : 0,
-      };
-    });
+    const out: ConsoleLicense[] = [];
+    for (const [index, school] of schools.entries()) {
+      const [rows, balances] = perSchool[index]!;
+      if (rows.length === 0) continue;
+      await setTenantScope(tx, school.id);
+      for (const license of await platformLicenseViews(tx, rows)) {
+        const use = license.audiences
+          .filter((a) => a.purchased > 0)
+          .map((a) => a.assigned / a.purchased);
+        out.push({
+          ...license,
+          schoolName: school.name,
+          balanceMinor: Number(balances.find((b) => b.license_id === license.id)?.balance ?? 0),
+          minorUnit: minor.find((m) => m.code === license.currencyCode)?.minor_unit ?? 2,
+          daysLeft: Math.ceil((Date.parse(license.endsAt) - now.getTime()) / DAY_MS),
+          seatUse: use.length > 0 ? Math.max(...use) : 0,
+        });
+      }
+    }
+    return out;
   });
   return all
     .filter((license) => !filters.status || license.status === filters.status)
@@ -494,13 +509,24 @@ export async function listChangeRequestsAcrossSchools(
   database: Database | DatabasePools,
   status: ChangeRequestView["status"] | undefined,
 ): Promise<ConsoleChangeRequest[]> {
-  const all = await forEachSchool(database, null, async (tx, school) =>
-    (await listChangeRequests(tx, status)).map((request) => ({
-      ...request,
-      schoolId: school.id,
-      schoolName: school.name,
-    })),
-  );
+  const all = await withSystemTx(database, async (tx) => {
+    const schools = await consoleSchools(tx, null);
+    const perSchool = await pipelinePerSchool(tx, schools, () => [
+      schoolChangeRequestsStatement(tx, status),
+    ]);
+    // Views only add tier names from app.plans (global), so all schools' rows convert together.
+    const rows = perSchool.flatMap(([schoolRows]) => [...schoolRows]);
+    const views = await toChangeRequestViews(tx, rows);
+    const owner = new Map(
+      perSchool.flatMap(([schoolRows], index) =>
+        schoolRows.map((row) => [row.id, schools[index]!]),
+      ),
+    );
+    return views.map((request) => {
+      const school = owner.get(request.id)!;
+      return { ...request, schoolId: school.id, schoolName: school.name };
+    });
+  });
   return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
@@ -604,42 +630,47 @@ export async function usageAndRevenue(
   now: Date = new Date(),
 ): Promise<{ periodStart: string; schools: SchoolUsageRevenue[] }> {
   const periodStart = usagePeriodStart(now);
-  const schools = await forEachSchool(database, null, async (tx, school) => {
-    const usage = await tx<{ feature_key: FeatureKey; used: string }[]>`
-      SELECT feature_key, sum(used)::text AS used FROM app.feature_usage_meters
-      WHERE school_id = current_setting('app.school_id')::uuid AND period_start = ${periodStart}::date
-      GROUP BY feature_key
-    `;
-    const revenue = await tx<
-      { code: string; minor_unit: number; this_month: string; total: string }[]
-    >`
-      SELECT c.code, c.minor_unit::int AS minor_unit,
-             COALESCE(sum(p.amount_minor) FILTER (WHERE p.received_at >= ${periodStart}::date), 0)::text AS this_month,
-             sum(p.amount_minor)::text AS total
-      FROM app.license_payments AS p
-      JOIN app.currencies AS c ON c.id = p.currency_id
-      WHERE p.school_id = current_setting('app.school_id')::uuid AND p.voided_at IS NULL
-      GROUP BY c.code, c.minor_unit
-      ORDER BY c.code
-    `;
-    if (usage.length === 0 && revenue.length === 0) return [];
-    return [
-      {
-        schoolId: school.id,
-        schoolName: school.name,
-        usage: FEATURE_KEYS.filter((key) => FEATURES[key].unit !== null).map((key) => ({
-          feature: key,
-          unit: FEATURES[key].unit,
-          used: Number(usage.find((row) => row.feature_key === key)?.used ?? 0),
-        })),
-        revenue: revenue.map((row) => ({
-          currencyCode: row.code,
-          minorUnit: row.minor_unit,
-          thisMonthMinor: Number(row.this_month),
-          totalMinor: Number(row.total),
-        })),
-      },
-    ];
-  });
+  const schools = await forEachSchool(
+    database,
+    null,
+    (tx) =>
+      [
+        tx<{ feature_key: FeatureKey; used: string }[]>`
+          SELECT feature_key, sum(used)::text AS used FROM app.feature_usage_meters
+          WHERE school_id = current_setting('app.school_id')::uuid AND period_start = ${periodStart}::date
+          GROUP BY feature_key
+        `,
+        tx<{ code: string; minor_unit: number; this_month: string; total: string }[]>`
+          SELECT c.code, c.minor_unit::int AS minor_unit,
+                 COALESCE(sum(p.amount_minor) FILTER (WHERE p.received_at >= ${periodStart}::date), 0)::text AS this_month,
+                 sum(p.amount_minor)::text AS total
+          FROM app.license_payments AS p
+          JOIN app.currencies AS c ON c.id = p.currency_id
+          WHERE p.school_id = current_setting('app.school_id')::uuid AND p.voided_at IS NULL
+          GROUP BY c.code, c.minor_unit
+          ORDER BY c.code
+        `,
+      ] as const,
+    ([usage, revenue], school): SchoolUsageRevenue[] => {
+      if (usage.length === 0 && revenue.length === 0) return [];
+      return [
+        {
+          schoolId: school.id,
+          schoolName: school.name,
+          usage: FEATURE_KEYS.filter((key) => FEATURES[key].unit !== null).map((key) => ({
+            feature: key,
+            unit: FEATURES[key].unit,
+            used: Number(usage.find((row) => row.feature_key === key)?.used ?? 0),
+          })),
+          revenue: revenue.map((row) => ({
+            currencyCode: row.code,
+            minorUnit: row.minor_unit,
+            thisMonthMinor: Number(row.this_month),
+            totalMinor: Number(row.total),
+          })),
+        },
+      ];
+    },
+  );
   return { periodStart, schools };
 }

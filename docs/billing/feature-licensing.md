@@ -496,20 +496,20 @@ School (`license:read` to read, `license:manage` to accept and upload; ORG_ADMIN
 
 Super admin (`platform:read` / `platform:manage`, web channel):
 
-| Route                                                                                                       |                                                                           |
-| ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `GET /api/platform/licenses/price-settings`, `PUT …/price-settings/{currencyCode}`                          | Price settings per currency                                               |
-| `GET`, `PUT /api/platform/licenses/bank-details`                                                            | The bank details on invoices                                              |
-| `POST /api/platform/licenses/quote`                                                                         | The calculator (with `schoolId`: that school's license and credits)       |
-| `GET /api/platform/licenses/invoices`                                                                       | Across schools: `status` (as above), `schoolId`, `from`/`to` issue dates  |
-| `GET /api/platform/licenses/receipts`                                                                       | Receipts waiting to be matched, across schools                            |
-| `GET /api/platform/licenses/finance`                                                                        | Per currency: received this month, outstanding, overdue; pending receipts |
-| `GET`, `POST /api/platform/schools/{schoolId}/license-quotes`; `GET`, `PUT …/{quoteId}`                     | Quotes; `PUT` re-prices a draft                                           |
-| `POST …/license-quotes/{quoteId}/send`, `/accept`, `/withdraw`                                              |                                                                           |
-| `GET /api/platform/schools/{schoolId}/license-invoices/{invoiceId}`, `POST …/void`, `POST …/activate-early` |                                                                           |
-| `POST …/license-invoices/{invoiceId}/payments`, `POST …/license-payments/{paymentId}/void`                  | Record and void payments                                                  |
-| `POST …/license-payments/upload-url`, `GET …/license-payments/{paymentId}/receipt-file`                     | The super admin's own receipt files                                       |
-| `POST …/license-receipts/{receiptId}/match`, `GET …/license-receipts/{receiptId}/file`                      | Match a school's receipt to a payment                                     |
+| Route                                                                                                       |                                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/platform/licenses/price-settings`, `PUT …/price-settings/{currencyCode}`                          | Price settings per currency                                                                                                                                       |
+| `GET`, `PUT /api/platform/licenses/bank-details`                                                            | The bank details on invoices                                                                                                                                      |
+| `POST /api/platform/licenses/quote`                                                                         | The calculator (with `schoolId`: that school's license and credits)                                                                                               |
+| `GET /api/platform/licenses/invoices`                                                                       | Across schools: `status` (as above), `schoolId`, `from`/`to` issue dates; paged by `limit` (default 100, max 200) and `cursor` (the previous page's `nextCursor`) |
+| `GET /api/platform/licenses/receipts`                                                                       | Receipts waiting to be matched, across schools                                                                                                                    |
+| `GET /api/platform/licenses/finance`                                                                        | Per currency: received this month, outstanding, overdue; pending receipts                                                                                         |
+| `GET`, `POST /api/platform/schools/{schoolId}/license-quotes`; `GET`, `PUT …/{quoteId}`                     | Quotes; `PUT` re-prices a draft                                                                                                                                   |
+| `POST …/license-quotes/{quoteId}/send`, `/accept`, `/withdraw`                                              |                                                                                                                                                                   |
+| `GET /api/platform/schools/{schoolId}/license-invoices/{invoiceId}`, `POST …/void`, `POST …/activate-early` |                                                                                                                                                                   |
+| `POST …/license-invoices/{invoiceId}/payments`, `POST …/license-payments/{paymentId}/void`                  | Record and void payments                                                                                                                                          |
+| `POST …/license-payments/upload-url`, `GET …/license-payments/{paymentId}/receipt-file`                     | The super admin's own receipt files                                                                                                                               |
+| `POST …/license-receipts/{receiptId}/match`, `GET …/license-receipts/{receiptId}/file`                      | Match a school's receipt to a payment                                                                                                                             |
 
 ### Jobs (apps/workers, billing queue)
 

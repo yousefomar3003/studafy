@@ -7,6 +7,7 @@ import {
 import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
+import { closeWorkerPools } from "./db/pool";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
 import { startBillingPipelineGauges } from "./metrics/billing-pipeline";
@@ -118,8 +119,10 @@ void relayRedis.connect().then(() => {
     redis: relayRedis,
     config: {
       batchSize: 100,
-      // 500ms rather than 1s: this is the fast path for ST-133's <5s propagation SLA.
+      // Idle cycles back off 0.5 s -> 5 s (queues/poll-loop.ts). ST-133's <5 s SLA rests on the
+      // entitlement invalidator below, not on this lossy pub/sub fast path.
       pollIntervalMs: 500,
+      maxIdleIntervalMs: 5_000,
       schoolIds: configuredSchoolIds.length > 0 ? configuredSchoolIds : null,
     },
     logger: workerLogger,
@@ -137,6 +140,8 @@ const entitlementInvalidator = startEntitlementInvalidator({
   config: {
     batchSize: env.ENTITLEMENT_BATCH_SIZE,
     pollIntervalMs: env.ENTITLEMENT_POLL_INTERVAL_MS,
+    // Idle backoff ceiling: the worst-case wait for a new event, so it stays well under the <5 s SLA.
+    maxIdleIntervalMs: 2_000,
     concurrency: 16,
   },
   logger: workerLogger,
@@ -161,6 +166,7 @@ const emailDispatcher = startEmailDispatcher({
   config: {
     batchSize: env.EMAIL_BATCH_SIZE,
     pollIntervalMs: env.EMAIL_POLL_INTERVAL_MS,
+    maxIdleIntervalMs: 5_000,
     ratePerSecond: env.EMAIL_MAX_RATE_PER_SECOND,
     frontendUrl: env.FRONTEND_URL,
   },
@@ -321,6 +327,8 @@ const shutdown = (signal: string) => {
     await relayDb.end({ timeout: 5 });
     await emailDb.end({ timeout: 5 });
     await entitlementDb.end({ timeout: 5 });
+    // The process-wide pools every job processor borrows (db/pool.ts) — after the drain above.
+    await closeWorkerPools();
     // startQueueGauges() was given queueMetricsConnection as a live IORedis instance rather
     // than plain connection options, so BullMQ treats it as externally owned and never closes it
     // itself — queue.close() only stops the per-queue Queue wrapper. Closing it here is what

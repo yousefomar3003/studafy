@@ -1,4 +1,4 @@
-import { Card, Input, Select } from "@studafy/ui";
+import { Button, Card, Input, Select } from "@studafy/ui";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -111,6 +111,16 @@ export default function PaymentsPage() {
         ) : null}
         {invoices.data && invoices.data.length > 0 ? (
           <InvoiceTable invoices={invoices.data} />
+        ) : null}
+        {invoices.hasNextPage ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => void invoices.fetchNextPage()}
+            loading={invoices.isFetchingNextPage}
+          >
+            {t("platformLicensing.payments.loadMore")}
+          </Button>
         ) : null}
       </section>
     </>

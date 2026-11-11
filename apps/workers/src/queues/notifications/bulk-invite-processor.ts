@@ -1,12 +1,16 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import postgres from "postgres";
+import { leaseDatabase } from "../../db/pool";
+import { withSystemTenantTx, withTenantTx } from "../../db/tenant-tx";
+
+import type { DatabaseSource } from "../../db/pool";
+import type { Sql } from "postgres";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-interface BulkInviteJobData {
+export interface BulkInviteJobData {
   bulkInviteId: string;
   schoolId: string;
 }
@@ -18,7 +22,21 @@ interface BulkInviteRecipient {
   status: string;
 }
 
-const BATCH_SIZE = 100;
+export const BULK_INVITE_BATCH_SIZE = 100;
+
+/**
+ * Thrown when a page of pending recipients was processed but not one of them left `pending` -- the
+ * invitation insert failed and so did the write marking the recipient failed. Re-reading the page
+ * would return the same rows forever, so the run stops here and the batch is marked failed.
+ */
+export class BulkInviteStalledError extends Error {
+  constructor(bulkInviteId: string, pending: number) {
+    super(
+      `bulk invite ${bulkInviteId} made no progress: ${String(pending)} pending recipient(s) could not be sent or marked failed`,
+    );
+    this.name = "BulkInviteStalledError";
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Token helpers (mirrors apps/api invitation service)
@@ -45,27 +63,37 @@ function hashToken(token: string): Buffer {
  *
  * Idempotency: only processes recipients in 'pending' status; re-running a partially
  * completed batch picks up where it left off.
+ *
+ * Every read and every status write runs in a system tenant transaction (`withSystemTenantTx`):
+ * both tables are RLS-forced, and a statement outside one sees zero rows -- which used to make the
+ * mark-failed UPDATE silently match nothing and the batch loop re-read the same page forever. A page
+ * on which no recipient leaves `pending` now stops the run (`BulkInviteStalledError`).
+ *
+ * `database` is the process-wide pool in production, a connection string in tests (db/pool.ts).
  */
 export async function processBulkInvite(
   data: BulkInviteJobData,
-  databaseUrl: string,
+  database: DatabaseSource,
 ): Promise<{ sent: number; failed: number }> {
-  const sql = postgres(databaseUrl, { max: 4, idle_timeout: 20, prepare: false });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
+  const tenant = { schoolId: data.schoolId };
 
   try {
-    // Mark as processing.
-    await sql`
-      UPDATE app.bulk_invites
-      SET status = 'processing'::app.bulk_invite_status, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${data.bulkInviteId}::uuid AND school_id = ${data.schoolId}
-    `;
-
-    // Fetch batch metadata for expiry_days and role.
-    const [batch] = await sql<{ role: string; expiry_days: number; created_by: string }[]>`
-      SELECT role, expiry_days, created_by
-      FROM app.bulk_invites
-      WHERE id = ${data.bulkInviteId}::uuid AND school_id = ${data.schoolId}
-    `;
+    // Mark as processing and fetch batch metadata for expiry_days and role.
+    const batch = await withSystemTenantTx(sql, tenant, async (tx) => {
+      await tx`
+        UPDATE app.bulk_invites
+        SET status = 'processing'::app.bulk_invite_status, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${data.bulkInviteId}::uuid AND school_id = ${data.schoolId}::uuid
+      `;
+      const [row] = await tx<{ role: string; expiry_days: number; created_by: string }[]>`
+        SELECT role, expiry_days, created_by
+        FROM app.bulk_invites
+        WHERE id = ${data.bulkInviteId}::uuid AND school_id = ${data.schoolId}::uuid
+      `;
+      return row;
+    });
 
     if (!batch) {
       throw new Error(`Bulk invite ${data.bulkInviteId} not found`);
@@ -77,7 +105,8 @@ export async function processBulkInvite(
     let sent = 0;
     let failed = 0;
 
-    // Process pending recipients in batches.
+    // Process pending recipients in pages. Every page either moves at least one recipient out of
+    // `pending` or stops the run, so the loop is bounded by the number of recipients.
     while (true) {
       const batchResult = await processRecipientBatch(
         sql,
@@ -91,34 +120,40 @@ export async function processBulkInvite(
       sent += batchResult.sent;
       failed += batchResult.failed;
 
-      if (batchResult.processed < BATCH_SIZE) break;
+      if (batchResult.processed > 0 && batchResult.progressed === 0) {
+        throw new BulkInviteStalledError(data.bulkInviteId, batchResult.processed);
+      }
+      if (batchResult.processed < BULK_INVITE_BATCH_SIZE) break;
     }
 
     // Update the batch summary and mark completed.
-    await sql`
-      UPDATE app.bulk_invites
-      SET status = 'completed'::app.bulk_invite_status,
-          sent_count = ${sent},
-          failed_count = ${failed},
-          completed_at = CURRENT_TIMESTAMP,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${data.bulkInviteId}::uuid AND school_id = ${data.schoolId}
-    `;
+    await withSystemTenantTx(sql, tenant, async (tx) => {
+      await tx`
+        UPDATE app.bulk_invites
+        SET status = 'completed'::app.bulk_invite_status,
+            sent_count = ${sent},
+            failed_count = ${failed},
+            completed_at = CURRENT_TIMESTAMP,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${data.bulkInviteId}::uuid AND school_id = ${data.schoolId}::uuid
+      `;
+    });
 
     return { sent, failed };
   } catch (error) {
-    // Mark as failed.
-    await sql`
-      UPDATE app.bulk_invites
-      SET status = 'failed'::app.bulk_invite_status, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${data.bulkInviteId}::uuid AND school_id = ${data.schoolId}
-    `.catch(() => {
-      // Best-effort status update on failure; ignore errors from the status write itself.
-    });
+    // Mark as failed. Best-effort: an error from the status write itself is ignored so the
+    // original error is what BullMQ sees.
+    await withSystemTenantTx(sql, tenant, async (tx) => {
+      await tx`
+        UPDATE app.bulk_invites
+        SET status = 'failed'::app.bulk_invite_status, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${data.bulkInviteId}::uuid AND school_id = ${data.schoolId}::uuid
+      `;
+    }).catch(() => undefined);
 
     throw error;
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
@@ -126,41 +161,50 @@ export async function processBulkInvite(
 // Batch processing
 // ---------------------------------------------------------------------------
 
+interface RecipientBatchResult {
+  sent: number;
+  failed: number;
+  /** Recipients read on this page. */
+  processed: number;
+  /** Recipients this page actually moved out of `pending` (sent, or marked failed). */
+  progressed: number;
+}
+
 async function processRecipientBatch(
-  sql: postgres.Sql,
+  sql: Sql,
   schoolId: string,
   bulkInviteId: string,
   role: string,
   createdBy: string,
   expiresAt: string,
-): Promise<{ sent: number; failed: number; processed: number }> {
+): Promise<RecipientBatchResult> {
   // Fetch a page of pending recipients.
-  const recipients = await sql<BulkInviteRecipient[]>`
-    SELECT id, email, normalized_email, status
-    FROM app.bulk_invite_recipients
-    WHERE bulk_invite_id = ${bulkInviteId}::uuid
-      AND school_id = ${schoolId}
-      AND status = 'pending'::app.bulk_invite_recipient_status
-    ORDER BY created_at ASC
-    LIMIT ${BATCH_SIZE}
-  `;
+  const recipients = await withSystemTenantTx(
+    sql,
+    { schoolId },
+    (tx) => tx<BulkInviteRecipient[]>`
+      SELECT id, email, normalized_email, status
+      FROM app.bulk_invite_recipients
+      WHERE bulk_invite_id = ${bulkInviteId}::uuid
+        AND school_id = ${schoolId}::uuid
+        AND status = 'pending'::app.bulk_invite_recipient_status
+      ORDER BY created_at ASC
+      LIMIT ${BULK_INVITE_BATCH_SIZE}
+    `,
+  );
 
   if (recipients.length === 0) {
-    return { sent: 0, failed: 0, processed: 0 };
+    return { sent: 0, failed: 0, processed: 0, progressed: 0 };
   }
 
   let sent = 0;
   let failed = 0;
+  let progressed = 0;
 
   // Process each recipient in its own transaction.
   for (const recipient of recipients) {
     try {
-      await sql.begin(async (tx) => {
-        await tx`
-          SELECT set_config('role', 'studafy_app', true),
-                 set_config('app.school_id', ${schoolId}, true)
-        `;
-
+      const updated = await withTenantTx(sql, { schoolId }, async (tx) => {
         const token = generateToken();
         const tokenHash = hashToken(token);
 
@@ -178,63 +222,78 @@ async function processRecipientBatch(
             ${createdBy}::uuid,
             ${expiresAt}::timestamptz
           )
-          ON CONFLICT (school_id, normalized_email, role) DO NOTHING
+          -- The predicate must match uq_invitations_active's, or Postgres finds no arbiter index
+          -- and every insert fails ("no unique or exclusion constraint matching").
+          ON CONFLICT (school_id, normalized_email, role)
+            WHERE revoked_at IS NULL AND consumed_at IS NULL
+            DO NOTHING
           RETURNING id
         `;
 
         if (!invitation) {
           // Duplicate active invitation exists — mark as sent (already covered).
-          await tx`
+          const duplicate = await tx`
             UPDATE app.bulk_invite_recipients
             SET status = 'sent'::app.bulk_invite_recipient_status,
                 error_message = 'duplicate active invitation',
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ${recipient.id}::uuid
           `;
-          sent++;
-          return;
+          return duplicate.count;
         }
 
-        // Emit outbox event for downstream email dispatch.
-        const payload = JSON.stringify({
+        // Emit outbox event for downstream email dispatch. Carries the raw token, exactly as the
+        // API's single invitation does (apps/api/src/lib/events/schemas.ts INVITATION_SENT): the
+        // email dispatcher builds the accept link from it, and the hash alone cannot. tx.json(),
+        // not JSON.stringify() + ::jsonb, which stores a JSON *string* the dispatcher cannot read
+        // (see billing/entitlement-change-publisher.ts).
+        const payload = tx.json({
           invitationId: invitation.id,
           email: recipient.email,
           role,
           expiresAt,
           invitedByUserId: createdBy,
+          token,
         });
 
         await tx`
           INSERT INTO app.outbox_events (school_id, event_name, payload)
-          VALUES (${schoolId}::uuid, 'invitation.sent', ${payload}::jsonb)
+          VALUES (${schoolId}::uuid, 'invitation.sent', ${payload})
         `;
 
         // Mark recipient as sent with the invitation ID.
-        await tx`
+        const marked = await tx`
           UPDATE app.bulk_invite_recipients
           SET status = 'sent'::app.bulk_invite_recipient_status,
               invitation_id = ${invitation.id}::uuid,
               updated_at = CURRENT_TIMESTAMP
           WHERE id = ${recipient.id}::uuid
         `;
-
-        sent++;
+        return marked.count;
       });
+      // Counted only once the transaction has committed.
+      sent++;
+      if (updated > 0) progressed++;
     } catch (error) {
-      // Mark recipient as failed with error message.
+      // Mark recipient as failed with error message. Best-effort, but whether it matched a row is
+      // what tells the caller this page made progress.
       const message = error instanceof Error ? error.message : "unknown error";
-      await sql`
-        UPDATE app.bulk_invite_recipients
-        SET status = 'failed'::app.bulk_invite_recipient_status,
-            error_message = ${message},
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = ${recipient.id}::uuid
-      `.catch(() => {
-        // Best-effort status update on failure; ignore errors from the status write itself.
-      });
+      const marked = await withSystemTenantTx(sql, { schoolId }, async (tx) => {
+        const result = await tx`
+          UPDATE app.bulk_invite_recipients
+          SET status = 'failed'::app.bulk_invite_recipient_status,
+              error_message = ${message},
+              updated_at = CURRENT_TIMESTAMP
+          WHERE id = ${recipient.id}::uuid
+            AND school_id = ${schoolId}::uuid
+            AND status = 'pending'::app.bulk_invite_recipient_status
+        `;
+        return result.count;
+      }).catch(() => 0);
       failed++;
+      if (marked > 0) progressed++;
     }
   }
 
-  return { sent, failed, processed: recipients.length };
+  return { sent, failed, processed: recipients.length, progressed };
 }

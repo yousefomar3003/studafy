@@ -8,7 +8,12 @@ import { requirePermission } from "../../../middleware/authz";
 import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
-import { sendFamilyReminder, sendFamilyStatement } from "../communications/service";
+import {
+  planBulkReminders,
+  reminderTriage,
+  sendFamilyReminder,
+  sendFamilyStatement,
+} from "../communications/service";
 import { withFinanceActorTx, withStudentIdentityTx } from "../students/service";
 
 import {
@@ -139,6 +144,9 @@ const statementDef = createRoute({
   ),
 });
 
+/** Most families one bulk reminder request sends to; the rest wait for the next request. */
+export const BULK_REMINDER_SEND_LIMIT = 100;
+
 const bulkReminderDef = createRoute({
   method: "post",
   path: "/api/finance/reminders",
@@ -147,7 +155,9 @@ const bulkReminderDef = createRoute({
   summary: "Remind every family with overdue fees",
   description:
     "Sends the overdue reminder to each listed family, or to every family with an overdue balance. " +
-    "Families reminded in the last 24 hours are skipped, so running it twice in a day is harmless.",
+    "Families reminded in the last 24 hours are skipped, so running it twice in a day is harmless. " +
+    "At most 100 families are reminded per request; `remaining` counts the rest, which the next " +
+    "request reaches.",
   security: [{ bearerAuth: [] }],
   request: {
     body: {
@@ -298,9 +308,23 @@ export function familyAccountRoutes(
       nothing_overdue: 0,
       no_guardians: 0,
       delivered: 0,
+      remaining: 0,
     };
+    // One set-based read sorts every family first: those with nothing overdue or reminded within
+    // the cooldown are counted without a transaction each, unknown ones are skipped. At most
+    // BULK_REMINDER_SEND_LIMIT are sent to per request, so one request's work stays bounded; the
+    // rest are reported as `remaining`, and running it again reaches them (the ones sent now are
+    // within the cooldown by then).
+    const unique = [...new Set(familyIds)];
+    const triage = await withFinanceActorTx(database, actor, (tx) =>
+      reminderTriage(tx, actor.schoolId, unique),
+    );
+    const plan = planBulkReminders(unique, triage, BULK_REMINDER_SEND_LIMIT);
+    summary.nothing_overdue = plan.nothingOverdue;
+    summary.recently_reminded = plan.recentlyReminded;
+    summary.remaining = plan.remaining;
     // One transaction per family: one family's failure must not undo the reminders already sent.
-    for (const familyId of [...new Set(familyIds)]) {
+    for (const familyId of plan.batch) {
       const outcome = await withFinanceActorTx(database, actor, async (tx) => {
         const sent = await sendFamilyReminder(tx, actor.schoolId, familyId, actor.userId);
         if (sent) await auditSend(tx, familyId, "payment_reminder", sent);

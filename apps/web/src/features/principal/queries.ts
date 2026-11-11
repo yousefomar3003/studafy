@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { api } from "../../lib/api";
 
-import { evaluationListKey, fetchEvaluations } from "./evaluations/queries";
+import { evaluationPreviewKey, fetchEvaluationPreview } from "./evaluations/queries";
 import { fetchMessageReports, messageReportTileKey } from "./message-reports/queries";
 
 import type { components } from "@studafy/api-client";
@@ -118,6 +118,7 @@ export async function fetchClassAttendanceSummary(
 const PRINCIPAL_HOME_POLL_MS = 60_000;
 export const OPEN_INCIDENTS_PREVIEW_LIMIT = 5;
 export const OPEN_MESSAGE_REPORTS_PREVIEW_LIMIT = 3;
+export const DRAFT_EVALUATIONS_PREVIEW_LIMIT = 5;
 const DRAFT_EVALUATIONS_FILTER = { status: "draft" as const };
 
 export function useOpenIncidentsPreviewQuery() {
@@ -137,10 +138,12 @@ export function useOpenMessageReportsPreviewQuery() {
   });
 }
 
+/** The newest draft evaluations plus the server's total — one request per poll, not every page. */
 export function useDraftEvaluationsQuery() {
   return useQuery({
-    queryKey: evaluationListKey(DRAFT_EVALUATIONS_FILTER),
-    queryFn: () => fetchEvaluations(DRAFT_EVALUATIONS_FILTER),
+    queryKey: evaluationPreviewKey(DRAFT_EVALUATIONS_FILTER, DRAFT_EVALUATIONS_PREVIEW_LIMIT),
+    queryFn: () =>
+      fetchEvaluationPreview(DRAFT_EVALUATIONS_FILTER, DRAFT_EVALUATIONS_PREVIEW_LIMIT),
     refetchInterval: PRINCIPAL_HOME_POLL_MS,
   });
 }

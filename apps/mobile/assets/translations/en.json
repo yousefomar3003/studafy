@@ -776,7 +776,10 @@
     },
     "generating": {
       "title": "Building your exam…",
-      "hint": "This can take a moment for a longer exam."
+      "hint": "This can take a moment for a longer exam.",
+      "stoppedTitle": "Still building your exam",
+      "stoppedHint": "This is taking longer than usual. Check again in a moment.",
+      "checkAgain": "Check again"
     },
     "ready": {
       "title": "Your exam is ready",
@@ -820,6 +823,11 @@
     "failed": {
       "title": "Couldn't build this exam",
       "body": "Something went wrong generating your exam. No time was spent — try again.",
+      "startNew": "Start a new exam"
+    },
+    "expired": {
+      "title": "Time ran out",
+      "body": "Your answers didn't reach the server before this exam closed, so it can't be scored.",
       "startNew": "Start a new exam"
     },
     "citation": {

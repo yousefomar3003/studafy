@@ -12,12 +12,30 @@ import { createServer } from "node:net";
 import type { Server, Socket } from "node:net";
 
 const PREAMBLE = Buffer.from("zINSTREAM\0", "utf8");
+const PING = Buffer.from("zPING\0", "utf8");
 
+/**
+ * `options.resetFirst` drops that many connections as soon as they arrive, before reading anything —
+ * what a client sees from fly's proxy while an on-demand clamd machine is still booting. A PING
+ * (the readiness probe) is answered PONG; any other request must be INSTREAM.
+ */
 export async function startFakeClamd(
   respond: (payload: Buffer) => string,
-): Promise<{ port: number; receivedPayload: () => Buffer; close: () => Promise<void> }> {
+  options: { resetFirst?: number } = {},
+): Promise<{
+  port: number;
+  receivedPayload: () => Buffer;
+  connections: () => number;
+  close: () => Promise<void>;
+}> {
   const payload: Buffer[] = [];
+  let connections = 0;
   const server: Server = createServer((socket: Socket) => {
+    connections += 1;
+    if (connections <= (options.resetFirst ?? 0)) {
+      socket.destroy();
+      return;
+    }
     let buffer = Buffer.alloc(0);
     let stage: "preamble" | "length" | "data" = "preamble";
     let frameLength = 0;
@@ -51,6 +69,14 @@ export async function startFakeClamd(
 
     socket.on("data", (chunk: Buffer) => {
       buffer = Buffer.concat([buffer, chunk]);
+      if (
+        stage === "preamble" &&
+        buffer.length >= PING.length &&
+        buffer.subarray(0, PING.length).equals(PING)
+      ) {
+        socket.end("PONG\0");
+        return;
+      }
       const complete = parse();
       if (complete) {
         socket.end(`${respond(complete)}\0`);
@@ -65,6 +91,7 @@ export async function startFakeClamd(
   return {
     port,
     receivedPayload: () => Buffer.concat(payload),
+    connections: () => connections,
     close: () => new Promise((resolve) => server.close(() => resolve())),
   };
 }

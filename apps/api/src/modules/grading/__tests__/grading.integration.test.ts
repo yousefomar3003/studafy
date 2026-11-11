@@ -73,6 +73,8 @@ import {
   readFinalizationResults,
 } from "../results-service";
 
+import { expectSameAsLegacy } from "./characterize";
+
 import type { TestApp, TestDatabase, TenantFixture } from "../../../../tests/harness";
 import type { SubjectConfigInput } from "../config-service";
 import type { MarkEntryInput } from "../marks-service";
@@ -113,6 +115,17 @@ const as = <T>(
 ) => withTenantTx(client!, { schoolId, userId }, fn);
 const admin = <T>(fn: (tx: TransactionSql) => Promise<T>) => as(tenant.users.ORG_ADMIN.id, fn);
 const teacher = <T>(fn: (tx: TransactionSql) => Promise<T>) => as(tenant.teachers[0]!.userId, fn);
+
+/**
+ * Characterization: at each step of the story, the set-based reads (overview, publish issues,
+ * summaries, every section x period computation, readiness, teacher assignments) must equal the
+ * per-row reference implementation exactly.
+ */
+async function characterize(yearId = tenant.academicYear.id) {
+  const teachers = [teacher];
+  if (ids.outsiderUser) teachers.push((fn) => as(ids.outsiderUser!, fn));
+  await expectSameAsLegacy(admin, tenant.schoolId, yearId, teachers);
+}
 
 /** The error code a rejected call carries. */
 async function codeOf(promise: Promise<unknown>): Promise<string> {
@@ -399,6 +412,7 @@ describeDb("academic grading", () => {
       await placeStudentInSection(tx, tenant.schoolId, ids["8A"]!, ids.s2!);
       await placeStudentInSection(tx, tenant.schoolId, ids["8B"]!, ids.s3!);
     });
+    await characterize();
   });
 
   test("7: weights are validated; a draft keeps an unfinished subject, publication refuses it", async () => {
@@ -423,6 +437,7 @@ describeDb("academic grading", () => {
     expect(broken.config.valid).toBe(false);
     expect(broken.config.weight_summary.annualTotal).toBe(90);
     expect(broken.config.issues.map((issue) => issue.code)).toContain("ANNUAL_WEIGHT_TOTAL");
+    await characterize();
 
     const issues = await admin((tx) =>
       collectPublishIssues(tx, tenant.schoolId, tenant.academicYear.id),
@@ -456,6 +471,7 @@ describeDb("academic grading", () => {
         ),
       ),
     ).toBe(ERROR_CODES.ACADEMIC_CONFIG_INVALID);
+    await characterize();
   });
 
   test("4: sections can override, exclude, or add one assessment, and say so explicitly", async () => {
@@ -546,6 +562,7 @@ describeDb("academic grading", () => {
     expect((await sheet(ids["8A"]!, ids.science!)).assessments.map((a) => a.name)).not.toContain(
       "Lab practical",
     );
+    await characterize();
   });
 
   test("14: teachers grade only what they are assigned to", async () => {
@@ -578,6 +595,7 @@ describeDb("academic grading", () => {
         ),
       ),
     ).toBe(ERROR_CODES.AUTHZ_FORBIDDEN);
+    await characterize();
   });
 
   test("9, 10, 11: marks, weighted, term and annual grades, and incomplete results", async () => {
@@ -680,6 +698,7 @@ describeDb("academic grading", () => {
         ),
       ),
     ).toBe(ERROR_CODES.MARK_SCORE_OUT_OF_RANGE);
+    await characterize();
   });
 
   test("5: changing a grade default needs confirmation, spares overrides and flags them", async () => {
@@ -725,6 +744,7 @@ describeDb("academic grading", () => {
     await admin((tx) => acknowledgeGradeRevision(tx, tenant.schoolId, ids.mathOverride8B!));
     const after = await admin((tx) => listSectionSubjects(tx, tenant.schoolId, ids["8B"]!));
     expect(after.subjects.find((s) => s.subject_id === ids.math)!.outdated).toBe(false);
+    await characterize();
   });
 
   test("approval: incomplete sheets cannot be submitted, submitted ones lock, approval unlocks finalization", async () => {
@@ -805,6 +825,7 @@ describeDb("academic grading", () => {
           null,
         );
     });
+    await characterize();
   });
 
   test("released marks: the student and a linked parent see approved marks by term, nobody else does", async () => {
@@ -958,6 +979,7 @@ describeDb("academic grading", () => {
         ),
       ),
     ).toBe(ERROR_CODES.RESULTS_ALREADY_FINALIZED);
+    await characterize();
   });
 
   test("10: a term report covers only the subjects graded in that term", async () => {
@@ -977,6 +999,7 @@ describeDb("academic grading", () => {
       average_percentage: 88,
       academic_status: "promoted",
     });
+    await characterize();
   });
 
   test("13: later configuration edits never change finalized results; finalized marks are locked", async () => {
@@ -1048,6 +1071,7 @@ describeDb("academic grading", () => {
         { confirmImpact: true },
       ),
     );
+    await characterize();
   });
 
   test("15: certificates carry the finalized results exactly", async () => {
@@ -1080,6 +1104,7 @@ describeDb("academic grading", () => {
       issueCertificates(tx, tenant.schoolId, tenant.users.ORG_ADMIN.id, ids.final8A!, undefined),
     );
     expect(again.issued).toHaveLength(0);
+    await characterize();
   });
 
   test("17: a correction recomputes with the rules results were finalized under, then the certificate is reissued", async () => {
@@ -1139,6 +1164,7 @@ describeDb("academic grading", () => {
     );
     expect(superseded.status).toBe("superseded");
     expect(superseded.content.overall.average_percentage).toBe(79);
+    await characterize();
   });
 
   test("11, 15: incomplete results can be finalized as incomplete but never certified", async () => {
@@ -1189,6 +1215,7 @@ describeDb("academic grading", () => {
     );
     expect(overview.counts.certificates_blocked).toBe(1);
     expect(overview.counts.sections_with_overrides).toBe(2);
+    await characterize();
   });
 
   test("6: a new year starts from the old configuration without its marks or results", async () => {
@@ -1252,6 +1279,8 @@ describeDb("academic grading", () => {
     // And the old year is untouched.
     const old = await admin((tx) => getConfigView(tx, tenant.schoolId, ids.scienceConfig!));
     expect(old.mark_count).toBe(10);
+    await characterize();
+    await characterize(year2!.id);
   });
 
   test("16: another school sees none of it", async () => {

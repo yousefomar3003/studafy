@@ -22,13 +22,14 @@
  */
 
 import { DOMAIN_EVENTS, NOTIFICATION_TYPES } from "@studafy/constants";
-import postgres from "postgres";
 
+import { leaseDatabase } from "../../../db/pool";
 import { withSystemTenantTx } from "../../../db/tenant-tx";
 
 import { loadSchoolIds } from "./schools";
 
-import type { TransactionSql } from "postgres";
+import type { DatabaseSource } from "../../../db/pool";
+import type { Sql, TransactionSql } from "postgres";
 
 /**
  * The notification types this job digests. A subset of DIGEST_ELIGIBLE_NOTIFICATION_TYPES
@@ -141,7 +142,7 @@ async function loadRecipientContext(
  * per-recipient notification.digestSent outbox events, all in one transaction.
  */
 async function processSchool(
-  sql: postgres.Sql,
+  sql: Sql,
   schoolId: string,
 ): Promise<{ recipients: number; items: number; claimed: number }> {
   return withSystemTenantTx(sql, { schoolId }, async (tx) => {
@@ -202,14 +203,15 @@ async function processSchool(
 }
 
 /**
- * Run one notification-digest cycle. `databaseUrl` is a parameter rather than read from the
- * environment so the processor is callable from a test against a disposable database — the same
- * shape digest-producer.ts and the attendance alert processor establish.
+ * Run one notification-digest cycle. `database` is a parameter rather than read from the
+ * environment — the process-wide pool in production, a connection string for a disposable database
+ * in tests — the same shape digest-producer.ts and the attendance alert processor establish.
  */
 export async function processNotificationDigest(
-  databaseUrl: string,
+  database: DatabaseSource,
 ): Promise<NotificationDigestResult> {
-  const sql = postgres(databaseUrl, { max: 4, idle_timeout: 20, prepare: false });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
     const schoolIds = await loadSchoolIds(sql);
@@ -233,6 +235,6 @@ export async function processNotificationDigest(
       notificationsClaimed: claimed,
     };
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }

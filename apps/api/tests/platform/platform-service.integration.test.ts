@@ -8,8 +8,10 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
+import { pipelinePerSchool, withSystemTx } from "../../src/db/tenant-tx";
 import {
   changeSchoolStatus,
+  getPlatformFinance,
   getPlatformOverview,
   getSchoolDetail,
   listPlans,
@@ -174,6 +176,69 @@ describe("platform console reads", () => {
     expect(pending.schools.map((s) => s.id)).toEqual([fixture.beta]);
     expect(pending.schools[0]!.subscription).toBeNull();
   });
+
+  integrationTest("each listed school's figures match reading that school alone", async () => {
+    const all = await listSchools(database(), { limit: 25, offset: 0 });
+    for (const summary of all.schools) {
+      const detail = await getSchoolDetail(database(), summary.id);
+      expect(summary).toEqual({
+        id: detail.id,
+        slug: detail.slug,
+        name: detail.name,
+        email: detail.email,
+        status: detail.status,
+        schoolNumber: detail.schoolNumber,
+        countryCode: detail.countryCode,
+        currencyCode: detail.currencyCode,
+        isReviewTenant: detail.isReviewTenant,
+        createdAt: detail.createdAt,
+        activeUsers: detail.activeUsers,
+        students: detail.students,
+        subscription: detail.subscription,
+      });
+    }
+  });
+
+  integrationTest("finance flags each school's own subscription", async () => {
+    const finance = await getPlatformFinance(database());
+    expect(finance.attention).toEqual([
+      expect.objectContaining({
+        schoolId: fixture.alpha,
+        schoolName: "Alpha Academy",
+        reason: "trial_ending",
+        subscriptionStatus: "trialing",
+        planName: "Platform Test Plan",
+      }),
+    ]);
+    expect(finance.revenueByCurrency).toEqual([]);
+    expect(finance.recentFailedRenewals).toEqual([]);
+  });
+
+  integrationTest(
+    "a pipelined walk reads each school under its own scope, then clears it",
+    async () => {
+      const schools = [{ id: fixture.alpha }, { id: fixture.beta }, { id: fixture.home }];
+      const { perSchool, after } = await withSystemTx(database(), async (tx) => {
+        const perSchool = await pipelinePerSchool(tx, schools, () => [
+          tx<{ scope: string }[]>`SELECT current_setting('app.school_id') AS scope`,
+          tx<{ school_id: string; n: number }[]>`
+          SELECT school_id::text AS school_id, count(*)::int AS n
+          FROM app.users GROUP BY school_id
+        `,
+        ]);
+        const [after] = await tx<{ scope: string }[]>`
+        SELECT current_setting('app.school_id', true) AS scope
+      `;
+        return { perSchool, after: after!.scope };
+      });
+      expect(perSchool.map(([[row]]) => row!.scope)).toEqual(schools.map((s) => s.id));
+      expect(perSchool.map(([, rows]) => rows.map((row) => row.school_id))).toEqual(
+        schools.map((s) => [s.id]),
+      );
+      expect(perSchool.map(([, [row]]) => row!.n)).toEqual([3, 2, 1]);
+      expect(after).toBe("");
+    },
+  );
 
   integrationTest("school detail counts roles within that school only", async () => {
     const detail = await getSchoolDetail(database(), fixture.beta);

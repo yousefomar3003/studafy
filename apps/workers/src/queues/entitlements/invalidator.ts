@@ -1,7 +1,8 @@
 import { DOMAIN_EVENTS } from "@studafy/constants";
 
 import { withSystemTenantTx } from "../../db/tenant-tx";
-import { loadSchoolIds } from "../notifications/email/schools";
+import { discoverPendingSchools } from "../outbox-discovery";
+import { startPollLoop } from "../poll-loop";
 
 import { claimEntitlementRows, markEntitlementRowsApplied } from "./claim";
 
@@ -23,13 +24,19 @@ import type { Sql } from "postgres";
  * delivery at-least-once, which is safe because the invalidation is idempotent — the version guard
  * turns a repeat into a no-op.
  *
- * ## Known ceiling
+ * ## Which schools, and how often
  *
- * Like the email dispatcher, this enumerates schools per cycle and issues one claim per school,
- * because `app.outbox_events` is tenant-isolated and its policy reads `app.school_id` without
- * `missing_ok` — a cross-tenant claim is not expressible. Schools are processed in bounded-parallel
- * chunks rather than serially, which is an improvement on that precedent but not a fix. A
- * tenant-agnostic outbox claim path is its own ticket and would benefit both consumers.
+ * `app.outbox_events` is tenant-isolated and its policy reads `app.school_id` without `missing_ok`,
+ * so a cross-tenant claim is not expressible. Each cycle therefore first asks
+ * `app.outbox_pending_school_ids('entitlement')` (000200) — one statement that probes this consumer's
+ * two partial indexes school by school — and opens a claim transaction only for the schools it
+ * names, in bounded-parallel chunks. An idle cycle is that one statement, not a transaction per
+ * school.
+ *
+ * Idle cycles back off from `pollIntervalMs` to `maxIdleIntervalMs` (poll-loop.ts). The SLA budget:
+ * an event committed just after an empty cycle waits at most `maxIdleIntervalMs` for the next one,
+ * plus that cycle's discovery and claim (milliseconds). apps/workers/src/index.ts sets 2 s, which
+ * keeps the worst case comfortably inside <5 s; raising it past ~4 s would break the SLA.
  */
 
 export interface EntitlementInvalidatorLogger {
@@ -40,7 +47,13 @@ export interface EntitlementInvalidatorLogger {
 
 export interface EntitlementInvalidatorConfig {
   batchSize: number;
+  /** The idle sleep after the first empty cycle. */
   pollIntervalMs: number;
+  /**
+   * The ceiling the idle sleep doubles up to while cycles stay empty — the dominant term in the <5 s
+   * propagation SLA (see the header). Defaults to `pollIntervalMs`, i.e. no backoff.
+   */
+  maxIdleIntervalMs?: number;
   /** How many schools to claim from concurrently. Bounds pool usage on a large tenant list. */
   concurrency: number;
 }
@@ -163,9 +176,12 @@ export async function processEntitlementSchool(
   });
 }
 
-/** Process every school once, in bounded-parallel chunks. Exported for tests. */
+/**
+ * Process every school with unapplied entitlement rows once, in bounded-parallel chunks. Exported
+ * for tests.
+ */
 export async function runEntitlementCycle(ctx: EntitlementInvalidatorContext): Promise<number> {
-  const schoolIds = await loadSchoolIds(ctx.db);
+  const schoolIds = await discoverPendingSchools(ctx.db, "entitlement");
   let applied = 0;
 
   for (let index = 0; index < schoolIds.length; index += ctx.config.concurrency) {
@@ -194,35 +210,16 @@ export async function runEntitlementCycle(ctx: EntitlementInvalidatorContext): P
 export function startEntitlementInvalidator(
   ctx: EntitlementInvalidatorContext,
 ): EntitlementInvalidatorHandle {
-  let stopped = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const loop = async (): Promise<void> => {
-    while (!stopped) {
-      try {
-        const applied = await runEntitlementCycle(ctx);
-        // Only idle when there was nothing to do. A full batch means more is waiting, and sleeping on
-        // it would turn a backlog into a multiple of the poll interval.
-        if (applied === 0) {
-          await new Promise<void>((resolve) => {
-            timer = setTimeout(resolve, ctx.config.pollIntervalMs);
-          });
-        }
-      } catch (err) {
-        ctx.logger.error({ err }, "entitlement invalidator cycle failed");
-        await new Promise<void>((resolve) => {
-          timer = setTimeout(resolve, ctx.config.pollIntervalMs);
-        });
-      }
-    }
-  };
-
-  void loop();
+  const loop = startPollLoop({
+    minIdleMs: ctx.config.pollIntervalMs,
+    maxIdleMs: ctx.config.maxIdleIntervalMs ?? ctx.config.pollIntervalMs,
+    cycle: () => runEntitlementCycle(ctx),
+    onError: (err) => ctx.logger.error({ err }, "entitlement invalidator cycle failed"),
+  });
 
   return {
     stop() {
-      stopped = true;
-      if (timer) clearTimeout(timer);
+      loop.stop();
     },
   };
 }

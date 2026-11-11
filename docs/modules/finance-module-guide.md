@@ -357,12 +357,12 @@ a guardian is linked the next invoice counts the student as a sibling. Issued in
 Four notification types (000152) reach a student's guardians, written straight into
 `app.notifications` like announcements and messages:
 
-| Type                   | Sent when                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------- |
-| `FEE_INVOICE_ISSUED`   | ERPNext's Sales Invoice webhook projects a submitted invoice that owes money      |
-| `FEE_PAYMENT_RECEIVED` | a Payment Entry is confirmed (either webhook)                                     |
-| `FEE_PAYMENT_REMINDER` | finance reminds a family, or all overdue families (`POST /api/finance/reminders`) |
-| `FEE_STATEMENT`        | finance sends a family its statement                                              |
+| Type                   | Sent when                                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `FEE_INVOICE_ISSUED`   | ERPNext's Sales Invoice webhook projects a submitted invoice that owes money                                                                                        |
+| `FEE_PAYMENT_RECEIVED` | a Payment Entry is confirmed (either webhook)                                                                                                                       |
+| `FEE_PAYMENT_REMINDER` | finance reminds a family, or all overdue families (`POST /api/finance/reminders`; at most 100 sends per request, the rest reported as `remaining` for the next run) |
+| `FEE_STATEMENT`        | finance sends a family its statement                                                                                                                                |
 
 `app.finance_communications` (000153) logs every send per guardian. Its partial unique index keeps an
 automatic notice to one per document, however often ERPNext redelivers; it enforces a 24-hour
