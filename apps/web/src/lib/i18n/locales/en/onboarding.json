@@ -51,6 +51,27 @@
     "invitationSent": "We also sent an account-activation invitation to <strong>{{email}}</strong>. It becomes usable once the school email above is verified.",
     "resend": "Resend verification email"
   },
+  "verifyEmail": {
+    "seoTitle": "Verify your school's email",
+    "seoDescription": "Confirm your school's contact email to activate it on Studafy.",
+    "title": "Verify your school's email",
+    "body": "Press the button to confirm this is your school's contact email and activate the school on Studafy.",
+    "submit": "Verify my email",
+    "verifiedTitle": "Your school is active",
+    "verifiedBody": "{{school}} is now active, and its workspace is being set up.",
+    "verifiedBodyNoName": "Your school is now active, and its workspace is being set up.",
+    "nextStep": "The administrator can now accept the invitation we emailed them, then sign in.",
+    "signIn": "Sign in",
+    "linkIncomplete": "This link is incomplete. Copy the whole link from the email, or request a new one below.",
+    "linkInvalid": "This link is invalid or has already been used. If your school's email is already verified, sign in. Otherwise, request a new link below.",
+    "linkExpired": "This link has expired. Request a new one below.",
+    "alreadyVerified": "Your school's email is already verified. You can sign in.",
+    "rateLimited": "Too many attempts. Wait a few minutes and try again.",
+    "resendHeading": "Request a new verification link",
+    "resendEmailLabel": "School contact email",
+    "resendSubmit": "Send a new link",
+    "resendSent": "If {{email}} belongs to a school waiting for verification, we have sent it a new link."
+  },
   "setup": {
     "stepsNavLabel": "Setup steps",
     "stepLabel": "{{number}}. {{label}}",
