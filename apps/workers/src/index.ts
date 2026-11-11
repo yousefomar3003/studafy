@@ -26,6 +26,7 @@ import {
   scheduleAccountDeletionSweepJob,
   scheduleAiMessageRetentionSweepJob,
   scheduleIpAddressRetentionSweepJob,
+  scheduleDataRetentionSweepJob,
   schedulePartitionMaintenanceJob,
   scheduleRecordRetentionSweepJob,
   scheduleClosureSweepJob,
@@ -259,6 +260,12 @@ const partitionMaintenanceRedis = createRedisConnection(env);
 void schedulePartitionMaintenanceJob(partitionMaintenanceRedis).then(() =>
   partitionMaintenanceRedis.disconnect(),
 );
+
+// Data retention scheduler (docs/modules/data-retention.md): idempotently register the daily 03:15
+// deletion of security events, sales inquiries, rejected school applications and in-app
+// notifications past 12 months, and of export bundles 30 days after their request finished.
+const dataRetentionRedis = createRedisConnection(env);
+void scheduleDataRetentionSweepJob(dataRetentionRedis).then(() => dataRetentionRedis.disconnect());
 
 // Ask AI message retention scheduler (ST-309): idempotently register the daily 08:45 purge of
 // app.ai_messages rows past their 90-day `expires_at` on the maintenance queue.

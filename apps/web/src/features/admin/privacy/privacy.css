@@ -1,6 +1,6 @@
 /**
  * Privacy requests page: the heading row with its "New request" button, each request's status
- * label, and the new-request form's spacing.
+ * label, an export whose file has been deleted, and the new-request form's spacing.
  */
 
 .privacy-page__header {
@@ -30,6 +30,11 @@
   border-color: transparent;
   background-color: var(--color-danger-subtle-bg);
   color: var(--color-danger-subtle-foreground);
+}
+
+.privacy-page__expired {
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
 }
 
 .privacy-form {

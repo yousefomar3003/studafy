@@ -1,10 +1,16 @@
 import { Button, Table, useToast } from "@studafy/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { NewPrivacyRequestModal } from "./NewPrivacyRequestModal";
-import { fetchExportDownloadUrl, usePrivacyRequests } from "./queries";
+import {
+  PRIVACY_REQUESTS_KEY,
+  fetchExportDownload,
+  isExportDeleted,
+  usePrivacyRequests,
+} from "./queries";
 
 import type { SchoolPrivacyRequest } from "./queries";
 
@@ -23,12 +29,14 @@ function subjectName(request: SchoolPrivacyRequest): string | null {
  * Privacy requests (`/portal/admin/privacy`), gated on `privacy:manageDsr` (ORG_ADMIN): every
  * request to export or erase what the school holds about one person, with its status and the
  * 30-day deadline it must be finished by. A finished export is downloaded from here; the link is
- * signed on demand and expires after a few minutes.
+ * signed on demand and expires after a few minutes. The bundle itself is deleted 30 days after the
+ * export finished, after which the row says so instead of offering a download.
  */
 export default function PrivacyRequestsPage() {
   const { t } = useTranslation();
   const { formatDate } = useFormatters();
   const { show } = useToast();
+  const queryClient = useQueryClient();
   const requests = usePrivacyRequests();
   const [filing, setFiling] = useState(false);
   const [downloading, setDownloading] = useState<string | null>(null);
@@ -39,7 +47,17 @@ export default function PrivacyRequestsPage() {
   async function download(request: SchoolPrivacyRequest) {
     setDownloading(request.id);
     try {
-      const url = await fetchExportDownloadUrl(request.id);
+      const { url, deleted } = await fetchExportDownload(request.id);
+      if (deleted) {
+        // Deleted since the list was loaded: say why, and refresh the row so it shows as such.
+        show({
+          variant: "error",
+          title: t("adminSchool.privacy.exportDeletedToast.title"),
+          description: t("adminSchool.privacy.exportDeletedToast.description"),
+        });
+        void queryClient.invalidateQueries({ queryKey: PRIVACY_REQUESTS_KEY });
+        return;
+      }
       if (!url) throw new Error("No download link.");
       window.open(url, "_blank", "noopener");
     } catch {
@@ -98,17 +116,23 @@ export default function PrivacyRequestsPage() {
               </Table.Cell>
               <Table.Cell>
                 {request.status === "completed" && request.request_type === "export" ? (
-                  <Button
-                    type="button"
-                    variant="tertiary"
-                    loading={downloading === request.id}
-                    aria-label={t("adminSchool.privacy.downloadLabel", {
-                      name: subjectName(request) ?? t("adminSchool.privacy.removedPerson"),
-                    })}
-                    onClick={() => void download(request)}
-                  >
-                    {t("adminSchool.privacy.download")}
-                  </Button>
+                  isExportDeleted(request) ? (
+                    <span className="privacy-page__expired">
+                      {t("adminSchool.privacy.exportDeleted")}
+                    </span>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="tertiary"
+                      loading={downloading === request.id}
+                      aria-label={t("adminSchool.privacy.downloadLabel", {
+                        name: subjectName(request) ?? t("adminSchool.privacy.removedPerson"),
+                      })}
+                      onClick={() => void download(request)}
+                    >
+                      {t("adminSchool.privacy.download")}
+                    </Button>
+                  )
                 ) : request.status === "failed" ? (
                   (request.failure_message ?? t("adminSchool.privacy.failedFallback"))
                 ) : (

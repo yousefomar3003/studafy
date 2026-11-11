@@ -1,9 +1,11 @@
 /**
  * School closure by the school's own administrator (POST /api/schools/current/closure).
  *
- * Closing a school is not deleting it. The school row moves to `archived` — the existing terminal
- * lifecycle state — and every row the school owns is kept: nothing is erased and no data subject
- * request is filed. What changes is who can get in, which is nobody:
+ * Closing a school does not delete anything at once. The school row moves to `archived` — the
+ * existing terminal lifecycle state — and every row the school owns is kept for now. The workers'
+ * daily tenant-closure sweep (apps/workers/src/queues/maintenance/closure-sweep.ts) then files the
+ * closure export and, 30 days after the export completes, the erasure of the school's data, as the
+ * School Agreement promises (clause B10). What changes at once is who can get in, which is nobody:
  *
  * 1. `app.schools.status = 'archived'`, with `closed_at` / `closed_by` (migration 000128).
  * 2. The school's entitlement version is bumped. jwtAuthMiddleware rejects every access token
