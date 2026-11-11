@@ -17,7 +17,7 @@ declared an embedding provider, so both ends of the vector leg are the same dete
   constructed in `apps/api/src/app.ts` for both `/search` and `/ask`.
 
 The mock seeds a sine vector from an FNV-1a hash of the text. Cosine distance between two of these
-vectors is well-formed and meaningless. With `AI_LLM_ENABLED=true` in `infra/deploy/environments/prod.env`,
+vectors is well-formed and meaningless. With `AI_LLM_ENABLED=true` in `infra/fly/api.toml`,
 the semantic leg added noise to every fused ranking. It also did worse than that.
 
 **The Ask AI grounding gate depended on that noise.** `assessGrounding` (`ask/refusal.ts`) needs the

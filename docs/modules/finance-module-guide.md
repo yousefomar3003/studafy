@@ -52,8 +52,8 @@ middleware in `app.ts` before any route existed.
 The ST-119 ticket asks for per-tenant API key/secret pairs from Vault or Secrets Manager, keyed by
 school. **That is not how this system works, and the code does not pretend otherwise.**
 
-- There is no Vault. Secrets Manager is provisioned per _service_
-  (`infra/terraform/modules/secrets`), not per tenant.
+- There is no Vault. Secrets are held per _service_ (the `prod` GitHub Environment, copied to each
+  fly app; `infra/fly/README.md`), not per tenant.
 - `app.erpnext_site_configs` — filled in by provisioning — has no credential column, because
   ERPNext never issues a per-tenant key here.
 - Separation happens at the edge instead: the ERPNext nginx frontend runs with

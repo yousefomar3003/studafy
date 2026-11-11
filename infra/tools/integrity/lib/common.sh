@@ -15,26 +15,9 @@ require_uuid() {
 }
 
 # Resolves libpq's standard PG* environment variables for the instance the caller should talk to.
-# Mirrors infra/tools/tenant-restore/lib/common.sh exactly: either CONNECTION_SECRET_ARN+AWS_REGION
-# (AWS Secrets Manager master credential) or plain PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE.
+# Plain PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE; TLS required unless PGSSLMODE says otherwise.
 resolve_pg_connection() {
-  if [ -n "${CONNECTION_SECRET_ARN:-}" ]; then
-    : "${AWS_REGION:?AWS_REGION must be set alongside CONNECTION_SECRET_ARN}"
-    command -v aws >/dev/null 2>&1 || fail "CONNECTION_SECRET_ARN is set but the aws CLI is not on PATH"
-    log "reading DB credentials from $CONNECTION_SECRET_ARN"
-    local secret_json
-    secret_json="$(aws secretsmanager get-secret-value --secret-id "$CONNECTION_SECRET_ARN" \
-      --region "$AWS_REGION" --query SecretString --output text)" \
-      || fail "could not read $CONNECTION_SECRET_ARN"
-    PGUSER="$(jq -r '.username' <<<"$secret_json")"
-    PGPASSWORD="$(jq -r '.password' <<<"$secret_json")"
-    PGDATABASE="$(jq -r '.dbname' <<<"$secret_json")"
-    PGPORT="$(jq -r '.port' <<<"$secret_json")"
-    PGHOST="${PGHOST_OVERRIDE:-$(jq -r '.host' <<<"$secret_json")}"
-    export PGUSER PGPASSWORD PGDATABASE PGPORT PGHOST
-  else
-    : "${PGHOST:?}" "${PGPORT:?}" "${PGUSER:?}" "${PGPASSWORD:?}" "${PGDATABASE:?}"
-  fi
+  : "${PGHOST:?}" "${PGPORT:?}" "${PGUSER:?}" "${PGPASSWORD:?}" "${PGDATABASE:?}"
   export PGSSLMODE="${PGSSLMODE:-require}"
 }
 

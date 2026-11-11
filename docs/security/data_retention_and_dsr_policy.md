@@ -72,10 +72,10 @@ toward the schema's own `user_id`/`student_id`/`teacher_id` convention or wideni
 ## How erasure actually works
 
 Every tenant foreign key in this schema is `ON DELETE RESTRICT`
-(`docs/database/migration-policy.md`; the same fact `infra/tools/tenant-restore`'s README documents
-at length for the sibling ST-267 tool). There is no cascade to lean on, and deleting an arbitrary
-tenant table's rows in the right cross-table order is exactly the problem that tool had to solve
-with a topological sort. This pipeline sidesteps it entirely: **erasure redacts personal-data
+(`docs/database/migration-policy.md`; the AWS-era ST-267 tenant-restore tool, since removed,
+documented the same fact). There is no cascade to lean on, and deleting an arbitrary tenant table's
+rows in the right cross-table order is exactly the problem that tool had to solve with a
+topological sort. This pipeline sidesteps it entirely: **erasure redacts personal-data
 columns in place, it does not delete the row**, except for a short, explicit list of pure
 session/security artifacts with nothing else worth keeping.
 
@@ -87,8 +87,8 @@ session/security artifacts with nothing else worth keeping.
 - **`HARD_DELETE_TABLES`** -- `refresh_tokens`, `user_devices`, `oauth_identities`. Pure
   session/security grants with no other tenant table's foreign key pointing at them and nothing
   non-personal worth retaining once revoked.
-- **Everything else** discovered as a tenant table (`tenant-tables.ts`, the exact catalog query
-  `infra/tools/tenant-restore/lib/discover-tenant-tables.sql` already treats as ground truth) is
+- **Everything else** discovered as a tenant table (`tenant-tables.ts`, the same catalog query the
+  removed tenant-restore tool treated as ground truth) is
   redacted: every column whose name matches `PII_COLUMN_PATTERNS` (`display_name`, `first_name`,
   `email`, `date_of_birth`, ... -- see `retention-registry.ts` for the full, deliberately
   conservative list) is set to `NULL` if nullable, or to a fresh `'erased-<uuid>'` value if not
@@ -223,7 +223,7 @@ None of these tables is a legal hold (`retention-registry.ts`).
 ## Student import files
 
 A student import keeps the school's original file (`app.student_imports.source_storage_key`, in
-object storage under the sensitive-documents KMS key) and, once it completes, the cells of the
+object storage, encrypted at rest by the R2 bucket; the sensitive-documents KMS key went with AWS) and, once it completes, the cells of the
 columns no field read on the lines whose student it created or updated
 (`app.student_import_rows`, tagged with `student_id` and, for a parent the import created,
 `parent_user_id`; [docs/modules/student-import-mapping-guide.md](../modules/student-import-mapping-guide.md#import-history-and-unmapped-columns)).

@@ -182,8 +182,8 @@ consume `attendance.alertRaised` rather than changing this worker.
 alert engine could not have run in any deployed environment, and the outbox relay was already broken
 for the same reason.
 
-`infra/deploy/ecs/workers/task-definition.json.tpl` now supplies `DATABASE_HOST`/`PORT`/`NAME` and
-the PgBouncer credentials, mirroring the API. `apps/workers/src/env.ts` accepts those discrete
+`infra/fly/workers.toml` now supplies `DATABASE_HOST`/`PORT`/`NAME` (Supabase's transaction pooler),
+and the deploy workflow stages the database credentials as secrets, mirroring the API. `apps/workers/src/env.ts` accepts those discrete
 variables and composes a URL via `databaseUrlFrom()`, preferring them over `DATABASE_URL` — which
 still carries its localhost default, so preferring the URL would silently point a deployed worker at
 nothing.

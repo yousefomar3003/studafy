@@ -33,19 +33,16 @@ primary_region = "fra"
   CLAMAV_PORT = "3310"
   AI_LLM_PROVIDER = "openai-compatible"
   AI_LLM_BASE_URL = "https://api.together.xyz/v1"
-  EMAIL_PROVIDER = "resend"
   # Resend sends only from a domain verified with it, and the verified one is send.studafy.com
   # (resend._domainkey.send and the send.send return path in Vercel DNS). From studafy.com every
   # email was refused. A sending subdomain also keeps bulk mail off the root domain's reputation.
-  SES_FROM_ADDRESS = "no-reply@send.studafy.com"
-  SES_FROM_NAME = "Studafy"
+  EMAIL_FROM_ADDRESS = "no-reply@send.studafy.com"
+  EMAIL_FROM_NAME = "Studafy"
   EMAIL_DRY_RUN = "false"
   PUSH_DRY_RUN = "false"
   # With the GOOGLE_PLAY_SERVICE_ACCOUNT secret, the account-deletion sweep turns off a deleted
   # student's Google Play AI add-on renewal. Same package as api.toml.
   GOOGLE_PLAY_PACKAGE_NAME = "com.studafy.studafy_mobile"
-  # The cost report publishes to CloudWatch, which this deployment does not have.
-  COST_REPORT_ENABLED = "false"
 
 # Supabase's root CA, from the base64 secret SUPABASE_CA_CERT_B64 (fly files from secrets are
 # base64), written before the process starts so NODE_EXTRA_CA_CERTS can load it.

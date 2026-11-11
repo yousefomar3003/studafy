@@ -216,7 +216,7 @@ wrong student.
 ST-121 asks for per-tenant ERPNext credentials from Vault and a per-tenant webhook secret. **Neither
 exists, and the code does not pretend otherwise** — the same situation ST-119 documented:
 
-- There is no Vault. Secrets Manager is provisioned per _service_, not per tenant.
+- There is no Vault. Secrets are held per _service_ (`infra/fly/README.md`), not per tenant.
 - `app.erpnext_site_configs` has no credential column, because ERPNext issues no per-tenant key here.
 - Tenant separation happens at the edge: the ERPNext nginx frontend sets
   `FRAPPE_SITE_NAME_HEADER = "$host"`, so **the Host header selects the Frappe site**. One credential,

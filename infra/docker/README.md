@@ -1,32 +1,22 @@
 # Image build doc: every container image Studafy ships
 
-Fourteen Dockerfiles live in this directory, plus a `.dockerignore` at the repo root (Docker only
+Seven Dockerfiles live in this directory, plus a `.dockerignore` at the repo root (Docker only
 reads `.dockerignore` from the build context root, and every image builds with the repo root as
-context — see "Why the build context is the repo root" below). `release.yml` builds, attests, and
-signs all fourteen; the registry module (`infra/terraform/modules/registry`) has one ECR repository
-per image.
+context — see "Why the build context is the repo root" below). fly.io builds the production images
+from these Dockerfiles (`infra/fly/*.toml`).
 
-| Group         | Image            | Dockerfile                  | Config it bakes in / where it is deployed                                                                  |
-| ------------- | ---------------- | --------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| App           | `api`            | `api.Dockerfile`            | Bun bundle of `apps/api`; ECS task def `infra/deploy/ecs/api`                                              |
-| App           | `realtime`       | `realtime.Dockerfile`       | Bun bundle of `apps/realtime`; `infra/deploy/ecs/realtime`                                                 |
-| App           | `workers`        | `workers.Dockerfile`        | Bun bundle of `apps/workers` + `workers/healthcheck.ts`; `infra/deploy/ecs/workers`                        |
-| App           | `web`            | `web.Dockerfile`            | Vite build of `apps/web` served by nginx with `web/nginx.conf`                                             |
-| DB tooling    | `migrations`     | `migrations.Dockerfile`     | `db/migrations` + the `@studafy/db` CLI; one-off task `infra/deploy/ecs/migrations`                        |
-| ERPNext       | `erpnext`        | `erpnext.Dockerfile`        | `frappe/erpnext` + Education app + `infra/deploy/erpnext/{seed,backup}`; `infra/terraform/modules/erpnext` |
-| Observability | `prometheus`     | `prometheus.Dockerfile`     | `prometheus/` (`prometheus.yml`, `rules/`); `infra/terraform/modules/monitoring`                           |
-| Observability | `grafana`        | `grafana.Dockerfile`        | `grafana/` (provisioning, dashboards); `modules/monitoring`                                                |
-| Observability | `alertmanager`   | `alertmanager.Dockerfile`   | `alertmanager/alertmanager.yml`; `modules/monitoring`                                                      |
-| Observability | `otel-collector` | `otel-collector.Dockerfile` | `otel-collector/config.yaml`; `modules/monitoring` (`tracing.tf`)                                          |
-| Observability | `tempo`          | `tempo.Dockerfile`          | `tempo/tempo.yaml`; `modules/monitoring` (`tracing.tf`)                                                    |
-| Observability | `loki`           | `loki.Dockerfile`           | `loki/loki-config.yml.tpl`; `infra/terraform/modules/logging`                                              |
-| Observability | `vector`         | `vector.Dockerfile`         | `vector/vector.yaml`; `modules/logging`                                                                    |
-| Backup        | `backup-verify`  | `backup-verify.Dockerfile`  | psql/aws-cli toolchain + `backup-verify/postgres-restore-verify.sh`; `infra/terraform/modules/backup`      |
+| Group      | Image        | Dockerfile              | Config it bakes in / where it is deployed                                              |
+| ---------- | ------------ | ----------------------- | -------------------------------------------------------------------------------------- |
+| App        | `api`        | `api.Dockerfile`        | Bun bundle of `apps/api`; fly app `infra/fly/api.toml`                                 |
+| App        | `realtime`   | `realtime.Dockerfile`   | Bun bundle of `apps/realtime`; `infra/fly/realtime.toml`                               |
+| App        | `workers`    | `workers.Dockerfile`    | Bun bundle of `apps/workers` + `workers/healthcheck.ts`; `infra/fly/workers.toml`      |
+| App        | `web`        | `web.Dockerfile`        | Vite build of `apps/web` served by nginx with `web/nginx.conf`; `infra/fly/web.toml`   |
+| DB tooling | `migrations` | `migrations.Dockerfile` | `db/migrations` + the `@studafy/db` CLI; one-off machine `infra/fly/migrate.toml`      |
+| Scanning   | `clamav`     | `clamav.Dockerfile`     | clamd; `infra/fly/scanner.toml`                                                        |
+| ERPNext    | `erpnext`    | `erpnext.Dockerfile`    | `frappe/erpnext` + Education app + `infra/erpnext/seed`; local only (`db/compose.yml`) |
 
-`containers.yml` builds, size-checks, and trivy-scans the four app images, `migrations`, and
-`erpnext` on every relevant PR (erpnext's scan is report-only; see the workflow's matrix comment).
-The observability images are third-party bases with this repo's config on top; each Dockerfile's
-header explains its config.
+`containers.yml` builds, size-checks, and trivy-scans every image on each relevant PR (erpnext's
+scan is report-only; see the workflow's matrix comment).
 
 The rest of this doc covers the four application images and ERPNext:
 
@@ -55,15 +45,14 @@ docker build -f infra/docker/web.Dockerfile      -t studafy/web      .
 
 ### Why the build context is the repo root
 
-`docs/runbooks/supply-chain-security.md`'s CI example currently shows
-`docker build -t "$DIGEST_TAG" apps/api` — a per-app build context. That works for `apps/api`
+A per-app build context (`docker build apps/api`) works for `apps/api`
 alone, which has zero workspace runtime dependencies, but not for `apps/workers` or
 `apps/realtime` (both depend on `@studafy/constants`) or `apps/web` (depends on `@studafy/ui`):
 none of those workspace packages exist inside `apps/<name>/` for a context scoped that narrowly.
 All four Dockerfiles need `bun.lock` and the `packages/*` workspace members to run
 `bun install --frozen-lockfile` and `turbo run build`, so the context has to be the repo root for
-every one of them, and the four `docker build` invocations above are what CI should actually run —
-this doc corrects that example; see "Known gaps" for the actual line changed.
+every one of them, and the four `docker build` invocations above are what CI actually runs
+(`containers.yml`; fly deploys build from the repo root too, `fly deploy .`).
 
 ## Running the whole stack locally
 
@@ -75,8 +64,8 @@ docker compose --profile seed run --rm seed  # optional demo data
 ```
 
 Web is on http://localhost:8080 (sign in with "Continue with Mock"), the API on :3000, realtime
-on :3001. Services run with `NODE_ENV=development` because the production env schemas require
-AWS-only dependencies. ERPNext and the observability images are not part of it. See the header of
+on :3001. Services run with `NODE_ENV=development` because the production env schemas require real
+credentials (Resend, R2, ClamAV). ERPNext is not part of it (`db/compose.yml` runs it). See the header of
 `compose.yml` for details.
 
 ## How each image is built
@@ -203,37 +192,24 @@ scan has no critical CVEs` as a CI gate exists to catch: the pinned tag drifts o
 new advisories even when nothing in this repo changes, so CI needs to run this on every build, not
 just at Dockerfile-authoring time.
 
-## Signing (cosign)
-
-Once CI builds these images and pushes to the ECR repositories `infra/terraform/modules/registry`
-provisions, `docs/runbooks/supply-chain-security.md` documents the `cosign sign`/`cosign verify`
-flow against those repositories' KMS signing key. That doc is updated alongside this one — see
-"Known gaps" below for exactly what changed.
-
 ## ERPNext plane
 
 `infra/docker/erpnext.Dockerfile` doesn't follow the two-stage Bun shape above — see the
 Dockerfile's own header comment for why (no slim final artifact to build toward; it layers the
 Education app onto the official `frappe/erpnext` image in place). It has no single listen port or
-`ENTRYPOINT`: `infra/terraform/modules/erpnext`'s task-definition templates run four different
-commands against this one image (gunicorn for `backend`, node for `websocket`, `bench worker`/
+`ENTRYPOINT`: `db/compose.yml` runs four different commands against this one image (gunicorn for `backend`, node for `websocket`, `bench worker`/
 `bench schedule` for `queue`/`scheduler`) — the `frontend` role uses a separate, unmodified
-upstream image (`frappe/erpnext-nginx`) instead, since nginx doesn't need the Education app. See
-`infra/terraform/modules/erpnext/README.md`.
+upstream image (`frappe/erpnext-nginx`) instead, since nginx doesn't need the Education app. No
+hosted ERPNext runs today.
 
 ## Known gaps
 
 - **`infra/docker/erpnext.Dockerfile` is built but its scan does not gate.** `containers.yml`
-  builds and trivy-scans it on every relevant PR and `release.yml` signs it, but the scan is
+  builds and trivy-scans it on every relevant PR, but the scan is
   report-only (`trivy_exit_code: "0"`) because its CVEs come from the unmodified upstream
   `frappe/erpnext` base. Whether the pinned `version-15` tags of `frappe/erpnext` and
   `frappe/education` behave correctly together is only proven by running the plane, not by the
   build.
-- **`docs/runbooks/supply-chain-security.md`'s build example was corrected**: its
-  `docker build -t "$DIGEST_TAG" apps/api` used a per-app build context, which — as explained
-  above — only happens to work for `apps/api`. Updated to
-  `docker build -f infra/docker/api.Dockerfile -t "$DIGEST_TAG" .` (repo-root context), and its
-  "Known gaps" no longer lists "no Dockerfile exists yet" for these three services.
 - **`apps/workers`' healthcheck proves Redis reachability, not job-processing health.** A worker
   that's connected to Redis but wedged on a specific job (stuck lock, infinite loop in a handler)
   reports `healthy` — see "Healthcheck instructions" above. Closing that gap needs an

@@ -5,27 +5,24 @@
 # (infra/docker/README.md's "Why the build context is the repo root"):
 #   docker build -f infra/docker/clamav.Dockerfile -t studafy/clamav .
 #
-# Runs as a sidecar container in the workers ECS task (infra/deploy/ecs/workers/
-# task-definition.json.tpl). Under awsvpc networking the task's containers share one network
-# namespace, so the workers reach clamd on 127.0.0.1:3310 (CLAMAV_HOST) and clamd binds only there:
-# nothing outside the task can submit a scan. That binding also means a plain `docker run -p 3310`
-# of this image cannot be reached from the host — local development uses the upstream image
-# directly (see .env's CLAMAV_HOST comment).
+# In production it is its own fly app (infra/fly/scanner.toml), reached by the workers over the
+# organisation's private network. The image's default binding is 127.0.0.1 only, which means a
+# plain `docker run -p 3310` of this image cannot be reached from the host — local development uses
+# the upstream image directly (see .env's CLAMAV_HOST comment).
 #
 # The upstream image already ships a signature database and runs freshclam to keep it current
-# (outbound HTTPS through the private subnets' NAT). Overrides, applied by rewriting the upstream
+# (outbound HTTPS). Overrides, applied by rewriting the upstream
 # clamd.conf rather than appending, because clamd rejects a directive defined twice:
-#   - TCPSocket/TCPAddr: task-local only, as above. CLAMAV_TCP_ADDRS (space separated) overrides
-#     the bind addresses for a deployment where clamd is its own service: fly.io builds with
-#     "0.0.0.0 ::" and reaches it over the organisation's private network (infra/fly/scanner.toml).
+#   - TCPSocket/TCPAddr: 127.0.0.1 by default. CLAMAV_TCP_ADDRS (space separated) overrides the
+#     bind addresses: fly.io builds with "0.0.0.0 ::" and reaches it over the organisation's private
+#     network (infra/fly/scanner.toml).
 #   - StreamMaxLength: 26M, just above the workers' CLAMAV_MAX_FILE_BYTES default (25 MiB), so clamd
 #     never truncates a stream the worker considers in bounds.
 #   - ConcurrentDatabaseReload no: a signature update reloads in place instead of holding a second
 #     copy of the ~1.5 GB database while the new one loads, which would double peak memory.
 #
-# The task definition's healthCheck runs studafy-clamdcheck.sh (end of this file);
-# the workers container waits on it (dependsOn HEALTHY) so no scan is attempted before the
-# signatures are loaded.
+# studafy-clamdcheck.sh (end of this file) is the image's health probe: clamd answers PING only
+# once the signatures are loaded.
 
 ARG CLAMAV_VERSION=1.4
 
@@ -42,9 +39,8 @@ RUN set -eu; \
       'StreamMaxLength 26M' \
       'ConcurrentDatabaseReload no' >> "$conf"
 
-# Health check for the task definition. The upstream clamdcheck.sh dials `localhost`, which resolves
-# to ::1 first in this image while clamd binds 127.0.0.1 only (above), so it never sees PONG and
-# the workers container — which waits on this check — would never start. Same PING/PONG probe,
+# Health check. The upstream clamdcheck.sh dials `localhost`, which resolves to ::1 first in this
+# image while clamd binds 127.0.0.1 by default (above), so it would never see PONG. Same PING/PONG probe,
 # pinned to the address clamd actually listens on.
 RUN printf '%s\n' \
       '#!/bin/sh' \

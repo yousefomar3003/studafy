@@ -53,8 +53,9 @@ normalized_email)`, so the same human may exist in more than one school as far a
   `setTenantScope`, exactly once the tenant is resolved.
 - **Centralized tenant management stays in `app.schools`.** Provisioning and restore are
   documented runbook operations, not schema events
-  ([`docs/runbooks/tenant-provisioning-checklist.md`](../runbooks/tenant-provisioning-checklist.md),
-  [`docs/runbooks/tenant-restore.md`](../runbooks/tenant-restore.md)).
+  ([`docs/runbooks/tenant-provisioning-checklist.md`](../runbooks/tenant-provisioning-checklist.md);
+  the AWS-era tenant-restore runbook was removed with AWS, and no restore procedure is defined for
+  Supabase yet).
 
 ## Alternatives considered
 

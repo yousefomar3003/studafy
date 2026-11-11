@@ -44,7 +44,6 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/auth/providers/link/start",
   "POST /api/schools/register",
   "POST /erpnext/webhooks",
-  "POST /email/webhooks/sns",
   "POST /email/webhooks/resend",
   "POST /api/subscriptions/webhook/stripe",
   "POST /api/subscriptions/webhook/tap",
@@ -559,9 +558,7 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "DELETE /api/auth/devices/{deviceId}",
   // Webhook — HMAC-authenticated, not bearer.
   "POST /erpnext/webhooks",
-  // SES → SNS email-event webhook (R-08) — SNS-signature-authenticated, not bearer.
-  "POST /email/webhooks/sns",
-  // Resend email-event webhook — Svix-signature-authenticated, not bearer.
+  // Resend email-event webhook (R-08) — Svix-signature-authenticated, not bearer.
   "POST /email/webhooks/resend",
   // Stripe billing webhook (ST-132) — authenticated by the Stripe-Signature HMAC over the raw
   // request body, not by a bearer token. Stripe holds no Studafy identity and no permission could

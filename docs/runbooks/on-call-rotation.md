@@ -2,31 +2,20 @@
 
 Who answers a page, when, and what they are expected to do.
 
-The alerts themselves, their severities and their per-alert procedures are in
-[`alert-catalog.md`](alert-catalog.md). This file is the other half: the human contract behind the
-`critical` / `warning` split that Alertmanager routes on.
+This file is the human contract behind the `critical` / `warning` split.
 
 ## Where the rotation actually lives
 
-**In the SNS subscriber list.** `infra/docker/alertmanager/alertmanager.yml` maps severity to one
-of three AWS SNS topics (`infra/terraform/modules/monitoring/notifications.tf`) and stops there:
-`critical` goes by email and SMS to `alert_email_addresses` / `alert_sms_numbers`, and to the
-Telegram chat in `alert_telegram_chat_id` (Alertmanager's own integration, not SNS); `warning` goes
-by email only. SNS has no schedules, acknowledgements or escalation timers, so until the team adopts
-an on-call provider, the rotation below is followed by people, not enforced by a tool — the
-recipients are everyone on it.
+**Nowhere automated, today.** The alerting pipeline ST-262 built (Prometheus rules, CloudWatch
+alarms, Alertmanager routing to SNS email/SMS and Telegram, and the alert catalog that went with
+them) ran on AWS and was retired with it. Production on fly.io reports errors to Sentry (org
+`studafy-limited`) and ships logs to Axiom (dataset `studafy-logs`, `infra/fly/log-shipper.toml`);
+no alert rules, routes or paging integration for either are defined in this repository, and there
+is no alert catalog yet.
 
-That boundary is deliberate and it is also forced. Alertmanager's time intervals _mute_ a matched
-route, they do not divert it — its own reference is explicit that a muted route "acts normally
-(including ending the route-matching process)". So "page during working hours, raise a ticket
-otherwise" cannot be written as two sibling routes: the out-of-hours alert would match the first
-one and be silently dropped, never reaching the second. Encoding working hours here would mean
-shipping a rule that does not do what it reads as, or duplicating the provider's schedule in a
-second place that drifts from it.
-
-So this document is the **specification** the provider is configured to. When the two disagree, this
-file is what the configuration is wrong against — and fixing the drift is an agenda item for the
-review in [`alert-catalog.md`](alert-catalog.md#the-noisy-alert-review).
+Until the team adopts an on-call provider, the rotation below is followed by people, not enforced
+by a tool. This document is the **specification** that provider will be configured to; when the two
+disagree, this file is what the configuration is wrong against.
 
 ## The rotation
 
@@ -65,9 +54,7 @@ t+30m   page engineering lead
 Acknowledging is not the same as fixing. Acknowledge as soon as you are looking at it — that is what
 stops the escalation and tells everyone else the alert has an owner.
 
-**If you cannot fix it, escalate.** The per-alert sections in
-[`alert-catalog.md`](alert-catalog.md) each end with an escalation line saying when. Escalating is
-the expected outcome for a whole class of alerts (a replica rebuild, a billing reconciliation), not
+**If you cannot fix it, escalate.** Escalating is the expected outcome for a whole class of alerts (a replica rebuild, a billing reconciliation), not
 an admission of anything.
 
 ## Being on call
@@ -85,14 +72,11 @@ hours (they do not page, by design — if one wakes you, the routing is wrong an
 **Before your week starts**, confirm you can actually do the job — this takes five minutes and is the
 difference between an incident and an incident plus an access problem:
 
-- [ ] You can SSH to the bastion and port-forward Prometheus, Alertmanager and Grafana
-      ([`alert-catalog.md`](alert-catalog.md#getting-to-prometheus-and-alertmanager)).
-- [ ] You have AWS console and CLI access to the environment, including `aws ecs`, `aws logs` and
-      `aws cloudwatch set-alarm-state`.
-- [ ] You are in the provider's schedule for the week and your notification rules are set for the
-      device you actually sleep next to.
-- [ ] You have run the `warning`-severity half of the
-      [test-fire drill](alert-catalog.md#test-firing-an-alert) and seen it arrive.
+- [ ] You can sign in to Sentry (org `studafy-limited`) and Axiom (dataset `studafy-logs`).
+- [ ] You have `fly` CLI access to the `studafy-core-*` apps (`fly status`, `fly logs`) and can run
+      the **Production deploy (fly.io)** workflow ([`infra/fly/README.md`](../../infra/fly/README.md)).
+- [ ] Once an on-call provider exists: you are in its schedule for the week and your notification
+      rules are set for the device you actually sleep next to.
 
 ## Handover
 
@@ -105,17 +89,11 @@ Fifteen minutes, Sunday morning, both people present. The outgoing primary walks
 4. **Anything scheduled this week** that will look like an incident: a migration, a bulk import, a
    certificate rotation, a load test.
 
-The fortnightly [noisy-alert review](alert-catalog.md#the-noisy-alert-review) runs in the same slot
-on alternate weeks, with the same two people, for the same reason: the person who was woken is the
-one with the evidence.
+A fortnightly noisy-alert review belongs in the same slot on alternate weeks, with the same two
+people, for the same reason: the person who was woken is the one with the evidence.
 
 ## Changing the rotation
 
-Adding or removing a person is a change to `alert_email_addresses` / `alert_sms_numbers` in the
-tier's tfvars and a `terraform apply` — no image rebuild. The Telegram chat is the same kind of
-change (`alert_telegram_chat_id`), plus the bot token in the monitoring secret's
-`TELEGRAM_BOT_TOKEN` key; whoever owns the chat must press **Start** on the bot first, or Telegram
-rejects every message. A new address receives AWS's confirmation
-email and gets nothing until its link is clicked, so re-run the
-[test-fire drill](alert-catalog.md#test-firing-an-alert) for every severity afterwards: an
-unconfirmed subscription fails silently and looks exactly like a quiet week.
+The AWS-era mechanism (SNS subscriber lists and a Telegram chat set through Terraform variables) is
+gone. How people are added to or removed from alert notifications on Sentry/Axiom is not yet
+defined; until it is, the roster is this team's own list.

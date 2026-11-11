@@ -1,7 +1,7 @@
 name: E2E critical journeys
 
 # ST-246 acceptance criteria: "all seven journeys green in CI nightly and pre-release." This repo's
-# release process is a manual `workflow_dispatch` (release.yml), not a tag/GitHub-release event, so
+# release process is a manual `workflow_dispatch` (fly-production-deploy.yml), not a tag/GitHub-release event, so
 # "pre-release" here is the same trigger — a human runs this before dispatching a release, the same
 # way `workflow_dispatch` lets them run it any other time they want a signal outside the nightly
 # schedule. Never on every pull request: the stack this suite stands up (real Postgres + Redis +

@@ -446,7 +446,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     // One job per confirmed material (scan-material) or other user upload (scan-upload, F-14).
     // Concurrency 2: each scan holds a clamd connection and streams the object once, and the
     // clean-file availability budget is dominated by scan latency — two in flight keeps that low
-    // without oversubscribing a Fargate-sized container's clamd pool.
+    // without oversubscribing the scanner app's clamd pool.
     processor: (job: Job) => {
       const storage = {
         databaseUrl,
@@ -466,11 +466,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         },
       };
       if (isUploadScanJob(job)) {
-        return processUploadScan(job, {
-          ...storage,
-          sensitiveKmsKeyId: workerEnv.STORAGE_SENSITIVE_KMS_KEY_ID,
-          log: workerLogger,
-        });
+        return processUploadScan(job, { ...storage, log: workerLogger });
       }
       return processMaterialScan(job, { ...storage, enqueueDerivation, enqueueIngestion });
     },

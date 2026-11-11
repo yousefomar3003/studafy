@@ -2,7 +2,7 @@
  * ClamAV clamd client for the file-scan queue.
  *
  * Talks the raw clamd INSTREAM protocol over TCP rather than shelling out to `clamscan`, because
- * the workers run on Fargate with no shared filesystem: the object to scan lives in S3 and is
+ * the workers and clamd share no filesystem (separate fly apps): the object to scan lives in R2 and is
  * streamed straight into the connection, never written to a temp file. INSTREAM is the protocol
  * for exactly that — the caller sends a length-prefixed byte stream and clamd answers with a
  * single verdict line terminated by NUL.

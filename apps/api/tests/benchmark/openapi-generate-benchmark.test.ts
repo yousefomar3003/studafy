@@ -463,7 +463,6 @@ const EXPECTED_PATHS = [
   "/api/users/{userId}/password/reset",
   "/api/users/{userId}/role",
   "/email/webhooks/resend",
-  "/email/webhooks/sns",
   "/erpnext/webhooks",
   "/healthz",
   "/meta/mobile-versions",

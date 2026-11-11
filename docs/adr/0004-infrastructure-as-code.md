@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded — AWS was retired in November 2026; production runs on fly.io (see
+[`infra/fly/README.md`](../../infra/fly/README.md)). The `infra/terraform` root this ADR describes
+was removed with it. Originally: Accepted.
 
 ## Context
 

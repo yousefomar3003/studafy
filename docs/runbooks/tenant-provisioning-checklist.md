@@ -29,7 +29,7 @@ This document describes the tenant provisioning pipeline that runs after a schoo
       - Mark provisioning_status = 'completed'
       - Emit school.created event to outbox
 
-5. Operator: infra/deploy/scripts/erpnext-new-site.sh <env> <site> --school-id <id> --company "<name>" --abbr <ABBR>
+5. Operator: create the school's ERPNext site (see "ERPNext site" below)
    → bench new-site, ERPNext setup wizard (the school's company), integration key, webhooks
 
 6. The school's first finance request
@@ -48,23 +48,28 @@ add-ons, such as the AI add-on.
 
 ## ERPNext site
 
+### Production status
+
+Production on fly.io has no ERPNext plane: there is no ERPNext fly app, and neither the fly configs
+(`infra/fly/`) nor the deploy workflow set any `ERPNEXT_*` value, so every finance route answers 503
+`ERPNEXT_NOT_CONFIGURED` there. The AWS-era site-creation script (`erpnext-new-site.sh`) was removed
+with the AWS stack, and a production procedure for creating a school's site is not yet defined.
+
 ### Prerequisites
 
-- `ERPNEXT_API_URL` (the plane's internal ALB; rendered from terraform output) and
-  `ERPNEXT_API_KEY` (`<api_key>:<api_secret>`, one credential for every school's site) in the
-  api and workers app secrets -- see docs/runbooks/production-secrets.md.
-- `ERPNEXT_SITE_DOMAIN` per tier (`infra/deploy/environments/<tier>.env`).
+- `ERPNEXT_API_URL` and `ERPNEXT_API_KEY` (`<api_key>:<api_secret>`, one credential for every
+  school's site) on the api and workers -- see docs/runbooks/production-secrets.md.
+- `ERPNEXT_SITE_DOMAIN`.
 
 ### Creating a school's site
 
 1. Read the school's row: `SELECT school_id, site_name, company_name, company_abbr FROM
 app.erpnext_site_configs WHERE status = 'pending'`.
-2. Run `infra/deploy/scripts/erpnext-new-site.sh <staging|prod> <site_name> --school-id <school_id>
---company "<company_name>" --abbr <company_abbr> [--currency JOD] [--country Jordan]`. It creates
-   the site with erpnext + education, finishes ERPNext's setup wizard (company, chart of accounts,
-   fiscal year, currency), sets the shared integration key on the site's integration user, creates
-   the Scholarship Award doctype, and installs the webhooks that report submitted invoices,
-   payments and fees to the API (`infra/deploy/erpnext/seed/provision.py`).
+2. Inside the erpnext image, create the site with erpnext + education, then run
+   `python -m erpnext_seed.provision <site> setup` (`infra/erpnext/seed/provision.py`; see its
+   README). It finishes ERPNext's setup wizard (company, chart of accounts, fiscal year, currency),
+   sets the shared integration key on the site's integration user, creates the Scholarship Award
+   doctype, and installs the webhooks that report submitted invoices, payments and fees to the API.
 3. Nothing else: on the school's next finance request the credential resolver sees the site answer,
    records its company in `erpnext_company_id` and marks the row `completed`. Until then every
    finance route answers 503 `ERPNEXT_NOT_CONFIGURED`.
@@ -78,7 +83,7 @@ database (with sample invoices and payments).
 {school-slug}.{ERPNEXT_SITE_DOMAIN}
 ```
 
-Example: `springfield-academy.erpnext.studafy.com`. Only a Host header inside the VPC -- the ERPNext
+Example: `springfield-academy.erpnext.studafy.com`. Only a Host header -- the ERPNext
 frontend picks the site from it -- never a public DNS name.
 
 ### Local provisioning failure
@@ -164,6 +169,6 @@ Manually triggers the full provisioning pipeline. Idempotent on retries.
 
 1. `SELECT site_name, status, last_error FROM app.erpnext_site_configs WHERE school_id = ...`
 2. No row: the school was provisioned while ERPNext was not configured -- re-run provisioning.
-3. `pending`: the site has not been created, or it does not answer yet. Run (or re-check)
-   erpnext-new-site.sh; from inside the VPC, `GET /api/resource/Company` with the site as the Host
+3. `pending`: the site has not been created, or it does not answer yet. Create (or re-check)
+   the site; from the API's network, `GET /api/resource/Company` with the site as the Host
    header and the integration key must answer 200 with the company.

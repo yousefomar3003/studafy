@@ -73,7 +73,7 @@ function notFound(): Error {
 
 function createFakeS3() {
   const objects = new Map<string, Buffer>();
-  const copies: { Key: string; SSEKMSKeyId?: string }[] = [];
+  const copies: { Key: string }[] = [];
   const client: ScanS3Client = {
     async getObject({ Key }) {
       const bytes = objects.get(Key);
@@ -87,11 +87,11 @@ function createFakeS3() {
     async headObject({ Key }) {
       return { exists: objects.has(Key) };
     },
-    async copyObject({ Bucket, Key, CopySource, SSEKMSKeyId }) {
+    async copyObject({ Bucket, Key, CopySource }) {
       const bytes = objects.get(CopySource.slice(Bucket.length + 1));
       if (!bytes) throw notFound();
       objects.set(Key, Buffer.from(bytes));
-      copies.push({ Key, ...(SSEKMSKeyId ? { SSEKMSKeyId } : {}) });
+      copies.push({ Key });
     },
     async deleteObject({ Key }) {
       objects.delete(Key);
@@ -369,7 +369,6 @@ describeDb("upload scan target registry against the schema", () => {
         target,
         school: spec.scope === "school",
       });
-      if (spec.sensitive === "column") expect(types.get("sensitive")).toBe("bool");
     }
   });
 
@@ -639,33 +638,6 @@ describeDb("processUploadScan", () => {
     });
     expect(
       await statusOf(null, "school_applications", "proof_storage_key", "proof_scan_status", key),
-    ).toBe("quarantined");
-  });
-
-  test("a sensitive file's quarantine copy is held under the sensitive-documents key", async () => {
-    const f = await seedFixture();
-    const s3 = createFakeS3();
-    s3.objects.set(f.importKey, Buffer.from(`name\n${EICAR}`));
-    expect(
-      await scan(
-        job("import_source", f.schoolId, f.importKey),
-        config(s3.client, { sensitiveKmsKeyId: "alias/studafy-records" }),
-      ),
-    ).toEqual({ processed: true, outcome: "quarantined" });
-    expect(s3.copies).toEqual([
-      {
-        Key: f.importKey.replace(/^permanent\//, "quarantine/"),
-        SSEKMSKeyId: "alias/studafy-records",
-      },
-    ]);
-    expect(
-      await statusOf(
-        f.schoolId,
-        "student_imports",
-        "source_storage_key",
-        "source_scan_status",
-        f.importKey,
-      ),
     ).toBe("quarantined");
   });
 });

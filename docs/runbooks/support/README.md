@@ -36,18 +36,15 @@ request to confirm the triage/escalation path actually works, not just reads as 
 ## Intake channels
 
 **Two channels into one inbox — not a ticketing product.** A dedicated mailbox beats a third-party
-helpdesk at this stage: fewer moving parts (KISS), and this repo self-hosts the equivalent
-mechanism already for the status page (`../../infra/terraform/modules/monitoring/status_page.tf`
-sends status mail from `status@send.studafy.com`, the domain `dns_ses_domain` sets in
-`environments/prod/prod.tfvars`) — a support mailbox on the same verified SES domain is the same
-mechanism, reused, not a new one invented. Both channels below land in that one mailbox; there is
-deliberately no second queue to keep in sync with the first.
+helpdesk at this stage: fewer moving parts (KISS). Both channels below land in that one mailbox;
+there is deliberately no second queue to keep in sync with the first.
 
 ### Email — exists in code, not provisioned
 
-- **Address:** `support@send.studafy.com` — same domain, same SES identity the status page already
-  verifies. Not yet provisioned; provisioning it is an environment-config change (an SES receiving
-  rule or a forward to wherever triage actually reads mail), not a code change.
+- **Address:** not yet chosen or provisioned. (The AWS-era plan was `support@send.studafy.com` on
+  the SES sending domain; SES was retired with AWS.) studafy.com's mailboxes are on Zoho
+  ([`../../../infra/fly/README.md`](../../../infra/fly/README.md#domains)), so provisioning a
+  support address is a mail-provider change, not a code change.
 - **Public surface:** `apps/web`'s About/Contact page (`apps/web/src/routes/marketing/AboutPage.tsx`)
   renders a `mailto:` link driven by `VITE_MARKETING_CONTACT_EMAIL` (`apps/web/src/lib/config.ts`).
   That variable is unset in every environment's history — the page's own fallback renders "Contact
@@ -79,9 +76,10 @@ help center couldn't answer, not a shortcut around it — that's also why the ma
 
 ## Severity and response-time SLA
 
-Reuses [`../alert-catalog.md`](../alert-catalog.md#severity-matrix)'s closed three-value vocabulary
-(`critical` / `warning` / `info`) so a severity means the same thing whether it came from a
-Prometheus rule or a school's email — no second scale to keep in sync with the first.
+Reuses the on-call rotation's closed three-value vocabulary
+([`../on-call-rotation.md`](../on-call-rotation.md#what-each-severity-promises): `critical` /
+`warning` / `info`) so a severity means the same thing whether it came from an alert or a school's
+email — no second scale to keep in sync with the first.
 
 | Severity   | What it means for a support request                                                                                                              | First response | Out of hours                                                                                                          |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------- | --------------------------------------------------------------------------------------------------------------------- |
@@ -89,8 +87,7 @@ Prometheus rule or a school's email — no second scale to keep in sync with the
 | `warning`  | A real defect or a blocked workflow, but the school has a workaround or it's not blocking today.                                                 | 1 working day  | Queued; nobody is woken                                                                                               |
 | `info`     | A question, a training gap, or a feature request — nothing broken.                                                                               | 2 working days | None                                                                                                                  |
 
-**What promotes a request to `critical` (a "SEV candidate").** The same test `alert-catalog.md`
-already applies to alerts: is a human needed in the next fifteen minutes, and is there something
+**What promotes a request to `critical` (a "SEV candidate").** The same test applied to alerts: is a human needed in the next fifteen minutes, and is there something
 they can do? "My grades look wrong" is `warning` until someone confirms it's not one teacher's
 data-entry error; it becomes `critical` the moment it's confirmed as a platform bug affecting live
 grading, or as anything touching cross-tenant isolation
@@ -125,9 +122,10 @@ the same incident machinery every other `critical` already uses — there is del
 separate "support incident" process:
 
 - Page per [`../on-call-rotation.md`](../on-call-rotation.md)'s `critical` path.
-- Run whichever runbook the failure shape demands — `../deploy-rollback.md` or the relevant
-  [`../dr/`](../dr/) runbook.
-- Post to the public status page per [`../incident-comms-templates.md`](../incident-comms-templates.md).
+- Run whichever runbook the failure shape demands — a fix released through the production deploy
+  ([`../../../infra/fly/README.md`](../../../infra/fly/README.md#deploying); no rollback procedure
+  is defined for fly yet), or [`../dr/README.md`](../dr/README.md).
+- Post incident updates per [`../incident-comms-templates.md`](../incident-comms-templates.md).
 - Any cross-tenant or security-adjacent finding additionally follows
   `../security/st-249-security-pass.md`'s severity/disposition format for the write-up.
 - File the follow-up ticket before closing — a resolved incident with no linked follow-up is not

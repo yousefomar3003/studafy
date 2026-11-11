@@ -16,9 +16,7 @@
 //   callback` → `/api/auth/refresh` round trip that Playwright/Flutter E2E also use. This is
 //   LOCAL/DEV ONLY and cannot be pointed at staging: `getMockOAuthConfig()`
 //   (apps/api/src/modules/auth/oauth/mock-config.ts) returns null whenever `NODE_ENV` or `APP_ENV`
-//   is "production", and staging's own task definition
-//   (infra/deploy/ecs/api/task-definition.json.tpl:16) hardcodes `NODE_ENV=production` for every
-//   environment it deploys, staging included — the API will 404 the mock routes there, and
+//   is "production", and every deployed image sets `NODE_ENV=production` — the API will 404 the mock routes there, and
 //   apps/api/src/env.ts:271-277 additionally makes the API *refuse to boot at all* if
 //   `MOCK_OAUTH_ISSUER_URL` is ever set alongside a production-shaped `NODE_ENV`/`APP_ENV`. That is
 //   a deliberate safety rail this suite must not route around. See docs/testing/

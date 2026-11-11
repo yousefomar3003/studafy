@@ -1,8 +1,8 @@
 # Secret rotation: JWT signing keys (JWKS overlap)
 
 The RSA signing/verification key pairs that sign `apps/api`'s access tokens. This is a distinct
-class from the other three: the key material never leaves process memory, never enters Secrets
-Manager, and rotation is already automatic. A quarterly drill verifies the overlap property that
+class from the other three: the key material never leaves process memory, is never a stored secret,
+and rotation is already automatic. A quarterly drill verifies the overlap property that
 makes rotation zero-downtime.
 
 Source: `apps/api/src/modules/auth/jwt/key-store.ts` (`KeyStore`), wired in
@@ -12,11 +12,12 @@ Source: `apps/api/src/modules/auth/jwt/key-store.ts` (`KeyStore`), wired in
 
 Boundary: `WS_JWT_SECRET` (HMAC `HS256`), the realtime handshake-ticket key that `apps/api` signs
 with and `apps/realtime/src/auth.ts` verifies, is a **different class**: an application secret held
-in Secrets Manager, not a JWT signing key pair. Rotate it through the application-secret procedure
-([`rotation-provider-api-keys.md`](rotation-provider-api-keys.md)) as a **realtime** key
-(`rotate-app-secret.sh <env> realtime WS_JWT_SECRET --generate`); Terraform copies the new value
-into the api secret in the same apply. Then redeploy `api` and `realtime` back to back: until both
-run the new value, new handshakes fail and clients retry. Open sockets are not affected, since the
+in the `prod` GitHub Environment, not a JWT signing key pair. Rotate it through the
+application-secret procedure ([`rotation-provider-api-keys.md`](rotation-provider-api-keys.md)):
+generate a new value of 32+ characters, set `WS_JWT_SECRET`, and run the deploy workflow, which
+stages it onto both `studafy-core-api` and `studafy-core-realtime` and deploys them back to back:
+until both run the new value, new handshakes fail and clients retry. (Realtime is scaled to zero
+while live updates are deferred, so today no handshakes happen at all.) Open sockets are not affected, since the
 key is checked only at handshake.
 
 ## What already rotates itself
@@ -31,12 +32,12 @@ logged: `logger.info({ kid }, "jwt key rotated")`, the structured-log audit trai
 No operator action rotates keys. What needs a human, quarterly, is _proving the overlap holds_ and
 noticing if it ever stops holding.
 
-## Quarterly drill (staging)
+## Quarterly drill
 
 **1. Prove the JWKS advertises the last two keys.**
 
 ```bash
-curl -fsS https://<edge_domain>/.well-known/jwks.json | jq '.keys[] | {kid, alg, use, kty}'
+curl -fsS https://api.studafy.com/.well-known/jwks.json | jq '.keys[] | {kid, alg, use, kty}'
 ```
 
 Expect exactly two keys unless the process started < the rotation interval ago (then one). Both
@@ -44,12 +45,11 @@ Expect exactly two keys unless the process started < the rotation interval ago (
 
 **2. Rotate on demand and watch the overlap live.**
 
-A restart regenerates both keys (see the gap below), so the clean way to force a live rotation in
-staging is the same mechanism a deploy uses:
+A restart regenerates both keys (see the gap below), so the clean way to force a live rotation is
+to restart the api's machines:
 
 ```bash
-aws ecs update-service --cluster <cluster> --service <name_prefix>-api --force-new-deployment
-aws ecs wait services-stable --cluster <cluster> --services <name_prefix>-api
+fly apps restart studafy-core-api
 ```
 
 Then immediately re-fetch the JWKS and note that both keys' kids changed. A token signed under the
@@ -62,7 +62,8 @@ against the served JWKS with `jose`'s `createLocalJWKSet` — the same assertion
 endpoint.
 
 **4. Audit trail (required recording, not optional):** capture the `jwt key rotated` log lines from
-the service's log group for the rotation window. See
+the api's logs in Axiom (dataset `studafy-logs`, shipped by `infra/fly/log-shipper.toml`) for the
+rotation window. See
 [`rotation-schedule.md`](rotation-schedule.md)'s audit/evidence section for the exact query.
 
 ## Honest gaps
@@ -73,17 +74,17 @@ the service's log group for the rotation window. See
   remaining TTL on the next restart/rotate. This is bounded (access TTL default 900s,
   `JWT_ACCESS_TTL_SECONDS`) and automatic (`KeyStore` rotates on init), but it is not the
   persistent-key scheme some clients assume JWKS implies. If a zero-gap restart guarantee ever
-  becomes an acceptance criterion, the change is: persist key pairs in Secrets Manager and load via
+  becomes an acceptance criterion, the change is: persist key pairs as a secret and load via
   the optional `init(privateKeyPem)` path. Not done here.
 - **`onRotate` is wired to the logger only** (`index.ts:139`), so a failed/absent log shipment is a
   silent gap in the audit trail. No separate durable event store holds rotation events (the
   `app.security_events` table structurally cannot: it is for unauthenticated _request_ rejections —
   `db/migrations/000028`; `app.audit_logs` requires a tenant and actor). The structured log and
-  CloudWatch retention are the record.
+  its retention in Axiom are the record.
 
 ## Known gaps
 
 - Realtime tokens are HMAC-HS256 with `WS_JWT_SECRET`; rotating that secret invalidates _all_
-  live WebSocket sessions at once (tasks re-read it at launch). That class's runbook
+  live WebSocket sessions at once (machines read it at start). That class's runbook
   ([`rotation-provider-api-keys.md`](rotation-provider-api-keys.md)) treats it as downtime-forcing
   by design, not silently.

@@ -4,15 +4,15 @@ Sentry error monitoring for the three backend services — `apps/api`, `apps/wor
 `apps/realtime`. The server-side counterpart of [the web client's](../../web/docs/error-monitoring.md).
 The moving parts:
 
-| Layer           | File(s)                                                                     | Responsibility                                                                                                        |
-| --------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Vendor seam     | `packages/observability/src/errorMonitoring.ts`                             | `initErrorMonitoring`, `captureError`, `forwardLog`, `withErrorMonitoringScope` — the only file importing `@sentry/*` |
-| PII scrubbing   | `packages/observability/src/scrubPii.ts`                                    | `beforeSend`/`beforeBreadcrumb` redaction, verified by `scrubPii.test.ts`                                             |
-| API catch point | `apps/api/src/middleware/errorHandler.ts`                                   | Reports every 5xx from the central `app.onError` handler                                                              |
-| API logs        | `apps/api/src/logger.ts` (`observer`), wired in `apps/api/src/index.ts`     | Forwards `warn`/`error`/`fatal` records                                                                               |
-| Workers         | `apps/workers/src/worker.ts` (`runMonitoredJob`), `apps/workers/src/log.ts` | Reports a job's final failed attempt; forwards `warn`/`error` logs                                                    |
-| Realtime        | `apps/realtime/src/app.ts` (`onError`, `monitored`)                         | Reports handshake/health-route 500s and throwing WebSocket handlers                                                   |
-| Deploy wiring   | `infra/deploy/ecs/*/task-definition.json.tpl`, `infra/deploy/environments/` | `SENTRY_DSN`, `SENTRY_ENVIRONMENT` from each tier's env file, `RELEASE_VERSION` per deploy                            |
+| Layer           | File(s)                                                                                | Responsibility                                                                                                        |
+| --------------- | -------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Vendor seam     | `packages/observability/src/errorMonitoring.ts`                                        | `initErrorMonitoring`, `captureError`, `forwardLog`, `withErrorMonitoringScope` — the only file importing `@sentry/*` |
+| PII scrubbing   | `packages/observability/src/scrubPii.ts`                                               | `beforeSend`/`beforeBreadcrumb` redaction, verified by `scrubPii.test.ts`                                             |
+| API catch point | `apps/api/src/middleware/errorHandler.ts`                                              | Reports every 5xx from the central `app.onError` handler                                                              |
+| API logs        | `apps/api/src/logger.ts` (`observer`), wired in `apps/api/src/index.ts`                | Forwards `warn`/`error`/`fatal` records                                                                               |
+| Workers         | `apps/workers/src/worker.ts` (`runMonitoredJob`), `apps/workers/src/log.ts`            | Reports a job's final failed attempt; forwards `warn`/`error` logs                                                    |
+| Realtime        | `apps/realtime/src/app.ts` (`onError`, `monitored`)                                    | Reports handshake/health-route 500s and throwing WebSocket handlers                                                   |
+| Deploy wiring   | `infra/fly/{api,workers,realtime}.toml`, `.github/workflows/fly-production-deploy.yml` | `SENTRY_ENVIRONMENT` in each app's `[env]`, `SENTRY_DSN` from the `prod` secrets, `RELEASE_VERSION` per deploy        |
 
 SDK: `@sentry/bun` (all three services run on Bun — see `infra/docker/*.Dockerfile`), pinned to the
 same `10.70.0` release as the web client's `@sentry/react`.
@@ -80,14 +80,15 @@ always on, `BunServer`/`Http`/`NodeFetch` are removed, and no `tracesSampleRate`
 
 ## Env vars
 
-| Var                  | Services               | Set where                                                                     | Notes                                                                                         |
-| -------------------- | ---------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `SENTRY_DSN`         | api, workers, realtime | `environment` in each task definition, from `infra/deploy/environments/*.env` | Empty/unset disables monitoring. A DSN only lets a process send events: config, not a secret. |
-| `SENTRY_ENVIRONMENT` | api, workers, realtime | `environment` in each task definition, from `infra/deploy/environments/*.env` | Falls back to `APP_ENV` (api) or `NODE_ENV` (workers, realtime).                              |
-| `RELEASE_VERSION`    | api, workers, realtime | `environment` in each task definition, `${IMAGE_TAG}`                         | The same immutable image tag the web build uses as its Sentry release.                        |
+| Var                  | Services               | Set where                                                                                                     | Notes                                                                                         |
+| -------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `SENTRY_DSN`         | api, workers, realtime | The `prod` GitHub Environment's `SENTRY_DSN` secret (optional), copied to each fly app by the deploy workflow | Empty/unset disables monitoring. A DSN only lets a process send events: config, not a secret. |
+| `SENTRY_ENVIRONMENT` | api, workers, realtime | `[env]` in `infra/fly/<app>.toml` (`production`)                                                              | Falls back to `APP_ENV` (api) or `NODE_ENV` (workers, realtime).                              |
+| `RELEASE_VERSION`    | api, workers, realtime | `fly deploy --env RELEASE_VERSION=<commit SHA>` in `fly-production-deploy.yml`                                | The same commit SHA the web build uses as its Sentry release.                                 |
 
-To turn monitoring on or off for an environment, set `SENTRY_DSN` in that tier's
-`infra/deploy/environments/<tier>.env` (empty turns it off) and redeploy.
+To turn monitoring on or off in production, set or clear the `SENTRY_DSN` secret in the `prod`
+GitHub Environment and rerun the deploy workflow (`infra/fly/README.md`). Events go to the Sentry
+organisation `studafy-limited`.
 
 ## Verifying
 

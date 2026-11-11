@@ -79,11 +79,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // Tap billing webhook (ST-298). Same processor, same in-transaction audit rows as Stripe above;
   // authenticated by the `hashstring` HMAC.
   "POST /api/subscriptions/webhook/tap",
-  // SES → SNS email-event webhook (deliverability R-08). Global, pre-tenant surface: auditAction
+  // Resend email-event webhook (deliverability R-08). Global, pre-tenant surface: auditAction
   // declares the intent, but no app.audit_logs row is written because the ledger insert into
   // app.email_events *is* the audit record — see src/email/webhook.ts.
-  "POST /email/webhooks/sns",
-  // Resend email-event webhook: the same posture as the SNS route above.
   "POST /email/webhooks/resend",
   // Session lifecycle (ST-071). All four mutate app.refresh_tokens. The revocation paths write
   // their audit rows from inside the service transaction rather than from the route, so that a

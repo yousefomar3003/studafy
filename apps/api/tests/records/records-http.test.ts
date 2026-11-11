@@ -38,11 +38,9 @@ interface StoredObject {
 
 function fakeStorage(): StorageService & {
   objects: Map<string, StoredObject>;
-  sensitiveCopies: string[];
   presigned: { key: string; ttl: number | undefined }[];
 } {
   const objects = new Map<string, StoredObject>();
-  const sensitiveCopies: string[] = [];
   const presigned: { key: string; ttl: number | undefined }[] = [];
   const base: StorageService = {
     ttlSeconds: 900,
@@ -67,10 +65,9 @@ function fakeStorage(): StorageService & {
     async checksumSha256() {
       return "a".repeat(64);
     },
-    async copy(source, destination, options) {
+    async copy(source, destination) {
       const object = objects.get(source);
       if (object) objects.set(destination, { ...object });
-      if (options?.sensitive) sensitiveCopies.push(destination);
     },
     async remove(key) {
       objects.delete(key);
@@ -81,7 +78,7 @@ function fakeStorage(): StorageService & {
       }
     },
   };
-  return Object.assign(base, { objects, sensitiveCopies, presigned });
+  return Object.assign(base, { objects, presigned });
 }
 
 const storage = fakeStorage();
@@ -762,7 +759,7 @@ describeDb("documents", () => {
     const { key } = await stage("record.sensitiveDocument", "application/pdf", 2048, w.admin);
     expect((await call(w.admin, "PUT", base, { storage_key: key })).status).toBe(200);
     expect(
-      storage.sensitiveCopies.some((dest) => dest.startsWith(`permanent/${w.schoolId}/`)),
+      [...storage.objects.keys()].some((dest) => dest.startsWith(`permanent/${w.schoolId}/`)),
     ).toBe(true);
 
     // Held back until scanned; then served under its one-minute URL.

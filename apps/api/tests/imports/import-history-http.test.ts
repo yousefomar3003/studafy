@@ -49,7 +49,6 @@ interface StoredObject {
 /** In-memory bucket that hashes what was really "uploaded", so the checksum check is real. */
 function fakeStorage() {
   const objects = new Map<string, StoredObject>();
-  const sensitiveCopies: string[] = [];
   const presigned: { key: string; ttl: number | undefined }[] = [];
   const service: StorageService = {
     ttlSeconds: 900,
@@ -72,10 +71,9 @@ function fakeStorage() {
         .update(objects.get(key)?.body ?? new Uint8Array())
         .digest("hex");
     },
-    async copy(source, destination, options) {
+    async copy(source, destination) {
       const object = objects.get(source);
       if (object) objects.set(destination, { ...object });
-      if (options?.sensitive) sensitiveCopies.push(destination);
     },
     async remove(key) {
       objects.delete(key);
@@ -86,7 +84,7 @@ function fakeStorage() {
       }
     },
   };
-  return Object.assign(service, { objects, sensitiveCopies, presigned });
+  return Object.assign(service, { objects, presigned });
 }
 
 const storage = fakeStorage();
@@ -305,7 +303,7 @@ describeDb("original import files", () => {
     expect(Math.round((expires - Date.now()) / 86_400_000)).toBe(180);
     expect(storage.objects.has(key)).toBe(false); // promoted out of temp/
     expect(
-      storage.sensitiveCopies.some((dest) => dest.startsWith(`permanent/${tenant.schoolId}/`)),
+      [...storage.objects.keys()].some((dest) => dest.startsWith(`permanent/${tenant.schoolId}/`)),
     ).toBe(true);
 
     // Not handed out until the malware scan clears it (F-14); then the worker's clean verdict.

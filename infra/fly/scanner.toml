@@ -1,5 +1,5 @@
-# ClamAV for the workers' file-scan queue, on fly.io (production). On AWS clamd is a sidecar bound to
-# 127.0.0.1; here it is its own app, so it binds every interface and is reachable only through its
+# ClamAV for the workers' file-scan queue, on fly.io (production). It is its own app, so it binds
+# every interface and is reachable only through its
 # Flycast (private) address — it has no public IP. It runs only while there are scans ([[services]]
 # below). Deploy from the repo root:
 #   fly deploy . --config infra/fly/scanner.toml --remote-only

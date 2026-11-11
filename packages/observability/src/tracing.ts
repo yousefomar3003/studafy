@@ -12,8 +12,8 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
 
 /**
  * Starts distributed tracing (ST-260): every span this process creates is exported over OTLP/HTTP
- * to the tail-sampling collector (`infra/terraform/modules/monitoring/tracing.tf`) — this SDK never
- * makes a sampling decision itself.
+ * to OTEL_EXPORTER_OTLP_ENDPOINT (Axiom in production) — this SDK never makes a sampling decision
+ * itself.
  *
  * ## Why sampling happens at the collector, not here
  *
@@ -21,10 +21,9 @@ import { ATTR_SERVICE_NAME } from "@opentelemetry/semantic-conventions";
  * `ParentBasedSampler(TraceIdRatioBasedSampler(0.1))` gives you — decides before the request has
  * run, so it can never know the request is about to fail: "always capture errors" and "decide at
  * the start" are mutually exclusive. So this process samples nothing (`AlwaysOnSampler`) and ships
- * every span it creates to the collector; the collector buffers each trace for a few seconds and
- * only then applies `tailsamplingprocessor`'s `errors` OR `probabilistic 10%` policies — the one
- * place in the pipeline that has actually seen how the trace ended. See that module's own
- * `otel-collector-config.yaml` for the policy definitions.
+ * every span it creates. Tail sampling (`errors` OR `probabilistic 10%`) needs a collector between
+ * this process and the backend, which the AWS stack had; production now exports straight to Axiom,
+ * so every span is kept there.
  *
  * This does mean every span this process creates crosses the network, all the time. That is the
  * standard trade tail sampling makes (see the OpenTelemetry Collector's own `tailsamplingprocessor`
