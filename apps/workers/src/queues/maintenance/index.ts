@@ -11,6 +11,16 @@ export {
   scheduleAiMessageRetentionSweepJob,
 } from "./ai-message-retention-sweep-scheduler";
 export { resolveAdminActor, armAdminActor, NoAdminActorError } from "./admin-actor";
+export {
+  IP_ADDRESS_RETENTION_BATCH_SIZE,
+  IP_ADDRESS_RETENTION_DAYS,
+  purgeExpiredIpAddresses,
+} from "./ip-address-retention-sweep";
+export type { PurgeExpiredIpAddressesResult } from "./ip-address-retention-sweep";
+export {
+  IP_ADDRESS_RETENTION_SWEEP_CRON_PATTERN,
+  scheduleIpAddressRetentionSweepJob,
+} from "./ip-address-retention-sweep-scheduler";
 export { MONTHS_AHEAD, ensureFuturePartitions } from "./partition-maintenance";
 export type { PartitionMaintenanceResult } from "./partition-maintenance";
 export {

@@ -1,8 +1,9 @@
 /**
  * Job dispatch for the `maintenance` queue (ST-268): the scheduled tenant-closure sweep, every data
  * subject request (export or erasure) it and the DSR API file, the scheduled Ask AI message
- * retention purge (ST-309), the scheduled data retention sweep (data-retention-sweep.ts) and the
- * scheduled account-deletion sweep (000143). Mirrors the reports queue's report-registry.ts dispatch shape -- one
+ * retention purge (ST-309), the scheduled data retention sweep (data-retention-sweep.ts), the
+ * scheduled IP-address retention sweep and the scheduled account-deletion sweep (000143). Mirrors
+ * the reports queue's report-registry.ts dispatch shape -- one
  * function the queue's Worker hands every job to.
  */
 
@@ -18,6 +19,7 @@ import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
 import { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 import { purgeExpiredRetainedData } from "./data-retention-sweep";
 import { processDsrJob } from "./dsr-processor";
+import { purgeExpiredIpAddresses } from "./ip-address-retention-sweep";
 import { ensureFuturePartitions } from "./partition-maintenance";
 import { resealRecordValues } from "./record-key-rotation";
 import { purgeExpiredSensitiveRecords } from "./record-retention-sweep";
@@ -65,6 +67,13 @@ export async function processMaintenanceJob(
 
   if (job.name === JOB_NAMES.PURGE_EXPIRED_AI_MESSAGES) {
     const result = await withPrimarySql(config, (sql) => purgeExpiredAiMessages(sql, workerLogger));
+    return { processed: true, ...result };
+  }
+
+  if (job.name === JOB_NAMES.PURGE_EXPIRED_IP_ADDRESSES) {
+    const result = await withPrimarySql(config, (sql) =>
+      purgeExpiredIpAddresses(sql, new Date(), workerLogger),
+    );
     return { processed: true, ...result };
   }
 

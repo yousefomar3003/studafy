@@ -319,6 +319,13 @@ for the product, not by this ticket:
   question, and it is the reason the append-only trigger blocks row deletion outright rather than
   leaving a convenient hole.
 
+**IP addresses are not removed from the audit log.** Every other table that stores an IP address has
+it set to NULL after 90 days by the daily IP-address retention sweep (see
+`docs/modules/account-deletion.md`, "IP addresses"). `client_ip` here cannot be: the append-only grants
+and `trg_audit_logs_append_only` reject every `UPDATE`, for the owner too, and that guarantee is not to be
+weakened for this. An audit-log row's IP address is therefore kept for as long as the row is — the audit
+log's lifetime — which the Privacy Policy states.
+
 When that policy exists, the mechanism is straightforward and should be a separate ticket:
 `ALTER TABLE … DETACH PARTITION` (which is not destructive), export, then drop. Detaching is the safe
 first step and is reversible; dropping is not.

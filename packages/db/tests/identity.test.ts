@@ -691,6 +691,9 @@ integrationTest(
         // partial index backing the live-session list.
         "idx_refresh_tokens_school_device",
         "idx_refresh_tokens_school_family",
+        // Added by 000193: the daily IP-address retention sweep finds rows that still hold an
+        // address by school and age.
+        "idx_refresh_tokens_school_ip_created",
         "idx_refresh_tokens_school_parent",
         "idx_refresh_tokens_school_replaced_by",
         "idx_refresh_tokens_school_user",

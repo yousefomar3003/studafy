@@ -141,6 +141,40 @@ Data Studafy deletes on a fixed schedule regardless of any request (AI chats, se
 fields, imports, reports, notifications, security events, rejected applications, export bundles)
 is listed in [data-retention.md](./data-retention.md).
 
+## IP addresses
+
+**Rule: an IP address is kept for 90 days, then removed (set to NULL), everywhere an `UPDATE` is
+allowed. The audit log is the one exception.** The row stays; only the address goes. This applies to
+every account, deleted or not.
+
+| Where                                   | Column       | After 90 days                                                                                                |
+| --------------------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------ |
+| `app.refresh_tokens` (sessions; tenant) | `ip_address` | Set to NULL, per school                                                                                      |
+| `app.security_events` (global)          | `client_ip`  | Set to NULL                                                                                                  |
+| `app.audit_logs` (append-only)          | `client_ip`  | **Kept for the audit log's lifetime** — no `UPDATE` is possible (grants + trigger), and that is not weakened |
+| Redis rate-limit buckets                | key name     | Expire on their own within about 2 minutes (below)                                                           |
+
+**Mechanism.** `apps/workers/src/queues/maintenance/ip-address-retention-sweep.ts`, job
+`purge-expired-ip-addresses` on the maintenance queue, daily at 03:45 UTC
+(`ip-address-retention-sweep-scheduler.ts`). Rows are updated 1000 per statement, one transaction per
+batch, `FOR UPDATE SKIP LOCKED`: `refresh_tokens` per school under `withSystemTenantTx` (served by the
+partial index `idx_refresh_tokens_school_ip_created`, 000193), `security_events` once as
+`studafy_admin`. A school that fails is logged and skipped; the rest continue. Age is the row's
+`created_at`. Neither column is in a CHECK constraint or watched by an `UPDATE` trigger.
+
+**Audit log.** `app.audit_logs` is append-only by grant and by `trg_audit_logs_append_only`, for the
+owner too (`docs/database/audit-log-partition-maintenance.md`). Its `client_ip` therefore lives as long
+as the row, and the audit log currently has no automatic retention. The Privacy Policy says so.
+
+**Redis rate-limit keys.** IP-scoped buckets (`rl:{class}:{ip}:{window}`, and `rl:sch:{ip}:…` for an
+unauthenticated request on a user-scoped route) are written by `takeRateLimitToken` with
+`SET … EX ttl` on every hit, `ttl = windowSeconds + ceil(maxTokens / refillRate)`. With the budgets in
+`apps/api/src/config/rateLimits.ts` that is at most 123 s (`auth-strict`: 60 + ⌈5 / 0.08⌉). The only
+longer-lived buckets, member sign-in `username` (up to 30 minutes), are keyed by member ID, not IP.
+
+**Not covered here.** Application logs (Axiom), Sentry and Cloudflare Turnstile follow those
+providers' retention; they are listed separately in the Privacy Policy.
+
 ## Known gaps
 
 Stated plainly so they are not mistaken for done:
