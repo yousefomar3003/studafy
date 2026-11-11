@@ -789,3 +789,23 @@ export const unmappedHeaderSignalSchema = z
   });
 
 export type UnmappedHeaderSignal = z.infer<typeof unmappedHeaderSignalSchema>;
+
+// ---------------------------------------------------------------------------
+// Template download
+// ---------------------------------------------------------------------------
+
+export const STUDENT_IMPORT_TEMPLATE_XLSX_MEDIA_TYPE =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+export const studentImportTemplateQuerySchema = z
+  .object({
+    format: z
+      .enum(["csv", "xlsx"])
+      .default("csv")
+      .openapi({ description: "csv (default) or xlsx, an Excel workbook with dropdowns." }),
+    lang: z
+      .enum(["en", "ar"])
+      .default("en")
+      .openapi({ description: "The xlsx workbook's language: headers, notes and instructions." }),
+  })
+  .openapi("StudentImportTemplateQuery");

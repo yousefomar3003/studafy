@@ -399,17 +399,24 @@
       },
       "page": {
         "title": "Import students",
-        "intro": "Upload a CSV of students to validate. Nothing is saved until you confirm.",
-        "uploadRegion": "Upload CSV",
-        "downloadTemplate": "Download CSV template",
-        "fileLabel": "Student CSV file",
+        "intro": "Download the Excel template, fill in your students and their parents, then upload it here. Nothing is saved until you confirm.",
+        "uploadRegion": "Upload file",
+        "downloadTemplate": "CSV template",
+        "fileLabel": "Student file (Excel or CSV)",
         "uploadProgress": "Upload progress",
         "uploading": "Uploading… {{percent}}%",
         "templateError": "Couldn't download the template. Please try again.",
         "validateError": "Couldn't validate that file. Please try again.",
         "applyError": "Couldn't apply the mapping. Please try again.",
         "confirmError": "Couldn't confirm the import. Please try again.",
-        "history": "Import history"
+        "history": "Import history",
+        "downloadExcelTemplate": "Download Excel template",
+        "templateHelp": "The Excel template has dropdowns for your grades and sections, and instructions inside. Nobody needs an email: everyone gets a Studafy ID.",
+        "excelErrors": {
+          "not_xlsx": "That file isn't an Excel workbook we can read. Save it as .xlsx or .csv and try again.",
+          "too_large": "That workbook is too large to read. Remove extra sheets or save it as .csv and try again.",
+          "no_sheet": "Couldn't find a sheet of students in that workbook."
+        }
       },
       "report": {
         "region": "Validation report",

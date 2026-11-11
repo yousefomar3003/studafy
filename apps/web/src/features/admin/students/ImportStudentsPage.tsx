@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { buildImportErrorReportCsv, downloadTextFile } from "../../../lib/csv";
+import { buildImportErrorReportCsv, downloadBlob, downloadTextFile } from "../../../lib/csv";
 import { useTranslation } from "../../../lib/i18n";
 import { SheetOffer } from "../../custom-lists/SheetOffer";
 
@@ -19,6 +19,7 @@ import {
 import {
   fetchStudentImport,
   fetchStudentImportTemplate,
+  fetchStudentImportWorkbook,
   STUDENTS_LIST_KEY,
   studentImportQueryKey,
 } from "./queries";
@@ -64,6 +65,17 @@ function apiErrorMessage(error: unknown, fallback: string): string {
 }
 
 /**
+ * The file to upload: a CSV as picked, or an Excel workbook converted to CSV in the browser (the
+ * reader is loaded only when one is picked). The API only ever receives CSV.
+ */
+async function asCsvFile(file: File): Promise<File> {
+  const { isXlsxFile, xlsxToCsv } = await import("../../../lib/xlsx");
+  if (!isXlsxFile(file)) return file;
+  const csv = xlsxToCsv(new Uint8Array(await file.arrayBuffer()));
+  return new File([csv], file.name.replace(/\.xlsx$/i, "") + ".csv", { type: "text/csv" });
+}
+
+/**
  * Student CSV import (ST-190): template download, dry-run upload with progress, column mapping
  * (ST-300, see `ColumnMappingPanel`), a row-level validation report, a dry-run diff of what
  * confirming would change (`ImportDiffPanel`), an explicit confirm step, and progress/summary while the confirmed import
@@ -82,7 +94,7 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  * status warrants it and stops the moment the component unmounts or the status leaves that set.
  */
 export default function ImportStudentsPage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
 
   const [record, setRecord] = useState<StudentImport | null>(null);
@@ -147,13 +159,31 @@ export default function ImportStudentsPage() {
     }
   }
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
+  async function handleDownloadWorkbook() {
+    const lang = i18n.language.startsWith("ar") ? "ar" : "en";
+    try {
+      const workbook = await fetchStudentImportWorkbook(lang);
+      downloadBlob(lang === "ar" ? "studafy-students-ar.xlsx" : "studafy-students.xlsx", workbook);
+    } catch (error) {
+      setBanner(apiErrorMessage(error, t("adminPeople.students.import.page.templateError")));
+    }
+  }
+
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const picked = event.target.files?.[0];
     event.target.value = "";
-    if (!file) return;
+    if (!picked) return;
 
     setBanner(null);
     setUnrecognised(null);
+    let file: File;
+    try {
+      file = await asCsvFile(picked);
+    } catch (error) {
+      const reason = (error as { reason?: string }).reason ?? "not_xlsx";
+      setBanner(t(`adminPeople.students.import.page.excelErrors.${reason}`));
+      return;
+    }
     setUploadProgress({ loaded: 0, total: file.size, percent: 0 });
     const text = file.text();
     uploadImport.mutate(
@@ -227,9 +257,17 @@ export default function ImportStudentsPage() {
       {step === "upload" ? (
         <Card as="section" aria-label={t("adminPeople.students.import.page.uploadRegion")}>
           <Card.Body>
-            <Button type="button" variant="secondary" onClick={handleDownloadTemplate}>
-              {t("adminPeople.students.import.page.downloadTemplate")}
-            </Button>
+            <div className="students-import__templates">
+              <Button type="button" onClick={() => void handleDownloadWorkbook()}>
+                {t("adminPeople.students.import.page.downloadExcelTemplate")}
+              </Button>
+              <Button type="button" variant="tertiary" onClick={handleDownloadTemplate}>
+                {t("adminPeople.students.import.page.downloadTemplate")}
+              </Button>
+            </div>
+            <p className="students-import__template-help">
+              {t("adminPeople.students.import.page.templateHelp")}
+            </p>
 
             <div className="students-import__upload">
               <label htmlFor="student-csv-file">
@@ -238,8 +276,8 @@ export default function ImportStudentsPage() {
               <input
                 id="student-csv-file"
                 type="file"
-                accept=".csv,text/csv"
-                onChange={handleFileChange}
+                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={(event) => void handleFileChange(event)}
                 disabled={uploadImport.isPending}
               />
             </div>

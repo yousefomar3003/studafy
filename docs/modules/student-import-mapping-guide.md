@@ -109,6 +109,24 @@ unplaced (`NO_ACADEMIC_YEAR`, `GRADE_NOT_FOUND`, `SECTION_NOT_FOUND`, `SECTION_R
 the column default. An update leaves the live value unchanged. An import therefore cannot blank out
 existing data, and it also cannot deliberately clear a field; use the student profile for that.
 
+## Excel template and Excel upload
+
+- **Template.** `GET /api/imports/students/template?format=xlsx&lang=en|ar` builds a workbook
+  (`apps/api/src/modules/imports/template-workbook.ts`, exceljs loaded on first use): a Students
+  sheet with only a header row (headers are recognised spellings, so the upload maps itself;
+  required columns highlighted; a note on every column; right-to-left in Arabic), the school's
+  published student record fields as extra columns, dropdowns for status, relationship and the
+  school's grades and sections of the current academic year (from a hidden Lists sheet), text format
+  on ID and date columns, and Instructions and Example sheets. Example rows never sit on the Students
+  sheet, so a forgotten example is never imported. `format=csv` (the default) is the CSV template.
+- **Upload.** The page accepts `.xlsx` as well as `.csv`. An Excel file is turned into CSV **in the
+  browser** (`apps/web/src/lib/xlsx.ts`, fflate + DOMParser, loaded only when an Excel file is
+  picked) and uploaded exactly as a CSV would be, so the API only ever parses CSV and a hostile
+  workbook is unpacked in the uploader's own tab, never on a server. Only the workbook parts the
+  reader needs are inflated, and a workbook declaring more than 100 MB uncompressed is refused
+  unopened. The Students / الطلاب sheet is read, else the first; dates in date-formatted cells become
+  `YYYY-MM-DD`; empty rows are kept so line numbers match Excel's row numbers.
+
 ## Header detection and mapping
 
 - **Delimiter.** `,`, `;` or tab, whichever occurs most often (outside quotes) on the first
