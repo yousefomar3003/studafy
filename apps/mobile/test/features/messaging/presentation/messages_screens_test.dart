@@ -133,6 +133,42 @@ void main() {
       },
     );
 
+    testWidgets(
+      'pull to refresh re-reads the shown child and the badge, not the other child',
+      (tester) async {
+        final client = _parentClient();
+        await _pump(
+          tester,
+          home: Consumer(
+            builder: (context, ref, _) {
+              // The tab badge, as the shell keeps it on screen.
+              ref.watch(unreadMessagesTotalProvider);
+              return const ParentMessagesScreen();
+            },
+          ),
+          client: client,
+          overrides: [
+            _children([('child-1', 'Amir'), ('child-2', 'Mira')]),
+          ],
+        );
+        await tester.tap(find.widgetWithText(ChoiceChip, 'Mira'));
+        await tester.pumpAndSettle();
+        final before = client.listConversationCalls.length;
+
+        await tester.fling(
+          find.text('Omar Khalil'),
+          const Offset(0, 400),
+          1000,
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          client.listConversationCalls.sublist(before),
+          unorderedEquals(<String?>['child-2', null]),
+        );
+      },
+    );
+
     testWidgets('one child: no switcher', (tester) async {
       await _pump(
         tester,

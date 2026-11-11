@@ -28,6 +28,7 @@ material_api.Material _materialFixture({
   required String id,
   String title = 'Notes',
   String? description,
+  String ingestStatus = 'ready',
 }) => material_api.Material.fromJson({
   'id': id,
   'school_id': 'school-1',
@@ -42,7 +43,7 @@ material_api.Material _materialFixture({
   'size_bytes': 1024,
   'checksum_sha256': null,
   'ai_visible': false,
-  'ingest_status': 'ready',
+  'ingest_status': ingestStatus,
   'ingest_error': null,
   'ingested_at': _t0,
   'created_at': _t0,
@@ -104,6 +105,7 @@ class _ContentAcademicsClient extends FakeAcademicsClient {
 
   List<material_api.Material> materials;
   final List<(String, UpdateMaterialBody)> updateCalls = [];
+  int listCalls = 0;
 
   @override
   Future<MaterialList> listMaterials({
@@ -111,7 +113,10 @@ class _ContentAcademicsClient extends FakeAcademicsClient {
     IngestStatus? ingestStatus,
     int? limit = 20,
     int? offset = 0,
-  }) async => MaterialList(materials: materials, total: materials.length);
+  }) async {
+    listCalls++;
+    return MaterialList(materials: materials, total: materials.length);
+  }
 
   @override
   Future<material_api.Material> updateMaterial({
@@ -458,6 +463,101 @@ void main() {
         findsOneWidget,
       );
       expect(switchTile(tester).value, isFalse);
+    });
+  });
+
+  group('material re-reads', () {
+    Future<_ContentAcademicsClient> pumpWith(
+      WidgetTester tester,
+      List<material_api.Material> materials,
+    ) async {
+      final academics = _ContentAcademicsClient(materials);
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: _ContentAssignmentsClient([]),
+          academics: academics,
+        ),
+      );
+      return academics;
+    }
+
+    testWidgets('never re-reads when every material has settled', (
+      tester,
+    ) async {
+      final academics = await pumpWith(tester, [
+        _materialFixture(id: 'm-1'),
+        _materialFixture(id: 'm-2', ingestStatus: 'failed'),
+        _materialFixture(id: 'm-3', ingestStatus: 'quarantined'),
+      ]);
+      expect(academics.listCalls, 1);
+
+      await tester.pump(const Duration(minutes: 5));
+      expect(academics.listCalls, 1);
+    });
+
+    testWidgets(
+      'backs off while a material is in the pipeline and stops once it settles',
+      (tester) async {
+        final academics = await pumpWith(tester, [
+          _materialFixture(id: 'm-1', ingestStatus: 'processing'),
+        ]);
+        expect(academics.listCalls, 1);
+
+        await tester.pump(materialPollInitialDelay);
+        await tester.pump();
+        expect(academics.listCalls, 2);
+
+        // Doubled: nothing at the original interval, the next read at twice it.
+        await tester.pump(materialPollInitialDelay);
+        expect(academics.listCalls, 2);
+        await tester.pump(materialPollInitialDelay);
+        await tester.pump();
+        expect(academics.listCalls, 3);
+
+        academics.materials = [_materialFixture(id: 'm-1')];
+        await tester.pump(materialPollInitialDelay * 4);
+        await tester.pump();
+        expect(academics.listCalls, 4);
+
+        await tester.pump(materialPollMaxDelay * 3);
+        expect(academics.listCalls, 4);
+      },
+    );
+
+    testWidgets('pauses while another route covers the screen', (tester) async {
+      final academics = await pumpWith(tester, [
+        _materialFixture(id: 'm-1', ingestStatus: 'scanning'),
+      ]);
+      await tester.tap(find.text('Materials'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Edit material'));
+      await tester.pumpAndSettle();
+      final calls = academics.listCalls;
+
+      await tester.pump(materialPollMaxDelay * 3);
+      expect(academics.listCalls, calls);
+
+      // Back without saving: catches up at once, then carries on polling.
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(academics.listCalls, calls + 1);
+      await tester.pump(materialPollInitialDelay);
+      await tester.pump();
+      expect(academics.listCalls, calls + 2);
+    });
+
+    testWidgets('pauses while the app is in the background', (tester) async {
+      final academics = await pumpWith(tester, [
+        _materialFixture(id: 'm-1', ingestStatus: 'uploaded'),
+      ]);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(materialPollMaxDelay * 3);
+      expect(academics.listCalls, 1);
+
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(academics.listCalls, 2);
     });
   });
 }

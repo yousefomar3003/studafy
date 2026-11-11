@@ -46,6 +46,10 @@ export interface ListExamsParams {
   offset: number;
   class_id: string;
   status?: string;
+  /** ISO 8601; keeps exams whose `ends_at` is later. */
+  ends_after?: string;
+  /** ISO 8601; keeps exams whose `starts_at` is earlier. */
+  starts_before?: string;
 }
 
 export interface CreateExamParams {
@@ -225,6 +229,14 @@ export async function listExams(
   params: ListExamsParams,
 ): Promise<{ rows: ExamRow[]; total: number }> {
   const statusFilter = params.status ? tx` AND e.status = ${params.status}::app.exam_status` : tx``;
+  // Narrows a "what's coming up" read (the teacher home) to the window it shows, instead of
+  // shipping the class's whole exam history to be filtered on the device.
+  const endsAfterFilter = params.ends_after
+    ? tx` AND e.ends_at > ${params.ends_after}::timestamptz`
+    : tx``;
+  const startsBeforeFilter = params.starts_before
+    ? tx` AND e.starts_at < ${params.starts_before}::timestamptz`
+    : tx``;
 
   const [rows, countResult] = await Promise.all([
     tx<ExamRow[]>`
@@ -238,6 +250,8 @@ export async function listExams(
       WHERE e.school_id = ${schoolId}
         AND e.class_id = ${params.class_id}
         ${statusFilter}
+        ${endsAfterFilter}
+        ${startsBeforeFilter}
       ORDER BY e.starts_at DESC
       LIMIT ${params.limit}
       OFFSET ${params.offset}
@@ -248,6 +262,8 @@ export async function listExams(
       WHERE e.school_id = ${schoolId}
         AND e.class_id = ${params.class_id}
         ${statusFilter}
+        ${endsAfterFilter}
+        ${startsBeforeFilter}
     `,
   ]);
 

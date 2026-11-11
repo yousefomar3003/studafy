@@ -36,9 +36,11 @@ import 'widgets/class_ai_materials_switch.dart';
 
 /// Teacher-owned content for one class: create and edit assignments, upload and edit materials.
 ///
-/// Material rows are periodically refreshed while their server-side scan or AI ingestion is
-/// active, so the transition to Ready is visible without requiring the teacher to leave and
-/// return.
+/// Material rows are re-read while any of them is still in the server-side scan / AI-ingestion
+/// pipeline (not [MaterialReadyStateX.isSettled]), so the transition to Ready is visible without
+/// the teacher leaving and returning. The re-read backs off from [materialPollInitialDelay] to
+/// [materialPollMaxDelay], stops once every material has settled, and pauses while the app is in
+/// the background or another route covers this one.
 class TeacherContentScreen extends ConsumerStatefulWidget {
   const TeacherContentScreen({
     required this.classId,
@@ -54,23 +56,87 @@ class TeacherContentScreen extends ConsumerStatefulWidget {
       _TeacherContentScreenState();
 }
 
+/// The first wait before re-reading materials that are still being scanned or ingested.
+const materialPollInitialDelay = Duration(seconds: 8);
+
+/// The longest wait between two re-reads; the delay doubles up to this while nothing settles.
+const materialPollMaxDelay = Duration(seconds: 60);
+
 class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final TabController _tabs;
   late Future<List<Assignment>> _assignments;
   late Future<List<material_api.Material>> _materials;
+
+  /// The next scheduled re-read, if any. One-shot: each load decides whether another is needed.
   Timer? _materialRefresh;
+  Duration _materialPollDelay = materialPollInitialDelay;
+
+  /// Whether the last successful load had a material still in the pipeline. Kept across a failed
+  /// load, so a transient error backs off rather than stopping the re-reads.
+  bool _materialsPending = false;
+
+  /// App in the foreground and this route on top. Re-reads are only scheduled while true.
+  bool _foreground = true;
+  bool _routeCurrent = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabs = TabController(length: 2, vsync: this);
     _assignments = _loadAssignments();
     _materials = _loadMaterials();
-    _materialRefresh = Timer.periodic(
-      const Duration(seconds: 8),
-      (_) => _refreshMaterials(),
-    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Rebuilt whenever a route is pushed over this one or popped back to it.
+    final current = ModalRoute.isCurrentOf(context) ?? true;
+    if (current == _routeCurrent) return;
+    _routeCurrent = current;
+    _onVisibilityChanged();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // `inactive` (a system sheet, a call banner) still shows the screen; only paused / hidden /
+    // detached count as background.
+    final foreground =
+        state == AppLifecycleState.resumed ||
+        state == AppLifecycleState.inactive;
+    if (foreground == _foreground) return;
+    _foreground = foreground;
+    _onVisibilityChanged();
+  }
+
+  bool get _visible => _foreground && _routeCurrent;
+
+  void _onVisibilityChanged() {
+    if (!_visible) {
+      _materialRefresh?.cancel();
+      _materialRefresh = null;
+    } else if (_materialsPending && _materialRefresh == null) {
+      // Back on screen with work still in the pipeline: catch up now rather than after the delay.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshMaterials());
+    }
+  }
+
+  /// Schedules the next re-read after a load, if any material is still in the pipeline.
+  void _scheduleMaterialPoll() {
+    _materialRefresh?.cancel();
+    _materialRefresh = null;
+    if (!mounted || !_materialsPending || !_visible) return;
+    final delay = _materialPollDelay;
+    _materialRefresh = Timer(delay, () {
+      _materialRefresh = null;
+      final doubled = delay * 2;
+      _materialPollDelay = doubled > materialPollMaxDelay
+          ? materialPollMaxDelay
+          : doubled;
+      _refreshMaterials(background: true);
+    });
   }
 
   Future<List<Assignment>> _loadAssignments() async =>
@@ -80,12 +146,24 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
               .listAssignments(classId: widget.classId, limit: 100))
           .assignments;
 
-  Future<List<material_api.Material>> _loadMaterials() async =>
-      (await ref
-              .read(apiClientProvider)
-              .academics
-              .listMaterials(classId: widget.classId, limit: 100))
-          .materials;
+  Future<List<material_api.Material>> _loadMaterials() async {
+    try {
+      final materials =
+          (await ref
+                  .read(apiClientProvider)
+                  .academics
+                  .listMaterials(classId: widget.classId, limit: 100))
+              .materials;
+      _materialsPending = materials.any(
+        (material) => !materialReadyStateFromWireName(
+          material.ingestStatus.name,
+        ).isSettled,
+      );
+      return materials;
+    } finally {
+      _scheduleMaterialPoll();
+    }
+  }
 
   // Block-bodied closures: an arrow would return the assigned Future, which setState rejects.
   void _refreshAssignments() {
@@ -95,8 +173,11 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
     });
   }
 
-  void _refreshMaterials() {
+  /// Re-reads the materials. A [background] re-read keeps the current backoff; anything the
+  /// teacher did (pull to refresh, an upload or edit) starts it over from the shortest delay.
+  void _refreshMaterials({bool background = false}) {
     if (!mounted) return;
+    if (!background) _materialPollDelay = materialPollInitialDelay;
     setState(() {
       _materials = _loadMaterials();
     });
@@ -104,6 +185,7 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _materialRefresh?.cancel();
     _tabs.dispose();
     super.dispose();

@@ -1271,6 +1271,12 @@ export const examQuerySchema = z
     offset: z.coerce.number().int().min(0).default(0),
     class_id: uuidSchema.openapi({ description: "Filter by class." }),
     status: examStatusSchema.optional(),
+    ends_after: z.string().datetime().optional().openapi({
+      description: "Only exams ending after this instant (ISO 8601), e.g. now for upcoming ones.",
+    }),
+    starts_before: z.string().datetime().optional().openapi({
+      description: "Only exams starting before this instant (ISO 8601).",
+    }),
   })
   .openapi("ExamQuery");
 

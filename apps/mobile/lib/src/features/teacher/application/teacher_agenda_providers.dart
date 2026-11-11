@@ -30,7 +30,11 @@ final teacherDraftAssignmentsProvider = FutureProvider<List<Assignment>>((
 });
 
 /// Scheduled or open exams in the teacher's classes that haven't ended and start within
-/// [upcomingExamsWindow], soonest first. One `GET /api/academics/exams` per class.
+/// [upcomingExamsWindow], soonest first. One `GET /api/academics/exams` per class, narrowed to
+/// that window server-side (`ends_after` / `starts_before`) so a class's past exams are not
+/// shipped just to be dropped here; the status check stays on the device (the endpoint takes one
+/// status, and this wants two). A single cross-class exams read would remove the per-class
+/// fan-out; that endpoint does not exist yet.
 final teacherUpcomingExamsProvider = FutureProvider<List<UpcomingExam>>((
   ref,
 ) async {
@@ -43,6 +47,9 @@ final teacherUpcomingExamsProvider = FutureProvider<List<UpcomingExam>>((
     classes.map((classInfo) async {
       final page = await api.academics.listExams(
         classId: classInfo.id,
+        // UTC: the API takes ISO 8601 instants with an offset.
+        endsAfter: now.toUtc(),
+        startsBefore: horizon.toUtc(),
         limit: 100,
       );
       return [

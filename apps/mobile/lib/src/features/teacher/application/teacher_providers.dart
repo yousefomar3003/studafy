@@ -206,19 +206,44 @@ final teacherTodaySessionsProvider = FutureProvider<List<TeacherSession>>((
           .toList()
         ..sort((a, b) => a.period.compareTo(b.period));
 
+  if (mySlots.isEmpty) return const [];
+
+  // One code + sessions lookup per class, not per slot: a class taught twice today shares it.
+  // The code comes from the teacher's own class list when the class is one they lead; only a
+  // class they are timetabled for without leading it needs its own `getClass`.
+  final ledCodes = {
+    for (final classInfo in await ref.watch(teacherClassesProvider.future))
+      classInfo.id: classInfo.code,
+  };
+  final classIds = {for (final slot in mySlots) slot.classId};
+  final perClass = {
+    for (final classId in classIds)
+      classId: () async {
+        final (code, sessions) = await (
+          switch (ledCodes[classId]) {
+            final code? => Future.value(code),
+            null => api.academics
+                .getClass(classId: classId)
+                .then((classInfo) => classInfo.code),
+          },
+          api.attendance.listAttendanceSessions(
+            classId: classId,
+            sessionDate: today,
+            limit: 50,
+          ),
+        ).wait;
+        return (code: code, sessions: sessions.attendanceSessions);
+      }(),
+  };
+
   return Future.wait(
     mySlots.map((slot) async {
-      final classInfo = await api.academics.getClass(classId: slot.classId);
-      final sessions = await api.attendance.listAttendanceSessions(
-        classId: slot.classId,
-        sessionDate: today,
-        limit: 50,
-      );
+      final info = await perClass[slot.classId]!;
       return TeacherSession(
         slot: slot,
-        classCode: classInfo.code,
+        classCode: info.code,
         attendance: SessionAttendanceState.fromSessions(
-          sessions.attendanceSessions,
+          info.sessions,
           slot.period,
         ),
       );

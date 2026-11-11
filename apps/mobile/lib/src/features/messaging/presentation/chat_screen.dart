@@ -29,7 +29,12 @@ Future<void> openChat(
       builder: (_) => ChatScreen(conversation: conversation, viewer: viewer),
     ),
   );
-  if (context.mounted) await refreshConversations(ref);
+  if (!context.mounted) return;
+  // A parent's list on screen is the conversation's child's; a teacher's is every conversation.
+  await refreshConversations(
+    ref,
+    studentId: viewer == MessagingViewer.parent ? conversation.student.id : null,
+  );
 }
 
 /// One parent ↔ teacher conversation, shared by both roles.
@@ -39,10 +44,11 @@ Future<void> openChat(
 /// uploaded as soon as they are picked. While either side has blocked the other the composer
 /// is replaced by a banner (with Unblock when the block is ours).
 ///
-/// Polls for new messages every [chatPollIntervalProvider] only while this screen is open and
-/// the app is in the foreground: polling starts after the first frame, stops when the app is
-/// paused / hidden and resumes (with an immediate catch-up poll) when it returns, and stops for
-/// good on dispose. The list is reversed, so it opens at — and stays pinned to — the newest
+/// Polls for new messages (adaptively, from [chatPollIntervalProvider]) only while this screen is
+/// on top and the app is in the foreground: polling starts after the first frame, stops when the
+/// app is paused / hidden or another route (the image viewer, a pushed screen) covers the chat,
+/// resumes with an immediate catch-up poll when it is visible again, and stops for good on
+/// dispose. The list is reversed, so it opens at — and stays pinned to — the newest
 /// message; scrolling up to the oldest loads the page before it.
 class ChatScreen extends ConsumerStatefulWidget {
   const ChatScreen({required this.conversation, required this.viewer, super.key});
@@ -60,6 +66,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   /// Captured once the provider is live, so [dispose] can stop polling without touching `ref`.
   ChatController? _controller;
 
+  /// Whether this chat's route is the top-most one; see [didChangeDependencies].
+  bool _routeCurrent = true;
+
   /// How close to the oldest loaded message (in pixels) scrolling must get to load older ones.
   static const _loadOlderThreshold = 240.0;
 
@@ -75,8 +84,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
       final controller = ref.read(chatControllerProvider(_conversationId).notifier)
         ..seedBlock(widget.conversation.block);
       _controller = controller;
-      if (_isForeground(WidgetsBinding.instance.lifecycleState)) _controller!.startPolling();
+      if (_visible) controller.startPolling();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Rebuilt whenever a route is pushed over this one or popped back to it.
+    final current = ModalRoute.isCurrentOf(context) ?? true;
+    if (current == _routeCurrent) return;
+    _routeCurrent = current;
+    _onVisibilityChanged();
   }
 
   @override
@@ -89,14 +108,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _onVisibilityChanged();
+  }
+
+  bool get _visible => _routeCurrent && _isForeground(WidgetsBinding.instance.lifecycleState);
+
+  /// Starts (with a catch-up poll) or stops polling to match whether the chat can be seen.
+  void _onVisibilityChanged() {
     final controller = _controller;
     if (controller == null) return;
-    if (state == AppLifecycleState.resumed) {
+    if (!_visible) {
+      controller.stopPolling();
+    } else if (!controller.isPolling) {
       controller
         ..poll()
         ..startPolling();
-    } else if (!_isForeground(state)) {
-      controller.stopPolling();
     }
   }
 

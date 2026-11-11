@@ -1,7 +1,12 @@
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:studafy_mobile/src/core/offline/attachment_image_cache.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/messaging/application/chat_draft_controller.dart';
 import 'package:studafy_mobile/src/features/messaging/application/messaging_providers.dart';
@@ -33,6 +38,19 @@ class _FakePicker extends ChatImagePicker {
   Future<PickedImage?> takePhoto() async => null;
 }
 
+/// Object storage answering every pre-signed URL as expired.
+class _ExpiredUrls implements HttpClientAdapter {
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async => ResponseBody.fromString('expired', 403);
+
+  @override
+  void close({bool force = false}) {}
+}
+
 Future<void> _pump(
   WidgetTester tester,
   FakeMessagingClient client, {
@@ -50,6 +68,13 @@ Future<void> _pump(
             viewer == MessagingViewer.parent ? parentUserId : teacherUserId,
           ),
           chatClockProvider.overrideWithValue(() => fixedNow),
+          // No disk, and storage that refuses every URL as expired.
+          attachmentImageCacheProvider.overrideWithValue(
+            AttachmentImageCache(
+              root: () async => throw const FileSystemException('no disk in tests'),
+              dio: Dio()..httpClientAdapter = _ExpiredUrls(),
+            ),
+          ),
           if (picker != null) chatImagePickerProvider.overrideWithValue(picker),
         ],
         child: Builder(
@@ -178,11 +203,14 @@ void main() {
         expect(find.byType(ChatImageView), findsNWidgets(2));
         final images = tester.widgetList<Image>(find.byType(Image)).toList();
         expect(
-          // Bubbles decode at display size, so each NetworkImage is wrapped in a ResizeImage.
-          images.map((image) => ((image.image as ResizeImage).imageProvider as NetworkImage).url),
+          // Cached by attachment id (not the URL), decoded at display size.
+          images.map((image) {
+            final provider = image.image as AttachmentImageProvider;
+            return (provider.id, provider.url, provider.cacheWidth != null);
+          }),
           containsAll([
-            'https://storage.test/a1.jpg',
-            'https://storage.test/a2.jpg',
+            ('a1', 'https://storage.test/a1.jpg', true),
+            ('a2', 'https://storage.test/a2.jpg', true),
           ]),
         );
         // No empty text area in the image-only bubble.
@@ -213,7 +241,7 @@ void main() {
             .where((c) => c.since == null && c.before == null)
             .length;
 
-        // flutter_test answers every HTTP request with 400, so the network image fails.
+        // Storage answers the URL as expired, so the image fails.
         for (var i = 0; i < 10 && fullLoads() < 2; i++) {
           await tester.runAsync(
             () => Future<void>.delayed(const Duration(milliseconds: 50)),
