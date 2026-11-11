@@ -196,6 +196,12 @@ export const JOB_NAMES = {
   // the student left (app.students.left_at) or, for a parent, from when their last child left.
   // Carries no payload. Registered on the maintenance queue via Job Scheduler.
   PURGE_EXPIRED_SENSITIVE_RECORDS: "purge-expired-sensitive-records",
+  // Scheduled deletion of data past its fixed retention period (docs/modules/data-retention.md):
+  // security events, sales inquiries, rejected school applications (and their proof file) and
+  // in-app notifications after 12 months, data subject request export bundles 30 days after the
+  // request finished. Carries no payload: the periods are DATA_RETENTION_RULES in
+  // data-retention-sweep.ts. Registered on the maintenance queue via Job Scheduler.
+  PURGE_EXPIRED_RETAINED_DATA: "purge-expired-retained-data",
   // Cost & budget reporting sweep (ST-293). Carries `{ mode: "daily" | "monthly" }`: "daily"
   // publishes today's AI-spend/Stripe-fee CloudWatch metrics so the budget alarms
   // (infra/terraform/modules/monitoring/alerts.tf) stay current; "monthly" additionally logs the

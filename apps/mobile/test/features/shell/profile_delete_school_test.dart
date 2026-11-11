@@ -84,7 +84,11 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.text("Your school's data is kept. Nothing is deleted."),
+        find.text(
+          "We prepare a copy of your school's data, then permanently delete it 30 days after "
+          'the copy is ready. Email hello@studafy.com before then if you need the copy, or if '
+          'this was a mistake.',
+        ),
         findsOneWidget,
       );
       expect(_confirmEnabled(tester), isFalse);

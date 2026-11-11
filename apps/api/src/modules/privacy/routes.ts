@@ -124,6 +124,7 @@ function toResponse(
     sla_due_at: row.slaDueAt.toISOString(),
     download_url: presigned?.url ?? null,
     download_url_expires_at: presigned?.expiresAt.toISOString() ?? null,
+    export_deleted_at: row.exportDeletedAt?.toISOString() ?? null,
     failure_message: row.failureMessage,
   };
 }
@@ -153,7 +154,8 @@ const listDsrRoute = createRoute({
   description:
     "Every per-person export and erasure request in the school, whoever filed it, newest first. " +
     "A completed export's download link is fetched per request from `GET /api/privacy/dsr/{requestId}`, " +
-    "which signs a short-lived URL; this list never carries one.",
+    "which signs a short-lived URL; this list never carries one. `export_deleted_at` says whether " +
+    "there is still a bundle to download: once set, the retention sweep has deleted it.",
   security: [{ bearerAuth: [] }],
   request: { query: listDsrQuerySchema },
   responses: standardResponses(
@@ -355,7 +357,9 @@ export function privacyRoutes(
     }
     // The export's ZIP archive (data, README and the subject's files); see the worker's
     // tenant-export.worker.ts for its layout.
-    const archiveKey = exportArchiveKey(row, auth.schoolId);
+    // No link once the retention sweep deleted the bundle (30 days after completion): the key
+    // stays on the row as the record, but nothing is stored behind it any more.
+    const archiveKey = row.exportDeletedAt ? null : exportArchiveKey(row, auth.schoolId);
     const presigned = archiveKey
       ? await requireStorage(storage).presign(
           archiveKey,

@@ -255,7 +255,7 @@ parameter` the moment it is unset. This pipeline resolves a real ORG_ADMIN (fall
   SUPER_ADMIN) of the school and acts as them; a school with no admin at all cannot be swept
   (`NoAdminActorError`, logged, sweep continues with the next school) -- filing a request still
   requires `requested_by_user_id`, and there is no one to attribute it to.
-- Export bundles are not purged by any sweep today. A GDPR export bundle is itself personal data,
-  so leaving it in object storage indefinitely is its own retention question this ticket did not
-  close -- follow-up work, tracked the same way `report-expiry-sweep.ts` closes the equivalent gap
-  for ordinary report artifacts.
+- Export bundles are deleted 30 days after the request finished by the data retention sweep
+  (`data-retention-sweep.ts`, [data-retention.md](../modules/data-retention.md)). The request row
+  stays, with its `storage_key`, and `export_deleted_at` records the deletion; the status API then
+  returns no download link.

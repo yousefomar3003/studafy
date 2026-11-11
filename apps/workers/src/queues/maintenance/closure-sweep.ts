@@ -1,8 +1,13 @@
 /**
- * The tenant-closure sweep (ST-268): the scheduled job that turns "this school's subscription
- * reached `closed`" (packages/billing's state machine, driven today by the dunning sweep's
- * `grace_exhausted` transition) into the two data subject requests closure requires -- an export
- * first, an erasure once its retention hold has elapsed.
+ * The tenant-closure sweep (ST-268): the scheduled job that turns a closed school into the two data
+ * subject requests closure requires -- an export first, an erasure once its retention hold has
+ * elapsed. A school is closed when either
+ *   - its subscription reached `closed` (packages/billing's state machine, driven by the dunning
+ *     sweep's `grace_exhausted` transition), or
+ *   - its own administrator closed it ("Delete school", POST /api/schools/current/closure, which
+ *     archives the school and records `closed_at`; migration 000128).
+ * The School Agreement promises the school's data is deleted after the export window (clause
+ * B10), so both kinds of closure end in erasure.
  *
  * Two stages, one idempotency rule each: never file a `tenant`-scope request of a given type for a
  * school that already has one (whatever its status), checked via
@@ -89,7 +94,15 @@ async function processSchoolClosure(
   log: BillingLogger,
 ): Promise<SchoolClosureOutcome | null> {
   const [closed] = await tx`
-    SELECT 1 FROM app.subscriptions WHERE school_id = ${schoolId}::uuid AND status = 'closed' LIMIT 1
+    SELECT 1
+    WHERE EXISTS (
+            SELECT 1 FROM app.subscriptions
+            WHERE school_id = ${schoolId}::uuid AND status = 'closed'
+          )
+       OR EXISTS (
+            SELECT 1 FROM app.schools
+            WHERE id = ${schoolId}::uuid AND status = 'archived' AND closed_at IS NOT NULL
+          )
   `;
   if (!closed) return null;
 
