@@ -7,7 +7,8 @@
  *
  *   - a tenant closure deletes every original file and every leftover cell;
  *   - a per-person erasure deletes that person's leftover cells (they are tied to the student or
- *     parent the import wrote, app.student_import_rows.student_id / parent_user_id) and records the
+ *     parents the import wrote, app.student_import_rows.student_id / parent_user_id /
+ *     parent2_user_id) and records the
  *     files as retained, with the retention period that bounds them;
  *   - a per-person export cannot include what is inside the files, and says so in knownGaps.
  *
@@ -49,6 +50,7 @@ export async function eraseImportData(
       DELETE FROM app.student_import_rows
       WHERE school_id = ${schoolId}::uuid
         AND (parent_user_id = ${subject.userId}::uuid
+             OR parent2_user_id = ${subject.userId}::uuid
              ${subject.studentId ? tx`OR student_id = ${subject.studentId}::uuid` : tx``})
     `;
     const [held] = await tx<{ held: boolean }[]>`

@@ -145,7 +145,6 @@ describeDb("student import mapping HTTP", () => {
     // None of these headers is a known spelling, so nothing required is mapped.
     expect(first.errors.map((e) => e.field).sort()).toEqual([
       "admission_number",
-      "email",
       "first_name",
       "last_name",
     ]);

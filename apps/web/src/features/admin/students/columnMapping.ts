@@ -31,9 +31,15 @@ export const FIELD_LABEL_KEYS: Readonly<Record<StudentImportField, string>> = {
   preferred_name: "adminPeople.students.import.fields.preferred_name",
   date_of_birth: "adminPeople.students.import.fields.date_of_birth",
   status: "adminPeople.students.import.fields.status",
+  grade: "adminPeople.students.import.fields.grade",
+  section: "adminPeople.students.import.fields.section",
+  family: "adminPeople.students.import.fields.family",
   parent_email: "adminPeople.students.import.fields.parent_email",
   parent_name: "adminPeople.students.import.fields.parent_name",
   parent_relationship: "adminPeople.students.import.fields.parent_relationship",
+  parent2_email: "adminPeople.students.import.fields.parent2_email",
+  parent2_name: "adminPeople.students.import.fields.parent2_name",
+  parent2_relationship: "adminPeople.students.import.fields.parent2_relationship",
 };
 
 const FIELD_HINT_KEYS: Readonly<Partial<Record<StudentImportField, string>>> = {
@@ -44,6 +50,12 @@ const FIELD_HINT_KEYS: Readonly<Partial<Record<StudentImportField, string>>> = {
   parent_email: "adminPeople.students.import.hints.parent_email",
   parent_name: "adminPeople.students.import.hints.parent_name",
   parent_relationship: "adminPeople.students.import.hints.parent_relationship",
+  grade: "adminPeople.students.import.hints.grade",
+  section: "adminPeople.students.import.hints.section",
+  family: "adminPeople.students.import.hints.family",
+  parent2_email: "adminPeople.students.import.hints.parent_email",
+  parent2_name: "adminPeople.students.import.hints.parent_name",
+  parent2_relationship: "adminPeople.students.import.hints.parent_relationship",
 };
 
 export function fieldLabel(field: StudentImportField, t: TFunction): string {
@@ -58,7 +70,9 @@ export function fieldHint(field: StudentImportField, t: TFunction): string | und
   const key = FIELD_HINT_KEYS[field];
   if (!key) return undefined;
   if (field === "status") return t(key, { values: STUDENT_STATUSES.join(", ") });
-  if (field === "parent_relationship") return t(key, { values: PARENT_RELATIONSHIPS.join(", ") });
+  if (field === "parent_relationship" || field === "parent2_relationship") {
+    return t(key, { values: PARENT_RELATIONSHIPS.join(", ") });
+  }
   return t(key);
 }
 
@@ -195,15 +209,29 @@ export function mappingFitsHeaders(mapping: ColumnMapping, headers: readonly str
   return mappedHeaders(mapping).every((header) => keys.has(normalizeHeader(header)));
 }
 
-/** A parent is all or nothing on the server: a row naming only one of these two is rejected. */
+const PARENT_COLUMNS = [
+  { email: "parent_email", name: "parent_name", relationship: "parent_relationship" },
+  { email: "parent2_email", name: "parent2_name", relationship: "parent2_relationship" },
+] as const;
+
+/**
+ * A parent is all or nothing on the server: a name or an email, and a relationship. A mapping that
+ * gives a parent's name or email but no relationship (or the reverse) rejects every row that uses
+ * it, so it is flagged before upload. A relationship alone is fine with a family column: blank
+ * family lines join the parents another line names.
+ */
 export function parentPairWarning(mapping: ColumnMapping, t: TFunction): string | null {
-  const hasEmail = mapping.parent_email !== undefined;
-  const hasRelationship = mapping.parent_relationship !== undefined;
-  if (hasEmail === hasRelationship) return null;
-  return t("adminPeople.students.import.parentPairWarning", {
-    email: fieldLabel("parent_email", t),
-    relationship: fieldLabel("parent_relationship", t),
-  });
+  for (const slot of PARENT_COLUMNS) {
+    const hasPerson = mapping[slot.email] !== undefined || mapping[slot.name] !== undefined;
+    const hasRelationship = mapping[slot.relationship] !== undefined;
+    if (hasPerson === hasRelationship) continue;
+    return t("adminPeople.students.import.parentPairWarning", {
+      name: fieldLabel(slot.name, t),
+      email: fieldLabel(slot.email, t),
+      relationship: fieldLabel(slot.relationship, t),
+    });
+  }
+  return null;
 }
 
 export function joinLabels(fields: readonly StudentImportField[], t: TFunction): string {

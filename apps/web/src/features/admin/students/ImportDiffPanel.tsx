@@ -34,7 +34,56 @@ const CONFLICT_MESSAGE_KEYS: Readonly<Record<DiffConflict, string>> = {
     "adminPeople.students.import.diff.conflicts.PARENT_EMAIL_BELONGS_TO_STUDENT",
 };
 
+type PlacementConflict = NonNullable<StudentImportDiffRow["placement_conflict"]>;
+
+const PLACEMENT_CONFLICT_KEYS: Readonly<Record<PlacementConflict, string>> = {
+  NO_ACADEMIC_YEAR: "adminPeople.students.import.diff.placementConflicts.NO_ACADEMIC_YEAR",
+  GRADE_NOT_FOUND: "adminPeople.students.import.diff.placementConflicts.GRADE_NOT_FOUND",
+  SECTION_NOT_FOUND: "adminPeople.students.import.diff.placementConflicts.SECTION_NOT_FOUND",
+  SECTION_REQUIRED: "adminPeople.students.import.diff.placementConflicts.SECTION_REQUIRED",
+};
+
 const FILTER_VALUES: readonly ActionFilter[] = ["all", "create", "update", "unchanged", "conflict"];
+
+interface ParentOutcome {
+  parent: StudentImportDiffRow["parent"];
+  parent_conflict: StudentImportDiffRow["parent_conflict"];
+  parent_group_line: number | null;
+}
+
+/** One parent's outcome as a sentence, or null when there is nothing to say. */
+function describeParent(outcome: ParentOutcome, second: boolean, t: TFunction): string | null {
+  switch (outcome.parent) {
+    case "create":
+      return second
+        ? t("adminPeople.students.import.diff.newSecondParentAccount")
+        : t("adminPeople.students.import.diff.newParentAccount");
+    case "sibling":
+      return t("adminPeople.students.import.diff.siblingParent", {
+        line: outcome.parent_group_line,
+      });
+    case "conflict":
+      return outcome.parent_conflict === "PARENT_EMAIL_IN_OTHER_FAMILY"
+        ? t("adminPeople.students.import.diff.parentEmailInOtherFamily")
+        : t("adminPeople.students.import.diff.parentAccountExists");
+    default:
+      return null;
+  }
+}
+
+/** Where the student lands: "Grade 1 – A", or the grade alone when it has one section. */
+function describePlacement(row: StudentImportDiffRow, t: TFunction): string | null {
+  const where = row.section ? `${row.grade} – ${row.section}` : (row.grade ?? "");
+  if (row.placement_conflict) {
+    return t(PLACEMENT_CONFLICT_KEYS[row.placement_conflict], {
+      grade: row.grade,
+      section: row.section,
+    });
+  }
+  if (row.placement === "place") return t("adminPeople.students.import.diff.placeIn", { where });
+  if (row.placement === "move") return t("adminPeople.students.import.diff.moveTo", { where });
+  return null;
+}
 
 /** What will happen to one row, as short sentences: the conflict reason, each field change, the
  * parent outcome (new, sibling of an earlier line, or not linked), and each template answer, with
@@ -48,15 +97,18 @@ function describeRow(row: StudentImportDiffRow, t: TFunction, language: string):
       to: change.to,
     }),
   );
-  if (row.parent === "create") parts.push(t("adminPeople.students.import.diff.newParentAccount"));
-  if (row.parent === "sibling") {
-    parts.push(
-      t("adminPeople.students.import.diff.siblingParent", { line: row.parent_group_line }),
-    );
+  if (row.parent === "kept" || row.parent2?.parent === "kept") {
+    parts.push(t("adminPeople.students.import.diff.parentsKept"));
   }
-  if (row.parent_conflict === "PARENT_ACCOUNT_EXISTS") {
-    parts.push(t("adminPeople.students.import.diff.parentAccountExists"));
+  for (const [outcome, second] of [
+    [row, false],
+    [row.parent2, true],
+  ] as const) {
+    const sentence = outcome ? describeParent(outcome, second, t) : null;
+    if (sentence) parts.push(sentence);
   }
+  const placement = describePlacement(row, t);
+  if (placement) parts.push(placement);
   for (const answer of row.records) {
     parts.push(
       t("adminPeople.students.import.diff.recordValue", {
@@ -145,7 +197,23 @@ export function ImportDiffPanel({ record }: ImportDiffPanelProps) {
                 <dt>{t("adminPeople.students.import.diff.stats.parentConflicts")}</dt>
                 <dd>{diff.totals.parent_conflicts}</dd>
               </div>
+              <div>
+                <dt>{t("adminPeople.students.import.diff.stats.placed")}</dt>
+                <dd>{diff.totals.placed}</dd>
+              </div>
+              <div>
+                <dt>{t("adminPeople.students.import.diff.stats.placementConflicts")}</dt>
+                <dd>{diff.totals.placement_conflicts}</dd>
+              </div>
             </dl>
+
+            {diff.totals.placement_conflicts > 0 ? (
+              <p role="status" className="students-import__warning">
+                {t("adminPeople.students.import.diff.placementConflictsBanner", {
+                  count: diff.totals.placement_conflicts,
+                })}
+              </p>
+            ) : null}
 
             {diff.totals.parent_conflicts > 0 ? (
               <p role="status" className="students-import__warning">

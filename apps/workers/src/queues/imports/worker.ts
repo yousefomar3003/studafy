@@ -9,9 +9,18 @@
  * created or updated (and whose parent it created), tagged with those ids. Everything else goes.
  * What is kept expires with the school's import retention period (import-source-retention-sweep.ts).
  *
- * Parents are never matched by email (docs/modules/finance-module-guide.md): a row whose
- * parent_email belongs to an existing account imports its student unlinked (PARENT_ACCOUNT_EXISTS),
- * and rows sharing one new parent_email share the one parent the first of them creates.
+ * Parents are never matched by email (docs/modules/finance-module-guide.md): a row whose parent
+ * email belongs to an existing account imports its student with that parent unlinked
+ * (PARENT_ACCOUNT_EXISTS). Which lines share a new parent -- the same family number, or else the
+ * same new email -- is decided by the plan (packages/student-import/src/plan.ts); each shared parent
+ * is created once, by the line the plan names, and a line's two parents share one household.
+ *
+ * Nobody needs an email: a student or parent created without one signs in with the member ID the
+ * user_roles trigger issues (000140) and a password set from a setup code (000141, 000184).
+ *
+ * A row naming a grade (and section) places its student in that section of the current academic
+ * year and enrolls them in the section's open classes, as placing them by hand does
+ * (apps/api/src/modules/academics/section-service.ts placeStudentInSection).
  *
  * Atomic: the whole import is one transaction. The plan, every write, every audit row and the
  * `completed` status commit together or not at all, so a failure part-way leaves no half-imported
@@ -29,7 +38,13 @@
  */
 
 import { normalizeRecordValue, sealRecordValue } from "@studafy/records";
-import { normalizeEmail, planStudentImport, unmappedColumns } from "@studafy/student-import";
+import {
+  normalizeEmail,
+  PARENT_SLOTS,
+  planStudentImport,
+  unmappedColumns,
+  withRecordDefaults,
+} from "@studafy/student-import";
 import postgres from "postgres";
 
 import { emitAuditLogs } from "../../db/audit";
@@ -45,6 +60,8 @@ import type {
 } from "@studafy/records";
 import type {
   ColumnMapping,
+  ParentSlot,
+  PlannedParent,
   PlannedRow,
   StagedRecord,
   StudentImportPlan,
@@ -66,8 +83,12 @@ export interface StudentImportSummary {
   parents_created: number;
   /** Parent-student links created. */
   parents_linked: number;
-  /** Rows whose parent_email already belonged to an account: student imported, parent unlinked. */
+  /** Parents not linked (an existing account, or an email another family creates). */
   parent_conflicts: number;
+  /** Students placed in, or moved to, a section. */
+  placed: number;
+  /** Students imported unplaced: unknown grade or section, or no academic year. */
+  placement_conflicts: number;
   /** Student record answers written from template columns. */
   record_answers: number;
 }
@@ -154,10 +175,10 @@ async function migrate(
     WHERE school_id = ${schoolId}::uuid AND import_id = ${importId}::uuid AND record IS NOT NULL
     ORDER BY line_number
   `;
-  // Rows staged before ST-299 (backfilled from rows_data) have no parent_name key.
+  // Rows staged by an earlier release lack the fields added since; missing means "not given".
   const records: StagedRecord[] = staged.map((row) => ({
     line_number: row.line_number,
-    record: { ...row.record, parent_name: row.record.parent_name ?? null },
+    record: withRecordDefaults(row.record),
   }));
 
   const plan = await planStudentImport(tx, schoolId, records);
@@ -220,6 +241,7 @@ async function keepLeftoverCells(
       UPDATE app.student_import_rows AS staged
       SET student_id = line.student_id,
           parent_user_id = line.parent_user_id,
+          parent2_user_id = line.parent2_user_id,
           record = NULL,
           source = coalesce(
             (SELECT jsonb_object_agg(cell.key, cell.value)
@@ -229,7 +251,7 @@ async function keepLeftoverCells(
             '{}'::jsonb
           )
       FROM jsonb_to_recordset(${tx.json(applied as never)}::jsonb)
-        AS line (line_number int, student_id uuid, parent_user_id uuid)
+        AS line (line_number int, student_id uuid, parent_user_id uuid, parent2_user_id uuid)
       WHERE staged.school_id = ${schoolId}::uuid
         AND staged.import_id = ${importId}::uuid
         AND staged.line_number = line.line_number
@@ -261,11 +283,12 @@ async function setStatus(
 // Applying the plan
 // ---------------------------------------------------------------------------
 
-/** A line this run wrote a student for, and the parent it created for that line, if any. */
+/** A line this run wrote a student for, and the parents it linked on that line, if any. */
 interface AppliedLine {
   line_number: number;
   student_id: string;
   parent_user_id: string | null;
+  parent2_user_id: string | null;
 }
 
 interface ApplyContext {
@@ -273,8 +296,10 @@ interface ApplyContext {
   schoolId: string;
   importId: string;
   audit: WorkerAuditEntry[];
-  /** Parent accounts created earlier in this run, by normalized email. */
-  parentsByEmail: Map<string, string>;
+  /** Parent accounts created earlier in this run, by `<naming line>:<slot index>`. */
+  parentsByGroup: Map<string, string>;
+  /** Every planned line, by line number: a shared parent is created from its naming line. */
+  linesByNumber: Map<number, PlannedRow>;
   /** Each parent's household, once looked up or created in this run. */
   familiesByParent: Map<string, string>;
   /** The published student record form, by field id. */
@@ -321,7 +346,8 @@ async function applyPlan(
     schoolId,
     importId,
     audit: [],
-    parentsByEmail: new Map(),
+    parentsByGroup: new Map(),
+    linesByNumber: new Map(plan.rows.map((row) => [row.line_number, row])),
     familiesByParent: new Map(),
     recordForm,
     keyring,
@@ -334,6 +360,8 @@ async function applyPlan(
     parents_created: 0,
     parents_linked: 0,
     parent_conflicts: 0,
+    placed: 0,
+    placement_conflicts: 0,
     record_answers: 0,
   };
 
@@ -354,21 +382,36 @@ async function applyPlan(
       summary.students_updated++;
     }
 
-    let parentUserId: string | null = null;
-    if (row.link === "create") {
-      const resolved = await resolveParent(ctx, row);
-      parentUserId = resolved.parentUserId;
+    // Both of the line's parents join one household: the first linked parent's.
+    let householdId: string | null = null;
+    const linked: (string | null)[] = [];
+    for (const [index, slot] of PARENT_SLOTS.entries()) {
+      const parent = index === 0 ? row.parent1 : row.parent2;
+      if (parent?.parent_conflict) summary.parent_conflicts++;
+      if (parent?.link !== "create") {
+        linked.push(null);
+        continue;
+      }
+      const resolved = await resolveParent(ctx, parent, slot, index);
       if (resolved.created) summary.parents_created++;
-      await createLink(ctx, parentUserId, studentId, row.record);
+      householdId ??= await resolveFamily(ctx, resolved.parentUserId, resolved.namedBy, slot);
+      await createLink(ctx, resolved.parentUserId, studentId, householdId, parent.relationship!);
       summary.parents_linked++;
+      linked.push(resolved.parentUserId);
     }
-    if (row.parent_conflict !== null) summary.parent_conflicts++;
+
+    if (row.placement_conflict !== null) summary.placement_conflicts++;
+    if (row.placement !== null && row.placement.action !== "unchanged") {
+      await placeStudent(ctx, studentId, row.placement);
+      summary.placed++;
+    }
 
     summary.record_answers += await writeRecordAnswers(ctx, studentId, row.record.records ?? {});
     applied.push({
       line_number: row.line_number,
       student_id: studentId,
-      parent_user_id: parentUserId,
+      parent_user_id: linked[0] ?? null,
+      parent2_user_id: linked[1] ?? null,
     });
   }
 
@@ -445,22 +488,105 @@ async function updateStudent(ctx: ApplyContext, studentId: string, row: PlannedR
 }
 
 /**
- * The new parent a row links to: created by the first line naming its email ("create"), reused by
- * every later one ("sibling"). Never an existing account -- the plan has already refused those.
+ * The new parent a line links to, created from the details on the line the plan names for it
+ * (parent_group_line) the first time any line of its group needs it -- which can be a blank family
+ * line ahead of the one naming the parent. Never an existing account: the plan refused those.
  */
 async function resolveParent(
   ctx: ApplyContext,
-  row: PlannedRow,
-): Promise<{ parentUserId: string; created: boolean }> {
-  const email = row.record.parent_email!;
-  const normalized = normalizeEmail(email);
-  const sibling = ctx.parentsByEmail.get(normalized);
-  if (sibling) return { parentUserId: sibling, created: false };
+  parent: PlannedParent,
+  slot: ParentSlot,
+  index: number,
+): Promise<{ parentUserId: string; created: boolean; namedBy: StudentImportRecord }> {
+  const namedBy = ctx.linesByNumber.get(parent.parent_group_line!)!.record;
+  const group = `${parent.parent_group_line}:${index}`;
+  const existing = ctx.parentsByGroup.get(group);
+  if (existing) return { parentUserId: existing, created: false, namedBy };
 
-  const parentUserId = await createUser(ctx, email, row.record.parent_name ?? email);
+  const email = namedBy[slot.email];
+  const displayName = (namedBy[slot.name] ?? email!).slice(0, 200).trim();
+  const parentUserId = await createUser(ctx, email, displayName);
   await grantRole(ctx, parentUserId, "PARENT");
-  ctx.parentsByEmail.set(normalized, parentUserId);
-  return { parentUserId, created: true };
+  ctx.parentsByGroup.set(group, parentUserId);
+  return { parentUserId, created: true, namedBy };
+}
+
+/**
+ * Places a student in a section of the current academic year and enrolls them in its open
+ * classes; a student in another section of that year is moved out of its classes first. A class
+ * at capacity is skipped, as placing by hand does. Mirrors placeStudentInSection (API).
+ */
+async function placeStudent(
+  ctx: ApplyContext,
+  studentId: string,
+  placement: NonNullable<PlannedRow["placement"]>,
+): Promise<void> {
+  const { tx, schoolId } = ctx;
+  const [previous] = await tx<{ section_id: string }[]>`
+    SELECT section_id FROM app.student_sections
+    WHERE school_id = ${schoolId}::uuid AND student_id = ${studentId}::uuid
+      AND academic_year_id = ${placement.academic_year_id}::uuid
+    FOR UPDATE
+  `;
+  if (previous && previous.section_id !== placement.section_id) {
+    await tx`
+      UPDATE app.enrollments AS e
+      SET status = 'withdrawn'::app.enrollment_status,
+          withdrawn_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      FROM app.classes AS cl
+      WHERE cl.id = e.class_id AND cl.school_id = e.school_id
+        AND cl.section_id = ${previous.section_id}::uuid
+        AND e.school_id = ${schoolId}::uuid AND e.student_id = ${studentId}::uuid
+        AND e.status IN ('active', 'waitlisted')
+    `;
+  }
+
+  await tx`
+    INSERT INTO app.student_sections (school_id, student_id, academic_year_id, section_id)
+    VALUES (
+      ${schoolId}::uuid, ${studentId}::uuid, ${placement.academic_year_id}::uuid,
+      ${placement.section_id}::uuid
+    )
+    ON CONFLICT (school_id, student_id, academic_year_id)
+    DO UPDATE SET section_id = EXCLUDED.section_id, updated_at = CURRENT_TIMESTAMP
+  `;
+
+  // One statement per student: each open class of the section with room left, new enrollments
+  // inserted and withdrawn ones re-activated. Earlier students of this run count toward capacity,
+  // since they were written in this same transaction.
+  const enrolled = await tx<{ class_id: string }[]>`
+    INSERT INTO app.enrollments (school_id, class_id, student_id)
+    SELECT cl.school_id, cl.id, ${studentId}::uuid
+    FROM app.classes AS cl
+    WHERE cl.school_id = ${schoolId}::uuid AND cl.section_id = ${placement.section_id}::uuid
+      AND cl.status IN ('planned', 'active')
+      AND (
+        cl.capacity IS NULL
+        OR (SELECT count(*) FROM app.enrollments AS taken
+            WHERE taken.school_id = cl.school_id AND taken.class_id = cl.id
+              AND taken.status = 'active') < cl.capacity
+      )
+    ON CONFLICT (school_id, class_id, student_id) DO UPDATE
+      SET status = 'active'::app.enrollment_status,
+          enrolled_at = CURRENT_TIMESTAMP,
+          withdrawn_at = NULL,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE app.enrollments.status NOT IN ('active', 'waitlisted')
+    RETURNING class_id
+  `;
+
+  ctx.audit.push({
+    action: previous ? "update" : "insert",
+    targetTable: "student_sections",
+    targetId: studentId,
+    oldValues: previous ? { section_id: previous.section_id } : null,
+    newValues: {
+      import_id: ctx.importId,
+      section_id: placement.section_id,
+      enrolled_class_ids: enrolled.map((row) => row.class_id),
+    },
+  });
 }
 
 /**
@@ -525,8 +651,13 @@ async function writeRecordAnswers(
   return written;
 }
 
-async function createUser(ctx: ApplyContext, email: string, displayName: string): Promise<string> {
-  const normalizedEmail = normalizeEmail(email);
+/** A new active account. With no email, its owner signs in with their member ID (000141). */
+async function createUser(
+  ctx: ApplyContext,
+  email: string | null,
+  displayName: string,
+): Promise<string> {
+  const normalizedEmail = email === null ? null : normalizeEmail(email);
   const [user] = await ctx.tx<{ id: string }[]>`
     INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
     VALUES (
@@ -570,15 +701,15 @@ async function createLink(
   ctx: ApplyContext,
   parentUserId: string,
   studentId: string,
-  record: StudentImportRecord,
+  familyId: string,
+  relationship: string,
 ): Promise<void> {
-  const familyId = await resolveFamily(ctx, parentUserId, record);
   await ctx.tx`
     INSERT INTO app.parent_child_links
       (school_id, family_id, parent_user_id, student_id, relationship)
     VALUES (
       ${ctx.schoolId}::uuid, ${familyId}::uuid, ${parentUserId}::uuid, ${studentId}::uuid,
-      ${record.parent_relationship}::app.parent_relationship
+      ${relationship}::app.parent_relationship
     )
   `;
   ctx.audit.push({
@@ -590,7 +721,7 @@ async function createLink(
       import_id: ctx.importId,
       family_id: familyId,
       parent_user_id: parentUserId,
-      relationship: record.parent_relationship,
+      relationship,
     },
   });
 }
@@ -601,6 +732,7 @@ async function resolveFamily(
   ctx: ApplyContext,
   parentUserId: string,
   record: StudentImportRecord,
+  slot: ParentSlot,
 ): Promise<string> {
   const cached = ctx.familiesByParent.get(parentUserId);
   if (cached) return cached;
@@ -613,7 +745,7 @@ async function resolveFamily(
   `;
   let familyId = existing?.id;
   if (!familyId) {
-    const displayName = (record.parent_name ?? record.parent_email!).slice(0, 200).trim();
+    const displayName = (record[slot.name] ?? record[slot.email]!).slice(0, 200).trim();
     const [family] = await ctx.tx<{ id: string }[]>`
       INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
       VALUES (${ctx.schoolId}::uuid, ${displayName}, ${parentUserId}::uuid)

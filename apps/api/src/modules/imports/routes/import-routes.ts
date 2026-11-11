@@ -593,10 +593,18 @@ const updateStudentImportSettingsRoute = createRoute({
 // Template
 // ---------------------------------------------------------------------------
 
+/**
+ * Students and their parents in one sheet. Nobody needs an email: each person gets a member ID and
+ * signs in with it. Lines sharing a family number share their parents, so a sibling's line can
+ * leave the parents blank (ADM-002). Grade and section place the student in a class.
+ */
 const CSV_TEMPLATE =
-  "admission_number,email,first_name,middle_name,last_name,preferred_name,date_of_birth,status,parent_email,parent_relationship\n" +
-  "ADM-2024-001,jane.doe@example.edu,Jane,Marie,Doe,Jenny,2010-03-15,enrolled,parent1@example.edu,mother\n" +
-  "ADM-2024-002,john.smith@example.edu,John,,Smith,,2011-07-22,applicant,,\n";
+  "admission_number,first_name,middle_name,last_name,date_of_birth,status,grade,section,family," +
+  "parent_name,parent_relationship,parent_email,parent2_name,parent2_relationship,parent2_email," +
+  "email,preferred_name\n" +
+  "ADM-001,Ali,Omar,Hassan,2016-03-15,enrolled,Grade 1,A,F1,Mona Hassan,mother,,Omar Hassan,father,,,\n" +
+  "ADM-002,Sara,Omar,Hassan,2018-09-02,enrolled,Grade 1,B,F1,,,,,,,,\n" +
+  "ADM-003,Lina,,Khaled,2015-11-20,enrolled,Grade 2,A,F2,Rana Khaled,mother,rana@example.com,,,,,\n";
 
 // ---------------------------------------------------------------------------
 // Route factory
