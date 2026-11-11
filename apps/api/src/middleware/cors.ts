@@ -30,6 +30,9 @@ const ALLOWED_HEADERS = [
   "X-Request-Id",
   "Idempotency-Key",
   "Accept-Language",
+  // The student import upload names its file in this header (POST /api/imports/students/upload,
+  // sent by the web app's XHR). Without it the browser's preflight fails and the upload never leaves.
+  "X-File-Name",
 ];
 const EXPOSED_HEADERS = ["X-Request-Id"];
 const MAX_AGE = 86400; // 24 hours
