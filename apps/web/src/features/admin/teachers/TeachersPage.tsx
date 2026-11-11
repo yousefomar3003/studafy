@@ -1,15 +1,19 @@
 import { ApiError } from "@studafy/api-client";
 import { PERMISSIONS } from "@studafy/constants";
 import { Button, Input, Modal, Select, Table, useToast } from "@studafy/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { ImportCsvButton } from "../../../components/ImportCsvButton";
 import { LinkButton } from "../../../components/LinkButton";
+import { api } from "../../../lib/api";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
-import { useTeacherRows, useUpdateTeacher } from "./queries";
+import { TEACHERS_KEY, useTeacherRows, useUpdateTeacher } from "./queries";
 
 import type { EmploymentStatus, TeacherRow, UpdateTeacherInput } from "./queries";
+import type { ImportSpec } from "../../../lib/data-transfer";
 
 import "../../principal/sections/sections.css";
 import "../../principal/years/years.css";
@@ -151,6 +155,76 @@ function EditTeacherModal({
   );
 }
 
+interface CreateTeacher {
+  display_name: string;
+  employee_number: string;
+  email?: string;
+  hire_date?: string;
+  employment_status: EmploymentStatus;
+}
+
+/**
+ * Teachers from a file, one `POST /api/teachers` per row: name and employee number, optionally an
+ * email (teachers without one sign in with their TCH- ID) and a hire date. A new teacher starts
+ * active unless the file says otherwise. Unknown columns can be kept as staff record fields for the
+ * teachers created.
+ */
+function useTeacherImportSpec(): ImportSpec<CreateTeacher> {
+  const { t } = useTranslation();
+  const permissions = usePermissions();
+  return {
+    templateName: "teachers",
+    fields: [
+      {
+        key: "display_name",
+        label: t("adminPeople.teachers.columns.name"),
+        required: true,
+        maxLength: 200,
+        example: "Sara Haddad",
+      },
+      {
+        key: "employee_number",
+        label: t("adminPeople.teachers.employeeNumber"),
+        required: true,
+        maxLength: 100,
+        example: "EMP-001",
+      },
+      {
+        key: "email",
+        label: t("adminPeople.teachers.emailOptional"),
+        type: "email",
+        maxLength: 320,
+        example: "",
+      },
+      { key: "hire_date", label: t("adminPeople.teachers.hireDate"), type: "date" },
+      {
+        key: "employment_status",
+        label: t("adminPeople.teachers.status"),
+        options: EMPLOYMENT_STATUSES,
+        example: "active",
+      },
+    ],
+    toRecord: (values) => ({
+      display_name: String(values.display_name),
+      employee_number: String(values.employee_number),
+      ...(values.email ? { email: String(values.email) } : {}),
+      ...(values.hire_date ? { hire_date: String(values.hire_date) } : {}),
+      employment_status: (values.employment_status as EmploymentStatus | null) ?? "active",
+    }),
+    create: async (body) => {
+      const { data } = await api.POST("/api/teachers", { body });
+      if (!data) throw new Error("Teacher creation returned no data.");
+      return data;
+    },
+    recordColumns: {
+      subjectKind: "staff",
+      idOf: (created) => (created as { user_id?: string } | undefined)?.user_id ?? null,
+      canKeep: permissions.has(PERMISSIONS.STAFF_RECORD_UPDATE),
+      canCreateField: permissions.has(PERMISSIONS.RECORD_TEMPLATE_MANAGE),
+    },
+  };
+}
+
 /**
  * Teachers (`/portal/admin/teachers`), gated on `organization:manageSettings` (each change also
  * needs `teacher:update` at the API): every teacher's employment record — employee number,
@@ -162,7 +236,10 @@ export default function TeachersPage() {
   const { formatDate } = useFormatters();
   const teachers = useTeacherRows();
   // Each teacher's staff record (staffRecord:read; ORG_ADMIN holds it).
-  const canReadRecords = usePermissions().has(PERMISSIONS.STAFF_RECORD_READ);
+  const permissions = usePermissions();
+  const canReadRecords = permissions.has(PERMISSIONS.STAFF_RECORD_READ);
+  const queryClient = useQueryClient();
+  const importSpec = useTeacherImportSpec();
   const [editing, setEditing] = useState<TeacherRow | null>(null);
   const day = (value: string | null) =>
     value ? formatDate(parseIsoDate(value), { dateStyle: "medium" }) : "—";
@@ -171,6 +248,13 @@ export default function TeachersPage() {
     <>
       <h1>{t("adminPeople.teachers.title")}</h1>
       <p>{t("adminPeople.teachers.description")}</p>
+      {permissions.has(PERMISSIONS.TEACHER_CREATE) ? (
+        <ImportCsvButton
+          spec={importSpec}
+          title={t("adminPeople.teachers.importTitle")}
+          onImported={() => void queryClient.invalidateQueries({ queryKey: TEACHERS_KEY })}
+        />
+      ) : null}
 
       <Table caption={t("adminPeople.teachers.caption")} hideCaption>
         <Table.Header>

@@ -19,7 +19,7 @@ interface Step {
 const STEPS: readonly Step[] = [
   { key: "setup", to: "/portal/principal/sections", permission: PERMISSIONS.TIMETABLE_MANAGE },
   { key: "students", to: "/portal/admin/students/import" },
-  { key: "teachers", to: "/portal/admin/users" },
+  { key: "teachers", to: "/portal/admin/teachers" },
   { key: "slips", to: "/portal/admin/import/slips", permission: PERMISSIONS.USER_UPDATE },
 ];
 

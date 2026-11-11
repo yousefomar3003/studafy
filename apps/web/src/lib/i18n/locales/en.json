@@ -240,11 +240,11 @@
   },
   "dataTransfer": {
     "import": {
-      "button": "Import CSV",
-      "intro": "Upload a CSV file with a header row using the columns below (up to {{max}} rows). Download the template to start from the right format.",
+      "button": "Import file",
+      "intro": "Upload an Excel or CSV file with a header row using the columns below (up to {{max}} rows). Download the template to start from the right format.",
       "required": "required",
       "downloadTemplate": "Download template",
-      "chooseFile": "CSV file",
+      "chooseFile": "File (Excel or CSV)",
       "chooseAnother": "Choose another file",
       "emptyFile": "The file has no data rows.",
       "missingColumns": "The file is missing required columns: {{columns}}.",
@@ -276,7 +276,8 @@
         "invalidBoolean": "{{field}} must be yes or no.",
         "invalidOption": "{{field}} must be one of: {{options}}.",
         "tooLong": "{{field}} must be at most {{max}} characters."
-      }
+      },
+      "notWorkbook": "That file isn't an Excel workbook we can read. Save it as .xlsx or .csv and try again."
     },
     "keepColumn": {
       "ignoredColumns": "These columns are not recognised: {{columns}}. After the import you can keep each one as a record field for the rows it creates.",

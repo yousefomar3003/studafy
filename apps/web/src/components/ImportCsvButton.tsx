@@ -45,6 +45,7 @@ interface DoneStage {
 
 type Stage =
   | { kind: "pick" }
+  | { kind: "unreadable" }
   | { kind: "invalidFile"; result: Extract<PrepareResult<unknown>, { ok: false }> }
   | { kind: "review"; fileName: string; rows: PreparedRow<unknown>[]; ignoredColumns: string[] }
   | { kind: "running"; total: number; done: number }
@@ -53,6 +54,14 @@ type Stage =
 
 /** Lines listed in the dialog before collapsing into "and N more" (the full list is downloadable). */
 const VISIBLE_ISSUES = 8;
+
+/** A CSV as text, or an Excel workbook's first sheet converted to CSV in the browser (the reader
+ * is loaded only when a workbook is picked). */
+async function readAsCsv(file: File): Promise<string> {
+  const { isXlsxFile, xlsxToCsv } = await import("../lib/xlsx");
+  if (!isXlsxFile(file)) return file.text();
+  return xlsxToCsv(new Uint8Array(await file.arrayBuffer()));
+}
 
 /**
  * "Import" button plus its dialog: download a template, pick a CSV, review per-row validation, then
@@ -93,7 +102,14 @@ export function ImportCsvButton<TRecord>({
   };
 
   const handleFile = async (file: File) => {
-    const text = await file.text();
+    let text: string;
+    try {
+      text = await readAsCsv(file);
+    } catch {
+      setStage({ kind: "unreadable" });
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
     setUnrecognised(recognisesNoColumn(text, spec) ? { fileName: file.name, csv: text } : null);
     const result = prepareImport(text, spec);
     if (result.ok) {
@@ -223,7 +239,7 @@ export function ImportCsvButton<TRecord>({
                 ref={inputRef}
                 id={inputId}
                 type="file"
-                accept=".csv,text/csv"
+                accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
                   if (file) void handleFile(file);
@@ -231,6 +247,12 @@ export function ImportCsvButton<TRecord>({
               />
             </div>
           </>
+        );
+      case "unreadable":
+        return (
+          <p role="alert" className="data-transfer__error">
+            {t("dataTransfer.import.notWorkbook")}
+          </p>
         );
       case "invalidFile": {
         const { result } = stage;

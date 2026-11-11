@@ -60,7 +60,14 @@ const getMock = mock((path: string, _init?: unknown) => {
 const patchMock = mock((_path: string, _init?: unknown) =>
   Promise.resolve<unknown>({ data: { ...TEACHER, hire_date: "2024-09-01" } }),
 );
-mock.module("../../../lib/api", () => ({ api: { GET: getMock, PATCH: patchMock } }));
+const postMock = mock((_path: string, init: { body: Record<string, unknown> }) =>
+  Promise.resolve<unknown>({
+    data: { ...TEACHER, user_id: "33333333-3333-4333-8333-333333333333", ...init.body },
+  }),
+);
+mock.module("../../../lib/api", () => ({
+  api: { GET: getMock, PATCH: patchMock, POST: postMock },
+}));
 
 async function renderPage() {
   const Page: ComponentType = (await import("./TeachersPage")).default;
@@ -85,9 +92,28 @@ afterEach(() => {
   cleanup();
   getMock.mockClear();
   patchMock.mockClear();
+  postMock.mockClear();
 });
 
 describe("TeachersPage", () => {
+  test("imports teachers from a file, with no email needed", async () => {
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Import file" }));
+    const dialog = await screen.findByRole("dialog", { name: "Import teachers" });
+    const input = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    const csv = "display_name,employee_number,email\nRana Khaled,EMP-7,\n";
+    fireEvent.change(input, { target: { files: [new File([csv], "teachers.csv")] } });
+
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Import 1 row" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    expect(postMock.mock.calls[0]![0]).toBe("/api/teachers");
+    expect(postMock.mock.calls[0]![1].body).toEqual({
+      display_name: "Rana Khaled",
+      employee_number: "EMP-7",
+      employment_status: "active",
+    });
+  });
+
   test("refuses an end date without a hire date, then saves the record", async () => {
     await renderPage();
 
