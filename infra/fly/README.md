@@ -62,6 +62,25 @@ Supabase's `postgres` is not a superuser, which the first migrations ran into on
   `studafy_monitor` cannot run. Production applied 000003 without those three statements and
   recorded it under the file's real checksum; everything else in it ran as written. The app does
   not use `studafy_monitor`.
+- **Migration 000002 revokes `CONNECT` on the database from `PUBLIC`.** Supabase's own login roles
+  (`pgbouncer`, which the pooler's auth query uses, `authenticator`, `supabase_auth_admin`,
+  `supabase_storage_admin`, …) connect through exactly that `PUBLIC` grant. After 000002 every one
+  of them was refused ("User does not have CONNECT privilege", thousands of times a day); once the
+  pooler's cached sessions ran out it could not authenticate anyone, and the API lost the database
+  (2026-11-11). Fixed by granting `CONNECT, TEMPORARY` back to every login role that is not
+  `studafy_*`, run once in the SQL editor:
+
+  ```sql
+  DO $$ DECLARE r record; BEGIN
+    FOR r IN SELECT rolname FROM pg_roles WHERE rolcanlogin AND rolname NOT LIKE 'studafy%' LOOP
+      BEGIN EXECUTE format('GRANT CONNECT, TEMPORARY ON DATABASE postgres TO %I', r.rolname);
+      EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+    END LOOP;
+  END $$;
+  ```
+
+  Rerun it on any new Supabase database right after 000002, and if Supabase adds a login role
+  later (Postgres logs show `42501 permission denied for database "postgres"`).
 
 ## First-time setup
 
