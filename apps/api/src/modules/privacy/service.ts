@@ -151,7 +151,8 @@ export async function listDsrRequestsForSchool(
   const rows = await tx<Record<string, unknown>[]>`
     SELECT
       dsr.id, dsr.request_type::text AS request_type, dsr.subject_user_id,
-      dsr.status::text AS status, dsr.storage_key, dsr.failure_message, dsr.created_at,
+      dsr.status::text AS status, dsr.storage_key, dsr.export_deleted_at, dsr.failure_message,
+      dsr.created_at,
       dsr.completed_at, dsr.sla_due_at, u.display_name AS subject_display_name
     FROM app.data_subject_requests AS dsr
     LEFT JOIN app.users AS u ON u.id = dsr.subject_user_id AND u.school_id = dsr.school_id

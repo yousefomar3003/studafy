@@ -13,7 +13,8 @@ import type { ComponentType } from "react";
 
 /**
  * Privacy requests page: lists the school's requests (an erased person shown as such), downloads a
- * finished export through a freshly signed link, and files an erasure only once the admin ticks
+ * finished export through a freshly signed link, shows an export whose file the retention sweep
+ * deleted (30 days on) as such instead of offering a download that would fail, and files an erasure only once the admin ticks
  * that they understand it is permanent. Plus an accessibility pass.
  */
 
@@ -28,6 +29,7 @@ const EXPORT_DONE = {
   sla_due_at: "2026-10-31T08:00:00.000Z",
   download_url: null,
   download_url_expires_at: null,
+  export_deleted_at: null,
   failure_message: null,
 };
 const ERASED = {
@@ -37,16 +39,41 @@ const ERASED = {
   subject_user_id: "user-2",
   subject_display_name: "erased-3f2b",
 };
+/** Finished in September; its file was deleted 30 days later. */
+const EXPORT_EXPIRED = {
+  ...EXPORT_DONE,
+  id: "dsr-4",
+  subject_user_id: "user-4",
+  subject_display_name: "Omar Saleh",
+  completed_at: "2026-09-01T09:00:00.000Z",
+  export_deleted_at: "2026-10-01T09:00:00.000Z",
+};
+/** Still stored when the list loaded, deleted by the time the admin clicks Download. */
+const EXPORT_RACED = {
+  ...EXPORT_DONE,
+  id: "dsr-5",
+  subject_user_id: "user-5",
+  subject_display_name: "Huda Karim",
+};
 const SAM = { id: "user-3", display_name: "Sam Lee", email: "sam@example.test", roles: [] };
 
-const getMock = mock((path: string, _init?: unknown) => {
+const getMock = mock((path: string, init?: unknown) => {
   switch (path) {
     case "/api/privacy/dsr":
-      return Promise.resolve<unknown>({ data: { requests: [EXPORT_DONE, ERASED] } });
-    case "/api/privacy/dsr/{requestId}":
+      return Promise.resolve<unknown>({
+        data: { requests: [EXPORT_DONE, ERASED, EXPORT_EXPIRED, EXPORT_RACED] },
+      });
+    case "/api/privacy/dsr/{requestId}": {
+      const { requestId } = (init as { params: { path: { requestId: string } } }).params.path;
+      if (requestId === EXPORT_RACED.id) {
+        return Promise.resolve<unknown>({
+          data: { ...EXPORT_RACED, export_deleted_at: "2026-11-01T09:00:00.000Z" },
+        });
+      }
       return Promise.resolve<unknown>({
         data: { ...EXPORT_DONE, download_url: "https://files.example.test/export.zip" },
       });
+    }
     case "/api/users":
       return Promise.resolve<unknown>({ data: { users: [SAM] } });
     default:
@@ -106,6 +133,46 @@ describe("PrivacyRequestsPage", () => {
       expect(getMock).toHaveBeenCalledWith("/api/privacy/dsr/{requestId}", {
         params: { path: { requestId: "dsr-1" } },
       });
+    } finally {
+      window.open = originalOpen;
+    }
+  });
+
+  test("an export whose file was deleted after 30 days shows as such, with no download", async () => {
+    await renderPage();
+
+    const row = (await screen.findByText("Omar Saleh")).closest("tr")!;
+    expect(within(row).getByText("Deleted after 30 days")).toBeTruthy();
+    expect(within(row).queryByRole("button")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Download the data export for Omar Saleh" }),
+    ).toBeNull();
+    // The live export next to it still offers its download.
+    expect(
+      screen.getByRole("button", { name: "Download the data export for Lina Haddad" }),
+    ).toBeTruthy();
+  });
+
+  test("an export deleted since the list loaded explains why instead of opening a link", async () => {
+    const opened: string[] = [];
+    const originalOpen = window.open;
+    window.open = ((url: string) => {
+      opened.push(url);
+      return null;
+    }) as typeof window.open;
+    try {
+      await renderPage();
+
+      fireEvent.click(
+        await screen.findByRole("button", { name: "Download the data export for Huda Karim" }),
+      );
+      expect(await screen.findByText("This export has been deleted")).toBeTruthy();
+      expect(screen.queryByText("Couldn't get the download link. Try again.")).toBeNull();
+      expect(opened).toEqual([]);
+      // The list is fetched again so the row can show the export as deleted.
+      await waitFor(() =>
+        expect(getMock.mock.calls.filter(([path]) => path === "/api/privacy/dsr")).toHaveLength(2),
+      );
     } finally {
       window.open = originalOpen;
     }

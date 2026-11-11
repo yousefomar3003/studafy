@@ -35,6 +35,12 @@ export const dsrResponseSchema = z
     sla_due_at: dateTimeSchema,
     download_url: z.string().url().nullable(),
     download_url_expires_at: dateTimeSchema.nullable(),
+    export_deleted_at: dateTimeSchema.nullable().openapi({
+      description:
+        "When a finished export's stored bundle was deleted by the data retention sweep, 30 days " +
+        "after completion; null while it is still stored, and always null for an erasure. Once set " +
+        "the request has no download link any more.",
+    }),
     failure_message: z.string().nullable(),
   })
   .openapi("DataSubjectRequest");

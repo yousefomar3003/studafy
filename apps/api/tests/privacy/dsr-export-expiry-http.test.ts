@@ -1,7 +1,8 @@
 /**
  * A completed export's download link (`GET /api/privacy/dsr/{requestId}`) is handed out until the
  * data retention sweep deletes the stored bundle, 30 days after completion (000189's
- * export_deleted_at); after that the request still answers, with no link. Requires a live
+ * export_deleted_at); after that the request still answers, with no link, and both it and the
+ * school's list carry `export_deleted_at` so the admin page can say so. Requires a live
  * PostgreSQL instance, gated on TEST_DATABASE_URL.
  *
  *   TEST_DATABASE_URL=postgres://... bun test tests/privacy/dsr-export-expiry-http.test.ts
@@ -128,7 +129,32 @@ describeDb("GET /api/privacy/dsr/{requestId} after the export bundle expires", (
       status: "completed",
       download_url: null,
       download_url_expires_at: null,
+      export_deleted_at: expect.any(String),
     });
     expect(presigned).toEqual([live.key]);
+  });
+
+  test("the school's list says which exports were deleted, without signing any link", async () => {
+    const fixture = await createFullTenant(database!.sql);
+    const admin = {
+      schoolId: fixture.schoolId,
+      userId: fixture.users.ORG_ADMIN!.id,
+      roles: [ROLES.ORG_ADMIN],
+    };
+    const live = await completedExport(fixture, 5, false);
+    const deleted = await completedExport(fixture, 31, true);
+    const signedBefore = presigned.length;
+
+    const res = await authenticatedRequest(harness!, "GET", "/api/privacy/dsr", admin);
+    expect(res.status).toBe(200);
+    const { requests } = (await res.json()) as {
+      requests: { id: string; export_deleted_at: string | null; download_url: string | null }[];
+    };
+    const byId = new Map(requests.map((r) => [r.id, r]));
+    expect(byId.get(live.id)).toMatchObject({ export_deleted_at: null, download_url: null });
+    const deletedRow = byId.get(deleted.id);
+    expect(deletedRow?.download_url).toBeNull();
+    expect(Number.isNaN(Date.parse(deletedRow?.export_deleted_at ?? ""))).toBe(false);
+    expect(presigned.length).toBe(signedBefore);
   });
 });
