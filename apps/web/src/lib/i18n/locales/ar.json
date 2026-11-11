@@ -295,6 +295,7 @@
       "issues": {
         "required": "{{field}} مطلوب.",
         "invalidEmail": "يجب أن يكون {{field}} بريدًا إلكترونيًا صالحًا.",
+        "invalidPhone": "يجب أن يكون {{field}} رقم هاتف من 6 إلى 20 رقمًا، مثل ‎+965 5000 1234.",
         "invalidDate": "يجب أن يكون {{field}} تاريخًا بتنسيق YYYY-MM-DD.",
         "invalidTime": "يجب أن يكون {{field}} وقتًا بتنسيق HH:MM.",
         "invalidNumber": "يجب أن يكون {{field}} رقمًا.",

@@ -146,19 +146,19 @@ async function stageConfirmedImport(
 
 function mixedCsv(slug: string): string {
   return [
-    "SIS export,,,,,,",
-    "Surname,Given Name,Student ID,E-mail,Enrollment Status,Guardian Email,Relationship",
+    "SIS export,,,,,,,",
+    "Surname,Given Name,Student ID,E-mail,Enrollment Status,Guardian Email,Relationship,Parent Phone",
     // create, with a new parent and a new link
-    `Doe,Jane,NEW-1,jane@${slug}.local,Enrolled,mum@${slug}.local,Mother`,
+    `Doe,Jane,NEW-1,jane@${slug}.local,Enrolled,mum@${slug}.local,Mother,+965 5000 0001`,
     // create, reusing the parent created on the line above
-    `Doe,John,NEW-2,john@${slug}.local,,mum@${slug}.local,mother`,
+    `Doe,John,NEW-2,john@${slug}.local,,mum@${slug}.local,mother,+965 5000 0001`,
     // update: status changes; the parent email belongs to an existing account, so it is a
     // PARENT_ACCOUNT_EXISTS parent conflict -- the student updates, no link is made or changed
-    `Name,Old,OLD-1,old@${slug}.local,enrolled,parent@${slug}.local,father`,
+    `Name,Old,OLD-1,old@${slug}.local,enrolled,parent@${slug}.local,father,+965 5000 0002`,
     // conflict: same admission number as an earlier line
-    `Dup,Dup,NEW-1,dup@${slug}.local,,,`,
+    `Dup,Dup,NEW-1,dup@${slug}.local,,,,`,
     // conflict: a staff account's email
-    `Teach,Er,NEW-3,teacher@${slug}.local,,,`,
+    `Teach,Er,NEW-3,teacher@${slug}.local,,,,`,
   ].join("\n");
 }
 
@@ -358,15 +358,15 @@ async function seedSections(fixture: Fixture): Promise<Record<string, string>> {
 
 describe("imports without email, with families and placement", () => {
   const csv = [
-    "Student ID,First Name,Last Name,Grade,Section,Family,Parent 1 Name,Parent 1 Relationship,Parent 2 Name,Parent 2 Relationship",
+    "Student ID,First Name,Last Name,Grade,Section,Family,Parent 1 Name,Parent 1 Relationship,Parent 1 Phone,Parent 2 Name,Parent 2 Relationship,Parent 2 Phone",
     // Creates both of family F1's parents, and is placed in Grade 1 A.
-    "S-1,Ali,Hassan,Grade 1,A,F1,Mona Hassan,الأم,Omar Hassan,father",
+    "S-1,Ali,Hassan,Grade 1,A,F1,Mona Hassan,الأم,٠٥٠١٢٣٤٥٦٧,Omar Hassan,father,+965 5000 5678",
     // A blank family line: joins both F1 parents, with the relationships line 2 gave.
-    "S-2,Sara,Hassan,grade 1,b,F1,,,,",
+    "S-2,Sara,Hassan,grade 1,b,F1,,,,,,",
     // An unknown grade: imported, with its parent, but unplaced.
-    "S-3,Lina,Khaled,Grade 9,,F2,Rana Khaled,mother,,",
+    "S-3,Lina,Khaled,Grade 9,,F2,Rana Khaled,mother,+965 5000 9012,,,",
     // A grade with one section needs no section column.
-    "S-4,Zaid,Khaled,Grade 2,,,,,,",
+    "S-4,Zaid,Khaled,Grade 2,,,,,,,,",
   ].join("\n");
 
   dbTest(
@@ -421,12 +421,13 @@ describe("imports without email, with families and placement", () => {
             admission_number: string;
             parent: string;
             email: string | null;
+            phone: string | null;
             code: string;
             relationship: string;
             family_id: string;
           }[]
         >`
-        SELECT s.admission_number, u.display_name AS parent, u.email, mc.code,
+        SELECT s.admission_number, u.display_name AS parent, u.email, u.phone, mc.code,
                l.relationship::text AS relationship, l.family_id
         FROM app.parent_child_links AS l
         JOIN app.students AS s ON s.id = l.student_id AND s.school_id = l.school_id
@@ -441,6 +442,14 @@ describe("imports without email, with families and placement", () => {
           ["S-2", "Mona Hassan", "mother"],
           ["S-2", "Omar Hassan", "father"],
           ["S-3", "Rana Khaled", "mother"],
+        ]);
+        // Every parent's phone is saved, Arabic digits read as 0-9.
+        expect(links.map((l) => [l.parent, l.phone])).toEqual([
+          ["Mona Hassan", "0501234567"],
+          ["Omar Hassan", "+965 5000 5678"],
+          ["Mona Hassan", "0501234567"],
+          ["Omar Hassan", "+965 5000 5678"],
+          ["Rana Khaled", "+965 5000 9012"],
         ]);
         expect(links.every((l) => l.email === null && l.code.startsWith("PAR-"))).toBe(true);
         // Both Hassan parents, for both children, in one household.
@@ -517,14 +526,14 @@ describe("parents are never matched by email", () => {
     async () => {
       const fixture = await seedSchool();
       const csv = [
-        "Surname,Given Name,Student ID,E-mail,Guardian Email,Relationship",
+        "Surname,Given Name,Student ID,E-mail,Guardian Email,Relationship,Parent Phone",
         // Two siblings sharing one new parent email: one parent, one household, two links.
-        `Haddad,Rana,SIB-1,rana@${fixture.slug}.local,new-dad@${fixture.slug}.local,father`,
-        `Haddad,Omar,SIB-2,omar@${fixture.slug}.local,NEW-DAD@${fixture.slug}.local,father`,
+        `Haddad,Rana,SIB-1,rana@${fixture.slug}.local,new-dad@${fixture.slug}.local,father,0501110001`,
+        `Haddad,Omar,SIB-2,omar@${fixture.slug}.local,NEW-DAD@${fixture.slug}.local,father,0501110001`,
         // An email that belongs to an existing parent account: imported, never linked to it.
-        `Saleh,Huda,EXIST-1,huda@${fixture.slug}.local,parent@${fixture.slug}.local,mother`,
+        `Saleh,Huda,EXIST-1,huda@${fixture.slug}.local,parent@${fixture.slug}.local,mother,0501110002`,
         // An email that belongs to a staff account: same rule.
-        `Saleh,Ali,EXIST-2,ali@${fixture.slug}.local,teacher@${fixture.slug}.local,father`,
+        `Saleh,Ali,EXIST-2,ali@${fixture.slug}.local,teacher@${fixture.slug}.local,father,0501110003`,
       ].join("\n");
       const importId = await stageConfirmedImport(fixture, csv);
 
@@ -655,18 +664,18 @@ describe("leftover cells of a completed import", () => {
       const fixture = await seedSchool();
       const s = fixture.slug;
       const csv = [
-        "Surname,Given Name,Student ID,E-mail,Guardian Email,Relationship,Blood Type,Notes",
+        "Surname,Given Name,Student ID,E-mail,Guardian Email,Relationship,Parent Phone,Blood Type,Notes",
         // create, with a new parent
-        `Doe,Jane,NEW-1,jane@${s}.local,mum@${s}.local,mother,A+,Likes chess`,
+        `Doe,Jane,NEW-1,jane@${s}.local,mum@${s}.local,mother,0501110001,A+,Likes chess`,
         // create, the sibling of the line above: same new parent
-        `Doe,John,NEW-2,john@${s}.local,mum@${s}.local,mother,B+,`,
+        `Doe,John,NEW-2,john@${s}.local,mum@${s}.local,mother,0501110001,B+,`,
         // update of an existing student (a new given name); its parent email belongs to an
         // account, so no parent is linked or recorded
-        `Name,Olivia,OLD-1,old@${s}.local,parent@${s}.local,father,O-,`,
+        `Name,Olivia,OLD-1,old@${s}.local,parent@${s}.local,father,0501110002,O-,`,
         // conflict (duplicate admission number): writes no one, so keeps nothing
-        `Dup,Dup,NEW-1,dup@${s}.local,,,AB+,Secret`,
+        `Dup,Dup,NEW-1,dup@${s}.local,,,,AB+,Secret`,
         // create, but with nothing in the unmapped columns: nothing to keep
-        `Solo,Sam,NEW-4,sam@${s}.local,,,,`,
+        `Solo,Sam,NEW-4,sam@${s}.local,,,,,`,
       ].join("\n");
       const importId = await stageConfirmedImport(fixture, csv);
 

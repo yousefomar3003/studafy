@@ -1,4 +1,5 @@
 import { canChangeRoleOf, isPlatformRole } from "@studafy/constants";
+import { normalizePhoneNumber } from "@studafy/records";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../db/tenant-tx";
@@ -28,6 +29,7 @@ export interface UserRow {
   school_id: string;
   email: string | null;
   display_name: string | null;
+  phone: string | null;
   status: UserStatus;
   email_verified_at: Date | null;
   last_login_at: Date | null;
@@ -56,6 +58,8 @@ export interface ListUsersParams {
 export interface CreateUserParams {
   email?: string;
   display_name?: string;
+  /** Contact phone as typed; saved as normalizePhoneNumber reads it. */
+  phone?: string;
   role: Role;
   /** PARENT only: students to link the new parent to. The caller has checked `parent:link`. */
   children?: { student_id: string; relationship: ParentRelationship }[];
@@ -63,6 +67,8 @@ export interface CreateUserParams {
 
 export interface UpdateUserParams {
   display_name?: string;
+  /** Null removes the phone; undefined leaves it as it is. */
+  phone?: string | null;
   status?: UserStatus;
 }
 
@@ -141,7 +147,7 @@ export async function listUsers(
   const limit = params.limit + 1; // fetch one extra to detect next page
 
   const rows = await tx<UserListRow[]>`
-    SELECT u.id, u.school_id, u.email, u.display_name, u.status,
+    SELECT u.id, u.school_id, u.email, u.display_name, u.phone, u.status,
            u.email_verified_at, u.last_login_at, u.created_at, u.updated_at,
            COALESCE(
              ARRAY_AGG(ur.role ORDER BY ur.created_at) FILTER (WHERE ur.role IS NOT NULL),
@@ -158,7 +164,7 @@ export async function listUsers(
       ${createdToFilter}
       ${roleFilter}
       ${cursorFilter}
-    GROUP BY u.id, u.school_id, u.email, u.display_name, u.status,
+    GROUP BY u.id, u.school_id, u.email, u.display_name, u.phone, u.status,
              u.email_verified_at, u.last_login_at, u.created_at, u.updated_at
     ORDER BY u.created_at DESC, u.id DESC
     LIMIT ${limit}
@@ -253,7 +259,7 @@ export async function getUser(
   userId: string,
 ): Promise<UserListRow | undefined> {
   const [row] = await tx<UserListRow[]>`
-    SELECT u.id, u.school_id, u.email, u.display_name, u.status,
+    SELECT u.id, u.school_id, u.email, u.display_name, u.phone, u.status,
            u.email_verified_at, u.last_login_at, u.created_at, u.updated_at,
            COALESCE(
              ARRAY_AGG(ur.role ORDER BY ur.created_at) FILTER (WHERE ur.role IS NOT NULL),
@@ -264,7 +270,7 @@ export async function getUser(
     FROM app.users u
     LEFT JOIN app.user_roles ur ON ur.user_id = u.id AND ur.school_id = u.school_id
     WHERE u.id = ${userId}::uuid AND u.school_id = ${schoolId}
-    GROUP BY u.id, u.school_id, u.email, u.display_name, u.status,
+    GROUP BY u.id, u.school_id, u.email, u.display_name, u.phone, u.status,
              u.email_verified_at, u.last_login_at, u.created_at, u.updated_at
   `;
   if (!row) return undefined;
@@ -294,12 +300,13 @@ export async function createUser(
   const normalizedEmail = email?.toLowerCase() ?? null;
 
   const [row] = await tx<{ id: string }[]>`
-    INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+    INSERT INTO app.users (school_id, email, normalized_email, display_name, phone, status)
     VALUES (
       ${schoolId},
       ${email},
       ${normalizedEmail},
       ${params.display_name ?? null},
+      ${params.phone === undefined ? null : normalizePhoneNumber(params.phone)},
       'invited'::app.user_status
     )
     RETURNING id
@@ -358,13 +365,16 @@ export async function updateUser(
     throw new HTTPException(404, { message: "User not found" });
   }
 
+  const phoneGiven = params.phone !== undefined;
+  const phone = params.phone == null ? null : normalizePhoneNumber(params.phone);
   const [updated] = await tx<UserRow[]>`
     UPDATE app.users
     SET display_name = COALESCE(${params.display_name ?? null}, display_name),
+        phone = CASE WHEN ${phoneGiven}::boolean THEN ${phone}::text ELSE phone END,
         status = COALESCE(${params.status ?? null}::app.user_status, status),
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${userId}::uuid AND school_id = ${schoolId}
-    RETURNING id, school_id, email, display_name, status,
+    RETURNING id, school_id, email, display_name, phone, status,
               email_verified_at, last_login_at, created_at, updated_at
   `;
 
@@ -376,6 +386,7 @@ export async function updateUser(
     action: "update",
     targetTable: "users",
     targetId: userId,
+    // Whether the phone changed, not the numbers: the audit trail is kept for years.
     oldValues: {
       display_name: existing.display_name,
       status: existing.status,
@@ -383,6 +394,7 @@ export async function updateUser(
     newValues: {
       display_name: updated.display_name,
       status: updated.status,
+      ...(updated.phone !== existing.phone ? { phone_changed: true } : {}),
     },
   });
 

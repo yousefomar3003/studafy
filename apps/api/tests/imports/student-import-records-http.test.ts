@@ -118,10 +118,10 @@ describeDb("student import with record template columns", () => {
     await assignRole(database!.sql, tenant.schoolId, existing.id, "PARENT");
 
     const csv = [
-      "Surname,Given Name,Student ID,E-mail,Guardian Email,Relationship,Bus stop,National ID",
-      `Haddad,Rana,S-1,rana@${tenant.slug}.local,dad@${tenant.slug}.local,father,Gate 3,${SECRET}`,
-      `Haddad,Omar,S-2,omar@${tenant.slug}.local,dad@${tenant.slug}.local,father,Gate 3,`,
-      `Saleh,Huda,S-3,huda@${tenant.slug}.local,parent@${tenant.slug}.local,mother,,`,
+      "Surname,Given Name,Student ID,E-mail,Guardian Email,Relationship,Bus stop,National ID,Parent Phone",
+      `Haddad,Rana,S-1,rana@${tenant.slug}.local,dad@${tenant.slug}.local,father,Gate 3,${SECRET},0501110001`,
+      `Haddad,Omar,S-2,omar@${tenant.slug}.local,dad@${tenant.slug}.local,father,Gate 3,,0501110001`,
+      `Saleh,Huda,S-3,huda@${tenant.slug}.local,parent@${tenant.slug}.local,mother,,,0501110002`,
     ].join("\n");
     const uploaded = await request(tenant, "POST", "/api/imports/students/upload", undefined, csv);
     expect(uploaded.status).toBe(201);
