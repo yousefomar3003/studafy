@@ -64,6 +64,28 @@ describe("account deletion emails", () => {
   });
 });
 
+describe("school verification emails", () => {
+  test("the link opens the web verify page with the token in the fragment, not the API", () => {
+    const token = "b".repeat(64);
+    const email = resolveEmail(
+      row(DOMAIN_EVENTS.SCHOOL_VERIFICATION_EMAIL_SENT, {
+        email: "office@hill.example",
+        token,
+        expiresAt: "2026-09-28T00:00:00.000Z",
+      }),
+      context,
+    );
+
+    const link = `https://app.studafy.test/verify-email#token=${token}`;
+    expect(email.template).toBe("verification");
+    expect(email.recipient).toBe("office@hill.example");
+    expect(email.content.text).toContain(link);
+    expect(email.content.html).toContain(`href="${link}"`);
+    expect(email.content.text).not.toContain("/api/");
+    expect(email.content.html).not.toContain("/api/");
+  });
+});
+
 describe("AI add-on purchase confirmation", () => {
   const payload = {
     schoolId: "00000000-0000-4000-8000-000000000001",
