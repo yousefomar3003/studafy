@@ -29,6 +29,7 @@
         { "name": "READ_DATABASE_NAME", "value": "workers_read" },
         { "name": "S3_REGION", "value": "${AWS_REGION}" },
         { "name": "S3_APP_FILES_BUCKET", "value": "${S3_APP_FILES_BUCKET}" },
+        { "name": "STORAGE_SENSITIVE_KMS_KEY_ID", "value": "${STORAGE_SENSITIVE_KMS_KEY_ID}" },
         { "name": "AWS_REGION", "value": "${AWS_REGION}" },
         { "name": "CLAMAV_HOST", "value": "127.0.0.1" },
         { "name": "AI_LLM_PROVIDER", "value": "${AI_LLM_PROVIDER}" },

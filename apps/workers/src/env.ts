@@ -134,6 +134,10 @@ export const envSchema = z
       .int()
       .positive()
       .default(25 * 1024 * 1024),
+    // The sensitive-documents KMS key (ADR-019), the same value apps/api holds. The scan worker
+    // re-encrypts the quarantine copy of a sensitive record document or import file under it. AWS
+    // only; unset on an S3-compatible store (fly.io), where the original was not KMS-encrypted either.
+    STORAGE_SENSITIVE_KMS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Base URL for the action links embedded in emails. The verify/activate endpoints are the
     // API's (the only surface with an ALB), so the link host is the app's public origin.
     FRONTEND_URL: z.string().url().default("http://localhost:5180"),

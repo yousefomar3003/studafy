@@ -1193,6 +1193,10 @@ export async function createReceipt(
   return (await invoiceReceipts(tx, invoiceId)).find((r) => r.id === row!.id)!;
 }
 
+/**
+ * A receipt whose file may be downloaded, or null. A file the malware scan has not cleared (F-14) —
+ * pending, infected or unscannable — reads as absent, so no URL is ever signed for it.
+ */
 export async function readReceipt(
   tx: TransactionSql,
   receiptId: string,
@@ -1201,6 +1205,7 @@ export async function readReceipt(
     SELECT ${RECEIPT_COLUMNS(tx)}
     FROM app.license_payment_receipts AS r
     WHERE r.school_id = current_setting('app.school_id')::uuid AND r.id = ${receiptId}::uuid
+      AND r.scan_status IN ('clean', 'unscanned')
   `;
   return row ? { ...toReceipt(row), storageKey: row.storage_key } : null;
 }

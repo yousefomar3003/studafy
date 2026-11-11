@@ -8,6 +8,7 @@ import { HTTPException } from "hono/http-exception";
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { requireStorage } from "../../../lib/storage";
+import { enqueueUploadScans } from "../../../lib/storage/upload-scan";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { hasPermission, requirePermission } from "../../../middleware/authz";
@@ -692,6 +693,12 @@ export function importRoutes(
           : undefined,
       ),
     );
+    // The kept original is downloadable only once the malware scan has cleared it (F-14).
+    if (record.source_storage_key) {
+      await enqueueUploadScans(c, [
+        { target: "import_source", schoolId: auth.schoolId, storageKey: record.source_storage_key },
+      ]);
+    }
 
     return c.json(toResponse(record), 201);
   });

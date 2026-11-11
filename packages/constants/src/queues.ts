@@ -11,8 +11,9 @@ export const QUEUE_NAMES = {
   BILLING: "billing",
   OUTBOX_RELAY: "outbox-relay",
   PROVISIONING: "provisioning",
-  // Malware scanning of uploaded objects (ClamAV). Consumes one job per confirmed material; the
-  // verdict decides whether the material becomes available (ready) or is quarantined.
+  // Malware scanning of uploaded objects (ClamAV). Consumes one job per confirmed material
+  // (scan-material) and one per other user upload (scan-upload); the verdict decides whether the
+  // file becomes downloadable or is quarantined.
   SCAN: "file-scan",
   // Material thumbnail/preview derivation. Consumes one job per clean material, enqueued by the
   // file-scan worker after it flips the material to `ready`. Derived images are cosmetic — their
@@ -131,6 +132,13 @@ export const JOB_NAMES = {
   // key, and the user to notify if the verdict is not clean. One job per confirm, at most once:
   // the worker claims the material by its 'scanning' status and flips it to a terminal state.
   SCAN_MATERIAL: "scan-material",
+  // Malware scan of every other user upload other people can download (F-14): submission and
+  // assignment files, question pictures, message images, record documents, expense and license
+  // receipts, school application proofs, student import files. Carries the upload target (one of
+  // UPLOAD_SCAN_TARGETS), the school (null for a school application), and the object's permanent
+  // key. Same file-scan queue and worker pool as SCAN_MATERIAL; the worker claims the row by its
+  // scan status and the key, so a duplicate or stale job (the file was since replaced) is a no-op.
+  SCAN_UPLOAD: "scan-upload",
   // Thumbnail + first-page preview derivation of a clean material. Carried by the derivations
   // queue; enqueued by the file-scan worker right after a clean verdict. Carries only the material
   // id: the worker reads storage_key/mime_type from the row, so a retry never acts on stale payload

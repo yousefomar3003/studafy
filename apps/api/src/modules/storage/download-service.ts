@@ -51,7 +51,8 @@ type Resolver = (
  * and "row missing" are indistinguishable and both answer 404.
  *
  * The extra predicates are the classes' own gates on serving: materials only once malware-scanned
- * ready (000088), export jobs only once completed with a stored object.
+ * ready (000088), submissions and receipts only once their malware scan has cleared them or they
+ * predate scanning (000192, F-14), export jobs only once completed with a stored object.
  */
 const RESOLVERS: Readonly<Record<DownloadClassKey, Resolver>> = {
   material: async (tx, schoolId, objectId) => {
@@ -67,6 +68,7 @@ const RESOLVERS: Readonly<Record<DownloadClassKey, Resolver>> = {
       SELECT storage_key
       FROM app.submission_attachments
       WHERE id = ${objectId} AND school_id = ${schoolId}
+        AND scan_status IN ('clean', 'unscanned')
     `;
     return row ? { storageKey: row.storage_key, targetTable: "submission_attachments" } : null;
   },
@@ -75,6 +77,7 @@ const RESOLVERS: Readonly<Record<DownloadClassKey, Resolver>> = {
       SELECT attachment_storage_key AS storage_key
       FROM app.expense_cache
       WHERE id = ${objectId} AND school_id = ${schoolId} AND attachment_storage_key IS NOT NULL
+        AND attachment_scan_status IN ('clean', 'unscanned')
     `;
     return row ? { storageKey: row.storage_key, targetTable: "expense_cache" } : null;
   },

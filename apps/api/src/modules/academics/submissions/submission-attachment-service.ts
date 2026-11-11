@@ -15,6 +15,7 @@ import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quo
 import { resolveCallerStudentId, resolveSubmissionForAttachment } from "./submission-service";
 
 import type { StorageService } from "../../../lib/storage";
+import type { UploadScanStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
 /**
@@ -55,6 +56,8 @@ export interface SubmissionAttachmentRow {
   checksum_sha256: string | null;
   attempt_number: number;
   uploaded_by_user_id: string;
+  /** Malware scan state (000192). A download URL is minted only for a servable one. */
+  scan_status: UploadScanStatus;
   created_at: Date;
 }
 
@@ -161,7 +164,8 @@ export async function confirmSubmissionAttachment(
       ${promoted.sizeBytes}, ${params.checksum_sha256 ?? null}, ${attemptNumber}
     )
     RETURNING id, submission_id, storage_key, original_file_name, mime_type,
-              size_bytes, checksum_sha256, attempt_number, uploaded_by_user_id, created_at
+              size_bytes, checksum_sha256, attempt_number, uploaded_by_user_id,
+              scan_status::text AS scan_status, created_at
   `;
 
   await emitAuditLog(tx, {
@@ -232,7 +236,8 @@ export async function listAttachmentsBySubmission(
 
   const rows = await tx<SubmissionAttachmentRow[]>`
     SELECT id, submission_id, storage_key, original_file_name, mime_type,
-           size_bytes, checksum_sha256, attempt_number, uploaded_by_user_id, created_at
+           size_bytes, checksum_sha256, attempt_number, uploaded_by_user_id,
+           scan_status::text AS scan_status, created_at
     FROM app.submission_attachments
     WHERE school_id = ${schoolId}
       AND submission_id IN ${tx(submissionIds as string[])}

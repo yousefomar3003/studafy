@@ -129,8 +129,34 @@ afterAll(async () => {
 describe("school applications", () => {
   integrationTest("submit stores the application and promotes the proof", async () => {
     const proofKey = stageProof(1);
-    const submitted = await submitApplication(database, storage, applicant(1), form(1, proofKey));
+    const uploadedKeys: string[] = [];
+    const submitted = await submitApplication(
+      database,
+      storage,
+      applicant(1),
+      form(1, proofKey),
+      uploadedKeys,
+    );
     expect(submitted.status).toBe("pending");
+    const permanentKey = proofKey.replace(/^temp\//, "permanent/");
+    expect(uploadedKeys).toEqual([permanentKey]);
+
+    // A reviewer gets no URL until the malware scan clears the proof (F-14) ...
+    expect((await getApplication(database, storage, submitted.id)).proof.url).toBeNull();
+    const setProofScan = (status: string) =>
+      db.sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`
+          UPDATE app.school_applications
+          SET proof_scan_status = ${status}::app.upload_scan_status
+          WHERE id = ${submitted.id}::uuid
+        `;
+      });
+    // ... never for an infected one ...
+    await setProofScan("quarantined");
+    expect((await getApplication(database, storage, submitted.id)).proof.url).toBeNull();
+    // ... and a short-lived one once it is clean.
+    await setProofScan("clean");
 
     const detail = await getApplication(database, storage, submitted.id);
     expect(detail.applicantEmail).toBe("owner1@gmail.test");

@@ -30,6 +30,7 @@ import {
 } from "../harness";
 
 import type { StorageService } from "../../src/lib/storage";
+import type { UploadScanRequest } from "../../src/lib/storage/upload-scan";
 import type { TestApp, TestDatabase } from "../harness";
 import type { Role } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -89,12 +90,40 @@ let database: TestDatabase | undefined;
 let harness: TestApp | undefined;
 let noStorageHarness: TestApp | undefined;
 const storage = fakeStorage();
+/** Every malware scan the app enqueued (F-14), in order. */
+const scanJobs: UploadScanRequest[] = [];
+
+/**
+ * Stand in for the file-scan worker's verdict on a message image (apps/workers scan-upload, which
+ * has its own EICAR tests): flip the row the way the worker does.
+ */
+async function recordScanVerdict(
+  schoolId: string,
+  storageKey: string,
+  verdict: "clean" | "quarantined",
+): Promise<void> {
+  await database!.sql.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    const result = await tx`
+      UPDATE app.message_attachments SET scan_status = ${verdict}::app.upload_scan_status
+      WHERE storage_key = ${storageKey} AND scan_status = 'scanning'
+    `;
+    expect(result.count).toBe(1);
+  });
+}
 
 beforeAll(async () => {
   if (!integrationEnabled) return;
   database = await createTestDatabase();
   await migrateDatabase(database.url);
-  const created = createTestApp({ database: database.sql, storage });
+  const created = createTestApp({
+    database: database.sql,
+    storage,
+    uploadScanEnqueuer: async (requests) => {
+      scanJobs.push(...requests);
+    },
+  });
   const plain = createTestApp({ database: database.sql });
   await Promise.all([created.ready, plain.ready]);
   harness = created;
@@ -365,12 +394,19 @@ describeDb("messaging image attachments", () => {
     expect(message.body).toBe("Homework photo");
     expect(message.attachments).toHaveLength(1);
     expect(message.attachments[0]).toMatchObject({ content_type: "image/jpeg", size_bytes: 2048 });
-    expect(message.attachments[0]!.download_url).toContain(`permanent/${world.schoolId}/`);
+    // Not downloadable until the malware scan clears it (F-14); the scan was enqueued.
+    expect(message.attachments[0]!.download_url).toBeNull();
 
     // Promoted out of temp/.
     expect(storage.objects.has(key)).toBe(false);
     const permanentKey = key.replace(/^temp\//, "permanent/");
     expect(storage.objects.has(permanentKey)).toBe(true);
+    expect(scanJobs).toContainEqual({
+      target: "message_attachment",
+      schoolId: world.schoolId,
+      storageKey: permanentKey,
+    });
+    await recordScanVerdict(world.schoolId, permanentKey, "clean");
 
     const page = await json<{ messages: MessageBody[] }>(
       await request(
@@ -381,7 +417,9 @@ describeDb("messaging image attachments", () => {
       200,
     );
     expect(page.messages[0]!.attachments.map((a) => a.id)).toEqual([message.attachments[0]!.id]);
-    expect(page.messages[0]!.attachments[0]!.download_url).not.toBeNull();
+    expect(page.messages[0]!.attachments[0]!.download_url).toContain(
+      `permanent/${world.schoolId}/`,
+    );
 
     const [audit] = await database!.sql<{ attachment_count: string; has_body: boolean }[]>`
       SELECT new_values->>'attachment_count' AS attachment_count,
@@ -398,6 +436,49 @@ describeDb("messaging image attachments", () => {
       storage_key: staged,
     });
     expect(confirm.status).toBe(400);
+  });
+
+  test("an infected image is never given a download URL, to participants or a reviewer", async () => {
+    const world = await buildWorld();
+    const conversation = await openConversation(world);
+    const key = await stageImage(world.teacher);
+    const message = await send(world.teacher, conversation.id, {
+      body: "look",
+      attachments: [{ storage_key: key }],
+    });
+    const permanentKey = key.replace(/^temp\//, "permanent/");
+    // The worker found EICAR in it: quarantined.
+    await recordScanVerdict(world.schoolId, permanentKey, "quarantined");
+
+    for (const actor of [world.parent, world.teacher]) {
+      const page = await json<{ messages: MessageBody[] }>(
+        await request(actor, "GET", `/api/messaging/conversations/${conversation.id}/messages`),
+        200,
+      );
+      const listed = page.messages.find((m) => m.id === message.id)!;
+      expect(listed.attachments).toHaveLength(1);
+      expect(listed.attachments[0]!.download_url).toBeNull();
+    }
+
+    const report = await json<{ report: ReportBody }>(
+      await request(
+        world.parent,
+        "POST",
+        `/api/messaging/conversations/${conversation.id}/reports`,
+        {
+          message_id: message.id,
+          reason_category: "harassment",
+        },
+      ),
+      201,
+    );
+    const detail = await json<{ report: ReportDetailBody }>(
+      await request(world.principal, "GET", `/api/messaging/reports/${report.report.id}`),
+      200,
+    );
+    const reported = detail.report.messages.find((m) => m.id === message.id)!;
+    expect(reported.attachments).toHaveLength(1);
+    expect(reported.attachments[0]!.download_url).toBeNull();
   });
 
   test("an image-only message has an empty body, a photo preview and a counted last_message", async () => {
@@ -805,6 +886,7 @@ describeDb("messaging reports and the review queue", () => {
       body: "the bad one",
       attachments: [{ storage_key: imageKey }],
     });
+    await recordScanVerdict(world.schoolId, imageKey.replace(/^temp\//, "permanent/"), "clean");
     await send(world.parent, conversation.id, { body: "after" });
 
     const created = await json<{ report: ReportBody; block: { blocked_by_me: boolean } }>(

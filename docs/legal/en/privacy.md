@@ -417,7 +417,7 @@ Our measures, suited to the kinds of data Studafy holds, including children's da
 - **protected secrets:** passwords are stored only as Argon2id hashes, and sign-in tokens, invitation links and setup codes only as hashes. On phones, sign-in tokens are kept in the device's secure storage and excluded from Android backups;
 - **private files,** opened through links that expire within minutes (sensitive documents within one minute);
 - **limits on misuse:** requests are rate-limited, and member-ID sign-in locks for 15 minutes after five failed attempts;
-- **virus scanning of class materials** on our own servers before students can open them, with infected files held back. Other files are not scanned at present;
+- **virus scanning of uploaded files,** such as class materials, homework, message images, record documents and receipts, on our own servers before anyone else can open them, with infected files held back. Files uploaded before we extended scanning to them in November 2026 may not have been scanned;
 - **audit records** of significant actions, including reveals of sensitive data and searches.
 
 No system is perfectly secure. If a personal data breach affects School Data, we tell the school without undue delay, as the [School Agreement](/school-agreement) requires, so it can meet its obligations. If a breach affects data we are responsible for, we notify the Data Protection Commission and, where the law requires, the people affected.

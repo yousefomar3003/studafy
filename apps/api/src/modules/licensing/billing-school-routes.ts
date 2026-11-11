@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 
+import { enqueueUploadScans } from "../../lib/storage/upload-scan";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
 import { requirePermission } from "../../middleware/authz";
@@ -296,6 +297,9 @@ export function schoolLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<App
       await recordStorageUpload(tx, confirmed.sizeBytes);
       return { result: receipt, versions: new Map(), pending: [] };
     });
+    await enqueueUploadScans(c, [
+      { target: "license_receipt", schoolId: actor.schoolId, storageKey: confirmed.storageKey },
+    ]);
     return c.json(result, 201);
   });
 
