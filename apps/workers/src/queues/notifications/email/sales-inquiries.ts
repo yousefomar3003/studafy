@@ -114,6 +114,18 @@ async function processOne(ctx: EmailDispatcherContext): Promise<InquiryOutcome> 
   });
 }
 
+/**
+ * `EXISTS` over the rows `processOne` would claim, for the dispatcher's per-cycle discovery
+ * statement (so an idle cycle need not open this stream's transaction at all). Must stay in step
+ * with `processOne`'s WHERE clause.
+ */
+export function pendingSalesInquiriesExist(tx: TransactionSql) {
+  return tx`EXISTS (
+    SELECT 1 FROM app.sales_inquiries
+    WHERE notified_at IS NULL AND notify_attempts < ${MAX_NOTIFY_ATTEMPTS}
+  )`;
+}
+
 /** Notifies the sales inbox about up to `batchSize` new inquiries. Returns how many it handled. */
 export async function processSalesInquiries(ctx: EmailDispatcherContext): Promise<number> {
   let processed = 0;

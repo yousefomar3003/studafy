@@ -9,7 +9,14 @@
  * - If the process crashes mid-send, the transaction rolls back and the row stays undispatched —
  *   the email is re-attempted next cycle. Duplicate mail is only possible in the window between
  *   SES accepting the message and the commit, which at-least-once semantics permit.
- * - Transient SES failures (throttle, 5xx, network) roll the row back so it retries next cycle.
+ * - Transient send failures (throttle, 5xx, network) — and anything else that throws while
+ *   resolving or sending — roll back to a savepoint, so no delivery row is left behind, and the
+ *   row is rescheduled: `email_attempts` counts the failure and `email_next_attempt_at` (000200)
+ *   pushes the next try out exponentially (30 s doubling to 1 h). The claim skips a row until then,
+ *   so one failing message never blocks the school's later ones, and after
+ *   EMAIL_MAX_SEND_ATTEMPTS it is dead-lettered: a terminal 'failed' delivery row records the last
+ *   error and the event is marked dispatched. Before 000200 a transient failure rolled the whole
+ *   transaction back and the row was retried every cycle, forever.
  * - Permanent failures (MessageRejected) commit a terminal 'failed' delivery row and mark the
  *   event dispatched, so a mailer that can never succeed does not spin forever.
  *
@@ -22,28 +29,42 @@
  * Claim scope is tenant isolation, not a school_id predicate: the per-row transaction runs under
  * withSystemTenantTx, so the FORCE'd RLS on app.outbox_events scopes the claim to the school
  * being processed and no other.
+ *
+ * Which schools to visit: each cycle asks one discovery statement which schools have claimable
+ * email rows (`app.outbox_pending_school_ids('email')`) and whether the platform-level streams
+ * (sales inquiries, school applications) have anything pending, and touches only those. Empty
+ * cycles back off from `pollIntervalMs` to `maxIdleIntervalMs` (poll-loop.ts). Mail to a suspended
+ * or closed school is not filtered out — dunning and deletion confirmations are exactly the mail
+ * such a school still needs.
  */
 
-import { withSystemTenantTx } from "../../../db/tenant-tx";
+import { withSystemTenantTx, withSystemTx } from "../../../db/tenant-tx";
+import { pendingSchoolIdsFragment } from "../../outbox-discovery";
+import { startPollLoop } from "../../poll-loop";
 
 import { claimEmailRows } from "./claim";
 import { resolveEmail } from "./resolve";
-import { processSalesInquiries } from "./sales-inquiries";
-import { processSchoolApplications } from "./school-applications";
-import { loadSchoolIds } from "./schools";
+import { pendingSalesInquiriesExist, processSalesInquiries } from "./sales-inquiries";
+import { pendingSchoolApplicationsExist, processSchoolApplications } from "./school-applications";
 import { isRetryableSendError } from "./sender";
 import { isSuppressed } from "./suppressions";
 
+import type { ClaimedEmailRow } from "./claim";
 import type { RateLimiter } from "./rate-limiter";
-import type { ClaimedOutboxRow } from "./resolve";
+import type { ClaimedOutboxRow, ResolvedEmail } from "./resolve";
 import type { EmailSender } from "./sender";
 import type { Sql, TransactionSql } from "postgres";
 
 export interface EmailDispatcherConfig {
   /** Max rows to process per school per poll cycle. */
   batchSize: number;
-  /** Milliseconds to sleep when an entire poll cycle finds zero claimable rows. */
+  /** Milliseconds to sleep after the first poll cycle that finds zero claimable rows. */
   pollIntervalMs: number;
+  /**
+   * The ceiling the idle sleep doubles up to while cycles keep finding nothing (poll-loop.ts).
+   * Defaults to `pollIntervalMs`, i.e. no backoff.
+   */
+  maxIdleIntervalMs?: number;
   /** SES send pacing, sends per second. */
   ratePerSecond: number;
   /** Base URL for the action links embedded in rendered emails. */
@@ -68,14 +89,29 @@ export interface DispatcherHandle {
   stop(): void;
 }
 
-export type RowOutcome = "sent" | "suppressed" | "duplicate" | "failed";
+/** "deferred": the attempt failed transiently and the row was rescheduled (see the header). */
+export type RowOutcome = "sent" | "suppressed" | "duplicate" | "failed" | "deferred";
 
 /** The max length the email_deliveries.last_error CHECK enforces. */
 const MAX_ERROR_LENGTH = 1000;
 
-async function loadSchoolName(db: Sql, schoolId: string): Promise<string> {
-  // app.schools is a global table with no RLS, so this needs no tenant context.
-  const [row] = await db<{ name: string }[]>`
+/**
+ * Attempts before a transiently failing row is dead-lettered. 10 is also the ceiling of both
+ * ck_email_deliveries_attempts and ck_outbox_events_email_attempts. With the schedule below the
+ * last attempt lands about 3 hours after the first, which outlasts a typical provider incident.
+ */
+export const EMAIL_MAX_SEND_ATTEMPTS = 10;
+const EMAIL_RETRY_BASE_MS = 30_000;
+const EMAIL_RETRY_MAX_MS = 60 * 60 * 1000;
+
+/** The wait before the next try, after `attempts` failed tries (1-based). Exported for tests. */
+export function emailRetryDelayMs(attempts: number): number {
+  return Math.min(EMAIL_RETRY_MAX_MS, EMAIL_RETRY_BASE_MS * 2 ** Math.max(0, attempts - 1));
+}
+
+async function loadSchoolName(tx: TransactionSql, schoolId: string): Promise<string> {
+  // app.schools is a global table with no RLS; studafy_admin (the system tenant role) owns it.
+  const [row] = await tx<{ name: string }[]>`
     SELECT name FROM app.schools WHERE id = ${schoolId}::uuid
   `;
   return row?.name ?? "Studafy";
@@ -107,20 +143,15 @@ function clampError(err: unknown): string {
 }
 
 /**
- * Claim, send, and record one row inside the caller's tenant transaction. Returns the row's
- * terminal outcome, or "empty" when the school has nothing left to claim.
+ * Send one resolved row and record the outcome. Runs inside a savepoint: anything thrown from here
+ * rolls back this row's delivery row and leaves the rescheduling to `processRow`.
  */
-async function processRow(
+async function deliverRow(
   tx: TransactionSql,
   ctx: EmailDispatcherContext,
-  schoolName: string,
-): Promise<RowOutcome | "empty"> {
-  const rows = await claimEmailRows(tx, 1);
-  if (rows.length === 0) return "empty";
-
-  const row = rows[0];
-  const resolved = resolveEmail(row, { frontendUrl: ctx.config.frontendUrl, schoolName });
-
+  row: ClaimedOutboxRow,
+  resolved: ResolvedEmail,
+): Promise<RowOutcome> {
   if (await isSuppressed(tx, resolved.recipient)) {
     await recordDelivery(tx, row, resolved.recipient, resolved.template);
     await markDispatched(tx, row);
@@ -150,10 +181,8 @@ async function processRow(
     await markDispatched(tx, row);
     return "sent";
   } catch (err) {
-    if (isRetryableSendError(err)) {
-      // Let the transaction roll back: the row stays undispatched and the next cycle retries.
-      throw err;
-    }
+    // Transient: let the savepoint roll back and processRow reschedule the row.
+    if (isRetryableSendError(err)) throw err;
     await tx`
       UPDATE app.email_deliveries
       SET status = 'failed', last_error = ${clampError(err)}, updated_at = CURRENT_TIMESTAMP
@@ -164,20 +193,110 @@ async function processRow(
   }
 }
 
-/** One poll cycle for a single school. Returns the number of rows processed. */
-async function processSchool(ctx: EmailDispatcherContext, schoolId: string): Promise<number> {
-  const schoolName = await loadSchoolName(ctx.db, schoolId);
+/**
+ * Reschedule a row whose attempt threw, or dead-letter it once it has used its attempts. Runs in
+ * the claim transaction after the attempt's savepoint was rolled back.
+ */
+async function rescheduleOrDeadLetter(
+  tx: TransactionSql,
+  ctx: EmailDispatcherContext,
+  row: ClaimedEmailRow,
+  resolved: ResolvedEmail | undefined,
+  err: unknown,
+): Promise<RowOutcome> {
+  const attempts = row.email_attempts + 1;
+  const lastError = clampError(err);
+
+  if (attempts < EMAIL_MAX_SEND_ATTEMPTS) {
+    const delayMs = emailRetryDelayMs(attempts);
+    await tx`
+      UPDATE app.outbox_events
+      SET email_attempts = ${attempts},
+          email_next_attempt_at = CURRENT_TIMESTAMP + make_interval(secs => ${delayMs / 1000})
+      WHERE id = ${row.id}
+    `;
+    ctx.logger.warn(
+      { err, event: row.event_name, outbox_id: row.id, attempts, retry_in_ms: delayMs },
+      "email send failed; rescheduled",
+    );
+    return "deferred";
+  }
+
+  // Dead letter. The delivery row is the durable record of the give-up; when the row could not
+  // even be resolved there is no recipient to key one on, and the log line is the record.
+  if (resolved) {
+    await tx`
+      INSERT INTO app.email_deliveries
+        (school_id, outbox_event_id, recipient, template, status, attempts, last_error)
+      VALUES (${row.school_id}::uuid, ${row.id}, ${resolved.recipient},
+              ${resolved.template}::app.email_template, 'failed', ${attempts}, ${lastError})
+      ON CONFLICT ON CONSTRAINT uq_email_deliveries_event_recipient DO NOTHING
+    `;
+  }
+  await tx`
+    UPDATE app.outbox_events
+    SET email_attempts = ${attempts}, email_next_attempt_at = NULL,
+        email_dispatched_at = ${new Date().toISOString()}
+    WHERE id = ${row.id}
+  `;
+  ctx.logger.error(
+    { err, event: row.event_name, outbox_id: row.id, attempts },
+    "email send failed permanently after retries; dead-lettered",
+  );
+  return "failed";
+}
+
+/**
+ * Claim, send, and record one row inside the caller's tenant transaction. Returns the row's
+ * outcome, or "empty" when the school has nothing left to claim.
+ */
+async function processRow(
+  tx: TransactionSql,
+  ctx: EmailDispatcherContext,
+  schoolName: (tx: TransactionSql) => Promise<string>,
+): Promise<RowOutcome | "empty"> {
+  const rows = await claimEmailRows(tx, 1);
+  if (rows.length === 0) return "empty";
+
+  const row = rows[0]!;
+  const attempt: { resolved?: ResolvedEmail } = {};
+  try {
+    return await tx.savepoint(async (sp) => {
+      attempt.resolved = resolveEmail(row, {
+        frontendUrl: ctx.config.frontendUrl,
+        schoolName: await schoolName(sp),
+      });
+      return deliverRow(sp, ctx, row, attempt.resolved);
+    });
+  } catch (err) {
+    return rescheduleOrDeadLetter(tx, ctx, row, attempt.resolved, err);
+  }
+}
+
+/**
+ * One poll cycle for a single school. Returns the number of rows processed. Exported for tests,
+ * which drive it directly rather than racing the polling loop.
+ */
+export async function processSchool(
+  ctx: EmailDispatcherContext,
+  schoolId: string,
+): Promise<number> {
+  // Read once a row has actually been claimed, then reused for the rest of the batch.
+  let schoolName: string | undefined;
+  const loadName = async (tx: TransactionSql): Promise<string> =>
+    (schoolName ??= await loadSchoolName(tx, schoolId));
 
   let processed = 0;
   for (let i = 0; i < ctx.config.batchSize; i++) {
     const outcome = await withSystemTenantTx(ctx.db, { schoolId }, (tx) =>
-      processRow(tx, ctx, schoolName),
+      processRow(tx, ctx, loadName),
     );
 
     if (outcome === "empty") break;
     processed += 1;
 
-    // Only actual sends consume rate tokens; suppressed, duplicate, and failed rows cost nothing.
+    // Only actual sends consume rate tokens; suppressed, duplicate, failed and deferred rows cost
+    // nothing.
     if (outcome === "sent") {
       await ctx.limiter.wait();
     }
@@ -185,23 +304,43 @@ async function processSchool(ctx: EmailDispatcherContext, schoolId: string): Pro
   return processed;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+interface PendingWork {
+  schoolIds: string[];
+  platformPending: boolean;
 }
 
-/** One full poll cycle across all schools. Returns the total number of rows processed. */
-async function pollOnce(ctx: EmailDispatcherContext): Promise<number> {
-  // Enumerate per cycle, not once at startup: a school that registers after the process boots
+/** The cycle's one discovery statement: schools with claimable rows, and platform-level mail. */
+async function discoverPendingWork(ctx: EmailDispatcherContext): Promise<PendingWork> {
+  return withSystemTx(ctx.db, async (tx) => {
+    const [row] = await tx<{ school_ids: string[]; platform_pending: boolean }[]>`
+      SELECT ${pendingSchoolIdsFragment(tx, "email")} AS school_ids,
+             (${pendingSalesInquiriesExist(tx)} OR ${pendingSchoolApplicationsExist(tx)})
+               AS platform_pending
+    `;
+    return {
+      schoolIds: row?.school_ids ?? [],
+      platformPending: row?.platform_pending ?? false,
+    };
+  });
+}
+
+/**
+ * One full poll cycle across the schools (and platform streams) with pending mail. Returns the
+ * total number of rows processed. Exported for tests.
+ */
+export async function pollOnce(ctx: EmailDispatcherContext): Promise<number> {
+  // Discovered per cycle, not once at startup: a school that registers after the process boots
   // must start receiving its emails without a redeploy.
-  const schoolIds = await loadSchoolIds(ctx.db);
+  const pending = await discoverPendingWork(ctx);
   let total = 0;
-  for (const schoolId of schoolIds) {
+  for (const schoolId of pending.schoolIds) {
     try {
       total += await processSchool(ctx, schoolId);
     } catch (err) {
       ctx.logger.error({ err, school_id: schoolId }, "email dispatch batch failed");
     }
   }
+  if (!pending.platformPending) return total;
   // Platform-level mail with no school behind it: "Talk to us" inquiries for the sales inbox.
   try {
     total += await processSalesInquiries(ctx);
@@ -219,31 +358,21 @@ async function pollOnce(ctx: EmailDispatcherContext): Promise<number> {
 
 /** Main email dispatcher loop. Runs until `stop()` is called. */
 export function startEmailDispatcher(ctx: EmailDispatcherContext): DispatcherHandle {
-  let stopped = false;
-
-  const loop = async (): Promise<void> => {
-    while (!stopped) {
-      try {
-        const count = await pollOnce(ctx);
-        if (count === 0) {
-          await sleep(ctx.config.pollIntervalMs);
-        }
-      } catch (err) {
-        ctx.logger.error({ err }, "email dispatch cycle failed");
-        await sleep(ctx.config.pollIntervalMs);
-      }
-    }
-  };
+  const loop = startPollLoop({
+    minIdleMs: ctx.config.pollIntervalMs,
+    maxIdleMs: ctx.config.maxIdleIntervalMs ?? ctx.config.pollIntervalMs,
+    cycle: () => pollOnce(ctx),
+    onError: (err) => ctx.logger.error({ err }, "email dispatch cycle failed"),
+  });
 
   ctx.logger.info(
     { batchSize: ctx.config.batchSize, ratePerSecond: ctx.config.ratePerSecond },
     "email dispatcher started",
   );
-  void loop();
 
   return {
     stop: () => {
-      stopped = true;
+      loop.stop();
       ctx.logger.info({}, "email dispatcher stopping");
     },
   };
