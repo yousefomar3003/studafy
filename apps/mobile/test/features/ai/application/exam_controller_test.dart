@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:drift/native.dart';
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/api_exception.dart';
 import 'package:studafy_mobile/src/core/offline/offline_database.dart';
@@ -69,6 +72,20 @@ class _FakeExamClient implements ExamClient {
 }
 
 final _serverNow = DateTime.utc(2026, 1, 1, 12);
+
+DioException _apiError(int status, String code) => DioException(
+  requestOptions: RequestOptions(path: '/exams'),
+  response: Response(
+    requestOptions: RequestOptions(path: '/exams'),
+    statusCode: status,
+  ),
+  error: ApiException(status: status, title: code, code: code),
+);
+
+DioException _networkError() => DioException(
+  requestOptions: RequestOptions(path: '/exams'),
+  type: DioExceptionType.connectionError,
+);
 
 ExamCitation _citation() =>
     const ExamCitation(chunkId: 'chunk-1', materialId: 'material-1', materialTitle: 'Bio');
@@ -513,21 +530,51 @@ void main() {
       expect(await store.load('student-1'), isNull);
     });
 
-    test('an expired submit surfaces the expired error without losing answers', () async {
+    test('an expired submit is terminal: lands on expired and clears the draft', () async {
       await reachInProgress();
       await controller.answer('item-1', 'a');
       client.submitExamHandler = ({required studentId, required examId, required answers}) async {
-        throw DioException(
-          requestOptions: RequestOptions(path: '/submit'),
-          error: const ApiException(status: 409, title: 'expired', code: 'AI_EXAM_EXPIRED'),
-        );
+        throw _apiError(409, 'AI_EXAM_EXPIRED');
       };
 
       await controller.submit();
 
-      final state = controller.state as ExamInProgress;
-      expect(state.submitError, ExamSubmitError.expired);
-      expect(state.answers, {'item-1': 'a'});
+      expect(controller.state, isA<ExamExpired>());
+      expect(await store.load('student-1'), isNull);
+    });
+
+    test('an invalid-state submit re-reads the session and shows a report that did land', () async {
+      await reachInProgress();
+      client.submitExamHandler = ({required studentId, required examId, required answers}) async {
+        throw _apiError(409, 'AI_EXAM_INVALID_STATE');
+      };
+      client.getExamHandler = ({required studentId, required examId}) async =>
+          ExamClientResult(session: _submittedSession(examId), serverTime: _serverNow);
+
+      await controller.submit();
+
+      expect(controller.state, isA<ExamSubmitted>());
+    });
+
+    test('a network failure before the deadline is shown, not retried', () {
+      fakeAsync((async) {
+        reachInProgress();
+        async.flushMicrotasks();
+        var calls = 0;
+        client.submitExamHandler = ({required studentId, required examId, required answers}) async {
+          calls++;
+          throw _networkError();
+        };
+
+        controller.submit();
+        async.flushMicrotasks();
+        async.elapse(const Duration(minutes: 2));
+
+        expect(calls, 1);
+        final state = controller.state as ExamInProgress;
+        expect(state.submitError, ExamSubmitError.network);
+        expect(state.isSubmitting, isFalse);
+      });
     });
 
     test('checkExpiry auto-submits once the server-synced clock runs out', () async {
@@ -543,6 +590,224 @@ void main() {
 
       expect(submitted, isTrue);
       expect(controller.state, isA<ExamSubmitted>());
+    });
+  });
+
+  group('auto-submit at the deadline', () {
+    /// Lands on [ExamInProgress] for a session whose deadline already passed, via [restore] — the
+    /// same path an app reopened after time ran out takes. [ExamController.restore] runs the first
+    /// [ExamController.checkExpiry] itself, so the auto-submit has already fired on return.
+    void resumePastDeadline(FakeAsync async) {
+      store.save('student-1', const ExamDraft(examSessionId: 'exam-1', answers: {'item-1': 'a'}));
+      async.flushMicrotasks();
+      client.getExamHandler = ({required studentId, required examId}) async => ExamClientResult(
+        session: _inProgressSession(
+          examId,
+          expiresAt: _serverNow.subtract(const Duration(seconds: 1)),
+        ),
+        serverTime: _serverNow,
+      );
+      controller.restore();
+      async.flushMicrotasks();
+    }
+
+    test('an expired answer is terminal: one request, then no more ticks', () {
+      fakeAsync((async) {
+        var calls = 0;
+        client.submitExamHandler = ({required studentId, required examId, required answers}) async {
+          calls++;
+          throw _apiError(409, 'AI_EXAM_EXPIRED');
+        };
+
+        resumePastDeadline(async);
+        async.elapse(const Duration(minutes: 5));
+        controller.checkExpiry();
+        async.flushMicrotasks();
+
+        expect(calls, 1);
+        expect(controller.state, isA<ExamExpired>());
+        expect(async.periodicTimerCount, 0, reason: 'countdown stopped');
+        expect(async.nonPeriodicTimerCount, 0, reason: 'no retry scheduled');
+      });
+    });
+
+    test('a non-expiry 4xx is shown and never retried', () {
+      fakeAsync((async) {
+        var calls = 0;
+        client.submitExamHandler = ({required studentId, required examId, required answers}) async {
+          calls++;
+          throw _apiError(422, 'VALIDATION_FAILED');
+        };
+
+        resumePastDeadline(async);
+        async.elapse(const Duration(minutes: 5));
+
+        expect(calls, 1);
+        final state = controller.state as ExamInProgress;
+        expect(state.submitError, ExamSubmitError.unknown);
+        expect(state.answers, {'item-1': 'a'}, reason: 'answers kept for a manual retry');
+      });
+    });
+
+    test('network failures retry with capped exponential backoff, at most 5 times', () {
+      fakeAsync((async) {
+        final callTimes = <Duration>[];
+        client.submitExamHandler = ({required studentId, required examId, required answers}) async {
+          callTimes.add(async.elapsed);
+          throw _networkError();
+        };
+
+        resumePastDeadline(async);
+        async.elapse(const Duration(minutes: 10));
+
+        // The auto-submit itself, then retries 2 s, 4 s, 8 s, 16 s, 30 s (capped) after each failure.
+        expect(callTimes, const [
+          Duration.zero,
+          Duration(seconds: 2),
+          Duration(seconds: 6),
+          Duration(seconds: 14),
+          Duration(seconds: 30),
+          Duration(seconds: 60),
+        ]);
+        final state = controller.state as ExamInProgress;
+        expect(state.submitError, ExamSubmitError.network);
+        expect(state.isSubmitting, isFalse);
+      });
+    });
+
+    test('a 5xx is retried and a later success shows the report', () {
+      fakeAsync((async) {
+        var calls = 0;
+        client.submitExamHandler = ({required studentId, required examId, required answers}) async {
+          calls++;
+          if (calls == 1) throw _apiError(503, 'SERVICE_UNAVAILABLE');
+          return ExamClientResult(session: _submittedSession(examId), serverTime: _serverNow);
+        };
+
+        resumePastDeadline(async);
+        async.elapse(const Duration(seconds: 2));
+
+        expect(calls, 2);
+        expect(controller.state, isA<ExamSubmitted>());
+        expect(async.pendingTimers, isEmpty);
+      });
+    });
+
+    test('dispose cancels a pending retry', () {
+      fakeAsync((async) {
+        var calls = 0;
+        client.submitExamHandler = ({required studentId, required examId, required answers}) async {
+          calls++;
+          throw _networkError();
+        };
+
+        resumePastDeadline(async);
+        controller.dispose();
+        // tearDown disposes again; give it a fresh, never-used controller.
+        controller = ExamController(client: client, progressStore: store, studentId: 'student-1');
+        async.elapse(const Duration(minutes: 5));
+
+        expect(calls, 1);
+      });
+    });
+  });
+
+  group('generation polling', () {
+    void createGenerating(FakeAsync async) {
+      client.createExamHandler =
+          ({
+            required studentId,
+            required materialIds,
+            questionCount,
+            questionTypes,
+            durationMinutes,
+          }) async =>
+              ExamClientResult(session: _generatingSession('exam-1'), serverTime: _serverNow);
+      controller.restore();
+      async.flushMicrotasks();
+      controller.create(materialIds: ['material-1']);
+      async.flushMicrotasks();
+    }
+
+    test('backs off 3 s -> 15 s and stops after the window with a check-again state', () {
+      fakeAsync((async) {
+        final pollTimes = <Duration>[];
+        client.getExamHandler = ({required studentId, required examId}) async {
+          pollTimes.add(async.elapsed);
+          return ExamClientResult(session: _generatingSession(examId), serverTime: _serverNow);
+        };
+
+        createGenerating(async);
+        async.elapse(const Duration(minutes: 30));
+
+        expect(pollTimes.take(5), const [
+          Duration(seconds: 3),
+          Duration(seconds: 9),
+          Duration(seconds: 21),
+          Duration(seconds: 36),
+          Duration(seconds: 51),
+        ]);
+        expect(pollTimes.last, lessThanOrEqualTo(examGenerationPollWindow));
+        expect(pollTimes.length, lessThan(25));
+        final state = controller.state as ExamGenerating;
+        expect(state.pollingStopped, isTrue);
+        expect(async.pendingTimers, isEmpty);
+
+        // "Check again" polls right away and opens a fresh window.
+        final before = pollTimes.length;
+        controller.checkAgain();
+        async.flushMicrotasks();
+        expect(pollTimes.length, before + 1);
+        expect((controller.state as ExamGenerating).pollingStopped, isFalse);
+        async.elapse(const Duration(seconds: 3));
+        expect(pollTimes.length, before + 2);
+      });
+    });
+
+    test('never stacks a second request while one is in flight', () {
+      fakeAsync((async) {
+        var calls = 0;
+        final pending = Completer<ExamClientResult>();
+        client.getExamHandler = ({required studentId, required examId}) {
+          calls++;
+          return pending.future;
+        };
+
+        createGenerating(async);
+        async.elapse(const Duration(seconds: 3));
+        controller.checkGenerationProgress();
+        controller.checkGenerationProgress();
+        async.elapse(const Duration(minutes: 1));
+
+        expect(calls, 1);
+        pending.complete(
+          ExamClientResult(session: _readySession('exam-1'), serverTime: _serverNow),
+        );
+        async.flushMicrotasks();
+        expect(controller.state, isA<ExamReady>());
+        expect(async.pendingTimers, isEmpty);
+      });
+    });
+
+    test('pauses while the app is backgrounded and checks right away on resume', () {
+      fakeAsync((async) {
+        var calls = 0;
+        client.getExamHandler = ({required studentId, required examId}) async {
+          calls++;
+          return ExamClientResult(session: _generatingSession(examId), serverTime: _serverNow);
+        };
+
+        createGenerating(async);
+        controller.onAppPaused();
+        async.elapse(const Duration(minutes: 10));
+        expect(calls, 0);
+
+        controller.onAppResumed();
+        async.flushMicrotasks();
+        expect(calls, 1);
+        async.elapse(const Duration(seconds: 3));
+        expect(calls, 2);
+      });
     });
   });
 

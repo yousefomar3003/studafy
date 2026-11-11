@@ -97,7 +97,9 @@ populated. 409 `AI_EXAM_INVALID_STATE` from any status other than `ready`.
 ```
 
 An item with no entry in `answers` is graded wrong, not skipped. Refused with 409 `AI_EXAM_EXPIRED`
-once `now() > expires_at` — **the server-side timer enforcement the acceptance criteria ask for**.
+once `now() > expires_at + AI_EXAM_SUBMIT_GRACE_SECONDS` (30 s) — **the server-side timer
+enforcement the acceptance criteria ask for**; see [Timer enforcement](#timer-enforcement) for the
+grace.
 Response is the same resource shape, `status: "submitted"`, `report` populated.
 
 ## The exam item schema and the grounded validator
@@ -183,8 +185,17 @@ Server-side, across two mutating actions, not embedded in generation:
 - `POST .../start` stamps `started_at = clock_timestamp()` and
   `expires_at = clock_timestamp() + make_interval(mins => duration_minutes)` in one guarded `UPDATE
 ... WHERE status = 'ready'` — atomic, so a double `start` call cannot restart the clock.
-- `POST .../submit` refuses with 409 `AI_EXAM_EXPIRED` once `now() > expires_at`, checked against the
-  loaded session row before any grading happens.
+- `POST .../submit` refuses with 409 `AI_EXAM_EXPIRED` once
+  `now() > expires_at + AI_EXAM_SUBMIT_GRACE_SECONDS` (30 s, `packages/constants/src/ai-exam.ts`),
+  checked against the loaded session row before any grading happens. The grace exists because the
+  client auto-submits at its own `00:00`: its countdown is only an estimate of the server clock, and
+  the request still has to cross the network, so a strict cut-off rejected honest on-time hand-ins.
+  It is never shown to the student, so it is not usable working time.
+- The mobile client auto-submits **once** at `00:00`. A 4xx answer is terminal (an expired exam
+  lands on an "expired" screen, the countdown stops); only a network failure or 5xx is retried, with
+  capped exponential backoff (2 s → 30 s, at most 5 retries). Generation-status polling backs off
+  3 s → 15 s, pauses while the app is backgrounded, and stops after ~5 minutes behind a "check
+  again" button — `GET` is cheap, but an unbounded loop per open screen is not.
 - `GET` never mutates state, so refreshing a status page can never start the clock, and there is no
   stored `expired` status — an abandoned, never-submitted session just stays `in_progress` forever,
   the same posture `app.assignment_submissions` takes toward a draft never turned in. Expiry is a
@@ -293,5 +304,5 @@ request in flight to fail once generation has moved to the worker.
 | Session does not exist, or belongs to a different student | 404 `AI_EXAM_NOT_FOUND`     |
 | `start` called from any status other than `ready`         | 409 `AI_EXAM_INVALID_STATE` |
 | `submit` called from any status other than `in_progress`  | 409 `AI_EXAM_INVALID_STATE` |
-| `submit` called after `expires_at`                        | 409 `AI_EXAM_EXPIRED`       |
+| `submit` called after `expires_at` + 30 s grace           | 409 `AI_EXAM_EXPIRED`       |
 | `submit` names an `item_id` outside the session           | 422 `VALIDATION_FAILED`     |

@@ -7,6 +7,7 @@ import {
   AI_EXAM_MAX_QUESTIONS,
   AI_EXAM_MIN_DURATION_MINUTES,
   AI_EXAM_MIN_QUESTIONS,
+  AI_EXAM_SUBMIT_GRACE_SECONDS,
   ERROR_CODES,
   EXAM_GENERATION_JOB_OPTIONS,
   JOB_NAMES,
@@ -70,7 +71,9 @@ import type { Context } from "hono";
  * The timer is enforced server-side across two mutating actions, not embedded in generation:
  * `POST .../start` (`ready -> in_progress`) stamps `started_at`/`expires_at` from the *server's*
  * clock, and `POST .../submit` (`in_progress -> submitted`) refuses with 409 `AI_EXAM_EXPIRED` once
- * `now() > expires_at` -- a client cannot extend its own time budget by any request it controls.
+ * `now() > expires_at + AI_EXAM_SUBMIT_GRACE_SECONDS` -- a client cannot extend its own time budget
+ * by any request it controls. The grace only absorbs clock skew and the latency of the auto-submit
+ * a client fires at `00:00`; without it an on-time hand-in that arrives a second late is lost.
  * `GET` never mutates state, so refreshing a status page can never start the clock.
  *
  * Scoring is deterministic (`exam/grading.ts`, the same MCQ-exact-match / normalized-short-answer
@@ -96,8 +99,8 @@ import type { Context } from "hono";
  *
  * Get / start / submit: a session that does not exist, or belongs to a different student -> 404
  * `AI_EXAM_NOT_FOUND`; start or submit called from a status that does not allow it -> 409
- * `AI_EXAM_INVALID_STATE`; submit called after `expires_at` -> 409 `AI_EXAM_EXPIRED`; an answer
- * naming an item id outside the session -> 422 `VALIDATION_FAILED`.
+ * `AI_EXAM_INVALID_STATE`; submit called after `expires_at` plus the grace -> 409
+ * `AI_EXAM_EXPIRED`; an answer naming an item id outside the session -> 422 `VALIDATION_FAILED`.
  */
 
 const EXAM_FEATURE: (typeof AI_FEATURES)[number] = "exam";
@@ -447,7 +450,8 @@ const submitExamRoute = createRoute({
   summary: "Submit exam answers for deterministic scoring and a per-topic weakness report",
   description:
     "Transitions 'in_progress' -> 'submitted': refuses with 409 AI_EXAM_EXPIRED once " +
-    "now() > expires_at -- the server-side timer enforcement -- scores MCQ by exact option-id " +
+    `now() > expires_at + ${AI_EXAM_SUBMIT_GRACE_SECONDS}s (a grace for clock skew and network ` +
+    "latency) -- the server-side timer enforcement -- scores MCQ by exact option-id " +
     "match and short-answer by normalized string equality, persists what was submitted, and " +
     "returns a per-topic report grouping items by the material they were grounded on, with study " +
     "references (citations of that topic's incorrect items) for every topic at or below the weak " +
@@ -765,8 +769,13 @@ export function aiExamRoutes(deps: {
       if (!session) return { kind: "not_found" as const };
       if (session.status !== "in_progress") return { kind: "invalid_state" as const };
       // Server-side timer enforcement: the client's clock is never trusted, and the client cannot
-      // extend expires_at through any request it controls.
-      if (session.expiresAt !== null && new Date() > session.expiresAt) {
+      // extend expires_at through any request it controls. The fixed grace covers an auto-submit
+      // fired at the client's 00:00 that is still in flight (or computed against a slightly skewed
+      // clock) when the deadline passes -- see AI_EXAM_SUBMIT_GRACE_SECONDS.
+      if (
+        session.expiresAt !== null &&
+        Date.now() > session.expiresAt.getTime() + AI_EXAM_SUBMIT_GRACE_SECONDS * 1000
+      ) {
         return { kind: "expired" as const };
       }
 
