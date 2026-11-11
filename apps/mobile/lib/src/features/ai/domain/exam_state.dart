@@ -44,9 +44,11 @@ enum ExamCreateError {
 /// own state machine (submitting twice, naming an item outside the session), not from anything a
 /// student did, so they fold into [unknown] rather than each getting user-facing copy.
 enum ExamSubmitError {
-  /// 409 `AI_EXAM_EXPIRED` — the server's clock passed `expiresAt` before this submission landed.
-  /// The server-side timer enforcement that makes the countdown tamper-resistant: nothing the
-  /// client does can undo this once it happens.
+  /// 409 `AI_EXAM_EXPIRED` — the server's clock passed `expiresAt` (plus its small submit grace)
+  /// before this submission landed. The server-side timer enforcement that makes the countdown
+  /// tamper-resistant: nothing the client does can undo this once it happens, which is why
+  /// `ExamController` turns it into the terminal [ExamExpired] state rather than leaving it on the
+  /// player as a retryable error.
   expired,
 
   /// A connectivity problem — no response reached the client. The answer draft is untouched, so
@@ -88,9 +90,14 @@ class ExamSetup extends ExamState {
 /// The item bank is still generating on a worker. No countdown yet — the timer only starts once
 /// the student deliberately begins the exam from [ExamReady].
 class ExamGenerating extends ExamState {
-  const ExamGenerating({required this.session});
+  const ExamGenerating({required this.session, this.pollingStopped = false});
 
   final ExamSession session;
+
+  /// `ExamController` gave up checking on its own (`examGenerationPollWindow` passed with the
+  /// session still generating). Generation hasn't failed — the screen offers a "check again"
+  /// action instead of a spinner, so a stuck job can't keep one open screen polling forever.
+  final bool pollingStopped;
 }
 
 /// Generated and waiting on the student's deliberate "start" — the "lock-in start" moment
@@ -162,6 +169,16 @@ class ExamInProgress extends ExamState {
 /// Graded: [session.report] has the score and per-topic weak-study links.
 class ExamSubmitted extends ExamState {
   const ExamSubmitted({required this.session});
+
+  final ExamSession session;
+}
+
+/// Time ran out server-side before a submission landed (409 `AI_EXAM_EXPIRED`) — terminal: the
+/// session can never be scored, so the countdown is stopped, the local draft is cleared, and the
+/// only way on is a new exam. Kept distinct from [ExamFailed] because the cause (and the copy) is
+/// the student's clock, not a generation fault.
+class ExamExpired extends ExamState {
+  const ExamExpired({required this.session});
 
   final ExamSession session;
 }

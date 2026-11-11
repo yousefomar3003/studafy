@@ -8,6 +8,7 @@ export {
   AI_EXAM_MAX_QUESTIONS,
   AI_EXAM_MIN_DURATION_MINUTES,
   AI_EXAM_MIN_QUESTIONS,
+  AI_EXAM_SUBMIT_GRACE_SECONDS,
   AI_EXAM_WEAK_TOPIC_THRESHOLD,
 } from "./ai-exam";
 export { dsrExportArchiveKey, dsrExportPrefix } from "./dsr-exports";

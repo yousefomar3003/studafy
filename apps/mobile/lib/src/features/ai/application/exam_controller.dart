@@ -24,12 +24,34 @@ const int examMaxDurationMinutes = 180;
 const int examDefaultDurationMinutes = 30;
 const int examMaxMaterials = 8;
 
-/// How often to poll [ExamClient.getExam] while a session is [ExamSessionStatus.generating].
-const Duration examGenerationPollInterval = Duration(seconds: 3);
+/// First delay between [ExamClient.getExam] polls while a session is
+/// [ExamSessionStatus.generating]. Each poll that still finds it generating doubles the delay, up
+/// to [examGenerationPollMaxInterval]: most exams are ready within the first few polls, and a
+/// longer one doesn't need checking every 3 s.
+const Duration examGenerationPollInitialInterval = Duration(seconds: 3);
 
-/// How often to re-check the countdown against [ExamSubmitError.expired] while a session is
-/// [ExamSessionStatus.inProgress].
+/// Ceiling on the backed-off generation poll delay.
+const Duration examGenerationPollMaxInterval = Duration(seconds: 15);
+
+/// How long (summed poll delays, i.e. foreground time) the controller keeps polling a generating
+/// session on its own before stopping at [ExamGenerating.pollingStopped] and leaving the next
+/// check to the student. Bounds what one open screen can cost if a generation job is stuck.
+const Duration examGenerationPollWindow = Duration(minutes: 5);
+
+/// How often to re-render the countdown (and check it against the deadline) while a session is
+/// [ExamSessionStatus.inProgress]. Local only — no request is made per tick.
 const Duration examCountdownTickInterval = Duration(seconds: 1);
+
+/// First delay before re-sending a submission that failed with a network error or a 5xx after the
+/// deadline passed. Doubles per retry up to [examSubmitRetryMaxDelay].
+const Duration examSubmitRetryInitialDelay = Duration(seconds: 2);
+
+/// Ceiling on the backed-off submit retry delay.
+const Duration examSubmitRetryMaxDelay = Duration(seconds: 30);
+
+/// How many automatic re-sends a failed post-deadline submission gets before the controller stops
+/// and leaves the error on screen for the student to retry by hand.
+const int examSubmitMaxRetries = 5;
 
 /// Drives one exam session end to end (ST-232): setup, background generation, the deliberate
 /// "lock-in start" that begins the server-enforced timer, timed play with a local answer draft,
@@ -71,8 +93,35 @@ class ExamController extends ChangeNotifier {
 
   Timer? _pollTimer;
   Timer? _countdownTimer;
+  Timer? _submitRetryTimer;
+
+  /// The delay the next generation poll will wait, and the total delay scheduled so far in the
+  /// current polling window (compared against [examGenerationPollWindow]).
+  Duration _pollDelay = examGenerationPollInitialInterval;
+  Duration _pollElapsed = Duration.zero;
+
+  /// True while a [ExamClient.getExam] generation check is awaiting its response, so a timer tick
+  /// and a manual check can never stack two requests.
+  bool _pollInFlight = false;
+
+  /// The app is backgrounded ([onAppPaused]) — no generation polls are scheduled until
+  /// [onAppResumed].
+  bool _appPaused = false;
+
+  /// Whether the countdown has already fired its one automatic submission for the current
+  /// in-progress session. Reaching `00:00` hands the exam in once; what happens if that fails is
+  /// decided by the failure (terminal, or a capped retry), never by the next countdown tick.
+  bool _autoSubmitFired = false;
+
+  /// Automatic submit retries already scheduled for the current in-progress session.
+  int _submitRetries = 0;
+
+  bool _disposed = false;
 
   void _emit(ExamState next) {
+    // A request that was in flight when the screen closed must not touch a disposed notifier (or
+    // schedule follow-up work for a screen nobody is looking at).
+    if (_disposed) return;
     _state = next;
     notifyListeners();
   }
@@ -156,7 +205,7 @@ class ExamController extends ChangeNotifier {
       await _progressStore.save(_studentId, ExamDraft(examSessionId: result.session.id));
       _syncSkew(result.serverTime);
       _emit(ExamGenerating(session: result.session));
-      _schedulePolling();
+      _startPolling();
     } on DioException catch (error) {
       _emit(ExamSetup(createError: _classifyCreateError(error)));
     } catch (_) {
@@ -168,32 +217,98 @@ class ExamController extends ChangeNotifier {
   /// [ExamSetup.restoreFailed] is set.
   Future<void> retryRestore() => restore();
 
-  void _schedulePolling() {
+  /// Begins a fresh polling window: backoff back at [examGenerationPollInitialInterval], the
+  /// [examGenerationPollWindow] budget unspent.
+  void _startPolling() {
+    _pollDelay = examGenerationPollInitialInterval;
+    _pollElapsed = Duration.zero;
+    _scheduleNextPoll();
+  }
+
+  /// Schedules one generation poll after the current backoff delay — a one-shot timer re-armed
+  /// after each response, never a periodic one, so a slow response can't overlap the next tick.
+  /// Once the next poll would land past the window, flags [ExamGenerating.pollingStopped]
+  /// instead.
+  void _scheduleNextPoll() {
     _pollTimer?.cancel();
-    _pollTimer = Timer.periodic(examGenerationPollInterval, (_) => checkGenerationProgress());
+    final current = _state;
+    if (_disposed || _appPaused || current is! ExamGenerating) return;
+
+    final delay = _pollDelay;
+    if (_pollElapsed + delay > examGenerationPollWindow) {
+      if (!current.pollingStopped) {
+        _emit(ExamGenerating(session: current.session, pollingStopped: true));
+      }
+      return;
+    }
+
+    _pollElapsed += delay;
+    final doubled = delay * 2;
+    _pollDelay = doubled > examGenerationPollMaxInterval ? examGenerationPollMaxInterval : doubled;
+    _pollTimer = Timer(delay, () async {
+      await checkGenerationProgress();
+      _scheduleNextPoll();
+    });
   }
 
   /// Polls the session once and advances past [ExamGenerating] if it's no longer generating.
   /// Public (not just timer-driven) so a pull-to-refresh or a test can trigger it directly.
-  /// No-op unless the current state is actually [ExamGenerating].
+  /// No-op unless the current state is actually [ExamGenerating], or while another check is
+  /// already in flight. Doesn't itself re-arm polling — see [checkAgain] for the student's action.
   Future<void> checkGenerationProgress() async {
     final current = _state;
     if (current is! ExamGenerating) {
       _pollTimer?.cancel();
       return;
     }
+    if (_pollInFlight) return;
+    _pollInFlight = true;
 
     try {
       final result = await _client.getExam(studentId: _studentId, examId: current.session.id);
+      // The student may have abandoned this exam (and even created another) while the request
+      // was in flight — only fold the response into the session it was asked about.
+      final latest = _state;
+      if (latest is! ExamGenerating || latest.session.id != current.session.id) return;
       if (result.session.status == ExamSessionStatus.generating) {
-        _emit(ExamGenerating(session: result.session));
+        _emit(ExamGenerating(session: result.session, pollingStopped: latest.pollingStopped));
         return;
       }
       _pollTimer?.cancel();
       await _applySession(result);
     } catch (_) {
-      // Transient network blip — leave the poll timer running to try again next tick.
+      // Transient network blip — the next scheduled poll (if any) tries again.
+    } finally {
+      _pollInFlight = false;
     }
+  }
+
+  /// The student's "check again" action once [ExamGenerating.pollingStopped] is showing: checks
+  /// right away and, if the exam is still generating, opens a fresh polling window. No-op outside
+  /// [ExamGenerating].
+  Future<void> checkAgain() async {
+    final current = _state;
+    if (current is! ExamGenerating) return;
+    _pollTimer?.cancel();
+    if (current.pollingStopped) _emit(ExamGenerating(session: current.session));
+    await checkGenerationProgress();
+    _startPolling();
+  }
+
+  /// The app went to the background: stop generation polling (nobody is watching, and on Android
+  /// timers keep firing for a while). The countdown keeps running — it's local, and an exam that
+  /// times out in the background should still be handed in on time.
+  void onAppPaused() {
+    _appPaused = true;
+    _pollTimer?.cancel();
+  }
+
+  /// The app is back in the foreground: a still-generating exam gets an immediate check and a
+  /// fresh polling window, even if the previous window had already stopped.
+  void onAppResumed() {
+    if (!_appPaused) return;
+    _appPaused = false;
+    if (_state is ExamGenerating) unawaited(checkAgain());
   }
 
   /// Begins the server-enforced timer: `ready -> in_progress`, revealing every item. No-op
@@ -209,21 +324,37 @@ class ExamController extends ChangeNotifier {
       final draft = ExamDraft(examSessionId: current.session.id);
       await _progressStore.save(_studentId, draft);
       _emit(ExamInProgress(session: result.session));
-      _scheduleCountdown();
+      _beginCountdown();
     } catch (_) {
       _emit(current.copyWith(isStarting: false, startFailed: true));
     }
   }
 
-  void _scheduleCountdown() {
+  /// Starts the countdown for a freshly-entered in-progress session, resetting its one-shot
+  /// auto-submit and retry budget.
+  void _beginCountdown() {
     _countdownTimer?.cancel();
+    _submitRetryTimer?.cancel();
+    _autoSubmitFired = false;
+    _submitRetries = 0;
+    if (_disposed) return;
     _countdownTimer = Timer.periodic(examCountdownTickInterval, (_) => checkExpiry());
+  }
+
+  void _stopInProgressTimers() {
+    _countdownTimer?.cancel();
+    _submitRetryTimer?.cancel();
   }
 
   /// Notifies listeners so the countdown display re-renders and, once time is up, submits
   /// automatically with whatever was answered — the "submission" half of the tamper-resistant
-  /// timer: the student is never left staring at `00:00` unable to hand in what they have. No-op
-  /// outside [ExamInProgress]; public so a test can drive expiry without waiting on the real
+  /// timer: the student is never left staring at `00:00` unable to hand in what they have.
+  ///
+  /// Fires that submission **once** per session and then stops ticking (nothing on screen changes
+  /// past `00:00`). A failed auto-submit is handled by [submit]'s own failure path — terminal for a
+  /// 4xx, a capped backoff for a network error or 5xx — never by re-submitting on every tick, which
+  /// would hammer the server with a request per second for as long as the screen stayed open.
+  /// No-op outside [ExamInProgress]; public so a test can drive expiry without waiting on the real
   /// timer.
   void checkExpiry() {
     final current = _state;
@@ -231,10 +362,15 @@ class ExamController extends ChangeNotifier {
       _countdownTimer?.cancel();
       return;
     }
+    if (_disposed) return;
     notifyListeners();
-    if (remaining() == Duration.zero && !current.isSubmitting) {
-      unawaited(submit());
-    }
+    if (remaining() > Duration.zero) return;
+
+    _countdownTimer?.cancel();
+    if (_autoSubmitFired) return;
+    _autoSubmitFired = true;
+    // A hand-in the student started by hand is already in flight; its own failure path covers it.
+    if (!current.isSubmitting) unawaited(submit());
   }
 
   /// Records [value] as [itemId]'s answer in the local draft. Blank clears a previously-saved
@@ -291,9 +427,20 @@ class ExamController extends ChangeNotifier {
   /// any time during [ExamInProgress] (an early hand-in) as well as automatically once the
   /// countdown reaches zero. No-op if a submit is already in flight or the state isn't
   /// [ExamInProgress].
+  ///
+  /// How a failure lands:
+  /// - 409 `AI_EXAM_EXPIRED` is terminal — [ExamExpired], countdown stopped, draft cleared.
+  /// - 409 `AI_EXAM_INVALID_STATE` most likely means an earlier attempt did land but its response
+  ///   was lost; the session is re-read so a hand-in that succeeded shows its report.
+  /// - A network error or 5xx after the deadline is re-sent automatically with capped exponential
+  ///   backoff ([examSubmitRetryInitialDelay] doubling to [examSubmitRetryMaxDelay], at most
+  ///   [examSubmitMaxRetries] times) — nobody may be there to tap "submit" again. Before the
+  ///   deadline the student is, so the error is just shown.
+  /// - Anything else (another 4xx) is shown and never retried automatically.
   Future<void> submit() async {
     final current = _state;
     if (current is! ExamInProgress || current.isSubmitting) return;
+    _submitRetryTimer?.cancel();
     _emit(current.copyWith(isSubmitting: true, clearSubmitError: true));
 
     try {
@@ -302,16 +449,72 @@ class ExamController extends ChangeNotifier {
         examId: current.session.id,
         answers: current.answers,
       );
-      _countdownTimer?.cancel();
+      if (!_isStillInProgress(current)) return;
+      _stopInProgressTimers();
       await _progressStore.clear(_studentId);
       _emit(ExamSubmitted(session: result.session));
     } on DioException catch (error) {
-      _emit(
-        current.copyWith(isSubmitting: false, submitError: _classifySubmitError(error)),
-      );
+      if (!_isStillInProgress(current)) return;
+      await _onSubmitFailed(current, error);
     } catch (_) {
+      if (!_isStillInProgress(current)) return;
       _emit(current.copyWith(isSubmitting: false, submitError: ExamSubmitError.unknown));
     }
+  }
+
+  /// Whether the screen is still on [submitted]'s session — false once the student abandoned it
+  /// ([startNewExam]) while a submit was in flight, whose late response must then be dropped.
+  bool _isStillInProgress(ExamInProgress submitted) {
+    final latest = _state;
+    return latest is ExamInProgress && latest.session.id == submitted.session.id;
+  }
+
+  Future<void> _onSubmitFailed(ExamInProgress current, DioException error) async {
+    switch (error.apiError?.code) {
+      case 'AI_EXAM_EXPIRED':
+        _stopInProgressTimers();
+        await _progressStore.clear(_studentId);
+        _emit(ExamExpired(session: current.session));
+        return;
+      case 'AI_EXAM_INVALID_STATE':
+        try {
+          final result = await _client.getExam(studentId: _studentId, examId: current.session.id);
+          if (!_isStillInProgress(current)) return;
+          if (result.session.status != ExamSessionStatus.inProgress) {
+            _stopInProgressTimers();
+            await _applySession(result);
+            return;
+          }
+        } catch (_) {
+          // Couldn't re-read it either — fall through and show the error.
+        }
+    }
+
+    if (_isRetryableSubmitFailure(error) &&
+        remaining() == Duration.zero &&
+        _submitRetries < examSubmitMaxRetries &&
+        !_disposed) {
+      final scaled = examSubmitRetryInitialDelay * (1 << _submitRetries);
+      final delay = scaled > examSubmitRetryMaxDelay ? examSubmitRetryMaxDelay : scaled;
+      _submitRetries++;
+      _submitRetryTimer?.cancel();
+      _submitRetryTimer = Timer(delay, () => unawaited(submit()));
+    }
+    _emit(current.copyWith(isSubmitting: false, submitError: _classifySubmitError(error)));
+  }
+
+  /// Worth re-sending unchanged: no response at all, or a server-side (5xx) failure. A 4xx is the
+  /// server's answer about this request and will be the same answer next time.
+  bool _isRetryableSubmitFailure(DioException error) {
+    final status = error.response?.statusCode ?? error.apiError?.status;
+    if (status != null) return status >= 500;
+    return switch (error.type) {
+      DioExceptionType.connectionTimeout ||
+      DioExceptionType.sendTimeout ||
+      DioExceptionType.receiveTimeout ||
+      DioExceptionType.connectionError => true,
+      _ => false,
+    };
   }
 
   /// Discards whatever exam is saved locally and returns to setup. Safe to call from any state —
@@ -319,15 +522,16 @@ class ExamController extends ChangeNotifier {
   /// quota already exist server-side regardless of whether it's finished.
   Future<void> startNewExam() async {
     _pollTimer?.cancel();
-    _countdownTimer?.cancel();
+    _stopInProgressTimers();
     await _progressStore.clear(_studentId);
     _emit(const ExamSetup());
   }
 
   @override
   void dispose() {
+    _disposed = true;
     _pollTimer?.cancel();
-    _countdownTimer?.cancel();
+    _stopInProgressTimers();
     super.dispose();
   }
 
@@ -341,7 +545,7 @@ class ExamController extends ChangeNotifier {
     switch (session.status) {
       case ExamSessionStatus.generating:
         _emit(ExamGenerating(session: session));
-        _schedulePolling();
+        _startPolling();
       case ExamSessionStatus.ready:
         _emit(ExamReady(session: session));
       case ExamSessionStatus.inProgress:
@@ -355,7 +559,7 @@ class ExamController extends ChangeNotifier {
         final rawIndex = draft?.currentIndex ?? 0;
         final currentIndex = rawIndex < 0 ? 0 : (rawIndex > maxIndex ? maxIndex : rawIndex);
         _emit(ExamInProgress(session: session, answers: answers, currentIndex: currentIndex));
-        _scheduleCountdown();
+        _beginCountdown();
         checkExpiry();
       case ExamSessionStatus.submitted:
         await _progressStore.clear(_studentId);
