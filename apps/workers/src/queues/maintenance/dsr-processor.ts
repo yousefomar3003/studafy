@@ -8,8 +8,8 @@
  */
 
 import { JOB_NAMES } from "@studafy/constants";
-import postgres from "postgres";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 import { isFinalAttempt } from "../reports/report-runner";
 import { createReportS3 } from "../reports/report-s3";
@@ -26,13 +26,17 @@ import { runTenantErasure } from "./tenant-erasure.worker";
 import { runTenantExport } from "./tenant-export.worker";
 
 import type { MaintenanceS3Client } from "./export-storage";
+import type { DatabaseLease } from "../../db/pool";
 import type { RecordKeyring } from "@studafy/records";
 import type { Job } from "bullmq";
 import type { Sql } from "postgres";
 
 export interface MaintenanceRunnerConfig {
+  /** Used only when `sql` is absent: a dedicated pool is opened per job (tests). */
   primaryDatabaseUrl: string;
   databaseCaCert?: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   s3Region?: string;
   s3Endpoint?: string;
   bucket?: string;
@@ -50,14 +54,10 @@ export interface DsrJobResult {
   reason?: string;
 }
 
-export function createMaintenancePool(config: MaintenanceRunnerConfig): Sql {
-  return postgres(config.primaryDatabaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
+/** The pool a maintenance job runs on: the shared one when configured, else a dedicated one. */
+export function leaseMaintenancePool(config: MaintenanceRunnerConfig): DatabaseLease {
+  return leaseDatabase(config.sql ?? config.primaryDatabaseUrl, {
+    databaseCaCert: config.databaseCaCert,
   });
 }
 
@@ -96,11 +96,11 @@ export async function processDsrJob(
   const data = job.data as { requestId?: string; schoolId?: string };
   if (!data.requestId || !data.schoolId) return { processed: false, reason: "missing job data" };
 
-  const sql = createMaintenancePool(config);
+  const lease = leaseMaintenancePool(config);
   try {
-    return await runDsrJob(sql, config, job, data.requestId, data.schoolId);
+    return await runDsrJob(lease.sql, config, job, data.requestId, data.schoolId);
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 

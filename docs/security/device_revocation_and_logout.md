@@ -334,10 +334,13 @@ with one lookup that was already happening.
 **No new `app.audit_action` enum values**, and **no `SESSION_REVOKE` permission** — see the audit and
 authorization sections above.
 
-**Sessions are soft-revoked, never deleted.** `revoked_at` is set and the row stays. The history is
-evidence for a later investigation, and a delete would break the composite foreign key every
-`refresh_tokens` row bound to a device holds. The same is true of `app.user_devices`, following the
-rule `000017` set.
+**Sessions are soft-revoked, not deleted on revocation.** `revoked_at` is set and the row stays. The
+history is evidence for a later investigation. The data retention sweep deletes a session — its
+whole token family, in one statement, because rotation links the tokens to each other — 90 days
+after the last of its tokens expired ([data-retention.md](../modules/data-retention.md)); its IP
+addresses are already gone by then. `app.user_devices` rows are never deleted outside erasure:
+a delete would break the composite foreign key every `refresh_tokens` row bound to a device holds,
+following the rule `000017` set.
 
 ## Related
 

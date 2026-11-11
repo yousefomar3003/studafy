@@ -6,6 +6,11 @@ interface ImportMetaEnv {
   /** Origin of the realtime gateway. Defaults to ws://localhost:3001 when unset. */
   readonly VITE_REALTIME_BASE_URL?: string;
   /**
+   * `"true"` turns the realtime WebSocket on. Anything else (including unset) leaves it off, which
+   * is the default while live updates are deferred — see `REALTIME_ENABLED` in lib/config.ts.
+   */
+  readonly VITE_REALTIME_ENABLED?: string;
+  /**
    * Contact address shown on the marketing site's About/Contact page. No built-in default — an
    * invented address would silently misdirect real inquiries, so the page falls back to a visible
    * "not configured" notice instead of a fabricated mailto.
