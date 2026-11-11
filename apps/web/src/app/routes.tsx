@@ -544,6 +544,11 @@ const ConfirmAccountDeletionPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../routes/legal/ConfirmAccountDeletionPage"),
 );
+// Where the emailed school verification link lands; public, like the registration form.
+const VerifyEmailPage = lazyWithCatalogs(
+  ONBOARDING_CATALOGS,
+  () => import("../routes/onboarding/VerifyEmailPage"),
+);
 const HelpHomePage = lazy(() => import("../features/help/HelpHomePage"));
 const HelpArticlePage = lazy(() => import("../features/help/HelpArticlePage"));
 
@@ -574,6 +579,8 @@ export const routes: RouteObject[] = [
           { path: "legal/delete-account", element: <DeleteAccountInfoPage /> },
           // Where the emailed deletion link lands (ST-302).
           { path: "legal/delete-account/confirm", element: <ConfirmAccountDeletionPage /> },
+          // Where the emailed school verification link lands (`/verify-email#token=...`).
+          { path: "verify-email", element: <VerifyEmailPage /> },
           // School sign-up: Google/Microsoft sign-in, then the application form and its status.
           // Public; /signup/apply is authorized by the API's applicant cookie, not RequireAuth.
           { path: "signup", element: <SignupPage /> },

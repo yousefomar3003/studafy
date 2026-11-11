@@ -32,9 +32,9 @@ const RESEND_COOLDOWN_MS = 30_000;
  * Public school self-registration (`/onboarding`). Two input steps (school details, administrator
  * contact) followed by a result screen — see `POST /api/schools/register` in
  * `apps/api/src/modules/tenancy/registration/`. There is no in-app "enter your code" verification
- * step: the email's verification link hits the API directly
- * (`GET /api/schools/verify-email/{token}`), so the result screen both explains that and offers a
- * resend action for `POST /api/schools/resend-verification`.
+ * step: the email's verification link opens the public `/verify-email#token=...` page
+ * (VerifyEmailPage), which calls `GET /api/schools/verify-email/{token}`. So the result screen
+ * explains that and offers a resend action for `POST /api/schools/resend-verification`.
  */
 export default function OnboardingPage() {
   const { t } = useTranslation();

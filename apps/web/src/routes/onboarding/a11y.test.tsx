@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, mock, test } from "bun:test";
 import { forwardRef, useEffect, useImperativeHandle } from "react";
+import { MemoryRouter } from "react-router-dom";
 
 import { expectNoA11yViolations } from "../../lib/test/axe";
 
@@ -49,6 +50,8 @@ mock.module("../../components/TurnstileWidget", () => ({
 
 const loadOnboardingPage = async (): Promise<ComponentType> =>
   (await import("./OnboardingPage")).default;
+const loadVerifyEmailPage = async (): Promise<ComponentType> =>
+  (await import("./VerifyEmailPage")).default;
 
 function renderInMain(Page: ComponentType) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -145,6 +148,29 @@ describe("onboarding flow accessibility", () => {
     fireEvent.click(screen.getByRole("button", { name: /create school account/i }));
     await screen.findByRole("heading", { name: /springfield academy is registered/i });
 
+    await expectNoA11yViolations(container);
+  });
+});
+
+describe("verify-email page accessibility", () => {
+  async function renderVerifyAt(url: string) {
+    const Page = await loadVerifyEmailPage();
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <main>
+          <Page />
+        </main>
+      </MemoryRouter>,
+    );
+  }
+
+  test("with a token, before verifying", async () => {
+    const { container } = await renderVerifyAt(`/verify-email#token=${"a".repeat(64)}`);
+    await expectNoA11yViolations(container);
+  });
+
+  test("without a token, offering a new link", async () => {
+    const { container } = await renderVerifyAt("/verify-email");
     await expectNoA11yViolations(container);
   });
 });
