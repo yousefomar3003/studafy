@@ -124,8 +124,9 @@ export const envSchema = z
       .int()
       .positive()
       .default(25 * 1024 * 1024),
-    // Base URL for the action links embedded in emails. The verify/activate endpoints are the
-    // API's (the only surface with an ALB), so the link host is the app's public origin.
+    // Base URL for the action links embedded in emails: the web app's public origin. Every link
+    // must open a web page (email/resolve.ts); the API is on a separate host on Fly, so an
+    // `/api/...` path here would land on the web app's 404 page.
     FRONTEND_URL: z.string().url().default("http://localhost:5180"),
     // Email dispatcher tunables. See queues/notifications/email/dispatcher.ts for how they bound
     // the polling loop.

@@ -18,6 +18,26 @@ function row(event_name: string, payload: Record<string, unknown>): ClaimedOutbo
   };
 }
 
+describe("invitation emails", () => {
+  test("the link opens the web app's invitation page, not an API endpoint", () => {
+    const token = "b".repeat(64);
+    const email = resolveEmail(
+      row(DOMAIN_EVENTS.INVITATION_SENT, {
+        email: "principal@example.com",
+        token,
+        expiresAt: "2026-10-04T00:00:00.000Z",
+      }),
+      context,
+    );
+
+    expect(email.template).toBe("invitation");
+    expect(email.recipient).toBe("principal@example.com");
+    expect(email.content.text).toContain(`https://app.studafy.test/invite/${token}`);
+    expect(email.content.html).toContain(`https://app.studafy.test/invite/${token}`);
+    expect(email.content.text).not.toContain("/api/");
+  });
+});
+
 describe("account deletion emails", () => {
   test("both events are claimed by the email dispatcher", () => {
     expect(EMAIL_EVENT_NAMES).toContain(DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED);
