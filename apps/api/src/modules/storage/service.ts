@@ -104,26 +104,30 @@ export interface InspectedStagedUpload {
   checksumSha256: string | null;
 }
 
+/** A staged temp/ object as stored: tenancy-checked key, existence, non-empty. No content class. */
+export interface StagedObject {
+  parsed: ParsedStorageKey;
+  contentType: string;
+  sizeBytes: number;
+}
+
 /**
- * Every confirm-time check, without the promotion: the key is this school's temp/ key, the object
- * exists, its *stored* type and size satisfy the content class, and (when supplied) its SHA-256
- * matches. Read-only against storage, so a caller confirming several objects together (a message
- * with images) can inspect them all before promoting any -- one bad file then leaves every staged
- * object in place for a retry.
+ * The storage half of inspectStagedUpload, for a caller that only learns the content class from
+ * the database (a record field's sensitivity): one HEAD, before any transaction is open. Pair it
+ * with assertFitsContentClass and verifyStagedChecksum.
  */
-export async function inspectStagedUpload(
+export async function readStagedObject(
   storage: StorageService,
   schoolId: string,
-  contentClass: ContentClass,
-  params: ConfirmUploadParams,
-): Promise<InspectedStagedUpload> {
+  storageKey: string,
+): Promise<StagedObject> {
   // The key arrives from the client (it was echoed back in the upload-url response), so it is
   // untrusted: it must parse as the four-segment scheme, live under temp/, and belong to this
   // school before it is ever handed to storage. Raising 403 here rather than 404 keeps a caller
   // from probing which foreign keys exist.
-  const parsed = assertSchoolOwnedKey(params.storageKey, schoolId, "temp");
+  const parsed = assertSchoolOwnedKey(storageKey, schoolId, "temp");
 
-  const metadata = await storage.head(params.storageKey);
+  const metadata = await storage.head(storageKey);
   if (!metadata) {
     throw new CodedHttpException(
       404,
@@ -135,39 +139,70 @@ export async function inspectStagedUpload(
   if (metadata.sizeBytes <= 0) {
     throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Staged upload is empty");
   }
-  if (metadata.sizeBytes > contentClass.maxSizeBytes) {
+  return { parsed, contentType: metadata.contentType, sizeBytes: metadata.sizeBytes };
+}
+
+/** The stored type and size satisfy the content class. Pure: no storage call. */
+export function assertFitsContentClass(object: StagedObject, contentClass: ContentClass): void {
+  if (object.sizeBytes > contentClass.maxSizeBytes) {
     throw new CodedHttpException(
       400,
       ERROR_CODES.VALIDATION_FAILED,
       "File exceeds the maximum size for this content class",
     );
   }
-  if (!contentClass.allowedContentTypes.has(metadata.contentType)) {
+  if (!contentClass.allowedContentTypes.has(object.contentType)) {
     throw new CodedHttpException(
       400,
       ERROR_CODES.VALIDATION_FAILED,
       "Uploaded file type is not allowed for this content class",
     );
   }
+}
 
-  // Verify only when the client supplies a checksum. The check is expensive (a full read of the
-  // staged object), so it is opt-in: the caller decides how strong the integrity guarantee must be.
-  let checksum: string | null = null;
-  if (params.checksumSha256) {
-    checksum = await storage.checksumSha256(params.storageKey);
-    if (checksum !== params.checksumSha256) {
-      throw new CodedHttpException(
-        400,
-        ERROR_CODES.STORAGE_CHECKSUM_MISMATCH,
-        "Uploaded file checksum does not match the checksum you provided",
-      );
-    }
+/**
+ * Verify only when the client supplies a checksum. The check is expensive (a full read of the
+ * staged object), so it is opt-in: the caller decides how strong the integrity guarantee must be.
+ * Run it after the size check, so a caller cannot make the API read an oversized object.
+ */
+export async function verifyStagedChecksum(
+  storage: StorageService,
+  storageKey: string,
+  expected: string | undefined,
+): Promise<string | null> {
+  if (!expected) return null;
+  const checksum = await storage.checksumSha256(storageKey);
+  if (checksum !== expected) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.STORAGE_CHECKSUM_MISMATCH,
+      "Uploaded file checksum does not match the checksum you provided",
+    );
   }
+  return checksum;
+}
+
+/**
+ * Every confirm-time check, without the promotion: the key is this school's temp/ key, the object
+ * exists, its *stored* type and size satisfy the content class, and (when supplied) its SHA-256
+ * matches. Read-only against storage, so a caller confirming several objects together (a message
+ * with images) can inspect them all before promoting any -- one bad file then leaves every staged
+ * object in place for a retry. Storage round trips only: call it with no transaction open.
+ */
+export async function inspectStagedUpload(
+  storage: StorageService,
+  schoolId: string,
+  contentClass: ContentClass,
+  params: ConfirmUploadParams,
+): Promise<InspectedStagedUpload> {
+  const object = await readStagedObject(storage, schoolId, params.storageKey);
+  assertFitsContentClass(object, contentClass);
+  const checksum = await verifyStagedChecksum(storage, params.storageKey, params.checksumSha256);
 
   return {
-    parsed,
-    contentType: metadata.contentType,
-    sizeBytes: metadata.sizeBytes,
+    parsed: object.parsed,
+    contentType: object.contentType,
+    sizeBytes: object.sizeBytes,
     checksumSha256: checksum,
   };
 }
@@ -189,7 +224,10 @@ export async function confirmUpload(
 
   const { parsed } = inspected;
   const permanentKey = buildPermanentKey(schoolId, parsed.objectId, parsed.filename);
-  const { sizeBytes } = await promoteTempObject(storage, params.storageKey, permanentKey);
+  // The size was just read by the inspection; promotion does not HEAD the object again.
+  const { sizeBytes } = await promoteTempObject(storage, params.storageKey, permanentKey, {
+    knownSizeBytes: inspected.sizeBytes,
+  });
 
   return {
     storageKey: permanentKey,

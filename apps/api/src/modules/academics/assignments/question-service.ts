@@ -1,19 +1,25 @@
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { buildPermanentKey, promoteTempObject, requireStorage } from "../../../lib/storage";
+import { buildPermanentKey, requireStorage } from "../../../lib/storage";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { getContentClass } from "../../storage/content-classes";
-import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quota-service";
 import { inspectStagedUpload } from "../../storage/service";
+import {
+  copyStagedUploads,
+  discardStagedUploads,
+  reserveStorage,
+} from "../../storage/staged-promotion";
 
 import { assertCanManageClass, getAssignmentForUpdate } from "./assignment-service";
 import { QUESTION_IMAGE_CONTENT_CLASS } from "./schemas";
 
 import type { AssignmentRow } from "./assignment-service";
 import type { QuestionImageContentType, QuestionInput, QuestionType } from "./schemas";
+import type { TxRunner } from "../../../db/tenant-tx";
 import type { StorageService } from "../../../lib/storage";
 import type { InspectedStagedUpload } from "../../storage/service";
+import type { StagedCopy } from "../../storage/staged-promotion";
 import type { UploadScanStatus } from "@studafy/constants";
 import type { JSONValue, TransactionSql } from "postgres";
 
@@ -166,52 +172,20 @@ export async function replaceQuestions(
   userId: string,
   assignmentId: string,
   questions: QuestionInput[],
-  storage: StorageService | null = null,
   /**
-   * Receives the permanent key of every picture this save uploaded, for the caller to hand to the
-   * malware scanner once the transaction commits (F-14). Kept pictures keep their scan state.
+   * Every staged picture of the save, already copied to permanent/ and charged to the meter by
+   * saveQuestions. A save with staged pictures goes through saveQuestions; this is its write step.
    */
-  uploadedImageKeys: string[] = [],
+  promoted: ReadonlyMap<string, PromotedQuestionImage> = new Map(),
 ): Promise<AssignmentRow> {
-  const existing = await getAssignmentForUpdate(tx, schoolId, assignmentId);
-  if (!existing) {
-    throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Assignment not found");
-  }
-
-  await assertCanManageClass(tx, existing.class_id);
-
-  if (existing.kind !== "questions") {
-    throw new CodedHttpException(
-      409,
-      ERROR_CODES.ASSIGNMENT_KIND_MISMATCH,
-      "Only a questions assignment has questions",
-    );
-  }
-
-  const [answered] = await tx<{ exists: boolean }[]>`
-    SELECT EXISTS (
-      SELECT 1 FROM app.assignment_submissions
-      WHERE school_id = ${schoolId} AND assignment_id = ${assignmentId}
-    ) AS exists
-  `;
-  if (answered?.exists) {
-    throw new CodedHttpException(
-      409,
-      ERROR_CODES.ASSIGNMENT_QUESTIONS_LOCKED,
-      "Questions cannot be changed after a student has submitted answers",
-    );
-  }
-
-  if (questions.length === 0 && existing.status !== "draft") {
-    throw new CodedHttpException(
-      409,
-      ERROR_CODES.ASSIGNMENT_QUESTIONS_REQUIRED,
-      "A published assignment must keep at least one question",
-    );
-  }
-
+  const { existing, images } = await checkReplaceQuestions(
+    tx,
+    schoolId,
+    assignmentId,
+    questions,
+    promoted,
+  );
   const previousCount = await countQuestions(tx, schoolId, assignmentId);
-  const images = await resolveImages(tx, storage, schoolId, assignmentId, questions);
 
   // Options cascade with their question (000167), so one delete clears the set.
   await tx`
@@ -230,11 +204,7 @@ export async function replaceQuestions(
 
     const questionRows: Record<string, JSONValue>[] = [];
     for (const [index, { id, position, question }] of prepared.entries()) {
-      const image = await storeImage(storage, schoolId, images.at(index) ?? null);
-      if (image?.promoted) {
-        await recordStorageUpload(tx, image.size_bytes);
-        uploadedImageKeys.push(image.storage_key);
-      }
+      const image = storedImage(images.at(index) ?? null);
       questionRows.push({
         id,
         position,
@@ -307,6 +277,60 @@ export async function replaceQuestions(
   return updated;
 }
 
+/**
+ * Every refusal of a save, before anything is written (see replaceQuestions), and every question's
+ * picture resolved. saveQuestions runs it in its check transaction, ahead of copying staged
+ * pictures, so a refused save copies nothing; replaceQuestions runs it again in the write.
+ */
+async function checkReplaceQuestions(
+  tx: TransactionSql,
+  schoolId: string,
+  assignmentId: string,
+  questions: QuestionInput[],
+  promoted: ReadonlyMap<string, PromotedQuestionImage>,
+) {
+  const existing = await getAssignmentForUpdate(tx, schoolId, assignmentId);
+
+  if (!existing) {
+    throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Assignment not found");
+  }
+
+  await assertCanManageClass(tx, existing.class_id);
+
+  if (existing.kind !== "questions") {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.ASSIGNMENT_KIND_MISMATCH,
+      "Only a questions assignment has questions",
+    );
+  }
+
+  const [answered] = await tx<{ exists: boolean }[]>`
+    SELECT EXISTS (
+      SELECT 1 FROM app.assignment_submissions
+      WHERE school_id = ${schoolId} AND assignment_id = ${assignmentId}
+    ) AS exists
+  `;
+  if (answered?.exists) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.ASSIGNMENT_QUESTIONS_LOCKED,
+      "Questions cannot be changed after a student has submitted answers",
+    );
+  }
+
+  if (questions.length === 0 && existing.status !== "draft") {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.ASSIGNMENT_QUESTIONS_REQUIRED,
+      "A published assignment must keep at least one question",
+    );
+  }
+
+  const images = await resolveImages(tx, schoolId, assignmentId, questions, promoted);
+  return { existing, images };
+}
+
 // ---------------------------------------------------------------------------
 // Pictures
 // ---------------------------------------------------------------------------
@@ -320,25 +344,30 @@ interface KeptImage {
   scan_status: UploadScanStatus;
 }
 
-/** A staged upload that passed every confirm-time check and is promoted during the save. */
+/** A staged picture of a save, already copied to permanent/ and charged by saveQuestions. */
+export interface PromotedQuestionImage {
+  permanentKey: string;
+  upload: InspectedStagedUpload;
+}
+
+/** A staged upload that passed every confirm-time check and was promoted for the save. */
 interface StagedImage {
   kind: "staged";
-  tempKey: string;
+  permanentKey: string;
   upload: InspectedStagedUpload;
 }
 
 /**
  * Work out every question's picture before anything is written, in question order: kept pictures
- * must name a question of this assignment that has one, and every staged upload must pass the
- * content-class checks and the school's storage quota. One bad picture refuses the whole save and
- * leaves every staged upload in place for a retry.
+ * must name a question of this assignment that has one, and every staged upload must be one
+ * saveQuestions inspected and promoted. One bad picture refuses the whole save.
  */
 async function resolveImages(
   tx: TransactionSql,
-  storage: StorageService | null,
   schoolId: string,
   assignmentId: string,
   questions: QuestionInput[],
+  promoted: ReadonlyMap<string, PromotedQuestionImage>,
 ): Promise<(KeptImage | StagedImage | null)[]> {
   const current = await tx<
     {
@@ -358,9 +387,7 @@ async function resolveImages(
   `;
   const currentById = new Map(current.map((row) => [row.id, row]));
 
-  const contentClass = getContentClass(QUESTION_IMAGE_CONTENT_CLASS);
   const resolved: (KeptImage | StagedImage | null)[] = [];
-  let stagedBytes = 0;
   for (const question of questions) {
     const image = question.image;
     if (!image) {
@@ -383,31 +410,24 @@ async function resolveImages(
       });
     } else {
       // The schema guarantees exactly one of the two fields is set.
-      const tempKey = image.upload_key!;
-      const upload = await inspectStagedUpload(requireStorage(storage), schoolId, contentClass, {
-        storageKey: tempKey,
-      });
-      stagedBytes += upload.sizeBytes;
-      resolved.push({ kind: "staged", tempKey, upload });
+      const staged = promoted.get(image.upload_key!);
+      if (!staged) {
+        // Only reachable by calling replaceQuestions directly with a staged picture.
+        throw new Error("A staged picture must be promoted through saveQuestions");
+      }
+      resolved.push({ kind: "staged", ...staged });
     }
   }
-
-  if (stagedBytes > 0) await assertStorageUploadQuota(tx, stagedBytes);
   return resolved;
 }
 
-/** The stored columns for a resolved picture, promoting a staged upload to permanent/. */
-async function storeImage(
-  storage: StorageService | null,
-  schoolId: string,
-  image: KeptImage | StagedImage | null,
-): Promise<{
+/** The stored columns for a resolved picture. A new picture waits for its malware scan (F-14). */
+function storedImage(image: KeptImage | StagedImage | null): {
   storage_key: string;
   mime_type: string;
   size_bytes: number;
   scan_status: UploadScanStatus;
-  promoted: boolean;
-} | null> {
+} | null {
   if (!image) return null;
   if (image.kind === "kept") {
     return {
@@ -415,22 +435,77 @@ async function storeImage(
       mime_type: image.mime_type,
       size_bytes: image.size_bytes,
       scan_status: image.scan_status,
-      promoted: false,
     };
   }
-
-  const permanentKey = buildPermanentKey(
-    schoolId,
-    image.upload.parsed.objectId,
-    image.upload.parsed.filename,
-  );
-  // `storage` is non-null here: resolveImages ran through requireStorage for any staged picture.
-  const promoted = await promoteTempObject(storage!, image.tempKey, permanentKey);
   return {
-    storage_key: permanentKey,
+    storage_key: image.permanentKey,
     mime_type: image.upload.contentType,
-    size_bytes: promoted.sizeBytes,
+    size_bytes: image.upload.sizeBytes,
     scan_status: "scanning",
-    promoted: true,
   };
+}
+
+/**
+ * Save an assignment's questions, promoting any newly staged pictures, with no transaction held
+ * across object storage (../../storage/staged-promotion.ts): every staged picture is inspected
+ * (content class, stored size and type) with no transaction open; one short transaction runs every
+ * refusal of the save and charges the pictures to the school's quota; the pictures are copied to
+ * permanent/; the write transaction replaces the questions and runs `finish` (the caller's
+ * read-back); the staged copies are dropped once it has committed. A save without new pictures is
+ * one transaction, as before.
+ */
+export async function saveQuestions<T>(
+  runTx: TxRunner,
+  storage: StorageService | null,
+  schoolId: string,
+  userId: string,
+  assignmentId: string,
+  questions: QuestionInput[],
+  /**
+   * Receives the permanent key of every picture this save uploaded, for the caller to hand to the
+   * malware scanner once the transaction commits (F-14). Kept pictures keep their scan state.
+   */
+  uploadedImageKeys: string[],
+  finish: (tx: TransactionSql, row: AssignmentRow) => Promise<T>,
+): Promise<T> {
+  const stagedKeys = [
+    ...new Set(questions.flatMap((question) => question.image?.upload_key ?? [])),
+  ];
+  const write = (promoted: ReadonlyMap<string, PromotedQuestionImage>) =>
+    runTx(async (tx) =>
+      finish(tx, await replaceQuestions(tx, schoolId, userId, assignmentId, questions, promoted)),
+    );
+  if (stagedKeys.length === 0) return write(new Map());
+
+  const store = requireStorage(storage);
+  const contentClass = getContentClass(QUESTION_IMAGE_CONTENT_CLASS);
+  const promoted = new Map<string, PromotedQuestionImage>();
+  for (const tempKey of stagedKeys) {
+    const upload = await inspectStagedUpload(store, schoolId, contentClass, {
+      storageKey: tempKey,
+    });
+    promoted.set(tempKey, {
+      permanentKey: buildPermanentKey(schoolId, upload.parsed.objectId, upload.parsed.filename),
+      upload,
+    });
+  }
+  const copies: StagedCopy[] = [...promoted].map(([tempKey, { permanentKey, upload }]) => ({
+    tempKey,
+    permanentKey,
+    sizeBytes: upload.sizeBytes,
+  }));
+
+  await runTx(async (tx) => {
+    await checkReplaceQuestions(tx, schoolId, assignmentId, questions, promoted);
+    await reserveStorage(
+      tx,
+      copies.reduce((total, copy) => total + copy.sizeBytes, 0),
+    );
+  });
+  await copyStagedUploads(store, runTx, copies);
+
+  const result = await write(promoted);
+  uploadedImageKeys.push(...copies.map((copy) => copy.permanentKey));
+  await discardStagedUploads(store, copies);
+  return result;
 }

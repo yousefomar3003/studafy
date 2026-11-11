@@ -46,6 +46,9 @@ interface StoredObject {
   sizeBytes: number;
 }
 
+/** Set by a test to make every CopyObject fail, as an S3 outage would. */
+let failCopies = false;
+
 function fakeStorage(): StorageService & { objects: Map<string, StoredObject> } {
   const objects = new Map<string, StoredObject>();
   const base: StorageService = {
@@ -71,6 +74,7 @@ function fakeStorage(): StorageService & { objects: Map<string, StoredObject> } 
       return "a".repeat(64);
     },
     async copy(source, destination) {
+      if (failCopies) throw new Error("bucket unavailable");
       const object = objects.get(source);
       if (object) objects.set(destination, { ...object });
     },
@@ -362,6 +366,21 @@ async function stageImage(
   return storage_key;
 }
 
+/** The school's storage meter, read as the platform would. */
+async function meterBytes(schoolId: string): Promise<number> {
+  let bytes = 0;
+  await database!.sql.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    const [row] = await tx<{ bytes_used: string }[]>`
+      SELECT bytes_used::text AS bytes_used FROM app.storage_usage_meters
+      WHERE school_id = ${schoolId}::uuid
+    `;
+    bytes = Number(row?.bytes_used ?? 0);
+  });
+  return bytes;
+}
+
 async function asUser<T>(
   schoolId: string,
   userId: string,
@@ -569,6 +588,64 @@ describeDb("messaging image attachments", () => {
       SELECT count(*)::int AS n FROM app.messages WHERE conversation_id = ${conversation.id}
     `;
     expect(count!.n).toBe(0);
+  });
+
+  test("a failed copy leaves no message, the staged image in place and the meter as it was", async () => {
+    const world = await buildWorld();
+    const conversation = await openConversation(world);
+    const path = `/api/messaging/conversations/${conversation.id}/messages`;
+    const key = await stageImage(world.parent);
+    const permanentKey = key.replace(/^temp\//, "permanent/");
+    const before = await meterBytes(world.schoolId);
+
+    failCopies = true;
+    let res: Response;
+    try {
+      res = await request(world.parent, "POST", path, {
+        body: "with photo",
+        attachments: [{ storage_key: key }],
+      });
+    } finally {
+      failCopies = false;
+    }
+    expect(res.status).toBe(500);
+
+    const [count] = await database!.sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM app.messages WHERE conversation_id = ${conversation.id}
+    `;
+    expect(count!.n).toBe(0);
+    expect(storage.objects.has(key)).toBe(true);
+    expect(storage.objects.has(permanentKey)).toBe(false);
+    // The bytes reserved before the copy were handed back.
+    expect(await meterBytes(world.schoolId)).toBe(before);
+
+    // The staged upload is still there, so the retry goes through.
+    const message = await send(world.parent, conversation.id, {
+      body: "with photo",
+      attachments: [{ storage_key: key }],
+    });
+    expect(message.attachments).toHaveLength(1);
+    expect(storage.objects.has(permanentKey)).toBe(true);
+    expect(storage.objects.has(key)).toBe(false);
+    expect(await meterBytes(world.schoolId)).toBe(before + 2048);
+  });
+
+  test("a blocked pair's image is refused before anything is copied or charged", async () => {
+    const world = await buildWorld();
+    const conversation = await openConversation(world);
+    const base = `/api/messaging/conversations/${conversation.id}`;
+    const key = await stageImage(world.teacher);
+    const before = await meterBytes(world.schoolId);
+    expect((await request(world.parent, "POST", `${base}/block`)).status).toBe(201);
+
+    const res = await request(world.teacher, "POST", `${base}/messages`, {
+      attachments: [{ storage_key: key }],
+    });
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as { code: string }).code).toBe("MESSAGING_BLOCKED");
+    expect(storage.objects.has(key)).toBe(true);
+    expect(storage.objects.has(key.replace(/^temp\//, "permanent/"))).toBe(false);
+    expect(await meterBytes(world.schoolId)).toBe(before);
   });
 
   test("without object storage, images answer 503 and text still sends", async () => {

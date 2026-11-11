@@ -23,6 +23,21 @@ function selectDatabase(database: Database | DatabasePools, options: TenantTxOpt
   return options.useReadReplica ? database.readReplica : database.primary;
 }
 
+/**
+ * Opens one short transaction per call. Handed to services whose work has to straddle a network
+ * call (object storage, ERPNext): they check and reserve in one transaction, make the call with no
+ * transaction open -- so no pooled connection sits idle while it runs -- and record the outcome in
+ * another.
+ */
+export type TxRunner = <T>(fn: (tx: TransactionSql) => Promise<T>) => Promise<T>;
+
+export function tenantTxRunner(
+  database: Database | DatabasePools,
+  context: TenantContext,
+): TxRunner {
+  return (fn) => withTenantTx(database, context, fn);
+}
+
 export async function withTenantTx<T>(
   database: Database | DatabasePools,
   context: TenantContext,

@@ -24,6 +24,7 @@ import {
   migrateDatabase,
 } from "../harness";
 
+import type { TxRunner } from "../../src/db/tenant-tx";
 import type { TenantErpNext } from "../../src/modules/finance/client/tenant-client";
 import type { TenantFixture, TestApp, TestDatabase } from "../harness";
 import type { Role } from "@studafy/constants";
@@ -116,6 +117,11 @@ function post(actor: Actor, path: string, body: unknown, headers: Record<string,
   });
 }
 
+/** The service's short transactions, run in the test's one transaction. */
+function inTx(tx: TransactionSql): TxRunner {
+  return (fn) => fn(tx);
+}
+
 /** An ERPNext double that records every POST and answers like frappe.client.cancel. */
 function recordingErpNext(): { client: TenantErpNext; calls: { path: string; body: unknown }[] } {
   const calls: { path: string; body: unknown }[] = [];
@@ -182,7 +188,13 @@ describeDb("cancelling an invoice", () => {
 
     const erpnext = recordingErpNext();
     const approved = await asApprover(fixture, (tx) =>
-      approveRefund(tx, erpnext.client, fixture.schoolId, fixture.users.ORG_ADMIN.id, request.id),
+      approveRefund(
+        inTx(tx),
+        async () => erpnext.client,
+        fixture.schoolId,
+        fixture.users.ORG_ADMIN.id,
+        request.id,
+      ),
     );
     expect(approved.status).toBe("completed");
     expect(erpnext.calls).toEqual([
@@ -293,7 +305,13 @@ describeDb("reversing a payment", () => {
 
     const erpnext = recordingErpNext();
     await asApprover(fixture, (tx) =>
-      approveRefund(tx, erpnext.client, fixture.schoolId, fixture.users.ORG_ADMIN.id, request.id),
+      approveRefund(
+        inTx(tx),
+        async () => erpnext.client,
+        fixture.schoolId,
+        fixture.users.ORG_ADMIN.id,
+        request.id,
+      ),
     );
     expect(erpnext.calls).toEqual([
       {

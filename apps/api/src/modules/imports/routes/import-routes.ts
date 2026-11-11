@@ -6,7 +6,7 @@ import { Queue } from "bullmq";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { withTenantTx } from "../../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../../db/tenant-tx";
 import { requireStorage } from "../../../lib/storage";
 import { enqueueUploadScans } from "../../../lib/storage/upload-scan";
 import { auditAction } from "../../../middleware/auditEmitter";
@@ -16,8 +16,14 @@ import { requireChannel } from "../../../middleware/channelGuard";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import {
+  copyStagedUploads,
+  discardStagedUploads,
+  reserveStorage,
+} from "../../storage/staged-promotion";
 import { applyColumn, listUnmappedColumns, previewColumn } from "../column-service";
 import {
+  checkImportUpload,
   confirmImport,
   createMapping,
   deleteMapping,
@@ -59,7 +65,7 @@ import {
 import {
   deleteSource,
   getImportSettings,
-  promoteSourceFile,
+  inspectSourceFile,
   sourceDownload,
   updateImportSettings,
 } from "../source-service";
@@ -700,7 +706,22 @@ export function importRoutes(
     const sourceStorage = source_key === undefined ? null : requireStorage(storage);
     const bodySha256 = createHash("sha256").update(body).digest("hex");
 
-    const record = await withTenantTx(database, tenantFrom(c), (tx) =>
+    // A kept original is promoted reserve -> copy -> write (../../storage/staged-promotion.ts): no
+    // transaction is open across its storage calls (a HEAD, a full read for the checksum, a copy).
+    // The upload's own refusals run before the copy, so a refused file is never kept.
+    const runTx = tenantTxRunner(database, tenantFrom(c));
+    const kept =
+      sourceStorage && source_key
+        ? await inspectSourceFile(sourceStorage, auth.schoolId, source_key, bodySha256)
+        : null;
+    if (sourceStorage && kept) {
+      await runTx(async (tx) => {
+        await checkImportUpload(tx, auth.schoolId, rawCsv, mapping_id);
+        await reserveStorage(tx, kept.sizeBytes);
+      });
+      await copyStagedUploads(sourceStorage, runTx, [kept]);
+    }
+    const record = await runTx((tx) =>
       uploadImport(
         tx,
         auth.schoolId,
@@ -708,11 +729,16 @@ export function importRoutes(
         fileName,
         rawCsv,
         mapping_id,
-        sourceStorage && source_key
-          ? () => promoteSourceFile(tx, sourceStorage, auth.schoolId, source_key, bodySha256)
+        kept
+          ? async () => ({
+              storageKey: kept.permanentKey,
+              fileName: kept.fileName,
+              sizeBytes: kept.sizeBytes,
+            })
           : undefined,
       ),
     );
+    if (sourceStorage && kept) await discardStagedUploads(sourceStorage, [kept]);
     // The kept original is downloadable only once the malware scan has cleared it (F-14).
     if (record.source_storage_key) {
       await enqueueUploadScans(c, [

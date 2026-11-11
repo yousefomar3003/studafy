@@ -10,7 +10,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { CodedHttpException } from "../../../../coded-http-exception";
-import { promoteTempObject } from "../../../../lib/storage/promote";
+import { copyStagedObject, promoteTempObject } from "../../../../lib/storage/promote";
 
 import type { PresignedUrl, StorageService } from "../../../../lib/storage";
 
@@ -80,9 +80,9 @@ describe("promoteTempObject", () => {
     const result = await promoteTempObject(storage, TEMP_KEY, PERMANENT_KEY);
 
     expect(result).toEqual({ key: PERMANENT_KEY, sizeBytes: 2048 });
+    // One HEAD answers both "does it exist" and "how big is it".
     expect(storage.calls).toEqual([
-      `exists:${TEMP_KEY}`,
-      `size:${TEMP_KEY}`,
+      `head:${TEMP_KEY}`,
       `copy:${TEMP_KEY}->${PERMANENT_KEY}`,
       `remove:${TEMP_KEY}`,
     ]);
@@ -104,7 +104,7 @@ describe("promoteTempObject", () => {
       expect((error as CodedHttpException).code).toBe("STORAGE_OBJECT_NOT_FOUND");
     }
 
-    expect(storage.calls).toEqual([`exists:${TEMP_KEY}`]);
+    expect(storage.calls).toEqual([`head:${TEMP_KEY}`]);
   });
 
   test("rejects an empty staged object", async () => {
@@ -160,5 +160,39 @@ describe("promoteTempObject", () => {
     await expect(promoteTempObject(storage, TEMP_KEY, PERMANENT_KEY)).rejects.toThrow(
       "bucket unavailable",
     );
+  });
+
+  test("skips the HEAD when the caller already read the size", async () => {
+    const storage = fakeStorage({ [TEMP_KEY]: 2048 });
+
+    const result = await promoteTempObject(storage, TEMP_KEY, PERMANENT_KEY, {
+      knownSizeBytes: 2048,
+    });
+
+    expect(result.sizeBytes).toBe(2048);
+    expect(storage.calls).toEqual([`copy:${TEMP_KEY}->${PERMANENT_KEY}`, `remove:${TEMP_KEY}`]);
+  });
+});
+
+describe("copyStagedObject", () => {
+  test("a staged object that vanished before the copy is a 404, not a 500", async () => {
+    const storage = fakeStorage(
+      { [TEMP_KEY]: 512 },
+      {
+        async copy() {
+          throw Object.assign(new Error("The specified key does not exist."), {
+            name: "NoSuchKey",
+          });
+        },
+      },
+    );
+
+    try {
+      await copyStagedObject(storage, TEMP_KEY, PERMANENT_KEY);
+      throw new Error("expected copyStagedObject to throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(CodedHttpException);
+      expect((error as CodedHttpException).status).toBe(404);
+    }
   });
 });

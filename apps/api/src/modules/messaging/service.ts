@@ -20,12 +20,16 @@ import {
 } from "@studafy/notification-templates";
 
 import { CodedHttpException } from "../../coded-http-exception";
-import { buildPermanentKey, promoteTempObject, requireStorage } from "../../lib/storage";
+import { buildPermanentKey, requireStorage } from "../../lib/storage";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { getContentClass } from "../storage/content-classes";
 import { DOWNLOAD_PRESIGN_TTL_SECONDS } from "../storage/download-service";
-import { assertStorageUploadQuota, recordStorageUpload } from "../storage/quota-service";
 import { inspectStagedUpload } from "../storage/service";
+import {
+  copyStagedUploads,
+  discardStagedUploads,
+  reserveStorage,
+} from "../storage/staged-promotion";
 
 import { MESSAGE_ATTACHMENT_CONTENT_CLASS } from "./schemas";
 
@@ -42,8 +46,10 @@ import type {
   SendMessageInput,
   TeacherMessagingContactList,
 } from "./schemas";
+import type { TxRunner } from "../../db/tenant-tx";
 import type { StorageService } from "../../lib/storage";
 import type { InspectedStagedUpload } from "../storage/service";
+import type { StagedCopy } from "../storage/staged-promotion";
 import type { UploadScanStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
@@ -806,11 +812,11 @@ function previewOf(body: string): string {
 
 /**
  * Every staged image passes the `message.attachment` content-class checks against the stored
- * object (type, size, optional checksum) and the school's storage quota before anything is
- * promoted, so one bad file refuses the send and leaves every staged upload in place for a retry.
+ * object (type, size, optional checksum) before anything is charged or promoted, so one bad file
+ * refuses the send and leaves every staged upload in place for a retry. Storage round trips only:
+ * no transaction is open while this runs.
  */
 async function inspectAttachments(
-  tx: TransactionSql,
   storage: StorageService,
   actor: MessagingActor,
   attachments: NonNullable<SendMessageInput["attachments"]>,
@@ -824,30 +830,35 @@ async function inspectAttachments(
     });
     inspected.push({ ...upload, tempKey: attachment.storage_key });
   }
-  await assertStorageUploadQuota(
-    tx,
-    inspected.reduce((total, upload) => total + upload.sizeBytes, 0),
-  );
   return inspected;
+}
+
+/** The images of a send, already copied to permanent/ and charged to the school's meter. */
+interface PromotedAttachment {
+  permanentKey: string;
+  upload: InspectedStagedUpload;
 }
 
 /**
  * Appends a message, with up to four images, advances the thread's activity and the sender's own
  * read marker (they have read what they just wrote), and leaves the other participant one in-app
- * DIRECT_MESSAGE notification unless they have turned that type off. All in the caller's
- * transaction, so the message, its images, its notification and its audit row commit together.
+ * DIRECT_MESSAGE notification unless they have turned that type off. The message, its images, its
+ * notification and its audit row commit together, in one transaction.
  *
- * Images: each staged temp/ key is inspected (inspectAttachments), the message row is written —
- * which is where RLS refuses a blocked pair — and only then are the objects promoted to permanent/
- * and their rows inserted. A failure after a promotion leaves an unreferenced permanent object
- * (wasted bytes, reclaimed by the storage reconciliation), never a row pointing at a missing one.
- * Without object storage a text-only send still works; a send with images answers 503.
+ * A send with images never holds that transaction across object storage (see
+ * ../storage/staged-promotion.ts): the staged objects are inspected first with no transaction open;
+ * a short transaction then checks the pair (participant, not blocked) and charges the school's
+ * storage quota; the objects are copied to permanent/ with no transaction open; then the message
+ * transaction writes the rows; the staged copies are dropped only after it commits. A failure after
+ * a copy leaves an unreferenced permanent object (wasted bytes, which the meter and the storage
+ * reconciliation both count), never a row pointing at a missing one. Without object storage a
+ * text-only send still works; a send with images answers 503.
  *
  * Push delivery is not triggered here: the only push path today is the grade-specific notification
  * dispatcher in apps/workers, which has no generic "deliver this app.notifications row" entry point.
  */
 export async function sendMessage(
-  tx: TransactionSql,
+  runTx: TxRunner,
   storage: StorageService | null,
   actor: MessagingActor,
   conversationId: string,
@@ -858,20 +869,72 @@ export async function sendMessage(
    */
   uploadedKeys: string[] = [],
 ): Promise<Message> {
-  const participants = await loadParticipants(tx, actor, conversationId);
-  const callerIsParent = participants.parent_user_id === actor.userId;
-  const recipientId = callerIsParent ? participants.teacher_user_id : participants.parent_user_id;
-  if (await isBlockedBetween(tx, participants.parent_user_id, participants.teacher_user_id)) {
-    throw blocked();
-  }
-
   const body = input.body ?? "";
   const staged = input.attachments ?? [];
   if (body.length === 0 && staged.length === 0) {
     throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Message is required");
   }
-  const inspected =
-    staged.length > 0 ? await inspectAttachments(tx, requireStorage(storage), actor, staged) : [];
+  if (staged.length === 0) {
+    return runTx((tx) => writeMessage(tx, storage, actor, conversationId, body, []));
+  }
+
+  const store = requireStorage(storage);
+  const inspected = await inspectAttachments(store, actor, staged);
+  const copies: StagedCopy[] = inspected.map((upload) => ({
+    tempKey: upload.tempKey,
+    permanentKey: buildPermanentKey(actor.schoolId, upload.parsed.objectId, upload.parsed.filename),
+    sizeBytes: upload.sizeBytes,
+  }));
+
+  await runTx(async (tx) => {
+    await assertCanSend(tx, actor, conversationId);
+    await reserveStorage(
+      tx,
+      copies.reduce((total, copy) => total + copy.sizeBytes, 0),
+    );
+  });
+  await copyStagedUploads(store, runTx, copies);
+
+  const message = await runTx((tx) =>
+    writeMessage(
+      tx,
+      storage,
+      actor,
+      conversationId,
+      body,
+      inspected.map((upload, index) => ({ permanentKey: copies[index]!.permanentKey, upload })),
+    ),
+  );
+  uploadedKeys.push(...copies.map((copy) => copy.permanentKey));
+  await discardStagedUploads(store, copies);
+  return message;
+}
+
+/** The caller is a participant of the thread and the pair is not blocked. */
+async function assertCanSend(
+  tx: TransactionSql,
+  actor: MessagingActor,
+  conversationId: string,
+): Promise<ParticipantRow> {
+  const participants = await loadParticipants(tx, actor, conversationId);
+  if (await isBlockedBetween(tx, participants.parent_user_id, participants.teacher_user_id)) {
+    throw blocked();
+  }
+  return participants;
+}
+
+/** The message transaction of sendMessage: rows only, no storage round trip. */
+async function writeMessage(
+  tx: TransactionSql,
+  storage: StorageService | null,
+  actor: MessagingActor,
+  conversationId: string,
+  body: string,
+  promoted: PromotedAttachment[],
+): Promise<Message> {
+  const participants = await assertCanSend(tx, actor, conversationId);
+  const callerIsParent = participants.parent_user_id === actor.userId;
+  const recipientId = callerIsParent ? participants.teacher_user_id : participants.parent_user_id;
 
   const [row] = await tx<MessageRow[]>`
     INSERT INTO app.messages (school_id, conversation_id, sender_user_id, body)
@@ -881,28 +944,19 @@ export async function sendMessage(
   if (!row) throw new Error("INSERT INTO app.messages returned no row");
 
   const attachments: MessageAttachment[] = [];
-  for (const [position, upload] of inspected.entries()) {
-    const permanentKey = buildPermanentKey(
-      actor.schoolId,
-      upload.parsed.objectId,
-      upload.parsed.filename,
-    );
-    // `storage` is non-null here: inspectAttachments ran through requireStorage for any image.
-    const promoted = await promoteTempObject(storage!, upload.tempKey, permanentKey);
-    await recordStorageUpload(tx, promoted.sizeBytes);
+  for (const [position, { permanentKey, upload }] of promoted.entries()) {
     const [attachment] = await tx<AttachmentRow[]>`
       INSERT INTO app.message_attachments (
         school_id, message_id, position, storage_key, original_file_name, mime_type, size_bytes,
         checksum_sha256
       ) VALUES (
         ${actor.schoolId}::uuid, ${row.id}::uuid, ${position}, ${permanentKey},
-        ${upload.parsed.filename}, ${upload.contentType}, ${promoted.sizeBytes},
+        ${upload.parsed.filename}, ${upload.contentType}, ${upload.sizeBytes},
         ${upload.checksumSha256}
       )
       RETURNING id, message_id, storage_key, mime_type, size_bytes::text AS size_bytes,
                 scan_status::text AS scan_status
     `;
-    uploadedKeys.push(permanentKey);
     attachments.push(await toAttachmentResponse(storage, attachment!));
   }
 

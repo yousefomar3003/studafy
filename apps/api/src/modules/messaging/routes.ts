@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS, ROLES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
-import { withTenantTx } from "../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../db/tenant-tx";
 import { enqueueUploadScans } from "../../lib/storage/upload-scan";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
@@ -615,8 +615,15 @@ export function messagingRoutes(
     const input = c.req.valid("json");
     const uploadedKeys: string[] = [];
     const actor = actorFrom(c);
-    const message = await withTenantTx(database, tenantFrom(c), (tx) =>
-      sendMessage(tx, storage, actor, conversationId, input, uploadedKeys),
+    // Not one withTenantTx: a send with images runs several short transactions around its storage
+    // calls (see sendMessage).
+    const message = await sendMessage(
+      tenantTxRunner(database, tenantFrom(c)),
+      storage,
+      actor,
+      conversationId,
+      input,
+      uploadedKeys,
     );
     await enqueueUploadScans(
       c,

@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
-import { setTenantScope, withSystemTx, withTenantTx } from "../../db/tenant-tx";
+import { setTenantScope, tenantTxRunner, withSystemTx, withTenantTx } from "../../db/tenant-tx";
 import { requireStorage } from "../../lib/storage";
 import { enqueueUploadScans } from "../../lib/storage/upload-scan";
 import { auditAction } from "../../middleware/auditEmitter";
@@ -1276,25 +1276,20 @@ export function recordRoutes(
       const params = paramsOf(c);
       const store = requireStorage(storage);
       const subject = subjectFrom(params);
-      const { records, replacedKey, storageKey } = await withTenantTx(
-        database,
-        tenant,
-        async (tx) => {
-          const { replacedKey, storageKey } = await attachDocument(
-            tx,
-            store,
-            tenant.schoolId,
-            subject,
-            params.fieldId!,
-            tenant.userId,
-            c.req.valid("json"),
-          );
-          return {
-            records: await getSubjectRecords(tx, tenant.schoolId, subject, "staff"),
-            replacedKey,
-            storageKey,
-          };
-        },
+      // Several short transactions around the storage calls, not one (see attachDocument).
+      const {
+        result: records,
+        replacedKey,
+        storageKey,
+      } = await attachDocument(
+        tenantTxRunner(database, tenant),
+        store,
+        tenant.schoolId,
+        subject,
+        params.fieldId!,
+        tenant.userId,
+        c.req.valid("json"),
+        (tx) => getSubjectRecords(tx, tenant.schoolId, subject, "staff"),
       );
       await removeObject(store, replacedKey);
       await enqueueUploadScans(c, [
