@@ -25,6 +25,7 @@ import {
   type TestDatabase,
 } from "../../../../tests/harness";
 import { CodedHttpException } from "../../../coded-http-exception";
+import { ErpNextError } from "../../../erpnext/client";
 import {
   approveRefund,
   applyRefundCompleted,
@@ -37,6 +38,7 @@ import {
   type InitiateRefundParams,
 } from "../refunds/service";
 
+import type { TxRunner } from "../../../db/tenant-tx";
 import type { TenantErpNext } from "../client/tenant-client";
 import type { TransactionSql } from "postgres";
 
@@ -191,6 +193,11 @@ async function createFinanceUser(schoolId: string): Promise<string> {
   const user = await createUser(db.sql, schoolId);
   await assignRole(db.sql, schoolId, user.id, ROLES.FINANCE);
   return user.id;
+}
+
+/** The service's short transactions, run in the test's one transaction. */
+function inTx(tx: TransactionSql): TxRunner {
+  return (fn) => fn(tx);
 }
 
 function mockErpNext(creditNoteName: string): TenantErpNext {
@@ -656,7 +663,13 @@ describeDb("approveRefund", () => {
     );
 
     const approved = await withTx(school.id, (tx) =>
-      approveRefund(tx, mockErpNext(creditNoteName), school.id, checkerId, row.id),
+      approveRefund(
+        inTx(tx),
+        async () => mockErpNext(creditNoteName),
+        school.id,
+        checkerId,
+        row.id,
+      ),
     );
 
     expect(approved.status).toBe("submitted_to_erpnext");
@@ -687,7 +700,9 @@ describeDb("approveRefund", () => {
     );
 
     await expect(
-      withTx(school.id, (tx) => approveRefund(tx, mockErpNext("CN-1"), school.id, userId, row.id)),
+      withTx(school.id, (tx) =>
+        approveRefund(inTx(tx), async () => mockErpNext("CN-1"), school.id, userId, row.id),
+      ),
     ).rejects.toMatchObject({ status: 403 });
   });
 
@@ -718,7 +733,13 @@ describeDb("approveRefund", () => {
     const secondCheckerId = await createFinanceUser(school.id);
     await expect(
       withTx(school.id, (tx) =>
-        approveRefund(tx, mockErpNext("CN-2"), school.id, secondCheckerId, row.id),
+        approveRefund(
+          inTx(tx),
+          async () => mockErpNext("CN-2"),
+          school.id,
+          secondCheckerId,
+          row.id,
+        ),
       ),
     ).rejects.toMatchObject({ status: 409 });
   });
@@ -729,7 +750,13 @@ describeDb("approveRefund", () => {
 
     await expect(
       withTx(school.id, (tx) =>
-        approveRefund(tx, mockErpNext("CN-X"), school.id, checkerId, crypto.randomUUID()),
+        approveRefund(
+          inTx(tx),
+          async () => mockErpNext("CN-X"),
+          school.id,
+          checkerId,
+          crypto.randomUUID(),
+        ),
       ),
     ).rejects.toMatchObject({ status: 404 });
   });
@@ -738,6 +765,154 @@ describeDb("approveRefund", () => {
 // ---------------------------------------------------------------------------
 // Webhook completion
 // ---------------------------------------------------------------------------
+
+describeDb("approveRefund: ERPNext is called with no transaction open", () => {
+  /** Each step in its own transaction, as the route runs it. */
+  const separateTxs =
+    (schoolId: string): TxRunner =>
+    (fn) =>
+      withTx(schoolId, fn);
+
+  async function pendingRefund(invoice: string) {
+    const school = await createSchool(db.sql);
+    const student = await createStudent(db.sql, school.id);
+    const makerId = await createFinanceUser(school.id);
+    const checkerId = await createFinanceUser(school.id);
+    const { row } = await initiateRefund(
+      db.sql,
+      { schoolId: school.id, userId: makerId },
+      {
+        student_id: student.id,
+        erpnext_invoice_id: invoice,
+        amount: 25,
+        currency: "JOD",
+        reason_code: "overpayment",
+      },
+      crypto.randomUUID(),
+    );
+    return { schoolId: school.id, checkerId, refundId: row.id };
+  }
+
+  function erpNextAnswering(post: () => Promise<unknown>): {
+    client: TenantErpNext;
+    calls: () => number;
+  } {
+    let calls = 0;
+    const client = {
+      get: () => Promise.reject(new Error("not implemented")),
+      post: () => {
+        calls += 1;
+        return post();
+      },
+      put: () => Promise.reject(new Error("not implemented")),
+    } as unknown as TenantErpNext;
+    return { client, calls: () => calls };
+  }
+
+  async function statusOf(schoolId: string, refundId: string) {
+    const [row] = await db.sql<{ status: string; checker_id: string | null }[]>`
+      SELECT status, checker_id FROM app.refund_requests WHERE id = ${refundId}::uuid
+    `;
+    expect(row).toBeDefined();
+    return { ...row!, schoolId };
+  }
+
+  test("an ERPNext refusal hands the claim back: pending again, and approvable later", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-F01");
+    const refusing = erpNextAnswering(() =>
+      Promise.reject(new ErpNextError("Return exceeds the net paid amount", 417, {})),
+    );
+
+    await expect(
+      approveRefund(
+        separateTxs(schoolId),
+        async () => refusing.client,
+        schoolId,
+        checkerId,
+        refundId,
+      ),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(await statusOf(schoolId, refundId)).toMatchObject({
+      status: "pending_approval",
+      checker_id: null,
+    });
+
+    const approved = await approveRefund(
+      separateTxs(schoolId),
+      async () => mockErpNext("ACC-CRN-F01"),
+      schoolId,
+      checkerId,
+      refundId,
+    );
+    expect(approved).toMatchObject({
+      status: "submitted_to_erpnext",
+      erpnext_credit_note_id: "ACC-CRN-F01",
+    });
+  });
+
+  test("ERPNext accepted but named no document: the request stays claimed, never approved twice", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-F02");
+    const nameless = erpNextAnswering(() =>
+      Promise.resolve({ data: { data: {} }, status: 201, headers: new Headers() }),
+    );
+
+    await expect(
+      approveRefund(
+        separateTxs(schoolId),
+        async () => nameless.client,
+        schoolId,
+        checkerId,
+        refundId,
+      ),
+    ).rejects.toMatchObject({ status: 502 });
+    expect(await statusOf(schoolId, refundId)).toMatchObject({
+      status: "approved",
+      checker_id: checkerId,
+    });
+
+    const retry = erpNextAnswering(() => Promise.reject(new Error("must not be called")));
+    await expect(
+      approveRefund(separateTxs(schoolId), async () => retry.client, schoolId, checkerId, refundId),
+    ).rejects.toMatchObject({ status: 409 });
+    expect(retry.calls()).toBe(0);
+  });
+
+  test("two concurrent approvals call ERPNext once", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-F03");
+    const secondChecker = await createFinanceUser(schoolId);
+    const slow = erpNextAnswering(
+      () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve({
+                data: { data: { name: "ACC-CRN-F03" } },
+                status: 201,
+                headers: new Headers(),
+              }),
+            50,
+          ),
+        ),
+    );
+
+    const outcomes = await Promise.allSettled([
+      approveRefund(separateTxs(schoolId), async () => slow.client, schoolId, checkerId, refundId),
+      approveRefund(
+        separateTxs(schoolId),
+        async () => slow.client,
+        schoolId,
+        secondChecker,
+        refundId,
+      ),
+    ]);
+
+    expect(slow.calls()).toBe(1);
+    expect(outcomes.map((o) => o.status).sort()).toEqual(["fulfilled", "rejected"]);
+    const rejected = outcomes.find((o) => o.status === "rejected") as PromiseRejectedResult;
+    expect(rejected.reason).toMatchObject({ status: 409 });
+    expect((await statusOf(schoolId, refundId)).status).toBe("submitted_to_erpnext");
+  });
+});
 
 describeDb("applyRefundCompleted", () => {
   test("completes a submitted refund via webhook", async () => {
@@ -764,7 +939,13 @@ describeDb("applyRefundCompleted", () => {
     );
 
     await withTx(school.id, (tx) =>
-      approveRefund(tx, mockErpNext(creditNoteName), school.id, checkerId, row.id),
+      approveRefund(
+        inTx(tx),
+        async () => mockErpNext(creditNoteName),
+        school.id,
+        checkerId,
+        row.id,
+      ),
     );
 
     await withTx(school.id, (tx) => applyRefundCompleted(tx, school.id, creditNoteName, {}));
@@ -838,7 +1019,13 @@ describeDb("applyRefundCompleted", () => {
 
     // Checker approves
     const approved = await withTx(school.id, (tx) =>
-      approveRefund(tx, mockErpNext(creditNoteName), school.id, checkerId, initiated.id),
+      approveRefund(
+        inTx(tx),
+        async () => mockErpNext(creditNoteName),
+        school.id,
+        checkerId,
+        initiated.id,
+      ),
     );
 
     expect(approved.status).toBe("submitted_to_erpnext");

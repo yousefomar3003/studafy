@@ -147,18 +147,17 @@ export async function importRecordFields(
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a CSV, detect its header row, map it (a saved mapping, or one suggested from the headers)
- * and stage every data line. Stored as `validated` when every line is valid, `uploaded` otherwise.
+ * Every way an upload can be refused before anything is written: the CSV parses, is within the
+ * row cap, and the named mapping exists. The upload route runs it ahead of copying a kept original
+ * out of temp/, so a refused file is never copied (it would hold student data with no row, and so
+ * no retention sweep, pointing at it).
  */
-export async function uploadImport(
+export async function checkImportUpload(
   tx: TransactionSql,
   schoolId: string,
-  uploadedBy: string,
-  fileName: string,
   rawCsv: string,
   mappingId?: string,
-  stageSource?: () => Promise<StagedSourceFile>,
-): Promise<ImportRecord> {
+) {
   const source = readCsvSource(rawCsv);
 
   if (source.rows.length > MAX_ROWS) {
@@ -173,6 +172,28 @@ export async function uploadImport(
   const mapping = mappingId
     ? (await getMapping(tx, schoolId, mappingId)).column_mapping
     : suggestColumnMapping(source.headers, recordFields);
+  return { source, recordFields, mapping };
+}
+
+/**
+ * Parse a CSV, detect its header row, map it (a saved mapping, or one suggested from the headers)
+ * and stage every data line. Stored as `validated` when every line is valid, `uploaded` otherwise.
+ */
+export async function uploadImport(
+  tx: TransactionSql,
+  schoolId: string,
+  uploadedBy: string,
+  fileName: string,
+  rawCsv: string,
+  mappingId?: string,
+  stageSource?: () => Promise<StagedSourceFile>,
+): Promise<ImportRecord> {
+  const { source, recordFields, mapping } = await checkImportUpload(
+    tx,
+    schoolId,
+    rawCsv,
+    mappingId,
+  );
   const staged = stageRows(source, mapping, recordFields);
   const validRows = countValid(staged.rows);
   // After the file has parsed: a file refused for its content is never kept.

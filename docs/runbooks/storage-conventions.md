@@ -45,6 +45,15 @@ Flow for a pre-signed upload:
    it moves/copies the object to `permanent/<schoolId>/<objectId>/<filename>` — S3 doesn't have a
    true move, so this is a `CopyObject` + `DeleteObject` pair — after which it is out of `temp/`
    and no longer subject to the 24h rule.
+
+   No database transaction is held open across these S3 calls
+   (`apps/api/src/modules/storage/staged-promotion.ts`): a confirm HEADs the staged object, then
+   one short transaction authorizes and charges the storage quota, then the `CopyObject` runs,
+   then a second short transaction writes the row that names the permanent key, and only after it
+   commits is the staged copy deleted. A failure after the copy leaves an unreferenced object in
+   `permanent/` (counted by the meter, as the bucket counts it), never a row pointing at a missing
+   object; a failed copy hands the reserved bytes back and leaves the staged object for a retry.
+
 4. If the app never confirms the upload (abandoned form, crashed tab), the object ages out of
    `temp/` on its own after 24h. This is the mechanism, not a fallback — nothing else cleans up
    unconfirmed uploads.

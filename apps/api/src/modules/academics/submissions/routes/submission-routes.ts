@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../../coded-http-exception";
-import { withTenantTx } from "../../../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../../../db/tenant-tx";
 import { requireStorage } from "../../../../lib/storage";
 import {
   enqueueUploadScans,
@@ -665,8 +665,13 @@ export function submissionRoutes(
     const body = c.req.valid("json");
     const active = requireStorage(storage);
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      confirmSubmissionAttachment(tx, active, auth.schoolId, auth.userId, submissionId, body),
+    const row = await confirmSubmissionAttachment(
+      tenantTxRunner(database, tenantFrom(c)),
+      active,
+      auth.schoolId,
+      auth.userId,
+      submissionId,
+      body,
     );
     await enqueueUploadScans(c, [
       { target: "submission_attachment", schoolId: auth.schoolId, storageKey: row.storage_key },

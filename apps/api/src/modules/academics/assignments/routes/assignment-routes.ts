@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../../coded-http-exception";
-import { withTenantTx } from "../../../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../../../db/tenant-tx";
 import { requireStorage } from "../../../../lib/storage";
 import {
   enqueueUploadScans,
@@ -27,7 +27,7 @@ import {
   deleteAttachment,
   listAttachmentsByAssignment,
 } from "../attachment-service";
-import { listQuestionsByAssignment, replaceQuestions } from "../question-service";
+import { listQuestionsByAssignment, saveQuestions } from "../question-service";
 import {
   assignmentAttachmentSchema,
   assignmentIdParamSchema,
@@ -627,19 +627,20 @@ export function assignmentRoutes(
     const body = c.req.valid("json");
 
     const uploadedImageKeys: string[] = [];
-    const assignment = await withTenantTx(database, tenantFrom(c), async (tx) => {
-      const row = await replaceQuestions(
-        tx,
-        auth.schoolId,
-        auth.userId,
-        assignmentId,
-        body.questions,
-        storage,
-        uploadedImageKeys,
-      );
-      const [hydrated] = await hydrate(tx, auth.schoolId, [row], storage);
-      return hydrated!;
-    });
+    // A save with new pictures runs short transactions around its storage calls (saveQuestions).
+    const assignment = await saveQuestions(
+      tenantTxRunner(database, tenantFrom(c)),
+      storage,
+      auth.schoolId,
+      auth.userId,
+      assignmentId,
+      body.questions,
+      uploadedImageKeys,
+      async (tx, row) => {
+        const [hydrated] = await hydrate(tx, auth.schoolId, [row], storage);
+        return hydrated!;
+      },
+    );
     await enqueueUploadScans(
       c,
       uploadedImageKeys.map((storageKey) => ({
@@ -680,8 +681,13 @@ export function assignmentRoutes(
     const body = c.req.valid("json");
     const active = requireStorage(storage);
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      confirmAttachment(tx, active, auth.schoolId, auth.userId, assignmentId, body),
+    const row = await confirmAttachment(
+      tenantTxRunner(database, tenantFrom(c)),
+      active,
+      auth.schoolId,
+      auth.userId,
+      assignmentId,
+      body,
     );
     await enqueueUploadScans(c, [
       { target: "assignment_attachment", schoolId: auth.schoolId, storageKey: row.storage_key },

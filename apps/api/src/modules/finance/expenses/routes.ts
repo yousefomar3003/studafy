@@ -3,7 +3,7 @@ import { randomUUID } from "crypto";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { PERMISSIONS } from "@studafy/constants";
 
-import { withTenantTx } from "../../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../../db/tenant-tx";
 import { requireStorage } from "../../../lib/storage/client";
 import { buildTempKey } from "../../../lib/storage/keys";
 import { enqueueUploadScans } from "../../../lib/storage/upload-scan";
@@ -332,8 +332,13 @@ export function expenseRoutes(
     const s3 = requireStorage(storage);
 
     const uploadedKeys: string[] = [];
-    const row = await withTenantTx(database, tenantFrom(c), async (tx) =>
-      confirmAttachment(tx, s3, auth.schoolId, expenseId, body.storage_key, uploadedKeys),
+    const row = await confirmAttachment(
+      tenantTxRunner(database, tenantFrom(c)),
+      s3,
+      auth.schoolId,
+      expenseId,
+      body.storage_key,
+      uploadedKeys,
     );
     await enqueueUploadScans(
       c,

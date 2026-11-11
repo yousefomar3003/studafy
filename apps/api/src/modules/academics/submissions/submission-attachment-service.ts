@@ -7,14 +7,20 @@ import {
   assertSchoolOwnedKey,
   buildPermanentKey,
   buildTempKey,
-  promoteTempObject,
+  readStagedSize,
 } from "../../../lib/storage";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
-import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quota-service";
+import {
+  copyStagedUploads,
+  discardStagedUploads,
+  reserveStorage,
+} from "../../storage/staged-promotion";
 
 import { resolveCallerStudentId, resolveSubmissionForAttachment } from "./submission-service";
 
+import type { TxRunner } from "../../../db/tenant-tx";
 import type { StorageService } from "../../../lib/storage";
+import type { StagedCopy } from "../../storage/staged-promotion";
 import type { UploadScanStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
@@ -127,61 +133,68 @@ export async function createSubmissionUploadUrl(
 /**
  * Verify a staged upload, move it under `permanent/`, and record it.
  *
- * The storage work happens before the INSERT and is not transactional with it. That ordering is
- * deliberate and the failure modes are asymmetric: if the copy succeeds and the transaction then
- * rolls back, an unreferenced object is left in `permanent/` -- wasted bytes, reclaimable by a
- * sweep. The reverse order would let a row exist pointing at an object that was never promoted,
- * which is a broken download the student sees on work they believe they handed in.
+ * Same reserve -> copy -> write shape as the assignment attachment confirm, with no transaction
+ * held across object storage (../../storage/staged-promotion.ts). If the copy succeeds and the row's
+ * transaction then fails, an unreferenced object is left in `permanent/` -- wasted bytes. The
+ * reverse order would let a row exist pointing at an object that was never promoted, which is a
+ * broken download the student sees on work they believe they handed in.
  */
 export async function confirmSubmissionAttachment(
-  tx: TransactionSql,
+  runTx: TxRunner,
   storage: StorageService,
   schoolId: string,
   userId: string,
   submissionId: string,
   params: ConfirmSubmissionAttachmentParams,
 ): Promise<SubmissionAttachmentRow> {
-  const { attemptNumber } = await assertOwnsSubmission(tx, schoolId, submissionId);
-
   // Untrusted on the way back in, however it was minted. This is the tenant boundary.
   const staged = assertSchoolOwnedKey(params.storage_key, schoolId, "temp");
-  const permanentKey = buildPermanentKey(schoolId, staged.objectId, staged.filename);
+  const copy: StagedCopy = {
+    tempKey: params.storage_key,
+    permanentKey: buildPermanentKey(schoolId, staged.objectId, staged.filename),
+    sizeBytes: await readStagedSize(storage, params.storage_key),
+  };
 
-  const promoted = await promoteTempObject(storage, params.storage_key, permanentKey, {
-    onSize: async (sizeBytes) => {
-      await assertStorageUploadQuota(tx, sizeBytes);
-    },
+  await runTx(async (tx) => {
+    await assertOwnsSubmission(tx, schoolId, submissionId);
+    await reserveStorage(tx, copy.sizeBytes);
   });
-  await recordStorageUpload(tx, promoted.sizeBytes);
+  await copyStagedUploads(storage, runTx, [copy]);
 
-  const [row] = await tx<SubmissionAttachmentRow[]>`
-    INSERT INTO app.submission_attachments (
-      school_id, submission_id, uploaded_by_user_id,
-      storage_key, original_file_name, mime_type, size_bytes, checksum_sha256, attempt_number
-    ) VALUES (
-      ${schoolId}, ${submissionId}, ${userId},
-      ${permanentKey}, ${staged.filename}, ${params.content_type},
-      ${promoted.sizeBytes}, ${params.checksum_sha256 ?? null}, ${attemptNumber}
-    )
-    RETURNING id, submission_id, storage_key, original_file_name, mime_type,
-              size_bytes, checksum_sha256, attempt_number, uploaded_by_user_id,
-              scan_status::text AS scan_status, created_at
-  `;
+  const row = await runTx(async (tx) => {
+    const { attemptNumber } = await assertOwnsSubmission(tx, schoolId, submissionId);
 
-  await emitAuditLog(tx, {
-    action: "insert",
-    targetTable: "submission_attachments",
-    targetId: row!.id,
-    newValues: {
-      submission_id: submissionId,
-      original_file_name: row!.original_file_name,
-      mime_type: row!.mime_type,
-      size_bytes: row!.size_bytes,
-      attempt_number: row!.attempt_number,
-    },
+    const [inserted] = await tx<SubmissionAttachmentRow[]>`
+      INSERT INTO app.submission_attachments (
+        school_id, submission_id, uploaded_by_user_id,
+        storage_key, original_file_name, mime_type, size_bytes, checksum_sha256, attempt_number
+      ) VALUES (
+        ${schoolId}, ${submissionId}, ${userId},
+        ${copy.permanentKey}, ${staged.filename}, ${params.content_type},
+        ${copy.sizeBytes}, ${params.checksum_sha256 ?? null}, ${attemptNumber}
+      )
+      RETURNING id, submission_id, storage_key, original_file_name, mime_type,
+                size_bytes, checksum_sha256, attempt_number, uploaded_by_user_id,
+                scan_status::text AS scan_status, created_at
+    `;
+
+    await emitAuditLog(tx, {
+      action: "insert",
+      targetTable: "submission_attachments",
+      targetId: inserted!.id,
+      newValues: {
+        submission_id: submissionId,
+        original_file_name: inserted!.original_file_name,
+        mime_type: inserted!.mime_type,
+        size_bytes: inserted!.size_bytes,
+        attempt_number: inserted!.attempt_number,
+      },
+    });
+
+    return inserted!;
   });
-
-  return row!;
+  await discardStagedUploads(storage, [copy]);
+  return row;
 }
 
 /**
