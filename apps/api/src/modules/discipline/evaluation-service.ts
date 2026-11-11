@@ -374,12 +374,16 @@ export async function listEvaluations(
   ]);
 
   const evaluations = rows.map(parseEvaluationRow);
-  const withScores = await Promise.all(
-    evaluations.map(async (e) => {
-      const scores = await listScoresForEvaluation(tx, schoolId, e.id);
-      return { ...e, scores };
-    }),
+  // One query for the whole page's scores instead of one per evaluation.
+  const scoresByEvaluation = await listScoresForEvaluations(
+    tx,
+    schoolId,
+    evaluations.map((e) => e.id),
   );
+  const withScores = evaluations.map((e) => ({
+    ...e,
+    scores: scoresByEvaluation.get(e.id) ?? [],
+  }));
 
   return {
     rows: withScores,
@@ -623,6 +627,31 @@ async function listScoresForEvaluation(
   `;
 
   return rows.map(parseScoreRow);
+}
+
+async function listScoresForEvaluations(
+  tx: TransactionSql,
+  schoolId: string,
+  evaluationIds: readonly string[],
+): Promise<Map<string, EvaluationScoreRow[]>> {
+  const byEvaluation = new Map<string, EvaluationScoreRow[]>();
+  if (evaluationIds.length === 0) return byEvaluation;
+
+  const rows = await tx<Record<string, unknown>[]>`
+    SELECT ${tx.unsafe(SCORE_COLUMNS)}
+    FROM app.evaluation_scores s
+    WHERE s.school_id = ${schoolId}::uuid
+      AND s.evaluation_id = ANY(${evaluationIds as string[]}::uuid[])
+    ORDER BY s.id ASC
+  `;
+
+  for (const row of rows) {
+    const score = parseScoreRow(row);
+    const bucket = byEvaluation.get(score.evaluation_id);
+    if (bucket) bucket.push(score);
+    else byEvaluation.set(score.evaluation_id, [score]);
+  }
+  return byEvaluation;
 }
 
 export async function getEvaluationScores(

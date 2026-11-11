@@ -103,6 +103,38 @@ export async function fetchEvaluations(
   });
 }
 
+export function evaluationPreviewKey(filter: EvaluationListFilter, limit: number) {
+  return [...evaluationListKey(filter), "preview", limit] as const;
+}
+
+export interface EvaluationPreview {
+  evaluations: EvaluationWithScores[];
+  total: number;
+}
+
+/** The newest `limit` evaluations for one filter plus the server's total — a single request, for
+ * summary tiles that only show a count and a short preview (vs. `fetchEvaluations`, which pages
+ * through every row). */
+export async function fetchEvaluationPreview(
+  filter: EvaluationListFilter,
+  limit: number,
+): Promise<EvaluationPreview> {
+  const { data } = await api.GET("/api/evaluations", {
+    params: {
+      query: {
+        limit,
+        offset: 0,
+        ...(filter.teacherId ? { teacher_id: filter.teacherId } : {}),
+        ...(filter.status ? { status: filter.status } : {}),
+      },
+    },
+  });
+  return {
+    evaluations: (data?.evaluations ?? []) as EvaluationWithScores[],
+    total: data?.total ?? 0,
+  };
+}
+
 export async function fetchEvaluation(evaluationId: string): Promise<EvaluationWithScores> {
   const { data } = await api.GET("/api/evaluations/{evaluationId}", {
     params: { path: { evaluationId } },

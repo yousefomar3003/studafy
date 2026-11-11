@@ -74,10 +74,17 @@ export default function FamiliesListPage() {
         show({
           variant: "success",
           title: t("finance.families.bulk.sentTitle", { count: result.sent }),
-          description: t("finance.families.bulk.sentDetail", {
-            guardians: result.delivered,
-            skipped: result.recently_reminded,
-          }),
+          description: [
+            t("finance.families.bulk.sentDetail", {
+              guardians: result.delivered,
+              skipped: result.recently_reminded,
+            }),
+            result.remaining > 0
+              ? t("finance.families.bulk.remaining", { remaining: result.remaining })
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" "),
         });
       },
       onError: () => show({ variant: "error", title: t("finance.families.bulk.error") }),
