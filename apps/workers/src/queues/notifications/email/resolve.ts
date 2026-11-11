@@ -43,9 +43,11 @@ export interface ResolvedEmail {
 // `/api/auth/invitations/{token}/activate`: that is a POST-only endpoint on another host, so a link
 // to it opened the web app's 404 page.
 const INVITATION_ACTION_PATH = "/invite/{token}";
-const VERIFICATION_ACTION_PATH = "/api/schools/verify-email/{token}";
-// A page, not an API path: the link must not delete anything on a GET, which mail scanners issue
-// on their own. The token rides in the fragment, which browsers never send to a server.
+// Pages, not API paths. FRONTEND_URL is the web app, which has no API behind it, and a GET from a
+// mail scanner must not use up a one-time token or delete anything. The token rides in the
+// fragment, which browsers never send to a server; the page calls the API when the user presses
+// its button (apps/web VerifyEmailPage, ConfirmAccountDeletionPage).
+const VERIFICATION_ACTION_PATH = "/verify-email#token={token}";
 const ACCOUNT_DELETION_ACTION_PATH = "/legal/delete-account/confirm#token={token}";
 // The public Terms of Service page (apps/web LegalDocumentPage), linked from purchase confirmations.
 const TERMS_PATH = "/terms";

@@ -32,6 +32,23 @@ const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
 const PHONE = /^\+?[\d\s\-().]+$/;
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/** Longest phone number kept (app.users ck_users_phone). */
+export const PHONE_MAX = 50;
+
+/**
+ * A phone number as people type it -- digits with + - ( ) . and spaces, 6 to 20 digits in all --
+ * trimmed, with Arabic-Indic and Persian digits read as 0-9. Null when it is not one (or is blank).
+ */
+export function normalizePhoneNumber(raw: string): string | null {
+  const phone = raw
+    .trim()
+    .replace(/[\u0660-\u0669]/g, (digit) => String(digit.charCodeAt(0) - 0x0660))
+    .replace(/[\u06f0-\u06f9]/g, (digit) => String(digit.charCodeAt(0) - 0x06f0));
+  if (phone === "" || phone.length > PHONE_MAX || !PHONE.test(phone)) return null;
+  const digits = phone.replace(/\D/g, "").length;
+  return digits >= 6 && digits <= 20 ? phone : null;
+}
+
 function ok(value: RecordValue | null): NormalizedRecordValue {
   return { ok: true, value };
 }
@@ -119,12 +136,9 @@ export function normalizeRecordValue(field: RecordValueField, raw: unknown): Nor
     }
     case "phone": {
       if (typeof raw !== "string") return fail("RECORD_VALUE_WRONG_TYPE");
-      const trimmed = raw.trim();
-      if (trimmed === "") return ok(null);
-      const digits = trimmed.replace(/\D/g, "").length;
-      return PHONE.test(trimmed) && digits >= 6 && digits <= 20
-        ? ok(trimmed)
-        : fail("RECORD_VALUE_INVALID_PHONE");
+      if (raw.trim() === "") return ok(null);
+      const phone = normalizePhoneNumber(raw);
+      return phone === null ? fail("RECORD_VALUE_INVALID_PHONE") : ok(phone);
     }
     case "email": {
       if (typeof raw !== "string") return fail("RECORD_VALUE_WRONG_TYPE");

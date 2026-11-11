@@ -1,3 +1,4 @@
+import { normalizePhoneNumber, PHONE_MAX } from "@studafy/records/browser";
 import { z } from "zod";
 
 import { PARENT_RELATIONSHIPS, STUDENT_IMPORT_FIELDS, STUDENT_STATUSES } from "./fields";
@@ -26,13 +27,18 @@ export interface StudentImportRecord {
   section: string | null;
   /** The school's own family number: lines sharing one share their parents. Never stored. */
   family: string | null;
-  /** Parent 1. A parent needs a name or an email (no email: they sign in with their member ID). */
+  /**
+   * Parent 1. A parent needs a name or an email (no email: they sign in with their member ID), a
+   * phone number and a relationship. The phone is contact data only, never used to match anyone.
+   */
   parent_email: string | null;
   parent_name: string | null;
+  parent_phone: string | null;
   parent_relationship: ParentRelationship | null;
   /** Parent 2, the same way. */
   parent2_email: string | null;
   parent2_name: string | null;
+  parent2_phone: string | null;
   parent2_relationship: ParentRelationship | null;
   /**
    * Answers for the school's student record template, by field id: only the cells the file
@@ -59,6 +65,19 @@ const requiredText = (max: number) =>
   z.string({ error: REQUIRED }).min(1, REQUIRED).max(max, `At most ${max} characters.`);
 const optionalText = (max: number) => z.string().max(max, `At most ${max} characters.`).nullable();
 const email = () => z.email({ error: "Not a valid email address." }).max(320);
+const phone = () =>
+  z
+    .string()
+    .max(PHONE_MAX, `At most ${PHONE_MAX} characters.`)
+    .transform((value, context) => {
+      const normalized = normalizePhoneNumber(value);
+      if (normalized === null) {
+        context.addIssue({ code: "custom", message: "Not a valid phone number." });
+        return z.NEVER;
+      }
+      return normalized;
+    })
+    .nullable();
 const relationship = () =>
   z.enum(PARENT_RELATIONSHIPS, { error: `One of: ${PARENT_RELATIONSHIPS.join(", ")}.` }).nullable();
 
@@ -134,15 +153,18 @@ const recordSchema = z.object({
   family: optionalText(100),
   parent_email: email().nullable(),
   parent_name: optionalText(200),
+  parent_phone: phone(),
   parent_relationship: relationship(),
   parent2_email: email().nullable(),
   parent2_name: optionalText(200),
+  parent2_phone: phone(),
   parent2_relationship: relationship(),
 });
 
 /**
  * A staged record as the current code expects it. Rows staged by an earlier release lack the
- * fields added since (ST-299's parent_name, then placement, family and parent 2); a missing one
+ * fields added since (ST-299's parent_name, then placement, family, parent 2 and the parents'
+ * phones); a missing one
  * means the file did not provide it.
  */
 export function withRecordDefaults(record: StudentImportRecord): StudentImportRecord {
@@ -150,11 +172,13 @@ export function withRecordDefaults(record: StudentImportRecord): StudentImportRe
     ...record,
     email: record.email ?? null,
     parent_name: record.parent_name ?? null,
+    parent_phone: record.parent_phone ?? null,
     grade: record.grade ?? null,
     section: record.section ?? null,
     family: record.family ?? null,
     parent2_email: record.parent2_email ?? null,
     parent2_name: record.parent2_name ?? null,
+    parent2_phone: record.parent2_phone ?? null,
     parent2_relationship: record.parent2_relationship ?? null,
   };
 }
@@ -204,16 +228,26 @@ export function normalizeAdmissionNumber(value: string): string {
 
 /** The columns of each parent a line can name. */
 export const PARENT_SLOTS = [
-  { email: "parent_email", name: "parent_name", relationship: "parent_relationship" },
-  { email: "parent2_email", name: "parent2_name", relationship: "parent2_relationship" },
+  {
+    email: "parent_email",
+    name: "parent_name",
+    phone: "parent_phone",
+    relationship: "parent_relationship",
+  },
+  {
+    email: "parent2_email",
+    name: "parent2_name",
+    phone: "parent2_phone",
+    relationship: "parent2_relationship",
+  },
 ] as const;
 
 export type ParentSlot = (typeof PARENT_SLOTS)[number];
 
 /**
  * A parent is all-or-nothing: a name or an email to create the account by (with no email they sign
- * in with their member ID), and a relationship for the link. A half-filled parent would be silently
- * dropped, so it is an error instead.
+ * in with their member ID), a phone number the school can reach them on, and a relationship for the
+ * link. A half-filled parent would be silently dropped, so it is an error instead.
  */
 function parentIssues(
   line: number,
@@ -223,7 +257,7 @@ function parentIssues(
   const parentEmail = input[slot.email];
   const named = parentEmail !== null || input[slot.name] !== null;
   if (!named) {
-    return input[slot.relationship] !== null
+    return input[slot.relationship] !== null || input[slot.phone] !== null
       ? [{ line, field: slot.name, message: "Give the parent's name or email." }]
       : [];
   }
@@ -234,6 +268,9 @@ function parentIssues(
       field: slot.relationship,
       message: "Required when the parent is given.",
     });
+  }
+  if (input[slot.phone] === null) {
+    issues.push({ line, field: slot.phone, message: "Required when the parent is given." });
   }
   if (parentEmail !== null && input.email !== null) {
     if (normalizeEmail(parentEmail) === normalizeEmail(input.email)) {

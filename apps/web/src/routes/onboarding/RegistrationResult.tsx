@@ -14,9 +14,10 @@ export interface RegistrationResultProps {
 /**
  * The terminal screen after a successful `POST /api/schools/register`. Covers both the "verify
  * your email" step and the "invitation was sent" success state from the ticket's acceptance
- * criteria — in practice they're the same screen, because the verification link in the email
- * points straight at the API (`GET /api/schools/verify-email/{token}`), not back into this app.
- * There is nothing else for the user to do here but check their inbox or ask for it again.
+ * criteria — in practice they're the same screen, because verification happens wherever the email
+ * is opened: its link goes to the public `/verify-email#token=...` page (VerifyEmailPage), not back
+ * to this screen. There is nothing else for the user to do here but check their inbox or ask for it
+ * again.
  */
 export function RegistrationResult({
   schoolName,

@@ -1,4 +1,5 @@
 import { ERROR_CODES } from "@studafy/constants";
+import { normalizePhoneNumber } from "@studafy/records";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../coded-http-exception";
@@ -138,6 +139,7 @@ export async function createTeacher(
   const email = params.email?.trim() || null;
   const normalizedEmail = email?.toLowerCase() ?? null;
   const normalizedEmployeeNumber = params.employee_number.toLowerCase().trim();
+  const phone = params.phone === undefined ? null : normalizePhoneNumber(params.phone);
 
   // Pre-check employee number for a friendly error.
   const existingEmployee = await tx<{ id: string }[]>`
@@ -157,12 +159,13 @@ export async function createTeacher(
 
   // Create the linked user account.
   const [user] = await tx<{ id: string }[]>`
-    INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+    INSERT INTO app.users (school_id, email, normalized_email, display_name, phone, status)
     VALUES (
       ${schoolId},
       ${email},
       ${normalizedEmail},
       ${params.display_name ?? email ?? params.employee_number},
+      ${phone},
       'active'::app.user_status
     )
     RETURNING id
@@ -220,7 +223,7 @@ export async function createTeacher(
     action: "insert",
     targetTable: "users",
     targetId: user.id,
-    newValues: { email, status: "active" },
+    newValues: { email, phone_set: phone !== null, status: "active" },
   });
 
   // Audit: role assignment.

@@ -36,9 +36,11 @@ export const FIELD_LABEL_KEYS: Readonly<Record<StudentImportField, string>> = {
   family: "adminPeople.students.import.fields.family",
   parent_email: "adminPeople.students.import.fields.parent_email",
   parent_name: "adminPeople.students.import.fields.parent_name",
+  parent_phone: "adminPeople.students.import.fields.parent_phone",
   parent_relationship: "adminPeople.students.import.fields.parent_relationship",
   parent2_email: "adminPeople.students.import.fields.parent2_email",
   parent2_name: "adminPeople.students.import.fields.parent2_name",
+  parent2_phone: "adminPeople.students.import.fields.parent2_phone",
   parent2_relationship: "adminPeople.students.import.fields.parent2_relationship",
 };
 
@@ -49,12 +51,14 @@ const FIELD_HINT_KEYS: Readonly<Partial<Record<StudentImportField, string>>> = {
   status: "adminPeople.students.import.hints.status",
   parent_email: "adminPeople.students.import.hints.parent_email",
   parent_name: "adminPeople.students.import.hints.parent_name",
+  parent_phone: "adminPeople.students.import.hints.parent_phone",
   parent_relationship: "adminPeople.students.import.hints.parent_relationship",
   grade: "adminPeople.students.import.hints.grade",
   section: "adminPeople.students.import.hints.section",
   family: "adminPeople.students.import.hints.family",
   parent2_email: "adminPeople.students.import.hints.parent_email",
   parent2_name: "adminPeople.students.import.hints.parent_name",
+  parent2_phone: "adminPeople.students.import.hints.parent_phone",
   parent2_relationship: "adminPeople.students.import.hints.parent_relationship",
 };
 
@@ -210,26 +214,42 @@ export function mappingFitsHeaders(mapping: ColumnMapping, headers: readonly str
 }
 
 const PARENT_COLUMNS = [
-  { email: "parent_email", name: "parent_name", relationship: "parent_relationship" },
-  { email: "parent2_email", name: "parent2_name", relationship: "parent2_relationship" },
+  {
+    email: "parent_email",
+    name: "parent_name",
+    phone: "parent_phone",
+    relationship: "parent_relationship",
+  },
+  {
+    email: "parent2_email",
+    name: "parent2_name",
+    phone: "parent2_phone",
+    relationship: "parent2_relationship",
+  },
 ] as const;
 
 /**
- * A parent is all or nothing on the server: a name or an email, and a relationship. A mapping that
- * gives a parent's name or email but no relationship (or the reverse) rejects every row that uses
- * it, so it is flagged before upload. A relationship alone is fine with a family column: blank
- * family lines join the parents another line names.
+ * A parent is all or nothing on the server: a name or an email, a relationship and a phone. A
+ * mapping that gives a parent's name or email but no relationship (or the reverse), or no phone,
+ * rejects every row that uses it, so it is flagged before upload. A relationship alone is fine with
+ * a family column: blank family lines join the parents another line names.
  */
 export function parentPairWarning(mapping: ColumnMapping, t: TFunction): string | null {
   for (const slot of PARENT_COLUMNS) {
     const hasPerson = mapping[slot.email] !== undefined || mapping[slot.name] !== undefined;
     const hasRelationship = mapping[slot.relationship] !== undefined;
-    if (hasPerson === hasRelationship) continue;
-    return t("adminPeople.students.import.parentPairWarning", {
-      name: fieldLabel(slot.name, t),
-      email: fieldLabel(slot.email, t),
-      relationship: fieldLabel(slot.relationship, t),
-    });
+    if (hasPerson !== hasRelationship) {
+      return t("adminPeople.students.import.parentPairWarning", {
+        name: fieldLabel(slot.name, t),
+        email: fieldLabel(slot.email, t),
+        relationship: fieldLabel(slot.relationship, t),
+      });
+    }
+    if (hasPerson && mapping[slot.phone] === undefined) {
+      return t("adminPeople.students.import.parentPhoneWarning", {
+        phone: fieldLabel(slot.phone, t),
+      });
+    }
   }
   return null;
 }

@@ -80,7 +80,7 @@ describe("header detection and suggested mapping", () => {
 
   test("Arabic headers map, parent 2 and placement included", () => {
     const { headers } = readCsvSource(
-      "رقم الطالب,الاسم الأول,اسم العائلة,الصف,الشعبة,رقم العائلة,اسم ولي الأمر 1,صلة القرابة 1,اسم ولي الأمر 2,صلة القرابة 2\n",
+      "رقم الطالب,الاسم الأول,اسم العائلة,الصف,الشعبة,رقم العائلة,اسم ولي الأمر 1,صلة القرابة 1,هاتف ولي الأمر 1,اسم ولي الأمر 2,صلة القرابة 2,هاتف ولي الأمر 2\n",
     );
     expect(suggestColumnMapping(headers)).toEqual({
       admission_number: "رقم الطالب",
@@ -91,8 +91,10 @@ describe("header detection and suggested mapping", () => {
       family: "رقم العائلة",
       parent_name: "اسم ولي الأمر 1",
       parent_relationship: "صلة القرابة 1",
+      parent_phone: "هاتف ولي الأمر 1",
       parent2_name: "اسم ولي الأمر 2",
       parent2_relationship: "صلة القرابة 2",
+      parent2_phone: "هاتف ولي الأمر 2",
     });
   });
 
@@ -149,9 +151,9 @@ describe("validateColumnMapping", () => {
 describe("stageRows", () => {
   const source = readCsvSource(
     [
-      "ID,Mail,First,Last,Status,Parent,Relation",
-      "A1,a1@example.edu,Ann,Lee,Enrolled,p1@example.edu,Step-Parent",
-      "A2,not-an-email,Bob,,,p2@example.edu,",
+      "ID,Mail,First,Last,Status,Parent,Relation,Parent phone",
+      "A1,a1@example.edu,Ann,Lee,Enrolled,p1@example.edu,Step-Parent,٠٧٩ ١٢٣ ٤٥٦٧",
+      "A2,not-an-email,Bob,,,p2@example.edu,,",
     ].join("\n"),
   );
   const mapping = {
@@ -162,6 +164,7 @@ describe("stageRows", () => {
     status: "Status",
     parent_email: "Parent",
     parent_relationship: "Relation",
+    parent_phone: "Parent phone",
   } as const;
 
   test("maps valid lines to records and reports invalid lines by their file line", () => {
@@ -181,9 +184,11 @@ describe("stageRows", () => {
       family: null,
       parent_email: "p1@example.edu",
       parent_name: null,
+      parent_phone: "079 123 4567",
       parent_relationship: "step_parent",
       parent2_email: null,
       parent2_name: null,
+      parent2_phone: null,
       parent2_relationship: null,
     });
     expect(staged.rows[1]!.record).toBeNull();
@@ -191,6 +196,7 @@ describe("stageRows", () => {
       [3, "email"],
       [3, "last_name"],
       [3, "parent_relationship"],
+      [3, "parent_phone"],
     ]);
   });
 
@@ -215,14 +221,49 @@ describe("toStudentImportRecord", () => {
     const result = toStudentImportRecord(2, {
       ...base,
       parent_email: "A@X.edu",
+      parent_phone: "+965 5000 1234",
       parent_relationship: "mother",
     });
     expect(result.issues.map((i) => i.field)).toEqual(["parent_email"]);
   });
 
   test("a parent named without a relationship is rejected", () => {
-    const result = toStudentImportRecord(2, { ...base, parent_name: "Pat" });
+    const result = toStudentImportRecord(2, {
+      ...base,
+      parent_name: "Pat",
+      parent_phone: "0501234567",
+    });
     expect(result.issues.map((i) => i.field)).toEqual(["parent_relationship"]);
+  });
+
+  test("every parent named needs a phone number", () => {
+    const missing = toStudentImportRecord(2, {
+      ...base,
+      parent_name: "Pat",
+      parent_relationship: "mother",
+      parent2_email: "q@x.edu",
+      parent2_relationship: "father",
+      parent2_phone: "0501234567",
+    });
+    expect(missing.issues).toEqual([
+      { line: 2, field: "parent_phone", message: "Required when the parent is given." },
+    ]);
+
+    const invalid = toStudentImportRecord(2, {
+      ...base,
+      parent_name: "Pat",
+      parent_relationship: "mother",
+      parent_phone: "call me",
+    });
+    expect(invalid.issues).toEqual([
+      { line: 2, field: "parent_phone", message: "Not a valid phone number." },
+    ]);
+  });
+
+  test("a line with no parent needs no phone, and a phone alone is not a parent", () => {
+    expect(toStudentImportRecord(2, base).issues).toEqual([]);
+    const result = toStudentImportRecord(2, { ...base, parent2_phone: "0501234567" });
+    expect(result.issues.map((i) => i.field)).toEqual(["parent2_name"]);
   });
 
   test("a relationship with no parent name or email is rejected", () => {
@@ -237,8 +278,10 @@ describe("toStudentImportRecord", () => {
       last_name: "Hassan",
       parent_name: "Mona Hassan",
       parent_relationship: "الأم",
+      parent_phone: "٠٥٠١٢٣٤٥٦٧",
       parent2_name: "Omar Hassan",
       parent2_relationship: "أب",
+      parent2_phone: "+965 5000 1234",
       status: "منتظم",
     });
     expect(result.issues).toEqual([]);
@@ -246,7 +289,9 @@ describe("toStudentImportRecord", () => {
       email: null,
       status: "enrolled",
       parent_email: null,
+      parent_phone: "0501234567",
       parent_relationship: "mother",
+      parent2_phone: "+965 5000 1234",
       parent2_relationship: "father",
     });
   });
@@ -255,8 +300,10 @@ describe("toStudentImportRecord", () => {
     const result = toStudentImportRecord(2, {
       ...base,
       parent_email: "p@x.edu",
+      parent_phone: "0501234567",
       parent_relationship: "mother",
       parent2_email: "P@x.edu",
+      parent2_phone: "0501234568",
       parent2_relationship: "father",
     });
     expect(result.issues.map((i) => i.field)).toEqual(["parent2_email"]);

@@ -1,4 +1,5 @@
 import { ApiError } from "@studafy/api-client";
+import { normalizePhoneNumber } from "@studafy/student-import";
 
 import { buildCsv, parseCsv } from "./csv";
 
@@ -11,7 +12,8 @@ import { buildCsv, parseCsv } from "./csv";
 /** Ceiling on one import file: rows are created one request at a time. */
 export const MAX_IMPORT_ROWS = 1_000;
 
-export type ImportFieldType = "text" | "email" | "date" | "time" | "number" | "integer" | "boolean";
+export type ImportFieldType =
+  "text" | "email" | "phone" | "date" | "time" | "number" | "integer" | "boolean";
 
 export type ImportValue = string | number | boolean | null;
 
@@ -58,6 +60,7 @@ export interface ImportIssue {
   code:
     | "required"
     | "invalidEmail"
+    | "invalidPhone"
     | "invalidDate"
     | "invalidTime"
     | "invalidNumber"
@@ -134,6 +137,11 @@ export function coerceImportValue(
       return EMAIL.test(value)
         ? { value: value.toLowerCase() }
         : { issue: { code: "invalidEmail", ...base } };
+    case "phone": {
+      // Saved as the server reads it: Arabic digits as 0-9.
+      const phone = normalizePhoneNumber(value);
+      return phone === null ? { issue: { code: "invalidPhone", ...base } } : { value: phone };
+    }
     case "date":
       return isValidIsoDate(value) ? { value } : { issue: { code: "invalidDate", ...base } };
     case "time":

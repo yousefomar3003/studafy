@@ -21,7 +21,14 @@ export type {
   RecordFieldVisibility,
   RecordSubjectKind,
 } from "./fields";
-export { LONG_TEXT_MAX, RECORD_VALUE_ERRORS, SHORT_TEXT_MAX, normalizeRecordValue } from "./values";
+export {
+  LONG_TEXT_MAX,
+  PHONE_MAX,
+  RECORD_VALUE_ERRORS,
+  SHORT_TEXT_MAX,
+  normalizePhoneNumber,
+  normalizeRecordValue,
+} from "./values";
 export type {
   NormalizedRecordValue,
   RecordValue,

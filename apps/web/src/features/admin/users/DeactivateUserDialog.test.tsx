@@ -14,6 +14,7 @@ const USER: UserWithRoles = {
   school_id: "school-1",
   email: "jamie@example.edu",
   display_name: "Jamie Chen",
+  phone: null,
   status: "active",
   roles: ["INSTRUCTOR"],
   email_verified_at: "2026-08-01T00:00:00.000Z",

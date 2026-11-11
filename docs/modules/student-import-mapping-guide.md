@@ -67,16 +67,26 @@ All endpoints require `student:import` (ORG_ADMIN, SUPER_ADMIN) on the web chann
 | `family`               | grouping    | no       | The school's own family number. Never stored (see Parents below).           |
 | `parent_name`          | `parents`   | no       | Parent 1's name, for a **new** parent.                                      |
 | `parent_email`         | `parents`   | no       | Parent 1's email. Optional: without one they sign in with their member ID.  |
+| `parent_phone`         | `parents`   | per line | Parent 1's phone. **Required whenever the line names parent 1.**            |
 | `parent_relationship`  | `links`     | no       | `mother`, `step_parent`, …; "Step-Parent", أم and أب are accepted.          |
 | `parent2_name`         | `parents`   | no       | Parent 2, the same way.                                                     |
 | `parent2_email`        | `parents`   | no       |                                                                             |
+| `parent2_phone`        | `parents`   | per line | Required whenever the line names parent 2.                                  |
 | `parent2_relationship` | `links`     | no       |                                                                             |
 
 Arabic header spellings are recognised too (رقم الطالب, الاسم الأول, الصف, الشعبة, رقم العائلة,
 اسم ولي الأمر 1, صلة القرابة 2, …; see `packages/student-import/src/fields.ts`).
 
-A parent is all or nothing: a name or an email (or both), and a relationship. A relationship with
-neither is rejected, and so is a parent without a relationship.
+A parent is all or nothing: a name or an email (or both), a relationship and a phone number. A
+relationship or a phone with neither name nor email is rejected, and so is a parent without a
+relationship or without a phone. A family line that leaves its parents blank needs no phone: it
+joins the parents another line names.
+
+**Phones** are read as people type them: digits with `+ - ( ) .` and spaces, 6 to 20 digits in all,
+Arabic-Indic digits (٠٥٠…) read as 0-9 (`normalizePhoneNumber`, `packages/records/src/values.ts`).
+The new parent's phone is saved on their account (`app.users.phone`, 000203), where staff with
+`user:read` see it on Users and can correct it. It is contact data only: never used to find, match
+or link anyone, and erasure redacts it with the account's other personal columns.
 
 ### Parents
 
@@ -114,7 +124,8 @@ existing data, and it also cannot deliberately clear a field; use the student pr
 - **Template.** `GET /api/imports/students/template?format=xlsx&lang=en|ar` builds a workbook
   (`apps/api/src/modules/imports/template-workbook.ts`, exceljs loaded on first use): a Students
   sheet with only a header row (headers are recognised spellings, so the upload maps itself;
-  required columns highlighted; a note on every column; right-to-left in Arabic), the school's
+  required columns highlighted, the parents' phone columns included; a note on every column;
+  right-to-left in Arabic), the school's
   published student record fields as extra columns, dropdowns for status, relationship and the
   school's grades and sections of the current academic year (from a hidden Lists sheet), text format
   on ID and date columns, and Instructions and Example sheets. Example rows never sit on the Students
