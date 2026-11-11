@@ -11,12 +11,12 @@
  *     their proof-of-ownership file. Global (000139). Pending applications are undecided and an
  *     approved one is the record of the school's acceptance, so neither is ever deleted.
  *   - app.notifications: in-app inbox rows, read or unread, 12 months after they were created. Per
- *     school. 000188 turned the dispatch/announcement/alert logs' links into ON DELETE SET NULL, so
+ *     school. 000189 turned the dispatch/announcement/alert logs' links into ON DELETE SET NULL, so
  *     the logs stay and only their pointer to the inbox row is cleared.
  *   - Data subject request export bundles (dsr-exports/<school>/<request>/...), 30 days after the
  *     request finished. Per school. The app.data_subject_requests row is the compliance record and
  *     stays; its storage_key cannot be cleared (ck_data_subject_requests_terminal_state), so
- *     export_deleted_at (000188) records that the objects are gone.
+ *     export_deleted_at (000189) records that the objects are gone.
  *
  * Rows are deleted in batches of DATA_RETENTION_BATCH_SIZE, one transaction per batch, until a
  * batch comes back short, so a backlog never holds locks for long. A failure in one category or one

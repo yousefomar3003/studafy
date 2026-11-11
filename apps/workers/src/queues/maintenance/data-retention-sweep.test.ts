@@ -2,7 +2,7 @@
  * The data retention sweep against a real database: for each category it seeds rows just past and
  * just inside the period, runs the sweep, and checks only the expired ones are gone -- for school
  * applications only rejected ones, by their rejection date; for notifications also the logs that
- * point at them (000188); for export bundles only the objects under the expired request's prefix.
+ * point at them (000189); for export bundles only the objects under the expired request's prefix.
  * Storage is an in-memory fake. Skipped (as `skipIf` tests) unless TEST_DATABASE_URL points at a
  * migrated database.
  */
@@ -277,7 +277,7 @@ describe("data retention sweep", () => {
       const oldRead = await seedNotification(school, "13 months", true);
       const recent = await seedNotification(school, "11 months", false);
 
-      // Every log that links to an inbox row: before 000188 each of these blocked the delete.
+      // Every log that links to an inbox row: before 000189 each of these blocked the delete.
       await asSchool(school.schoolId, async (tx) => {
         await tx`
           INSERT INTO app.notification_dispatch_logs

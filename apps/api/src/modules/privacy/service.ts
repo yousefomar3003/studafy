@@ -20,7 +20,7 @@ export interface DataSubjectRequestRow {
   subjectUserId: string;
   status: DsrStatus;
   storageKey: string | null;
-  /** Set once the data retention sweep deleted the stored export bundle (000188). */
+  /** Set once the data retention sweep deleted the stored export bundle (000189). */
   exportDeletedAt: Date | null;
   failureMessage: string | null;
   createdAt: Date;

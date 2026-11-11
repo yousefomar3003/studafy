@@ -38,13 +38,13 @@ category.
   at the same key.
 - **Notifications.** Per school. Three logs point at an inbox row — the notification dispatch log,
   announcement recipients and the attendance alert log. Their links were `ON DELETE RESTRICT`, which
-  blocked the delete; migration 000188 changed them to `ON DELETE SET NULL (notification_id)` and
+  blocked the delete; migration 000189 changed them to `ON DELETE SET NULL (notification_id)` and
   indexed them. The log rows stay; only the link is cleared.
 - **Export bundles.** Per school. Every object under `dsr-exports/<school>/<request>/` is deleted;
   files the manifest only references (materials, attachments) live elsewhere and are not touched.
   The `app.data_subject_requests` row is the compliance record and stays. Its `storage_key` cannot
   be cleared — `ck_data_subject_requests_terminal_state` requires it on a completed export — so the
-  sweep sets `export_deleted_at` (000188) once every object is gone. A bundle with an object that
+  sweep sets `export_deleted_at` (000189) once every object is gone. A bundle with an object that
   failed to delete stays unmarked and is retried the next day. From then on
   `GET /api/privacy/dsr/{requestId}` returns the request without a download link. A closure export
   is deleted after the same 30 days its school has to download it before the erasure.

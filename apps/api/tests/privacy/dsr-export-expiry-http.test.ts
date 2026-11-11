@@ -1,6 +1,6 @@
 /**
  * A completed export's download link (`GET /api/privacy/dsr/{requestId}`) is handed out until the
- * data retention sweep deletes the stored bundle, 30 days after completion (000188's
+ * data retention sweep deletes the stored bundle, 30 days after completion (000189's
  * export_deleted_at); after that the request still answers, with no link. Requires a live
  * PostgreSQL instance, gated on TEST_DATABASE_URL.
  *

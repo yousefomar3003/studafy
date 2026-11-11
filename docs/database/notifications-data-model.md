@@ -258,7 +258,7 @@ Not built here, and deliberately out of scope for this migration:
   given above.
 - **Devices are never pruned.** Notifications are deleted 12 months after they were created by the
   workers' data retention sweep ([data-retention.md](../modules/data-retention.md)); the logs that
-  link to them keep their rows with the link cleared (000188). Nothing prunes devices that have not
+  link to them keep their rows with the link cleared (000189). Nothing prunes devices that have not
   been seen in months.
 - **No delivery receipts.** `notifications` records that a row was created, not that a push was
   accepted by FCM, delivered, or opened. A `notification_deliveries` table (per notification, per
