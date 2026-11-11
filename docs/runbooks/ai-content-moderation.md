@@ -122,8 +122,8 @@ Stated plainly so they are not assumed covered:
 - **No notification to moderators.** Nothing pushes or emails a school moderator when a report
   arrives; they must check the queue. Meeting the 24-hour urgent target depends on that habit.
 - **No alert rule is wired yet** for the `ai_moderation_escalation` / `ai_content_report_urgent` log
-  events; one needs adding to `infra/terraform/modules/monitoring/alerts.tf` with an entry in
-  `alert-catalog.md`.
+  events. They reach Axiom with every other log line (dataset `studafy-logs`,
+  `infra/fly/log-shipper.toml`); no alert on them is defined there yet.
 - **No moderation UI.** The queue is API-only; there is no web admin screen for it yet.
 - The age band used for filtering on quiz, flashcards, and summary is fixed at `high` (the most
   permissive), because those routes do not receive the student's age band. Every category except

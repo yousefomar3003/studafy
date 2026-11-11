@@ -60,8 +60,8 @@ The contract between `apps/api` (issuer, `src/modules/realtime/ticket.ts`) and t
 against the real verifier.
 
 - **Format:** a JWT, `alg: HS256`. Any other `alg` is refused.
-- **Key:** `WS_JWT_SECRET`, read by both services from Secrets Manager. Terraform generates it once
-  and writes the same value into the realtime and api app secrets (`infra/terraform/main.tf`).
+- **Key:** `WS_JWT_SECRET`, one value in the `prod` GitHub Environment that the deploy workflow
+  copies to both the realtime and api fly apps (`infra/fly/README.md`).
   Both services refuse to start in production with the development default or a key under 32
   characters.
 - **Why not the API's JWKS:** the API generates its RSA signing keys in memory, per task, so a

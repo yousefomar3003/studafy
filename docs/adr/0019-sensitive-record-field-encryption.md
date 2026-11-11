@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted. Decision 7 (SSE-KMS for sensitive document files) no longer applies: AWS was retired in
+November 2026 and files live on Cloudflare R2, which has no per-object KMS, so
+`STORAGE_SENSITIVE_KMS_KEY_ID` is gone and the bucket's own encryption applies (see
+[`infra/fly/README.md`](../../infra/fly/README.md)). The rest of this ADR stands.
 
 ## Context
 
@@ -114,8 +117,7 @@ The API (reveal, DSR export) needs to decrypt. Retention deletes only rows and n
   against anything that can read rows: the app role, dumps, replicas, restored backups or SQL
   logging.
 - **A third-party envelope library** (Tink, libsodium bindings). Rejected. `node:crypto` AES-GCM is
-  enough for this threat model, and a new native dependency would need a supply-chain review
-  (`docs/runbooks/supply-chain-security.md`).
+  enough for this threat model, and a new native dependency would need a supply-chain review.
 
 ## Consequences
 

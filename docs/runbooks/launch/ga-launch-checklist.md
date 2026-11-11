@@ -16,24 +16,14 @@ ticket is gated on has not itself concluded.** This is not a pessimistic estimat
 rest of this repo already says about itself, collected in one place:
 
 - **The pilot has not run.** [`pilot-school-onboarding.md`](pilot-school-onboarding.md)'s own gate
-  blocks starting until prod is verified live, and [`pilot-completion-report.md`](pilot-completion-report.md)
+  blocks starting until its own gates close, and [`pilot-completion-report.md`](pilot-completion-report.md)
   is a template with no numbers filled in. There is no Go verdict to build a GA launch on.
-- **Prod has never been applied.** `environment-matrix.md`'s honesty note and the ST-266 drill
-  report ([`dr/st-266-game-day-drill-report.md`](../dr/st-266-game-day-drill-report.md)) both say
-  the same thing independently: no AWS account had ever been applied to, from any environment in
-  this repo's history, until **2026-09-11**, when `infra/terraform/bootstrap` was applied for real
-  against account `862910165270` — state buckets for all three environments, the Route53 zone,
-  GitHub OIDC provider, and per-environment `terraform-apply` IAM roles now exist. That first real
-  apply surfaced and fixed a genuine bug (`aws_iam_role_policy_attachment.terraform_power_user`
-  and `aws_iam_role_policy.terraform_iam` used a whole for_each'd resource as their own `for_each`
-  source, which `terraform import` cannot resolve on an empty account — fixed to iterate
-  `local.environments` instead, the same static set the role itself already uses). The **network
-  → data-tier → app-tier** modules any real environment (`dev`/`staging`/`prod`) needs are still
-  unapplied — this is the account-wide plumbing bootstrap requires, not a running environment.
-- **There is no deploy path yet.** [`deploy-rollback.md`](../deploy-rollback.md)'s own Status line:
-  "Not runnable yet" — no ECS cluster, execution role, or ALB target group exists in
-  `infra/terraform`, and the ECR repository policy denies the task execution role. "Launch
-  executed with monitoring watch" has no deploy mechanism to execute yet.
+- **Prod is live, on fly.io, not AWS.** The AWS account bootstrapped on 2026-09-11 never got
+  past its account-wide plumbing and was retired; production runs on fly.io with Supabase, Redis
+  Cloud, R2, Resend, Sentry and Axiom ([`infra/fly/README.md`](../../../infra/fly/README.md)) and
+  is deployed by **Production deploy (fly.io)** (`.github/workflows/fly-production-deploy.yml`).
+  Several items below were scoped against AWS mechanisms (RDS backups, the S3/CloudFront status
+  page, Alertmanager paging) that no longer exist; each says so.
 
 Treat every "Open" row below as exactly that — not a formality left to tidy up before a review,
 but a real artifact (a contract, a report, a named roster, a provisioned account) that does not
@@ -42,11 +32,11 @@ which is worse than leaving the row open.
 
 ## Dependency gate
 
-| Dependency                                             | Status   | Evidence                                                                                                                                                                                                                    |
-| ------------------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pilot school onboarding executed with a **Go** verdict | **Open** | [`pilot-completion-report.md`](pilot-completion-report.md) has no cohort filled in — the pilot has not run against a live prod                                                                                              |
-| Prod environment applied to real AWS and verified      | **Open** | `environment-matrix.md` — `infra/terraform/bootstrap` applied 2026-09-11 (state buckets, DNS zone, OIDC, IAM roles); network/data/app-tier modules for any environment still unapplied                                      |
-| Production secrets and web build variables supplied    | **Open** | [`../production-secrets.md`](../production-secrets.md) — api refuses to boot on prod without `TURNSTILE_SECRET_KEY` (Stripe is optional for a Tap-only, Jordan-first launch); web bundle needs its three `VITE_*` variables |
+| Dependency                                             | Status   | Evidence                                                                                                                                                                                                                 |
+| ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Pilot school onboarding executed with a **Go** verdict | **Open** | [`pilot-completion-report.md`](pilot-completion-report.md) has no cohort filled in — the pilot has not run against a live prod                                                                                           |
+| Prod environment deployed and verified                 | Met      | fly.io production, deployed and smoke-checked by `fly-production-deploy.yml`; first operator created 2026-11-10 (`infra/fly/README.md`)                                                                                  |
+| Production secrets and web build variables supplied    | **Open** | [`../production-secrets.md`](../production-secrets.md), `prod` GitHub Environment (`infra/fly/README.md#secrets`) — the deploy fails by name on a missing required secret; optional ones (OAuth, Stripe) need confirming |
 
 GA does not start from zero once these close — the pilot's own success-criteria queries, feedback
 loop, and incident handling are the same mechanisms this checklist's go/no-go review reuses. A
@@ -55,8 +45,8 @@ on a paused or stopped pilot.
 
 ## Canonical naming
 
-Same conventions as [`launch/README.md`](README.md): `dev | staging | prod` (never "production" or
-"live" as an environment token — "live" below always means "verified running against real
+Same conventions as [`launch/README.md`](README.md): `local | prod` (never "live" as an
+environment token — "live" below always means "verified running against real
 infrastructure", not an environment name), a school by `app.schools.slug`, metric names fixed to
 `staff_activation_rate` / `daily_attendance_usage` / `sev_incident_count` where the pilot's numbers
 feed this review. Checklist item names below (`nfr-verification`, `security-pass`, `pentest`,
@@ -85,22 +75,22 @@ against a real (not local-Docker) environment confirming it, or an explicit acce
   `docs/testing/load-test-scenarios.md` uses proposed defaults pending "the real NFR-01/02
   numbers, to replace this doc's proposed defaults" (its own words) — nobody has supplied them.
 - **The load-test suite that would produce the evidence has never run for real.**
-  `load-test-scenarios.md`: "the suite has never been run against a real Postgres/API stack" — no
-  staging run exists either.
+  `load-test-scenarios.md`: "the suite has never been run against a real Postgres/API stack" — and
+  there is no staging environment to run it against.
 
-**Evidence path once closed:** `docs/testing/load-test-scenarios.md` run output against staging or
-prod, plus a real NFR-01/NFR-02 document replacing the proposed defaults.
+**Evidence path once closed:** `docs/testing/load-test-scenarios.md` run output against prod (or a
+prod-shaped environment stood up for it), plus a real NFR-01/NFR-02 document replacing the proposed defaults.
 
 **Compiled evidence pack (ST-295):**
 [`nfr-verification-evidence-pack.md`](nfr-verification-evidence-pack.md) — the formal verification
-run this item asks for. It found the same thing this section already says (no staging run exists),
+run this item asks for. It found the same thing this section already says (no load run exists),
 plus a finding this section didn't have yet: this repo has no `SAD §5` and only five NFR IDs are
 referenced anywhere in it (NFR-01/02/03/05/11), not fifteen. Verdicts every one of those five, plus
 the security/DR/load-test/accessibility/locale/query-performance evidence this repo has under other
 names, against a gap register with owner and remediation target per gap — nine gaps remain open,
 two were closed while compiling the pack (a missing NFR-11 doc, authored and run; a believed
 CI-wiring gap that further checking showed was never real). Status stays **Open** — closing two
-items doesn't change that NFR-01/02/03 have no real target and no staging exists to measure
+items doesn't change that NFR-01/02/03 have no real target and no load run exists to measure
 against; the pack documents the real state, it does not manufacture GA readiness.
 
 ### 2. Security pass + pen test closure
@@ -116,9 +106,9 @@ been contracted, executed, reported, and every critical/high from it remediated 
 - External pen test: **Open.**
   [`security/st-250-external-pentest-commissioning.md`](../security/st-250-external-pentest-commissioning.md)'s
   own status table: vendor not contracted, engagement not executed, report not received,
-  remediation/retest not started, redacted summary not published. The scope, ROE checklist, and
-  the two pieces of infrastructure it needs (WAF allowlist mechanism, seeded two-tenant staging)
-  are ready — the engagement itself is a procurement action nothing in this repo can complete.
+  remediation/retest not started, redacted summary not published. The scope and ROE checklist are
+  ready; the two pieces of infrastructure it was scoped against (the AWS WAF allowlist and a seeded
+  two-tenant staging) went with AWS and need replacing — and the engagement itself is a procurement action nothing in this repo can complete.
 
 **Evidence path once closed:** signed engagement contract, vendor report, this repo's own
 `st-250-<vendor>-<year>-findings.md` findings-and-fixes log with zero open critical/high, retest
@@ -128,20 +118,20 @@ confirmation per finding, published redacted summary
 ### 3. DR drill report
 
 **Closes when:** a drill has run against real infrastructure and produced a measured RPO/RTO
-against the target (RPO ≤ 5 min / RTO ≤ 4 h per `SAD_30_backup_policy.md`).
+against a target. `SAD_30_backup_policy.md` no longer states one: the AWS-era RPO ≤ 5 min / RTO ≤ 4 h
+targets went with AWS, and RPO/RTO for Supabase, R2 and Redis Cloud is not yet defined.
 
-**Status: Open — mechanism verified, nothing measured.**
+**Status: Open — no DR runbooks for the current stack, nothing measured.**
 
 [`dr/st-266-game-day-drill-report.md`](../dr/st-266-game-day-drill-report.md) states its own result
 up front: "the drill did not run against real infrastructure, and no real RPO/RTO number was
-measured." What is closed: `terraform validate` passes for the whole configuration including
-`module.backup`, every runbook script was read in full and cross-referenced, and ten concrete gaps
-were found and filed as GitHub issues (`dr-gap` label, #278–#287) — gap #1 of those, "no AWS
-account has ever been applied to," blocks every other one.
+measured." It drilled the AWS stack (RDS, AWS Backup), which was retired; the six scenario
+runbooks went with it, and none exist yet for Supabase, Redis Cloud and R2
+([`dr/README.md`](../dr/README.md)). The `dr-gap` issues it filed (#278–#287) describe AWS gaps.
 
-**Evidence path once closed:** a re-run of the same drill against an applied prod (or a prod-shaped
-staging), reporting a real RPO/RTO number, filed as a new dated report next to this one — not an
-edit of `st-266`'s, which stands as the honest record of the first attempt.
+**Evidence path once closed:** DR runbooks written for the fly/Supabase stack, then a drill against
+them reporting a real RPO/RTO number, filed as a new dated report next to `st-266`'s — not an edit
+of it, which stands as the honest record of the first attempt.
 
 ### 4. On-call staffed
 
@@ -152,11 +142,9 @@ on-call provider, the rotation is live, and one full handover has happened witho
 
 [`on-call-rotation.md`](../on-call-rotation.md) specifies the contract (one primary + one
 secondary always staffed, weekly cadence, Sunday 10:00 `Asia/Amman` handover, 15-minute
-critical-page acknowledgment) but the schedule itself "lives in the on-call provider, not in this
-repo" and no names are recorded here by design (`launch/README.md`'s ownership convention). Nobody
-has confirmed the provider-side schedule actually matches this spec, or that a roster of four
-exists at all — that confirmation is exactly what `alert-catalog.md`'s "noisy alert review" agenda
-item calls for when the two drift.
+critical-page acknowledgment), but no on-call provider or paging path exists since the AWS
+Alertmanager pipeline was retired, and no names are recorded here by design (`launch/README.md`'s
+ownership convention). Nobody has confirmed that a roster of four exists at all.
 
 **Evidence path once closed:** a dated confirmation (screenshot or export from the on-call
 provider, not asserted from memory) that the roster and schedule match `on-call-rotation.md`, plus
@@ -164,22 +152,16 @@ one completed handover.
 
 ### 5. Status page live
 
-**Closes when:** `status_page_enabled = true` has been applied to prod, the public URL resolves,
-`status-page-sync` is confirmed reflecting real synthetic-probe state, and (if subscriber email is
-wanted) SES is provisioned.
+**Closes when:** a public status page is live at a URL schools can find, and the incident
+templates ([`incident-comms-templates.md`](../incident-comms-templates.md)) are posted there.
 
-**Status: Open — built, not applied anywhere.**
+**Status: Open — no status page exists.**
 
-The mechanism is real and complete: self-hosted S3 + CloudFront, four Lambdas
-(`infra/terraform/modules/monitoring/status_page.tf`), `status-page-sync` polling every minute,
-manual incident posting via `status-page-incident`, subscriber double opt-in
-(`docs/runbooks/incident-comms-templates.md` documents the human half). None of it is running —
-same "written, not applied" state as every other piece of `infra/terraform` per
-`environment-matrix.md`. It also has no custom domain wired (served on CloudFront's own hostname)
-and SES-backed subscriber email is conditional on `ses_domain_identity_arn`, unset today.
+The self-hosted page built for this item (S3 + CloudFront, Lambdas, SES subscriber email) was AWS
+infrastructure that was never applied and has been retired. Nothing replaces it yet.
 
-**Evidence path once closed:** `terraform output status_page_url` printing a real URL that
-resolves, `status-page-sync`'s CloudWatch logs showing real alarm reads on the applied environment.
+**Evidence path once closed:** the status page's public URL resolving, and a test incident posted
+and resolved on it.
 
 ### 6. Store apps approved
 
@@ -230,9 +212,8 @@ GitHub-issue loop, which does not scale to every school and was never meant to.
 **Status: Open — workflow now documented, intake channel not yet live.**
 
 [`support/README.md`](../support/README.md) now defines the intake channels
-(`support@send.studafy.com`, the same verified SES domain the status page already uses, plus the
-in-app help center linking out to it — a dedicated help widget is deliberately deferred, see that
-file's "Help widget" section), the severity/SLA table (reusing `alert-catalog.md`'s
+(a support mailbox, address not yet chosen, plus the in-app help center linking out to it — a dedicated help widget is deliberately deferred, see that
+file's "Help widget" section), the severity/SLA table (reusing `on-call-rotation.md`'s
 `critical`/`warning`/`info` vocabulary, not a second scale), the triage disposition loop
 (generalizing the pilot's own `backlog`/`sev`/`wontfix`/`training` dispositions), a macro library
 covering the top 7 predicted issues ([`support/macro-library.md`](../support/macro-library.md)),
@@ -274,23 +255,24 @@ against a calendar date, against evidence existing.
 ## Launch execution with monitoring watch
 
 Only after a **Go** verdict. This section is the sequence for the day of, not a description of
-mechanisms already documented elsewhere — those are: [`deploy-rollback.md`](../deploy-rollback.md)
-(deploy + the two rollback mechanisms), [`incident-comms-templates.md`](../incident-comms-templates.md)
-(status page posting), [`alert-catalog.md`](../alert-catalog.md) (what a person watches).
+mechanisms already documented elsewhere — those are: [`infra/fly/README.md`](../../../infra/fly/README.md#deploying)
+(the deploy; no rollback procedure is defined for fly yet), [`incident-comms-templates.md`](../incident-comms-templates.md)
+(incident updates), and Sentry (org `studafy-limited`) plus Axiom (dataset `studafy-logs`) for what
+a person watches — there is no alert catalog or dashboard set on fly yet.
 
-1. **T-1 day**: on-call primary/secondary for the launch window confirmed and reachable; status
-   page incident drafted (not posted) using the "Planned maintenance" template so it's one click
+1. **T-1 day**: on-call primary/secondary for the launch window confirmed and reachable; an
+   incident update drafted (not posted) using the "Scheduled maintenance" template so it's one click
    away if launch needs to be visible.
-2. **T-0**: deploy per `deploy-rollback.md`'s sequence, one service at a time
-   (`api` → `realtime` → `workers`), `aws ecs wait services-stable` confirmed for each before the
-   next — never all three in parallel on a first GA cutover.
+2. **T-0**: run **Production deploy (fly.io)**. It already deploys one service at a time (scanner,
+   migrations, then `api` → `realtime` → `workers` → `web`) and ends with a smoke check of the api
+   and web `/healthz`.
 3. **Watch window**: minimum 2 hours of active watch (not "alerts will page if something's wrong")
-   against the SLO panels `alert-catalog.md`'s API SLOs section defines
-   (`ApiAvailabilityFastBurn`/`SlowBurn`, `ApiLatencyFastBurn`/`SlowBurn`), the status page's own
-   badges, and the queue-depth alarms if any async workers shipped in the same change.
+   against Sentry's error stream and the API's request logs in Axiom (error rate and latency), plus
+   the workers' logs if any async workers shipped in the same change.
 4. **Any SEV during the watch window**: same incident path as the pilot's
    ([`pilot-school-onboarding.md`](pilot-school-onboarding.md#incident-exit)) — leave this runbook,
-   run `deploy-rollback.md` or the relevant `dr/` runbook, post to the status page, record it.
+   ship a fix through the deploy workflow or follow [`dr/README.md`](../dr/README.md), post an
+   incident update, record it.
 5. **Exit**: watch window elapsed clean, or an incident reached a stable resolved state with a
    follow-up ticket filed. Either way, a closing note goes in the sign-off block below — GA is
    "launched," not "launched and forgotten."
@@ -317,7 +299,7 @@ start/end, incidents (none / list with follow-up links).
 
 Item 8 (support workflow) is now documented (`support/README.md`) — pure writing, no external
 account needed, so it moved first. The remaining seven items each need something this repo cannot
-produce on its own: an applied AWS account, a contracted pentest vendor, live App Store/Play
+produce on its own: DR runbooks and a status page for the fly stack, a contracted pentest vendor, live App Store/Play
 accounts, a live Stripe account, and a confirmed on-call roster. Closing any of them is a
 real-world action outside this codebase, evidenced back into this checklist once it happens — not
 a documentation task.

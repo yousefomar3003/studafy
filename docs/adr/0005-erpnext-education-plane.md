@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Superseded — AWS was retired in November 2026; production runs on fly.io (see
+[`infra/fly/README.md`](../../infra/fly/README.md)), which has no ERPNext plane. The ECS/RDS plane
+this ADR describes and `infra/deploy` were removed; the seed and provisioning scripts live on in
+`infra/erpnext/seed`. Originally: Accepted.
 
 ## Context
 

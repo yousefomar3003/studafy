@@ -27,10 +27,10 @@ CREATE POLICY <table>_tenant_policy ON app.<table>
 ```
 
 `FORCE ROW LEVEL SECURITY` is what makes this complete: it subjects _even the table owner_
-(`studafy_admin`, the connection behind PgBouncer) to the policy — a bare `SELECT * FROM
+(`studafy_admin`) to the policy — a bare `SELECT * FROM
 app.outbox_events` without `SET LOCAL app.school_id` returns zero rows, not every school's events.
 The GUC is set per-transaction (`SET LOCAL app.school_id = '<uuid>'`), not per-session, which
-makes PgBouncer transaction pooling safe (no session state leaks across pooled connections).
+makes transaction pooling (Supabase's transaction pooler in production) safe (no session state leaks across pooled connections).
 
 **The five known failure shapes that break this:**
 
@@ -46,10 +46,10 @@ makes PgBouncer transaction pooling safe (no session state leaks across pooled c
    by `SQLSTATE 42501` (the trigger on every table that forbids ownership transfer). An attacker
    trying to move a row from school A to school B gets a clean, expected rejection — but the probe
    tests this as a positive "the trigger works," not as an incident.
-5. **PgBouncer session leak** — a GUC set in one transaction persists into the next transaction on
+5. **Pooler session leak** — a GUC set in one transaction persists into the next transaction on
    the same pooled connection. The `poolIsolation` probe tests against this with 32 concurrent
-   transactions (see `CONCURRENCY` constant); PgBouncer's `server_reset_query_always = 1` clears
-   session state on release.
+   transactions (see `CONCURRENCY` constant); `SET LOCAL` scoping is what prevents it, since the
+   production pooler (Supabase's, in transaction mode) is not configured from this repository.
 
 ## Detection
 
@@ -99,7 +99,7 @@ Standard DR roles from `docs/runbooks/dr/README.md`:
 
 ```bash
 # 1a. Audit the current RLS state for every app.* table
-# (from the bastion, as studafy_admin, per postgres-conventions.md):
+# (Supabase SQL editor, or a direct connection to db.<project ref>.supabase.co:5432):
 SELECT schemaname, tablename, policyname, cmd, qual, with_check
 FROM pg_policies WHERE schemaname = 'app'
 ORDER BY tablename, policyname;
@@ -120,9 +120,14 @@ the source of truth for which table _should_ have RLS. Compare its expected set 
 is the smoking gun, not an indicator.
 
 **2. Contain.** If the breach is a _write_, lock the database to inbound writes from the
-application while the forensic investigation runs. Do **not** reboot the instances or restart
-PgBouncer — that destroys connection state and the evidence of which pool connection handled the
+application while the forensic investigation runs. Do **not** restart the fly machines or the
+database — that destroys connection state and the evidence of which pool connection handled the
 offending transaction:
+
+Production's services log in as Supabase's `postgres` user, not `studafy_admin`
+([`infra/fly/README.md`](../../infra/fly/README.md#database-connections),
+[S-01](../security/S-01-database-role-verification.md)), so revoke from the role the services
+actually use:
 
 ```sql
 -- Option A (least destructive): revoke write access for the application role
@@ -159,12 +164,12 @@ returns empty) is the GUC-leak smoking gun.
 
 **4. Fix the root cause.**
 
-| Root cause                                | Fix                                                                                                                                                                                  |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| RLS policy missing/dropped                | `CREATE POLICY` re-adding it (same statement as the migration), then re-run the `test:security` probe locally to confirm.                                                            |
-| Wrong `school_id` GUC in application code | Identify the code path, fix, deploy via `deploy-rollback.md`.                                                                                                                        |
-| PgBouncer session leak                    | Verify `server_reset_query_always = 1` on the PgBouncer config; if present, this is an application-layer leak, not a PgBouncer one — look for a connection held across transactions. |
-| Manual DDL bypassed the repo              | Revoke the manual DDL permission (`REVOKE CREATE ON SCHEMA app FROM studafy_admin`), then add the missing policy via a new migration.                                                |
+| Root cause                                | Fix                                                                                                                                                                               |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RLS policy missing/dropped                | `CREATE POLICY` re-adding it (same statement as the migration), then re-run the `test:security` probe locally to confirm.                                                         |
+| Wrong `school_id` GUC in application code | Identify the code path, fix, release with the production deploy workflow ([`infra/fly/README.md`](../../infra/fly/README.md#deploying)).                                          |
+| Pooler session leak                       | Look for a GUC set with `SET` instead of `SET LOCAL`, or a connection held across transactions — the production pooler is managed by Supabase, so the leak is in the application. |
+| Manual DDL bypassed the repo              | Revoke the manual DDL permission (`REVOKE CREATE ON SCHEMA app FROM studafy_admin`), then add the missing policy via a new migration.                                             |
 
 **5. Verify isolation is restored.**
 
@@ -172,8 +177,8 @@ Run the NFR-05 cross-tenant security probe against the _production_ database (it
 from the environment, so it can be pointed at any Postgres instance):
 
 ```bash
-# From the bastion, or via a one-off ECS task pointed at prod:
-TEST_DATABASE_URL="postgresql://studafy_test:<password>@<pgbouncer-host>:<port>/studafy_prod?sslmode=require" \
+# From a workstation allowed to reach the production database (Supabase's pooler):
+TEST_DATABASE_URL="postgresql://studafy_test:<password>@<pooler-host>:<port>/<database>?sslmode=require" \
 DATABASE_SSL_MODE=require \
 bun run test:security --cwd apps/api
 ```
@@ -186,8 +191,8 @@ here after a fix means the fix didn't land.
 slice from school A's context is already committed — RLS is enforced on access, not logged as a
 prevention event. Two options, neither clean:
 
-- **Point-in-time recovery to before the bad write** — same mechanism as
-  `docs/runbooks/dr/postgres-instance-loss.md`, but scoped to one school. This rolls back _every_
+- **Point-in-time recovery to before the bad write** — a whole-database restore (no restore
+  procedure is defined for Supabase yet; see [`dr/README.md`](dr/README.md)). This rolls back _every_
   school's writes after that timestamp, not just the offending one — an unacceptable trade-off
   unless the window is very short. Document the RTO.
 - **Targeted deletion** — if the offending rows are known and identifiable (from the audit log),
@@ -217,11 +222,10 @@ just a missing policy.
 ## Known gaps
 
 - **No runtime detection.** The `test:security` suite is a CI gate; there is no real-time
-  "cross-tenant access attempted" CloudWatch metric or alarm. A runtime probe (a synthetic
+  "cross-tenant access attempted" metric or alert. A runtime probe (a synthetic
   cross-tenant query on a schedule, or an audit of `app.audit_logs` for school_id mismatches) is
   future work. This is the honest reason the detection section above starts with "user report."
-- **No write-scoped recovery tool.** `postgres-instance-loss.md`'s PITR restore recovers the
-  whole instance; a school-scoped undo of cross-tenant writes is a manual SQL exercise, not a
+- **No write-scoped recovery tool.** A point-in-time restore recovers the whole database; a school-scoped undo of cross-tenant writes is a manual SQL exercise, not a
   runbook-automated one. A targeted "undo school X's writes in window Y" tool is future work.
 - **The `poolIsolation` probe's concurrency constant is tuned to the local test harness.**
   `CONCURRENCY = 32` and `POOL_SIZE = 4` match the CI runner's pool config; a production pool

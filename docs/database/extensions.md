@@ -25,14 +25,14 @@ for the domain design; this document covers only the extension itself (see
 | pg_stat_statements | `pg_stat_statements` | Aggregated query-execution telemetry for performance observability.                                                            | **Yes**          |
 | btree_gist         | `btree_gist`         | GiST operator support for scalar equality (uuid, smallint), required to declare `EXCLUDE USING gist` on `app.timetable_slots`. | No               |
 
-- **Supported PostgreSQL version:** 16. `family = "postgres16"` in the RDS parameter group; local/CI
-  use `pgvector/pgvector:pg16`.
+- **Supported PostgreSQL version:** 16 or later. Local/CI use `pgvector/pgvector:pg16`; production
+  runs whatever version the Supabase project runs (read it with `SHOW server_version`).
 - **The pgvector extension name is `vector`, not `pgvector`.** The migration uses
   `CREATE EXTENSION IF NOT EXISTS vector;`.
 - **Recorded versions:** run `SELECT extname, extversion FROM pg_extension ORDER BY extname;` in each
   environment and record the result there. Versions come from the running server / image and are not
   pinned by this repository; they may differ between the local `pgvector/pgvector:pg16` image and
-  RDS's allowlisted builds. Do not assume a version — read it from `pg_extension`.
+  Supabase's builds. Do not assume a version — read it from `pg_extension`.
 
 ### pgcrypto — approved use cases
 
@@ -63,9 +63,10 @@ for the domain design; this document covers only the extension itself (see
 
 ## Ownership model
 
-Installing any of these extensions requires superuser (`rds_superuser` on RDS). They are therefore
-owned by the **migration-runner identity** — the login that runs migrations (local/CI: the
-`studafy_test` superuser; RDS: the master user). The migration deliberately does **not**
+Installing any of these extensions requires an administrative login (superuser locally; Supabase's
+`postgres` role, which is not a superuser, in production). They are therefore owned by the
+**migration-runner identity** — the login that runs migrations (local/CI: the `studafy_test`
+superuser; production: Supabase's `postgres`). The migration deliberately does **not**
 `SET ROLE studafy_admin`: `studafy_admin` is `NOSUPERUSER` and cannot create extensions, and
 extension installation must stay an administrative operation.
 
@@ -93,11 +94,9 @@ grant from this migration:
 `CREATE EXTENSION pg_stat_statements` succeeding does **not** mean it is collecting statistics. The
 module must be loaded through `shared_preload_libraries`, which is a **static** server parameter:
 
-- **RDS / managed:** set in the parameter group. This repo sets
-  `shared_preload_libraries = 'pg_stat_statements'` (`apply_method = pending-reboot`) in
-  [`infra/terraform/modules/postgres/main.tf`](../../infra/terraform/modules/postgres/main.tf).
-  Because it is static, it applies on the instance's first boot; **changing it on a running instance
-  requires a reboot.** No reboot ⇒ the extension exists but the views raise on read.
+- **Production (Supabase):** controlled by Supabase, not by this repo. Supabase installs
+  `pg_stat_statements` itself, in its own `extensions` schema, so the `public.pg_stat_statements`
+  grants below do not apply there (see "Production on Supabase" below).
 - **Local / CI:** `compose.yml` (test profile) starts Postgres with
   `-c shared_preload_libraries=pg_stat_statements`, so operationality is genuinely exercised.
 
@@ -116,8 +115,8 @@ GRANT  SELECT ON public.pg_stat_statements TO studafy_monitor;
 GRANT  pg_read_all_stats TO studafy_monitor;
 ```
 
-- **`studafy_monitor`** is a `NOLOGIN` privilege/group role (same pattern as ST-031's roles): the
-  login identity is provisioned externally in Secrets Manager and granted membership; no password is
+- **`studafy_monitor`** is a `NOLOGIN` privilege/group role (same pattern as ST-031's roles): a
+  login identity is provisioned outside the repository and granted membership; no password is
   written in SQL. It carries the same safe attribute baseline
   (`NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOLOGIN`) and receives only
   `CONNECT` on the database plus the grants above.
@@ -138,8 +137,7 @@ using bind parameters — personal data). Treat it as sensitive:
 - Never expose `pg_stat_statements` rows or query text through an application API.
 - Only `studafy_monitor` (and superusers) may read it. Non-privileged roles that could otherwise see
   the view get `<insufficient privilege>` for other users' text; here they get no access at all.
-- Monitoring credentials live in Secrets Manager and must never reach application runtime
-  configuration.
+- Monitoring credentials must never reach application runtime configuration.
 
 ### Reset and retention behavior
 
@@ -150,25 +148,25 @@ audit log; export to a metrics pipeline if history is needed.
 
 ## Environment coverage
 
-The migration is identical across dev, staging, and production. Only these differ per environment and
+The migration is identical locally, in CI, and in production. Only these differ per environment and
 must be verified/documented:
 
-| Aspect                           | Where it is controlled                                       |
-| -------------------------------- | ------------------------------------------------------------ |
-| PostgreSQL major version (16)    | RDS `engine_version` / local image                           |
-| Extension availability + version | Provider allowlist / image; read from `pg_extension`         |
-| `pg_stat_statements` preload     | Parameter group (RDS) / compose command (local, CI)          |
-| Reboot to apply preload          | Operator-scheduled on RDS                                    |
-| Permission to install            | `rds_superuser` (RDS) / superuser (local, CI)                |
-| Credentials / connection         | Secrets Manager (deployed) / `TEST_DATABASE_URL` (local, CI) |
+| Aspect                           | Where it is controlled                                                       |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| PostgreSQL major version         | Supabase project (production) / local image                                  |
+| Extension availability + version | Provider / image; read from `pg_extension`                                   |
+| `pg_stat_statements` preload     | Supabase (production) / compose command (local, CI)                          |
+| Permission to install            | Supabase's `postgres` role, not a superuser (production) / superuser (local) |
+| Credentials / connection         | `prod` GitHub Environment secrets / `TEST_DATABASE_URL` (local, CI)          |
 
-**Managed-provider note (AWS RDS):** `vector`, `pgcrypto`, and `pg_trgm` are on the RDS Postgres 16
-extension allowlist and need no parameter-group change. Only `pg_stat_statements` needs the preload
-parameter (and a reboot to apply it on a running instance).
+**Production on Supabase:** Supabase keeps `pg_stat_statements` in its own `extensions` schema and
+keeps the admin option on `pg_read_all_stats`, so migration 000003's three `studafy_monitor` grants
+cannot run there. Production applied 000003 without those three statements; the app does not use
+`studafy_monitor` (`infra/fly/README.md`, "Where Supabase differs from RDS").
 
 ## Environment verification procedure
 
-Run against each accessible environment (never destructively against shared staging/production):
+Run against each accessible environment (never destructively against production):
 
 ```sql
 -- 1. All four present, with versions.
@@ -210,13 +208,13 @@ statistics.
 
 ## Failure modes
 
-| Symptom                                                          | Cause / action                                                                                     |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `CREATE EXTENSION vector` fails: extension not available         | Image/provider lacks pgvector. Use `pgvector/pgvector:pg16`; confirm the RDS allowlist.            |
-| Migration warns "not in shared_preload_libraries"                | Preload not configured. Set the parameter group and reboot (RDS); the other extensions still work. |
-| `SELECT ... FROM pg_stat_statements` raises "must be loaded ..." | Same as above — not operational until preloaded and restarted.                                     |
-| `permission denied for view pg_stat_statements` as the app role  | Expected: only `studafy_monitor` may read it.                                                      |
-| `studafy_app` blocked from `CREATE/ALTER/DROP EXTENSION`         | Expected: extension management is administrative.                                                  |
+| Symptom                                                          | Cause / action                                                                                |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `CREATE EXTENSION vector` fails: extension not available         | Image/provider lacks pgvector. Use `pgvector/pgvector:pg16`; confirm the provider offers it.  |
+| Migration warns "not in shared_preload_libraries"                | Preload not configured (provider setting / compose command); the other extensions still work. |
+| `SELECT ... FROM pg_stat_statements` raises "must be loaded ..." | Same as above — not operational until preloaded and restarted.                                |
+| `permission denied for view pg_stat_statements` as the app role  | Expected: only `studafy_monitor` may read it.                                                 |
+| `studafy_app` blocked from `CREATE/ALTER/DROP EXTENSION`         | Expected: extension management is administrative.                                             |
 
 ## Upgrade policy
 
@@ -310,7 +308,7 @@ data. Never claim a performance gain without evidence.
 
 ## What remains infrastructure-controlled
 
-- `shared_preload_libraries` and any reboot to apply it (parameter group / provider).
+- `shared_preload_libraries` and any restart to apply it (Supabase in production).
 - Provider extension allowlist and the concrete extension versions available.
 - The external login roles that receive membership in `studafy_app` / `studafy_monitor` /
-  `studafy_admin`, and their credentials in Secrets Manager.
+  `studafy_admin`, and their credentials (outside the repository).

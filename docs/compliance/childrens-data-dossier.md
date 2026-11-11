@@ -33,26 +33,33 @@ and never asks for it.
 
 ## Roles
 
-| Party                                                                | Role                                                        | Basis in the code                                                                                                       |
-| -------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| The school                                                           | Controller                                                  | `apps/api/src/modules/account/retention-policy.ts` states retention as "a legal obligation of the school as controller" |
-| Studafy                                                              | Processor                                                   | Processes student data only for the school's account                                                                    |
-| AWS (`eu-central-1`, Frankfurt; `infra/terraform/environments/prod`) | Sub-processor: hosting, database, file storage, email (SES) |                                                                                                                         |
-| Google Firebase                                                      | Sub-processor: push notifications, crash reports            | `sdk_compliance_inventory.md`                                                                                           |
-| Sentry                                                               | Sub-processor: crash and performance reports                | `sdk_compliance_inventory.md`                                                                                           |
-| Together AI                                                          | Sub-processor: AI study tools, called by the API only       | `apps/mobile/docs/ai_data_sharing_consent.md`                                                                           |
-| Stripe, Tap                                                          | Payment processors for parent payments, on their own pages  | `docs/store_payment_routing.md`                                                                                         |
-| Cloudflare Turnstile                                                 | Captcha on the public deletion page                         | `docs/modules/account-deletion.md`                                                                                      |
+| Party                                   | Role                                                                | Basis in the code                                                                                                       |
+| --------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| The school                              | Controller                                                          | `apps/api/src/modules/account/retention-policy.ts` states retention as "a legal obligation of the school as controller" |
+| Studafy                                 | Processor                                                           | Processes student data only for the school's account                                                                    |
+| fly.io (`fra`, Frankfurt)               | Sub-processor: hosting (API, workers, realtime, web, virus scanner) | `infra/fly/README.md`                                                                                                   |
+| Supabase (`eu-central-1`, Frankfurt)    | Sub-processor: database (Postgres)                                  | `infra/fly/README.md`                                                                                                   |
+| Redis Cloud (`eu-central-1`, Frankfurt) | Sub-processor: cache, queues, sessions                              | `infra/fly/README.md`                                                                                                   |
+| Cloudflare R2                           | Sub-processor: file storage (bucket `studafy-prod-files`)           | `infra/fly/README.md`                                                                                                   |
+| Resend                                  | Sub-processor: transactional email                                  | `infra/fly/README.md`                                                                                                   |
+| Axiom (EU)                              | Sub-processor: service logs                                         | `infra/fly/log-shipper.toml`                                                                                            |
+| Google Firebase                         | Sub-processor: push notifications, crash reports                    | `sdk_compliance_inventory.md`                                                                                           |
+| Sentry                                  | Sub-processor: crash and performance reports                        | `sdk_compliance_inventory.md`                                                                                           |
+| Together AI                             | Sub-processor: AI study tools, called by the API only               | `apps/mobile/docs/ai_data_sharing_consent.md`                                                                           |
+| Stripe, Tap                             | Payment processors for parent payments, on their own pages          | `docs/store_payment_routing.md`                                                                                         |
+| Cloudflare Turnstile                    | Captcha on the public deletion page                                 | `docs/modules/account-deletion.md`                                                                                      |
 
-ERPNext runs on Studafy's own infrastructure (`infra/terraform/modules/erpnext`). It holds invoices
-that identify a student by admission number. It is not a separate sub-processor.
+ERPNext is not part of the fly.io production stack today (the AWS-era deployment was removed). Where
+it runs, it is Studafy's own installation, not a separate sub-processor; it holds invoices that
+identify a student by admission number.
 
 ## Lawful basis
 
 **Studafy operates in Jordan only.** The business confirmed this on 2026-10-02. Store distribution
 is limited to Jordan to match
 ([store answers](store-audience-and-age-ratings.md#countries-and-regions)). Production data is
-hosted outside Jordan, in AWS `eu-central-1` (Frankfurt). Firebase, Sentry and Together AI process
+hosted outside Jordan, in Frankfurt (fly.io `fra`, Supabase and Redis Cloud `eu-central-1`); files
+are on Cloudflare R2 and service logs in Axiom's EU region. Firebase, Sentry and Together AI process
 data in the United States.
 
 **Jordan: Personal Data Protection Law No. 24 of 2023.** Engineering's working position, which

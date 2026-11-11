@@ -63,14 +63,14 @@ time).
 
 ## Values
 
-| Where                                               | Value                         | dev / staging / prod                                                         |
-| --------------------------------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `infra/deploy/environments/<tier>.env`              | `AI_STORE_PRODUCT_ID`         | `studafy_ai_monthly` (same id in both stores)                                |
-|                                                     | `APPLE_IAP_BUNDLE_ID`         | `com.studafy.studafyMobile.dev` / `.staging` / `com.studafy.studafyMobile`   |
-|                                                     | `APPLE_IAP_APP_APPLE_ID`      | App Store Connect → the app → App Information → **Apple ID** (a number)      |
-|                                                     | `GOOGLE_PLAY_PACKAGE_NAME`    | `com.studafy.studafy_mobile.dev` / `.staging` / `com.studafy.studafy_mobile` |
-| api app secret (`TF_VAR_secrets_app_secret_values`) | `GOOGLE_PLAY_SERVICE_ACCOUNT` | the service account's JSON key, on one line (also in the workers app secret) |
-|                                                     | `GOOGLE_PLAY_RTDN_TOKEN`      | `openssl rand -hex 32`                                                       |
+| Where                            | Value                         | dev / staging / prod                                                         |
+| -------------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
+| `infra/fly/api.toml` `[env]`     | `AI_STORE_PRODUCT_ID`         | `studafy_ai_monthly` (same id in both stores)                                |
+|                                  | `APPLE_IAP_BUNDLE_ID`         | `com.studafy.studafyMobile.dev` / `.staging` / `com.studafy.studafyMobile`   |
+|                                  | `APPLE_IAP_APP_APPLE_ID`      | App Store Connect → the app → App Information → **Apple ID** (a number)      |
+|                                  | `GOOGLE_PLAY_PACKAGE_NAME`    | `com.studafy.studafy_mobile.dev` / `.staging` / `com.studafy.studafy_mobile` |
+| `prod` GitHub Environment secret | `GOOGLE_PLAY_SERVICE_ACCOUNT` | the service account's JSON key, on one line (copied to api and workers)      |
+|                                  | `GOOGLE_PLAY_RTDN_TOKEN`      | `openssl rand -hex 32`                                                       |
 
 Each store is off while its values are empty; the api refuses to boot with a half-configured store
 (`apps/api/src/env.ts`). Locally, put the same names in `.env`.
@@ -87,11 +87,12 @@ Each store is off while its values are empty; the api refuses to boot with a hal
    student keeps AI while Apple retries the card; the API keeps the add-on `past_due` meanwhile.
 4. **Server notifications.** The app → App Information → App Store Server Notifications →
    **Version 2**, Production URL `https://api.studafy.com/api/subscriptions/webhook/apple`, Sandbox
-   URL the staging API's same path. Use "Request a Test Notification" — the API answers 200
+   URL: there is no staging API any more, so no sandbox URL is defined. Use "Request a Test Notification" — the API answers 200
    (`ignored`).
 5. **Sandbox testers.** Users and Access → Sandbox → Test Accounts. Sign in with one on a device
    under Settings → App Store → Sandbox Account.
-6. Put the bundle id and the Apple ID number into the tier's `.env` file and deploy.
+6. Put the bundle id and the Apple ID number into `infra/fly/api.toml` (production) or `.env`
+   (local) and deploy.
 
 The API accepts sandbox purchases on every tier on purpose — App Review buys with a sandbox account
 against the production server. Every billing event records the environment, so a sandbox purchase is
@@ -125,8 +126,8 @@ never counted as revenue (`payload->>'environment'`).
       AI until the subscription next renews or expires.
 5. **License testers.** Play Console → Settings → License testing → add the testers' Google
    accounts. Their purchases are free test purchases that renew every few minutes.
-6. Put the package name into the tier's `.env` file, the two secrets into the api app secret, and
-   deploy.
+6. Put the package name into `infra/fly/api.toml` (production) or `.env` (local), the two secrets
+   into the `prod` GitHub Environment, and deploy.
 
 ## Checking it works
 

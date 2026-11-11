@@ -2,14 +2,14 @@
 
 Sentry error monitoring for the web app. The moving parts:
 
-| Layer                 | File(s)                                                                          | Responsibility                                                                                         |
-| --------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Config                | `src/lib/monitoring/config.ts`                                                   | Env-derived DSN, environment, and release version                                                      |
-| Vendor seam           | `src/lib/monitoring/sentry.ts`                                                   | `initMonitoring`, `captureException`, `setMonitoringUser` — the only file that imports `@sentry/react` |
-| PII scrubbing         | `src/lib/monitoring/scrub-pii.ts`                                                | `beforeSend`/`beforeBreadcrumb` redaction, verified by `scrub-pii.test.ts`                             |
-| User context          | `src/lib/monitoring/use-sync-monitoring-user.ts`                                 | Keeps the Sentry user (id only) aligned with the session                                               |
-| Catch points          | `src/components/ErrorBoundary.tsx`, `src/components/RouteError.tsx`              | Where a thrown error actually reaches `captureException`                                               |
-| Release + source maps | `vite.config.ts`, `infra/docker/web.Dockerfile`, `.github/workflows/release.yml` | Tags the build with the release version and uploads source maps                                        |
+| Layer                 | File(s)                                                                                        | Responsibility                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Config                | `src/lib/monitoring/config.ts`                                                                 | Env-derived DSN, environment, and release version                                                      |
+| Vendor seam           | `src/lib/monitoring/sentry.ts`                                                                 | `initMonitoring`, `captureException`, `setMonitoringUser` — the only file that imports `@sentry/react` |
+| PII scrubbing         | `src/lib/monitoring/scrub-pii.ts`                                                              | `beforeSend`/`beforeBreadcrumb` redaction, verified by `scrub-pii.test.ts`                             |
+| User context          | `src/lib/monitoring/use-sync-monitoring-user.ts`                                               | Keeps the Sentry user (id only) aligned with the session                                               |
+| Catch points          | `src/components/ErrorBoundary.tsx`, `src/components/RouteError.tsx`                            | Where a thrown error actually reaches `captureException`                                               |
+| Release + source maps | `vite.config.ts`, `infra/docker/web.Dockerfile`, `.github/workflows/fly-production-deploy.yml` | Tags the build with the release version and uploads source maps                                        |
 
 ## No vendor lock-in beyond the seam
 
@@ -20,17 +20,17 @@ validation build. The app behaves identically with or without a Sentry project c
 
 ## Env vars
 
-| Var                             | Set where                                                                       | Notes                                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `VITE_SENTRY_DSN`               | `--build-arg` in `release.yml`, from the `VITE_SENTRY_DSN` environment variable | Public DSN, baked in at build time. Unset disables monitoring.                                   |
-| `VITE_SENTRY_ENVIRONMENT`       | Same                                                                            | Falls back to the Vite build mode.                                                               |
-| `VITE_RELEASE_VERSION`          | Same, value is the release's immutable image tag (the git commit SHA)           | Falls back to `"unknown"`. Mirrors the API's own `RELEASE_VERSION` (`apps/api/src/env.ts`).      |
-| `SENTRY_ORG` / `SENTRY_PROJECT` | `--build-arg` in `release.yml`                                                  | Which Sentry project source maps upload to.                                                      |
-| `SENTRY_AUTH_TOKEN`             | BuildKit `--secret` in `release.yml`, scoped to the `vite build` step only      | Never becomes an image layer or `ARG`; absent entirely in the `containers.yml` validation build. |
+| Var                             | Set where                                                                                                             | Notes                                                                                            |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `VITE_SENTRY_DSN`               | `--build-arg` in `fly-production-deploy.yml`, from the `prod` environment's `VITE_SENTRY_DSN` variable                | Public DSN, baked in at build time. Unset disables monitoring.                                   |
+| `VITE_SENTRY_ENVIRONMENT`       | `[build.args]` in `infra/fly/web.toml` (`production`)                                                                 | Falls back to the Vite build mode.                                                               |
+| `VITE_RELEASE_VERSION`          | `--build-arg` in `fly-production-deploy.yml`, value is the deployed git commit SHA                                    | Falls back to `"unknown"`. Mirrors the API's own `RELEASE_VERSION` (`apps/api/src/env.ts`).      |
+| `SENTRY_ORG` / `SENTRY_PROJECT` | `--build-arg` in `fly-production-deploy.yml`, from the `prod` environment's variables                                 | Which Sentry project source maps upload to.                                                      |
+| `SENTRY_AUTH_TOKEN`             | `--build-secret` in `fly-production-deploy.yml` (the `prod` secret, when set), mounted for the `vite build` step only | Never becomes an image layer or `ARG`; absent entirely in the `containers.yml` validation build. |
 
 ## Release tagging and source maps
 
-A release build (`release.yml`) bakes the deploy's own immutable image tag into
+A production deploy (`fly-production-deploy.yml`) bakes the deployed commit SHA into
 `VITE_RELEASE_VERSION`, and `vite.config.ts`'s `sentryVitePlugin` uploads that same value to Sentry
 as the release name — so a captured error's release always correlates to the deploy that shipped it.
 Source maps are only ever generated for that authenticated upload (`build.sourcemap: "hidden"`, only

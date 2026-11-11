@@ -1,5 +1,12 @@
 # NFR verification and evidence pack (ST-295)
 
+> **Compiled against the AWS-era repo.** Rows that cite `infra/terraform` (the CloudWatch SLO
+> dashboard and synthetics, RDS PITR, the WAF allowlist, the unapplied staging/prod modules) describe
+> infrastructure that was retired in November 2026 and removed from the repository. Production now
+> runs on fly.io ([`infra/fly/README.md`](../../../infra/fly/README.md)) and there is no staging
+> environment; gap #4 below is superseded by that, while the measurement gaps (no load run, no
+> measured SLO or RPO/RTO) still stand. The rest is kept as the record of what was found.
+
 Compiles this repo's actual NFR-relevant evidence — load-test results, chaos/game-day drill
 outcomes, SLO history, security evidence — into one pack for the GA go/no-go review
 ([`ga-launch-checklist.md`](ga-launch-checklist.md), item 1). Read

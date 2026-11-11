@@ -110,7 +110,7 @@ scripts/check_coverage.dart` (the actual gate) → uploaded as the `mobile-cover
 
 - **Secrets + dependency CVEs (`security-scan`):** one `aquasecurity/trivy-action` filesystem scan,
   `scanners: secret,vuln`, pinned to the same `trivy-action@v0.36.0` / trivy `v0.72.0` that
-  `containers.yml` and `terraform.yml` already use — `.trivyignore`'s header documents that pin as
+  `containers.yml` already uses — `.trivyignore`'s header documents that pin as
   the project's baseline. (This job used to run `trivy-action@master` for secrets only; that
   floating tag drifted from the documented baseline on trivy's release schedule rather than the
   codebase's, which is why it's pinned now.) `ignore-unfixed: true` and `severity: CRITICAL,HIGH`
