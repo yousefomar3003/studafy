@@ -37,8 +37,8 @@
  */
 
 import { activeTraceFields, withClientSpan } from "@studafy/observability";
-import postgres from "postgres";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import {
@@ -59,7 +59,10 @@ export interface DeliveryLogger {
 }
 
 export interface DeliveryDependencies {
+  /** Used only when `sql` is absent: a dedicated pool is opened for this job (tests). */
   databaseUrl: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   log: DeliveryLogger;
   push: PushSender;
 }
@@ -316,8 +319,8 @@ export async function processNotificationDelivery(
 ): Promise<DeliveryResult> {
   const { schoolId, recipientId, channel, dispatchLogId } = data;
 
-  // prepare: false is mandatory behind PgBouncer transaction pooling.
-  const sql = postgres(deps.databaseUrl, { max: 2, idle_timeout: 20, prepare: false });
+  const database = leaseDatabase(deps.sql ?? deps.databaseUrl);
+  const sql = database.sql;
 
   try {
     if (channel === "push") {
@@ -343,6 +346,6 @@ export async function processNotificationDelivery(
 
     return { processed: true, channel, routesResolved, sent: false, pruned: 0 };
   } finally {
-    await sql.end({ timeout: 5 });
+    await database.release();
   }
 }

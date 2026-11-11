@@ -18,7 +18,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import IORedis from "ioredis";
 import postgres from "postgres";
 
-import { processEntitlementSchool } from "../invalidator";
+import { processEntitlementSchool, runEntitlementCycle } from "../invalidator";
 
 import type { EntitlementInvalidatorContext } from "../invalidator";
 import type { Sql } from "postgres";
@@ -268,6 +268,25 @@ describe("entitlement invalidator", () => {
     expect(await processEntitlementSchool(context(), schoolId)).toBe(1);
     expect(await readCursor(schoolId, id)).not.toBeNull();
     expect(await processEntitlementSchool(context(), schoolId)).toBe(0);
+  });
+
+  // The cycle no longer visits every school: it asks app.outbox_pending_school_ids (000200) which
+  // schools have unapplied rows and claims only there. A school with work must still be found.
+  invalidatorTest("a cycle discovers and drains a school with pending rows", async () => {
+    const schoolId = await seedSchool();
+    const key = `ent:${schoolId}`;
+    const id = await seedOutboxRow(schoolId, DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED, {
+      schoolId,
+      subscriptionId: crypto.randomUUID(),
+      previousStatus: "active",
+      status: "canceled",
+      entitlementsVersion: 6,
+    });
+
+    // Other suites' leftovers may be drained too, hence at-least.
+    expect(await runEntitlementCycle(context())).toBeGreaterThanOrEqual(1);
+    expect(await redis!.get(key)).toBe("6|");
+    expect(await readCursor(schoolId, id)).not.toBeNull();
   });
 
   // Tenant isolation on app.outbox_events is what scopes the claim; the consumer passes no school_id

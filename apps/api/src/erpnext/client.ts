@@ -78,6 +78,12 @@ export interface ErpNextRequestOptions {
   acceptLanguage?: string;
   /** Additional headers to include */
   headers?: Record<string, string>;
+  /**
+   * `false`: one attempt, never retried. For a write ERPNext does not deduplicate (a credit note, a
+   * cancel), where a timeout or 5xx may mean it was applied: retrying could apply it twice. The
+   * caller resolves such an ambiguous failure itself (see finance/refunds/service.ts).
+   */
+  retry?: boolean;
 }
 
 export interface ErpNextResponse<T = unknown> {
@@ -167,12 +173,13 @@ export class ErpNextClient {
     const attemptAll = async (): Promise<ErpNextResponse<T>> => {
       let lastError: unknown;
 
-      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+      const maxAttempts = options?.retry === false ? 1 : MAX_ATTEMPTS;
+      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
           return await this.attempt<T>(method, path, body, options);
         } catch (error) {
           lastError = error;
-          if (!isTransientErpNextFailure(error) || attempt === MAX_ATTEMPTS) throw error;
+          if (!isTransientErpNextFailure(error) || attempt === maxAttempts) throw error;
 
           const delay = backoffDelayMs(attempt);
           this.logger?.warn(
@@ -180,7 +187,7 @@ export class ErpNextClient {
               method,
               path,
               attempt,
-              max_attempts: MAX_ATTEMPTS,
+              max_attempts: maxAttempts,
               delay_ms: Math.round(delay),
               kind: error instanceof ErpNextError ? error.kind : "unknown",
               status: error instanceof ErpNextError ? error.status : undefined,

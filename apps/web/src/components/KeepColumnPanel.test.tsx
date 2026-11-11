@@ -111,7 +111,7 @@ async function importFile(csv: string) {
       </ToastProvider>
     </QueryClientProvider>,
   );
-  fireEvent.click(screen.getByRole("button", { name: "Import CSV" }));
+  fireEvent.click(screen.getByRole("button", { name: "Import file" }));
   const dialog = await screen.findByRole("dialog", { name: "Import users" });
   const input = dialog.querySelector('input[type="file"]') as HTMLInputElement;
   fireEvent.change(input, {
@@ -195,7 +195,7 @@ describe("keeping an imported column as a record field", () => {
         </ToastProvider>
       </QueryClientProvider>,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Import CSV" }));
+    fireEvent.click(screen.getByRole("button", { name: "Import file" }));
     const dialog = await screen.findByRole("dialog", { name: "Import users" });
     const input = dialog.querySelector('input[type="file"]') as HTMLInputElement;
     fireEvent.change(input, {

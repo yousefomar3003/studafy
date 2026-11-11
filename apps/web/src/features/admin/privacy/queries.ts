@@ -36,11 +36,20 @@ export function useFilePrivacyRequest() {
   });
 }
 
+/** A finished export whose stored bundle the retention sweep already deleted (30 days after it
+ * completed): the request stays as the record, but there is nothing left to download. */
+export function isExportDeleted(request: { export_deleted_at?: string | null }): boolean {
+  return Boolean(request.export_deleted_at);
+}
+
 /** A completed export's download link: signed per request and short-lived, so it is fetched only
- * when the admin asks for it, never kept in the list. */
-export async function fetchExportDownloadUrl(requestId: string): Promise<string | null> {
+ * when the admin asks for it, never kept in the list. `deleted` is true when the bundle was
+ * deleted since the list was loaded, so there is no link to give. */
+export async function fetchExportDownload(
+  requestId: string,
+): Promise<{ url: string | null; deleted: boolean }> {
   const { data } = await api.GET("/api/privacy/dsr/{requestId}", {
     params: { path: { requestId } },
   });
-  return data?.download_url ?? null;
+  return { url: data?.download_url ?? null, deleted: data ? isExportDeleted(data) : false };
 }

@@ -30,6 +30,7 @@ import { requestIdHeaders, standardResponses } from "../../openapi/responses";
 
 import { cancelAccountDeletion, scheduleAccountDeletion } from "./account-deletion-service";
 import { confirmAccountDeletion, requestAccountDeletion } from "./deletion-request-service";
+import { acceptLegalDocuments, legalAcceptanceStatus } from "./legal-acceptance-service";
 import { getAccountProfile } from "./profile-service";
 import { RETAINED_RECORD_CATEGORIES } from "./retention-policy";
 import {
@@ -40,6 +41,8 @@ import {
   accountDeletionRequestResponseSchema,
   accountDeletionResponseSchema,
   accountProfileSchema,
+  legalAcceptanceBodySchema,
+  legalAcceptanceResponseSchema,
 } from "./schemas";
 
 import type { Database } from "../../db/client";
@@ -54,13 +57,39 @@ const getProfileRoute = createRoute({
   operationId: "getOwnAccountProfile",
   summary: "Get the caller's own profile",
   description:
-    "Returns the caller's display name, contact address, member IDs, any scheduled deletion and " +
-    "the school the session is signed in to. Resolved from the session's user, so every role can " +
+    "Returns the caller's display name, contact address, member IDs, any scheduled deletion, the " +
+    "store-billed AI subscriptions deleting the account would leave running, and the school the " +
+    "session is signed in to. Resolved from the session's user, so every role can " +
     "load it without a permission.",
   security: [{ bearerAuth: [] }],
   responses: standardResponses(
     { 200: { description: "The caller's own profile.", schema: accountProfileSchema } },
     [401, 404, 500],
+  ),
+});
+
+const acceptLegalRoute = createRoute({
+  method: "post",
+  path: "/api/account/legal-acceptance",
+  tags: ["Account"],
+  operationId: "acceptLegalDocuments",
+  summary: "Accept the current Terms of Service and Privacy Policy",
+  description:
+    "Records that the caller accepts the Terms of Service and has read the Privacy Policy, at the " +
+    "versions named, which must be the current ones (`legal_acceptance` on the profile); otherwise " +
+    "409 LEGAL_VERSION_OUTDATED. Until a user has accepted, every other request but the profile, " +
+    "account deletion and logout is refused with 403 LEGAL_ACCEPTANCE_REQUIRED. The session's " +
+    "access token keeps that restriction until it is refreshed, so refresh after accepting.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: legalAcceptanceBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "Acceptance recorded.", schema: legalAcceptanceResponseSchema } },
+    [401, 404, 409, 422, 500],
   ),
 });
 
@@ -73,8 +102,10 @@ const deleteAccountRoute = createRoute({
   description:
     "Signs the caller out everywhere and schedules the deletion for `scheduled_for` (14 days). " +
     "Until then, signing in again allows only cancelling it. On that date the account is " +
-    "detached from the school, AI add-on billing stops and an erasure request is filed; personal " +
-    "data is erased by `completes_by`. `retained_records` lists the only records kept, and why. " +
+    "detached from the school, Stripe/Tap AI add-on billing stops (a Google Play renewal is turned " +
+    "off best-effort) and an erasure request is filed; personal data is erased by `completes_by`. " +
+    "`retained_records` lists the only records kept, and why. `active_store_subscriptions` lists " +
+    "App Store / Google Play subscriptions the caller must cancel in the store themselves. " +
     "Member-password accounts must send their own `member_id` and `password`.",
   security: [{ bearerAuth: [] }],
   request: {
@@ -165,6 +196,8 @@ export function accountRoutes(
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use("/api/account/deletion", auditAction("update", "users"));
+  // The audit row is the history of every acceptance; the user row keeps only the latest.
+  routes.use("/api/account/legal-acceptance", auditAction("update", "users"));
   // The request writes no audit row (see deletion-request-service.ts); the deletion it leads to is
   // audited on confirm, inside scheduleAccountDeletion's transaction.
   routes.use("/api/account/deletion-requests", auditAction("delete", "users"));
@@ -219,6 +252,7 @@ export function accountRoutes(
           school_name: a.schoolName,
           scheduled_for: a.scheduledFor.toISOString(),
           completes_by: a.completesBy.toISOString(),
+          active_store_subscriptions: a.activeStoreSubscriptions,
         })),
         retained_records: retainedRecords,
       },
@@ -244,7 +278,39 @@ export function accountRoutes(
         member_ids: row.member_ids,
         deletion_scheduled_for: row.deletion_due_at?.toISOString() ?? null,
         deletion_requires_member_credentials: row.deletion_requires_member_credentials,
+        active_store_subscriptions: row.active_store_subscriptions,
         school: { id: row.school_id, name: row.school_name },
+        legal_acceptance: (() => {
+          const status = legalAcceptanceStatus(row);
+          return {
+            required: status.required,
+            terms_version: status.termsVersion,
+            privacy_version: status.privacyVersion,
+            accepted_at: status.acceptedAt?.toISOString() ?? null,
+          };
+        })(),
+      },
+      200,
+    );
+  });
+
+  routes.openapi(acceptLegalRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+    const accepted = await withTenantTx(
+      database,
+      { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+      (tx) =>
+        acceptLegalDocuments(tx, auth.userId, {
+          termsVersion: body.terms_version,
+          privacyVersion: body.privacy_version,
+        }),
+    );
+    return c.json(
+      {
+        terms_version: accepted.termsVersion,
+        privacy_version: accepted.privacyVersion,
+        accepted_at: accepted.acceptedAt.toISOString(),
       },
       200,
     );
@@ -275,6 +341,7 @@ export function accountRoutes(
         scheduled_for: result.scheduledFor.toISOString(),
         completes_by: result.completesBy.toISOString(),
         retained_records: retainedRecords,
+        active_store_subscriptions: result.activeStoreSubscriptions,
       },
       202,
     );

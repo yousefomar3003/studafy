@@ -74,6 +74,12 @@ export const envSchema = z
     RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     STRIPE_SECRET_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // Google Play Developer API, optional: lets the account-deletion sweep turn off renewal of a
+    // deleted student's AI add-on bought through Google Play (stripe-ai-billing-canceller.ts's Play
+    // counterpart). The same package name and service account as apps/api/src/env.ts; set together.
+    // Unset, the sweep logs and skips the call -- the person was told to cancel in the store.
+    GOOGLE_PLAY_PACKAGE_NAME: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    GOOGLE_PLAY_SERVICE_ACCOUNT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // The ST-293 cost report publishes to CloudWatch, so a deployment outside AWS sets
     // COST_REPORT_ENABLED=false and the daily/monthly sweeps are never scheduled. On by default.
     COST_REPORT_ENABLED: z.preprocess(
@@ -128,6 +134,10 @@ export const envSchema = z
       .int()
       .positive()
       .default(25 * 1024 * 1024),
+    // The sensitive-documents KMS key (ADR-019), the same value apps/api holds. The scan worker
+    // re-encrypts the quarantine copy of a sensitive record document or import file under it. AWS
+    // only; unset on an S3-compatible store (fly.io), where the original was not KMS-encrypted either.
+    STORAGE_SENSITIVE_KMS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Base URL for the action links embedded in emails. The verify/activate endpoints are the
     // API's (the only surface with an ALB), so the link host is the app's public origin.
     FRONTEND_URL: z.string().url().default("http://localhost:5180"),
@@ -203,6 +213,27 @@ export const envSchema = z
           code: "custom",
           path: ["RECORDS_ENCRYPTION_KEYS"],
           message: (error as Error).message,
+        });
+      }
+    }
+
+    if (
+      (env.GOOGLE_PLAY_PACKAGE_NAME === undefined) !==
+      (env.GOOGLE_PLAY_SERVICE_ACCOUNT === undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["GOOGLE_PLAY_SERVICE_ACCOUNT"],
+        message: "GOOGLE_PLAY_PACKAGE_NAME and GOOGLE_PLAY_SERVICE_ACCOUNT must be set together",
+      });
+    } else if (env.GOOGLE_PLAY_SERVICE_ACCOUNT !== undefined) {
+      try {
+        JSON.parse(env.GOOGLE_PLAY_SERVICE_ACCOUNT);
+      } catch {
+        context.addIssue({
+          code: "custom",
+          path: ["GOOGLE_PLAY_SERVICE_ACCOUNT"],
+          message: "GOOGLE_PLAY_SERVICE_ACCOUNT must be the service account's JSON key",
         });
       }
     }

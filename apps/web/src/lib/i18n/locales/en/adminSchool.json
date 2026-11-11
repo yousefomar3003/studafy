@@ -24,7 +24,8 @@
       "audit": "Audit log →",
       "privacy": "Privacy requests →",
       "aiReports": "AI content reports →",
-      "teachers": "Teachers' employment →"
+      "teachers": "Teachers' employment →",
+      "importData": "Import data"
     }
   },
   "tiles": {
@@ -501,6 +502,11 @@
     "download": "Download",
     "downloadLabel": "Download the data export for {{name}}",
     "downloadFailed": "Couldn't get the download link. Try again.",
+    "exportDeleted": "Deleted after 30 days",
+    "exportDeletedToast": {
+      "title": "This export has been deleted",
+      "description": "Exports are kept for 30 days after they finish. File a new request for a fresh copy."
+    },
     "failedFallback": "The request failed. File it again, or contact Studafy support.",
     "empty": "No privacy requests yet.",
     "loadError": "Couldn't load the privacy requests.",
@@ -509,7 +515,7 @@
       "person": "Person",
       "type": "What do they want?",
       "explain": {
-        "export": "Collects everything the school holds about this person into one file, which you can download here once it's ready. Nothing is changed.",
+        "export": "Collects everything the school holds about this person into one file, which you can download here for 30 days once it's ready. Nothing is changed.",
         "erasure": "Removes this person's name, contact details and other personal data from the school's records, and signs them out of every device. Financial and audit records the school must keep by law stay as they are. This can't be undone."
       },
       "understandErasure": "I understand this person's data will be erased for good",

@@ -13,6 +13,31 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Exam window filters: `GET /api/academics/exams` (`ExamQuery`) takes optional `ends_after` and
+  `starts_before` (ISO 8601 instants), so a "coming up" read gets only the exams in its window
+  instead of the class's whole history. The mobile teacher home passes them.
+
+- Login slips: `POST /api/users/member-setup-codes` (`IssueMemberSetupCodesRequest`) takes optional
+  `include_pending` (also re-issue unused, unexpired codes: a reprint, which invalidates earlier
+  slips) and `after` (page by member ID). `IssuedMemberSetupCodes` gains `last` (send it as `after`),
+  and each item (`IssuedMemberSetupCode`, now a named schema) gains `class_label` (a student's grade
+  and section this year) and `children` (a parent's linked children by name), for printing slips.
+
+- Excel student import template: `GET /api/imports/students/template` takes
+  `StudentImportTemplateQuery` (`format=csv|xlsx`, `lang=en|ar`). `format=xlsx` returns an Excel
+  workbook with dropdowns of the school's grades and sections, its record fields as columns, and
+  instructions ([student-import-mapping-guide.md](../modules/student-import-mapping-guide.md#excel-template-and-excel-upload)).
+  The default is still the CSV template.
+
+- Student import without email, with families, two parents and placement (migration 000198;
+  [student-import-mapping-guide.md](../modules/student-import-mapping-guide.md#parents)):
+  `StudentImportColumnMapping` gains `grade`, `section`, `family`, `parent2_name`, `parent2_email`
+  and `parent2_relationship`, and `email` is no longer required. `ImportDiffRow` gains `parent2`
+  (`ImportDiffParent`), `family`, `grade`, `section`, `placement` and `placement_conflict`;
+  `parent` gains `kept` and `parent_conflict` gains `PARENT_EMAIL_IN_OTHER_FAMILY`. `ImportDiff`
+  totals and `ImportSummary` gain `placed` and `placement_conflicts`. The CSV template now shows
+  email-less students, a family and two parents.
+
 - Realtime handshake tickets (QA-14, F-05; [protocol.md](../../apps/realtime/docs/protocol.md#handshake-ticket)),
   under the new "Realtime" tag: `GET /api/realtime/ticket` (`RealtimeTicket`). Bearer-authenticated;
   returns a single-use, 30-second ticket for the caller's own session, which the realtime gateway's
@@ -342,6 +367,13 @@ when it required the `version-bump` label.
   with an empty `prompt`.
 
 ### Changed
+
+- `GET /api/privacy/dsr/{requestId}` (`DataSubjectRequest`): a completed export's `download_url` now
+  points at the export's ZIP archive (`dsr-exports/<school>/<request>/export.zip`: a README, the data
+  as JSON with one file per table, `manifest.json`, and copies of the person's files) instead of a
+  bare `manifest.json`, and works for an hour instead of 15 minutes. A key outside the request's own
+  export prefix is never signed. `download_url` and `download_url_expires_at` gained descriptions.
+  Same fields and types; not breaking.
 
 - **(breaking)** `POST /api/inquiries` (`SubmitInquiry`): `phone` is now required. It must look like
   a phone number: digits with `+`, `-`, `(`, `)`, `.` and spaces, 6 to 20 digits in all; anything

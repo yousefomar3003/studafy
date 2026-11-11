@@ -3,6 +3,7 @@ import { activeTraceFields } from "@studafy/observability";
 import { sanitizeSensitivePath } from "../lib/security/sensitive-path";
 
 import type { AuthContext } from "./authContext";
+import type { UploadScanEnqueuer } from "../lib/storage/upload-scan";
 import type { Logger } from "../logger";
 import type { AiQuotaHandle, AiTokenBudgetConfig } from "../modules/ai/gate/token-budget";
 import type { FeatureGateContext } from "../modules/features/middleware";
@@ -117,6 +118,11 @@ export interface AppVariables {
   aiQuota?: AiQuotaHandle;
   /** The AI token budget's meter and hold sizing, set by provideAiTokenBudget on /api/ai/*. */
   aiTokenBudget?: AiTokenBudgetConfig;
+  /**
+   * Hands committed uploads to the malware scanner (F-14). Set by createApp when a scan queue is
+   * available; read through enqueueUploadScans (lib/storage/upload-scan.ts), never directly.
+   */
+  uploadScan?: UploadScanEnqueuer;
 }
 
 export interface AppEnv {

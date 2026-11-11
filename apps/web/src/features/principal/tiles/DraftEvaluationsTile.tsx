@@ -5,15 +5,13 @@ import { useTranslation } from "../../../lib/i18n";
 import { EVALUATION_TYPE_LABEL_KEYS } from "../evaluations/labels";
 import { useDraftEvaluationsQuery } from "../queries";
 
-const PREVIEW_LIMIT = 5;
-
 /** The newest draft evaluations. Their count is the principal home's summary strip. */
 export function DraftEvaluationsTile() {
   const { t } = useTranslation();
   const { data, isPending, isError } = useDraftEvaluationsQuery();
 
-  const evaluations = data ?? [];
-  const total = evaluations.length;
+  const evaluations = data?.evaluations ?? [];
+  const total = data?.total ?? 0;
 
   return (
     <DashboardTile
@@ -27,7 +25,7 @@ export function DraftEvaluationsTile() {
 
       {evaluations.length > 0 ? (
         <ul className="principal-incident-list">
-          {evaluations.slice(0, PREVIEW_LIMIT).map((evaluation) => (
+          {evaluations.map((evaluation) => (
             <li key={evaluation.id} className="principal-incident-list__item">
               <span className="principal-incident-list__title">
                 {t(EVALUATION_TYPE_LABEL_KEYS[evaluation.evaluation_type])}

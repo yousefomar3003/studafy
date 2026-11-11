@@ -543,6 +543,32 @@ export async function getParentChildren(
   return rows.map((r) => r.student_id);
 }
 
+/**
+ * One incident as a parent may see it: resolved, and about a student linked to `parentUserId`.
+ * Anything else, including an incident about another family's child, reads as not found, so a
+ * parent cannot learn that it exists. Whether the school shows incidents to parents at all is the
+ * caller's check ({@link getParentDisciplineVisibility}).
+ */
+export async function getParentIncident(
+  tx: TransactionSql,
+  schoolId: string,
+  parentUserId: string,
+  incidentId: string,
+): Promise<IncidentRow | undefined> {
+  const [row] = await tx<Record<string, unknown>[]>`
+    SELECT ${tx.unsafe(INCIDENT_COLUMNS)}
+    FROM app.discipline_incidents
+    WHERE id = ${incidentId}::uuid
+      AND school_id = ${schoolId}::uuid
+      AND status = 'resolved'
+      AND student_id IN (
+        SELECT student_id FROM app.parent_child_links
+        WHERE school_id = ${schoolId}::uuid AND parent_user_id = ${parentUserId}::uuid
+      )
+  `;
+  return row ? parseIncidentRow(row) : undefined;
+}
+
 export async function getParentResolvedIncidents(
   tx: TransactionSql,
   schoolId: string,

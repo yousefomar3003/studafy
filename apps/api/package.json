@@ -45,6 +45,7 @@
     "@studafy/student-import": "workspace:*",
     "@studafy/tap-payments": "workspace:*",
     "bullmq": "5.79.3",
+    "exceljs": "4.4.0",
     "google-auth-library": "11.3.0",
     "hono": "4.12.34",
     "ioredis": "5.10.1",

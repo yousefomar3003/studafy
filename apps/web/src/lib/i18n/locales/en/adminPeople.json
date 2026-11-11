@@ -268,27 +268,36 @@
     "import": {
       "fields": {
         "admission_number": "Admission number",
-        "email": "Student email",
+        "email": "Student email (optional)",
         "first_name": "First name",
         "middle_name": "Middle name",
         "last_name": "Last name",
         "preferred_name": "Preferred name",
         "date_of_birth": "Date of birth",
         "status": "Status",
-        "parent_email": "Parent email",
-        "parent_name": "Parent name",
-        "parent_relationship": "Parent relationship"
+        "parent_email": "Parent 1 email (optional)",
+        "parent_name": "Parent 1 name",
+        "parent_relationship": "Parent 1 relationship",
+        "grade": "Grade",
+        "section": "Section",
+        "family": "Family number",
+        "parent2_email": "Parent 2 email",
+        "parent2_name": "Parent 2 name",
+        "parent2_relationship": "Parent 2 relationship"
       },
       "hints": {
         "admission_number": "Your school's unique ID for the student.",
-        "email": "The student's sign-in email. An import never changes it for an existing student.",
+        "email": "Optional. Students without an email sign in with their Studafy ID. An import never changes an existing student's sign-in email.",
         "date_of_birth": "Must be YYYY-MM-DD, for example 2012-09-01.",
         "status": "One of {{values}}. Blank means applicant for a new student.",
-        "parent_email": "Creates a new parent account, shared by siblings with the same email. An email that already has an account is not linked. Needs Parent relationship too.",
-        "parent_name": "Only used when a new parent account is created.",
-        "parent_relationship": "One of {{values}}. Needs Parent email too."
+        "parent_email": "Optional. Parents without an email sign in with their Studafy ID. An email that already has an account is not linked.",
+        "parent_name": "The parent's full name. Give a name or an email, plus the relationship.",
+        "parent_relationship": "One of {{values}} (Arabic words such as أم or أب work too).",
+        "grade": "The grade to place the student in, spelled as in Academics, for example Grade 1.",
+        "section": "The section of that grade, for example A. Leave blank if the grade has only one section.",
+        "family": "Any number or code you choose. Brothers and sisters with the same family number share their parents, so you only type the parents once."
       },
-      "parentPairWarning": "Map both {{email}} and {{relationship}}, or neither. Rows that give a parent without both are rejected.",
+      "parentPairWarning": "Map {{relationship}} together with {{name}} or {{email}}. Rows that give a parent without a relationship are rejected.",
       "blocker": {
         "missing": "Map a column to every required field before confirming. Missing: {{fields}}.",
         "unapplied": "You changed the mapping. Apply it to re-check the file before confirming.",
@@ -359,7 +368,9 @@
           "noChange": "No change",
           "skipped": "Skipped (conflicts)",
           "newParentAccounts": "New parent accounts",
-          "parentConflicts": "Parents to link by hand"
+          "parentConflicts": "Parents to link by hand",
+          "placed": "Placed in a class",
+          "placementConflicts": "Not placed"
         },
         "columns": {
           "line": "Line",
@@ -371,21 +382,41 @@
         "parentAccountExists": "This parent email already belongs to an account, so no link is made. The student is still imported: link the parent from the student's Guardians tab or Finance > Unlinked.",
         "recordValue": "{{field}}: {{value}}",
         "parentConflictsBanner_one": "{{count}} row names a parent email that already belongs to an account. Those students are imported without a parent link; link the parent yourself from the student's Guardians tab or Finance > Unlinked. An import never matches people by email.",
-        "parentConflictsBanner_other": "{{count}} rows name a parent email that already belongs to an account. Those students are imported without a parent link; link the parent yourself from the student's Guardians tab or Finance > Unlinked. An import never matches people by email."
+        "parentConflictsBanner_other": "{{count}} rows name a parent email that already belongs to an account. Those students are imported without a parent link; link the parent yourself from the student's Guardians tab or Finance > Unlinked. An import never matches people by email.",
+        "newSecondParentAccount": "Creates a second parent account in the same household",
+        "parentsKept": "Already has a parent in Studafy, so the import adds none",
+        "parentEmailInOtherFamily": "Another family in this file already uses this parent email, so this parent is not linked. The student is still imported: link the parent from the student's Guardians tab.",
+        "placeIn": "Placed in {{where}}",
+        "moveTo": "Moved to {{where}}",
+        "placementConflicts": {
+          "NO_ACADEMIC_YEAR": "Not placed in a class: there is no current or upcoming academic year yet. Add one in Academics, then import again.",
+          "GRADE_NOT_FOUND": "Not placed in a class: no grade called “{{grade}}” has sections this year.",
+          "SECTION_NOT_FOUND": "Not placed in a class: {{grade}} has no section “{{section}}” this year.",
+          "SECTION_REQUIRED": "Not placed in a class: {{grade}} has several sections, so give the section."
+        },
+        "placementConflictsBanner_one": "{{count}} student will be imported without a class, because their grade or section was not found. Check the spelling against Academics, or place them by hand afterwards.",
+        "placementConflictsBanner_other": "{{count}} students will be imported without a class, because their grade or section was not found. Check the spelling against Academics, or place them by hand afterwards."
       },
       "page": {
         "title": "Import students",
-        "intro": "Upload a CSV of students to validate. Nothing is saved until you confirm.",
-        "uploadRegion": "Upload CSV",
-        "downloadTemplate": "Download CSV template",
-        "fileLabel": "Student CSV file",
+        "intro": "Download the Excel template, fill in your students and their parents, then upload it here. Nothing is saved until you confirm.",
+        "uploadRegion": "Upload file",
+        "downloadTemplate": "CSV template",
+        "fileLabel": "Student file (Excel or CSV)",
         "uploadProgress": "Upload progress",
         "uploading": "Uploading… {{percent}}%",
         "templateError": "Couldn't download the template. Please try again.",
         "validateError": "Couldn't validate that file. Please try again.",
         "applyError": "Couldn't apply the mapping. Please try again.",
         "confirmError": "Couldn't confirm the import. Please try again.",
-        "history": "Import history"
+        "history": "Import history",
+        "downloadExcelTemplate": "Download Excel template",
+        "templateHelp": "The Excel template has dropdowns for your grades and sections, and instructions inside. Nobody needs an email: everyone gets a Studafy ID.",
+        "excelErrors": {
+          "not_xlsx": "That file isn't an Excel workbook we can read. Save it as .xlsx or .csv and try again.",
+          "too_large": "That workbook is too large to read. Remove extra sheets or save it as .csv and try again.",
+          "no_sheet": "Couldn't find a sheet of students in that workbook."
+        }
       },
       "report": {
         "region": "Validation report",
@@ -426,7 +457,11 @@
         "backToStudents": "Back to students",
         "parentConflicts": "Parents to link by hand",
         "recordAnswers": "Record answers",
-        "leftoverColumns": "See the columns Studafy did not use, and map them to records"
+        "leftoverColumns": "See the columns Studafy did not use, and map them to records",
+        "placed": "Placed in a class",
+        "placementConflicts": "Not placed in a class",
+        "slipsHint": "Everyone you just added can sign in once they have their login slip.",
+        "printSlips": "Print login slips"
       },
       "failed": {
         "region": "Import failed",
@@ -755,6 +790,60 @@
     "empty": "No teachers yet. Add them on Members.",
     "loadError": "Couldn't load the teachers.",
     "record": "Staff record",
-    "recordLabel": "Open {{name}}'s staff record"
+    "recordLabel": "Open {{name}}'s staff record",
+    "importTitle": "Import teachers",
+    "emailOptional": "Email (optional)"
+  },
+  "importData": {
+    "title": "Import data",
+    "intro": "Bring your whole school onto Studafy in four steps. Nobody needs an email: every student, parent and teacher gets a Studafy ID and signs in with it.",
+    "history": "Past imports",
+    "steps": {
+      "setup": {
+        "title": "Set up grades and sections",
+        "body": "Add your grades and their sections for this year, so imported students land straight in their class.",
+        "action": "Grades and sections"
+      },
+      "students": {
+        "title": "Import students and parents",
+        "body": "Download the Excel template, fill in one row per student with their parents, and upload it. Brothers and sisters share a family number, so you type their parents once.",
+        "action": "Import students"
+      },
+      "teachers": {
+        "title": "Import teachers",
+        "body": "On the Teachers page, choose Import file, download the template, and fill in each teacher's name and employee number. An email is optional: teachers get a TCH- ID to sign in with.",
+        "action": "Teachers"
+      },
+      "slips": {
+        "title": "Print login slips",
+        "body": "Print a slip for everyone who hasn't signed in yet, with their ID and a one-time code. They choose their own password the first time they sign in.",
+        "action": "Login slips"
+      }
+    }
+  },
+  "loginSlips": {
+    "title": "Login slips",
+    "intro": "Each slip has a person's Studafy ID and a one-time code. They sign in with both, then choose their own password, and the code stops working.",
+    "prepareRegion": "Prepare slips",
+    "roleLabel": "Slips for",
+    "roles": {
+      "STUDENT": "Students",
+      "PARENT": "Parents",
+      "INSTRUCTOR": "Teachers"
+    },
+    "reprint": "Also reprint slips that were printed before but not used yet",
+    "reprintWarning": "Reprinting gives those people a new code. Slips you printed for them earlier will stop working.",
+    "prepare": "Prepare slips",
+    "preparing": "Preparing…",
+    "error": "Couldn't prepare the slips. Please try again.",
+    "none": "Everyone has already signed in or has an unused slip. Tick “reprint” to print those again.",
+    "ready_one": "{{count}} slip is ready. The codes are shown only now, so print before you leave this page.",
+    "ready_other": "{{count}} slips are ready. The codes are shown only now, so print before you leave this page.",
+    "print": "Print",
+    "listLabel": "Login slips",
+    "parentOf": "Parent of {{names}}",
+    "id": "Studafy ID",
+    "code": "One-time code",
+    "how": "Go to {{url}}, enter your ID and this code, then choose your own password. The code works until {{date}}."
   }
 }

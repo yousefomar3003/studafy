@@ -24,6 +24,7 @@ import {
   integrationEnabled,
   migrateDatabase,
 } from "../../../../tests/harness";
+import { planBulkReminders } from "../communications/service";
 import { allocateOldestFirst, validateAllocations } from "../family-accounts/service";
 
 import type { TenantFixture, TestApp, TestDatabase } from "../../../../tests/harness";
@@ -139,6 +140,37 @@ function json(body: unknown, headers: Record<string, string> = {}): RequestInit 
     headers: { "Content-Type": "application/json", ...headers },
   };
 }
+
+describe("bulk reminder plan", () => {
+  const now = Date.parse("2026-11-11T12:00:00Z");
+  const row = (familyId: string, overdueInvoiceCount: number, hoursAgo: number | null) => ({
+    familyId,
+    overdueInvoiceCount,
+    lastReminderAt: hoursAgo === null ? null : new Date(now - hoursAgo * 3_600_000),
+  });
+
+  test("counts settled and recently reminded families and caps the sends", () => {
+    const triage = [
+      row("a", 2, null),
+      row("b", 0, null),
+      row("c", 1, 2),
+      row("d", 1, 30),
+      row("e", 3, null),
+    ];
+    expect(planBulkReminders(["a", "b", "c", "d", "e", "x", "a"], triage, 2, now)).toEqual({
+      batch: ["a", "d"],
+      remaining: 1,
+      nothingOverdue: 1,
+      recentlyReminded: 1,
+    });
+    expect(planBulkReminders(["a", "d", "e"], triage, 100, now)).toEqual({
+      batch: ["a", "d", "e"],
+      remaining: 0,
+      nothingOverdue: 0,
+      recentlyReminded: 0,
+    });
+  });
+});
 
 describe("family payment split", () => {
   const open = [
@@ -289,6 +321,88 @@ describeDb("family finance over HTTP", () => {
       `;
     });
     expect(notification?.title).toContain("600.000 JOD");
+  });
+
+  test("a bulk run sends only to families due a reminder and counts the rest", async () => {
+    const parent = await createUser(database!.sql, fixture!.schoolId, { displayName: "Second" });
+    await assignRole(database!.sql, fixture!.schoolId, parent.id, ROLES.PARENT);
+    const child = await createStudent(database!.sql, fixture!.schoolId, {
+      firstName: "Other",
+      lastName: "Child",
+    });
+    const [dueFamily, settledFamily] = await database!.sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      await tx`SELECT set_config('app.school_id', ${fixture!.schoolId}, true)`;
+      const families = await tx<{ id: string }[]>`
+        INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+        VALUES (${fixture!.schoolId}::uuid, 'Due family', ${parent.id}::uuid),
+               (${fixture!.schoolId}::uuid, 'Settled family', ${parent.id}::uuid)
+        RETURNING id
+      `;
+      await tx`
+        INSERT INTO app.parent_child_links
+          (school_id, family_id, parent_user_id, student_id, relationship)
+        VALUES (${fixture!.schoolId}::uuid, ${families[0]!.id}::uuid, ${parent.id}::uuid,
+                ${child.id}::uuid, 'father')
+      `;
+      const [jod] = await tx<{ id: string }[]>`SELECT id FROM app.currencies WHERE code = 'JOD'`;
+      await tx`
+        INSERT INTO app.invoice_cache (
+          school_id, student_id, currency_id, erpnext_docname, erpnext_status,
+          total_amount_minor, outstanding_amount_minor, issued_date, due_date, erpnext_payload,
+          last_synced_at
+        ) VALUES (
+          ${fixture!.schoolId}::uuid, ${child.id}::uuid, ${jod!.id}::uuid, 'SINV-OTHER', 'submitted',
+          300000, 300000, '2026-01-01', '2026-02-01'::date, ${tx.json({})}, CURRENT_TIMESTAMP
+        )
+      `;
+      return families.map((family) => family.id);
+    });
+
+    // The sibling family was reminded by the test above; one id is no family at all.
+    const listed = await authenticatedRequest(
+      harness!,
+      "POST",
+      "/api/finance/reminders",
+      asFinance(),
+      json({
+        family_ids: [
+          dueFamily!,
+          familyId!,
+          settledFamily!,
+          "00000000-0000-4000-8000-0000000000aa",
+          dueFamily!,
+        ],
+      }),
+    );
+    expect(listed.status).toBe(200);
+    expect(await listed.json()).toEqual({
+      families: 5,
+      sent: 1,
+      recently_reminded: 1,
+      nothing_overdue: 1,
+      no_guardians: 0,
+      delivered: 1,
+      remaining: 0,
+    });
+
+    // Every overdue family, now both reminded today.
+    const everyone = await authenticatedRequest(
+      harness!,
+      "POST",
+      "/api/finance/reminders",
+      asFinance(),
+      json({}),
+    );
+    expect(await everyone.json()).toEqual({
+      families: 2,
+      sent: 0,
+      recently_reminded: 2,
+      nothing_overdue: 0,
+      no_guardians: 0,
+      delivered: 0,
+      remaining: 0,
+    });
   });
 
   test("a statement is sent and the profile shows the message history", async () => {

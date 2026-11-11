@@ -36,13 +36,11 @@ final aiHubClientProvider = Provider<AiHubClient>((ref) {
 /// (`usage-routes.ts`) — so this provider does not gate on `currentStudentIdProvider` the way
 /// `todayGradesProvider` does.
 ///
-/// `.autoDispose`, not kept alive: [AiHubScreen] re-reads it on every app resume (see that
-/// screen's `WidgetsBindingObserver`) so an add-on activated outside the app is reflected without
-/// the student having to force-quit and reopen the app.
-///
-/// It also re-reads on sign-in/sign-out and whenever [myFeaturesProvider] reloads (an entitlement
-/// change pushed over realtime, a store purchase), so the AI tab and everything else driven by the
-/// feature list — the subscriber logo, feature gates — never disagree about one person.
+/// `.autoDispose`, not kept alive. It re-reads on sign-in/sign-out and whenever [myFeaturesProvider]
+/// reloads (an app resume — throttled by `featuresAutoRefreshProvider` — an entitlement change
+/// pushed over realtime, a store purchase), so an add-on activated outside the app is reflected
+/// without the student force-quitting it, and the AI tab and everything else driven by the feature
+/// list — the subscriber logo, feature gates — never disagree about one person.
 final aiHubStatusProvider = FutureProvider.autoDispose<AiHubStatus>((ref) async {
   ref.watch(authStatusProvider);
   ref.listen(myFeaturesProvider, (previous, next) {

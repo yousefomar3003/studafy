@@ -5,6 +5,7 @@
 // school whose ORG_ADMIN is linked to the applicant's own (provider, subject) -- so the returning-
 // user login resolver finds them -- with audit rows in both the new school and the operator's.
 
+import { LEGAL_DOCUMENT_VERSIONS } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -128,8 +129,34 @@ afterAll(async () => {
 describe("school applications", () => {
   integrationTest("submit stores the application and promotes the proof", async () => {
     const proofKey = stageProof(1);
-    const submitted = await submitApplication(database, storage, applicant(1), form(1, proofKey));
+    const uploadedKeys: string[] = [];
+    const submitted = await submitApplication(
+      database,
+      storage,
+      applicant(1),
+      form(1, proofKey),
+      uploadedKeys,
+    );
     expect(submitted.status).toBe("pending");
+    const permanentKey = proofKey.replace(/^temp\//, "permanent/");
+    expect(uploadedKeys).toEqual([permanentKey]);
+
+    // A reviewer gets no URL until the malware scan clears the proof (F-14) ...
+    expect((await getApplication(database, storage, submitted.id)).proof.url).toBeNull();
+    const setProofScan = (status: string) =>
+      db.sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`
+          UPDATE app.school_applications
+          SET proof_scan_status = ${status}::app.upload_scan_status
+          WHERE id = ${submitted.id}::uuid
+        `;
+      });
+    // ... never for an infected one ...
+    await setProofScan("quarantined");
+    expect((await getApplication(database, storage, submitted.id)).proof.url).toBeNull();
+    // ... and a short-lived one once it is clean.
+    await setProofScan("clean");
 
     const detail = await getApplication(database, storage, submitted.id);
     expect(detail.applicantEmail).toBe("owner1@gmail.test");
@@ -137,6 +164,12 @@ describe("school applications", () => {
     expect(detail.currencyCode).toBe("SAR");
     expect(detail.proof.contentType).toBe("application/pdf");
     expect(detail.proof.url).toContain("permanent/school-applications/");
+    // The applicant accepted the current terms and school agreement, recorded at submission.
+    expect(detail.termsAcceptance).toEqual({
+      termsVersion: LEGAL_DOCUMENT_VERSIONS.terms,
+      schoolAgreementVersion: LEGAL_DOCUMENT_VERSIONS.schoolAgreement,
+      acceptedAt: expect.any(String),
+    });
 
     const status = await getApplicantStatus(database, applicant(1));
     expect(status.application?.id).toBe(submitted.id);

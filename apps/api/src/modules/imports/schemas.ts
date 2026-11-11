@@ -74,8 +74,22 @@ export const importSummarySchema = z
       .optional()
       .openapi({
         description:
-          "Rows whose parent_email already belonged to an account: the student was imported, the " +
-          "parent not linked. Absent on imports completed before the change.",
+          "Parents not linked: their email already belonged to an account, or another family in " +
+          "the file creates that email. The student was imported. Absent on imports completed " +
+          "before the change.",
+      }),
+    placed: z.number().int().optional().openapi({
+      description:
+        "Students placed in, or moved to, a section. Absent on imports completed before placement.",
+    }),
+    placement_conflicts: z
+      .number()
+      .int()
+      .optional()
+      .openapi({
+        description:
+          "Students imported unplaced: unknown grade or section, or no academic year. Absent on " +
+          "imports completed before placement.",
       }),
     record_answers: z.number().int().optional().openapi({
       description: "Student record answers written from template columns.",
@@ -392,6 +406,22 @@ export const importDiffRecordValueSchema = z
 
 const fieldChangeSchema = z.object({ from: z.string().nullable(), to: z.string() });
 
+const parentOutcomeSchema = z.enum(["create", "sibling", "conflict", "kept"]);
+const parentConflictSchema = z.enum(["PARENT_ACCOUNT_EXISTS", "PARENT_EMAIL_IN_OTHER_FAMILY"]);
+
+export const importDiffParentSchema = z
+  .object({
+    parent: parentOutcomeSchema,
+    parent_conflict: parentConflictSchema.nullable(),
+    parent_group_line: z.number().int().positive().nullable(),
+    parent_email: z.string().nullable(),
+    parent_name: z.string().nullable(),
+    link: z.enum(["create"]).nullable(),
+  })
+  .openapi("ImportDiffParent", {
+    description: "A row's second parent, with the same meanings as the row's parent_* fields.",
+  });
+
 export const importDiffRowSchema = z
   .object({
     line_number: z.number().int().positive().openapi({ description: "1-based CSV line number." }),
@@ -415,27 +445,24 @@ export const importDiffRowSchema = z
         ),
       )
       .openapi({ description: "Live student fields this row changes (from -> to)." }),
-    parent: z
-      .enum(["create", "sibling", "conflict"])
-      .nullable()
-      .openapi({
-        description:
-          "create: this line creates a new parent and household. sibling: an earlier line in this " +
-          "file creates them and this student joins (see parent_group_line). conflict: the parent " +
-          "is not linked (see parent_conflict). Null when the row names no parent.",
-      }),
-    parent_conflict: z
-      .enum(["PARENT_ACCOUNT_EXISTS"])
-      .nullable()
-      .openapi({
-        description:
-          "PARENT_ACCOUNT_EXISTS: parent_email already belongs to an account. The student is still " +
-          "imported, with no link; link the parent from the student's Guardians tab or Finance > " +
-          "Unlinked. An import never matches people by email.",
-      }),
+    parent: parentOutcomeSchema.nullable().openapi({
+      description:
+        "Parent 1. create: this line creates a new parent and household. sibling: another line " +
+        "of the file (same family, or same new email) names them and this student joins (see " +
+        "parent_group_line). conflict: the parent is not linked (see parent_conflict). kept: the " +
+        "student already has a parent, so the import adds none. Null when the row names no parent " +
+        "and joins no family's.",
+    }),
+    parent_conflict: parentConflictSchema.nullable().openapi({
+      description:
+        "PARENT_ACCOUNT_EXISTS: the parent email already belongs to an account. " +
+        "PARENT_EMAIL_IN_OTHER_FAMILY: another family in this file creates a parent with this " +
+        "email. Either way the student is still imported, with that parent unlinked; link them " +
+        "from the student's Guardians tab or Finance > Unlinked. An import never matches people.",
+    }),
     parent_group_line: z.number().int().positive().nullable().openapi({
       description:
-        "The line that creates this row's new parent; equal to line_number on that line.",
+        "The line whose details create this row's new parent; equal to line_number on that line.",
     }),
     parent_email: z.string().nullable().openapi({ description: "The parent email as given." }),
     parent_name: z.string().nullable().openapi({ description: "The parent name as given." }),
@@ -443,6 +470,29 @@ export const importDiffRowSchema = z
       .enum(["create"])
       .nullable()
       .openapi({ description: "create: a parent-student link is made. Null: no link." }),
+    parent2: importDiffParentSchema.nullable(),
+    family: z.string().nullable().openapi({
+      description: "The file's family number: lines sharing one share their parents.",
+    }),
+    grade: z.string().nullable().openapi({ description: "The grade as given." }),
+    section: z.string().nullable().openapi({ description: "The section as given." }),
+    placement: z
+      .enum(["place", "move", "unchanged"])
+      .nullable()
+      .openapi({
+        description:
+          "place: the student is placed in the section. move: moved there from another section " +
+          "of the year. unchanged: already there. Null: no grade given, or see placement_conflict.",
+      }),
+    placement_conflict: z
+      .enum(["NO_ACADEMIC_YEAR", "GRADE_NOT_FOUND", "SECTION_NOT_FOUND", "SECTION_REQUIRED"])
+      .nullable()
+      .openapi({
+        description:
+          "Why the student is imported unplaced: no active or planned academic year, no grade of " +
+          "that name with sections this year, no such section in the grade, or no section given " +
+          "for a grade with several.",
+      }),
     records: z
       .array(importDiffRecordValueSchema)
       .openapi({ description: "Template answers this row writes. Sensitive ones are masked." }),
@@ -461,7 +511,14 @@ export const importDiffSchema = z
         parents_created: z.number().int(),
         links_created: z.number().int(),
         parent_conflicts: z.number().int().openapi({
-          description: "Rows whose parent will not be linked (PARENT_ACCOUNT_EXISTS).",
+          description: "Parents that will not be linked (see parent_conflict).",
+        }),
+        placed: z
+          .number()
+          .int()
+          .openapi({ description: "Students placed in or moved to a section." }),
+        placement_conflicts: z.number().int().openapi({
+          description: "Students that will be imported unplaced (see placement_conflict).",
         }),
       })
       .openapi({ description: "Counts over every valid row, regardless of the action filter." }),
@@ -732,3 +789,23 @@ export const unmappedHeaderSignalSchema = z
   });
 
 export type UnmappedHeaderSignal = z.infer<typeof unmappedHeaderSignalSchema>;
+
+// ---------------------------------------------------------------------------
+// Template download
+// ---------------------------------------------------------------------------
+
+export const STUDENT_IMPORT_TEMPLATE_XLSX_MEDIA_TYPE =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+export const studentImportTemplateQuerySchema = z
+  .object({
+    format: z
+      .enum(["csv", "xlsx"])
+      .default("csv")
+      .openapi({ description: "csv (default) or xlsx, an Excel workbook with dropdowns." }),
+    lang: z
+      .enum(["en", "ar"])
+      .default("en")
+      .openapi({ description: "The xlsx workbook's language: headers, notes and instructions." }),
+  })
+  .openapi("StudentImportTemplateQuery");

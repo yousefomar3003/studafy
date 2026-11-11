@@ -116,4 +116,28 @@ void main() {
     expect(await session.tokenProvider, isNull);
     expect(session.isAuthenticated, isFalse);
   });
+
+  for (final status in [408, 429]) {
+    test('a $status on renewal keeps the user signed in', () async {
+      // A school's devices share one IP, so a rate-limited refresh is ordinary on a busy morning
+      // and says nothing about whether the refresh token is still good.
+      final adapter = _RefreshAdapter(
+        (_) async => _json(status, {'title': 'Too Many Requests'}),
+      );
+      final session = await signedIn(adapter, expiresIn: 30);
+
+      expect(await session.tokenProvider, 'old-access');
+      expect(session.isAuthenticated, isTrue);
+    });
+  }
+
+  test('only rejections of the token itself count as the session ending', () {
+    expect(AuthSession.isSessionRejection(400), isTrue);
+    expect(AuthSession.isSessionRejection(401), isTrue);
+    expect(AuthSession.isSessionRejection(403), isTrue);
+    expect(AuthSession.isSessionRejection(408), isFalse);
+    expect(AuthSession.isSessionRejection(429), isFalse);
+    expect(AuthSession.isSessionRejection(500), isFalse);
+    expect(AuthSession.isSessionRejection(503), isFalse);
+  });
 }

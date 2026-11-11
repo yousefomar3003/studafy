@@ -5,7 +5,9 @@
  *
  * Per due account, one transaction:
  *   - stop AI add-on billing (Stripe: cancel at period end; Tap: drop the saved card so the
- *     renewal worker has nothing to charge),
+ *     renewal worker has nothing to charge; Google Play: turn off renewal, best-effort; App Store:
+ *     impossible -- Apple offers no cancel API, so the delete screens told the person to cancel it
+ *     in the store),
  *   - detach from the school: status `archived`, roles, sign-in identities and parent links
  *     removed — with no oauth_identities row and no roles, no login or refresh can succeed,
  *   - revoke any session still open (one signed in during the grace period to cancel, say),
@@ -42,6 +44,17 @@ export interface AiBillingCanceller {
   cancelStripeSubscriptionAtPeriodEnd(subscriptionId: string): Promise<void>;
 }
 
+/** Turns off renewal of one AI add-on bought through Google Play, by its purchase token. */
+export interface GooglePlayBillingCanceller {
+  cancelGooglePlaySubscription(purchaseToken: string): Promise<"canceled" | "not_renewing">;
+}
+
+/** The providers the sweep may call. Either is null when the deployment has no credentials for it. */
+export interface AiBillingCancellers {
+  stripe: AiBillingCanceller | null;
+  googlePlay: GooglePlayBillingCanceller | null;
+}
+
 export interface AccountDeletionSweepResult {
   accountsDeleted: number;
   failures: number;
@@ -50,7 +63,7 @@ export interface AccountDeletionSweepResult {
 export async function runAccountDeletionSweep(
   sql: Sql,
   now: Date,
-  billing: AiBillingCanceller | null,
+  billing: AiBillingCancellers,
   enqueue: EnqueueDsrJob,
   log: BillingLogger,
 ): Promise<AccountDeletionSweepResult> {
@@ -61,7 +74,7 @@ export async function runAccountDeletionSweep(
     for (const userId of due) {
       try {
         const requestId = await withSystemTenantTx(sql, { schoolId }, (tx) =>
-          runDeletion(tx, schoolId, userId, now, billing),
+          runDeletion(tx, schoolId, userId, now, billing, log),
         );
         if (!requestId) continue;
         result.accountsDeleted += 1;
@@ -104,7 +117,8 @@ async function runDeletion(
   schoolId: string,
   userId: string,
   now: Date,
-  billing: AiBillingCanceller | null,
+  billing: AiBillingCancellers,
+  log: BillingLogger,
 ): Promise<string | null> {
   // Re-checked under the row lock: a cancellation may have landed since the due set was read.
   const [user] = await tx<{ email: string | null; status: string; deletion_requested_at: Date }[]>`
@@ -115,7 +129,8 @@ async function runDeletion(
   `;
   if (!user) return null;
 
-  const aiSubscriptionsCanceled = await cancelAiSubscriptions(tx, billing, userId);
+  const aiSubscriptionsCanceled = await cancelAiSubscriptions(tx, billing.stripe, userId);
+  const storeSubscriptions = await stopStoreRenewals(tx, billing.googlePlay, schoolId, userId, log);
 
   await tx`
     UPDATE app.users
@@ -164,6 +179,7 @@ async function runDeletion(
       data_subject_request_id: request.id,
       erasure_due_at: request.slaDueAt.toISOString(),
       ai_subscriptions_canceled: aiSubscriptionsCanceled,
+      ...(storeSubscriptions.length > 0 ? { store_subscriptions: storeSubscriptions } : {}),
     },
   });
 
@@ -224,4 +240,77 @@ async function cancelAiSubscriptions(
     }
   }
   return canceled;
+}
+
+/** What happened to one live store-billed AI add-on; recorded on the deletion's audit entry. */
+export interface StoreSubscriptionOutcome {
+  platform: "apple" | "google";
+  /**
+   * `canceled`: Play renewal turned off. `not_renewing`: Play says it will not renew anyway.
+   * `not_configured`: no Play credentials on this deployment. `failed`: the Play call failed.
+   * `not_cancellable`: an App Store subscription, which only the person can cancel.
+   */
+  outcome: "canceled" | "not_renewing" | "not_configured" | "failed" | "not_cancellable";
+}
+
+/**
+ * Stops renewal of a live AI add-on bought in an app store for this user's student record, where
+ * the store lets Studafy. Best-effort, unlike Stripe above: a failure is logged and recorded, never
+ * thrown, because the account must still be detached and erased on time -- and the person was
+ * already told on the delete screen to cancel in the store, which is the only way for the App
+ * Store. A parent's own deletion cancels nothing for their children: the children's accounts stay.
+ *
+ * Store purchases have no provider column on ai_subscriptions; their billing event names the store
+ * (app.ai_store_purchases, 000163), the same lookup apps/api's licensing/overlap.ts uses.
+ */
+async function stopStoreRenewals(
+  tx: TransactionSql,
+  googlePlay: GooglePlayBillingCanceller | null,
+  schoolId: string,
+  userId: string,
+  log: BillingLogger,
+): Promise<StoreSubscriptionOutcome[]> {
+  const rows = await tx<{ platform: string; store_ref: string }[]>`
+    SELECT p.platform, p.store_ref
+    FROM app.ai_subscriptions AS a
+    JOIN app.students AS s ON s.id = a.student_id AND s.school_id = a.school_id
+    JOIN app.ai_store_purchases(
+      ARRAY(
+        SELECT st.id FROM app.students AS st
+        WHERE st.user_id = ${userId}::uuid
+          AND st.school_id = current_setting('app.school_id')::uuid
+      )
+    ) AS p ON p.student_id = a.student_id
+    WHERE s.user_id = ${userId}::uuid
+      AND a.status NOT IN ('canceled', 'expired', 'closed')
+      AND a.stripe_subscription_id IS NULL
+      AND a.tap_payment_agreement_id IS NULL
+  `;
+
+  const outcomes: StoreSubscriptionOutcome[] = [];
+  for (const row of rows) {
+    if (row.platform !== "google") {
+      outcomes.push({ platform: "apple", outcome: "not_cancellable" });
+      continue;
+    }
+    if (!googlePlay) {
+      log.warn(
+        { school_id: schoolId, user_id: userId },
+        "account deletion: Google Play is not configured; the AI add-on's Play renewal was not turned off",
+      );
+      outcomes.push({ platform: "google", outcome: "not_configured" });
+      continue;
+    }
+    try {
+      const outcome = await googlePlay.cancelGooglePlaySubscription(row.store_ref);
+      outcomes.push({ platform: "google", outcome });
+    } catch (error) {
+      log.warn(
+        { err: error, school_id: schoolId, user_id: userId },
+        "account deletion: turning off the AI add-on's Google Play renewal failed",
+      );
+      outcomes.push({ platform: "google", outcome: "failed" });
+    }
+  }
+  return outcomes;
 }

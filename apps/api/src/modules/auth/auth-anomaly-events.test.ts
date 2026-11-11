@@ -46,12 +46,16 @@ function createStubEventSink() {
 // ---------------------------------------------------------------------------
 
 describe("ROUTE_CLASS_MAP registration", () => {
-  test("refresh is auth-strict", () => {
-    expect(ROUTE_CLASS_MAP["/api/auth/refresh"]).toBe("auth-strict");
+  test("refresh is auth-session", () => {
+    expect(ROUTE_CLASS_MAP["/api/auth/refresh"]).toBe("auth-session");
   });
 
-  test("logout is auth-strict", () => {
-    expect(ROUTE_CLASS_MAP["/api/auth/logout"]).toBe("auth-strict");
+  test("logout is auth-session", () => {
+    expect(ROUTE_CLASS_MAP["/api/auth/logout"]).toBe("auth-session");
+  });
+
+  test("member sign-in is auth-login", () => {
+    expect(ROUTE_CLASS_MAP["/api/auth/login/member"]).toBe("auth-login");
   });
 
   test("sessions is auth", () => {
@@ -76,12 +80,12 @@ describe("ROUTE_CLASS_MAP registration", () => {
 });
 
 describe("resolveRouteClass", () => {
-  test("resolves /api/auth/refresh to auth-strict", () => {
-    expect(resolveRouteClass("/api/auth/refresh")).toBe("auth-strict");
+  test("resolves /api/auth/refresh to auth-session", () => {
+    expect(resolveRouteClass("/api/auth/refresh")).toBe("auth-session");
   });
 
-  test("resolves /api/auth/logout to auth-strict", () => {
-    expect(resolveRouteClass("/api/auth/logout")).toBe("auth-strict");
+  test("resolves /api/auth/logout to auth-session", () => {
+    expect(resolveRouteClass("/api/auth/logout")).toBe("auth-session");
   });
 
   test("resolves /api/auth/sessions to auth", () => {
@@ -245,5 +249,19 @@ describe("emitTokenReuseDetected", () => {
     });
 
     expect(log.calls[0].fields).toMatchObject({ device_id: null });
+  });
+});
+
+describe("budgets for endpoints a whole school calls from one IP", () => {
+  // 15-minute access tokens refreshed 2 minutes early: one refresh per device per 13 minutes.
+  const REFRESHES_PER_DEVICE_PER_SECOND = 1 / (13 * 60);
+
+  test("refresh sustains well over a thousand devices behind one address", () => {
+    const devices = RATE_LIMIT_BUDGETS["auth-session"].refillRate / REFRESHES_PER_DEVICE_PER_SECOND;
+    expect(devices).toBeGreaterThan(1_000);
+  });
+
+  test("a class of 30 can sign in at once from one address", () => {
+    expect(RATE_LIMIT_BUDGETS["auth-login"].maxTokens).toBeGreaterThanOrEqual(30);
   });
 });

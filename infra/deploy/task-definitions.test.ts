@@ -67,6 +67,7 @@ describe("attendance report ECS task definitions", () => {
       READ_DATABASE_NAME: "workers_read",
       S3_REGION: "1",
       S3_APP_FILES_BUCKET: "1",
+      STORAGE_SENSITIVE_KMS_KEY_ID: "1",
       FRONTEND_URL: "1",
     });
     expect(values(container.secrets)).toHaveProperty("DATABASE_CA_CERT");
@@ -273,6 +274,19 @@ describe("production readiness of the ECS task definitions", () => {
         valueFrom: `<API_APP_SECRETS_ARN>:${key}::`,
       });
     }
+    // The account-deletion sweep turns off Google Play renewals with the same package and key.
+    const workers = (await renderNamed("workers")).containerDefinitions.find(
+      (c) => c.name === "workers",
+    )!;
+    expect(values(workers.environment!)).toMatchObject({
+      GOOGLE_PLAY_PACKAGE_NAME: "<GOOGLE_PLAY_PACKAGE_NAME>",
+    });
+    expect(workers.secrets).toContainEqual({
+      name: "GOOGLE_PLAY_SERVICE_ACCOUNT",
+      valueFrom: "<WORKERS_APP_SECRETS_ARN>:GOOGLE_PLAY_SERVICE_ACCOUNT::",
+    });
+    const mainTf = await readFile(join(import.meta.dir, "..", "terraform", "main.tf"), "utf8");
+    expect(mainTf).toMatch(/workers = \{[^}]*\bGOOGLE_PLAY_SERVICE_ACCOUNT = ""/);
     // Every tier defines each id (empty = that store is off), so envsubst never renders a stale shell
     // value into the task definition.
     for (const tier of ["dev", "staging", "prod"]) {

@@ -7,6 +7,7 @@ import { ErpNextClient } from "./erpnext/client";
 import { erpNextWebhookRoutes } from "./erpnext/webhook";
 import { healthRoutes } from "./health";
 import { createNoopSecurityEventSink } from "./lib/security/securityEventSink";
+import { createUploadScanEnqueuer } from "./lib/storage/upload-scan";
 import {
   requestIdMiddleware,
   localeMiddleware,
@@ -21,12 +22,14 @@ import {
   jwtAuthMiddleware,
   tenantLifecycleGuard,
   accountDeletionGuard,
+  legalAcceptanceGuard,
 } from "./middleware";
 import {
   academicYearRoutes,
   termRoutes,
   subjectRoutes,
   courseRoutes,
+  classAiMaterialsRoutes,
   classRoutes,
   roomRoutes,
   sectionRoutes,
@@ -185,6 +188,7 @@ import { openApiValidationHook } from "./openapi/hook";
 import type { Database } from "./db";
 import type { SecurityEventSink } from "./lib/security/securityEventSink";
 import type { StorageService } from "./lib/storage";
+import type { UploadScanEnqueuer } from "./lib/storage/upload-scan";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
@@ -313,6 +317,12 @@ export interface AppOptions {
    */
   storage?: StorageService | null;
   /**
+   * Hands committed uploads to the malware scanner (F-14, lib/storage/upload-scan.ts). Defaults to
+   * a `scan-upload` producer on the file-scan queue when `redis` is present, and to none without it
+   * (uploads then stay unserved). Tests pass a recorder.
+   */
+  uploadScanEnqueuer?: UploadScanEnqueuer | null;
+  /**
    * Stripe payment provider for subscription billing.
    *
    * Nullable: when absent, checkout, portal, and webhook routes still register (so the OpenAPI
@@ -390,6 +400,7 @@ export function createApp({
   qaLoginPassword,
   rateLimitDisabled = false,
   storage = null,
+  uploadScanEnqueuer,
   stripeProvider = null,
   tapProvider = null,
   tapCountries = new Set(),
@@ -477,6 +488,17 @@ export function createApp({
   // boundary to drift onto different connections or key prefixes.
   const jtiDenylist = redis ? createJtiDenylist(redis) : null;
 
+  // The malware scan producer for every upload other than a material (F-14). On every request, so a
+  // route that stores a file enqueues its scan through enqueueUploadScans(c, ...) after commit.
+  const uploadScan =
+    uploadScanEnqueuer === undefined ? createUploadScanEnqueuer(redis ?? null) : uploadScanEnqueuer;
+  if (uploadScan) {
+    app.use("*", async (c, next) => {
+      c.set("uploadScan", uploadScan);
+      await next();
+    });
+  }
+
   // OAuth state (PKCE verifier + nonce, keyed by `state`), shared by every OAuth flow below. One
   // instance because the browser flows — login, invitation activation, provider linking — all
   // return through each provider's single registered callback, which must see whatever state the
@@ -527,6 +549,11 @@ export function createApp({
   // Account deletion guard (000143): a session signed in during a deletion's grace period may only
   // read its profile, cancel the deletion or log out. Claim-only, like the lifecycle guard.
   app.use("/api/*", accountDeletionGuard());
+
+  // Legal acceptance guard (000188): until the user accepts the current Terms of Service and
+  // Privacy Policy, the session may only read its profile, accept, manage its own deletion or log
+  // out. Claim-only, like the deletion guard.
+  app.use("/api/*", legalAcceptanceGuard());
 
   // Rate limiter middleware: token-bucket rate limiting via Redis. Registered after the logger
   // so rate-limited requests are still logged for observability, but before routes so they
@@ -1233,6 +1260,9 @@ export function createApp({
   // enqueued.
   if (database) {
     app.route("/", materialRoutes(database, storage, redis ?? null));
+    // Per-class "use this class's materials with the AI study assistant" setting (000196). Turning
+    // it back on enqueues ingestion, so it takes Redis the same optional way.
+    app.route("/", classAiMaterialsRoutes(database, redis ?? null));
   }
 
   // Global search (ST-278). Role-scoped Postgres full-text search across students, users,

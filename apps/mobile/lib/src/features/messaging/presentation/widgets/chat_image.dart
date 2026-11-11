@@ -5,6 +5,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/offline/attachment_image_cache.dart';
 import '../../application/messaging_providers.dart';
 import '../../domain/messaging.dart';
 
@@ -29,11 +30,14 @@ class ChatImage {
 
 /// Renders a [ChatImage] filling its box, with a placeholder while loading.
 ///
+/// Network images go through [AttachmentImageCache], keyed by the attachment id, so the URL
+/// re-minted by every message re-fetch does not download (or decode) a picture again.
+///
 /// A network image that fails to load is most likely past its five-minute URL: [onError] is
 /// called (once per URL, after the frame) so the chat can re-fetch the messages for fresh URLs,
 /// and a neutral placeholder stays in the meantime instead of an error. A local file that fails
 /// and an attachment with no URL show "Photo unavailable".
-class ChatImageView extends StatefulWidget {
+class ChatImageView extends ConsumerStatefulWidget {
   const ChatImageView({
     required this.image,
     this.fit = BoxFit.cover,
@@ -52,10 +56,10 @@ class ChatImageView extends StatefulWidget {
   final bool decodeAtDisplaySize;
 
   @override
-  State<ChatImageView> createState() => _ChatImageViewState();
+  ConsumerState<ChatImageView> createState() => _ChatImageViewState();
 }
 
-class _ChatImageViewState extends State<ChatImageView> {
+class _ChatImageViewState extends ConsumerState<ChatImageView> {
   String? _reportedUrl;
 
   void _reportError(String url) {
@@ -96,10 +100,16 @@ class _ChatImageViewState extends State<ChatImageView> {
     }
     final url = image.url;
     if (url == null) return const _Placeholder(unavailable: true);
-    return Image.network(
-      url,
+    return Image(
+      // Keyed by the URL: a fresh URL after a failure is a new load, not the failed one.
       key: ValueKey(url),
-      cacheWidth: cacheWidth,
+      image: AttachmentImageProvider(
+        cache: ref.watch(attachmentImageCacheProvider),
+        namespace: 'chat',
+        id: image.key,
+        url: url,
+        cacheWidth: cacheWidth,
+      ),
       fit: widget.fit,
       loadingBuilder: (context, child, progress) => progress == null
           ? child

@@ -24,6 +24,19 @@ import type { MiddlewareHandler } from "hono";
  * Routes that never reach the provider (usage, search, grading, reviews, exam polling, consent
  * itself) pass through untouched.
  */
+/**
+ * A consent verdict already read for this request, keyed by the request itself. The student-self
+ * gate runs first on every per-student route; when that route also calls the model it reads the
+ * consent in the same transaction as the self check and leaves the verdict here, so one request
+ * opens one transaction for both gates instead of two. Never carried across requests: a
+ * withdrawal takes effect on the very next request, on every API instance.
+ */
+const prefetchedConsent = new WeakMap<Request, boolean>();
+
+export function rememberConsentVerdict(request: Request, consented: boolean): void {
+  prefetchedConsent.set(request, consented);
+}
+
 export function aiConsentGate(deps: { database: Database }): MiddlewareHandler<AppEnv> {
   const { database } = deps;
 
@@ -34,13 +47,15 @@ export function aiConsentGate(deps: { database: Database }): MiddlewareHandler<A
     }
 
     const auth = requireAuth(c);
-    const consent = await withTenantTx(
-      database,
-      { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
-      (tx) => findCurrentConsent(tx, auth.userId),
-    );
+    const consented =
+      prefetchedConsent.get(c.req.raw) ??
+      (await withTenantTx(
+        database,
+        { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+        async (tx) => (await findCurrentConsent(tx, auth.userId)) !== null,
+      ));
 
-    if (!consent) {
+    if (!consented) {
       throw new CodedHttpException(
         403,
         ERROR_CODES.AI_CONSENT_REQUIRED,

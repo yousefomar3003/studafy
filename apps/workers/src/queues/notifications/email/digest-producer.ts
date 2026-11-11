@@ -14,16 +14,17 @@
  */
 
 import { DOMAIN_EVENTS } from "@studafy/constants";
-import postgres from "postgres";
 
+import { leaseDatabase } from "../../../db/pool";
 import { withSystemTenantTx } from "../../../db/tenant-tx";
 
 import { loadSchoolIds } from "./schools";
 
-import type { TransactionSql } from "postgres";
+import type { DatabaseSource } from "../../../db/pool";
+import type { Sql, TransactionSql } from "postgres";
 
 /** The parent-facing events a digest aggregates. Their payload schemas live in apps/api. */
-const DIGEST_SOURCE_EVENTS: readonly string[] = [
+export const DIGEST_SOURCE_EVENTS: readonly string[] = [
   DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED,
   DOMAIN_EVENTS.FEE_INSTALLMENT_OVERDUE,
 ];
@@ -149,7 +150,7 @@ async function loadParentEmail(tx: TransactionSql, parentUserId: string): Promis
  * digest.sent outbox events, all in one transaction.
  */
 async function processSchool(
-  sql: postgres.Sql,
+  sql: Sql,
   schoolId: string,
 ): Promise<{ parents: number; items: number; claimed: number }> {
   return withSystemTenantTx(sql, { schoolId }, async (tx) => {
@@ -204,12 +205,13 @@ async function processSchool(
 }
 
 /**
- * Run one digest cycle. `databaseUrl` is a parameter rather than read from the environment so the
- * processor is callable from a test against a disposable database — the same shape the attendance
- * alert processor establishes.
+ * Run one digest cycle. `database` is a parameter rather than read from the environment — the
+ * process-wide pool in production, a connection string for a disposable database in tests — the
+ * same shape the attendance alert processor establishes.
  */
-export async function processDigest(databaseUrl: string): Promise<DigestResult> {
-  const sql = postgres(databaseUrl, { max: 4, idle_timeout: 20, prepare: false });
+export async function processDigest(database: DatabaseSource): Promise<DigestResult> {
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
     const schoolIds = await loadSchoolIds(sql);
@@ -233,6 +235,6 @@ export async function processDigest(databaseUrl: string): Promise<DigestResult> 
       sourceEventsClaimed: claimed,
     };
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }

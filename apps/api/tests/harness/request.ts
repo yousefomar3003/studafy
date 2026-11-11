@@ -7,6 +7,7 @@ import { AUTH_CHANNELS, KeyStore, signAccessToken } from "../../src/modules/auth
 
 import type { Database } from "../../src/db";
 import type { StorageService } from "../../src/lib/storage";
+import type { UploadScanEnqueuer } from "../../src/lib/storage/upload-scan";
 import type { AppEnv } from "../../src/middleware/requestId";
 import type { AuthChannel } from "../../src/modules/auth";
 import type { PaymentProviderPort } from "../../src/modules/subscriptions";
@@ -57,6 +58,8 @@ export interface TestAppOptions {
   stripeProvider?: PaymentProviderPort | null;
   /** Object storage (e.g. an in-memory fake). Defaults to `null`: storage-backed routes answer 503. */
   storage?: StorageService | null;
+  /** Records the malware scans uploads enqueue (F-14). Defaults to none: uploads stay unserved. */
+  uploadScanEnqueuer?: UploadScanEnqueuer | null;
 }
 
 /** A test app plus the key store whose keys its tokens must be signed with. */
@@ -94,6 +97,7 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     docsEnabled: options.docsEnabled ?? false,
     stripeProvider: options.stripeProvider ?? null,
     storage: options.storage ?? null,
+    uploadScanEnqueuer: options.uploadScanEnqueuer ?? null,
   });
 
   return { app, keyStore, ready: keyStore.init() };

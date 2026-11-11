@@ -133,6 +133,24 @@ describe("loadEnv", () => {
     expect(env.STRIPE_SECRET_KEY).toBeUndefined();
   });
 
+  test("takes the Google Play package and service account together, the key as JSON", () => {
+    const google = {
+      GOOGLE_PLAY_PACKAGE_NAME: "com.studafy.studafy_mobile",
+      GOOGLE_PLAY_SERVICE_ACCOUNT: '{"type":"service_account"}',
+    };
+    expect(loadEnv(google)).toMatchObject(google);
+    expect(
+      loadEnv({ GOOGLE_PLAY_PACKAGE_NAME: "", GOOGLE_PLAY_SERVICE_ACCOUNT: "" })
+        .GOOGLE_PLAY_PACKAGE_NAME,
+    ).toBeUndefined();
+    expect(() => loadEnv({ ...google, GOOGLE_PLAY_SERVICE_ACCOUNT: "" })).toThrow(
+      EnvValidationError,
+    );
+    expect(() => loadEnv({ ...google, GOOGLE_PLAY_SERVICE_ACCOUNT: "not json" })).toThrow(
+      EnvValidationError,
+    );
+  });
+
   describe("email in production", () => {
     const deployed = {
       NODE_ENV: "production",

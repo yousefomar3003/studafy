@@ -35,7 +35,10 @@ final messagingUserIdProvider = Provider<String?>((ref) {
 /// The caller's conversations, newest activity first. Keyed by student id: a parent's Messages
 /// tab asks for the selected child's; `null` asks for every conversation (the teacher's list,
 /// and the unread badge on either role's Messages tab).
-final conversationsProvider = FutureProvider.family<List<Conversation>, String?>((
+///
+/// Auto-disposed: a child's list the parent switched away from is dropped rather than kept (and
+/// re-fetched by every refresh); the all-conversations list stays alive under the badge.
+final conversationsProvider = FutureProvider.autoDispose.family<List<Conversation>, String?>((
   ref,
   studentId,
 ) async {
@@ -64,10 +67,15 @@ final teacherMessagingContactsProvider = FutureProvider.autoDispose<List<Teacher
   (ref) => ref.watch(messagingClientProvider).fetchTeacherContacts(),
 );
 
-/// Re-fetches every conversation list (and with it the unread badge). Called on pull-to-refresh,
-/// when the Messages tab is re-selected, and when a chat is closed.
+/// Re-fetches the conversation list on screen — [studentId]'s (a parent's selected child) or every
+/// conversation's (`null`, the teacher's) — and with it the unread badge. Called on
+/// pull-to-refresh, when the Messages tab is re-selected, and when a chat is closed.
+///
+/// Only those keys: the badge sums every conversation, which one child's list cannot stand in for,
+/// so for a parent it is a second read; other children's lists are not touched.
 Future<void> refreshConversations(WidgetRef ref, {String? studentId}) async {
-  ref.invalidate(conversationsProvider);
+  ref.invalidate(conversationsProvider(studentId));
+  if (studentId != null) ref.invalidate(conversationsProvider(null));
   try {
     await ref.read(conversationsProvider(studentId).future);
   } on Object {
@@ -96,8 +104,18 @@ PendingFailure pendingFailureOf(Object error) {
   };
 }
 
-/// How often an open chat asks for new messages. Override in tests.
+/// How soon an open chat asks for new messages after something happened (a message sent or
+/// received, the chat opened). Override in tests.
+///
+/// While nothing new arrives the wait doubles up to [chatPollIdleMaxInterval]; after a failed
+/// poll it doubles up to [chatPollErrorMaxInterval]. Either resets to this on the next message.
 final chatPollIntervalProvider = Provider<Duration>((ref) => const Duration(seconds: 5));
+
+/// The longest wait between two polls of a quiet chat: 5 → 10 → 20 → 30 seconds.
+const chatPollIdleMaxInterval = Duration(seconds: 30);
+
+/// The longest wait between two polls while they keep failing (offline, server trouble).
+const chatPollErrorMaxInterval = Duration(minutes: 2);
 
 /// The clock pending messages are stamped with. Override in tests.
 final chatClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
@@ -119,13 +137,17 @@ const attachmentRefreshCooldown = Duration(seconds: 15);
 ///
 /// Polling is not automatic: the chat screen starts it while it is visible and the app is in
 /// the foreground, and stops it on pause / dispose. Auto-disposed with the screen, which also
-/// cancels any timer still running.
+/// cancels any timer still running. It is adaptive — see [chatPollIntervalProvider] — so a chat
+/// left open with nothing happening settles at one request per [chatPollIdleMaxInterval].
 class ChatController extends Notifier<ChatState> {
   ChatController(this.conversationId);
 
   final String conversationId;
 
+  /// The next scheduled poll. One-shot: each poll schedules the one after it.
   Timer? _pollTimer;
+  bool _pollingActive = false;
+  Duration? _pollInterval;
   bool _polling = false;
   bool _refreshingAttachments = false;
   DateTime? _lastAttachmentRefresh;
@@ -134,7 +156,12 @@ class ChatController extends Notifier<ChatState> {
   MessagingClient get _client => ref.read(messagingClientProvider);
 
   /// Whether the periodic poll is running.
-  bool get isPolling => _pollTimer != null;
+  bool get isPolling => _pollingActive;
+
+  /// The wait before the next scheduled poll. Exposed for tests.
+  Duration get pollInterval => _pollInterval ?? _baseInterval;
+
+  Duration get _baseInterval => ref.read(chatPollIntervalProvider);
 
   @override
   ChatState build() {
@@ -163,21 +190,49 @@ class ChatController extends Notifier<ChatState> {
     }
   }
 
-  /// Starts polling every [chatPollIntervalProvider]. No-op if already running.
+  /// Starts polling, first after [chatPollIntervalProvider]. No-op if already running.
   void startPolling() {
-    if (_pollTimer != null) return;
-    _pollTimer = Timer.periodic(ref.read(chatPollIntervalProvider), (_) => poll());
+    if (_pollingActive) return;
+    _pollingActive = true;
+    _pollInterval = _baseInterval;
+    _scheduleNextPoll();
   }
 
   void stopPolling() {
+    _pollingActive = false;
     _pollTimer?.cancel();
     _pollTimer = null;
+  }
+
+  void _scheduleNextPoll() {
+    _pollTimer?.cancel();
+    _pollTimer = null;
+    if (!_pollingActive || !ref.mounted) return;
+    _pollTimer = Timer(pollInterval, () async {
+      _pollTimer = null;
+      await poll();
+      _scheduleNextPoll();
+    });
+  }
+
+  /// Something happened in the chat: the next poll comes after the shortest wait again, sooner
+  /// than the one already scheduled if the chat had gone quiet.
+  void _resetPollInterval() {
+    if (pollInterval == _baseInterval) return;
+    _pollInterval = _baseInterval;
+    if (_pollTimer != null) _scheduleNextPoll();
+  }
+
+  /// Doubles the wait before the next poll, up to [max].
+  void _backOffPoll(Duration max) {
+    final doubled = pollInterval * 2;
+    _pollInterval = doubled > max ? max : doubled;
   }
 
   /// Fetches messages newer than the latest one shown and merges them in (no duplicates, even
   /// if the server's `since` is inclusive or a just-sent message arrives both ways). Marks the
   /// conversation read when something from the other side arrived. Failures are swallowed — the
-  /// next tick tries again.
+  /// next scheduled poll tries again, after a longer wait.
   Future<void> poll() async {
     if (_polling || state.isLoading || state.error != null || !ref.mounted) return;
     _polling = true;
@@ -187,10 +242,14 @@ class ChatController extends Notifier<ChatState> {
         limit: chatPageSize,
         since: state.latestCreatedAt,
       );
-      if (!ref.mounted || page.messages.isEmpty) return;
+      if (!ref.mounted) return;
       final known = {for (final message in state.messages) message.id};
       final fresh = page.messages.where((message) => !known.contains(message.id)).toList();
-      if (fresh.isEmpty) return;
+      if (fresh.isEmpty) {
+        _backOffPoll(chatPollIdleMaxInterval);
+        return;
+      }
+      _resetPollInterval();
       final me = ref.read(messagingUserIdProvider);
       // A message of ours the poll saw before its POST answered: drop the matching in-flight
       // bubble now rather than show it twice until the POST resolves.
@@ -207,7 +266,8 @@ class ChatController extends Notifier<ChatState> {
       state = state.copyWith(messages: mergeMessages(state.messages, fresh), pending: pending);
       if (fresh.any((message) => message.senderId != me)) unawaited(_markRead());
     } on Object {
-      // Transient; keep what is shown.
+      // Transient; keep what is shown and wait longer before asking again.
+      if (ref.mounted) _backOffPoll(chatPollErrorMaxInterval);
     } finally {
       _polling = false;
     }
@@ -302,6 +362,8 @@ class ChatController extends Notifier<ChatState> {
       images: images,
     );
     state = state.copyWith(pending: [...state.pending, pending]);
+    // A reply is likelier now than at any time the chat sat quiet.
+    _resetPollInterval();
     await _deliver(pending);
   }
 

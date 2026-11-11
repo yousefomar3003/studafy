@@ -519,6 +519,16 @@
       "title": "Create a list from a spreadsheet",
       "where": "Lists › From a spreadsheet",
       "keywords": "import list, spreadsheet, csv, excel, upload sheet, unrecognised file, custom list import, new list from file"
+    },
+    "import-data": {
+      "title": "Import data",
+      "where": "Admin › Import data",
+      "keywords": "import, upload, excel, spreadsheet, template, bulk, students, parents, onboarding, get started"
+    },
+    "login-slips": {
+      "title": "Print login slips",
+      "where": "Admin › Import data",
+      "keywords": "login slips, sign-in codes, setup codes, passwords, print, first sign-in, student IDs"
     }
   }
 }

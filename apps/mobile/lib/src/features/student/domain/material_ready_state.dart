@@ -54,4 +54,16 @@ extension MaterialReadyStateX on MaterialReadyState {
   /// Whether the storage gateway will actually resolve a download URL for a material in this
   /// state — true only for [MaterialReadyState.ready].
   bool get isOpenable => this == MaterialReadyState.ready;
+
+  /// Whether the pipeline is done with this material — [MaterialReadyState.ready],
+  /// [MaterialReadyState.failed] or [MaterialReadyState.quarantined] — so re-reading it will not
+  /// show a different state without someone acting on it. Screens poll only while some material
+  /// is not settled.
+  bool get isSettled => switch (this) {
+    MaterialReadyState.ready || MaterialReadyState.failed || MaterialReadyState.quarantined => true,
+    MaterialReadyState.pendingScan ||
+    MaterialReadyState.scanning ||
+    MaterialReadyState.queued ||
+    MaterialReadyState.processing => false,
+  };
 }

@@ -1,5 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { ERROR_CODES, ROLES } from "@studafy/constants";
+import { AI_EXAM_SUBMIT_GRACE_SECONDS, ERROR_CODES, ROLES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
@@ -164,11 +164,11 @@ function fakeDatabase(
     queries.push(sql);
     let rows: unknown[] = [];
 
-    if (sql.includes("SELECT id, ingest_status")) {
+    if (sql.includes("SELECT m.id, m.ingest_status")) {
       const materialIds = args[1] as string[];
       rows = materialIds
         .filter((id) => over.materials?.[id])
-        .map((id) => ({ id, ingest_status: over.materials![id]!.ingest_status }));
+        .map((id) => ({ id, ingest_status: over.materials![id]!.ingest_status, ai_enabled: true }));
     } else if (sql.includes("INSERT INTO app.exam_sessions")) {
       rows = [{ id: EXAM_ID, created_at: baseSession().created_at }];
     } else if (sql.includes("SET status = 'failed'")) {
@@ -584,6 +584,50 @@ describe("POST /api/ai/students/{studentId}/exams/{examId}/submit", () => {
           status: "in_progress",
           started_at: new Date("2020-01-01T00:00:00.000Z"),
           expires_at: new Date("2020-01-01T00:30:00.000Z"),
+        }),
+        items: gradableItems(),
+      }).database,
+    });
+
+    const res = await postJson(app, submitUrl, { answers: [] });
+    const body = (await res.json()) as { code: string };
+
+    expect(res.status).toBe(409);
+    expect(body.code).toBe(ERROR_CODES.AI_EXAM_EXPIRED);
+  });
+
+  test("a submit landing within the grace after expires_at is still scored", async () => {
+    // The client auto-submits at its own 00:00; skew and latency mean that request can reach the
+    // server a few seconds after expires_at. It must still count as an on-time hand-in.
+    const app = buildExamApp({
+      database: fakeDatabase({
+        session: baseSession({
+          status: "in_progress",
+          started_at: new Date(Date.now() - 30 * 60_000),
+          expires_at: new Date(Date.now() - 5_000),
+        }),
+        items: gradableItems(),
+        answers: [
+          { exam_item_id: ITEM_1, is_correct: true },
+          { exam_item_id: ITEM_2, is_correct: false },
+        ],
+      }).database,
+    });
+
+    const res = await postJson(app, submitUrl, { answers: [{ item_id: ITEM_1, answer: "A" }] });
+    const body = (await res.json()) as { status: string };
+
+    expect(res.status).toBe(200);
+    expect(body.status).toBe("submitted");
+  });
+
+  test("a submit landing just past the grace answers 409 AI_EXAM_EXPIRED", async () => {
+    const app = buildExamApp({
+      database: fakeDatabase({
+        session: baseSession({
+          status: "in_progress",
+          started_at: new Date(Date.now() - 31 * 60_000),
+          expires_at: new Date(Date.now() - (AI_EXAM_SUBMIT_GRACE_SECONDS + 1) * 1000),
         }),
         items: gradableItems(),
       }).database,

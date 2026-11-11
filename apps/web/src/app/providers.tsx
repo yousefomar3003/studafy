@@ -3,7 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { useMemo, useState, type PropsWithChildren } from "react";
 
 import { AuthProvider, sessionStore, useAuthStatus } from "../lib/auth";
-import { API_BASE_URL } from "../lib/config";
+import { API_BASE_URL, REALTIME_ENABLED } from "../lib/config";
 import { LocaleProvider, useTranslation } from "../lib/i18n";
 import { MonitoringUserSync } from "../lib/monitoring";
 import { fetchRealtimeTicket, RealtimeClient, RealtimeProvider } from "../lib/realtime";
@@ -38,8 +38,11 @@ export function AppProviders({
   sessionStore: sessionStoreOverride,
   realtimeSocketFactory,
   realtimeGetTicket,
+  realtimeEnabled = REALTIME_ENABLED,
 }: PropsWithChildren<{
   sessionStore?: SessionStore;
+  /** Test seam: overrides the build's `REALTIME_ENABLED` (lib/config.ts). */
+  realtimeEnabled?: boolean;
   realtimeSocketFactory?: RealtimeClientOptions["socketFactory"];
   /** Test seam, beside `realtimeSocketFactory`: replaces the ticket request to the API. */
   realtimeGetTicket?: RealtimeClientOptions["getTicket"];
@@ -70,7 +73,9 @@ export function AppProviders({
           <ToastProvider>
             <AuthProvider store={store}>
               <MonitoringUserSync />
-              <SessionRealtimeProvider client={realtimeClient}>{children}</SessionRealtimeProvider>
+              <SessionRealtimeProvider client={realtimeClient} enabled={realtimeEnabled}>
+                {children}
+              </SessionRealtimeProvider>
             </AuthProvider>
           </ToastProvider>
         </QueryClientProvider>
@@ -111,18 +116,21 @@ function TranslatedUiStrings({ children }: PropsWithChildren) {
 }
 
 /**
- * Connects the realtime socket only while the session is authenticated. The session store restores
+ * Connects the realtime socket only while the session is authenticated, and only in a build with
+ * realtime turned on (`REALTIME_ENABLED`, lib/config.ts); otherwise the client stays `idle` and never
+ * dials the gateway or asks the API for a ticket. The session store restores
  * lazily (a guard or an authenticated request asks first), so connecting unconditionally on mount
  * would make every public page — the marketing home included — call the refresh endpoint just to
  * learn there is no session. Signing out (or the session expiring) disconnects the socket.
  */
 function SessionRealtimeProvider({
   client,
+  enabled,
   children,
-}: PropsWithChildren<{ client: RealtimeClient }>) {
+}: PropsWithChildren<{ client: RealtimeClient; enabled: boolean }>) {
   const status = useAuthStatus();
   return (
-    <RealtimeProvider client={client} enabled={status === "authenticated"}>
+    <RealtimeProvider client={client} enabled={enabled && status === "authenticated"}>
       {children}
     </RealtimeProvider>
   );

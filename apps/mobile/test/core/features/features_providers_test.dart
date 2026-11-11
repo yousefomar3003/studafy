@@ -41,10 +41,14 @@ void main() {
 
   /// [signedIn] false skips the session (and its refresh timer) for the lifecycle test, which runs
   /// in a widget test's fake clock and needs no realtime.
-  Future<ProviderContainer> container({bool signedIn = true}) async {
+  Future<ProviderContainer> container({
+    bool signedIn = true,
+    DateTime Function()? clock,
+  }) async {
     final container = ProviderContainer(
       overrides: [
         myFeaturesClientProvider.overrideWithValue(client),
+        if (clock != null) featuresClockProvider.overrideWithValue(clock),
         if (signedIn) ...[
           authSessionProvider.overrideWithValue(
             await fakeAuthenticatedSession(
@@ -178,29 +182,48 @@ void main() {
     },
   );
 
-  test('re-reads when the app comes back to the foreground', () async {
-    final binding = TestWidgetsFlutterBinding.ensureInitialized();
-    final c = await container(signedIn: false);
-    c.listen(myFeaturesProvider, (_, _) {});
-    // Listened, as the app root watches it: Riverpod pauses an unlistened provider's listeners.
-    c.listen(featuresAutoRefreshProvider, (_, _) {});
-    await c.read(myFeaturesProvider.future);
-    expect(client.calls, 1);
+  test(
+    're-reads when the app comes back to the foreground, at most every 5 minutes',
+    () async {
+      final binding = TestWidgetsFlutterBinding.ensureInitialized();
+      var now = DateTime(2026, 11, 11, 9);
+      final c = await container(signedIn: false, clock: () => now);
+      c.listen(myFeaturesProvider, (_, _) {});
+      // Listened, as the app root watches it: Riverpod pauses an unlistened provider's listeners.
+      c.listen(featuresAutoRefreshProvider, (_, _) {});
+      await c.read(myFeaturesProvider.future);
+      expect(client.calls, 1);
 
-    for (final state in [
-      AppLifecycleState.inactive,
-      AppLifecycleState.hidden,
-      AppLifecycleState.paused,
-      AppLifecycleState.hidden,
-      AppLifecycleState.inactive,
-      AppLifecycleState.resumed,
-    ]) {
-      binding.handleAppLifecycleStateChanged(state);
-    }
-    await _settle();
-    await c.read(myFeaturesProvider.future);
-    expect(client.calls, 2);
-  });
+      Future<void> backgroundAndResume() async {
+        for (final state in [
+          AppLifecycleState.inactive,
+          AppLifecycleState.hidden,
+          AppLifecycleState.paused,
+          AppLifecycleState.hidden,
+          AppLifecycleState.inactive,
+          AppLifecycleState.resumed,
+        ]) {
+          binding.handleAppLifecycleStateChanged(state);
+        }
+        await _settle();
+        await c.read(myFeaturesProvider.future);
+      }
+
+      // Back within minutes of the first read: nothing new is likely, so no re-read.
+      now = now.add(const Duration(minutes: 2));
+      await backgroundAndResume();
+      expect(client.calls, 1);
+
+      now = now.add(featuresResumeRefreshInterval);
+      await backgroundAndResume();
+      expect(client.calls, 2);
+
+      // The window restarts from that re-read.
+      now = now.add(const Duration(minutes: 1));
+      await backgroundAndResume();
+      expect(client.calls, 2);
+    },
+  );
 }
 
 class _NoopObserver implements AppLifecycleObserver {

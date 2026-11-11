@@ -2,9 +2,9 @@ import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 import { injectTraceContext } from "@studafy/observability";
 import { resolveRecordKeyring } from "@studafy/records";
 import { Queue } from "bullmq";
-import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
+import { workerPool, workerReadPool } from "./db/pool";
 import { databaseUrlFrom, loadEnv, readDatabaseUrlFrom } from "./env";
 import { workerLogger } from "./log";
 import { enqueueAiIngestion } from "./queues/ai-ingestion/enqueue";
@@ -32,7 +32,15 @@ import { processDigest, processNotificationDigest } from "./queues/notifications
 import { createFcmSender } from "./queues/notifications/push";
 import { processReportJob } from "./queues/reports";
 import { createReportS3 } from "./queues/reports/report-s3";
-import { createScanS3, materialScanFailedListener, processMaterialScan } from "./queues/scan";
+import {
+  CLAMD_STARTUP_WAIT_MS,
+  createScanS3,
+  isUploadScanJob,
+  materialScanFailedListener,
+  processMaterialScan,
+  processUploadScan,
+  uploadScanFailedListener,
+} from "./queues/scan";
 
 import type { AiIngestionJobData } from "./queues/ai-ingestion/job";
 import type { TenantSemaphore } from "./queues/ai-ingestion/semaphore";
@@ -73,6 +81,13 @@ export interface QueueDefinition {
 const workerEnv = loadEnv();
 const databaseUrl = databaseUrlFrom(workerEnv);
 const readDatabaseUrl = readDatabaseUrlFrom(workerEnv);
+
+// Every processor runs on the process-wide pools (db/pool.ts) instead of opening a pool per job;
+// index.ts closes them on shutdown. Functions, so nothing is built until a job (or a failure
+// listener below) asks — the connection strings above stay for the processors that still take
+// one: the per-job fallback in their config types, and billing's batch-invoice pool.
+const db = () => workerPool(workerEnv);
+const readDb = () => workerReadPool(workerEnv);
 
 /**
  * Placeholder processor for a queue that has no domain logic yet. It exists so the worker
@@ -260,6 +275,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       }
       return processIngestJob(job, {
         databaseUrl,
+        sql: db(),
         databaseCaCert: workerEnv.DATABASE_CA_CERT,
         s3Region: workerEnv.S3_REGION,
         s3Endpoint: workerEnv.S3_ENDPOINT,
@@ -286,6 +302,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       }
       return processExamGeneration(job, {
         databaseUrl,
+        sql: db(),
         databaseCaCert: workerEnv.DATABASE_CA_CERT,
         anthropic: examAnthropicClient(),
       });
@@ -304,11 +321,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       if (job.name === JOB_NAMES.EVALUATE_ATTENDANCE_ALERTS) {
         const data = job.data as Partial<AttendanceAlertJobData>;
         if (data.schoolId && data.sessionDate && Array.isArray(data.studentIds)) {
-          return processAttendanceAlert(
-            data as AttendanceAlertJobData,
-            databaseUrl,
-            job.id ?? null,
-          );
+          return processAttendanceAlert(data as AttendanceAlertJobData, db(), job.id ?? null);
         }
         return { processed: false, reason: "missing job data" };
       }
@@ -318,6 +331,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         if (data.schoolId && data.eventId && data.eventType && data.submissionId) {
           return processNotificationDispatch(data as DispatchNotificationJobData, {
             databaseUrl,
+            sql: db(),
             enqueueDelivery,
             jobId: job.id ?? null,
           });
@@ -330,6 +344,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         if (data.schoolId && data.dispatchLogId && data.recipientId && data.channel) {
           return processNotificationDelivery(data as DeliverNotificationJobData, {
             databaseUrl,
+            sql: db(),
             log: workerLogger,
             push: pushSender(),
           });
@@ -338,25 +353,20 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       }
 
       if (job.name === JOB_NAMES.PUBLISH_DUE_ANNOUNCEMENTS) {
-        const sql = postgres(databaseUrl, { max: 4, idle_timeout: 20, prepare: false });
-        try {
-          return await publishDueAnnouncements(sql, new Date(), workerLogger);
-        } finally {
-          await sql.end({ timeout: 5 });
-        }
+        return publishDueAnnouncements(db(), new Date(), workerLogger);
       }
 
       if (job.name === JOB_NAMES.SEND_DIGESTS) {
-        return processDigest(databaseUrl);
+        return processDigest(db());
       }
 
       if (job.name === JOB_NAMES.SEND_NOTIFICATION_DIGESTS) {
-        return processNotificationDigest(databaseUrl);
+        return processNotificationDigest(db());
       }
 
       const data = job.data as { bulkInviteId?: string; schoolId?: string };
       if (data.bulkInviteId && data.schoolId) {
-        return processBulkInvite(data as { bulkInviteId: string; schoolId: string }, databaseUrl);
+        return processBulkInvite(data as { bulkInviteId: string; schoolId: string }, db());
       }
       // registry.test.ts calls every processor with `{ data: {} }` and requires a defined result,
       // so this fallback is load-bearing rather than defensive.
@@ -365,7 +375,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     // Terminal failures on this queue are dead-lettered to app.notification_dead_letters and raise
     // `notification.dispatchFailed`. Only this queue carries the hook — it is the only one whose
     // jobs a person is waiting on.
-    onFailed: deadLetterListener(databaseUrl, workerLogger),
+    onFailed: deadLetterListener(db(), workerLogger),
   },
   {
     name: QUEUE_NAMES.REPORTS,
@@ -378,6 +388,8 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       processReportJob(job, {
         primaryDatabaseUrl: databaseUrl,
         readDatabaseUrl,
+        sql: db(),
+        readSql: readDb(),
         s3Region: workerEnv.S3_REGION,
         s3Endpoint: workerEnv.S3_ENDPOINT,
         bucket: workerEnv.S3_APP_FILES_BUCKET,
@@ -391,34 +403,30 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     concurrency: 2,
     processor: async (job: Job) => {
       if (job.name === JOB_NAMES.PURGE_ABANDONED_IMPORTS) {
-        const sql = postgres(databaseUrl, { max: 2, idle_timeout: 20, prepare: false });
-        try {
-          const now = new Date();
-          const result = await purgeAbandonedStudentImports(sql, now, workerLogger);
-          // Same daily job: original files and leftover cells past the school's retention period.
-          const storage =
-            workerEnv.S3_REGION && workerEnv.S3_APP_FILES_BUCKET
-              ? createReportS3({
-                  region: workerEnv.S3_REGION,
-                  endpoint: workerEnv.S3_ENDPOINT,
-                  bucket: workerEnv.S3_APP_FILES_BUCKET,
-                })
-              : null;
-          const sources = await purgeExpiredImportSources(sql, storage, now, workerLogger);
-          // Unmapped columns of imports uploaded before they were recorded, for the platform count.
-          const backfill = await backfillUnmappedColumns(sql, workerLogger);
-          return {
-            processed: true,
-            ...result,
-            sourceFiles: sources.files,
-            sourceCellImports: sources.cellImports,
-            sourceFailed: sources.failed,
-            unmappedBackfilled: backfill.imports,
-            unmappedBackfillFailed: backfill.failed,
-          };
-        } finally {
-          await sql.end({ timeout: 5 });
-        }
+        const sql = db();
+        const now = new Date();
+        const result = await purgeAbandonedStudentImports(sql, now, workerLogger);
+        // Same daily job: original files and leftover cells past the school's retention period.
+        const storage =
+          workerEnv.S3_REGION && workerEnv.S3_APP_FILES_BUCKET
+            ? createReportS3({
+                region: workerEnv.S3_REGION,
+                endpoint: workerEnv.S3_ENDPOINT,
+                bucket: workerEnv.S3_APP_FILES_BUCKET,
+              })
+            : null;
+        const sources = await purgeExpiredImportSources(sql, storage, now, workerLogger);
+        // Unmapped columns of imports uploaded before they were recorded, for the platform count.
+        const backfill = await backfillUnmappedColumns(sql, workerLogger);
+        return {
+          processed: true,
+          ...result,
+          sourceFiles: sources.files,
+          sourceCellImports: sources.cellImports,
+          sourceFailed: sources.failed,
+          unmappedBackfilled: backfill.imports,
+          unmappedBackfillFailed: backfill.failed,
+        };
       }
 
       const data = job.data as { importId?: string; schoolId?: string };
@@ -427,7 +435,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
       }
       return processStudentImport(
         data as { importId: string; schoolId: string },
-        databaseUrl,
+        db(),
         resolveRecordKeyring(workerEnv),
       );
     },
@@ -435,12 +443,14 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.SCAN,
     concurrency: 2,
-    // One job per confirmed material. Concurrency 2: each scan holds a clamd connection and streams
-    // the object once, and the clean-file availability budget is dominated by scan latency — two in
-    // flight keeps that low without oversubscribing a Fargate-sized container's clamd pool.
-    processor: (job: Job) =>
-      processMaterialScan(job, {
+    // One job per confirmed material (scan-material) or other user upload (scan-upload, F-14).
+    // Concurrency 2: each scan holds a clamd connection and streams the object once, and the
+    // clean-file availability budget is dominated by scan latency — two in flight keeps that low
+    // without oversubscribing a Fargate-sized container's clamd pool.
+    processor: (job: Job) => {
+      const storage = {
         databaseUrl,
+        sql: db(),
         databaseCaCert: workerEnv.DATABASE_CA_CERT,
         s3: workerEnv.S3_REGION
           ? createScanS3({ region: workerEnv.S3_REGION, endpoint: workerEnv.S3_ENDPOINT })
@@ -451,13 +461,28 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           port: workerEnv.CLAMAV_PORT,
           timeoutMs: workerEnv.CLAMAV_TIMEOUT_MS,
           maxFileBytes: workerEnv.CLAMAV_MAX_FILE_BYTES,
+          // The scanner starts on demand on fly.io; wait out its cold start before streaming.
+          startupWaitMs: CLAMD_STARTUP_WAIT_MS,
         },
-        enqueueDerivation,
-        enqueueIngestion,
-      }),
-    // Terminal failures fail closed: the material is marked failed (never available) and the
-    // uploader is alerted. See scan-material.worker.ts.
-    onFailed: materialScanFailedListener(databaseUrl, workerLogger),
+      };
+      if (isUploadScanJob(job)) {
+        return processUploadScan(job, {
+          ...storage,
+          sensitiveKmsKeyId: workerEnv.STORAGE_SENSITIVE_KMS_KEY_ID,
+          log: workerLogger,
+        });
+      }
+      return processMaterialScan(job, { ...storage, enqueueDerivation, enqueueIngestion });
+    },
+    // Terminal failures fail closed: the material or upload is marked failed (never served) and
+    // the failure is logged; a material's uploader is also alerted. See scan-material.worker.ts and
+    // scan-upload.worker.ts.
+    onFailed: (() => {
+      const onMaterialFailed = materialScanFailedListener(db(), workerLogger);
+      const onUploadFailed = uploadScanFailedListener(db(), workerLogger);
+      return (job, error) =>
+        isUploadScanJob(job) ? onUploadFailed(job, error) : onMaterialFailed(job, error);
+    })(),
   },
   {
     name: QUEUE_NAMES.DERIVATIONS,
@@ -470,6 +495,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     processor: (job: Job) =>
       processMaterialDerivation(job, {
         databaseUrl,
+        sql: db(),
         databaseCaCert: workerEnv.DATABASE_CA_CERT,
         s3: workerEnv.S3_REGION
           ? createDerivationS3({ region: workerEnv.S3_REGION, endpoint: workerEnv.S3_ENDPOINT })
@@ -481,16 +507,21 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     name: QUEUE_NAMES.BILLING,
     concurrency: 1,
     processor: async (job) =>
-      processBillingJob(job, databaseUrl, {
-        s3Region: workerEnv.S3_REGION,
-        s3Endpoint: workerEnv.S3_ENDPOINT,
-        bucket: workerEnv.S3_APP_FILES_BUCKET,
-      }),
+      processBillingJob(
+        job,
+        databaseUrl,
+        {
+          s3Region: workerEnv.S3_REGION,
+          s3Endpoint: workerEnv.S3_ENDPOINT,
+          bucket: workerEnv.S3_APP_FILES_BUCKET,
+        },
+        db(),
+      ),
     // Terminal failures of `process-billing-event` park the app.billing_events row itself (ST-132).
     // The row already holds the verbatim provider payload, the reason and the attempt count, so it
     // is the dead-letter record — a separate table would be a second copy of data this one has in
     // full. ERPNext invoice jobs share this queue and are ignored by the listener.
-    onFailed: billingDeadLetterListener(databaseUrl, workerLogger),
+    onFailed: billingDeadLetterListener(db(), workerLogger),
   },
   {
     name: QUEUE_NAMES.OUTBOX_RELAY,
@@ -508,10 +539,13 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         {
           primaryDatabaseUrl: databaseUrl,
           databaseCaCert: workerEnv.DATABASE_CA_CERT,
+          sql: db(),
           s3Region: workerEnv.S3_REGION,
           s3Endpoint: workerEnv.S3_ENDPOINT,
           bucket: workerEnv.S3_APP_FILES_BUCKET,
           stripeSecretKey: workerEnv.STRIPE_SECRET_KEY,
+          googlePlayPackageName: workerEnv.GOOGLE_PLAY_PACKAGE_NAME,
+          googlePlayServiceAccount: workerEnv.GOOGLE_PLAY_SERVICE_ACCOUNT,
           recordKeyring: resolveRecordKeyring(workerEnv),
         },
         enqueueDsrJob,

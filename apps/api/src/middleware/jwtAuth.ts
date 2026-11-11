@@ -410,6 +410,7 @@ export function jwtAuthMiddleware({
       entitlementsVer: payload.entitlements_ver,
       subscriptionStatus: payload.subscription_status,
       ...(payload.deletion_pending ? { deletionPending: true } : {}),
+      ...(payload.legal_acceptance_pending ? { legalAcceptancePending: true } : {}),
     };
     c.set("auth", auth);
 

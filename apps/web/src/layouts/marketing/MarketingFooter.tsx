@@ -9,7 +9,8 @@ const YEAR = new Date().getFullYear();
 
 /**
  * Public site footer: what Studafy is in one line, then three plain columns: the site, the way into
- * the app, and the two legal pages both app stores require to be reachable from the website.
+ * the app, and the legal pages (both app stores require the privacy policy and account deletion to be
+ * reachable from the website).
  */
 export function MarketingFooter() {
   const { t } = useTranslation();
@@ -57,6 +58,12 @@ export function MarketingFooter() {
             <ul>
               <li>
                 <Link to="/privacy">{t("site.marketing.footer.privacy")}</Link>
+              </li>
+              <li>
+                <Link to="/terms">{t("site.marketing.footer.terms")}</Link>
+              </li>
+              <li>
+                <Link to="/school-agreement">{t("site.marketing.footer.schoolAgreement")}</Link>
               </li>
               <li>
                 <Link to="/legal/delete-account">{t("site.marketing.footer.deleteAccount")}</Link>

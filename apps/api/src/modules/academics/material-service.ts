@@ -328,22 +328,33 @@ export async function toggleAiVisible(
   }
 
   if (aiVisible) {
+    // A class whose AI materials setting is off (000196) keeps its materials out of ingestion: the
+    // flag is recorded, but a 'ready' material is not re-staged until the class setting is turned
+    // back on (which re-stages every AI-visible 'ready' material of the class). Fail closed when
+    // the class cannot be read.
+    const [cls] = await tx<{ ai_materials_enabled: boolean }[]>`
+      SELECT ai_materials_enabled
+      FROM app.classes
+      WHERE id = ${existing.class_id} AND school_id = ${schoolId}
+    `;
+    const restage = cls?.ai_materials_enabled === true;
+
     // 'ready' -> 'queued' + clear the ingest stamp (the CHECK requires 'queued' with a null stamp);
     // every other state keeps its status, so nothing mid-flight is derailed.
     const [row] = await tx<MaterialRow[]>`
       UPDATE app.materials
       SET ai_visible = true,
           ingest_status = CASE
-            WHEN ingest_status = 'ready'::app.material_ingest_status
+            WHEN ${restage}::boolean AND ingest_status = 'ready'::app.material_ingest_status
               THEN 'queued'::app.material_ingest_status
             ELSE ingest_status
           END,
           ingest_error = CASE
-            WHEN ingest_status = 'ready'::app.material_ingest_status THEN NULL
+            WHEN ${restage}::boolean AND ingest_status = 'ready'::app.material_ingest_status THEN NULL
             ELSE ingest_error
           END,
           ingested_at = CASE
-            WHEN ingest_status = 'ready'::app.material_ingest_status THEN NULL
+            WHEN ${restage}::boolean AND ingest_status = 'ready'::app.material_ingest_status THEN NULL
             ELSE ingested_at
           END,
           updated_at = CURRENT_TIMESTAMP

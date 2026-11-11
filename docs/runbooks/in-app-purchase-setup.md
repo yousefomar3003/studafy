@@ -29,6 +29,38 @@ Code: `apps/api/src/modules/subscriptions/store/` (server), `apps/mobile/lib/fea
 Cancelling is done in the store's own subscription settings (the app links there); access lasts to
 the end of the paid period.
 
+## The 14-day right of withdrawal
+
+Under EU consumer law (Directive 2011/83/EU art. 16(m), as amended) a consumer keeps a 14-day right
+to withdraw from a digital service unless they expressly asked for it to start straight away and
+acknowledged losing the right once it does, and we confirm that on a durable medium. Terms of
+Service section 7.7 says so; the purchase flow does it:
+
+1. **Ask.** The offer card (`ai_store_offer_card.dart`) has a required checkbox, unticked by default:
+   "I want the AI study assistant to start now, and I understand I lose my 14-day right to cancel
+   once it starts", next to a link to `/terms`. Subscribe stays disabled until it is ticked.
+2. **Record.** When Subscribe is pressed the app keeps the time on the device
+   (`withdrawal_waiver_store.dart`) and sends it with that purchase's report:
+   `withdrawalWaiverAcknowledged: true` and `withdrawalWaiverAcknowledgedAt`. It survives a relaunch
+   (a report that failed, an Ask to Buy approved later) and is forgotten once the report succeeds or
+   the sheet is cancelled. "Restore purchases" never sends it. The API stores it on the student's
+   `app.ai_subscriptions` row with the Terms of Service version (`LEGAL_DOCUMENT_VERSIONS.terms`) and
+   the purchase it belongs to (`withdrawal_waiver_*` columns, 000195), once per store transaction,
+   and writes an `app.audit_logs` row (target `ai_subscriptions`, actor the student) for each one.
+3. **Confirm.** In the same transaction the API raises `aiSubscription.purchaseConfirmed`; the email
+   dispatcher sends the student the `ai-store-purchase-confirmation` email (purchase, the waiver and
+   when it was given, the terms version and a link to them). **A student without an email address**
+   (a member-ID account) cannot be emailed: the row's `withdrawal_waiver_confirmation` is `in_app`
+   instead of `email`, and the confirmation is shown in the app on the AI usage screen
+   (`GET /api/subscriptions/ai/store/config` → `purchaseConfirmation`). Every student with a recorded
+   waiver sees it there; the in-app copy says when it was emailed too.
+
+App versions released before this flow send no waiver. Their purchases are registered as before and
+record nothing (the columns stay null): the right of withdrawal then still applies, and the store's
+refund handling covers it. The API never refuses a purchase for a missing waiver — by the time the
+app reports it the store has taken the money — and refuses only a malformed one (`false`, or no
+time).
+
 ## Values
 
 | Where                                               | Value                         | dev / staging / prod                                                         |
@@ -37,7 +69,7 @@ the end of the paid period.
 |                                                     | `APPLE_IAP_BUNDLE_ID`         | `com.studafy.studafyMobile.dev` / `.staging` / `com.studafy.studafyMobile`   |
 |                                                     | `APPLE_IAP_APP_APPLE_ID`      | App Store Connect → the app → App Information → **Apple ID** (a number)      |
 |                                                     | `GOOGLE_PLAY_PACKAGE_NAME`    | `com.studafy.studafy_mobile.dev` / `.staging` / `com.studafy.studafy_mobile` |
-| api app secret (`TF_VAR_secrets_app_secret_values`) | `GOOGLE_PLAY_SERVICE_ACCOUNT` | the service account's JSON key, on one line                                  |
+| api app secret (`TF_VAR_secrets_app_secret_values`) | `GOOGLE_PLAY_SERVICE_ACCOUNT` | the service account's JSON key, on one line (also in the workers app secret) |
 |                                                     | `GOOGLE_PLAY_RTDN_TOKEN`      | `openssl rand -hex 32`                                                       |
 
 Each store is off while its values are empty; the api refuses to boot with a half-configured store
@@ -102,6 +134,10 @@ never counted as revenue (`payload->>'environment'`).
 - After a test purchase: the student's row in `app.ai_subscriptions` is `active`, and
   `app.billing_events` has a `processed` row with provider `apple`/`google` and event id
   `<platform>:purchase:<transaction id>`.
+- After a test purchase from a current app: the row's `withdrawal_waiver_*` columns are set, and an
+  `aiSubscription.purchaseConfirmed` outbox row was emailed (`app.email_deliveries`, template
+  `ai-store-purchase-confirmation`) — or, for a member-ID student, the confirmation shows on the AI
+  usage screen.
 - After the store's renewal or expiry: further `processed` rows with event id
   `<platform>:notification:<id>`.
 - A notification answered `unattributed` is one for a purchase the app has not reported yet (the

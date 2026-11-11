@@ -58,12 +58,27 @@ interface ApplicationRow {
 type Outcome = "sent" | "failed" | "empty";
 type Stream = "team" | "applicant";
 
+function pendingPredicate(tx: TransactionSql, stream: Stream) {
+  return stream === "team"
+    ? tx`a.team_notified_at IS NULL AND a.team_notify_attempts < ${MAX_NOTIFY_ATTEMPTS}`
+    : tx`a.status <> 'pending' AND a.applicant_notified_at IS NULL
+         AND a.applicant_notify_attempts < ${MAX_NOTIFY_ATTEMPTS}`;
+}
+
+/**
+ * `EXISTS` over the rows either stream would claim, for the dispatcher's per-cycle discovery
+ * statement (so an idle cycle need not open these streams' transactions at all). Shares
+ * `pendingPredicate` with `claim`, so the two cannot drift.
+ */
+export function pendingSchoolApplicationsExist(tx: TransactionSql) {
+  return tx`EXISTS (
+    SELECT 1 FROM app.school_applications a
+    WHERE (${pendingPredicate(tx, "team")}) OR (${pendingPredicate(tx, "applicant")})
+  )`;
+}
+
 async function claim(tx: TransactionSql, stream: Stream): Promise<ApplicationRow | undefined> {
-  const pending =
-    stream === "team"
-      ? tx`a.team_notified_at IS NULL AND a.team_notify_attempts < ${MAX_NOTIFY_ATTEMPTS}`
-      : tx`a.status <> 'pending' AND a.applicant_notified_at IS NULL
-           AND a.applicant_notify_attempts < ${MAX_NOTIFY_ATTEMPTS}`;
+  const pending = pendingPredicate(tx, stream);
   const [row] = await tx<ApplicationRow[]>`
     SELECT a.id, a.status, a.provider, a.applicant_email, a.applicant_name, a.applicant_job_title,
            a.applicant_phone, a.school_name, a.school_email, co.name AS country_name,

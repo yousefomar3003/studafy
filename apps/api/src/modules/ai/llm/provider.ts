@@ -69,6 +69,13 @@ export const AI_LLM_MAX_ATTEMPTS = 3;
 export const AI_LLM_DEFAULT_BASE_URL = "https://api.anthropic.com/v1";
 export const AI_LLM_API_VERSION = "2023-06-01";
 export const AI_LLM_DEFAULT_TIMEOUT_MS = 60_000;
+/** A stream that sends nothing for this long is dead, not slow: abort it and free the socket. */
+export const AI_LLM_STREAM_IDLE_TIMEOUT_MS = 30_000;
+/**
+ * The longest a stream may run end to end. The largest answer the gateway asks for (16,384 output
+ * tokens, AI_LLM_MAX_RESERVE_TOKENS) streams in well under this at any normal provider speed.
+ */
+export const AI_LLM_STREAM_TOTAL_TIMEOUT_MS = 300_000;
 export const AI_LLM_DEFAULT_MAX_TOKENS = 4096;
 const LLM_BASE_BACKOFF_MS = 200;
 const LLM_MAX_BACKOFF_MS = 2_000;
@@ -147,8 +154,16 @@ export interface AnthropicProviderOptions {
    * OpenAI-compatible provider has no default and must name its own (e.g. https://api.together.xyz/v1).
    */
   baseUrl?: string;
-  /** Whole-call timeout: connect + wait + read. Default 60s. */
+  /**
+   * Whole-call timeout for generate(): connect + wait + reading the whole body. For stream() it
+   * bounds the wait for the response headers; the body is bounded by the two stream timeouts.
+   * Default 60s.
+   */
   timeoutMs?: number;
+  /** stream(): abort when no bytes arrive for this long. Default 30s. */
+  streamIdleTimeoutMs?: number;
+  /** stream(): abort when the whole stream runs longer than this. Default 5 min. */
+  streamTotalTimeoutMs?: number;
   /** Server default for `max_tokens` when a request omits it. Default 4096. */
   defaultMaxTokens?: number;
   /** Zero-retention posture: never send `metadata.user_id` when true. Default false. */
@@ -258,6 +273,42 @@ function extractErrorMessage(data: unknown): string {
   return "AI provider error";
 }
 
+/** What the SSE readers need of a body reader (Bun's and the DOM's reader types differ). */
+interface Chunk {
+  done: boolean;
+  value?: Uint8Array;
+}
+interface ChunkReader {
+  read(): Promise<Chunk>;
+  cancel(): Promise<void>;
+  releaseLock(): void;
+}
+
+/** The deadlines of one stream: whichever fires first names the timeout. */
+interface StreamDeadline {
+  controller: AbortController;
+  reason: "connect" | "idle" | "total" | null;
+}
+
+/** `promise`, or a rejection as soon as `signal` aborts -- whichever comes first. */
+function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) return Promise.reject(new DOMException("Aborted", "AbortError"));
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => reject(new DOMException("Aborted", "AbortError"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener("abort", onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", onAbort);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+}
+
 export function createAnthropicProvider(options: AnthropicProviderOptions): LlmProvider {
   return new AnthropicProvider(options);
 }
@@ -267,6 +318,8 @@ export class AnthropicProvider implements LlmProvider {
   private readonly apiFormat: LlmApiFormat;
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
+  private readonly streamIdleTimeoutMs: number;
+  private readonly streamTotalTimeoutMs: number;
   private readonly defaultMaxTokens: number;
   private readonly zeroRetention: boolean;
   private readonly circuitBreaker: CircuitBreaker | undefined;
@@ -282,6 +335,8 @@ export class AnthropicProvider implements LlmProvider {
     }
     this.baseUrl = (options.baseUrl ?? AI_LLM_DEFAULT_BASE_URL).replace(/\/$/, "");
     this.timeoutMs = options.timeoutMs ?? AI_LLM_DEFAULT_TIMEOUT_MS;
+    this.streamIdleTimeoutMs = options.streamIdleTimeoutMs ?? AI_LLM_STREAM_IDLE_TIMEOUT_MS;
+    this.streamTotalTimeoutMs = options.streamTotalTimeoutMs ?? AI_LLM_STREAM_TOTAL_TIMEOUT_MS;
     this.defaultMaxTokens = options.defaultMaxTokens ?? AI_LLM_DEFAULT_MAX_TOKENS;
     this.zeroRetention = options.zeroRetention ?? false;
     this.circuitBreaker = options.circuitBreaker;
@@ -336,32 +391,97 @@ export class AnthropicProvider implements LlmProvider {
     }
   }
 
+  /**
+   * Stream one generation. Three deadlines keep a stalled provider from holding a socket (and the
+   * request that consumes it) open forever: `timeoutMs` until the headers arrive, then
+   * `streamIdleTimeoutMs` between chunks and `streamTotalTimeoutMs` end to end, each until the body
+   * is fully read. Any of them aborts the request and surfaces as a `timeout` LlmProviderError
+   * from the generator. A consumer that stops early cancels the body, which frees the connection.
+   */
   async *stream(input: LlmGenerateInput): AsyncGenerator<LlmStreamEvent, void, unknown> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
+    const deadline: StreamDeadline = { controller, reason: null };
+    const abortFor = (reason: StreamDeadline["reason"]) => () => {
+      deadline.reason ??= reason;
+      controller.abort();
+    };
+    const connectTimer = setTimeout(abortFor("connect"), this.timeoutMs);
+    const totalTimer = setTimeout(abortFor("total"), this.streamTotalTimeoutMs);
 
-    let response: Response;
     try {
-      response = await this.fetchFn(this.endpoint(), {
-        method: "POST",
-        headers: { ...this.headers(), accept: "text/event-stream" },
-        body: JSON.stringify(this.body(input, true)),
-        signal: controller.signal,
-      });
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw this.transportError(error, controller, input);
-    }
-    clearTimeout(timeoutId);
+      let response: Response;
+      try {
+        response = await this.fetchFn(this.endpoint(), {
+          method: "POST",
+          headers: { ...this.headers(), accept: "text/event-stream" },
+          body: JSON.stringify(this.body(input, true)),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        throw this.transportError(error, controller, input);
+      } finally {
+        clearTimeout(connectTimer);
+      }
 
-    if (!response.ok) throw await this.httpError(response);
-    if (!response.body) {
-      throw new LlmProviderError("AI provider returned an empty stream", 503, "network");
-    }
+      if (!response.ok) throw await this.httpError(response);
+      if (!response.body) {
+        throw new LlmProviderError("AI provider returned an empty stream", 503, "network");
+      }
 
-    yield* this.apiFormat === "openai-compatible"
-      ? this.readOpenAiSse(response.body, input)
-      : this.readSse(response.body);
+      yield* this.apiFormat === "openai-compatible"
+        ? this.readOpenAiSse(response.body, input, deadline)
+        : this.readSse(response.body, deadline);
+    } finally {
+      clearTimeout(connectTimer);
+      clearTimeout(totalTimer);
+    }
+  }
+
+  /**
+   * One read from a stream body, bounded by the idle timeout and by the stream's abort signal (the
+   * total timeout). Raced rather than left to the fetch implementation: a body is not guaranteed
+   * to error when its request's signal aborts.
+   */
+  private async readChunk(reader: ChunkReader, deadline: StreamDeadline): Promise<Chunk> {
+    const { signal } = deadline.controller;
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+    const stalled = new Promise<never>((_, reject) => {
+      onAbort = () => reject(this.streamTimeoutError(deadline));
+      if (signal.aborted) {
+        onAbort();
+        return;
+      }
+      signal.addEventListener("abort", onAbort, { once: true });
+      idleTimer = setTimeout(() => {
+        deadline.reason ??= "idle";
+        deadline.controller.abort();
+      }, this.streamIdleTimeoutMs);
+    });
+    try {
+      return await Promise.race([reader.read(), stalled]);
+    } finally {
+      clearTimeout(idleTimer);
+      if (onAbort) signal.removeEventListener("abort", onAbort);
+    }
+  }
+
+  private streamTimeoutError(deadline: StreamDeadline): LlmProviderError {
+    const message =
+      deadline.reason === "idle"
+        ? `AI stream stalled: nothing received for ${this.streamIdleTimeoutMs}ms`
+        : `AI stream did not finish within ${this.streamTotalTimeoutMs}ms`;
+    return new LlmProviderError(message, 504, "timeout");
+  }
+
+  /** Release a stream body: cancel it (frees the socket when it did not end) and drop the lock. */
+  private async closeReader(reader: ChunkReader): Promise<void> {
+    try {
+      await reader.cancel();
+    } catch {
+      // Already errored or closed: nothing left to free.
+    }
+    reader.releaseLock();
   }
 
   private endpoint(): string {
@@ -400,27 +520,35 @@ export class AnthropicProvider implements LlmProvider {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.timeoutMs);
 
-    let response: Response;
-    try {
-      response = await this.fetchFn(this.endpoint(), {
-        method: "POST",
-        headers: this.headers(),
-        body: JSON.stringify(this.body(input, false)),
-        signal: controller.signal,
-      });
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw this.transportError(error, controller, input);
-    }
-    clearTimeout(timeoutId);
-
-    if (!response.ok) throw await this.httpError(response);
-
+    // The timeout covers the whole call -- the body as well as the headers. A provider that sends
+    // headers and then stalls would otherwise hold the socket and the caller's request open.
     let json: unknown;
     try {
-      json = await response.json();
-    } catch {
-      throw new LlmProviderError("AI provider returned an unreadable response", 503, "network");
+      let response: Response;
+      try {
+        response = await this.fetchFn(this.endpoint(), {
+          method: "POST",
+          headers: this.headers(),
+          body: JSON.stringify(this.body(input, false)),
+          signal: controller.signal,
+        });
+      } catch (error) {
+        throw this.transportError(error, controller, input);
+      }
+
+      if (!response.ok) throw await this.httpError(response);
+
+      try {
+        json = await untilAborted(response.json(), controller.signal);
+      } catch (error) {
+        if (controller.signal.aborted) {
+          void response.body?.cancel().catch(() => undefined);
+          throw this.transportError(error, controller, input);
+        }
+        throw new LlmProviderError("AI provider returned an unreadable response", 503, "network");
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
 
     if (this.apiFormat === "openai-compatible") {
@@ -493,7 +621,10 @@ export class AnthropicProvider implements LlmProvider {
    * Parse the provider's SSE stream. Text deltas are yielded as they arrive; usage and stop reason
    * are accumulated from `message_start` and `message_delta` and carried on the final `done` event.
    */
-  private async *readSse(body: ReadableStream<Uint8Array>): AsyncGenerator<LlmStreamEvent> {
+  private async *readSse(
+    body: ReadableStream<Uint8Array>,
+    deadline: StreamDeadline,
+  ): AsyncGenerator<LlmStreamEvent> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -506,7 +637,7 @@ export class AnthropicProvider implements LlmProvider {
 
     try {
       for (;;) {
-        const { done, value } = await reader.read();
+        const { done, value } = await this.readChunk(reader, deadline);
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
 
@@ -567,7 +698,7 @@ export class AnthropicProvider implements LlmProvider {
         };
       }
     } finally {
-      reader.releaseLock();
+      await this.closeReader(reader);
     }
   }
 
@@ -580,6 +711,7 @@ export class AnthropicProvider implements LlmProvider {
   private async *readOpenAiSse(
     body: ReadableStream<Uint8Array>,
     input: LlmGenerateInput,
+    deadline: StreamDeadline,
   ): AsyncGenerator<LlmStreamEvent> {
     const reader = body.getReader();
     const decoder = new TextDecoder();
@@ -602,7 +734,7 @@ export class AnthropicProvider implements LlmProvider {
 
     try {
       for (;;) {
-        const { done: ended, value } = await reader.read();
+        const { done: ended, value } = await this.readChunk(reader, deadline);
         if (ended) break;
         buffer += decoder.decode(value, { stream: true });
 
@@ -644,7 +776,7 @@ export class AnthropicProvider implements LlmProvider {
       // A truncated stream (no [DONE]) still yields what it received.
       yield done();
     } finally {
-      reader.releaseLock();
+      await this.closeReader(reader);
     }
   }
 }

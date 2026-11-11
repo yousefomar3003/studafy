@@ -37,6 +37,15 @@ export const AI_EXAM_MAX_DURATION_MINUTES = 180;
 export const AI_EXAM_DEFAULT_DURATION_MINUTES = 30;
 
 /**
+ * How long after `expires_at` a submit is still accepted. The countdown a client shows is only an
+ * estimate of the server's clock, and the auto-submit it fires at `00:00` still has to cross the
+ * network, so a strict `now() > expires_at` cut-off rejects honest hand-ins that left the device on
+ * time. Small on purpose: it absorbs clock skew and request latency, not a meaningful amount of
+ * extra working time — the client never shows it, so a student cannot plan around it.
+ */
+export const AI_EXAM_SUBMIT_GRACE_SECONDS = 30;
+
+/**
  * A topic (material) is flagged `weak` in the per-topic report when its correct-answer percentage
  * falls at or below this threshold. 60, not 50: a report meant to surface what to re-study should
  * flag "shaky", not only "failing".

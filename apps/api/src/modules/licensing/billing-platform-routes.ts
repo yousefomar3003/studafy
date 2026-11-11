@@ -196,7 +196,8 @@ const listInvoicesRoute = createRoute({
   summary: "License invoices across schools",
   description:
     "Filter by status (`unpaid` = issued or partially paid; `overdue` = unpaid past due), by " +
-    "school, and by issue date (`from`, `to`, inclusive). Newest first.",
+    "school, and by issue date (`from`, `to`, inclusive). Newest first, `limit` per page (default " +
+    "100); follow `nextCursor` for the next page.",
   request: { query: platformInvoiceListQuerySchema },
   responses: standardResponses(
     { 200: { description: "Invoices", schema: platformInvoiceListSchema } },
@@ -748,8 +749,11 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
 
   routes.openapi(listInvoicesRoute, async (c) => {
     const query = c.req.valid("query");
-    const invoices = await listInvoicesAcrossSchools(deps.database, query);
-    return c.json({ invoices, status: query.status }, 200);
+    const page = await listInvoicesAcrossSchools(deps.database, query);
+    return c.json(
+      { invoices: page.invoices, status: query.status, nextCursor: page.nextCursor },
+      200,
+    );
   });
 
   routes.openapi(listReceiptsRoute, async (c) => {

@@ -81,11 +81,7 @@ describe("assignColumn", () => {
 
 describe("missingRequiredFields / isSameMapping / mappingFitsHeaders", () => {
   test("lists required fields without a column", () => {
-    expect(missingRequiredFields({ admission_number: "ID" })).toEqual([
-      "email",
-      "first_name",
-      "last_name",
-    ]);
+    expect(missingRequiredFields({ admission_number: "ID" })).toEqual(["first_name", "last_name"]);
     expect(missingRequiredFields(COMPLETE)).toEqual([]);
   });
 
@@ -102,17 +98,19 @@ describe("missingRequiredFields / isSameMapping / mappingFitsHeaders", () => {
 });
 
 describe("parentPairWarning", () => {
-  test("warns only when exactly one of parent email and relationship is mapped", () => {
+  test("warns when a parent's name or email and its relationship are not mapped together", () => {
     expect(parentPairWarning(COMPLETE, t)).toBeNull();
     expect(parentPairWarning({ parent_email: "a", parent_relationship: "b" }, t)).toBeNull();
-    expect(parentPairWarning({ parent_email: "a" }, t)).toContain("Parent relationship");
+    expect(parentPairWarning({ parent_name: "a", parent_relationship: "b" }, t)).toBeNull();
+    expect(parentPairWarning({ parent_email: "a" }, t)).toContain("Parent 1 relationship");
+    expect(parentPairWarning({ parent2_name: "a" }, t)).toContain("Parent 2 relationship");
   });
 });
 
 describe("confirmBlocker", () => {
   test("blocks on missing required fields first, naming them", () => {
     expect(confirmBlocker({ admission_number: "Student ID" }, {}, 0, t)).toBe(
-      "Map a column to every required field before confirming. Missing: Student email, First name, Last name.",
+      "Map a column to every required field before confirming. Missing: First name, Last name.",
     );
   });
 

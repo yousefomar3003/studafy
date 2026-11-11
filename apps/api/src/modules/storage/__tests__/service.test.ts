@@ -182,12 +182,11 @@ describe("confirmUpload", () => {
       checksumSha256: VALID_SHA,
     });
 
-    // head (stored facts) → checksum → promote's exists/size/copy/remove.
+    // head (stored facts) → checksum → copy/remove. The promotion reuses the size the head read,
+    // so the object is not HEADed again.
     expect(storage.calls).toEqual([
       `head:${TEMP_KEY}`,
       `checksum:${TEMP_KEY}`,
-      `exists:${TEMP_KEY}`,
-      `size:${TEMP_KEY}`,
       `copy:${TEMP_KEY}->${PERMANENT_KEY}`,
       `remove:${TEMP_KEY}`,
     ]);

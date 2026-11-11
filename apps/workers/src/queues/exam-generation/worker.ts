@@ -1,5 +1,4 @@
-import postgres from "postgres";
-
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 import { isFinalAttempt } from "../reports/report-runner";
 
@@ -16,10 +15,14 @@ import { assembleExamPrompt, toExamSources } from "./prompt";
 
 import type { AnthropicClient } from "./anthropic-client";
 import type { Job } from "bullmq";
+import type { Sql } from "postgres";
 
 export interface ExamGenerationWorkerConfig {
+  /** Used only when `sql` is absent: a dedicated pool is opened for this job (tests). */
   databaseUrl: string;
   databaseCaCert?: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   /**
    * Absent when `ANTHROPIC_API_KEY` is not configured for the workers process -- the queue still
    * boots and jobs fail closed (session marked `failed`) at claim time, the same posture the
@@ -61,14 +64,10 @@ export async function processExamGeneration(
   if (!parsed.success) return { processed: false, reason: "invalid job data" };
   const data = parsed.data;
 
-  const sql = postgres(config.databaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
+  const sqlLease = leaseDatabase(config.sql ?? config.databaseUrl, {
+    databaseCaCert: config.databaseCaCert,
   });
+  const sql = sqlLease.sql;
 
   const fail = (reason: string) =>
     withSystemTenantTx(sql, { schoolId: data.schoolId }, (tx) =>
@@ -160,6 +159,6 @@ export async function processExamGeneration(
       itemCount: items.length,
     };
   } finally {
-    await sql.end({ timeout: 5 });
+    await sqlLease.release();
   }
 }

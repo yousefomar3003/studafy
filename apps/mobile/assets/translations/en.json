@@ -113,7 +113,16 @@
         "alreadyPending": "A deletion is already scheduled for your account.",
         "wrongCredentials": "The member ID or password is incorrect.",
         "locked": "Too many wrong passwords. Try again later.",
-        "failed": "Your account couldn't be deleted. Check your connection and try again."
+        "failed": "Your account couldn't be deleted. Check your connection and try again.",
+        "storeWarning": {
+          "title": "Cancel your App Store or Google Play subscription",
+          "ownBody": "You have an AI Study Assistant subscription billed by Apple (App Store) or Google (Google Play), not by Studafy. Deleting your account doesn't cancel it, so you may keep being charged until you cancel it in the store.",
+          "googlePlayNote": "For Google Play, we also try to stop the renewal when your account is finally deleted, but cancel it yourself to be sure.",
+          "childBody": "A child linked to your account has an AI Study Assistant subscription billed by Apple or Google. Deleting your account doesn't cancel it or delete your child's account. If it's billed to your store account and you want it to stop, cancel it in the store.",
+          "stepsIntro": "To cancel:",
+          "appStoreSteps": "App Store: on the iPhone or iPad that bought it, open Settings, tap your name, then Subscriptions, choose Studafy and tap Cancel Subscription.",
+          "googlePlaySteps": "Google Play: open the Google Play app, tap your profile picture, then Payments & subscriptions, then Subscriptions, choose Studafy and tap Cancel subscription."
+        }
       },
       "deletionPending": {
         "title": "Account scheduled for deletion",
@@ -123,6 +132,21 @@
         "signOut": "Sign out",
         "failed": "The deletion couldn't be cancelled. Check your connection and try again."
       },
+      "legalAcceptance": {
+        "title": "Before you continue",
+        "updatedTitle": "We have updated our terms",
+        "body": "To use Studafy, please read and accept our Terms of Service and read our Privacy Policy. They explain how Studafy works, what you may use it for, and how your school and Studafy look after your personal data.",
+        "updatedBody": "Our Terms of Service or Privacy Policy have changed since you last accepted them. Please read the current versions and accept them to continue using Studafy.",
+        "terms": "Read the Terms of Service",
+        "privacy": "Read the Privacy Policy",
+        "checkbox": "I accept the Terms of Service and I have read the Privacy Policy.",
+        "accept": "Accept and continue",
+        "accepting": "Saving your acceptance",
+        "signOut": "Sign out",
+        "delete": "Delete my account instead",
+        "failed": "Your acceptance couldn't be saved. Check your connection and try again.",
+        "outdated": "The terms changed while this screen was open. Sign out and sign in again to see the current versions."
+      },
       "deleteSchool": {
         "action": "Delete school",
         "title": "Delete school",
@@ -130,7 +154,7 @@
         "consequences": {
           "signedOut": "Everyone at your school — staff, teachers, students and parents — is signed out immediately.",
           "noSignIn": "Nobody at your school can sign in to Studafy again.",
-          "dataKept": "Your school's data is kept. Nothing is deleted."
+          "dataDeleted": "We prepare a copy of your school's data, then permanently delete it 30 days after the copy is ready. Email hello@studafy.com before then if you need the copy, or if this was a mistake."
         },
         "confirmPrompt": "To confirm, type your school's name exactly as shown:",
         "nameLabel": "School name",
@@ -517,6 +541,14 @@
     "title": "Studafy AI Study Assistant",
     "price": "{price} per month",
     "subscribe": "Subscribe",
+    "waiver": {
+      "label": "I want the AI study assistant to start now, and I understand I lose my 14-day right to cancel once it starts."
+    },
+    "confirmation": {
+      "title": "Your purchase confirmation",
+      "body": "On {date}, before buying, you asked for the AI study assistant to start now and confirmed you understand you lose your 14-day right to cancel once it starts. Terms of Service of {version} apply.",
+      "emailed": "We also emailed you this confirmation."
+    },
     "restore": {
       "action": "Restore purchases",
       "none": "No purchases to restore for this account."
@@ -527,7 +559,8 @@
     },
     "links": {
       "privacy": "Privacy policy",
-      "terms": "Terms of use"
+      "terms": "Terms of use",
+      "termsOfService": "Terms of Service"
     },
     "errors": {
       "storeFailed": "The purchase didn't go through. You haven't been charged — please try again.",
@@ -743,7 +776,10 @@
     },
     "generating": {
       "title": "Building your exam…",
-      "hint": "This can take a moment for a longer exam."
+      "hint": "This can take a moment for a longer exam.",
+      "stoppedTitle": "Still building your exam",
+      "stoppedHint": "This is taking longer than usual. Check again in a moment.",
+      "checkAgain": "Check again"
     },
     "ready": {
       "title": "Your exam is ready",
@@ -787,6 +823,11 @@
     "failed": {
       "title": "Couldn't build this exam",
       "body": "Something went wrong generating your exam. No time was spent — try again.",
+      "startNew": "Start a new exam"
+    },
+    "expired": {
+      "title": "Time ran out",
+      "body": "Your answers didn't reach the server before this exam closed, so it can't be scored.",
       "startNew": "Start a new exam"
     },
     "citation": {
@@ -1198,6 +1239,18 @@
         "edit": "Edit material",
         "empty": "No materials yet.",
         "loadError": "Could not load materials."
+      },
+      "aiMaterials": {
+        "title": "Use this class's materials with the AI study assistant",
+        "subtitleOn": "Students can ask the AI about these materials and make quizzes, flashcards and exams from them. Their text is sent to our AI provider.",
+        "subtitleOff": "These materials are not used by the AI study assistant and are not sent to our AI provider.",
+        "loadError": "Couldn't load the AI setting for this class.",
+        "saveError": "Couldn't change the AI setting. Try again.",
+        "forbidden": "Only this class's teachers or school leadership can change this.",
+        "confirmOffTitle": "Stop using these materials with AI?",
+        "confirmOffBody": "Students will no longer be able to use this class's materials with the AI study assistant, and the AI copies of them, with any quizzes, flashcards and exams made from them, will be deleted. You can turn this back on later.",
+        "confirmOff": "Turn off",
+        "cancel": "Cancel"
       },
       "assignmentForm": {
         "title": "Title",

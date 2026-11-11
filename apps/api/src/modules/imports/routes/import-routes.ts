@@ -6,8 +6,9 @@ import { Queue } from "bullmq";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { withTenantTx } from "../../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../../db/tenant-tx";
 import { requireStorage } from "../../../lib/storage";
+import { enqueueUploadScans } from "../../../lib/storage/upload-scan";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { hasPermission, requirePermission } from "../../../middleware/authz";
@@ -15,13 +16,20 @@ import { requireChannel } from "../../../middleware/channelGuard";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
+import {
+  copyStagedUploads,
+  discardStagedUploads,
+  reserveStorage,
+} from "../../storage/staged-promotion";
 import { applyColumn, listUnmappedColumns, previewColumn } from "../column-service";
 import {
+  checkImportUpload,
   confirmImport,
   createMapping,
   deleteMapping,
   getImport,
   getImportDiff,
+  importRecordFields,
   listImports,
   listMappings,
   updateImportMapping,
@@ -34,18 +42,20 @@ import {
   columnTargetBodySchema,
   confirmImportBodySchema,
   createStudentImportMappingBodySchema,
+  importColumnPreviewSchema,
   importDiffQuerySchema,
   importDiffSchema,
   importIdParamSchema,
   importListQuerySchema,
   importListSchema,
-  importColumnPreviewSchema,
   importRecordSchema,
   importSettingsSchema,
   importSourceDownloadSchema,
   mappingIdParamSchema,
+  STUDENT_IMPORT_TEMPLATE_XLSX_MEDIA_TYPE,
   studentImportMappingListSchema,
   studentImportMappingSchema,
+  studentImportTemplateQuerySchema,
   unmappedColumnsSchema,
   updateImportMappingBodySchema,
   updateImportSettingsBodySchema,
@@ -55,10 +65,11 @@ import {
 import {
   deleteSource,
   getImportSettings,
-  promoteSourceFile,
+  inspectSourceFile,
   sourceDownload,
   updateImportSettings,
 } from "../source-service";
+import { buildStudentImportTemplate } from "../template-workbook";
 
 import type { Database } from "../../../db/client";
 import type { StorageService } from "../../../lib/storage";
@@ -262,12 +273,17 @@ const downloadTemplateRoute = createRoute({
   path: "/api/imports/students/template",
   tags: ["Imports"],
   operationId: "downloadStudentImportTemplate",
-  summary: "Download student import CSV template",
-  description: "Returns a CSV file with the expected headers and an example row.",
+  summary: "Download the student import template",
+  description:
+    "format=csv (default): a CSV with the expected headers and example rows. format=xlsx: an " +
+    "Excel workbook in the requested language, with one header row, notes, dropdowns of the " +
+    "school's grades and sections of the current academic year, its student record fields as " +
+    "extra columns, and instructions and an example on separate sheets.",
   security: [{ bearerAuth: [] }],
+  request: { query: studentImportTemplateQuerySchema },
   responses: {
     200: {
-      description: "CSV template file.",
+      description: "Template file.",
       headers: {
         "X-Request-Id": {
           required: true,
@@ -276,7 +292,10 @@ const downloadTemplateRoute = createRoute({
         },
         "Content-Disposition": { schema: { type: "string" } },
       },
-      content: { "text/csv": { schema: { type: "string" } } },
+      content: {
+        "text/csv": { schema: { type: "string" } },
+        [STUDENT_IMPORT_TEMPLATE_XLSX_MEDIA_TYPE]: { schema: { type: "string", format: "binary" } },
+      },
     },
     401: {
       description: "Authentication is missing or invalid.",
@@ -592,10 +611,18 @@ const updateStudentImportSettingsRoute = createRoute({
 // Template
 // ---------------------------------------------------------------------------
 
+/**
+ * Students and their parents in one sheet. Nobody needs an email: each person gets a member ID and
+ * signs in with it. Lines sharing a family number share their parents, so a sibling's line can
+ * leave the parents blank (ADM-002). Grade and section place the student in a class.
+ */
 const CSV_TEMPLATE =
-  "admission_number,email,first_name,middle_name,last_name,preferred_name,date_of_birth,status,parent_email,parent_relationship\n" +
-  "ADM-2024-001,jane.doe@example.edu,Jane,Marie,Doe,Jenny,2010-03-15,enrolled,parent1@example.edu,mother\n" +
-  "ADM-2024-002,john.smith@example.edu,John,,Smith,,2011-07-22,applicant,,\n";
+  "admission_number,first_name,middle_name,last_name,date_of_birth,status,grade,section,family," +
+  "parent_name,parent_relationship,parent_email,parent2_name,parent2_relationship,parent2_email," +
+  "email,preferred_name\n" +
+  "ADM-001,Ali,Omar,Hassan,2016-03-15,enrolled,Grade 1,A,F1,Mona Hassan,mother,,Omar Hassan,father,,,\n" +
+  "ADM-002,Sara,Omar,Hassan,2018-09-02,enrolled,Grade 1,B,F1,,,,,,,,\n" +
+  "ADM-003,Lina,,Khaled,2015-11-20,enrolled,Grade 2,A,F2,Rana Khaled,mother,rana@example.com,,,,,\n";
 
 // ---------------------------------------------------------------------------
 // Route factory
@@ -679,7 +706,22 @@ export function importRoutes(
     const sourceStorage = source_key === undefined ? null : requireStorage(storage);
     const bodySha256 = createHash("sha256").update(body).digest("hex");
 
-    const record = await withTenantTx(database, tenantFrom(c), (tx) =>
+    // A kept original is promoted reserve -> copy -> write (../../storage/staged-promotion.ts): no
+    // transaction is open across its storage calls (a HEAD, a full read for the checksum, a copy).
+    // The upload's own refusals run before the copy, so a refused file is never kept.
+    const runTx = tenantTxRunner(database, tenantFrom(c));
+    const kept =
+      sourceStorage && source_key
+        ? await inspectSourceFile(sourceStorage, auth.schoolId, source_key, bodySha256)
+        : null;
+    if (sourceStorage && kept) {
+      await runTx(async (tx) => {
+        await checkImportUpload(tx, auth.schoolId, rawCsv, mapping_id);
+        await reserveStorage(tx, kept.sizeBytes);
+      });
+      await copyStagedUploads(sourceStorage, runTx, [kept]);
+    }
+    const record = await runTx((tx) =>
       uploadImport(
         tx,
         auth.schoolId,
@@ -687,11 +729,22 @@ export function importRoutes(
         fileName,
         rawCsv,
         mapping_id,
-        sourceStorage && source_key
-          ? () => promoteSourceFile(tx, sourceStorage, auth.schoolId, source_key, bodySha256)
+        kept
+          ? async () => ({
+              storageKey: kept.permanentKey,
+              fileName: kept.fileName,
+              sizeBytes: kept.sizeBytes,
+            })
           : undefined,
       ),
     );
+    if (sourceStorage && kept) await discardStagedUploads(sourceStorage, [kept]);
+    // The kept original is downloadable only once the malware scan has cleared it (F-14).
+    if (record.source_storage_key) {
+      await enqueueUploadScans(c, [
+        { target: "import_source", schoolId: auth.schoolId, storageKey: record.source_storage_key },
+      ]);
+    }
 
     return c.json(toResponse(record), 201);
   });
@@ -727,7 +780,27 @@ export function importRoutes(
   // also matches getStudentImportRoute's "{importId}" pattern with importId="template".
   // Registered after, this route was dead: every request to it hit getImport("template", ...)
   // instead of serving the CSV template.
-  routes.openapi(downloadTemplateRoute, async (_c) => {
+  routes.openapi(downloadTemplateRoute, async (c) => {
+    const { format, lang } = c.req.valid("query");
+    if (format === "xlsx") {
+      const auth = requireAuth(c);
+      const workbook = await withTenantTx(database, tenantFrom(c), async (tx) =>
+        buildStudentImportTemplate(
+          tx,
+          auth.schoolId,
+          lang,
+          await importRecordFields(tx, auth.schoolId),
+        ),
+      );
+      const fileName = lang === "ar" ? "studafy-students-ar.xlsx" : "studafy-students.xlsx";
+      return new Response(workbook, {
+        status: 200,
+        headers: {
+          "Content-Type": STUDENT_IMPORT_TEMPLATE_XLSX_MEDIA_TYPE,
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+        },
+      });
+    }
     return new Response(CSV_TEMPLATE, {
       status: 200,
       headers: {

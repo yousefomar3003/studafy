@@ -8,8 +8,8 @@
  */
 
 import { JOB_NAMES } from "@studafy/constants";
-import postgres from "postgres";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 import { isFinalAttempt } from "../reports/report-runner";
 import { createReportS3 } from "../reports/report-s3";
@@ -20,23 +20,31 @@ import {
   completeDsrExport,
   failDsrRequest,
 } from "./dsr-store";
+import { createMaintenanceS3 } from "./export-storage";
 import { resolveSubjectIdentifiers } from "./subject-resolver";
 import { runTenantErasure } from "./tenant-erasure.worker";
 import { runTenantExport } from "./tenant-export.worker";
 
-import type { MaintenanceS3Client } from "./tenant-export.worker";
+import type { MaintenanceS3Client } from "./export-storage";
+import type { DatabaseLease } from "../../db/pool";
 import type { RecordKeyring } from "@studafy/records";
 import type { Job } from "bullmq";
 import type { Sql } from "postgres";
 
 export interface MaintenanceRunnerConfig {
+  /** Used only when `sql` is absent: a dedicated pool is opened per job (tests). */
   primaryDatabaseUrl: string;
   databaseCaCert?: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   s3Region?: string;
   s3Endpoint?: string;
   bucket?: string;
   /** For the account-deletion sweep's Stripe AI add-on cancellations; absent outside production. */
   stripeSecretKey?: string;
+  /** For the same sweep's Google Play renewal cancellations; both set, or the call is skipped. */
+  googlePlayPackageName?: string;
+  googlePlayServiceAccount?: string;
   /** Opens sensitive record answers for a DSR export (ADR-019). */
   recordKeyring: RecordKeyring;
 }
@@ -46,27 +54,25 @@ export interface DsrJobResult {
   reason?: string;
 }
 
-export function createMaintenancePool(config: MaintenanceRunnerConfig): Sql {
-  return postgres(config.primaryDatabaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
+/** The pool a maintenance job runs on: the shared one when configured, else a dedicated one. */
+export function leaseMaintenancePool(config: MaintenanceRunnerConfig): DatabaseLease {
+  return leaseDatabase(config.sql ?? config.primaryDatabaseUrl, {
+    databaseCaCert: config.databaseCaCert,
   });
 }
 
-/** Reuses the reports queue's S3 adapter -- the interface it satisfies (put/remove/presignGet) is a
- * strict superset of MaintenanceS3Client, so no maintenance-specific client is needed. */
+/** Reads the stored files an export copies and streams its archive (export-storage.ts). */
 function createMaintenanceStorage(config: MaintenanceRunnerConfig): MaintenanceS3Client {
   const region = config.s3Region;
   const bucket = config.bucket;
   if (!region || !bucket) throw new Error("DSR export storage is not configured");
-  return createReportS3({ region, endpoint: config.s3Endpoint, bucket });
+  return createMaintenanceS3({ region, endpoint: config.s3Endpoint, bucket });
 }
 
-/** Delete erased record documents. A failure leaves an unreferenced object, never a dangling row. */
+/**
+ * Delete the files an erasure released: record documents, import sources and message images. A
+ * failure leaves an unreferenced object, never a dangling row.
+ */
 async function removeObjects(config: MaintenanceRunnerConfig, keys: readonly string[]) {
   if (keys.length === 0 || !config.s3Region || !config.bucket) return;
   const s3 = createReportS3({
@@ -90,11 +96,11 @@ export async function processDsrJob(
   const data = job.data as { requestId?: string; schoolId?: string };
   if (!data.requestId || !data.schoolId) return { processed: false, reason: "missing job data" };
 
-  const sql = createMaintenancePool(config);
+  const lease = leaseMaintenancePool(config);
   try {
-    return await runDsrJob(sql, config, job, data.requestId, data.schoolId);
+    return await runDsrJob(lease.sql, config, job, data.requestId, data.schoolId);
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
@@ -116,7 +122,7 @@ async function runDsrJob(
         const record = claim.record;
 
         if (job.name === JOB_NAMES.RUN_DATA_SUBJECT_EXPORT) {
-          const { manifestKey } = await runTenantExport(tx, {
+          const { archiveKey } = await runTenantExport(tx, {
             s3: createMaintenanceStorage(config),
             requestId,
             schoolId,
@@ -125,7 +131,7 @@ async function runDsrJob(
             now: new Date(),
             recordKeyring: config.recordKeyring,
           });
-          await completeDsrExport(tx, schoolId, requestId, manifestKey);
+          await completeDsrExport(tx, schoolId, requestId, archiveKey);
           return { processed: true };
         }
 

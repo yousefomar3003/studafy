@@ -23,6 +23,21 @@ function selectDatabase(database: Database | DatabasePools, options: TenantTxOpt
   return options.useReadReplica ? database.readReplica : database.primary;
 }
 
+/**
+ * Opens one short transaction per call. Handed to services whose work has to straddle a network
+ * call (object storage, ERPNext): they check and reserve in one transaction, make the call with no
+ * transaction open -- so no pooled connection sits idle while it runs -- and record the outcome in
+ * another.
+ */
+export type TxRunner = <T>(fn: (tx: TransactionSql) => Promise<T>) => Promise<T>;
+
+export function tenantTxRunner(
+  database: Database | DatabasePools,
+  context: TenantContext,
+): TxRunner {
+  return (fn) => withTenantTx(database, context, fn);
+}
+
 export async function withTenantTx<T>(
   database: Database | DatabasePools,
   context: TenantContext,
@@ -100,6 +115,62 @@ export async function setTenantScope(
     return;
   }
   await tx`SELECT set_config('app.school_id', ${schoolId}, true)`.execute();
+}
+
+/**
+ * Any single, not yet sent statement `pipelinePerSchool` can run for a school: a postgres.js
+ * query built on `tx` (lazy until `.execute()` or awaited).
+ */
+export interface SchoolStatement extends PromiseLike<readonly unknown[]> {
+  execute(): unknown;
+}
+
+/** The rows each statement of a `pipelinePerSchool` build resolved to, in build order. */
+export type SchoolStatementResults<Q extends readonly SchoolStatement[]> = {
+  [K in keyof Q]: Q[K] extends PromiseLike<infer R> ? R : never;
+};
+
+/**
+ * Run the same read statements for many schools, each under that school's own tenant scope, in one
+ * round trip instead of one (or more) per school.
+ *
+ * Every tenant table FORCEs its `tenant_isolation` policy onto `studafy_admin` too (ADR-0015), so a
+ * cross-school figure cannot be one `GROUP BY school_id` statement without widening a policy. This
+ * keeps the isolation the platform console already relies on -- arm `app.school_id`, run the
+ * school's statements, re-arm for the next school -- but writes the whole sequence
+ * (`set_config(A)`, A's statements, `set_config(B)`, ...) onto the transaction's connection before
+ * awaiting any result. Postgres runs a connection's statements strictly in the order they arrive,
+ * and postgres.js sends a transaction's statements in the order `.execute()` is called, so each
+ * statement still sees exactly its own school's scope.
+ *
+ * `build` must be synchronous and return un-awaited statements built on `tx`: awaiting anything in
+ * it would let a later school's `set_config` overtake an earlier school's statement. The scope is
+ * cleared afterwards (fail closed), so a caller that needs one school armed re-arms it.
+ */
+export async function pipelinePerSchool<
+  S extends { id: string },
+  const Q extends readonly SchoolStatement[],
+>(
+  tx: TransactionSql,
+  schools: readonly S[],
+  build: (school: S) => Q,
+): Promise<SchoolStatementResults<Q>[]> {
+  if (schools.length === 0) return [];
+  const sent: PromiseLike<unknown>[] = [];
+  const perSchool: Promise<unknown[]>[] = [];
+  for (const school of schools) {
+    const statements = build(school);
+    sent.push(tx`SELECT set_config('app.school_id', ${school.id}, true)`.execute());
+    for (const statement of statements) statement.execute();
+    const results = Promise.all(statements);
+    sent.push(results);
+    perSchool.push(results);
+  }
+  sent.push(tx`SELECT set_config('app.school_id', '', true)`.execute());
+  // Wait for every statement (a failure aborts the transaction, failing the ones after it too) so
+  // no rejection is left unobserved, then hand back each school's results.
+  await Promise.all(sent);
+  return (await Promise.all(perSchool)) as SchoolStatementResults<Q>[];
 }
 
 /**

@@ -45,14 +45,23 @@ export async function loadSummaryMaterial(
   tx: TransactionSql,
   materialId: string,
 ): Promise<LoadSummaryMaterialResult> {
-  const materials = await tx<{ id: string; title: string | null; ingest_status: string }[]>`
-    SELECT id, title, ingest_status
-    FROM app.materials
-    WHERE id = ${materialId}::uuid
+  // ai_enabled: the class's AI materials setting (000196). A material of a class with it off is
+  // reported not_ready, like one not yet ingested; the class lookup fails closed.
+  const materials = await tx<
+    { id: string; title: string | null; ingest_status: string; ai_enabled: boolean }[]
+  >`
+    SELECT m.id, m.title, m.ingest_status,
+           COALESCE(
+             (SELECT cl.ai_materials_enabled FROM app.classes cl
+              WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
+             false
+           ) AS ai_enabled
+    FROM app.materials m
+    WHERE m.id = ${materialId}::uuid
   `;
   const material = materials[0];
   if (!material) return { status: "not_found" };
-  if (material.ingest_status !== "ready") return { status: "not_ready" };
+  if (material.ingest_status !== "ready" || !material.ai_enabled) return { status: "not_ready" };
 
   const chunkRows = await tx<
     {

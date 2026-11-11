@@ -45,4 +45,15 @@ class FakeSecureTokenStore extends SecureTokenStore {
 
   @override
   Future<void> writeSavedAccounts(String? json) async => savedAccounts = json;
+
+  /// Member device tokens by upper-cased member ID.
+  final memberDeviceTokens = <String, String>{};
+
+  @override
+  Future<String?> readMemberDeviceToken(String memberId) async =>
+      memberDeviceTokens[memberId.trim().toUpperCase()];
+
+  @override
+  Future<void> writeMemberDeviceToken(String memberId, String token) async =>
+      memberDeviceTokens[memberId.trim().toUpperCase()] = token;
 }

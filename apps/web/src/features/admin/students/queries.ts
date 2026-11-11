@@ -312,6 +312,17 @@ export function studentImportQueryKey(importId: string) {
   return ["students", "import", importId] as const;
 }
 
+/** `GET /api/imports/students/template?format=xlsx` — the Excel template in `lang`, with the
+ * school's grades and sections as dropdowns and its record fields as extra columns. */
+export async function fetchStudentImportWorkbook(lang: "en" | "ar"): Promise<Blob> {
+  const { data } = await api.GET("/api/imports/students/template", {
+    params: { query: { format: "xlsx", lang } },
+    parseAs: "blob",
+  });
+  if (!data) throw new Error("Template unavailable");
+  return data as unknown as Blob;
+}
+
 /** `GET /api/imports/students/template` — a CSV with the expected headers and an example row. */
 export async function fetchStudentImportTemplate(): Promise<string> {
   const { data } = await api.GET("/api/imports/students/template");

@@ -8,12 +8,18 @@ class AppConfig {
     required this.apiBaseUrl,
     required this.realtimeBaseUrl,
     required this.webBaseUrl,
+    this.realtimeEnabled = false,
   });
 
   factory AppConfig.fromEnvironment(AppEnvironment environment) {
     const apiBaseUrlOverride = String.fromEnvironment('API_BASE_URL');
     const realtimeBaseUrlOverride = String.fromEnvironment('REALTIME_BASE_URL');
     const webBaseUrlOverride = String.fromEnvironment('WEB_BASE_URL');
+    // Live updates are deferred (the gateway's cost was not worth it yet), so no build opens the
+    // realtime socket unless it is built with `--dart-define=REALTIME_ENABLED=true`. Without it the
+    // app never asks for a ticket or dials the gateway, and so never wakes the scaled-to-zero
+    // realtime app (infra/fly/realtime.toml); screens load fresh data when opened as before.
+    const realtimeEnabled = bool.fromEnvironment('REALTIME_ENABLED');
 
     return AppConfig(
       environment: environment,
@@ -30,6 +36,7 @@ class AppConfig {
       webBaseUrl: Uri.parse(
         webBaseUrlOverride.isEmpty ? environment.defaultWebBaseUrl : webBaseUrlOverride,
       ),
+      realtimeEnabled: realtimeEnabled,
     );
   }
 
@@ -45,6 +52,9 @@ class AppConfig {
   final Uri realtimeBaseUrl;
   final Uri webBaseUrl;
 
+  /// Whether the app connects to the realtime gateway at all (`REALTIME_ENABLED`, off by default).
+  final bool realtimeEnabled;
+
   /// Used by `integration_test/support/test_app.dart` to repoint [apiBaseUrl] at an unroutable
   /// host mid-test (the attendance-offline-replay journey's "airplane mode") via
   /// `ProviderContainer.updateOverrides` — see that file for why a real OS-level network toggle
@@ -55,6 +65,7 @@ class AppConfig {
       apiBaseUrl: apiBaseUrl ?? this.apiBaseUrl,
       realtimeBaseUrl: realtimeBaseUrl,
       webBaseUrl: webBaseUrl,
+      realtimeEnabled: realtimeEnabled,
     );
   }
 }

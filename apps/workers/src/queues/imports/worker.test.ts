@@ -207,6 +207,8 @@ describe("student import staging migration", () => {
       parents_created: 1,
       parents_linked: 2,
       parent_conflicts: 1,
+      placed: 0,
+      placement_conflicts: 0,
       record_answers: 0,
     });
     expect(await importState(fixture.schoolId, importId)).toEqual({ status: "completed", summary });
@@ -318,6 +320,149 @@ describe("student import staging migration", () => {
     expect(String(refusal)).toContain("not confirmed");
     expect((await importState(fixture.schoolId, importId)).status).toBe("validated");
   });
+});
+
+/** An academic year with Grade 1 (sections A, B) and Grade 2 (one section, Blue). */
+async function seedSections(fixture: Fixture): Promise<Record<string, string>> {
+  return asAdmin(fixture.schoolId, async (tx) => {
+    const [year] = await tx<{ id: string }[]>`
+      INSERT INTO app.academic_years (school_id, code, name, starts_on, ends_on, status)
+      VALUES (${fixture.schoolId}::uuid, 'Y1', 'Year 1', CURRENT_DATE - 30, CURRENT_DATE + 300,
+              'active')
+      RETURNING id
+    `;
+    const grade = async (name: string, order: number) => {
+      const [row] = await tx<{ id: string }[]>`
+        INSERT INTO app.grade_levels (school_id, name, sort_order)
+        VALUES (${fixture.schoolId}::uuid, ${name}, ${order}) RETURNING id
+      `;
+      return row!.id;
+    };
+    const section = async (gradeId: string, name: string) => {
+      const [row] = await tx<{ id: string }[]>`
+        INSERT INTO app.sections (school_id, academic_year_id, grade_level_id, name)
+        VALUES (${fixture.schoolId}::uuid, ${year!.id}::uuid, ${gradeId}::uuid, ${name})
+        RETURNING id
+      `;
+      return row!.id;
+    };
+    const one = await grade("Grade 1", 1);
+    const two = await grade("Grade 2", 2);
+    return {
+      "1A": await section(one, "A"),
+      "1B": await section(one, "B"),
+      "2Blue": await section(two, "Blue"),
+    };
+  });
+}
+
+describe("imports without email, with families and placement", () => {
+  const csv = [
+    "Student ID,First Name,Last Name,Grade,Section,Family,Parent 1 Name,Parent 1 Relationship,Parent 2 Name,Parent 2 Relationship",
+    // Creates both of family F1's parents, and is placed in Grade 1 A.
+    "S-1,Ali,Hassan,Grade 1,A,F1,Mona Hassan,الأم,Omar Hassan,father",
+    // A blank family line: joins both F1 parents, with the relationships line 2 gave.
+    "S-2,Sara,Hassan,grade 1,b,F1,,,,",
+    // An unknown grade: imported, with its parent, but unplaced.
+    "S-3,Lina,Khaled,Grade 9,,F2,Rana Khaled,mother,,",
+    // A grade with one section needs no section column.
+    "S-4,Zaid,Khaled,Grade 2,,,,,,",
+  ].join("\n");
+
+  dbTest(
+    "creates email-less students and parents, shares family parents, places students",
+    async () => {
+      const fixture = await seedSchool();
+      const sections = await seedSections(fixture);
+      const importId = await stageConfirmedImport(fixture, csv);
+
+      const summary = await migrateStagedImport(
+        db!,
+        { importId, schoolId: fixture.schoolId },
+        DEVELOPMENT_RECORD_KEYRING,
+      );
+      expect(summary).toMatchObject({
+        students_created: 4,
+        parents_created: 3,
+        parents_linked: 5,
+        placed: 3,
+        placement_conflicts: 1,
+        conflicts: 0,
+      });
+
+      await asAdmin(fixture.schoolId, async (tx) => {
+        const students = await tx<
+          {
+            admission_number: string;
+            email: string | null;
+            code: string;
+            section_id: string | null;
+          }[]
+        >`
+        SELECT s.admission_number, u.email, mc.code, ss.section_id
+        FROM app.students AS s
+        JOIN app.users AS u ON u.id = s.user_id AND u.school_id = s.school_id
+        JOIN app.member_codes AS mc ON mc.user_id = u.id AND mc.kind = 'STU'
+        LEFT JOIN app.student_sections AS ss ON ss.student_id = s.id AND ss.school_id = s.school_id
+        WHERE s.school_id = ${fixture.schoolId}::uuid AND s.admission_number LIKE 'S-%'
+        ORDER BY s.admission_number
+      `;
+        expect(students.map((s) => [s.admission_number, s.email, s.section_id])).toEqual([
+          ["S-1", null, sections["1A"]],
+          ["S-2", null, sections["1B"]],
+          ["S-3", null, null],
+          ["S-4", null, sections["2Blue"]],
+        ]);
+        // Every student got a member ID to sign in with.
+        expect(students.every((s) => s.code.startsWith("STU-"))).toBe(true);
+
+        const links = await tx<
+          {
+            admission_number: string;
+            parent: string;
+            email: string | null;
+            code: string;
+            relationship: string;
+            family_id: string;
+          }[]
+        >`
+        SELECT s.admission_number, u.display_name AS parent, u.email, mc.code,
+               l.relationship::text AS relationship, l.family_id
+        FROM app.parent_child_links AS l
+        JOIN app.students AS s ON s.id = l.student_id AND s.school_id = l.school_id
+        JOIN app.users AS u ON u.id = l.parent_user_id AND u.school_id = l.school_id
+        JOIN app.member_codes AS mc ON mc.user_id = u.id AND mc.kind = 'PAR'
+        WHERE l.school_id = ${fixture.schoolId}::uuid AND s.admission_number LIKE 'S-%'
+        ORDER BY s.admission_number, l.relationship
+      `;
+        expect(links.map((l) => [l.admission_number, l.parent, l.relationship])).toEqual([
+          ["S-1", "Mona Hassan", "mother"],
+          ["S-1", "Omar Hassan", "father"],
+          ["S-2", "Mona Hassan", "mother"],
+          ["S-2", "Omar Hassan", "father"],
+          ["S-3", "Rana Khaled", "mother"],
+        ]);
+        expect(links.every((l) => l.email === null && l.code.startsWith("PAR-"))).toBe(true);
+        // Both Hassan parents, for both children, in one household.
+        expect(new Set(links.slice(0, 4).map((l) => l.family_id)).size).toBe(1);
+      });
+
+      // The same file again: nothing new -- no duplicate parents, nobody moved.
+      const again = await stageConfirmedImport(fixture, csv);
+      const repeat = await migrateStagedImport(
+        db!,
+        { importId: again, schoolId: fixture.schoolId },
+        DEVELOPMENT_RECORD_KEYRING,
+      );
+      expect(repeat).toMatchObject({
+        students_created: 0,
+        students_updated: 0,
+        parents_created: 0,
+        parents_linked: 0,
+        placed: 0,
+      });
+    },
+  );
 });
 
 /** Publish a one-version student record template straight into the tables, as a publish would. */

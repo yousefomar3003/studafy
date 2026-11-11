@@ -85,6 +85,7 @@ interface ExplainRow {
   page_number: number | null;
   section_title: string | null;
   ingest_status: string;
+  ai_enabled: boolean;
 }
 
 function readyRow(over: Partial<ExplainRow> = {}): ExplainRow {
@@ -96,6 +97,7 @@ function readyRow(over: Partial<ExplainRow> = {}): ExplainRow {
     page_number: 1,
     section_title: "Respiration",
     ingest_status: "ready",
+    ai_enabled: true,
     ...over,
   };
 }

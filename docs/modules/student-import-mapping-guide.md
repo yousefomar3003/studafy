@@ -52,26 +52,95 @@ All endpoints require `student:import` (ORG_ADMIN, SUPER_ADMIN) on the web chann
 
 ## Fields and targets
 
-| Field                 | Target     | Required | Notes                                                                  |
-| --------------------- | ---------- | -------- | ---------------------------------------------------------------------- |
-| `admission_number`    | `students` | yes      | Matched case- and whitespace-insensitively.                            |
-| `email`               | `students` | yes      | The student's login. An import never changes it.                       |
-| `first_name`          | `students` | yes      |                                                                        |
-| `last_name`           | `students` | yes      |                                                                        |
-| `middle_name`         | `students` | no       |                                                                        |
-| `preferred_name`      | `students` | no       |                                                                        |
-| `date_of_birth`       | `students` | no       | `YYYY-MM-DD` only; `03/04/2010` is rejected, not guessed.              |
-| `status`              | `students` | no       | `applicant`, `enrolled`, … Case-insensitive. New default: `applicant`. |
-| `parent_email`        | `parents`  | no       | Finds or creates the parent account (PARENT role).                     |
-| `parent_name`         | `parents`  | no       | Display name for a **new** parent only.                                |
-| `parent_relationship` | `links`    | no       | `mother`, `step_parent`, …; "Step-Parent" is accepted.                 |
+| Field                  | Target      | Required | Notes                                                                       |
+| ---------------------- | ----------- | -------- | --------------------------------------------------------------------------- |
+| `admission_number`     | `students`  | yes      | Matched case- and whitespace-insensitively.                                 |
+| `email`                | `students`  | no       | Optional. Without one the student signs in with their member ID (000141).   |
+| `first_name`           | `students`  | yes      |                                                                             |
+| `last_name`            | `students`  | yes      |                                                                             |
+| `middle_name`          | `students`  | no       |                                                                             |
+| `preferred_name`       | `students`  | no       |                                                                             |
+| `date_of_birth`        | `students`  | no       | `YYYY-MM-DD` only; `03/04/2010` is rejected, not guessed.                   |
+| `status`               | `students`  | no       | `applicant`, `enrolled`, … Case-insensitive; Arabic words (منتظم) accepted. |
+| `grade`                | `placement` | no       | Grade name, as in Academics. Places the student (see Placement below).      |
+| `section`              | `placement` | no       | Section name in that grade. Optional when the grade has one section.        |
+| `family`               | grouping    | no       | The school's own family number. Never stored (see Parents below).           |
+| `parent_name`          | `parents`   | no       | Parent 1's name, for a **new** parent.                                      |
+| `parent_email`         | `parents`   | no       | Parent 1's email. Optional: without one they sign in with their member ID.  |
+| `parent_relationship`  | `links`     | no       | `mother`, `step_parent`, …; "Step-Parent", أم and أب are accepted.          |
+| `parent2_name`         | `parents`   | no       | Parent 2, the same way.                                                     |
+| `parent2_email`        | `parents`   | no       |                                                                             |
+| `parent2_relationship` | `links`     | no       |                                                                             |
 
-A parent is all or nothing. `parent_email` and `parent_relationship` must be given together, and
-`parent_name` needs `parent_email`.
+Arabic header spellings are recognised too (رقم الطالب, الاسم الأول, الصف, الشعبة, رقم العائلة,
+اسم ولي الأمر 1, صلة القرابة 2, …; see `packages/student-import/src/fields.ts`).
+
+A parent is all or nothing: a name or an email (or both), and a relationship. A relationship with
+neither is rejected, and so is a parent without a relationship.
+
+### Parents
+
+- **Never matched.** A parent email that already belongs to an account is a `PARENT_ACCOUNT_EXISTS`
+  parent conflict: the student is imported, that parent unlinked, and staff link them by hand.
+- **Siblings share parents through `family`.** Every line with the same family number shares its
+  parent 1 and its parent 2, each created from the first line of the family that names them. A
+  line of the family that leaves the parent blank still joins, with the relationship the naming
+  line gave, so the school types each family's parents once. The number is the school's own
+  statement that those children are siblings, a link staff chose, not one inferred from names or
+  phone numbers. Without a `family` column, lines naming the same new parent email share that
+  parent (the original rule), and a parent with neither is new on every line.
+- **One email, one account.** A new parent email used by two different families is created for the
+  first; the second family's parent is `PARENT_EMAIL_IN_OTHER_FAMILY` (unlinked).
+- **No duplicates on re-import.** A student who already has a parent gets none from an import
+  (`parent: "kept"`).
+- A line's two parents join one household (`app.families`): the first linked parent's.
+
+### Placement
+
+`grade` and `section` name a section of the current academic year: the `active` one, else a
+`planned` one (a school importing before term starts). Names match case- and spacing-
+insensitively. The student is placed (`app.student_sections`) and enrolled in the section's open
+classes, skipping any at capacity, as placing by hand does; a student already in another section of
+that year is moved. Nothing is created: an unknown grade or section, a grade with several sections
+and no section given, or no academic year is a `placement_conflict`, and the student is imported
+unplaced (`NO_ACADEMIC_YEAR`, `GRADE_NOT_FOUND`, `SECTION_NOT_FOUND`, `SECTION_REQUIRED`).
 
 **A blank cell or an unmapped column means "no value", never "clear it".** A create falls back to
 the column default. An update leaves the live value unchanged. An import therefore cannot blank out
 existing data, and it also cannot deliberately clear a field; use the student profile for that.
+
+## Excel template and Excel upload
+
+- **Template.** `GET /api/imports/students/template?format=xlsx&lang=en|ar` builds a workbook
+  (`apps/api/src/modules/imports/template-workbook.ts`, exceljs loaded on first use): a Students
+  sheet with only a header row (headers are recognised spellings, so the upload maps itself;
+  required columns highlighted; a note on every column; right-to-left in Arabic), the school's
+  published student record fields as extra columns, dropdowns for status, relationship and the
+  school's grades and sections of the current academic year (from a hidden Lists sheet), text format
+  on ID and date columns, and Instructions and Example sheets. Example rows never sit on the Students
+  sheet, so a forgotten example is never imported. `format=csv` (the default) is the CSV template.
+- **Upload.** The page accepts `.xlsx` as well as `.csv`. An Excel file is turned into CSV **in the
+  browser** (`apps/web/src/lib/xlsx.ts`, fflate + DOMParser, loaded only when an Excel file is
+  picked) and uploaded exactly as a CSV would be, so the API only ever parses CSV and a hostile
+  workbook is unpacked in the uploader's own tab, never on a server. Only the workbook parts the
+  reader needs are inflated, and a workbook declaring more than 100 MB uncompressed is refused
+  unopened. The Students / الطلاب sheet is read, else the first; dates in date-formatted cells become
+  `YYYY-MM-DD`; empty rows are kept so line numbers match Excel's row numbers.
+
+## Import data page and login slips
+
+`/portal/admin/import` is where a school starts: grades and sections, then students and parents
+(this import), then teachers, then login slips. `/portal/admin/import/slips` prints one slip per
+student, parent or teacher who has not signed in yet: name, class (students) or children (parents),
+Studafy ID and a one-time setup code (000184; valid 14 days). They sign in with the ID and code and
+must choose their own password. There is deliberately no shared default password: member IDs are
+sequential, so a shared password would let anyone open any account not claimed yet.
+
+Codes exist only in the response (the server keeps a hash), so the page says to print before
+leaving. Running it again skips people whose code is still unused, so printed slips stay valid; the
+"reprint" option re-issues those codes instead (earlier slips stop working), paging by member ID
+(`after`/`last`) because re-issued members keep matching. Slips are sorted by class, parents by
+their first child, and print three to a row with everything else on the page hidden.
 
 ## Header detection and mapping
 
@@ -114,12 +183,12 @@ with, so a client can show the detected headers and let the admin correct the ma
 
 Every valid staged row gets exactly one action:
 
-| Action      | Meaning                                                                                                                  |
-| ----------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `create`    | No student has this admission number: a new student is created, reusing the account for the email if one exists.         |
-| `update`    | The student exists, and the row changes at least one field (`changes`, from → to) or creates or changes the parent link. |
-| `unchanged` | The student exists, and the row changes nothing.                                                                         |
-| `conflict`  | The row cannot be applied safely. It is skipped by the migration and never fails the import.                             |
+| Action      | Meaning                                                                                                          |
+| ----------- | ---------------------------------------------------------------------------------------------------------------- |
+| `create`    | No student has this admission number: a new student is created, reusing the account for the email if one exists. |
+| `update`    | The student exists, and the row changes at least one field (`changes`, from → to), links a parent, or places it. |
+| `unchanged` | The student exists, and the row changes nothing.                                                                 |
+| `conflict`  | The row cannot be applied safely. It is skipped by the migration and never fails the import.                     |
 
 Conflict reasons:
 
@@ -156,7 +225,8 @@ so a student edited between the preview and the commit is judged against live da
   first row of every import.
 
 Summary (`student_imports.summary`): `students_created`, `students_updated`, `students_skipped`
-(unchanged + conflict), `conflicts`, `parents_created`, `parents_linked`.
+(unchanged + conflict), `conflicts`, `parents_created`, `parents_linked`, `parent_conflicts`,
+`placed`, `placement_conflicts`, `record_answers`.
 
 ## Import history and unmapped columns
 

@@ -20,22 +20,33 @@ export const STUDENT_IMPORT_FIELDS = [
   "preferred_name",
   "date_of_birth",
   "status",
-  "parent_email",
+  "grade",
+  "section",
+  "family",
   "parent_name",
+  "parent_email",
   "parent_relationship",
+  "parent2_name",
+  "parent2_email",
+  "parent2_relationship",
 ] as const;
 
 export type StudentImportField = (typeof STUDENT_IMPORT_FIELDS)[number];
 
-/** Where a mapped value is written: app.students (+ its app.users row), the parent's app.users row,
- * or the app.parent_child_links edge between them. */
-export type StudentImportTarget = "students" | "parents" | "links";
+/**
+ * Where a mapped value is written: app.students (+ its app.users row), the parent's app.users row,
+ * the app.parent_child_links edge between them, or the student's section placement
+ * (app.student_sections). `family` is "grouping": it is never stored, only used to give siblings
+ * on several lines the same parents.
+ */
+export type StudentImportTarget = "students" | "parents" | "links" | "placement" | "grouping";
 
 export interface StudentImportFieldDefinition {
   target: StudentImportTarget;
   required: boolean;
   /** Header spellings recognised by `suggestColumnMapping`, compared after `normalizeHeader`. The
-   * field's own name is always recognised and is not repeated here. */
+   * field's own name is always recognised and is not repeated here. Arabic spellings are listed
+   * too, with and without hamza, since schools type both. */
   aliases: readonly string[];
 }
 
@@ -54,49 +65,153 @@ export const STUDENT_IMPORT_FIELD_DEFINITIONS: Readonly<
       "roll number",
       "enrollment number",
       "enrolment number",
+      "رقم القيد",
+      "الرقم المدرسي",
+      "رقم الطالب",
     ],
   },
+  // Optional: students sign in with their member ID and a password (000141), not an email.
   email: {
     target: "students",
-    required: true,
-    aliases: ["student email", "email address", "e-mail", "student email address"],
+    required: false,
+    aliases: [
+      "student email",
+      "email address",
+      "e-mail",
+      "student email address",
+      "البريد الإلكتروني",
+      "البريد الالكتروني",
+      "بريد الطالب",
+    ],
   },
   first_name: {
     target: "students",
     required: true,
-    aliases: ["given name", "forename", "first"],
+    aliases: ["given name", "forename", "first", "الاسم الأول", "الاسم الاول"],
   },
-  middle_name: { target: "students", required: false, aliases: ["middle"] },
+  middle_name: {
+    target: "students",
+    required: false,
+    aliases: ["middle", "الاسم الأوسط", "الاسم الاوسط", "اسم الأب", "اسم الاب"],
+  },
   last_name: {
     target: "students",
     required: true,
-    aliases: ["surname", "family name", "last"],
+    aliases: ["surname", "family name", "last", "اسم العائلة", "الكنية"],
   },
-  preferred_name: { target: "students", required: false, aliases: ["nickname", "known as"] },
+  preferred_name: {
+    target: "students",
+    required: false,
+    aliases: ["nickname", "known as", "الاسم المفضل"],
+  },
   date_of_birth: {
     target: "students",
     required: false,
-    aliases: ["dob", "birth date", "birthdate", "birthday"],
+    aliases: ["dob", "birth date", "birthdate", "birthday", "تاريخ الميلاد"],
   },
   status: {
     target: "students",
     required: false,
-    aliases: ["student status", "enrollment status", "enrolment status"],
+    aliases: ["student status", "enrollment status", "enrolment status", "الحالة", "حالة الطالب"],
   },
-  parent_email: {
-    target: "parents",
+  grade: {
+    target: "placement",
     required: false,
-    aliases: ["guardian email", "parent email address", "guardian email address"],
+    aliases: ["grade level", "year group", "class level", "الصف", "المرحلة الدراسية"],
+  },
+  section: {
+    target: "placement",
+    required: false,
+    aliases: ["class section", "homeroom", "الشعبة", "الفصل"],
+  },
+  family: {
+    target: "grouping",
+    required: false,
+    aliases: [
+      "family number",
+      "family no",
+      "family id",
+      "family code",
+      "household",
+      "رقم العائلة",
+      "رقم الأسرة",
+      "رقم الاسرة",
+    ],
   },
   parent_name: {
     target: "parents",
     required: false,
-    aliases: ["guardian name", "parent full name", "guardian full name"],
+    aliases: [
+      "guardian name",
+      "parent full name",
+      "guardian full name",
+      "parent 1 name",
+      "guardian 1 name",
+      "اسم ولي الأمر",
+      "اسم ولي الامر",
+      "اسم ولي الأمر 1",
+      "اسم ولي الامر 1",
+    ],
+  },
+  parent_email: {
+    target: "parents",
+    required: false,
+    aliases: [
+      "guardian email",
+      "parent email address",
+      "guardian email address",
+      "parent 1 email",
+      "guardian 1 email",
+      "بريد ولي الأمر",
+      "بريد ولي الامر",
+      "بريد ولي الأمر 1",
+      "بريد ولي الامر 1",
+    ],
   },
   parent_relationship: {
     target: "links",
     required: false,
-    aliases: ["relationship", "guardian relationship", "relation"],
+    aliases: [
+      "relationship",
+      "guardian relationship",
+      "relation",
+      "parent 1 relationship",
+      "guardian 1 relationship",
+      "صلة القرابة",
+      "صلة القرابة 1",
+    ],
+  },
+  parent2_name: {
+    target: "parents",
+    required: false,
+    aliases: [
+      "parent 2 name",
+      "second parent name",
+      "guardian 2 name",
+      "اسم ولي الأمر 2",
+      "اسم ولي الامر 2",
+    ],
+  },
+  parent2_email: {
+    target: "parents",
+    required: false,
+    aliases: [
+      "parent 2 email",
+      "second parent email",
+      "guardian 2 email",
+      "بريد ولي الأمر 2",
+      "بريد ولي الامر 2",
+    ],
+  },
+  parent2_relationship: {
+    target: "links",
+    required: false,
+    aliases: [
+      "parent 2 relationship",
+      "second parent relationship",
+      "guardian 2 relationship",
+      "صلة القرابة 2",
+    ],
   },
 };
 

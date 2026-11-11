@@ -7,6 +7,7 @@ import {
   stageRows,
   suggestColumnMapping,
   unmappedColumns,
+  withRecordDefaults,
 } from "@studafy/student-import";
 
 import { CodedHttpException } from "../../coded-http-exception";
@@ -126,7 +127,7 @@ function mappingColumns(tx: TransactionSql) {
  * (docs/modules/student-records.md "CSV import"). Document fields are included so a mapping that
  * names one is refused with a reason rather than as an unknown field.
  */
-async function importRecordFields(
+export async function importRecordFields(
   tx: TransactionSql,
   schoolId: string,
 ): Promise<ImportRecordField[]> {
@@ -146,18 +147,17 @@ async function importRecordFields(
 // ---------------------------------------------------------------------------
 
 /**
- * Parse a CSV, detect its header row, map it (a saved mapping, or one suggested from the headers)
- * and stage every data line. Stored as `validated` when every line is valid, `uploaded` otherwise.
+ * Every way an upload can be refused before anything is written: the CSV parses, is within the
+ * row cap, and the named mapping exists. The upload route runs it ahead of copying a kept original
+ * out of temp/, so a refused file is never copied (it would hold student data with no row, and so
+ * no retention sweep, pointing at it).
  */
-export async function uploadImport(
+export async function checkImportUpload(
   tx: TransactionSql,
   schoolId: string,
-  uploadedBy: string,
-  fileName: string,
   rawCsv: string,
   mappingId?: string,
-  stageSource?: () => Promise<StagedSourceFile>,
-): Promise<ImportRecord> {
+) {
   const source = readCsvSource(rawCsv);
 
   if (source.rows.length > MAX_ROWS) {
@@ -172,6 +172,28 @@ export async function uploadImport(
   const mapping = mappingId
     ? (await getMapping(tx, schoolId, mappingId)).column_mapping
     : suggestColumnMapping(source.headers, recordFields);
+  return { source, recordFields, mapping };
+}
+
+/**
+ * Parse a CSV, detect its header row, map it (a saved mapping, or one suggested from the headers)
+ * and stage every data line. Stored as `validated` when every line is valid, `uploaded` otherwise.
+ */
+export async function uploadImport(
+  tx: TransactionSql,
+  schoolId: string,
+  uploadedBy: string,
+  fileName: string,
+  rawCsv: string,
+  mappingId?: string,
+  stageSource?: () => Promise<StagedSourceFile>,
+): Promise<ImportRecord> {
+  const { source, recordFields, mapping } = await checkImportUpload(
+    tx,
+    schoolId,
+    rawCsv,
+    mappingId,
+  );
   const staged = stageRows(source, mapping, recordFields);
   const validRows = countValid(staged.rows);
   // After the file has parsed: a file refused for its content is never kept.
@@ -181,7 +203,7 @@ export async function uploadImport(
     INSERT INTO app.student_imports (
       school_id, uploaded_by, status, file_name, row_count, valid_rows, error_rows,
       header_line, source_headers, column_mapping, errors, source_storage_key, source_file_name,
-      source_size_bytes, source_uploaded_at
+      source_size_bytes, source_uploaded_at, source_scan_status
     ) VALUES (
       ${schoolId},
       ${uploadedBy},
@@ -197,7 +219,8 @@ export async function uploadImport(
       ${file?.storageKey ?? null},
       ${file?.fileName ?? null},
       ${file?.sizeBytes ?? null},
-      ${file ? tx`CURRENT_TIMESTAMP` : null}
+      ${file ? tx`CURRENT_TIMESTAMP` : null},
+      ${file ? "scanning" : "unscanned"}::app.upload_scan_status
     )
     RETURNING ${importColumns(tx)}
   `;
@@ -494,8 +517,8 @@ export async function getImportDiff(
     schoolId,
     staged.map((row) => ({
       line_number: row.line_number,
-      // Rows staged before ST-299 (backfilled from rows_data) have no parent_name key.
-      record: { ...row.record, parent_name: row.record.parent_name ?? null },
+      // Rows staged by an earlier release lack the fields added since; missing means "not given".
+      record: withRecordDefaults(row.record),
     })),
   );
 
@@ -520,6 +543,22 @@ export async function getImportDiff(
         parent_email: row.record.parent_email,
         parent_name: row.record.parent_name,
         link: row.link,
+        parent2:
+          row.parent2 === null
+            ? null
+            : {
+                parent: row.parent2.parent,
+                parent_conflict: row.parent2.parent_conflict,
+                parent_group_line: row.parent2.parent_group_line,
+                parent_email: row.record.parent2_email,
+                parent_name: row.record.parent2_name,
+                link: row.parent2.link,
+              },
+        family: row.record.family,
+        grade: row.record.grade,
+        section: row.record.section,
+        placement: row.placement?.action ?? null,
+        placement_conflict: row.placement_conflict,
         // In form order: the staged answers are a jsonb object, which keeps no key order.
         records: [...fields.values()].flatMap((field) => {
           const fieldId = field.id;

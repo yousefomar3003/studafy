@@ -2,7 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { withTenantTx } from "../../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
@@ -373,10 +373,16 @@ export function refundRoutes(
     const { refundId } = c.req.valid("param");
     const acceptLanguage = c.req.header("Accept-Language") ?? undefined;
 
-    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
-      const erpnext = await erpnextFactory.forSchool(tx, auth.schoolId);
-      return approveRefund(tx, erpnext, auth.schoolId, auth.userId, refundId, acceptLanguage);
-    });
+    // Claim, call ERPNext with no transaction open, then record (see approveRefund).
+    const row = await approveRefund(
+      tenantTxRunner(database, tenantFrom(c)),
+      (tx) => erpnextFactory.forSchool(tx, auth.schoolId),
+      auth.schoolId,
+      auth.userId,
+      refundId,
+      acceptLanguage,
+      c.get("log"),
+    );
 
     return c.json(toRefundResponse(row), 200);
   });

@@ -399,6 +399,16 @@ describe("emit", () => {
           studentId: uid,
           email: "test@example.com",
         },
+        [DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED]: {
+          schoolId: uid,
+          aiSubscriptionId: uid,
+          studentId: uid,
+          email: "test@example.com",
+          platform: "google",
+          acknowledgedAt: new Date().toISOString(),
+          recordedAt: new Date().toISOString(),
+          termsVersion: "2026-11-11",
+        },
       };
 
       await database!.sql.begin(async (tx) => {

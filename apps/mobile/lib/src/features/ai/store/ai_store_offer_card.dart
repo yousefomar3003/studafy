@@ -13,11 +13,17 @@ import 'store_gateway.dart';
 
 /// Buying the AI add-on through the App Store / Google Play, under the not-active notice.
 ///
-/// What the stores require of a subscription purchase screen, and nothing else: the store's own
-/// localized price and period, a way to restore purchases, how renewal and cancelling work, and
-/// links to the privacy policy and (App Store) terms of use. Never a price of its own, and never a
-/// way to pay outside the store (`apps/mobile/docs/store_payment_routing.md`). Renders nothing
-/// while loading or when [AiStoreHidden].
+/// What the stores require of a subscription purchase screen: the store's own localized price and
+/// period, a way to restore purchases, how renewal and cancelling work, and links to the privacy
+/// policy and (App Store) terms of use. Never a price of its own, and never a way to pay outside the
+/// store (`apps/mobile/docs/store_payment_routing.md`). Renders nothing while loading or when
+/// [AiStoreHidden].
+///
+/// And what EU consumer law requires before a digital service starts within the 14-day withdrawal
+/// period (Directive 2011/83/EU art. 16(m); Terms of Service 7.7): a required checkbox, unticked by
+/// default, by which the student asks for it to start now and acknowledges losing the right to
+/// cancel once it does, with a link to the Terms of Service. Subscribe stays disabled until it is
+/// ticked; the acknowledgement is sent with the purchase and confirmed by email or in the app.
 class AiStoreOfferCard extends ConsumerWidget {
   const AiStoreOfferCard({super.key});
 
@@ -64,9 +70,19 @@ class _Offer extends ConsumerWidget {
             'aiStore.price'.tr(namedArgs: {'price': offer.price}),
             style: textTheme.headlineSmall,
           ),
-          const SizedBox(height: AppSpacing.space16),
+          const SizedBox(height: AppSpacing.space12),
+          CheckboxListTile(
+            key: const ValueKey('aiStore.waiver'),
+            value: offer.waiverAcknowledged,
+            onChanged: busy ? null : (value) => controller.acknowledgeWaiver(value ?? false),
+            controlAffinity: ListTileControlAffinity.leading,
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text('aiStore.waiver.label'.tr(), style: textTheme.bodyMedium),
+          ),
+          const SizedBox(height: AppSpacing.space8),
           FilledButton(
-            onPressed: busy ? null : controller.buy,
+            onPressed: busy || !offer.waiverAcknowledged ? null : controller.buy,
             child: offer.busy == AiStoreBusy.purchasing
                 ? const SizedBox.square(
                     dimension: 20,
@@ -107,6 +123,11 @@ class _Offer extends ConsumerWidget {
                   mode: LaunchMode.externalApplication,
                 ),
                 child: Text('aiStore.links.privacy'.tr()),
+              ),
+              TextButton(
+                onPressed: () =>
+                    launchUrl(ref.read(termsUrlProvider), mode: LaunchMode.externalApplication),
+                child: Text('aiStore.links.termsOfService'.tr()),
               ),
               if (apple)
                 TextButton(

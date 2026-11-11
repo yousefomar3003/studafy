@@ -95,9 +95,12 @@ runs is not a demonstrated need.
 - No per-row retry/backoff/poison state. A relayed row is done; a row that fails downstream after
   being claimed is the BullMQ job's own retry/dead-letter concern (`outbox-relay` queue,
   `apps/workers/src/registry.ts`), not something this table re-implements.
-- No pruning/retention job. Relayed rows accumulate until an operational decision is made about
-  retention; that is a future maintenance ticket (the same shape as
-  `docs/database/attendance-partition-maintenance.md`), not part of this migration.
+- Retention. The data retention sweep (`apps/workers/src/queues/maintenance/data-retention-sweep.ts`,
+  [data-retention.md](../modules/data-retention.md)) deletes a row 14 days after it was written once
+  every consumer has finished with it: `relayed_at` is set, `email_dispatched_at` is set if the
+  email dispatcher or digest producer claims its event name, and `entitlement_applied_at` is set if
+  the entitlement invalidator does. A row any consumer has not finished is never deleted.
+  `idx_outbox_events_school_created` (000201) serves the sweep.
 - No `updated_at` or `aggregate_id`/`occurred_at` columns beyond the ticket's own field list
   (`event_name`, `payload`, `school_id`, `created_at`, `relayed_at`). Nothing in the current ticket
   demonstrates a need for them, and inventing columns speculatively is exactly what the

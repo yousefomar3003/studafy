@@ -354,6 +354,7 @@
     "fromFilter": "Issued from",
     "toFilter": "Issued to",
     "empty": "No invoices match.",
+    "loadMore": "Show more invoices",
     "columns": {
       "number": "Invoice",
       "school": "School",

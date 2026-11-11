@@ -24,6 +24,7 @@ interface ExplainRow {
   page_number: number | null;
   section_title: string | null;
   ingest_status: string;
+  ai_enabled: boolean;
 }
 
 function readyRow(over: Partial<ExplainRow> = {}): ExplainRow {
@@ -35,6 +36,7 @@ function readyRow(over: Partial<ExplainRow> = {}): ExplainRow {
     page_number: 1,
     section_title: "Photosynthesis",
     ingest_status: "ready",
+    ai_enabled: true,
     ...over,
   };
 }
@@ -60,6 +62,12 @@ describe("loadExplainPassage", () => {
       fakeTx(readyRow({ ingest_status: "processing" })),
       CHUNK_ID,
     );
+
+    expect(result.status).toBe("not_ready");
+  });
+
+  test("reports not_ready when the chunk's class has its AI materials setting off", async () => {
+    const result = await loadExplainPassage(fakeTx(readyRow({ ai_enabled: false })), CHUNK_ID);
 
     expect(result.status).toBe("not_ready");
   });

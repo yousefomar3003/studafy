@@ -168,6 +168,32 @@ describe("PrincipalDashboardPage", () => {
     ).toBeTruthy();
   });
 
+  test("reads draft evaluations as one preview page with the server's total", async () => {
+    getMock.mockImplementation((path: string) => {
+      if (path === "/api/evaluations") {
+        return Promise.resolve({
+          data: {
+            evaluations: [{ id: "evaluation-1", evaluation_type: "peer_review", scores: [] }],
+            total: 137,
+            limit: 5,
+            offset: 0,
+          },
+        });
+      }
+      return emptyResponsesFor(path);
+    });
+
+    await renderPage(await loadPrincipalDashboardPage());
+
+    expect(await screen.findByText("137")).toBeTruthy();
+    expect(screen.getByText("Peer review")).toBeTruthy();
+    const evaluationCalls = getMock.mock.calls.filter(([path]) => path === "/api/evaluations");
+    expect(evaluationCalls).toHaveLength(1);
+    expect((evaluationCalls[0] as unknown[])[1]).toEqual({
+      params: { query: { limit: 5, offset: 0, status: "draft" } },
+    });
+  });
+
   test("renders each tile's empty state when there is nothing to show yet", async () => {
     getMock.mockImplementation(emptyResponsesFor);
 

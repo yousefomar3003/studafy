@@ -188,8 +188,8 @@ would export ciphertext and miss parent records:
 - **Export** includes every answer about the subject, as a student, a parent and a member of staff
   (`staff_user_id` is the person's own user id). Sensitive values
   are decrypted so the subject gets their own data (GDPR art. 15), each labelled with the field as it
-  read when answered, with document metadata and file keys in the manifest
-  (`data/record_answers.ndjson`).
+  read when answered (the export archive's `data/record_answers.json`). Each answer's document is
+  copied into the archive's `files/record-documents/` and listed in its `manifest.json`.
 - **Erasure** deletes the subject's answers outright, with their documents cascading. The stored
   files are deleted after the erasure commits. Audit rows stay under the audit legal hold and never
   contain a sensitive value.
@@ -224,12 +224,12 @@ the preview, and in the worker's apply.
   as `student:import`; creating a field also needs `recordTemplate:manage`.
 - **The original file and leftover cells** are kept 180 days at most (a school can shorten it), then
   deleted; see [Student import files](../security/data_retention_and_dsr_policy.md#student-import-files).
-- **Parents are never matched by email.** A `parent_email` that already belongs to an account in the
-  school is a `PARENT_ACCOUNT_EXISTS` parent conflict: the student is still imported, with no link,
-  and the preview tells staff to link the parent from the student's Guardians tab or Finance >
-  Unlinked. A new `parent_email` creates a new parent and household. Rows in the same file sharing
-  one new `parent_email` are siblings: the first creates the parent, the others join it, and the
-  preview shows that grouping (`parent: "sibling"`, `parent_group_line`) before confirm.
+- **Parents are never matched by email.** A parent email that already belongs to an account in the
+  school is a `PARENT_ACCOUNT_EXISTS` parent conflict: the student is still imported, with that
+  parent unlinked, and the preview tells staff to link them from the student's Guardians tab or
+  Finance > Unlinked. Nobody needs an email (they sign in with their member ID). Siblings share
+  parents only through the file's own `family` number, or else the same new parent email; see
+  [the import mapping guide](./student-import-mapping-guide.md#parents).
 
 ### Staff and class CSV imports: "Keep as a record field"
 

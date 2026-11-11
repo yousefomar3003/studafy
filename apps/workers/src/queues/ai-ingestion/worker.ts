@@ -3,6 +3,7 @@ import { NOTIFICATION_TYPES } from "@studafy/constants";
 import { sanitizePlainText } from "@studafy/sanitize";
 import postgres from "postgres";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { createEmbeddingStage, createMockEmbeddingProvider } from "./embedding";
@@ -17,11 +18,14 @@ import type { IngestChunk } from "./ingest";
 import type { OcrReport } from "./ocr";
 import type { TenantSemaphore, TenantSemaphoreLease } from "./semaphore";
 import type { Job } from "bullmq";
-import type { TransactionSql } from "postgres";
+import type { Sql, TransactionSql } from "postgres";
 
 export interface AiIngestionWorkerConfig {
+  /** Used only when `sql` is absent: a dedicated pool is opened for this job (tests). */
   databaseUrl: string;
   databaseCaCert?: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   s3Region?: string;
   s3Endpoint?: string;
   bucket?: string;
@@ -59,12 +63,15 @@ interface MaterialClaim {
   original_file_name: string;
   uploaded_by_user_id: string;
   ai_visible: boolean;
+  /** The class's AI materials setting (000196). */
+  class_ai_enabled: boolean;
 }
 
 /** The columns a re-claim re-reads under FOR UPDATE, to decide whether the work still commits. */
 interface MaterialState {
   ingest_status: string;
   ai_visible: boolean;
+  class_ai_enabled: boolean;
 }
 
 type IngestResult =
@@ -85,6 +92,10 @@ type IngestResult =
  *    it `ready` with `ingested_at`. The re-claim is what makes a toggle race safe: if the teacher
  *    disabled AI visibility (or a duplicate job already finished) while this job parsed, the final
  *    transaction skips without writing chunks or notifying;
+ *  - a material whose class has its AI materials setting off (000196) is never parsed: the claim
+ *    (or, if the setting went off mid-parse, the re-claim) finishes it as `ready` with no chunks and
+ *    deletes any it had, so the class's text never reaches the embedding stage and a queued job
+ *    cannot strand the material in `queued`. Turning the setting back on re-stages it;
  *  - a terminal failure (the last attempt) records `failed` + a reason in `ingest_error` and
  *    notifies the uploader. The transaction boundary is what makes this safe: a crash mid-insert
  *    rolls back and the retry re-claims from `processing`; a committed insert and a committed
@@ -101,14 +112,10 @@ export async function processIngestJob(
     throw new Error("ai ingestion storage is not configured");
   }
 
-  const database = postgres(config.databaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
+  const databaseLease = leaseDatabase(config.sql ?? config.databaseUrl, {
+    databaseCaCert: config.databaseCaCert,
   });
+  const database = databaseLease.sql;
   const semaphore = config.semaphore ?? nullSemaphore;
 
   let lease: TenantSemaphoreLease | null = null;
@@ -120,13 +127,19 @@ export async function processIngestJob(
     lease = await semaphore.acquire(data.schoolId);
     if (!lease) throw new TenantConcurrencyExceededError(data.schoolId);
 
+    let heldBack = false;
     const claim = await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
       const [locked] = await tx<MaterialClaim[]>`
-        SELECT storage_key, mime_type, ingest_status::text AS ingest_status,
-               original_file_name, uploaded_by_user_id, ai_visible
-        FROM app.materials
-        WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
-        FOR UPDATE
+        SELECT m.storage_key, m.mime_type, m.ingest_status::text AS ingest_status,
+               m.original_file_name, m.uploaded_by_user_id, m.ai_visible,
+               COALESCE(
+                 (SELECT cl.ai_materials_enabled FROM app.classes cl
+                  WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
+                 false
+               ) AS class_ai_enabled
+        FROM app.materials m
+        WHERE m.school_id = ${data.schoolId}::uuid AND m.id = ${data.materialId}::uuid
+        FOR UPDATE OF m
       `;
       if (!locked) throw new Error("material does not exist");
       if (
@@ -134,6 +147,11 @@ export async function processIngestJob(
         !locked.ai_visible ||
         (locked.ingest_status !== "queued" && locked.ingest_status !== "processing")
       ) {
+        return null;
+      }
+      if (!locked.class_ai_enabled) {
+        await holdBackMaterial(tx, data.schoolId, data.materialId);
+        heldBack = true;
         return null;
       }
       await tx`
@@ -149,6 +167,11 @@ export async function processIngestJob(
     });
 
     if (!claim) {
+      if (heldBack) {
+        await config
+          .enqueueDerivation?.({ schoolId: data.schoolId, materialId: data.materialId })
+          .catch(() => undefined);
+      }
       return { processed: true, materialId: data.materialId, ingested: false, chunks: 0 };
     }
     material = claim;
@@ -205,14 +228,26 @@ export async function processIngestJob(
       { schoolId: data.schoolId },
       async (tx) => {
         const [state] = await tx<MaterialState[]>`
-        SELECT ingest_status::text AS ingest_status, ai_visible
-        FROM app.materials
-        WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
-        FOR UPDATE
+        SELECT m.ingest_status::text AS ingest_status, m.ai_visible,
+               COALESCE(
+                 (SELECT cl.ai_materials_enabled FROM app.classes cl
+                  WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
+                 false
+               ) AS class_ai_enabled
+        FROM app.materials m
+        WHERE m.school_id = ${data.schoolId}::uuid AND m.id = ${data.materialId}::uuid
+        FOR UPDATE OF m
       `;
         // The teacher may have toggled AI visibility off (or a duplicate job already finished) while
         // this job parsed. Skip — never write chunks for a hidden material or notify for a stale one.
         if (!state || state.ingest_status !== "processing" || !state.ai_visible) {
+          return false;
+        }
+        // The class's AI materials setting went off while this job parsed: drop the parsed text
+        // and finish the material chunk-free, exactly as the claim would have.
+        if (!state.class_ai_enabled) {
+          await holdBackMaterial(tx, data.schoolId, data.materialId);
+          heldBack = true;
           return false;
         }
         await tx`
@@ -248,7 +283,7 @@ export async function processIngestJob(
     // The material is `ready` now, so the thumbnail/preview can be derived from the same bytes.
     // Best-effort by design: an enqueue failure must not fail an already-committed ingestion, and a
     // missing thumbnail degrades to the list's type icon rather than a failed material.
-    if (committed) {
+    if (committed || heldBack) {
       await config
         .enqueueDerivation?.({ schoolId: data.schoolId, materialId: data.materialId })
         .catch(() => undefined);
@@ -288,8 +323,33 @@ export async function processIngestJob(
     throw error;
   } finally {
     await lease?.release().catch(() => undefined);
-    await database.end({ timeout: 5 });
+    await databaseLease.release();
   }
+}
+
+/**
+ * Finish a material of a class whose AI materials setting is off (000196) without ingesting it:
+ * no chunks (any left from an earlier run are deleted) and `ready` with an ingest stamp, the state
+ * the scan worker gives a clean material that is not AI-bound. Must run under the material's row
+ * lock, which both callers hold.
+ */
+async function holdBackMaterial(
+  tx: TransactionSql,
+  schoolId: string,
+  materialId: string,
+): Promise<void> {
+  await tx`
+    DELETE FROM app.material_chunks
+    WHERE school_id = ${schoolId}::uuid AND material_id = ${materialId}::uuid
+  `;
+  await tx`
+    UPDATE app.materials
+    SET ingest_status = 'ready'::app.material_ingest_status,
+        ingest_error = NULL,
+        ingested_at = clock_timestamp(),
+        updated_at = clock_timestamp()
+    WHERE school_id = ${schoolId}::uuid AND id = ${materialId}::uuid
+  `;
 }
 
 async function fetchFromS3(

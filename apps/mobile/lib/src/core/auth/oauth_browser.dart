@@ -28,7 +28,9 @@ Future<String> _flutterWebAuth2(Uri url, String callbackScheme) =>
 /// `SFSafariViewController` silently drops the IdP's redirect to the custom
 /// scheme, so the code never comes back. The session captures that redirect
 /// itself. On Android it opens in the default browser app, and the
-/// `studafy://auth/callback` intent filter brings the user back. Never an
+/// `studafy://auth/callback` intent filter brings the user back; the API
+/// addresses that redirect as an `intent://` URL naming this app's package, so
+/// another app that also declares the scheme cannot take it. Never an
 /// embedded webview, which Google and Microsoft both refuse to sign in.
 ///
 /// The IdP never sees `studafy://auth/callback`: it returns to the API's own
@@ -45,11 +47,8 @@ class OAuthBrowser {
   Completer<OAuthCallback>? _pending;
 
   /// The deep link the API's callback sends the browser back to.
-  Uri get redirectUri => Uri(
-        scheme: _callbackScheme,
-        host: _callbackHost,
-        path: _callbackPath,
-      );
+  Uri get redirectUri =>
+      Uri(scheme: _callbackScheme, host: _callbackHost, path: _callbackPath);
 
   /// Whether sign-in runs in an `ASWebAuthenticationSession` (iOS) rather than
   /// the browser app plus a deep link (Android). The session reports its own

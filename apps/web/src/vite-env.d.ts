@@ -6,6 +6,11 @@ interface ImportMetaEnv {
   /** Origin of the realtime gateway. Defaults to ws://localhost:3001 when unset. */
   readonly VITE_REALTIME_BASE_URL?: string;
   /**
+   * `"true"` turns the realtime WebSocket on. Anything else (including unset) leaves it off, which
+   * is the default while live updates are deferred — see `REALTIME_ENABLED` in lib/config.ts.
+   */
+  readonly VITE_REALTIME_ENABLED?: string;
+  /**
    * Contact address shown on the marketing site's About/Contact page. No built-in default — an
    * invented address would silently misdirect real inquiries, so the page falls back to a visible
    * "not configured" notice instead of a fabricated mailto.
@@ -18,6 +23,12 @@ interface ImportMetaEnv {
    * unset) — see lib/config.ts.
    */
   readonly VITE_TURNSTILE_SITE_KEY?: string;
+  /**
+   * The public site's origin (`https://studafy.com`), which every page names as its canonical
+   * address. The same build also serves `app.studafy.com`, so without it a crawler would file each
+   * marketing page twice. Unset (local, tests) falls back to the page's own origin.
+   */
+  readonly VITE_SITE_ORIGIN?: string;
   /**
    * Sentry DSN for the web app's error monitoring (`lib/monitoring`). Unset in local dev and in the
    * `containers.yml` validation build — monitoring stays disabled rather than failing without one.

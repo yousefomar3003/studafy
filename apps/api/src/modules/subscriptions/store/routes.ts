@@ -16,10 +16,11 @@ import { AUTH_CHANNELS } from "../../auth/channels";
 import {
   handleAppleNotification,
   handleGooglePlayNotification,
+  readStorePurchaseConfirmation,
   registerStorePurchase,
 } from "./service";
 
-import type { StoreBilling } from "./service";
+import type { StoreBilling, StorePurchaseConfirmation } from "./service";
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { SupportedLocale } from "../../../middleware/locale";
@@ -39,6 +40,20 @@ const StoreConfigSchema = z
      */
     accountToken: z.string().uuid().nullable(),
     profileId: z.string().uuid().nullable(),
+    /**
+     * The in-app copy of the last in-app purchase's withdrawal-waiver confirmation (000195): what
+     * the student was also emailed, or -- for an account without an email address -- the
+     * confirmation itself. Null when none was recorded. Inline, not a named component: a nullable
+     * `$ref` loses its nullability on the way to the generated Dart client.
+     */
+    purchaseConfirmation: z
+      .object({
+        acknowledgedAt: z.string().datetime(),
+        recordedAt: z.string().datetime(),
+        termsVersion: z.string(),
+        confirmation: z.enum(["email", "in_app"]).openapi("AiStoreWaiverConfirmation"),
+      })
+      .nullable(),
   })
   .openapi("AiStoreConfig");
 
@@ -47,7 +62,34 @@ const RegisterPurchaseSchema = z
     platform: z.enum(["apple", "google"]),
     /** Apple: the transaction's JWS (StoreKit 2 jwsRepresentation). Google: the purchase token. */
     verificationData: z.string().min(1).max(20_000),
+    // Nullable as well as optional: the generated Dart client sends an unset field as null.
+    withdrawalWaiverAcknowledged: z
+      .boolean()
+      .nullish()
+      .openapi({
+        description:
+          "True when the student, before the store's purchase sheet opened, asked for the add-on to " +
+          "start now and acknowledged losing the 14-day right of withdrawal once it does. Sent with " +
+          "a new purchase only; omitted (or null) for 'restore purchases' and from app versions that " +
+          "do not ask, in which case nothing is recorded. When present it must be true, with " +
+          "withdrawalWaiverAcknowledgedAt.",
+      }),
+    withdrawalWaiverAcknowledgedAt: z.string().datetime({ offset: true }).nullish().openapi({
+      description: "When the student gave that acknowledgement (ISO 8601).",
+    }),
   })
+  .refine(
+    (body) =>
+      body.withdrawalWaiverAcknowledged == null
+        ? body.withdrawalWaiverAcknowledgedAt == null
+        : body.withdrawalWaiverAcknowledged && body.withdrawalWaiverAcknowledgedAt != null,
+    {
+      message:
+        "withdrawalWaiverAcknowledged must be true and sent with withdrawalWaiverAcknowledgedAt, " +
+        "or both omitted",
+      path: ["withdrawalWaiverAcknowledged"],
+    },
+  )
   .openapi("AiStorePurchaseRequest");
 
 const PurchaseResultSchema = z
@@ -63,8 +105,9 @@ const storeConfigRoute = createRoute({
   operationId: "getAiStoreConfig",
   summary: "In-app purchase setup for the AI add-on",
   description:
-    "Whether the AI add-on can be bought in the mobile app, which store product to offer, and " +
-    "whether this signed-in user may buy it (a student whose school has an active plan).",
+    "Whether the AI add-on can be bought in the mobile app, which store product to offer, " +
+    "whether this signed-in user may buy it (a student whose school has an active plan), and the " +
+    "confirmation of their last in-app purchase's withdrawal waiver, if one was recorded.",
   security: [{ bearerAuth: [] }],
   responses: standardResponses(
     { 200: { description: "Store setup", schema: StoreConfigSchema } },
@@ -81,8 +124,10 @@ const registerPurchaseRoute = createRoute({
   description:
     "Called by the mobile app when an App Store or Google Play purchase of the AI add-on " +
     "completes, and again by 'restore purchases'. The purchase is verified with the store, must " +
-    "carry this student's account id, and turns the student's AI add-on on. Idempotent. Mobile " +
-    "sessions only.",
+    "carry this student's account id, and turns the student's AI add-on on. A new purchase " +
+    "carries the student's waiver of the 14-day right of withdrawal, which is recorded with the " +
+    "Terms of Service version and confirmed to the student by email (or in the app, for an " +
+    "account without one). Idempotent. Mobile sessions only.",
   security: [{ bearerAuth: [] }],
   request: { body: { content: { "application/json": { schema: RegisterPurchaseSchema } } } },
   responses: standardResponses(
@@ -158,24 +203,31 @@ export function aiStoreRoutes(
     const auth = requireAuth(c);
     const enabled = store !== null && (store.apple !== null || store.google !== null);
     let student: { id: string } | null = null;
+    let purchaseConfirmation: StorePurchaseConfirmation | null = null;
     if (enabled) {
-      // A student of a school whose own plan is live: the add-on works only on top of that, so
-      // selling it otherwise would take money for nothing.
-      const [row] = await withTenantTx(
+      ({ student, purchaseConfirmation } = await withTenantTx(
         database,
         { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
-        (tx) => tx<{ id: string }[]>`
-          SELECT s.id FROM app.students s
-          WHERE s.user_id = ${auth.userId}::uuid
-            AND EXISTS (
-              SELECT 1 FROM app.subscriptions
-              WHERE school_id = ${auth.schoolId}::uuid
-                AND status IN ('trialing', 'active', 'past_due', 'grace_period')
-            )
-          LIMIT 1
-        `,
-      );
-      student = row ?? null;
+        async (tx) => {
+          const [row] = await tx<{ id: string; purchasable: boolean }[]>`
+            SELECT s.id,
+                   -- A student of a school whose own plan is live: the add-on works only on top
+                   -- of that, so selling it otherwise would take money for nothing.
+                   EXISTS (
+                     SELECT 1 FROM app.subscriptions
+                     WHERE school_id = ${auth.schoolId}::uuid
+                       AND status IN ('trialing', 'active', 'past_due', 'grace_period')
+                   ) AS purchasable
+            FROM app.students s
+            WHERE s.user_id = ${auth.userId}::uuid
+            LIMIT 1
+          `;
+          return {
+            student: row?.purchasable ? { id: row.id } : null,
+            purchaseConfirmation: row ? await readStorePurchaseConfirmation(tx, row.id) : null,
+          };
+        },
+      ));
     }
     return c.json(
       {
@@ -185,6 +237,7 @@ export function aiStoreRoutes(
         purchasable: student !== null,
         accountToken: student?.id ?? null,
         profileId: student ? auth.schoolId : null,
+        purchaseConfirmation,
       },
       200,
     );
@@ -202,6 +255,10 @@ export function aiStoreRoutes(
       platform: body.platform,
       verificationData: body.verificationData,
       locale,
+      withdrawalWaiver:
+        body.withdrawalWaiverAcknowledged && body.withdrawalWaiverAcknowledgedAt
+          ? { acknowledgedAt: new Date(body.withdrawalWaiverAcknowledgedAt) }
+          : null,
     });
     return c.json(result, 200);
   });

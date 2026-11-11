@@ -33,10 +33,11 @@ import { autoScore, listAnswersBySubmission } from "../../submissions/answer-ser
 import { toSubmissionResponse } from "../../submissions/routes/submission-routes";
 import { gradeSubmission, submitAssignment } from "../../submissions/submission-service";
 import { createAssignment, updateAssignment } from "../assignment-service";
-import { listQuestionsByAssignment, replaceQuestions } from "../question-service";
+import { listQuestionsByAssignment, replaceQuestions, saveQuestions } from "../question-service";
 import { toQuestionResponse } from "../routes/assignment-routes";
 import { replaceQuestionsBodySchema } from "../schemas";
 
+import type { TxRunner } from "../../../../db/tenant-tx";
 import type { PresignedUrl, StorageService } from "../../../../lib/storage";
 import type { AnswerRow } from "../../submissions/answer-service";
 import type { SubmissionRow } from "../../submissions/submission-service";
@@ -59,6 +60,7 @@ function questionRow(viewerIsStaff: boolean): QuestionRow {
     image_storage_key: null,
     image_mime_type: null,
     image_size_bytes: null,
+    image_scan_status: "unscanned",
     viewer_is_staff: viewerIsStaff,
     options: [
       {
@@ -244,6 +246,11 @@ async function asUser<T>(
     result = await fn(tx);
   });
   return result as T;
+}
+
+/** Every short transaction of a multi-step save, run in the test's one transaction. */
+function inTx(tx: TransactionSql): TxRunner {
+  return (fn) => fn(tx);
 }
 
 /** One school, two teachers with a class each, and two students in the first class. */
@@ -651,8 +658,18 @@ describeDb("pictures", () => {
       prompt: "",
       image: { upload_key: tempKey },
     };
+    const uploadedImageKeys: string[] = [];
     const saved = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
-      await replaceQuestions(tx, t.school.id, t.teacherA.userId, draft.id, [pictureOnly], storage);
+      await saveQuestions(
+        inTx(tx),
+        storage,
+        t.school.id,
+        t.teacherA.userId,
+        draft.id,
+        [pictureOnly],
+        uploadedImageKeys,
+        async () => undefined,
+      );
       return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
     });
     const stored = saved[0]!;
@@ -660,35 +677,38 @@ describeDb("pictures", () => {
     expect(stored.image_storage_key).toStartWith(`permanent/${t.school.id}/`);
     expect(stored.image_mime_type).toBe("image/png");
     expect(storage.objects.has(tempKey)).toBe(false);
+    // A new picture waits for its malware scan (F-14), and is handed to the caller to enqueue.
+    expect(stored.image_scan_status).toBe("scanning");
+    expect(uploadedImageKeys).toEqual([stored.image_storage_key!]);
+
+    // The worker's clean verdict, keyed by the object as scan-upload.worker.ts writes it.
+    await db.sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      await tx`SELECT set_config('app.school_id', ${t.school.id}, true)`;
+      await tx`
+        UPDATE app.assignment_questions SET image_scan_status = 'clean'
+        WHERE image_storage_key = ${stored.image_storage_key}
+      `;
+    });
 
     const kept = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
-      await replaceQuestions(
-        tx,
-        t.school.id,
-        t.teacherA.userId,
-        draft.id,
-        [
-          {
-            ...pictureOnly,
-            prompt: "Which organ is this?",
-            image: { keep_from_question_id: stored.id },
-          },
-        ],
-        storage,
-      );
+      await replaceQuestions(tx, t.school.id, t.teacherA.userId, draft.id, [
+        {
+          ...pictureOnly,
+          prompt: "Which organ is this?",
+          image: { keep_from_question_id: stored.id },
+        },
+      ]);
       return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
     });
     expect(kept[0]!.image_storage_key).toBe(stored.image_storage_key);
+    // Re-saving rewrites the question rows; a kept picture keeps its verdict.
+    expect(kept[0]!.image_scan_status).toBe("clean");
 
     const removed = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
-      await replaceQuestions(
-        tx,
-        t.school.id,
-        t.teacherA.userId,
-        draft.id,
-        [{ ...QUESTIONS[0]!, image: null }],
-        storage,
-      );
+      await replaceQuestions(tx, t.school.id, t.teacherA.userId, draft.id, [
+        { ...QUESTIONS[0]!, image: null },
+      ]);
       return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
     });
     expect(removed[0]!.image_storage_key).toBeNull();
@@ -699,14 +719,9 @@ describeDb("pictures", () => {
     const draft = await draftQuiz(t);
     await expect(
       asUser(t.school.id, t.teacherA.userId, (tx) =>
-        replaceQuestions(
-          tx,
-          t.school.id,
-          t.teacherA.userId,
-          draft.id,
-          [{ ...QUESTIONS[0]!, image: { keep_from_question_id: crypto.randomUUID() } }],
-          fakeImageStorage(),
-        ),
+        replaceQuestions(tx, t.school.id, t.teacherA.userId, draft.id, [
+          { ...QUESTIONS[0]!, image: { keep_from_question_id: crypto.randomUUID() } },
+        ]),
       ),
     ).rejects.toThrow(/keep_from_question_id/);
   });
@@ -719,13 +734,15 @@ describeDb("pictures", () => {
     storage.objects.set(foreignKey, 2048);
     await expect(
       asUser(t.school.id, t.teacherA.userId, (tx) =>
-        replaceQuestions(
-          tx,
+        saveQuestions(
+          inTx(tx),
+          storage,
           t.school.id,
           t.teacherA.userId,
           draft.id,
           [{ ...QUESTIONS[0]!, image: { upload_key: foreignKey } }],
-          storage,
+          [],
+          async () => undefined,
         ),
       ),
     ).rejects.toThrow();

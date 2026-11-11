@@ -21,6 +21,7 @@ interface MaterialRow {
   id: string;
   title: string | null;
   ingest_status: string;
+  ai_enabled?: boolean;
 }
 
 interface ChunkRow {
@@ -37,7 +38,7 @@ function fakeTx(over: { material?: MaterialRow; chunks?: ChunkRow[] }): Transact
     const rows = sql.includes("FROM app.material_chunks")
       ? (over.chunks ?? [])
       : over.material
-        ? [over.material]
+        ? [{ ai_enabled: true, ...over.material }]
         : [];
     return Object.assign(Promise.resolve(rows), { execute: () => Promise.resolve() });
   };
@@ -55,6 +56,18 @@ describe("loadSummaryMaterial", () => {
     const result = await loadSummaryMaterial(
       fakeTx({
         material: { id: MATERIAL_ID, title: "Biology", ingest_status: "processing" },
+        chunks: [],
+      }),
+      MATERIAL_ID,
+    );
+
+    expect(result.status).toBe("not_ready");
+  });
+
+  test("reports not_ready when the material's class has its AI materials setting off", async () => {
+    const result = await loadSummaryMaterial(
+      fakeTx({
+        material: { id: MATERIAL_ID, title: "Biology", ingest_status: "ready", ai_enabled: false },
         chunks: [],
       }),
       MATERIAL_ID,

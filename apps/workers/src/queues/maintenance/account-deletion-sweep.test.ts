@@ -13,6 +13,7 @@ import postgres from "postgres";
 
 import { runAccountDeletionSweep } from "./account-deletion-sweep";
 
+import type { AiBillingCancellers } from "./account-deletion-sweep";
 import type { BillingLogger } from "@studafy/billing";
 import type { Sql, TransactionSql } from "postgres";
 
@@ -23,6 +24,7 @@ const sweepTest = test.skipIf(!enabled);
 let db: Sql | undefined;
 
 const silentLogger: BillingLogger = { info: () => undefined, warn: () => undefined };
+const NO_BILLING: AiBillingCancellers = { stripe: null, googlePlay: null };
 
 beforeAll(() => {
   if (!enabled) return;
@@ -125,7 +127,7 @@ describe("account deletion sweep", () => {
     const result = await runAccountDeletionSweep(
       db!,
       new Date(),
-      null,
+      NO_BILLING,
       async (job) => {
         enqueued.push(job);
       },
@@ -158,7 +160,7 @@ describe("account deletion sweep", () => {
     await runAccountDeletionSweep(
       db!,
       new Date(),
-      null,
+      NO_BILLING,
       async (job) => {
         enqueued.push(job);
       },
@@ -166,4 +168,119 @@ describe("account deletion sweep", () => {
     );
     expect(enqueued.filter((job) => job.schoolId === seeded.schoolId)).toEqual([]);
   });
+
+  sweepTest(
+    "turns off a Google Play renewal best-effort and never blocks the deletion",
+    async () => {
+      const seeded = await seed();
+      const google = await storeAddon(seeded.schoolId, seeded.due, "google");
+      // Inside its grace period: the store must not be touched.
+      await storeAddon(seeded.schoolId, seeded.pending, "google");
+
+      const cancelled: string[] = [];
+      const warnings: string[] = [];
+      const result = await runAccountDeletionSweep(
+        db!,
+        new Date(),
+        {
+          stripe: null,
+          googlePlay: {
+            cancelGooglePlaySubscription: async (token) => {
+              cancelled.push(token);
+              return "canceled";
+            },
+          },
+        },
+        async () => undefined,
+        { info: () => undefined, warn: (_fields, message) => warnings.push(message) },
+      );
+
+      expect(result.failures).toBe(0);
+      expect(cancelled).toEqual([google]);
+      expect(warnings).toEqual([]);
+      expect(await storeOutcomes(seeded.schoolId, seeded.due)).toEqual([
+        { platform: "google", outcome: "canceled" },
+      ]);
+    },
+  );
+
+  sweepTest("still deletes when the Play call fails or the store is the App Store", async () => {
+    const seeded = await seed();
+    await storeAddon(seeded.schoolId, seeded.due, "google");
+    const apple = await seed();
+    await storeAddon(apple.schoolId, apple.due, "apple");
+
+    const warnings: string[] = [];
+    const result = await runAccountDeletionSweep(
+      db!,
+      new Date(),
+      {
+        stripe: null,
+        googlePlay: {
+          cancelGooglePlaySubscription: async () => {
+            throw new Error("Play is down");
+          },
+        },
+      },
+      async () => undefined,
+      { info: () => undefined, warn: (_fields, message) => warnings.push(message) },
+    );
+
+    expect(result.failures).toBe(0);
+    expect((await stateOf(seeded.schoolId, seeded.due)).status).toBe("archived");
+    expect(await storeOutcomes(seeded.schoolId, seeded.due)).toEqual([
+      { platform: "google", outcome: "failed" },
+    ]);
+    expect(warnings).toContain(
+      "account deletion: turning off the AI add-on's Google Play renewal failed",
+    );
+    expect((await stateOf(apple.schoolId, apple.due)).status).toBe("archived");
+    expect(await storeOutcomes(apple.schoolId, apple.due)).toEqual([
+      { platform: "apple", outcome: "not_cancellable" },
+    ]);
+  });
 });
+
+/** Gives the user a student record with a live AI add-on bought in a store; returns the token. */
+async function storeAddon(schoolId: string, userId: string, platform: "apple" | "google") {
+  const token = `${platform}-${crypto.randomUUID()}`;
+  await asSchool(schoolId, async (tx) => {
+    const [student] = await tx<{ id: string }[]>`
+      INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status)
+      VALUES (
+        ${schoolId}::uuid, ${userId}::uuid, ${`ADM-${token.slice(-8)}`}, 'Store', 'Student', 'enrolled'
+      )
+      RETURNING id
+    `;
+    await tx`
+      INSERT INTO app.ai_subscriptions (
+        school_id, student_id, status, current_period_start, current_period_end
+      ) VALUES (
+        ${schoolId}::uuid, ${student!.id}::uuid, 'active', now() - interval '10 days',
+        now() + interval '20 days'
+      )
+    `;
+    await tx`
+      INSERT INTO app.billing_events (
+        provider, provider_event_id, event_type, effective_at, payload, status, attempt_count, processed_at
+      ) VALUES (
+        ${platform}, ${`${platform}:purchase:${token}`}, 'purchased', now() - interval '10 days',
+        ${tx.json({ store_ref: token, metadata: { school_id: schoolId, student_id: student!.id } })},
+        'processed', 1, now()
+      )
+    `;
+  });
+  return token;
+}
+
+/** The store outcomes the deletion's audit entry recorded. */
+async function storeOutcomes(schoolId: string, userId: string) {
+  return asSchool(schoolId, async (tx) => {
+    const [row] = await tx<{ outcomes: unknown }[]>`
+      SELECT new_values -> 'store_subscriptions' AS outcomes FROM app.audit_logs
+      WHERE target_table = 'users' AND target_id = ${userId}::uuid
+        AND new_values ->> 'reason' = 'account_deletion'
+    `;
+    return row?.outcomes ?? null;
+  });
+}

@@ -145,6 +145,14 @@ const ImportStudentsPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
   () => import("../features/admin/students/ImportStudentsPage"),
 );
+const ImportDataPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/import/ImportDataPage"),
+);
+const LoginSlipsPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/import/LoginSlipsPage"),
+);
 const ImportHistoryPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
   () => import("../features/admin/students/imports/ImportHistoryPage"),
@@ -527,10 +535,7 @@ const DeleteAccountPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../features/account/privacy/DeleteAccountPage"),
 );
-const PrivacyPolicyPage = lazyWithCatalogs(
-  ONBOARDING_CATALOGS,
-  () => import("../routes/legal/PrivacyPolicyPage"),
-);
+const LegalDocumentPage = lazy(() => import("../routes/legal/LegalDocumentPage"));
 const DeleteAccountInfoPage = lazyWithCatalogs(
   ONBOARDING_CATALOGS,
   () => import("../routes/legal/DeleteAccountInfoPage"),
@@ -561,8 +566,11 @@ export const routes: RouteObject[] = [
           { path: "pricing", element: <PricingPage /> },
           { path: "about", element: <AboutPage /> },
           // Public: both app stores' listing forms require these to be reachable without an
-          // account. See apps/mobile/store/review-checklist.md and privacy-labels.md.
-          { path: "privacy", element: <PrivacyPolicyPage /> },
+          // account. The documents' text is in /docs/legal/{en,ar}. See apps/mobile/store/review-checklist.md and privacy-labels.md.
+          { path: "privacy", element: <LegalDocumentPage document="privacy" /> },
+          { path: "terms", element: <LegalDocumentPage document="terms" /> },
+          // The agreement a school accepts when it applies, including the data-processing terms.
+          { path: "school-agreement", element: <LegalDocumentPage document="school-agreement" /> },
           { path: "legal/delete-account", element: <DeleteAccountInfoPage /> },
           // Where the emailed deletion link lands (ST-302).
           { path: "legal/delete-account/confirm", element: <ConfirmAccountDeletionPage /> },
@@ -732,6 +740,25 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <StudentsListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Where a school starts bringing its people in: grades, students and parents,
+            // teachers, then everyone's login slips (features/admin/import).
+            path: "admin/import",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <ImportDataPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Issuing codes needs user:update (POST /api/users/member-setup-codes).
+            path: "admin/import/slips",
+            element: (
+              <RequirePermission permission={PERMISSIONS.USER_UPDATE}>
+                <LoginSlipsPage />
               </RequirePermission>
             ),
           },

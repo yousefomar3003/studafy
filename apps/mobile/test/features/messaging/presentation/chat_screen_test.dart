@@ -217,4 +217,30 @@ void main() {
       expect(polls(), 3);
     },
   );
+
+  testWidgets('pauses while another route covers the chat', (tester) async {
+    final client = _clientWithThread();
+    await _pumpChat(tester, client);
+    int polls() =>
+        client.listMessageCalls.where((call) => call.since != null).length;
+
+    tester
+        .state<NavigatorState>(find.byType(Navigator))
+        .push(
+          MaterialPageRoute<void>(
+            builder: (_) => const Scaffold(body: Text('Covering')),
+          ),
+        );
+    await tester.pumpAndSettle();
+    await tester.pump(const Duration(minutes: 2));
+    expect(polls(), 0);
+
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    expect(polls(), 1, reason: 'catches up as soon as the chat is back on top');
+    await tester.pump(const Duration(seconds: 5));
+    expect(polls(), 2);
+
+    await _dispose(tester);
+  });
 }

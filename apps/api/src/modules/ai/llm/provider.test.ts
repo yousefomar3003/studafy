@@ -365,6 +365,129 @@ describe("AnthropicProvider.stream", () => {
   });
 });
 
+describe("AnthropicProvider timeouts until the body is read", () => {
+  /** A stream that sends `first` and then nothing, ever; records whether it was cancelled. */
+  function stallingBody(first: string) {
+    const state = { cancelled: false };
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        if (first) controller.enqueue(new TextEncoder().encode(first));
+      },
+      cancel() {
+        state.cancelled = true;
+      },
+    });
+    return { body, state };
+  }
+
+  async function drain(provider: ReturnType<typeof providerWith>) {
+    const events: unknown[] = [];
+    const error = await (async () => {
+      for await (const event of provider.stream(GENERATE_INPUT)) events.push(event);
+    })().catch((e: unknown) => e);
+    return { events, error };
+  }
+
+  test("a stream that goes quiet is aborted by the idle timeout and its body cancelled", async () => {
+    const { body, state } = stallingBody(
+      `data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hel"}}\n\n`,
+    );
+    const { fetch } = stubFetch(
+      () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }),
+    );
+
+    const { events, error } = await drain(
+      providerWith(fetch, { streamIdleTimeoutMs: 20, streamTotalTimeoutMs: 5_000 }),
+    );
+
+    expect(events).toEqual([{ type: "delta", delta: "Hel", text: "Hel" }]);
+    expect(error).toBeInstanceOf(LlmProviderError);
+    expect((error as LlmProviderError).kind).toBe("timeout");
+    expect((error as LlmProviderError).message).toContain("stalled");
+    expect(state.cancelled).toBe(true);
+  });
+
+  test("a stream that keeps trickling is still cut at the total timeout", async () => {
+    const encoder = new TextEncoder();
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        timer = setInterval(() => {
+          controller.enqueue(
+            encoder.encode(
+              `data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"."}}\n\n`,
+            ),
+          );
+        }, 5);
+      },
+      cancel() {
+        clearInterval(timer);
+      },
+    });
+    const { fetch } = stubFetch(
+      () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }),
+    );
+
+    const { events, error } = await drain(
+      providerWith(fetch, { streamIdleTimeoutMs: 1_000, streamTotalTimeoutMs: 60 }),
+    );
+    clearInterval(timer);
+
+    expect(events.length).toBeGreaterThan(0);
+    expect((error as LlmProviderError).kind).toBe("timeout");
+    expect((error as LlmProviderError).message).toContain("did not finish");
+  });
+
+  test("an OpenAI-compatible stream is bounded the same way", async () => {
+    const { body } = stallingBody(`data: {"choices":[{"delta":{"content":"Hi"}}]}\n`);
+    const { fetch } = stubFetch(
+      () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }),
+    );
+
+    const { error } = await drain(
+      providerWith(fetch, {
+        apiFormat: "openai-compatible",
+        baseUrl: "https://api.together.xyz/v1",
+        streamIdleTimeoutMs: 20,
+      }),
+    );
+
+    expect((error as LlmProviderError).kind).toBe("timeout");
+  });
+
+  test("a consumer that stops early cancels the body", async () => {
+    const { body, state } = stallingBody(
+      `data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}\n\n`,
+    );
+    const { fetch } = stubFetch(
+      () => new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } }),
+    );
+
+    for await (const _event of providerWith(fetch).stream(GENERATE_INPUT)) break;
+
+    expect(state.cancelled).toBe(true);
+  });
+
+  test("generate() times out on a body that never finishes, not only on the headers", async () => {
+    // A fresh stalling body per attempt: a timeout is transient, so generate() retries it.
+    const { fetch, calls } = stubFetch(
+      () =>
+        new Response(stallingBody('{"id":"msg_1",').body, {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+    );
+
+    const error = await providerWith(fetch, { timeoutMs: 30 })
+      .generate(GENERATE_INPUT)
+      .catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(LlmProviderError);
+    expect((error as LlmProviderError).kind).toBe("timeout");
+    expect(calls).toHaveLength(AI_LLM_MAX_ATTEMPTS);
+  });
+});
+
 describe("apiFormat: openai-compatible", () => {
   const BASE_URL = "https://api.together.xyz/v1";
   const QWEN = "Qwen/Qwen3.5-9B";

@@ -148,6 +148,19 @@ describe("ApplyPage", () => {
     const file = new File(["%PDF-1.7"], "registration.pdf", { type: "application/pdf" });
     fireEvent.change(screen.getByLabelText(/^Proof document/), { target: { files: [file] } });
 
+    // Everything else is filled in; the terms are still to be accepted.
+    fireEvent.click(submit);
+    expect(
+      await screen.findByText(
+        "Accept the Terms of Service and the School Agreement to submit your application.",
+      ),
+    ).toBeTruthy();
+    expect(applicantPost).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "Terms of Service" }).getAttribute("href")).toBe(
+      "/terms",
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: /accept the Terms of Service/ }));
+
     fireEvent.click(submit);
 
     await waitFor(() => expect(applicantPost).toHaveBeenCalledTimes(2));
@@ -169,6 +182,7 @@ describe("ApplyPage", () => {
       address: "King Fahd Rd, Al Olaya",
       proof_storage_key: "temp/school-applications/abc/registration.pdf",
       proof_file_name: "registration.pdf",
+      accept_terms: true,
     });
   });
 });

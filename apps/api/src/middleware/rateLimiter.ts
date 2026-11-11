@@ -1,11 +1,13 @@
 import { HTTPException } from "hono/http-exception";
 
 import {
+  IP_SCOPED_ROUTE_CLASSES,
   RATE_LIMIT_BUDGETS,
   RATE_LIMIT_EXEMPT_PATHS,
   buildRateLimitKey,
   resolveRouteClass,
 } from "../config/rateLimits";
+import { getSecurityConfig } from "../config/security";
 import { emitRateLimitBlock } from "../modules/auth/auth-anomaly-events";
 
 import type { AppEnv } from "./requestId";
@@ -63,14 +65,23 @@ export interface RateLimiterOptions {
 // ---------------------------------------------------------------------------
 
 /**
- * Extract the client IP address from the request. Trusts the **last** entry in
- * `X-Forwarded-For` because ALB appends its own observation at the end in the
- * default "Append" mode — all preceding entries are client-controlled and
- * potentially spoofed.
+ * Extract the client IP address from the request.
  *
- * Falls back to `X-Real-IP` (if an upstream proxy sets it), then to `"unknown"`.
+ * When `CLIENT_IP_HEADER` names the header the platform's proxy sets (`fly-client-ip` on fly.io,
+ * which fly overwrites on every request), that header is the address. fly's own X-Forwarded-For
+ * ends with the app's anycast address, not the visitor's, so the rule below would key every visitor
+ * on one value there.
+ *
+ * Otherwise trusts the **last** entry in `X-Forwarded-For` because ALB appends its own observation
+ * at the end in the default "Append" mode — all preceding entries are client-controlled and
+ * potentially spoofed. Falls back to `X-Real-IP` (if an upstream proxy sets it), then to `"unknown"`.
  */
 export function extractClientIp(c: { req: { header(name: string): string | undefined } }): string {
+  const trustedHeader = getSecurityConfig().clientIpHeader;
+  if (trustedHeader) {
+    const value = c.req.header(trustedHeader)?.trim();
+    if (value) return value;
+  }
   const xff = c.req.header("x-forwarded-for");
   if (xff) {
     const ips = xff
@@ -98,7 +109,7 @@ function buildIdentity(
   auth: { schoolId: string; userId: string } | undefined,
   clientIp: string,
 ): string {
-  if (routeClass === "auth" || routeClass === "auth-strict") return clientIp;
+  if (IP_SCOPED_ROUTE_CLASSES.has(routeClass)) return clientIp;
   if (auth) return `${auth.schoolId}:${auth.userId}`;
   return clientIp;
 }
@@ -283,7 +294,7 @@ export function rateLimiterMiddleware({
 
       // Emit anomaly telemetry for auth endpoints so monitoring can count and alert.
       // Non-auth routes are not recorded here: a 429 on /api/ai is operational, not adversarial.
-      if (routeClass === "auth" || routeClass === "auth-strict") {
+      if (IP_SCOPED_ROUTE_CLASSES.has(routeClass)) {
         emitRateLimitBlock(c.get("log"), eventSink, {
           routeClass,
           path: c.req.path,

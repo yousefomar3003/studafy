@@ -23,6 +23,8 @@ export interface SecurityConfig {
   csrfCookieMaxAge: number;
   hstsMaxAge: number;
   cspReportOnly: boolean;
+  /** Header holding the visitor's address (lower-case), or null to use X-Forwarded-For. */
+  clientIpHeader: string | null;
 }
 
 const CSRF_COOKIE_NAME = "XSRF-TOKEN";
@@ -71,6 +73,7 @@ export function getSecurityConfig(): SecurityConfig {
     csrfCookieMaxAge: CSRF_COOKIE_MAX_AGE,
     hstsMaxAge: HSTS_MAX_AGE,
     cspReportOnly: environment === "development",
+    clientIpHeader: env.CLIENT_IP_HEADER ?? null,
   };
 
   return cachedConfig;

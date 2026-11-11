@@ -11,8 +11,9 @@ export const QUEUE_NAMES = {
   BILLING: "billing",
   OUTBOX_RELAY: "outbox-relay",
   PROVISIONING: "provisioning",
-  // Malware scanning of uploaded objects (ClamAV). Consumes one job per confirmed material; the
-  // verdict decides whether the material becomes available (ready) or is quarantined.
+  // Malware scanning of uploaded objects (ClamAV). Consumes one job per confirmed material
+  // (scan-material) and one per other user upload (scan-upload); the verdict decides whether the
+  // file becomes downloadable or is quarantined.
   SCAN: "file-scan",
   // Material thumbnail/preview derivation. Consumes one job per clean material, enqueued by the
   // file-scan worker after it flips the material to `ready`. Derived images are cosmetic — their
@@ -131,6 +132,13 @@ export const JOB_NAMES = {
   // key, and the user to notify if the verdict is not clean. One job per confirm, at most once:
   // the worker claims the material by its 'scanning' status and flips it to a terminal state.
   SCAN_MATERIAL: "scan-material",
+  // Malware scan of every other user upload other people can download (F-14): submission and
+  // assignment files, question pictures, message images, record documents, expense and license
+  // receipts, school application proofs, student import files. Carries the upload target (one of
+  // UPLOAD_SCAN_TARGETS), the school (null for a school application), and the object's permanent
+  // key. Same file-scan queue and worker pool as SCAN_MATERIAL; the worker claims the row by its
+  // scan status and the key, so a duplicate or stale job (the file was since replaced) is a no-op.
+  SCAN_UPLOAD: "scan-upload",
   // Thumbnail + first-page preview derivation of a clean material. Carried by the derivations
   // queue; enqueued by the file-scan worker right after a clean verdict. Carries only the material
   // id: the worker reads storage_key/mime_type from the row, so a retry never acts on stale payload
@@ -186,11 +194,27 @@ export const JOB_NAMES = {
   // the sweep runs app.delete_expired_ai_messages() per school until a batch comes back short.
   // Registered on the maintenance queue via Job Scheduler.
   PURGE_EXPIRED_AI_MESSAGES: "purge-expired-ai-messages",
+  // Scheduled creation of the coming months' partitions of the monthly-partitioned tables
+  // (app.audit_logs, app.attendance_sessions, app.attendance_records). Neither family has a default
+  // partition, so a write dated in a month with no partition fails; this keeps three months ready.
+  // Carries no payload. Registered on the maintenance queue via Job Scheduler.
+  ENSURE_TABLE_PARTITIONS: "ensure-table-partitions",
   // Scheduled deletion of sensitive student and parent record answers past their retention period
   // (docs/modules/student-records.md "Retention"): a field's months, default 12, counted from when
   // the student left (app.students.left_at) or, for a parent, from when their last child left.
   // Carries no payload. Registered on the maintenance queue via Job Scheduler.
   PURGE_EXPIRED_SENSITIVE_RECORDS: "purge-expired-sensitive-records",
+  // Scheduled removal of IP addresses older than 90 days (docs/modules/account-deletion.md "IP
+  // addresses"): sets app.refresh_tokens.ip_address (per school) and app.security_events.client_ip
+  // (global) to NULL in batches. app.audit_logs is append-only and keeps its addresses. Carries no
+  // payload. Registered on the maintenance queue via Job Scheduler.
+  PURGE_EXPIRED_IP_ADDRESSES: "purge-expired-ip-addresses",
+  // Scheduled deletion of data past its fixed retention period (docs/modules/data-retention.md):
+  // security events, sales inquiries, rejected school applications (and their proof file) and
+  // in-app notifications after 12 months, data subject request export bundles 30 days after the
+  // request finished. Carries no payload: the periods are DATA_RETENTION_RULES in
+  // data-retention-sweep.ts. Registered on the maintenance queue via Job Scheduler.
+  PURGE_EXPIRED_RETAINED_DATA: "purge-expired-retained-data",
   // Cost & budget reporting sweep (ST-293). Carries `{ mode: "daily" | "monthly" }`: "daily"
   // publishes today's AI-spend/Stripe-fee CloudWatch metrics so the budget alarms
   // (infra/terraform/modules/monitoring/alerts.tf) stay current; "monthly" additionally logs the
