@@ -296,9 +296,14 @@ class FakeAcademicsClient extends Fake implements AcademicsClient {
     return ClassList(classes: filtered, total: filtered.length);
   }
 
+  /// Every `getClass` id asked for, in order.
+  final List<String> getClassCalls = [];
+
   @override
-  Future<Class> getClass({required String classId}) async =>
-      classes.firstWhere((c) => c.id == classId);
+  Future<Class> getClass({required String classId}) async {
+    getClassCalls.add(classId);
+    return classes.firstWhere((c) => c.id == classId);
+  }
 
   @override
   Future<Course> getCourse({required String courseId}) async =>
@@ -345,6 +350,9 @@ class FakeAttendanceClient extends Fake implements AttendanceClient {
 
   Map<String, List<AttendanceSession>> sessionsByClassId;
 
+  /// Every `listAttendanceSessions` class id asked for, in order.
+  final List<String?> listSessionsCalls = [];
+
   // --- Write path (attendance-taking screen, ST-235) ----------------------
 
   /// Every `recordAttendanceBatch` body received, in order.
@@ -368,6 +376,7 @@ class FakeAttendanceClient extends Fake implements AttendanceClient {
     int? limit = 20,
     int? offset = 0,
   }) async {
+    listSessionsCalls.add(classId);
     final rows = sessionsByClassId[classId] ?? const [];
     return AttendanceSessionList(attendanceSessions: rows, total: rows.length);
   }

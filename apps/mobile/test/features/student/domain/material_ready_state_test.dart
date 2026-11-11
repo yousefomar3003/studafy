@@ -31,4 +31,17 @@ void main() {
       }
     });
   });
+
+  group('MaterialReadyStateX.isSettled', () {
+    test('is true only where the pipeline has finished', () {
+      const settled = {
+        MaterialReadyState.ready,
+        MaterialReadyState.failed,
+        MaterialReadyState.quarantined,
+      };
+      for (final state in MaterialReadyState.values) {
+        expect(state.isSettled, settled.contains(state), reason: '$state');
+      }
+    });
+  });
 }

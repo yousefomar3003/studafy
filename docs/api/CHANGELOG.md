@@ -13,6 +13,10 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Exam window filters: `GET /api/academics/exams` (`ExamQuery`) takes optional `ends_after` and
+  `starts_before` (ISO 8601 instants), so a "coming up" read gets only the exams in its window
+  instead of the class's whole history. The mobile teacher home passes them.
+
 - Login slips: `POST /api/users/member-setup-codes` (`IssueMemberSetupCodesRequest`) takes optional
   `include_pending` (also re-issue unused, unexpired codes: a reprint, which invalidates earlier
   slips) and `after` (page by member ID). `IssuedMemberSetupCodes` gains `last` (send it as `after`),

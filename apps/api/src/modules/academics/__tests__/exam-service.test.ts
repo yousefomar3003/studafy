@@ -289,6 +289,52 @@ describeDb("exam service", () => {
     expect(total).toBe(1);
   });
 
+  test("listExams narrows to a time window", async () => {
+    const school = await createSchool(db.sql);
+    const teacher = await createTeacher(db.sql, school.id);
+    const room = await createRoom(db.sql, school.id);
+    const year = await createAcademicYear(db.sql, school.id);
+    const term = await createTerm(db.sql, school.id, year.id);
+    const subject = await createSubject(db.sql, school.id);
+    const course = await createCourse(db.sql, school.id, subject.id);
+    const cls = await createClass(db.sql, school.id, {
+      courseId: course.id,
+      academicYearId: year.id,
+      termId: term.id,
+      leadTeacherId: teacher.id,
+      roomId: room.id,
+    });
+
+    for (const [title, day] of [
+      ["Monday", 1],
+      ["Tuesday", 2],
+      ["Wednesday", 3],
+    ] as const) {
+      await withTx(school.id, (tx) =>
+        createExam(tx, school.id, teacher.userId, {
+          class_id: cls.id,
+          title,
+          starts_at: weekdayDate(day, 9),
+          ends_at: weekdayDate(day, 11),
+          max_score: 100,
+        }),
+      );
+    }
+
+    // Ended before Tuesday 10:00 is out (Monday); starting at or after Wednesday 09:00 is out.
+    const { rows, total } = await withTx(school.id, (tx) =>
+      listExams(tx, school.id, {
+        class_id: cls.id,
+        ends_after: weekdayDate(2, 10),
+        starts_before: weekdayDate(3, 9),
+        limit: 10,
+        offset: 0,
+      }),
+    );
+    expect(total).toBe(1);
+    expect(rows.map((row) => row.title)).toEqual(["Tuesday"]);
+  });
+
   test("updateExam modifies fields and returns updated row", async () => {
     const school = await createSchool(db.sql);
     const teacher = await createTeacher(db.sql, school.id);

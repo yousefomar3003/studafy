@@ -185,6 +185,54 @@ void main() {
       },
     );
 
+    test(
+      'looks each class up once, and only the classes the teacher does not lead',
+      () async {
+        final today = DateTime.now().weekday;
+        final academics = FakeAcademicsClient(
+          classes: [
+            classFixture(id: 'c1', code: 'MATH101-A'),
+            classFixture(id: 'c9', code: 'SCI-9', leadTeacherId: 'teacher-9'),
+          ],
+        );
+        final attendance = FakeAttendanceClient();
+        final api = FakeStudafyApiClient(
+          teachers: FakeTeachersClient(teacherProfile(id: 'teacher-1')),
+          academics: academics,
+          timetable: FakeTimetableClient(
+            versions: [approvedVersion()],
+            slots: [
+              for (final (id, classId, period) in [
+                ('s1', 'c1', 1),
+                ('s2', 'c1', 3),
+                ('s3', 'c9', 2),
+              ])
+                slotFixture(
+                  id: id,
+                  classId: classId,
+                  teacherId: 'teacher-1',
+                  weekday: today,
+                  period: period,
+                ),
+            ],
+          ),
+          attendance: attendance,
+        );
+
+        final sessions = await _container(
+          api,
+        ).read(teacherTodaySessionsProvider.future);
+
+        expect(sessions.map((s) => (s.slot.id, s.classCode)), [
+          ('s1', 'MATH101-A'),
+          ('s3', 'SCI-9'),
+          ('s2', 'MATH101-A'),
+        ]);
+        expect(academics.getClassCalls, ['c9']);
+        expect(attendance.listSessionsCalls, unorderedEquals(['c1', 'c9']));
+      },
+    );
+
     test('is empty when the term has no approved timetable', () async {
       final api = FakeStudafyApiClient(
         timetable: FakeTimetableClient(versions: const []),

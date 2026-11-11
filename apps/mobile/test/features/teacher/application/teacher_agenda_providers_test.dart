@@ -36,14 +36,20 @@ class _ExamsAcademicsClient extends FakeAcademicsClient {
   _ExamsAcademicsClient(this.exams);
 
   final List<Exam> exams;
+  final windows = <(DateTime?, DateTime?)>[];
 
   @override
   Future<ExamList> listExams({
     required String classId,
     Status14? status,
+    DateTime? endsAfter,
+    DateTime? startsBefore,
     int? limit = 20,
     int? offset = 0,
-  }) async => ExamList(exams: exams, total: exams.length);
+  }) async {
+    windows.add((endsAfter, startsBefore));
+    return ExamList(exams: exams, total: exams.length);
+  }
 }
 
 Assignment _assignment(
@@ -60,6 +66,7 @@ void main() {
     'upcoming exams: scheduled or open, not ended, within two weeks, soonest first',
     () async {
       final now = DateTime.now();
+      late final _ExamsAcademicsClient academics;
       final container = ProviderContainer(
         overrides: [
           teacherClassesProvider.overrideWith(
@@ -67,7 +74,7 @@ void main() {
           ),
           apiClientProvider.overrideWithValue(
             FakeStudafyApiClient(
-              academics: _ExamsAcademicsClient([
+              academics: academics = _ExamsAcademicsClient([
                 _exam('later', startsAt: now.add(const Duration(days: 5))),
                 _exam(
                   'soon',
@@ -91,6 +98,12 @@ void main() {
       final exams = await container.read(teacherUpcomingExamsProvider.future);
       expect([for (final entry in exams) entry.exam.id], ['soon', 'later']);
       expect(exams.first.classCode, 'MATH101-A');
+
+      // Asked for the window only, as UTC instants.
+      final (endsAfter, startsBefore) = academics.windows.single;
+      expect(endsAfter!.isUtc, isTrue);
+      expect(endsAfter.difference(now).inSeconds.abs(), lessThan(60));
+      expect(startsBefore!.difference(endsAfter), upcomingExamsWindow);
     },
   );
 
