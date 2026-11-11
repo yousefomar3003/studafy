@@ -1,5 +1,10 @@
 export { runAccountDeletionSweep } from "./account-deletion-sweep";
-export type { AccountDeletionSweepResult, AiBillingCanceller } from "./account-deletion-sweep";
+export type {
+  AccountDeletionSweepResult,
+  AiBillingCanceller,
+  AiBillingCancellers,
+  GooglePlayBillingCanceller,
+} from "./account-deletion-sweep";
 export {
   ACCOUNT_DELETION_SWEEP_CRON_PATTERN,
   scheduleAccountDeletionSweepJob,
@@ -11,6 +16,16 @@ export {
   scheduleAiMessageRetentionSweepJob,
 } from "./ai-message-retention-sweep-scheduler";
 export { resolveAdminActor, armAdminActor, NoAdminActorError } from "./admin-actor";
+export {
+  IP_ADDRESS_RETENTION_BATCH_SIZE,
+  IP_ADDRESS_RETENTION_DAYS,
+  purgeExpiredIpAddresses,
+} from "./ip-address-retention-sweep";
+export type { PurgeExpiredIpAddressesResult } from "./ip-address-retention-sweep";
+export {
+  IP_ADDRESS_RETENTION_SWEEP_CRON_PATTERN,
+  scheduleIpAddressRetentionSweepJob,
+} from "./ip-address-retention-sweep-scheduler";
 export { MONTHS_AHEAD, ensureFuturePartitions } from "./partition-maintenance";
 export type { PartitionMaintenanceResult } from "./partition-maintenance";
 export {
@@ -78,11 +93,10 @@ export type {
 } from "./dsr-types";
 export { createMaintenancePool, processDsrJob } from "./dsr-processor";
 export type { MaintenanceRunnerConfig } from "./dsr-processor";
-export {
-  EXPORT_MANIFEST_SCHEMA_VERSION,
-  FILE_TABLES,
-  parseExportManifest,
-} from "./export-manifest";
+export { EXPORT_MANIFEST_SCHEMA_VERSION, parseExportManifest } from "./export-manifest";
+export { EXPORT_FILE_FOLDERS, listExportFiles } from "./export-files";
+export type { ExportFileSource } from "./export-files";
+export { createMaintenanceS3, exportPartSize } from "./export-storage";
 export type { ExportManifest } from "./export-manifest";
 export { processMaintenanceJob } from "./maintenance-registry";
 export {

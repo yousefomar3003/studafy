@@ -3,6 +3,7 @@ import { ERROR_CODES, PERMISSIONS, ROLES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { withTenantTx } from "../../db/tenant-tx";
+import { enqueueUploadScans } from "../../lib/storage/upload-scan";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
 import { requirePermission } from "../../middleware/authz";
@@ -612,8 +613,18 @@ export function messagingRoutes(
   routes.openapi(sendMessageRoute, async (c) => {
     const { conversationId } = c.req.valid("param");
     const input = c.req.valid("json");
+    const uploadedKeys: string[] = [];
+    const actor = actorFrom(c);
     const message = await withTenantTx(database, tenantFrom(c), (tx) =>
-      sendMessage(tx, storage, actorFrom(c), conversationId, input),
+      sendMessage(tx, storage, actor, conversationId, input, uploadedKeys),
+    );
+    await enqueueUploadScans(
+      c,
+      uploadedKeys.map((storageKey) => ({
+        target: "message_attachment" as const,
+        schoolId: actor.schoolId,
+        storageKey,
+      })),
     );
     return c.json({ message }, 201);
   });

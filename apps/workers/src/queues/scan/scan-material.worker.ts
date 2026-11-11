@@ -127,8 +127,9 @@ export function quarantineKeyOf(storageKey: string): string | null {
  * Scan the object at `key` and return the verdict, or `"missing"` when it does not exist.
  *
  * The S3 body is handed to clamd as a stream, so the object is never buffered whole in the worker.
+ * Shared with the scan-upload worker.
  */
-async function scanObject(
+export async function scanObject(
   s3: ScanS3Client,
   bucket: string,
   key: string,
@@ -145,7 +146,11 @@ async function scanObject(
   }
 }
 
-async function objectExists(s3: ScanS3Client, bucket: string, key: string): Promise<boolean> {
+export async function objectExists(
+  s3: ScanS3Client,
+  bucket: string,
+  key: string,
+): Promise<boolean> {
   const probe = await s3.headObject({ Bucket: bucket, Key: key });
   return probe.exists;
 }

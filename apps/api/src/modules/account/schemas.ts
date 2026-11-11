@@ -11,6 +11,25 @@ export const retainedRecordSchema = z
   })
   .openapi("RetainedRecord");
 
+export const activeStoreSubscriptionSchema = z
+  .object({
+    platform: z.enum(["app_store", "google_play"]).openapi({
+      description: "The store that bills the subscription.",
+    }),
+    for_child: z.boolean().openapi({
+      description: "True when it is a linked child's subscription rather than the caller's own.",
+    }),
+  })
+  .openapi("ActiveStoreSubscription");
+
+const activeStoreSubscriptionsSchema = z.array(activeStoreSubscriptionSchema).openapi({
+  description:
+    "Live AI add-on subscriptions bought through the App Store or Google Play -- the caller's own " +
+    "and their linked children's -- that deleting this account does not cancel. Apple and Google " +
+    "bill them, so they must be cancelled in the store's subscription settings. At most one entry " +
+    "per store and owner (own / child); empty when there are none.",
+});
+
 export const accountDeletionRequestBodySchema = z
   .object({
     email: z.string().email().max(320).openapi({
@@ -49,6 +68,7 @@ export const accountDeletionConfirmResponseSchema = z
           completes_by: dateTimeSchema.openapi({
             description: "Latest time by which this account's personal data will have been erased.",
           }),
+          active_store_subscriptions: activeStoreSubscriptionsSchema,
         }),
       )
       .openapi({
@@ -95,6 +115,7 @@ export const accountDeletionResponseSchema = z
     retained_records: z.array(retainedRecordSchema).openapi({
       description: "The only records kept after erasure, and the legal basis for each.",
     }),
+    active_store_subscriptions: activeStoreSubscriptionsSchema,
   })
   .openapi("AccountDeletion");
 
@@ -145,6 +166,7 @@ export const accountProfileSchema = z
         "Whether POST /api/account/deletion needs the caller's member_id and password (accounts " +
         "that sign in with a member ID and password).",
     }),
+    active_store_subscriptions: activeStoreSubscriptionsSchema,
     school: z
       .object({
         id: uuidSchema,

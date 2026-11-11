@@ -57,8 +57,9 @@ const getProfileRoute = createRoute({
   operationId: "getOwnAccountProfile",
   summary: "Get the caller's own profile",
   description:
-    "Returns the caller's display name, contact address, member IDs, any scheduled deletion and " +
-    "the school the session is signed in to. Resolved from the session's user, so every role can " +
+    "Returns the caller's display name, contact address, member IDs, any scheduled deletion, the " +
+    "store-billed AI subscriptions deleting the account would leave running, and the school the " +
+    "session is signed in to. Resolved from the session's user, so every role can " +
     "load it without a permission.",
   security: [{ bearerAuth: [] }],
   responses: standardResponses(
@@ -101,8 +102,10 @@ const deleteAccountRoute = createRoute({
   description:
     "Signs the caller out everywhere and schedules the deletion for `scheduled_for` (14 days). " +
     "Until then, signing in again allows only cancelling it. On that date the account is " +
-    "detached from the school, AI add-on billing stops and an erasure request is filed; personal " +
-    "data is erased by `completes_by`. `retained_records` lists the only records kept, and why. " +
+    "detached from the school, Stripe/Tap AI add-on billing stops (a Google Play renewal is turned " +
+    "off best-effort) and an erasure request is filed; personal data is erased by `completes_by`. " +
+    "`retained_records` lists the only records kept, and why. `active_store_subscriptions` lists " +
+    "App Store / Google Play subscriptions the caller must cancel in the store themselves. " +
     "Member-password accounts must send their own `member_id` and `password`.",
   security: [{ bearerAuth: [] }],
   request: {
@@ -249,6 +252,7 @@ export function accountRoutes(
           school_name: a.schoolName,
           scheduled_for: a.scheduledFor.toISOString(),
           completes_by: a.completesBy.toISOString(),
+          active_store_subscriptions: a.activeStoreSubscriptions,
         })),
         retained_records: retainedRecords,
       },
@@ -274,6 +278,7 @@ export function accountRoutes(
         member_ids: row.member_ids,
         deletion_scheduled_for: row.deletion_due_at?.toISOString() ?? null,
         deletion_requires_member_credentials: row.deletion_requires_member_credentials,
+        active_store_subscriptions: row.active_store_subscriptions,
         school: { id: row.school_id, name: row.school_name },
         legal_acceptance: (() => {
           const status = legalAcceptanceStatus(row);
@@ -336,6 +341,7 @@ export function accountRoutes(
         scheduled_for: result.scheduledFor.toISOString(),
         completes_by: result.completesBy.toISOString(),
         retained_records: retainedRecords,
+        active_store_subscriptions: result.activeStoreSubscriptions,
       },
       202,
     );

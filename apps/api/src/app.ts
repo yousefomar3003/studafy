@@ -7,6 +7,7 @@ import { ErpNextClient } from "./erpnext/client";
 import { erpNextWebhookRoutes } from "./erpnext/webhook";
 import { healthRoutes } from "./health";
 import { createNoopSecurityEventSink } from "./lib/security/securityEventSink";
+import { createUploadScanEnqueuer } from "./lib/storage/upload-scan";
 import {
   requestIdMiddleware,
   localeMiddleware,
@@ -187,6 +188,7 @@ import { openApiValidationHook } from "./openapi/hook";
 import type { Database } from "./db";
 import type { SecurityEventSink } from "./lib/security/securityEventSink";
 import type { StorageService } from "./lib/storage";
+import type { UploadScanEnqueuer } from "./lib/storage/upload-scan";
 import type { InflightTracker } from "./lifecycle";
 import type { Logger } from "./logger";
 import type { AppEnv } from "./middleware/requestId";
@@ -315,6 +317,12 @@ export interface AppOptions {
    */
   storage?: StorageService | null;
   /**
+   * Hands committed uploads to the malware scanner (F-14, lib/storage/upload-scan.ts). Defaults to
+   * a `scan-upload` producer on the file-scan queue when `redis` is present, and to none without it
+   * (uploads then stay unserved). Tests pass a recorder.
+   */
+  uploadScanEnqueuer?: UploadScanEnqueuer | null;
+  /**
    * Stripe payment provider for subscription billing.
    *
    * Nullable: when absent, checkout, portal, and webhook routes still register (so the OpenAPI
@@ -392,6 +400,7 @@ export function createApp({
   qaLoginPassword,
   rateLimitDisabled = false,
   storage = null,
+  uploadScanEnqueuer,
   stripeProvider = null,
   tapProvider = null,
   tapCountries = new Set(),
@@ -478,6 +487,17 @@ export function createApp({
   // instance makes it structurally impossible for the read side and the write side of the revocation
   // boundary to drift onto different connections or key prefixes.
   const jtiDenylist = redis ? createJtiDenylist(redis) : null;
+
+  // The malware scan producer for every upload other than a material (F-14). On every request, so a
+  // route that stores a file enqueues its scan through enqueueUploadScans(c, ...) after commit.
+  const uploadScan =
+    uploadScanEnqueuer === undefined ? createUploadScanEnqueuer(redis ?? null) : uploadScanEnqueuer;
+  if (uploadScan) {
+    app.use("*", async (c, next) => {
+      c.set("uploadScan", uploadScan);
+      await next();
+    });
+  }
 
   // OAuth state (PKCE verifier + nonce, keyed by `state`), shared by every OAuth flow below. One
   // instance because the browser flows — login, invitation activation, provider linking — all

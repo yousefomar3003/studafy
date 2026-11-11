@@ -27,12 +27,13 @@ quarantine/<schoolId>/<objectId>/<filename>
 
 ## `app-files` bucket
 
-| Top-level prefix | Purpose                                                                                          | Lifecycle                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
-| `temp/`          | Staging area for pre-signed uploads before the app confirms/processes them                       | Expires after 1 day (24h)                                         |
-| `reports/`       | Generated exports (e.g. PDF/CSV reports) offered for download                                    | Expires after 7 days                                              |
-| `permanent/`     | Confirmed, long-lived user content (avatars, assignment attachments, etc.)                       | No expiration                                                     |
-| `quarantine/`    | Objects a malware scan flagged. Never served; copied here, then the `permanent/` copy is deleted | No expiration (retain for forensics; expiry is a future decision) |
+| Top-level prefix | Purpose                                                                                                                                                                                | Lifecycle                                                         |
+| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `temp/`          | Staging area for pre-signed uploads before the app confirms/processes them                                                                                                             | Expires after 1 day (24h)                                         |
+| `reports/`       | Generated exports (e.g. PDF/CSV reports) offered for download                                                                                                                          | Expires after 7 days                                              |
+| `permanent/`     | Confirmed, long-lived user content (avatars, assignment attachments, etc.)                                                                                                             | No expiration                                                     |
+| `quarantine/`    | Objects a malware scan flagged. Never served; copied here, then the `permanent/` copy is deleted                                                                                       | No expiration (retain for forensics; expiry is a future decision) |
+| `dsr-exports/`   | Data subject request exports: one ZIP archive per request, `dsr-exports/<schoolId>/<requestId>/export.zip` ([policy](../security/data_retention_and_dsr_policy.md#the-export-archive)) | No bucket rule (see the policy)                                   |
 
 Flow for a pre-signed upload:
 
@@ -59,6 +60,18 @@ ClamAV flags a confirmed material. The worker copies the object from `permanent/
 is retried by re-scanning the `quarantine/` copy rather than being mis-labelled as a scan failure.
 Nothing in the app ever serves from this prefix, so an infected object is unreachable the moment
 the `permanent/` copy is gone.
+
+Every other upload another person can download goes through the same queue (`scan-upload` jobs,
+F-14, migration 000192): submission and assignment files, question pictures, message images,
+record documents (sensitive ones included), expense and license receipts, school application
+proofs (`quarantine/school-applications/...`) and student import files. Each of those rows carries
+an `app.upload_scan_status`: the write that stores the key sets `scanning`, the API enqueues the
+job after commit, and the worker sets `clean`, `quarantined` (same copy -> delete -> flip order) or
+`failed` (retries exhausted). Every read path signs a URL only for `clean` or `unscanned` (a file
+uploaded before 000192, which stays downloadable; a `scan-upload` job for it scans it like a new
+one). A sensitive file's quarantine copy is re-encrypted under the sensitive-documents KMS key.
+Not covered: license payment receipts uploaded by platform staff (only platform staff read them)
+and user avatars (never stored against a row or served by the API).
 
 ## `backups-archive` bucket
 

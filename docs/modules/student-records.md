@@ -188,8 +188,8 @@ would export ciphertext and miss parent records:
 - **Export** includes every answer about the subject, as a student, a parent and a member of staff
   (`staff_user_id` is the person's own user id). Sensitive values
   are decrypted so the subject gets their own data (GDPR art. 15), each labelled with the field as it
-  read when answered, with document metadata and file keys in the manifest
-  (`data/record_answers.ndjson`).
+  read when answered (the export archive's `data/record_answers.json`). Each answer's document is
+  copied into the archive's `files/record-documents/` and listed in its `manifest.json`.
 - **Erasure** deletes the subject's answers outright, with their documents cascading. The stored
   files are deleted after the erasure commits. Audit rows stay under the audit legal hold and never
   contain a sensitive value.

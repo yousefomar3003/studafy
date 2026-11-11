@@ -150,6 +150,14 @@ export const DOMAIN_EVENTS = {
   AI_SUBSCRIPTION_PAUSED: "aiSubscription.paused",
   AI_SUBSCRIPTION_RESUMED: "aiSubscription.resumed",
 
+  // A student bought the AI add-on in the app and, before the store's purchase sheet opened, asked
+  // for it to start straight away and acknowledged losing the 14-day right of withdrawal (EU
+  // consumer law; Terms of Service 7.7). Raised by registerStorePurchase
+  // (apps/api/src/modules/subscriptions/store/service.ts) in the transaction that records the
+  // waiver, once per purchase, for a student with an email address: the email dispatcher sends the
+  // confirmation on a durable medium the law asks for. A student without one sees it in the app.
+  AI_STORE_PURCHASE_CONFIRMED: "aiSubscription.purchaseConfirmed",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

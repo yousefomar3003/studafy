@@ -119,6 +119,32 @@ describe("registering a purchase", () => {
   });
 });
 
+describe("the withdrawal waiver sent with a purchase", () => {
+  // Stops at validation, before the store or the database: an app that sends the field at all
+  // sends it as given, with the time.
+  test.each([
+    ["false", { withdrawalWaiverAcknowledged: false }],
+    ["true without the time", { withdrawalWaiverAcknowledged: true }],
+    [
+      "a time without the acknowledgement",
+      { withdrawalWaiverAcknowledgedAt: "2026-11-11T10:00:00Z" },
+    ],
+    [
+      "a time that is not one",
+      { withdrawalWaiverAcknowledged: true, withdrawalWaiverAcknowledgedAt: "yesterday" },
+    ],
+  ])("is refused as %s", async (_label, waiver) => {
+    const res = await post(
+      appFor(AUTH_CHANNELS.MOBILE, store),
+      "/api/subscriptions/ai/store/purchases",
+      JSON.stringify({ platform: "google", verificationData: "token", ...waiver }),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await codeOf(res)).toBe(ERROR_CODES.VALIDATION_FAILED);
+  });
+});
+
 describe("store setup", () => {
   test("reports the add-on as not for sale when no store is configured", async () => {
     const res = await appFor(AUTH_CHANNELS.MOBILE, null).request(
@@ -133,6 +159,7 @@ describe("store setup", () => {
       purchasable: false,
       accountToken: null,
       profileId: null,
+      purchaseConfirmation: null,
     });
   });
 });

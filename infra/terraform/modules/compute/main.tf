@@ -155,7 +155,8 @@ data "aws_iam_policy_document" "workers_reports" {
   }
 
   # Infected files are copied to quarantine/ before the served copy is deleted, and a retry
-  # re-scans the quarantine copy (queues/scan/scan-material.worker.ts). Never deleted by workers.
+  # re-scans the quarantine copy (queues/scan/scan-material.worker.ts, scan-upload.worker.ts). Never
+  # deleted by workers.
   statement {
     effect = "Allow"
     actions = [
@@ -163,6 +164,15 @@ data "aws_iam_policy_document" "workers_reports" {
       "s3:PutObject",
     ]
     resources = ["${var.app_files_bucket_arn}/quarantine/*"]
+  }
+
+  # Sensitive record documents and student import files (ADR-019) are malware-scanned too (F-14):
+  # Decrypt to stream one into clamd, GenerateDataKey to hold an infected one's quarantine copy
+  # under the same key (STORAGE_SENSITIVE_KMS_KEY_ID).
+  statement {
+    effect    = "Allow"
+    actions   = ["kms:GenerateDataKey", "kms:Decrypt"]
+    resources = [var.sensitive_documents_kms_key_arn]
   }
 
   # Report artifacts: written by the report workers, signed for download (the pre-signed GET runs

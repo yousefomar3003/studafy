@@ -26,6 +26,7 @@ import {
 } from "../harness";
 
 import type { StorageService } from "../../src/lib/storage";
+import type { UploadScanRequest } from "../../src/lib/storage/upload-scan";
 import type { TenantFixture, TestApp, TestDatabase } from "../harness";
 import type { Role } from "@studafy/constants";
 
@@ -84,12 +85,20 @@ function fakeStorage(): StorageService & {
 const storage = fakeStorage();
 let database: TestDatabase | undefined;
 let harness: TestApp | undefined;
+/** Every malware scan the app enqueued (F-14). */
+const scanJobs: UploadScanRequest[] = [];
 
 beforeAll(async () => {
   if (!integrationEnabled) return;
   database = await createTestDatabase();
   await migrateDatabase(database.url);
-  const created = createTestApp({ database: database.sql, storage });
+  const created = createTestApp({
+    database: database.sql,
+    storage,
+    uploadScanEnqueuer: async (requests) => {
+      scanJobs.push(...requests);
+    },
+  });
   await created.ready;
   harness = created;
 }, 60_000);
@@ -505,6 +514,23 @@ describeDb("staff records", () => {
     );
     expect(attached.status).toBe(200);
     expect(storage.sensitiveCopies.some((key) => key.includes(w.schoolId))).toBe(true);
+
+    // Held back until the malware scan clears it (F-14); then the worker's clean verdict.
+    const adminPath = `/api/staff/${w.teacher.userId}/records/${passport.id}/document/download`;
+    expect((await call(w.admin, "GET", adminPath)).status).toBe(404);
+    const permanentKey = storage_key.replace(/^temp\//, "permanent/");
+    expect(scanJobs).toContainEqual({
+      target: "record_document",
+      schoolId: w.schoolId,
+      storageKey: permanentKey,
+    });
+    await database!.sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      await tx`SELECT set_config('app.school_id', ${w.schoolId}, true)`;
+      await tx`
+        UPDATE app.record_documents SET scan_status = 'clean' WHERE storage_key = ${permanentKey}
+      `;
+    });
 
     // The staff member's own read never lists the sensitive document, nor downloads it.
     const own = await json<{ entries: EntryDto[] }>(

@@ -1,12 +1,14 @@
 import { Button, Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
-import { useState, type PropsWithChildren } from "react";
+import { useState, type ComponentProps, type PropsWithChildren } from "react";
 
 import { Loading } from "../../../components/Loading";
 import { api } from "../../../lib/api";
 import { useSessionStore } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { LegalAcceptanceScreen } from "../legal/LegalAcceptanceScreen";
+
+import { StoreSubscriptionWarning } from "./StoreSubscriptionWarning";
 
 /**
  * Wraps each authenticated layout inside `RequireAuth` (app/routes.tsx). Holds back the guarded content while the signed-in account has a deletion scheduled (its 14-day
@@ -36,7 +38,14 @@ export function DeletionPendingGate({ children }: PropsWithChildren) {
 
   if (profile.isPending) return <Loading />;
   const scheduledFor = profile.data?.deletion_scheduled_for;
-  if (scheduledFor) return <DeletionPending scheduledFor={scheduledFor} />;
+  if (scheduledFor) {
+    return (
+      <DeletionPending
+        scheduledFor={scheduledFor}
+        storeSubscriptions={profile.data?.active_store_subscriptions}
+      />
+    );
+  }
   // Next, the legal documents (000188): until the user accepts the current versions, the API
   // allows only accepting, deleting the account and signing out.
   const legal = profile.data?.legal_acceptance;
@@ -46,7 +55,13 @@ export function DeletionPendingGate({ children }: PropsWithChildren) {
   return <>{children}</>;
 }
 
-function DeletionPending({ scheduledFor }: { scheduledFor: string }) {
+function DeletionPending({
+  scheduledFor,
+  storeSubscriptions,
+}: {
+  scheduledFor: string;
+  storeSubscriptions: ComponentProps<typeof StoreSubscriptionWarning>["subscriptions"];
+}) {
   const { t } = useTranslation();
   const { formatDate } = useFormatters();
   const store = useSessionStore();
@@ -75,6 +90,7 @@ function DeletionPending({ scheduledFor }: { scheduledFor: string }) {
           {t("accountDeletion.pendingGateBody", { date: formatDate(new Date(scheduledFor)) })}
         </p>
         {failed ? <p role="alert">{t("accountDeletion.pendingGateFailed")}</p> : null}
+        <StoreSubscriptionWarning subscriptions={storeSubscriptions} />
         <Button type="button" onClick={() => void cancel()} disabled={cancelling}>
           {t("accountDeletion.pendingGateCancel")}
         </Button>{" "}

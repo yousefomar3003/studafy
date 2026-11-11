@@ -105,7 +105,8 @@ const downloadRoute = createRoute({
     "Mints a short-lived pre-signed GET URL for a stored object. The content class decides the " +
     "required permission and whether issuance is audited; the object is resolved by id through a " +
     "tenant-scoped query that runs under RLS, so a caller can only ever obtain a URL for an object " +
-    "their roles can read. A missing or invisible object answers 404.",
+    "their roles can read. A missing or invisible object answers 404, as does a submission file " +
+    "or receipt that has not passed its malware scan.",
   security: [{ bearerAuth: [] }],
   request: {
     params: downloadParamsSchema,

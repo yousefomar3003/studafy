@@ -10,6 +10,7 @@ export {
   AI_EXAM_MIN_QUESTIONS,
   AI_EXAM_WEAK_TOPIC_THRESHOLD,
 } from "./ai-exam";
+export { dsrExportArchiveKey, dsrExportPrefix } from "./dsr-exports";
 export { DOMAIN_EVENTS, ERPNEXT_DOC_EVENT_MAP } from "./events";
 export type { DomainEvent } from "./events";
 export { ERROR_CODES } from "./errors";
@@ -66,3 +67,10 @@ export { PAYMENT_PURPOSES } from "./payment-purposes";
 export type { PaymentPurpose } from "./payment-purposes";
 export { SUBSCRIPTION_STATUSES } from "./subscription-status";
 export type { SubscriptionStatus } from "./subscription-status";
+export {
+  SERVABLE_UPLOAD_SCAN_STATUSES,
+  UPLOAD_SCAN_STATUSES,
+  UPLOAD_SCAN_TARGETS,
+  isServableUploadScanStatus,
+} from "./upload-scan";
+export type { UploadScanStatus, UploadScanTarget } from "./upload-scan";

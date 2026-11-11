@@ -63,3 +63,47 @@ describe("account deletion emails", () => {
     expect(email.content.html).not.toContain("<School>");
   });
 });
+
+describe("AI add-on purchase confirmation", () => {
+  const payload = {
+    schoolId: "00000000-0000-4000-8000-000000000001",
+    aiSubscriptionId: "00000000-0000-4000-8000-000000000003",
+    studentId: "00000000-0000-4000-8000-000000000004",
+    email: "student@example.com",
+    platform: "google",
+    acknowledgedAt: "2026-11-11T09:59:30.000Z",
+    recordedAt: "2026-11-11T10:00:00.000Z",
+    termsVersion: "2026-11-11",
+  };
+
+  test("is claimed by the email dispatcher", () => {
+    expect(EMAIL_EVENT_NAMES).toContain(DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED);
+  });
+
+  test("confirms the purchase and the waiver of the 14-day right, with the terms", () => {
+    const email = resolveEmail(row(DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED, payload), context);
+
+    expect(email.template).toBe("ai-store-purchase-confirmation");
+    expect(email.recipient).toBe("student@example.com");
+    expect(email.content.subject).toBe("Your Studafy AI Study Assistant purchase");
+    for (const body of [email.content.text, email.content.html]) {
+      expect(body).toContain("through Google Play");
+      expect(body).toContain(new Date(payload.acknowledgedAt).toUTCString());
+      expect(body).toContain(new Date(payload.recordedAt).toUTCString());
+      expect(body).toContain("you lose your 14-day right to cancel once it starts");
+      expect(body).toContain("Terms of Service last updated 2026-11-11");
+      expect(body).toContain("https://app.studafy.test/terms");
+    }
+    // A Studafy purchase, not the school's: the school's name is not the sender.
+    expect(email.content.html).not.toContain("Hill");
+  });
+
+  test("names the App Store for an Apple purchase", () => {
+    const email = resolveEmail(
+      row(DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED, { ...payload, platform: "apple" }),
+      context,
+    );
+    expect(email.content.text).toContain("through the App Store");
+    expect(email.content.text).toContain("cancel it in the App Store");
+  });
+});

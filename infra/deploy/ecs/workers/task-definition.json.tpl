@@ -29,6 +29,7 @@
         { "name": "READ_DATABASE_NAME", "value": "workers_read" },
         { "name": "S3_REGION", "value": "${AWS_REGION}" },
         { "name": "S3_APP_FILES_BUCKET", "value": "${S3_APP_FILES_BUCKET}" },
+        { "name": "STORAGE_SENSITIVE_KMS_KEY_ID", "value": "${STORAGE_SENSITIVE_KMS_KEY_ID}" },
         { "name": "AWS_REGION", "value": "${AWS_REGION}" },
         { "name": "CLAMAV_HOST", "value": "127.0.0.1" },
         { "name": "AI_LLM_PROVIDER", "value": "${AI_LLM_PROVIDER}" },
@@ -39,7 +40,8 @@
         { "name": "SES_FROM_ADDRESS", "value": "${SES_FROM_ADDRESS}" },
         { "name": "SES_CONFIGURATION_SET", "value": "${SES_CONFIGURATION_SET}" },
         { "name": "EMAIL_DRY_RUN", "value": "${EMAIL_DRY_RUN}" },
-        { "name": "PUSH_DRY_RUN", "value": "${PUSH_DRY_RUN}" }
+        { "name": "PUSH_DRY_RUN", "value": "${PUSH_DRY_RUN}" },
+        { "name": "GOOGLE_PLAY_PACKAGE_NAME", "value": "${GOOGLE_PLAY_PACKAGE_NAME}" }
       ],
       "dependsOn": [{ "containerName": "clamav", "condition": "HEALTHY" }],
       "secrets": [
@@ -55,7 +57,8 @@
         { "name": "AI_LLM_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:AI_LLM_API_KEY::" },
         { "name": "ERPNEXT_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:ERPNEXT_API_KEY::" },
         { "name": "RECONCILIATION_API_KEY", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:RECONCILIATION_API_KEY::" },
-        { "name": "FIREBASE_SERVICE_ACCOUNT", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:FIREBASE_SERVICE_ACCOUNT::" }
+        { "name": "FIREBASE_SERVICE_ACCOUNT", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:FIREBASE_SERVICE_ACCOUNT::" },
+        { "name": "GOOGLE_PLAY_SERVICE_ACCOUNT", "valueFrom": "${WORKERS_APP_SECRETS_ARN}:GOOGLE_PLAY_SERVICE_ACCOUNT::" }
       ],
       "healthCheck": {
         "command": ["CMD-SHELL", "bun healthcheck.ts"],

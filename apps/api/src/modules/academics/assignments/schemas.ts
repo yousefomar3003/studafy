@@ -93,7 +93,8 @@ export const assignmentAttachmentSchema = z
       .openapi({
         description:
           "Short-lived pre-signed GET URL. Null when object storage is not configured for this " +
-          "deployment. Never a raw bucket URL -- treat it as opaque and do not cache it beyond " +
+          "deployment, and until the file has passed its malware scan (an infected file never " +
+          "gets one). Never a raw bucket URL -- treat it as opaque and do not cache it beyond " +
           "`download_url_expires_at`.",
       }),
     download_url_expires_at: dateTimeSchema.nullable().openapi({
@@ -150,8 +151,8 @@ export const assignmentQuestionImageSchema = z
       .openapi({
         description:
           "Short-lived pre-signed GET URL for the picture. Null when object storage is not " +
-          "configured for this deployment. Re-fetch the assignment for a fresh one after " +
-          "`download_url_expires_at`.",
+          "configured for this deployment, and until the picture has passed its malware scan. " +
+          "Re-fetch the assignment for a fresh one after `download_url_expires_at`.",
       }),
     download_url_expires_at: dateTimeSchema.nullable().openapi({
       description: "When `download_url` stops working.",

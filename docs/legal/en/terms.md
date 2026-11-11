@@ -127,7 +127,7 @@ Deleting the app does not cancel a subscription. When you cancel, you keep acces
 
 7.9 **If your school gives you AI access.** If your school later gives you AI access through its own licence, you do not need your own subscription. We turn off renewal of a Google Play subscription where we can. Apple does not let us stop App Store renewals, so the app tells you how to cancel it yourself. We do not refund the time already paid for automatically, but you can ask the store.
 
-7.10 **If you delete your account, or your school stops using Studafy.** Deleting your Studafy account, a parent deleting their own account, or your school stopping or pausing its use of Studafy **does not cancel a subscription bought through Apple or Google**. The AI features stop working when your account is deleted or your school's access ends or is paused, but the store may keep charging you until you cancel. Please cancel in the store first (section 7.5). If you were charged for a period you could not use, contact us at hello@studafy.com and we will help you ask the store for a refund.
+7.10 **If you delete your account, or your school stops using Studafy.** Deleting your Studafy account, a parent deleting their own account, or your school stopping or pausing its use of Studafy **does not cancel a subscription bought through Apple, and is not guaranteed to cancel one bought through Google**. When your own account is deleted, we try to turn off renewal of a Google Play subscription; Apple does not let us stop App Store renewals. The AI features stop working when your account is deleted or your school's access ends or is paused, but the store may keep charging you until you cancel. Please cancel in the store first (section 7.5). If you were charged for a period you could not use, contact us at hello@studafy.com and we will help you ask the store for a refund.
 
 ## 8. Fees for schools
 
@@ -156,7 +156,7 @@ Deleting the app does not cancel a subscription. When you cancel, you keep acces
 - After 14 days, your account is removed from your school, and your links to any children are removed. A child's own account is not deleted when a parent deletes theirs.
 - Your name, contact details and profile are then erased within 30 days.
 
-10.3 **What is kept.** Some records are kept because your school, or we, must keep them by law: your grades and attendance (without your name or contact details), financial and payment records, and the audit log, including the record of your deletion. Messages you sent remain readable by the person you sent them to, and work you handed in stays part of your school's records. Your school can tell you more about the records it keeps.
+10.3 **What is kept.** Some records are kept because your school, or we, must keep them by law: your grades and attendance (without your name or contact details), financial and payment records, and the audit log, including the record of your deletion. The text and images of messages you sent are erased, except where a message was included in a report to your school, and work you handed in stays part of your school's records. Your school can tell you more about the records it keeps.
 
 10.4 **Your school can remove your access** at any time, for example when you leave. Ask your school about the records it keeps after that.
 

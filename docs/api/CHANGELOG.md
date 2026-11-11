@@ -343,6 +343,13 @@ when it required the `version-bump` label.
 
 ### Changed
 
+- `GET /api/privacy/dsr/{requestId}` (`DataSubjectRequest`): a completed export's `download_url` now
+  points at the export's ZIP archive (`dsr-exports/<school>/<request>/export.zip`: a README, the data
+  as JSON with one file per table, `manifest.json`, and copies of the person's files) instead of a
+  bare `manifest.json`, and works for an hour instead of 15 minutes. A key outside the request's own
+  export prefix is never signed. `download_url` and `download_url_expires_at` gained descriptions.
+  Same fields and types; not breaking.
+
 - **(breaking)** `POST /api/inquiries` (`SubmitInquiry`): `phone` is now required. It must look like
   a phone number: digits with `+`, `-`, `(`, `)`, `.` and spaces, 6 to 20 digits in all; anything
   else answers 400. The sales team calls schools back, and an email address alone was too easy to

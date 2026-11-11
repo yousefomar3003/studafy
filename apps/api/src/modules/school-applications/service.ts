@@ -21,7 +21,11 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { ERROR_CODES, LEGAL_DOCUMENT_VERSIONS } from "@studafy/constants";
+import {
+  ERROR_CODES,
+  LEGAL_DOCUMENT_VERSIONS,
+  isServableUploadScanStatus,
+} from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { setTenantScope, withSystemTx } from "../../db/tenant-tx";
@@ -157,6 +161,8 @@ export async function submitApplication(
   storage: StorageService,
   identity: ApplicantIdentity,
   params: SubmitApplicationParams,
+  /** Receives the proof's permanent key, for the caller to hand to the malware scanner (F-14). */
+  uploadedKeys: string[] = [],
 ) {
   // Cheap refusals first, before touching storage.
   const existing = await withSystemTx(database, (tx) => latestApplication(tx, identity));
@@ -221,6 +227,7 @@ export async function submitApplication(
       `;
       return inserted!;
     });
+    uploadedKeys.push(permanentKey);
     return toApplicantApplication(row);
   } catch (error) {
     if (isUniqueViolation(error, "uq_school_applications_pending_identity")) {
@@ -283,6 +290,8 @@ interface ApplicationRow {
   proof_file_name: string;
   proof_content_type: string;
   proof_size_bytes: number;
+  /** The proof's malware scan state (000192); a URL is signed only for a servable one. */
+  proof_scan_status: string;
   reviewed_by_user_id: string | null;
   reviewed_at: Date | null;
   review_note: string | null;
@@ -302,7 +311,7 @@ const APPLICATION_SELECT = (tx: TransactionSql) => tx`
          co.name AS country_name, co.alpha2_code AS country_code, a.default_currency_id,
          cu.code AS currency_code, a.city, a.address, a.website, a.student_count, a.message,
          a.proof_storage_key, a.proof_file_name, a.proof_content_type, a.proof_size_bytes,
-         a.reviewed_by_user_id, a.reviewed_at, a.review_note, a.provisioned_school_id,
+         a.proof_scan_status::text AS proof_scan_status, a.reviewed_by_user_id, a.reviewed_at, a.review_note, a.provisioned_school_id,
          a.team_notified_at, a.applicant_notified_at, a.terms_version,
          a.school_agreement_version, a.terms_accepted_at, a.created_at, a.updated_at
   FROM app.school_applications a
@@ -326,7 +335,12 @@ function toSummary(row: ApplicationRow) {
 }
 
 async function toDetail(row: ApplicationRow, storage: StorageService | null) {
-  const proofUrl = storage ? (await storage.presign(row.proof_storage_key, "GET")).url : null;
+  // No URL until the malware scan has cleared the proof (F-14): an applicant's file reaches a
+  // platform reviewer only once ClamAV has seen it.
+  const proofUrl =
+    storage && isServableUploadScanStatus(row.proof_scan_status)
+      ? (await storage.presign(row.proof_storage_key, "GET")).url
+      : null;
   return {
     ...toSummary(row),
     applicantJobTitle: row.applicant_job_title,

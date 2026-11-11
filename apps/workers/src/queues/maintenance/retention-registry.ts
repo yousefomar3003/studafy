@@ -99,12 +99,74 @@ export const OUT_OF_SCOPE_GLOBAL_TABLES: ReadonlySet<string> = new Set([
   "security_events",
 ]);
 
+/**
+ * Free text and files a person wrote themselves, which column-name redaction cannot reach: the body
+ * of a message is not a "name" column, and an Ask AI turn is keyed by `conversation_id`, not by a
+ * SUBJECT_LINK_COLUMNS column. authored-content-dsr.ts erases these for a person (by who wrote or
+ * owns them) or for a whole school, before the generic walk runs; the walk then still redacts any
+ * personal-looking column on whatever that pass deliberately kept.
+ *
+ *   replace_text -- the row stays, its text becomes AUTHORED_TEXT_ERASED_MARKER. Used where other
+ *                   people's data hangs off the row: a message is one turn in someone else's
+ *                   conversation, so the thread keeps its shape and the other side's messages stay
+ *                   coherent. app.notifications is here only for its DIRECT_MESSAGE rows, whose body
+ *                   quotes the sender's message to the recipient.
+ *   delete       -- the row goes. Used where nothing outside the person's own content depends on it:
+ *                   a message's images, and everything the AI study assistant stored for a student
+ *                   (questions, answers, citations, quizzes, flashcards and reviews, practice exams).
+ *
+ * Deliberately NOT here, so they stay the school's record (docs/modules/account-deletion.md):
+ * work handed in to a teacher (assignment_submissions, submission_attachments), marks, attendance,
+ * discipline, everything in LEGAL_HOLD_TABLES, and safeguarding reports -- app.message_reports with
+ * its evidence snapshot (message_report_messages / _attachments) and app.ai_content_reports, which
+ * carries its own copy of the reported text. A message an open report points at is kept too
+ * (authored-content-dsr.ts), and so is an image a report's snapshot points at.
+ *
+ * Summaries and concept maps are not stored in PostgreSQL: they live in a Redis cache for 24 hours
+ * (AI_SUMMARY_CACHE_TTL_SECONDS), well inside the 14-day deletion grace period. Ask AI has no
+ * uploads: a photographed page is read on the server and never stored.
+ */
+export type AuthoredContentAction = "replace_text" | "delete";
+
+export const AUTHORED_CONTENT_TABLES: ReadonlyMap<string, AuthoredContentAction> = new Map<
+  string,
+  AuthoredContentAction
+>([
+  // Parent <-> teacher messaging (000127, 000134).
+  ["messages", "replace_text"],
+  ["message_attachments", "delete"],
+  ["notifications", "replace_text"],
+  // The AI study assistant (000021, 000099, 000101, 000102).
+  ["ai_conversations", "delete"],
+  ["ai_messages", "delete"],
+  ["ai_message_citations", "delete"],
+  ["quizzes", "delete"],
+  ["quiz_questions", "delete"],
+  ["quiz_question_options", "delete"],
+  ["flashcard_decks", "delete"],
+  ["flashcards", "delete"],
+  ["flashcard_reviews", "delete"],
+  ["exam_sessions", "delete"],
+  ["exam_items", "delete"],
+  ["exam_item_options", "delete"],
+  ["exam_item_answers", "delete"],
+]);
+
+/** What a person's erased message (and its notification preview) reads as afterwards. */
+export const AUTHORED_TEXT_ERASED_MARKER = "[deleted]";
+
 export type ErasureAction = "legal_hold" | "hard_delete" | "redact";
 
 export function classifyTable(tableName: string): ErasureAction {
   if (LEGAL_HOLD_TABLES.has(tableName)) return "legal_hold";
   if (HARD_DELETE_TABLES.has(tableName)) return "hard_delete";
   return "redact";
+}
+
+/** How authored-content-dsr.ts erases a table's rows, or null if that pass does not touch it. */
+export function authoredContentAction(tableName: string): AuthoredContentAction | null {
+  if (LEGAL_HOLD_TABLES.has(tableName)) return null;
+  return AUTHORED_CONTENT_TABLES.get(tableName) ?? null;
 }
 
 /**

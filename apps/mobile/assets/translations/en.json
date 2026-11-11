@@ -113,7 +113,16 @@
         "alreadyPending": "A deletion is already scheduled for your account.",
         "wrongCredentials": "The member ID or password is incorrect.",
         "locked": "Too many wrong passwords. Try again later.",
-        "failed": "Your account couldn't be deleted. Check your connection and try again."
+        "failed": "Your account couldn't be deleted. Check your connection and try again.",
+        "storeWarning": {
+          "title": "Cancel your App Store or Google Play subscription",
+          "ownBody": "You have an AI Study Assistant subscription billed by Apple (App Store) or Google (Google Play), not by Studafy. Deleting your account doesn't cancel it, so you may keep being charged until you cancel it in the store.",
+          "googlePlayNote": "For Google Play, we also try to stop the renewal when your account is finally deleted, but cancel it yourself to be sure.",
+          "childBody": "A child linked to your account has an AI Study Assistant subscription billed by Apple or Google. Deleting your account doesn't cancel it or delete your child's account. If it's billed to your store account and you want it to stop, cancel it in the store.",
+          "stepsIntro": "To cancel:",
+          "appStoreSteps": "App Store: on the iPhone or iPad that bought it, open Settings, tap your name, then Subscriptions, choose Studafy and tap Cancel Subscription.",
+          "googlePlaySteps": "Google Play: open the Google Play app, tap your profile picture, then Payments & subscriptions, then Subscriptions, choose Studafy and tap Cancel subscription."
+        }
       },
       "deletionPending": {
         "title": "Account scheduled for deletion",
@@ -532,6 +541,14 @@
     "title": "Studafy AI Study Assistant",
     "price": "{price} per month",
     "subscribe": "Subscribe",
+    "waiver": {
+      "label": "I want the AI study assistant to start now, and I understand I lose my 14-day right to cancel once it starts."
+    },
+    "confirmation": {
+      "title": "Your purchase confirmation",
+      "body": "On {date}, before buying, you asked for the AI study assistant to start now and confirmed you understand you lose your 14-day right to cancel once it starts. Terms of Service of {version} apply.",
+      "emailed": "We also emailed you this confirmation."
+    },
     "restore": {
       "action": "Restore purchases",
       "none": "No purchases to restore for this account."
@@ -542,7 +559,8 @@
     },
     "links": {
       "privacy": "Privacy policy",
-      "terms": "Terms of use"
+      "terms": "Terms of use",
+      "termsOfService": "Terms of Service"
     },
     "errors": {
       "storeFailed": "The purchase didn't go through. You haven't been charged — please try again.",
