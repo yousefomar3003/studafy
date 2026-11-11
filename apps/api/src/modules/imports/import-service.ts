@@ -181,7 +181,7 @@ export async function uploadImport(
     INSERT INTO app.student_imports (
       school_id, uploaded_by, status, file_name, row_count, valid_rows, error_rows,
       header_line, source_headers, column_mapping, errors, source_storage_key, source_file_name,
-      source_size_bytes, source_uploaded_at
+      source_size_bytes, source_uploaded_at, source_scan_status
     ) VALUES (
       ${schoolId},
       ${uploadedBy},
@@ -197,7 +197,8 @@ export async function uploadImport(
       ${file?.storageKey ?? null},
       ${file?.fileName ?? null},
       ${file?.sizeBytes ?? null},
-      ${file ? tx`CURRENT_TIMESTAMP` : null}
+      ${file ? tx`CURRENT_TIMESTAMP` : null},
+      ${file ? "scanning" : "unscanned"}::app.upload_scan_status
     )
     RETURNING ${importColumns(tx)}
   `;

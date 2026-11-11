@@ -86,7 +86,11 @@ async function exportRequest(
       ${requestId}, ${fixture.schoolId}, 'export', 'user'::app.dsr_subject_scope,
       'user_request'::app.dsr_reason, ${fixture.users.PARENT!.id}, ${fixture.users.ORG_ADMIN!.id},
       ${key ? "completed" : "queued"}::app.dsr_status, ${key},
-      now() + interval '30 days', ${key ? new Date() : null}, ${key ? new Date() : null}
+      -- The database's clock for every timestamp: a JS Date can be a millisecond behind its
+      -- now() and fail ck_data_subject_requests_timestamps (started/completed >= created).
+      now() + interval '30 days',
+      CASE WHEN ${key}::text IS NULL THEN NULL ELSE now() END,
+      CASE WHEN ${key}::text IS NULL THEN NULL ELSE now() END
     )
   `;
   return requestId;

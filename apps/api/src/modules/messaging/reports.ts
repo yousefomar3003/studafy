@@ -379,7 +379,8 @@ interface SnapshotAttachmentRow {
   attachment_id: string;
   mime_type: MessageAttachmentContentType;
   size_bytes: string;
-  storage_key: string;
+  /** Null when the image is not servable: pending, infected or unscannable (000192). */
+  storage_key: string | null;
 }
 
 export async function getMessageReport(

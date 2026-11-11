@@ -15,6 +15,7 @@ import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quo
 import { assertCanManageClass } from "./assignment-service";
 
 import type { StorageService } from "../../../lib/storage";
+import type { UploadScanStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
 /**
@@ -51,6 +52,8 @@ export interface AttachmentRow {
   size_bytes: string;
   checksum_sha256: string | null;
   uploaded_by_user_id: string;
+  /** Malware scan state (000192). A download URL is minted only for a servable one. */
+  scan_status: UploadScanStatus;
   created_at: Date;
 }
 
@@ -159,7 +162,8 @@ export async function confirmAttachment(
       ${promoted.sizeBytes}, ${params.checksum_sha256 ?? null}
     )
     RETURNING id, assignment_id, storage_key, original_file_name, mime_type,
-              size_bytes, checksum_sha256, uploaded_by_user_id, created_at
+              size_bytes, checksum_sha256, uploaded_by_user_id,
+              scan_status::text AS scan_status, created_at
   `;
 
   await emitAuditLog(tx, {
@@ -230,7 +234,8 @@ export async function listAttachmentsByAssignment(
 
   const rows = await tx<AttachmentRow[]>`
     SELECT id, assignment_id, storage_key, original_file_name, mime_type,
-           size_bytes, checksum_sha256, uploaded_by_user_id, created_at
+           size_bytes, checksum_sha256, uploaded_by_user_id,
+           scan_status::text AS scan_status, created_at
     FROM app.assignment_attachments
     WHERE school_id = ${schoolId}
       AND assignment_id IN ${tx(assignmentIds as string[])}

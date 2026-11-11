@@ -259,6 +259,8 @@ sink, so tests never issue background INSERTs.
 retention sweep (`apps/workers/src/queues/maintenance/data-retention-sweep.ts`,
 [data-retention.md](../modules/data-retention.md)). The table is intentionally not partitioned and
 carries no append-only trigger, so `DELETE` by `studafy_admin` is the whole mechanism.
+The rows' **IP addresses** are removed sooner: the daily IP-address retention sweep sets
+`client_ip` to NULL once a row is 90 days old (see `docs/modules/account-deletion.md`, "IP addresses").
 
 ## Performance
 

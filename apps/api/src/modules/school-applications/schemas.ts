@@ -145,7 +145,10 @@ export const platformApplicationSchema = platformApplicationSummarySchema
       fileName: z.string(),
       contentType: z.string(),
       sizeBytes: z.number().int(),
-      /** Short-lived pre-signed GET; null when object storage is not configured. */
+      /**
+       * Short-lived pre-signed GET; null when object storage is not configured, or until the file
+       * has passed its malware scan.
+       */
       url: z.string().url().nullable(),
     }),
     reviewNote: z.string().nullable(),

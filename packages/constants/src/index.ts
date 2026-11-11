@@ -67,3 +67,10 @@ export { PAYMENT_PURPOSES } from "./payment-purposes";
 export type { PaymentPurpose } from "./payment-purposes";
 export { SUBSCRIPTION_STATUSES } from "./subscription-status";
 export type { SubscriptionStatus } from "./subscription-status";
+export {
+  SERVABLE_UPLOAD_SCAN_STATUSES,
+  UPLOAD_SCAN_STATUSES,
+  UPLOAD_SCAN_TARGETS,
+  isServableUploadScanStatus,
+} from "./upload-scan";
+export type { UploadScanStatus, UploadScanTarget } from "./upload-scan";

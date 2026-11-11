@@ -99,7 +99,7 @@ What is recorded depends on the school. Studafy is built to hold:
 
 Parents and teachers can message each other about a child the teacher teaches. Students cannot send or receive messages. We store each message's sender, text (up to 2,000 characters), time and any images (up to four).
 
-Only the two people in a conversation can read it in the app; school leaders cannot, unless a participant reports a message. A report gives the school's administrators and principal a copy of the reported message and up to 20 earlier messages, with the senders' names. The school decides what to do and keeps reports as safeguarding records. Messages cannot be edited or deleted once sent. Blocking someone stops new messages; earlier ones remain visible.
+Only the two people in a conversation can read it in the app; school leaders cannot, unless a participant reports a message. A report gives the school's administrators and principal a copy of the reported message and up to 20 earlier messages, with the senders' names. The school decides what to do and keeps reports as safeguarding records. Messages cannot be edited or deleted once sent, except that deleting your account erases the ones you sent (section 11). Blocking someone stops new messages; earlier ones remain visible.
 
 ### 3.4 Notifications and email
 
@@ -130,7 +130,7 @@ To keep Studafy secure, find faults and prevent misuse, we record:
 - **error reports** to Sentry, with your user identifier and technical details, after automatic filters remove email addresses, tokens and phone numbers where they detect them. Sentry may also receive the sending device's IP address;
 - **mobile crash reports** to Firebase Crashlytics, with crash details, device model, operating system, app installation identifiers and your user identifier.
 
-**IP addresses are stored as they are, not in hashed form,** in the audit log, security events, session records and rate-limit counters.
+**IP addresses are stored as they are, not in hashed form,** in the audit log, security events, session records and rate-limit counters. We remove them from security events and session records after 90 days, and rate-limit counters expire within minutes. The audit log cannot be changed, so the IP addresses in it are kept for as long as the audit log is (section 10).
 
 ### 3.7 School applications and sales inquiries
 
@@ -310,9 +310,9 @@ We keep personal data only as long as it is needed. Some periods are applied aut
 | AI quizzes, flashcards and practice exams                                                            | While the student's account exists                                                                                                                                                                                     |
 | AI consent records                                                                                   | While the account exists, and afterwards as long as needed to show consent was given                                                                                                                                   |
 | Message reports                                                                                      | Kept as the school's safeguarding records; they cannot be deleted                                                                                                                                                      |
-| Sign-in sessions                                                                                     | Signed in for up to 30 days without use, extended on each use; session records kept as long as needed for security and legal purposes                                                                                  |
-| Audit log, security events, application logs, error and crash reports                                | As long as needed for security and legal purposes                                                                                                                                                                      |
-| Rate-limit counters                                                                                  | Up to 15 minutes                                                                                                                                                                                                       |
+| Sign-in sessions                                                                                     | Signed in for up to 30 days without use, extended on each use; session records kept as long as needed for security and legal purposes, but their IP addresses are removed after 90 days                                |
+| Audit log, security events, application logs, error and crash reports                                | As long as needed for security and legal purposes. IP addresses are removed from security events after 90 days; IP addresses in the audit log are kept for as long as the audit log                                    |
+| Rate-limit counters                                                                                  | Up to 30 minutes; counters that use IP addresses, about 2 minutes                                                                                                                                                      |
 | Tax, accounting and payment records                                                                  | As long as tax and accounting law requires                                                                                                                                                                             |
 | School applications and documents; sales inquiries                                                   | As long as needed to deal with them and to keep a record of our relationship with the school                                                                                                                           |
 | Data exports prepared for a request                                                                  | Held securely while the school uses Studafy, unless the school asks us to delete them sooner                                                                                                                           |
@@ -340,14 +340,17 @@ You can also ask your school to remove your account.
 
 Erasure removes your name, email address and similar contact details from your account and profile, and the answers in your school's custom record forms and lists that relate to you, with their documents.
 
+It also erases the messages you sent: the text of each one is replaced with “[deleted]”, its images are deleted, and so is its preview in the other person's notifications. The conversation stays in place, so the other person's own messages still make sense. For a student, everything the AI study assistant stored is deleted: Ask AI conversations, quizzes, flashcards and practice exams, with their answers and review schedule.
+
 ### 11.3 What is kept, and why
 
 Deleting your account does not delete the school's records about you. These remain:
 
 - **academic and attendance records,** such as marks, results, certificates and attendance, which schools often must keep; your name is removed from your profile, but the records remain for the school;
-- **messages you sent and work you handed in,** including attachments, which stay part of the school's records and visible to the other person in the conversation or to your teachers;
-- **other school records about you,** such as discipline records, teacher evaluations, records others created about you, and message reports;
-- **AI conversations,** until their 90-day period ends, and **student import files,** until their period ends;
+- **work you handed in,** including attachments, which stays part of the school's records and visible to your teachers;
+- **messages included in a report to your school:** a message that a report still under review points to stays as it is, with its images, and the copies filed with any report are kept as the school's safeguarding record;
+- **other school records about you,** such as discipline records, teacher evaluations, records others created about you, message reports and reports of AI content;
+- **student import files,** until their period ends;
 - **the audit log and security records,** for security and legal purposes;
 - **tax, accounting and payment records,** as long as the law requires.
 
@@ -417,7 +420,7 @@ Our measures, suited to the kinds of data Studafy holds, including children's da
 - **protected secrets:** passwords are stored only as Argon2id hashes, and sign-in tokens, invitation links and setup codes only as hashes. On phones, sign-in tokens are kept in the device's secure storage and excluded from Android backups;
 - **private files,** opened through links that expire within minutes (sensitive documents within one minute);
 - **limits on misuse:** requests are rate-limited, and member-ID sign-in locks for 15 minutes after five failed attempts;
-- **virus scanning of class materials** on our own servers before students can open them, with infected files held back. Other files are not scanned at present;
+- **virus scanning of uploaded files,** such as class materials, homework, message images, record documents and receipts, on our own servers before anyone else can open them, with infected files held back. Files uploaded before we extended scanning to them in November 2026 may not have been scanned;
 - **audit records** of significant actions, including reveals of sensitive data and searches.
 
 No system is perfectly secure. If a personal data breach affects School Data, we tell the school without undue delay, as the [School Agreement](/school-agreement) requires, so it can meet its obligations. If a breach affects data we are responsible for, we notify the Data Protection Commission and, where the law requires, the people affected.

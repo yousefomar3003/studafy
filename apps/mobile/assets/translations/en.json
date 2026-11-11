@@ -532,6 +532,14 @@
     "title": "Studafy AI Study Assistant",
     "price": "{price} per month",
     "subscribe": "Subscribe",
+    "waiver": {
+      "label": "I want the AI study assistant to start now, and I understand I lose my 14-day right to cancel once it starts."
+    },
+    "confirmation": {
+      "title": "Your purchase confirmation",
+      "body": "On {date}, before buying, you asked for the AI study assistant to start now and confirmed you understand you lose your 14-day right to cancel once it starts. Terms of Service of {version} apply.",
+      "emailed": "We also emailed you this confirmation."
+    },
     "restore": {
       "action": "Restore purchases",
       "none": "No purchases to restore for this account."
@@ -542,7 +550,8 @@
     },
     "links": {
       "privacy": "Privacy policy",
-      "terms": "Terms of use"
+      "terms": "Terms of use",
+      "termsOfService": "Terms of Service"
     },
     "errors": {
       "storeFailed": "The purchase didn't go through. You haven't been charged — please try again.",

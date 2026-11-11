@@ -156,7 +156,7 @@ Deleting the app does not cancel a subscription. When you cancel, you keep acces
 - After 14 days, your account is removed from your school, and your links to any children are removed. A child's own account is not deleted when a parent deletes theirs.
 - Your name, contact details and profile are then erased within 30 days.
 
-10.3 **What is kept.** Some records are kept because your school, or we, must keep them by law: your grades and attendance (without your name or contact details), financial and payment records, and the audit log, including the record of your deletion. Messages you sent remain readable by the person you sent them to, and work you handed in stays part of your school's records. Your school can tell you more about the records it keeps.
+10.3 **What is kept.** Some records are kept because your school, or we, must keep them by law: your grades and attendance (without your name or contact details), financial and payment records, and the audit log, including the record of your deletion. The text and images of messages you sent are erased, except where a message was included in a report to your school, and work you handed in stays part of your school's records. Your school can tell you more about the records it keeps.
 
 10.4 **Your school can remove your access** at any time, for example when you leave. Ask your school about the records it keeps after that.
 

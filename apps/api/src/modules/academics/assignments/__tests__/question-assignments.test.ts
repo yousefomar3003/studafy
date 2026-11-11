@@ -59,6 +59,7 @@ function questionRow(viewerIsStaff: boolean): QuestionRow {
     image_storage_key: null,
     image_mime_type: null,
     image_size_bytes: null,
+    image_scan_status: "unscanned",
     viewer_is_staff: viewerIsStaff,
     options: [
       {
@@ -651,8 +652,17 @@ describeDb("pictures", () => {
       prompt: "",
       image: { upload_key: tempKey },
     };
+    const uploadedImageKeys: string[] = [];
     const saved = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
-      await replaceQuestions(tx, t.school.id, t.teacherA.userId, draft.id, [pictureOnly], storage);
+      await replaceQuestions(
+        tx,
+        t.school.id,
+        t.teacherA.userId,
+        draft.id,
+        [pictureOnly],
+        storage,
+        uploadedImageKeys,
+      );
       return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
     });
     const stored = saved[0]!;
@@ -660,6 +670,19 @@ describeDb("pictures", () => {
     expect(stored.image_storage_key).toStartWith(`permanent/${t.school.id}/`);
     expect(stored.image_mime_type).toBe("image/png");
     expect(storage.objects.has(tempKey)).toBe(false);
+    // A new picture waits for its malware scan (F-14), and is handed to the caller to enqueue.
+    expect(stored.image_scan_status).toBe("scanning");
+    expect(uploadedImageKeys).toEqual([stored.image_storage_key!]);
+
+    // The worker's clean verdict, keyed by the object as scan-upload.worker.ts writes it.
+    await db.sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      await tx`SELECT set_config('app.school_id', ${t.school.id}, true)`;
+      await tx`
+        UPDATE app.assignment_questions SET image_scan_status = 'clean'
+        WHERE image_storage_key = ${stored.image_storage_key}
+      `;
+    });
 
     const kept = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
       await replaceQuestions(
@@ -679,6 +702,8 @@ describeDb("pictures", () => {
       return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
     });
     expect(kept[0]!.image_storage_key).toBe(stored.image_storage_key);
+    // Re-saving rewrites the question rows; a kept picture keeps its verdict.
+    expect(kept[0]!.image_scan_status).toBe("clean");
 
     const removed = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
       await replaceQuestions(

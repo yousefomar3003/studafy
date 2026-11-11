@@ -6,6 +6,7 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/ai_hub_providers.dart';
 import '../domain/ai_hub_status.dart';
 import '../domain/ai_usage.dart';
+import '../store/ai_store_purchase_confirmation_note.dart';
 import 'widgets/ai_hub_message.dart';
 import 'widgets/ai_not_active_card.dart';
 import 'widgets/ai_school_inactive_notice.dart';
@@ -25,6 +26,10 @@ import 'widgets/ai_usage_warning_banner.dart';
 /// one. No AI route records which of `AiFeature`'s cases (ask, quiz, exam, ...) a token was spent
 /// on, so there is nothing true to show there yet -- adding it is a backend change (a feature
 /// column on the ledger, plus every AI route tagging its own writes), not a mobile-only one.
+///
+/// Under it, for a student who bought the add-on in the app, the confirmation of that purchase and of
+/// the withdrawal waiver given with it ([AiStorePurchaseConfirmationNote]) — for a member-ID account
+/// without an email address, the only copy they get.
 ///
 /// Reuses [aiHubStatusProvider] rather than re-fetching: it's the same quota snapshot the hub
 /// screen just loaded. Rendering the school-inactive/not-active/unavailable cases with the hub's own
@@ -70,6 +75,8 @@ class AiUsageScreen extends ConsumerWidget {
                   if (usage.level != AiUsageLevel.normal)
                     const SizedBox(height: AppSpacing.space16),
                   AiUsageMeter(usage: usage),
+                  // The in-app copy of an in-app purchase's confirmation, when there is one.
+                  const AiStorePurchaseConfirmationNote(),
                 ],
               ),
             ),

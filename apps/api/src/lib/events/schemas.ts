@@ -390,6 +390,22 @@ export const eventPayloadSchemas = {
     email: z.string().email(),
   }),
 
+  // ── AI add-on bought in the app: purchase and withdrawal-waiver confirmation ──
+  // Raised by registerStorePurchase (apps/api/src/modules/subscriptions/store/service.ts) once per
+  // store purchase whose waiver it records, for a student with an email address. The email is the
+  // durable-medium confirmation EU consumer law asks for (Terms of Service 7.7). acknowledgedAt is
+  // when the student ticked the box, recordedAt when the server recorded the purchase with it.
+  [DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED]: z.object({
+    schoolId: uid,
+    aiSubscriptionId: uid,
+    studentId: uid,
+    email: z.string().email(),
+    platform: z.enum(["apple", "google"]),
+    acknowledgedAt: z.string().datetime(),
+    recordedAt: z.string().datetime(),
+    termsVersion: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }),
+
   [DOMAIN_EVENTS.SUBSCRIPTION_SEAT_DRIFT_REPORTED]: z.object({
     schoolId: uid,
     subscriptionId: uid,

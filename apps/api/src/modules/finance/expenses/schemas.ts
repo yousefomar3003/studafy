@@ -58,7 +58,8 @@ export const expenseSchema = z
     erpnext_name: z.string().nullable().openapi({ description: "ERPNext document name." }),
     erpnext_status: z.string(),
     attachment_url: z.string().nullable().openapi({
-      description: "Pre-signed download URL for the attachment, if one exists.",
+      description:
+        "Pre-signed download URL for the attachment, if one exists and has passed its malware scan.",
     }),
     expense_date: z
       .string()
