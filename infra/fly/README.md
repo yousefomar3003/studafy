@@ -83,6 +83,22 @@ Supabase's `postgres` is not a superuser, which the first migrations ran into on
   `PUBLIC`, Supabase's default, so a platform role added later is covered too), so a new database
   needs nothing by hand.
 
+- **The Data API is off, but PostgREST still runs.** Studafy talks to Postgres directly, so the
+  project was created with the Data API disabled. Supabase keeps PostgREST running anyway and points
+  it at a schema that does not exist, so it logs `3F000 schema "pg_pgrst_no_exposed_schemas" does not
+exist` about twice a minute. Supabase's documented fix, run once in the SQL editor (done on
+  production 2026-11-11), gives it an empty schema instead:
+
+  ```sql
+  create schema if not exists pgrst_no_exposed_schemas;
+  alter role authenticator set pgrst.db_schemas = 'pgrst_no_exposed_schemas';
+  notify pgrst;
+  ```
+
+  Before ever turning the Data API on, undo it: `alter role authenticator reset pgrst.db_schemas;
+notify pgrst;`. A healthy project logs next to no Postgres errors; a steady stream means a setting
+  like these two, not load.
+
 ## First-time setup
 
 1. Create the apps (once):
