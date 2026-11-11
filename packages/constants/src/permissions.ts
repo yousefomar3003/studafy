@@ -510,6 +510,11 @@ const PRINCIPAL_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.CUSTOM_LIST_MANAGE,
   PERMISSIONS.CUSTOM_LIST_USE,
   PERMISSIONS.CUSTOM_LIST_READ_SENSITIVE,
+  // Decides, with the class's teachers, whether a class's study materials are used with the AI
+  // study assistant (PUT /api/academics/classes/{classId}/ai-materials, 000196). School leadership
+  // owns what leaves the school for the AI provider; not material:create/update/delete -- the
+  // materials themselves stay the teachers'.
+  PERMISSIONS.MATERIAL_MANAGE_AI,
 ];
 
 // The attendance office: takes, corrects and reports attendance for the whole school, and nothing

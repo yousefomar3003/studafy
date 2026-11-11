@@ -164,11 +164,11 @@ function fakeDatabase(
     queries.push(sql);
     let rows: unknown[] = [];
 
-    if (sql.includes("SELECT id, ingest_status")) {
+    if (sql.includes("SELECT m.id, m.ingest_status")) {
       const materialIds = args[1] as string[];
       rows = materialIds
         .filter((id) => over.materials?.[id])
-        .map((id) => ({ id, ingest_status: over.materials![id]!.ingest_status }));
+        .map((id) => ({ id, ingest_status: over.materials![id]!.ingest_status, ai_enabled: true }));
     } else if (sql.includes("INSERT INTO app.exam_sessions")) {
       rows = [{ id: EXAM_ID, created_at: baseSession().created_at }];
     } else if (sql.includes("SET status = 'failed'")) {

@@ -45,6 +45,7 @@ afterAll(async () => {
 
 interface MaterialFixture {
   schoolId: string;
+  classId: string;
   materialId: string;
   storageKey: string;
 }
@@ -57,7 +58,7 @@ let fixtureSeq = 0;
  * (school -> user/teacher -> academic year/term/subject/course/room -> class), seeded as
  * studafy_admin because role_scope_visibility gates INSERT ... RETURNING.
  */
-async function seedFixture(): Promise<MaterialFixture> {
+async function seedFixture(options: { classAiEnabled?: boolean } = {}): Promise<MaterialFixture> {
   fixtureSeq += 1;
   const tag = `sanitize${fixtureSeq}-${Date.now().toString(36)}`;
 
@@ -122,9 +123,11 @@ async function seedFixture(): Promise<MaterialFixture> {
     `;
     const [cls] = await tx<{ id: string }[]>`
       INSERT INTO app.classes
-        (school_id, course_id, academic_year_id, term_id, lead_teacher_id, room_id, code, capacity, status)
+        (school_id, course_id, academic_year_id, term_id, lead_teacher_id, room_id, code, capacity,
+         status, ai_materials_enabled)
       VALUES (${schoolId}::uuid, ${course!.id}::uuid, ${year!.id}::uuid, ${term!.id}::uuid,
-              ${teacherId}::uuid, ${room!.id}::uuid, ${`CLS-${tag}`}, 32, 'active')
+              ${teacherId}::uuid, ${room!.id}::uuid, ${`CLS-${tag}`}, 32, 'active',
+              ${options.classAiEnabled ?? true})
       RETURNING id
     `;
 
@@ -139,7 +142,7 @@ async function seedFixture(): Promise<MaterialFixture> {
       RETURNING id
     `;
 
-    return { schoolId, materialId: material!.id, storageKey };
+    return { schoolId, classId: cls!.id, materialId: material!.id, storageKey };
   });
 }
 
@@ -197,5 +200,76 @@ describeDb("ai-ingestion stored-XSS neutralization", () => {
     expect(allContent).toContain("Never trust user input, even inside a document upload.");
     // The payload's own text is preserved, inert, not silently dropped.
     expect(allContent).toContain("document.location");
+  });
+});
+
+/**
+ * The per-class AI materials setting (000196): a class with it off never has its material text
+ * parsed into chunks, whether the setting was already off when the job claimed the material or went
+ * off while the job was parsing. Either way the material finishes `ready`, chunk-free, and its
+ * preview derivation is still enqueued.
+ */
+describeDb("ai-ingestion and the class AI materials setting", () => {
+  async function materialRow(materialId: string) {
+    const [row] = await sql<{ ingest_status: string; ingested_at: Date | null }[]>`
+      SELECT ingest_status::text AS ingest_status, ingested_at
+      FROM app.materials WHERE id = ${materialId}::uuid
+    `;
+    return row!;
+  }
+
+  test("a class with the setting off: the material is finished without being read", async () => {
+    const fixture = await seedFixture({ classAiEnabled: false });
+    let fetched = false;
+    const derived: string[] = [];
+    const config: AiIngestionWorkerConfig = {
+      databaseUrl: databaseUrl!,
+      fetchBytes: async () => {
+        fetched = true;
+        return new Uint8Array(await buildDocx("Never read", ["Secret lesson text."], []));
+      },
+      enqueueDerivation: async ({ materialId }) => {
+        derived.push(materialId);
+      },
+    };
+
+    const result = await processIngestJob(jobFor(fixture), config);
+
+    expect(result).toMatchObject({ processed: true, ingested: false, chunks: 0 });
+    expect(fetched).toBe(false);
+    expect(await chunkContents(fixture.materialId)).toEqual([]);
+    const row = await materialRow(fixture.materialId);
+    expect(row.ingest_status).toBe("ready");
+    expect(row.ingested_at).not.toBeNull();
+    expect(derived).toEqual([fixture.materialId]);
+  });
+
+  test("the setting going off mid-parse drops the parsed text", async () => {
+    const fixture = await seedFixture();
+    const derived: string[] = [];
+    const config: AiIngestionWorkerConfig = {
+      databaseUrl: databaseUrl!,
+      fetchBytes: async () => {
+        // A teacher turns the class setting off while the job is fetching and parsing.
+        await sql.begin(async (tx) => {
+          await tx.unsafe("SET LOCAL ROLE studafy_admin");
+          await tx`SELECT set_config('app.school_id', ${fixture.schoolId}, true)`;
+          await tx`
+            UPDATE app.classes SET ai_materials_enabled = false WHERE id = ${fixture.classId}::uuid
+          `;
+        });
+        return new Uint8Array(await buildDocx("Lesson", ["Lesson text for the class."], []));
+      },
+      enqueueDerivation: async ({ materialId }) => {
+        derived.push(materialId);
+      },
+    };
+
+    const result = await processIngestJob(jobFor(fixture), config);
+
+    expect(result).toMatchObject({ processed: true, ingested: false, chunks: 0 });
+    expect(await chunkContents(fixture.materialId)).toEqual([]);
+    expect((await materialRow(fixture.materialId)).ingest_status).toBe("ready");
+    expect(derived).toEqual([fixture.materialId]);
   });
 });

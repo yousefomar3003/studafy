@@ -133,6 +133,12 @@ describe("ROLE_PERMISSIONS", () => {
     );
   });
 
+  test("class AI materials setting: the class's teachers and school leadership (000196)", () => {
+    expect(rolesHolding(PERMISSIONS.MATERIAL_MANAGE_AI)).toEqual(
+      [ROLES.INSTRUCTOR, ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
+    );
+  });
+
   // Custom lists: leadership shapes them; every school staff role may work in one, narrowed by the
   // list's audience; families never hold any of it.
   describe("custom lists", () => {
