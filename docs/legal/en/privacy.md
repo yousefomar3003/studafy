@@ -99,7 +99,7 @@ What is recorded depends on the school. Studafy is built to hold:
 
 Parents and teachers can message each other about a child the teacher teaches. Students cannot send or receive messages. We store each message's sender, text (up to 2,000 characters), time and any images (up to four).
 
-Only the two people in a conversation can read it in the app; school leaders cannot, unless a participant reports a message. A report gives the school's administrators and principal a copy of the reported message and up to 20 earlier messages, with the senders' names. The school decides what to do and keeps reports as safeguarding records. Messages cannot be edited or deleted once sent. Blocking someone stops new messages; earlier ones remain visible.
+Only the two people in a conversation can read it in the app; school leaders cannot, unless a participant reports a message. A report gives the school's administrators and principal a copy of the reported message and up to 20 earlier messages, with the senders' names. The school decides what to do and keeps reports as safeguarding records. Messages cannot be edited or deleted once sent, except that deleting your account erases the ones you sent (section 11). Blocking someone stops new messages; earlier ones remain visible.
 
 ### 3.4 Notifications and email
 
@@ -340,14 +340,17 @@ You can also ask your school to remove your account.
 
 Erasure removes your name, email address and similar contact details from your account and profile, and the answers in your school's custom record forms and lists that relate to you, with their documents.
 
+It also erases the messages you sent: the text of each one is replaced with “[deleted]”, its images are deleted, and so is its preview in the other person's notifications. The conversation stays in place, so the other person's own messages still make sense. For a student, everything the AI study assistant stored is deleted: Ask AI conversations, quizzes, flashcards and practice exams, with their answers and review schedule.
+
 ### 11.3 What is kept, and why
 
 Deleting your account does not delete the school's records about you. These remain:
 
 - **academic and attendance records,** such as marks, results, certificates and attendance, which schools often must keep; your name is removed from your profile, but the records remain for the school;
-- **messages you sent and work you handed in,** including attachments, which stay part of the school's records and visible to the other person in the conversation or to your teachers;
-- **other school records about you,** such as discipline records, teacher evaluations, records others created about you, and message reports;
-- **AI conversations,** until their 90-day period ends, and **student import files,** until their period ends;
+- **work you handed in,** including attachments, which stays part of the school's records and visible to your teachers;
+- **messages included in a report to your school:** a message that a report still under review points to stays as it is, with its images, and the copies filed with any report are kept as the school's safeguarding record;
+- **other school records about you,** such as discipline records, teacher evaluations, records others created about you, message reports and reports of AI content;
+- **student import files,** until their period ends;
 - **the audit log and security records,** for security and legal purposes;
 - **tax, accounting and payment records,** as long as the law requires.
 

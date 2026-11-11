@@ -108,6 +108,26 @@ passes may miss rows this policy hides from whichever admin they resolved to act
 (`admin-actor.ts`). The export manifest's `knownGaps` field says so explicitly for every bundle
 that reaches this table, rather than silently shipping an incomplete one.
 
+## What a person wrote themselves
+
+Free text and files a person authored are out of reach of column-name redaction: a message body is
+not a name column, and an Ask AI turn is keyed by `conversation_id`. `retention-registry.ts`'s
+`AUTHORED_CONTENT_TABLES` lists them with how each is erased, and `authored-content-dsr.ts` erases
+them before the generic walk, per person or for the whole school:
+
+- **Messages** a person sent: body replaced with `[deleted]` (`replace_text`, the thread keeps its
+  shape), images deleted with their objects removed after commit, and the recipient's
+  `DIRECT_MESSAGE` notification preview replaced.
+- **AI study content** of a student: conversations, turns, citations, quizzes, flashcards, reviews
+  and practice exams deleted (`delete`), in FK order. Moderation decisions are kept, detached from
+  the deleted turn.
+- **Safeguarding first:** a message an open message report points at (as the reported message or in
+  its snapshot) is skipped entirely; an image a report snapshot references is kept; report
+  snapshots and AI content reports are never touched. Each appears in `retained_tables`.
+
+What the pass keeps still goes through the generic walk afterwards, so a closure still redacts the
+file names of the images it kept, as before.
+
 ## School-defined record data
 
 Student, parent, staff and class records (`app.record_answers`, `app.record_documents`;

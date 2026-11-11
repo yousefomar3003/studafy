@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test";
 
 import { RECORD_DATA_TABLES } from "./records-dsr";
 import {
+  AUTHORED_CONTENT_TABLES,
+  authoredContentAction,
   classifyTable,
   HARD_DELETE_TABLES,
   isPersonalDataColumn,
@@ -110,5 +112,50 @@ describe("custom lists", () => {
   test("rows and cells are exported opened and erased by records-dsr.ts, not the generic walk", () => {
     expect(RECORD_DATA_TABLES.has("custom_list_rows")).toBe(true);
     expect(RECORD_DATA_TABLES.has("custom_list_values")).toBe(true);
+  });
+});
+
+// What a person wrote themselves (authored-content-dsr.ts). The boundary is as much what is NOT here
+// as what is: the school's own records stay.
+describe("AUTHORED_CONTENT_TABLES", () => {
+  test("messages keep their row and lose their text; their images and AI content are deleted", () => {
+    expect(authoredContentAction("messages")).toBe("replace_text");
+    expect(authoredContentAction("notifications")).toBe("replace_text");
+    expect(authoredContentAction("message_attachments")).toBe("delete");
+    for (const table of [
+      "ai_conversations",
+      "ai_messages",
+      "quizzes",
+      "flashcard_decks",
+      "exam_sessions",
+    ]) {
+      expect(authoredContentAction(table)).toBe("delete");
+    }
+  });
+
+  test("never reaches school records, safeguarding reports or a legal hold", () => {
+    for (const table of [
+      "assignment_submissions",
+      "submission_attachments",
+      "grades",
+      "grade_submissions",
+      "attendance_records",
+      "audit_logs",
+      "message_reports",
+      "message_report_messages",
+      "message_report_attachments",
+      "ai_content_reports",
+      "ai_moderation_decisions",
+      "ai_usage_meters",
+      "ai_data_sharing_consents",
+      "message_conversations",
+    ]) {
+      expect(authoredContentAction(table)).toBeNull();
+    }
+    for (const table of AUTHORED_CONTENT_TABLES.keys()) {
+      expect(LEGAL_HOLD_TABLES.has(table)).toBe(false);
+      expect(HARD_DELETE_TABLES.has(table)).toBe(false);
+      expect(RECORD_DATA_TABLES.has(table)).toBe(false);
+    }
   });
 });
