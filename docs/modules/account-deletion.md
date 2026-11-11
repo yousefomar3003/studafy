@@ -53,6 +53,8 @@ columns (audited as `account_deletion_cancelled`); the client then refreshes its
 
 1. AI add-on billing stops for the user's student record: Stripe subscriptions are set to cancel at
    period end; Tap subscriptions lose their saved card, so the renewal worker cannot charge them.
+   A Stripe failure rolls the account back to retry the next day. App-store purchases follow —
+   see [Store subscriptions](#store-subscriptions-app-store-and-google-play).
 2. The user is detached from the school: `users.status = 'archived'`, and their `user_roles`,
    `oauth_identities` and `parent_child_links` (as parent) are deleted; any open session is revoked.
    With no identity row and no roles, no login or refresh can succeed.
@@ -62,6 +64,40 @@ columns (audited as `account_deletion_cancelled`); the client then refreshes its
    dispatcher sends the confirmation (school, erasure date, what is kept) from it.
 
 After commit the erasure job is enqueued. A failed account stays due and is retried the next day.
+
+## Store subscriptions (App Store and Google Play)
+
+Students buy the AI add-on in the mobile app (web purchase is switched off). Apple and Google
+bill those subscriptions, not Studafy, so deleting the account cannot simply stop them:
+
+| Store       | What deletion does                                                                                                                                                                                                           |
+| ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App Store   | Nothing — Apple has no API for a developer to cancel a subscription. The person must cancel it in Settings → their name → Subscriptions.                                                                                     |
+| Google Play | On the due date, the sweep turns off renewal (`purchases.subscriptions.cancel`, `google-play-ai-billing-canceller.ts`), **best-effort**: a failure or missing credentials is logged and recorded, never blocks the deletion. |
+
+A store purchase has no provider column on `ai_subscriptions`; its billing event names the store and
+purchase token, read through `app.ai_store_purchases()` (000163) — the same lookup licensing uses
+when a school seat covers a personal subscriber. The deletion's audit entry records one
+`store_subscriptions` item per store purchase: `{ platform, outcome }`, with outcome `canceled`,
+`not_renewing` (Play says it will not renew anyway), `failed`, `not_configured` (no Play
+credentials on the workers) or `not_cancellable` (App Store).
+
+**Warning before deletion.** Because neither path is guaranteed, the person is told up front.
+`GET /api/account/profile`, `POST /api/account/deletion` and each account in the emailed-link
+confirm response carry `active_store_subscriptions`: one `{ platform, for_child }` item per store
+and owner, for live (`LIVE_STATUSES`, period not ended) AI add-ons bought in a store, on the
+caller's own student record **and on every student linked to them as a parent** — a parent's
+deletion cancels nothing for their children, whose accounts stay. It names no child and no
+subscription detail. When it is not empty, the screens show the store's cancel steps:
+
+- web `DeleteAccountPage.tsx` (before the action and again once scheduled) and
+  `DeletionPendingGate.tsx` (during the grace period), through `StoreSubscriptionWarning.tsx`;
+- mobile `delete_account_screen.dart` (`StoreSubscriptionWarningCard`, above the form);
+- the public `/legal/delete-account/confirm` page, after confirming; before it, its text and the
+  `/legal/delete-account` page say so for everyone.
+
+**Configuration.** The workers need `GOOGLE_PLAY_PACKAGE_NAME` and `GOOGLE_PLAY_SERVICE_ACCOUNT`
+(the same values as the api; set together). Without them the Play call is skipped with a warning.
 
 Within 30 days, the maintenance worker's erasure pass
 (`apps/workers/src/queues/maintenance`) redacts personal-data columns across the tenant's tables
@@ -153,7 +189,14 @@ Stated plainly so they are not mistaken for done:
   change.
 - **AI subscriptions are matched through the student record.** A parent deleting their account
   does not cancel a child's AI subscription they may be paying for; `ai_subscriptions` has no payer
-  column to match on.
+  column to match on. The parent is warned (`active_store_subscriptions` with `for_child: true`)
+  and given the store's steps, since the child's account stays.
+- **App Store subscriptions cannot be cancelled by Studafy**, and the Google Play cancel is
+  best-effort. Only the warning above covers them; a `failed` outcome on the audit entry is not
+  retried.
+- **School closure stops no AI add-on billing at all** (Stripe, Tap or store). The closure sweep
+  (`closure-sweep.ts`) files the tenant export and erasure only, and there is no screen to warn
+  students and parents on. Terms 7.10 tells them to cancel in the store.
 - **The web flow trusts mailbox control.** Anyone who can read an account's email can delete it —
   the same trust the invitation flow places in that mailbox. An account whose school recorded an
   address the person no longer controls can only be deleted by signing in or through the school.

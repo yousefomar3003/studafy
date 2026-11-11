@@ -37,7 +37,7 @@ the end of the paid period.
 |                                                     | `APPLE_IAP_BUNDLE_ID`         | `com.studafy.studafyMobile.dev` / `.staging` / `com.studafy.studafyMobile`   |
 |                                                     | `APPLE_IAP_APP_APPLE_ID`      | App Store Connect → the app → App Information → **Apple ID** (a number)      |
 |                                                     | `GOOGLE_PLAY_PACKAGE_NAME`    | `com.studafy.studafy_mobile.dev` / `.staging` / `com.studafy.studafy_mobile` |
-| api app secret (`TF_VAR_secrets_app_secret_values`) | `GOOGLE_PLAY_SERVICE_ACCOUNT` | the service account's JSON key, on one line                                  |
+| api app secret (`TF_VAR_secrets_app_secret_values`) | `GOOGLE_PLAY_SERVICE_ACCOUNT` | the service account's JSON key, on one line (also in the workers app secret) |
 |                                                     | `GOOGLE_PLAY_RTDN_TOKEN`      | `openssl rand -hex 32`                                                       |
 
 Each store is off while its values are empty; the api refuses to boot with a half-configured store

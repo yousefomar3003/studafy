@@ -173,6 +173,7 @@
         "bullmq": "5.79.3",
         "exceljs": "4.4.0",
         "firebase-admin": "14.2.0",
+        "google-auth-library": "11.3.0",
         "ioredis": "5.10.1",
         "jszip": "3.10.1",
         "mammoth": "1.12.0",

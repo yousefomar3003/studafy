@@ -37,6 +37,9 @@ export interface MaintenanceRunnerConfig {
   bucket?: string;
   /** For the account-deletion sweep's Stripe AI add-on cancellations; absent outside production. */
   stripeSecretKey?: string;
+  /** For the same sweep's Google Play renewal cancellations; both set, or the call is skipped. */
+  googlePlayPackageName?: string;
+  googlePlayServiceAccount?: string;
   /** Opens sensitive record answers for a DSR export (ADR-019). */
   recordKeyring: RecordKeyring;
 }

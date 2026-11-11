@@ -16,6 +16,7 @@ const CONFIRMED = {
       school_name: "Hill School",
       scheduled_for: "2026-10-11T00:00:00.000Z",
       completes_by: "2026-11-10T00:00:00.000Z",
+      active_store_subscriptions: [],
     },
   ],
   retained_records: [
@@ -77,6 +78,45 @@ describe("ConfirmAccountDeletionPage", () => {
     });
     expect(screen.getByRole("status").textContent).toContain("Hill School");
     expect(screen.getByText(/attendance marks the school recorded/i)).toBeTruthy();
+  });
+
+  test("warns when an account's AI subscription is billed by a store", async () => {
+    postMock.mockImplementationOnce(() =>
+      Promise.resolve({
+        data: {
+          ...CONFIRMED,
+          accounts: [
+            { ...CONFIRMED.accounts[0], active_store_subscriptions: [] },
+            {
+              school_name: "River School",
+              scheduled_for: "2026-10-11T00:00:00.000Z",
+              completes_by: "2026-11-10T00:00:00.000Z",
+              active_store_subscriptions: [{ platform: "app_store", for_child: false }],
+            },
+          ],
+        },
+      }),
+    );
+    await renderAt(`/legal/delete-account/confirm#token=${TOKEN}`);
+
+    fireEvent.click(deleteButton());
+
+    expect(
+      await screen.findByRole("heading", {
+        level: 2,
+        name: "Cancel your App Store or Google Play subscription",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText(/^App Store: on the iPhone or iPad/)).toBeTruthy();
+  });
+
+  test("shows no store warning when no account has a store subscription", async () => {
+    await renderAt(`/legal/delete-account/confirm#token=${TOKEN}`);
+
+    fireEvent.click(deleteButton());
+
+    await screen.findByRole("heading", { name: /your account deletion is scheduled/i });
+    expect(screen.queryByRole("heading", { name: /cancel your app store/i })).toBeNull();
   });
 
   test("an address with no active account says so", async () => {

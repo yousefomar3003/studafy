@@ -81,7 +81,7 @@ run would overwrite. The workflow checks the required ones up front and names an
 | `RESEND_API_KEY`                                                                                                                  |     | ✓                                |                            |         |
 | `RESEND_WEBHOOK_SECRET`                                                                                                           | ✓   |                                  |                            |         |
 | `TURNSTILE_SECRET_KEY`                                                                                                            | ✓   |                                  |                            |         |
-| `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_RTDN_TOKEN`                                                                           | ✓   |                                  |                            |         |
+| `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_RTDN_TOKEN`                                                                           | ✓   | `GOOGLE_PLAY_SERVICE_ACCOUNT`    |                            |         |
 | `FIREBASE_SERVICE_ACCOUNT`                                                                                                        |     | ✓                                |                            |         |
 | Optional: `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, `MICROSOFT_OAUTH_CLIENT_ID`/`_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓   | `STRIPE_SECRET_KEY`              |                            |         |
 

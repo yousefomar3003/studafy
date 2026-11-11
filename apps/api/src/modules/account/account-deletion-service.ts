@@ -16,7 +16,9 @@
  * 2. Cancel (here, `DELETE /api/account/deletion`) — clears both columns while the account is
  *    still attached. The client refreshes its token to drop the claim.
  *
- * 3. Run (apps/workers' account-deletion sweep, daily) — on the due date: stop AI add-on billing,
+ * 3. Run (apps/workers' account-deletion sweep, daily) — on the due date: stop AI add-on billing
+ *    (Stripe and Tap; a Google Play renewal best-effort; an App Store one cannot be stopped, so the
+ *    response and the profile list it in `active_store_subscriptions` for the person to cancel),
  *    detach from the school (archived; roles, sign-in identities and parent links removed), file
  *    and enqueue the erasure, revoke any session left. The erasure itself then completes within
  *    its 30-day SLA, keeping only what retention-policy.ts lists.
@@ -34,6 +36,9 @@ import {
 import { REVOCATION_REASONS, revokeAndDenylist } from "../auth/services/revocation-service";
 import { findOpenDsrRequest } from "../privacy/service";
 
+import { findActiveStoreSubscriptions } from "./store-subscriptions";
+
+import type { ActiveStoreSubscription } from "./store-subscriptions";
 import type { Database } from "../../db/client";
 import type { Logger } from "../../logger";
 import type { JtiDenylist } from "../auth/denylist";
@@ -78,6 +83,8 @@ export interface ScheduledAccountDeletion {
   /** Latest time personal data will have been erased: the due date plus the erasure SLA. */
   completesBy: Date;
   sessionsRevoked: number;
+  /** App Store / Google Play subscriptions (own or a child's) the person must cancel in the store. */
+  activeStoreSubscriptions: ActiveStoreSubscription[];
 }
 
 export async function scheduleAccountDeletion(
@@ -149,6 +156,7 @@ export async function scheduleAccountDeletion(
       kind: "scheduled",
       requestedAt: scheduled!.requested_at,
       dueAt: scheduled!.due_at,
+      activeStoreSubscriptions: await findActiveStoreSubscriptions(tx, userId),
     } as const;
   });
 
@@ -159,6 +167,7 @@ export async function scheduleAccountDeletion(
     scheduledFor: outcome.dueAt,
     completesBy: new Date(outcome.dueAt.getTime() + ERASURE_SLA_DAYS * MILLIS_PER_DAY),
     sessionsRevoked: await revokeAllSessions(deps, params),
+    activeStoreSubscriptions: outcome.activeStoreSubscriptions,
   };
 }
 

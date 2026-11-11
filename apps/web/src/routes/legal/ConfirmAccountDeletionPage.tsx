@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useSeo } from "../../components/Seo";
+import { StoreSubscriptionWarning } from "../../features/account/privacy/StoreSubscriptionWarning";
 import { api } from "../../lib/api";
 import { Trans, useFormatters, useTranslation } from "../../lib/i18n";
 
@@ -129,6 +130,12 @@ function DeletionResult({ result }: { result: ConfirmedDeletion }) {
           </li>
         ))}
       </ul>
+      <StoreSubscriptionWarning
+        headingLevel={2}
+        subscriptions={result.accounts.flatMap((account) =>
+          Array.from(account.active_store_subscriptions ?? []),
+        )}
+      />
       <p>{t("onboarding.legal.confirmDeletion.retainedIntro")}</p>
       <ul>
         {result.retained_records.map((record) => (
