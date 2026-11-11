@@ -53,6 +53,5 @@ export {
   evaluateBudgetBreach,
   computeAiCostTotals,
   computeStripeFeesUsd,
-  COST_METRIC_NAMESPACE,
 } from "./cost-report";
 export type { CostReportResult, BudgetVerdict, AiCostTotals } from "./cost-report";

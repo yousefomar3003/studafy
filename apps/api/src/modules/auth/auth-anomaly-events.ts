@@ -7,7 +7,7 @@
  * slow down the rejection path they report on.
  *
  * Structured logs land at ERROR level with `event` as the discriminator. Aggregation
- * pipelines (Datadog log-based metrics, CloudWatch metric filters) build counters
+ * pipelines (Axiom monitors and log-based metrics) build counters
  * on the `event` field. Security events are persisted to `app.security_events` via
  * the async sink for queryable history and alert rules.
  *

@@ -678,8 +678,7 @@ function assertExpiryAllowed(field: PublishedField, expiresOn: string | null | u
  * object; one short transaction resolves the field (and so its content class and sensitivity) and
  * charges the quota; the checksum, when supplied, is verified and the object copied with no
  * transaction open; a second short transaction writes the document row and runs `finish` (the
- * caller's read-back). A sensitive field's file is promoted under the sensitive-documents KMS key
- * (ADR-019). Returns a replaced file's key for the caller to delete once the transaction commits,
+ * caller's read-back). Returns a replaced file's key for the caller to delete once the transaction commits,
  * and the new file's key for the caller to hand to the malware scanner then (F-14): until it is
  * scanned clean it is not downloadable.
  */
@@ -717,7 +716,6 @@ export async function attachDocument<T>(
     tempKey: input.storage_key,
     permanentKey: buildPermanentKey(schoolId, staged.parsed.objectId, staged.parsed.filename),
     sizeBytes: staged.sizeBytes,
-    sensitive,
   };
   try {
     await verifyStagedChecksum(storage, input.storage_key, input.checksum_sha256);

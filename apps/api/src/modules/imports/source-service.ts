@@ -6,8 +6,8 @@
  * The browser stages the file through the storage gateway under the import.source content class,
  * then posts the same bytes to the upload route. The upload checks the staged object's SHA-256
  * against the bytes it parsed before promoting it, so the archived file is exactly the one that was
- * imported, and promotes it under the sensitive-documents KMS key: a school's export can hold ID
- * numbers and medical notes no column of ours reads.
+ * imported. A school's export can hold ID numbers and medical notes no column of ours reads, so
+ * it downloads only through a one-minute audited URL.
  *
  * An archived file holds many people's data and a per-person erasure cannot redact inside it, so it
  * lives a fixed time (docs/security/data_retention_and_dsr_policy.md "Student import files"): 180
@@ -71,7 +71,6 @@ export async function inspectSourceFile(
     tempKey: stagedKey,
     permanentKey: buildPermanentKey(schoolId, upload.parsed.objectId, upload.parsed.filename),
     sizeBytes: upload.sizeBytes,
-    sensitive: true,
     fileName: upload.parsed.filename,
   };
 }

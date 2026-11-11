@@ -21,8 +21,8 @@ export function getSentryEnvironment(): string | undefined {
 
 /**
  * Correlates every captured event to the deploy that produced it. Baked in at Docker build time
- * from the same immutable image tag `release.yml` pushes to ECR (`VITE_RELEASE_VERSION` build arg
- * in `infra/docker/web.Dockerfile`) and uploaded to Sentry as the release name by the
+ * from the deployed commit, the same release the api and workers report (`VITE_RELEASE_VERSION`
+ * build arg in `infra/docker/web.Dockerfile`, set by `fly-production-deploy.yml`) and uploaded to Sentry as the release name by the
  * `sentryVitePlugin` in `vite.config.ts`. Falls back to "unknown" outside that pipeline — mirroring
  * the API's own `RELEASE_VERSION` default (`apps/api/src/env.ts`).
  */

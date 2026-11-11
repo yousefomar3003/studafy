@@ -2,9 +2,7 @@
  * Cost & budget reporting sweep (ST-293) — pure-logic and fake-injected unit tests.
  *
  * `evaluateBudgetBreach` is the piece of "budget breach alerts fire in test" this module can prove
- * without a live CloudWatch alarm: the alarm itself (alerts.tf's `AiSpendBudgetHigh`) fires from the
- * same `AiEstimatedSpendUsd` metric `publishCostMetrics` sends, so this file proves the sweep would
- * report a breach for the same numbers the alarm's threshold would trip on. `computeAiCostTotals`'s
+ * without a live monitor: it decides the `budgetBreached` field the cost-report log line carries. `computeAiCostTotals`'s
  * real-database path (per-school RLS-scoped transactions) is not covered here — mirroring
  * apps/api/src/modules/ai/routes/metrics-routes.test.ts's own fake-database approach for the
  * equivalent admin-metrics endpoint, not a new gap this ticket introduces.
@@ -18,7 +16,6 @@ import {
   computeStripeFeesUsd,
   estimateAiCostUsd,
   evaluateBudgetBreach,
-  publishCostMetrics,
 } from "../cost-report";
 
 import type { WorkerLogger } from "../../../log";
@@ -89,48 +86,6 @@ describe("computeAiRevenueUsd", () => {
 
   test("zero students yields zero revenue", () => {
     expect(computeAiRevenueUsd(0)).toBe(0);
-  });
-});
-
-describe("publishCostMetrics", () => {
-  test("publishes both metrics under the given namespace when Stripe fees are known", async () => {
-    const sent: unknown[] = [];
-    const fakeCloudWatch = { send: async (command: unknown) => sent.push(command) };
-    const now = new Date("2026-09-01T06:15:00.000Z");
-
-    await publishCostMetrics(
-      fakeCloudWatch as never,
-      "Studafy/Cost",
-      { aiEstimatedSpendUsd: 123.45, stripeFeesUsd: 67.89 },
-      now,
-    );
-
-    expect(sent).toHaveLength(1);
-    const input = (sent[0] as { input: { Namespace: string; MetricData: unknown[] } }).input;
-    expect(input.Namespace).toBe("Studafy/Cost");
-    expect(input.MetricData).toHaveLength(2);
-    expect(input.MetricData).toContainEqual(
-      expect.objectContaining({ MetricName: "AiEstimatedSpendUsd", Value: 123.45 }),
-    );
-    expect(input.MetricData).toContainEqual(
-      expect.objectContaining({ MetricName: "StripeFeesUsd", Value: 67.89 }),
-    );
-  });
-
-  test("omits StripeFeesUsd when Stripe fees are unknown (null)", async () => {
-    const sent: unknown[] = [];
-    const fakeCloudWatch = { send: async (command: unknown) => sent.push(command) };
-
-    await publishCostMetrics(
-      fakeCloudWatch as never,
-      "Studafy/Cost",
-      { aiEstimatedSpendUsd: 10, stripeFeesUsd: null },
-      new Date("2026-09-01T06:15:00.000Z"),
-    );
-
-    const input = (sent[0] as { input: { MetricData: { MetricName: string }[] } }).input;
-    expect(input.MetricData).toHaveLength(1);
-    expect(input.MetricData[0]!.MetricName).toBe("AiEstimatedSpendUsd");
   });
 });
 

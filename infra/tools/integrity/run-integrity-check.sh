@@ -13,7 +13,7 @@
 #
 # Exit status: 0 clean (every check pass), 1 any check failed or errored, 2 usage error.
 #
-# Connection: lib/common.sh's resolve_pg_connection -- CONNECTION_SECRET_ARN+AWS_REGION or plain
+# Connection: lib/common.sh's resolve_pg_connection -- plain
 # PGHOST/PGPORT/PGUSER/PGPASSWORD/PGDATABASE. Data checks run as the connected role (superuser
 # locally / RDS master) scoped to the school by the app.school_id session GUC plus an explicit
 # school_id filter on every query, so a connected role that bypasses RLS still sees only this

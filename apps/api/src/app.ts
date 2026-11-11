@@ -456,9 +456,9 @@ export function createApp({
 
   // Security headers: CSP, HSTS, X-Frame-Options, and friends on every response.
   //
-  // HSTS lives here rather than at the edge because the ALB in front of this service
-  // (infra/terraform/modules/edge) terminates TLS and forwards plaintext to us; its listener
-  // actions can't inject response headers, so HSTS has to be set here or nowhere. See
+  // HSTS lives here rather than at the edge because fly's proxy in front of this service terminates
+  // TLS and forwards plaintext to us without adding response headers, so HSTS has to be set here or
+  // nowhere. See
   // docs/runbooks/edge-security.md.
   app.use("*", securityHeadersMiddleware());
 
@@ -612,7 +612,7 @@ export function createApp({
   }
 
   // Resend email-event webhook (deliverability R-08). Mounted with the other webhooks for the
-  // same reason: it authenticates by Resend's Svix HMAC signature, not by a session token, so it must sit outside the bearer-token chain. It is mounted only when a
+  // same reason: it authenticates by Resend's Svix signature, not by a session token, so it must sit outside the bearer-token chain. It is mounted only when a
   // database is available because ingestion writes the event ledger, suppression list, and delivery
   // status.
   if (database) {

@@ -83,8 +83,8 @@ const aiHealthRoute = createRoute({
     "Provider-level outages are detected the way docs/runbooks/ai-provider-outage.md already " +
     "describes (retry/circuit-breaker logs, Anthropic's own status page), not by this endpoint. " +
     "Its purpose is narrower: give the public status page's `ai` component the same shape of " +
-    "black-box GET the other four components already have (infra/terraform/modules/monitoring's " +
-    "synthetics.tf), rather than leaving it the one component nothing ever checks.",
+    "black-box GET the other four components already have, rather than leaving it the one " +
+    "component nothing ever checks.",
   // Explicitly unauthenticated, same posture as /healthz and /api/mobile/config: a black-box probe
   // has no session to bear a token, and the published contract should not depend on whether a
   // deployment has AI enabled at all. /api/ai/health is in jwtAuth.ts's DEFAULT_PUBLIC_PATHS.

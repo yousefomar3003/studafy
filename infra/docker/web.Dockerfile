@@ -11,9 +11,9 @@ FROM oven/bun:${BUN_VERSION}-alpine AS build
 WORKDIR /app
 
 # Baked into the bundle at build time (Vite inlines `import.meta.env.VITE_*` at build, not runtime —
-# unlike the ECS services, a static SPA has no server process left to read an env var from after
-# this point). VITE_RELEASE_VERSION is normally the same immutable image tag `release.yml` pushes to
-# ECR, so a captured error's Sentry release lines up with the deploy that shipped it (see
+# unlike the api/workers services, a static SPA has no server process left to read an env var from after
+# this point). VITE_RELEASE_VERSION is the deployed commit (fly-production-deploy.yml passes
+# github.sha), so a captured error's Sentry release lines up with the deploy that shipped it (see
 # `apps/web/src/lib/monitoring/config.ts`); VITE_SENTRY_DSN, SENTRY_ORG, and SENTRY_PROJECT go
 # unset in the `containers.yml` validation build, which is fine — see that file's own doc comment on
 # degrading to "monitoring disabled" without one. SENTRY_AUTH_TOKEN is deliberately not an ARG (ARGs
@@ -27,8 +27,8 @@ ENV VITE_RELEASE_VERSION=${VITE_RELEASE_VERSION} \
     VITE_SENTRY_DSN=${VITE_SENTRY_DSN} \
     SENTRY_ORG=${SENTRY_ORG} \
     SENTRY_PROJECT=${SENTRY_PROJECT}
-# Endpoint/feature overrides. release.yml passes the API, realtime and Turnstile values per tier from
-# its GitHub Environment variables; the root compose.yml local stack passes the first three.
+# Endpoint/feature overrides. infra/fly/web.toml's [build.args] and fly-production-deploy.yml pass
+# the production values; the root compose.yml local stack passes the first three.
 # Deliberately ARG-only, not ENV: apps/web/src/lib/config.ts falls back with `??`, which an
 # empty-string ENV would defeat, so the build RUN below unsets any left empty. An unset
 # VITE_TURNSTILE_SITE_KEY falls back to Cloudflare's always-pass test key, which a deployed tier must
@@ -43,7 +43,7 @@ ARG VITE_TURNSTILE_SITE_KEY
 ARG VITE_SITE_ORIGIN
 # The marketing site's contact address; unset shows a "not configured" notice, never an invented one.
 ARG VITE_MARKETING_CONTACT_EMAIL
-# The tier Sentry files the bundle's errors under (release.yml: staging, production); unset falls
+# The tier Sentry files the bundle's errors under (production on fly); unset falls
 # back to Vite's build mode.
 ARG VITE_SENTRY_ENVIRONMENT
 
@@ -76,7 +76,7 @@ RUN bun run --cwd packages/constants build \
 # apps/web/package.json declares it as a dependency, then apps/web's `vite build` itself.
 #
 # The secret mount is optional (id not required): when the caller passes `--secret
-# id=sentry_auth_token,...` (release.yml's authenticated release build), the file exists and its
+# id=sentry_auth_token,...` (fly-production-deploy.yml's release build), the file exists and its
 # contents become SENTRY_AUTH_TOKEN for this RUN step only. When it doesn't (containers.yml's
 # validation build), the file is simply absent and the `[ -f ... ]` guard leaves the variable unset
 # — vite.config.ts's own sentryReleaseUploadEnabled check is what actually turns the upload off.

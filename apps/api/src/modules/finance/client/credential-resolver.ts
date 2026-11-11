@@ -5,8 +5,8 @@
  * school. That is not how the deployed plane works, and pretending otherwise would produce code
  * that cannot run:
  *
- *   - There is no Vault in this system, and Secrets Manager is provisioned per *service*
- *     (`infra/terraform/modules/secrets`), not per tenant.
+ *   - There is no Vault in this system, and secrets are set per *service* (fly secrets from the
+ *     `prod` GitHub Environment), not per tenant.
  *   - `app.erpnext_site_configs` — the table provisioning already fills in — has no credential
  *     column, because ERPNext never issues a per-tenant key here.
  *   - Tenant separation is achieved at the edge instead: the ERPNext nginx frontend is configured
@@ -123,8 +123,8 @@ export class EnvCredentialResolver implements ErpNextCredentialResolver {
     }
 
     // A row that is not 'completed' names a site that an operator creates out of band
-    // (infra/deploy/scripts/erpnext-new-site.sh -- a Frappe site can only be made by bench, never
-    // over the REST API). Ask the site itself: once it answers with its company, record that and
+    // (`bench new-site` plus infra/erpnext/seed/provision.py -- a Frappe site can only be made by
+    // bench, never over the REST API). Ask the site itself: once it answers with its company, record that and
     // carry on, so a school's finance switches on by itself the moment its site is ready.
     if (row.status !== "completed") {
       const company = this.probeSite ? await this.probeSite(row.site_name) : null;

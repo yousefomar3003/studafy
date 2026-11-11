@@ -23,7 +23,6 @@ describe("loadEnv", () => {
       EMAIL_FROM_ADDRESS: "no-reply@send.studafy.com",
       EMAIL_FROM_NAME: "Studafy",
       EMAIL_DRY_RUN: false,
-      COST_REPORT_ENABLED: true,
       PUSH_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
@@ -59,7 +58,6 @@ describe("loadEnv", () => {
       EMAIL_FROM_ADDRESS: "no-reply@send.studafy.com",
       EMAIL_FROM_NAME: "Studafy",
       EMAIL_DRY_RUN: false,
-      COST_REPORT_ENABLED: true,
       PUSH_DRY_RUN: false,
       CLAMAV_PORT: 3310,
       CLAMAV_TIMEOUT_MS: 30_000,
@@ -106,7 +104,7 @@ describe("loadEnv", () => {
         STRIPE_SECRET_KEY: "sk_test_prod",
         CLAMAV_HOST: "clamd.internal",
         ...RECORD_KEYS,
-        RESEND_API_KEY: "re_test_key",
+        RESEND_API_KEY: "re_test",
         FIREBASE_SERVICE_ACCOUNT: "{}",
       }),
     ).toMatchObject({
@@ -125,7 +123,7 @@ describe("loadEnv", () => {
       READ_DATABASE_NAME: "workers_read",
       CLAMAV_HOST: "clamd.internal",
       ...RECORD_KEYS,
-      RESEND_API_KEY: "re_test_key",
+      RESEND_API_KEY: "re_test",
       FIREBASE_SERVICE_ACCOUNT: "{}",
       // Injected empty by the task definition when the secret holds no Stripe key.
       STRIPE_SECRET_KEY: "",
@@ -163,7 +161,7 @@ describe("loadEnv", () => {
 
     test("refuses to boot without Resend, so email can never silently stop", () => {
       expect(() => loadEnv(deployed)).toThrow(EnvValidationError);
-      // The task definition always injects the key; empty must not count as set.
+      // A deploy can inject the key empty; empty must not count as set.
       expect(() => loadEnv({ ...deployed, RESEND_API_KEY: "" })).toThrow(EnvValidationError);
     });
 
@@ -171,15 +169,8 @@ describe("loadEnv", () => {
       expect(loadEnv({ ...deployed, EMAIL_DRY_RUN: "true" }).EMAIL_DRY_RUN).toBe(true);
     });
 
-    test("turns the CloudWatch cost report off only on an explicit false", () => {
-      const base = { ...deployed, EMAIL_DRY_RUN: "true" };
-      expect(loadEnv(base).COST_REPORT_ENABLED).toBe(true);
-      expect(loadEnv({ ...base, COST_REPORT_ENABLED: "" }).COST_REPORT_ENABLED).toBe(true);
-      expect(loadEnv({ ...base, COST_REPORT_ENABLED: "false" }).COST_REPORT_ENABLED).toBe(false);
-    });
-
     test("sends from the verified domain by default", () => {
-      const env = loadEnv({ ...deployed, RESEND_API_KEY: "re_test_key" });
+      const env = loadEnv({ ...deployed, RESEND_API_KEY: "re_test" });
       expect(env.EMAIL_FROM_ADDRESS).toBe("no-reply@send.studafy.com");
       expect(env.EMAIL_FROM_NAME).toBe("Studafy");
     });

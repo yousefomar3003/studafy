@@ -216,10 +216,8 @@ export const JOB_NAMES = {
   // data-retention-sweep.ts. Registered on the maintenance queue via Job Scheduler.
   PURGE_EXPIRED_RETAINED_DATA: "purge-expired-retained-data",
   // Cost & budget reporting sweep (ST-293). Carries `{ mode: "daily" | "monthly" }`: "daily"
-  // publishes today's AI-spend/Stripe-fee CloudWatch metrics so the budget alarms
-  // (infra/terraform/modules/monitoring/alerts.tf) stay current; "monthly" additionally logs the
-  // full structured cost report (AI margin, Stripe fees, budget verdict) the `<prefix>-cost`
-  // CloudWatch dashboard's Logs Insights widget reads (infra/terraform/modules/monitoring/cost.tf).
+  // logs month-to-date AI spend and Stripe fees; "monthly" logs the previous month's full
+  // structured cost report (AI margin, Stripe fees, budget verdict). Both reach Axiom as log lines.
   // No other payload: both modes read every school's AI usage straight from the database.
   // Registered on the billing queue via Job Scheduler.
   RUN_COST_REPORT: "run-cost-report",

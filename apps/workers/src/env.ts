@@ -80,22 +80,12 @@ export const envSchema = z
     // Unset, the sweep logs and skips the call -- the person was told to cancel in the store.
     GOOGLE_PLAY_PACKAGE_NAME: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     GOOGLE_PLAY_SERVICE_ACCOUNT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
-    // The ST-293 cost report publishes to CloudWatch, so a deployment outside AWS sets
-    // COST_REPORT_ENABLED=false and the daily/monthly sweeps are never scheduled. On by default.
-    COST_REPORT_ENABLED: z.preprocess(
-      emptyAsUnset,
-      z
-        .enum(["true", "false"])
-        .optional()
-        .transform((value) => value !== "false"),
-    ),
     // Transactional email through Resend (deliverability R-08). When RESEND_API_KEY is unset the
     // email dispatcher runs in dry-run mode: it renders, dedups, and records deliveries exactly as in
-    // production but never calls Resend — the dev/test path. A production worker refuses to boot
-    // that way unless EMAIL_DRY_RUN=true says so on purpose (dev/staging, which have no verified
-    // sending domain), so a missing key can never silently stop every invitation and password
-    // email. EMAIL_FROM_ADDRESS must be on the domain verified in Resend (send.studafy.com, region
-    // eu-west-1); bounces and complaints come back to the API's /email/webhooks/resend.
+    // production but never calls Resend — the dev/test path. A production worker refuses to boot that
+    // way unless EMAIL_DRY_RUN=true says so on purpose, so a missing key can never silently stop every
+    // invitation and password email. EMAIL_FROM_ADDRESS must be on a domain verified in Resend;
+    // bounces and complaints reach the API's /email/webhooks/resend.
     RESEND_API_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     EMAIL_FROM_ADDRESS: z.preprocess(
       emptyAsUnset,
@@ -134,10 +124,6 @@ export const envSchema = z
       .int()
       .positive()
       .default(25 * 1024 * 1024),
-    // The sensitive-documents KMS key (ADR-019), the same value apps/api holds. The scan worker
-    // re-encrypts the quarantine copy of a sensitive record document or import file under it. AWS
-    // only; unset on an S3-compatible store (fly.io), where the original was not KMS-encrypted either.
-    STORAGE_SENSITIVE_KMS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Base URL for the action links embedded in emails. The verify/activate endpoints are the
     // API's (the only surface with an ALB), so the link host is the app's public origin.
     FRONTEND_URL: z.string().url().default("http://localhost:5180"),

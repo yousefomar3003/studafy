@@ -1,4 +1,3 @@
-import { CloudWatchClient } from "@aws-sdk/client-cloudwatch";
 import { JOB_NAMES } from "@studafy/constants";
 import { TapClient } from "@studafy/tap-payments";
 import Stripe from "stripe";
@@ -7,7 +6,7 @@ import { createPool, leaseDatabase } from "../../db/pool";
 import { workerLogger } from "../../log";
 
 import { retryBillingEvent } from "./billing-event.service";
-import { COST_METRIC_NAMESPACE, runCostReport } from "./cost-report";
+import { runCostReport } from "./cost-report";
 import { runDunningSweep } from "./dunning-sweep";
 import { runFinanceReconciliation } from "./finance-reconciliation";
 import { generateInvoice, generateBatchInvoices } from "./invoice.service";
@@ -247,7 +246,6 @@ async function processCostReport(
 ): Promise<unknown> {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   const stripe = secretKey ? new Stripe(secretKey, { apiVersion: "2026-07-29.dahlia" }) : undefined;
-  const cloudwatch = new CloudWatchClient({});
   const monthlyBudgetUsd = process.env.AI_MONTHLY_SPEND_BUDGET_USD
     ? Number(process.env.AI_MONTHLY_SPEND_BUDGET_USD)
     : undefined;
@@ -259,11 +257,9 @@ async function processCostReport(
     return await runCostReport(
       {
         sql,
-        cloudwatch,
         stripe,
         log: workerLogger,
         monthlyBudgetUsd,
-        metricNamespace: COST_METRIC_NAMESPACE,
       },
       mode,
       new Date(),

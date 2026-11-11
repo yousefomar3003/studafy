@@ -60,11 +60,8 @@ export interface StorageService {
   head(key: string): Promise<ObjectMetadata | null>;
   /** SHA-256 of the object body, streamed from storage. */
   checksumSha256(key: string): Promise<string>;
-  /**
-   * Server-side copy. `sensitive` re-encrypts the destination under the sensitive-documents KMS key
-   * (ADR-019) when one is configured; without one (local development) it keeps the bucket default.
-   */
-  copy(sourceKey: string, destinationKey: string, options?: { sensitive?: boolean }): Promise<void>;
+  /** Server-side copy. The destination keeps the bucket's own at-rest encryption. */
+  copy(sourceKey: string, destinationKey: string): Promise<void>;
   remove(key: string): Promise<void>;
   /**
    * Iterate every object under a key prefix, streaming pagination internally.
@@ -92,7 +89,6 @@ export function createStorageService(env: Env): StorageService | null {
       : {}),
   });
   const ttlSeconds = env.S3_PRESIGN_TTL_SECONDS;
-  const sensitiveKmsKeyId = env.STORAGE_SENSITIVE_KMS_KEY_ID;
 
   return {
     ttlSeconds,
@@ -169,19 +165,12 @@ export function createStorageService(env: Env): StorageService | null {
       return hash.digest("hex");
     },
 
-    async copy(sourceKey, destinationKey, options) {
+    async copy(sourceKey, destinationKey) {
       await client.send(
         new CopyObjectCommand({
           Bucket: bucket,
           Key: destinationKey,
           CopySource: encodeURIComponent(`${bucket}/${sourceKey}`),
-          ...(options?.sensitive && sensitiveKmsKeyId
-            ? {
-                ServerSideEncryption: "aws:kms",
-                SSEKMSKeyId: sensitiveKmsKeyId,
-                BucketKeyEnabled: true,
-              }
-            : {}),
         }),
       );
     },

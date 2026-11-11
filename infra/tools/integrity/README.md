@@ -11,7 +11,7 @@ every check actually detects the corruption it was built to detect, on a disposa
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `run-integrity-check.sh`        | Runs the four checks for one school (`--school-slug` or `--school-id`), writes the report, exits 0 clean / 1 on findings / 2 on usage error.                               |
 | `drill-corruption.sh`           | Injects one real violation per check, asserts the console flags all of them with findings, undoes them, re-runs, and requires a clean result. Local-only + superuser-only. |
-| `lib/common.sh`                 | Connection resolution (same dual AWS/direct mode as `infra/tools/tenant-restore`), school/admin resolution, capability probes.                                             |
+| `lib/common.sh`                 | Connection resolution (plain `PG*` variables), school/admin resolution, capability probes.                                                                                 |
 | `lib/checks/*.sql`              | `01-orphaned-links.sql`, `02-enrollment-invoice-consistency.sql`, `03-grade-weight-sums.sql`, `04-rls-catalog.sql` (catalogue sub-probe).                                  |
 | `lib/checks/rls-spot-probes.sh` | Behavioural RLS probes (`SET ROLE studafy_app`), aggregated into the `rls-spot-probes` check together with `04`.                                                           |
 
@@ -63,9 +63,9 @@ export PGHOST=127.0.0.1 PGPORT=54329 PGUSER=studafy_test PGPASSWORD=studafy_test
 ./drill-corruption.sh                                              # -> RESULT: PASS
 ```
 
-AWS mode is identical to `tenant-restore`'s: set `CONNECTION_SECRET_ARN` + `AWS_REGION` (and
-`PGHOST_OVERRIDE` if a scratch instance is the target). Data checks run as the connected role
-(superuser locally / RDS master) — they set `app.school_id` via
+Against production, point the standard `PG*` variables at Supabase's direct connection (see
+`infra/fly/README.md`). Data checks run as the connected role (superuser locally, `postgres` on
+Supabase) — they set `app.school_id` via
 `SELECT set_config('app.school_id', :'school_id', false)` and filter every query by school_id
 explicitly, so a connected role that bypasses RLS still sees exactly one tenant. The RLS probes
 additionally `SET ROLE studafy_app`, so the connected role must be able to (probed up front, hard
@@ -102,9 +102,9 @@ failure otherwise).
   parity probe compares `studafy_app` + admin actor counts to an explicit `school_id` count. Tables
   with an additional restrictive `role_scope_visibility` policy (migration 000037) resolve their
   admin escape hatch via `app.user_id`, which is why the probe sets a real admin. A table whose
-  restrictive policy has _no_ admin escape (like `teacher_evaluations`, seen in `tenant-restore`'s
-  known gaps) is not among the probe tables, and this console makes no claim about it.
-- **Data checks need a role that can see the whole tenant.** Locally and on RDS the connected role
+  restrictive policy has _no_ admin escape (like `teacher_evaluations`)
+  is not among the probe tables, and this console makes no claim about it.
+- **Data checks need a role that can see the whole tenant.** Locally the connected role
   is a superuser, which the checks rely on for their baseline reads. A non-superuser connection
   would silently change what the checks can see; the console does not currently detect that (the
   drill does require superuser, separately).
@@ -114,7 +114,5 @@ failure otherwise).
 - **100-finding cap.** Findings embed is capped at 100 per check; `findings_count` carries the
   true total. For a massively corrupt tenant, count-level truth is on the report.
 - **Validation was exercised on the local compose instance** (`bun run db:up` + migrate + seed),
-  not against real AWS RDS — consistent with every other module in this repo (see
-  `infra/tools/tenant-restore/README.md`). Whether the RDS master credential behaves like a local
-  superuser w.r.t. RLS (it is expected to bypass it, the same way a local Docker superuser does)
-  has never been confirmed against live infrastructure.
+  not against Supabase. Supabase's `postgres` role is not a superuser, so whether it sees past RLS
+  the way a local Docker superuser does has not been confirmed against live infrastructure.

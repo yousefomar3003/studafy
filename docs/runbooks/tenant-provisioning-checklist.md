@@ -64,7 +64,7 @@ app.erpnext_site_configs WHERE status = 'pending'`.
    the site with erpnext + education, finishes ERPNext's setup wizard (company, chart of accounts,
    fiscal year, currency), sets the shared integration key on the site's integration user, creates
    the Scholarship Award doctype, and installs the webhooks that report submitted invoices,
-   payments and fees to the API (`infra/deploy/erpnext/seed/provision.py`).
+   payments and fees to the API (`infra/erpnext/seed/provision.py`).
 3. Nothing else: on the school's next finance request the credential resolver sees the site answer,
    records its company in `erpnext_company_id` and marks the row `completed`. Until then every
    finance route answers 503 `ERPNEXT_NOT_CONFIGURED`.

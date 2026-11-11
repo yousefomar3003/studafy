@@ -1,6 +1,6 @@
 name: Mobile release
 
-# The mobile counterpart to staging-deploy.yml / prod-deploy.yml (ST-257). fastlane
+# The mobile counterpart to fly-production-deploy.yml (ST-257). fastlane
 # (apps/mobile/fastlane/Fastfile) owns every store interaction; this workflow only decides which
 # lane runs when, and prepares the build inputs Flutter needs.
 #
@@ -12,8 +12,7 @@ name: Mobile release
 # mobile-integration.yml takes for its Firebase Test Lab secrets — never a silent skip.
 #
 # Every `uses:` is pinned to a commit SHA, not a mutable tag: this file is new to the diff, so
-# semgrep's github-actions-mutable-action-tag rule (ci.yml's SAST job) catches every line — the
-# same reasoning staging-deploy.yml documents. The trailing comment names the release each SHA is.
+# semgrep's github-actions-mutable-action-tag rule (ci.yml's SAST job) catches every line. The trailing comment names the release each SHA is.
 
 on:
   push:

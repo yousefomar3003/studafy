@@ -2,8 +2,8 @@ import { $ } from "bun";
 
 /**
  * Gives every school in the local database a working ERPNext site (`bun run erpnext:site`), the
- * same way production does it -- infra/deploy/scripts/erpnext-new-site.sh's steps, run against
- * the local ERPNext from db/compose.yml (`bun run erpnext:up`) instead of ECS:
+ * same steps an operator runs by hand on a hosted ERPNext (infra/erpnext/seed/README.md), run
+ * against the local ERPNext from db/compose.yml (`bun run erpnext:up`):
  *
  *   1. `bench new-site <slug>.<ERPNEXT_SITE_DOMAIN>` with erpnext + education, unless it exists.
  *   2. `python -m erpnext_seed.provision <site> setup`: ERPNext's setup wizard (the school's
@@ -40,7 +40,7 @@ const psql = [
   "-tAc",
 ];
 
-/** Run bench-side python from the sites directory, as erpnext-new-site.sh does on ECS. */
+/** Run bench-side python from the sites directory, as an operator does on a hosted bench. */
 async function provision(site: string, ...args: string[]): Promise<void> {
   await $`${compose} exec -T -e STUDAFY_ERPNEXT_API_KEY=${credential} -e STUDAFY_ERPNEXT_WEBHOOK_SECRET=${webhookSecret} erpnext-backend bash -c ${'cd sites && exec ../env/bin/python -m erpnext_seed.provision "$@"'} provision ${site} ${args}`;
 }

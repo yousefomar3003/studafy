@@ -61,19 +61,18 @@ export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
     // The deployment tier, which NODE_ENV cannot express: staging runs a production build
-    // (NODE_ENV=production) against non-production origins and secrets. Terraform already models
-    // the three tiers (infra/terraform/environments/{dev,staging,prod}), so the application needs a
-    // matching axis to resolve its CORS allowlist against.
+    // (NODE_ENV=production) against non-production origins and secrets, so the application needs
+    // its own axis to resolve its CORS allowlist against.
     APP_ENV: z.enum(["development", "staging", "production"]).default("development"),
     // Comma-separated absolute origins permitted by the CORS allowlist. Deliberately data, not a
     // compiled-in table: the previous hardcoded map had already drifted from infra, listing
-    // studafy.com/www.studafy.com while prod.tfvars provisions app.studafy.com. Required in
+    // studafy.com/www.studafy.com while production serves app.studafy.com. Required in
     // staging/production by the refinement below, so a deployed tier cannot fall back to the
     // localhost defaults and quietly accept credentialed cross-origin requests it should not.
     CORS_ALLOWED_ORIGINS: z.string().optional(),
     // The request header that carries the visitor's address, set by the platform's own proxy and
-    // never passed through from the client: `fly-client-ip` on fly.io. Unset (AWS behind an ALB),
-    // the last X-Forwarded-For entry is used. Rate limits, audit rows and security events all key on
+    // never passed through from the client: `fly-client-ip` on fly.io. Unset (a proxy that only
+    // appends X-Forwarded-For), the last X-Forwarded-For entry is used. Rate limits, audit rows and security events all key on
     // this, so the wrong source puts every visitor in one bucket (it did on fly, 2026-11-10).
     CLIENT_IP_HEADER: z.preprocess(
       emptyAsUnset,
@@ -86,25 +85,22 @@ export const envSchema = z
     PORT: z.coerce.number().int().min(1).max(65535).default(3000),
     HOST: z.string().min(1).default("0.0.0.0"),
     // A separate port from PORT, on purpose (ST-259): the Prometheus-format /metrics endpoint
-    // (@studafy/observability's startMetricsServer) must never be reachable through the public ALB
-    // path api's own PORT is, since it carries no auth of its own — only the monitoring security
-    // group can route to it. 9464 is Prometheus's own registered default port.
+    // (@studafy/observability's startMetricsServer) must never be reachable through the public
+    // path api's own PORT is, since it carries no auth of its own — fly exposes only PORT. 9464 is Prometheus's own registered default port.
     METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
-    // Distributed tracing (ST-260): base URL of the OTel collector's OTLP/HTTP receiver, e.g.
-    // "http://otel-collector.metrics.internal:4318" (infra/terraform/modules/monitoring/tracing.tf).
-    // Optional and unset by default — dev, test and the OpenAPI generator all run with no collector
-    // reachable, the same nullable-producer shape REDIS_URL/S3_* already use. `.or(z.literal(""))`:
-    // dev's task definition sets this key to an empty string rather than omitting it (render.sh
-    // substitutes an unset infra/deploy/environments/dev.env value into the JSON literally), and
-    // index.ts's `|| undefined` is what turns that back into "disabled" for startTracing(). See
-    // @studafy/observability's tracing.ts for why sampling happens at the collector, not here.
+    // Distributed tracing (ST-260): base URL of an OTLP/HTTP receiver — Axiom's EU edge in
+    // production (infra/fly/README.md), with its auth in OTEL_EXPORTER_OTLP_HEADERS. Optional and
+    // unset by default — dev, test and the OpenAPI generator all run with no receiver reachable, the
+    // same nullable-producer shape REDIS_URL/S3_* already use. `.or(z.literal(""))`: a deploy may set
+    // the key empty rather than omit it, and index.ts's `|| undefined` turns that back into
+    // "disabled" for startTracing().
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional().or(z.literal("")),
     SHUTDOWN_TIMEOUT_MS: z.coerce.number().int().min(0).default(10_000),
     // Upper bound on the /readyz dependency probe (src/readiness.ts). A hung check — a busted pool
     // slot, an ioredis command retrying in the offline queue — must flip readiness within this
     // bound, which the acceptance criterion ties to 10 seconds; the cap enforces that contract in
-    // the schema itself. Defaults below the ALB target group's own 5s probe timeout
-    // (infra/terraform/modules/compute/main.tf) so this service answers 503 in time for the edge.
+    // the schema itself. fly's own /readyz check (infra/fly/api.toml) gives up after 3s,
+    // so on fly a hung dependency already shows as a failed check before this bound is reached.
     READINESS_TIMEOUT_MS: z.coerce.number().int().positive().max(10_000).default(5_000),
     // Derived from the logger's own level names, so an added level cannot drift out of the
     // environment contract. The dependency runs one way: env knows the logger, never the reverse.
@@ -115,8 +111,8 @@ export const envSchema = z
     // logging field is an outage. Deployments set it from IMAGE_TAG.
     RELEASE_VERSION: z.string().min(1).default("unknown"),
     // Sentry error monitoring (@studafy/observability's initErrorMonitoring). Unset disables it —
-    // the normal state in dev and test. Empty is unset: the task definition always injects the key
-    // from the tier's infra/deploy/environments/*.env, where empty turns monitoring off.
+    // the normal state in dev and test. Empty is unset, so a deploy that injects the key empty turns
+    // monitoring off.
     SENTRY_DSN: z.preprocess(emptyAsUnset, z.string().url().optional()),
     // The deploy tier events are grouped under. Falls back to APP_ENV (index.ts).
     SENTRY_ENVIRONMENT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
@@ -141,9 +137,9 @@ export const envSchema = z
     READ_DATABASE_NAME: z.string().min(1).optional(),
     REDIS_URL: z.string().min(1).optional(),
     ERPNEXT_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
-    // Signing secret (whsec_...) of the Resend webhook endpoint for email events (deliverability
-    // R-08). Optional: when absent, /email/webhooks/resend answers 500 so a missing secret cannot
-    // silently pass as verified.
+    // Signing secret (whsec_...) of the Resend webhook endpoint, for /email/webhooks/resend
+    // (deliverability R-08). Optional: when absent that route answers 500, so a misconfigured
+    // webhook cannot silently pass as secure.
     RESEND_WEBHOOK_SECRET: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // ERPNext integration (ST-089). All optional — activates only when both are set.
     ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
@@ -219,16 +215,11 @@ export const envSchema = z
     // fall back to that development key (resolveRecordKeyring).
     RECORDS_ENCRYPTION_KEYS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     RECORDS_ENCRYPTION_CURRENT_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
-    // KMS key for sensitive record documents (ADR-019): applied when a staged upload is promoted to
-    // permanent/. Required on a deployed tier backed by AWS S3. SSE-KMS is AWS-only, so it is
-    // refused alongside S3_ENDPOINT: an S3-compatible provider (Cloudflare R2, local rustfs) keeps
-    // the bucket's own at-rest encryption instead.
-    STORAGE_SENSITIVE_KMS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // S3-compatible object storage for the app-files bucket (ST-103). All optional and validated
     // as a group below: the feature activates only when the whole set is present, so dev and test
     // boot without object storage and attachment endpoints answer 503 instead of the app failing to
-    // start. S3_ENDPOINT is optional even within the group — absent means AWS S3 proper; set it for
-    // MinIO or any other S3-compatible provider.
+    // start. S3_ENDPOINT names the S3-compatible provider (Cloudflare R2 in production, rustfs
+    // locally); absent falls back to the SDK's default AWS endpoint.
     S3_ENDPOINT: z.string().url().optional(),
     S3_REGION: z.string().min(1).optional(),
     S3_ACCESS_KEY_ID: z.string().min(1).optional(),
@@ -488,29 +479,6 @@ export const envSchema = z
         code: "custom",
         path: ["RECORDS_ENCRYPTION_KEYS"],
         message: `RECORDS_ENCRYPTION_KEYS is required when APP_ENV is ${env.APP_ENV}`,
-      });
-    }
-    // SSE-KMS exists only on AWS S3 proper (no S3_ENDPOINT). S3-compatible providers (Tigris,
-    // rustfs) accept the headers and silently store the object without KMS, so a key id there would
-    // claim protection the object does not have: refuse it. They rely on provider encryption at
-    // rest instead (ADR-019, decision 7).
-    if (env.S3_ENDPOINT !== undefined && env.STORAGE_SENSITIVE_KMS_KEY_ID !== undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["STORAGE_SENSITIVE_KMS_KEY_ID"],
-        message:
-          "STORAGE_SENSITIVE_KMS_KEY_ID is only supported on AWS S3; unset it when S3_ENDPOINT is set",
-      });
-    }
-    if (
-      env.APP_ENV !== "development" &&
-      env.S3_ENDPOINT === undefined &&
-      env.STORAGE_SENSITIVE_KMS_KEY_ID === undefined
-    ) {
-      context.addIssue({
-        code: "custom",
-        path: ["STORAGE_SENSITIVE_KMS_KEY_ID"],
-        message: `STORAGE_SENSITIVE_KMS_KEY_ID is required on AWS S3 when APP_ENV is ${env.APP_ENV}`,
       });
     }
 

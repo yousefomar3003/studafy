@@ -83,8 +83,8 @@ export function createTracingMiddleware(options: TracingMiddlewareOptions = {}):
 
 /**
  * The active span's `trace_id`/`span_id`, meant to be spread into a `log.child()`/log-call
- * bindings object — "trace links from logs" (ST-260): a CloudWatch Logs line carrying `trace_id`
- * lets a reader paste it straight into Grafana Tempo's search and land on the exact request or job.
+ * bindings object — "trace links from logs" (ST-260): a log line carrying `trace_id`
+ * lets a reader search for it in Axiom and land on the exact request's or job's trace.
  *
  * Returns `{}` outside any span (tracing disabled, or a code path with no active trace — a
  * cron-scheduled BullMQ job with no producer, a boot-time log line), so callers can unconditionally

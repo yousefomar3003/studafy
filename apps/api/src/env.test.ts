@@ -5,13 +5,11 @@ import { describe, expect, test } from "bun:test";
 import { EnvValidationError, loadEnv } from "./env";
 import { LOG_LEVEL_NAMES } from "./logger";
 
-// A deployed tier needs a real records keyring and a KMS key for sensitive documents (ADR-019), and a
-// real realtime ticket key (QA-14).
+// A deployed tier needs a real records keyring (ADR-019) and a real realtime ticket key (QA-14).
 const DEPLOYED_SECRETS = {
   WS_JWT_SECRET: "w".repeat(32),
   RECORDS_ENCRYPTION_KEYS: JSON.stringify({ "prod-1": Buffer.alloc(32, 3).toString("base64") }),
   RECORDS_ENCRYPTION_CURRENT_KEY_ID: "prod-1",
-  STORAGE_SENSITIVE_KMS_KEY_ID: "alias/studafy-records",
 };
 
 describe("loadEnv", () => {
@@ -191,22 +189,6 @@ describe("loadEnv", () => {
     expect(() =>
       loadEnv({ ...deployed, ...DEPLOYED_SECRETS, RECORDS_ENCRYPTION_KEYS: "" }),
     ).toThrow(/RECORDS_ENCRYPTION_KEYS/);
-    expect(() =>
-      loadEnv({ ...deployed, ...DEPLOYED_SECRETS, STORAGE_SENSITIVE_KMS_KEY_ID: "" }),
-    ).toThrow(/STORAGE_SENSITIVE_KMS_KEY_ID/);
-    // S3-compatible providers (Tigris) have no KMS: the key is not required there, and refused
-    // because the provider would silently store the object without it.
-    const tigris = { S3_ENDPOINT: "https://fly.storage.tigris.dev" };
-    expect(
-      loadEnv({ ...deployed, ...DEPLOYED_SECRETS, ...tigris, STORAGE_SENSITIVE_KMS_KEY_ID: "" })
-        .STORAGE_SENSITIVE_KMS_KEY_ID,
-    ).toBeUndefined();
-    expect(() => loadEnv({ ...deployed, ...DEPLOYED_SECRETS, ...tigris })).toThrow(
-      /only supported on AWS S3/,
-    );
-    expect(() =>
-      loadEnv({ S3_ENDPOINT: "http://localhost:9000", STORAGE_SENSITIVE_KMS_KEY_ID: "k" }),
-    ).toThrow(/only supported on AWS S3/);
     // The in-repository development key never seals real data.
     expect(() =>
       loadEnv({
@@ -225,21 +207,8 @@ describe("loadEnv", () => {
       });
     expect(malformed).toThrow(/32 bytes/);
     expect(malformed).not.toThrow(/c2hvcnQ=/);
-    // Development needs neither.
+    // Development needs none of it.
     expect(loadEnv({ APP_ENV: "development" }).RECORDS_ENCRYPTION_KEYS).toBeUndefined();
-  });
-
-  test("drops the KMS requirement on S3-compatible storage and refuses a KMS key there", () => {
-    const r2 = {
-      CORS_ALLOWED_ORIGINS: "https://app.studafy.com",
-      TURNSTILE_SECRET_KEY: "s",
-      APP_ENV: "production",
-      S3_ENDPOINT: "https://account.r2.cloudflarestorage.com",
-    };
-    expect(
-      loadEnv({ ...r2, ...DEPLOYED_SECRETS, STORAGE_SENSITIVE_KMS_KEY_ID: "" }).S3_ENDPOINT,
-    ).toBe("https://account.r2.cloudflarestorage.com");
-    expect(() => loadEnv({ ...r2, ...DEPLOYED_SECRETS })).toThrow(/only supported on AWS S3/);
   });
 
   test('treats a deployed tier with only OAuth redirect URIs as "provider off", not half-configured', () => {

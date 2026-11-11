@@ -1,5 +1,5 @@
 # Full local Studafy stack, built from the same infra/docker/*.Dockerfile images CI scans and
-# release.yml ships:
+# fly.io ships:
 #
 #   docker compose up -d --build --wait          # postgres, redis, migrations, api, realtime, workers, web
 #   docker compose --profile seed run --rm seed  # optional: load the demo tenant (db/seeds/seed.ts)
@@ -15,11 +15,11 @@
 #   bun run db:down  # docker compose rm -sfv test-postgres test-redis (leaves the dev stack running)
 #
 # The services run with NODE_ENV=development: the images default to production, whose env schemas
-# require an RDS CA cert, a read replica, Stripe, and ClamAV (apps/api/src/env.ts,
+# require a database CA cert, a read replica, Stripe, and ClamAV (apps/api/src/env.ts,
 # apps/workers/src/env.ts) -- none of which exist locally. Optional integrations (ERPNext, Stripe,
-# Tap, Anthropic, S3, SES, FCM) stay unset unless added to a root .env, which compose reads for the
-# ${...} values below. Not included: the ERPNext plane (its own MariaDB/bench stack, see
-# infra/docker/README.md) and the observability images, whose configs target ECS/S3.
+# Tap, Anthropic, S3/R2, Resend, FCM) stay unset unless added to a root .env, which compose reads for the
+# ${...} values below. Not included: the ERPNext plane (its own MariaDB/bench stack in
+# db/compose.yml, see infra/docker/README.md).
 
 name: studafy
 
@@ -78,8 +78,8 @@ services:
     # `CREATE EXTENSION vector` would fail against it.
     image: pgvector/pgvector:pg16
     # Preload pg_stat_statements so the disposable local/CI database actually collects statistics and
-    # the operational extension tests can query them. On RDS this is the parameter-group setting in
-    # infra/terraform/modules/postgres (requires a reboot); here it is a container flag.
+    # the operational extension tests can query them. Supabase preloads it already; here
+    # it is a container flag.
     command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
     environment:
       POSTGRES_USER: studafy_test
