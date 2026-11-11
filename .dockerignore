@@ -43,6 +43,8 @@ apps/mobile/.metadata
 # `docs/help` — Docker skips excluded directories entirely, making re-inclusion beneath them a no-op.
 docs/*
 !docs/help
+# docs/legal too: the legal pages (/privacy, /terms, /school-agreement) import their Markdown the same way.
+!docs/legal
 infra/terraform
 infra/load-tests
 infra/tools

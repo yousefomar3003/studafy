@@ -75,6 +75,11 @@ describe("legal acceptance", () => {
       const schoolId = tenant.schoolId;
       // A mobile-only role signs in on the mobile channel (see tests/entitlements/token-claims.test.ts).
       const userId = tenant.users.INSTRUCTOR.id;
+      // Test users are created having accepted (tests/harness/factories.ts); this one has not.
+      await db!.sql`
+        UPDATE app.users SET terms_version = NULL, privacy_version = NULL, legal_accepted_at = NULL
+         WHERE id = ${userId}::uuid
+      `;
 
       const issued = await withTenantTx(db!.sql, { schoolId, userId }, (tx) =>
         issueTokenPair(tx, config(), { userId, schoolId, channel: AUTH_CHANNELS.MOBILE }),
