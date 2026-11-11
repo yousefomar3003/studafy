@@ -13,7 +13,8 @@ import '../application/school_closure_providers.dart';
 /// "Delete school": the school admin closes their school (`POST /api/schools/current/closure`).
 ///
 /// Closing archives the school rather than erasing it: everyone at the school is signed out at
-/// once and can no longer sign in, and all of the school's data is kept. The admin confirms by
+/// once and can no longer sign in, and the school's data is exported and then
+/// permanently erased 30 days after the export completes (the worker's tenant-closure sweep). The admin confirms by
 /// typing the school's name; the button stays disabled until it matches the way the server
 /// compares it. On success this device signs out through [AuthNotifier.logout] and the login
 /// screen explains that the app is no longer available for the school.
@@ -138,7 +139,7 @@ class _DeleteSchoolScreenState extends ConsumerState<DeleteSchoolScreen> {
                       for (final key in const [
                         'shell.profile.deleteSchool.consequences.signedOut',
                         'shell.profile.deleteSchool.consequences.noSignIn',
-                        'shell.profile.deleteSchool.consequences.dataKept',
+                        'shell.profile.deleteSchool.consequences.dataDeleted',
                       ])
                         Padding(
                           padding: const EdgeInsets.only(

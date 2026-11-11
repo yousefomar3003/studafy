@@ -38,7 +38,8 @@ import '../../../design/layout/bottom_inset_padding.dart';
 /// and, for every role, "Delete my account" ([DeleteAccountScreen]), the in-app deletion App Store
 /// Guideline 5.1.1(v) and Google Play require. The school admin (ORG_ADMIN) additionally gets
 /// "Delete school" ([DeleteSchoolScreen]): it closes the whole school — every member is signed out
-/// and can no longer sign in, and the school's data is kept. See
+/// and can no longer sign in, and the school's data is exported, then erased
+/// 30 days later. See
 /// `apps/mobile/store/review-checklist.md` §1.
 ///
 /// Members of staff also get "My staff record" ([OwnStaffRecordScreen]) and "Lists"

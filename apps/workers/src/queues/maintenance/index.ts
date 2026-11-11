@@ -16,12 +16,43 @@ export {
   scheduleAiMessageRetentionSweepJob,
 } from "./ai-message-retention-sweep-scheduler";
 export { resolveAdminActor, armAdminActor, NoAdminActorError } from "./admin-actor";
+export {
+  IP_ADDRESS_RETENTION_BATCH_SIZE,
+  IP_ADDRESS_RETENTION_DAYS,
+  purgeExpiredIpAddresses,
+} from "./ip-address-retention-sweep";
+export type { PurgeExpiredIpAddressesResult } from "./ip-address-retention-sweep";
+export {
+  IP_ADDRESS_RETENTION_SWEEP_CRON_PATTERN,
+  scheduleIpAddressRetentionSweepJob,
+} from "./ip-address-retention-sweep-scheduler";
 export { MONTHS_AHEAD, ensureFuturePartitions } from "./partition-maintenance";
 export type { PartitionMaintenanceResult } from "./partition-maintenance";
 export {
   PARTITION_MAINTENANCE_CRON_PATTERN,
   schedulePartitionMaintenanceJob,
 } from "./partition-maintenance-scheduler";
+export {
+  DATA_RETENTION_BATCH_SIZE,
+  DATA_RETENTION_RULES,
+  DSR_EXPORT_RETENTION_DAYS,
+  NOTIFICATION_RETENTION_MONTHS,
+  REJECTED_SCHOOL_APPLICATION_RETENTION_MONTHS,
+  SALES_INQUIRY_RETENTION_MONTHS,
+  SECURITY_EVENT_RETENTION_MONTHS,
+  purgeExpiredRetainedData,
+  retentionCutoff,
+} from "./data-retention-sweep";
+export type {
+  DataRetentionRule,
+  DataRetentionSweepResult,
+  RetainedDataCategory,
+  RetentionObjectStore,
+} from "./data-retention-sweep";
+export {
+  DATA_RETENTION_SWEEP_CRON_PATTERN,
+  scheduleDataRetentionSweepJob,
+} from "./data-retention-sweep-scheduler";
 export {
   RECORD_RETENTION_BATCH_SIZE,
   purgeExpiredSensitiveRecords,

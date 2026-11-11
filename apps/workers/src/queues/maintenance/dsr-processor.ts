@@ -69,7 +69,10 @@ function createMaintenanceStorage(config: MaintenanceRunnerConfig): MaintenanceS
   return createReportS3({ region, endpoint: config.s3Endpoint, bucket });
 }
 
-/** Delete erased record documents. A failure leaves an unreferenced object, never a dangling row. */
+/**
+ * Delete the files an erasure released: record documents, import sources and message images. A
+ * failure leaves an unreferenced object, never a dangling row.
+ */
 async function removeObjects(config: MaintenanceRunnerConfig, keys: readonly string[]) {
   if (keys.length === 0 || !config.s3Region || !config.bucket) return;
   const s3 = createReportS3({
