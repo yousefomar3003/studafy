@@ -67,7 +67,25 @@ After commit the erasure job is enqueued. A failed account stays due and is retr
 
 Within 30 days, the maintenance worker's erasure pass
 (`apps/workers/src/queues/maintenance`) redacts personal-data columns across the tenant's tables
-and deletes session/identity artefacts, per `retention-registry.ts`.
+and deletes session/identity artefacts, per `retention-registry.ts`. Before that walk it erases what
+the person wrote themselves (`authored-content-dsr.ts`, `AUTHORED_CONTENT_TABLES`):
+
+- **Messages they sent** (`messages.sender_user_id`): the body becomes `[deleted]`; the row stays so
+  the other participant's thread keeps its shape. Their images (`message_attachments`) are deleted,
+  and the stored objects removed after the transaction commits. The `DIRECT_MESSAGE` notification
+  each message raised for the recipient quotes it, so that preview becomes `[deleted]` too.
+- **Their AI study content** (a student's): Ask AI conversations, questions, answers and citations,
+  quizzes, flashcard decks with cards and review schedule, and practice exams with items and
+  answers are deleted. `ai_moderation_decisions.message_id` is cleared; the decision (a hash, never
+  the text) stays. Summaries and concept maps exist only in a 24-hour Redis cache, which has expired
+  by the end of the 14-day grace period; Ask AI never stores the photos it reads.
+- **Kept for safeguarding:** a message an open report (`pending`/`in_review`) points at, directly or
+  in its snapshot, is left exactly as it is, with its images; an image any report's snapshot points
+  at is kept; the snapshots (`message_report_messages`) and AI content reports
+  (`ai_content_reports`, with their `content_snapshot`) are the school's record. Each is listed in
+  the request's `retained_tables`, with counts for the messages and images.
+
+A school closure's erasure applies the same rules to everyone in the school.
 
 ## Web deletion flow (no sign-in)
 
@@ -134,6 +152,11 @@ change to the other.
 | `financial_records` | `subscriptions`, `ai_subscriptions`, payment and refund tables | Untouched (legal hold)          | Tax and accounting law                                  |
 | `audit_log`         | `audit_logs`                                                   | Untouched (legal hold)          | Art. 5(2) accountability, incl. this deletion           |
 
+Also kept, and disclosed in the privacy policy (section 11.3) rather than in `retained_records`: work
+handed in to teachers (`assignment_submissions`, `submission_attachments`), discipline records and
+other school records, and safeguarding reports with the messages they hold (above). Messages the
+person sent and their AI study content are erased.
+
 The retention _period_ for grades and attendance is set by each school's education authority and
 is not encoded here.
 
@@ -186,11 +209,12 @@ Stated plainly so they are not mistaken for done:
   account-deletion sweep, before the identities are removed. Until then, App
   Store guideline 4.8 (offer SIWA alongside Google/Microsoft) remains the open item in
   `apps/mobile/store/review-checklist.md`.
-- **The erasure worker misses free text and files.** It redacts by column name and finds a
-  person's rows only through `user_id`/`student_id`/`teacher_id`. So `ai_messages.question/answer`
-  (keyed by `conversation_id`), submission text content, and uploaded files in S3
-  (`submission_attachments`, `assignment_attachments`) are not erased. Fixing this is a worker
-  change.
+- **A message kept for an open report is not erased later.** Once the report is closed, nothing
+  re-runs the erasure for it; it stays until the school deletes it or closes. A notification title
+  that names the sender (`DIRECT_MESSAGE` and other types) is not rewritten either; only the
+  message preview in its body is.
+- **Submission text and files stay by design** (`assignment_submissions.content`,
+  `submission_attachments`): they are work handed in to the school, not erased with the account.
 - **AI subscriptions are matched through the student record.** A parent deleting their account
   does not cancel a child's AI subscription they may be paying for; `ai_subscriptions` has no payer
   column to match on.

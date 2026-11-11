@@ -262,7 +262,7 @@
       "noMailboxWithEmail": "No longer have access to that mailbox? Contact your school, or email us at <mailLink>{{email}}</mailLink>.",
       "whatHappensHeading": "What happens",
       "whatHappensBody": "Straight away, you are signed out on every device. For 14 days, you can cancel the deletion by signing in again. After 14 days, your account is removed from your school and your links to any children are removed; a child's own account is not deleted. Your name, contact details and profile are then erased within 30 days, and we email you when your account is deleted. Deleting your account does not cancel an AI subscription bought through Google Play or the App Store, so cancel it in the store first.",
-      "retainedBody": "Some records are kept because the law requires it: your grades and attendance (without your name or contact details), financial and payment records, and the audit log, including the record of this deletion. Messages you sent stay readable by the person you sent them to, and work you handed in stays in your school's records. See the <privacyLink>privacy policy</privacyLink> for detail.",
+      "retainedBody": "Some records are kept because the law requires it: your grades and attendance (without your name or contact details), financial and payment records, and the audit log, including the record of this deletion. The text and photos of messages you sent are erased, except messages included in a report to your school, which it keeps as a safeguarding record. Your AI study history is deleted. Work you handed in stays in your school's records. See the <privacyLink>privacy policy</privacyLink> for detail.",
       "formLabel": "Request account deletion",
       "emailLabel": "Account email",
       "submit": "Email me a deletion link",
@@ -285,7 +285,7 @@
       "deletedTitle": "Your account deletion is scheduled",
       "erasedBy": "{{school}}: deleted on {{scheduledDate}} unless you sign in and cancel; personal data erased by {{date}}.",
       "retainedIntro": "We will email you when your account is deleted. These records are kept because the law requires it:",
-      "seePrivacy": "Messages you sent stay readable by the person you sent them to, and work you handed in stays in your school's records. See the <privacyLink>privacy policy</privacyLink> for why."
+      "seePrivacy": "The text and photos of messages you sent are erased, except messages included in a report to your school, and your AI study history is deleted. Work you handed in stays in your school's records. See the <privacyLink>privacy policy</privacyLink> for why."
     }
   },
   "signup": {
