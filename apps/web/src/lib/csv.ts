@@ -100,7 +100,11 @@ export function parseCsv(text: string): string[][] {
 
 /** Triggers a browser download of `content` as a file named `filename`. */
 export function downloadTextFile(filename: string, content: string, mimeType: string): void {
-  const blob = new Blob([content], { type: mimeType });
+  downloadBlob(filename, new Blob([content], { type: mimeType }));
+}
+
+/** Triggers a browser download of `blob` as a file named `filename`. */
+export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   try {
     const link = document.createElement("a");

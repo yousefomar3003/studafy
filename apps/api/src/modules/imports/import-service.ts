@@ -127,7 +127,7 @@ function mappingColumns(tx: TransactionSql) {
  * (docs/modules/student-records.md "CSV import"). Document fields are included so a mapping that
  * names one is refused with a reason rather than as an unknown field.
  */
-async function importRecordFields(
+export async function importRecordFields(
   tx: TransactionSql,
   schoolId: string,
 ): Promise<ImportRecordField[]> {

@@ -13,6 +13,12 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Excel student import template: `GET /api/imports/students/template` takes
+  `StudentImportTemplateQuery` (`format=csv|xlsx`, `lang=en|ar`). `format=xlsx` returns an Excel
+  workbook with dropdowns of the school's grades and sections, its record fields as columns, and
+  instructions ([student-import-mapping-guide.md](../modules/student-import-mapping-guide.md#excel-template-and-excel-upload)).
+  The default is still the CSV template.
+
 - Student import without email, with families, two parents and placement (migration 000198;
   [student-import-mapping-guide.md](../modules/student-import-mapping-guide.md#parents)):
   `StudentImportColumnMapping` gains `grade`, `section`, `family`, `parent2_name`, `parent2_email`

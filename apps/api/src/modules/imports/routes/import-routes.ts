@@ -23,6 +23,7 @@ import {
   deleteMapping,
   getImport,
   getImportDiff,
+  importRecordFields,
   listImports,
   listMappings,
   updateImportMapping,
@@ -35,18 +36,20 @@ import {
   columnTargetBodySchema,
   confirmImportBodySchema,
   createStudentImportMappingBodySchema,
+  importColumnPreviewSchema,
   importDiffQuerySchema,
   importDiffSchema,
   importIdParamSchema,
   importListQuerySchema,
   importListSchema,
-  importColumnPreviewSchema,
   importRecordSchema,
   importSettingsSchema,
   importSourceDownloadSchema,
   mappingIdParamSchema,
+  STUDENT_IMPORT_TEMPLATE_XLSX_MEDIA_TYPE,
   studentImportMappingListSchema,
   studentImportMappingSchema,
+  studentImportTemplateQuerySchema,
   unmappedColumnsSchema,
   updateImportMappingBodySchema,
   updateImportSettingsBodySchema,
@@ -60,6 +63,7 @@ import {
   sourceDownload,
   updateImportSettings,
 } from "../source-service";
+import { buildStudentImportTemplate } from "../template-workbook";
 
 import type { Database } from "../../../db/client";
 import type { StorageService } from "../../../lib/storage";
@@ -263,12 +267,17 @@ const downloadTemplateRoute = createRoute({
   path: "/api/imports/students/template",
   tags: ["Imports"],
   operationId: "downloadStudentImportTemplate",
-  summary: "Download student import CSV template",
-  description: "Returns a CSV file with the expected headers and an example row.",
+  summary: "Download the student import template",
+  description:
+    "format=csv (default): a CSV with the expected headers and example rows. format=xlsx: an " +
+    "Excel workbook in the requested language, with one header row, notes, dropdowns of the " +
+    "school's grades and sections of the current academic year, its student record fields as " +
+    "extra columns, and instructions and an example on separate sheets.",
   security: [{ bearerAuth: [] }],
+  request: { query: studentImportTemplateQuerySchema },
   responses: {
     200: {
-      description: "CSV template file.",
+      description: "Template file.",
       headers: {
         "X-Request-Id": {
           required: true,
@@ -277,7 +286,10 @@ const downloadTemplateRoute = createRoute({
         },
         "Content-Disposition": { schema: { type: "string" } },
       },
-      content: { "text/csv": { schema: { type: "string" } } },
+      content: {
+        "text/csv": { schema: { type: "string" } },
+        [STUDENT_IMPORT_TEMPLATE_XLSX_MEDIA_TYPE]: { schema: { type: "string", format: "binary" } },
+      },
     },
     401: {
       description: "Authentication is missing or invalid.",
@@ -742,7 +754,27 @@ export function importRoutes(
   // also matches getStudentImportRoute's "{importId}" pattern with importId="template".
   // Registered after, this route was dead: every request to it hit getImport("template", ...)
   // instead of serving the CSV template.
-  routes.openapi(downloadTemplateRoute, async (_c) => {
+  routes.openapi(downloadTemplateRoute, async (c) => {
+    const { format, lang } = c.req.valid("query");
+    if (format === "xlsx") {
+      const auth = requireAuth(c);
+      const workbook = await withTenantTx(database, tenantFrom(c), async (tx) =>
+        buildStudentImportTemplate(
+          tx,
+          auth.schoolId,
+          lang,
+          await importRecordFields(tx, auth.schoolId),
+        ),
+      );
+      const fileName = lang === "ar" ? "studafy-students-ar.xlsx" : "studafy-students.xlsx";
+      return new Response(workbook, {
+        status: 200,
+        headers: {
+          "Content-Type": STUDENT_IMPORT_TEMPLATE_XLSX_MEDIA_TYPE,
+          "Content-Disposition": `attachment; filename="${fileName}"`,
+        },
+      });
+    }
     return new Response(CSV_TEMPLATE, {
       status: 200,
       headers: {

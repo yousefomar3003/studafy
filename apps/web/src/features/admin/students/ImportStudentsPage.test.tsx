@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { strToU8, zipSync } from "fflate";
 import { MemoryRouter } from "react-router-dom";
 
 import { expectNoA11yViolations } from "../../../lib/test/axe";
@@ -149,6 +150,7 @@ class FakeXhr {
   static nextResponseBody: unknown = importRecord();
   static lastInstance: FakeXhr | null = null;
   static lastUrl = "";
+  static lastBody: unknown = null;
 
   status = 0;
   response = "";
@@ -174,7 +176,8 @@ class FakeXhr {
   getAllResponseHeaders() {
     return "content-type: application/json\r\n";
   }
-  send(_body: unknown) {
+  send(body: unknown) {
+    FakeXhr.lastBody = body;
     setTimeout(() => {
       this.upload.onprogress?.({ lengthComputable: true, loaded: 50, total: 100 });
       this.upload.onprogress?.({ lengthComputable: true, loaded: 100, total: 100 });
@@ -207,7 +210,7 @@ function uploadFile() {
   const file = new File(["admission_number,email\nADM-1,a@b.com"], "students.csv", {
     type: "text/csv",
   });
-  const input = screen.getByLabelText("Student CSV file") as HTMLInputElement;
+  const input = screen.getByLabelText("Student file (Excel or CSV)") as HTMLInputElement;
   fireEvent.change(input, { target: { files: [file] } });
 }
 
@@ -233,13 +236,69 @@ describe("ImportStudentsPage", () => {
   test("downloads the CSV template", async () => {
     await renderPage(await loadImportStudentsPage());
 
-    fireEvent.click(screen.getByRole("button", { name: "Download CSV template" }));
+    fireEvent.click(screen.getByRole("button", { name: "CSV template" }));
 
     await waitFor(() => {
       expect(getMock.mock.calls.some(([path]) => path === "/api/imports/students/template")).toBe(
         true,
       );
     });
+  });
+
+  test("downloads the Excel template in the page's language", async () => {
+    await renderPage(await loadImportStudentsPage());
+
+    fireEvent.click(screen.getByRole("button", { name: "Download Excel template" }));
+
+    await waitFor(() => {
+      const call = getMock.mock.calls.find(([path]) => path === "/api/imports/students/template");
+      expect(call?.[1]).toMatchObject({
+        params: { query: { format: "xlsx", lang: "en" } },
+        parseAs: "blob",
+      });
+    });
+  });
+
+  test("an Excel workbook is converted in the browser and uploaded as CSV", async () => {
+    const ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+    const workbook = zipSync({
+      "xl/workbook.xml": strToU8(
+        `<workbook ${ns} xmlns:r="r"><sheets><sheet name="Students" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+      ),
+      "xl/_rels/workbook.xml.rels": strToU8(
+        '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+      ),
+      "xl/worksheets/sheet1.xml": strToU8(
+        `<worksheet ${ns}><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Student number</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>007</t></is></c></row></sheetData></worksheet>`,
+      ),
+    });
+    FakeXhr.nextResponseBody = importRecord({ status: "validated", valid_rows: 1, error_rows: 0 });
+
+    await renderPage(await loadImportStudentsPage());
+    const input = screen.getByLabelText("Student file (Excel or CSV)") as HTMLInputElement;
+    const file = new File([workbook], "roll.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await screen.findByRole("region", { name: "Validation report" });
+    const sent = FakeXhr.lastBody as File;
+    expect(sent.name).toBe("roll.csv");
+    expect(await sent.text()).toBe("Student number\n007\n");
+  });
+
+  test("a file that is not a workbook is refused with a reason, before any upload", async () => {
+    FakeXhr.lastBody = null;
+    await renderPage(await loadImportStudentsPage());
+    const input = screen.getByLabelText("Student file (Excel or CSV)") as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["not a zip"], "roll.xlsx")] } });
+
+    expect(
+      await screen.findByText(
+        "That file isn't an Excel workbook we can read. Save it as .xlsx or .csv and try again.",
+      ),
+    ).toBeTruthy();
+    expect(FakeXhr.lastBody).toBeNull();
   });
 
   test("uploads a CSV, shows upload progress, then the validation report", async () => {
@@ -347,7 +406,7 @@ describe("ImportStudentsPage", () => {
     ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Start a new import" }));
-    expect(await screen.findByLabelText("Student CSV file")).toBeTruthy();
+    expect(await screen.findByLabelText("Student file (Excel or CSV)")).toBeTruthy();
   });
 
   test("maps a non-template CSV end to end: suggest, fix, apply, preview, confirm", async () => {
