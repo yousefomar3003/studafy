@@ -1,8 +1,12 @@
+import { createHash } from "node:crypto";
+
 import { processBillingEvent } from "@studafy/billing";
-import { ERROR_CODES } from "@studafy/constants";
+import { DOMAIN_EVENTS, ERROR_CODES, LEGAL_DOCUMENT_VERSIONS } from "@studafy/constants";
+import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withSystemTx, withTenantTx } from "../../../db/tenant-tx";
+import { emit } from "../../../lib/events";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { publishEntitlementChange } from "../entitlements/entitlement-change-publisher";
@@ -25,7 +29,9 @@ import type { TransactionSql } from "postgres";
  *
  * - {@link registerStorePurchase}: the student's app reports a completed purchase. This is the one
  *   moment the server knows both the store's reference and the Studafy school and student it is
- *   for, so it is also where that link is recorded (as the purchase's billing event).
+ *   for, so it is also where that link is recorded (as the purchase's billing event), and where the
+ *   student's waiver of the 14-day right of withdrawal is recorded and confirmed
+ *   ({@link recordWithdrawalWaiver}).
  * - {@link handleAppleNotification} / {@link handleGooglePlayNotification}: renewals, failures,
  *   expiry and refunds the stores report later, unauthenticated. They are attributed to the
  *   school and student through the purchase's billing event (`store_ref`), so a notification can
@@ -44,6 +50,27 @@ export interface StoreBilling {
 export interface StorePurchaseResult {
   active: boolean;
   expiresAt: string | null;
+}
+
+/**
+ * The student's express request, made in the app before the store's purchase sheet opened, for the
+ * AI add-on to start straight away, and their acknowledgement that they lose the 14-day right of
+ * withdrawal once it does (Directive 2011/83/EU art. 16(m); Terms of Service 7.7).
+ */
+export interface StoreWithdrawalWaiver {
+  /** When the student ticked the box, by the device's clock. */
+  acknowledgedAt: Date;
+}
+
+/** How the waiver was confirmed to the student on a durable medium. */
+export type WithdrawalWaiverConfirmation = "email" | "in_app";
+
+/** What the app shows of a recorded waiver: the in-app copy of the confirmation. */
+export interface StorePurchaseConfirmation {
+  acknowledgedAt: string;
+  recordedAt: string;
+  termsVersion: string;
+  confirmation: WithdrawalWaiverConfirmation;
 }
 
 const auditWriter: BillingAuditWriter = (tx, entry) => emitAuditLog(tx, entry);
@@ -133,6 +160,12 @@ export async function registerStorePurchase(
     platform: StorePlatform;
     verificationData: string;
     locale: SupportedLocale;
+    /**
+     * The waiver the app sent with the purchase. Absent from app versions that do not ask for it,
+     * from "restore purchases", and from a purchase redelivered after the app lost it: recorded as
+     * nothing, never refused, because by now the store has taken the money.
+     */
+    withdrawalWaiver?: StoreWithdrawalWaiver | null;
   },
 ): Promise<StorePurchaseResult> {
   const { locale } = params;
@@ -177,6 +210,15 @@ export async function registerStorePurchase(
     params.requestId,
   );
 
+  await recordWithdrawalWaiver(database, logger, {
+    schoolId: params.schoolId,
+    userId: params.userId,
+    requestId: params.requestId,
+    studentId: student.id,
+    subscription,
+    waiver: params.withdrawalWaiver ?? null,
+  });
+
   if (subscription.platform === "google") {
     // Play refunds a purchase left unacknowledged for three days. Acknowledging only after the
     // purchase is recorded means a failure here is retried by the app's next report, never lost.
@@ -188,6 +230,149 @@ export async function registerStorePurchase(
   }
 
   return { active: true, expiresAt: subscription.periodEnd?.toISOString() ?? null };
+}
+
+/**
+ * Which store purchase a waiver belongs to: the platform and the SHA-256 of the transaction id. The
+ * transaction, not the subscription's stable reference: an Apple resubscription keeps its
+ * originalTransactionId but is a new contract with a new right of withdrawal. Hashed because Google
+ * falls back to the purchase token -- a credential for the purchase -- when Play reports no order
+ * id, and app.ai_subscriptions is readable at tenant level (000195).
+ */
+function waiverPurchaseRef(subscription: StoreSubscription): string {
+  const digest = createHash("sha256").update(subscription.transactionId).digest("hex");
+  return `${subscription.platform}:${digest}`;
+}
+
+const deliverableEmail = z.string().email();
+
+/**
+ * Record the student's withdrawal waiver on their AI add-on row, and confirm it to them on a durable
+ * medium: an email when the account has a deliverable address, otherwise the copy the app shows
+ * from the store config (`purchaseConfirmation`) -- a member-ID student has no email (000141).
+ *
+ * Once per purchase: a report of a purchase whose waiver is already recorded (a retry) changes
+ * nothing and sends nothing. A report without a waiver -- "restore purchases", or an app version
+ * that does not ask -- records nothing, and leaves an earlier purchase's waiver in place: it is still
+ * true, and says which purchase it was for. The audit log keeps every one recorded.
+ */
+async function recordWithdrawalWaiver(
+  database: Database | DatabasePools,
+  logger: Logger,
+  params: {
+    schoolId: string;
+    userId: string;
+    requestId?: string;
+    studentId: string;
+    subscription: StoreSubscription;
+    waiver: StoreWithdrawalWaiver | null;
+  },
+): Promise<void> {
+  const { waiver } = params;
+  if (!waiver) return;
+  const purchaseRef = waiverPurchaseRef(params.subscription);
+  await withTenantTx(
+    database,
+    { schoolId: params.schoolId, userId: params.userId, requestId: params.requestId },
+    async (tx) => {
+      const [row] = await tx<{ id: string; purchase_ref: string | null }[]>`
+        SELECT id, withdrawal_waiver_purchase_ref AS purchase_ref
+        FROM app.ai_subscriptions
+        WHERE student_id = ${params.studentId}::uuid
+        FOR UPDATE
+      `;
+      if (!row) {
+        logger.warn(
+          { student_id: params.studentId, platform: params.subscription.platform },
+          "store purchase registered without an AI add-on row; withdrawal waiver not recorded",
+        );
+        return;
+      }
+      if (row.purchase_ref === purchaseRef) return;
+
+      const [user] = await tx<{ email: string | null }[]>`
+        SELECT email FROM app.users WHERE id = ${params.userId}::uuid
+      `;
+      const email = deliverableEmail.safeParse(user?.email ?? null);
+      const confirmation: WithdrawalWaiverConfirmation = email.success ? "email" : "in_app";
+      const termsVersion = LEGAL_DOCUMENT_VERSIONS.terms;
+
+      // The device's clock, but never later than the server's: the waiver cannot postdate the
+      // purchase it was given for.
+      const [recorded] = await tx<{ acknowledged_at: Date; recorded_at: Date }[]>`
+        UPDATE app.ai_subscriptions
+           SET withdrawal_waiver_purchase_ref = ${purchaseRef},
+               withdrawal_waiver_acknowledged_at =
+                 LEAST(${waiver.acknowledgedAt}::timestamptz, CURRENT_TIMESTAMP),
+               withdrawal_waiver_terms_version = ${termsVersion},
+               withdrawal_waiver_recorded_at = CURRENT_TIMESTAMP,
+               withdrawal_waiver_confirmation = ${confirmation}
+         WHERE id = ${row.id}::uuid
+        RETURNING withdrawal_waiver_acknowledged_at AS acknowledged_at,
+                  withdrawal_waiver_recorded_at AS recorded_at
+      `;
+      const acknowledgedAt = recorded!.acknowledged_at.toISOString();
+      const recordedAt = recorded!.recorded_at.toISOString();
+
+      await emitAuditLog(tx, {
+        action: "update",
+        targetTable: "ai_subscriptions",
+        targetId: row.id,
+        oldValues: { withdrawal_waiver_purchase_ref: row.purchase_ref },
+        newValues: {
+          withdrawal_waiver_purchase_ref: purchaseRef,
+          withdrawal_waiver_acknowledged_at: acknowledgedAt,
+          withdrawal_waiver_terms_version: termsVersion,
+          withdrawal_waiver_recorded_at: recordedAt,
+          withdrawal_waiver_confirmation: confirmation,
+        },
+      });
+
+      if (email.success) {
+        await emit(tx, DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED, {
+          schoolId: params.schoolId,
+          aiSubscriptionId: row.id,
+          studentId: params.studentId,
+          email: email.data,
+          platform: params.subscription.platform,
+          acknowledgedAt,
+          recordedAt,
+          termsVersion,
+        });
+      }
+    },
+  );
+}
+
+/** The signed-in student's recorded withdrawal waiver, for the app's in-app confirmation. */
+export async function readStorePurchaseConfirmation(
+  tx: TransactionSql,
+  studentId: string,
+): Promise<StorePurchaseConfirmation | null> {
+  const [row] = await tx<
+    {
+      acknowledged_at: Date | null;
+      recorded_at: Date | null;
+      terms_version: string | null;
+      confirmation: WithdrawalWaiverConfirmation | null;
+    }[]
+  >`
+    SELECT withdrawal_waiver_acknowledged_at AS acknowledged_at,
+           withdrawal_waiver_recorded_at AS recorded_at,
+           withdrawal_waiver_terms_version AS terms_version,
+           withdrawal_waiver_confirmation AS confirmation
+    FROM app.ai_subscriptions
+    WHERE student_id = ${studentId}::uuid
+  `;
+  if (!row?.acknowledged_at || !row.recorded_at || !row.terms_version || !row.confirmation) {
+    return null;
+  }
+  return {
+    acknowledgedAt: row.acknowledged_at.toISOString(),
+    recordedAt: row.recorded_at.toISOString(),
+    termsVersion: row.terms_version,
+    confirmation: row.confirmation,
+  };
 }
 
 async function applyNotification(

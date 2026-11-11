@@ -11,6 +11,7 @@ import { DOMAIN_EVENTS } from "@studafy/constants";
 import {
   renderAccountDeletionConfirmationEmail,
   renderAccountDeletionVerificationEmail,
+  renderAiStorePurchaseConfirmationEmail,
   renderAiSubscriptionPausedEmail,
   renderAiSubscriptionResumedEmail,
   renderDigestEmail,
@@ -42,6 +43,8 @@ const VERIFICATION_ACTION_PATH = "/api/schools/verify-email/{token}";
 // A page, not an API path: the link must not delete anything on a GET, which mail scanners issue
 // on their own. The token rides in the fragment, which browsers never send to a server.
 const ACCOUNT_DELETION_ACTION_PATH = "/legal/delete-account/confirm#token={token}";
+// The public Terms of Service page (apps/web LegalDocumentPage), linked from purchase confirmations.
+const TERMS_PATH = "/terms";
 
 interface InvitationPayload {
   email: string;
@@ -123,6 +126,18 @@ interface SeatDriftPayload {
  */
 interface AiSubscriptionPauseResumePayload {
   email: string;
+}
+
+/**
+ * The AI add-on purchase confirmation payload registerStorePurchase writes (000195).
+ * schoolId/aiSubscriptionId/studentId are correlation handles; the recipient is the student.
+ */
+interface AiStorePurchaseConfirmedPayload {
+  email: string;
+  platform: "apple" | "google";
+  acknowledgedAt: string;
+  recordedAt: string;
+  termsVersion: string;
 }
 
 /**
@@ -255,6 +270,20 @@ export function resolveEmail(
         }),
       };
     }
+    case DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED: {
+      const payload = row.payload as unknown as AiStorePurchaseConfirmedPayload;
+      return {
+        template: "ai-store-purchase-confirmation",
+        recipient: payload.email,
+        content: renderAiStorePurchaseConfirmationEmail({
+          platform: payload.platform,
+          acknowledgedAt: payload.acknowledgedAt,
+          recordedAt: payload.recordedAt,
+          termsVersion: payload.termsVersion,
+          termsUrl: `${context.frontendUrl}${TERMS_PATH}`,
+        }),
+      };
+    }
     default:
       throw new Error(`no email template for outbox event ${row.event_name}`);
   }
@@ -272,4 +301,5 @@ export const EMAIL_EVENT_NAMES: readonly string[] = [
   DOMAIN_EVENTS.AI_SUBSCRIPTION_RESUMED,
   DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED,
   DOMAIN_EVENTS.ACCOUNT_DELETED,
+  DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED,
 ];

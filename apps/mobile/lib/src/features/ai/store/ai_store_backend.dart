@@ -1,9 +1,29 @@
 import '../../../core/api/generated/models/ai_store_purchase_request.dart';
 import '../../../core/api/generated/models/ai_store_purchase_request_platform.dart';
+import '../../../core/api/generated/models/ai_store_waiver_confirmation.dart';
 import '../../../core/api/generated/subscriptions/subscriptions_client.dart';
 
 /// Which store a purchase goes through.
 enum StorePlatform { apple, google }
+
+/// The server's record of the signed-in student's last in-app purchase: that, before buying, they
+/// asked for the AI add-on to start straight away and acknowledged losing the 14-day right to
+/// cancel. The in-app copy of the confirmation — the only one for an account with no email address.
+class AiStorePurchaseConfirmation {
+  const AiStorePurchaseConfirmation({
+    required this.acknowledgedAt,
+    required this.termsVersion,
+    required this.emailed,
+  });
+
+  final DateTime acknowledgedAt;
+
+  /// The Terms of Service version (its `Last updated` date) the purchase was made under.
+  final String termsVersion;
+
+  /// Whether the confirmation was also emailed to the student.
+  final bool emailed;
+}
 
 /// What the server says about selling the AI add-on in the app to the signed-in user
 /// (`GET /api/subscriptions/ai/store/config`).
@@ -16,6 +36,7 @@ class AiStoreSetup {
     required this.purchasable,
     required this.accountToken,
     required this.profileId,
+    this.purchaseConfirmation,
   });
 
   final bool enabled;
@@ -33,6 +54,9 @@ class AiStoreSetup {
   /// The school's id (Google `obfuscatedProfileId`).
   final String? profileId;
 
+  /// The confirmation of the last in-app purchase's withdrawal waiver, if one was recorded.
+  final AiStorePurchaseConfirmation? purchaseConfirmation;
+
   /// Whether the add-on is offered on [platform] to this user.
   bool offers(StorePlatform platform) =>
       enabled &&
@@ -48,7 +72,15 @@ abstract interface class AiStoreBackend {
   Future<AiStoreSetup> setup();
 
   /// Throws a `DioException` carrying an `ApiException` when the server refuses the purchase.
-  Future<void> register(StorePlatform platform, String verificationData);
+  ///
+  /// [withdrawalWaiverAcknowledgedAt] is when the student, before the store's purchase sheet
+  /// opened, asked for the add-on to start now and acknowledged losing the 14-day right to cancel.
+  /// Sent with a new purchase only — never with a restored one, which they did not just agree to.
+  Future<void> register(
+    StorePlatform platform,
+    String verificationData, {
+    DateTime? withdrawalWaiverAcknowledgedAt,
+  });
 }
 
 /// [AiStoreBackend] over the generated client's two in-app purchase methods — the only calls
@@ -69,17 +101,31 @@ class ApiAiStoreBackend implements AiStoreBackend {
       purchasable: config.purchasable,
       accountToken: config.accountToken,
       profileId: config.profileId,
+      purchaseConfirmation: switch (config.purchaseConfirmation) {
+        final confirmation? => AiStorePurchaseConfirmation(
+          acknowledgedAt: confirmation.acknowledgedAt,
+          termsVersion: confirmation.termsVersion,
+          emailed: confirmation.confirmation == AiStoreWaiverConfirmation.email,
+        ),
+        null => null,
+      },
     );
   }
 
   @override
-  Future<void> register(StorePlatform platform, String verificationData) async {
+  Future<void> register(
+    StorePlatform platform,
+    String verificationData, {
+    DateTime? withdrawalWaiverAcknowledgedAt,
+  }) async {
     await _client.registerAiStorePurchase(
       body: AiStorePurchaseRequest(
         platform: platform == StorePlatform.apple
             ? AiStorePurchaseRequestPlatform.apple
             : AiStorePurchaseRequestPlatform.google,
         verificationData: verificationData,
+        withdrawalWaiverAcknowledged: withdrawalWaiverAcknowledgedAt != null ? true : null,
+        withdrawalWaiverAcknowledgedAt: withdrawalWaiverAcknowledgedAt?.toUtc(),
       ),
     );
   }

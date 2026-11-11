@@ -32,15 +32,18 @@ DioException _refused(String code, int status) => DioException(
 void main() {
   late FakeGateway gateway;
   late FakeBackend backend;
+  late FakeWaiverStore waivers;
   late ProviderContainer container;
 
   setUp(() {
     gateway = FakeGateway();
     backend = FakeBackend(storeSetup());
+    waivers = FakeWaiverStore();
     container = ProviderContainer(
       overrides: [
         storeGatewayProvider.overrideWithValue(gateway),
         aiStoreBackendProvider.overrideWithValue(backend),
+        withdrawalWaiverStoreProvider.overrideWithValue(waivers),
       ],
     );
   });
@@ -107,10 +110,69 @@ void main() {
     test("stamps the purchase with the student's and the school's ids", () async {
       await load();
 
+      container.read(aiStoreProvider.notifier).acknowledgeWaiver(true);
       await container.read(aiStoreProvider.notifier).buy();
 
       expect(gateway.bought.single, (accountToken: studentId, profileId: schoolId));
       expect((current() as AiStoreOffering).busy, AiStoreBusy.purchasing);
+    });
+
+    test('opens the store only once the withdrawal waiver is ticked', () async {
+      await load();
+      final controller = container.read(aiStoreProvider.notifier);
+      expect((current() as AiStoreOffering).waiverAcknowledged, isFalse);
+
+      await controller.buy();
+      expect(gateway.bought, isEmpty);
+
+      controller
+        ..acknowledgeWaiver(true)
+        ..acknowledgeWaiver(false);
+      await controller.buy();
+      expect(gateway.bought, isEmpty);
+      expect(waivers.kept, isNull);
+    });
+
+    test('sends the waiver with the purchase it was given for, then forgets it', () async {
+      await load();
+      final controller = container.read(aiStoreProvider.notifier)..acknowledgeWaiver(true);
+      final before = DateTime.now().toUtc();
+
+      await controller.buy();
+      expect(waivers.kept, isNotNull);
+      await deliver(_purchase(PurchaseStatus.purchased));
+
+      final sent = backend.waivers.single;
+      expect(sent, isNotNull);
+      expect(sent!.isBefore(before), isFalse);
+      expect(sent.isUtc, isTrue);
+      expect(waivers.kept, isNull);
+      expect(current(), isA<AiStoreActivated>());
+    });
+
+    test('a purchase the server confirms on a later launch still carries the waiver', () async {
+      // The waiver was given, and the store took the purchase, in an earlier run of the app.
+      final givenAt = DateTime.utc(2026, 11, 11, 9, 59);
+      waivers.kept = givenAt;
+      await load();
+
+      backend.refusal = DioException(requestOptions: RequestOptions(path: '/'));
+      await deliver(_purchase(PurchaseStatus.purchased));
+      // Not confirmed yet: kept for the next try.
+      expect(waivers.kept, givenAt);
+
+      backend.refusal = null;
+      await deliver(_purchase(PurchaseStatus.purchased));
+      expect(backend.waivers, [givenAt, givenAt]);
+      expect(waivers.kept, isNull);
+    });
+
+    test('a purchase bought without the waiver (an older version) is sent without one', () async {
+      await load();
+
+      await deliver(_purchase(PurchaseStatus.purchased));
+
+      expect(backend.waivers, [null]);
     });
 
     test('a delivered purchase is registered, then finished, and the add-on turns on', () async {
@@ -158,9 +220,14 @@ void main() {
 
     test('a cancelled sheet goes back to the offer; a store error says so', () async {
       await load();
+      final controller = container.read(aiStoreProvider.notifier)..acknowledgeWaiver(true);
+      await controller.buy();
 
       await deliver(_purchase(PurchaseStatus.canceled));
       expect((current() as AiStoreOffering).messageKey, isNull);
+      // Nothing was bought, so the waiver given for it is gone; the box stays ticked.
+      expect(waivers.kept, isNull);
+      expect((current() as AiStoreOffering).waiverAcknowledged, isTrue);
 
       await deliver(_purchase(PurchaseStatus.error));
       expect((current() as AiStoreOffering).messageKey, 'aiStore.errors.storeFailed');
@@ -187,6 +254,16 @@ void main() {
       expect(gateway.restores, 1);
       expect(backend.registered, hasLength(1));
       expect(current(), isA<AiStoreActivated>());
+    });
+
+    test('a restored purchase is never sent with a waiver', () async {
+      waivers.kept = DateTime.utc(2026, 11, 11);
+      await load();
+
+      unawaited(container.read(aiStoreProvider.notifier).restore());
+      await deliver(_purchase(PurchaseStatus.restored));
+
+      expect(backend.waivers, [null]);
     });
 
     // testWidgets for its fake clock: the restore waits restoreSettle for a redelivery.
