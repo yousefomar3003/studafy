@@ -1,4 +1,5 @@
 import { ApiError } from "@studafy/api-client";
+import { normalizePhoneNumber } from "@studafy/student-import";
 import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useEffect, useState } from "react";
 
@@ -12,11 +13,12 @@ import type { EditUserValues } from "./schema";
 import type { Role } from "@studafy/constants";
 import type { FormEvent } from "react";
 
-const EMPTY_VALUES: EditUserValues = { display_name: "", role: ASSIGNABLE_ROLES[0]! };
+const EMPTY_VALUES: EditUserValues = { display_name: "", phone: "", role: ASSIGNABLE_ROLES[0]! };
 
 function valuesFor(user: UserWithRoles): EditUserValues {
   return {
     display_name: user.display_name ?? "",
+    phone: user.phone ?? "",
     // Assignable-role narrowing (see schema.ts) means a platform role (SUPER_ADMIN, SUPPORT_AGENT)
     // won't appear in the picker; falling back to their current role keeps the field truthful
     // rather than silently substituting a different one the picker does offer. The cast is what
@@ -30,7 +32,10 @@ export interface EditUserModalProps {
   onClose: () => void;
 }
 
-/** Combines `PATCH /api/users/{userId}` (display name) and `PATCH .../role` behind one save action. */
+/**
+ * Combines `PATCH /api/users/{userId}` (display name, phone) and `PATCH .../role` behind one save
+ * action.
+ */
 export function EditUserModal({ user, onClose }: EditUserModalProps) {
   const { t } = useTranslation();
   const { show } = useToast();
@@ -74,9 +79,16 @@ export function EditUserModal({ user, onClose }: EditUserModalProps) {
 
     const currentRole = user.roles[0] as Role | undefined;
     const tasks: Promise<unknown>[] = [];
-    if (result.data.display_name !== (user.display_name ?? "")) {
+    const nameChanged = result.data.display_name !== (user.display_name ?? "");
+    const phone = result.data.phone === "" ? null : normalizePhoneNumber(result.data.phone);
+    const phoneChanged = phone !== (user.phone ?? null);
+    if (nameChanged || phoneChanged) {
       tasks.push(
-        updateUser.mutateAsync({ userId: user.id, display_name: result.data.display_name }),
+        updateUser.mutateAsync({
+          userId: user.id,
+          ...(nameChanged ? { display_name: result.data.display_name } : {}),
+          ...(phoneChanged ? { phone } : {}),
+        }),
       );
     }
     if (result.data.role !== currentRole) {
@@ -116,6 +128,15 @@ export function EditUserModal({ user, onClose }: EditUserModalProps) {
             onChange={(e) => setField("display_name", e.target.value)}
             error={errors.display_name && t(errors.display_name)}
             required
+          />
+          <Input
+            label={t("adminPeople.users.form.phone")}
+            type="tel"
+            dir="ltr"
+            autoComplete="off"
+            value={values.phone}
+            onChange={(e) => setField("phone", e.target.value)}
+            error={errors.phone && t(errors.phone)}
           />
           <Select
             label={t("adminPeople.users.form.role")}

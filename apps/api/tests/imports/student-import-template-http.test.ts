@@ -6,6 +6,7 @@
 
 import {
   readCsvSource,
+  stageRows,
   STUDENT_IMPORT_FIELDS,
   suggestColumnMapping,
 } from "@studafy/student-import";
@@ -110,6 +111,31 @@ describeDb("student import Excel template", () => {
     });
   }
 
+  for (const lang of ["en", "ar"] as const) {
+    test(`the ${lang} worked example imports cleanly, every parent with a phone`, async () => {
+      const tenant = await createTenant();
+      const workbook = await downloadWorkbook(tenant, lang);
+      const example = workbook.worksheets[2]!;
+      const lines: string[] = [];
+      example.eachRow({ includeEmpty: false }, (row) => {
+        const cells = (row.values as unknown[]).slice(1).map((value) => String(value ?? ""));
+        lines.push(cells.join(","));
+      });
+      const source = readCsvSource(lines.join("\n"));
+      const staged = stageRows(source, suggestColumnMapping(source.headers));
+      expect(staged.issues).toEqual([]);
+      expect(staged.rows).toHaveLength(3);
+      // The phone columns are highlighted as required on the Students sheet.
+      const students = workbook.worksheets[0]!;
+      const headers = headerRow(students);
+      for (const field of ["parent_phone", "parent2_phone"] as const) {
+        const column = headers.indexOf(suggestColumnMapping(headers)[field]!) + 1;
+        const fill = students.getRow(1).getCell(column).fill as { fgColor?: { argb?: string } };
+        expect(fill.fgColor?.argb).toBe("FFFFE699");
+      }
+    });
+  }
+
   test("offers the school's grades and sections as dropdowns", async () => {
     const tenant = await createTenant();
     const workbook = await downloadWorkbook(tenant, "en");
@@ -127,6 +153,10 @@ describeDb("student import Excel template", () => {
       channel: AUTH_CHANNELS.WEB,
     });
     expect(res.status).toBe(200);
-    expect(await res.text()).toStartWith("admission_number,");
+    const text = await res.text();
+    expect(text).toStartWith("admission_number,");
+    const source = readCsvSource(text);
+    expect(source.headers).toContain("parent_phone");
+    expect(stageRows(source, suggestColumnMapping(source.headers)).issues).toEqual([]);
   });
 });

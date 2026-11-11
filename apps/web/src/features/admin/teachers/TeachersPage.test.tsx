@@ -101,7 +101,7 @@ describe("TeachersPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Import file" }));
     const dialog = await screen.findByRole("dialog", { name: "Import teachers" });
     const input = dialog.querySelector('input[type="file"]') as HTMLInputElement;
-    const csv = "display_name,employee_number,email\nRana Khaled,EMP-7,\n";
+    const csv = "display_name,employee_number,phone,email\nRana Khaled,EMP-7,٠٥٠١٢٣٤٥٦٧,\n";
     fireEvent.change(input, { target: { files: [new File([csv], "teachers.csv")] } });
 
     fireEvent.click(await within(dialog).findByRole("button", { name: "Import 1 row" }));
@@ -110,8 +110,22 @@ describe("TeachersPage", () => {
     expect(postMock.mock.calls[0]![1].body).toEqual({
       display_name: "Rana Khaled",
       employee_number: "EMP-7",
+      phone: "0501234567",
       employment_status: "active",
     });
+  });
+
+  test("a teacher's phone is required", async () => {
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Import file" }));
+    const dialog = await screen.findByRole("dialog", { name: "Import teachers" });
+    const input = dialog.querySelector('input[type="file"]') as HTMLInputElement;
+    const csv = "display_name,employee_number,phone\nRana Khaled,EMP-7,\nSami Aziz,EMP-8,call me\n";
+    fireEvent.change(input, { target: { files: [new File([csv], "teachers.csv")] } });
+
+    expect(await within(dialog).findByText(/Phone is required/)).toBeTruthy();
+    expect(within(dialog).getByText(/Phone must be a phone number/)).toBeTruthy();
+    expect(postMock).not.toHaveBeenCalled();
   });
 
   test("refuses an end date without a hire date, then saves the record", async () => {

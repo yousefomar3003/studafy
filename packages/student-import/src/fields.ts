@@ -25,9 +25,11 @@ export const STUDENT_IMPORT_FIELDS = [
   "family",
   "parent_name",
   "parent_email",
+  "parent_phone",
   "parent_relationship",
   "parent2_name",
   "parent2_email",
+  "parent2_phone",
   "parent2_relationship",
 ] as const;
 
@@ -168,6 +170,31 @@ export const STUDENT_IMPORT_FIELD_DEFINITIONS: Readonly<
       "بريد ولي الامر 1",
     ],
   },
+  // Required for every parent a line names (record.ts parentIssues), not for every line: a
+  // sibling's line leaves its family's parents blank.
+  parent_phone: {
+    target: "parents",
+    required: false,
+    aliases: [
+      "parent phone",
+      "parent mobile",
+      "parent phone number",
+      "parent mobile number",
+      "guardian phone",
+      "guardian mobile",
+      "parent 1 phone",
+      "parent 1 mobile",
+      "guardian 1 phone",
+      "هاتف ولي الأمر",
+      "هاتف ولي الامر",
+      "جوال ولي الأمر",
+      "جوال ولي الامر",
+      "رقم هاتف ولي الأمر",
+      "رقم هاتف ولي الامر",
+      "هاتف ولي الأمر 1",
+      "هاتف ولي الامر 1",
+    ],
+  },
   parent_relationship: {
     target: "links",
     required: false,
@@ -201,6 +228,20 @@ export const STUDENT_IMPORT_FIELD_DEFINITIONS: Readonly<
       "guardian 2 email",
       "بريد ولي الأمر 2",
       "بريد ولي الامر 2",
+    ],
+  },
+  parent2_phone: {
+    target: "parents",
+    required: false,
+    aliases: [
+      "parent 2 phone",
+      "parent 2 mobile",
+      "second parent phone",
+      "guardian 2 phone",
+      "هاتف ولي الأمر 2",
+      "هاتف ولي الامر 2",
+      "جوال ولي الأمر 2",
+      "جوال ولي الامر 2",
     ],
   },
   parent2_relationship: {

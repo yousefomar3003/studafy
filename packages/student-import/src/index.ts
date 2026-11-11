@@ -1,4 +1,6 @@
 export { parseCsv, detectDelimiter } from "./csv";
+// The phone rule every import (and the web forms) checks contact phones with.
+export { normalizePhoneNumber, PHONE_MAX } from "@studafy/records/browser";
 export type { CsvDelimiter, CsvRecord } from "./csv";
 
 export {

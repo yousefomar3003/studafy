@@ -141,6 +141,11 @@ export default function UsersListPage() {
       renderCell: (user) => user.email ?? "—",
     },
     {
+      id: "phone",
+      header: t("adminPeople.users.list.columns.phone"),
+      renderCell: (user) => (user.phone ? <span dir="ltr">{user.phone}</span> : "—"),
+    },
+    {
       id: "role",
       header: t("adminPeople.users.list.columns.role"),
       renderCell: (user) =>

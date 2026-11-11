@@ -1,5 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import { ASSIGNABLE_ROLES, ROLES } from "@studafy/constants";
+import { normalizePhoneNumber, PHONE_MAX } from "@studafy/records";
 import { uuidSchema, dateTimeSchema, dateSchema } from "@studafy/shared-schemas";
 
 import { userStatusSchema } from "../../openapi/components";
@@ -39,6 +40,20 @@ export const parentRelationshipSchema = z
   .openapi({ description: "Guardian relationship to the student." });
 
 // ---------------------------------------------------------------------------
+// Contact phone
+// ---------------------------------------------------------------------------
+
+/**
+ * A person's contact phone as people type it: digits with + - ( ) . and spaces, 6 to 20 digits,
+ * Arabic digits allowed. Saved as normalizePhoneNumber reads it. Never used to match anyone.
+ */
+export const contactPhoneSchema = z
+  .string()
+  .max(PHONE_MAX)
+  .refine((value) => normalizePhoneNumber(value) !== null, { message: "Not a valid phone number" })
+  .openapi({ example: "+965 5000 1234" });
+
+// ---------------------------------------------------------------------------
 // User with roles
 // ---------------------------------------------------------------------------
 
@@ -57,6 +72,9 @@ export const userWithRolesSchema = z
         example: "student@example.edu",
       }),
     display_name: z.string().nullable().openapi({ description: "Optional human-readable name." }),
+    phone: z.string().nullable().openapi({
+      description: "Contact phone as the school entered it. Null when none was given.",
+    }),
     status: userStatusSchema,
     roles: z
       .array(roleSchema)
@@ -95,6 +113,7 @@ export const createUserBodySchema = z
       .min(1)
       .max(200)
       .openapi({ description: "Human-readable name.", example: "Jamie Rivera" }),
+    phone: contactPhoneSchema.optional(),
     role: assignableRoleSchema.openapi({ description: "Role to assign to the new user." }),
     children: z
       .array(
@@ -154,6 +173,10 @@ export const updateUserBodySchema = z
       .max(200)
       .optional()
       .openapi({ description: "Human-readable name." }),
+    phone: contactPhoneSchema
+      .nullable()
+      .optional()
+      .openapi({ description: "Contact phone. Null removes it; omitted leaves it as it is." }),
     status: userStatusSchema.optional().openapi({ description: "Lifecycle state." }),
   })
   .openapi("UpdateUserBody");
@@ -756,6 +779,11 @@ export const createTeacherBodySchema = z
       }),
     display_name: z.string().trim().min(1).max(200).optional().openapi({
       description: "The teacher's name. Defaults to the email, or the employee number.",
+    }),
+    phone: contactPhoneSchema.optional().openapi({
+      description:
+        "The teacher's contact phone, shown to staff who manage users. Required by the Teachers " +
+        "import template.",
     }),
     employee_number: z.string().min(1).max(100).openapi({
       description: "Unique employee number within the school.",

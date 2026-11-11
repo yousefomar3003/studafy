@@ -6,7 +6,8 @@
  *   - "Students" / "الطلاب": one header row, then nothing -- examples live on the instructions sheet,
  *     so a forgotten example row is never imported. Headers are spellings the import recognises
  *     (packages/student-import/src/fields.ts aliases, or a record field's label), so the upload maps
- *     itself. Required columns are highlighted; every column carries a note saying what goes in it.
+ *     itself. Required columns are highlighted (a parent's phone is required for every parent the row
+ *     names); every column carries a note saying what goes in it.
  *     Dropdowns offer the status and relationship words, and the school's own grades and sections of
  *     the current academic year. ID-like and date columns are text, so Excel keeps leading zeros and
  *     never turns 2016-03-15 into a serial number.
@@ -33,6 +34,7 @@ const LAST_ROW = 10_001;
 
 interface TemplateColumn {
   field: StudentImportField;
+  /** Highlighted header. For a parent's phone: required whenever that parent is given. */
   required?: boolean;
   /** Text format: keeps leading zeros, and stops Excel turning dates into serial numbers. */
   text?: boolean;
@@ -51,9 +53,11 @@ const COLUMNS: readonly TemplateColumn[] = [
   { field: "family", text: true, width: 12 },
   { field: "parent_name", width: 22 },
   { field: "parent_relationship", width: 14 },
+  { field: "parent_phone", required: true, text: true, width: 18 },
   { field: "parent_email", width: 24 },
   { field: "parent2_name", width: 22 },
   { field: "parent2_relationship", width: 14 },
+  { field: "parent2_phone", required: true, text: true, width: 18 },
   { field: "parent2_email", width: 24 },
   { field: "email", width: 24 },
   { field: "preferred_name", width: 16 },
@@ -73,9 +77,11 @@ const HEADERS: Readonly<Record<TemplateLanguage, Readonly<Record<StudentImportFi
     family: "Family number",
     parent_name: "Parent 1 name",
     parent_relationship: "Parent 1 relationship",
+    parent_phone: "Parent 1 phone",
     parent_email: "Parent 1 email",
     parent2_name: "Parent 2 name",
     parent2_relationship: "Parent 2 relationship",
+    parent2_phone: "Parent 2 phone",
     parent2_email: "Parent 2 email",
     email: "Student email",
     preferred_name: "Preferred name",
@@ -92,9 +98,11 @@ const HEADERS: Readonly<Record<TemplateLanguage, Readonly<Record<StudentImportFi
     family: "رقم العائلة",
     parent_name: "اسم ولي الأمر 1",
     parent_relationship: "صلة القرابة 1",
+    parent_phone: "هاتف ولي الأمر 1",
     parent_email: "بريد ولي الأمر 1",
     parent2_name: "اسم ولي الأمر 2",
     parent2_relationship: "صلة القرابة 2",
+    parent2_phone: "هاتف ولي الأمر 2",
     parent2_email: "بريد ولي الأمر 2",
     email: "بريد الطالب",
     preferred_name: "الاسم المفضل",
@@ -115,10 +123,14 @@ const NOTES: Readonly<Record<TemplateLanguage, Partial<Record<StudentImportField
     family:
       "Any number you choose. Brothers and sisters get the same family number, so you type " +
       "their parents once, on one of their rows.",
-    parent_name: "Give a name or an email (or both), and the relationship.",
+    parent_name: "Give a name or an email (or both), the relationship and a phone number.",
     parent_relationship: "Pick from the list.",
+    parent_phone:
+      "Required for every parent you type, for example +965 5000 1234. Leave it blank on a " +
+      "brother's or sister's row that leaves the parent blank.",
     parent_email: "Optional. Parents without an email sign in with the ID Studafy gives them.",
     parent2_relationship: "Pick from the list.",
+    parent2_phone: "Required when you type a second parent.",
     parent2_email: "Optional.",
     email: "Optional. Students without an email sign in with the ID Studafy gives them.",
   },
@@ -133,11 +145,14 @@ const NOTES: Readonly<Record<TemplateLanguage, Partial<Record<StudentImportField
       "اختر من القائمة. اتركها فارغة إذا كان للصف شعبة واحدة. الأسماء غير الموجودة يُبلّغ عنها ولا تُنشأ.",
     family:
       "أي رقم تختاره. الإخوة والأخوات يأخذون رقم العائلة نفسه، فتكتب أولياء أمورهم مرة واحدة في أحد صفوفهم.",
-    parent_name: "اكتب الاسم أو البريد (أو كليهما)، وصلة القرابة.",
+    parent_name: "اكتب الاسم أو البريد (أو كليهما)، وصلة القرابة ورقم الهاتف.",
     parent_relationship: "اختر من القائمة.",
+    parent_phone:
+      "مطلوب لكل ولي أمر تكتبه، مثل ‎+965 5000 1234. اتركه فارغًا في صف الأخ أو الأخت الذي تُترك فيه أعمدة ولي الأمر فارغة.",
     parent_email:
       "اختياري. ولي الأمر الذي ليس لديه بريد يسجّل الدخول بالرقم الذي يعطيه له Studafy.",
     parent2_relationship: "اختر من القائمة.",
+    parent2_phone: "مطلوب عند كتابة ولي أمر ثانٍ.",
     parent2_email: "اختياري.",
     email: "اختياري. الطالب الذي ليس لديه بريد يسجّل الدخول بالرقم الذي يعطيه له Studafy.",
   },
@@ -169,7 +184,8 @@ const INSTRUCTIONS: Readonly<Record<TemplateLanguage, readonly string[]>> = {
     "How to import your students and their parents",
     "",
     "1. Fill in the Students sheet: one row per student. Keep the header row as it is.",
-    "2. Only Student number, First name and Last name are required. Nobody needs an email.",
+    "2. Student number, First name and Last name are required, and every parent you type needs a",
+    "   phone number. Nobody needs an email.",
     "3. Give brothers and sisters the same Family number. Type their parents on one of their rows;",
     "   the other rows can leave the parent columns blank and still get the same parents.",
     "4. Grade and Section put the student in their class. Pick them from the lists.",
@@ -186,7 +202,8 @@ const INSTRUCTIONS: Readonly<Record<TemplateLanguage, readonly string[]>> = {
     "كيف تستورد طلابك وأولياء أمورهم",
     "",
     "1. املأ ورقة الطلاب: صف واحد لكل طالب. اترك صف العناوين كما هو.",
-    "2. المطلوب فقط رقم الطالب والاسم الأول واسم العائلة. لا يحتاج أحد إلى بريد إلكتروني.",
+    "2. المطلوب رقم الطالب والاسم الأول واسم العائلة، ورقم هاتف لكل ولي أمر تكتبه.",
+    "   لا يحتاج أحد إلى بريد إلكتروني.",
     "3. أعطِ الإخوة والأخوات رقم العائلة نفسه. اكتب أولياء أمورهم في أحد صفوفهم،",
     "   ويمكن ترك أعمدة أولياء الأمور فارغة في الصفوف الأخرى وسيحصلون على أولياء الأمور أنفسهم.",
     "4. الصف والشعبة يضعان الطالب في فصله. اخترهما من القوائم.",
@@ -216,14 +233,14 @@ const EXAMPLE_ROWS: Readonly<Record<TemplateLanguage, readonly (readonly string[
 
 const EXAMPLE_PARENTS: Readonly<Record<TemplateLanguage, readonly (readonly string[])[]>> = {
   en: [
-    ["Mona Hassan", "mother", "", "Omar Hassan", "father", ""],
-    ["", "", "", "", "", ""],
-    ["Rana Khaled", "mother", "rana@example.com", "", "", ""],
+    ["Mona Hassan", "mother", "+965 5000 1234", "", "Omar Hassan", "father", "+965 5000 5678", ""],
+    ["", "", "", "", "", "", "", ""],
+    ["Rana Khaled", "mother", "+965 5000 9012", "rana@example.com", "", "", "", ""],
   ],
   ar: [
-    ["منى حسن", "أم", "", "عمر حسن", "أب", ""],
-    ["", "", "", "", "", ""],
-    ["رنا خالد", "أم", "rana@example.com", "", "", ""],
+    ["منى حسن", "أم", "+965 5000 1234", "", "عمر حسن", "أب", "+965 5000 5678", ""],
+    ["", "", "", "", "", "", "", ""],
+    ["رنا خالد", "أم", "+965 5000 9012", "rana@example.com", "", "", "", ""],
   ],
 };
 
@@ -361,12 +378,17 @@ export async function buildStudentImportTemplate(
     if (index === 0) cell.font = { bold: true, size: 14 };
   });
 
-  // The worked example, in the Students sheet's column order (its first 15 columns).
+  // The worked example, in the Students sheet's column order, up to the last parent column.
+  const exampleColumns = COLUMNS.slice(
+    0,
+    COLUMNS.findIndex((column) => column.field === "parent2_email") + 1,
+  );
   const exampleHeader = example.getRow(1);
-  exampleHeader.values = COLUMNS.slice(0, 15).map((column) => HEADERS[language][column.field]);
+  exampleHeader.values = exampleColumns.map((column) => HEADERS[language][column.field]);
   exampleHeader.font = { bold: true };
-  COLUMNS.slice(0, 15).forEach((column, index) => {
+  exampleColumns.forEach((column, index) => {
     example.getColumn(index + 1).width = column.width;
+    if (column.text) example.getColumn(index + 1).numFmt = "@";
   });
   EXAMPLE_ROWS[language].forEach((row, index) => {
     example.getRow(index + 2).values = [...row, ...EXAMPLE_PARENTS[language][index]!];
