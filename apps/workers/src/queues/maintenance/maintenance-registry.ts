@@ -15,6 +15,7 @@ import { runAccountDeletionSweep } from "./account-deletion-sweep";
 import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
 import { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 import { processDsrJob } from "./dsr-processor";
+import { ensureFuturePartitions } from "./partition-maintenance";
 import { resealRecordValues } from "./record-key-rotation";
 import { purgeExpiredSensitiveRecords } from "./record-retention-sweep";
 import { StripeAiBillingCanceller } from "./stripe-ai-billing-canceller";
@@ -51,6 +52,11 @@ export async function processMaintenanceJob(
       runAccountDeletionSweep(sql, new Date(), billing, enqueue, workerLogger),
     );
     return { processed: true, ...result };
+  }
+
+  if (job.name === JOB_NAMES.ENSURE_TABLE_PARTITIONS) {
+    const result = await withPrimarySql(config, (sql) => ensureFuturePartitions(sql, workerLogger));
+    return result.ran ? { processed: true } : { processed: false, reason: "partition lock held" };
   }
 
   if (job.name === JOB_NAMES.PURGE_EXPIRED_AI_MESSAGES) {
