@@ -1,6 +1,8 @@
 import IORedis from "ioredis";
 
-import { loadSchoolIds } from "../notifications/email/schools";
+import { withSystemTenantTx } from "../../db/tenant-tx";
+import { discoverPendingSchools } from "../outbox-discovery";
+import { startPollLoop } from "../poll-loop";
 
 import { claimBatch } from "./claim";
 import { incrementFailed, incrementPublished, recordLag } from "./metrics";
@@ -13,18 +15,24 @@ import type { Sql } from "postgres";
 export interface RelayConfig {
   /** Max rows to claim per school per poll cycle. */
   batchSize: number;
-  /** Milliseconds to sleep when an entire poll cycle finds zero unrelayed rows. */
+  /** Milliseconds to sleep after the first poll cycle that finds zero unrelayed rows. */
   pollIntervalMs: number;
   /**
-   * Schools to relay for, or `null` to discover them from `app.schools` each cycle.
+   * The ceiling the idle sleep doubles up to while cycles keep finding nothing (see poll-loop.ts).
+   * Defaults to `pollIntervalMs`, i.e. no backoff.
+   */
+  maxIdleIntervalMs?: number;
+  /**
+   * Schools to relay for, or `null` for every school.
    *
    * `null` is the normal deployment. An explicit list is an override for tests and for pinning a
    * relay to a subset of tenants; it was previously the only source, which meant the relay silently
    * did not start when the variable was unset — the state it has been in in production.
    *
-   * Re-reading each cycle rather than once at startup is what lets a newly registered school be
-   * relayed without a worker restart. The read is one indexed scan of a small global table against
-   * the same pool the relay already holds.
+   * Either way, each cycle asks `app.outbox_pending_school_ids('relay')` which schools have
+   * unrelayed rows and opens a claim transaction only for those (an explicit list narrows that
+   * answer). A newly registered school is therefore relayed without a worker restart, and an idle
+   * cycle is one statement rather than one transaction per school.
    */
   schoolIds: string[] | null;
 }
@@ -35,7 +43,7 @@ export interface RelayLogger {
   error(fields: Record<string, unknown>, msg: string): void;
 }
 
-interface RelayContext {
+export interface RelayContext {
   db: Sql;
   redis: IORedis;
   config: RelayConfig;
@@ -50,9 +58,14 @@ export interface RelayHandle {
  * Claim, relay, and mark one batch for a single school. Runs inside one database transaction so
  * row locks from SKIP LOCKED are held for the duration, preventing concurrent relayers from
  * double-claiming.
+ *
+ * A system tenant transaction, like the entitlement invalidator's and the email dispatcher's: tenant
+ * isolation is armed for this school, so the claim no longer depends on the login role bypassing
+ * RLS (the services' current `postgres` login does; the dedicated NOBYPASSRLS login that
+ * docs/security/S-01-database-role-verification.md plans would not).
  */
 async function relayBatch(ctx: RelayContext, schoolId: string): Promise<number> {
-  return await ctx.db.begin(async (tx) => {
+  return await withSystemTenantTx(ctx.db, { schoolId }, async (tx) => {
     const { rows } = await claimBatch(tx, schoolId, ctx.config.batchSize);
     if (rows.length === 0) return 0;
 
@@ -74,12 +87,14 @@ async function relayBatch(ctx: RelayContext, schoolId: string): Promise<number> 
 }
 
 /**
- * One full poll cycle across all configured schools. Returns the total number of events relayed
- * in this cycle.
+ * One full poll cycle across the schools that have unrelayed rows. Returns the total number of
+ * events relayed in this cycle. Exported for tests.
  */
-async function pollOnce(ctx: RelayContext): Promise<number> {
+export async function pollOnce(ctx: RelayContext): Promise<number> {
   let total = 0;
-  const schoolIds = ctx.config.schoolIds ?? (await loadSchoolIds(ctx.db));
+  const pending = await discoverPendingSchools(ctx.db, "relay");
+  const configured = ctx.config.schoolIds === null ? null : new Set(ctx.config.schoolIds);
+  const schoolIds = configured ? pending.filter((id) => configured.has(id)) : pending;
   for (const schoolId of schoolIds) {
     try {
       const count = await relayBatch(ctx, schoolId);
@@ -92,10 +107,6 @@ async function pollOnce(ctx: RelayContext): Promise<number> {
   return total;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
  * Main relay loop. Claims batches via SKIP LOCKED, publishes to Redis pub/sub, marks relayed_at.
  * Runs until `stop()` is called.
@@ -105,22 +116,15 @@ function sleep(ms: number): Promise<void> {
  * release and the row stays unrelayed — picked up on the next cycle.
  */
 export function startRelay(ctx: RelayContext): RelayHandle {
-  let stopped = false;
-
-  const loop = async (): Promise<void> => {
-    while (!stopped) {
-      try {
-        const count = await pollOnce(ctx);
-        if (count === 0) {
-          await sleep(ctx.config.pollIntervalMs);
-        }
-      } catch (err) {
-        incrementFailed();
-        ctx.logger.error({ err }, "relay cycle failed");
-        await sleep(ctx.config.pollIntervalMs);
-      }
-    }
-  };
+  const loop = startPollLoop({
+    minIdleMs: ctx.config.pollIntervalMs,
+    maxIdleMs: ctx.config.maxIdleIntervalMs ?? ctx.config.pollIntervalMs,
+    cycle: () => pollOnce(ctx),
+    onError: (err) => {
+      incrementFailed();
+      ctx.logger.error({ err }, "relay cycle failed");
+    },
+  });
 
   ctx.logger.info(
     {
@@ -129,11 +133,10 @@ export function startRelay(ctx: RelayContext): RelayHandle {
     },
     "outbox relay started",
   );
-  void loop();
 
   return {
     stop: () => {
-      stopped = true;
+      loop.stop();
       ctx.logger.info({}, "outbox relay stopping");
     },
   };

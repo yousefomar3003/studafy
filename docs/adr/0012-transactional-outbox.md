@@ -65,9 +65,13 @@ LOCKED LIMIT n`, then marks `relayed_at` on those exact rows in the same transac
 
 - Consumers are written once to be idempotent, because "at-least-once" is the contract — event
   names are the dedup key downstream, not a promise of single delivery.
-- Relay throughput is per-tenant (one claim batch per school per cycle), which caps a single scan
-  cost at O(#schools) per cycle — the same ceiling SAD_16 records for the email dispatcher; a
-  cross-tenant claim path is a separate ticket.
+- Relay throughput is per-tenant (one claim batch per school per cycle). Which schools to visit is
+  asked once per cycle through `app.outbox_pending_school_ids(consumer)` (000200), which probes
+  each school's partial index under that school's tenant context in a single statement, so a cycle
+  opens claim transactions only for schools with pending rows. The relay, the email dispatcher and
+  the entitlement invalidator all work this way, and back off from their poll interval up to a
+  ceiling while idle (`apps/workers/src/queues/poll-loop.ts`). A cross-tenant claim path is still a
+  separate ticket.
 - The table stays at five fields; anyone tempted to add delivery state must first justify why the
   BullMQ consumer's own retry policy is insufficient. A demonstrated need is an expansion migration,
   not something guessed at on day one.
