@@ -18,6 +18,27 @@ export {
   schedulePartitionMaintenanceJob,
 } from "./partition-maintenance-scheduler";
 export {
+  DATA_RETENTION_BATCH_SIZE,
+  DATA_RETENTION_RULES,
+  DSR_EXPORT_RETENTION_DAYS,
+  NOTIFICATION_RETENTION_MONTHS,
+  REJECTED_SCHOOL_APPLICATION_RETENTION_MONTHS,
+  SALES_INQUIRY_RETENTION_MONTHS,
+  SECURITY_EVENT_RETENTION_MONTHS,
+  purgeExpiredRetainedData,
+  retentionCutoff,
+} from "./data-retention-sweep";
+export type {
+  DataRetentionRule,
+  DataRetentionSweepResult,
+  RetainedDataCategory,
+  RetentionObjectStore,
+} from "./data-retention-sweep";
+export {
+  DATA_RETENTION_SWEEP_CRON_PATTERN,
+  scheduleDataRetentionSweepJob,
+} from "./data-retention-sweep-scheduler";
+export {
   RECORD_RETENTION_BATCH_SIZE,
   purgeExpiredSensitiveRecords,
 } from "./record-retention-sweep";

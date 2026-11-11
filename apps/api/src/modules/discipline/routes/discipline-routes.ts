@@ -1,5 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { PERMISSIONS } from "@studafy/constants";
+import { PERMISSIONS, ROLE_PERMISSIONS, ROLES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
@@ -9,17 +9,18 @@ import { requirePermission, requirePermissionIn } from "../../../middleware/auth
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import {
+  createAction,
   createIncident,
   getIncident,
-  listIncidents,
-  updateIncident,
-  resolveIncident,
-  listActions,
-  createAction,
-  updateAction,
   getParentChildren,
-  getParentResolvedIncidents,
   getParentDisciplineVisibility,
+  getParentIncident,
+  getParentResolvedIncidents,
+  listActions,
+  listIncidents,
+  resolveIncident,
+  updateAction,
+  updateIncident,
 } from "../discipline-service";
 import {
   disciplineIncidentListSchema,
@@ -241,6 +242,22 @@ const updateActionRoute = createRoute({
   ),
 });
 
+/**
+ * Whether the caller reads incidents only as a parent: they hold PARENT and no other role that may
+ * read incidents (a teacher who is also a parent sees what teachers see). Parents see only their
+ * own children's resolved incidents, and only when the school turns that on.
+ */
+function readsAsParentOnly(roles: readonly string[]): boolean {
+  if (!roles.includes(ROLES.PARENT)) return false;
+  return !roles.some(
+    (role) =>
+      role !== ROLES.PARENT &&
+      (ROLE_PERMISSIONS[role as keyof typeof ROLE_PERMISSIONS] ?? []).includes(
+        PERMISSIONS.DISCIPLINE_INCIDENT_READ,
+      ),
+  );
+}
+
 export function disciplineRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
@@ -279,9 +296,8 @@ export function disciplineRoutes(database: Database): OpenAPIHono<AppEnv> {
   routes.openapi(listIncidentsRoute, async (c) => {
     const auth = requireAuth(c);
     const query = c.req.valid("query");
-    const isParent = auth.roles.includes("PARENT");
 
-    if (isParent) {
+    if (readsAsParentOnly(auth.roles)) {
       const visible = await withTenantTx(database, tenantFrom(c), (tx) =>
         getParentDisciplineVisibility(tx, auth.schoolId),
       );
@@ -313,8 +329,23 @@ export function disciplineRoutes(database: Database): OpenAPIHono<AppEnv> {
     const auth = requireAuth(c);
     const { incidentId } = c.req.valid("param");
 
+    // A parent holds disciplineIncident:read for their own children only; the permission alone
+    // would let them open any incident in the school by its id.
+    if (readsAsParentOnly(auth.roles)) {
+      const visible = await withTenantTx(database, tenantFrom(c), (tx) =>
+        getParentDisciplineVisibility(tx, auth.schoolId),
+      );
+      if (!visible) {
+        throw new HTTPException(403, {
+          message: "Parent visibility of discipline incidents is disabled for this school",
+        });
+      }
+    }
+
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      getIncident(tx, auth.schoolId, incidentId),
+      readsAsParentOnly(auth.roles)
+        ? getParentIncident(tx, auth.schoolId, auth.userId, incidentId)
+        : getIncident(tx, auth.schoolId, incidentId),
     );
 
     if (!row) {

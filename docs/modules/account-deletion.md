@@ -21,8 +21,10 @@ that sign in with a member ID and password — enters both, which the API verifi
 sign-in lockout. A final dialog follows.
 
 The school admin additionally has **"Delete school"**, which is _not_ an account deletion:
-`POST /api/schools/current/closure` archives the school, signs every member out and blocks sign-in,
-and retains all data (`apps/api/src/modules/tenancy/closure`).
+`POST /api/schools/current/closure` archives the school, signs every member out and blocks sign-in
+(`apps/api/src/modules/tenancy/closure`). The workers' daily tenant-closure sweep then exports the
+school's data and erases it 30 days after the export completes (`closure-sweep.ts`), as for a school
+whose subscription closed.
 
 ## What happens
 
@@ -134,6 +136,10 @@ change to the other.
 
 The retention _period_ for grades and attendance is set by each school's education authority and
 is not encoded here.
+
+Data Studafy deletes on a fixed schedule regardless of any request (AI chats, sensitive record
+fields, imports, reports, notifications, security events, rejected applications, export bundles)
+is listed in [data-retention.md](./data-retention.md).
 
 ## Known gaps
 
