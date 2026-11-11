@@ -64,7 +64,9 @@ Add new app-wide providers inside `AppProviders`.
 
 `AppProviders` wires one `RealtimeClient` behind the query client. The base URL comes from
 `VITE_REALTIME_BASE_URL` (default `ws://localhost:3001`); auth is supplied by
-`getRealtimeToken()` (`src/lib/realtime/token.ts`).
+`getRealtimeToken()` (`src/lib/realtime/token.ts`). The socket only opens in a build with
+`VITE_REALTIME_ENABLED=true` (`REALTIME_ENABLED` in `src/lib/config.ts`): live updates are deferred,
+so it is off by default, including production (`infra/fly/web.toml`), and the client stays `idle`.
 
 ### Query-key contract
 

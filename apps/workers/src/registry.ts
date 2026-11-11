@@ -33,6 +33,7 @@ import { createFcmSender } from "./queues/notifications/push";
 import { processReportJob } from "./queues/reports";
 import { createReportS3 } from "./queues/reports/report-s3";
 import {
+  CLAMD_STARTUP_WAIT_MS,
   createScanS3,
   isUploadScanJob,
   materialScanFailedListener,
@@ -459,6 +460,8 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           port: workerEnv.CLAMAV_PORT,
           timeoutMs: workerEnv.CLAMAV_TIMEOUT_MS,
           maxFileBytes: workerEnv.CLAMAV_MAX_FILE_BYTES,
+          // The scanner starts on demand on fly.io; wait out its cold start before streaming.
+          startupWaitMs: CLAMD_STARTUP_WAIT_MS,
         },
       };
       if (isUploadScanJob(job)) {

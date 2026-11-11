@@ -12,6 +12,22 @@ Production runs on fly.io instead of AWS ECS. Each service is its own fly app in
 | `studafy-core-web`      | `web.toml`      | apps/web, public at `app.studafy.com`                       |
 | `studafy-core-migrate`  | `migrate.toml`  | db migrations, run as a one-off machine                     |
 
+What runs when:
+
+- **api, web**: always on (`min_machines_running = 1`). A cold start would land on a person's
+  request, and the web machine is 256 MB (about $2 a month).
+- **workers**: always on; they poll their queues.
+- **scanner**: on demand. The workers' first connection to its Flycast address starts it, and fly's
+  proxy stops it again a few minutes after the last scan. The scan worker waits up to two minutes
+  for clamd to answer before it streams a file (`CLAMD_STARTUP_WAIT_MS`), so a cold start (about
+  30 s) delays a scan, never fails it.
+- **realtime**: scaled to zero while live updates are deferred. Nothing reaches it: the web build
+  and the mobile builds leave the socket off (`VITE_REALTIME_ENABLED`, `REALTIME_ENABLED`) and the
+  API has no `/ws` route while `REALTIME_FLY_APP` is unset. To turn realtime on, set
+  `REALTIME_FLY_APP` (api.toml), `VITE_REALTIME_ENABLED = "true"` (web.toml), build the apps with
+  `--dart-define=REALTIME_ENABLED=true`, and put realtime.toml back to `min_machines_running = 1`
+  with `auto_stop_machines = "off"`.
+
 Managed services: Postgres on Supabase (project `studafy-prod`, `eu-central-1`), Redis on Redis
 Cloud (`eu-central-1`, `noeviction`, AOF every second), files on Cloudflare R2 (bucket
 `studafy-prod-files`), email through Resend.
