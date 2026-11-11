@@ -258,7 +258,9 @@ sink, so tests never issue background INSERTs.
 **Retention is not yet automated.** These rows have a bounded useful life and the table is
 intentionally not partitioned and carries no append-only trigger — `DELETE` by `studafy_admin` is the
 intended sweep. A scheduled job in the ST-053 maintenance family should own it; until then the table
-grows, bounded in rate by the sink's queue ceiling.
+grows, bounded in rate by the sink's queue ceiling. The rows' **IP addresses** are already limited:
+the daily IP-address retention sweep sets `client_ip` to NULL once a row is 90 days old (see
+`docs/modules/account-deletion.md`, "IP addresses").
 
 ## Performance
 

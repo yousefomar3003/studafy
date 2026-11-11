@@ -25,6 +25,7 @@ import { scheduleAbandonedImportSweepJob } from "./queues/imports";
 import {
   scheduleAccountDeletionSweepJob,
   scheduleAiMessageRetentionSweepJob,
+  scheduleIpAddressRetentionSweepJob,
   schedulePartitionMaintenanceJob,
   scheduleRecordRetentionSweepJob,
   scheduleClosureSweepJob,
@@ -264,6 +265,14 @@ void schedulePartitionMaintenanceJob(partitionMaintenanceRedis).then(() =>
 const aiMessageRetentionRedis = createRedisConnection(env);
 void scheduleAiMessageRetentionSweepJob(aiMessageRetentionRedis).then(() =>
   aiMessageRetentionRedis.disconnect(),
+);
+
+// IP address retention scheduler (docs/modules/account-deletion.md "IP addresses"): idempotently
+// register the daily 03:45 removal of IP addresses older than 90 days from session rows and security
+// events on the maintenance queue -- a quiet slot between the 03:00 Tap renewal and 04:00 dunning.
+const ipAddressRetentionRedis = createRedisConnection(env);
+void scheduleIpAddressRetentionSweepJob(ipAddressRetentionRedis).then(() =>
+  ipAddressRetentionRedis.disconnect(),
 );
 
 // Sensitive record retention scheduler (docs/modules/student-records.md "Retention"):
