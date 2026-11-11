@@ -48,11 +48,20 @@ class AttachmentImageCache {
   static const _pruneEvery = 20;
 
   final _inFlight = <String, Future<Uint8List>>{};
+  final _pendingWrites = <Future<void>>{};
   int _writesSincePrune = _pruneEvery;
+
+  /// Completes once every disk write (and any prune it triggered) started so far has finished.
+  /// The writes are fire-and-forget so a picture shows before it is stored; tests wait on this
+  /// instead of guessing a delay.
+  @visibleForTesting
+  Future<void> flush() => Future.wait(_pendingWrites.toList());
 
   Future<Directory> _dir() async {
     final root = await _root();
-    return Directory(p.join(root.path, 'attachment_images')).create(recursive: true);
+    return Directory(
+      p.join(root.path, 'attachment_images'),
+    ).create(recursive: true);
   }
 
   /// A file-system-safe name for [namespace] + [id] (ids are UUIDs; anything else is replaced).
@@ -92,7 +101,9 @@ class AttachmentImageCache {
     final data = response.data;
     if (data == null || data.isEmpty) throw StateError('Empty image response');
     final bytes = data is Uint8List ? data : Uint8List.fromList(data);
-    unawaited(_write(name, bytes));
+    final write = _write(name, bytes);
+    _pendingWrites.add(write);
+    unawaited(write.whenComplete(() => _pendingWrites.remove(write)));
     return bytes;
   }
 
@@ -166,7 +177,8 @@ class AttachmentImageCache {
 final attachmentImageCacheProvider = Provider<AttachmentImageCache>((ref) {
   final cache = AttachmentImageCache();
   ref.listen(authStatusProvider, (previous, next) {
-    if (previous == AuthStatus.authenticated && next == AuthStatus.unauthenticated) {
+    if (previous == AuthStatus.authenticated &&
+        next == AuthStatus.unauthenticated) {
       cache.clear();
     }
   });
@@ -204,14 +216,19 @@ class AttachmentImageProvider extends ImageProvider<AttachmentImageProvider> {
       SynchronousFuture<AttachmentImageProvider>(this);
 
   @override
-  ImageStreamCompleter loadImage(AttachmentImageProvider key, ImageDecoderCallback decode) {
+  ImageStreamCompleter loadImage(
+    AttachmentImageProvider key,
+    ImageDecoderCallback decode,
+  ) {
     final chunkEvents = StreamController<ImageChunkEvent>();
     return MultiFrameImageStreamCompleter(
       codec: _load(key, decode, chunkEvents),
       chunkEvents: chunkEvents.stream,
       scale: 1,
       debugLabel: '$namespace/$id',
-      informationCollector: () => [DiagnosticsProperty<ImageProvider>('Image provider', this)],
+      informationCollector: () => [
+        DiagnosticsProperty<ImageProvider>('Image provider', this),
+      ],
     );
   }
 
@@ -226,7 +243,10 @@ class AttachmentImageProvider extends ImageProvider<AttachmentImageProvider> {
         id,
         url,
         onProgress: (received, total) => chunkEvents.add(
-          ImageChunkEvent(cumulativeBytesLoaded: received, expectedTotalBytes: total),
+          ImageChunkEvent(
+            cumulativeBytesLoaded: received,
+            expectedTotalBytes: total,
+          ),
         ),
       );
       final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
@@ -234,8 +254,9 @@ class AttachmentImageProvider extends ImageProvider<AttachmentImageProvider> {
       if (width == null) return await decode(buffer);
       return await decode(
         buffer,
-        getTargetSize: (intrinsicWidth, intrinsicHeight) =>
-            ui.TargetImageSize(width: width < intrinsicWidth ? width : intrinsicWidth),
+        getTargetSize: (intrinsicWidth, intrinsicHeight) => ui.TargetImageSize(
+          width: width < intrinsicWidth ? width : intrinsicWidth,
+        ),
       );
     } catch (_) {
       // As NetworkImage does: the cache may not hold the key yet, so evict once it can.

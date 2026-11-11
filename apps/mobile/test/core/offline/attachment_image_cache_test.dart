@@ -37,18 +37,6 @@ void main() {
     maxBytes: maxBytes,
   );
 
-  /// Lets the cache's fire-and-forget disk write finish.
-  Future<void> settle() =>
-      Future<void>.delayed(const Duration(milliseconds: 50));
-
-  /// Waits (up to 5 s) until [done] holds. The cache writes and prunes in the background, and a
-  /// fixed delay is not enough on a slow CI runner.
-  Future<void> until(bool Function() done) async {
-    for (var i = 0; i < 500 && !done(); i++) {
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-    }
-  }
-
   File cached(String id) => File(
     '${root.path}/attachment_images/${AttachmentImageCache.fileNameFor('chat', id)}',
   );
@@ -69,7 +57,7 @@ void main() {
       2,
       3,
     ]);
-    await settle();
+    await first.flush();
 
     // A new instance (an app restart) with a re-minted URL: served from disk.
     final second = cache();
@@ -97,7 +85,7 @@ void main() {
   test('namespaces do not collide', () async {
     final c = cache();
     await c.load('chat', 'x', 'https://storage.test/chat-x');
-    await settle();
+    await c.flush();
     await c.load('question', 'x', 'https://storage.test/question-x');
     expect(adapter.requested, hasLength(2));
   });
@@ -120,7 +108,7 @@ void main() {
   test('clear wipes everything', () async {
     final c = cache();
     await c.load('chat', 'a1', 'https://storage.test/a1');
-    await settle();
+    await c.flush();
     await c.clear();
     await c.load('chat', 'a1', 'https://storage.test/a1');
     expect(adapter.requested, hasLength(2));
@@ -133,12 +121,12 @@ void main() {
       final c = cache(maxBytes: 1000);
       // The first write always checks the size; it is under the cap.
       await c.load('chat', 'old', 'https://storage.test/old');
-      await until(() => cached('old').existsSync());
+      await c.flush();
       final dir = Directory('${root.path}/attachment_images');
       await cached('old').setLastModified(DateTime(2020));
       for (final id in ['b', 'c']) {
         await c.load('chat', id, 'https://storage.test/$id');
-        await until(() => cached(id).existsSync());
+        await c.flush();
       }
       // Over the cap now (1200 bytes), but the next check is a few writes away.
       expect(dir.listSync(), hasLength(3));
@@ -146,11 +134,8 @@ void main() {
       // The 20th write since the first check checks again.
       for (var i = 0; i < 18; i++) {
         await c.load('chat', 'n$i', 'https://storage.test/n$i');
-        await until(() => cached('n$i').existsSync());
+        await c.flush();
       }
-      // The prune runs after the 20th write's rename; wait for it to drop the oldest file.
-      await until(() => !cached('old').existsSync());
-      await settle();
       final names = dir.listSync().map((e) => e.uri.pathSegments.last).toSet();
       final total = dir.listSync().whereType<File>().fold<int>(
         0,
