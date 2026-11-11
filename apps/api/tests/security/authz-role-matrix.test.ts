@@ -116,7 +116,6 @@ beforeAll(async () => {
   // a crash) behind a config gap that's specific to this harness, not to production. The Resend
   // secret is in Svix's `whsec_<base64>` form, as verifyResendSignature decodes it.
   process.env.ERPNEXT_WEBHOOK_SECRET ??= "test-erpnext-webhook-secret";
-  process.env.EMAIL_EVENTS_SNS_TOPIC_ARN ??= "arn:aws:sns:us-east-1:000000000000:test-topic";
   process.env.RESEND_WEBHOOK_SECRET ??= `whsec_${Buffer.from("test-resend-webhook-secret").toString("base64")}`;
 
   keyStore = new KeyStore(60_000);

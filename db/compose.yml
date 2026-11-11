@@ -18,8 +18,8 @@ services:
     # `CREATE EXTENSION vector` would fail against it.
     image: pgvector/pgvector:pg16
     # Preload pg_stat_statements so the disposable local/CI database actually collects statistics and
-    # the operational extension tests can query them. On RDS this is the parameter-group setting in
-    # infra/terraform/modules/postgres (requires a reboot); here it is a container flag.
+    # the operational extension tests can query them. Supabase preloads it already; here
+    # it is a container flag.
     command: ["postgres", "-c", "shared_preload_libraries=pg_stat_statements"]
     environment:
       POSTGRES_USER: studafy_test
@@ -48,8 +48,8 @@ services:
   # --- Local file uploads (profile "files") ---------------------------------------------------------
   # Started by `bun run db:up` (which passes --profile files), not by CI's plain `docker compose up`,
   # so the database/Redis CI jobs don't wait on a ClamAV signature load they never use.
-  # Production uses real S3 through the ECS task roles and a ClamAV sidecar in the workers task
-  # (infra/docker/clamav.Dockerfile); these two stand in for them on a developer machine.
+  # Production uses Cloudflare R2 and the ClamAV scanner app (infra/fly/scanner.toml); these two
+  # stand in for them on a developer machine.
 
   # S3-compatible object storage for the app-files bucket. RustFS rather than MinIO: MinIO's free
   # images are no longer published to Docker Hub or quay.io. The credentials are local-only and bound
@@ -87,8 +87,8 @@ services:
       - clamav-db:/var/lib/clamav
 
   # --- Local ERPNext (profile "erpnext") -------------------------------------------------------------
-  # The accounting plane behind /api/finance/* and the Finance dashboard, in the shape
-  # infra/terraform/modules/erpnext runs it on ECS: one bench (this repo's infra/docker/erpnext
+  # The accounting plane behind /api/finance/* and the Finance dashboard, in the shape a
+  # hosted ERPNext would run: one bench (this repo's infra/docker/erpnext
   # image -- ERPNext + Frappe Education), MariaDB, two Redis, and backend/websocket/queue/scheduler
   # roles behind an nginx frontend that picks the Frappe site from the Host header (one site per
   # school). Opt-in and heavy (~2-3 GB RAM, first build ~4 GB): `bun run erpnext:up` starts it and

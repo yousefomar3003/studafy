@@ -6,14 +6,11 @@
  * cost attribution already exists (`GET /api/ai/admin/metrics`, ST-155,
  * apps/api/src/modules/ai/routes/metrics-routes.ts) — that endpoint is the source of truth for "which
  * school", and this sweep does not recompute it per tenant. What it adds is the *platform-wide*
- * total, published as a CloudWatch metric the budget alarms in
- * infra/terraform/modules/monitoring/alerts.tf watch (`AiEstimatedSpendUsd`), plus Stripe's own
- * processing fees (`StripeFeesUsd`) — a cost line nothing else in this codebase tracks.
+ * total (`aiEstimatedCostUsd`), plus Stripe's own processing fees (`stripeFeesUsd`) — a cost line
+ * nothing else in this codebase tracks — written as one structured log line per run. The workers'
+ * logs ship to Axiom (infra/fly/README.md), where those fields are queryable and alertable.
  *
- * Deliberately NOT per-school-dimensioned on CloudWatch: this module's own README has a "cardinality
- * budget" section that is explicit about never labelling a metric by school id, and a monitoring
- * metric is exactly the wrong place to duplicate the per-tenant attribution the admin-metrics
- * endpoint already owns.
+ * Deliberately NOT per-school: the per-tenant attribution belongs to the admin-metrics endpoint.
  *
  * ## Why a per-school loop, not one cross-tenant query
  *
@@ -36,17 +33,12 @@
  * package.
  */
 
-import { CloudWatchClient, PutMetricDataCommand } from "@aws-sdk/client-cloudwatch";
-
 import { withSystemTenantTx } from "../../db/tenant-tx";
 import { loadSchoolIds } from "../notifications/email/schools";
 
 import type { WorkerLogger } from "../../log";
 import type { Sql } from "postgres";
 import type Stripe from "stripe";
-
-/** CloudWatch namespace every cost metric this sweep publishes lands under (Studafy/<component>). */
-export const COST_METRIC_NAMESPACE = "Studafy/Cost";
 
 // --- Pricing (mirrors apps/api/src/modules/ai/usage/costs.ts — see header) -----------------------
 
@@ -85,9 +77,8 @@ export interface BudgetVerdict {
 
 /**
  * Pure breach check — no I/O, so it is the piece of "budget breach alerts" this sweep can prove
- * with a unit test. The actual *paging* is the CloudWatch alarm on the metric this sweep publishes
- * (`AiSpendBudgetHigh`, alerts.tf); this function is what decides the monthly report's own verdict
- * line, evaluated against the same budget the alarm's threshold should be set to.
+ * with a unit test. It decides the report's own verdict line (`budgetBreached`), which an Axiom
+ * monitor on the cost-report log line can alert on.
  */
 export function evaluateBudgetBreach(spendUsd: number, budgetUsd: number): BudgetVerdict {
   const overageUsd = Math.round((spendUsd - budgetUsd) * 100) / 100;
@@ -223,42 +214,15 @@ export async function computeStripeFeesUsd(
   return Math.round(feesMinorUnits) / 100;
 }
 
-// --- CloudWatch publishing ---------------------------------------------------------------------------
-
-export interface CostMetrics {
-  aiEstimatedSpendUsd: number;
-  /** Null when the Stripe portion was skipped (no STRIPE_SECRET_KEY) — nothing is published for it. */
-  stripeFeesUsd: number | null;
-}
-
-export async function publishCostMetrics(
-  cloudwatch: CloudWatchClient,
-  namespace: string,
-  metrics: CostMetrics,
-  now: Date,
-): Promise<void> {
-  const metricData = [
-    { MetricName: "AiEstimatedSpendUsd", Value: metrics.aiEstimatedSpendUsd },
-    ...(metrics.stripeFeesUsd === null
-      ? []
-      : [{ MetricName: "StripeFeesUsd", Value: metrics.stripeFeesUsd }]),
-  ].map((entry) => ({ ...entry, Unit: "None" as const, Timestamp: now }));
-
-  await cloudwatch.send(new PutMetricDataCommand({ Namespace: namespace, MetricData: metricData }));
-}
-
 // --- Orchestration -----------------------------------------------------------------------------------
 
 export interface CostReportDeps {
   sql: Sql;
-  cloudwatch: CloudWatchClient;
   /** Undefined when STRIPE_SECRET_KEY is not configured — the Stripe portion is skipped, not faked. */
   stripe?: Stripe;
   log: WorkerLogger;
-  /** Advisory budget for the monthly report's verdict line; the alarm's own threshold is separate
-   *  Terraform state (alerts.tf's `ai_monthly_spend_budget_usd`) and must be kept in sync by hand. */
+  /** Budget for the report's verdict line (AI_MONTHLY_SPEND_BUDGET_USD). */
   monthlyBudgetUsd?: number;
-  metricNamespace?: string;
 }
 
 export interface CostReportResult {
@@ -279,20 +243,16 @@ function previousMonthWindow(now: Date): { since: Date; until: Date } {
 }
 
 /**
- * `mode: "daily"` publishes CloudWatch metrics only, cheaply, so the budget alarms stay current
- * intraday. `mode: "monthly"` additionally logs the previous calendar month's full structured
- * report — the "monthly report automated" acceptance criterion — read by the `<prefix>-cost`
- * CloudWatch dashboard's Logs Insights widget
- * (infra/terraform/modules/monitoring/cost.tf), the same "queryable log line, not an email"
- * pattern ST-255's deploy annotations already established.
+ * `mode: "daily"` logs month-to-date totals, so spend is visible intraday. `mode: "monthly"` logs
+ * the previous calendar month's full report — the "monthly report automated" acceptance criterion.
+ * Both are one structured log line ("queryable log line, not an email"), shipped to Axiom.
  */
 export async function runCostReport(
   deps: CostReportDeps,
   mode: "daily" | "monthly",
   now: Date,
 ): Promise<CostReportResult> {
-  const { sql, cloudwatch, stripe, log } = deps;
-  const namespace = deps.metricNamespace ?? COST_METRIC_NAMESPACE;
+  const { sql, stripe, log } = deps;
   const window = mode === "monthly" ? previousMonthWindow(now) : monthToDateWindow(now);
 
   const ai = await computeAiCostTotals(sql, now);
@@ -303,13 +263,6 @@ export async function runCostReport(
   } else {
     log.warn({ mode }, "cost-report: STRIPE_SECRET_KEY not set, skipping Stripe fee reporting");
   }
-
-  await publishCostMetrics(
-    cloudwatch,
-    namespace,
-    { aiEstimatedSpendUsd: ai.estimatedCostUsd, stripeFeesUsd },
-    now,
-  );
 
   const budgetVerdict =
     deps.monthlyBudgetUsd === undefined
@@ -334,7 +287,7 @@ export async function runCostReport(
   if (mode === "monthly") {
     log.info(logFields, "cost-report: monthly cost report");
   } else {
-    log.info(logFields, "cost-report: daily cost metrics published");
+    log.info(logFields, "cost-report: daily cost totals");
   }
 
   return { mode, ai, stripeFeesUsd, budgetVerdict };

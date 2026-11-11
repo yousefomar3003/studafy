@@ -1,8 +1,8 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-import { normalizeAddresses } from "./ses-events";
+import { normalizeAddresses } from "./email-events";
 
-import type { ParsedSesEvent } from "./ses-events";
+import type { ParsedEmailEvent } from "./email-events";
 
 /**
  * Resend email-event webhook: signature check and event parsing.
@@ -12,7 +12,7 @@ import type { ParsedSesEvent } from "./ses-events";
  * more space-separated `v1,<signature>` entries in `svix-signature`. A delivery older or newer than
  * five minutes is refused, so a captured request cannot be replayed later.
  *
- * Parsing maps Resend's events onto the same ledger the SES webhook writes (`ParsedSesEvent`):
+ * Parsing maps Resend's events onto the email-event ledger (`ParsedEmailEvent`):
  * `email.bounced` is a hard bounce (soft bounces arrive as `email.delivery_delayed`, which is
  * ignored), `email.complained` a spam complaint, `email.delivered` a delivery. The message id is
  * Resend's `data.email_id`, the id the workers' Resend sender recorded on the delivery row.
@@ -73,7 +73,7 @@ interface ResendEvent {
  * @throws {ResendEventError} When the body is not usable (no email id, or a bounce/complaint with no
  *   recipient to suppress).
  */
-export function parseResendEvent(body: unknown): ParsedSesEvent | null {
+export function parseResendEvent(body: unknown): ParsedEmailEvent | null {
   if (typeof body !== "object" || body === null || Array.isArray(body)) {
     throw new ResendEventError("Resend event is not a JSON object");
   }

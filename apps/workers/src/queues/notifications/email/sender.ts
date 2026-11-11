@@ -1,13 +1,10 @@
 /**
- * Send adapters for the email channel: Amazon SES and Resend.
+ * The email channel's send adapter: Resend.
  *
  * The dispatcher depends on a narrow `EmailSender` interface so tests inject a stub and the
- * process never touches a provider. `createEmailSender` picks the adapter from EMAIL_PROVIDER;
- * `createSesSender` and `createResendSender` build the real adapters, or a loud dry-run substitute
- * when the provider's credential is not configured (local development and CI).
+ * process never touches a provider. `createEmailSender` builds the Resend adapter, or a loud
+ * dry-run substitute when RESEND_API_KEY is not configured (local development and CI).
  */
-
-import { SendEmailCommand, SESv2Client } from "@aws-sdk/client-sesv2";
 
 import type { RenderedEmail } from "./templates";
 
@@ -51,85 +48,16 @@ export function isRetryableSendError(err: unknown): boolean {
     // again unchanged.
     return err.status === undefined || err.status === 429 || err.status >= 500;
   }
-  if (err instanceof Error) {
-    // Connection-level failures — SES never saw the request, so retrying is safe.
-    if (
-      err.name === "ECONNRESET" ||
+  // Connection-level failures: the provider never saw the request, so retrying is safe.
+  return (
+    err instanceof Error &&
+    (err.name === "ECONNRESET" ||
       err.name === "EPIPE" ||
       err.name === "ETIMEDOUT" ||
       err.name === "EAI_AGAIN" ||
       err.name === "ENOTFOUND" ||
-      err.message.includes("socket closed")
-    ) {
-      return true;
-    }
-    if ("$metadata" in err) {
-      const status = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
-      if (status !== undefined) {
-        // 429 (throttling) and 5xx are transient by SES's own contract.
-        return status === 429 || status >= 500;
-      }
-    }
-  }
-  return false;
-}
-
-/**
- * Build the email sender. Without a region the sender is a dry run: it resolves like a send but
- * nothing leaves the process, so the whole dispatcher pipeline (claim, dedup, delivery ledger)
- * works in development and CI without AWS credentials.
- */
-export function createSesSender(
-  env: {
-    SES_REGION?: string;
-    SES_FROM_ADDRESS: string;
-    SES_FROM_NAME?: string;
-    SES_CONFIGURATION_SET?: string;
-  },
-  logger: SenderLogger,
-): EmailSender {
-  const fromAddress = env.SES_FROM_ADDRESS;
-  const from = formatFrom(fromAddress, env.SES_FROM_NAME);
-
-  if (env.SES_REGION === undefined) {
-    logger.warn({ fromAddress }, "SES_REGION unset — email dispatcher running in dry-run mode");
-    return {
-      async send(_email: OutboundEmail): Promise<SentEmail> {
-        return { messageId: `dry-run-${crypto.randomUUID()}`, dryRun: true };
-      },
-    };
-  }
-
-  const client = new SESv2Client({ region: env.SES_REGION });
-
-  return {
-    async send(email: OutboundEmail): Promise<SentEmail> {
-      const result = await client.send(
-        new SendEmailCommand({
-          FromEmailAddress: from,
-          // Bounces and complaints are published through the configuration set's SNS destination
-          // to the API, which suppresses the address (apps/api/src/email/webhook.ts).
-          ConfigurationSetName: env.SES_CONFIGURATION_SET,
-          Destination: { ToAddresses: [email.to] },
-          ...(email.replyTo ? { ReplyToAddresses: [email.replyTo] } : {}),
-          Content: {
-            Simple: {
-              Subject: { Data: email.subject, Charset: "UTF-8" },
-              Body: {
-                Text: { Data: email.text, Charset: "UTF-8" },
-                Html: { Data: email.html, Charset: "UTF-8" },
-              },
-            },
-          },
-        }),
-      );
-
-      if (result.MessageId === undefined) {
-        throw new Error("SES SendEmail returned no MessageId");
-      }
-      return { messageId: result.MessageId, dryRun: false };
-    },
-  };
+      err.message.includes("socket closed"))
+  );
 }
 
 /**
@@ -143,21 +71,22 @@ function formatFrom(address: string, name: string | undefined): string {
 export const RESEND_API_URL = "https://api.resend.com/emails";
 
 /**
- * Build the Resend sender. The from address (SES_FROM_ADDRESS / SES_FROM_NAME, shared with SES)
- * must be on a domain verified in Resend. Without RESEND_API_KEY the sender is a dry run, like SES
- * without a region. Bounces and complaints come back through the API's /email/webhooks/resend.
+ * Build the email sender. EMAIL_FROM_ADDRESS must be on a domain verified in Resend. Without
+ * RESEND_API_KEY the sender is a dry run: it resolves like a send but nothing leaves the process,
+ * so the whole dispatcher pipeline (claim, dedup, delivery ledger) works in development and CI.
+ * Bounces and complaints come back through the API's /email/webhooks/resend.
  */
-export function createResendSender(
+export function createEmailSender(
   env: {
     RESEND_API_KEY?: string;
-    SES_FROM_ADDRESS: string;
-    SES_FROM_NAME?: string;
+    EMAIL_FROM_ADDRESS: string;
+    EMAIL_FROM_NAME?: string;
   },
   logger: SenderLogger,
   fetchImpl: typeof fetch = fetch,
 ): EmailSender {
-  const fromAddress = env.SES_FROM_ADDRESS;
-  const from = formatFrom(fromAddress, env.SES_FROM_NAME);
+  const fromAddress = env.EMAIL_FROM_ADDRESS;
+  const from = formatFrom(fromAddress, env.EMAIL_FROM_NAME);
   const apiKey = env.RESEND_API_KEY;
 
   if (!apiKey) {
@@ -209,21 +138,4 @@ export function createResendSender(
       return { messageId: body.id, dryRun: false };
     },
   };
-}
-
-/** The sender for EMAIL_PROVIDER: SES (the default) or Resend. */
-export function createEmailSender(
-  env: {
-    EMAIL_PROVIDER: "ses" | "resend";
-    RESEND_API_KEY?: string;
-    SES_REGION?: string;
-    SES_FROM_ADDRESS: string;
-    SES_FROM_NAME?: string;
-    SES_CONFIGURATION_SET?: string;
-  },
-  logger: SenderLogger,
-): EmailSender {
-  return env.EMAIL_PROVIDER === "resend"
-    ? createResendSender(env, logger)
-    : createSesSender(env, logger);
 }

@@ -122,7 +122,7 @@ export async function provisionTenant(
 
   // ── 3. ERPNext site registration ─────────────────────────────────────────
   // Only where the integration is configured. The site itself is created by an operator
-  // (erpnext-new-site.sh) and activates on the school's first finance request -- see
+  // (bench, infra/erpnext/seed) and activates on the school's first finance request -- see
   // registerErpNextSite -- so a school's own provisioning never waits on, or fails with, ERPNext.
   if (!erpNextClient) {
     logger.warn({ school_id: schoolId }, "ERPNext not configured, skipping site registration");
@@ -305,8 +305,8 @@ export function erpNextSiteName(slug: string): string {
  * Record the school's ERPNext site as awaiting creation.
  *
  * A Frappe site can only be created by bench (`bench new-site`), never over the REST API, so the API
- * cannot create one itself. An operator runs `infra/deploy/scripts/erpnext-new-site.sh <env>
- * <site>`, which creates the site, finishes ERPNext's setup wizard (the school's company) and sets
+ * cannot create one itself. An operator runs `bench new-site <site>` and then
+ * infra/erpnext/seed/provision.py's `setup`, which finishes ERPNext's setup wizard (the school's company) and sets
  * the integration key. The credential resolver (modules/finance/client/credential-resolver.ts)
  * then notices the site answering on the school's next finance request and marks it 'completed'
  * with its company -- so this row is all provisioning has to write.
@@ -339,7 +339,7 @@ async function registerErpNextSite(
 
   logger.info(
     { school_id: params.schoolId, site_name: siteName },
-    "ERPNext site registered; awaiting erpnext-new-site.sh",
+    "ERPNext site registered; awaiting its bench site",
   );
 }
 

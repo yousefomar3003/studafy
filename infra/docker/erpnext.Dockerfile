@@ -2,15 +2,14 @@
 #
 # Build from the repo root, same convention as the other three Dockerfiles in this directory
 # (infra/docker/README.md's "Why the build context is the repo root") — this one doesn't touch the
-# Bun workspace, but it does need infra/deploy/erpnext/seed/, which only exists in a repo-root
+# Bun workspace, but it does need infra/erpnext/seed/, which only exists in a repo-root
 # context:
 #   docker build -f infra/docker/erpnext.Dockerfile -t studafy/erpnext .
 #
-# This image is used by the backend/websocket/queue/scheduler ECS services
-# (infra/terraform/modules/erpnext) — every bench role that runs Python/Node bench commands. The
-# frontend role deliberately does NOT use this image; it runs the stock upstream
-# frappe/erpnext-nginx image unmodified, since nginx doesn't run bench and doesn't need the
-# Education app installed (see modules/erpnext/README.md).
+# This image is every bench role that runs Python/Node bench commands (backend, websocket, queue,
+# scheduler; see db/compose.yml for the local stack). The frontend role deliberately does NOT use
+# this image; it runs the stock upstream frappe/erpnext-nginx image unmodified, since nginx doesn't
+# run bench and doesn't need the Education app installed.
 #
 # No custom build/runtime split like api/realtime/workers/web's Dockerfiles: there is no slim
 # final artifact to copy things into here — frappe/erpnext's own image is already the runtime,
@@ -22,19 +21,6 @@
 # change on our side. The digest makes builds reproducible; Renovate proposes each new upstream
 # digest as its own PR, where the size budget and scan run before it can merge.
 FROM frappe/erpnext:version-15@sha256:de8e0068467b4ea5a9d1b0a7c07e37b1ed8d2ea8d2f9d02c316bfd4d5a80f5f3
-
-# The backup/restore-drill ECS tasks (infra/terraform/modules/backup, ST-265) reuse this same bench
-# image to run `bench backup`/`bench restore`/`bench doctor` against a real Frappe site — no separate
-# image exists for that purpose (KISS: one bench-capable image, not two nearly-identical ones). AWS
-# CLI is added here, as root before the switch to the unprivileged frappe user below, purely so
-# those tasks can `aws s3 cp`/`aws s3 sync` backups to/from the backups-archive bucket and read the
-# MariaDB root credential from Secrets Manager, without vendoring a second S3/Secrets Manager client.
-#
-# frappe/erpnext's own image already ends on `USER frappe` (not root), so we have to switch back to
-# root explicitly here or apt-get fails with "Permission denied" on /var/lib/apt/lists/partial
-# (exit code 100) instead of ever reaching a package-resolution error.
-USER root
-RUN apt-get update && apt-get install -y --no-install-recommends awscli jq && rm -rf /var/lib/apt/lists/*
 
 USER frappe
 WORKDIR /home/frappe/frappe-bench
@@ -55,20 +41,14 @@ RUN bench get-app education --branch version-15.2 https://github.com/frappe/educ
     bench build --app education && \
     rm -rf /home/frappe/.cache /home/frappe/.npm apps/education/.git
 
-# infra/deploy/scripts/erpnext-new-site.sh's --seed flag runs `bench --site <hostname> execute
-# erpnext_seed.load_fixtures` against whichever role picks up the run-task override — placed on
+# Seeding a demo site runs `bench --site <hostname> execute erpnext_seed.load_fixtures` (see
+# infra/erpnext/seed/README.md) — placed on
 # PYTHONPATH (below) rather than installed as a proper bench app, since it's a one-shot loader
 # script, not a Frappe app with its own doctypes/migrations.
-COPY --chown=frappe:frappe infra/deploy/erpnext/seed/ /home/frappe/frappe-bench/erpnext_seed/
+COPY --chown=frappe:frappe infra/erpnext/seed/ /home/frappe/frappe-bench/erpnext_seed/
 ENV PYTHONPATH=/home/frappe/frappe-bench
 
-# infra/terraform/modules/backup's site-backup/restore-drill task definitions override `command` to
-# run one of these directly (e.g. ["bash", "erpnext-backup.sh"]) — same "COPY the script in, select
-# it via the task's own command override" shape as erpnext_seed/ above, not a bench app.
-COPY --chown=frappe:frappe infra/deploy/erpnext/backup/*.sh /home/frappe/frappe-bench/
-RUN chmod +x /home/frappe/frappe-bench/erpnext-backup.sh /home/frappe/frappe-bench/erpnext-restore-drill.sh
-
-# No EXPOSE, no ENTRYPOINT/CMD override: modules/erpnext's task-definition templates set the
-# actual command per role (gunicorn for backend, node for websocket, bench worker/schedule for
+# No EXPOSE, no ENTRYPOINT/CMD override: the caller (db/compose.yml locally) sets the actual
+# command per role (gunicorn for backend, node for websocket, bench worker/schedule for
 # queue/scheduler) — this image is a shared base for all four, not a single-role image the way
 # api/realtime/workers/web's Dockerfiles are.

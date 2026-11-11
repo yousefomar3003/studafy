@@ -1,46 +1,42 @@
 # Infrastructure map
 
-Everything Studafy needs outside application code: container images, ECS deploy manifests, AWS
-Terraform, operator tools, and load tests. Each subdirectory has its own README with the detail;
-this page is the index. `infra/` is not a Bun workspace (only `infra/load-tests` has its own
-`package.json`).
+Everything Studafy needs outside application code: container images, the fly.io app configs,
+operator tools, and load tests. Each subdirectory has its own README with the detail; this page is
+the index. `infra/` is not a Bun workspace (only `infra/load-tests` has its own `package.json`).
+
+Production runs on fly.io with managed services around it: Postgres on Supabase, Redis on Redis
+Cloud, files on Cloudflare R2, email through Resend, errors in Sentry, and logs and traces in Axiom.
+Nothing runs on AWS. The retired AWS stack (Terraform, ECS deploy scripts, the self-hosted
+Prometheus/Grafana/Loki/Tempo images) is in git history before the commit that removed it.
 
 ## Layout
 
 ```
 infra/
-├── docker/       — the 14 Dockerfiles (app, DB tooling, ERPNext, observability, backup) + baked-in config
-├── deploy/       — ECS task-definition/service templates, per-env deploy parameters, deploy scripts
-├── terraform/    — AWS infrastructure (root stack + modules), plus the account bootstrap stack
+├── docker/       — the app, migrations, ClamAV, and ERPNext Dockerfiles + baked-in config
+├── fly/          — one fly.toml per production app, and the production runbook
+├── erpnext/      — ERPNext seed and provisioning scripts baked into the erpnext image
 ├── tools/        — operator tooling run by hand against a database
 └── load-tests/   — k6 load scenarios (ST-248)
 ```
 
-| Path                                                        | What lives there                                                                                                                                                                                                                                                                                   |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [`docker/`](./docker/README.md)                             | One `<image>.Dockerfile` per image (`api`, `realtime`, `workers`, `web`, `migrations`, `erpnext`, `prometheus`, `grafana`, `alertmanager`, `otel-collector`, `tempo`, `loki`, `vector`, `backup-verify`) and a same-named folder for the config each one bakes in.                                 |
-| [`deploy/`](./deploy/README.md)                             | `ecs/{api,realtime,workers,migrations}` templates, `environments/{dev,staging,prod,preview}.env`, `scripts/` (render, migrate, deploy, rollback, populate-env, restore-drill wrappers, previews, ...), `preview/`, `erpnext/{seed,backup}`.                                                        |
-| [`terraform/`](./terraform/README.md)                       | Root stack (`main.tf` wires the modules in `modules/`: naming, network, redis, postgres, pgbouncer, secrets, storage, registry, dns, edge, cdn, compute, monitoring, logging, mariadb, erpnext, backup), `outputs.tf`, and `environments/<env>/{backend.hcl,<env>.tfvars}` for dev, staging, prod. |
-| [`terraform/bootstrap/`](./terraform/bootstrap/README.md)   | Account-wide, apply-once stack: state buckets, the Route 53 zone, GitHub's OIDC provider, and the protected Terraform roles.                                                                                                                                                                       |
-| [`tools/tenant-restore/`](./tools/tenant-restore/README.md) | Restore a backup to a scratch instance and extract one school's slice (runbook: `docs/runbooks/tenant-restore.md`).                                                                                                                                                                                |
-| [`tools/integrity/`](./tools/integrity/README.md)           | Per-tenant, read-only integrity checks with a JSON report, plus a self-verifying corruption drill.                                                                                                                                                                                                 |
-| [`load-tests/`](./load-tests/README.md)                     | k6 scenarios (morning attendance peak, results-day read storm, Ask AI concurrency), thresholds, and a regression comparer.                                                                                                                                                                         |
+| Path                                              | What lives there                                                                                                              |
+| ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| [`docker/`](./docker/README.md)                   | One `<image>.Dockerfile` per image (`api`, `realtime`, `workers`, `web`, `migrations`, `clamav`, `erpnext`) and their config. |
+| [`fly/`](./fly/README.md)                         | `api`, `realtime`, `workers`, `scanner`, `web`, `migrate`, and `log-shipper` app configs; secrets, deploys, observability.    |
+| [`erpnext/seed/`](./erpnext/seed/README.md)       | `provision.py` (site setup, integration user, webhooks) and the synthetic demo fixtures.                                      |
+| [`tools/integrity/`](./tools/integrity/README.md) | Per-tenant, read-only integrity checks with a JSON report, plus a self-verifying corruption drill.                            |
+| [`load-tests/`](./load-tests/README.md)           | k6 scenarios (morning attendance peak, results-day read storm, Ask AI concurrency), thresholds, and a regression comparer.    |
 
 ## Environments
 
-| Environment | Terraform inputs                                | `deploy/environments/*.env` (`APP_ENV`, `WEB_ORIGIN`) | Deployed by                                  |
-| ----------- | ----------------------------------------------- | ----------------------------------------------------- | -------------------------------------------- |
-| dev         | `terraform/environments/dev/dev.tfvars`         | `development`, `http://localhost:5180`                | `deploy.yml` (manual)                        |
-| staging     | `terraform/environments/staging/staging.tfvars` | `staging`, `https://staging.studafy.com`              | `staging-deploy.yml` (every merge to `main`) |
-| prod        | `terraform/environments/prod/prod.tfvars`       | `production`, `https://app.studafy.com`               | `prod-deploy.yml` (manual, approval gated)   |
-| preview     | none (shares no Terraform outputs)              | `preview.env` (`PREVIEW_*` handles)                   | `pr-preview.yml` for `preview`-labelled PRs  |
+| Environment | `APP_ENV`, origin                       | Deployed by                                                                  |
+| ----------- | --------------------------------------- | ---------------------------------------------------------------------------- |
+| local       | `development`, `http://localhost:5180`  | `compose.yml` / `bun run dev`                                                |
+| prod        | `production`, `https://app.studafy.com` | `fly-production-deploy.yml` (manual, gated by the `prod` GitHub Environment) |
 
-Each environment has its own S3 state (`terraform/environments/<env>/backend.hcl`); the state
-buckets come from `terraform/bootstrap`, which is applied once per account before anything else.
-Operator-specific bastion inputs are not in `*.tfvars`: CI reads them from the repository variables
-`BASTION_ALLOWED_SSH_CIDRS_<ENV>` and `BASTION_KEY_NAME_<ENV>`. The image build and
-deploy jobs only run when the repository variable `AWS_DEPLOYMENTS_ENABLED` is
-`true`; Terraform plans only when `AWS_PLAN_ROLE_ARN` is set.
+Production secrets live in the `prod` GitHub Environment; every deploy copies them to the fly apps.
+See [`fly/README.md`](./fly/README.md).
 
 ## Local stack: root `compose.yml`
 
@@ -65,7 +61,7 @@ bun run db:up                         # just the disposable test database
 ```
 
 The Vite dev server (`apps/web`, outside compose) runs on port 5180 with `strictPort`, because
-another local project uses 5173. ERPNext and the observability images are not part of compose.
+another local project uses 5173. ERPNext runs from `db/compose.yml` (`bun run erpnext:up`).
 
 ## Root `scripts/`
 
@@ -73,34 +69,24 @@ another local project uses 5173. ERPNext and the observability images are not pa
 | ------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
 | `ci-local-db.sh`         | Mirrors CI's `database-migrations` job against a disposable local Postgres.                                                |
 | `ci-local-containers.sh` | Mirrors `containers.yml`'s build-scan matrix (size budgets, Trivy if installed; skips erpnext unless `INCLUDE_ERPNEXT=1`). |
-| `check-alert-rules.ts`   | The alerting invariants CI enforces on the Prometheus rule files (e.g. every alert links a runbook).                       |
 | `check-drift.sh`         | Regenerates all codegen artifacts locally so a broken generator is caught before CI.                                       |
 | `eslint-staged.ts`       | Pre-commit `eslint --fix` over staged files, per workspace package.                                                        |
 
 ## How a change flows
 
 1. **Pull request.** `ci.yml` (tests, database migrations + RLS coverage audit, security scans,
-   `bun test infra/deploy`, ...), `containers.yml` (builds, size-checks, and Trivy-scans the app,
-   migrations, and erpnext images), and `terraform.yml` (`validate` for both stacks; `plan` per
-   environment when `AWS_PLAN_ROLE_ARN` is set).
-2. **Build and sign.** `release.yml` builds all 14 images, pushes them to ECR, attaches SBOM and
-   provenance, and cosign-signs them. It runs for dev from `build-and-sign.yml` on every merge to
-   `main`, and as the first job of the staging and prod pipelines.
-3. **Deploy.** `staging-deploy.yml` (every merge to `main`) and `prod-deploy.yml` (manual, approval
-   gated) run `migrate.sh` (signed migrations image as a one-off Fargate task; a failure halts
-   everything), then `populate-env.sh` + `deploy.sh` per service (api, realtime, workers), then
-   post-deploy checks (staging: a smoke job; prod: synthetics during the rollout and an ALB 5xx
-   watch). A failed check runs `populate-env.sh` + `rollback.sh` for each service. Schema changes are never rolled back, so
-   migrations must stay backward-compatible. `deploy.yml` is the manual any-environment path that
-   also runs `terraform apply` first.
+   ...) and `containers.yml` (builds, size-checks, and Trivy-scans the app, migrations, clamav, and
+   erpnext images).
+2. **Deploy.** `fly-production-deploy.yml`, run by hand: copies the `prod` secrets to the fly apps,
+   runs migrations as a one-off machine (a failure releases nothing), then deploys each app. Schema
+   changes are never rolled back, so migrations must stay backward-compatible.
 
-Details: [`deploy/README.md`](./deploy/README.md) and `docs/runbooks/deploy-rollback.md`.
+Details: [`fly/README.md`](./fly/README.md).
 
 ## Where to change X
 
-| To...                       | Change                                                                                                                                                                                                                                                                                           |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Add an env var to a service | The app's `src/env.ts` (`apps/api`, `apps/workers`, `apps/realtime`); `deploy/ecs/<service>/task-definition.json.tpl` (`environment`, or `secrets` with the key added in Terraform's `modules/secrets`); `deploy/environments/<env>.env` if it differs per environment; `compose.yml` for local. |
-| Add a migration             | The next six-digit file in `db/migrations` (`000048` is a permanent gap; never reuse it). See `docs/database/migration-policy.md`.                                                                                                                                                               |
-| Add an image                | `docker/<name>.Dockerfile` (+ `docker/<name>/` config), the `release.yml` build matrix, `image_repository_names` in `terraform/modules/registry`, and the `containers.yml` matrix if PRs should build it.                                                                                        |
-| Add a Terraform module      | `terraform/modules/<name>/`, a `module` block in `terraform/main.tf`, root `variables.tf`/`outputs.tf` entries, and per-environment values in `terraform/environments/<env>/<env>.tfvars`.                                                                                                       |
+| To...                       | Change                                                                                                                                                                              |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Add an env var to a service | The app's `src/env.ts` (`apps/api`, `apps/workers`, `apps/realtime`); `fly/<app>.toml` `[env]`, or a `prod` secret plus the deploy workflow's secret list; `compose.yml` for local. |
+| Add a migration             | The next six-digit file in `db/migrations` (`000048` is a permanent gap; never reuse it). See `docs/database/migration-policy.md`.                                                  |
+| Add an image                | `docker/<name>.Dockerfile` (+ `docker/<name>/` config), a `fly/<app>.toml` if it ships, and the `containers.yml` matrix.                                                            |

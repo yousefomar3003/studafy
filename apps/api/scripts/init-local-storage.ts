@@ -8,7 +8,7 @@ import {
 /**
  * Prepares the local S3 stand-in (the `s3` service in db/compose.yml) for the app: creates the
  * app-files bucket and gives it the same browser CORS rule as the real one
- * (infra/terraform/modules/storage/main.tf), so presigned uploads from the Vite dev server work.
+ * (the R2 bucket's, infra/fly/README.md), so presigned uploads from the Vite dev server work.
  *
  * Run by `bun run db:up` after the containers report healthy; safe to re-run. Every value can be
  * overridden from the environment, and the defaults match db/compose.yml and .env.example. Refuses

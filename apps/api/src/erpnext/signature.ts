@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * The two headers an ERPNext webhook signature can arrive in. Frappe's own Webhook doctype (what
- * every school's site actually sends -- infra/deploy/erpnext/seed/provision.py installs them) puts a
+ * every school's site actually sends -- infra/erpnext/seed/provision.py installs them) puts a
  * base64 HMAC-SHA256 of the body in `X-Frappe-Webhook-Signature`. `X-ERPNext-Signature` with a hex
  * digest is the form this API documented first; both carry the same HMAC.
  */

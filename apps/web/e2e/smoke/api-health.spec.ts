@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Confirms the api/realtime services `staging-deploy.yml` just rolled are actually answering, from
- * outside the VPC, the same path a real client takes (through the ALB, not an internal target-group
- * check). `/healthz` (liveness) and `/readyz` (readiness) are the two-tier contract
- * `apps/api/src/health.ts` and `infra/deploy/README.md`'s "Probe mapping" already document; this
- * suite is what actually calls them post-deploy instead of only trusting ECS's own health check.
+ * Confirms a deployment's api/realtime services are actually answering, from outside, the same
+ * path a real client takes (SMOKE_API_URL, not the platform's internal health check). `/healthz`
+ * (liveness) and `/readyz` (readiness) are the two-tier contract `apps/api/src/health.ts`
+ * documents; this suite is what actually calls them after a deploy instead of only trusting the
+ * platform's own check.
  */
 const API_BASE_URL = process.env.SMOKE_API_URL;
 if (!API_BASE_URL) {

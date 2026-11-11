@@ -162,8 +162,8 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
     },
   ],
   // A document field the school marked sensitive (a passport scan, a medical certificate). Stricter
-  // than record.document: PDF and the two common image types only, a smaller cap, promoted under the
-  // sensitive-documents KMS key, downloaded through one-minute URLs that need
+  // than record.document: PDF and the two common image types only, a smaller cap, downloaded through
+  // one-minute URLs that need
   // studentRecord:readSensitive and are audited (ADR-019).
   [
     "record.sensitiveDocument",
@@ -188,8 +188,8 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
     },
   ],
   // A sensitive document on a staff record (an ID card scan, a medical certificate): as
-  // record.sensitiveDocument -- PDF and two image types, a 5 MiB cap, the sensitive-documents KMS
-  // key, one-minute audited downloads that need staffRecord:readSensitive (ADR-019).
+  // record.sensitiveDocument -- PDF and two image types, a 5 MiB cap, one-minute audited downloads
+  // that need staffRecord:readSensitive (ADR-019).
   [
     "staffRecord.sensitiveDocument",
     {
@@ -214,8 +214,8 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
   // The original file a school uploaded to the student import (000179), kept so nothing in it is
   // lost: staff map its unmapped columns later without a re-upload, and download it back. Staged
   // through the generic request-upload route, then confirmed by the import upload itself, which
-  // checks the stored bytes are the bytes it parsed and promotes them under the sensitive-documents
-  // KMS key: a school's file can hold ID numbers and medical notes. The web client always sends
+  // checks the stored bytes are the bytes it parsed and promotes them: a school's file can hold ID
+  // numbers and medical notes. The web client always sends
   // text/csv. Readable only with student:import, through a one-minute audited URL.
   [
     "import.source",

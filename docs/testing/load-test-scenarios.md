@@ -151,7 +151,7 @@ past its own `SEED_ALLOW_NONLOCAL` escape hatch, because "these are never a legi
 **local-only** on purpose, useful only for proving the k6 suite mechanically correct. Provisioning
 thousands of synthetic teacher/student identities in staging (once findings 1–3 above are resolved)
 is therefore a deliberate, human-run, one-off action — the same posture
-`infra/deploy/erpnext/seed`'s "seed tenant" already has (run explicitly via `--seed`, never
+`infra/erpnext/seed`'s "seed tenant" already has (run explicitly via `--seed`, never
 automatic) — not something any script, this one included, should do unattended.
 
 **Bottom line:** this ticket delivers a complete, mechanically-verified k6 suite and the exact list

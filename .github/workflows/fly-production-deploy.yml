@@ -10,7 +10,7 @@ name: Production deploy (fly.io)
 # Order matters and matches the README: the scanner first (the workers reach it), then migrations
 # (a release never runs against an older schema), then api, realtime, workers and web.
 #
-# Supersedes prod-deploy.yml/deploy.yml, which target the retired AWS ECS stack.
+# Replaced the retired AWS ECS deploy workflows, removed with the rest of the AWS stack.
 
 on:
   workflow_dispatch: {}

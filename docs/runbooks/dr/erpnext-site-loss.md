@@ -6,8 +6,8 @@ school's site and the MariaDB instance itself are fine. Instance-wide loss is
 [mariadb-instance-loss.md](mariadb-instance-loss.md) instead.
 
 Mechanism source: [`infra/terraform/modules/backup/erpnext_backup.tf`](../../../infra/terraform/modules/backup/erpnext_backup.tf),
-[`infra/deploy/erpnext/backup/erpnext-backup.sh`](../../../infra/deploy/erpnext/backup/erpnext-backup.sh),
-[`infra/deploy/erpnext/backup/erpnext-restore-drill.sh`](../../../infra/deploy/erpnext/backup/erpnext-restore-drill.sh).
+[`infra/erpnext/backup/erpnext-backup.sh`](../../../infra/erpnext/backup/erpnext-backup.sh),
+[`infra/erpnext/backup/erpnext-restore-drill.sh`](../../../infra/erpnext/backup/erpnext-restore-drill.sh).
 Comms templates: [README.md](README.md).
 
 ## RPO / RTO target

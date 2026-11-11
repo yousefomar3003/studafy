@@ -32,8 +32,6 @@ export interface PromoteOptions {
    * because this module is storage infra and must stay database-free.
    */
   onSize?: (sizeBytes: number) => Promise<void>;
-  /** Promote under the sensitive-documents KMS key (ADR-019); see StorageService.copy. */
-  sensitive?: boolean;
   /**
    * The stored size, when the caller has already read it (inspectStagedUpload / readStagedObject).
    * The existence and size HEAD is then skipped: it would only re-read what the caller just read.
@@ -87,7 +85,7 @@ export async function promoteTempObject(
 
   await options.onSize?.(sizeBytes);
 
-  await copyStagedObject(storage, tempKey, permanentKey, { sensitive: options.sensitive });
+  await copyStagedObject(storage, tempKey, permanentKey);
 
   // A failed cleanup has already been rendered harmless by the 24h lifecycle rule on temp/, and
   // failing the caller's request over it would roll back an object that is correctly in place.
@@ -105,14 +103,9 @@ export async function copyStagedObject(
   storage: StorageService,
   tempKey: string,
   permanentKey: string,
-  options: { sensitive?: boolean } = {},
 ): Promise<void> {
   try {
-    if (options.sensitive) {
-      await storage.copy(tempKey, permanentKey, { sensitive: true });
-    } else {
-      await storage.copy(tempKey, permanentKey);
-    }
+    await storage.copy(tempKey, permanentKey);
   } catch (error) {
     // The staged object was read moments ago but is gone now (aged out of temp/, or a concurrent
     // confirm of the same key already discarded it): the same answer as never uploaded.

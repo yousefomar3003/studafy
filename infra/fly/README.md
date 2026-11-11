@@ -168,7 +168,7 @@ not affected. In the Cloudflare dashboard: R2 → `studafy-prod-files` → Setti
 ]
 ```
 
-It is the rule the AWS bucket had (`infra/terraform/modules/storage`), with every browser domain.
+It is the rule the old AWS bucket had, with every browser domain.
 Check it with a preflight: `curl -X OPTIONS -H "Origin: https://studafy.com" -H
 "Access-Control-Request-Method: PUT" https://<account>.r2.cloudflarestorage.com/studafy-prod-files/x`
 answers 204 with `Access-Control-Allow-Origin`; an origin not listed gets 403.

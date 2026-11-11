@@ -66,11 +66,6 @@ interface TargetSpec {
   statusColumn: string;
   /** `global` for app.school_applications, which has no school; everything else is per school. */
   scope: "school" | "global";
-  /**
-   * Whether the original was promoted under the sensitive-documents KMS key (ADR-019), so the
-   * quarantine copy is too: always (import files), per row (record documents' `sensitive`), never.
-   */
-  sensitive: "always" | "column" | "never";
 }
 
 /**
@@ -83,63 +78,54 @@ export const UPLOAD_SCAN_TARGET_SPECS: Readonly<Record<UploadScanTarget, TargetS
     keyColumn: "storage_key",
     statusColumn: "scan_status",
     scope: "school",
-    sensitive: "never",
   },
   assignment_attachment: {
     table: "assignment_attachments",
     keyColumn: "storage_key",
     statusColumn: "scan_status",
     scope: "school",
-    sensitive: "never",
   },
   question_image: {
     table: "assignment_questions",
     keyColumn: "image_storage_key",
     statusColumn: "image_scan_status",
     scope: "school",
-    sensitive: "never",
   },
   message_attachment: {
     table: "message_attachments",
     keyColumn: "storage_key",
     statusColumn: "scan_status",
     scope: "school",
-    sensitive: "never",
   },
   record_document: {
     table: "record_documents",
     keyColumn: "storage_key",
     statusColumn: "scan_status",
     scope: "school",
-    sensitive: "column",
   },
   expense_attachment: {
     table: "expense_cache",
     keyColumn: "attachment_storage_key",
     statusColumn: "attachment_scan_status",
     scope: "school",
-    sensitive: "never",
   },
   license_receipt: {
     table: "license_payment_receipts",
     keyColumn: "storage_key",
     statusColumn: "scan_status",
     scope: "school",
-    sensitive: "never",
   },
   school_application_proof: {
     table: "school_applications",
     keyColumn: "proof_storage_key",
     statusColumn: "proof_scan_status",
     scope: "global",
-    sensitive: "never",
   },
   import_source: {
     table: "student_imports",
     keyColumn: "source_storage_key",
     statusColumn: "source_scan_status",
     scope: "school",
-    sensitive: "always",
   },
 };
 
@@ -170,8 +156,6 @@ export interface ScanUploadConfig {
   s3: ScanS3Client | null;
   bucket?: string;
   clamd: ClamdConfig;
-  /** The sensitive-documents KMS key; the quarantine copy of a sensitive file is held under it. */
-  sensitiveKmsKeyId?: string;
   /** Where an infected verdict is reported. The log line is the alert. */
   log?: Pick<DeadLetterLogger, "error">;
 }
@@ -217,15 +201,9 @@ async function readRow(
   tx: TransactionSql,
   spec: TargetSpec,
   data: ScanUploadJobData,
-): Promise<{ status: string; sensitive: boolean } | undefined> {
-  const sensitive =
-    spec.sensitive === "column"
-      ? tx`sensitive`
-      : spec.sensitive === "always"
-        ? tx`true`
-        : tx`false`;
-  const [row] = await tx<{ status: string; sensitive: boolean }[]>`
-    SELECT ${tx(spec.statusColumn)}::text AS status, ${sensitive} AS sensitive
+): Promise<{ status: string } | undefined> {
+  const [row] = await tx<{ status: string }[]>`
+    SELECT ${tx(spec.statusColumn)}::text AS status
     FROM ${tx(`app.${spec.table}`)}
     WHERE ${rowFilter(tx, spec, data)}
     LIMIT 1
@@ -331,12 +309,10 @@ export async function processUploadScan(
 
     // Infected. Copy -> delete permanent -> flip (see the header).
     if (!recoveredFromQuarantine) {
-      const kmsKeyId = row.sensitive ? config.sensitiveKmsKeyId : undefined;
       await s3.copyObject({
         Bucket: bucket,
         Key: quarantineKey,
         CopySource: `${bucket}/${data.storageKey}`,
-        ...(kmsKeyId ? { SSEKMSKeyId: kmsKeyId } : {}),
       });
       await s3.deleteObject({ Bucket: bucket, Key: data.storageKey });
     }

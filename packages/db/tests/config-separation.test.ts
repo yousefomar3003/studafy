@@ -116,26 +116,4 @@ describe("runtime and migration configuration separation", () => {
     },
     { timeout: 30_000 },
   );
-
-  test("API and migration task definitions draw credentials from different secrets", async () => {
-    // Both paths are fixed repository literals joined with the repo root.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    const apiTemplate = await readFile(
-      resolve(repoRoot, "infra/deploy/ecs/api/task-definition.json.tpl"),
-      "utf8",
-    );
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    const migrationsTemplate = await readFile(
-      resolve(repoRoot, "infra/deploy/ecs/migrations/task-definition.json.tpl"),
-      "utf8",
-    );
-
-    // Runtime credentials come from the PgBouncer application secret, not the Postgres master secret.
-    expect(apiTemplate).toContain("PGBOUNCER_SECRET_ARN");
-    expect(apiTemplate).not.toContain("POSTGRES_SECRET_ARN");
-
-    // Migrations connect with the administrative master secret, never the runtime application secret.
-    expect(migrationsTemplate).toContain("POSTGRES_SECRET_ARN");
-    expect(migrationsTemplate).not.toContain("PGBOUNCER_SECRET_ARN");
-  });
 });

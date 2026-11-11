@@ -117,7 +117,7 @@ erpnext_cluster_service_names` (the five ERPNext services).
      same `curl` against `/api/method/ping` should return `200 {"message":"pong"}`.
    - _Seed tenant usable end-to-end_: `curl` the internal ALB with `Host:
 seed-school.erpnext.staging.studafy.com`, confirm a Frappe login page renders, and confirm the
-     `Test Student One`/`Test Student Two` records exist (`infra/deploy/erpnext/seed/README.md`).
+     `Test Student One`/`Test Student Two` records exist (`infra/erpnext/seed/README.md`).
    - _Staging isolated from prod data and keys_: separate state buckets, separate VPCs
      (non-overlapping CIDRs), separate Secrets Manager containers per environment (`name_prefix`
      scoped) — structurally true by this repo's own module design, not something to check

@@ -40,8 +40,6 @@ export interface StagedCopy {
   tempKey: string;
   permanentKey: string;
   sizeBytes: number;
-  /** Copy under the sensitive-documents KMS key (ADR-019). */
-  sensitive?: boolean;
 }
 
 /**
@@ -72,9 +70,7 @@ export async function copyStagedUploads(
   let landed = 0;
   try {
     for (const copy of copies) {
-      await copyStagedObject(storage, copy.tempKey, copy.permanentKey, {
-        sensitive: copy.sensitive,
-      });
+      await copyStagedObject(storage, copy.tempKey, copy.permanentKey);
       landed += 1;
     }
   } catch (error) {

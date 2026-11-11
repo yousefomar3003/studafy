@@ -39,10 +39,8 @@ interface StoredObject {
 
 function fakeStorage(): StorageService & {
   objects: Map<string, StoredObject>;
-  sensitiveCopies: string[];
 } {
   const objects = new Map<string, StoredObject>();
-  const sensitiveCopies: string[] = [];
   const base: StorageService = {
     ttlSeconds: 900,
     check: async () => true,
@@ -65,10 +63,9 @@ function fakeStorage(): StorageService & {
     async checksumSha256() {
       return "a".repeat(64);
     },
-    async copy(source, destination, options) {
+    async copy(source, destination) {
       const object = objects.get(source);
       if (object) objects.set(destination, { ...object });
-      if (options?.sensitive) sensitiveCopies.push(destination);
     },
     async remove(key) {
       objects.delete(key);
@@ -79,7 +76,7 @@ function fakeStorage(): StorageService & {
       }
     },
   };
-  return Object.assign(base, { objects, sensitiveCopies });
+  return Object.assign(base, { objects });
 }
 
 const storage = fakeStorage();
@@ -513,7 +510,9 @@ describeDb("staff records", () => {
       { storage_key },
     );
     expect(attached.status).toBe(200);
-    expect(storage.sensitiveCopies.some((key) => key.includes(w.schoolId))).toBe(true);
+    expect(
+      [...storage.objects.keys()].some((key) => key.startsWith(`permanent/${w.schoolId}/`)),
+    ).toBe(true);
 
     // Held back until the malware scan clears it (F-14); then the worker's clean verdict.
     const adminPath = `/api/staff/${w.teacher.userId}/records/${passport.id}/document/download`;

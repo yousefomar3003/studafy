@@ -57,11 +57,9 @@ const HISTOGRAM_VIEWS: ViewOptions[] = [
  * Starts a process-wide Prometheus-compatible metrics endpoint (ST-259).
  *
  * Deliberately a separate HTTP server on its own port (`PrometheusExporter`'s built-in listener),
- * not a route mounted on the service's own Hono app: the ALB only ever forwards `/healthz`,
- * `/readyz` and business routes to the public target groups (modules/compute's own listener
- * rules), so a `/metrics` route there would need its own auth story to keep it off the public
- * internet. A dedicated port that only Prometheus's security group can reach needs none — see
- * infra/terraform/modules/monitoring/README.md.
+ * not a route mounted on the service's own Hono app: a `/metrics` route there would be public and
+ * need its own auth story. A dedicated port the platform never exposes publicly (fly publishes only
+ * the service port) needs none.
  *
  * Call this once, at process bootstrap, before any code calls `getMeter()`/`createRedMetrics
  * Middleware()` in this package: `@opentelemetry/api`'s `metrics.getMeter()` returns a no-op

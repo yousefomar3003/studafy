@@ -27,7 +27,7 @@ import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { withTenantTx } from "../../db/tenant-tx";
-import { normalizeAddress } from "../../email/ses-events";
+import { normalizeAddress } from "../../email/email-events";
 import { emit } from "../../lib/events/emitter";
 import { verifyCaptcha } from "../tenancy/registration/captcha";
 import {

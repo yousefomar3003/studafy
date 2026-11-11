@@ -7,8 +7,8 @@
  * The CORS allowlist is data (CORS_ALLOWED_ORIGINS), not a table compiled into this file. An
  * earlier revision hardcoded a per-environment map and it had already drifted from the
  * infrastructure that provisions the hosts: it listed studafy.com and www.studafy.com while
- * infra/terraform/environments/prod/prod.tfvars provisions app.studafy.com. A map here can only
- * ever be a second copy of a fact Terraform already owns, so it is deliberately not one.
+ * production serves app.studafy.com. A map here can only ever be a second copy of a fact the
+ * deployment config (infra/fly/api.toml) already owns, so it is deliberately not one.
  */
 
 import { loadEnv, parseOriginList } from "../env";
