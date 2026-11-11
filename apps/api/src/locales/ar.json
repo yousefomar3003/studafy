@@ -166,6 +166,7 @@
   "MATERIAL_NOT_FOUND": "لم يتم العثور على المادة",
   "MATERIAL_STORAGE_CONFIRM_FAILED": "فشل تأكيد التخزين",
   "MATERIAL_INGEST_IN_PROGRESS": "امتصاص المادة قيد التنفيذ بالفعل",
+  "CLASS_AI_MATERIALS_FORBIDDEN": "لا يمكن إلا لمعلمي هذا الفصل أو لقيادة المدرسة تغيير استخدام مواده مع مساعد الدراسة بالذكاء الاصطناعي",
   "ATTENDANCE_SESSION_NOT_FOUND": "لم يتم العثور على جلسة الحضور",
   "ATTENDANCE_SESSION_DUPLICATE": "توجد بالفعل جلسة حضور لهذا الفصل والتاريخ والفترة",
   "ATTENDANCE_NO_TIMETABLE_SLOT": "لم يتم العثور على خانة جدول درس معتمدة لهذا الفصل والتاريخ والفترة",

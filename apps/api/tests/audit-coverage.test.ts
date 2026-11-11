@@ -301,6 +301,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  // Class AI materials setting (000196). Audited as an update on classes.
+  "PUT /api/academics/classes/{classId}/ai-materials",
   // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm.
   // auditAction declares the mutation, but no app.audit_logs row is written: the staged object
   // under temp/ IS the audit record, an infra-level event with no database row to pair it with —

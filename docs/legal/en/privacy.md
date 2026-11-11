@@ -195,6 +195,8 @@ The assistant runs on a model provided by **Together AI** (Together Computer, In
 - **the student's questions** and, in Ask AI, up to six earlier messages from the conversation; and
 - **the text of the class materials** used (and a material's title, for summaries). Materials are written by teachers and others and **can contain names or other personal details.**
 
+**Teachers and school leaders can keep a class's materials out.** Each class has a setting, "Use this class's materials with the AI study assistant", which is on unless changed. The class's teachers and the school's leaders can switch it off in the app at any time. While it is off, that class's materials are not sent to Together AI and the assistant does not use them, and the copies we keep of them for the assistant are deleted, together with any quizzes, flashcards and practice exams made from them. Text already sent cannot be recalled. Switching it back on makes the class's materials available to the assistant again.
+
 We do **not** send the student's name, email address, age, date of birth, country, marks, attendance or any user identifier.
 
 **Photos.** A student can photograph a page to turn it into text. The text is read from the photo on our own servers; the photo is not stored and is never sent to Together AI. Only the extracted text is sent, if the student uses it.
@@ -211,7 +213,7 @@ Before first use, each student is shown a consent screen naming Together AI and 
 
 - **Ask AI conversations:** 90 days, then deleted automatically.
 - **Summaries:** held temporarily for 24 hours to avoid generating them twice.
-- **Quizzes, flashcards and practice exams** a student creates, with their answers and review schedule: kept with the student's account.
+- **Quizzes, flashcards and practice exams** a student creates, with their answers and review schedule: kept with the student's account, except that those made from a class's materials are deleted if that class's setting is switched off (section 5.2).
 - **Consent records** (when given and withdrawn, and which version) and **monthly usage counts.**
 - **Safety records.** When the filter blocks something, we keep a fingerprint (hash) of the text, not the text. If a student reports an AI answer, a copy goes to the school's administrators, who review reports. If the filter blocks the most serious content, involving the abuse of children, an urgent report with the blocked text is filed automatically for the school's administrators. Where a school cannot act, Studafy may report to the authorities where the law requires or allows.
 

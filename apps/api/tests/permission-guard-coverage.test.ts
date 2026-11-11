@@ -136,6 +136,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",
+  // Class AI materials setting (000196). Guarded by requirePermission(MATERIAL_MANAGE_AI); the
+  // service then narrows a teacher to the classes they teach.
+  "PUT /api/academics/classes/{classId}/ai-materials",
   // Grades & sections (000147). Every write guarded by requirePermission(TIMETABLE_MANAGE).
   "POST /api/academics/grade-levels",
   "PATCH /api/academics/grade-levels/{gradeLevelId}",

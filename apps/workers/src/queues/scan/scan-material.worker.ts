@@ -100,6 +100,8 @@ interface MaterialScanRow {
   uploaded_by_user_id: string;
   ingest_status: string;
   ai_visible: boolean;
+  /** The class's AI materials setting (000196); false keeps the material out of AI ingestion. */
+  class_ai_enabled: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -234,10 +236,15 @@ export async function processMaterialScan(
   try {
     const material = await withSystemTenantTx(sql, { schoolId }, async (tx) => {
       const [row] = await tx<MaterialScanRow[]>`
-        SELECT id, school_id, storage_key, original_file_name, uploaded_by_user_id,
-               ingest_status::text AS ingest_status, ai_visible
-        FROM app.materials
-        WHERE id = ${materialId}::uuid AND school_id = ${schoolId}::uuid
+        SELECT m.id, m.school_id, m.storage_key, m.original_file_name, m.uploaded_by_user_id,
+               m.ingest_status::text AS ingest_status, m.ai_visible,
+               COALESCE(
+                 (SELECT cl.ai_materials_enabled FROM app.classes cl
+                  WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
+                 false
+               ) AS class_ai_enabled
+        FROM app.materials m
+        WHERE m.id = ${materialId}::uuid AND m.school_id = ${schoolId}::uuid
       `;
       return row;
     });
@@ -300,7 +307,10 @@ export async function processMaterialScan(
         throw new Error("material object is missing but its quarantine copy scans clean");
       }
 
-      if (material.ai_visible) {
+      // A class whose AI materials setting is off (000196) keeps its materials out of AI ingestion:
+      // the clean material goes straight to `ready`, like a non-AI one, and turning the setting back
+      // on re-stages it for ingestion.
+      if (material.ai_visible && material.class_ai_enabled) {
         // Hand the material to the ai-ingestion queue. The flip to `queued` is the claim: it is
         // guarded by the `scanning` status, so a retried or duplicated scan job can only ever flip
         // once — whichever run wins, the others see `queued` and drop into the re-enqueue branch

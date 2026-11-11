@@ -115,6 +115,8 @@ let fixtureSeq = 0;
 interface SeedFixtureOptions {
   /** Defaults to false — the materials column default — matching the majority of uploads. */
   aiVisible?: boolean;
+  /** The class's AI materials setting (000196); defaults to true, the column default. */
+  classAiEnabled?: boolean;
 }
 
 /**
@@ -186,9 +188,11 @@ async function seedFixture(options: SeedFixtureOptions = {}): Promise<MaterialFi
     `;
     const [cls] = await tx<{ id: string }[]>`
       INSERT INTO app.classes
-        (school_id, course_id, academic_year_id, term_id, lead_teacher_id, room_id, code, capacity, status)
+        (school_id, course_id, academic_year_id, term_id, lead_teacher_id, room_id, code, capacity,
+         status, ai_materials_enabled)
       VALUES (${schoolId}::uuid, ${course!.id}::uuid, ${year!.id}::uuid, ${term!.id}::uuid,
-              ${teacherId}::uuid, ${room!.id}::uuid, ${`CLS-${tag}`}, 32, 'active')
+              ${teacherId}::uuid, ${room!.id}::uuid, ${`CLS-${tag}`}, 32, 'active',
+              ${options.classAiEnabled ?? true})
       RETURNING id
     `;
     const classId = cls!.id;
@@ -336,6 +340,37 @@ describeDb("processMaterialScan", () => {
       expect(s3.objects.has(f.storageKey)).toBe(true);
       expect(enqueued).toEqual([{ schoolId: f.schoolId, materialId: f.materialId }]);
       expect(await scanNotifications(f)).toHaveLength(0);
+    } finally {
+      await clamd.close();
+    }
+  });
+
+  test("a clean AI-visible material of a class with the AI materials setting off goes to ready, not ingestion", async () => {
+    const f = await seedFixture({ aiVisible: true, classAiEnabled: false });
+    const s3 = createFakeS3();
+    s3.objects.set(f.storageKey, Buffer.from("harmless notes for the class"));
+
+    const ingestion: string[] = [];
+    const derivations: string[] = [];
+    const clamd = await startFakeClamd(() => "stream: OK");
+    try {
+      const result = await processMaterialScan(jobFor(f), {
+        databaseUrl: databaseUrl!,
+        s3: s3.client,
+        bucket: "test-bucket",
+        clamd: { host: "127.0.0.1", port: clamd.port, timeoutMs: 5_000, maxFileBytes: 1 << 20 },
+        enqueueDerivation: async ({ materialId }) => {
+          derivations.push(materialId);
+        },
+        enqueueIngestion: async (_schoolId, materialId) => {
+          ingestion.push(materialId);
+        },
+      });
+
+      expect(result).toEqual({ processed: true, outcome: "clean" });
+      expect((await materialRow(f))!.ingest_status).toBe("ready");
+      expect(ingestion).toEqual([]);
+      expect(derivations).toEqual([f.materialId]);
     } finally {
       await clamd.close();
     }

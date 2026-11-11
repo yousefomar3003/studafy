@@ -53,6 +53,7 @@ const COURSE = {
 let classes: Record<string, unknown>[] = [CLASS];
 let subjects: Record<string, unknown>[] = [SUBJECT];
 let courses: Record<string, unknown>[] = [COURSE];
+let aiEnabled = true;
 
 const getMock = mock((path: string, init?: { params?: { path?: { subjectId?: string } } }) => {
   switch (path) {
@@ -103,6 +104,8 @@ const getMock = mock((path: string, init?: { params?: { path?: { subjectId?: str
       });
     case "/api/academics/classes/{classId}/enrollments":
       return Promise.resolve<unknown>({ data: { enrollments: [], total: 0 } });
+    case "/api/academics/classes/{classId}/ai-materials":
+      return Promise.resolve<unknown>({ data: { class_id: "class-1", enabled: aiEnabled } });
     default:
       return Promise.resolve<unknown>({ data: undefined });
   }
@@ -126,12 +129,16 @@ const patchMock = mock((_path: string, init: { body: Record<string, unknown> }) 
   classes = [{ ...CLASS, ...init.body }];
   return Promise.resolve<unknown>({ data: classes[0] });
 });
+const putMock = mock((_path: string, init: { body: { enabled: boolean } }) => {
+  aiEnabled = init.body.enabled;
+  return Promise.resolve<unknown>({ data: { class_id: "class-1", enabled: aiEnabled } });
+});
 const deleteMock = mock((_path: string, _init?: unknown) => {
   classes = [];
   return Promise.resolve<unknown>({ data: undefined });
 });
 mock.module("../../../lib/api", () => ({
-  api: { GET: getMock, POST: postMock, PATCH: patchMock, DELETE: deleteMock },
+  api: { GET: getMock, POST: postMock, PATCH: patchMock, PUT: putMock, DELETE: deleteMock },
 }));
 
 async function renderAs(role: string) {
@@ -166,7 +173,9 @@ afterEach(() => {
   classes = [CLASS];
   subjects = [SUBJECT];
   courses = [COURSE];
+  aiEnabled = true;
   getMock.mockClear();
+  putMock.mockClear();
   postMock.mockClear();
   patchMock.mockClear();
   deleteMock.mockClear();
@@ -272,6 +281,33 @@ describe("PrincipalClassesPage", () => {
       }),
     );
     expect(await screen.findByRole("cell", { name: "Grade 10 – C" })).toBeTruthy();
+  });
+
+  test("turns off using the class's materials with the AI study assistant", async () => {
+    await renderAs("PRINCIPAL");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit MATH-101" }));
+    const dialog = await screen.findByRole("dialog", { name: "Edit MATH-101" });
+    const checkbox = within(dialog).getByRole("checkbox", {
+      name: "Use this class's materials with the AI study assistant",
+    }) as HTMLInputElement;
+    await waitFor(() => expect(checkbox.checked).toBe(true));
+    const save = within(dialog).getByRole("button", { name: "Save changes" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+
+    fireEvent.click(checkbox);
+    expect(within(dialog).getByText(/not sent to our AI provider/)).toBeTruthy();
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(putMock).toHaveBeenCalledWith("/api/academics/classes/{classId}/ai-materials", {
+        params: { path: { classId: "class-1" } },
+        body: { enabled: false },
+      }),
+    );
+    // Only the AI setting changed, so the class itself is not patched.
+    expect(patchMock).not.toHaveBeenCalled();
+    await screen.findByText("Class saved");
   });
 
   test("deletes a class after confirming", async () => {

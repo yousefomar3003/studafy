@@ -348,4 +348,116 @@ void main() {
     expect(academics.updateCalls, isEmpty);
     expect(find.text('Enter a title.'), findsOneWidget);
   });
+
+  group('AI materials setting', () {
+    Future<_ContentAcademicsClient> pumpMaterials(
+      WidgetTester tester, {
+      bool enabled = true,
+    }) async {
+      final academics = _ContentAcademicsClient([_materialFixture(id: 'm-1')])
+        ..aiMaterialsEnabledByClassId = {'class-1': enabled};
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: _ContentAssignmentsClient([]),
+          academics: academics,
+        ),
+      );
+      await tester.tap(find.text('Materials'));
+      await tester.pumpAndSettle();
+      return academics;
+    }
+
+    SwitchListTile switchTile(WidgetTester tester) =>
+        tester.widget(find.byKey(const ValueKey('class-ai-materials-switch')));
+
+    testWidgets('shows the class setting on by default', (tester) async {
+      await pumpMaterials(tester);
+
+      expect(
+        find.text("Use this class's materials with the AI study assistant"),
+        findsOneWidget,
+      );
+      expect(switchTile(tester).value, isTrue);
+      expect(find.textContaining('sent to our AI provider'), findsOneWidget);
+    });
+
+    testWidgets('turning it off asks first, then saves', (tester) async {
+      final academics = await pumpMaterials(tester);
+
+      await tester.tap(find.byKey(const ValueKey('class-ai-materials-switch')));
+      await tester.pumpAndSettle();
+      expect(find.text('Stop using these materials with AI?'), findsOneWidget);
+
+      // Cancelling changes nothing.
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(academics.aiMaterialsUpdates, isEmpty);
+      expect(switchTile(tester).value, isTrue);
+
+      await tester.tap(find.byKey(const ValueKey('class-ai-materials-switch')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Turn off'));
+      await tester.pumpAndSettle();
+
+      expect(academics.aiMaterialsUpdates, [('class-1', false)]);
+      expect(switchTile(tester).value, isFalse);
+      expect(
+        find.text(
+          'These materials are not used by the AI study assistant and are '
+          'not sent to our AI provider.',
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('turning it on saves without asking', (tester) async {
+      final academics = await pumpMaterials(tester, enabled: false);
+      expect(switchTile(tester).value, isFalse);
+
+      await tester.tap(find.byKey(const ValueKey('class-ai-materials-switch')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Stop using these materials with AI?'), findsNothing);
+      expect(academics.aiMaterialsUpdates, [('class-1', true)]);
+      expect(switchTile(tester).value, isTrue);
+    });
+
+    testWidgets('shows the refusal when the caller may not change it', (
+      tester,
+    ) async {
+      final academics = _ContentAcademicsClient([])
+        ..aiMaterialsEnabledByClassId = {'class-1': false}
+        ..throwOnAiMaterialsUpdate = DioException(
+          requestOptions: RequestOptions(
+            path: '/api/academics/classes/class-1/ai-materials',
+          ),
+          error: const ApiException(
+            status: 403,
+            title: 'Forbidden',
+            code: 'CLASS_AI_MATERIALS_FORBIDDEN',
+          ),
+        );
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: _ContentAssignmentsClient([]),
+          academics: academics,
+        ),
+      );
+      await tester.tap(find.text('Materials'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const ValueKey('class-ai-materials-switch')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text(
+          "Only this class's teachers or school leadership can change this.",
+        ),
+        findsOneWidget,
+      );
+      expect(switchTile(tester).value, isFalse);
+    });
+  });
 }

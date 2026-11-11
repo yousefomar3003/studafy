@@ -32,6 +32,7 @@ import '../../student/domain/material_ready_state.dart';
 import '../../student/presentation/widgets/material_ready_state_pill.dart';
 import 'assignment_submissions_screen.dart';
 import 'question_editor_screen.dart';
+import 'widgets/class_ai_materials_switch.dart';
 
 /// Teacher-owned content for one class: create and edit assignments, upload and edit materials.
 ///
@@ -165,11 +166,24 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
             assignments: true,
           ),
         ),
-        _MaterialList(
-          future: _materials,
-          onRefresh: _refreshMaterials,
-          onEdit: (material) =>
-              _open(_MaterialEditor(material: material), assignments: false),
+        Column(
+          children: [
+            // Whether the class's materials are used with the AI study assistant (000196).
+            ClassAiMaterialsSwitch(
+              classId: widget.classId,
+              onChanged: _refreshMaterials,
+            ),
+            Expanded(
+              child: _MaterialList(
+                future: _materials,
+                onRefresh: _refreshMaterials,
+                onEdit: (material) => _open(
+                  _MaterialEditor(material: material),
+                  assignments: false,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     ),

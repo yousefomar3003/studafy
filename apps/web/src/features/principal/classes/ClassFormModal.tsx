@@ -1,5 +1,5 @@
 import { ApiError } from "@studafy/api-client";
-import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
+import { Button, Checkbox, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useEffect, useState } from "react";
 
 import { useTranslation } from "../../../lib/i18n";
@@ -7,6 +7,7 @@ import { useCourses, useTeacherContacts, useTerms } from "../school/queries";
 import { sectionDisplayName, useSections } from "../sections/queries";
 
 import { AddCourseModal } from "./AddCourseModal";
+import { useClassAiMaterials, useUpdateClassAiMaterials } from "./ai-materials";
 import { useCreateClass, useUpdateClass } from "./mutations";
 
 import type { UpdateClassInput } from "./mutations";
@@ -23,6 +24,7 @@ type ClassStatus = (typeof CLASS_STATUSES)[number];
 const NO_SECTION = "none";
 /** Mirrors `createClassBodySchema`: a 1–50 character code. */
 const MAX_CODE_LENGTH = 50;
+const AI_MATERIALS_HELPER_ID = "class-form-ai-materials-helper";
 
 export interface ClassFormModalProps {
   open: boolean;
@@ -63,6 +65,7 @@ export function ClassFormModal({
   const { show } = useToast();
   const create = useCreateClass();
   const update = useUpdateClass();
+  const updateAiMaterials = useUpdateClassAiMaterials();
   const saving = klass ? update : create;
 
   const [courseId, setCourseId] = useState<string>();
@@ -74,6 +77,10 @@ export function ClassFormModal({
   const [capacity, setCapacity] = useState("");
   const [status, setStatus] = useState<ClassStatus>("planned");
   const [addingCourse, setAddingCourse] = useState(false);
+  // Edit only: whether the class's materials are used with the AI study assistant (000196). A new
+  // class starts with it on (the column default); it is saved through its own endpoint.
+  const aiMaterials = useClassAiMaterials(open && klass ? klass.id : undefined);
+  const [aiEnabled, setAiEnabled] = useState<boolean>();
 
   useEffect(() => {
     if (!open) return;
@@ -87,6 +94,11 @@ export function ClassFormModal({
     setStatus(klass?.status ?? "planned");
     setAddingCourse(false);
   }, [open, klass, defaultYearId, defaultTermId]);
+
+  const storedAiEnabled = aiMaterials.data?.enabled;
+  useEffect(() => {
+    if (open) setAiEnabled(storedAiEnabled);
+  }, [open, storedAiEnabled]);
 
   const courses = useCourses(open);
   const teachers = useTeacherContacts();
@@ -108,12 +120,13 @@ export function ClassFormModal({
         ...(section !== klass.section_id ? { section_id: section } : {}),
       }
     : {};
+  const aiChanged = klass !== null && aiEnabled !== undefined && aiEnabled !== storedAiEnabled;
   const canSubmit =
     trimmedCode !== "" &&
     capacityValid &&
     teacherId !== undefined &&
     (klass
-      ? Object.keys(changes).length > 0
+      ? Object.keys(changes).length > 0 || aiChanged
       : courseId !== undefined && yearId !== undefined && termId !== undefined);
 
   const courseOptions = [...(courses.data ?? [])]
@@ -154,7 +167,14 @@ export function ClassFormModal({
       });
 
     if (klass) {
-      update.mutate({ classId: klass.id, body: changes }, { onSuccess, onError });
+      const writes: Promise<unknown>[] = [];
+      if (Object.keys(changes).length > 0) {
+        writes.push(update.mutateAsync({ classId: klass.id, body: changes }));
+      }
+      if (aiChanged && aiEnabled !== undefined) {
+        writes.push(updateAiMaterials.mutateAsync({ classId: klass.id, enabled: aiEnabled }));
+      }
+      Promise.all(writes).then(onSuccess, onError);
     } else if (courseId && yearId && termId) {
       create.mutate(
         {
@@ -274,6 +294,24 @@ export function ClassFormModal({
               onChange={setStatus}
               required
             />
+            {klass ? (
+              <div>
+                <Checkbox
+                  label={t("principal.classes.form.aiMaterials")}
+                  aria-describedby={AI_MATERIALS_HELPER_ID}
+                  checked={aiEnabled ?? false}
+                  disabled={aiEnabled === undefined}
+                  onChange={(event) => setAiEnabled(event.target.checked)}
+                />
+                <p id={AI_MATERIALS_HELPER_ID} className="sf-field__helper">
+                  {aiMaterials.isError
+                    ? t("principal.classes.form.aiMaterialsLoadError")
+                    : aiEnabled === false
+                      ? t("principal.classes.form.aiMaterialsOffHelper")
+                      : t("principal.classes.form.aiMaterialsOnHelper")}
+                </p>
+              </div>
+            ) : null}
           </div>
         </Modal.Body>
         <Modal.Footer>
@@ -282,7 +320,7 @@ export function ClassFormModal({
           </Button>
           <Button
             type="button"
-            loading={saving.isPending}
+            loading={saving.isPending || updateAiMaterials.isPending}
             disabled={!canSubmit}
             onClick={handleSubmit}
           >

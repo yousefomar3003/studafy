@@ -103,7 +103,9 @@ function fakeDatabase(opts: { contentExists?: boolean; duplicateReport?: boolean
       return result([{ card_order: 1, front: "Mitosis", back: "Cell division" }]);
     }
     if (sql.includes("FROM app.materials")) {
-      return result([{ id: MATERIAL_ID, title: "Cells", ingest_status: "ready" }]);
+      return result([
+        { id: MATERIAL_ID, title: "Cells", ingest_status: "ready", ai_enabled: true },
+      ]);
     }
     if (sql.includes("FROM app.material_chunks")) {
       return result([

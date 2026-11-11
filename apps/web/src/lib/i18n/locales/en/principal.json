@@ -770,7 +770,11 @@
       "updated": "Class saved",
       "saveFailed": "Couldn't save the class",
       "duplicateCode": "A class with the code \"{{code}}\" already exists. Choose another code.",
-      "sectionNotInYear": "That section isn't part of this class's academic year. Choose a section of the same year."
+      "sectionNotInYear": "That section isn't part of this class's academic year. Choose a section of the same year.",
+      "aiMaterials": "Use this class's materials with the AI study assistant",
+      "aiMaterialsOnHelper": "Students can ask the AI about this class's materials and make quizzes, flashcards and exams from them. Their text is sent to our AI provider.",
+      "aiMaterialsOffHelper": "This class's materials are not used by the AI study assistant and are not sent to our AI provider. Saving deletes their AI copies and anything generated from them.",
+      "aiMaterialsLoadError": "Couldn't load this class's AI setting."
     },
     "courseModal": {
       "title": "Add a course",

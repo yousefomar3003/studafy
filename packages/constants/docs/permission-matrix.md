@@ -138,7 +138,7 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `material:read`                  | ✅          | ✅        |           |                    |         | ✅         | ✅      |        |       |               |
 | `material:update`                | ✅          | ✅        |           |                    |         | ✅         |         |        |       |               |
 | `material:delete`                | ✅          | ✅        |           |                    |         | ✅         |         |        |       |               |
-| `material:manageAi`              | ✅          | ✅        |           |                    |         | ✅         |         |        |       |               |
+| `material:manageAi`              | ✅          | ✅        | ✅        |                    |         | ✅         |         |        |       |               |
 | `aiContent:moderate`             | ✅          | ✅        |           |                    |         |            |         |        |       |               |
 | `attendance:record:create`       | ✅          |           |           | ✅                 |         | ✅         |         |        |       |               |
 | `attendance:record:read`         | ✅          | ✅        | ✅        | ✅                 |         | ✅         |         |        |       |               |

@@ -363,6 +363,9 @@ export const ERROR_CODES = {
   MATERIAL_NOT_FOUND: "MATERIAL_NOT_FOUND",
   MATERIAL_STORAGE_CONFIRM_FAILED: "MATERIAL_STORAGE_CONFIRM_FAILED",
   MATERIAL_INGEST_IN_PROGRESS: "MATERIAL_INGEST_IN_PROGRESS",
+  // The caller holds material:manageAi but neither teaches the class nor leads the school, so may
+  // not change whether the class's materials are used with the AI study assistant (000196).
+  CLASS_AI_MATERIALS_FORBIDDEN: "CLASS_AI_MATERIALS_FORBIDDEN",
 
   // Gradebook configuration — category weights and scheme versioning (ST-112).
   INVALID_GRADEBOOK_WEIGHT_TOTAL: "INVALID_GRADEBOOK_WEIGHT_TOTAL",

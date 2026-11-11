@@ -174,7 +174,9 @@ function fakeDatabase(
       rows = over.chunksByMaterial?.[materialId] ?? [];
     } else if (sql.includes("FROM app.materials")) {
       const materialIds = args[1] as string[];
-      rows = materialIds.flatMap((id) => (over.materials?.[id] ? [over.materials[id]!] : []));
+      rows = materialIds.flatMap((id) =>
+        over.materials?.[id] ? [{ ai_enabled: true, ...over.materials[id]! }] : [],
+      );
     }
 
     return Object.assign(Promise.resolve(rows), { execute: () => Promise.resolve() });

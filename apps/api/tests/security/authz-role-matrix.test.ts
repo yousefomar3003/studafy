@@ -440,6 +440,15 @@ const GUARD_CASES: GuardCase[] = [
     permission: "timetable:manage",
     source: "academics/routes/enrollment-routes.ts",
   },
+  // Class AI materials setting (000196). Teachers and leadership hold material:manageAi; GUEST does
+  // not. The service additionally narrows a teacher to the classes they teach.
+  {
+    method: "PUT",
+    path: "/api/academics/classes/{classId}/ai-materials",
+    permission: "material:manageAi",
+    source: "academics/routes/class-ai-materials-routes.ts",
+    allowedRole: ROLES.PRINCIPAL,
+  },
   {
     method: "POST",
     path: "/api/academics/exams",

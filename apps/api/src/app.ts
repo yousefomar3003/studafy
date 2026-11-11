@@ -29,6 +29,7 @@ import {
   termRoutes,
   subjectRoutes,
   courseRoutes,
+  classAiMaterialsRoutes,
   classRoutes,
   roomRoutes,
   sectionRoutes,
@@ -1260,6 +1261,9 @@ export function createApp({
   // enqueued.
   if (database) {
     app.route("/", materialRoutes(database, storage, redis ?? null));
+    // Per-class "use this class's materials with the AI study assistant" setting (000196). Turning
+    // it back on enqueues ingestion, so it takes Redis the same optional way.
+    app.route("/", classAiMaterialsRoutes(database, redis ?? null));
   }
 
   // Global search (ST-278). Role-scoped Postgres full-text search across students, users,

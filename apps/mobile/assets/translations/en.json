@@ -1232,6 +1232,18 @@
         "empty": "No materials yet.",
         "loadError": "Could not load materials."
       },
+      "aiMaterials": {
+        "title": "Use this class's materials with the AI study assistant",
+        "subtitleOn": "Students can ask the AI about these materials and make quizzes, flashcards and exams from them. Their text is sent to our AI provider.",
+        "subtitleOff": "These materials are not used by the AI study assistant and are not sent to our AI provider.",
+        "loadError": "Couldn't load the AI setting for this class.",
+        "saveError": "Couldn't change the AI setting. Try again.",
+        "forbidden": "Only this class's teachers or school leadership can change this.",
+        "confirmOffTitle": "Stop using these materials with AI?",
+        "confirmOffBody": "Students will no longer be able to use this class's materials with the AI study assistant, and the AI copies of them, with any quizzes, flashcards and exams made from them, will be deleted. You can turn this back on later.",
+        "confirmOff": "Turn off",
+        "cancel": "Cancel"
+      },
       "assignmentForm": {
         "title": "Title",
         "titleRequired": "Enter a title.",

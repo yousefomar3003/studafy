@@ -27,7 +27,8 @@ export type LoadExplainPassageResult =
  * A chunk is explainable only once its ingest pipeline has finished (`ingest_status = 'ready'`).
  * Anything still mid-flight ('uploaded' / 'processing' / 'scanning' / 'queued') is reported as
  * {@link LoadExplainPassageResult.not_ready} so the client can distinguish "try later" from "does
- * not exist" (404).
+ * not exist" (404). So is a chunk whose class has its AI materials setting off (000196): such a
+ * class's materials are never sent to the AI provider. The class lookup fails closed.
  *
  * The loaded text is capped at `AI_EXPLAIN_MAX_INPUT_CHARS`, bounding the prompt cost the route
  * reserves for. A single chunk already sits below that cap (the ingest chunker's 800-token budget
@@ -46,6 +47,7 @@ export async function loadExplainPassage(
       page_number: number | null;
       section_title: string | null;
       ingest_status: string;
+      ai_enabled: boolean;
     }[]
   >`
     SELECT c.id AS chunk_id,
@@ -54,14 +56,19 @@ export async function loadExplainPassage(
            m.title AS material_title,
            c.page_number,
            c.section_title,
-           m.ingest_status
+           m.ingest_status,
+           COALESCE(
+             (SELECT cl.ai_materials_enabled FROM app.classes cl
+              WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
+             false
+           ) AS ai_enabled
     FROM app.material_chunks c
     JOIN app.materials m ON m.id = c.material_id AND m.school_id = c.school_id
     WHERE c.id = ${chunkId}::uuid
   `;
   const row = rows[0];
   if (!row) return { status: "not_found" };
-  if (row.ingest_status !== "ready") return { status: "not_ready" };
+  if (row.ingest_status !== "ready" || !row.ai_enabled) return { status: "not_ready" };
 
   return {
     status: "ok",

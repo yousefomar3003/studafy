@@ -22,7 +22,9 @@ import 'package:studafy_mobile/src/core/api/generated/models/correct_attendance_
 import 'package:studafy_mobile/src/core/api/generated/models/corrected_attendance_record.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/create_attendance_session_body.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/update_attendance_session_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/update_class_ai_materials_body.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/class.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/class_ai_materials_setting.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/class_list.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/course.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/enrollment.dart';
@@ -247,6 +249,35 @@ class FakeAcademicsClient extends Fake implements AcademicsClient {
   Map<String, List<Enrollment>> enrollmentsByClassId;
 
   String? lastLeadTeacherId;
+
+  /// The per-class AI materials setting (000196); a class missing here reads as on (the default).
+  Map<String, bool> aiMaterialsEnabledByClassId = {};
+  final List<(String, bool)> aiMaterialsUpdates = [];
+
+  /// When set, `updateClassAiMaterials` throws it instead of applying the change.
+  DioException? throwOnAiMaterialsUpdate;
+
+  @override
+  Future<ClassAiMaterialsSetting> getClassAiMaterials({
+    required String classId,
+  }) async => ClassAiMaterialsSetting(
+    classId: classId,
+    enabled: aiMaterialsEnabledByClassId[classId] ?? true,
+  );
+
+  @override
+  Future<ClassAiMaterialsSetting> updateClassAiMaterials({
+    required String classId,
+    required UpdateClassAiMaterialsBody body,
+  }) async {
+    if (throwOnAiMaterialsUpdate != null) throw throwOnAiMaterialsUpdate!;
+    aiMaterialsUpdates.add((classId, body.enabled));
+    aiMaterialsEnabledByClassId = {
+      ...aiMaterialsEnabledByClassId,
+      classId: body.enabled,
+    };
+    return ClassAiMaterialsSetting(classId: classId, enabled: body.enabled);
+  }
 
   @override
   Future<ClassList> listClasses({
