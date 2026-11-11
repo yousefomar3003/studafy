@@ -23,8 +23,12 @@ primary_region = "fra"
   FRONTEND_URL = "https://app.studafy.com"
   GOOGLE_OAUTH_REDIRECT_URI = "https://api.studafy.com/api/auth/oauth/google/callback"
   MICROSOFT_OAUTH_REDIRECT_URI = "https://api.studafy.com/api/auth/oauth/microsoft/callback"
-  # Clients open the realtime socket at this host's /ws; the API hands it to this app (app.ts).
-  REALTIME_FLY_APP = "studafy-core-realtime"
+  # Clients open the realtime socket at this host's /ws and the API hands it to the app named here
+  # (app.ts). Unset while live updates are deferred: /ws then has no route, so a client still
+  # trying to connect (a mobile build from before REALTIME_ENABLED) gets a 404 from this always-on
+  # app instead of waking the scaled-to-zero realtime app. Turn realtime back on with
+  # REALTIME_FLY_APP = "studafy-core-realtime" (and realtime.toml, web.toml, the mobile flag).
+  # REALTIME_FLY_APP = "studafy-core-realtime"
   # Supabase's transaction pooler stands in for PgBouncer; every pool already runs prepare: false.
   # No read replica on Supabase's plan: reads go to the same pooler.
   DATABASE_HOST = "aws-1-eu-central-1.pooler.supabase.com"
@@ -50,6 +54,8 @@ primary_region = "fra"
 [http_service]
   internal_port = 3000
   force_https = true
+  # Always on, deliberately: a cold start would land on a real request (sign-in, a teacher taking
+  # attendance), and the API also answers webhooks and the mobile apps' background refreshes.
   auto_stop_machines = "off"
   min_machines_running = 1
 
