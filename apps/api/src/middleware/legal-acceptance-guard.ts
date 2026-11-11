@@ -22,7 +22,7 @@ const ALLOWED_WHILE_PENDING: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Legal acceptance guard (000187).
+ * Legal acceptance guard (000188).
  *
  * A session whose user has not accepted the current Terms of Service and Privacy Policy carries the
  * `legal_acceptance_pending` claim (set when the token is minted), and this guard confines it to

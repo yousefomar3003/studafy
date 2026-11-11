@@ -216,7 +216,7 @@ interface SessionClaims {
   deletionPending: boolean;
   /**
    * Whether the user has yet to accept the current Terms of Service and Privacy Policy
-   * (LEGAL_DOCUMENT_VERSIONS; 000187): the `legal_acceptance_pending` claim.
+   * (LEGAL_DOCUMENT_VERSIONS; 000188): the `legal_acceptance_pending` claim.
    */
   legalAcceptancePending: boolean;
 }

@@ -12,7 +12,7 @@ export interface AccountProfileRow {
   deletion_due_at: Date | null;
   /** Whether deleting this account asks for its member ID and password. */
   deletion_requires_member_credentials: boolean;
-  /** The legal documents the user last accepted (000187); null until they first accept. */
+  /** The legal documents the user last accepted (000188); null until they first accept. */
   terms_version: string | null;
   privacy_version: string | null;
   legal_accepted_at: Date | null;

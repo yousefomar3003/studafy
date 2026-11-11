@@ -37,7 +37,7 @@ export function DeletionPendingGate({ children }: PropsWithChildren) {
   if (profile.isPending) return <Loading />;
   const scheduledFor = profile.data?.deletion_scheduled_for;
   if (scheduledFor) return <DeletionPending scheduledFor={scheduledFor} />;
-  // Next, the legal documents (000187): until the user accepts the current versions, the API
+  // Next, the legal documents (000188): until the user accepts the current versions, the API
   // allows only accepting, deleting the account and signing out.
   const legal = profile.data?.legal_acceptance;
   if (legal?.required) {

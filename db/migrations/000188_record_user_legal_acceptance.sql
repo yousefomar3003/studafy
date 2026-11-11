@@ -32,10 +32,10 @@ ALTER TABLE app.users
   );
 
 COMMENT ON COLUMN app.users.terms_version IS
-  'Last-updated date of the Terms of Service the user most recently accepted (000187).';
+  'Last-updated date of the Terms of Service the user most recently accepted (000188).';
 COMMENT ON COLUMN app.users.privacy_version IS
-  'Last-updated date of the Privacy Policy the user most recently confirmed reading (000187).';
+  'Last-updated date of the Privacy Policy the user most recently confirmed reading (000188).';
 COMMENT ON COLUMN app.users.legal_accepted_at IS
-  'When the user accepted terms_version and privacy_version (000187).';
+  'When the user accepted terms_version and privacy_version (000188).';
 
 RESET ROLE;

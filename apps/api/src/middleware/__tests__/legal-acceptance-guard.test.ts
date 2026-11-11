@@ -1,5 +1,5 @@
 /**
- * Legal acceptance guard (000187): a session whose token carries `legal_acceptance_pending` reaches
+ * Legal acceptance guard (000188): a session whose token carries `legal_acceptance_pending` reaches
  * only the profile, the acceptance route, its own deletion and logout; every other session is
  * untouched.
  */

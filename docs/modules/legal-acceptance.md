@@ -20,8 +20,8 @@ them; `?lang=ar` opens the Arabic text. The old `legal.studafy.com` addresses re
 
 | Who                      | Accepts                                | When                                    | Stored on                                             |
 | ------------------------ | -------------------------------------- | --------------------------------------- | ----------------------------------------------------- |
-| A school (its applicant) | Terms of Service, School Agreement     | Submitting the application (`/signup`)  | `app.school_applications` (migration 000186)          |
-| Every user               | Terms of Service; reads Privacy Policy | First sign-in, and after either changes | `app.users.terms_version`, `privacy_version` (000187) |
+| A school (its applicant) | Terms of Service, School Agreement     | Submitting the application (`/signup`)  | `app.school_applications` (migration 000187)          |
+| Every user               | Terms of Service; reads Privacy Policy | First sign-in, and after either changes | `app.users.terms_version`, `privacy_version` (000188) |
 
 The current versions are `LEGAL_DOCUMENT_VERSIONS` in `packages/constants/src/legal.ts`. The web
 test `apps/web/src/routes/legal/legal-versions.test.ts` fails if they differ from the documents'

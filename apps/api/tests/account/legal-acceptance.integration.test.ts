@@ -1,5 +1,5 @@
 /**
- * Legal acceptance (000187) end to end at the service level: a user who has not accepted the current
+ * Legal acceptance (000188) end to end at the service level: a user who has not accepted the current
  * Terms of Service and Privacy Policy is issued a token carrying `legal_acceptance_pending`;
  * accepting the current versions records them, and the refreshed token no longer carries the claim.
  * Outdated versions are refused. Requires a live PostgreSQL instance, gated on TEST_DATABASE_URL.

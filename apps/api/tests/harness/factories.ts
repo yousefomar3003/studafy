@@ -81,7 +81,7 @@ export async function createUser(
     displayName?: string;
     status?: string;
     /**
-     * Whether the user has accepted the current Terms of Service and Privacy Policy (000187).
+     * Whether the user has accepted the current Terms of Service and Privacy Policy (000188).
      * Default true: a real session for a user who has not accepted is refused almost everything
      * (legalAcceptanceGuard), which only the tests about that gate want.
      */

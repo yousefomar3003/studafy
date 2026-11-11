@@ -1,5 +1,5 @@
 /**
- * Recording a user's acceptance of the Terms of Service and the Privacy Policy (000187).
+ * Recording a user's acceptance of the Terms of Service and the Privacy Policy (000188).
  *
  * The client names the versions it showed; they must be the current ones (LEGAL_DOCUMENT_VERSIONS),
  * so an acceptance can only ever be recorded for the text the person could actually read. The

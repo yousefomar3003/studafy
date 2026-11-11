@@ -529,7 +529,7 @@ export function createApp({
   // read its profile, cancel the deletion or log out. Claim-only, like the lifecycle guard.
   app.use("/api/*", accountDeletionGuard());
 
-  // Legal acceptance guard (000187): until the user accepts the current Terms of Service and
+  // Legal acceptance guard (000188): until the user accepts the current Terms of Service and
   // Privacy Policy, the session may only read its profile, accept, manage its own deletion or log
   // out. Claim-only, like the deletion guard.
   app.use("/api/*", legalAcceptanceGuard());

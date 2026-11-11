@@ -13,7 +13,7 @@ import '../application/shell_providers.dart';
 
 /// Shown instead of the shell until the signed-in user accepts the current Terms of Service and
 /// confirms they have read the Privacy Policy (`AccountProfile.legalAcceptance`, migration
-/// 000187). The server refuses such a session everything but accepting, deleting the account and
+/// 000188). The server refuses such a session everything but accepting, deleting the account and
 /// signing out, so those are the actions here. A first sign-in and a later change to either
 /// document both land here; a previous acceptance picks the "updated" wording.
 ///

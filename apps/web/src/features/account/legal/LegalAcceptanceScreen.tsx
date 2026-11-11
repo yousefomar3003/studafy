@@ -13,7 +13,7 @@ export interface LegalVersions {
 
 /**
  * Shown in place of the app until the signed-in user accepts the current Terms of Service and
- * confirms they have read the Privacy Policy (000187). The API refuses every other request from
+ * confirms they have read the Privacy Policy (000188). The API refuses every other request from
  * such a session (403 LEGAL_ACCEPTANCE_REQUIRED), so the screen offers only what it allows:
  * accept, delete the account, or sign out. A first sign-in and a later change to either document
  * both land here; `isUpdate` picks the wording.
