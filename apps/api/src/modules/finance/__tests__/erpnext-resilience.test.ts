@@ -122,6 +122,15 @@ describe("retry policy", () => {
     expect(calls).toHaveLength(3);
   });
 
+  test("retry: false makes one attempt, even on a transient failure", async () => {
+    // A credit note or cancel that timed out may have landed; a retry could post it twice.
+    stubFetch([{ status: 503, body: { message: "down" } }]);
+
+    await expect(makeClient().post("/x", {}, { retry: false })).rejects.toThrow();
+
+    expect(calls).toHaveLength(1);
+  });
+
   test("does not retry a 400 — it is ERPNext's verdict, not a blip", async () => {
     stubFetch([{ status: 400, body: { message: "Fee category is required" } }]);
 

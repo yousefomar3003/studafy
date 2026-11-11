@@ -34,12 +34,15 @@ import {
   hashRefundRequest,
   initiateRefund,
   listRefunds,
+  reconcileStaleRefundClaims,
+  refundTag,
   rejectRefund,
   type InitiateRefundParams,
+  type RefundLog,
 } from "../refunds/service";
 
 import type { TxRunner } from "../../../db/tenant-tx";
-import type { TenantErpNext } from "../client/tenant-client";
+import type { TenantErpNext, TenantErpNextFactory } from "../client/tenant-client";
 import type { TransactionSql } from "postgres";
 
 const SCHOOL_ID = "11111111-1111-4111-8111-111111111111";
@@ -793,20 +796,62 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
     return { schoolId: school.id, checkerId, refundId: row.id };
   }
 
-  function erpNextAnswering(post: () => Promise<unknown>): {
+  function erpNextAnswering(
+    post: () => Promise<unknown>,
+    get: (path: string) => Promise<unknown> = () => Promise.reject(new Error("not implemented")),
+  ): {
     client: TenantErpNext;
     calls: () => number;
+    gets: string[];
+    bodies: unknown[];
   } {
     let calls = 0;
+    const gets: string[] = [];
+    const bodies: unknown[] = [];
     const client = {
-      get: () => Promise.reject(new Error("not implemented")),
-      post: () => {
+      get: (path: string) => {
+        gets.push(path);
+        return get(path);
+      },
+      post: (_path: string, body: unknown, options?: { retry?: boolean }) => {
         calls += 1;
+        bodies.push(body);
+        // An approval's write is never retried by the client (a retry could post twice).
+        expect(options?.retry).toBe(false);
         return post();
       },
       put: () => Promise.reject(new Error("not implemented")),
     } as unknown as TenantErpNext;
-    return { client, calls: () => calls };
+    return { client, calls: () => calls, gets, bodies };
+  }
+
+  /** ERPNext's list answer for the credit-note lookup. */
+  const creditNotes = (...names: string[]) =>
+    Promise.resolve({
+      data: { data: names.map((name) => ({ name })) },
+      status: 200,
+      headers: new Headers(),
+    });
+
+  const timedOut = () =>
+    Promise.reject(new ErpNextError("ERPNext request timed out", 504, null, "timeout"));
+
+  function recordingLog() {
+    const errors: Record<string, unknown>[] = [];
+    const log = {
+      error: (fields: Record<string, unknown>) => errors.push(fields),
+      warn: () => undefined,
+      info: () => undefined,
+    } as unknown as RefundLog;
+    return { log, errors };
+  }
+
+  /** Age a claim past STALE_REFUND_CLAIM_MINUTES, as if its approval request ended long ago. */
+  async function ageClaim(refundId: string) {
+    await db.sql`
+      UPDATE app.refund_requests SET approved_at = now() - interval '1 hour'
+      WHERE id = ${refundId}::uuid
+    `;
   }
 
   async function statusOf(schoolId: string, refundId: string) {
@@ -850,7 +895,7 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
     });
   });
 
-  test("ERPNext accepted but named no document: the request stays claimed, never approved twice", async () => {
+  test("ERPNext accepted, named no document and cannot be asked: stays claimed, never approved twice", async () => {
     const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-F02");
     const nameless = erpNextAnswering(() =>
       Promise.resolve({ data: { data: {} }, status: 201, headers: new Headers() }),
@@ -864,7 +909,7 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
         checkerId,
         refundId,
       ),
-    ).rejects.toMatchObject({ status: 502 });
+    ).rejects.toMatchObject({ status: 503 });
     expect(await statusOf(schoolId, refundId)).toMatchObject({
       status: "approved",
       checker_id: checkerId,
@@ -875,6 +920,146 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
       approveRefund(separateTxs(schoolId), async () => retry.client, schoolId, checkerId, refundId),
     ).rejects.toMatchObject({ status: 409 });
     expect(retry.calls()).toBe(0);
+  });
+
+  test("the credit note carries the refund's tag in remarks", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-T01");
+    const erpnext = erpNextAnswering(() =>
+      Promise.resolve({ data: { data: { name: "CN-T01" } }, status: 201, headers: new Headers() }),
+    );
+    await approveRefund(
+      separateTxs(schoolId),
+      async () => erpnext.client,
+      schoolId,
+      checkerId,
+      refundId,
+    );
+    expect(erpnext.bodies[0]).toMatchObject({ remarks: refundTag(refundId) });
+  });
+
+  test("ambiguous failure, credit note found in ERPNext: finalized once, never posted again", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-A10");
+    const erpnext = erpNextAnswering(timedOut, () => creditNotes("ACC-CRN-A10"));
+
+    const approved = await approveRefund(
+      separateTxs(schoolId),
+      async () => erpnext.client,
+      schoolId,
+      checkerId,
+      refundId,
+    );
+
+    expect(approved).toMatchObject({
+      status: "submitted_to_erpnext",
+      erpnext_credit_note_id: "ACC-CRN-A10",
+      checker_id: checkerId,
+    });
+    expect(erpnext.calls()).toBe(1);
+    // The lookup names the invoice, a submitted return, and the refund's tag.
+    const lookup = decodeURIComponent(erpnext.gets[0]!);
+    expect(lookup).toContain('["return_against","=","ACC-SINV-A10"]');
+    expect(lookup).toContain(refundTag(refundId));
+  });
+
+  test("ambiguous failure, nothing in ERPNext: handed back, and approvable later", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-A11");
+    const erpnext = erpNextAnswering(
+      () => Promise.reject(new ErpNextError("Internal Server Error", 502, null, "http")),
+      () => creditNotes(),
+    );
+
+    await expect(
+      approveRefund(
+        separateTxs(schoolId),
+        async () => erpnext.client,
+        schoolId,
+        checkerId,
+        refundId,
+      ),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(await statusOf(schoolId, refundId)).toMatchObject({
+      status: "pending_approval",
+      checker_id: null,
+    });
+  });
+
+  test("ambiguous failure and the lookup fails: stays approved, reported, settled later", async () => {
+    const { schoolId, checkerId, refundId } = await pendingRefund("ACC-SINV-A12");
+    const down = erpNextAnswering(timedOut, () =>
+      Promise.reject(new ErpNextError("unreachable", 503, null, "network")),
+    );
+    const { log, errors } = recordingLog();
+
+    await expect(
+      approveRefund(
+        separateTxs(schoolId),
+        async () => down.client,
+        schoolId,
+        checkerId,
+        refundId,
+        undefined,
+        log,
+      ),
+    ).rejects.toMatchObject({ status: 503 });
+    expect(await statusOf(schoolId, refundId)).toMatchObject({ status: "approved" });
+    expect(errors).toEqual([
+      expect.objectContaining({ refund_request_id: refundId, stage: "approval" }),
+    ]);
+
+    // Still in flight: another approval is refused without touching ERPNext.
+    const again = erpNextAnswering(() => Promise.reject(new Error("must not be called")));
+    await expect(
+      approveRefund(separateTxs(schoolId), async () => again.client, schoolId, checkerId, refundId),
+    ).rejects.toMatchObject({ status: 409 });
+
+    // Once stale, approving again settles the claim first: ERPNext had it, so it is finalized
+    // without a second POST.
+    await ageClaim(refundId);
+    const found = erpNextAnswering(
+      () => Promise.reject(new Error("must not be called")),
+      () => creditNotes("ACC-CRN-A12"),
+    );
+    const settled = await approveRefund(
+      separateTxs(schoolId),
+      async () => found.client,
+      schoolId,
+      checkerId,
+      refundId,
+    );
+    expect(settled).toMatchObject({
+      status: "submitted_to_erpnext",
+      erpnext_credit_note_id: "ACC-CRN-A12",
+    });
+    expect(found.calls()).toBe(0);
+  });
+
+  test("accepted without a name: recorded when the lookup finds it, kept approved when not", async () => {
+    const found = await pendingRefund("ACC-SINV-N01");
+    const nameless = () =>
+      Promise.resolve({ data: { data: {} }, status: 201, headers: new Headers() });
+    const finds = erpNextAnswering(nameless, () => creditNotes("ACC-CRN-N01"));
+    const approved = await approveRefund(
+      separateTxs(found.schoolId),
+      async () => finds.client,
+      found.schoolId,
+      found.checkerId,
+      found.refundId,
+    );
+    expect(approved.erpnext_credit_note_id).toBe("ACC-CRN-N01");
+
+    // Accepted is not absent: an empty lookup never hands the claim back for a second post.
+    const lost = await pendingRefund("ACC-SINV-N02");
+    const empty = erpNextAnswering(nameless, () => creditNotes());
+    await expect(
+      approveRefund(
+        separateTxs(lost.schoolId),
+        async () => empty.client,
+        lost.schoolId,
+        lost.checkerId,
+        lost.refundId,
+      ),
+    ).rejects.toMatchObject({ status: 503 });
+    expect((await statusOf(lost.schoolId, lost.refundId)).status).toBe("approved");
   });
 
   test("two concurrent approvals call ERPNext once", async () => {
@@ -911,6 +1096,127 @@ describeDb("approveRefund: ERPNext is called with no transaction open", () => {
     const rejected = outcomes.find((o) => o.status === "rejected") as PromiseRejectedResult;
     expect(rejected.reason).toMatchObject({ status: 409 });
     expect((await statusOf(schoolId, refundId)).status).toBe("submitted_to_erpnext");
+  });
+});
+
+describeDb("reconcileStaleRefundClaims", () => {
+  async function claimedRefund(schoolId: string, invoice: string, minutesAgo: number) {
+    const student = await createStudent(db.sql, schoolId);
+    const makerId = await createFinanceUser(schoolId);
+    const checkerId = await createFinanceUser(schoolId);
+    const { row } = await initiateRefund(
+      db.sql,
+      { schoolId, userId: makerId },
+      {
+        student_id: student.id,
+        erpnext_invoice_id: invoice,
+        amount: 10,
+        currency: "JOD",
+        reason_code: "overpayment",
+      },
+      crypto.randomUUID(),
+    );
+    await db.sql`
+      UPDATE app.refund_requests
+      SET status = 'approved', checker_id = ${checkerId}::uuid,
+          approved_at = now() - make_interval(mins => ${minutesAgo})
+      WHERE id = ${row.id}::uuid
+    `;
+    return row.id;
+  }
+
+  test("finalizes what ERPNext has, hands back what it lacks, leaves fresh claims alone", async () => {
+    const school = await createSchool(db.sql);
+    const posted = await claimedRefund(school.id, "ACC-SINV-R01", 60);
+    const missing = await claimedRefund(school.id, "ACC-SINV-R02", 60);
+    const fresh = await claimedRefund(school.id, "ACC-SINV-R03", 1);
+    let posts = 0;
+    const erpnext = {
+      get: (path: string) =>
+        Promise.resolve({
+          data: {
+            data: decodeURIComponent(path).includes("ACC-SINV-R01")
+              ? [{ name: "ACC-CRN-R01" }]
+              : [],
+          },
+          status: 200,
+          headers: new Headers(),
+        }),
+      post: () => {
+        posts += 1;
+        return Promise.reject(new Error("the reconciler never posts"));
+      },
+      put: () => Promise.reject(new Error("not implemented")),
+    } as unknown as TenantErpNext;
+
+    const counts = await reconcileStaleRefundClaims(
+      db.sql,
+      { forSchool: async () => erpnext } as unknown as TenantErpNextFactory,
+      school.id,
+    );
+
+    expect(counts).toEqual({ finalized: 1, released: 1, unknown: 0 });
+    expect(posts).toBe(0);
+    const rows = await db.sql<
+      { id: string; status: string; erpnext_credit_note_id: string | null }[]
+    >`
+      SELECT id, status, erpnext_credit_note_id FROM app.refund_requests
+      WHERE id IN (${posted}::uuid, ${missing}::uuid, ${fresh}::uuid)
+    `;
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    expect(byId.get(posted)).toMatchObject({
+      status: "submitted_to_erpnext",
+      erpnext_credit_note_id: "ACC-CRN-R01",
+    });
+    expect(byId.get(missing)!.status).toBe("pending_approval");
+    expect(byId.get(fresh)!.status).toBe("approved");
+
+    // The finalize is audited as the checker's approval.
+    const [audit] = await db.sql<{ n: number }[]>`
+      SELECT count(*)::int AS n FROM app.audit_logs
+      WHERE target_table = 'refund_requests' AND target_id = ${posted}
+        AND new_values->>'status' = 'submitted_to_erpnext'
+    `;
+    expect(audit!.n).toBe(1);
+  });
+
+  test("a lookup failure leaves the claim approved and counts it as unknown", async () => {
+    const school = await createSchool(db.sql);
+    const stuck = await claimedRefund(school.id, "ACC-SINV-R04", 60);
+    const erpnext = {
+      get: () => Promise.reject(new ErpNextError("unreachable", 503, null, "network")),
+      post: () => Promise.reject(new Error("the reconciler never posts")),
+      put: () => Promise.reject(new Error("not implemented")),
+    } as unknown as TenantErpNext;
+
+    const counts = await reconcileStaleRefundClaims(
+      db.sql,
+      { forSchool: async () => erpnext } as unknown as TenantErpNextFactory,
+      school.id,
+    );
+
+    expect(counts).toEqual({ finalized: 0, released: 0, unknown: 1 });
+    const [row] = await db.sql<{ status: string }[]>`
+      SELECT status FROM app.refund_requests WHERE id = ${stuck}::uuid
+    `;
+    expect(row!.status).toBe("approved");
+  });
+
+  test("a school with nothing stuck never opens an ERPNext client", async () => {
+    const school = await createSchool(db.sql);
+    let opened = 0;
+    const counts = await reconcileStaleRefundClaims(
+      db.sql,
+      {
+        forSchool: async () => {
+          opened += 1;
+          return {} as TenantErpNext;
+        },
+      } as unknown as TenantErpNextFactory,
+      school.id,
+    );
+    expect(counts).toEqual({ finalized: 0, released: 0, unknown: 0 });
+    expect(opened).toBe(0);
   });
 });
 

@@ -12,6 +12,7 @@ import { ROLES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
+import { ErpNextError } from "../../src/erpnext/client";
 import { approveRefund, rejectRefund } from "../../src/modules/finance/refunds/service";
 import {
   assignRole,
@@ -333,6 +334,56 @@ describeDb("reversing a payment", () => {
       reason_notes: "Again",
     });
     expect(again.status).toBe(409);
+  });
+
+  test("a cancel that timed out but landed in ERPNext is finalized once, never re-posted", async () => {
+    const fixture = await createFullTenant(database!.sql);
+    const finance = await financeOf(fixture);
+    await invoice(fixture, "INV-AMB", { total: 100_000, outstanding: 30_000 });
+    const paymentId = await payment(fixture, "PE-AMB", "INV-AMB", 70_000);
+    const request = (await (
+      await post(finance, `/api/finance/payments/${paymentId}/reversal`, {
+        reason_code: "error_correction",
+        reason_notes: "Wrong family",
+      })
+    ).json()) as Refund;
+
+    const gets: string[] = [];
+    let posts = 0;
+    const erpnext = {
+      post: () => {
+        posts += 1;
+        return Promise.reject(new ErpNextError("timed out", 504, null, "timeout"));
+      },
+      // ERPNext had cancelled it: docstatus 2.
+      get: (path: string) => {
+        gets.push(path);
+        return Promise.resolve({
+          data: { data: { docstatus: 2 } },
+          status: 200,
+          headers: new Headers(),
+        });
+      },
+      put: () => Promise.reject(new Error("not used")),
+    } as unknown as TenantErpNext;
+
+    const runner: TxRunner = (fn) => asApprover(fixture, fn);
+    const approved = await approveRefund(
+      runner,
+      async () => erpnext,
+      fixture.schoolId,
+      fixture.users.ORG_ADMIN.id,
+      request.id,
+    );
+
+    expect(approved.status).toBe("completed");
+    expect(posts).toBe(1);
+    expect(gets).toEqual(["/api/resource/Payment%20Entry/PE-AMB"]);
+    // The invoice is owed again exactly once.
+    expect(await invoiceRow(fixture.schoolId, "INV-AMB")).toEqual({
+      erpnext_status: "submitted",
+      outstanding: 100_000,
+    });
   });
 
   test("a payment that is not confirmed cannot be reversed", async () => {

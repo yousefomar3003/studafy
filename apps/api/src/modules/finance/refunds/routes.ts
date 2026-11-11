@@ -381,6 +381,7 @@ export function refundRoutes(
       auth.userId,
       refundId,
       acceptLanguage,
+      c.get("log"),
     );
 
     return c.json(toRefundResponse(row), 200);
