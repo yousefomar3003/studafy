@@ -79,8 +79,9 @@ Supabase's `postgres` is not a superuser, which the first migrations ran into on
   END $$;
   ```
 
-  Rerun it on any new Supabase database right after 000002, and if Supabase adds a login role
-  later (Postgres logs show `42501 permission denied for database "postgres"`).
+  Migration 000202 now does this on every Supabase database (it grants the two privileges back to
+  `PUBLIC`, Supabase's default, so a platform role added later is covered too), so a new database
+  needs nothing by hand.
 
 ## First-time setup
 
