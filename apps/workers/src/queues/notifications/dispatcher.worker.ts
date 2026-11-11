@@ -35,8 +35,8 @@
 
 import { NOTIFICATION_TYPES } from "@studafy/constants";
 import { NOTIFICATION_CATALOG } from "@studafy/notification-templates";
-import postgres from "postgres";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { isUrgent, isWithinQuietHours } from "./quiet-hours";
@@ -83,7 +83,10 @@ export interface DeliverNotificationJobData {
 export type DeliveryEnqueuer = (data: DeliverNotificationJobData) => Promise<void>;
 
 export interface DispatchDependencies {
+  /** Used only when `sql` is absent: a dedicated pool is opened for this job (tests). */
   databaseUrl: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   enqueueDelivery: DeliveryEnqueuer;
   jobId?: string | null;
 }
@@ -408,9 +411,8 @@ export async function processNotificationDispatch(
   const notificationType = NOTIFICATION_TYPES.GRADE_POSTED;
   const channels = NOTIFICATION_CATALOG[notificationType].channels;
 
-  // prepare: false is mandatory — the runtime sits behind PgBouncer in transaction pooling mode,
-  // where server-side prepared statements do not survive between transactions.
-  const sql = postgres(deps.databaseUrl, { max: 4, idle_timeout: 20, prepare: false });
+  const database = leaseDatabase(deps.sql ?? deps.databaseUrl);
+  const sql = database.sql;
 
   const result: DispatchResult = {
     processed: true,
@@ -496,7 +498,7 @@ export async function processNotificationDispatch(
       }
     }
   } finally {
-    await sql.end({ timeout: 5 });
+    await database.release();
   }
 
   if (result.unresolved > 0) {

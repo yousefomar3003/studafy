@@ -45,12 +45,13 @@ import {
   unmappedColumns,
   withRecordDefaults,
 } from "@studafy/student-import";
-import postgres from "postgres";
 
 import { emitAuditLogs } from "../../db/audit";
+import { withDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import type { WorkerAuditEntry } from "../../db/audit";
+import type { DatabaseSource } from "../../db/pool";
 import type {
   RecordFieldOption,
   RecordFieldSensitivity,
@@ -99,15 +100,10 @@ const MIGRATABLE_STATUSES = ["confirmed", "processing", "failed"];
 
 export async function processStudentImport(
   data: StudentImportJobData,
-  databaseUrl: string,
+  database: DatabaseSource,
   keyring: RecordKeyring,
 ): Promise<StudentImportSummary> {
-  const sql = postgres(databaseUrl, { max: 2, idle_timeout: 20, prepare: false });
-  try {
-    return await migrateStagedImport(sql, data, keyring);
-  } finally {
-    await sql.end({ timeout: 5 });
-  }
+  return withDatabase(database, (sql) => migrateStagedImport(sql, data, keyring));
 }
 
 export async function migrateStagedImport(

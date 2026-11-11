@@ -8,7 +8,6 @@
  */
 
 import { JOB_NAMES } from "@studafy/constants";
-import postgres from "postgres";
 
 import { workerLogger } from "../../log";
 import { createStorageQuotaS3 } from "../billing/storage-quota-s3";
@@ -18,7 +17,7 @@ import { runAccountDeletionSweep } from "./account-deletion-sweep";
 import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
 import { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 import { purgeExpiredRetainedData } from "./data-retention-sweep";
-import { processDsrJob } from "./dsr-processor";
+import { leaseMaintenancePool, processDsrJob } from "./dsr-processor";
 import { GooglePlayAiBillingCanceller } from "./google-play-ai-billing-canceller";
 import { purgeExpiredIpAddresses } from "./ip-address-retention-sweep";
 import { ensureFuturePartitions } from "./partition-maintenance";
@@ -136,17 +135,10 @@ async function withPrimarySql<T>(
   config: MaintenanceRunnerConfig,
   fn: (sql: Sql) => Promise<T>,
 ): Promise<T> {
-  const sql = postgres(config.primaryDatabaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
-  });
+  const lease = leaseMaintenancePool(config);
   try {
-    return await fn(sql);
+    return await fn(lease.sql);
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
