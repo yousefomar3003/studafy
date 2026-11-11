@@ -60,6 +60,18 @@ is retried by re-scanning the `quarantine/` copy rather than being mis-labelled 
 Nothing in the app ever serves from this prefix, so an infected object is unreachable the moment
 the `permanent/` copy is gone.
 
+Every other upload another person can download goes through the same queue (`scan-upload` jobs,
+F-14, migration 000192): submission and assignment files, question pictures, message images,
+record documents (sensitive ones included), expense and license receipts, school application
+proofs (`quarantine/school-applications/...`) and student import files. Each of those rows carries
+an `app.upload_scan_status`: the write that stores the key sets `scanning`, the API enqueues the
+job after commit, and the worker sets `clean`, `quarantined` (same copy -> delete -> flip order) or
+`failed` (retries exhausted). Every read path signs a URL only for `clean` or `unscanned` (a file
+uploaded before 000192, which stays downloadable; a `scan-upload` job for it scans it like a new
+one). A sensitive file's quarantine copy is re-encrypted under the sensitive-documents KMS key.
+Not covered: license payment receipts uploaded by platform staff (only platform staff read them)
+and user avatars (never stored against a row or served by the API).
+
 ## `backups-archive` bucket
 
 No lifecycle-category prefix, because everything in this bucket is a durable backup, not a

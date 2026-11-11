@@ -1,4 +1,4 @@
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, isServableUploadScanStatus } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { parseStorageKey } from "../../../lib/storage/keys";
@@ -76,6 +76,7 @@ const CACHE_COLUMNS = `
   ec.erpnext_docname AS erpnext_name,
   ec.erpnext_status,
   ec.attachment_storage_key,
+  ec.attachment_scan_status::text AS attachment_scan_status,
   ec.expense_date::text AS expense_date,
   ec.last_synced_at,
   c.code AS currency,
@@ -212,7 +213,8 @@ async function projectToCache(
     INSERT INTO app.expense_cache (
       school_id, document_type, category, vendor, description,
       currency_id, amount_minor, erpnext_docname, erpnext_status,
-      attachment_storage_key, expense_date, erpnext_payload, last_synced_at
+      attachment_storage_key, attachment_scan_status, expense_date, erpnext_payload,
+      last_synced_at
     ) VALUES (
       ${schoolId}::uuid,
       ${documentType}::text,
@@ -224,6 +226,7 @@ async function projectToCache(
       ${erpnextName},
       ${statusFromDocstatus(doc.docstatus)},
       ${params.attachment_storage_key ?? null},
+      ${params.attachment_storage_key ? "scanning" : "unscanned"}::app.upload_scan_status,
       ${expenseDate}::date,
       ${tx.json(doc as unknown as JSONValue)}::jsonb,
       CURRENT_TIMESTAMP
@@ -237,6 +240,13 @@ async function projectToCache(
           amount_minor         = EXCLUDED.amount_minor,
           erpnext_status       = EXCLUDED.erpnext_status,
           attachment_storage_key = EXCLUDED.attachment_storage_key,
+          -- A new file waits for its malware scan (F-14); the same file keeps its verdict.
+          attachment_scan_status = CASE
+            WHEN app.expense_cache.attachment_storage_key
+                 IS NOT DISTINCT FROM EXCLUDED.attachment_storage_key
+            THEN app.expense_cache.attachment_scan_status
+            ELSE EXCLUDED.attachment_scan_status
+          END,
           expense_date         = EXCLUDED.expense_date,
           erpnext_payload      = EXCLUDED.erpnext_payload,
           last_synced_at       = EXCLUDED.last_synced_at,
@@ -281,12 +291,17 @@ export function assertOwnAttachmentKey(key: string | undefined, schoolId: string
   }
 }
 
+/**
+ * A short-lived URL for an expense's attachment, or null when there is none, storage is not
+ * configured, or the malware scan has not cleared it (F-14).
+ */
 export async function resolveStorageUrl(
-  storage: StorageService,
+  storage: StorageService | null | undefined,
   schoolId: string,
   storageKey: string | null,
+  scanStatus: string | null = "clean",
 ): Promise<string | null> {
-  if (!storageKey) return null;
+  if (!storageKey || !storage || !isServableUploadScanStatus(scanStatus)) return null;
   // Never sign another school's object, whatever the row says.
   if (!isOwnAttachmentKey(storageKey, schoolId)) return null;
   try {
@@ -350,9 +365,10 @@ export async function getExpense(
   }
 
   const attachmentUrl = await resolveStorageUrl(
-    storage!,
+    storage,
     schoolId,
     row.attachment_storage_key as string | null,
+    row.attachment_scan_status as string | null,
   );
 
   return parseCacheRow(row, attachmentUrl);
@@ -481,6 +497,8 @@ export async function confirmAttachment(
   schoolId: string,
   expenseId: string,
   tempKey: string,
+  /** Receives the promoted key, for the caller to hand to the malware scanner after commit (F-14). */
+  uploadedKeys: string[] = [],
 ): Promise<ExpenseRow> {
   const { assertSchoolOwnedKey } = await import("../../../lib/storage/keys");
   const { buildPermanentKey } = await import("../../../lib/storage/keys");
@@ -511,16 +529,18 @@ export async function confirmAttachment(
     },
   });
   await recordStorageUpload(tx, promoted.sizeBytes);
+  uploadedKeys.push(permanentKey);
 
   const erpnextName = before.erpnext_name as string;
   await tx`
     UPDATE app.expense_cache
     SET attachment_storage_key = ${permanentKey},
+        attachment_scan_status = 'scanning',
         updated_at = CURRENT_TIMESTAMP
     WHERE school_id = ${schoolId}::uuid AND erpnext_docname = ${erpnextName}
   `;
 
-  const presigned = await storage.presign(permanentKey, "GET");
+  // No URL yet: the file waits for its malware scan (F-14) and is served once it is clean.
   const [updated] = await tx<Record<string, unknown>[]>`
     SELECT ${tx.unsafe(CACHE_COLUMNS)}
     FROM app.expense_cache AS ec
@@ -528,7 +548,7 @@ export async function confirmAttachment(
     WHERE ec.school_id = ${schoolId}::uuid AND ec.erpnext_docname = ${erpnextName}
   `;
 
-  return parseCacheRow(updated!, presigned.url);
+  return parseCacheRow(updated!, null);
 }
 
 export async function getMonthlySummary(

@@ -12,7 +12,13 @@
  * value leaves this module as its mask, except through revealValue, which is audited like a write.
  */
 
-import { ERROR_CODES, PERMISSIONS, ROLES, SCHOOL_STAFF_ROLES } from "@studafy/constants";
+import {
+  ERROR_CODES,
+  PERMISSIONS,
+  ROLES,
+  SCHOOL_STAFF_ROLES,
+  isServableUploadScanStatus,
+} from "@studafy/constants";
 import {
   RecordKeyUnavailableError,
   RecordSealBrokenError,
@@ -227,6 +233,8 @@ interface AnswerRow {
   document_mime_type: string | null;
   document_size_bytes: string | null;
   document_sensitive: boolean | null;
+  /** The file's malware scan state (000192); text so a LEFT JOIN miss reads as null. */
+  document_scan_status: string | null;
   document_uploaded_at: Date | null;
   document_verified_at: Date | null;
   document_expires_on: string | null;
@@ -262,6 +270,7 @@ async function loadAnswers(
            d.status AS document_status, d.storage_key AS document_storage_key,
            d.original_file_name AS document_file_name, d.mime_type AS document_mime_type,
            d.size_bytes::text AS document_size_bytes, d.sensitive AS document_sensitive,
+           d.scan_status::text AS document_scan_status,
            d.uploaded_at AS document_uploaded_at, d.verified_at AS document_verified_at,
            to_char(d.expires_on, 'YYYY-MM-DD') AS document_expires_on
     FROM app.record_answers AS a
@@ -663,7 +672,8 @@ function assertExpiryAllowed(field: PublishedField, expiresOn: string | null | u
  * gateway under the field's content class; it is inspected, quota-checked and promoted here, in
  * the same transaction as the row that references it (the messaging pattern). A sensitive field's
  * file is promoted under the sensitive-documents KMS key (ADR-019). Returns a replaced file's key
- * for the caller to delete once the transaction commits.
+ * for the caller to delete once the transaction commits, and the new file's key for the caller to
+ * hand to the malware scanner then (F-14): until it is scanned clean it is not downloadable.
  */
 export async function attachDocument(
   tx: TransactionSql,
@@ -673,7 +683,7 @@ export async function attachDocument(
   fieldId: string,
   actorId: string,
   input: { storage_key: string; checksum_sha256?: string; expires_on?: string | null },
-): Promise<{ replacedKey: string | null }> {
+): Promise<{ replacedKey: string | null; storageKey: string }> {
   await assertSubjectReadable(tx, schoolId, subject, "staff");
   const form = await getPublishedForm(tx, schoolId, subject.kind);
   const field = documentField(form, fieldId);
@@ -709,15 +719,16 @@ export async function attachDocument(
   const [document] = await tx<{ id: string }[]>`
     INSERT INTO app.record_documents (
       school_id, answer_id, status, storage_key, original_file_name, mime_type, size_bytes,
-      sensitive, uploaded_by, uploaded_at, expires_on
+      sensitive, uploaded_by, uploaded_at, expires_on, scan_status
     ) VALUES (
       ${schoolId}::uuid, ${answer.id}::uuid, 'uploaded', ${permanentKey}, ${upload.parsed.filename},
       ${upload.contentType}, ${promoted.sizeBytes}, ${sensitive}, ${actorId}::uuid,
-      CURRENT_TIMESTAMP, ${input.expires_on ?? null}::date
+      CURRENT_TIMESTAMP, ${input.expires_on ?? null}::date, 'scanning'
     )
     ON CONFLICT (school_id, answer_id) DO UPDATE SET
       status = 'uploaded',
       storage_key = EXCLUDED.storage_key,
+      scan_status = EXCLUDED.scan_status,
       original_file_name = EXCLUDED.original_file_name,
       mime_type = EXCLUDED.mime_type,
       size_bytes = EXCLUDED.size_bytes,
@@ -747,7 +758,7 @@ export async function attachDocument(
       expires_on: input.expires_on ?? null,
     },
   });
-  return { replacedKey: previous?.storage_key ?? null };
+  return { replacedKey: previous?.storage_key ?? null, storageKey: permanentKey };
 }
 
 async function loadDocument(
@@ -870,7 +881,15 @@ export async function documentDownload(
   const row = answers.find((answer) => answer.field_id === fieldId);
   // A field no longer on the form is leadership's to see, as in getSubjectRecords.
   const visible = field ? isFieldVisibleTo(field, audience) : audience === "staff";
-  if (!visible || !row || !hasFile(row) || !row.document_storage_key) {
+  // A file the malware scan has not cleared (F-14) is answered as absent, like a material that is
+  // not ready: pending, infected and unscannable files are never handed out.
+  if (
+    !visible ||
+    !row ||
+    !hasFile(row) ||
+    !row.document_storage_key ||
+    !isServableUploadScanStatus(row.document_scan_status)
+  ) {
     throw new CodedHttpException(404, ERROR_CODES.RECORD_DOCUMENT_NOT_FOUND, "No document on file");
   }
 

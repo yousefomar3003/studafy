@@ -1,4 +1,10 @@
 export { materialScanFailedListener, processMaterialScan } from "./scan-material.worker";
+export {
+  isUploadScanJob,
+  processUploadScan,
+  uploadScanFailedListener,
+  UPLOAD_SCAN_TARGET_SPECS,
+} from "./scan-upload.worker";
 export { scanStream, parseClamdResponse, ClamdScanError } from "./clamd";
 export { createScanS3 } from "./s3";
 export type { ClamdConfig, ScanVerdict } from "./clamd";

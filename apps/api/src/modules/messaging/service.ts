@@ -12,7 +12,7 @@
  * policy violation surface as a 500.
  */
 
-import { ERROR_CODES, NOTIFICATION_TYPES } from "@studafy/constants";
+import { ERROR_CODES, NOTIFICATION_TYPES, isServableUploadScanStatus } from "@studafy/constants";
 import {
   isTemplateLocale,
   NOTIFICATION_CHANNELS,
@@ -44,6 +44,7 @@ import type {
 } from "./schemas";
 import type { StorageService } from "../../lib/storage";
 import type { InspectedStagedUpload } from "../storage/service";
+import type { UploadScanStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
 /** The authenticated caller, as the service needs it. */
@@ -602,25 +603,36 @@ interface AttachmentRow {
   mime_type: MessageAttachmentContentType;
   /** bigint, which postgres.js hands back as a string. */
   size_bytes: string;
+  /** Malware scan state (000192). */
+  scan_status: UploadScanStatus;
 }
 
 /**
  * Project a stored image onto its response shape, with a short-lived pre-signed GET. The storage
  * key is never serialized. Without object storage the row still renders with a null URL, the same
  * posture as assignment attachments: history stays readable on a deployment without storage.
+ *
+ * Likewise without a key (a report snapshot withholds an unservable image's key) or until the
+ * malware scan has cleared the image (F-14): it is listed, with a null URL.
  */
 export async function toAttachmentResponse(
   storage: StorageService | null,
   row: {
     id: string;
-    storage_key: string;
+    storage_key: string | null;
     mime_type: MessageAttachmentContentType;
     size_bytes: string | number;
+    /** Omitted when the caller already withheld an unservable key (the report snapshot). */
+    scan_status?: UploadScanStatus;
   },
 ): Promise<MessageAttachment> {
-  const presigned = storage
-    ? await storage.presign(row.storage_key, "GET", undefined, DOWNLOAD_PRESIGN_TTL_SECONDS)
-    : null;
+  const servable =
+    row.storage_key !== null &&
+    (row.scan_status === undefined || isServableUploadScanStatus(row.scan_status));
+  const presigned =
+    storage && servable && row.storage_key !== null
+      ? await storage.presign(row.storage_key, "GET", undefined, DOWNLOAD_PRESIGN_TTL_SECONDS)
+      : null;
   return {
     id: row.id,
     content_type: row.mime_type,
@@ -640,7 +652,8 @@ async function loadAttachments(
   const byMessage = new Map<string, MessageAttachment[]>();
   if (messageIds.length === 0) return byMessage;
   const rows = await tx<AttachmentRow[]>`
-    SELECT id, message_id, storage_key, mime_type, size_bytes::text AS size_bytes
+    SELECT id, message_id, storage_key, mime_type, size_bytes::text AS size_bytes,
+           scan_status::text AS scan_status
     FROM app.message_attachments
     WHERE school_id = ${actor.schoolId}::uuid
       AND message_id = ANY(${messageIds as string[]}::uuid[])
@@ -839,6 +852,11 @@ export async function sendMessage(
   actor: MessagingActor,
   conversationId: string,
   input: SendMessageInput,
+  /**
+   * Receives the permanent key of every image this send stored, for the caller to hand to the
+   * malware scanner once the transaction commits (F-14).
+   */
+  uploadedKeys: string[] = [],
 ): Promise<Message> {
   const participants = await loadParticipants(tx, actor, conversationId);
   const callerIsParent = participants.parent_user_id === actor.userId;
@@ -881,8 +899,10 @@ export async function sendMessage(
         ${upload.parsed.filename}, ${upload.contentType}, ${promoted.sizeBytes},
         ${upload.checksumSha256}
       )
-      RETURNING id, message_id, storage_key, mime_type, size_bytes::text AS size_bytes
+      RETURNING id, message_id, storage_key, mime_type, size_bytes::text AS size_bytes,
+                scan_status::text AS scan_status
     `;
+    uploadedKeys.push(permanentKey);
     attachments.push(await toAttachmentResponse(storage, attachment!));
   }
 

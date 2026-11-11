@@ -32,7 +32,14 @@ import { processDigest, processNotificationDigest } from "./queues/notifications
 import { createFcmSender } from "./queues/notifications/push";
 import { processReportJob } from "./queues/reports";
 import { createReportS3 } from "./queues/reports/report-s3";
-import { createScanS3, materialScanFailedListener, processMaterialScan } from "./queues/scan";
+import {
+  createScanS3,
+  isUploadScanJob,
+  materialScanFailedListener,
+  processMaterialScan,
+  processUploadScan,
+  uploadScanFailedListener,
+} from "./queues/scan";
 
 import type { AiIngestionJobData } from "./queues/ai-ingestion/job";
 import type { TenantSemaphore } from "./queues/ai-ingestion/semaphore";
@@ -435,11 +442,12 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
   {
     name: QUEUE_NAMES.SCAN,
     concurrency: 2,
-    // One job per confirmed material. Concurrency 2: each scan holds a clamd connection and streams
-    // the object once, and the clean-file availability budget is dominated by scan latency — two in
-    // flight keeps that low without oversubscribing a Fargate-sized container's clamd pool.
-    processor: (job: Job) =>
-      processMaterialScan(job, {
+    // One job per confirmed material (scan-material) or other user upload (scan-upload, F-14).
+    // Concurrency 2: each scan holds a clamd connection and streams the object once, and the
+    // clean-file availability budget is dominated by scan latency — two in flight keeps that low
+    // without oversubscribing a Fargate-sized container's clamd pool.
+    processor: (job: Job) => {
+      const storage = {
         databaseUrl,
         databaseCaCert: workerEnv.DATABASE_CA_CERT,
         s3: workerEnv.S3_REGION
@@ -452,12 +460,25 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           timeoutMs: workerEnv.CLAMAV_TIMEOUT_MS,
           maxFileBytes: workerEnv.CLAMAV_MAX_FILE_BYTES,
         },
-        enqueueDerivation,
-        enqueueIngestion,
-      }),
-    // Terminal failures fail closed: the material is marked failed (never available) and the
-    // uploader is alerted. See scan-material.worker.ts.
-    onFailed: materialScanFailedListener(databaseUrl, workerLogger),
+      };
+      if (isUploadScanJob(job)) {
+        return processUploadScan(job, {
+          ...storage,
+          sensitiveKmsKeyId: workerEnv.STORAGE_SENSITIVE_KMS_KEY_ID,
+          log: workerLogger,
+        });
+      }
+      return processMaterialScan(job, { ...storage, enqueueDerivation, enqueueIngestion });
+    },
+    // Terminal failures fail closed: the material or upload is marked failed (never served) and
+    // the failure is logged; a material's uploader is also alerted. See scan-material.worker.ts and
+    // scan-upload.worker.ts.
+    onFailed: (() => {
+      const onMaterialFailed = materialScanFailedListener(databaseUrl, workerLogger);
+      const onUploadFailed = uploadScanFailedListener(databaseUrl, workerLogger);
+      return (job, error) =>
+        isUploadScanJob(job) ? onUploadFailed(job, error) : onMaterialFailed(job, error);
+    })(),
   },
   {
     name: QUEUE_NAMES.DERIVATIONS,

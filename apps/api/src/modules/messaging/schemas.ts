@@ -64,7 +64,8 @@ export const messageAttachmentSchema = z
       .openapi({
         description:
           "Short-lived (5 minute) pre-signed GET URL for the image. Null when object storage is not " +
-          "configured for this deployment. Treat it as opaque and re-fetch the message list for a " +
+          "configured for this deployment, and until the image has passed its malware scan (an " +
+          "infected image never gets one). Treat it as opaque and re-fetch the message list for a " +
           "fresh one after `download_url_expires_at`.",
       }),
     download_url_expires_at: dateTimeSchema.nullable().openapi({

@@ -240,7 +240,7 @@ We host, store, organise, display, transmit and delete School Data so that the S
 - generating reports, certificates, receipts and other documents;
 - importing data the School provides, such as student lists;
 - providing the AI study features to students who choose to use them;
-- keeping the audit log, scanning study materials for viruses, and protecting the Service;
+- keeping the audit log, scanning uploaded files for viruses, and protecting the Service;
 - giving support the School asks for, and helping the School with requests from data subjects;
 - deleting data when the School, a User or this agreement requires it.
 
@@ -316,7 +316,7 @@ The Service has no built-in fields for special category data. The School may rec
 
 - Rate limits on sign-in, messaging, AI and other requests.
 - Bot protection (Cloudflare Turnstile) on public forms, including the contact form, school registration and the public account deletion page.
-- Study materials are scanned for viruses before they are made available. Infected files are quarantined, and the uploader is told.
+- Files that Users upload, such as study materials, homework and assignment files, message images, record documents and receipts, are scanned for viruses before anyone else can download them. Infected files are quarantined and never made available; for study materials the uploader is also told. Files uploaded before scanning was extended to them in November 2026 may not have been scanned.
 - HTML is removed from text that Users write, such as announcements, comments and submissions.
 - Files are downloaded through links that expire after a few minutes.
 
