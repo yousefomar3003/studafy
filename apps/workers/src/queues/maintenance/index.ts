@@ -11,6 +11,12 @@ export {
   scheduleAiMessageRetentionSweepJob,
 } from "./ai-message-retention-sweep-scheduler";
 export { resolveAdminActor, armAdminActor, NoAdminActorError } from "./admin-actor";
+export { MONTHS_AHEAD, ensureFuturePartitions } from "./partition-maintenance";
+export type { PartitionMaintenanceResult } from "./partition-maintenance";
+export {
+  PARTITION_MAINTENANCE_CRON_PATTERN,
+  schedulePartitionMaintenanceJob,
+} from "./partition-maintenance-scheduler";
 export {
   DATA_RETENTION_BATCH_SIZE,
   DATA_RETENTION_RULES,
@@ -32,12 +38,6 @@ export {
   DATA_RETENTION_SWEEP_CRON_PATTERN,
   scheduleDataRetentionSweepJob,
 } from "./data-retention-sweep-scheduler";
-export { MONTHS_AHEAD, ensureFuturePartitions } from "./partition-maintenance";
-export type { PartitionMaintenanceResult } from "./partition-maintenance";
-export {
-  PARTITION_MAINTENANCE_CRON_PATTERN,
-  schedulePartitionMaintenanceJob,
-} from "./partition-maintenance-scheduler";
 export {
   RECORD_RETENTION_BATCH_SIZE,
   purgeExpiredSensitiveRecords,
