@@ -332,6 +332,26 @@ describeDb("updateUser", () => {
     expect(updated.email).toBe("update@test.local");
   });
 
+  test("sets, keeps and removes the contact phone", async () => {
+    const school = await createSchool(db.sql);
+    const user = await createUserFactory(db.sql, school.id, { email: "phone@test.local" });
+
+    const set = await withTx(school.id, (tx) =>
+      updateUser(tx, school.id, user.id, { phone: " ٠٥٠١٢٣٤٥٦٧ " }),
+    );
+    expect(set.phone).toBe("0501234567");
+
+    const kept = await withTx(school.id, (tx) =>
+      updateUser(tx, school.id, user.id, { display_name: "Renamed" }),
+    );
+    expect(kept.phone).toBe("0501234567");
+
+    const removed = await withTx(school.id, (tx) =>
+      updateUser(tx, school.id, user.id, { phone: null }),
+    );
+    expect(removed.phone).toBeNull();
+  });
+
   test("returns 404 for non-existent user", async () => {
     const school = await createSchool(db.sql);
 

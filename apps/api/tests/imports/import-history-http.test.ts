@@ -275,11 +275,12 @@ async function confirmAndComplete(tenant: Tenant, importId: string) {
 
 function csvFor(slug: string) {
   return [
-    "Student ID,First,Last,Email,Guardian Email,Relationship,Civil ID,House,Allergic?,Bus stop",
-    `S-1,Rana,Haddad,rana@${slug}.local,dad@${slug}.local,father,289010112345,Red,yes,Gate 3`,
-    `S-2,Omar,Haddad,omar@${slug}.local,dad@${slug}.local,father,301020254321,Blue,no,Gate 4`,
-    `S-3,Huda,Saleh,huda@${slug}.local,,,290030398765,Red,maybe,`,
-    `S-4,Sami,Saleh,sami@${slug}.local,,,,Blue,no,Gate 3`,
+    // Parent Phone last: the column tests below pick columns by their position in the file.
+    "Student ID,First,Last,Email,Guardian Email,Relationship,Civil ID,House,Allergic?,Bus stop,Parent Phone",
+    `S-1,Rana,Haddad,rana@${slug}.local,dad@${slug}.local,father,289010112345,Red,yes,Gate 3,0501110001`,
+    `S-2,Omar,Haddad,omar@${slug}.local,dad@${slug}.local,father,301020254321,Blue,no,Gate 4,0501110001`,
+    `S-3,Huda,Saleh,huda@${slug}.local,,,290030398765,Red,maybe,,`,
+    `S-4,Sami,Saleh,sami@${slug}.local,,,,Blue,no,Gate 3,`,
   ].join("\n");
 }
 
@@ -842,11 +843,11 @@ describeDb("unmapped columns", () => {
     });
     await publish(tenant, "parent");
     const csv = [
-      "Student ID,First,Last,Email,Guardian Email,Relationship,Employer",
-      `S-1,Rana,Haddad,rana@${tenant.slug}.local,dad@${tenant.slug}.local,father,Acme`,
-      `S-2,Omar,Haddad,omar@${tenant.slug}.local,dad@${tenant.slug}.local,father,Acme`,
-      `S-3,Huda,Saleh,huda@${tenant.slug}.local,mum@${tenant.slug}.local,mother,Beta`,
-      `S-4,Sami,Saleh,sami@${tenant.slug}.local,mum@${tenant.slug}.local,mother,Gamma`,
+      "Student ID,First,Last,Email,Guardian Email,Relationship,Employer,Parent Phone",
+      `S-1,Rana,Haddad,rana@${tenant.slug}.local,dad@${tenant.slug}.local,father,Acme,0501110001`,
+      `S-2,Omar,Haddad,omar@${tenant.slug}.local,dad@${tenant.slug}.local,father,Acme,0501110001`,
+      `S-3,Huda,Saleh,huda@${tenant.slug}.local,mum@${tenant.slug}.local,mother,Beta,0501110002`,
+      `S-4,Sami,Saleh,sami@${tenant.slug}.local,mum@${tenant.slug}.local,mother,Gamma,0501110002`,
     ].join("\n");
     const uploaded = await json<ImportDto>(
       await upload(tenant, csv, await stageSource(tenant.admin, csv)),

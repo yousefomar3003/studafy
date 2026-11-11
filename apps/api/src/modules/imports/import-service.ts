@@ -542,6 +542,7 @@ export async function getImportDiff(
         parent_group_line: row.parent_group_line,
         parent_email: row.record.parent_email,
         parent_name: row.record.parent_name,
+        parent_phone: row.record.parent_phone,
         link: row.link,
         parent2:
           row.parent2 === null
@@ -552,6 +553,7 @@ export async function getImportDiff(
                 parent_group_line: row.parent2.parent_group_line,
                 parent_email: row.record.parent2_email,
                 parent_name: row.record.parent2_name,
+                parent_phone: row.record.parent2_phone,
                 link: row.parent2.link,
               },
         family: row.record.family,

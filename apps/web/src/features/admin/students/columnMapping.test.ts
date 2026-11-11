@@ -100,10 +100,33 @@ describe("missingRequiredFields / isSameMapping / mappingFitsHeaders", () => {
 describe("parentPairWarning", () => {
   test("warns when a parent's name or email and its relationship are not mapped together", () => {
     expect(parentPairWarning(COMPLETE, t)).toBeNull();
-    expect(parentPairWarning({ parent_email: "a", parent_relationship: "b" }, t)).toBeNull();
-    expect(parentPairWarning({ parent_name: "a", parent_relationship: "b" }, t)).toBeNull();
+    const phone = { parent_phone: "p" };
+    expect(
+      parentPairWarning({ ...phone, parent_email: "a", parent_relationship: "b" }, t),
+    ).toBeNull();
+    expect(
+      parentPairWarning({ ...phone, parent_name: "a", parent_relationship: "b" }, t),
+    ).toBeNull();
     expect(parentPairWarning({ parent_email: "a" }, t)).toContain("Parent 1 relationship");
     expect(parentPairWarning({ parent2_name: "a" }, t)).toContain("Parent 2 relationship");
+  });
+
+  test("warns when a parent is mapped without a phone column", () => {
+    expect(parentPairWarning({ parent_name: "a", parent_relationship: "b" }, t)).toBe(
+      "Every parent needs a phone number: map a column to Parent 1 phone. Rows that give a parent without a phone are rejected.",
+    );
+    expect(
+      parentPairWarning(
+        {
+          parent_name: "a",
+          parent_relationship: "b",
+          parent_phone: "c",
+          parent2_name: "d",
+          parent2_relationship: "e",
+        },
+        t,
+      ),
+    ).toContain("Parent 2 phone");
   });
 });
 

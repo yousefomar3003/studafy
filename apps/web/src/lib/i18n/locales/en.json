@@ -269,6 +269,7 @@
       "issues": {
         "required": "{{field}} is required.",
         "invalidEmail": "{{field}} must be a valid email address.",
+        "invalidPhone": "{{field}} must be a phone number with 6 to 20 digits, for example +965 5000 1234.",
         "invalidDate": "{{field}} must be a date in YYYY-MM-DD format.",
         "invalidTime": "{{field}} must be a time in HH:MM format.",
         "invalidNumber": "{{field}} must be a number.",

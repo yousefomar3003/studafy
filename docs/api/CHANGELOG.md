@@ -13,6 +13,13 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Contact phone for parents and teachers (000203): `UserWithRoles` / `UserListItem` gain `phone`
+  (nullable). `CreateUserBody` and `CreateTeacherBody` take optional `phone`; `UpdateUserBody`
+  takes `phone` (null removes it). A phone is 6 to 20 digits with `+ - ( ) .` and spaces; Arabic
+  digits are read as 0-9. The student import's diff rows (`ImportDiffRow`, `ImportDiffParent`) gain
+  `parent_phone`, and the import requires a phone for every parent a line names (new import fields
+  `parent_phone`, `parent2_phone`). The Teachers import template requires one for every teacher.
+
 - Exam window filters: `GET /api/academics/exams` (`ExamQuery`) takes optional `ends_after` and
   `starts_before` (ISO 8601 instants), so a "coming up" read gets only the exams in its window
   instead of the class's whole history. The mobile teacher home passes them.

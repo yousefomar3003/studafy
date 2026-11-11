@@ -1,4 +1,5 @@
 import { ASSIGNABLE_ROLES } from "@studafy/constants";
+import { normalizePhoneNumber } from "@studafy/student-import";
 import { z } from "zod";
 
 import type { Role } from "@studafy/constants";
@@ -65,6 +66,14 @@ export const editUserSchema = z.object({
     .trim()
     .min(1, "adminPeople.validation.nameRequired")
     .max(200, "adminPeople.validation.maxLength200"),
+  /** Blank removes the phone. Saved as the server reads it (Arabic digits as 0-9). */
+  phone: z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === "" || normalizePhoneNumber(value) !== null,
+      "adminPeople.validation.phoneInvalid",
+    ),
   role: roleEnum,
 });
 export type EditUserValues = z.infer<typeof editUserSchema>;

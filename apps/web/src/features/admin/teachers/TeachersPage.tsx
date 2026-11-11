@@ -158,14 +158,16 @@ function EditTeacherModal({
 interface CreateTeacher {
   display_name: string;
   employee_number: string;
+  phone: string;
   email?: string;
   hire_date?: string;
   employment_status: EmploymentStatus;
 }
 
 /**
- * Teachers from a file, one `POST /api/teachers` per row: name and employee number, optionally an
- * email (teachers without one sign in with their TCH- ID) and a hire date. A new teacher starts
+ * Teachers from a file, one `POST /api/teachers` per row: name, employee number and phone number
+ * (required, so the school can reach every teacher), optionally an email (teachers without one
+ * sign in with their TCH- ID) and a hire date. A new teacher starts
  * active unless the file says otherwise. Unknown columns can be kept as staff record fields for the
  * teachers created.
  */
@@ -190,6 +192,14 @@ function useTeacherImportSpec(): ImportSpec<CreateTeacher> {
         example: "EMP-001",
       },
       {
+        key: "phone",
+        label: t("adminPeople.teachers.phone"),
+        required: true,
+        type: "phone",
+        maxLength: 50,
+        example: "+965 5000 1234",
+      },
+      {
         key: "email",
         label: t("adminPeople.teachers.emailOptional"),
         type: "email",
@@ -207,6 +217,7 @@ function useTeacherImportSpec(): ImportSpec<CreateTeacher> {
     toRecord: (values) => ({
       display_name: String(values.display_name),
       employee_number: String(values.employee_number),
+      phone: String(values.phone),
       ...(values.email ? { email: String(values.email) } : {}),
       ...(values.hire_date ? { hire_date: String(values.hire_date) } : {}),
       employment_status: (values.employment_status as EmploymentStatus | null) ?? "active",

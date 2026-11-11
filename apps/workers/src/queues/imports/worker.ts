@@ -501,7 +501,7 @@ async function resolveParent(
 
   const email = namedBy[slot.email];
   const displayName = (namedBy[slot.name] ?? email!).slice(0, 200).trim();
-  const parentUserId = await createUser(ctx, email, displayName);
+  const parentUserId = await createUser(ctx, email, displayName, namedBy[slot.phone]);
   await grantRole(ctx, parentUserId, "PARENT");
   ctx.parentsByGroup.set(group, parentUserId);
   return { parentUserId, created: true, namedBy };
@@ -648,16 +648,22 @@ async function writeRecordAnswers(
 }
 
 /** A new active account. With no email, its owner signs in with their member ID (000141). */
+/**
+ * A new account. `phone` is a parent's contact number (000203); null for a student, and for a
+ * parent staged before parents' phones were imported.
+ */
 async function createUser(
   ctx: ApplyContext,
   email: string | null,
   displayName: string,
+  phone: string | null = null,
 ): Promise<string> {
   const normalizedEmail = email === null ? null : normalizeEmail(email);
   const [user] = await ctx.tx<{ id: string }[]>`
-    INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+    INSERT INTO app.users (school_id, email, normalized_email, display_name, phone, status)
     VALUES (
-      ${ctx.schoolId}::uuid, ${email}, ${normalizedEmail}, ${displayName}, 'active'::app.user_status
+      ${ctx.schoolId}::uuid, ${email}, ${normalizedEmail}, ${displayName}, ${phone},
+      'active'::app.user_status
     )
     RETURNING id
   `;
@@ -666,7 +672,14 @@ async function createUser(
     targetTable: "users",
     targetId: user!.id,
     oldValues: null,
-    newValues: { import_id: ctx.importId, email, display_name: displayName, status: "active" },
+    // Whether a phone was saved, not the number: the audit trail is kept for years.
+    newValues: {
+      import_id: ctx.importId,
+      email,
+      display_name: displayName,
+      phone_set: phone !== null,
+      status: "active",
+    },
   });
   return user!.id;
 }

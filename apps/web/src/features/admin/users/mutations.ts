@@ -91,6 +91,7 @@ export function useCreateUser() {
         school_id: "",
         email: values.email,
         display_name: values.display_name ?? null,
+        phone: null,
         status: "invited",
         roles: [values.role as Role],
         email_verified_at: null,
@@ -125,24 +126,26 @@ export function useCreateUser() {
 
 export interface UpdateUserVariables {
   userId: string;
-  display_name: string;
+  display_name?: string;
+  /** Null removes the phone; omitted leaves it as it is. */
+  phone?: string | null;
 }
 
 export function useUpdateUser() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ userId, display_name }: UpdateUserVariables) => {
+    mutationFn: async ({ userId, ...body }: UpdateUserVariables) => {
       const { data } = await api.PATCH("/api/users/{userId}", {
         params: { path: { userId } },
-        body: { display_name },
+        body,
       });
       return data;
     },
-    onMutate: async ({ userId, display_name }) => {
+    onMutate: async ({ userId, ...changes }) => {
       await queryClient.cancelQueries({ queryKey: USERS_LIST_KEY });
       const snapshot = snapshotUserLists(queryClient);
-      patchUserInLists(queryClient, userId, (user) => ({ ...user, display_name }));
+      patchUserInLists(queryClient, userId, (user) => ({ ...user, ...changes }));
       return { snapshot };
     },
     onError: (_error, _vars, context) => {

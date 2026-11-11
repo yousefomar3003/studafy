@@ -22,6 +22,7 @@
   "validation": {
     "emailRequired": "Email is required",
     "emailInvalid": "Enter a valid email address",
+    "phoneInvalid": "Enter a phone number with 6 to 20 digits, for example +965 5000 1234",
     "maxLength200": "Keep it under 200 characters",
     "maxLength100": "Keep it under 100 characters",
     "nameRequired": "Name is required",
@@ -63,6 +64,7 @@
       "columns": {
         "name": "Name",
         "email": "Email",
+        "phone": "Phone",
         "role": "Role",
         "status": "Status",
         "lastActive": "Last active",
@@ -72,6 +74,7 @@
     "form": {
       "email": "Email",
       "displayName": "Display name",
+      "phone": "Phone",
       "role": "Role"
     },
     "create": {
@@ -278,12 +281,14 @@
         "parent_email": "Parent 1 email (optional)",
         "parent_name": "Parent 1 name",
         "parent_relationship": "Parent 1 relationship",
+        "parent_phone": "Parent 1 phone",
         "grade": "Grade",
         "section": "Section",
         "family": "Family number",
         "parent2_email": "Parent 2 email",
         "parent2_name": "Parent 2 name",
-        "parent2_relationship": "Parent 2 relationship"
+        "parent2_relationship": "Parent 2 relationship",
+        "parent2_phone": "Parent 2 phone"
       },
       "hints": {
         "admission_number": "Your school's unique ID for the student.",
@@ -293,11 +298,13 @@
         "parent_email": "Optional. Parents without an email sign in with their Studafy ID. An email that already has an account is not linked.",
         "parent_name": "The parent's full name. Give a name or an email, plus the relationship.",
         "parent_relationship": "One of {{values}} (Arabic words such as أم or أب work too).",
+        "parent_phone": "Required for every parent a row gives, for example +965 5000 1234. Arabic digits work too.",
         "grade": "The grade to place the student in, spelled as in Academics, for example Grade 1.",
         "section": "The section of that grade, for example A. Leave blank if the grade has only one section.",
         "family": "Any number or code you choose. Brothers and sisters with the same family number share their parents, so you only type the parents once."
       },
       "parentPairWarning": "Map {{relationship}} together with {{name}} or {{email}}. Rows that give a parent without a relationship are rejected.",
+      "parentPhoneWarning": "Every parent needs a phone number: map a column to {{phone}}. Rows that give a parent without a phone are rejected.",
       "blocker": {
         "missing": "Map a column to every required field before confirming. Missing: {{fields}}.",
         "unapplied": "You changed the mapping. Apply it to re-check the file before confirming.",
@@ -792,7 +799,8 @@
     "record": "Staff record",
     "recordLabel": "Open {{name}}'s staff record",
     "importTitle": "Import teachers",
-    "emailOptional": "Email (optional)"
+    "emailOptional": "Email (optional)",
+    "phone": "Phone"
   },
   "importData": {
     "title": "Import data",

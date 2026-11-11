@@ -13,6 +13,7 @@ import {
   keyringHoldsDevelopmentKey,
   labelSuggestsSensitive,
   maskRecordValue,
+  normalizePhoneNumber,
   normalizeRecordValue,
   openRecordValue,
   parseRecordKeyring,
@@ -212,6 +213,20 @@ describe("values", () => {
       ok: false,
       error: "RECORD_VALUE_DOCUMENT_FIELD",
     });
+  });
+
+  test("reads a phone number as people type it, Arabic digits included", () => {
+    expect(normalizePhoneNumber("  +965 5000-1234 ")).toBe("+965 5000-1234");
+    expect(normalizePhoneNumber("(06) 555.1234")).toBe("(06) 555.1234");
+    expect(normalizePhoneNumber("٠٧٩١٢٣٤٥٦٧")).toBe("0791234567");
+    expect(normalizePhoneNumber("۰۵۰۱۲۳۴۵۶۷")).toBe("0501234567");
+    expect(normalizeRecordValue(field("phone"), "٠٧٩١٢٣٤٥٦٧")).toEqual({
+      ok: true,
+      value: "0791234567",
+    });
+    for (const invalid of ["", "12345", "call me", "+965 5000 1234 ext 2", "1".repeat(21)]) {
+      expect(normalizePhoneNumber(invalid)).toBeNull();
+    }
   });
 });
 

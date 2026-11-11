@@ -613,16 +613,19 @@ const updateStudentImportSettingsRoute = createRoute({
 
 /**
  * Students and their parents in one sheet. Nobody needs an email: each person gets a member ID and
- * signs in with it. Lines sharing a family number share their parents, so a sibling's line can
- * leave the parents blank (ADM-002). Grade and section place the student in a class.
+ * signs in with it. Every parent needs a phone number. Lines sharing a family number share their
+ * parents, so a sibling's line can leave the parents blank (ADM-002). Grade and section place the
+ * student in a class.
  */
 const CSV_TEMPLATE =
   "admission_number,first_name,middle_name,last_name,date_of_birth,status,grade,section,family," +
-  "parent_name,parent_relationship,parent_email,parent2_name,parent2_relationship,parent2_email," +
-  "email,preferred_name\n" +
-  "ADM-001,Ali,Omar,Hassan,2016-03-15,enrolled,Grade 1,A,F1,Mona Hassan,mother,,Omar Hassan,father,,,\n" +
-  "ADM-002,Sara,Omar,Hassan,2018-09-02,enrolled,Grade 1,B,F1,,,,,,,,\n" +
-  "ADM-003,Lina,,Khaled,2015-11-20,enrolled,Grade 2,A,F2,Rana Khaled,mother,rana@example.com,,,,,\n";
+  "parent_name,parent_relationship,parent_phone,parent_email," +
+  "parent2_name,parent2_relationship,parent2_phone,parent2_email,email,preferred_name\n" +
+  "ADM-001,Ali,Omar,Hassan,2016-03-15,enrolled,Grade 1,A,F1," +
+  "Mona Hassan,mother,+965 5000 1234,,Omar Hassan,father,+965 5000 5678,,,\n" +
+  "ADM-002,Sara,Omar,Hassan,2018-09-02,enrolled,Grade 1,B,F1,,,,,,,,,,\n" +
+  "ADM-003,Lina,,Khaled,2015-11-20,enrolled,Grade 2,A,F2," +
+  "Rana Khaled,mother,+965 5000 9012,rana@example.com,,,,,,\n";
 
 // ---------------------------------------------------------------------------
 // Route factory

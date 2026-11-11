@@ -67,9 +67,10 @@ afterAll(async () => {
 
 async function insertFixtureUser(): Promise<string> {
   const [user] = await sql!<{ id: string }[]>`
-    INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+    INSERT INTO app.users (school_id, email, normalized_email, display_name, phone, status)
     VALUES (
-      ${schoolId}::uuid, 'jane.doe@example.com', 'jane.doe@example.com', 'Jane Doe', 'active'
+      ${schoolId}::uuid, 'jane.doe@example.com', 'jane.doe@example.com', 'Jane Doe',
+      '+965 5000 1234', 'active'
     )
     RETURNING id
   `;
@@ -80,7 +81,7 @@ describe("findRedactableColumns", () => {
   dbTest("finds users' verified personal columns and nothing structural", async () => {
     const columns = await findRedactableColumns(sql!, "users");
     const names = columns.map((c) => c.columnName).sort();
-    expect(names).toEqual(["display_name", "email", "normalized_email"]);
+    expect(names).toEqual(["display_name", "email", "normalized_email", "phone"]);
   });
 
   dbTest("is a clean no-op set for a table with no personal columns", async () => {
@@ -98,16 +99,22 @@ describe("redactPersonalColumns", () => {
     });
 
     expect(outcome.rowsAffected).toBe(1);
-    expect(outcome.columns.sort()).toEqual(["display_name", "email", "normalized_email"]);
+    expect(outcome.columns.sort()).toEqual(["display_name", "email", "normalized_email", "phone"]);
 
-    // All three are nullable since member password login (000141): an account no longer needs an
-    // email, so an erased one keeps none rather than a placeholder.
+    // All four are nullable since member password login (000141) and the contact phone (000203):
+    // an account no longer needs an email, so an erased one keeps none rather than a placeholder.
     const [row] = await sql!<
-      { display_name: string | null; email: string | null; normalized_email: string | null }[]
+      {
+        display_name: string | null;
+        email: string | null;
+        normalized_email: string | null;
+        phone: string | null;
+      }[]
     >`
-      SELECT display_name, email, normalized_email FROM app.users WHERE school_id = ${schoolId}::uuid
+      SELECT display_name, email, normalized_email, phone
+      FROM app.users WHERE school_id = ${schoolId}::uuid
     `;
-    expect(row).toEqual({ display_name: null, email: null, normalized_email: null });
+    expect(row).toEqual({ display_name: null, email: null, normalized_email: null, phone: null });
   });
 
   dbTest(

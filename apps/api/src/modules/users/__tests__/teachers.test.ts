@@ -239,6 +239,24 @@ describeDb("createTeacher", () => {
     expect(teacher.employment_status).toBe("active");
   });
 
+  test("saves the teacher's phone on their account", async () => {
+    const school = await createSchool(db.sql);
+
+    const teacher = await withTx(school.id, (tx) =>
+      createTeacher(tx, school.id, {
+        display_name: "Sara Haddad",
+        employee_number: "EMP-PHONE",
+        employment_status: "active",
+        phone: "+965 5000 1234",
+      }),
+    );
+
+    const [user] = await db.sql<{ phone: string | null; email: string | null }[]>`
+      SELECT phone, email FROM app.users WHERE id = ${teacher.user_id}::uuid
+    `;
+    expect(user).toEqual({ phone: "+965 5000 1234", email: null });
+  });
+
   test("rejects duplicate employee number within school", async () => {
     const school = await createSchool(db.sql);
     await createTeacherFactory(db.sql, school.id, { employeeNumber: "EMP-DUP" });

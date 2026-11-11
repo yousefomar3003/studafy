@@ -416,6 +416,7 @@ export const importDiffParentSchema = z
     parent_group_line: z.number().int().positive().nullable(),
     parent_email: z.string().nullable(),
     parent_name: z.string().nullable(),
+    parent_phone: z.string().nullable(),
     link: z.enum(["create"]).nullable(),
   })
   .openapi("ImportDiffParent", {
@@ -466,6 +467,10 @@ export const importDiffRowSchema = z
     }),
     parent_email: z.string().nullable().openapi({ description: "The parent email as given." }),
     parent_name: z.string().nullable().openapi({ description: "The parent name as given." }),
+    parent_phone: z
+      .string()
+      .nullable()
+      .openapi({ description: "The parent phone, as given with Arabic digits read as 0-9." }),
     link: z
       .enum(["create"])
       .nullable()
