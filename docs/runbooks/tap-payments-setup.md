@@ -71,7 +71,7 @@ The same flow runs on Stripe (Checkout `payment` mode) for non-Tap schools.
 
 | Variable          | Where        | Value                                                                            |
 | ----------------- | ------------ | -------------------------------------------------------------------------------- |
-| `TAP_SECRET_KEY`  | api, workers | `sk_test_…` (staging) / `sk_live_…` (production), from the Tap dashboard         |
+| `TAP_SECRET_KEY`  | api, workers | `sk_test_…` (testing) / `sk_live_…` (production), from the Tap dashboard         |
 | `TAP_WEBHOOK_URL` | api, workers | Public URL of `POST /api/subscriptions/webhook/tap`                              |
 | `TAP_COUNTRIES`   | api          | Countries billed through Tap, e.g. `JO` (empty: none — every school uses Stripe) |
 
@@ -83,17 +83,11 @@ The same flow runs on Stripe (Checkout `payment` mode) for non-Tap schools.
   webhooks for charges in flight to fail verification until Tap retries.
 - The webhook URL is sent on every charge (`post.url`); nothing is registered in the dashboard.
 
-**Deployment wiring.** Both variables are injected from each service's Secrets Manager
-app-secrets (`infra/deploy/ecs/{api,workers}/task-definition.json.tpl`). ECS refuses to start a task
-whose `valueFrom` names a JSON key the secret does not hold, so Terraform always writes both keys:
-`module.secrets`' `app_secret_defaults` defaults them to `""` for `api` and `workers`, and the apps
-read `""` as "Tap off". To turn Tap on in an environment, supply real values through
-`TF_VAR_secrets_app_secret_values` (as `infra/deploy/scripts/rotate-app-secret.sh` does) and roll
-both services.
-
-**Order on the first deploy of this change:** `terraform apply` (so both secrets contain the keys)
-**before** deploying the new api and workers task definitions. Deploying the task definitions
-first would fail to start the tasks until the apply lands.
+**Deployment wiring.** Production secrets live in the `prod` GitHub Environment and reach the fly
+apps through `.github/workflows/fly-production-deploy.yml` (`infra/fly/README.md`). That workflow
+does not copy `TAP_SECRET_KEY` or `TAP_WEBHOOK_URL` today, so Tap is off in production. To turn it
+on, add both to the `prod` environment and to the workflow's secret lists for `studafy-core-api`
+and `studafy-core-workers`, set `TAP_COUNTRIES` in `infra/fly/api.toml`, and rerun the deploy.
 
 Apply migrations `000111`, `000112`, `000113`.
 
@@ -115,7 +109,8 @@ Apply migrations `000111`, `000112`, `000113`.
    cd apps/api && TAP_TEST_SECRET_KEY=sk_test_... bun test tap-sandbox
    ```
 
-2. **Subscription, end to end in staging** (`TAP_SECRET_KEY=sk_test_…`):
+2. **Subscription, end to end with a test key** (`TAP_SECRET_KEY=sk_test_…`, on an API that Tap
+   can reach at `TAP_WEBHOOK_URL`):
    1. A school whose country is JO, with a JOD plan price. `POST /api/subscriptions/school/checkout`;
       open the `url`; pay with a Tap test card from Tap's sandbox docs (never put card numbers in
       code, tickets or logs).
@@ -129,7 +124,7 @@ Apply migrations `000111`, `000112`, `000113`.
       `app.tap_renewal_attempts`, then an `invoice.paid` event and the period advanced a month.
    5. Decline: repeat with a test card Tap declines — `past_due`, and a retry three days later.
 
-3. **Fee payment** (staging): take an outstanding invoice's `pay_online_url` from the family view,
+3. **Fee payment** (same test setup): take an outstanding invoice's `pay_online_url` from the family view,
    `POST /api/finance/online-payments` as the linked parent, pay on the returned page, and check the
    payment reaches `succeeded` with an `erpnext_payment_entry_id` that exists in ERPNext.
 

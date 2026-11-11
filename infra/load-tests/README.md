@@ -16,7 +16,7 @@ infra/load-tests/
 ├── config/          environment + NFR-01/02 threshold resolution (env-var overridable)
 ├── lib/             shared k6 helpers: auth (token-pool | mock-oauth), request tagging
 ├── scenarios/       the three k6 scripts — one file each, runnable standalone with `k6 run`
-├── seed/            LOCAL-ONLY fixture generator (never touches staging — see below)
+├── seed/            LOCAL-ONLY fixture generator (never touches a deployed environment — see below)
 ├── data/            data files the scenarios read; example-*.json are committed samples
 ├── scripts/         run.sh (orchestrates one scenario + comparison + archiving), regression
 │                    comparison, report archiving
@@ -25,7 +25,7 @@ infra/load-tests/
 
 ## Quickstart — local
 
-This is the only path proven end-to-end by this ticket (no live staging exists to run the other
+This is the only path proven end-to-end by this ticket (there is no staging environment to run the other
 path against — see "Honesty: what was and wasn't run" below). It needs a local API with the mock
 OAuth provider enabled:
 
@@ -57,16 +57,19 @@ mechanics, not the actual 5,000-teacher load model (see the load model doc for t
 
 ## Running against a real environment
 
+Production (`https://api.studafy.com`, `infra/fly/README.md`) is the only deployed environment;
+there is no staging. `config/environments.js` still lists `dev` and `staging` hostnames from the
+retired AWS plan, environments that do not exist, so point a real run at a host with `BASE_URL`:
+
 ```bash
-TARGET_ENV=staging \
+BASE_URL=https://<api host> \
   TEACHERS_FILE=/path/to/real/teachers.json \
   bash scripts/run.sh morning-attendance-peak
 ```
 
 `AUTH_MODE=mock-oauth` **cannot** be used here — `MOCK_OAUTH_ISSUER_URL` is refused at boot whenever
-`NODE_ENV`/`APP_ENV` is production-shaped (`apps/api/src/env.ts:271-277`), and staging's own task
-definition hardcodes `NODE_ENV=production`
-(`infra/deploy/ecs/api/task-definition.json.tpl:16`) — this is a deliberate safety rail, not a gap
+`NODE_ENV`/`APP_ENV` is production-shaped (`apps/api/src/env.ts`), and the production API sets
+`NODE_ENV = "production"` (`infra/fly/api.toml`) — this is a deliberate safety rail, not a gap
 to route around. `TEACHERS_FILE`/`STUDENTS_FILE`/`AI_STUDENTS_FILE` must instead point at a data
 file with real, already-valid `accessToken`s (`AUTH_MODE=token-pool`, the default). See the load
 model doc's "Credentials and fixtures" section for exactly what has to exist before that file can be
@@ -99,11 +102,9 @@ real regression against last time. Calling `k6 run` directly skips both steps; a
 
 ## Why this is not wired into CI
 
-There is no k6 binary in this repo's CI image and no reachable staging to point it at (see the
-honesty note in `docs/runbooks/environment-matrix.md` — staging has never been applied against a
-real AWS account from this repo's own authoring environment). This suite is an operator-run tool for
-pre-term load validation, the same posture `infra/deploy/scripts/deploy.sh` and
-`erpnext-new-site.sh` already have — written to work, not proven against a live account by CI.
+There is no k6 binary in this repo's CI image and no staging environment to point it at
+(production is the only deployed environment). This suite is an operator-run tool for pre-term load
+validation — written to work, not proven against a live environment by CI.
 
 ## Honesty: what was and wasn't run
 

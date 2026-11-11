@@ -54,5 +54,5 @@ Data lives in `app.school_applications` (migration 000139). The table is global 
 
 - **Object storage** (`S3_*`) must be configured. Otherwise the upload endpoints answer 503, and
   the console cannot show the proof.
-- **SES** (`SES_REGION`, `SES_FROM_ADDRESS`) must be configured for the emails to go out. Without
-  it the dispatcher runs dry.
+- **Resend** (`RESEND_API_KEY`, `EMAIL_FROM_ADDRESS`) must be configured for the emails to go out.
+  Without the key the dispatcher runs dry.

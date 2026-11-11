@@ -1,38 +1,41 @@
 # Migration failure
 
-A database migration fails during a deploy. Both deploy paths run the same one-off Fargate task
-(`infra/deploy/scripts/migrate.sh`): staging on every merge to `main`, prod on
-`workflow_dispatch`. A non-zero migration exit halts the pipeline before any service is touched —
-this runbook is what a responder does with the `deploy-failure` GitHub issue that halts opens.
+A database migration fails during a deploy. Production has one deploy path,
+**Production deploy (fly.io)** (`.github/workflows/fly-production-deploy.yml`, `workflow_dispatch`
+only), and its "Run database migrations" step runs the migrations as a one-off fly machine in the
+`studafy-core-migrate` app before any service is deployed. A non-zero exit fails that step and the
+run stops there — nothing is released. This runbook is what a responder does with that failed run.
 
-Mechanism source: [`infra/deploy/scripts/migrate.sh`](../../infra/deploy/scripts/migrate.sh),
+Mechanism source: [`.github/workflows/fly-production-deploy.yml`](../../.github/workflows/fly-production-deploy.yml),
+[`infra/fly/migrate.toml`](../../infra/fly/migrate.toml),
 [`packages/db/src/runner.ts`](../../packages/db/src/runner.ts),
 [`packages/db/src/errors.ts`](../../packages/db/src/errors.ts),
-[`db/migrations/`](../../db/migrations/). Deploy context: `docs/runbooks/deploy-rollback.md`'s
-"Migration gate" sections; `docs/runbooks/postgres-conventions.md` for how the instance is reached.
+[`db/migrations/`](../../db/migrations/). Deploy context and how the database is reached:
+[`infra/fly/README.md`](../../infra/fly/README.md) ("Deploying", "Database connections").
 
 ## Detection
 
-The `alert-migration-failed` job in `.github/workflows/staging-deploy.yml` /
-`prod-deploy.yml` opens a GitHub issue (label `deploy-failure`) naming the failed run. There is no
-paging channel in this repo (see `docs/runbooks/deploy-rollback.md`'s migration-gate note) — the
-issue _is_ the alert; the responder is whoever claims it first.
+The failed workflow run is the alert: the step ends with `Migrations exited with <code>; nothing
+was released.` (or `The migration machine never launched`). The workflow opens no issue and there
+is no paging channel in this repo; GitHub's own failed-run notification reaches whoever dispatched
+it. Open a GitHub issue (label `deploy-failure`) linking the run if more than one person needs to
+see it.
 
-No CloudWatch alarm covers migration failures — they happen inside a deploy pipeline, not against a
-live service, so a metric alarm is the wrong surface. A constant failure mode worth knowing:
-`exceeded max attempts` / `tasks-stopped` with a non-zero `exitCode` is _normal_ for a failed
-migration; the ECS task always exits non-zero by design.
+The migration machine connects **directly** to Supabase (`db.<project ref>.supabase.co:5432`, user
+`postgres`), not through the pooler (`infra/fly/migrate.toml`). The step prints the machine's logs
+(`flyctl logs --app studafy-core-migrate --machine <id>`) and then destroys the machine, so the
+run log is where the failure is read.
 
 ## Why the migration gate is what it is
 
-`migrate.sh` runs before any `deploy.sh` call in both workflows (`needs: migrate` on every deploy
-job), and its non-zero exit halts the run. Two failure shapes inside the task must be told apart
+The migration step runs before any `flyctl deploy` of a service, and its non-zero exit halts the
+run. Three failure shapes inside the machine must be told apart
 before anything else, because they have different answers:
 
 1. **A statement in a migration file failed** — `MigrationExecutionError` from `applyMigration` in
    `runner.ts` (`<filename> failed: <message>`). The failure is inside one migration's own SQL.
 2. **The advisory lock was already held** — `MigrationLockError`, "Another migration process holds
-   the Studafy advisory lock". Either a previous migration task is still running, or a task was
+   the Studafy advisory lock". Either a previous migration machine is still running, or one was
    killed **after** acquiring the lock (a held-but-orphaned lock only clears when the session
    holding it ends — a lost session releases its PostgreSQL advisory lock automatically, but only
    once Postgres notices the connection is gone).
@@ -42,49 +45,41 @@ before anything else, because they have different answers:
 
 The migration runner is **forward-only** — command set is `migrate|status|validate|pending|seed`
 (`packages/db/src/cli.ts`), and every migration is expected to stay backward-compatible with code
-it might be rolled back under (`docs/runbooks/deploy-rollback.md`'s rollback-scope note). There is
-no "down" command to reach for.
+it might run under. There is no "down" command to reach for, and no rollback procedure is
+defined for fly yet: schema changes are never rolled back.
 
 ## Decision points
 
-1. **Which failure shape?** Read the task's `stoppedReason` and the migration container's log.
+1. **Which failure shape?** Read the migration machine's log in the failed run.
    Lock-vs-statement-vs-validation divide the world as above; the procedure differs from step 2 on.
-2. **Is the failure in a _new, in-flight_ migration or in one that already applied elsewhere?**
-   A migration that applied cleanly in staging but fails in prod is usually drift (prod schema
-   ahead/behind of the code the image carries). A migration that fails in staging is usually a bug
-   in the migration itself.
+2. **Is the failure in a _new, in-flight_ migration or a drift problem?** There is no staging
+   environment; a migration that passed CI's `database-migrations` job but fails in production is
+   usually drift (production's schema ahead/behind of the code the image carries) or a Supabase
+   difference (`infra/fly/README.md`'s "Where Supabase differs from RDS"). One that also fails
+   locally is a bug in the migration itself.
 3. **Can the deploy continue with the migration deferred?** Sometimes yes — a rollback target
    doesn't need the new column. Decide _before_ hand-running anything, and say the decision in the
    issue, so a second responder doesn't race you.
 
 ## Procedure
 
-All commands from the bastion or a role with ECS `DescribeTasks`/`RunTask` + CloudWatch Logs read.
-
-**1. Confirm the gate actually halted (nothing deployed).**
-
-```bash
-aws ecs list-tasks --cluster "$ECS_CLUSTER" \
-  --service-name studafy-$ENV-api --desired-status RUNNING \
-  --query 'taskArns' --output text
-```
-
-The deploy jobs never started, so the service is still on its previous task-definition revision.
-If a service _did_ change, the failure wasn't the migration gate — see `deploy-rollback.md`, not
-this doc.
-
-**2. Read the failure.**
+**1. Confirm the gate actually halted (nothing deployed).** In the failed run, every step after
+"Run database migrations" is skipped. The services are still on their previous release:
 
 ```bash
-TASK_ARN="$(aws ecs list-tasks --cluster "$ECS_CLUSTER" \
-  --service-name studafy-$ENV-migrations --query 'taskArns[0]' --output text)" # or from the run URL
-aws ecs describe-tasks --cluster "$ECS_CLUSTER" --tasks "$TASK_ARN" \
-  --query 'tasks[0].{lastStatus:lastStatus,stoppedReason:stoppedReason,exitCode:containers[0].exitCode}'
-aws logs tail "/studafy-$ENV/ecs/migrations" --since 5m   # awslogs-group from ecs/migrations/task-definition.json.tpl
+fly releases --app studafy-core-api | head -3
 ```
 
-The two-minute screencap: a `stoppedReason` of `Essential container in task exited` with a
-non-zero `exitCode`, and the log line matching one of the three runner errors.
+If a service _did_ change, the failure wasn't the migration gate.
+
+**2. Read the failure.** The "Run database migrations" step's log shows the machine's output
+followed by `Migrations exited with <code>`; match the error against the three runner errors
+above. If the run died before printing logs, the machine may still exist:
+
+```bash
+fly machine list --app studafy-core-migrate
+fly logs --app studafy-core-migrate --no-tail
+```
 
 **3a. Statement failure → fix the migration, not the environment.**
 
@@ -99,30 +94,31 @@ the old checksum, editing it puts every later `validate` into `MigrationValidati
 # SELECT version, name FROM public.schema_migrations ORDER BY version DESC LIMIT 3;
 ```
 
-Then re-dispatch the deploy (staging: merge the fix to `main` again; prod: re-run
-`prod-deploy.yml` with the fixed image tag). The migration task re-runs from a clean checkout.
+Then merge the fix and run **Production deploy (fly.io)** again on the fixed ref. The migration
+machine re-runs from a freshly built image.
 
 **3b. Lock error → find the holder, or wait it out.**
 
 ```sql
--- From the bastion against the primary (docs/runbooks/postgres-conventions.md's connection convention):
+-- Supabase SQL editor, or a direct connection (db.<project ref>.supabase.co:5432):
 SELECT pid, state, query_start, now() - query_start AS age, query
 FROM pg_stat_activity
 WHERE query ILIKE '%6004517954832980272%'      -- ADVISORY_LOCK_KEY (packages/db/src/runner.ts)
    OR wait_event_type = 'Lock';
 ```
 
-A live second migration task is the usual suspect — the first (`StartedBy: studafy-migrations`)
-may have been retried by a workflow rerun while the original still ran. Either let the earlier
-task finish (wait, then re-dispatch) or stop it deliberately. An _orphaned_ lock from a killed
-task clears automatically once Postgres reaps the dead session; if `pg_stat_activity` shows
+A live second migration machine is the usual suspect (`fly machine list --app
+studafy-core-migrate`) — a workflow rerun while the original still ran. The workflow's concurrency
+group (`fly-production`) queues a second run rather than overlapping, so this mostly follows a
+hand-run `fly machine run`. Either let the earlier machine finish (wait, then re-dispatch) or stop
+it deliberately. An _orphaned_ lock from a killed machine clears automatically once Postgres reaps the dead session; if `pg_stat_activity` shows
 nothing holding it, the lock is gone and the original failure was something else — re-run the
 advisory-lock step (`SELECT pg_try_advisory_lock(...)`) to prove it's free before re-dispatching.
 
 **3c. Validation error → never a re-run; fix the repo.**
 
 `MigrationValidationError` means an applied migration's file diverged from what ran (renamed,
-edited, or out-of-order pending). Re-running the task reproduces the same validation failure —
+edited, or out-of-order pending). Re-running the machine reproduces the same validation failure —
 this is a code review / history fix, not an operational one. The deploy stays halted until the
 repo is corrected; record the offending file in the issue.
 
@@ -141,10 +137,9 @@ repo is corrected; record the offending file in the issue.
   `packages/db/src/discovery.ts` / migration headers) can leave partial effects; a re-run must
   assume that and be idempotent or reviewed for it.
 
-**5. Close the loop.** The `annotate` job of a _successful_ re-deploy writes the completion line to
-`/studafy-<env>/deploys`; if the deploy stays halted, leave the issue open with the decision from
-step 4 and the follow-up ticket links. The `deploy-failure` label is what the on-call handoff keyed
-on — don't close the issue silently.
+**5. Close the loop.** A successful re-deploy ends with the workflow's smoke check passing; if the
+deploy stays halted, leave the issue open with the decision from step 4 and the follow-up ticket
+links — don't close it silently.
 
 ## Rollback / abort criteria
 
@@ -154,13 +149,12 @@ environment-side action makes a validation error go away.
 
 ## Known gaps
 
-- No automated detection distinguishes the three failure shapes — the `stoppedReason`/log triage
-  in step 2 is manual. A CI job that greps the migration task's log for the three error classes and
+- No automated detection distinguishes the three failure shapes — the log triage in step 2 is
+  manual. A step that greps the migration machine's log for the three error classes and
   labels the issue accordingly is future work.
 - A non-transactional migration that partially applied and then failed has no automated "where did
   it stop" report — `db:migrate` re-runs the file from the top each time, and the file is assumed
   idempotent; that assumption should be tested per non-transactional migration, not trusted.
 - There is no "deploy without this migration" affordance at all (no skip flag, no env toggle).
   Deferring a release is currently the only halt-consistent option, which is honest but coarse.
-- Nothing in this repo exercises `migrate.sh` against a real AWS account — same caveat
-  everything in `infra/deploy` carries (`infra/deploy/README.md`'s "Known gaps").
+- A failed migration opens no issue automatically; the failed workflow run is the only signal.

@@ -73,7 +73,7 @@ whether controlled runtime administration may eventually update it, and `require
 activation behavior. These fields do not grant write access.
 
 Passwords, API keys, tokens, connection strings, and encryption material are prohibited. They remain
-in Secrets Manager. ST-033 seeds no settings. Future migrations adding known keys must document
+in the deployment's secret store (the `prod` GitHub Environment, copied to the fly apps). ST-033 seeds no settings. Future migrations adding known keys must document
 semantic bounds that the generic integer/text types cannot express.
 
 ## Reference-data provenance and updates

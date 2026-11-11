@@ -9,21 +9,21 @@ controlled independently. Configuration: `docs/runbooks/anthropic-provider-confi
 
 ## Detection
 
-There is no CloudWatch alarm targeting Anthropic's availability today. Detection is the same set of
+There is no alert targeting Anthropic's availability today. Detection is the same set of
 signals as any other provider outage — the one that arrives first matters:
 
-- **Prometheus (workers)**: `bullmq_job_outcomes_total{outcome="failed"}` on the
-  `ai-exam-generation` queue with the logs `exam generation failed; retrying` (transient) or
+- **Workers**: failed jobs on the `ai-exam-generation` queue (`bullmq_job_outcomes_total{outcome="failed"}`
+  is exposed but nothing scrapes it on fly yet), with the logs — in Axiom, dataset `studafy-logs` — `exam generation failed; retrying` (transient) or
   `AI provider request failed: <message>` (terminal).
-- **Prometheus (api)**: the retry logger in `provider.ts` emits `AI generation failed; retrying`
+- **API logs (Axiom)**: the retry logger in `provider.ts` emits `AI generation failed; retrying`
   with `kind`/`status` on every transient attempt.
 - **Redis (api circuit breaker state)**: the circuit breaker is per-school, default closed, trips
   on consecutive failures, opens with a 30-second cooldown (constant in
   `apps/api/src/lib/circuit-breaker.ts`). Check:
   ```
-  # From the bastion against the cache DB:
-  redis-cli -h <primary> -p 6379 -a <token> --tls DB 0 \
-    KEYS cb:ai:* | head          # open state keys, one per school with a tripped circuit
+  # Against Redis Cloud, with the production REDIS_URL (rediss://…):
+  redis-cli -u "$REDIS_URL" --tls -n 0 \
+    KEYS 'cb:ai:*' | head        # open state keys, one per school with a tripped circuit
   ```
   A school's circuit in `open` state is a request being answered `AI_LLM_UNAVAILABLE` immediately,
   plus a `Retry-After` header. A spreading pattern (multiple `cb:ai:*` keys) is a global outage.
@@ -75,8 +75,8 @@ signals as any other provider outage — the one that arrives first matters:
 
 **1. Stop new calls to the provider (the kill switches).**
 
-**LLM gateway** — set `AI_LLM_ENABLED=false` in the API environment variables, deploy (or apply via
-`infra/deploy/scripts/deploy.sh api <env> <new-tag>`). The provider is not constructed, and every
+**LLM gateway** — set `AI_LLM_ENABLED = "false"` in `infra/fly/api.toml`'s `[env]` and release with
+**Production deploy (fly.io)** (`infra/fly/README.md`). The provider is not constructed, and every
 generate request returns `503 AI_LLM_DISABLED` — a known, typed error clients can route to UI
 fallback. Because a per-tenant override beats the env default, also list and clear any `ai.llm`
 override rows:
@@ -90,8 +90,8 @@ DELETE FROM app.feature_flags WHERE flag_name IN ('ai.llm', 'ai.rerank');
 Clearing a row propagates within the flag cache TTL (10s) on the next evaluation — no deploy needed.
 
 **Exam generation** — the API-side kill switch does not cover this surface. The worker's
-`ANTHROPIC_API_KEY` absence is what disables it, so removing the key from the ECS secrets is the
-incidental path, _or_ add an explicit env guard (a future ticket; today the worker boots and
+`ANTHROPIC_API_KEY` absence is what disables it, so removing the key from the workers' secrets
+(the `prod` GitHub Environment, released by the deploy workflow) is the incidental path, _or_ add an explicit env guard (a future ticket; today the worker boots and
 processes jobs but fails at claim time when the client is null). **Do not stop the worker to kill
 one queue** — it hosts 10+ queues; `registry.ts`'s queue affinity means other jobs must continue.
 
@@ -141,8 +141,8 @@ confirm the model is enabled on the deployment before landing that change.
 ## Known gaps
 
 - **No automated health-check probe.** Nothing in this repo pings `https://api.anthropic.com/v1`
-  periodically; the `realtime-probe` Lambda is WebSocket-only. A synthetic Anthropic health probe
-  on a 1-minute schedule, emitted as a CloudWatch metric or Prometheus gauge, would make "provider
+  periodically. A synthetic Anthropic health probe on a 1-minute schedule, feeding an alert, would
+  make "provider
   is up" a concrete, alarmed claim rather than a dashboard observation. Not built by any ticket
   here; natural follow-up.
 - **Exam generation's failure path is not DLQ-shaped.** A failed session is marked `failed` on

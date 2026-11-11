@@ -59,9 +59,9 @@ of `JSON.stringify`. See `logger.ts`.
 unpack every line before it could match one.
 
 **Deviation from pino's defaults, stated rather than silent:** pino's default base bindings are `pid` and
-`hostname`. We bind `service`, `env`, and `release_version` instead. `pid` is always 1 in a Fargate task,
-`os.hostname()` is a syscall, and the awslogs stream prefix already identifies the task — none of the
-three would survive a query.
+`hostname`. We bind `service`, `env`, and `release_version` instead. `pid` is always 1 in a container,
+`os.hostname()` is a syscall, and fly's log stream already tags each line with its app and machine —
+none of the three would survive a query.
 
 ## Levels
 
@@ -221,7 +221,9 @@ Stated plainly, because the gaps matter more than the parts that work:
 - **Non-`Error` throws bypass `onError` entirely.** Hono's compose catches with
   `if (err instanceof Error && onError)`, so `throw "boom"` yields a bodyless 500 with no `X-Request-Id`
   and no log line. Throw `Error` subclasses.
-- **No log shipping beyond awslogs.** stdout goes to CloudWatch via the Fargate log driver. There is no
-  aggregator, no sampling, and no retention policy in this repo.
+- **Log shipping is fly's, not the app's.** stdout goes to fly's log stream, and `studafy-log-shipper`
+  (`infra/fly/log-shipper.toml`) ships every app's lines to Axiom (EU), dataset `studafy-logs`. There
+  is no sampling, and no retention policy in this repo; retention is whatever the Axiom dataset is set
+  to.
 - **`apps/realtime` and `apps/workers` still use `console.log`.** The logger is not a shared package yet;
   lifting it into `packages/` is the natural follow-up when a second service needs it.

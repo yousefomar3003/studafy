@@ -11,8 +11,9 @@ troubleshooting) instead of a suggestion to "keep going".
 
 ## Gate — read before starting
 
-- [ ] **Prod is verified live.** Ran `docs/runbooks/environment-matrix.md`'s _apply-to-verified_
-      runbook end to end. If this is not checked, **stop** — see `launch/README.md`'s status note.
+- [ ] **Prod is verified live.** The last **Production deploy (fly.io)** run on the release being
+      piloted passed its smoke check (`infra/fly/README.md`). If this is not checked, **stop** —
+      see `launch/README.md`'s status note.
 - [ ] Dependency gates met (DR runbooks, security pass) — see `launch/README.md`'s table.
 - [ ] Cohort list approved (2–3 schools, section 1). No names in this repo — resolve at kickoff.
 - [ ] Roles resolved to people: Pilot lead, one School liaison per school, Importer, Feedback
@@ -177,7 +178,7 @@ ORDER BY 1;
 
 ### 3.3 `sev_incident_count` — target: zero per cohort
 
-"SEV incident" = any of, per `docs/runbooks/alert-catalog.md` and
+"SEV incident" = any of, per `docs/runbooks/on-call-rotation.md` and
 `docs/runbooks/incident-comms-templates.md`: a paged/acknowledged alert, a `dr-incident` or
 `deploy-failure` GitHub issue, or **any cross-tenant or security-adjacent finding** affecting a
 pilot school — including a positive from the `.github/workflows` `cross-tenant-security` /
@@ -230,7 +231,8 @@ The completion report ends with one of, per cohort:
 ## Incident exit
 
 Any SEV during the window: leave this runbook, run
-`docs/runbooks/dr/` or `docs/runbooks/deploy-rollback.md` as the failure demands, use
+`docs/runbooks/dr/README.md`, or ship a fix through the production deploy (`infra/fly/README.md`;
+no rollback procedure is defined for fly yet) as the failure demands, use
 `docs/runbooks/incident-comms-templates.md` for comms, and record the incident in section 3.3's
 `sev_incident_count` and the report. The 4-week clock does not pause for incidents — the report
 counts them.
@@ -240,7 +242,7 @@ counts them.
 - Cohort size is capped at 3 by design (one importer, one liaison-per-school ratio that doesn't
   scale). Scaling beyond 3 is a separate decision after the Go verdict.
 - No dashboard panel exists for these metrics; the queries in section 3 are the source of truth
-  until a pilot-specific Grafana panel is warranted (the metrics catalog doesn't grow for a
-  4-week cohort).
+  until a pilot-specific dashboard is warranted (there is no metrics dashboard on fly yet, and one
+  is not built for a 4-week cohort).
 - The staff-role set in 2.2 is an explicit list; if `app.user_role` (migration 000007 plus later
   additions) gains roles, verify the list against `pg_enum` in prod before import.

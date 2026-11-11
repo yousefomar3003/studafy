@@ -33,7 +33,7 @@ deployment pins a specific Anthropic release for parity across surfaces.
 
 ## OpenAI-compatible providers (Together AI)
 
-Deployed tiers run on **Together AI** (`infra/deploy/environments/<tier>.env`), not Anthropic:
+Production runs on **Together AI** (`infra/fly/api.toml`'s `[env]`), not Anthropic:
 
 ```bash
 AI_LLM_ENABLED=true
@@ -119,7 +119,8 @@ the provider would silently re-enable retention; keep request construction insid
 
 The key is sent as a **header, never a URL parameter**, so it cannot leak through a logged URL.
 Error payloads are run through the audit redactor and then scrubbed for any literal occurrence of
-the key itself. The key lives in Secrets Manager, never in committed config, `openapi.json`, or
+the key itself. The key lives in the `prod` GitHub Environment (copied to the fly apps by the deploy,
+`infra/fly/README.md#secrets`), never in committed config, `openapi.json`, or
 environment templates. See `docs/runbooks/secrets-conventions.md` for the general policy.
 
 ## Prompt caching

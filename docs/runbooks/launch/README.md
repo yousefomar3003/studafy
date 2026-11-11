@@ -13,13 +13,12 @@ prod, measure the acceptance criteria, and decide whether to keep going.
 
 ## Status — read this before treating anything here as "ready to roll pilots in prod"
 
-**Prod is not live.** `docs/runbooks/environment-matrix.md`'s honesty note says it plainly: every
-value there reflects what this repo's Terraform/deploy code is written to produce; none of it has
-been applied against a real AWS account. "Apply-ready" is `terraform fmt`, `terraform validate`,
-and an offline `plan` — not a running environment. This directory is written for exactly that
-gap: the onboarding procedure, the feedback loop, and the success-criteria queries are complete
-and exec-ready today, but **pilots must not be onboarded until a `prod` environment exists and
-passes the apply-to-verified runbook** in `environment-matrix.md`.
+**Prod is live on fly.io.** The AWS/Terraform environment this directory was first written against
+was never applied and has been retired; production now runs on fly.io with Supabase, Redis Cloud,
+R2, Resend, Sentry and Axiom ([`infra/fly/README.md`](../../../infra/fly/README.md)), and its first
+platform operator was created on 2026-11-10. There is no staging environment. The onboarding
+procedure, the feedback loop, and the success-criteria queries are written to run against that
+production deployment; the pilot itself has not run yet.
 
 Consequences, stated so nobody mistakes preparation for execution:
 
@@ -27,22 +26,22 @@ Consequences, stated so nobody mistakes preparation for execution:
   monitoring queries) are read from API/service source and migration SQL and are accurate to what
   that code does on a real deployment.
 - The **operational sequencing** (cohort selection, white-glove import, feedback triage, weekly
-  cadence) is this ticket's addition — executable in sequence, not yet exercised against a live
-  prod.
+  cadence) is this ticket's addition — executable in sequence, not yet exercised with a real
+  pilot school.
 - The **report template** has no numbers in it. No pilot metric gets a value until it is measured
   against a live environment.
 
 ## Dependency gates
 
-| Dependency                                                                      | Status   | Evidence                                                                                                         |
-| ------------------------------------------------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
-| DR runbooks authored and first drill executed (this task's stated dependency)   | **Met**  | `docs/runbooks/dr/` — six scenarios + `st-266-game-day-drill-report.md`                                          |
-| Pre-launch security pass clean                                                  | **Met**  | `docs/runbooks/security/st-249-security-pass.md` — zero critical/high open; cross-tenant suite green (462 tests) |
-| Cross-tenant isolation regression gate in CI                                    | Met      | `tests/security/route-guard-wiring.test.ts` runs on every PR via `cross-tenant-security` job                     |
-| **Prod environment applied to real AWS and verified**                           | **Open** | No live account in this repo's history; run `environment-matrix.md`'s _apply-to-verified_ runbook first          |
-| Pilot school onboarding executed with a **Go** verdict (GA's stated dependency) | **Open** | `pilot-completion-report.md` has no cohort filled in — the pilot has not run                                     |
+| Dependency                                                                      | Status   | Evidence                                                                                                                                                 |
+| ------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DR runbooks authored and first drill executed (this task's stated dependency)   | **Open** | Met on AWS (`dr/st-266-game-day-drill-report.md`), but the six scenario runbooks were retired with AWS; none exist for fly/Supabase yet (`dr/README.md`) |
+| Pre-launch security pass clean                                                  | **Met**  | `docs/runbooks/security/st-249-security-pass.md` — zero critical/high open; cross-tenant suite green (462 tests)                                         |
+| Cross-tenant isolation regression gate in CI                                    | Met      | `tests/security/route-guard-wiring.test.ts` runs on every PR via `cross-tenant-security` job                                                             |
+| Prod environment deployed and verified                                          | Met      | fly.io production, deployed by `fly-production-deploy.yml` (smoke-checked); first operator 2026-11-10 (`infra/fly/README.md`)                            |
+| Pilot school onboarding executed with a **Go** verdict (GA's stated dependency) | **Open** | `pilot-completion-report.md` has no cohort filled in — the pilot has not run                                                                             |
 
-A pilot school is not "live" until the prod gate is closed. Until then, treat everything in
+A pilot school is not "live" until the open gates are closed. Until then, treat everything in
 [`pilot-school-onboarding.md`](pilot-school-onboarding.md) as rehearsal-ready, hold the
 completion report, and keep the cohort list internal. The same applies one level up:
 [`ga-launch-checklist.md`](ga-launch-checklist.md) does not start until the pilot itself reaches a
@@ -51,7 +50,7 @@ Go verdict.
 ## Canonical naming
 
 - **Runbook filenames** are a kebab-case noun phrase naming _what is being done_ (`pilot-school-onboarding.md`, `pilot-completion-report.md`, `ga-launch-checklist.md`). The manual is one noun; the report is one noun; the checklist is one noun — one file per job, no overlap.
-- **Environment tokens**: `dev | staging | prod`, exactly as `infra/terraform/README.md` and `environment-matrix.md` define them. Never "production", "prd", or "live".
+- **Environment tokens**: `local | prod`, exactly as [`infra/README.md`](../../../infra/README.md#environments) defines them (`APP_ENV` `development` / `production`). Never "prd" or "live".
 - **School identity**: a pilot school is identified by its `app.schools.slug` (canonical) plus `app.schools.id`. Never invent shorthand for a real school.
 - **Metric names**: `staff_activation_rate`, `daily_attendance_usage`, `sev_incident_count` — fixed across the onboarding runbook, the report template, and any SQL, so a number means the same thing in all three places.
 

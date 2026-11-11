@@ -1,19 +1,20 @@
 # Object storage conventions
 
-Source of the buckets: [`infra/terraform/modules/storage`](../../infra/terraform/modules/storage).
-This doc is the key-scheme convention apps must follow — the Terraform module provisions the
-buckets and their lifecycle rules; it has no way to enforce what key an application writes an
-object under. A key that doesn't follow this scheme still uploads fine; it just silently misses
+Production stores files in one Cloudflare R2 bucket, `studafy-prod-files`, reached through the S3
+API (`S3_APP_FILES_BUCKET`, `S3_ENDPOINT`; [`infra/fly/README.md`](../../infra/fly/README.md)). This
+doc is the key-scheme convention apps must follow — bucket lifecycle rules have no way to enforce
+what key an application writes an object under. A key that doesn't follow this scheme still uploads fine; it just silently misses
 the lifecycle rule (or another school's tenant boundary) that the scheme exists to give it.
 
 ## Why category comes before schoolId, not after
 
-The `temp-expiration` and `reports-expiration` lifecycle rules on `app-files`
-(`modules/storage/main.tf`) each match on a single S3 key **prefix** — `temp/` and `reports/`.
-S3 lifecycle prefix filters match literally from the start of the key; there is no wildcard or
-"any depth" option. A key like `schools/<schoolId>/temp/<file>` would need one lifecycle rule
-per `schoolId` to expire correctly, which isn't viable — schools are created and deleted by the
-application at runtime, not by a Terraform apply.
+The scheme was designed for two bucket lifecycle rules (`temp-expiration` and
+`reports-expiration`), each matching a single key **prefix** — `temp/` and `reports/`. Lifecycle
+prefix filters match literally from the start of the key; there is no wildcard or "any depth"
+option. A key like `schools/<schoolId>/temp/<file>` would need one lifecycle rule per `schoolId` to
+expire correctly, which isn't viable — schools are created and deleted by the application at
+runtime. (Whether those rules are configured on the R2 bucket is not recorded in this repo; see
+"Known gaps".)
 
 Putting the lifecycle category first solves this with a fixed, small number of rules that cover
 every school:
@@ -25,7 +26,7 @@ permanent/<schoolId>/<objectId>/<filename>
 quarantine/<schoolId>/<objectId>/<filename>
 ```
 
-## `app-files` bucket
+## `app-files` bucket (`studafy-prod-files`)
 
 | Top-level prefix | Purpose                                                                                                                                                                                | Lifecycle                                                         |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
@@ -39,11 +40,11 @@ Flow for a pre-signed upload:
 
 1. `apps/api` issues a pre-signed `PUT`/`POST` URL for a key under
    `temp/<schoolId>/<objectId>/<filename>`.
-2. `apps/web` uploads directly to S3 using that URL (this is what `web_origin` in the CORS
-   config exists for — the app's own frontend origin, not S3's).
+2. `apps/web` uploads directly to R2 using that URL (this is what the bucket's CORS policy exists
+   for — it must list every browser domain; [`infra/fly/README.md`](../../infra/fly/README.md#file-storage-r2-cors)).
 3. Once `apps/api` confirms the upload (e.g. via a completion callback or a `HeadObject` check),
-   it moves/copies the object to `permanent/<schoolId>/<objectId>/<filename>` — S3 doesn't have a
-   true move, so this is a `CopyObject` + `DeleteObject` pair — after which it is out of `temp/`
+   it moves/copies the object to `permanent/<schoolId>/<objectId>/<filename>` — the S3 API doesn't
+   have a true move, so this is a `CopyObject` + `DeleteObject` pair — after which it is out of `temp/`
    and no longer subject to the 24h rule.
 
    No database transaction is held open across these S3 calls
@@ -78,23 +79,8 @@ an `app.upload_scan_status`: the write that stores the key sets `scanning`, the 
 job after commit, and the worker sets `clean`, `quarantined` (same copy -> delete -> flip order) or
 `failed` (retries exhausted). Every read path signs a URL only for `clean` or `unscanned` (a file
 uploaded before 000192, which stays downloadable; a `scan-upload` job for it scans it like a new
-one). A sensitive file's quarantine copy is re-encrypted under the sensitive-documents KMS key.
-Not covered: license payment receipts uploaded by platform staff (only platform staff read them)
+one). Not covered: license payment receipts uploaded by platform staff (only platform staff read them)
 and user avatars (never stored against a row or served by the API).
-
-## `backups-archive` bucket
-
-No lifecycle-category prefix, because everything in this bucket is a durable backup, not a
-short-lived category-of-the-moment object:
-
-```
-<schoolId>/<backupDate>/<snapshot-or-export-name>
-```
-
-e.g. `a1b2c3d4/2026-07-10/db-snapshot.sql.gz`. `schoolId` is still first — the same "fixed small
-number of lifecycle rules" argument doesn't apply here (there are none), but keeping the prefix
-order consistent with `app-files` means a script that lists "everything for school X" uses the
-same `<schoolId>/` prefix convention in both buckets, rather than a different rule per bucket.
 
 ## `schoolId` format
 
@@ -105,22 +91,22 @@ or transform it; if it's already a valid room-key segment, it's already a valid 
 
 ## Access scoping
 
-IAM policies for the role that generates pre-signed URLs should scope `s3:PutObject`/
-`s3:GetObject` to `arn:aws:s3:::<app-files-bucket>/*/<schoolId>/*` where possible (per-request,
-not a static policy — the `schoolId` isn't known until request time) so that a compromised or
-buggy pre-signed-URL request for one school can't be pointed at another school's prefix. This is
-an application-layer control (the pre-signing code decides what key it signs for); the Terraform
-module has no visibility into which `schoolId` a given request is for.
+The R2 API token the api and workers use can read and write the whole bucket, so per-school scoping
+is an application-layer control: the pre-signing code decides what key it signs for, and must only
+ever sign a key under the requesting school's own `<schoolId>` segment, so that a compromised or
+buggy pre-signed-URL request for one school can't be pointed at another school's prefix. Nothing at
+the bucket level knows which `schoolId` a given request is for.
 
 ## Known gaps
 
-- No compute tier exists yet (`infra/terraform/README.md`), so nothing in this repo actually
-  generates a pre-signed URL today. This doc describes the key scheme that code should follow
-  when it's written, not something already exercised end-to-end.
-- The `temp/` → `permanent/` move step is application logic that doesn't exist yet either. Until
-  it does, verify the module's lifecycle rules with the manual test-object procedure in
-  [`modules/storage/README.md`](../../infra/terraform/modules/storage/README.md#verifying-lifecycle-rules-with-test-objects).
-- The app-files lifecycle rule matches only the `reports/` prefix. Legacy finance exports live
+- **The `temp/` and `reports/` expiry rules are not recorded for R2.** They were defined in the
+  retired AWS Terraform; whether equivalent lifecycle rules exist on `studafy-prod-files` is not
+  captured anywhere in this repo. Until confirmed on the bucket in the Cloudflare
+  dashboard, assume abandoned uploads under `temp/`
+  are not expiring on their own.
+- **No per-object encryption key.** R2 has no per-object KMS; sensitive documents rely on the
+  bucket's own encryption (ADR-019's field encryption covers the record values, not the files).
+- The lifecycle rule design matches only the `reports/` prefix. Legacy finance exports live
   under `tenant-<schoolId>/reports/` (see [`docs/modules/report-framework.md`](../modules/report-framework.md))
   and are invisible to that rule; the workers' daily `purge-expired-reports` sweep (ST-175) is the
   DB-driven closure for both prefixes.
@@ -133,9 +119,9 @@ like any other upload, under `temp/` then `permanent/<schoolId>/…`, through tw
 write that attaches it (`gatewayConfirm: false`).
 
 - `record.document`: PDF, JPEG, PNG or HEIC, up to 10 MiB, downloaded through five-minute URLs.
-- `record.sensitiveDocument`: PDF, JPEG or PNG, up to 5 MiB. The promotion `CopyObject` re-encrypts
-  the object with the sensitive-documents KMS key (`STORAGE_SENSITIVE_KMS_KEY_ID`, Bucket Key
-  enabled, ADR-019). Downloads are one-minute URLs that need `studentRecord:readSensitive` and are
+- `record.sensitiveDocument`: PDF, JPEG or PNG, up to 5 MiB. Stored under the bucket's own
+  encryption like every other object (the SSE-KMS re-encryption it had on AWS is gone: R2 has no
+  per-object KMS). Downloads are one-minute URLs that need `studentRecord:readSensitive` and are
   audited.
 
 A replaced or removed document's object is deleted after its row change commits. The retention

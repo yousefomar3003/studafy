@@ -21,26 +21,11 @@ A static site with two halves:
 
 ## Where it's deployed
 
-One CloudFront distribution per environment, reusing `module.cdn`'s existing web-bundle bucket
-under a `docs/api/` key prefix (see
-[`docs/runbooks/cdn-cache-policy.md`](../runbooks/cdn-cache-policy.md)'s "A second site shares this
-bucket"). `module.cdn` is not instantiated for `dev`, so the site deploys to staging and production
-only:
-
-| Environment | URL                                                      |
-| ----------- | -------------------------------------------------------- |
-| staging     | `https://staging.studafy.com/docs/api/latest/index.html` |
-| production  | `https://app.studafy.com/docs/api/latest/index.html`     |
-
-`latest/` always mirrors the most recently deployed release; every release additionally gets an
-immutable copy at `docs/api/<commit-sha>/index.html` that stays addressable after `latest` moves on
-— see `.github/workflows/staging-deploy.yml` and `prod-deploy.yml`'s `deploy-docs` job, which runs
-on every release build (`needs: build`), independent of and in parallel with the api/realtime/workers
-rolling deploy.
-
-`index.html` in that URL is not decorative — link to it explicitly. A known caching limitation
-(documented in cdn-cache-policy.md) means the bare directory URL falls through to apps/web's shell
-instead of the docs site's.
+Nowhere, at the moment. The AWS-era deploy (a `docs/api/` prefix on the CloudFront web-bundle
+bucket, published by the retired staging and production deploy workflows) was removed with the rest
+of the AWS stack, and neither the fly.io web app (`infra/fly/web.toml`, `infra/docker/web.Dockerfile`)
+nor `.github/workflows/fly-production-deploy.yml` builds or serves this site. CI still builds it on
+every pull request (`ci.yml`) and keeps the result as the `api-docs-site` artifact for 14 days, so a contract change that breaks the guides is still caught.
 
 ## Building and testing it locally
 
