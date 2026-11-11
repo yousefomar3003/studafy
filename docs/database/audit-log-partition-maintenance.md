@@ -8,18 +8,19 @@ without touching the other.
 
 ## Overview
 
-|                      |                                                                                  |
-| -------------------- | -------------------------------------------------------------------------------- |
-| Parent table         | `app.audit_logs`                                                                 |
-| Partitioning         | declarative `PARTITION BY RANGE (created_at)`, one partition per calendar month  |
-| Partition names      | `audit_logs_y2026m07`                                                            |
-| Boundaries           | half-open, UTC: `FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')`  |
-| Default partition    | none, deliberately                                                               |
-| Initial range        | 2026-06 through 2027-01, created by migration `000018`                           |
-| Maintenance command  | `bun run db:audit:partitions [months-ahead]` (default 3)                         |
-| Required role        | the administrative/migration identity; the command runs as `studafy_admin`       |
-| Grants on partitions | `SELECT, INSERT` for `studafy_app` — **never** `UPDATE`, `DELETE`, or `TRUNCATE` |
-| Retention            | out of scope — nothing is ever dropped automatically                             |
+|                      |                                                                                                             |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Parent table         | `app.audit_logs`                                                                                            |
+| Partitioning         | declarative `PARTITION BY RANGE (created_at)`, one partition per calendar month                             |
+| Partition names      | `audit_logs_y2026m07`                                                                                       |
+| Boundaries           | half-open, UTC: `FROM ('2026-07-01 00:00:00+00') TO ('2026-08-01 00:00:00+00')`                             |
+| Default partition    | none, deliberately                                                                                          |
+| Initial range        | 2026-06 through 2027-01, created by migration `000018`                                                      |
+| Maintenance command  | `bun run db:audit:partitions [months-ahead]` (default 3)                                                    |
+| Automated            | daily 02:15 UTC by the workers (`ensure-table-partitions` job, `partition-maintenance.ts`), 12 months ahead |
+| Required role        | the administrative/migration identity; the command runs as `studafy_admin`                                  |
+| Grants on partitions | `SELECT, INSERT` for `studafy_app` — **never** `UPDATE`, `DELETE`, or `TRUNCATE`                            |
+| Retention            | out of scope — nothing is ever dropped automatically                                                        |
 
 An audit log is unbounded-growth, write-heavy, read-sparse data. Monthly partitioning keeps vacuum,
 index maintenance, and investigation queries bounded, and makes an eventual archive strategy a metadata
@@ -317,6 +318,13 @@ for the product, not by this ticket:
   legitimate-interest basis for keeping a security audit trail overrides it. This one is a legal
   question, and it is the reason the append-only trigger blocks row deletion outright rather than
   leaving a convenient hole.
+
+**IP addresses are not removed from the audit log.** Every other table that stores an IP address has
+it set to NULL after 90 days by the daily IP-address retention sweep (see
+`docs/modules/account-deletion.md`, "IP addresses"). `client_ip` here cannot be: the append-only grants
+and `trg_audit_logs_append_only` reject every `UPDATE`, for the owner too, and that guarantee is not to be
+weakened for this. An audit-log row's IP address is therefore kept for as long as the row is — the audit
+log's lifetime — which the Privacy Policy states.
 
 When that policy exists, the mechanism is straightforward and should be a separate ticket:
 `ALTER TABLE … DETACH PARTITION` (which is not destructive), export, then drop. Detaching is the safe

@@ -18,6 +18,7 @@ import "../../components/dashboard-tile.css";
 import "./admin-dashboard.css";
 
 const ADMIN_LINKS = [
+  { key: "importData", to: "/portal/admin/import" },
   { key: "users", to: "/portal/admin/users" },
   { key: "students", to: "/portal/admin/students" },
   { key: "teachers", to: "/portal/admin/teachers" },

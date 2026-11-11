@@ -45,10 +45,19 @@ export async function loadQuizMaterials(
 ): Promise<LoadQuizMaterialsResult> {
   // One query for every requested material rather than one per id -- the failure check below
   // still walks materialIds in request order, so "first invalid material" reporting is unchanged.
-  const rows = await tx<{ id: string; title: string | null; ingest_status: string }[]>`
-    SELECT id, title, ingest_status
-    FROM app.materials
-    WHERE id = ANY (${materialIds}::uuid[])
+  // ai_enabled: the class's AI materials setting (000196). A material of a class with it off is
+  // reported not_ready, like one not yet ingested; the class lookup fails closed.
+  const rows = await tx<
+    { id: string; title: string | null; ingest_status: string; ai_enabled: boolean }[]
+  >`
+    SELECT m.id, m.title, m.ingest_status,
+           COALESCE(
+             (SELECT cl.ai_materials_enabled FROM app.classes cl
+              WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
+             false
+           ) AS ai_enabled
+    FROM app.materials m
+    WHERE m.id = ANY (${materialIds}::uuid[])
   `;
   const rowsById = new Map(rows.map((row) => [row.id, row]));
 
@@ -57,7 +66,9 @@ export async function loadQuizMaterials(
   for (const materialId of materialIds) {
     const material = rowsById.get(materialId);
     if (!material) return { status: "not_found", materialId };
-    if (material.ingest_status !== "ready") return { status: "not_ready", materialId };
+    if (material.ingest_status !== "ready" || !material.ai_enabled) {
+      return { status: "not_ready", materialId };
+    }
     materials.push({ id: material.id, title: material.title });
   }
 

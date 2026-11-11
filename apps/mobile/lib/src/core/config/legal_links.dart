@@ -10,10 +10,21 @@ Uri buildAccountDeleteUrl({required Uri webBaseUrl}) {
   return webBaseUrl.replace(path: '/account/delete');
 }
 
-/// The public `/privacy` page (`PrivacyPolicyPage.tsx`). No sign-in required, so it is reachable
+/// The public `/privacy` page (`LegalDocumentPage.tsx`). No sign-in required, so it is reachable
 /// from the login screen as well as the Profile tab.
 Uri buildPrivacyPolicyUrl({required Uri webBaseUrl}) {
   return webBaseUrl.replace(path: '/privacy');
+}
+
+/// The public `/terms` page: the Terms of Service every user accepts before using the app.
+Uri buildTermsUrl({required Uri webBaseUrl}) {
+  return webBaseUrl.replace(path: '/terms');
+}
+
+/// The public `/legal/delete-account` page (`DeleteAccountInfoPage.tsx`): deletion without a
+/// session, by an emailed link. Used where the signed-in deletion flow is not reachable.
+Uri buildPublicAccountDeleteUrl({required Uri webBaseUrl}) {
+  return webBaseUrl.replace(path: '/legal/delete-account');
 }
 
 /// Apple's standard licensed application end user license agreement — the terms of use an App

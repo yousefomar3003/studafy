@@ -29,7 +29,10 @@ class ParentMessagesScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(selectedShellTabProvider, (previous, next) {
-      if (next == messagesTabKey && previous != next) refreshConversations(ref);
+      if (next == messagesTabKey && previous != next) {
+        final studentId = ref.read(selectedChildProvider).value?.studentId;
+        if (studentId != null) refreshConversations(ref, studentId: studentId);
+      }
     });
 
     return ref

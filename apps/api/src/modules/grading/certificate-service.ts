@@ -131,7 +131,10 @@ function newSerial(yearCode: string, kind: CertificateKind): string {
 }
 
 /** Why a student's finalized result cannot carry a certificate, if it cannot. */
-export function blockingReasons(result: StoredStudentResult): string[] {
+export function blockingReasons(result: {
+  status: StoredStudentResult["status"];
+  subjects: readonly Pick<StoredStudentResult["subjects"][number], "status" | "subject_name">[];
+}): string[] {
   const reasons: string[] = [];
   if (result.status !== "complete") reasons.push("The overall result is incomplete.");
   for (const subject of result.subjects) {
@@ -140,27 +143,25 @@ export function blockingReasons(result: StoredStudentResult): string[] {
   return reasons;
 }
 
-async function renderContent(
+interface RenderContext {
+  school_name: string;
+  year_code: string;
+  year_name: string;
+  section_name: string;
+  grade_level_name: string;
+  term_name: string | null;
+  issuer_name: string | null;
+  terms: { id: string; name: string }[];
+}
+
+/** What every certificate of one finalization shares: names of the school, year, section, term, issuer. */
+async function loadRenderContext(
   tx: TransactionSql,
   schoolId: string,
   userId: string,
   finalization: FinalizationRow,
-  result: StoredStudentResult,
-  kind: CertificateKind,
-  serial: string,
-  reissue: CertificateContent["reissue"],
-): Promise<CertificateContent> {
-  const [context] = await tx<
-    {
-      school_name: string;
-      year_code: string;
-      year_name: string;
-      section_name: string;
-      grade_level_name: string;
-      term_name: string | null;
-      issuer_name: string | null;
-    }[]
-  >`
+): Promise<RenderContext> {
+  const [context] = await tx<Omit<RenderContext, "terms">[]>`
     SELECT school.name AS school_name, year.code AS year_code, year.name AS year_name,
            section.name AS section_name, grade.name AS grade_level_name, term.name AS term_name,
            (SELECT display_name FROM app.users WHERE id = ${userId}::uuid AND school_id = ${schoolId}::uuid) AS issuer_name
@@ -176,28 +177,40 @@ async function renderContent(
     SELECT id, name FROM app.terms
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${finalization.academic_year_id}::uuid
   `;
+  return { ...context!, terms };
+}
+
+function renderContent(
+  context: RenderContext,
+  schoolId: string,
+  userId: string,
+  finalization: FinalizationRow,
+  result: StoredStudentResult,
+  kind: CertificateKind,
+  serial: string,
+  reissue: CertificateContent["reissue"],
+): CertificateContent {
+  const terms = context.terms;
   return {
     version: 1,
     kind,
     serial_number: serial,
     issued_at: new Date().toISOString(),
-    school: { id: schoolId, name: context!.school_name },
+    school: { id: schoolId, name: context.school_name },
     academic_year: {
       id: finalization.academic_year_id,
-      code: context!.year_code,
-      name: context!.year_name,
+      code: context.year_code,
+      name: context.year_name,
     },
-    term: finalization.term_id
-      ? { id: finalization.term_id, name: context!.term_name ?? "" }
-      : null,
+    term: finalization.term_id ? { id: finalization.term_id, name: context.term_name ?? "" } : null,
     student: {
       id: result.student_id,
       first_name: result.first_name,
       last_name: result.last_name,
       admission_number: result.admission_number,
     },
-    grade_level_name: context!.grade_level_name,
-    section_name: context!.section_name,
+    grade_level_name: context.grade_level_name,
+    section_name: context.section_name,
     subjects: result.subjects
       .filter((subject) => subject.include_on_certificate)
       .map((subject) => ({
@@ -229,49 +242,74 @@ async function renderContent(
       version: finalization.version,
       finalized_at: finalization.finalized_at.toISOString(),
     },
-    issued_by: { user_id: userId, name: context!.issuer_name },
+    issued_by: { user_id: userId, name: context.issuer_name },
     reissue,
   };
 }
 
-async function insertCertificate(
+/** Rows per multi-row INSERT of certificates (each carries its rendered content). */
+const INSERT_CHUNK = 200;
+
+/**
+ * Render and insert certificates for students of one finalization: the shared names are read once
+ * and the rows go in as multi-row INSERTs, instead of three reads and an INSERT per student.
+ * Returns the new ids in the order of `items`.
+ */
+async function insertCertificates(
   tx: TransactionSql,
   schoolId: string,
   userId: string,
   finalization: FinalizationRow,
-  result: StoredStudentResult,
-  reissueOf: { id: string; serial: string; reason: string } | null,
-): Promise<string> {
+  items: {
+    result: StoredStudentResult;
+    reissueOf: { id: string; serial: string; reason: string } | null;
+  }[],
+): Promise<string[]> {
+  if (items.length === 0) return [];
   const kind: CertificateKind =
     finalization.term_id === null ? "annual_certificate" : "term_report";
-  const [year] = await tx<{ code: string }[]>`
-    SELECT code FROM app.academic_years WHERE id = ${finalization.academic_year_id}::uuid AND school_id = ${schoolId}::uuid
-  `;
-  const serial = newSerial(year!.code, kind);
-  const content = await renderContent(
-    tx,
-    schoolId,
-    userId,
-    finalization,
-    result,
-    kind,
-    serial,
-    reissueOf ? { supersedes_serial: reissueOf.serial, reason: reissueOf.reason } : null,
-  );
-  const sha = createHash("sha256").update(JSON.stringify(content)).digest("hex");
-  const [row] = await tx<{ id: string }[]>`
-    INSERT INTO app.certificates (
-      school_id, academic_year_id, student_id, finalization_id, kind, serial_number,
-      issued_by_user_id, supersedes_id, reissue_reason, content, content_sha256
-    ) VALUES (
-      ${schoolId}::uuid, ${finalization.academic_year_id}::uuid, ${result.student_id}::uuid,
-      ${finalization.id}::uuid, ${kind}, ${serial}, ${userId}::uuid,
-      ${reissueOf?.id ?? null}::uuid, ${reissueOf?.reason ?? null},
-      ${tx.json(content as never)}, ${sha}
-    )
-    RETURNING id
-  `;
-  return row!.id;
+  const context = await loadRenderContext(tx, schoolId, userId, finalization);
+  const rows = items.map(({ result, reissueOf }) => {
+    const serial = newSerial(context.year_code, kind);
+    const content = renderContent(
+      context,
+      schoolId,
+      userId,
+      finalization,
+      result,
+      kind,
+      serial,
+      reissueOf ? { supersedes_serial: reissueOf.serial, reason: reissueOf.reason } : null,
+    );
+    return {
+      student_id: result.student_id,
+      serial_number: serial,
+      supersedes_id: reissueOf?.id ?? null,
+      reissue_reason: reissueOf?.reason ?? null,
+      content,
+      content_sha256: createHash("sha256").update(JSON.stringify(content)).digest("hex"),
+    };
+  });
+  const idBySerial = new Map<string, string>();
+  for (let i = 0; i < rows.length; i += INSERT_CHUNK) {
+    const chunk = rows.slice(i, i + INSERT_CHUNK);
+    const inserted = await tx<{ id: string; serial_number: string }[]>`
+      INSERT INTO app.certificates (
+        school_id, academic_year_id, student_id, finalization_id, kind, serial_number,
+        issued_by_user_id, supersedes_id, reissue_reason, content, content_sha256
+      )
+      SELECT ${schoolId}::uuid, ${finalization.academic_year_id}::uuid, x.student_id,
+             ${finalization.id}::uuid, ${kind}, x.serial_number, ${userId}::uuid,
+             x.supersedes_id, x.reissue_reason, x.content, x.content_sha256
+      FROM jsonb_to_recordset(${tx.json(chunk as never)}::jsonb) AS x(
+        student_id uuid, serial_number text, supersedes_id uuid, reissue_reason text,
+        content jsonb, content_sha256 text
+      )
+      RETURNING id, serial_number
+    `;
+    for (const row of inserted) idBySerial.set(row.serial_number, row.id);
+  }
+  return rows.map((row) => idBySerial.get(row.serial_number)!);
 }
 
 // ---------------------------------------------------------------------------
@@ -306,30 +344,131 @@ export async function certificateReadiness(
           AND term_id IS NOT DISTINCT FROM ${finalization.term_id}::uuid
       )
   `;
-  return results.map((result) => {
-    const certificate = issued.find((row) => row.student_id === result.student_id);
-    const reasons = blockingReasons(result);
-    let state: CertificateState;
-    if (certificate) {
-      state = certificate.finalization_id === finalizationId ? "issued" : "needs_reissue";
-    } else {
-      state = reasons.length > 0 ? "blocked" : "ready";
-    }
-    if (finalization.status !== "finalized" && state === "ready") state = "blocked";
-    return {
-      student_id: result.student_id,
-      first_name: result.first_name,
-      last_name: result.last_name,
-      state,
-      reasons:
-        finalization.status !== "finalized"
-          ? ["These results were superseded by a correction."]
-          : state === "blocked"
-            ? reasons
-            : [],
-      certificate_id: certificate?.id ?? null,
-    };
-  });
+  return results.map((result) =>
+    readinessRow(
+      finalization,
+      result,
+      blockingReasons(result),
+      issued.find((row) => row.student_id === result.student_id),
+    ),
+  );
+}
+
+/** One student's certificate state for a finalization: what {@link certificateReadiness} reports. */
+function readinessRow(
+  finalization: Pick<FinalizationRow, "id" | "status">,
+  result: { student_id: string; first_name: string; last_name: string },
+  reasons: string[],
+  certificate: { id: string; finalization_id: string } | undefined,
+): ReadinessRow {
+  let state: CertificateState;
+  if (certificate) {
+    state = certificate.finalization_id === finalization.id ? "issued" : "needs_reissue";
+  } else {
+    state = reasons.length > 0 ? "blocked" : "ready";
+  }
+  if (finalization.status !== "finalized" && state === "ready") state = "blocked";
+  return {
+    student_id: result.student_id,
+    first_name: result.first_name,
+    last_name: result.last_name,
+    state,
+    reasons:
+      finalization.status !== "finalized"
+        ? ["These results were superseded by a correction."]
+        : state === "blocked"
+          ? reasons
+          : [],
+    certificate_id: certificate?.id ?? null,
+  };
+}
+
+/**
+ * {@link certificateReadiness} for many finalizations in three queries (the year overview reads
+ * every section's annual results). Reads only what readiness needs — result status and the names
+ * of incomplete subjects — not the stored snapshots.
+ */
+export async function certificateReadinessMany(
+  tx: TransactionSql,
+  schoolId: string,
+  finalizations: readonly Pick<FinalizationRow, "id" | "section_id" | "term_id" | "status">[],
+): Promise<Map<string, ReadinessRow[]>> {
+  const out = new Map<string, ReadinessRow[]>();
+  if (finalizations.length === 0) return out;
+  const ids = finalizations.map((finalization) => finalization.id);
+  const sectionIds = [...new Set(finalizations.map((finalization) => finalization.section_id))];
+  const [overall, incomplete, issued] = await Promise.all([
+    tx<
+      {
+        finalization_id: string;
+        student_id: string;
+        first_name: string;
+        last_name: string;
+        status: StoredStudentResult["status"];
+      }[]
+    >`
+      SELECT overall.finalization_id, overall.student_id, student.first_name, student.last_name,
+             overall.status
+      FROM app.student_overall_results AS overall
+      JOIN app.students AS student ON student.id = overall.student_id AND student.school_id = overall.school_id
+      WHERE overall.school_id = ${schoolId}::uuid AND overall.finalization_id = ANY (${ids}::uuid[])
+      ORDER BY student.last_name, student.first_name, student.id
+    `,
+    tx<{ finalization_id: string; student_id: string; subject_name: string }[]>`
+      SELECT result.finalization_id, result.student_id,
+             result.config_snapshot->'subject'->>'name' AS subject_name
+      FROM app.student_subject_results AS result
+      WHERE result.school_id = ${schoolId}::uuid AND result.finalization_id = ANY (${ids}::uuid[])
+        AND result.status = 'incomplete'
+    `,
+    tx<
+      {
+        id: string;
+        student_id: string;
+        finalization_id: string;
+        section_id: string;
+        term_id: string | null;
+      }[]
+    >`
+      SELECT certificate.id, certificate.student_id, certificate.finalization_id,
+             finalization.section_id, finalization.term_id
+      FROM app.certificates AS certificate
+      JOIN app.result_finalizations AS finalization
+        ON finalization.id = certificate.finalization_id AND finalization.school_id = certificate.school_id
+      WHERE certificate.school_id = ${schoolId}::uuid AND certificate.status = 'issued'
+        AND finalization.section_id = ANY (${sectionIds}::uuid[])
+    `,
+  ]);
+  const incompleteByStudent = new Map<string, string[]>();
+  for (const row of incomplete) {
+    const key = `${row.finalization_id}|${row.student_id}`;
+    const names = incompleteByStudent.get(key);
+    // Subject order only shapes the reason text; keep readFinalizationResults' (by name).
+    if (names) names.push(row.subject_name);
+    else incompleteByStudent.set(key, [row.subject_name]);
+  }
+  for (const finalization of finalizations) {
+    const rows = overall
+      .filter((row) => row.finalization_id === finalization.id)
+      .map((row) => {
+        const names = (incompleteByStudent.get(`${finalization.id}|${row.student_id}`) ?? []).sort(
+          (a, b) => a.localeCompare(b),
+        );
+        const reasons = blockingReasons({
+          status: row.status,
+          subjects: names.map((name) => ({ status: "incomplete" as const, subject_name: name })),
+        });
+        const certificate = issued.find(
+          (candidate) =>
+            candidate.student_id === row.student_id &&
+            candidate.section_id === finalization.section_id &&
+            candidate.term_id === finalization.term_id,
+        );
+        return readinessRow(finalization, row, reasons, certificate);
+      });
+    out.set(finalization.id, rows);
+  }
+  return out;
 }
 
 /**
@@ -376,11 +515,18 @@ export async function issueCertificates(
     }
   }
   const results = await readFinalizationResults(tx, schoolId, finalizationId);
-  const issued: string[] = [];
-  for (const row of wanted.filter((candidate) => candidate.state === "ready")) {
-    const result = results.find((candidate) => candidate.student_id === row.student_id)!;
-    issued.push(await insertCertificate(tx, schoolId, userId, finalization, result, null));
-  }
+  const issued = await insertCertificates(
+    tx,
+    schoolId,
+    userId,
+    finalization,
+    wanted
+      .filter((candidate) => candidate.state === "ready")
+      .map((row) => ({
+        result: results.find((candidate) => candidate.student_id === row.student_id)!,
+        reissueOf: null,
+      })),
+  );
   if (issued.length > 0) {
     await emitAuditLog(tx, {
       action: "insert",
@@ -463,15 +609,13 @@ export async function reissueCertificate(
     UPDATE app.certificates SET status = 'superseded'
     WHERE id = ${certificateId}::uuid AND school_id = ${schoolId}::uuid
   `;
-  const newId = await insertCertificate(tx, schoolId, userId, finalization, result, {
-    id: old.id,
-    serial: old.serial_number,
-    reason,
-  });
+  const [newId] = await insertCertificates(tx, schoolId, userId, finalization, [
+    { result, reissueOf: { id: old.id, serial: old.serial_number, reason } },
+  ]);
   await emitAuditLog(tx, {
     action: "insert",
     targetTable: "certificates",
-    targetId: newId,
+    targetId: newId!,
     newValues: {
       reason,
       finalization_id: current.id,
@@ -479,7 +623,7 @@ export async function reissueCertificate(
       supersedes_serial_number: old.serial_number,
     },
   });
-  return getCertificate(tx, schoolId, newId);
+  return getCertificate(tx, schoolId, newId!);
 }
 
 export async function revokeCertificate(

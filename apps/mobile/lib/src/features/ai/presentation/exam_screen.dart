@@ -6,6 +6,7 @@ import '../application/ask_ai_providers.dart';
 import '../application/exam_controller.dart';
 import '../application/exam_providers.dart';
 import '../domain/exam_state.dart';
+import 'widgets/exam_expired_view.dart';
 import 'widgets/exam_failed_view.dart';
 import 'widgets/exam_generating_view.dart';
 import 'widgets/exam_player_view.dart';
@@ -32,6 +33,10 @@ class ExamScreen extends ConsumerStatefulWidget {
 class _ExamScreenState extends ConsumerState<ExamScreen> {
   ExamController? _controller;
 
+  /// Forwards app background/foreground transitions so the controller can stop generation
+  /// polling while nobody is looking at the screen.
+  AppLifecycleListener? _lifecycle;
+
   @override
   void initState() {
     super.initState();
@@ -43,6 +48,10 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
         studentId: studentId,
       )..addListener(_onChange);
       _controller = controller;
+      _lifecycle = AppLifecycleListener(
+        onPause: controller.onAppPaused,
+        onResume: controller.onAppResumed,
+      );
       controller.restore();
     }
   }
@@ -53,6 +62,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
 
   @override
   void dispose() {
+    _lifecycle?.dispose();
     _controller?.removeListener(_onChange);
     _controller?.dispose();
     super.dispose();
@@ -62,7 +72,7 @@ class _ExamScreenState extends ConsumerState<ExamScreen> {
     final state = controller.state;
     if (state is ExamSetup) return;
 
-    final confirmed = state is ExamSubmitted || state is ExamFailed
+    final confirmed = state is ExamSubmitted || state is ExamFailed || state is ExamExpired
         ? true
         : await showDialog<bool>(
                 context: context,
@@ -130,7 +140,7 @@ class _Body extends StatelessWidget {
         ),
         onRetryRestore: controller.retryRestore,
       ),
-      ExamGenerating() => const ExamGeneratingView(),
+      ExamGenerating() => ExamGeneratingView(state: state, onCheckAgain: controller.checkAgain),
       ExamReady() => ExamReadyView(state: state, onStart: controller.start),
       ExamInProgress() => ExamPlayerView(
         state: state,
@@ -144,6 +154,7 @@ class _Body extends StatelessWidget {
         report: state.session.report!,
         onStartNew: controller.startNewExam,
       ),
+      ExamExpired() => ExamExpiredView(onStartNew: controller.startNewExam),
       ExamFailed() => ExamFailedView(onStartNew: controller.startNewExam),
     };
   }

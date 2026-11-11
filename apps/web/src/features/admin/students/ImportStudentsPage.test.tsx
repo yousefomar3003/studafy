@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { strToU8, zipSync } from "fflate";
 import { MemoryRouter } from "react-router-dom";
 
 import { expectNoA11yViolations } from "../../../lib/test/axe";
@@ -149,6 +150,7 @@ class FakeXhr {
   static nextResponseBody: unknown = importRecord();
   static lastInstance: FakeXhr | null = null;
   static lastUrl = "";
+  static lastBody: unknown = null;
 
   status = 0;
   response = "";
@@ -174,7 +176,8 @@ class FakeXhr {
   getAllResponseHeaders() {
     return "content-type: application/json\r\n";
   }
-  send(_body: unknown) {
+  send(body: unknown) {
+    FakeXhr.lastBody = body;
     setTimeout(() => {
       this.upload.onprogress?.({ lengthComputable: true, loaded: 50, total: 100 });
       this.upload.onprogress?.({ lengthComputable: true, loaded: 100, total: 100 });
@@ -207,7 +210,7 @@ function uploadFile() {
   const file = new File(["admission_number,email\nADM-1,a@b.com"], "students.csv", {
     type: "text/csv",
   });
-  const input = screen.getByLabelText("Student CSV file") as HTMLInputElement;
+  const input = screen.getByLabelText("Student file (Excel or CSV)") as HTMLInputElement;
   fireEvent.change(input, { target: { files: [file] } });
 }
 
@@ -233,13 +236,69 @@ describe("ImportStudentsPage", () => {
   test("downloads the CSV template", async () => {
     await renderPage(await loadImportStudentsPage());
 
-    fireEvent.click(screen.getByRole("button", { name: "Download CSV template" }));
+    fireEvent.click(screen.getByRole("button", { name: "CSV template" }));
 
     await waitFor(() => {
       expect(getMock.mock.calls.some(([path]) => path === "/api/imports/students/template")).toBe(
         true,
       );
     });
+  });
+
+  test("downloads the Excel template in the page's language", async () => {
+    await renderPage(await loadImportStudentsPage());
+
+    fireEvent.click(screen.getByRole("button", { name: "Download Excel template" }));
+
+    await waitFor(() => {
+      const call = getMock.mock.calls.find(([path]) => path === "/api/imports/students/template");
+      expect(call?.[1]).toMatchObject({
+        params: { query: { format: "xlsx", lang: "en" } },
+        parseAs: "blob",
+      });
+    });
+  });
+
+  test("an Excel workbook is converted in the browser and uploaded as CSV", async () => {
+    const ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"';
+    const workbook = zipSync({
+      "xl/workbook.xml": strToU8(
+        `<workbook ${ns} xmlns:r="r"><sheets><sheet name="Students" sheetId="1" r:id="rId1"/></sheets></workbook>`,
+      ),
+      "xl/_rels/workbook.xml.rels": strToU8(
+        '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+      ),
+      "xl/worksheets/sheet1.xml": strToU8(
+        `<worksheet ${ns}><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>Student number</t></is></c></row><row r="2"><c r="A2" t="inlineStr"><is><t>007</t></is></c></row></sheetData></worksheet>`,
+      ),
+    });
+    FakeXhr.nextResponseBody = importRecord({ status: "validated", valid_rows: 1, error_rows: 0 });
+
+    await renderPage(await loadImportStudentsPage());
+    const input = screen.getByLabelText("Student file (Excel or CSV)") as HTMLInputElement;
+    const file = new File([workbook], "roll.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    fireEvent.change(input, { target: { files: [file] } });
+
+    await screen.findByRole("region", { name: "Validation report" });
+    const sent = FakeXhr.lastBody as File;
+    expect(sent.name).toBe("roll.csv");
+    expect(await sent.text()).toBe("Student number\n007\n");
+  });
+
+  test("a file that is not a workbook is refused with a reason, before any upload", async () => {
+    FakeXhr.lastBody = null;
+    await renderPage(await loadImportStudentsPage());
+    const input = screen.getByLabelText("Student file (Excel or CSV)") as HTMLInputElement;
+    fireEvent.change(input, { target: { files: [new File(["not a zip"], "roll.xlsx")] } });
+
+    expect(
+      await screen.findByText(
+        "That file isn't an Excel workbook we can read. Save it as .xlsx or .csv and try again.",
+      ),
+    ).toBeTruthy();
+    expect(FakeXhr.lastBody).toBeNull();
   });
 
   test("uploads a CSV, shows upload progress, then the validation report", async () => {
@@ -347,7 +406,7 @@ describe("ImportStudentsPage", () => {
     ).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "Start a new import" }));
-    expect(await screen.findByLabelText("Student CSV file")).toBeTruthy();
+    expect(await screen.findByLabelText("Student file (Excel or CSV)")).toBeTruthy();
   });
 
   test("maps a non-template CSV end to end: suggest, fix, apply, preview, confirm", async () => {
@@ -356,21 +415,20 @@ describe("ImportStudentsPage", () => {
       valid_rows: 0,
       error_rows: 2,
       header_line: 3,
-      source_headers: ["Student ID", "Given Name", "Surname", "Contact"],
-      // What the server suggests from its alias list: everything but the email.
+      source_headers: ["Student ID", "Given Name", "Apellido", "Contact"],
+      // What the server suggests from its alias list: everything but the last name.
       column_mapping: {
         admission_number: "Student ID",
         first_name: "Given Name",
-        last_name: "Surname",
       },
-      errors: [{ line: 3, field: "email", message: 'Map a column to "email".' }],
+      errors: [{ line: 3, field: "last_name", message: 'Map a column to "last_name".' }],
     });
     putMock.mockImplementation((_path: string, init?: RequestInit) =>
       Promise.resolve<unknown>({
         data: importRecord({
           status: "validated",
           header_line: 3,
-          source_headers: ["Student ID", "Given Name", "Surname", "Contact"],
+          source_headers: ["Student ID", "Given Name", "Apellido", "Contact"],
           column_mapping: (init?.body as { column_mapping: unknown }).column_mapping,
           updated_at: "2026-08-01T00:01:00.000Z",
         }),
@@ -384,24 +442,22 @@ describe("ImportStudentsPage", () => {
     expect(
       mapping.getByText("4 columns found on line 3 of students.csv.", { exact: false }),
     ).toBeTruthy();
-    // "Given Name" and "Surname" are aliases the server matched; "Student ID" too.
-    expect(mapping.getAllByText("High: known alternative name")).toHaveLength(3);
-    expect(
-      mapping.getByText("3 of 4 required fields mapped. Missing: Student email."),
-    ).toBeTruthy();
+    // "Given Name" and "Student ID" are aliases the server matched.
+    expect(mapping.getAllByText("High: known alternative name")).toHaveLength(2);
+    expect(mapping.getByText("2 of 3 required fields mapped. Missing: Last name.")).toBeTruthy();
 
     const confirm = screen.getByRole("button", { name: /^Confirm import/ });
     expect(confirm.hasAttribute("disabled")).toBe(true);
     expect(
       screen.getByText(
-        "Map a column to every required field before confirming. Missing: Student email.",
+        "Map a column to every required field before confirming. Missing: Last name.",
       ),
     ).toBeTruthy();
     // No preview for a mapping that stages no records.
     expect(screen.queryByRole("region", { name: "Import preview" })).toBeNull();
 
-    choose("Student email", "Contact");
-    expect(mapping.getByText("4 of 4 required fields mapped.")).toBeTruthy();
+    choose("Last name", "Apellido");
+    expect(mapping.getByText("3 of 3 required fields mapped.")).toBeTruthy();
     expect(mapping.getByText("Chosen manually")).toBeTruthy();
     expect(
       screen.getByText("You changed the mapping. Apply it to re-check the file before confirming."),
@@ -415,9 +471,8 @@ describe("ImportStudentsPage", () => {
     expect(init?.body).toEqual({
       column_mapping: {
         admission_number: "Student ID",
-        email: "Contact",
         first_name: "Given Name",
-        last_name: "Surname",
+        last_name: "Apellido",
       },
       save_as: undefined,
     });

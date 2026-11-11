@@ -138,7 +138,7 @@ describe("students feature accessibility", () => {
         </ToastProvider>
       </QueryClientProvider>,
     );
-    await screen.findByRole("button", { name: "Download CSV template" });
+    await screen.findByRole("button", { name: "CSV template" });
 
     await expectNoA11yViolations(container);
   });

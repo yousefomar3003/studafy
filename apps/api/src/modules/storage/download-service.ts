@@ -22,6 +22,7 @@
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
+import { parseStorageKey } from "../../lib/storage/keys";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { getDownloadClass } from "./content-classes";
@@ -51,7 +52,8 @@ type Resolver = (
  * and "row missing" are indistinguishable and both answer 404.
  *
  * The extra predicates are the classes' own gates on serving: materials only once malware-scanned
- * ready (000088), export jobs only once completed with a stored object.
+ * ready (000088), submissions and receipts only once their malware scan has cleared them or they
+ * predate scanning (000192, F-14), export jobs only once completed with a stored object.
  */
 const RESOLVERS: Readonly<Record<DownloadClassKey, Resolver>> = {
   material: async (tx, schoolId, objectId) => {
@@ -67,6 +69,7 @@ const RESOLVERS: Readonly<Record<DownloadClassKey, Resolver>> = {
       SELECT storage_key
       FROM app.submission_attachments
       WHERE id = ${objectId} AND school_id = ${schoolId}
+        AND scan_status IN ('clean', 'unscanned')
     `;
     return row ? { storageKey: row.storage_key, targetTable: "submission_attachments" } : null;
   },
@@ -75,8 +78,12 @@ const RESOLVERS: Readonly<Record<DownloadClassKey, Resolver>> = {
       SELECT attachment_storage_key AS storage_key
       FROM app.expense_cache
       WHERE id = ${objectId} AND school_id = ${schoolId} AND attachment_storage_key IS NOT NULL
+        AND attachment_scan_status IN ('clean', 'unscanned')
     `;
-    return row ? { storageKey: row.storage_key, targetTable: "expense_cache" } : null;
+    // The key could once be set from a request body without a school check; never sign another
+    // school's object, even from an old row.
+    if (!row || parseStorageKey(row.storage_key)?.schoolId !== schoolId) return null;
+    return { storageKey: row.storage_key, targetTable: "expense_cache" };
   },
   // The one class spanning two tables: an attendance export job or a finance report job. Attendance
   // first, finance second; both are school-scoped and completed-only, so the only thing the caller

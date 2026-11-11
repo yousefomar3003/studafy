@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { PERMISSIONS } from "@studafy/constants";
 
 import { requireStorage } from "../../lib/storage";
+import { enqueueUploadScans } from "../../lib/storage/upload-scan";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
 import { requirePermission } from "../../middleware/authz";
@@ -160,22 +161,37 @@ export function schoolApplicantRoutes(
   routes.openapi(submitRoute, async (c) => {
     const identity = await requireApplicant(c, sessionConfig);
     const body = c.req.valid("json");
-    const application = await submitApplication(database, requireStorage(storage), identity, {
-      applicantName: body.applicant_name,
-      applicantJobTitle: body.applicant_job_title,
-      applicantPhone: body.applicant_phone,
-      schoolName: body.school_name,
-      schoolEmail: body.school_email,
-      countryId: body.country_id,
-      defaultCurrencyId: body.default_currency_id,
-      city: body.city,
-      address: body.address,
-      website: body.website,
-      studentCount: body.student_count,
-      message: body.message,
-      proofStorageKey: body.proof_storage_key,
-      proofFileName: body.proof_file_name,
-    });
+    const uploadedKeys: string[] = [];
+    const application = await submitApplication(
+      database,
+      requireStorage(storage),
+      identity,
+      {
+        applicantName: body.applicant_name,
+        applicantJobTitle: body.applicant_job_title,
+        applicantPhone: body.applicant_phone,
+        schoolName: body.school_name,
+        schoolEmail: body.school_email,
+        countryId: body.country_id,
+        defaultCurrencyId: body.default_currency_id,
+        city: body.city,
+        address: body.address,
+        website: body.website,
+        studentCount: body.student_count,
+        message: body.message,
+        proofStorageKey: body.proof_storage_key,
+        proofFileName: body.proof_file_name,
+      },
+      uploadedKeys,
+    );
+    await enqueueUploadScans(
+      c,
+      uploadedKeys.map((storageKey) => ({
+        target: "school_application_proof" as const,
+        schoolId: null,
+        storageKey,
+      })),
+    );
     c.get("log")?.info(
       { event: "school_application_received", application_id: application.id },
       "school application received",

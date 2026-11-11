@@ -135,6 +135,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/academics/classes/{classId}/enrollments",
   "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
   "POST /api/academics/classes/{classId}/enrollments/transfer",
+  // Class AI materials setting (000196). Guarded by requirePermission(MATERIAL_MANAGE_AI); the
+  // service then narrows a teacher to the classes they teach.
+  "PUT /api/academics/classes/{classId}/ai-materials",
   // Grades & sections (000147). Every write guarded by requirePermission(TIMETABLE_MANAGE).
   "POST /api/academics/grade-levels",
   "PATCH /api/academics/grade-levels/{gradeLevelId}",
@@ -357,6 +360,8 @@ const EXPECTED_MUTATING_ROUTES = [
   // Self-service account deletion — the caller is always the subject (never a parameter).
   "POST /api/account/deletion",
   "DELETE /api/account/deletion",
+  // Accepting the legal documents (000188) — the caller is always the subject.
+  "POST /api/account/legal-acceptance",
   // Public account deletion (ST-302) — unauthenticated; captcha-gated request, then a one-time
   // emailed token.
   "POST /api/account/deletion-requests",
@@ -608,6 +613,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   "POST /api/privacy/me/dsr",
   "POST /api/account/deletion",
   "DELETE /api/account/deletion",
+  // Accepting the legal documents (000188): the caller's own row, never a parameter.
+  "POST /api/account/legal-acceptance",
   // Public account deletion (ST-302) — no caller identity or bearer permission. The request is
   // authorized by Turnstile only and discloses nothing; confirm is authorized by the one-time token
   // emailed to the account's address, and acts only on the accounts under that address.

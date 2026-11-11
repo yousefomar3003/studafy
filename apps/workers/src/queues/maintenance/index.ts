@@ -1,5 +1,10 @@
 export { runAccountDeletionSweep } from "./account-deletion-sweep";
-export type { AccountDeletionSweepResult, AiBillingCanceller } from "./account-deletion-sweep";
+export type {
+  AccountDeletionSweepResult,
+  AiBillingCanceller,
+  AiBillingCancellers,
+  GooglePlayBillingCanceller,
+} from "./account-deletion-sweep";
 export {
   ACCOUNT_DELETION_SWEEP_CRON_PATTERN,
   scheduleAccountDeletionSweepJob,
@@ -11,6 +16,47 @@ export {
   scheduleAiMessageRetentionSweepJob,
 } from "./ai-message-retention-sweep-scheduler";
 export { resolveAdminActor, armAdminActor, NoAdminActorError } from "./admin-actor";
+export {
+  IP_ADDRESS_RETENTION_BATCH_SIZE,
+  IP_ADDRESS_RETENTION_DAYS,
+  purgeExpiredIpAddresses,
+} from "./ip-address-retention-sweep";
+export type { PurgeExpiredIpAddressesResult } from "./ip-address-retention-sweep";
+export {
+  IP_ADDRESS_RETENTION_SWEEP_CRON_PATTERN,
+  scheduleIpAddressRetentionSweepJob,
+} from "./ip-address-retention-sweep-scheduler";
+export { MONTHS_AHEAD, ensureFuturePartitions } from "./partition-maintenance";
+export type { PartitionMaintenanceResult } from "./partition-maintenance";
+export {
+  PARTITION_MAINTENANCE_CRON_PATTERN,
+  schedulePartitionMaintenanceJob,
+} from "./partition-maintenance-scheduler";
+export {
+  DATA_RETENTION_BATCH_SIZE,
+  DATA_RETENTION_RULES,
+  DSR_EXPORT_RETENTION_DAYS,
+  EMAIL_RECORD_RETENTION_MONTHS,
+  EXPIRED_SESSION_RETENTION_DAYS,
+  FINISHED_OUTBOX_EVENT_RETENTION_DAYS,
+  NOTIFICATION_LOG_RETENTION_MONTHS,
+  NOTIFICATION_RETENTION_MONTHS,
+  REJECTED_SCHOOL_APPLICATION_RETENTION_MONTHS,
+  SALES_INQUIRY_RETENTION_MONTHS,
+  SECURITY_EVENT_RETENTION_MONTHS,
+  purgeExpiredRetainedData,
+  retentionCutoff,
+} from "./data-retention-sweep";
+export type {
+  DataRetentionRule,
+  DataRetentionSweepResult,
+  RetainedDataCategory,
+  RetentionObjectStore,
+} from "./data-retention-sweep";
+export {
+  DATA_RETENTION_SWEEP_CRON_PATTERN,
+  scheduleDataRetentionSweepJob,
+} from "./data-retention-sweep-scheduler";
 export {
   RECORD_RETENTION_BATCH_SIZE,
   purgeExpiredSensitiveRecords,
@@ -49,13 +95,12 @@ export type {
   RedactedTableEntry,
   RetainedTableEntry,
 } from "./dsr-types";
-export { createMaintenancePool, processDsrJob } from "./dsr-processor";
+export { leaseMaintenancePool, processDsrJob } from "./dsr-processor";
 export type { MaintenanceRunnerConfig } from "./dsr-processor";
-export {
-  EXPORT_MANIFEST_SCHEMA_VERSION,
-  FILE_TABLES,
-  parseExportManifest,
-} from "./export-manifest";
+export { EXPORT_MANIFEST_SCHEMA_VERSION, parseExportManifest } from "./export-manifest";
+export { EXPORT_FILE_FOLDERS, listExportFiles } from "./export-files";
+export type { ExportFileSource } from "./export-files";
+export { createMaintenanceS3, exportPartSize } from "./export-storage";
 export type { ExportManifest } from "./export-manifest";
 export { processMaintenanceJob } from "./maintenance-registry";
 export {

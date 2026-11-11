@@ -24,14 +24,15 @@
 import { reprocessClaimedEvent, truncateError } from "@studafy/billing";
 import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 import { recordDeadLetter } from "@studafy/observability";
-import postgres from "postgres";
 
 import { emitAuditLog } from "../../db/audit";
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTx } from "../../db/tenant-tx";
 import { describeError, isTerminalFailure } from "../notifications/dead-letter";
 
 import { publishEntitlementChange } from "./entitlement-change-publisher";
 
+import type { DatabaseSource } from "../../db/pool";
 import type { DeadLetterLogger, FailedHandler } from "../notifications/dead-letter";
 import type { BillingEventSource, BillingLogger, ProcessOutcome } from "@studafy/billing";
 
@@ -61,10 +62,11 @@ export interface ProcessBillingEventResult {
  */
 export async function retryBillingEvent(
   data: { provider: BillingEventSource; providerEventId: string },
-  databaseUrl: string,
+  database: DatabaseSource,
   log: BillingLogger,
 ): Promise<ProcessBillingEventResult> {
-  const sql = postgres(databaseUrl, { max: 1, idle_timeout: 20, prepare: false });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
     return await withSystemTx(sql, async (tx) => {
@@ -110,7 +112,7 @@ export async function retryBillingEvent(
       return { processed: true, outcome: result.outcome };
     });
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
@@ -130,9 +132,10 @@ export async function deadLetterBillingEvent(
   provider: BillingEventSource,
   providerEventId: string,
   reason: string,
-  databaseUrl: string,
+  database: DatabaseSource,
 ): Promise<void> {
-  const sql = postgres(databaseUrl, { max: 1, idle_timeout: 20, prepare: false });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
     await withSystemTx(sql, async (tx) => {
@@ -147,7 +150,7 @@ export async function deadLetterBillingEvent(
       `;
     });
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
@@ -169,7 +172,7 @@ const EVENT_SOURCES: readonly BillingEventSource[] = ["stripe", "tap", "apple", 
  * the queue but not the ledger, and marking a `billing_events` row for it would be a lie.
  */
 export function billingDeadLetterListener(
-  databaseUrl: string,
+  database: DatabaseSource,
   log: DeadLetterLogger,
 ): FailedHandler {
   return (job, error) => {
@@ -215,7 +218,7 @@ export function billingDeadLetterListener(
       provider,
       providerEventId,
       `Retries exhausted after ${job.attemptsMade} attempts: ${errorClass}: ${message}`,
-      databaseUrl,
+      database,
     ).catch((writeError: unknown) => {
       log.error(
         {

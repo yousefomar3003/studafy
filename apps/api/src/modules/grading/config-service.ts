@@ -11,13 +11,17 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { assertConfigEditable, requireYear } from "./access";
 import {
+  effectiveSubjects,
   loadConfigDetail,
+  loadConfigDetails,
   loadScale,
+  loadYearConfigs,
   loadYearTerms,
   requireConfig,
   requireProgram,
   requireSectionRow,
   resolveSectionSubjects,
+  sectionConfigs,
   toEngineConfig,
 } from "./engine-config";
 
@@ -25,6 +29,8 @@ import type { GradingConfigStatus, YearRow } from "./access";
 import type {
   AssessmentRow,
   CategoryRow,
+  ConfigDetails,
+  EffectiveSubject,
   LoadedConfig,
   ProgramRow,
   SectionRow,
@@ -649,13 +655,24 @@ export async function toConfigView(
   schoolId: string,
   loaded: LoadedConfig,
 ): Promise<ConfigView> {
-  const { config } = loaded;
-  const engine = toEngineConfig(loaded);
-  const issues = config.is_excluded ? [] : validateSubjectConfig(engine);
   const counts = await markCounts(
     tx,
     schoolId,
     loaded.assessments.map((assessment) => assessment.id),
+  );
+  return configViewOf(loaded, counts);
+}
+
+/** {@link toConfigView} with the mark counts already read (any superset of this config's). */
+function configViewOf(loaded: LoadedConfig, allCounts: ReadonlyMap<string, number>): ConfigView {
+  const { config } = loaded;
+  const engine = toEngineConfig(loaded);
+  const issues = config.is_excluded ? [] : validateSubjectConfig(engine);
+  // Only this config's assessments, in the order a per-config count query would have listed them.
+  const counts = new Map(
+    loaded.assessments
+      .filter((assessment) => allCounts.has(assessment.id))
+      .map((assessment) => [assessment.id, allCounts.get(assessment.id)!]),
   );
   const termById = new Map(loaded.terms.map((term) => [term.id, term]));
   return {
@@ -753,9 +770,17 @@ export async function listGradeConfigs(
       AND config.grade_level_id = ${gradeLevelId}::uuid AND config.section_id IS NULL
     ORDER BY subject.name
   `;
-  const views: ConfigView[] = [];
-  for (const row of rows) views.push(await getConfigView(tx, schoolId, row.id));
-  return views;
+  // The grade's configs in a fixed number of queries rather than ~8 per subject.
+  const configs = (
+    await loadYearConfigs(tx, schoolId, yearId, { gradeLevelIds: [gradeLevelId] })
+  ).filter((config) => config.section_id === null);
+  const details = await loadConfigDetails(tx, schoolId, yearId, configs);
+  const counts = await markCounts(
+    tx,
+    schoolId,
+    details.assessments.map((assessment) => assessment.id),
+  );
+  return rows.map((row) => configViewOf(details.get(row.id), counts));
 }
 
 export interface ConfigSummary {
@@ -778,6 +803,7 @@ export async function listConfigSummaries(
   tx: TransactionSql,
   schoolId: string,
   yearId: string,
+  context?: Pick<YearConfigContext, "details">,
 ): Promise<ConfigSummary[]> {
   const rows = await tx<{ id: string; is_excluded: boolean }[]>`
     SELECT config.id, config.is_excluded
@@ -786,10 +812,13 @@ export async function listConfigSummaries(
     WHERE config.school_id = ${schoolId}::uuid AND config.academic_year_id = ${yearId}::uuid
     ORDER BY subject.name
   `;
+  const details =
+    context?.details ??
+    (await loadConfigDetails(tx, schoolId, yearId, await loadYearConfigs(tx, schoolId, yearId)));
   const summaries: ConfigSummary[] = [];
   for (const row of rows) {
     if (row.is_excluded) continue;
-    const loaded = await loadConfigDetail(tx, schoolId, row.id);
+    const loaded = details.get(row.id);
     const engine = toEngineConfig(loaded);
     const issues = validateSubjectConfig(engine);
     const weights = summarizeWeights(engine);
@@ -1434,53 +1463,150 @@ export async function listSectionSubjects(
       AND (section_id IS NULL OR section_id = ${sectionId}::uuid)
   `;
   const byId = new Map(revisions.map((row) => [row.id, row]));
-  const teachers = await sectionTeachers(tx, schoolId, sectionId);
-  return {
-    section,
-    subjects: subjects.map((subject) => ({
-      ...subject,
-      grade_revision: subject.grade_config_id
-        ? (byId.get(subject.grade_config_id)?.revision ?? null)
-        : null,
-      based_on_revision: subject.override_config_id
-        ? (byId.get(subject.override_config_id)?.based_on_revision ?? null)
-        : null,
-      teachers: teachers.filter((teacher) => teacher.subject_id === subject.subject_id),
-    })),
-  };
+  const teachers = (await loadSectionTeachers(tx, schoolId, [sectionId])).get(sectionId) ?? [];
+  return { section, subjects: sectionSubjectViews(subjects, byId, teachers) };
 }
 
-/** Explicit assignments plus teachers who already teach a class of the section in the subject. */
-async function sectionTeachers(
+interface SectionTeacher {
+  subject_id: string;
+  teacher_id: string;
+  name: string;
+  assignment_id: string | null;
+}
+
+function sectionSubjectViews(
+  subjects: readonly EffectiveSubject[],
+  configsById: ReadonlyMap<string, { revision: number; based_on_revision: number | null }>,
+  teachers: readonly SectionTeacher[],
+): SectionSubjectView[] {
+  return subjects.map((subject) => ({
+    ...subject,
+    grade_revision: subject.grade_config_id
+      ? (configsById.get(subject.grade_config_id)?.revision ?? null)
+      : null,
+    based_on_revision: subject.override_config_id
+      ? (configsById.get(subject.override_config_id)?.based_on_revision ?? null)
+      : null,
+    teachers: teachers.filter((teacher) => teacher.subject_id === subject.subject_id),
+  }));
+}
+
+/**
+ * Explicit assignments plus teachers who already teach a class of the section in the subject, for
+ * many sections in one query; each section's teachers ordered by name.
+ */
+async function loadSectionTeachers(
   tx: TransactionSql,
   schoolId: string,
-  sectionId: string,
-): Promise<
-  { subject_id: string; teacher_id: string; name: string; assignment_id: string | null }[]
-> {
-  return tx<
-    { subject_id: string; teacher_id: string; name: string; assignment_id: string | null }[]
-  >`
-    SELECT assignment.subject_id, assignment.teacher_id, users.display_name AS name,
-           assignment.id AS assignment_id
+  sectionIds: readonly string[],
+): Promise<Map<string, SectionTeacher[]>> {
+  const out = new Map<string, SectionTeacher[]>();
+  if (sectionIds.length === 0) return out;
+  const rows = await tx<(SectionTeacher & { section_id: string })[]>`
+    SELECT assignment.section_id, assignment.subject_id, assignment.teacher_id,
+           users.display_name AS name, assignment.id AS assignment_id
     FROM app.section_subject_teachers AS assignment
     JOIN app.teachers AS teacher ON teacher.id = assignment.teacher_id AND teacher.school_id = assignment.school_id
     JOIN app.users AS users ON users.id = teacher.user_id AND users.school_id = teacher.school_id
-    WHERE assignment.school_id = ${schoolId}::uuid AND assignment.section_id = ${sectionId}::uuid
+    WHERE assignment.school_id = ${schoolId}::uuid
+      AND assignment.section_id = ANY (${sectionIds as string[]}::uuid[])
     UNION
-    SELECT course.subject_id, class.lead_teacher_id, users.display_name, NULL
+    SELECT class.section_id, course.subject_id, class.lead_teacher_id, users.display_name, NULL
     FROM app.classes AS class
     JOIN app.courses AS course ON course.id = class.course_id AND course.school_id = class.school_id
     JOIN app.teachers AS teacher ON teacher.id = class.lead_teacher_id AND teacher.school_id = class.school_id
     JOIN app.users AS users ON users.id = teacher.user_id AND users.school_id = teacher.school_id
-    WHERE class.school_id = ${schoolId}::uuid AND class.section_id = ${sectionId}::uuid
+    WHERE class.school_id = ${schoolId}::uuid
+      AND class.section_id = ANY (${sectionIds as string[]}::uuid[])
       AND class.status IN ('planned', 'active')
       AND NOT EXISTS (
         SELECT 1 FROM app.section_subject_teachers AS explicit
         WHERE explicit.school_id = class.school_id AND explicit.section_id = class.section_id
           AND explicit.subject_id = course.subject_id AND explicit.teacher_id = class.lead_teacher_id
       )
+    ORDER BY name, teacher_id, subject_id, assignment_id
   `;
+  for (const row of rows) {
+    const teacher: SectionTeacher = {
+      subject_id: row.subject_id,
+      teacher_id: row.teacher_id,
+      name: row.name,
+      assignment_id: row.assignment_id,
+    };
+    const list = out.get(row.section_id);
+    if (list) list.push(teacher);
+    else out.set(row.section_id, [teacher]);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// A whole year's configuration, read set-based
+// ---------------------------------------------------------------------------
+
+export interface YearSection {
+  id: string;
+  name: string;
+  academic_year_id: string;
+  grade_level_id: string;
+  grade_level_name: string;
+  archived_at: Date | null;
+  student_count: number;
+}
+
+/**
+ * Everything the year's dashboards and publish validation read, in a fixed number of queries:
+ * programs, every config with its structure, every section and every section's teachers.
+ */
+export interface YearConfigContext {
+  programs: ProgramRow[];
+  configs: SubjectConfigRow[];
+  details: ConfigDetails;
+  /** Every section of the year, by name. */
+  sections: YearSection[];
+  teachers: Map<string, SectionTeacher[]>;
+}
+
+export async function loadYearConfigContext(
+  tx: TransactionSql,
+  schoolId: string,
+  yearId: string,
+): Promise<YearConfigContext> {
+  const programs = await listPrograms(tx, schoolId, yearId);
+  const configs = await loadYearConfigs(tx, schoolId, yearId);
+  const [details, sections] = await Promise.all([
+    loadConfigDetails(tx, schoolId, yearId, configs),
+    tx<YearSection[]>`
+      SELECT section.id, section.name, section.academic_year_id, section.grade_level_id,
+             grade.name AS grade_level_name, section.archived_at,
+             (SELECT count(*)::int FROM app.student_sections AS placement
+              WHERE placement.section_id = section.id AND placement.school_id = section.school_id) AS student_count
+      FROM app.sections AS section
+      JOIN app.grade_levels AS grade
+        ON grade.id = section.grade_level_id AND grade.school_id = section.school_id
+      WHERE section.school_id = ${schoolId}::uuid AND section.academic_year_id = ${yearId}::uuid
+      ORDER BY section.name
+    `,
+  ]);
+  const teachers = await loadSectionTeachers(
+    tx,
+    schoolId,
+    sections.map((section) => section.id),
+  );
+  return { programs, configs, details, sections, teachers };
+}
+
+/** {@link listSectionSubjects}' subjects for one section of a loaded year. */
+export function sectionSubjectsOf(
+  context: YearConfigContext,
+  section: YearSection,
+): SectionSubjectView[] {
+  const configs = sectionConfigs(context.configs, section);
+  return sectionSubjectViews(
+    effectiveSubjects(configs),
+    new Map(configs.map((config) => [config.id, config])),
+    context.teachers.get(section.id) ?? [],
+  );
 }
 
 /**
@@ -1959,9 +2085,11 @@ export async function collectPublishIssues(
   tx: TransactionSql,
   schoolId: string,
   yearId: string,
+  loaded?: YearConfigContext,
 ): Promise<PublishIssue[]> {
+  const context = loaded ?? (await loadYearConfigContext(tx, schoolId, yearId));
   const issues: PublishIssue[] = [];
-  const programs = await listPrograms(tx, schoolId, yearId);
+  const programs = context.programs;
   if (programs.length === 0) {
     issues.push({
       severity: "error",
@@ -1969,36 +2097,33 @@ export async function collectPublishIssues(
       message: "No grade is set up for this academic year.",
     });
   }
+  // The issue list follows this query's row order, as it always has.
   const configs = await tx<{ id: string; is_excluded: boolean }[]>`
     SELECT id, is_excluded FROM app.subject_configs
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid
   `;
   for (const row of configs) {
     if (row.is_excluded) continue;
-    const loaded = await loadConfigDetail(tx, schoolId, row.id);
-    for (const issue of validateSubjectConfig(toEngineConfig(loaded))) {
+    const loadedConfig = context.details.get(row.id);
+    for (const issue of validateSubjectConfig(toEngineConfig(loadedConfig))) {
       issues.push({
         severity: issue.severity,
         code: issue.code,
-        message: `${loaded.config.subject_name}: ${issue.message}`,
-        grade_level_id: loaded.config.grade_level_id,
-        section_id: loaded.config.section_id ?? undefined,
-        subject_id: loaded.config.subject_id,
-        config_id: loaded.config.id,
+        message: `${loadedConfig.config.subject_name}: ${issue.message}`,
+        grade_level_id: loadedConfig.config.grade_level_id,
+        section_id: loadedConfig.config.section_id ?? undefined,
+        subject_id: loadedConfig.config.subject_id,
+        config_id: loadedConfig.config.id,
       });
     }
   }
   for (const program of programs) {
-    const sections = await sectionsOfGrade(tx, schoolId, yearId, program.grade_level_id);
+    const sections = context.sections.filter(
+      (section) => section.grade_level_id === program.grade_level_id,
+    );
     const hasSubjects =
       configs.length > 0 &&
-      (
-        await tx<{ count: number }[]>`
-      SELECT count(*)::int AS count FROM app.subject_configs
-      WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid
-        AND grade_level_id = ${program.grade_level_id}::uuid
-    `
-      )[0]!.count > 0;
+      context.configs.some((config) => config.grade_level_id === program.grade_level_id);
     if (!hasSubjects) {
       issues.push({
         severity: "error",
@@ -2016,8 +2141,7 @@ export async function collectPublishIssues(
       });
     }
     for (const section of sections) {
-      const { subjects } = await listSectionSubjects(tx, schoolId, section.id);
-      for (const subject of subjects) {
+      for (const subject of sectionSubjectsOf(context, section)) {
         if (subject.source !== "excluded" && subject.teachers.length === 0) {
           issues.push({
             severity: "warning",

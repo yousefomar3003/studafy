@@ -7,14 +7,21 @@ import {
   assertSchoolOwnedKey,
   buildPermanentKey,
   buildTempKey,
-  promoteTempObject,
+  readStagedSize,
 } from "../../../lib/storage";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
-import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quota-service";
+import {
+  copyStagedUploads,
+  discardStagedUploads,
+  reserveStorage,
+} from "../../storage/staged-promotion";
 
 import { assertCanManageClass } from "./assignment-service";
 
+import type { TxRunner } from "../../../db/tenant-tx";
 import type { StorageService } from "../../../lib/storage";
+import type { StagedCopy } from "../../storage/staged-promotion";
+import type { UploadScanStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
 /**
@@ -51,6 +58,8 @@ export interface AttachmentRow {
   size_bytes: string;
   checksum_sha256: string | null;
   uploaded_by_user_id: string;
+  /** Malware scan state (000192). A download URL is minted only for a servable one. */
+  scan_status: UploadScanStatus;
   created_at: Date;
 }
 
@@ -119,62 +128,71 @@ export async function createUploadUrl(
 /**
  * Verify a staged upload, move it under `permanent/`, and record it.
  *
- * The storage work happens before the INSERT and is not transactional with it. That ordering is
- * deliberate and the failure modes are asymmetric: if the copy succeeds and the transaction then
- * rolls back, an unreferenced object is left in `permanent/` -- wasted bytes, reclaimable by a
- * sweep. The reverse order would let a row exist pointing at an object that was never promoted,
- * which is a broken download the user sees.
+ * The storage work is not transactional with the INSERT, and no transaction is held open across
+ * it (../../storage/staged-promotion.ts): HEAD the staged object; one short transaction authorizes
+ * and charges the quota; copy to permanent/; a second short transaction writes the row; drop the
+ * staged copy. The failure modes are asymmetric and the ordering picks the harmless one: if the
+ * copy succeeds and the row's transaction then fails, an unreferenced object is left in
+ * `permanent/` -- wasted bytes. The reverse order would let a row exist pointing at an object that
+ * was never promoted, which is a broken download the user sees.
  */
 export async function confirmAttachment(
-  tx: TransactionSql,
+  runTx: TxRunner,
   storage: StorageService,
   schoolId: string,
   userId: string,
   assignmentId: string,
   params: ConfirmAttachmentParams,
 ): Promise<AttachmentRow> {
-  const classId = await resolveAssignmentClass(tx, schoolId, assignmentId);
-  await assertCanManageClass(tx, classId);
-
   // Untrusted on the way back in, however it was minted. This is the tenant boundary.
   const staged = assertSchoolOwnedKey(params.storage_key, schoolId, "temp");
-  const permanentKey = buildPermanentKey(schoolId, staged.objectId, staged.filename);
+  const copy: StagedCopy = {
+    tempKey: params.storage_key,
+    permanentKey: buildPermanentKey(schoolId, staged.objectId, staged.filename),
+    sizeBytes: await readStagedSize(storage, params.storage_key),
+  };
 
   // The quota hard stop runs on the stored size before the copy, so a refused promotion leaves
-  // the staged object untouched in temp/; the meter is credited once the promotion actually lands.
-  const promoted = await promoteTempObject(storage, params.storage_key, permanentKey, {
-    onSize: async (sizeBytes) => {
-      await assertStorageUploadQuota(tx, sizeBytes);
-    },
+  // the staged object untouched in temp/.
+  await runTx(async (tx) => {
+    await assertCanManageClass(tx, await resolveAssignmentClass(tx, schoolId, assignmentId));
+    await reserveStorage(tx, copy.sizeBytes);
   });
-  await recordStorageUpload(tx, promoted.sizeBytes);
+  await copyStagedUploads(storage, runTx, [copy]);
 
-  const [row] = await tx<AttachmentRow[]>`
-    INSERT INTO app.assignment_attachments (
-      school_id, assignment_id, uploaded_by_user_id,
-      storage_key, original_file_name, mime_type, size_bytes, checksum_sha256
-    ) VALUES (
-      ${schoolId}, ${assignmentId}, ${userId},
-      ${permanentKey}, ${staged.filename}, ${params.content_type},
-      ${promoted.sizeBytes}, ${params.checksum_sha256 ?? null}
-    )
-    RETURNING id, assignment_id, storage_key, original_file_name, mime_type,
-              size_bytes, checksum_sha256, uploaded_by_user_id, created_at
-  `;
+  const row = await runTx(async (tx) => {
+    await assertCanManageClass(tx, await resolveAssignmentClass(tx, schoolId, assignmentId));
 
-  await emitAuditLog(tx, {
-    action: "insert",
-    targetTable: "assignment_attachments",
-    targetId: row!.id,
-    newValues: {
-      assignment_id: assignmentId,
-      original_file_name: row!.original_file_name,
-      mime_type: row!.mime_type,
-      size_bytes: row!.size_bytes,
-    },
+    const [inserted] = await tx<AttachmentRow[]>`
+      INSERT INTO app.assignment_attachments (
+        school_id, assignment_id, uploaded_by_user_id,
+        storage_key, original_file_name, mime_type, size_bytes, checksum_sha256
+      ) VALUES (
+        ${schoolId}, ${assignmentId}, ${userId},
+        ${copy.permanentKey}, ${staged.filename}, ${params.content_type},
+        ${copy.sizeBytes}, ${params.checksum_sha256 ?? null}
+      )
+      RETURNING id, assignment_id, storage_key, original_file_name, mime_type,
+                size_bytes, checksum_sha256, uploaded_by_user_id,
+                scan_status::text AS scan_status, created_at
+    `;
+
+    await emitAuditLog(tx, {
+      action: "insert",
+      targetTable: "assignment_attachments",
+      targetId: inserted!.id,
+      newValues: {
+        assignment_id: assignmentId,
+        original_file_name: inserted!.original_file_name,
+        mime_type: inserted!.mime_type,
+        size_bytes: inserted!.size_bytes,
+      },
+    });
+
+    return inserted!;
   });
-
-  return row!;
+  await discardStagedUploads(storage, [copy]);
+  return row;
 }
 
 /**
@@ -230,7 +248,8 @@ export async function listAttachmentsByAssignment(
 
   const rows = await tx<AttachmentRow[]>`
     SELECT id, assignment_id, storage_key, original_file_name, mime_type,
-           size_bytes, checksum_sha256, uploaded_by_user_id, created_at
+           size_bytes, checksum_sha256, uploaded_by_user_id,
+           scan_status::text AS scan_status, created_at
     FROM app.assignment_attachments
     WHERE school_id = ${schoolId}
       AND assignment_id IN ${tx(assignmentIds as string[])}

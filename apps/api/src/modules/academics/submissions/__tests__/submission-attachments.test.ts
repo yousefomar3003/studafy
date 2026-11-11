@@ -182,7 +182,7 @@ async function attachFile(
   storage.objects.set(minted.storage_key, 4096);
 
   return asUser(schoolId, userId, (tx) =>
-    confirmSubmissionAttachment(tx, storage, schoolId, userId, submissionId, {
+    confirmSubmissionAttachment((fn) => fn(tx), storage, schoolId, userId, submissionId, {
       storage_key: minted.storage_key,
       content_type: "application/pdf",
     }),
@@ -295,10 +295,17 @@ describeDb("storage key tenant boundary", () => {
 
     await expect(
       asUser(t.school.id, t.studentA.userId, (tx) =>
-        confirmSubmissionAttachment(tx, storage, t.school.id, t.studentA.userId, row.id, {
-          storage_key: foreignKey,
-          content_type: "application/pdf",
-        }),
+        confirmSubmissionAttachment(
+          (fn) => fn(tx),
+          storage,
+          t.school.id,
+          t.studentA.userId,
+          row.id,
+          {
+            storage_key: foreignKey,
+            content_type: "application/pdf",
+          },
+        ),
       ),
       // Asserted on status and code, not wording: assertSchoolOwnedKey's message is user-facing
       // copy, while 403 STORAGE_KEY_FORBIDDEN is the contract.

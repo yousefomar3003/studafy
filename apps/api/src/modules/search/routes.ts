@@ -118,7 +118,8 @@ const globalSearchRoute = createRoute({
     "applies exactly as on that type's list endpoint (a teacher's classes and students are those " +
     "they teach). Matching is accent- and Arabic-letter-form-insensitive, treats the last word as " +
     "a prefix, and falls back to typo-tolerant matching for names. Every call is recorded as a " +
-    "'read' audit entry against 'global_search' (query, types, offset, sections run and counts).",
+    "'read' audit entry against 'global_search' (query, types, offset, sections run and the " +
+    "totals of those that matched).",
   security: [{ bearerAuth: [] }],
   request: { query: searchQuerySchema },
   responses: standardResponses(
@@ -153,7 +154,11 @@ export function searchRoutes(database: Database): OpenAPIHono<AppEnv> {
       });
 
       // The query text and which sections it touched are themselves sensitive, so they are
-      // recorded -- never a hit's values, only how many there were.
+      // recorded -- never a hit's values, only how many there were. Every call is recorded (the
+      // compliance promise in docs/modules/search.md); the row is kept small because audit_logs
+      // is never purged and the palette searches as the user types: `totals` names only the
+      // sections that matched (every other section in `sections` matched nothing), and the
+      // per-page count is not stored -- it is min(limit, total - offset), derivable from the rest.
       await emitAuditLog(tx, {
         action: "read",
         targetTable: "global_search",
@@ -164,10 +169,11 @@ export function searchRoutes(database: Database): OpenAPIHono<AppEnv> {
           offset,
           types: types === undefined ? null : requested,
           sections: found.ran,
-          result_counts: Object.fromEntries(
-            found.ran.map((type) => [type, found.results[type].length]),
+          totals: Object.fromEntries(
+            found.ran
+              .filter((type) => found.totals[type] > 0)
+              .map((type) => [type, found.totals[type]]),
           ),
-          totals: Object.fromEntries(found.ran.map((type) => [type, found.totals[type]])),
         },
         clientIp: clientIpFrom(c),
         userAgent: c.req.header("user-agent"),

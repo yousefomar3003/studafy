@@ -5,6 +5,9 @@
  */
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
+/** The public site's origin for canonical links; `undefined` falls back to the page's own origin. */
+export const SITE_ORIGIN = import.meta.env.VITE_SITE_ORIGIN;
+
 /** Contact address for the marketing site. `undefined` when not configured — see vite-env.d.ts. */
 export const MARKETING_CONTACT_EMAIL = import.meta.env.VITE_MARKETING_CONTACT_EMAIL;
 
@@ -27,3 +30,12 @@ export const TURNSTILE_SITE_KEY =
  */
 export const SHOW_MOCK_LOGIN =
   import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCK_AUTH === "true";
+
+/**
+ * Whether the app opens the realtime WebSocket (`lib/realtime`) at all. Off unless the build sets
+ * `VITE_REALTIME_ENABLED=true`: live updates are deferred (the gateway's cost was not worth it yet),
+ * every page already loads fresh data when opened, and an attempted socket would both log
+ * handshake errors and wake the scaled-to-zero realtime machine (infra/fly/realtime.toml) on every
+ * signed-in page view. While off, the client stays `idle` and never asks the API for a ticket.
+ */
+export const REALTIME_ENABLED = import.meta.env.VITE_REALTIME_ENABLED === "true";

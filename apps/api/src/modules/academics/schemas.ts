@@ -1271,6 +1271,12 @@ export const examQuerySchema = z
     offset: z.coerce.number().int().min(0).default(0),
     class_id: uuidSchema.openapi({ description: "Filter by class." }),
     status: examStatusSchema.optional(),
+    ends_after: z.string().datetime().optional().openapi({
+      description: "Only exams ending after this instant (ISO 8601), e.g. now for upcoming ones.",
+    }),
+    starts_before: z.string().datetime().optional().openapi({
+      description: "Only exams starting before this instant (ISO 8601).",
+    }),
   })
   .openapi("ExamQuery");
 
@@ -1485,3 +1491,30 @@ export const toggleAiVisibleBodySchema = z
   .openapi("ToggleAiVisibleBody");
 
 export type ToggleAiVisibleBody = z.infer<typeof toggleAiVisibleBodySchema>;
+
+// ---------------------------------------------------------------------------
+// Class AI materials setting (000196)
+// ---------------------------------------------------------------------------
+
+export const classAiMaterialsSettingSchema = z
+  .object({
+    class_id: uuidSchema.openapi({ description: "The class this setting belongs to." }),
+    enabled: z.boolean().openapi({
+      description:
+        "Whether this class's materials are used with the AI study assistant. When false they " +
+        "are not ingested, retrieved or sent to the AI provider, and their AI chunks are deleted.",
+    }),
+  })
+  .openapi("ClassAiMaterialsSetting");
+
+export type ClassAiMaterialsSetting = z.infer<typeof classAiMaterialsSettingSchema>;
+
+export const updateClassAiMaterialsBodySchema = z
+  .object({
+    enabled: z.boolean().openapi({
+      description: "Use this class's materials with the AI study assistant (default true).",
+    }),
+  })
+  .openapi("UpdateClassAiMaterialsBody");
+
+export type UpdateClassAiMaterialsBody = z.infer<typeof updateClassAiMaterialsBodySchema>;

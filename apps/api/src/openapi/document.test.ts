@@ -318,6 +318,7 @@ describe("structure", () => {
         "/api/academics/submissions/{submissionId}/attachments/{attachmentId}",
         "/api/academics/classes",
         "/api/academics/classes/{classId}",
+        "/api/academics/classes/{classId}/ai-materials",
         "/api/academics/classes/{classId}/enrollments",
         "/api/academics/rooms",
         "/api/academics/sections",
@@ -512,6 +513,7 @@ describe("structure", () => {
         "/api/platform/users/lookup",
         // Self-service account deletion and profile. Bearer-authenticated; the caller is the subject.
         "/api/account/deletion",
+        "/api/account/legal-acceptance",
         "/api/account/profile",
         // Public account deletion (ST-302). Unauthenticated: captcha, then an emailed token.
         "/api/account/deletion-requests",
@@ -986,6 +988,7 @@ describe("security", () => {
         "GET /api/academics/submissions/{submissionId}",
         "GET /api/academics/classes",
         "GET /api/academics/classes/{classId}",
+        "GET /api/academics/classes/{classId}/ai-materials",
         "GET /api/academics/classes/{classId}/enrollments",
         "GET /api/academics/rooms",
         "GET /api/academics/courses/{courseId}",
@@ -1142,6 +1145,7 @@ describe("security", () => {
         "GET /api/storage/downloads/{contentClass}/{objectId}",
         "PATCH /api/academics/assignments/{assignmentId}",
         "PATCH /api/academics/classes/{classId}",
+        "PUT /api/academics/classes/{classId}/ai-materials",
         "PATCH /api/academics/courses/{courseId}",
         "PATCH /api/academics/exams/{examId}",
         "PATCH /api/academics/grade-levels/{gradeLevelId}",
@@ -1359,6 +1363,7 @@ describe("security", () => {
         "POST /api/privacy/me/dsr",
         // Self-service account deletion and profile. Bearer-authenticated only.
         "POST /api/account/deletion",
+        "POST /api/account/legal-acceptance",
         "GET /api/account/profile",
         "POST /api/storage/uploads/confirm",
         "POST /api/storage/uploads/request-upload",

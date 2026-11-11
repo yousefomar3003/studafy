@@ -184,6 +184,17 @@
   margin: var(--space-16) 0;
 }
 
+.students-import__templates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.students-import__template-help {
+  margin-block: var(--space-8) 0;
+  color: var(--color-muted-foreground);
+}
+
 .students-import__upload {
   display: flex;
   flex-direction: column;

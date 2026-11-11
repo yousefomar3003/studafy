@@ -37,6 +37,7 @@ import {
   userStatusCountsSchema,
   userWithRolesSchema,
 } from "../schemas";
+import { loginSlipContext } from "../slip-context";
 import {
   createUser as createUserService,
   deactivateUser,
@@ -525,12 +526,20 @@ export function userRoutes(
   });
 
   routes.openapi(issueSetupCodesRoute, async (c) => {
-    const { role } = c.req.valid("json");
+    const { role, include_pending, after } = c.req.valid("json");
 
     // Only accounts that have never set a password are touched, so no one is signed out.
-    const batch = await withTenantTx(database, tenantFrom(c), (tx) =>
-      issueUnclaimedSetupCodes(tx, role as Role),
-    );
+    const { batch, context } = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const issued = await issueUnclaimedSetupCodes(tx, role as Role, {
+        includePending: include_pending ?? false,
+        after,
+      });
+      const slips = await loginSlipContext(
+        tx,
+        issued.issued.map((member) => member.userId),
+      );
+      return { batch: issued, context: slips };
+    });
 
     c.header("Cache-Control", "no-store");
     return c.json(
@@ -541,8 +550,11 @@ export function userRoutes(
           usernames: member.usernames,
           setup_code: member.setupCode,
           expires_at: member.expiresAt.toISOString(),
+          class_label: context.get(member.userId)?.classLabel ?? null,
+          children: context.get(member.userId)?.children ?? [],
         })),
         remaining: batch.remaining,
+        last: batch.last,
       },
       200,
     );

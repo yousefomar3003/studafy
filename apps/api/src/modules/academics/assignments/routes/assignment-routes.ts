@@ -2,8 +2,12 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../../coded-http-exception";
-import { withTenantTx } from "../../../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../../../db/tenant-tx";
 import { requireStorage } from "../../../../lib/storage";
+import {
+  enqueueUploadScans,
+  isServableUploadScanStatus,
+} from "../../../../lib/storage/upload-scan";
 import { auditAction } from "../../../../middleware/auditEmitter";
 import { requireAuth } from "../../../../middleware/authContext";
 import { hasPermission, requirePermission } from "../../../../middleware/authz";
@@ -23,7 +27,7 @@ import {
   deleteAttachment,
   listAttachmentsByAssignment,
 } from "../attachment-service";
-import { listQuestionsByAssignment, replaceQuestions } from "../question-service";
+import { listQuestionsByAssignment, saveQuestions } from "../question-service";
 import {
   assignmentAttachmentSchema,
   assignmentIdParamSchema,
@@ -111,7 +115,11 @@ async function toAttachmentResponse(
   row: AttachmentRow,
   storage: StorageService | null,
 ): Promise<AssignmentAttachment> {
-  const presigned = storage ? await storage.presign(row.storage_key, "GET") : null;
+  // No URL until the malware scan has cleared the file (F-14).
+  const presigned =
+    storage && isServableUploadScanStatus(row.scan_status)
+      ? await storage.presign(row.storage_key, "GET")
+      : null;
 
   return {
     id: row.id,
@@ -136,9 +144,11 @@ async function toQuestionImageResponse(
   storage: StorageService | null,
 ): Promise<AssignmentQuestionImage | null> {
   if (row.image_storage_key === null || row.image_mime_type === null) return null;
-  const presigned = storage
-    ? await storage.presign(row.image_storage_key, "GET", undefined, DOWNLOAD_PRESIGN_TTL_SECONDS)
-    : null;
+  // No URL until the malware scan has cleared the picture (F-14).
+  const presigned =
+    storage && isServableUploadScanStatus(row.image_scan_status)
+      ? await storage.presign(row.image_storage_key, "GET", undefined, DOWNLOAD_PRESIGN_TTL_SECONDS)
+      : null;
   return {
     content_type: row.image_mime_type,
     size_bytes: Number(row.image_size_bytes),
@@ -616,18 +626,29 @@ export function assignmentRoutes(
     const { assignmentId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const assignment = await withTenantTx(database, tenantFrom(c), async (tx) => {
-      const row = await replaceQuestions(
-        tx,
-        auth.schoolId,
-        auth.userId,
-        assignmentId,
-        body.questions,
-        storage,
-      );
-      const [hydrated] = await hydrate(tx, auth.schoolId, [row], storage);
-      return hydrated!;
-    });
+    const uploadedImageKeys: string[] = [];
+    // A save with new pictures runs short transactions around its storage calls (saveQuestions).
+    const assignment = await saveQuestions(
+      tenantTxRunner(database, tenantFrom(c)),
+      storage,
+      auth.schoolId,
+      auth.userId,
+      assignmentId,
+      body.questions,
+      uploadedImageKeys,
+      async (tx, row) => {
+        const [hydrated] = await hydrate(tx, auth.schoolId, [row], storage);
+        return hydrated!;
+      },
+    );
+    await enqueueUploadScans(
+      c,
+      uploadedImageKeys.map((storageKey) => ({
+        target: "question_image" as const,
+        schoolId: auth.schoolId,
+        storageKey,
+      })),
+    );
 
     return c.json(assignment, 200);
   });
@@ -660,9 +681,17 @@ export function assignmentRoutes(
     const body = c.req.valid("json");
     const active = requireStorage(storage);
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      confirmAttachment(tx, active, auth.schoolId, auth.userId, assignmentId, body),
+    const row = await confirmAttachment(
+      tenantTxRunner(database, tenantFrom(c)),
+      active,
+      auth.schoolId,
+      auth.userId,
+      assignmentId,
+      body,
     );
+    await enqueueUploadScans(c, [
+      { target: "assignment_attachment", schoolId: auth.schoolId, storageKey: row.storage_key },
+    ]);
 
     return c.json(await toAttachmentResponse(row, active), 201);
   });

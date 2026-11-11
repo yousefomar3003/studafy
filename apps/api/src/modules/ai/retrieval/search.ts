@@ -170,6 +170,11 @@ function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<H
     FROM fused f
     JOIN app.material_chunks c ON c.id = f.id
     JOIN app.materials m ON m.id = c.material_id AND m.school_id = c.school_id
+    -- A class whose AI materials setting is off (000196) never grounds an answer. Its chunks are
+    -- deleted when the setting is turned off; this keeps the guarantee even for a chunk written by
+    -- a race the ingestion worker's re-claim did not see.
+    JOIN app.classes cl ON cl.id = m.class_id AND cl.school_id = m.school_id
+      AND cl.ai_materials_enabled
     ORDER BY f.rrf_score DESC
     LIMIT ${limit}
   `.then((rows) =>

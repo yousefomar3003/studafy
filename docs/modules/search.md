@@ -93,7 +93,14 @@ fails if the search module names a record table, and the search integration test
 stored record value is never found.
 
 Every call writes a `read` audit entry against `global_search`: the query text, limit, offset,
-requested types, the sections that ran and their counts. Never a hit's values.
+requested types, the sections that ran (`sections`) and the total of each one that matched
+(`totals`; a section in `sections` but not in `totals` matched nothing). Never a hit's values. The
+row is kept small because `audit_logs` is never purged and the palette searches as the person
+types: the hits on the page are not stored separately, since they are `min(limit, total - offset)`.
+
+Each section's total comes from `count(*) OVER ()` alongside its page. It is not capped: ranking
+already reads and ranks every match in the school's rows (`ORDER BY rank ... LIMIT`), so the count
+adds no scan, and a capped "100+" would change the API contract the "See all N results" rows use.
 
 ## Matching rules
 

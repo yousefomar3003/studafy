@@ -12,19 +12,27 @@ import {
   requireYear,
 } from "./access";
 import {
+  effectiveSubjects,
   loadConfigDetail,
   loadMarks,
   loadRoster,
+  loadYearConfigs,
   requireEffectiveSubject,
   requireProgram,
   requireSectionRow,
-  resolveSectionSubjects,
+  sectionConfigs,
   toEngineConfig,
   toMarkInputs,
 } from "./engine-config";
 
 import type { GradingConfigStatus } from "./access";
-import type { LoadedConfig, MarkRow, RosterStudent, SectionRow } from "./engine-config";
+import type {
+  EffectiveSubject,
+  LoadedConfig,
+  MarkRow,
+  RosterStudent,
+  SectionRow,
+} from "./engine-config";
 import type { MarkStatus, SubjectGradingConfig, SubjectResult } from "@studafy/grading-engine";
 import type { TransactionSql } from "postgres";
 
@@ -217,13 +225,51 @@ export async function listMyAssignments(
     WHERE section.school_id = ${schoolId}::uuid AND section.academic_year_id = ${years[0]!}::uuid
       AND app.teaches_section_subject(section.id, config.subject_id)
   `;
+  if (candidates.length === 0) return [];
+
+  // Sections, their configs and their sheets in three queries, not three per candidate.
+  const sectionIds = [...new Set(candidates.map((candidate) => candidate.section_id))];
+  const sectionRows = await tx<SectionRow[]>`
+    SELECT section.id, section.name, section.academic_year_id, section.grade_level_id,
+           grade.name AS grade_level_name, section.archived_at
+    FROM app.sections AS section
+    JOIN app.grade_levels AS grade
+      ON grade.id = section.grade_level_id AND grade.school_id = section.school_id
+    WHERE section.id = ANY (${sectionIds}::uuid[]) AND section.school_id = ${schoolId}::uuid
+  `;
+  const sectionsById = new Map(sectionRows.map((section) => [section.id, section]));
+  const configs = await loadYearConfigs(tx, schoolId, years[0]!, {
+    gradeLevelIds: [...new Set(sectionRows.map((section) => section.grade_level_id))],
+    sectionIds,
+  });
+  const sheetRows = await tx<
+    Pick<MarkSheetRow, "section_id" | "subject_id" | "term_id" | "status">[]
+  >`
+    SELECT sheet.section_id, sheet.subject_id, sheet.term_id, sheet.status
+    FROM app.mark_sheets AS sheet
+    LEFT JOIN app.terms AS term ON term.id = sheet.term_id AND term.school_id = sheet.school_id
+    WHERE sheet.school_id = ${schoolId}::uuid AND sheet.section_id = ANY (${sectionIds}::uuid[])
+    ORDER BY term.sequence_number NULLS LAST, sheet.id
+  `;
+  const subjectsBySection = new Map<string, EffectiveSubject[]>();
+
   const result: MyAssignment[] = [];
   for (const candidate of candidates) {
-    const section = await requireSectionRow(tx, schoolId, candidate.section_id);
-    const subjects = await resolveSectionSubjects(tx, schoolId, section);
+    const section = sectionsById.get(candidate.section_id);
+    if (!section) {
+      throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Section not found");
+    }
+    let subjects = subjectsBySection.get(section.id);
+    if (!subjects) {
+      subjects = effectiveSubjects(sectionConfigs(configs, section));
+      subjectsBySection.set(section.id, subjects);
+    }
     const subject = subjects.find((s) => s.subject_id === candidate.subject_id);
     if (!subject || subject.config_id === null) continue;
-    const sheets = await loadSheets(tx, schoolId, section.id, subject.subject_id);
+    // Each period's sheet, term order then annual (the order the sheet itself lists periods in).
+    const sheets = sheetRows.filter(
+      (sheet) => sheet.section_id === section.id && sheet.subject_id === subject.subject_id,
+    );
     result.push({
       academic_year_id: section.academic_year_id,
       section_id: section.id,

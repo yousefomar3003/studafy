@@ -42,6 +42,8 @@ export interface AuthContext {
   subscriptionStatus: SubscriptionStatus;
   /** A self-service deletion is scheduled for this user. Drives accountDeletionGuard middleware. */
   deletionPending?: boolean;
+  /** The user has not accepted the current legal documents. Drives legalAcceptanceGuard middleware. */
+  legalAcceptancePending?: boolean;
 }
 
 /**

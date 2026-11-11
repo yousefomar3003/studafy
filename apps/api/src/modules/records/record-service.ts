@@ -12,7 +12,13 @@
  * value leaves this module as its mask, except through revealValue, which is audited like a write.
  */
 
-import { ERROR_CODES, PERMISSIONS, ROLES, SCHOOL_STAFF_ROLES } from "@studafy/constants";
+import {
+  ERROR_CODES,
+  PERMISSIONS,
+  ROLES,
+  SCHOOL_STAFF_ROLES,
+  isServableUploadScanStatus,
+} from "@studafy/constants";
 import {
   RecordKeyUnavailableError,
   RecordSealBrokenError,
@@ -23,16 +29,18 @@ import {
 } from "@studafy/records";
 
 import { CodedHttpException } from "../../coded-http-exception";
-import { buildPermanentKey, promoteTempObject } from "../../lib/storage";
+import { buildPermanentKey } from "../../lib/storage";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { hasPermission } from "../../middleware/authz";
 import { getContentClass } from "../storage/content-classes";
+import { releaseStorageUsage } from "../storage/quota-service";
+import { assertFitsContentClass, readStagedObject, verifyStagedChecksum } from "../storage/service";
 import {
-  assertStorageUploadQuota,
-  recordStorageUpload,
-  releaseStorageUsage,
-} from "../storage/quota-service";
-import { inspectStagedUpload } from "../storage/service";
+  copyStagedUploads,
+  discardStagedUploads,
+  releaseReservation,
+  reserveStorage,
+} from "../storage/staged-promotion";
 
 import { getPublishedForm } from "./template-service";
 
@@ -43,7 +51,9 @@ import type {
   SubjectRecordsDto,
 } from "./schemas";
 import type { PublishedField } from "./template-service";
+import type { TxRunner } from "../../db/tenant-tx";
 import type { StorageService } from "../../lib/storage";
+import type { StagedCopy } from "../storage/staged-promotion";
 import type { Role } from "@studafy/constants";
 import type {
   RecordAudience,
@@ -227,6 +237,8 @@ interface AnswerRow {
   document_mime_type: string | null;
   document_size_bytes: string | null;
   document_sensitive: boolean | null;
+  /** The file's malware scan state (000192); text so a LEFT JOIN miss reads as null. */
+  document_scan_status: string | null;
   document_uploaded_at: Date | null;
   document_verified_at: Date | null;
   document_expires_on: string | null;
@@ -262,6 +274,7 @@ async function loadAnswers(
            d.status AS document_status, d.storage_key AS document_storage_key,
            d.original_file_name AS document_file_name, d.mime_type AS document_mime_type,
            d.size_bytes::text AS document_size_bytes, d.sensitive AS document_sensitive,
+           d.scan_status::text AS document_scan_status,
            d.uploaded_at AS document_uploaded_at, d.verified_at AS document_verified_at,
            to_char(d.expires_on, 'YYYY-MM-DD') AS document_expires_on
     FROM app.record_answers AS a
@@ -660,94 +673,132 @@ function assertExpiryAllowed(field: PublishedField, expiresOn: string | null | u
 
 /**
  * Attach (or replace) the file behind a document field. The upload was staged through the generic
- * gateway under the field's content class; it is inspected, quota-checked and promoted here, in
- * the same transaction as the row that references it (the messaging pattern). A sensitive field's
- * file is promoted under the sensitive-documents KMS key (ADR-019). Returns a replaced file's key
- * for the caller to delete once the transaction commits.
+ * gateway under the field's content class; it is inspected, quota-checked and promoted here, with
+ * no transaction held across object storage (../storage/staged-promotion.ts): HEAD the staged
+ * object; one short transaction resolves the field (and so its content class and sensitivity) and
+ * charges the quota; the checksum, when supplied, is verified and the object copied with no
+ * transaction open; a second short transaction writes the document row and runs `finish` (the
+ * caller's read-back). A sensitive field's file is promoted under the sensitive-documents KMS key
+ * (ADR-019). Returns a replaced file's key for the caller to delete once the transaction commits,
+ * and the new file's key for the caller to hand to the malware scanner then (F-14): until it is
+ * scanned clean it is not downloadable.
  */
-export async function attachDocument(
-  tx: TransactionSql,
+export async function attachDocument<T>(
+  runTx: TxRunner,
   storage: StorageService,
   schoolId: string,
   subject: RecordSubject,
   fieldId: string,
   actorId: string,
   input: { storage_key: string; checksum_sha256?: string; expires_on?: string | null },
-): Promise<{ replacedKey: string | null }> {
-  await assertSubjectReadable(tx, schoolId, subject, "staff");
-  const form = await getPublishedForm(tx, schoolId, subject.kind);
-  const field = documentField(form, fieldId);
-  assertExpiryAllowed(field, input.expires_on);
-  const sensitive = field.sensitivity === "sensitive";
-  const contentClass = getContentClass(recordDocumentContentClass(subject.kind, sensitive));
+  finish: (tx: TransactionSql) => Promise<T>,
+): Promise<{ replacedKey: string | null; storageKey: string; result: T }> {
+  const staged = await readStagedObject(storage, schoolId, input.storage_key);
 
-  const upload = await inspectStagedUpload(storage, schoolId, contentClass, {
-    storageKey: input.storage_key,
-    checksumSha256: input.checksum_sha256,
+  const resolveField = async (tx: TransactionSql) => {
+    await assertSubjectReadable(tx, schoolId, subject, "staff");
+    const form = await getPublishedForm(tx, schoolId, subject.kind);
+    const field = documentField(form, fieldId);
+    assertExpiryAllowed(field, input.expires_on);
+    return { field, sensitive: field.sensitivity === "sensitive" };
+  };
+
+  const { sensitive } = await runTx(async (tx) => {
+    const resolved = await resolveField(tx);
+    assertFitsContentClass(
+      staged,
+      getContentClass(recordDocumentContentClass(subject.kind, resolved.sensitive)),
+    );
+    await reserveStorage(tx, staged.sizeBytes);
+    return resolved;
   });
-  await assertStorageUploadQuota(tx, upload.sizeBytes);
 
-  const answer = await upsertAnswerRow(tx, schoolId, subject, field, actorId, {
-    value: null,
-    ciphertext: null,
-    keyId: null,
-    mask: null,
+  const copy: StagedCopy = {
+    tempKey: input.storage_key,
+    permanentKey: buildPermanentKey(schoolId, staged.parsed.objectId, staged.parsed.filename),
+    sizeBytes: staged.sizeBytes,
+    sensitive,
+  };
+  try {
+    await verifyStagedChecksum(storage, input.storage_key, input.checksum_sha256);
+  } catch (error) {
+    await releaseReservation(runTx, copy.sizeBytes);
+    throw error;
+  }
+  await copyStagedUploads(storage, runTx, [copy]);
+
+  const written = await runTx(async (tx) => {
+    const { field } = await resolveField(tx);
+    if ((field.sensitivity === "sensitive") !== sensitive) {
+      // The template was republished mid-upload and the copy went under the wrong key.
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.RECORD_FIELD_INVALID,
+        "This document field changed while the file was uploading; upload it again",
+      );
+    }
+
+    const answer = await upsertAnswerRow(tx, schoolId, subject, field, actorId, {
+      value: null,
+      ciphertext: null,
+      keyId: null,
+      mask: null,
+    });
+    const [previous] = await tx<
+      { storage_key: string | null; size_bytes: string | null; status: RecordDocumentStatus }[]
+    >`
+      SELECT storage_key, size_bytes::text AS size_bytes, status FROM app.record_documents
+      WHERE school_id = ${schoolId}::uuid AND answer_id = ${answer.id}::uuid
+      FOR UPDATE
+    `;
+    if (previous?.size_bytes) await releaseStorageUsage(tx, Number(previous.size_bytes));
+
+    const [document] = await tx<{ id: string }[]>`
+      INSERT INTO app.record_documents (
+        school_id, answer_id, status, storage_key, original_file_name, mime_type, size_bytes,
+        sensitive, uploaded_by, uploaded_at, expires_on, scan_status
+      ) VALUES (
+        ${schoolId}::uuid, ${answer.id}::uuid, 'uploaded', ${copy.permanentKey},
+        ${staged.parsed.filename}, ${staged.contentType}, ${copy.sizeBytes}, ${sensitive},
+        ${actorId}::uuid, CURRENT_TIMESTAMP, ${input.expires_on ?? null}::date, 'scanning'
+      )
+      ON CONFLICT (school_id, answer_id) DO UPDATE SET
+        status = 'uploaded',
+        storage_key = EXCLUDED.storage_key,
+        scan_status = EXCLUDED.scan_status,
+        original_file_name = EXCLUDED.original_file_name,
+        mime_type = EXCLUDED.mime_type,
+        size_bytes = EXCLUDED.size_bytes,
+        sensitive = EXCLUDED.sensitive,
+        uploaded_by = EXCLUDED.uploaded_by,
+        uploaded_at = EXCLUDED.uploaded_at,
+        verified_by = NULL,
+        verified_at = NULL,
+        expires_on = coalesce(EXCLUDED.expires_on, app.record_documents.expires_on),
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING id
+    `;
+
+    await emitAuditLog(tx, {
+      action: previous ? "update" : "insert",
+      targetTable: "record_documents",
+      targetId: document!.id,
+      oldValues: previous ? { field_id: field.id, status: previous.status, sensitive } : null,
+      // The file name of a sensitive document can itself say too much ("passport_A1234567.pdf").
+      newValues: {
+        field_id: field.id,
+        status: "uploaded",
+        sensitive,
+        ...(sensitive ? {} : { file_name: staged.parsed.filename }),
+        content_type: staged.contentType,
+        size_bytes: copy.sizeBytes,
+        expires_on: input.expires_on ?? null,
+      },
+    });
+    return { replacedKey: previous?.storage_key ?? null, result: await finish(tx) };
   });
-  const [previous] = await tx<
-    { storage_key: string | null; size_bytes: string | null; status: RecordDocumentStatus }[]
-  >`
-    SELECT storage_key, size_bytes::text AS size_bytes, status FROM app.record_documents
-    WHERE school_id = ${schoolId}::uuid AND answer_id = ${answer.id}::uuid
-    FOR UPDATE
-  `;
-
-  const permanentKey = buildPermanentKey(schoolId, upload.parsed.objectId, upload.parsed.filename);
-  const promoted = await promoteTempObject(storage, input.storage_key, permanentKey, { sensitive });
-  await recordStorageUpload(tx, promoted.sizeBytes);
-  if (previous?.size_bytes) await releaseStorageUsage(tx, Number(previous.size_bytes));
-
-  const [document] = await tx<{ id: string }[]>`
-    INSERT INTO app.record_documents (
-      school_id, answer_id, status, storage_key, original_file_name, mime_type, size_bytes,
-      sensitive, uploaded_by, uploaded_at, expires_on
-    ) VALUES (
-      ${schoolId}::uuid, ${answer.id}::uuid, 'uploaded', ${permanentKey}, ${upload.parsed.filename},
-      ${upload.contentType}, ${promoted.sizeBytes}, ${sensitive}, ${actorId}::uuid,
-      CURRENT_TIMESTAMP, ${input.expires_on ?? null}::date
-    )
-    ON CONFLICT (school_id, answer_id) DO UPDATE SET
-      status = 'uploaded',
-      storage_key = EXCLUDED.storage_key,
-      original_file_name = EXCLUDED.original_file_name,
-      mime_type = EXCLUDED.mime_type,
-      size_bytes = EXCLUDED.size_bytes,
-      sensitive = EXCLUDED.sensitive,
-      uploaded_by = EXCLUDED.uploaded_by,
-      uploaded_at = EXCLUDED.uploaded_at,
-      verified_by = NULL,
-      verified_at = NULL,
-      expires_on = coalesce(EXCLUDED.expires_on, app.record_documents.expires_on),
-      updated_at = CURRENT_TIMESTAMP
-    RETURNING id
-  `;
-
-  await emitAuditLog(tx, {
-    action: previous ? "update" : "insert",
-    targetTable: "record_documents",
-    targetId: document!.id,
-    oldValues: previous ? { field_id: field.id, status: previous.status, sensitive } : null,
-    // The file name of a sensitive document can itself say too much ("passport_A1234567.pdf").
-    newValues: {
-      field_id: field.id,
-      status: "uploaded",
-      sensitive,
-      ...(sensitive ? {} : { file_name: upload.parsed.filename }),
-      content_type: upload.contentType,
-      size_bytes: promoted.sizeBytes,
-      expires_on: input.expires_on ?? null,
-    },
-  });
-  return { replacedKey: previous?.storage_key ?? null };
+  await discardStagedUploads(storage, [copy]);
+  return { ...written, storageKey: copy.permanentKey };
 }
 
 async function loadDocument(
@@ -870,7 +921,15 @@ export async function documentDownload(
   const row = answers.find((answer) => answer.field_id === fieldId);
   // A field no longer on the form is leadership's to see, as in getSubjectRecords.
   const visible = field ? isFieldVisibleTo(field, audience) : audience === "staff";
-  if (!visible || !row || !hasFile(row) || !row.document_storage_key) {
+  // A file the malware scan has not cleared (F-14) is answered as absent, like a material that is
+  // not ready: pending, infected and unscannable files are never handed out.
+  if (
+    !visible ||
+    !row ||
+    !hasFile(row) ||
+    !row.document_storage_key ||
+    !isServableUploadScanStatus(row.document_scan_status)
+  ) {
     throw new CodedHttpException(404, ERROR_CODES.RECORD_DOCUMENT_NOT_FOUND, "No document on file");
   }
 

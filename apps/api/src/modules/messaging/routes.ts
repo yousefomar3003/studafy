@@ -2,7 +2,8 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS, ROLES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
-import { withTenantTx } from "../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../db/tenant-tx";
+import { enqueueUploadScans } from "../../lib/storage/upload-scan";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
 import { requirePermission } from "../../middleware/authz";
@@ -612,8 +613,25 @@ export function messagingRoutes(
   routes.openapi(sendMessageRoute, async (c) => {
     const { conversationId } = c.req.valid("param");
     const input = c.req.valid("json");
-    const message = await withTenantTx(database, tenantFrom(c), (tx) =>
-      sendMessage(tx, storage, actorFrom(c), conversationId, input),
+    const uploadedKeys: string[] = [];
+    const actor = actorFrom(c);
+    // Not one withTenantTx: a send with images runs several short transactions around its storage
+    // calls (see sendMessage).
+    const message = await sendMessage(
+      tenantTxRunner(database, tenantFrom(c)),
+      storage,
+      actor,
+      conversationId,
+      input,
+      uploadedKeys,
+    );
+    await enqueueUploadScans(
+      c,
+      uploadedKeys.map((storageKey) => ({
+        target: "message_attachment" as const,
+        schoolId: actor.schoolId,
+        storageKey,
+      })),
     );
     return c.json({ message }, 201);
   });

@@ -93,7 +93,7 @@ function fakeDatabase(over: {
     } else if (sql.includes("FROM app.material_chunks")) {
       rows = over.chunks ?? [];
     } else if (sql.includes("FROM app.materials")) {
-      rows = over.material ? [over.material] : [];
+      rows = over.material ? [{ ai_enabled: true, ...over.material }] : [];
     } else {
       rows = [];
     }

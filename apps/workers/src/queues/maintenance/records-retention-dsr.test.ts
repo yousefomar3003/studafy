@@ -17,6 +17,7 @@ import postgres from "postgres";
 
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
+import { createFakeExportStorage, readExportArchive } from "./__tests__/export-fakes";
 import { resealRecordValues } from "./record-key-rotation";
 import { purgeExpiredSensitiveRecords } from "./record-retention-sweep";
 import { eraseCustomListData, eraseRecordData } from "./records-dsr";
@@ -367,10 +368,7 @@ describeDb("record data in the DSR pipeline", () => {
     await answer(s, { kind: "student", id: other.studentId }, "busStop", "Gate 9", false);
     await answer(s, { kind: "parent", id: guardian }, "parentId", "G-445566", true);
 
-    const objects = new Map<string, Uint8Array>();
-    const s3 = {
-      put: async (key: string, body: Uint8Array) => void objects.set(key, body),
-    };
+    const s3 = createFakeExportStorage();
     const exportFor = async (userId: string) =>
       withSystemTenantTx(sql!, { schoolId: s.schoolId }, (tx) =>
         runTenantExport(tx, {
@@ -387,10 +385,9 @@ describeDb("record data in the DSR pipeline", () => {
     const childExport = await exportFor(child.userId);
     const entry = childExport.manifest.tables.find((table) => table.table === "record_answers")!;
     expect(entry.rowCount).toBe(2);
-    const lines = new TextDecoder()
-      .decode(objects.get(entry.storageKey)!)
-      .split("\n")
-      .map((line) => JSON.parse(line) as { label_en: string; value: unknown });
+    const lines = await (
+      await readExportArchive(s3.objects.get(childExport.archiveKey))
+    ).rows<{ label_en: string; value: unknown }>("record_answers");
     expect(lines.map((line) => [line.label_en, line.value]).sort()).toEqual(
       [
         ["busStop", "Gate 3"],
@@ -403,8 +400,8 @@ describeDb("record data in the DSR pipeline", () => {
     );
 
     const guardianExport = await exportFor(guardian);
-    const guardianEntry = guardianExport.manifest.tables.find((t) => t.table === "record_answers")!;
-    expect(new TextDecoder().decode(objects.get(guardianEntry.storageKey)!)).toContain("G-445566");
+    const guardianArchive = await readExportArchive(s3.objects.get(guardianExport.archiveKey));
+    expect(await guardianArchive.text("data/record_answers.json")).toContain("G-445566");
 
     const erasure = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, async (tx) =>
       runTenantErasure(
@@ -489,8 +486,7 @@ describeDb("staff and class records in retention and the DSR pipeline", () => {
     await answer(s, { kind: "staff", id: colleague }, "qualification", "MEd", false);
     await answer(s, { kind: "class", id: classId }, "busGroup", "Route 4", false);
 
-    const objects = new Map<string, Uint8Array>();
-    const s3 = { put: async (key: string, body: Uint8Array) => void objects.set(key, body) };
+    const s3 = createFakeExportStorage();
     const exported = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, (tx) =>
       runTenantExport(tx, {
         s3,
@@ -504,12 +500,9 @@ describeDb("staff and class records in retention and the DSR pipeline", () => {
     );
     const entry = exported.manifest.tables.find((table) => table.table === "record_answers")!;
     expect(entry.rowCount).toBe(2);
-    const lines = new TextDecoder()
-      .decode(objects.get(entry.storageKey)!)
-      .split("\n")
-      .map(
-        (line) => JSON.parse(line) as { subject_kind: string; label_en: string; value: unknown },
-      );
+    const lines = await (
+      await readExportArchive(s3.objects.get(exported.archiveKey))
+    ).rows<{ subject_kind: string; label_en: string; value: unknown }>("record_answers");
     expect(lines.map((line) => [line.subject_kind, line.label_en, line.value]).sort()).toEqual(
       [
         ["staff", "qualification", "BEd"],
@@ -728,8 +721,7 @@ describeDb("custom lists in the DSR pipeline", () => {
     await listRow(s, list, { kind: "student", id: pupil.studentId }, LOCKER_CODE);
     await listRow(s, list, { kind: "student", id: other.studentId }, "OTHER-CODE-1234");
 
-    const objects = new Map<string, Uint8Array>();
-    const s3 = { put: async (key: string, body: Uint8Array) => void objects.set(key, body) };
+    const s3 = createFakeExportStorage();
     const exported = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, (tx) =>
       runTenantExport(tx, {
         s3,
@@ -743,14 +735,16 @@ describeDb("custom lists in the DSR pipeline", () => {
     );
     const entry = exported.manifest.tables.find((table) => table.table === "custom_list_rows")!;
     expect(entry.rowCount).toBe(1);
-    const body = new TextDecoder().decode(objects.get(entry.storageKey)!);
-    expect(body).not.toContain("OTHER-CODE-1234");
-    const line = JSON.parse(body) as {
-      link_kind: string;
-      link_id: string;
-      list_name_ar: string;
-      cells: { label_en: string; sensitivity: string; value: unknown; choices?: unknown[] }[];
-    };
+    const archive = await readExportArchive(s3.objects.get(exported.archiveKey));
+    expect(await archive.text("data/custom_list_rows.json")).not.toContain("OTHER-CODE-1234");
+    const line = (
+      await archive.rows<{
+        link_kind: string;
+        link_id: string;
+        list_name_ar: string;
+        cells: { label_en: string; sensitivity: string; value: unknown; choices?: unknown[] }[];
+      }>("custom_list_rows")
+    )[0]!;
     expect(line.link_kind).toBe("student");
     expect(line.link_id).toBe(pupil.studentId);
     expect(line.list_name_ar).toBe("الخزائن");
@@ -847,8 +841,7 @@ describeDb("custom lists in the DSR pipeline", () => {
     const rowId = await listRow(s, list, { kind: "student", id: pupil.studentId }, LOCKER_CODE);
     await listRow(s, list, { kind: "class", id: classId }, "X-4");
 
-    const objects = new Map<string, Uint8Array>();
-    const s3 = { put: async (key: string, body: Uint8Array) => void objects.set(key, body) };
+    const s3 = createFakeExportStorage();
     const exported = await withSystemTenantTx(sql!, { schoolId: s.schoolId }, (tx) =>
       runTenantExport(tx, {
         s3,

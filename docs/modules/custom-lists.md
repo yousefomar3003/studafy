@@ -237,7 +237,8 @@ them for two reasons: a sensitive cell is ciphertext, and a cell has no link col
 Instead:
 
 - **Per-person export** includes every row linked to the person, as a student by `student_id` or
-  as a parent or member of staff by `user_id`. It goes in `custom_list_rows.ndjson`, with:
+  as a parent or member of staff by `user_id`. It goes in the export archive's
+  `data/custom_list_rows.json`, with:
   - the list's name;
   - the link;
   - each cell labelled by its column, with choices given with their labels;

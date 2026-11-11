@@ -3,6 +3,7 @@ import { DOMAIN_EVENTS } from "@studafy/constants";
 import { ErpNextError } from "../../../erpnext/client";
 import { emit } from "../../../lib/events/emitter";
 import { getCurrencyByCode, toMinorUnits } from "../currency";
+import { reconcileStaleRefundClaims } from "../refunds/service";
 
 import type { Database } from "../../../db/client";
 import type { Logger } from "../../../logger";
@@ -371,6 +372,18 @@ export async function runGlobalReconciliation(
       );
     } catch (err) {
       logger?.error?.({ schoolId: school.id, err }, "school reconciliation failed");
+    }
+
+    // Refunds an approval left `approved` without a settled ERPNext outcome: looked up in ERPNext
+    // (never posted to) and finalized or handed back. One short query per school when none are
+    // stuck, which is the normal case. See finance/refunds/service.ts.
+    try {
+      const refunds = await reconcileStaleRefundClaims(database, erpnextFactory, school.id, logger);
+      if (refunds.finalized + refunds.released + refunds.unknown > 0) {
+        logger?.info?.({ schoolId: school.id, ...refunds }, "stale refund claims settled");
+      }
+    } catch (err) {
+      logger?.error?.({ schoolId: school.id, err }, "stale refund claim reconciliation failed");
     }
   }
 

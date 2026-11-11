@@ -1,16 +1,18 @@
 import { createHash } from "node:crypto";
 
 import { ERROR_CODES } from "@studafy/constants";
+import { captureError } from "@studafy/observability";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { withTenantTx } from "../../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../../db/tenant-tx";
 import { ErpNextError } from "../../../erpnext/client";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
 
 import type { Database } from "../../../db/client";
-import type { TenantContext } from "../../../db/tenant-tx";
-import type { TenantErpNext } from "../client/tenant-client";
+import type { TenantContext, TxRunner } from "../../../db/tenant-tx";
+import type { Logger } from "../../../logger";
+import type { TenantErpNext, TenantErpNextFactory } from "../client/tenant-client";
 import type { TransactionSql } from "postgres";
 
 const SALES_INVOICE_RESOURCE = "/api/resource/Sales%20Invoice";
@@ -362,19 +364,478 @@ export async function initiateRefund(
 // Checker step — approve a refund
 // ---------------------------------------------------------------------------
 
+/** The one ERPNext write an approval makes, decided while the request is claimed. */
+interface ApprovalCall {
+  path: string;
+  body: Record<string, unknown>;
+  /** The ERPNext document the call acts on (a cancellation's invoice or Payment Entry). */
+  docname: string | null;
+}
+
+/** Where an approval's ERPNext write stands, as far as ERPNext itself says. */
+type ErpNextOutcome =
+  /** Applied: the credit note exists (its name), or the document is cancelled (null). */
+  | { applied: true; creditNoteId: string | null }
+  /** Confirmed not applied: safe to hand the claim back. */
+  | { applied: false };
+
+/** A claim older than this is no longer in flight: its approval request has long ended. */
+export const STALE_REFUND_CLAIM_MINUTES = 15;
+
+/** Logs where an approval's outcome could not be settled. Defaults to nothing (tests). */
+export type RefundLog = Pick<Logger, "error" | "warn" | "info">;
+
+/**
+ * The text a credit note carries in its standard `remarks` field so it can be found again after an
+ * ambiguous failure. `remarks` is a stock Sales Invoice field on every ERPNext site, so the lookup
+ * needs no custom field (unknown `custom_*` fields are dropped silently by Frappe on insert).
+ */
+export function refundTag(refundId: string): string {
+  return `Studafy refund request ${refundId}`;
+}
+
+/**
+ * The checker step: approve a pending request and make its ERPNext write exactly once, as
+ * claim -> call -> finalize, with no transaction open while ERPNext is called:
+ *
+ *   1. claim    -- one short transaction re-checks the request (pending, a different checker, a
+ *                  still-confirmed payment for a reversal) and moves it to `approved`. The UPDATE is
+ *                  conditional on `pending_approval`, so of two concurrent approvals exactly one
+ *                  wins and ERPNext is called once.
+ *   2. call     -- the ERPNext POST, one attempt (`retry: false`: a retried write could apply twice).
+ *   3. finalize -- one short transaction records the outcome and the audit entry.
+ *
+ * When the call fails, what happens depends on whether ERPNext could have applied it:
+ *   - definitive refusal (ERPNext answered 4xx, or the circuit was open so nothing was sent): the
+ *     claim is handed back (`pending_approval` again) and ERPNext's error is returned.
+ *   - ambiguous (timeout, connection lost, 5xx -- or a 2xx without the credit note's name): ERPNext
+ *     is asked once whether the write landed (lookUpOutcome). Applied -> finalized as a success.
+ *     Confirmed absent -> handed back, as a refusal. The lookup fails too -> the request stays
+ *     `approved` (it can never be approved, and posted, twice), the failure is reported, and
+ *     reconcileStaleRefundClaims settles it later; the caller gets 503.
+ *
+ * Approving a request whose claim went stale (`approved` for over STALE_REFUND_CLAIM_MINUTES)
+ * first settles that claim the same way, then approves it normally only if ERPNext has nothing.
+ */
 export async function approveRefund(
-  tx: TransactionSql,
-  erpnext: TenantErpNext,
+  runTx: TxRunner,
+  erpnextFor: (tx: TransactionSql) => Promise<TenantErpNext>,
   schoolId: string,
   userId: string,
   refundId: string,
   acceptLanguage?: string,
+  log?: RefundLog,
 ): Promise<RefundRow> {
-  const refund = await getRefundById(tx, schoolId, refundId);
-  if (!refund) {
-    throw new CodedHttpException(404, ERROR_CODES.REFUND_NOT_FOUND, "Refund request not found");
+  const settled = await settleStaleClaim(runTx, erpnextFor, schoolId, refundId, log);
+  if (settled) return settled;
+
+  const claim = await runTx(async (tx) => {
+    const refund = await getRefundById(tx, schoolId, refundId);
+    if (!refund) {
+      throw new CodedHttpException(404, ERROR_CODES.REFUND_NOT_FOUND, "Refund request not found");
+    }
+    assertApprovable(refund, userId);
+
+    const call =
+      refund.kind === "credit_note"
+        ? await creditNoteCall(tx, schoolId, refund)
+        : await cancellationCall(tx, schoolId, refund);
+
+    const claimed = await tx`
+      UPDATE app.refund_requests
+      SET status = 'approved', checker_id = ${userId}::uuid, approved_at = CURRENT_TIMESTAMP,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE school_id = ${schoolId}::uuid AND id = ${refundId}::uuid
+        AND status = 'pending_approval'
+    `;
+    if (claimed.count === 0) {
+      // A concurrent approval or rejection got there first.
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.REFUND_INVALID_STATUS,
+        "This request was approved or rejected by someone else",
+      );
+    }
+
+    return {
+      refund: { ...refund, checker_id: userId },
+      call,
+      erpnext: await erpnextFor(tx),
+    };
+  });
+  const { refund, call, erpnext } = claim;
+
+  // Only the POST is inside the try: a lookup's own 503 must not be mistaken for the call failing.
+  let created: { name?: string } | undefined;
+  let callError: unknown = null;
+  try {
+    const response = await erpnext.post<{ data?: { name?: string } }>(call.path, call.body, {
+      acceptLanguage,
+      retry: false,
+    });
+    created = response.data.data ?? {};
+  } catch (error) {
+    callError = error;
   }
 
+  let outcome: ErpNextOutcome;
+  if (created) {
+    const creditNoteId = created.name?.trim() || null;
+    outcome =
+      refund.kind !== "credit_note" || creditNoteId
+        ? { applied: true, creditNoteId }
+        : await resolveAccepted(erpnext, refund, log);
+  } else {
+    outcome = isDefinitiveRefusal(callError)
+      ? { applied: false }
+      : await resolveAmbiguous(erpnext, refund, call.docname, callError, log);
+  }
+
+  if (!outcome.applied) {
+    await releaseClaim(runTx, schoolId, refundId, userId);
+    translateErpNextRefundError(callError);
+  }
+
+  return runTx((tx) => finalizeApproval(tx, schoolId, refund, call.docname, outcome));
+}
+
+/**
+ * A definitive refusal: ERPNext answered with a verdict (4xx) or was never called (open circuit).
+ * Anything else -- timeout, connection lost, 5xx, an unexpected throw -- may have been applied.
+ */
+function isDefinitiveRefusal(error: unknown): boolean {
+  if (!(error instanceof ErpNextError)) return false;
+  if (error.kind === "circuit_open") return true;
+  return error.kind === "http" && error.status < 500;
+}
+
+/** Thrown when ERPNext could not say whether a refund's write landed. The request stays approved. */
+function outcomeUnknown(): CodedHttpException {
+  return new CodedHttpException(
+    503,
+    ERROR_CODES.ERPNEXT_UNAVAILABLE,
+    "ERPNext did not confirm the refund. It stays approved and is checked against ERPNext " +
+      "automatically; do not post it again in ERPNext.",
+  );
+}
+
+/**
+ * ERPNext accepted the return (2xx) but did not say its name. It was accepted, so "not found" is
+ * not proof of absence: only a found note is recorded; anything else stays approved (503).
+ */
+async function resolveAccepted(
+  erpnext: TenantErpNext,
+  refund: RefundRow,
+  log?: RefundLog,
+): Promise<ErpNextOutcome> {
+  let outcome: ErpNextOutcome;
+  try {
+    outcome = await lookUpOutcome(erpnext, refund, null);
+  } catch (lookupError) {
+    reportUnsettled(refund, "approval", lookupError, null, log);
+    throw outcomeUnknown();
+  }
+  if (!outcome.applied) {
+    reportUnsettled(refund, "approval", new Error("accepted credit note not found"), null, log);
+    throw outcomeUnknown();
+  }
+  return outcome;
+}
+
+/**
+ * After an ambiguous failure, ask ERPNext once whether the write landed. If even that fails the
+ * request stays approved: report it and answer 503 (outcomeUnknown).
+ */
+async function resolveAmbiguous(
+  erpnext: TenantErpNext,
+  refund: RefundRow,
+  docname: string | null,
+  callError: unknown,
+  log?: RefundLog,
+): Promise<ErpNextOutcome> {
+  try {
+    return await lookUpOutcome(erpnext, refund, docname);
+  } catch (lookupError) {
+    reportUnsettled(refund, "approval", lookupError, callError, log);
+    throw outcomeUnknown();
+  }
+}
+
+function reportUnsettled(
+  refund: Pick<RefundRow, "id" | "school_id" | "kind">,
+  stage: "approval" | "reconciliation",
+  lookupError: unknown,
+  callError: unknown,
+  log?: RefundLog,
+): void {
+  const context = {
+    refund_request_id: refund.id,
+    school_id: refund.school_id,
+    kind: refund.kind,
+    stage,
+  };
+  log?.error(
+    {
+      ...context,
+      lookup_error: lookupError instanceof Error ? lookupError.message : String(lookupError),
+      call_error:
+        callError instanceof Error ? callError.message : callError ? String(callError) : null,
+    },
+    "refund outcome unknown: ERPNext could not be checked; the request stays approved",
+  );
+  captureError(lookupError, {
+    tags: { refund_request_id: refund.id, school_id: refund.school_id, stage },
+    extra: { kind: refund.kind },
+  });
+}
+
+/**
+ * Whether an approval's ERPNext write landed, read from ERPNext with GETs only (it never posts):
+ *   - credit note: a submitted return Sales Invoice against the invoice whose `remarks` carry the
+ *     refund's tag (refundTag).
+ *   - cancellation / reversal: the target document's docstatus is 2 (cancelled).
+ * Throws when ERPNext cannot be asked.
+ */
+export async function lookUpOutcome(
+  erpnext: TenantErpNext,
+  refund: Pick<RefundRow, "id" | "kind" | "erpnext_invoice_id">,
+  docname: string | null,
+): Promise<ErpNextOutcome> {
+  if (refund.kind === "credit_note") {
+    const filters = JSON.stringify([
+      ["is_return", "=", 1],
+      ["return_against", "=", refund.erpnext_invoice_id],
+      ["docstatus", "=", 1],
+      ["remarks", "like", `%${refundTag(refund.id)}%`],
+    ]);
+    const response = await erpnext.get<{ data?: { name?: string }[] }>(
+      `${SALES_INVOICE_RESOURCE}?filters=${encodeURIComponent(filters)}` +
+        `&fields=${encodeURIComponent(JSON.stringify(["name"]))}&limit_page_length=1`,
+    );
+    const name = response.data.data?.[0]?.name?.trim();
+    return name ? { applied: true, creditNoteId: name } : { applied: false };
+  }
+
+  const doctype = refund.kind === "invoice_cancellation" ? "Sales%20Invoice" : "Payment%20Entry";
+  const target = docname ?? refund.erpnext_invoice_id;
+  const response = await erpnext.get<{ data?: { docstatus?: number } }>(
+    `/api/resource/${doctype}/${encodeURIComponent(target)}`,
+  );
+  return response.data.data?.docstatus === 2
+    ? { applied: true, creditNoteId: null }
+    : { applied: false };
+}
+
+/** Record an applied approval: the same writes whether it was seen at once or found later. */
+async function finalizeApproval(
+  tx: TransactionSql,
+  schoolId: string,
+  refund: RefundRow,
+  docname: string | null,
+  outcome: Extract<ErpNextOutcome, { applied: true }>,
+): Promise<RefundRow> {
+  // Locked and re-checked: an approval's own finalize and a later settle of the same claim must
+  // not both apply (a reversal's invoice balance would be raised twice).
+  const [locked] = await tx<{ status: string }[]>`
+    SELECT status FROM app.refund_requests
+    WHERE school_id = ${schoolId}::uuid AND id = ${refund.id}::uuid
+    FOR UPDATE
+  `;
+  if (locked?.status !== "approved") {
+    const current = await getRefundById(tx, schoolId, refund.id);
+    if (!current) throw new Error("refund row vanished");
+    return current;
+  }
+  if (refund.kind !== "credit_note") {
+    return finalizeCancellation(tx, schoolId, refund.checker_id!, refund, docname);
+  }
+  return finalizeCreditNote(tx, schoolId, refund, outcome.creditNoteId!);
+}
+
+async function finalizeCreditNote(
+  tx: TransactionSql,
+  schoolId: string,
+  refund: RefundRow,
+  creditNoteId: string,
+): Promise<RefundRow> {
+  await tx`
+    UPDATE app.refund_requests
+    SET status = 'submitted_to_erpnext',
+        erpnext_credit_note_id = ${creditNoteId},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE school_id = ${schoolId}::uuid AND id = ${refund.id}::uuid
+  `;
+
+  await tx`
+    UPDATE app.refund_idempotency_logs
+    SET erpnext_credit_note_id = ${creditNoteId}
+    WHERE school_id = ${schoolId}::uuid
+      AND idempotency_key = ${refund.idempotency_key}
+  `;
+
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "refund_requests",
+    targetId: refund.id,
+    oldValues: {
+      status: "pending_approval",
+    },
+    newValues: {
+      status: "submitted_to_erpnext",
+      checker_id: refund.checker_id,
+      erpnext_credit_note_id: creditNoteId,
+      reason_code: refund.reason_code,
+      amount_minor: refund.amount_minor,
+    },
+  });
+
+  const row = await getRefundById(tx, schoolId, refund.id);
+  if (!row) throw new Error("refund row vanished after update");
+  return row;
+}
+
+// ---------------------------------------------------------------------------
+// Stale claims -- requests left `approved` by an approval whose outcome was not settled
+// ---------------------------------------------------------------------------
+
+/** What settling one stale claim did. */
+export type StaleClaimResult = "finalized" | "released" | "unknown";
+
+/** The ERPNext document a claimed cancellation or reversal acts on. */
+async function claimedDocname(
+  tx: TransactionSql,
+  schoolId: string,
+  refund: RefundRow,
+): Promise<string | null> {
+  if (refund.kind === "credit_note") return null;
+  if (refund.kind === "invoice_cancellation") return refund.erpnext_invoice_id;
+  const [payment] = await tx<{ erpnext_docname: string }[]>`
+    SELECT erpnext_docname FROM app.payment_cache
+    WHERE school_id = ${schoolId}::uuid AND id = ${refund.payment_entry_id}::uuid
+  `;
+  return payment?.erpnext_docname ?? null;
+}
+
+/**
+ * Settle one claim: look it up in ERPNext (GETs only, nothing is ever posted from here), then
+ * finalize it if the write landed, or hand it back to `pending_approval` if it did not. A lookup
+ * failure leaves it `approved` and is reported. The finalize and release are conditional on the
+ * request still being this claim, so a concurrent settle cannot apply twice.
+ */
+export async function settleClaim(
+  runTx: TxRunner,
+  erpnext: TenantErpNext,
+  schoolId: string,
+  refund: RefundRow,
+  log?: RefundLog,
+): Promise<{ result: StaleClaimResult; row: RefundRow | null }> {
+  const docname = await runTx((tx) => claimedDocname(tx, schoolId, refund));
+  if (refund.kind !== "credit_note" && !docname) {
+    reportUnsettled(refund, "reconciliation", new Error("payment row missing"), null, log);
+    return { result: "unknown", row: null };
+  }
+
+  let outcome: ErpNextOutcome;
+  try {
+    outcome = await lookUpOutcome(erpnext, refund, docname);
+  } catch (error) {
+    reportUnsettled(refund, "reconciliation", error, null, log);
+    return { result: "unknown", row: null };
+  }
+
+  if (outcome.applied) {
+    const row = await runTx((tx) => finalizeApproval(tx, schoolId, refund, docname, outcome));
+    log?.info(
+      { refund_request_id: refund.id, school_id: schoolId },
+      "stale refund claim finalized",
+    );
+    return { result: "finalized", row };
+  }
+
+  await releaseClaim(runTx, schoolId, refund.id, refund.checker_id!);
+  log?.info({ refund_request_id: refund.id, school_id: schoolId }, "stale refund claim released");
+  return { result: "released", row: null };
+}
+
+/**
+ * Before a new approval: a request left `approved` for longer than STALE_REFUND_CLAIM_MINUTES is
+ * settled first. Returns the finalized row when ERPNext had applied it; null to carry on (a fresh
+ * claim then follows, or a 409 for a claim still in flight). 503 when ERPNext cannot be asked.
+ */
+async function settleStaleClaim(
+  runTx: TxRunner,
+  erpnextFor: (tx: TransactionSql) => Promise<TenantErpNext>,
+  schoolId: string,
+  refundId: string,
+  log?: RefundLog,
+): Promise<RefundRow | null> {
+  const stale = await runTx(async (tx) => {
+    const [row] = await tx<{ stale: boolean }[]>`
+      SELECT approved_at < now() - make_interval(mins => ${STALE_REFUND_CLAIM_MINUTES}) AS stale
+      FROM app.refund_requests
+      WHERE school_id = ${schoolId}::uuid AND id = ${refundId}::uuid AND status = 'approved'
+    `;
+    if (!row?.stale) return null;
+    return {
+      refund: (await getRefundById(tx, schoolId, refundId))!,
+      erpnext: await erpnextFor(tx),
+    };
+  });
+  if (!stale) return null;
+
+  const { result, row } = await settleClaim(runTx, stale.erpnext, schoolId, stale.refund, log);
+  if (result === "unknown") throw outcomeUnknown();
+  return result === "finalized" ? row : null;
+}
+
+/** How many stale claims one school's sweep settles at most; the rest wait for the next run. */
+export const STALE_REFUND_SWEEP_LIMIT = 20;
+
+/**
+ * Settle a school's stale claims (reconciliation job). Lists them in one short transaction and
+ * opens an ERPNext client only when there is something to settle. Bounded by
+ * STALE_REFUND_SWEEP_LIMIT per run.
+ */
+export async function reconcileStaleRefundClaims(
+  database: Database,
+  erpnextFactory: Pick<TenantErpNextFactory, "forSchool">,
+  schoolId: string,
+  log?: RefundLog,
+): Promise<Record<StaleClaimResult, number>> {
+  const counts: Record<StaleClaimResult, number> = { finalized: 0, released: 0, unknown: 0 };
+  const listed = await withTenantTx(database, { schoolId }, async (tx) => {
+    const ids = await tx<{ id: string }[]>`
+      SELECT id FROM app.refund_requests
+      WHERE school_id = ${schoolId}::uuid AND status = 'approved'
+        AND approved_at < now() - make_interval(mins => ${STALE_REFUND_CLAIM_MINUTES})
+      ORDER BY approved_at
+      LIMIT ${STALE_REFUND_SWEEP_LIMIT}
+    `;
+    if (ids.length === 0) return null;
+    const refunds: RefundRow[] = [];
+    for (const { id } of ids) {
+      const row = await getRefundById(tx, schoolId, id);
+      if (row) refunds.push(row);
+    }
+    return { refunds, erpnext: await erpnextFactory.forSchool(tx, schoolId) };
+  });
+  if (!listed) return counts;
+
+  for (const refund of listed.refunds) {
+    // As the checker who approved it, so the audit entry of a finalize names them.
+    const runTx = tenantTxRunner(database, { schoolId, userId: refund.checker_id ?? undefined });
+    try {
+      const { result } = await settleClaim(runTx, listed.erpnext, schoolId, refund, log);
+      counts[result] += 1;
+    } catch (error) {
+      counts.unknown += 1;
+      reportUnsettled(refund, "reconciliation", error, null, log);
+    }
+  }
+  return counts;
+}
+
+function assertApprovable(refund: RefundRow, userId: string): void {
   if (refund.status !== "pending_approval") {
     throw new CodedHttpException(
       409,
@@ -390,11 +851,41 @@ export async function approveRefund(
       "The maker and checker must be different users",
     );
   }
+}
 
-  if (refund.kind !== "credit_note") {
-    return approveCancellation(tx, erpnext, schoolId, userId, refund, acceptLanguage);
+/**
+ * Hand a claim back once ERPNext refused it or is confirmed not to have applied it: nothing was
+ * written there, so the request is pending again, exactly as before the approval. Conditional on
+ * still being this checker's claim. If even this cannot be written the request stays `approved` --
+ * the safe side; the reconciliation settles it.
+ */
+async function releaseClaim(
+  runTx: TxRunner,
+  schoolId: string,
+  refundId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    await runTx(
+      (tx) => tx`
+        UPDATE app.refund_requests
+        SET status = 'pending_approval', checker_id = NULL, approved_at = NULL,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE school_id = ${schoolId}::uuid AND id = ${refundId}::uuid
+          AND status = 'approved' AND checker_id = ${userId}::uuid
+      `,
+    );
+  } catch {
+    // See above.
   }
+}
 
+/** A credit note: a submitted return Sales Invoice against the refunded invoice. */
+async function creditNoteCall(
+  tx: TransactionSql,
+  schoolId: string,
+  refund: RefundRow,
+): Promise<ApprovalCall> {
   const currency = await getCurrencyByCode(tx, refund.currency);
   if (!currency) {
     throw new CodedHttpException(
@@ -406,81 +897,29 @@ export async function approveRefund(
 
   const amountDecimal = Number(refund.amount_minor) / Math.pow(10, currency.minorUnit);
 
-  const erpnextDoc: Record<string, unknown> = {
-    doctype: "Sales Invoice",
-    is_return: 1,
-    return_against: refund.erpnext_invoice_id,
-    customer: "",
-    items: [],
-    total: -amountDecimal,
-    grand_total: -amountDecimal,
-    outstanding_amount: -amountDecimal,
-    is_pos: 0,
-    update_stock: 0,
-    custom_school_id: schoolId,
-    custom_student_id: refund.student_id,
-    custom_reason_code: refund.reason_code,
-    ...(refund.reason_notes ? { custom_reason_notes: refund.reason_notes } : {}),
-    docstatus: 1,
+  return {
+    path: SALES_INVOICE_RESOURCE,
+    body: {
+      doctype: "Sales Invoice",
+      is_return: 1,
+      return_against: refund.erpnext_invoice_id,
+      customer: "",
+      items: [],
+      total: -amountDecimal,
+      grand_total: -amountDecimal,
+      outstanding_amount: -amountDecimal,
+      is_pos: 0,
+      update_stock: 0,
+      custom_school_id: schoolId,
+      custom_student_id: refund.student_id,
+      custom_reason_code: refund.reason_code,
+      ...(refund.reason_notes ? { custom_reason_notes: refund.reason_notes } : {}),
+      // How the note is found again after an ambiguous failure (lookUpOutcome).
+      remarks: refundTag(refund.id),
+      docstatus: 1,
+    },
+    docname: null,
   };
-
-  let erpnextResult: { name?: string };
-  try {
-    const response = await erpnext.post<{ data: Record<string, unknown> }>(
-      SALES_INVOICE_RESOURCE,
-      erpnextDoc,
-      { acceptLanguage },
-    );
-    erpnextResult = response.data.data as { name?: string };
-  } catch (error) {
-    translateErpNextRefundError(error);
-  }
-
-  const creditNoteId = erpnextResult.name?.trim();
-  if (!creditNoteId) {
-    throw new CodedHttpException(
-      502,
-      ERROR_CODES.ERPNEXT_UNAVAILABLE,
-      "ERPNext accepted the return but returned no document name",
-    );
-  }
-
-  await tx`
-    UPDATE app.refund_requests
-    SET status = 'submitted_to_erpnext',
-        checker_id = ${userId}::uuid,
-        erpnext_credit_note_id = ${creditNoteId},
-        approved_at = CURRENT_TIMESTAMP,
-        updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${refundId}::uuid
-  `;
-
-  await tx`
-    UPDATE app.refund_idempotency_logs
-    SET erpnext_credit_note_id = ${creditNoteId}
-    WHERE school_id = ${schoolId}::uuid
-      AND idempotency_key = ${refund.idempotency_key}
-  `;
-
-  await emitAuditLog(tx, {
-    action: "update",
-    targetTable: "refund_requests",
-    targetId: refundId,
-    oldValues: {
-      status: "pending_approval",
-    },
-    newValues: {
-      status: "submitted_to_erpnext",
-      checker_id: userId,
-      erpnext_credit_note_id: creditNoteId,
-      reason_code: refund.reason_code,
-      amount_minor: refund.amount_minor,
-    },
-  });
-
-  const row = await getRefundById(tx, schoolId, refundId);
-  if (!row) throw new Error("refund row vanished after update");
-  return row;
 }
 
 // ---------------------------------------------------------------------------
@@ -697,19 +1136,14 @@ export async function requestPaymentReversal(
 }
 
 /**
- * The checker step for a cancellation or reversal: cancel the document in ERPNext (docstatus 2),
- * then bring the local read models in line at once rather than waiting for a webhook ERPNext does
- * not send on cancel. A reversal makes its invoice owed again by the payment's amount, capped at
- * the invoice total; the next reconciliation corrects any drift.
+ * The ERPNext call for a cancellation or reversal: cancel the document (docstatus 2). A reversal
+ * cancels the payment's Payment Entry, so the payment must still be confirmed.
  */
-async function approveCancellation(
+async function cancellationCall(
   tx: TransactionSql,
-  erpnext: TenantErpNext,
   schoolId: string,
-  userId: string,
   refund: RefundRow,
-  acceptLanguage?: string,
-): Promise<RefundRow> {
+): Promise<ApprovalCall> {
   let docname = refund.erpnext_invoice_id;
   if (refund.kind === "payment_reversal") {
     const [payment] = await tx<{ erpnext_docname: string; status: string }[]>`
@@ -726,19 +1160,28 @@ async function approveCancellation(
     docname = payment.erpnext_docname;
   }
 
-  try {
-    await erpnext.post(
-      FRAPPE_CANCEL,
-      {
-        doctype: refund.kind === "invoice_cancellation" ? "Sales Invoice" : "Payment Entry",
-        name: docname,
-      },
-      { acceptLanguage },
-    );
-  } catch (error) {
-    translateErpNextRefundError(error);
-  }
+  return {
+    path: FRAPPE_CANCEL,
+    body: {
+      doctype: refund.kind === "invoice_cancellation" ? "Sales Invoice" : "Payment Entry",
+      name: docname,
+    },
+    docname,
+  };
+}
 
+/**
+ * Once ERPNext has cancelled the document, bring the local read models in line at once rather than
+ * waiting for a webhook ERPNext does not send on cancel. A reversal makes its invoice owed again
+ * by the payment's amount, capped at the invoice total; the next reconciliation corrects any drift.
+ */
+async function finalizeCancellation(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  refund: RefundRow,
+  docname: string | null,
+): Promise<RefundRow> {
   if (refund.kind === "invoice_cancellation") {
     await tx`
       UPDATE app.invoice_cache
@@ -764,9 +1207,8 @@ async function approveCancellation(
 
   await tx`
     UPDATE app.refund_requests
-    SET status = 'completed', checker_id = ${userId}::uuid, approved_at = CURRENT_TIMESTAMP,
-        completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${refund.id}::uuid
+    SET status = 'completed', completed_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+    WHERE school_id = ${schoolId}::uuid AND id = ${refund.id}::uuid
   `;
 
   await emitAuditLog(tx, {

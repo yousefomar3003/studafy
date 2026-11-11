@@ -10,6 +10,7 @@
  */
 
 import { armAdminActor, resolveAdminActor } from "./admin-actor";
+import { eraseAuthoredContent } from "./authored-content-dsr";
 import { eraseImportData } from "./imports-dsr";
 import { RECORD_DATA_TABLES, eraseCustomListData, eraseRecordData } from "./records-dsr";
 import { hardDeleteRows, redactPersonalColumns } from "./redact";
@@ -24,7 +25,10 @@ import type { TransactionSql } from "postgres";
 export interface ErasureResult {
   redactedTables: RedactedTableEntry[];
   retainedTables: RetainedTableEntry[];
-  /** Record document and import source files this erasure released: remove them after commit. */
+  /**
+   * Record documents, import source files and message images this erasure released: remove them
+   * after commit.
+   */
   orphanedStorageKeys: string[];
 }
 
@@ -41,9 +45,14 @@ export async function runTenantErasure(
   const adminUserId = await resolveAdminActor(tx, schoolId);
   await armAdminActor(tx, adminUserId);
 
+  // What the person wrote themselves (retention-registry.ts AUTHORED_CONTENT_TABLES): message
+  // bodies and images, and their AI study content. First, so the walk below only sees what this pass
+  // deliberately kept (safeguarding evidence) and redacts its personal-looking columns as before.
+  const authored = await eraseAuthoredContent(tx, schoolId, subject);
+
   const tables = await discoverTenantTables(tx);
-  const redacted: RedactedTableEntry[] = [];
-  const retained: RetainedTableEntry[] = [];
+  const redacted: RedactedTableEntry[] = [...authored.redacted];
+  const retained: RetainedTableEntry[] = [...authored.retained];
 
   for (const { tableName } of tables) {
     // This pipeline's own compliance trail must not be touched by the erasure it is recording.
@@ -158,6 +167,6 @@ export async function runTenantErasure(
   return {
     redactedTables: redacted,
     retainedTables: retained,
-    orphanedStorageKeys: [...records.storageKeys, ...imports.storageKeys],
+    orphanedStorageKeys: [...records.storageKeys, ...imports.storageKeys, ...authored.storageKeys],
   };
 }

@@ -2,12 +2,20 @@
  * The export half of the GDPR pipeline (ST-268): "a complete export bundle (schema-verified)" for a
  * whole school (tenant closure) or one person within it (a filed DSR export).
  *
- * One S3 object per discovered tenant table (NDJSON, one `row_to_json` line per row -- letting
- * Postgres serialize its own rows sidesteps any JS round-trip precision/formatting mismatch for
- * numeric/date columns) plus one manifest.json tying them together with per-object SHA-256 and row
- * counts. `parseExportManifest` (export-manifest.ts) validates that manifest against
- * exportManifestSchema before it is uploaded -- a bundle that fails validation is a thrown error,
- * never a completed request with an unverified manifest.
+ * The bundle is one ZIP archive (`dsrExportArchiveKey`, under the request's dsr-exports/ prefix),
+ * streamed to storage as it is written (export-archive.ts):
+ *
+ *   README.txt                 what the archive holds, for the person reading it
+ *   manifest.json              every entry, with row counts and SHA-256 checksums
+ *   data/<table>.json          one JSON array per table, one `row_to_json` row per line -- letting
+ *                              Postgres serialize its own rows sidesteps any JS round-trip
+ *                              precision/formatting mismatch for numeric/date columns
+ *   files/<folder>/<name>      copies of the stored files (export-files.ts, records-dsr.ts)
+ *
+ * Rows are read through a cursor and files are streamed from storage, so neither a large table nor
+ * a school's every upload is held in memory. `parseExportManifest` (export-manifest.ts) validates
+ * the manifest before it is written -- a bundle that fails validation is a thrown error, the upload
+ * is abandoned, and the request is never completed with an unverified manifest.
  *
  * Unlike erasure, export does not consult retention-registry.ts's legal-hold classification: legal
  * hold says "erasure must not touch this", not "this must not be exported" -- a school's financial
@@ -16,29 +24,28 @@
  * way, subject to the same per-user narrowing (findSubjectPredicate) a per-user DSR export needs.
  */
 
-import { createHash } from "node:crypto";
+import { dsrExportArchiveKey, dsrExportPrefix } from "@studafy/constants";
 
 import { armAdminActor, resolveAdminActor } from "./admin-actor";
-import { FILE_TABLES, parseExportManifest } from "./export-manifest";
+import { ArchivePaths, ExportArchiveWriter } from "./export-archive";
+import { EXPORT_FILE_FOLDERS, MESSAGE_FILES_EXPORT_GAP, listExportFiles } from "./export-files";
+import { parseExportManifest } from "./export-manifest";
+import { renderExportReadme } from "./export-readme";
+import { exportPartSize } from "./export-storage";
 import { IMPORT_FILES_EXPORT_GAP } from "./imports-dsr";
 import { RECORD_DATA_TABLES, exportCustomListData, exportRecordData } from "./records-dsr";
 import { assertSafeIdentifier } from "./redact";
 import { findSubjectPredicate, resolveSubjectIdentifiers } from "./subject-resolver";
 import { discoverTenantTables } from "./tenant-tables";
 
+import type { ExportFileSource } from "./export-files";
 import type { ExportManifest } from "./export-manifest";
+import type { MaintenanceS3Client } from "./export-storage";
 import type { SubjectIdentifiers } from "./subject-resolver";
 import type { RecordKeyring } from "@studafy/records";
 import type { TransactionSql } from "postgres";
 
-/** The narrow object-storage port this worker needs -- shared shape with the reports framework's. */
-export interface MaintenanceS3Client {
-  put(
-    key: string,
-    body: Uint8Array,
-    options: { contentType: string; contentDisposition: string },
-  ): Promise<void>;
-}
+export type { MaintenanceS3Client } from "./export-storage";
 
 /**
  * A table this schema is known to have no admin-visible read path for at all
@@ -48,29 +55,61 @@ export interface MaintenanceS3Client {
  */
 const NO_ADMIN_VISIBILITY_TABLES: ReadonlySet<string> = new Set(["teacher_evaluations"]);
 
-function sha256Hex(body: Uint8Array): string {
-  return createHash("sha256").update(body).digest("hex");
+/** Rows fetched per cursor round trip while a table is written to the archive. */
+const CURSOR_BATCH_ROWS = 500;
+
+interface RowFilter {
+  clause: string;
+  params: string[];
 }
 
-async function dumpTableRows(
-  tx: TransactionSql,
-  table: string,
-  schoolId: string,
-  subject?: { column: string; value: string },
-): Promise<string[]> {
+function rowFilter(table: string, schoolId: string, subject?: { column: string; value: string }) {
   assertSafeIdentifier(table);
-  const params: string[] = [schoolId];
-  let whereClause = `"school_id" = $1`;
+  const filter: RowFilter = { clause: `"school_id" = $1`, params: [schoolId] };
   if (subject) {
     assertSafeIdentifier(subject.column);
-    params.push(subject.value);
-    whereClause += ` AND "${subject.column}" = $2`;
+    filter.clause += ` AND "${subject.column}" = $2`;
+    filter.params.push(subject.value);
   }
-  const rows = await tx.unsafe<{ json: string }[]>(
-    `SELECT row_to_json(t)::text AS json FROM app."${table}" AS t WHERE ${whereClause}`,
-    params,
+  return filter;
+}
+
+async function hasRows(tx: TransactionSql, table: string, filter: RowFilter): Promise<boolean> {
+  const [row] = await tx.unsafe<{ found: boolean }[]>(
+    `SELECT EXISTS (SELECT 1 FROM app."${table}" WHERE ${filter.clause}) AS found`,
+    filter.params,
   );
-  return rows.map((row) => row.json);
+  return row?.found ?? false;
+}
+
+/** A JSON array of the table's rows, one per line, read through a cursor. */
+async function* tableJson(
+  tx: TransactionSql,
+  table: string,
+  filter: RowFilter,
+  counter: { rows: number },
+): AsyncGenerator<string> {
+  yield "[";
+  const cursor = tx
+    .unsafe<{ json: string }[]>(
+      `SELECT row_to_json(t)::text AS json FROM app."${table}" AS t WHERE ${filter.clause}`,
+      filter.params,
+    )
+    .cursor(CURSOR_BATCH_ROWS);
+  for await (const rows of cursor) {
+    let batch = "";
+    for (const row of rows) {
+      batch += (counter.rows === 0 ? "\n" : ",\n") + row.json;
+      counter.rows += 1;
+    }
+    yield batch;
+  }
+  yield "\n]\n";
+}
+
+/** Lines that are already JSON objects, as a JSON array in the same shape as tableJson's. */
+function linesJson(lines: readonly string[]): string {
+  return `[\n${lines.join(",\n")}\n]\n`;
 }
 
 export interface TenantExportOptions {
@@ -80,17 +119,37 @@ export interface TenantExportOptions {
   subjectScope: "tenant" | "user";
   subjectUserId: string | null;
   now: Date;
-  /** Opens sensitive record answers so the bundle holds the subject's data, not ciphertext. */
+  /** Opens sensitive record answers for the archive, so it holds the subject's data, not ciphertext. */
   recordKeyring: RecordKeyring;
 }
 
 export interface TenantExportResult {
   manifest: ExportManifest;
-  manifestKey: string;
+  /** The archive's storage key: what the request's `storage_key` is set to. */
+  archiveKey: string;
+  archiveBytes: number;
 }
 
+/** The request's storage prefix, without the trailing slash. */
 export function tenantExportPrefix(schoolId: string, requestId: string): string {
-  return `dsr-exports/${schoolId}/${requestId}`;
+  return dsrExportPrefix(schoolId, requestId).replace(/\/$/, "");
+}
+
+async function displayNames(
+  tx: TransactionSql,
+  schoolId: string,
+  subjectUserId: string | null,
+): Promise<{ schoolName: string; subjectName: string | null }> {
+  const [school] = await tx<{ name: string }[]>`
+    SELECT name FROM app.schools WHERE id = ${schoolId}::uuid
+  `;
+  const [subject] = subjectUserId
+    ? await tx<{ display_name: string | null }[]>`
+        SELECT display_name FROM app.users
+        WHERE school_id = ${schoolId}::uuid AND id = ${subjectUserId}::uuid
+      `
+    : [];
+  return { schoolName: school?.name ?? "The school", subjectName: subject?.display_name ?? null };
 }
 
 /** Runs inside a transaction that already has `app.school_id` armed (`withSystemTenantTx`). */
@@ -110,141 +169,128 @@ export async function runTenantExport(
       ? await resolveSubjectIdentifiers(tx, schoolId, subjectUserId)
       : undefined;
 
-  const prefix = tenantExportPrefix(schoolId, requestId);
+  // Everything that is read into memory anyway is read before the archive starts.
   const tables = await discoverTenantTables(tx);
+  const records = await exportRecordData(tx, schoolId, resolvedSubject, recordKeyring);
+  const customListLines = await exportCustomListData(tx, schoolId, resolvedSubject, recordKeyring);
+  const fileSources: ExportFileSource[] = [
+    ...(await listExportFiles(tx, schoolId, resolvedSubject)),
+    ...records.files.map((file) => ({
+      table: "record_documents",
+      ...file,
+      checksumSha256: null,
+    })),
+  ];
+  const names = await displayNames(tx, schoolId, subjectUserId);
 
-  const tableEntries: ExportManifest["tables"] = [];
-  const fileEntries: ExportManifest["files"] = [];
-  const knownGaps: string[] = [];
+  const knownGaps: string[] = [MESSAGE_FILES_EXPORT_GAP];
+  // Original student import files: a closure's bundle copies every one still held (the school's
+  // own uploads); a person's bundle cannot search inside them, and says so.
+  if (resolvedSubject) knownGaps.push(IMPORT_FILES_EXPORT_GAP);
 
-  for (const { tableName } of tables) {
-    // This pipeline's own request ledger is metadata about the DSR process, not the subject's data.
-    if (tableName === "data_subject_requests") continue;
-    // Record answers and custom list cells are exported opened, below (records-dsr.ts): a raw dump
-    // would hand the subject ciphertext, and a cell has no link column to scope it by.
-    if (RECORD_DATA_TABLES.has(tableName)) continue;
+  const archiveKey = dsrExportArchiveKey(schoolId, requestId);
+  const expectedFileBytes = fileSources.reduce((sum, file) => sum + (file.sizeBytes ?? 0), 0);
+  const downloadName = `studafy-export-${now.toISOString().slice(0, 10)}.zip`;
+  const writer = new ExportArchiveWriter(
+    (body) =>
+      s3.putStream(archiveKey, body, {
+        contentType: "application/zip",
+        contentDisposition: `attachment; filename="${downloadName}"`,
+        partSizeBytes: exportPartSize(expectedFileBytes),
+      }),
+    now,
+  );
 
-    const predicate = resolvedSubject
-      ? await findSubjectPredicate(tx, tableName, resolvedSubject)
-      : undefined;
-    if (resolvedSubject && !predicate) continue;
+  try {
+    const tableEntries: ExportManifest["tables"] = [];
 
-    const rows = await dumpTableRows(tx, tableName, schoolId, predicate ?? undefined);
-    if (rows.length === 0) continue;
+    for (const { tableName } of tables) {
+      // This pipeline's own request ledger is metadata about the DSR process, not the subject's data.
+      if (tableName === "data_subject_requests") continue;
+      // Record answers and custom list cells are exported opened, below (records-dsr.ts): a raw dump
+      // would hand the subject ciphertext, and a cell has no link column to scope it by.
+      if (RECORD_DATA_TABLES.has(tableName)) continue;
 
-    if (NO_ADMIN_VISIBILITY_TABLES.has(tableName)) {
+      const predicate = resolvedSubject
+        ? await findSubjectPredicate(tx, tableName, resolvedSubject)
+        : undefined;
+      if (resolvedSubject && !predicate) continue;
+
+      const filter = rowFilter(tableName, schoolId, predicate ?? undefined);
+      if (!(await hasRows(tx, tableName, filter))) continue;
+
+      if (NO_ADMIN_VISIBILITY_TABLES.has(tableName)) {
+        knownGaps.push(
+          `app.${tableName}: no admin read policy exists for this table (docs/database/role-model.md); ` +
+            `rows neither authored nor received by the resolved admin actor may be missing from this bundle.`,
+        );
+      }
+
+      const path = `data/${tableName}.json`;
+      const counter = { rows: 0 };
+      const entry = await writer.add(path, tableJson(tx, tableName, filter, counter), {
+        compress: true,
+      });
+      tableEntries.push({ table: tableName, rowCount: counter.rows, path, sha256: entry.sha256 });
+    }
+
+    for (const [table, lines] of [
+      ["record_answers", records.lines],
+      ["custom_list_rows", customListLines],
+    ] as const) {
+      if (lines.length === 0) continue;
+      const path = `data/${table}.json`;
+      const entry = await writer.add(path, linesJson(lines), { compress: true });
+      tableEntries.push({ table, rowCount: lines.length, path, sha256: entry.sha256 });
+    }
+
+    const paths = new ArchivePaths();
+    const fileEntries: ExportManifest["files"] = [];
+    let mismatched = 0;
+    for (const file of fileSources) {
+      const body = await s3.open(file.storageKey);
+      const base = {
+        table: file.table,
+        sourceId: file.sourceId,
+        originalFileName: file.originalFileName,
+        uploadSha256: file.checksumSha256,
+      };
+      if (!body) {
+        fileEntries.push({ ...base, path: null, sizeBytes: null, sha256: null });
+        continue;
+      }
+      const folder = EXPORT_FILE_FOLDERS[file.table] ?? "other";
+      const path = paths.allocate(`files/${folder}`, file.originalFileName);
+      const entry = await writer.add(path, body, { compress: false });
+      if (file.checksumSha256 && file.checksumSha256 !== entry.sha256) mismatched += 1;
+      fileEntries.push({ ...base, path, sizeBytes: entry.bytes, sha256: entry.sha256 });
+    }
+    if (mismatched > 0) {
       knownGaps.push(
-        `app.${tableName}: no admin read policy exists for this table (docs/database/role-model.md); ` +
-          `rows neither authored nor received by the resolved admin actor may be missing from this bundle.`,
+        `${mismatched} of the copied files differ from the checksum recorded when they were ` +
+          "uploaded (manifest.json: sha256 and uploadSha256).",
       );
     }
 
-    const body = new TextEncoder().encode(rows.join("\n"));
-    const key = `${prefix}/data/${tableName}.ndjson`;
-    await s3.put(key, body, {
-      contentType: "application/x-ndjson",
-      contentDisposition: `attachment; filename="${tableName}.ndjson"`,
-    });
-    tableEntries.push({
-      table: tableName,
-      rowCount: rows.length,
-      storageKey: key,
-      sha256: sha256Hex(body),
+    const manifest = parseExportManifest({
+      schemaVersion: 2,
+      requestId,
+      schoolId,
+      subjectScope,
+      subjectUserId,
+      generatedAt: now.toISOString(),
+      tables: tableEntries,
+      files: fileEntries,
+      retainedTables: [],
+      knownGaps,
     });
 
-    if (FILE_TABLES.includes(tableName)) {
-      for (const line of rows) {
-        const parsed = JSON.parse(line) as Record<string, unknown>;
-        const storageKey = parsed.storage_key;
-        const originalFileName = parsed.original_file_name;
-        if (typeof storageKey === "string" && typeof originalFileName === "string") {
-          fileEntries.push({
-            table: tableName,
-            storageKey,
-            originalFileName,
-            checksumSha256:
-              typeof parsed.checksum_sha256 === "string" ? parsed.checksum_sha256 : null,
-          });
-        }
-      }
-    }
+    await writer.add("manifest.json", JSON.stringify(manifest, null, 2), { compress: true });
+    await writer.add("README.txt", renderExportReadme({ manifest, ...names }), { compress: true });
+    const archiveBytes = await writer.finish();
+    return { manifest, archiveKey, archiveBytes };
+  } catch (error) {
+    await writer.abort(error);
+    throw error;
   }
-
-  const records = await exportRecordData(tx, schoolId, resolvedSubject, recordKeyring);
-  if (records.lines.length > 0) {
-    const body = new TextEncoder().encode(records.lines.join("\n"));
-    const key = `${prefix}/data/record_answers.ndjson`;
-    await s3.put(key, body, {
-      contentType: "application/x-ndjson",
-      contentDisposition: `attachment; filename="record_answers.ndjson"`,
-    });
-    tableEntries.push({
-      table: "record_answers",
-      rowCount: records.lines.length,
-      storageKey: key,
-      sha256: sha256Hex(body),
-    });
-    for (const file of records.files) {
-      fileEntries.push({ table: "record_documents", ...file, checksumSha256: null });
-    }
-  }
-
-  const customListLines = await exportCustomListData(tx, schoolId, resolvedSubject, recordKeyring);
-  if (customListLines.length > 0) {
-    const body = new TextEncoder().encode(customListLines.join("\n"));
-    const key = `${prefix}/data/custom_list_rows.ndjson`;
-    await s3.put(key, body, {
-      contentType: "application/x-ndjson",
-      contentDisposition: `attachment; filename="custom_list_rows.ndjson"`,
-    });
-    tableEntries.push({
-      table: "custom_list_rows",
-      rowCount: customListLines.length,
-      storageKey: key,
-      sha256: sha256Hex(body),
-    });
-  }
-
-  // Original student import files: a closure's bundle lists every one still held (the school's own
-  // uploads); a person's bundle cannot search inside them, and says so.
-  if (resolvedSubject) {
-    knownGaps.push(IMPORT_FILES_EXPORT_GAP);
-  } else {
-    const sources = await tx<{ storage_key: string; file_name: string }[]>`
-      SELECT source_storage_key AS storage_key, source_file_name AS file_name
-      FROM app.student_imports
-      WHERE school_id = ${schoolId}::uuid AND source_storage_key IS NOT NULL
-      ORDER BY created_at
-    `;
-    for (const source of sources) {
-      fileEntries.push({
-        table: "student_imports",
-        storageKey: source.storage_key,
-        originalFileName: source.file_name,
-        checksumSha256: null,
-      });
-    }
-  }
-
-  const manifest = parseExportManifest({
-    schemaVersion: 1,
-    requestId,
-    schoolId,
-    subjectScope,
-    subjectUserId,
-    generatedAt: now.toISOString(),
-    tables: tableEntries,
-    files: fileEntries,
-    retainedTables: [],
-    knownGaps,
-  });
-
-  const manifestKey = `${prefix}/manifest.json`;
-  const manifestBody = new TextEncoder().encode(JSON.stringify(manifest, null, 2));
-  await s3.put(manifestKey, manifestBody, {
-    contentType: "application/json",
-    contentDisposition: `attachment; filename="manifest.json"`,
-  });
-
-  return { manifest, manifestKey };
 }

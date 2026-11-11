@@ -1,11 +1,13 @@
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, isServableUploadScanStatus } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { parseStorageKey } from "../../../lib/storage/keys";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
 import { translateErpNextError as translateSharedErpNextError } from "../erpnext-errors";
 import { upsertMapping } from "../id-mappings/service";
 
+import type { TxRunner } from "../../../db/tenant-tx";
 import type { StorageService } from "../../../lib/storage";
 import type { TenantErpNext } from "../client/tenant-client";
 import type { JSONValue, TransactionSql } from "postgres";
@@ -75,6 +77,7 @@ const CACHE_COLUMNS = `
   ec.erpnext_docname AS erpnext_name,
   ec.erpnext_status,
   ec.attachment_storage_key,
+  ec.attachment_scan_status::text AS attachment_scan_status,
   ec.expense_date::text AS expense_date,
   ec.last_synced_at,
   c.code AS currency,
@@ -211,7 +214,8 @@ async function projectToCache(
     INSERT INTO app.expense_cache (
       school_id, document_type, category, vendor, description,
       currency_id, amount_minor, erpnext_docname, erpnext_status,
-      attachment_storage_key, expense_date, erpnext_payload, last_synced_at
+      attachment_storage_key, attachment_scan_status, expense_date, erpnext_payload,
+      last_synced_at
     ) VALUES (
       ${schoolId}::uuid,
       ${documentType}::text,
@@ -223,6 +227,7 @@ async function projectToCache(
       ${erpnextName},
       ${statusFromDocstatus(doc.docstatus)},
       ${params.attachment_storage_key ?? null},
+      ${params.attachment_storage_key ? "scanning" : "unscanned"}::app.upload_scan_status,
       ${expenseDate}::date,
       ${tx.json(doc as unknown as JSONValue)}::jsonb,
       CURRENT_TIMESTAMP
@@ -236,6 +241,13 @@ async function projectToCache(
           amount_minor         = EXCLUDED.amount_minor,
           erpnext_status       = EXCLUDED.erpnext_status,
           attachment_storage_key = EXCLUDED.attachment_storage_key,
+          -- A new file waits for its malware scan (F-14); the same file keeps its verdict.
+          attachment_scan_status = CASE
+            WHEN app.expense_cache.attachment_storage_key
+                 IS NOT DISTINCT FROM EXCLUDED.attachment_storage_key
+            THEN app.expense_cache.attachment_scan_status
+            ELSE EXCLUDED.attachment_scan_status
+          END,
           expense_date         = EXCLUDED.expense_date,
           erpnext_payload      = EXCLUDED.erpnext_payload,
           last_synced_at       = EXCLUDED.last_synced_at,
@@ -255,12 +267,44 @@ async function projectToCache(
   return parseCacheRow(projected!);
 }
 
+/**
+ * Whether `key` is one of this school's own `temp/` or `permanent/` objects. An expense's attachment
+ * key can arrive from the client (create/update bodies), so it is checked before it is stored and
+ * again before it is ever signed: rows saved before the check existed are not trusted either.
+ */
+export function isOwnAttachmentKey(key: string, schoolId: string): boolean {
+  const parsed = parseStorageKey(key);
+  return (
+    parsed !== null &&
+    parsed.schoolId === schoolId &&
+    (parsed.category === "temp" || parsed.category === "permanent")
+  );
+}
+
+/** Refuses a client-supplied attachment key that is not this school's (403, like assertSchoolOwnedKey). */
+export function assertOwnAttachmentKey(key: string | undefined, schoolId: string): void {
+  if (key !== undefined && !isOwnAttachmentKey(key, schoolId)) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.STORAGE_KEY_FORBIDDEN,
+      "Storage key does not belong to this school",
+    );
+  }
+}
+
+/**
+ * A short-lived URL for an expense's attachment, or null when there is none, storage is not
+ * configured, or the malware scan has not cleared it (F-14).
+ */
 export async function resolveStorageUrl(
-  storage: StorageService,
+  storage: StorageService | null | undefined,
   schoolId: string,
   storageKey: string | null,
+  scanStatus: string | null = "clean",
 ): Promise<string | null> {
-  if (!storageKey) return null;
+  if (!storageKey || !storage || !isServableUploadScanStatus(scanStatus)) return null;
+  // Never sign another school's object, whatever the row says.
+  if (!isOwnAttachmentKey(storageKey, schoolId)) return null;
   try {
     const { url } = await storage.presign(storageKey, "GET");
     return url;
@@ -322,9 +366,10 @@ export async function getExpense(
   }
 
   const attachmentUrl = await resolveStorageUrl(
-    storage!,
+    storage,
     schoolId,
     row.attachment_storage_key as string | null,
+    row.attachment_scan_status as string | null,
   );
 
   return parseCacheRow(row, attachmentUrl);
@@ -337,6 +382,7 @@ export async function createExpense(
   params: CreateExpenseParams,
   acceptLanguage?: string,
 ): Promise<ExpenseRow> {
+  assertOwnAttachmentKey(params.attachment_storage_key, schoolId);
   const payload = toErpNextPayload(params.document_type, params, schoolId);
 
   let doc: ErpNextExpenseDoc;
@@ -377,6 +423,7 @@ export async function updateExpense(
   params: UpdateExpenseParams,
   acceptLanguage?: string,
 ): Promise<ExpenseRow> {
+  assertOwnAttachmentKey(params.attachment_storage_key, schoolId);
   const [before] = await tx<Record<string, unknown>[]>`
     SELECT ${tx.unsafe(CACHE_COLUMNS)}
     FROM app.expense_cache AS ec
@@ -445,60 +492,78 @@ export async function updateExpense(
   return row;
 }
 
+/**
+ * Attach a staged upload to an expense. No transaction is held across object storage
+ * (../../storage/staged-promotion.ts): HEAD the staged object; one short transaction finds the
+ * expense and charges the quota; copy to permanent/; a second short transaction points the expense
+ * at the copy; then the staged copy is dropped. A failure after the copy leaves an unreferenced
+ * object, never an expense pointing at a missing one.
+ */
 export async function confirmAttachment(
-  tx: TransactionSql,
+  runTx: TxRunner,
   storage: StorageService,
   schoolId: string,
   expenseId: string,
   tempKey: string,
+  /** Receives the promoted key, for the caller to hand to the malware scanner after commit (F-14). */
+  uploadedKeys: string[] = [],
 ): Promise<ExpenseRow> {
   const { assertSchoolOwnedKey } = await import("../../../lib/storage/keys");
   const { buildPermanentKey } = await import("../../../lib/storage/keys");
-  const { promoteTempObject } = await import("../../../lib/storage/promote");
-  const { assertStorageUploadQuota, recordStorageUpload } =
-    await import("../../storage/quota-service");
+  const { readStagedSize } = await import("../../../lib/storage/promote");
+  const { copyStagedUploads, discardStagedUploads, reserveStorage } =
+    await import("../../storage/staged-promotion");
 
   assertSchoolOwnedKey(tempKey, schoolId, "temp");
 
-  const [before] = await tx<Record<string, unknown>[]>`
-    SELECT ${tx.unsafe(CACHE_COLUMNS)}
-    FROM app.expense_cache AS ec
-    JOIN app.currencies AS c ON c.id = ec.currency_id
-    WHERE ec.school_id = ${schoolId}::uuid
-      AND (ec.id = ${expenseId}::uuid OR ec.erpnext_docname = ${expenseId})
-  `;
-
-  if (!before) {
-    throw new CodedHttpException(404, ERROR_CODES.EXPENSE_NOT_FOUND, "Expense not found");
-  }
-
-  const objectId = crypto.randomUUID();
   const filename = tempKey.split("/").at(-1) ?? "attachment";
-  const permanentKey = buildPermanentKey(schoolId, objectId, filename);
-  const promoted = await promoteTempObject(storage, tempKey, permanentKey, {
-    onSize: async (sizeBytes) => {
-      await assertStorageUploadQuota(tx, sizeBytes);
-    },
+  const copy = {
+    tempKey,
+    permanentKey: buildPermanentKey(schoolId, crypto.randomUUID(), filename),
+    sizeBytes: await readStagedSize(storage, tempKey),
+  };
+
+  const findExpense = async (tx: TransactionSql): Promise<string> => {
+    const [before] = await tx<{ erpnext_name: string }[]>`
+      SELECT ec.erpnext_docname AS erpnext_name
+      FROM app.expense_cache AS ec
+      WHERE ec.school_id = ${schoolId}::uuid
+        AND (ec.id = ${expenseId}::uuid OR ec.erpnext_docname = ${expenseId})
+    `;
+    if (!before) {
+      throw new CodedHttpException(404, ERROR_CODES.EXPENSE_NOT_FOUND, "Expense not found");
+    }
+    return before.erpnext_name;
+  };
+
+  await runTx(async (tx) => {
+    await findExpense(tx);
+    await reserveStorage(tx, copy.sizeBytes);
   });
-  await recordStorageUpload(tx, promoted.sizeBytes);
+  await copyStagedUploads(storage, runTx, [copy]);
 
-  const erpnextName = before.erpnext_name as string;
-  await tx`
-    UPDATE app.expense_cache
-    SET attachment_storage_key = ${permanentKey},
-        updated_at = CURRENT_TIMESTAMP
-    WHERE school_id = ${schoolId}::uuid AND erpnext_docname = ${erpnextName}
-  `;
+  const row = await runTx(async (tx) => {
+    const erpnextName = await findExpense(tx);
+    await tx`
+      UPDATE app.expense_cache
+      SET attachment_storage_key = ${copy.permanentKey},
+          attachment_scan_status = 'scanning',
+          updated_at = CURRENT_TIMESTAMP
+      WHERE school_id = ${schoolId}::uuid AND erpnext_docname = ${erpnextName}
+    `;
 
-  const presigned = await storage.presign(permanentKey, "GET");
-  const [updated] = await tx<Record<string, unknown>[]>`
-    SELECT ${tx.unsafe(CACHE_COLUMNS)}
-    FROM app.expense_cache AS ec
-    JOIN app.currencies AS c ON c.id = ec.currency_id
-    WHERE ec.school_id = ${schoolId}::uuid AND ec.erpnext_docname = ${erpnextName}
-  `;
-
-  return parseCacheRow(updated!, presigned.url);
+    // No URL yet: the file waits for its malware scan (F-14) and is served once it is clean.
+    const [updated] = await tx<Record<string, unknown>[]>`
+      SELECT ${tx.unsafe(CACHE_COLUMNS)}
+      FROM app.expense_cache AS ec
+      JOIN app.currencies AS c ON c.id = ec.currency_id
+      WHERE ec.school_id = ${schoolId}::uuid AND ec.erpnext_docname = ${erpnextName}
+    `;
+    return parseCacheRow(updated!, null);
+  });
+  uploadedKeys.push(copy.permanentKey);
+  await discardStagedUploads(storage, [copy]);
+  return row;
 }
 
 export async function getMonthlySummary(

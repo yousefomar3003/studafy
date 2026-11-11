@@ -104,7 +104,9 @@ jobs:
             echo "$app: ${#pairs[@]} secrets staged"
           }
 
-          stage studafy-core-migrate DATABASE_USER DATABASE_PASSWORD DATABASE_CA_CERT
+          # No DATABASE_USER: migrations connect directly as plain `postgres` (migrate.toml [env]),
+          # and a secret of that name would override it with the pooler's `postgres.<ref>`.
+          stage studafy-core-migrate DATABASE_PASSWORD DATABASE_CA_CERT
 
           stage studafy-core-api DATABASE_USER DATABASE_PASSWORD DATABASE_CA_CERT REDIS_URL \
             S3_ENDPOINT S3_ACCESS_KEY_ID S3_SECRET_ACCESS_KEY SENTRY_DSN \
@@ -123,6 +125,7 @@ jobs:
             S3_ENDPOINT AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY SENTRY_DSN \
             RECORDS_ENCRYPTION_KEYS RECORDS_ENCRYPTION_CURRENT_KEY_ID \
             AI_LLM_API_KEY RESEND_API_KEY FIREBASE_SERVICE_ACCOUNT STRIPE_SECRET_KEY \
+            GOOGLE_PLAY_SERVICE_ACCOUNT \
             OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
 
       - name: Deploy the virus scanner
@@ -135,14 +138,55 @@ jobs:
           flyctl deploy . --config infra/fly/migrate.toml --remote-only --build-only --push \
             --image-label "$RELEASE"
 
+          # `machine run` applies the app's secrets but not migrate.toml's [env] (only `fly deploy`
+          # does), so pass that table explicitly; migrate.toml stays its single source.
+          env_args=()
+          while IFS= read -r pair; do env_args+=(--env "$pair"); done < <(python3 -c '
+          import sys, tomllib
+          with open("infra/fly/migrate.toml", "rb") as f:
+              for key, value in tomllib.load(f).get("env", {}).items():
+                  print(f"{key}={value}")
+          ')
+          if [ "${#env_args[@]}" -eq 0 ]; then
+            echo "::error::No [env] read from infra/fly/migrate.toml."
+            exit 1
+          fi
+
           # A named, non-restarting machine, kept until its exit code has been read.
           name="migrate-${RELEASE:0:12}-${GITHUB_RUN_ATTEMPT}"
-          flyctl machine run "registry.fly.io/$app:$RELEASE" --app "$app" --region fra \
-            --name "$name" --restart no --detach
-          id="$(flyctl machine list --app "$app" --json | jq -r --arg n "$name" '.[] | select(.name == $n) | .id')"
+          machine_id() {
+            flyctl machine list --app "$app" --json | jq -r --arg n "$name" '.[] | select(.name == $n) | .id'
+          }
+          # The image was pushed seconds ago, and the registry region serving the launch can still
+          # answer MANIFEST_UNKNOWN for it (seen on the first production run), creating no machine;
+          # only then is the launch retried. `machine run` also reports a failure when a run with
+          # nothing to apply exits before it is seen started, so a machine that exists counts as
+          # launched, and its exit code below decides the outcome; migrations never run twice.
+          id=""
+          for attempt in 1 2 3 4 5 6; do
+            flyctl machine run "registry.fly.io/$app:$RELEASE" --app "$app" --region fra \
+              --name "$name" --restart no --detach "${env_args[@]}" || true
+            id="$(machine_id)"
+            if [ -n "$id" ]; then break; fi
+            echo "::warning::Migration machine did not launch (attempt $attempt); retrying."
+            sleep $((attempt * 10))
+          done
+          if [ -z "$id" ]; then
+            echo "::error::The migration machine never launched; nothing was released."
+            exit 1
+          fi
           flyctl machine wait "$id" --app "$app" --state stopped --wait-timeout 15m
-          code="$(flyctl machine list --app "$app" --json | jq -r --arg id "$id" \
-            '[.[] | select(.id == $id) | .events[]? | select(.type == "exit") | .request.exit_event.exit_code][0] // "unknown"')"
+          # fly omits exit_code from the exit event when it is 0 (a clean run's event carries only
+          # the signal and the time), so an exit event without one means success; no exit event at
+          # all stays "unknown". The machine can also report "stopped" a moment before its exit
+          # event is listed, so wait for the event, up to 30 seconds, before deciding.
+          code=unknown
+          for _ in $(seq 1 10); do
+            code="$(flyctl machine list --app "$app" --json | jq -r --arg id "$id" \
+              '[.[] | select(.id == $id) | .events[]? | select(.type == "exit") | (.request.exit_event.exit_code // 0)][0] // "unknown"')"
+            if [ "$code" != "unknown" ]; then break; fi
+            sleep 3
+          done
           flyctl logs --app "$app" --machine "$id" --no-tail || true
           flyctl machine destroy "$id" --app "$app" --force
           if [ "$code" != "0" ]; then

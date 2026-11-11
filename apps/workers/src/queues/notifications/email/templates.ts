@@ -19,7 +19,8 @@ export type EmailTemplate =
   | "ai-subscription-paused"
   | "ai-subscription-resumed"
   | "account-deletion-verification"
-  | "account-deletion-confirmation";
+  | "account-deletion-confirmation"
+  | "ai-store-purchase-confirmation";
 
 export interface RenderedEmail {
   subject: string;
@@ -115,6 +116,25 @@ export interface AccountDeletionConfirmationEmailData {
   schoolName: string;
   /** ISO datetime by which personal data will have been erased. */
   completesBy: string;
+}
+
+/**
+ * The confirmation, on a durable medium, of an AI add-on bought in the app and of the student's
+ * waiver of the 14-day right of withdrawal (Directive 2011/83/EU art. 16(m); Terms of Service 7.7).
+ * Sent to the student once per purchase; a student without an email address sees the same facts in
+ * the app instead.
+ */
+export interface AiStorePurchaseConfirmationEmailData {
+  /** Where it was bought: "apple" (App Store) or "google" (Google Play). */
+  platform: "apple" | "google";
+  /** ISO datetime the student asked for it to start now and acknowledged losing the right. */
+  acknowledgedAt: string;
+  /** ISO datetime the purchase was confirmed and the add-on started. */
+  recordedAt: string;
+  /** The Terms of Service version (its `Last updated` date) the purchase was made under. */
+  termsVersion: string;
+  /** The public Terms of Service page. */
+  termsUrl: string;
 }
 
 export interface DigestItem {
@@ -311,6 +331,26 @@ export function renderAccountDeletionConfirmationEmail(
     subject: "Your Studafy account has been deleted",
     text,
     html: shell(data.schoolName, bodyHtml),
+  };
+}
+
+export function renderAiStorePurchaseConfirmationEmail(
+  data: AiStorePurchaseConfirmationEmailData,
+): RenderedEmail {
+  const store = data.platform === "apple" ? "the App Store" : "Google Play";
+  const acknowledged = formatDateLabel(data.acknowledgedAt);
+  const started = formatDateLabel(data.recordedAt);
+  const intro = `Thank you for buying the Studafy AI Study Assistant through ${store}. It started on ${started}.`;
+  const waiver = `Before you bought it, on ${acknowledged}, you asked for the AI Study Assistant to start straight away and confirmed that you understand you lose your 14-day right to cancel once it starts.`;
+  const renewal = `The subscription renews every month until you cancel it in ${store}. Refunds of store purchases are handled by ${store} under its own refund policy. If the service is faulty, your legal rights are not affected.`;
+  const terms = `Your purchase is under the Studafy Terms of Service last updated ${data.termsVersion}, section 7.`;
+  const keep = "Please keep this email for your records.";
+  const text = `${intro}\n\n${waiver}\n\n${renewal}\n\n${terms} Read them here: ${data.termsUrl}\n\n${keep}`;
+  const bodyHtml = `<p>${escapeHtml(intro)}</p><p><strong>${escapeHtml(waiver)}</strong></p><p>${escapeHtml(renewal)}</p><p>${escapeHtml(terms)} <a href="${escapeHtml(data.termsUrl)}">Read the Terms of Service</a>.</p><p>${escapeHtml(keep)}</p>`;
+  return {
+    subject: "Your Studafy AI Study Assistant purchase",
+    text,
+    html: shell("Studafy", bodyHtml),
   };
 }
 

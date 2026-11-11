@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 
 import { api } from "../../../lib/api";
 import { PLATFORM_KEY } from "../queries";
@@ -223,10 +223,14 @@ export interface InvoiceListFilters {
   to: string;
 }
 
+/**
+ * Invoices across schools (or one school), newest first. The server pages the list (`nextCursor`);
+ * `data` is every page loaded so far, and `fetchNextPage` loads the next one while `hasNextPage`.
+ */
 export function useInvoicesQuery(filters: InvoiceListFilters) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: [...LICENSING_KEY, "invoices", filters] as const,
-    queryFn: async () => {
+    queryFn: async ({ pageParam }) => {
       const { data } = await api.GET("/api/platform/licenses/invoices", {
         params: {
           query: {
@@ -234,12 +238,19 @@ export function useInvoicesQuery(filters: InvoiceListFilters) {
             schoolId: filters.schoolId || undefined,
             from: filters.from || undefined,
             to: filters.to || undefined,
+            cursor: pageParam,
           },
         },
       });
       if (!data) throw new Error("Invoice list returned no data.");
-      return data.invoices as InvoiceListItem[];
+      return {
+        invoices: data.invoices as InvoiceListItem[],
+        nextCursor: data.nextCursor ?? null,
+      };
     },
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) => page.nextCursor ?? undefined,
+    select: (data) => data.pages.flatMap((page) => page.invoices),
     placeholderData: keepPreviousData,
   });
 }

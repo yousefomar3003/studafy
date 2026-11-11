@@ -115,8 +115,10 @@ void main() {
   });
 
   group('polling timer', () {
-    testWidgets('ticks every 5 seconds while started, never after stop', (
-      tester,
+    /// A container with `conv-1` loaded (one message) and kept alive, inside a widget test so
+    /// timers run on the fake clock.
+    Future<(ProviderContainer, FakeMessagingClient)> polling(
+      WidgetTester tester,
     ) async {
       final client = FakeMessagingClient(
         messages: {
@@ -127,25 +129,108 @@ void main() {
         overrides: [
           messagingClientProvider.overrideWithValue(client),
           messagingUserIdProvider.overrideWithValue(parentUserId),
+          chatClockProvider.overrideWithValue(() => fixedNow),
         ],
       );
       addTearDown(container.dispose);
       container.listen(chatControllerProvider('conv-1'), (_, _) {});
       await tester.pump();
-      final initialCalls = client.listMessageCalls.length;
+      return (container, client);
+    }
 
+    testWidgets(
+      'backs off 5 → 10 → 20 → 30 seconds while quiet, never after stop',
+      (tester) async {
+        final (container, client) = await polling(tester);
+        int polls() =>
+            client.listMessageCalls.where((call) => call.since != null).length;
+
+        final controller = _controller(container)..startPolling();
+        expect(controller.isPolling, isTrue);
+
+        for (final (wait, expected) in [
+          (5, 1),
+          (10, 2),
+          (20, 3),
+          (30, 4),
+          (30, 5),
+        ]) {
+          await tester.pump(Duration(seconds: wait - 1));
+          expect(polls(), expected - 1, reason: 'not before ${wait}s');
+          await tester.pump(const Duration(seconds: 1));
+          expect(polls(), expected, reason: 'after ${wait}s');
+        }
+        expect(client.listMessageCalls.last.since, t0);
+        expect(controller.pollInterval, chatPollIdleMaxInterval);
+
+        controller.stopPolling();
+        expect(controller.isPolling, isFalse);
+        await tester.pump(const Duration(minutes: 2));
+        expect(polls(), 5);
+      },
+    );
+
+    testWidgets('a new message brings the 5 second interval back', (
+      tester,
+    ) async {
+      final (container, client) = await polling(tester);
       final controller = _controller(container)..startPolling();
-      expect(controller.isPolling, isTrue);
-
       await tester.pump(const Duration(seconds: 5));
-      await tester.pump(const Duration(seconds: 5));
-      expect(client.listMessageCalls.length, initialCalls + 2);
-      expect(client.listMessageCalls.last.since, t0);
+      await tester.pump(const Duration(seconds: 10));
+      expect(controller.pollInterval, const Duration(seconds: 20));
 
-      controller.stopPolling();
-      expect(controller.isPolling, isFalse);
+      client.messages['conv-1']!.add(
+        messageFixture('m2', at: t0.add(const Duration(minutes: 1))),
+      );
       await tester.pump(const Duration(seconds: 20));
-      expect(client.listMessageCalls.length, initialCalls + 2);
+      expect(_state(container).messages.map((m) => m.id), ['m1', 'm2']);
+      expect(controller.pollInterval, const Duration(seconds: 5));
+      controller.stopPolling();
+    });
+
+    testWidgets('sending pulls a quiet chat\'s next poll in', (tester) async {
+      final (container, client) = await polling(tester);
+      int polls() =>
+          client.listMessageCalls.where((call) => call.since != null).length;
+      final controller = _controller(container)..startPolling();
+      await tester.pump(const Duration(seconds: 5));
+      await tester.pump(const Duration(seconds: 10));
+      await tester.pump(const Duration(seconds: 20));
+      expect(polls(), 3);
+      expect(controller.pollInterval, const Duration(seconds: 30));
+
+      await controller.send('Any news?');
+      expect(controller.pollInterval, const Duration(seconds: 5));
+      await tester.pump(const Duration(seconds: 5));
+      expect(polls(), 4);
+      controller.stopPolling();
+    });
+
+    testWidgets('failing polls back off up to the error ceiling', (
+      tester,
+    ) async {
+      final (container, client) = await polling(tester);
+      client.listError = StateError('offline');
+      final controller = _controller(container)..startPolling();
+
+      var elapsed = Duration.zero;
+      while (elapsed < const Duration(minutes: 10)) {
+        final wait = controller.pollInterval;
+        await tester.pump(wait);
+        elapsed += wait;
+      }
+      expect(controller.pollInterval, chatPollErrorMaxInterval);
+      // 5 + 10 + 20 + 40 + 80 s, then every two minutes.
+      final calls = client.listMessageCalls.where((c) => c.since != null);
+      expect(calls.length, lessThanOrEqualTo(9));
+
+      client.listError = null;
+      client.messages['conv-1']!.add(
+        messageFixture('m2', at: t0.add(const Duration(minutes: 1))),
+      );
+      await tester.pump(controller.pollInterval);
+      expect(controller.pollInterval, const Duration(seconds: 5));
+      controller.stopPolling();
     });
 
     testWidgets('disposing the provider cancels the timer', (tester) async {

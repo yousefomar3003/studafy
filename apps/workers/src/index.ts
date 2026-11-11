@@ -7,6 +7,7 @@ import {
 import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
+import { closeWorkerPools } from "./db/pool";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
 import { startBillingPipelineGauges } from "./metrics/billing-pipeline";
@@ -25,6 +26,9 @@ import { scheduleAbandonedImportSweepJob } from "./queues/imports";
 import {
   scheduleAccountDeletionSweepJob,
   scheduleAiMessageRetentionSweepJob,
+  scheduleIpAddressRetentionSweepJob,
+  scheduleDataRetentionSweepJob,
+  schedulePartitionMaintenanceJob,
   scheduleRecordRetentionSweepJob,
   scheduleClosureSweepJob,
 } from "./queues/maintenance";
@@ -115,8 +119,10 @@ void relayRedis.connect().then(() => {
     redis: relayRedis,
     config: {
       batchSize: 100,
-      // 500ms rather than 1s: this is the fast path for ST-133's <5s propagation SLA.
+      // Idle cycles back off 0.5 s -> 5 s (queues/poll-loop.ts). ST-133's <5 s SLA rests on the
+      // entitlement invalidator below, not on this lossy pub/sub fast path.
       pollIntervalMs: 500,
+      maxIdleIntervalMs: 5_000,
       schoolIds: configuredSchoolIds.length > 0 ? configuredSchoolIds : null,
     },
     logger: workerLogger,
@@ -134,6 +140,8 @@ const entitlementInvalidator = startEntitlementInvalidator({
   config: {
     batchSize: env.ENTITLEMENT_BATCH_SIZE,
     pollIntervalMs: env.ENTITLEMENT_POLL_INTERVAL_MS,
+    // Idle backoff ceiling: the worst-case wait for a new event, so it stays well under the <5 s SLA.
+    maxIdleIntervalMs: 2_000,
     concurrency: 16,
   },
   logger: workerLogger,
@@ -158,6 +166,7 @@ const emailDispatcher = startEmailDispatcher({
   config: {
     batchSize: env.EMAIL_BATCH_SIZE,
     pollIntervalMs: env.EMAIL_POLL_INTERVAL_MS,
+    maxIdleIntervalMs: 5_000,
     ratePerSecond: env.EMAIL_MAX_RATE_PER_SECOND,
     frontendUrl: env.FRONTEND_URL,
   },
@@ -251,11 +260,32 @@ void scheduleAnnouncementPublishJob(announcementPublishRedis).then(() =>
 const closureSweepRedis = createRedisConnection(env);
 void scheduleClosureSweepJob(closureSweepRedis).then(() => closureSweepRedis.disconnect());
 
+// Partition maintenance scheduler: idempotently register the daily 02:15 creation of the coming
+// months' partitions of app.audit_logs and the attendance tables, which have no default partition.
+const partitionMaintenanceRedis = createRedisConnection(env);
+void schedulePartitionMaintenanceJob(partitionMaintenanceRedis).then(() =>
+  partitionMaintenanceRedis.disconnect(),
+);
+
+// Data retention scheduler (docs/modules/data-retention.md): idempotently register the daily 03:15
+// deletion of security events, sales inquiries, rejected school applications and in-app
+// notifications past 12 months, and of export bundles 30 days after their request finished.
+const dataRetentionRedis = createRedisConnection(env);
+void scheduleDataRetentionSweepJob(dataRetentionRedis).then(() => dataRetentionRedis.disconnect());
+
 // Ask AI message retention scheduler (ST-309): idempotently register the daily 08:45 purge of
 // app.ai_messages rows past their 90-day `expires_at` on the maintenance queue.
 const aiMessageRetentionRedis = createRedisConnection(env);
 void scheduleAiMessageRetentionSweepJob(aiMessageRetentionRedis).then(() =>
   aiMessageRetentionRedis.disconnect(),
+);
+
+// IP address retention scheduler (docs/modules/account-deletion.md "IP addresses"): idempotently
+// register the daily 03:45 removal of IP addresses older than 90 days from session rows and security
+// events on the maintenance queue -- a quiet slot between the 03:00 Tap renewal and 04:00 dunning.
+const ipAddressRetentionRedis = createRedisConnection(env);
+void scheduleIpAddressRetentionSweepJob(ipAddressRetentionRedis).then(() =>
+  ipAddressRetentionRedis.disconnect(),
 );
 
 // Sensitive record retention scheduler (docs/modules/student-records.md "Retention"):
@@ -297,6 +327,8 @@ const shutdown = (signal: string) => {
     await relayDb.end({ timeout: 5 });
     await emailDb.end({ timeout: 5 });
     await entitlementDb.end({ timeout: 5 });
+    // The process-wide pools every job processor borrows (db/pool.ts) — after the drain above.
+    await closeWorkerPools();
     // startQueueGauges() was given queueMetricsConnection as a live IORedis instance rather
     // than plain connection options, so BullMQ treats it as externally owned and never closes it
     // itself — queue.close() only stops the per-queue Queue wrapper. Closing it here is what

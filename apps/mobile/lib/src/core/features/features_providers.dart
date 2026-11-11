@@ -58,14 +58,33 @@ final hasPersonalSubscriptionProvider = Provider<bool>((ref) {
 /// license activated, suspended or ended); the realtime gateway delivers it to that person's room.
 const userEntitlementChangedEvent = 'userEntitlement.changed';
 
-/// Keeps [myFeaturesProvider] current without the person doing anything: re-reads it when the app
-/// comes back to the foreground (a purchase or a seat may have happened elsewhere), when the
-/// realtime gateway says this person's entitlements changed, and when the socket reconnects (events
-/// sent while it was down are not replayed). Watched once by the app root.
-final featuresAutoRefreshProvider = Provider<void>((ref) {
-  void refresh() => ref.invalidate(myFeaturesProvider);
+/// The shortest gap between two re-reads of [myFeaturesProvider] triggered by the app coming back
+/// to the foreground. Switching apps several times a minute should not re-read each time.
+const featuresResumeRefreshInterval = Duration(minutes: 5);
 
-  final lifecycle = AppLifecycleListener(onResume: refresh);
+/// The clock [featuresAutoRefreshProvider] throttles resume re-reads with. Override in tests.
+final featuresClockProvider = Provider<DateTime Function()>((ref) => DateTime.now);
+
+/// Keeps [myFeaturesProvider] current without the person doing anything: re-reads it when the app
+/// comes back to the foreground (a purchase or a seat may have happened elsewhere) — at most once
+/// per [featuresResumeRefreshInterval], counted from the last read this provider caused or the
+/// session start — when the realtime gateway says this person's entitlements changed, and when the
+/// socket reconnects (events sent while it was down are not replayed). Watched once by the app
+/// root. The AI tab's status re-reads with the features list (`aiHubStatusProvider`), so it shares
+/// this throttle.
+final featuresAutoRefreshProvider = Provider<void>((ref) {
+  final clock = ref.watch(featuresClockProvider);
+  var lastRefresh = clock();
+  void refresh() {
+    lastRefresh = clock();
+    ref.invalidate(myFeaturesProvider);
+  }
+
+  final lifecycle = AppLifecycleListener(
+    onResume: () {
+      if (clock().difference(lastRefresh) >= featuresResumeRefreshInterval) refresh();
+    },
+  );
   ref.onDispose(lifecycle.dispose);
 
   // The realtime half only for a signed-in session: the gateway needs its token, and nothing before

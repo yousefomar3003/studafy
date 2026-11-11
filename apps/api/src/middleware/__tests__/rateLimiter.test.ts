@@ -1,8 +1,9 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
-import { afterAll, beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { Hono } from "hono";
 
 import { buildRateLimitKey, resolveRouteClass } from "../../config/rateLimits";
+import { resetSecurityConfig } from "../../config/security";
 import { createRedisClient } from "../../redis";
 import { requestIdMiddleware, errorHandlerMiddleware } from "../index";
 import { rateLimiterMiddleware, extractClientIp } from "../rateLimiter";
@@ -140,6 +141,42 @@ describe("extractClientIp", () => {
       req: { header: () => undefined },
     });
     expect(ip).toBe("unknown");
+  });
+});
+
+describe("extractClientIp behind fly.io (CLIENT_IP_HEADER=fly-client-ip)", () => {
+  // What fly's proxy sends: the visitor in Fly-Client-IP, its own anycast address last in XFF.
+  const flyHeaders: Record<string, string> = {
+    "fly-client-ip": "203.0.113.7",
+    "x-forwarded-for": "203.0.113.7, 2a09:8280:1::1f6:86f:0",
+  };
+  const fromFly = { req: { header: (name: string) => flyHeaders[name] } };
+
+  beforeEach(() => {
+    process.env.CLIENT_IP_HEADER = "Fly-Client-IP";
+    resetSecurityConfig();
+  });
+  afterEach(() => {
+    delete process.env.CLIENT_IP_HEADER;
+    resetSecurityConfig();
+  });
+
+  test("keys on the visitor, not on fly's own address", () => {
+    expect(extractClientIp(fromFly)).toBe("203.0.113.7");
+  });
+
+  test("falls back to X-Forwarded-For when the header is missing", () => {
+    expect(
+      extractClientIp({
+        req: { header: (name: string) => (name === "x-forwarded-for" ? "1.2.3.4" : undefined) },
+      }),
+    ).toBe("1.2.3.4");
+  });
+
+  test("unset, the header is ignored (a client could send it anywhere else)", () => {
+    delete process.env.CLIENT_IP_HEADER;
+    resetSecurityConfig();
+    expect(extractClientIp(fromFly)).toBe("2a09:8280:1::1f6:86f:0");
   });
 });
 

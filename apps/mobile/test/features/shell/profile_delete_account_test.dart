@@ -4,12 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/api_exception.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/account_profile.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/active_store_subscription.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/active_store_subscription_platform.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/legal_acceptance_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/school3.dart';
 import 'package:studafy_mobile/src/core/auth/auth_notifier.dart';
 import 'package:studafy_mobile/src/core/auth/auth_state.dart';
 import 'package:studafy_mobile/src/features/shell/application/shell_providers.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/delete_account_screen.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/deletion_pending_screen.dart';
+import 'package:studafy_mobile/src/features/shell/presentation/legal_acceptance_screen.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/pill_navigation_bar.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/profile_tab_screen.dart';
 
@@ -130,6 +134,75 @@ void main() {
     });
   });
 
+  group('a store-billed AI subscription', () {
+    Future<DateTime> noDelete({String? memberId, String? password}) async =>
+        DateTime.utc(2026, 11, 1);
+
+    testWidgets('is not warned about when there is none', (tester) async {
+      await _pumpOnDeleteAccount(
+        tester,
+        memberAccount: false,
+        delete: noDelete,
+      );
+
+      expect(find.byKey(const Key('deleteAccountStoreWarning')), findsNothing);
+    });
+
+    testWidgets('an own App Store subscription shows the App Store steps', (
+      tester,
+    ) async {
+      await _pumpOnDeleteAccount(
+        tester,
+        memberAccount: false,
+        delete: noDelete,
+        storeSubscriptions: const [
+          ActiveStoreSubscription(
+            platform: ActiveStoreSubscriptionPlatform.appStore,
+            forChild: false,
+          ),
+        ],
+      );
+
+      expect(
+        find.byKey(const Key('deleteAccountStoreWarning')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('Cancel your App Store or Google Play subscription'),
+        findsOneWidget,
+      );
+      expect(
+        find.textContaining("Deleting your account doesn't cancel it"),
+        findsOneWidget,
+      );
+      expect(find.textContaining('App Store: on the iPhone'), findsOneWidget);
+      expect(find.textContaining('Google Play: open'), findsNothing);
+      expect(find.textContaining('A child linked'), findsNothing);
+    });
+
+    testWidgets("a child's Google Play subscription warns the parent", (
+      tester,
+    ) async {
+      await _pumpOnDeleteAccount(
+        tester,
+        memberAccount: false,
+        delete: noDelete,
+        storeSubscriptions: const [
+          ActiveStoreSubscription(
+            platform: ActiveStoreSubscriptionPlatform.googlePlay,
+            forChild: true,
+          ),
+        ],
+      );
+
+      expect(find.textContaining('A child linked'), findsOneWidget);
+      expect(find.textContaining('Google Play: open'), findsOneWidget);
+      // The best-effort Play cancel applies only to the person's own subscription.
+      expect(find.textContaining('we also try to stop'), findsNothing);
+      expect(find.textContaining('App Store: on the iPhone'), findsNothing);
+    });
+  });
+
   testWidgets('a pending deletion replaces the shell until it is cancelled', (
     tester,
   ) async {
@@ -167,11 +240,55 @@ void main() {
     expect(find.byType(DeletionPendingScreen), findsNothing);
     expect(find.byType(PillNavigationBar), findsOneWidget);
   });
+
+  testWidgets('the shell waits until the user accepts the terms', (
+    tester,
+  ) async {
+    var required = true;
+    var accepts = 0;
+    await pumpAppShell(
+      tester,
+      session: await fakeAuthenticatedSession(roles: const ['PARENT']),
+      overrides: [
+        accountProfileProvider.overrideWith(
+          (ref) async =>
+              _profile(memberAccount: false, legalRequired: required),
+        ),
+        acceptLegalDocumentsProvider.overrideWith(
+          (ref) => (versions) async {
+            expect(versions.termsVersion, '2026-11-11');
+            accepts++;
+            required = false;
+            ref.invalidate(accountProfileProvider);
+          },
+        ),
+      ],
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LegalAcceptanceScreen), findsOneWidget);
+    expect(find.byType(PillNavigationBar), findsNothing);
+
+    // Accepting is disabled until the box is ticked.
+    final accept = find.byKey(const Key('legalAcceptanceAccept'));
+    expect(tester.widget<FilledButton>(accept).onPressed, isNull);
+    await tester.tap(find.byKey(const Key('legalAcceptanceCheckbox')));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(accept);
+    await tester.tap(accept);
+    await tester.pumpAndSettle();
+
+    expect(accepts, 1);
+    expect(find.byType(LegalAcceptanceScreen), findsNothing);
+    expect(find.byType(PillNavigationBar), findsOneWidget);
+  });
 }
 
 AccountProfile _profile({
   required bool memberAccount,
   DateTime? scheduledFor,
+  bool legalRequired = false,
+  List<ActiveStoreSubscription> storeSubscriptions = const [],
 }) => AccountProfile(
   userId: 'user-1',
   displayName: 'Test Parent',
@@ -179,7 +296,14 @@ AccountProfile _profile({
   memberIds: memberAccount ? const ['PAR-0001'] : const [],
   deletionScheduledFor: scheduledFor,
   deletionRequiresMemberCredentials: memberAccount,
+  activeStoreSubscriptions: storeSubscriptions,
   school: const School3(id: 'school-1', name: 'Al Noor Academy'),
+  legalAcceptance: LegalAcceptanceStatus(
+    requiredValue: legalRequired,
+    termsVersion: '2026-11-11',
+    privacyVersion: '2026-11-11',
+    acceptedAt: legalRequired ? null : DateTime.utc(2026, 11, 11),
+  ),
 );
 
 /// Pumps a PARENT shell with [delete] standing in for the API, opens Profile → Delete my account,
@@ -189,13 +313,17 @@ Future<ProviderContainer> _pumpOnDeleteAccount(
   required bool memberAccount,
   required Future<DateTime> Function({String? memberId, String? password})
   delete,
+  List<ActiveStoreSubscription> storeSubscriptions = const [],
 }) async {
   await pumpAppShell(
     tester,
     session: await fakeAuthenticatedSession(roles: const ['PARENT']),
     overrides: [
       accountProfileProvider.overrideWith(
-        (ref) async => _profile(memberAccount: memberAccount),
+        (ref) async => _profile(
+          memberAccount: memberAccount,
+          storeSubscriptions: storeSubscriptions,
+        ),
       ),
       deleteOwnAccountProvider.overrideWithValue(delete),
     ],

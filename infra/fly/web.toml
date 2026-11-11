@@ -13,11 +13,19 @@ primary_region = "fra"
   [build.args]
     VITE_API_BASE_URL = "https://api.studafy.com"
     VITE_REALTIME_BASE_URL = "wss://api.studafy.com"
+    # Live updates are deferred: the bundle never opens the socket, so a signed-in page view never
+    # wakes the scaled-to-zero realtime app (realtime.toml). "true" turns it back on.
+    VITE_REALTIME_ENABLED = "false"
     VITE_SENTRY_ENVIRONMENT = "production"
+    # Every page names its studafy.com address as canonical, whichever of the four hosts served it.
+    VITE_SITE_ORIGIN = "https://studafy.com"
+    VITE_MARKETING_CONTACT_EMAIL = "hello@studafy.com"
 
 [http_service]
   internal_port = 8080
   force_https = true
+  # Always on, deliberately: a cold start would sit on the first visitor's page load (and the
+  # marketing site's LCP), and a 256 MB machine costs about $2 a month.
   auto_stop_machines = "off"
   min_machines_running = 1
 

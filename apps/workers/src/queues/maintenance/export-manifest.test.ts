@@ -11,13 +11,27 @@ function validManifest() {
     subjectScope: "tenant" as const,
     subjectUserId: null,
     generatedAt: "2026-09-09T00:00:00.000Z",
-    tables: [{ table: "students", rowCount: 3, storageKey: "k1", sha256: "a".repeat(64) }],
+    tables: [
+      { table: "students", rowCount: 3, path: "data/students.json", sha256: "a".repeat(64) },
+    ],
     files: [
       {
         table: "materials",
-        storageKey: "permanent/x/y/z",
+        sourceId: "3e6b3b0a-2f6d-4d6e-9a3c-9d3a5a2b1c00",
         originalFileName: "notes.pdf",
-        checksumSha256: "b".repeat(64),
+        path: "files/materials/notes.pdf",
+        sizeBytes: 1024,
+        sha256: "b".repeat(64),
+        uploadSha256: "b".repeat(64),
+      },
+      {
+        table: "materials",
+        sourceId: "4e6b3b0a-2f6d-4d6e-9a3c-9d3a5a2b1c00",
+        originalFileName: "gone.pdf",
+        path: null,
+        sizeBytes: null,
+        sha256: null,
+        uploadSha256: null,
       },
     ],
     retainedTables: [{ table: "subscriptions", reason: "financial/audit legal hold" }],
@@ -31,12 +45,21 @@ describe("parseExportManifest", () => {
   });
 
   test("rejects a wrong schema version rather than silently accepting it", () => {
-    expect(() => parseExportManifest({ ...validManifest(), schemaVersion: 2 })).toThrow();
+    expect(() => parseExportManifest({ ...validManifest(), schemaVersion: 1 })).toThrow();
+    expect(() => parseExportManifest({ ...validManifest(), schemaVersion: 3 })).toThrow();
   });
 
   test("rejects a non-hex sha256", () => {
     const manifest = validManifest();
     manifest.tables[0]!.sha256 = "not-a-hash";
+    expect(() => parseExportManifest(manifest)).toThrow();
+  });
+
+  test("rejects a version 1 entry that names a storage object instead of an archive path", () => {
+    const manifest = validManifest() as Record<string, unknown>;
+    manifest.tables = [
+      { table: "students", rowCount: 3, storageKey: "k1", sha256: "a".repeat(64) },
+    ];
     expect(() => parseExportManifest(manifest)).toThrow();
   });
 

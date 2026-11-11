@@ -33,8 +33,25 @@ export const dsrResponseSchema = z
     created_at: dateTimeSchema,
     completed_at: dateTimeSchema.nullable(),
     sla_due_at: dateTimeSchema,
-    download_url: z.string().url().nullable(),
-    download_url_expires_at: dateTimeSchema.nullable(),
+    download_url: z
+      .string()
+      .url()
+      .nullable()
+      .openapi({
+        description:
+          "Set only by `GET /api/privacy/dsr/{requestId}` for a completed export: a signed link to " +
+          "its ZIP archive (a README, the data as JSON with one file per table, a manifest with " +
+          "checksums, and copies of the files). Signed anew on each call; `null` otherwise.",
+      }),
+    download_url_expires_at: dateTimeSchema.nullable().openapi({
+      description: "When `download_url` stops working (one hour after it was signed).",
+    }),
+    export_deleted_at: dateTimeSchema.nullable().openapi({
+      description:
+        "When a finished export's stored bundle was deleted by the data retention sweep, 30 days " +
+        "after completion; null while it is still stored, and always null for an erasure. Once set " +
+        "the request has no download link any more.",
+    }),
     failure_message: z.string().nullable(),
   })
   .openapi("DataSubjectRequest");

@@ -144,8 +144,14 @@ async function seedReadyMaterial(
   return { materialId: material.id, storageKey };
 }
 
-/** A submitted submission with one attachment owned by the tenant's primary student. */
-async function seedSubmissionAttachment(tenant: TenantFixture): Promise<{
+/**
+ * A submitted submission with one attachment owned by the tenant's primary student, already scanned
+ * clean by default (000192).
+ */
+async function seedSubmissionAttachment(
+  tenant: TenantFixture,
+  scanStatus = "clean",
+): Promise<{
   attachmentId: string;
   storageKey: string;
 }> {
@@ -175,10 +181,11 @@ async function seedSubmissionAttachment(tenant: TenantFixture): Promise<{
     const [attachment] = await tx<{ id: string }[]>`
       INSERT INTO app.submission_attachments (
         school_id, submission_id, uploaded_by_user_id,
-        storage_key, original_file_name, mime_type, size_bytes
+        storage_key, original_file_name, mime_type, size_bytes, scan_status
       ) VALUES (
         ${tenant.schoolId}, ${submission!.id}, ${student.userId},
-        ${storageKey}, 'essay.pdf', 'application/pdf', 1024
+        ${storageKey}, 'essay.pdf', 'application/pdf', 1024,
+        ${scanStatus}::app.upload_scan_status
       )
       RETURNING id
     `;
@@ -351,6 +358,53 @@ describeDb("download gateway row scope", () => {
         requestDownload(tx, storage, tenant.schoolId, "submission", attachmentId),
       ),
     ).rejects.toMatchObject({ status: 404 });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Malware scan gate (F-14)
+// ---------------------------------------------------------------------------
+
+describeDb("download gateway malware scan gate", () => {
+  test("a submission file not scanned clean answers 404 and mints nothing", async () => {
+    const tenant = await createFullTenant(db.sql);
+    for (const status of ["scanning", "quarantined", "failed"]) {
+      const { attachmentId } = await seedSubmissionAttachment(tenant, status);
+      const storage = fakeStorage();
+      await expect(
+        asTenant(tenant.schoolId, tenant.students[0]!.userId, (tx) =>
+          requestDownload(tx, storage, tenant.schoolId, "submission", attachmentId),
+        ),
+      ).rejects.toMatchObject({ status: 404 });
+      expect(storage.presignCalls).toHaveLength(0);
+    }
+  });
+
+  test("a submission file uploaded before scanning (unscanned) is still served", async () => {
+    const tenant = await createFullTenant(db.sql);
+    const { attachmentId, storageKey } = await seedSubmissionAttachment(tenant, "unscanned");
+    const storage = fakeStorage();
+    const result = await asTenant(tenant.schoolId, tenant.students[0]!.userId, (tx) =>
+      requestDownload(tx, storage, tenant.schoolId, "submission", attachmentId),
+    );
+    expect(result.downloadUrl).toContain(storageKey);
+  });
+
+  test("a quarantined receipt answers 404", async () => {
+    const tenant = await createFullTenant(db.sql);
+    const { receiptId } = await seedReceipt(tenant);
+    await asAdmin(tenant.schoolId, async (tx) => {
+      await tx`
+        UPDATE app.expense_cache SET attachment_scan_status = 'quarantined' WHERE id = ${receiptId}
+      `;
+    });
+    const storage = fakeStorage();
+    await expect(
+      asTenant(tenant.schoolId, tenant.users.ORG_ADMIN.id, (tx) =>
+        requestDownload(tx, storage, tenant.schoolId, "receipt", receiptId),
+      ),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(storage.presignCalls).toHaveLength(0);
   });
 });
 

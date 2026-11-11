@@ -46,13 +46,7 @@ import {
   renderProgressReport,
 } from "./progress-report.worker";
 import { purgeExpiredReports } from "./report-expiry-sweep";
-import {
-  closeReportPorts,
-  createPrimaryPool,
-  createReportStorage,
-  openReportPorts,
-  runReport,
-} from "./report-runner";
+import { createReportStorage, leasePrimaryPool, openReportPorts, runReport } from "./report-runner";
 
 import type { FinanceReportJobRow } from "./finance-report-store";
 import type { ReportRunResult, ReportRunnerConfig, ReportTypeDefinition } from "./report-types";
@@ -129,19 +123,19 @@ export async function processReportJob(
   const definition = lookupReportType(job.name);
   if (!definition) return { processed: false, reason: "unknown report job" };
 
-  const ports = openReportPorts(config);
+  const opened = openReportPorts(config);
   try {
-    return await runReport(job, definition, config, ports);
+    return await runReport(job, definition, config, opened.ports);
   } finally {
-    await closeReportPorts(ports);
+    await opened.release();
   }
 }
 
 async function purgeExpiredReportArtifacts(config: ReportRunnerConfig): Promise<void> {
-  const primary = createPrimaryPool(config);
+  const primary = leasePrimaryPool(config);
   try {
-    await purgeExpiredReports(primary, createReportStorage(config), new Date(), workerLogger);
+    await purgeExpiredReports(primary.sql, createReportStorage(config), new Date(), workerLogger);
   } finally {
-    await primary.end({ timeout: 5 });
+    await primary.release();
   }
 }

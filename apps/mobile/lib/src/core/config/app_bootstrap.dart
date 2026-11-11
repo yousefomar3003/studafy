@@ -104,10 +104,13 @@ void bootstrapApp(AppEnvironment environment) {
               launchIntroProvider.overrideWithValue(launchIntro),
               crashReporterProvider.overrideWithValue(crashReporter!),
               // A single-use handshake ticket per attempt (QA-14), fetched with the session's
-              // bearer token; the access token itself never goes to the gateway.
-              realtimeTokenProvider.overrideWith(
-                (ref) => realtimeTicketProvider(authenticatedDio(ref)),
-              ),
+              // bearer token; the access token itself never goes to the gateway. Only when realtime
+              // is turned on (AppConfig.realtimeEnabled): left unoverridden, the token provider
+              // resolves none, so the client stays `unauthorized` and never dials the gateway.
+              if (appConfig.realtimeEnabled)
+                realtimeTokenProvider.overrideWith(
+                  (ref) => realtimeTicketProvider(authenticatedDio(ref)),
+                ),
             ],
             child: const StudafyApp(),
           ),

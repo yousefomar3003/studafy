@@ -2,7 +2,7 @@ import { ROLES } from "@studafy/constants";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"; // eslint-disable-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 
 import { createApp } from "../../src/app";
-import { MEMBER_LOGIN_BUDGETS } from "../../src/config/rateLimits";
+import { buildMemberLoginRateLimitKey, MEMBER_LOGIN_BUDGETS } from "../../src/config/rateLimits";
 import { resetSecurityConfig } from "../../src/config/security";
 import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
@@ -13,6 +13,7 @@ import { createRedisClient } from "../../src/redis";
 import {
   assignRole,
   createSchool,
+  createStudent,
   createTestDatabase,
   createUser,
   integrationEnabled,
@@ -90,6 +91,15 @@ function post(
 
 const login = (username: string, password: string, newPassword?: string) =>
   post(LOGIN, { username, password, new_password: newPassword, channel: "mobile" });
+
+/** Sign-in from a device that holds `deviceToken`. */
+const loginFrom = (deviceToken: string, username: string, password: string) =>
+  post(LOGIN, { username, password, device_token: deviceToken, channel: "mobile" });
+
+async function deviceTokenOf(response: Response): Promise<string | undefined> {
+  expect(response.status).toBe(200);
+  return ((await response.json()) as { device_token?: string }).device_token;
+}
 
 async function expectCode(response: Response, status: number, code: string): Promise<void> {
   expect(response.status).toBe(status);
@@ -347,12 +357,164 @@ describe("member password sign-in", () => {
     expect((await login(signedUp.code, "Has-A-Pass-1")).status).toBe(200);
   });
 
+  integrationTest(
+    "a reprint re-issues pending codes in pages, and slips name a parent's children",
+    async () => {
+      const parent = await member([ROLES.PARENT]);
+      const child = await createStudent(sql, schoolId, { firstName: "Lina", lastName: "Khaled" });
+      await sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+        const [family] = await tx<{ id: string }[]>`
+          INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+          VALUES (${schoolId}, 'Khaled', ${parent.id}) RETURNING id
+        `;
+        await tx`
+          INSERT INTO app.parent_child_links
+            (school_id, family_id, parent_user_id, student_id, relationship)
+          VALUES (${schoolId}, ${family!.id}, ${parent.id}, ${child.id}, 'mother')
+        `;
+      });
+      const token = await adminToken();
+      interface Batch {
+        issued: (IssuedCode & { user_id: string; children: string[] })[];
+        last: string | null;
+      }
+
+      const first = (await (
+        await post("/api/users/member-setup-codes", { role: "PARENT" }, token)
+      ).json()) as Batch;
+      const slip = first.issued.find((row) => row.user_id === parent.id)!;
+      expect(slip.children).toEqual(["Lina Khaled"]);
+
+      // Without include_pending the parent is skipped: the printed slip stays valid.
+      const again = (await (
+        await post("/api/users/member-setup-codes", { role: "PARENT" }, token)
+      ).json()) as Batch;
+      expect(again.issued.map((row) => row.user_id)).not.toContain(parent.id);
+
+      // A reprint re-issues it, and pages past it with `after` instead of looping.
+      const reprint = (await (
+        await post(
+          "/api/users/member-setup-codes",
+          { role: "PARENT", include_pending: true },
+          token,
+        )
+      ).json()) as Batch;
+      const reissued = reprint.issued.find((row) => row.user_id === parent.id)!;
+      expect(reissued.setup_code).not.toBe(slip.setup_code);
+      const next = (await (
+        await post(
+          "/api/users/member-setup-codes",
+          { role: "PARENT", include_pending: true, after: reprint.last },
+          token,
+        )
+      ).json()) as Batch;
+      expect(next.issued.map((row) => row.user_id)).not.toContain(parent.id);
+
+      // The old slip no longer works; the reprinted one does.
+      expect((await login(parent.code, slip.setup_code)).status).toBe(401);
+      await expectCode(
+        await login(parent.code, reissued.setup_code),
+        403,
+        "AUTH_PASSWORD_CHANGE_REQUIRED",
+      );
+    },
+  );
+
   integrationTest("the member summary no longer publishes a password", async () => {
     const response = await app.request("/api/users/member-summary", {
       headers: { authorization: `Bearer ${await adminToken()}` },
     });
     expect(response.status).toBe(200);
     expect(await response.json()).not.toHaveProperty("default_password");
+  });
+
+  integrationTest("a stranger's wrong guesses do not lock the member's own phone out", async () => {
+    const student = await member([ROLES.STUDENT]);
+    const { setup_code } = await issueCode(student.id);
+    const phone = await deviceTokenOf(await login(student.code, setup_code, "Lunar-Otter-58"));
+    expect(phone).toMatch(/^[\w-]{43}$/u);
+
+    // Someone who knows the ID locks the account.
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await login(student.code, "wrong-guess");
+    }
+    await expectCode(await login(student.code, "Lunar-Otter-58"), 403, "AUTH_ACCOUNT_LOCKED");
+
+    // The member's phone still signs in, keeps its token, and the lock is lifted.
+    const again = await loginFrom(phone!, student.code, "Lunar-Otter-58");
+    expect(await deviceTokenOf(again)).toBeUndefined();
+    expect((await login(student.code, "Lunar-Otter-58")).status).toBe(200);
+  });
+
+  integrationTest("a trusted device that keeps guessing loses its trust", async () => {
+    const parent = await claimed([ROLES.PARENT], "Quiet-Harbor-31");
+    const phone = await deviceTokenOf(await login(parent.code, "Quiet-Harbor-31"));
+
+    // Its wrong passwords count against the device, not the account...
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await expectCode(
+        await loginFrom(phone!, parent.code, "wrong-guess"),
+        401,
+        "AUTH_INVALID_CREDENTIALS",
+      );
+    }
+    expect((await login(parent.code, "Quiet-Harbor-31")).status).toBe(200);
+
+    // ...and after five it is an ordinary device again, under the account lockout.
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await loginFrom(phone!, parent.code, "wrong-guess");
+    }
+    await expectCode(
+      await loginFrom(phone!, parent.code, "wrong-guess"),
+      403,
+      "AUTH_ACCOUNT_LOCKED",
+    );
+    await expectCode(
+      await loginFrom(phone!, parent.code, "Quiet-Harbor-31"),
+      403,
+      "AUTH_ACCOUNT_LOCKED",
+    );
+  });
+
+  integrationTest("a device token opens nothing on its own or on another account", async () => {
+    const first = await claimed([ROLES.STUDENT], "Copper-Lantern-4");
+    const second = await claimed([ROLES.STUDENT], "Velvet-Comet-19");
+    const phone = await deviceTokenOf(await login(first.code, "Copper-Lantern-4"));
+
+    await expectCode(
+      await loginFrom(phone!, first.code, "wrong-guess"),
+      401,
+      "AUTH_INVALID_CREDENTIALS",
+    );
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await login(second.code, "wrong-guess");
+    }
+    // Trusted for the first account only: the second stays locked against it.
+    await expectCode(
+      await loginFrom(phone!, second.code, "Velvet-Comet-19"),
+      403,
+      "AUTH_ACCOUNT_LOCKED",
+    );
+  });
+
+  integrationTest("an admin reset forgets every trusted device", async () => {
+    const teacher = await claimed([ROLES.INSTRUCTOR], "Maple-Signal-62");
+    const phone = await deviceTokenOf(await login(teacher.code, "Maple-Signal-62"));
+    const { setup_code } = await issueCode(teacher.id);
+    const fresh = await deviceTokenOf(await login(teacher.code, setup_code, "Cedar-Window-73"));
+    expect(fresh).not.toBe(phone);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      await login(teacher.code, "wrong-guess");
+    }
+    await expectCode(
+      await loginFrom(phone!, teacher.code, "Cedar-Window-73"),
+      403,
+      "AUTH_ACCOUNT_LOCKED",
+    );
+    expect((await loginFrom(fresh!, teacher.code, "Cedar-Window-73")).status).toBe(200);
   });
 
   redisTest("sign-in attempts on one member ID are limited whatever the IP", async () => {
@@ -392,5 +554,68 @@ describe("member password sign-in", () => {
       { "x-forwarded-for": "203.0.113.7" },
     );
     expect(other.status).toBe(401);
+  });
+
+  redisTest("a trusted device signs in after strangers spend the member ID's budget", async () => {
+    const logger = createLogger({ destination: () => undefined });
+    const client = createRedisClient({ url: redisUrl!, logger });
+    try {
+      const limited = createApp({
+        isReady: () => true,
+        tracker: createInflightTracker(),
+        logger,
+        database: sql,
+        redis: client,
+        keyStore,
+        jwtIssuer: TEST_JWT_ISSUER,
+        jwtAudience: TEST_JWT_AUDIENCE,
+      });
+      const student = await claimed([ROLES.STUDENT], "Harbor-Kettle-83");
+      // Member codes repeat across test files (each has its own database) but Redis is shared, so
+      // start this ID's and the platform's buckets empty.
+      await client.del(
+        buildMemberLoginRateLimitKey("username", student.code),
+        buildMemberLoginRateLimitKey("global"),
+      );
+      const phone = await deviceTokenOf(
+        await post(
+          LOGIN,
+          { username: student.code, password: "Harbor-Kettle-83", channel: "mobile" },
+          undefined,
+          limited,
+          { "x-forwarded-for": "198.18.40.1" },
+        ),
+      );
+
+      for (let n = 0; n < MEMBER_LOGIN_BUDGETS.username.maxTokens; n += 1) {
+        await post(LOGIN, { username: student.code, password: `guess-${n}` }, undefined, limited, {
+          "x-forwarded-for": `198.18.41.${n}`,
+        });
+      }
+      const stranger = await post(
+        LOGIN,
+        { username: student.code, password: "Harbor-Kettle-83" },
+        undefined,
+        limited,
+        { "x-forwarded-for": "198.18.42.1" },
+      );
+      expect(stranger.status).toBe(429);
+
+      const own = await post(
+        LOGIN,
+        {
+          username: student.code,
+          password: "Harbor-Kettle-83",
+          device_token: phone,
+          channel: "mobile",
+        },
+        undefined,
+        limited,
+        { "x-forwarded-for": "198.18.42.2" },
+      );
+      expect(own.status).toBe(200);
+    } finally {
+      client.disconnect();
+    }
   });
 });

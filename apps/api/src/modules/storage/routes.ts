@@ -3,8 +3,8 @@ import { ERROR_CODES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../coded-http-exception";
-import { withTenantTx } from "../../db/tenant-tx";
-import { requireStorage } from "../../lib/storage";
+import { tenantTxRunner, withTenantTx } from "../../db/tenant-tx";
+import { buildPermanentKey, requireStorage } from "../../lib/storage";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
 import { hasPermission, requirePermissionIn } from "../../middleware/authz";
@@ -13,12 +13,7 @@ import { standardResponses } from "../../openapi/responses";
 
 import { getContentClass, getDownloadClass } from "./content-classes";
 import { requestDownload } from "./download-service";
-import {
-  DEFAULT_STORAGE_CAP_BYTES,
-  STORAGE_QUOTA_WARNING_THRESHOLD,
-  assertStorageUploadQuota,
-  recordStorageUpload,
-} from "./quota-service";
+import { STORAGE_QUOTA_WARNING_THRESHOLD, assertStorageUploadQuota } from "./quota-service";
 import {
   confirmedUploadSchema,
   confirmUploadBodySchema,
@@ -27,7 +22,8 @@ import {
   requestUploadBodySchema,
   uploadUrlResponseSchema,
 } from "./schemas";
-import { confirmUpload, requestUpload } from "./service";
+import { confirmUpload, inspectStagedUpload, requestUpload } from "./service";
+import { copyStagedUploads, discardStagedUploads, reserveStorage } from "./staged-promotion";
 
 import type { StorageUsage } from "./quota-service";
 import type { Database, DatabasePools } from "../../db/client";
@@ -105,7 +101,8 @@ const downloadRoute = createRoute({
     "Mints a short-lived pre-signed GET URL for a stored object. The content class decides the " +
     "required permission and whether issuance is audited; the object is resolved by id through a " +
     "tenant-scoped query that runs under RLS, so a caller can only ever obtain a URL for an object " +
-    "their roles can read. A missing or invisible object answers 404.",
+    "their roles can read. A missing or invisible object answers 404, as does a submission file " +
+    "or receipt that has not passed its malware scan.",
   security: [{ bearerAuth: [] }],
   request: {
     params: downloadParamsSchema,
@@ -232,32 +229,34 @@ export function storageRoutes(
     let quota: StorageUsage | null = null;
 
     if (database) {
-      let capBytes = DEFAULT_STORAGE_CAP_BYTES;
-      confirmed = await withTenantTx(database, tenantFrom(c), async (tx) => {
-        const result = await confirmUpload(
-          storageService,
-          auth.schoolId,
-          contentClass,
-          {
-            storageKey: body.storage_key,
-            checksumSha256: body.checksum_sha256,
-          },
-          {
-            // Re-check the quota against the *stored* size before the object leaves temp/ --
-            // closing the "claim small, upload big" gap at the quota boundary.
-            assertCanPromote: async (sizeBytes) => {
-              capBytes = (await assertStorageUploadQuota(tx, sizeBytes)).capBytes;
-            },
-          },
-        );
-        const bytesUsed = await recordStorageUpload(tx, result.sizeBytes);
-        quota = {
-          bytesUsed,
-          capBytes,
-          fractionUsed: capBytes > 0 ? bytesUsed / capBytes : NaN,
-        };
-        return result;
+      // reserve -> copy -> drop (./staged-promotion.ts): the storage round trips run with no
+      // transaction open; the quota check and the meter charge share one short transaction, and
+      // run against the *stored* size before the object leaves temp/ -- closing the "claim small,
+      // upload big" gap at the quota boundary.
+      const runTx = tenantTxRunner(database, tenantFrom(c));
+      const inspected = await inspectStagedUpload(storageService, auth.schoolId, contentClass, {
+        storageKey: body.storage_key,
+        checksumSha256: body.checksum_sha256,
       });
+      quota = await runTx((tx) => reserveStorage(tx, inspected.sizeBytes));
+      const copy = {
+        tempKey: body.storage_key,
+        permanentKey: buildPermanentKey(
+          auth.schoolId,
+          inspected.parsed.objectId,
+          inspected.parsed.filename,
+        ),
+        sizeBytes: inspected.sizeBytes,
+      };
+      await copyStagedUploads(storageService, runTx, [copy]);
+      await discardStagedUploads(storageService, [copy]);
+      confirmed = {
+        storageKey: copy.permanentKey,
+        originalFileName: inspected.parsed.filename,
+        contentType: inspected.contentType,
+        sizeBytes: inspected.sizeBytes,
+        checksumSha256: inspected.checksumSha256,
+      };
     } else {
       confirmed = await confirmUpload(storageService, auth.schoolId, contentClass, {
         storageKey: body.storage_key,

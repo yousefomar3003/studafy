@@ -512,6 +512,7 @@
       "sentTitle_one": "Reminder sent to {{count}} family",
       "sentTitle_other": "Reminders sent to {{count}} families",
       "sentDetail": "{{guardians}} guardians notified. {{skipped}} families were already reminded today.",
+      "remaining": "Families still due a reminder: {{remaining}}. Send again to reach them.",
       "error": "Reminders could not be sent. Try again."
     },
     "detail": {

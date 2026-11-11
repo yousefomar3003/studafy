@@ -26,40 +26,17 @@ import 'widgets/ai_usage_meter.dart';
 /// state each renders and `apps/mobile/docs/store_payment_routing.md` for why the add-on is sold
 /// here only through the store's own billing.
 ///
-/// Re-checks entitlement on every app resume (not just first load): an add-on activated outside
-/// the app has no way to call back into it, so "entitlement reflected without reinstall" depends
-/// on this screen noticing the app came back to the foreground on its own, rather than the student
-/// having to force a refresh.
-/// Pull-to-refresh covers the same case manually, and for a transient fetch error.
-class AiHubScreen extends ConsumerStatefulWidget {
+/// Re-checks entitlement when the app comes back to the foreground (not just on first load): an
+/// add-on activated outside the app has no way to call back into it. That re-check is
+/// `featuresAutoRefreshProvider`'s — at most once per `featuresResumeRefreshInterval` — and
+/// [aiHubStatusProvider] re-reads whenever the features list does, so this screen keeps no resume
+/// observer of its own (it used to, which read `/api/ai/usage` twice on every resume).
+/// Pull-to-refresh covers the same case at once, and a transient fetch error.
+class AiHubScreen extends ConsumerWidget {
   const AiHubScreen({super.key});
 
   @override
-  ConsumerState<AiHubScreen> createState() => _AiHubScreenState();
-}
-
-class _AiHubScreenState extends ConsumerState<AiHubScreen> with WidgetsBindingObserver {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      ref.invalidate(aiHubStatusProvider);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(aiHubStatusProvider);
     final tutorGate = ref.watch(featureGateProvider(FeatureKeys.aiTutor));
 

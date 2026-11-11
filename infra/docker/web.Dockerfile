@@ -35,8 +35,14 @@ ENV VITE_RELEASE_VERSION=${VITE_RELEASE_VERSION} \
 # never ship: apps/api rejects that key's tokens once a real TURNSTILE_SECRET_KEY is set.
 ARG VITE_API_BASE_URL
 ARG VITE_REALTIME_BASE_URL
+# "true" turns the realtime WebSocket on; unset leaves it off (apps/web/src/lib/config.ts).
+ARG VITE_REALTIME_ENABLED
 ARG VITE_ENABLE_MOCK_AUTH
 ARG VITE_TURNSTILE_SITE_KEY
+# The public site's origin, named as every page's canonical address (apps/web/src/lib/config.ts).
+ARG VITE_SITE_ORIGIN
+# The marketing site's contact address; unset shows a "not configured" notice, never an invented one.
+ARG VITE_MARKETING_CONTACT_EMAIL
 # The tier Sentry files the bundle's errors under (release.yml: staging, production); unset falls
 # back to Vite's build mode.
 ARG VITE_SENTRY_ENVIRONMENT
@@ -80,8 +86,11 @@ RUN --mount=type=secret,id=sentry_auth_token \
     fi; \
     [ -n "$VITE_API_BASE_URL" ] || unset VITE_API_BASE_URL; \
     [ -n "$VITE_REALTIME_BASE_URL" ] || unset VITE_REALTIME_BASE_URL; \
+    [ -n "$VITE_REALTIME_ENABLED" ] || unset VITE_REALTIME_ENABLED; \
     [ -n "$VITE_ENABLE_MOCK_AUTH" ] || unset VITE_ENABLE_MOCK_AUTH; \
     [ -n "$VITE_TURNSTILE_SITE_KEY" ] || unset VITE_TURNSTILE_SITE_KEY; \
+    [ -n "$VITE_SITE_ORIGIN" ] || unset VITE_SITE_ORIGIN; \
+    [ -n "$VITE_MARKETING_CONTACT_EMAIL" ] || unset VITE_MARKETING_CONTACT_EMAIL; \
     [ -n "$VITE_SENTRY_ENVIRONMENT" ] || unset VITE_SENTRY_ENVIRONMENT; \
     bunx turbo run build --filter=@studafy/web
 

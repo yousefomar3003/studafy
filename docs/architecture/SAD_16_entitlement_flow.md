@@ -144,6 +144,14 @@ so the two modules stay independently deployable.
 >
 > Running both is safe by construction, not by luck: both apply the same version-guarded Lua, so
 > whichever arrives second returns 0 and changes nothing.
+>
+> **Update (compute-cost cleanup, 000200).** The durable poller no longer opens a transaction per
+> school every 500 ms. Each cycle asks `app.outbox_pending_school_ids('entitlement')` which schools
+> have unapplied rows and claims only there, and idle cycles back off from
+> `ENTITLEMENT_POLL_INTERVAL_MS` (500 ms) to a 2 s ceiling. The SLA budget is that ceiling plus one
+> cycle's discovery and claim (milliseconds), so the worst case stays well inside 5 s; the ceiling
+> must not be raised past ~4 s. The relay (the pub/sub fast path) backs off to 5 s, which is fine
+> because the guarantee never rested on it.
 
 ## The cache encoding, and why invalidation is not a DELETE
 

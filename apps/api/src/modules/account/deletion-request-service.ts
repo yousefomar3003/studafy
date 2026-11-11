@@ -39,6 +39,7 @@ import {
 import { scheduleAccountDeletion } from "./account-deletion-service";
 
 import type { AccountDeletionDeps } from "./account-deletion-service";
+import type { ActiveStoreSubscription } from "./store-subscriptions";
 import type { Database } from "../../db/client";
 import type { Logger } from "../../logger";
 import type { RedisClient } from "../../redis";
@@ -73,6 +74,7 @@ export interface ConfirmedAccountDeletion {
   schoolName: string;
   scheduledFor: Date;
   completesBy: Date;
+  activeStoreSubscriptions: ActiveStoreSubscription[];
 }
 
 interface ResolvedAccount {
@@ -181,6 +183,7 @@ export async function confirmAccountDeletion(
       schoolName: account.schoolName,
       scheduledFor: result.scheduledFor,
       completesBy: result.completesBy,
+      activeStoreSubscriptions: result.activeStoreSubscriptions,
     });
   }
 

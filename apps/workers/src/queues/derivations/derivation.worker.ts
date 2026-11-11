@@ -28,9 +28,9 @@
  */
 
 import { createCanvas, loadImage } from "@napi-rs/canvas";
-import postgres from "postgres";
 import { getDocumentProxy, renderPageAsImage } from "unpdf";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { deriveMaterialJobDataSchema } from "./job";
@@ -38,14 +38,18 @@ import { deriveMaterialJobDataSchema } from "./job";
 import type { DerivationS3Client } from "./s3";
 import type { Image } from "@napi-rs/canvas";
 import type { Job } from "bullmq";
+import type { Sql } from "postgres";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 export interface MaterialDerivationConfig {
+  /** Used only when `sql` is absent: a dedicated pool is opened for this job (tests). */
   databaseUrl: string;
   databaseCaCert?: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   s3: DerivationS3Client | null;
   bucket?: string;
 }
@@ -259,14 +263,10 @@ export async function processMaterialDerivation(
 
   if (!config.s3 || !config.bucket) throw new Error("derivation storage is not configured");
 
-  const sql = postgres(config.databaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
+  const sqlLease = leaseDatabase(config.sql ?? config.databaseUrl, {
+    databaseCaCert: config.databaseCaCert,
   });
+  const sql = sqlLease.sql;
 
   try {
     const material = await withSystemTenantTx(sql, { schoolId }, async (tx) => {
@@ -338,6 +338,6 @@ export async function processMaterialDerivation(
     }
     throw error;
   } finally {
-    await sql.end({ timeout: 5 });
+    await sqlLease.release();
   }
 }

@@ -28,10 +28,11 @@
  */
 
 import { DOMAIN_EVENTS, NOTIFICATION_TYPES } from "@studafy/constants";
-import postgres from "postgres";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
+import type { DatabaseSource } from "../../db/pool";
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -371,13 +372,13 @@ async function emitAlertRaised(
 /**
  * Evaluate one attendance submission and alert on any thresholds it crossed.
  *
- * `databaseUrl` is a parameter rather than read from the environment so the processor is callable
- * from a test against a disposable database — the shape processBulkInvite and processStudentImport
- * already establish.
+ * `database` is a parameter rather than read from the environment: the process-wide pool in
+ * production (db/pool.ts), a connection string for a disposable database in tests — the shape
+ * processBulkInvite and processStudentImport already establish.
  */
 export async function processAttendanceAlert(
   data: AttendanceAlertJobData,
-  databaseUrl: string,
+  database: DatabaseSource,
   jobId: string | null = null,
 ): Promise<AttendanceAlertResult> {
   const { schoolId, sessionDate, studentIds } = data;
@@ -386,9 +387,8 @@ export async function processAttendanceAlert(
     return { processed: true, studentsEvaluated: 0, alertsSent: 0, duplicatesSkipped: 0 };
   }
 
-  // prepare: false is mandatory — the runtime sits behind PgBouncer in transaction pooling mode,
-  // where server-side prepared statements do not survive between transactions.
-  const sql = postgres(databaseUrl, { max: 4, idle_timeout: 20, prepare: false });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   let alertsSent = 0;
   let duplicatesSkipped = 0;
@@ -483,7 +483,7 @@ export async function processAttendanceAlert(
       duplicatesSkipped += outcome.skipped;
     }
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 
   return {

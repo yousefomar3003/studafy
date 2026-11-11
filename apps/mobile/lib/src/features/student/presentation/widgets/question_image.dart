@@ -1,7 +1,9 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/generated/models/assignment_question.dart';
+import '../../../../core/offline/attachment_image_cache.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 
 /// A question's heading: "3. What is …" — or "Question 3" when the picture is the whole question.
@@ -13,13 +15,25 @@ String questionHeading(AssignmentQuestion question) => question.prompt.isEmpty
 
 /// A question's picture, fitted to the card; tap to open it full screen and pinch to zoom.
 /// Nothing when the question has none.
-class QuestionImage extends StatelessWidget {
+///
+/// Cached on the device by question id ([AttachmentImageCache]) rather than by its pre-signed URL,
+/// which changes on every read of the assignment. The id is a stable key for the picture: editing
+/// an assignment's questions replaces every question row under a new id, so a question id never
+/// names a different picture.
+class QuestionImage extends ConsumerWidget {
   const QuestionImage({required this.question, super.key});
 
   final AssignmentQuestion question;
 
+  ImageProvider _provider(WidgetRef ref, String url) => AttachmentImageProvider(
+    cache: ref.read(attachmentImageCacheProvider),
+    namespace: 'question',
+    id: question.id,
+    url: url,
+  );
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final url = question.image?.downloadUrl;
     if (question.image == null) return const SizedBox.shrink();
     final colorScheme = Theme.of(context).colorScheme;
@@ -38,7 +52,7 @@ class QuestionImage extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: url == null
               ? null
-              : () => _openFullScreen(context, url, label),
+              : () => _openFullScreen(context, _provider(ref, url), label),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(12),
             child: ColoredBox(
@@ -51,8 +65,8 @@ class QuestionImage extends StatelessWidget {
                 child: Center(
                   child: url == null
                       ? const Icon(Icons.image_outlined, size: 48)
-                      : Image.network(
-                          url,
+                      : Image(
+                          image: _provider(ref, url),
                           fit: BoxFit.contain,
                           loadingBuilder: (context, child, progress) =>
                               progress == null
@@ -73,7 +87,11 @@ class QuestionImage extends StatelessWidget {
     );
   }
 
-  void _openFullScreen(BuildContext context, String url, String label) {
+  void _openFullScreen(
+    BuildContext context,
+    ImageProvider image,
+    String label,
+  ) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         fullscreenDialog: true,
@@ -87,8 +105,8 @@ class QuestionImage extends StatelessWidget {
           body: InteractiveViewer(
             maxScale: 5,
             child: Center(
-              child: Image.network(
-                url,
+              child: Image(
+                image: image,
                 fit: BoxFit.contain,
                 semanticLabel: label,
               ),

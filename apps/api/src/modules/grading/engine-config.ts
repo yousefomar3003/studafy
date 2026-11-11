@@ -290,12 +290,24 @@ export async function loadScale(
     WHERE scale.id = ${scaleId}::uuid AND scale.school_id = ${schoolId}::uuid
     ORDER BY band.min_percentage DESC
   `;
+  return toScale(rows);
+}
+
+/** A scale's rows (scale LEFT JOIN its bands, highest band first) as the engine's bands. */
+function toScale(
+  rows: readonly {
+    name: string;
+    label: string | null;
+    min_percentage: string | null;
+    gpa_points: string | null;
+  }[],
+): { name: string | null; bands: GradeBand[] } {
   return {
     name: rows[0]?.name ?? null,
     bands: rows
       .filter((row) => row.label !== null)
       .map((row) => ({
-        label: row.label,
+        label: row.label!,
         minPercentage: Number(row.min_percentage),
         gpaPoints: row.gpa_points === null ? null : Number(row.gpa_points),
       })),
@@ -320,15 +332,23 @@ export async function requireProgram(
       AND program.academic_year_id = ${yearId}::uuid
       AND program.grade_level_id = ${gradeLevelId}::uuid
   `;
-  if (!program) {
-    throw new CodedHttpException(
-      404,
-      ERROR_CODES.GRADE_PROGRAM_NOT_FOUND,
-      "This grade has not been set up for the academic year",
-    );
-  }
+  if (!program) throw programNotFound();
   return program;
 }
+
+function programNotFound(): CodedHttpException {
+  return new CodedHttpException(
+    404,
+    ERROR_CODES.GRADE_PROGRAM_NOT_FOUND,
+    "This grade has not been set up for the academic year",
+  );
+}
+
+const PROGRAM_COLUMNS = `
+  program.id, program.academic_year_id, program.grade_level_id,
+  grade.name AS grade_level_name, program.grade_scale_id,
+  program.max_failed_subjects_for_supplementary, program.mark_approval_required,
+  program.average_rounding_decimals, program.average_rounding_mode, program.updated_at`;
 
 /** A config with its categories, assessments, term weights, the year's terms and its scale. */
 export async function loadConfigDetail(
@@ -349,7 +369,7 @@ export async function loadConfigDetail(
       FROM app.subject_config_assessments AS assessment
       WHERE assessment.school_id = ${schoolId}::uuid
         AND assessment.subject_config_id = ${configId}::uuid
-      ORDER BY assessment.sort_order, assessment.name
+      ORDER BY assessment.sort_order, assessment.name, assessment.id
     `,
     tx<TermWeightRow[]>`
       SELECT term_id, weight
@@ -374,6 +394,185 @@ export async function loadConfigDetail(
     scale: scale.bands,
     scaleName: scale.name,
   };
+}
+
+/**
+ * Set-based loading for screens that read many configs at once (the year overview, publish
+ * validation, a section's results). Everything {@link loadConfigDetail} reads for one config is
+ * read here for all of them in a fixed number of queries, and {@link ConfigDetails.get} assembles
+ * the same {@link LoadedConfig} — same rows, same order — so callers compute exactly what they
+ * would have computed one config at a time.
+ */
+export interface ConfigDetails {
+  /** The year's terms, by sequence. */
+  terms: TermRow[];
+  /** Every assessment of the loaded configs, whatever its status or section. */
+  assessments: AssessmentRow[];
+  /** As {@link loadConfigDetail}; throws GRADE_PROGRAM_NOT_FOUND like it when the grade has no program. */
+  get(configId: string): LoadedConfig;
+  /** As {@link requireProgram} for the year these details were loaded for. */
+  program(gradeLevelId: string): ProgramRow;
+  /** As {@link loadScale}. */
+  scale(scaleId: string | null): { name: string | null; bands: GradeBand[] };
+}
+
+/** Group rows by a key, keeping the rows' order within each group. */
+function groupBy<T>(rows: readonly T[], key: (row: T) => string): Map<string, T[]> {
+  const groups = new Map<string, T[]>();
+  for (const row of rows) {
+    const id = key(row);
+    const group = groups.get(id);
+    if (group) group.push(row);
+    else groups.set(id, [row]);
+  }
+  return groups;
+}
+
+/**
+ * The year's subject configs (optionally only some grades, and only grade defaults plus the
+ * overrides of some sections), ordered as {@link resolveSectionSubjects} needs them.
+ */
+export async function loadYearConfigs(
+  tx: TransactionSql,
+  schoolId: string,
+  yearId: string,
+  filter: { gradeLevelIds?: string[]; sectionIds?: string[] } = {},
+): Promise<SubjectConfigRow[]> {
+  const gradeFilter = filter.gradeLevelIds
+    ? tx`AND config.grade_level_id = ANY (${filter.gradeLevelIds}::uuid[])`
+    : tx``;
+  const sectionFilter = filter.sectionIds
+    ? tx`AND (config.section_id IS NULL OR config.section_id = ANY (${filter.sectionIds}::uuid[]))`
+    : tx``;
+  return tx<SubjectConfigRow[]>`
+    SELECT ${tx.unsafe(CONFIG_COLUMNS)}
+    FROM app.subject_configs AS config
+    JOIN app.subjects AS subject
+      ON subject.id = config.subject_id AND subject.school_id = config.school_id
+    WHERE config.school_id = ${schoolId}::uuid
+      AND config.academic_year_id = ${yearId}::uuid
+      ${gradeFilter}
+      ${sectionFilter}
+    ORDER BY subject.name, config.subject_id, config.section_id NULLS FIRST
+  `;
+}
+
+/** Categories, assessments, term weights, terms, programs and scales of many configs of one year. */
+export async function loadConfigDetails(
+  tx: TransactionSql,
+  schoolId: string,
+  yearId: string,
+  configs: readonly SubjectConfigRow[],
+): Promise<ConfigDetails> {
+  const configIds = configs.map((config) => config.id);
+  const [categories, assessments, termWeights, terms, programs] = await Promise.all([
+    configIds.length === 0
+      ? Promise.resolve([] as CategoryRow[])
+      : tx<CategoryRow[]>`
+          SELECT id, subject_config_id, name, kind, scope, weight, aggregation, drop_lowest, sort_order
+          FROM app.subject_config_categories
+          WHERE school_id = ${schoolId}::uuid AND subject_config_id = ANY (${configIds}::uuid[])
+          ORDER BY sort_order, name
+        `,
+    configIds.length === 0
+      ? Promise.resolve([] as AssessmentRow[])
+      : tx<AssessmentRow[]>`
+          SELECT ${tx.unsafe(ASSESSMENT_COLUMNS)}
+          FROM app.subject_config_assessments AS assessment
+          WHERE assessment.school_id = ${schoolId}::uuid
+            AND assessment.subject_config_id = ANY (${configIds}::uuid[])
+          ORDER BY assessment.sort_order, assessment.name, assessment.id
+        `,
+    configIds.length === 0
+      ? Promise.resolve([] as (TermWeightRow & { subject_config_id: string })[])
+      : tx<(TermWeightRow & { subject_config_id: string })[]>`
+          SELECT subject_config_id, term_id, weight
+          FROM app.subject_config_term_weights
+          WHERE school_id = ${schoolId}::uuid AND subject_config_id = ANY (${configIds}::uuid[])
+        `,
+    loadYearTerms(tx, schoolId, yearId),
+    tx<ProgramRow[]>`
+      SELECT ${tx.unsafe(PROGRAM_COLUMNS)}
+      FROM app.grade_programs AS program
+      JOIN app.grade_levels AS grade
+        ON grade.id = program.grade_level_id AND grade.school_id = program.school_id
+      WHERE program.school_id = ${schoolId}::uuid AND program.academic_year_id = ${yearId}::uuid
+    `,
+  ]);
+  const scaleIds = [
+    ...new Set(
+      [...configs.map((c) => c.grade_scale_id), ...programs.map((p) => p.grade_scale_id)].filter(
+        (id): id is string => id !== null,
+      ),
+    ),
+  ];
+  const scaleRows =
+    scaleIds.length === 0
+      ? []
+      : await tx<
+          {
+            scale_id: string;
+            name: string;
+            label: string | null;
+            min_percentage: string | null;
+            gpa_points: string | null;
+          }[]
+        >`
+          SELECT scale.id AS scale_id, scale.name, band.label, band.min_percentage, band.gpa_points
+          FROM app.grade_scales AS scale
+          LEFT JOIN app.grade_scale_bands AS band
+            ON band.grade_scale_id = scale.id AND band.school_id = scale.school_id
+          WHERE scale.id = ANY (${scaleIds}::uuid[]) AND scale.school_id = ${schoolId}::uuid
+          ORDER BY band.min_percentage DESC
+        `;
+
+  const configById = new Map(configs.map((config) => [config.id, config]));
+  const categoriesByConfig = groupBy(categories, (row) => row.subject_config_id);
+  const assessmentsByConfig = groupBy(assessments, (row) => row.subject_config_id);
+  const weightsByConfig = groupBy(termWeights, (row) => row.subject_config_id);
+  const programByGrade = new Map(programs.map((program) => [program.grade_level_id, program]));
+  const scales = new Map(
+    [...groupBy(scaleRows, (row) => row.scale_id)].map(([id, rows]) => [id, toScale(rows)]),
+  );
+  const noScale = { name: null, bands: [] as GradeBand[] };
+
+  const details: ConfigDetails = {
+    terms,
+    assessments,
+    program(gradeLevelId) {
+      const program = programByGrade.get(gradeLevelId);
+      if (!program) throw programNotFound();
+      return program;
+    },
+    scale(scaleId) {
+      return (scaleId === null ? undefined : scales.get(scaleId)) ?? noScale;
+    },
+    get(configId) {
+      const config = configById.get(configId);
+      if (!config) {
+        throw new CodedHttpException(
+          404,
+          ERROR_CODES.SUBJECT_CONFIG_NOT_FOUND,
+          "Subject configuration not found",
+        );
+      }
+      const program = details.program(config.grade_level_id);
+      const scale = details.scale(config.grade_scale_id ?? program.grade_scale_id);
+      return {
+        config,
+        categories: categoriesByConfig.get(configId) ?? [],
+        assessments: assessmentsByConfig.get(configId) ?? [],
+        termWeights: (weightsByConfig.get(configId) ?? []).map(({ term_id, weight }) => ({
+          term_id,
+          weight,
+        })),
+        terms,
+        scale: scale.bands,
+        scaleName: scale.name,
+      };
+    },
+  };
+  return details;
 }
 
 // ---------------------------------------------------------------------------
@@ -532,8 +731,16 @@ export async function resolveSectionSubjects(
       AND config.academic_year_id = ${section.academic_year_id}::uuid
       AND config.grade_level_id = ${section.grade_level_id}::uuid
       AND (config.section_id IS NULL OR config.section_id = ${section.id}::uuid)
-    ORDER BY subject.name
+    ORDER BY subject.name, config.subject_id, config.section_id NULLS FIRST
   `;
+  return effectiveSubjects(configs);
+}
+
+/**
+ * {@link resolveSectionSubjects} over already-loaded configs: `configs` must be exactly the
+ * section's grade defaults and its own overrides, ordered by subject name.
+ */
+export function effectiveSubjects(configs: readonly SubjectConfigRow[]): EffectiveSubject[] {
   const defaults = new Map(
     configs.filter((c) => c.section_id === null).map((c) => [c.subject_id, c]),
   );
@@ -570,6 +777,19 @@ export async function resolveSectionSubjects(
         override.based_on_revision < grade.revision,
     };
   });
+}
+
+/** The configs, out of a year's, that one section sees: its grade's defaults and its own overrides. */
+export function sectionConfigs(
+  configs: readonly SubjectConfigRow[],
+  section: Pick<SectionRow, "id" | "academic_year_id" | "grade_level_id">,
+): SubjectConfigRow[] {
+  return configs.filter(
+    (config) =>
+      config.academic_year_id === section.academic_year_id &&
+      config.grade_level_id === section.grade_level_id &&
+      (config.section_id === null || config.section_id === section.id),
+  );
 }
 
 export async function requireEffectiveSubject(
@@ -617,6 +837,14 @@ export async function loadRoster(
       AND placement.section_id = ${section.id}::uuid
     ORDER BY student.last_name, student.first_name, student.id
   `;
+  return toRoster(rows, requirement);
+}
+
+/** Who takes a subject, from the section's placed students and each one's choice for it. */
+export function toRoster(
+  rows: readonly (Omit<RosterStudent, "status"> & { choice: string | null })[],
+  requirement: SubjectRequirement,
+): RosterStudent[] {
   return rows
     .filter((row) => requirement === "mandatory" || row.choice !== null)
     .map((row) => ({
@@ -626,6 +854,70 @@ export async function loadRoster(
       admission_number: row.admission_number,
       status: row.choice === "exempt" ? "exempt" : "enrolled",
     }));
+}
+
+export interface PlacedStudent {
+  section_id: string;
+  student_id: string;
+  first_name: string;
+  last_name: string;
+  admission_number: string;
+}
+
+/** The students placed in each section, in roster order (last name, first name, id). */
+export async function loadPlacements(
+  tx: TransactionSql,
+  schoolId: string,
+  sectionIds: readonly string[],
+): Promise<Map<string, PlacedStudent[]>> {
+  if (sectionIds.length === 0) return new Map();
+  const rows = await tx<PlacedStudent[]>`
+    SELECT placement.section_id, student.id AS student_id, student.first_name, student.last_name,
+           student.admission_number
+    FROM app.student_sections AS placement
+    JOIN app.students AS student
+      ON student.id = placement.student_id AND student.school_id = placement.school_id
+    WHERE placement.school_id = ${schoolId}::uuid
+      AND placement.section_id = ANY (${sectionIds as string[]}::uuid[])
+    ORDER BY student.last_name, student.first_name, student.id
+  `;
+  return groupBy(rows, (row) => row.section_id);
+}
+
+/** Students' optional/elective subject choices for a year, keyed `${student_id}|${subject_id}`. */
+export async function loadSubjectChoices(
+  tx: TransactionSql,
+  schoolId: string,
+  yearId: string,
+  studentIds: readonly string[],
+): Promise<Map<string, string>> {
+  if (studentIds.length === 0) return new Map();
+  const rows = await tx<{ student_id: string; subject_id: string; status: string }[]>`
+    SELECT student_id, subject_id, status
+    FROM app.student_subject_enrollments
+    WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid
+      AND student_id = ANY (${studentIds as string[]}::uuid[])
+  `;
+  return new Map(rows.map((row) => [`${row.student_id}|${row.subject_id}`, row.status]));
+}
+
+/** {@link loadRoster} over loaded placements and choices. */
+export function rosterFrom(
+  placed: readonly PlacedStudent[],
+  choices: ReadonlyMap<string, string>,
+  subjectId: string,
+  requirement: SubjectRequirement,
+): RosterStudent[] {
+  return toRoster(
+    placed.map((student) => ({
+      student_id: student.student_id,
+      first_name: student.first_name,
+      last_name: student.last_name,
+      admission_number: student.admission_number,
+      choice: choices.get(`${student.student_id}|${subjectId}`) ?? null,
+    })),
+    requirement,
+  );
 }
 
 export interface MarkRow {

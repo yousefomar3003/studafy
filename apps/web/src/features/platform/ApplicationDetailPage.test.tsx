@@ -48,6 +48,7 @@ function application(status: "pending" | "approved" | "rejected") {
     schoolId: status === "approved" ? "55555555-5555-4555-8555-555555555555" : null,
     teamNotifiedAt: null,
     applicantNotifiedAt: null,
+    termsAcceptance: null,
     updatedAt: "2026-10-16T09:00:00.000Z",
   };
 }

@@ -310,7 +310,7 @@ async function seedSchoolA(): Promise<void> {
          erpnext_docname, erpnext_status, attachment_storage_key, erpnext_payload, expense_date,
          last_synced_at)
       VALUES (${schoolId}, 'purchase_invoice', 'Stationery', 'Quokka Supplies', 'private note',
-              ${currencyId}, 4200, 'PINV-0042', 'Paid', 'permanent/secret/key.pdf', '{}'::jsonb,
+              ${currencyId}, 4200, 'PINV-0042', 'Paid', ${`permanent/${schoolId}/secret/key.pdf`}, '{}'::jsonb,
               '2026-03-01', now())
       RETURNING id
     `;
@@ -446,7 +446,8 @@ describeDb("GET /api/search — contract", () => {
     const text = JSON.stringify(body);
     expect(text).not.toContain("Secretive description");
     expect(text).not.toContain("private note");
-    expect(text).not.toContain("permanent/secret");
+    // The seeded expense's attachment key (permanent/<school>/secret/key.pdf).
+    expect(text).not.toContain("/secret/key.pdf");
     expect(text).not.toContain("Body text");
   });
 
@@ -808,7 +809,7 @@ describeDb("GET /api/search — types, offset, totals", () => {
     expect(first.totals.users).toBe(0);
   });
 
-  test("the audit row records query, types, offset, sections run and counts -- never hit values", async () => {
+  test("the audit row records query, types, offset, sections run and totals -- never hit values", async () => {
     await search(a, admin(), [ROLES.ORG_ADMIN], "pagetest", "&types=students&offset=3&limit=2");
     const rows = await database!.sql<{ new_values: Record<string, unknown> }[]>`
       SELECT new_values FROM app.audit_logs
@@ -820,8 +821,20 @@ describeDb("GET /api/search — types, offset, totals", () => {
     const values = rows[0]!.new_values;
     expect(values.types).toEqual(["students"]);
     expect(values.sections).toEqual(["students"]);
-    expect(values.result_counts).toEqual({ students: 2 });
     expect(values.totals).toEqual({ students: 7 });
+    // Derivable from limit, offset and totals, so not stored (audit_logs is never purged).
+    expect(values).not.toHaveProperty("result_counts");
     expect(JSON.stringify(values)).not.toContain(pagetestIds[0]!);
+  });
+
+  test("the audit row's totals name only sections that matched; sections lists every one run", async () => {
+    await search(a, admin(), [ROLES.ORG_ADMIN], "pagetest", "&types=students,rooms&offset=1");
+    const [row] = await database!.sql<{ new_values: Record<string, unknown> }[]>`
+      SELECT new_values FROM app.audit_logs
+      WHERE school_id = ${a.schoolId} AND target_table = 'global_search' AND actor_id = ${admin()}
+        AND new_values->>'query' = 'pagetest' AND (new_values->>'offset')::int = 1
+    `;
+    expect(row!.new_values.sections).toEqual(["students", "rooms"]);
+    expect(row!.new_values.totals).toEqual({ students: 7 });
   });
 });
