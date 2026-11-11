@@ -18,8 +18,14 @@
 
 import type { Sql } from "postgres";
 
-/** How many months beyond the current one to keep partitioned: the manual commands' default. */
-export const MONTHS_AHEAD = 3;
+/**
+ * How many months beyond the current one to keep partitioned. A year, not the manual commands'
+ * default of 3: empty partitions cost almost nothing, and with a year of headroom a job that stopped
+ * running unnoticed still gives a year before any write could fail. Rows are placed by the moment
+ * they are written (`created_at`), never by a school's term or class dates, so only the future needs
+ * covering.
+ */
+export const MONTHS_AHEAD = 12;
 
 /** packages/db/src/runner.ts ADVISORY_LOCK_KEY, shared by migrations and partition maintenance. */
 export const PARTITION_ADVISORY_LOCK_KEY = "6004517954832980272";
