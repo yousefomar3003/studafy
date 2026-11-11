@@ -424,6 +424,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // modules/account/account-deletion-service.ts.
   "POST /api/account/deletion",
   "DELETE /api/account/deletion",
+  // Accepting the legal documents (000188): auditAction('update', 'users') — the audit log is the
+  // history of every acceptance. See modules/account/routes.ts.
+  "POST /api/account/legal-acceptance",
   // Public account deletion (ST-302). The request writes no audit row (it is anonymous until the
   // emailed link is used); confirm runs scheduleAccountDeletion, whose 'update' row carries
   // source: "web_request" — see modules/account/deletion-request-service.ts.

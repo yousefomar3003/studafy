@@ -123,6 +123,21 @@
         "signOut": "Sign out",
         "failed": "The deletion couldn't be cancelled. Check your connection and try again."
       },
+      "legalAcceptance": {
+        "title": "Before you continue",
+        "updatedTitle": "We have updated our terms",
+        "body": "To use Studafy, please read and accept our Terms of Service and read our Privacy Policy. They explain how Studafy works, what you may use it for, and how your school and Studafy look after your personal data.",
+        "updatedBody": "Our Terms of Service or Privacy Policy have changed since you last accepted them. Please read the current versions and accept them to continue using Studafy.",
+        "terms": "Read the Terms of Service",
+        "privacy": "Read the Privacy Policy",
+        "checkbox": "I accept the Terms of Service and I have read the Privacy Policy.",
+        "accept": "Accept and continue",
+        "accepting": "Saving your acceptance",
+        "signOut": "Sign out",
+        "delete": "Delete my account instead",
+        "failed": "Your acceptance couldn't be saved. Check your connection and try again.",
+        "outdated": "The terms changed while this screen was open. Sign out and sign in again to see the current versions."
+      },
       "deleteSchool": {
         "action": "Delete school",
         "title": "Delete school",

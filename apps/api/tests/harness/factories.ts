@@ -1,3 +1,4 @@
+import { LEGAL_DOCUMENT_VERSIONS } from "../../../../packages/constants/src/legal";
 import { isPlatformRole } from "../../../../packages/constants/src/roles";
 
 import type { Role } from "../../../../packages/constants/src/roles";
@@ -75,7 +76,17 @@ export interface UserRecord {
 export async function createUser(
   sql: Sql,
   schoolId: string,
-  overrides?: { email?: string; displayName?: string; status?: string },
+  overrides?: {
+    email?: string;
+    displayName?: string;
+    status?: string;
+    /**
+     * Whether the user has accepted the current Terms of Service and Privacy Policy (000188).
+     * Default true: a real session for a user who has not accepted is refused almost everything
+     * (legalAcceptanceGuard), which only the tests about that gate want.
+     */
+    legalAccepted?: boolean;
+  },
 ): Promise<UserRecord> {
   const email = overrides?.email ?? `user-${crypto.randomUUID().slice(0, 8)}@test.local`;
   const normalizedEmail = email.toLowerCase().trim();
@@ -84,14 +95,21 @@ export async function createUser(
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
     await tx.unsafe("SET LOCAL ROLE studafy_app");
 
+    const accepted = overrides?.legalAccepted ?? true;
     const [user] = await tx<{ id: string; email: string; normalized_email: string }[]>`
-      INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+      INSERT INTO app.users (
+        school_id, email, normalized_email, display_name, status,
+        terms_version, privacy_version, legal_accepted_at
+      )
       VALUES (
         ${schoolId},
         ${email},
         ${normalizedEmail},
         ${overrides?.displayName ?? null},
-        ${(overrides?.status as "active" | "invited" | "suspended" | "archived") ?? "active"}
+        ${(overrides?.status as "active" | "invited" | "suspended" | "archived") ?? "active"},
+        ${accepted ? LEGAL_DOCUMENT_VERSIONS.terms : null},
+        ${accepted ? LEGAL_DOCUMENT_VERSIONS.privacy : null},
+        ${accepted ? new Date() : null}
       )
       RETURNING id, email, normalized_email
     `;

@@ -155,6 +155,7 @@ const EXPECTED_PATHS = [
   "/api/academics/years/{yearId}/rollover",
   "/api/academics/years/{yearId}/terms",
   "/api/account/deletion",
+  "/api/account/legal-acceptance",
   "/api/account/deletion-requests",
   "/api/account/deletion-requests/confirm",
   "/api/account/profile",

@@ -38,6 +38,12 @@ export interface AccessTokenClaims {
    * accountDeletionGuard, which limits the session to showing and cancelling the deletion.
    */
   deletion_pending?: true;
+  /**
+   * Present (and `true`) only while the user has not accepted the current Terms of Service and
+   * Privacy Policy (LEGAL_DOCUMENT_VERSIONS). Drives legalAcceptanceGuard, which limits the session
+   * to reading and accepting them.
+   */
+  legal_acceptance_pending?: true;
 }
 
 /**
@@ -61,4 +67,5 @@ export interface SignAccessTokenParams {
   channel: AuthChannel;
   subscription_status: SubscriptionStatus;
   deletion_pending?: boolean;
+  legal_acceptance_pending?: boolean;
 }

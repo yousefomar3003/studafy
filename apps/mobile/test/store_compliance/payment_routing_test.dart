@@ -82,6 +82,8 @@ void main() {
           'school fees — a real-world service, exempt from in-app purchase',
       'lib/src/features/shell/presentation/profile_tab_screen.dart':
           'privacy policy',
+      'lib/src/features/shell/presentation/legal_acceptance_screen.dart':
+          'terms of service, privacy policy and the public account-deletion page',
       'lib/src/features/student/presentation/material_viewer_screen.dart':
           'file download',
       'lib/src/features/student/presentation/widgets/attachment_download_tile.dart':

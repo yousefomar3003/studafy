@@ -45,6 +45,7 @@ export { hasPermission, requirePermission } from "./authz";
 export { requireChannel } from "./channelGuard";
 export { tenantLifecycleGuard } from "./tenant-lifecycle";
 export { accountDeletionGuard } from "./account-deletion-guard";
+export { legalAcceptanceGuard } from "./legal-acceptance-guard";
 export { corsMiddleware, type CorsOptions } from "./cors";
 export { csrfMiddleware, type CsrfOptions } from "./csrf";
 export {

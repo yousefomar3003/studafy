@@ -30,6 +30,7 @@ import { requestIdHeaders, standardResponses } from "../../openapi/responses";
 
 import { cancelAccountDeletion, scheduleAccountDeletion } from "./account-deletion-service";
 import { confirmAccountDeletion, requestAccountDeletion } from "./deletion-request-service";
+import { acceptLegalDocuments, legalAcceptanceStatus } from "./legal-acceptance-service";
 import { getAccountProfile } from "./profile-service";
 import { RETAINED_RECORD_CATEGORIES } from "./retention-policy";
 import {
@@ -40,6 +41,8 @@ import {
   accountDeletionRequestResponseSchema,
   accountDeletionResponseSchema,
   accountProfileSchema,
+  legalAcceptanceBodySchema,
+  legalAcceptanceResponseSchema,
 } from "./schemas";
 
 import type { Database } from "../../db/client";
@@ -61,6 +64,31 @@ const getProfileRoute = createRoute({
   responses: standardResponses(
     { 200: { description: "The caller's own profile.", schema: accountProfileSchema } },
     [401, 404, 500],
+  ),
+});
+
+const acceptLegalRoute = createRoute({
+  method: "post",
+  path: "/api/account/legal-acceptance",
+  tags: ["Account"],
+  operationId: "acceptLegalDocuments",
+  summary: "Accept the current Terms of Service and Privacy Policy",
+  description:
+    "Records that the caller accepts the Terms of Service and has read the Privacy Policy, at the " +
+    "versions named, which must be the current ones (`legal_acceptance` on the profile); otherwise " +
+    "409 LEGAL_VERSION_OUTDATED. Until a user has accepted, every other request but the profile, " +
+    "account deletion and logout is refused with 403 LEGAL_ACCEPTANCE_REQUIRED. The session's " +
+    "access token keeps that restriction until it is refreshed, so refresh after accepting.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: {
+      required: true,
+      content: { "application/json": { schema: legalAcceptanceBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "Acceptance recorded.", schema: legalAcceptanceResponseSchema } },
+    [401, 404, 409, 422, 500],
   ),
 });
 
@@ -165,6 +193,8 @@ export function accountRoutes(
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use("/api/account/deletion", auditAction("update", "users"));
+  // The audit row is the history of every acceptance; the user row keeps only the latest.
+  routes.use("/api/account/legal-acceptance", auditAction("update", "users"));
   // The request writes no audit row (see deletion-request-service.ts); the deletion it leads to is
   // audited on confirm, inside scheduleAccountDeletion's transaction.
   routes.use("/api/account/deletion-requests", auditAction("delete", "users"));
@@ -245,6 +275,37 @@ export function accountRoutes(
         deletion_scheduled_for: row.deletion_due_at?.toISOString() ?? null,
         deletion_requires_member_credentials: row.deletion_requires_member_credentials,
         school: { id: row.school_id, name: row.school_name },
+        legal_acceptance: (() => {
+          const status = legalAcceptanceStatus(row);
+          return {
+            required: status.required,
+            terms_version: status.termsVersion,
+            privacy_version: status.privacyVersion,
+            accepted_at: status.acceptedAt?.toISOString() ?? null,
+          };
+        })(),
+      },
+      200,
+    );
+  });
+
+  routes.openapi(acceptLegalRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+    const accepted = await withTenantTx(
+      database,
+      { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+      (tx) =>
+        acceptLegalDocuments(tx, auth.userId, {
+          termsVersion: body.terms_version,
+          privacyVersion: body.privacy_version,
+        }),
+    );
+    return c.json(
+      {
+        terms_version: accepted.termsVersion,
+        privacy_version: accepted.privacyVersion,
+        accepted_at: accepted.acceptedAt.toISOString(),
       },
       200,
     );

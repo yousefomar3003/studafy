@@ -21,7 +21,7 @@
 
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, LEGAL_DOCUMENT_VERSIONS } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { setTenantScope, withSystemTx } from "../../db/tenant-tx";
@@ -205,14 +205,17 @@ export async function submitApplication(
           provider, provider_subject, applicant_email, applicant_name, applicant_job_title,
           applicant_phone, school_name, school_email, country_id, default_currency_id, city,
           address, website, student_count, message, proof_storage_key, proof_file_name,
-          proof_content_type, proof_size_bytes
+          proof_content_type, proof_size_bytes, terms_version, school_agreement_version,
+          terms_accepted_at
         ) VALUES (
           ${identity.provider}, ${identity.subject}, ${identity.email}, ${params.applicantName},
           ${params.applicantJobTitle ?? null}, ${params.applicantPhone}, ${params.schoolName},
           ${params.schoolEmail?.toLowerCase() ?? null}, ${params.countryId}::uuid,
           ${params.defaultCurrencyId}::uuid, ${params.city}, ${params.address},
           ${params.website ?? null}, ${params.studentCount ?? null}, ${params.message ?? null},
-          ${permanentKey}, ${params.proofFileName}, ${head.contentType}, ${head.sizeBytes}
+          ${permanentKey}, ${params.proofFileName}, ${head.contentType}, ${head.sizeBytes},
+          ${LEGAL_DOCUMENT_VERSIONS.terms}, ${LEGAL_DOCUMENT_VERSIONS.schoolAgreement},
+          CURRENT_TIMESTAMP
         )
         RETURNING id, status, school_name, created_at, reviewed_at, review_note
       `;
@@ -286,6 +289,9 @@ interface ApplicationRow {
   provisioned_school_id: string | null;
   team_notified_at: Date | null;
   applicant_notified_at: Date | null;
+  terms_version: string | null;
+  school_agreement_version: string | null;
+  terms_accepted_at: Date | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -297,7 +303,8 @@ const APPLICATION_SELECT = (tx: TransactionSql) => tx`
          cu.code AS currency_code, a.city, a.address, a.website, a.student_count, a.message,
          a.proof_storage_key, a.proof_file_name, a.proof_content_type, a.proof_size_bytes,
          a.reviewed_by_user_id, a.reviewed_at, a.review_note, a.provisioned_school_id,
-         a.team_notified_at, a.applicant_notified_at, a.created_at, a.updated_at
+         a.team_notified_at, a.applicant_notified_at, a.terms_version,
+         a.school_agreement_version, a.terms_accepted_at, a.created_at, a.updated_at
   FROM app.school_applications a
   JOIN app.countries co ON co.id = a.country_id
   JOIN app.currencies cu ON cu.id = a.default_currency_id
@@ -344,6 +351,14 @@ async function toDetail(row: ApplicationRow, storage: StorageService | null) {
     schoolId: row.provisioned_school_id,
     teamNotifiedAt: isoOrNull(row.team_notified_at),
     applicantNotifiedAt: isoOrNull(row.applicant_notified_at),
+    termsAcceptance:
+      row.terms_version && row.school_agreement_version && row.terms_accepted_at
+        ? {
+            termsVersion: row.terms_version,
+            schoolAgreementVersion: row.school_agreement_version,
+            acceptedAt: iso(row.terms_accepted_at),
+          }
+        : null,
     updatedAt: iso(row.updated_at),
   };
 }

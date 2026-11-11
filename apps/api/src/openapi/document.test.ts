@@ -512,6 +512,7 @@ describe("structure", () => {
         "/api/platform/users/lookup",
         // Self-service account deletion and profile. Bearer-authenticated; the caller is the subject.
         "/api/account/deletion",
+        "/api/account/legal-acceptance",
         "/api/account/profile",
         // Public account deletion (ST-302). Unauthenticated: captcha, then an emailed token.
         "/api/account/deletion-requests",
@@ -1360,6 +1361,7 @@ describe("security", () => {
         "POST /api/privacy/me/dsr",
         // Self-service account deletion and profile. Bearer-authenticated only.
         "POST /api/account/deletion",
+        "POST /api/account/legal-acceptance",
         "GET /api/account/profile",
         "POST /api/storage/uploads/confirm",
         "POST /api/storage/uploads/request-upload",
