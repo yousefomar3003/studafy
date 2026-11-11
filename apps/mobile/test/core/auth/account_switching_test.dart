@@ -213,6 +213,40 @@ void main() {
     },
   );
 
+  test(
+    'member sign-in sends this device\'s token and keeps a new one',
+    () async {
+      final bodies = <Object?>[];
+      final harness = await _Harness.signedIn(
+        'parent-a',
+        respond: (options) {
+          if (options.path != '/api/auth/login/member') {
+            return ResponseBody.fromString('', 204);
+          }
+          bodies.add(options.data);
+          return _json({
+            'access_token': fakeAccessToken(sub: 'student-b'),
+            'token_type': 'Bearer',
+            'expires_in': 900,
+            'session_id': 'session-student-b',
+            'refresh_token': 'refresh-student-b',
+            'device_token': 'device-new',
+          });
+        },
+      );
+      harness.store.memberDeviceTokens['STU-100002'] = 'device-old';
+      await harness.auth.addAccount(current: schoolA);
+
+      await harness.auth.loginWithMember(
+        username: 'stu-100002',
+        password: 'secret-pass',
+      );
+
+      expect((bodies.single! as Map)['device_token'], 'device-old');
+      expect(harness.store.memberDeviceTokens['STU-100002'], 'device-new');
+    },
+  );
+
   test('removing a saved account ends its session on the server', () async {
     final harness = await _Harness.signedIn(
       'parent-a',

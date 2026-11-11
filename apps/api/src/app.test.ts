@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { createApp } from "./app";
 import {
   RATE_LIMIT_EXEMPT_PATHS,
+  RATE_LIMIT_BUDGETS,
   ROUTE_CLASS_MAP,
   DEFAULT_ROUTE_CLASS,
   resolveRouteClass,
@@ -63,11 +64,11 @@ describe("rate limiter coverage", () => {
 
   test("ROUTE_CLASS_MAP values are valid route classes with budgets", () => {
     for (const [, cls] of Object.entries(ROUTE_CLASS_MAP)) {
-      expect(["auth", "auth-strict", "ai", "default"]).toContain(cls);
+      expect(Object.keys(RATE_LIMIT_BUDGETS)).toContain(cls);
     }
   });
 
   test("DEFAULT_ROUTE_CLASS has a defined budget", () => {
-    expect(["auth", "auth-strict", "ai", "default"]).toContain(DEFAULT_ROUTE_CLASS);
+    expect(Object.keys(RATE_LIMIT_BUDGETS)).toContain(DEFAULT_ROUTE_CLASS);
   });
 });
