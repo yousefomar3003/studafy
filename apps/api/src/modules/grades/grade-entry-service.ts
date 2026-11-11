@@ -478,17 +478,18 @@ export async function createAssessment(
   const haveRow = new Set(alreadyLabelled.map((r) => r.grade_submission_id));
   const missing = draftIds.filter((id) => !haveRow.has(id));
 
-  for (const submissionId of missing) {
+  // One multi-row INSERT for the whole roster instead of one round trip per student.
+  if (missing.length > 0) {
     await tx`
       INSERT INTO app.grades (school_id, grade_submission_id, score, max_score, weight, label)
-      VALUES (
+      SELECT
         ${schoolId}::uuid,
-        ${submissionId}::uuid,
+        submission_id,
         NULL,
         ${String(input.maxScore)}::numeric(10,2),
         ${String(input.weight)}::numeric(10,2),
         ${input.label}
-      )
+      FROM unnest(${missing}::uuid[]) AS submission_id
     `;
   }
 

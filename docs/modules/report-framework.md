@@ -29,13 +29,16 @@ BullMQ job on QUEUE_NAMES.REPORTS
                  store.complete(sql, ctx, key, signedUrl)
                  → { processed: true, storageKey, bytes }
                  on error: store.fail only on the final BullMQ attempt, then rethrow
-                 finally: closeReportPorts (primary + replica pools end)
+                 finally: release (ends only pools opened for this job)
 ```
 
-The `reports` queue has concurrency 3; each job owns one primary pool (max 2) and, when a read
-replica is configured, one replica pool (max 3), opened and closed per job in `openReportPorts` /
-`closeReportPorts`. Pools connect lazily, so a job that short-circuits (unknown name, unparseable
-payload) never touches the database.
+The `reports` queue has concurrency 3. Jobs run on the workers process's shared pools
+(`apps/workers/src/db/pool.ts`): the primary pool every processor borrows, and a read pool (max 3)
+when a separate read database is configured — otherwise the primary pool serves both roles. The
+registry passes them as `config.sql` / `config.readSql`; `openReportPorts` borrows them and its
+`release` ends nothing. Without them (tests), it opens a primary pool (max 2) and replica pool
+(max 3) from the connection strings and `release` ends both. Pools connect lazily, so a job that
+short-circuits (unknown name, unparseable payload) never touches the database.
 
 ## The ports
 

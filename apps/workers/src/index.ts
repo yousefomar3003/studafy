@@ -7,6 +7,7 @@ import {
 import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
+import { closeWorkerPools } from "./db/pool";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { workerLogger } from "./log";
 import { startBillingPipelineGauges } from "./metrics/billing-pipeline";
@@ -321,6 +322,8 @@ const shutdown = (signal: string) => {
     await relayDb.end({ timeout: 5 });
     await emailDb.end({ timeout: 5 });
     await entitlementDb.end({ timeout: 5 });
+    // The process-wide pools every job processor borrows (db/pool.ts) — after the drain above.
+    await closeWorkerPools();
     // startQueueGauges() was given queueMetricsConnection as a live IORedis instance rather
     // than plain connection options, so BullMQ treats it as externally owned and never closes it
     // itself — queue.close() only stops the per-queue Queue wrapper. Closing it here is what

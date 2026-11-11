@@ -35,9 +35,9 @@
  */
 
 import { JOB_NAMES, UPLOAD_SCAN_TARGETS, type UploadScanTarget } from "@studafy/constants";
-import postgres from "postgres";
 import { z } from "zod";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx, withSystemTx } from "../../db/tenant-tx";
 import {
   isTerminalFailure,
@@ -50,6 +50,7 @@ import { ClamdScanError, type ClamdConfig } from "./clamd";
 import { objectExists, quarantineKeyOf, scanObject } from "./scan-material.worker";
 
 import type { ScanS3Client } from "./s3";
+import type { DatabaseSource } from "../../db/pool";
 import type { Job } from "bullmq";
 import type { Sql, TransactionSql } from "postgres";
 
@@ -161,8 +162,11 @@ export const scanUploadJobDataSchema = z
 export type ScanUploadJobData = z.infer<typeof scanUploadJobDataSchema>;
 
 export interface ScanUploadConfig {
+  /** Used only when `sql` is absent: a dedicated pool is opened for this job (tests). */
   databaseUrl: string;
   databaseCaCert?: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   s3: ScanS3Client | null;
   bucket?: string;
   clamd: ClamdConfig;
@@ -266,14 +270,10 @@ export async function processUploadScan(
   if (!config.s3 || !config.bucket) throw new Error("scan storage is not configured");
   if (!config.clamd.host) throw new Error("clamd is not configured");
 
-  const sql = postgres(config.databaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
+  const sqlLease = leaseDatabase(config.sql ?? config.databaseUrl, {
+    databaseCaCert: config.databaseCaCert,
   });
+  const sql = sqlLease.sql;
   const s3 = config.s3;
   const bucket = config.bucket;
 
@@ -355,7 +355,7 @@ export async function processUploadScan(
     );
     return { processed: true, outcome: "quarantined" };
   } finally {
-    await sql.end({ timeout: 5 });
+    await sqlLease.release();
   }
 }
 
@@ -368,12 +368,12 @@ export async function processUploadScan(
  * never served. An `unscanned` (pre-000192) file a backfill could not scan stays as it was.
  */
 export function uploadScanFailedListener(
-  databaseUrl: string,
+  database: DatabaseSource,
   log: DeadLetterLogger,
 ): FailedHandler {
   return (job, error) => {
     if (!isTerminalFailure(job)) return;
-    void handleUploadScanFailure(job, error, databaseUrl, log).catch((writeError: unknown) => {
+    void handleUploadScanFailure(job, error, database, log).catch((writeError: unknown) => {
       log.error(
         { event: "upload_scan_failure_write_failed", job_id: job.id ?? null, err: writeError },
         "could not record a terminally failed upload scan",
@@ -385,7 +385,7 @@ export function uploadScanFailedListener(
 async function handleUploadScanFailure(
   job: FailedJobLike,
   error: Error,
-  databaseUrl: string,
+  database: DatabaseSource,
   log: DeadLetterLogger,
 ): Promise<void> {
   const parsed = scanUploadJobDataSchema.safeParse(job.data);
@@ -404,11 +404,12 @@ async function handleUploadScanFailure(
 
   const data = parsed.data;
   const spec = UPLOAD_SCAN_TARGET_SPECS[data.target];
-  const sql = postgres(databaseUrl, { max: 1, idle_timeout: 20, prepare: false });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
   try {
     await inScope(sql, spec, data.schoolId, (tx) => decide(tx, spec, data, "failed", ["scanning"]));
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 

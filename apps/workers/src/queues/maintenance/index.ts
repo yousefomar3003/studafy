@@ -36,6 +36,10 @@ export {
   DATA_RETENTION_BATCH_SIZE,
   DATA_RETENTION_RULES,
   DSR_EXPORT_RETENTION_DAYS,
+  EMAIL_RECORD_RETENTION_MONTHS,
+  EXPIRED_SESSION_RETENTION_DAYS,
+  FINISHED_OUTBOX_EVENT_RETENTION_DAYS,
+  NOTIFICATION_LOG_RETENTION_MONTHS,
   NOTIFICATION_RETENTION_MONTHS,
   REJECTED_SCHOOL_APPLICATION_RETENTION_MONTHS,
   SALES_INQUIRY_RETENTION_MONTHS,
@@ -91,7 +95,7 @@ export type {
   RedactedTableEntry,
   RetainedTableEntry,
 } from "./dsr-types";
-export { createMaintenancePool, processDsrJob } from "./dsr-processor";
+export { leaseMaintenancePool, processDsrJob } from "./dsr-processor";
 export type { MaintenanceRunnerConfig } from "./dsr-processor";
 export { EXPORT_MANIFEST_SCHEMA_VERSION, parseExportManifest } from "./export-manifest";
 export { EXPORT_FILE_FOLDERS, listExportFiles } from "./export-files";

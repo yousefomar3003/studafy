@@ -7,6 +7,7 @@
  * migrated database.
  */
 
+import { DOMAIN_EVENTS } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import postgres from "postgres";
@@ -14,6 +15,9 @@ import postgres from "postgres";
 import {
   DATA_RETENTION_BATCH_SIZE,
   DATA_RETENTION_RULES,
+  OUTBOX_EMAIL_EVENT_NAMES,
+  OUTBOX_ENTITLEMENT_EVENT_NAMES,
+  SESSION_FAMILY_BATCH_SIZE,
   purgeExpiredRetainedData,
   retentionCutoff,
 } from "./data-retention-sweep";
@@ -23,7 +27,10 @@ import type { Sql, TransactionSql } from "postgres";
 
 const databaseUrl = process.env.TEST_DATABASE_URL;
 const enabled = Boolean(databaseUrl);
-const sweepTest = test.skipIf(!enabled);
+/** Every sweep walks every school in the database, so the test's time grows with the database. */
+const SWEEP_TIMEOUT_MS = 60_000;
+const sweepTest = (name: string, fn: () => Promise<void>) =>
+  test.skipIf(!enabled)(name, fn, SWEEP_TIMEOUT_MS);
 
 let db: Sql | undefined;
 
@@ -44,6 +51,7 @@ afterAll(async () => {
     await tx`DELETE FROM app.security_events WHERE request_path = ${securityPath}`;
     await tx`DELETE FROM app.sales_inquiries WHERE id = ANY(${seededInquiries}::uuid[])`;
     await tx`DELETE FROM app.school_applications WHERE id = ANY(${seededApplications}::uuid[])`;
+    await tx`DELETE FROM app.email_events WHERE message_id LIKE ${`${run}-%`}`;
   });
   await db.end({ timeout: 5 });
 });
@@ -144,7 +152,7 @@ async function seedNotification(school: SeededSchool, age: string, read: boolean
 }
 
 describe("data retention sweep", () => {
-  test("periods are 12 months, and 30 days for export bundles", () => {
+  test("periods are 12 months; 30 days for export bundles, 14 for outbox events, 90 for sessions", () => {
     expect(
       Object.fromEntries(
         DATA_RETENTION_RULES.map((rule) => [
@@ -158,10 +166,39 @@ describe("data retention sweep", () => {
       rejectedSchoolApplications: "12 months",
       notifications: "12 months",
       dsrExports: "30 days",
+      emailEvents: "12 months",
+      emailDeliveries: "12 months",
+      notificationDispatchLogs: "12 months",
+      notificationIdempotencyKeys: "12 months",
+      notificationDeadLetters: "12 months",
+      attendanceAlertLogs: "12 months",
+      outboxEvents: "14 days",
+      expiredSessions: "90 days",
     });
     const now = new Date("2026-11-11T03:15:00Z");
     expect(retentionCutoff("notifications", now).toISOString()).toBe("2025-11-11T03:15:00.000Z");
     expect(retentionCutoff("dsrExports", now).toISOString()).toBe("2026-10-12T03:15:00.000Z");
+    expect(retentionCutoff("outboxEvents", now).toISOString()).toBe("2026-10-28T03:15:00.000Z");
+    expect(retentionCutoff("expiredSessions", now).toISOString()).toBe("2026-08-13T03:15:00.000Z");
+  });
+
+  test("an outbox event waits for every consumer that claims it", () => {
+    // The consumers' own claim lists, not copies: a new email or entitlement event is covered.
+    for (const name of [
+      DOMAIN_EVENTS.INVITATION_SENT,
+      DOMAIN_EVENTS.DIGEST_SENT,
+      DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED,
+      DOMAIN_EVENTS.FEE_INSTALLMENT_OVERDUE,
+    ]) {
+      expect(OUTBOX_EMAIL_EVENT_NAMES).toContain(name);
+    }
+    expect([...OUTBOX_ENTITLEMENT_EVENT_NAMES].sort()).toEqual(
+      [
+        DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED,
+        DOMAIN_EVENTS.AI_SUBSCRIPTION_STATUS_CHANGED,
+        DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED,
+      ].sort(),
+    );
   });
 
   sweepTest("deletes security events and sales inquiries older than 12 months", async () => {
@@ -475,4 +512,310 @@ describe("data retention sweep", () => {
     );
     expect(gone!.count).toBe(0);
   });
+  sweepTest(
+    "deletes outbox events 14 days old once every consumer finished with them",
+    async () => {
+      const school = await seedSchool();
+      const other = "retentionTest.finished";
+      const seed = (
+        label: string,
+        eventName: string,
+        daysAgo: number,
+        cursors: { relayed?: boolean; email?: boolean; entitlement?: boolean },
+      ) =>
+        asSchool(school.schoolId, async (tx) => {
+          const [row] = await tx<{ id: string }[]>`
+          INSERT INTO app.outbox_events
+            (school_id, event_name, payload, created_at, relayed_at, email_dispatched_at,
+             entitlement_applied_at)
+          VALUES (
+            ${school.schoolId}::uuid, ${eventName}, ${tx.json({ label })},
+            now() - make_interval(days => ${daysAgo}),
+            CASE WHEN ${cursors.relayed ?? false} THEN now() END,
+            CASE WHEN ${cursors.email ?? false} THEN now() END,
+            CASE WHEN ${cursors.entitlement ?? false} THEN now() END
+          )
+          RETURNING id::text AS id
+        `;
+          return [label, row!.id] as const;
+        });
+
+      const ids = new Map([
+        await seed("finished", other, 15, { relayed: true }),
+        await seed("finished-recent", other, 13, { relayed: true }),
+        await seed("unrelayed-old", other, 400, {}),
+        await seed("email-sent", DOMAIN_EVENTS.INVITATION_SENT, 15, { relayed: true, email: true }),
+        await seed("email-pending", DOMAIN_EVENTS.INVITATION_SENT, 400, { relayed: true }),
+        await seed("email-unrelayed", DOMAIN_EVENTS.INVITATION_SENT, 15, { email: true }),
+        await seed("digest-pending", DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED, 15, { relayed: true }),
+        await seed("digest-done", DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED, 15, {
+          relayed: true,
+          email: true,
+        }),
+        await seed("entitlement-pending", DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED, 15, {
+          relayed: true,
+        }),
+        await seed("entitlement-done", DOMAIN_EVENTS.SUBSCRIPTION_STATUS_CHANGED, 15, {
+          relayed: true,
+          entitlement: true,
+        }),
+        await seed("user-entitlement-pending", DOMAIN_EVENTS.USER_ENTITLEMENT_CHANGED, 15, {
+          relayed: true,
+        }),
+      ]);
+      // More than one batch of finished events.
+      await asSchool(
+        school.schoolId,
+        (tx) => tx`
+        INSERT INTO app.outbox_events (school_id, event_name, payload, created_at, relayed_at)
+        SELECT ${school.schoolId}::uuid, ${other}, '{}'::jsonb, now() - interval '20 days', now()
+        FROM generate_series(1, ${DATA_RETENTION_BATCH_SIZE + 1})
+      `,
+      );
+
+      const result = await purgeExpiredRetainedData(db!, new FakeStore());
+
+      expect(result.failed).toBe(0);
+      expect(result.outboxEvents).toBeGreaterThanOrEqual(DATA_RETENTION_BATCH_SIZE + 1 + 4);
+      const left = await asSchool(
+        school.schoolId,
+        (tx) => tx<{ label: string }[]>`
+        SELECT payload->>'label' AS label FROM app.outbox_events
+        WHERE school_id = ${school.schoolId}::uuid ORDER BY id
+      `,
+      );
+      expect(left.map((row) => row.label)).toEqual([
+        "finished-recent",
+        "unrelayed-old",
+        "email-pending",
+        "email-unrelayed",
+        "digest-pending",
+        "entitlement-pending",
+        "user-entitlement-pending",
+      ]);
+      expect(ids.size).toBe(11);
+    },
+  );
+
+  sweepTest(
+    "deletes email deliveries 12 months old whose outbox event is gone, and email events",
+    async () => {
+      const school = await seedSchool();
+      const [pendingEvent] = await asSchool(
+        school.schoolId,
+        (tx) => tx<{ id: string }[]>`
+          INSERT INTO app.outbox_events (school_id, event_name, payload, created_at, relayed_at)
+          VALUES (${school.schoolId}::uuid, ${DOMAIN_EVENTS.INVITATION_SENT}, '{}'::jsonb,
+                  now() - interval '13 months', now())
+          RETURNING id::text AS id
+        `,
+      );
+      let nextEventId = 9_000_000_000 + Math.floor(Math.random() * 1_000_000_000);
+      const seed = (
+        label: string,
+        age: string,
+        status: "sent" | "claimed",
+        outboxEventId = String(nextEventId++),
+      ) =>
+        asSchool(school.schoolId, async (tx) => {
+          const [row] = await tx<{ id: string }[]>`
+            INSERT INTO app.email_deliveries
+              (school_id, outbox_event_id, recipient, template, status, message_id, created_at,
+               updated_at)
+            VALUES (
+              ${school.schoolId}::uuid, ${outboxEventId}::bigint, ${`${label}@parent.local`},
+              'invitation', ${status}, ${status === "sent" ? `${run}-${label}` : null},
+              now() - ${age}::interval, now() - ${age}::interval
+            )
+            RETURNING id
+          `;
+          return row!.id;
+        });
+
+      const sentOld = await seed("sent-old", "13 months", "sent");
+      const sentRecent = await seed("sent-recent", "11 months", "sent");
+      const claimedOld = await seed("claimed-old", "13 months", "claimed");
+      const eventPending = await seed("event-pending", "13 months", "sent", pendingEvent!.id);
+
+      await asAdmin(async (tx) => {
+        for (const [label, age] of [
+          ["old", "13 months"],
+          ["recent", "11 months"],
+        ] as const) {
+          await tx`
+            INSERT INTO app.email_events (message_id, event_type, payload, received_at)
+            VALUES (${`${run}-${label}`}, 'delivery', '{}'::jsonb, now() - ${age}::interval)
+          `;
+        }
+      });
+
+      const result = await purgeExpiredRetainedData(db!, new FakeStore());
+
+      expect(result.failed).toBe(0);
+      expect(result.emailDeliveries).toBeGreaterThanOrEqual(1);
+      expect(result.emailEvents).toBeGreaterThanOrEqual(1);
+      const left = await asSchool(
+        school.schoolId,
+        (tx) => tx<{ id: string }[]>`
+          SELECT id FROM app.email_deliveries WHERE school_id = ${school.schoolId}::uuid
+        `,
+      );
+      expect(new Set(left.map((row) => row.id))).toEqual(
+        new Set([sentRecent, claimedOld, eventPending]),
+      );
+      expect(left.map((row) => row.id)).not.toContain(sentOld);
+      const events = await asAdmin(
+        (tx) => tx<{ message_id: string }[]>`
+          SELECT message_id FROM app.email_events WHERE message_id LIKE ${`${run}-%`}
+        `,
+      );
+      expect(events.map((row) => row.message_id)).toEqual([`${run}-recent`]);
+    },
+  );
+
+  sweepTest(
+    "deletes notification dispatch logs, idempotency keys, dead letters and alert logs after 12 months",
+    async () => {
+      const school = await seedSchool();
+      for (const [label, age] of [
+        ["old", "13 months"],
+        ["recent", "11 months"],
+      ] as const) {
+        await asSchool(school.schoolId, async (tx) => {
+          await tx`
+            INSERT INTO app.notification_dispatch_logs
+              (school_id, event_id, event_type, recipient_id, recipient_role, channel,
+               idempotency_key, status, rendered_title, rendered_body, created_at, updated_at)
+            VALUES (${school.schoolId}::uuid, ${`evt-${label}`}, 'grade.posted',
+                    ${school.userId}::uuid, 'student', 'push', ${`key-${label}`}, 'enqueued',
+                    'Grade posted', 'A grade', now() - ${age}::interval, now() - ${age}::interval)
+          `;
+          await tx`
+            INSERT INTO app.notification_idempotency_keys
+              (school_id, idempotency_key, recipient_user_id, channel, reserved_at, dispatched_at)
+            VALUES (${school.schoolId}::uuid, ${`key-${label}`}, ${school.userId}::uuid, 'push',
+                    now() - ${age}::interval, now() - ${age}::interval)
+          `;
+          await tx`
+            INSERT INTO app.notification_idempotency_keys
+              (school_id, idempotency_key, recipient_user_id, channel, reserved_at)
+            VALUES (${school.schoolId}::uuid, ${`unresolved-${label}`}, ${school.userId}::uuid,
+                    'push', now() - ${age}::interval)
+          `;
+          await tx`
+            INSERT INTO app.notification_dead_letters
+              (school_id, queue_name, job_id, job_name, attempts_made, error_class, error_message,
+               failed_at)
+            VALUES (${school.schoolId}::uuid, 'notifications', ${`job-${label}`}, 'dispatch', 5,
+                    'Error', 'boom', now() - ${age}::interval)
+          `;
+          await tx`
+            INSERT INTO app.attendance_alert_logs
+              (school_id, student_id, parent_user_id, rule_type, threshold_value, dedup_key, sent_at)
+            VALUES (${school.schoolId}::uuid, ${school.studentId}::uuid, ${school.parentId}::uuid,
+                    'consecutive_days', 3, ${`consecutive_days:3:${label}`},
+                    now() - ${age}::interval)
+          `;
+        });
+      }
+
+      const result = await purgeExpiredRetainedData(db!, new FakeStore());
+
+      expect(result.failed).toBe(0);
+      expect(result.notificationDispatchLogs).toBeGreaterThanOrEqual(1);
+      expect(result.notificationIdempotencyKeys).toBeGreaterThanOrEqual(2);
+      expect(result.notificationDeadLetters).toBeGreaterThanOrEqual(1);
+      expect(result.attendanceAlertLogs).toBeGreaterThanOrEqual(1);
+      const [left] = await asSchool(
+        school.schoolId,
+        (tx) => tx<{ logs: string[]; keys: string[]; letters: string[]; alerts: string[] }[]>`
+          SELECT
+            ARRAY(SELECT event_id::text FROM app.notification_dispatch_logs
+                   WHERE school_id = ${school.schoolId}::uuid) AS logs,
+            ARRAY(SELECT idempotency_key::text FROM app.notification_idempotency_keys
+                   WHERE school_id = ${school.schoolId}::uuid ORDER BY 1) AS keys,
+            ARRAY(SELECT job_id FROM app.notification_dead_letters
+                   WHERE school_id = ${school.schoolId}::uuid) AS letters,
+            ARRAY(SELECT dedup_key FROM app.attendance_alert_logs
+                   WHERE school_id = ${school.schoolId}::uuid) AS alerts
+        `,
+      );
+      expect(left).toEqual({
+        logs: ["evt-recent"],
+        keys: ["key-recent", "unresolved-recent"],
+        letters: ["job-recent"],
+        alerts: ["consecutive_days:3:recent"],
+      });
+    },
+  );
+
+  sweepTest(
+    "deletes a sign-in session whole once every token in it expired 90 days ago",
+    async () => {
+      const school = await seedSchool();
+      /** A chain of rotated tokens, one per expiry (days from now; negative is in the past). */
+      const seedFamily = (expiries: number[]) =>
+        asSchool(school.schoolId, async (tx) => {
+          const familyId = crypto.randomUUID();
+          let parent: string | null = null;
+          for (const days of expiries) {
+            const [row]: { id: string }[] = await tx<{ id: string }[]>`
+              INSERT INTO app.refresh_tokens
+                (school_id, user_id, token_hash, family_id, parent_token_id, channel, issued_at,
+                 expires_at, ip_address)
+              VALUES (
+                ${school.schoolId}::uuid, ${school.userId}::uuid, sha256(gen_random_uuid()::text::bytea),
+                ${familyId}::uuid, ${parent}::uuid, 'web',
+                now() + make_interval(days => ${days}) - interval '30 days',
+                now() + make_interval(days => ${days}), '203.0.113.7'
+              )
+              RETURNING id
+            `;
+            if (parent) {
+              await tx`
+                UPDATE app.refresh_tokens
+                SET rotated_at = now() + make_interval(days => ${days}) - interval '30 days',
+                    replaced_by_token_id = ${row!.id}::uuid
+                WHERE id = ${parent}::uuid
+              `;
+            }
+            parent = row!.id;
+          }
+          return familyId;
+        });
+
+      const expired = await seedFamily([-200, -150, -91]);
+      const recentlyExpired = await seedFamily([-200, -89]);
+      const live = await seedFamily([-200, -120, 10]);
+      // More than one batch of families, each a single expired token.
+      await asSchool(
+        school.schoolId,
+        (tx) => tx`
+          INSERT INTO app.refresh_tokens
+            (school_id, user_id, token_hash, family_id, channel, issued_at, expires_at)
+          SELECT ${school.schoolId}::uuid, ${school.userId}::uuid,
+                 sha256(gen_random_uuid()::text::bytea), gen_random_uuid(), 'mobile',
+                 now() - interval '130 days', now() - interval '100 days'
+          FROM generate_series(1, ${SESSION_FAMILY_BATCH_SIZE + 1})
+        `,
+      );
+
+      const result = await purgeExpiredRetainedData(db!, new FakeStore());
+
+      expect(result.failed).toBe(0);
+      expect(result.expiredSessions).toBeGreaterThanOrEqual(3 + SESSION_FAMILY_BATCH_SIZE + 1);
+      const left = await asSchool(
+        school.schoolId,
+        (tx) => tx<{ family_id: string; tokens: number }[]>`
+          SELECT family_id::text, count(*)::int AS tokens FROM app.refresh_tokens
+          WHERE school_id = ${school.schoolId}::uuid GROUP BY family_id
+        `,
+      );
+      expect(Object.fromEntries(left.map((row) => [row.family_id, row.tokens]))).toEqual({
+        [recentlyExpired]: 2,
+        [live]: 3,
+      });
+      expect(left.map((row) => row.family_id)).not.toContain(expired);
+    },
+  );
 });

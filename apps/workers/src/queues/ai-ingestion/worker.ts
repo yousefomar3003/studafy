@@ -3,6 +3,7 @@ import { NOTIFICATION_TYPES } from "@studafy/constants";
 import { sanitizePlainText } from "@studafy/sanitize";
 import postgres from "postgres";
 
+import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { createEmbeddingStage, createMockEmbeddingProvider } from "./embedding";
@@ -17,11 +18,14 @@ import type { IngestChunk } from "./ingest";
 import type { OcrReport } from "./ocr";
 import type { TenantSemaphore, TenantSemaphoreLease } from "./semaphore";
 import type { Job } from "bullmq";
-import type { TransactionSql } from "postgres";
+import type { Sql, TransactionSql } from "postgres";
 
 export interface AiIngestionWorkerConfig {
+  /** Used only when `sql` is absent: a dedicated pool is opened for this job (tests). */
   databaseUrl: string;
   databaseCaCert?: string;
+  /** The process-wide pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
   s3Region?: string;
   s3Endpoint?: string;
   bucket?: string;
@@ -108,14 +112,10 @@ export async function processIngestJob(
     throw new Error("ai ingestion storage is not configured");
   }
 
-  const database = postgres(config.databaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
+  const databaseLease = leaseDatabase(config.sql ?? config.databaseUrl, {
+    databaseCaCert: config.databaseCaCert,
   });
+  const database = databaseLease.sql;
   const semaphore = config.semaphore ?? nullSemaphore;
 
   let lease: TenantSemaphoreLease | null = null;
@@ -323,7 +323,7 @@ export async function processIngestJob(
     throw error;
   } finally {
     await lease?.release().catch(() => undefined);
-    await database.end({ timeout: 5 });
+    await databaseLease.release();
   }
 }
 

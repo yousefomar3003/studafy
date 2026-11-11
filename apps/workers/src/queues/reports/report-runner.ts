@@ -8,11 +8,12 @@
  *   → optionally pre-sign and persist a download URL → mark ready
  *
  * On a failed attempt it rethrows for BullMQ's retry and only marks the row `failed` once the
- * retries are exhausted (the shared `isFinalAttempt` helper). Every postgres pool it opens is
- * closed in `finally` regardless of outcome.
+ * retries are exhausted (the shared `isFinalAttempt` helper). In production it runs on the
+ * process-wide pools (db/pool.ts); a pool it opens itself (tests) is closed in `finally` regardless
+ * of outcome.
  */
 
-import postgres from "postgres";
+import { leaseDatabase } from "../../db/pool";
 
 import { createReportS3, REPORT_SIGNED_URL_TTL_SECONDS } from "./report-s3";
 
@@ -22,6 +23,7 @@ import type {
   ReportRunResult,
   ReportS3Client,
 } from "./report-types";
+import type { DatabaseLease } from "../../db/pool";
 import type { Job } from "bullmq";
 import type { Sql } from "postgres";
 
@@ -30,47 +32,42 @@ export function isFinalAttempt(attemptsMade: number, attempts: number | undefine
   return attemptsMade + 1 >= (attempts ?? 1);
 }
 
-/** The database pools and S3 client a report run lives on, opened and closed per job. */
+/** The database pools and S3 client a report run lives on. */
 export interface ReportPorts {
   primary: Sql;
   replica?: Sql;
   s3: ReportS3Client;
 }
 
-export function createPrimaryPool(config: ReportRunnerConfig): Sql {
-  return postgres(config.primaryDatabaseUrl, {
-    max: 2,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
+/** The primary pool: the shared one when configured, else a dedicated one for this job (tests). */
+export function leasePrimaryPool(config: ReportRunnerConfig): DatabaseLease {
+  return leaseDatabase(config.sql ?? config.primaryDatabaseUrl, {
+    databaseCaCert: config.databaseCaCert,
   });
 }
 
-function createReplicaPool(config: ReportRunnerConfig): Sql | undefined {
-  if (!config.readDatabaseUrl) return undefined;
-  return postgres(config.readDatabaseUrl, {
-    max: 3,
-    idle_timeout: 20,
-    prepare: false,
-    ...(config.databaseCaCert
-      ? { ssl: { ca: config.databaseCaCert, rejectUnauthorized: true } }
-      : {}),
-  });
+function leaseReplicaPool(config: ReportRunnerConfig): DatabaseLease | undefined {
+  const source = config.readSql ?? config.readDatabaseUrl;
+  if (!source) return undefined;
+  return leaseDatabase(source, { max: 3, databaseCaCert: config.databaseCaCert });
 }
 
-export function openReportPorts(config: ReportRunnerConfig): ReportPorts {
+/** A report run's ports, plus the release that ends whichever pools were opened for it. */
+export interface OpenedReportPorts {
+  ports: ReportPorts;
+  release(): Promise<void>;
+}
+
+export function openReportPorts(config: ReportRunnerConfig): OpenedReportPorts {
+  const s3 = createReportStorage(config);
+  const primary = leasePrimaryPool(config);
+  const replica = leaseReplicaPool(config);
   return {
-    primary: createPrimaryPool(config),
-    replica: createReplicaPool(config),
-    s3: createReportStorage(config),
+    ports: { primary: primary.sql, replica: replica?.sql, s3 },
+    release: async () => {
+      await Promise.all([primary.release(), replica?.release()]);
+    },
   };
-}
-
-export async function closeReportPorts(ports: ReportPorts): Promise<void> {
-  const pools = [ports.primary, ...(ports.replica ? [ports.replica] : [])];
-  await Promise.all(pools.map((pool) => pool.end({ timeout: 5 })));
 }
 
 /** Validate bucket/region and build the report S3 client, throwing when storage is unconfigured. */

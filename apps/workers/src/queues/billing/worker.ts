@@ -1,9 +1,9 @@
 import { CloudWatchClient } from "@aws-sdk/client-cloudwatch";
 import { JOB_NAMES } from "@studafy/constants";
 import { TapClient } from "@studafy/tap-payments";
-import postgres from "postgres";
 import Stripe from "stripe";
 
+import { createPool, leaseDatabase } from "../../db/pool";
 import { workerLogger } from "../../log";
 
 import { retryBillingEvent } from "./billing-event.service";
@@ -30,7 +30,9 @@ import type {
   GenerateInvoiceJobData,
   GenerateBatchInvoicesJobData,
 } from "./schemas";
+import type { DatabaseSource } from "../../db/pool";
 import type { Job } from "bullmq";
+import type { Sql } from "postgres";
 
 export const BILLING_QUEUE = JOB_NAMES.GENERATE_INVOICE;
 
@@ -41,17 +43,25 @@ export interface StorageReconciliationOptions {
   bucket?: string;
 }
 
+/**
+ * `databaseUrl` is always needed: the batch-invoice run opens its own small pool from it (see
+ * processBatchInvoices). Every other billing job runs on `sql`, the process-wide pool (db/pool.ts),
+ * when one is given, and on a dedicated pool opened from `databaseUrl` otherwise.
+ */
 export async function processBillingJob(
   job: Job<BillingJobData>,
   databaseUrl: string,
   storageOptions?: StorageReconciliationOptions,
+  sql?: Sql,
 ): Promise<unknown> {
+  const database: DatabaseSource = sql ?? databaseUrl;
+
   if (job.name === JOB_NAMES.GENERATE_INVOICE) {
     const parsed = generateInvoiceSchema.safeParse(job.data);
     if (!parsed.success) {
       return { processed: false, reason: "invalid job data", errors: parsed.error.issues };
     }
-    return processSingleInvoice(parsed.data, databaseUrl);
+    return processSingleInvoice(parsed.data, database);
   }
 
   if (job.name === JOB_NAMES.GENERATE_BATCH_INVOICES) {
@@ -70,7 +80,7 @@ export async function processBillingJob(
     if (!parsed.success) {
       return { processed: false, reason: "invalid job data", errors: parsed.error.issues };
     }
-    return retryBillingEvent(parsed.data, databaseUrl, workerLogger);
+    return retryBillingEvent(parsed.data, database, workerLogger);
   }
 
   // Daily grace-period sweep (ST-134). Carries no payload -- the scheduler registers it with no
@@ -78,7 +88,7 @@ export async function processBillingJob(
   // owns its own postgres connection rather than running inside the job's, because it spans many
   // tenant transactions and each school commits on its own.
   if (job.name === JOB_NAMES.RUN_DUNNING) {
-    return processDunningSweep(databaseUrl);
+    return processDunningSweep(database);
   }
 
   // Daily Tap renewals (ST-298). Same no-payload shape as the sweeps. A deployment with no Tap
@@ -86,7 +96,7 @@ export async function processBillingJob(
   // key without a webhook URL is a thrown error, because a renewal nobody hears about never
   // advances the period it paid for.
   if (job.name === JOB_NAMES.RUN_TAP_RENEWALS) {
-    return processTapRenewals(databaseUrl);
+    return processTapRenewals(database);
   }
 
   // Nightly seat reconciliation (ST-136). Same shape as the dunning sweep: no payload, its own
@@ -94,7 +104,7 @@ export async function processBillingJob(
   // Stripe, so it also needs the Stripe secret -- billing must not silently skip reconciliation,
   // so a missing key is a thrown error (the registry re-queues it) rather than a dry run.
   if (job.name === JOB_NAMES.RUN_SEAT_RECONCILIATION) {
-    return processSeatReconciliation(databaseUrl);
+    return processSeatReconciliation(database);
   }
 
   // Daily storage-quota reconciliation (ST-16x). Same shape as the dunning and seat sweeps: no
@@ -103,7 +113,7 @@ export async function processBillingJob(
   // a missing S3 region/bucket is a thrown error (the registry re-queues it) rather than a silent
   // skip, because a meter that never reconciles drifts without limit.
   if (job.name === JOB_NAMES.RUN_STORAGE_QUOTA_RECONCILIATION) {
-    return processStorageQuotaReconciliation(databaseUrl, storageOptions);
+    return processStorageQuotaReconciliation(database, storageOptions);
   }
 
   // Daily finance reconciliation: triggers apps/api's run (finance-reconciliation.ts). Without a
@@ -131,7 +141,7 @@ export async function processBillingJob(
   // missing one cost line is not worth failing the whole sweep over. See cost-report.ts's header.
   if (job.name === JOB_NAMES.RUN_COST_REPORT) {
     const mode = (job.data as { mode?: unknown })?.mode === "monthly" ? "monthly" : "daily";
-    return processCostReport(databaseUrl, mode);
+    return processCostReport(database, mode);
   }
 
   // School license jobs (session 3 of docs/billing/feature-licensing.md). No payload, their own
@@ -141,14 +151,15 @@ export async function processBillingJob(
     job.name === JOB_NAMES.RUN_LICENSE_REMINDERS ||
     job.name === JOB_NAMES.RUN_USAGE_PERIOD_START
   ) {
-    return processLicenseJob(job.name, databaseUrl);
+    return processLicenseJob(job.name, database);
   }
 
   return { processed: false, reason: "unknown billing job" };
 }
 
-async function processLicenseJob(name: string, databaseUrl: string): Promise<unknown> {
-  const sql = postgres(databaseUrl, { max: 2 });
+async function processLicenseJob(name: string, database: DatabaseSource): Promise<unknown> {
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
   try {
     const now = new Date();
     if (name === JOB_NAMES.RUN_LICENSE_LIFECYCLE) {
@@ -159,11 +170,11 @@ async function processLicenseJob(name: string, databaseUrl: string): Promise<unk
     }
     return await runUsagePeriodStart(sql, now, workerLogger);
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
-async function processTapRenewals(databaseUrl: string): Promise<unknown> {
+async function processTapRenewals(database: DatabaseSource): Promise<unknown> {
   const secretKey = process.env.TAP_SECRET_KEY;
   const webhookUrl = process.env.TAP_WEBHOOK_URL;
   if (!secretKey) {
@@ -174,7 +185,8 @@ async function processTapRenewals(databaseUrl: string): Promise<unknown> {
     throw new Error("TAP_WEBHOOK_URL is required to run Tap renewals");
   }
 
-  const sql = postgres(databaseUrl, { max: 2 });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
     return await runTapRenewals(
@@ -185,13 +197,14 @@ async function processTapRenewals(databaseUrl: string): Promise<unknown> {
       workerLogger,
     );
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
-async function processSeatReconciliation(databaseUrl: string): Promise<unknown> {
+async function processSeatReconciliation(database: DatabaseSource): Promise<unknown> {
   const secretKey = process.env.STRIPE_SECRET_KEY;
-  const sql = postgres(databaseUrl, { max: 2 });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
     // Seats are only reconciled against Stripe subscriptions; Tap-billed schools (Jordan, the Gulf,
@@ -224,11 +237,14 @@ async function processSeatReconciliation(databaseUrl: string): Promise<unknown> 
       workerLogger,
     );
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
-async function processCostReport(databaseUrl: string, mode: "daily" | "monthly"): Promise<unknown> {
+async function processCostReport(
+  database: DatabaseSource,
+  mode: "daily" | "monthly",
+): Promise<unknown> {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   const stripe = secretKey ? new Stripe(secretKey, { apiVersion: "2026-07-29.dahlia" }) : undefined;
   const cloudwatch = new CloudWatchClient({});
@@ -236,7 +252,8 @@ async function processCostReport(databaseUrl: string, mode: "daily" | "monthly")
     ? Number(process.env.AI_MONTHLY_SPEND_BUDGET_USD)
     : undefined;
 
-  const sql = postgres(databaseUrl, { max: 2 });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
     return await runCostReport(
@@ -252,12 +269,12 @@ async function processCostReport(databaseUrl: string, mode: "daily" | "monthly")
       new Date(),
     );
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
 async function processStorageQuotaReconciliation(
-  databaseUrl: string,
+  database: DatabaseSource,
   options?: StorageReconciliationOptions,
 ): Promise<unknown> {
   if (!options?.s3Region || !options.bucket) {
@@ -266,10 +283,11 @@ async function processStorageQuotaReconciliation(
     );
   }
 
-  const sql = postgres(databaseUrl, { max: 2 });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
-    return runStorageQuotaReconciliation(
+    return await runStorageQuotaReconciliation(
       sql,
       createStorageQuotaS3({
         region: options.s3Region,
@@ -279,28 +297,30 @@ async function processStorageQuotaReconciliation(
       workerLogger,
     );
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
-async function processDunningSweep(databaseUrl: string): Promise<unknown> {
-  const sql = postgres(databaseUrl, { max: 2 });
+async function processDunningSweep(database: DatabaseSource): Promise<unknown> {
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
-    return runDunningSweep(sql, new Date(), workerLogger);
+    return await runDunningSweep(sql, new Date(), workerLogger);
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
 async function processSingleInvoice(
   data: GenerateInvoiceJobData,
-  databaseUrl: string,
+  database: DatabaseSource,
 ): Promise<unknown> {
-  const sql = postgres(databaseUrl, { max: 1 });
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
 
   try {
-    return sql.begin(async (tx) => {
+    return await sql.begin(async (tx) => {
       await tx`SELECT set_config('app.school_id', ${data.schoolId}, true)`.execute();
       await tx.unsafe("SET LOCAL ROLE studafy_admin");
 
@@ -313,7 +333,7 @@ async function processSingleInvoice(
       );
     });
   } finally {
-    await sql.end({ timeout: 5 });
+    await lease.release();
   }
 }
 
@@ -322,7 +342,10 @@ async function processBatchInvoices(
   databaseUrl: string,
   job: Job<BillingJobData>,
 ): Promise<unknown> {
-  const sql = postgres(databaseUrl, { max: 2 });
+  // Deliberately its own pool rather than the process-wide one (db/pool.ts): this run holds a
+  // tenant transaction across each ERPNext call, 10 at a time, and `max: 2` is what bounds that to
+  // two connections. On the shared pool it could pin most of it for the length of the batch.
+  const sql = createPool(databaseUrl, { max: 2 });
 
   // `generateBatchInvoices` opens its own per-step transactions (see its doc comment in
   // invoice.service.ts) rather than running inside one held open for the whole batch, so there is

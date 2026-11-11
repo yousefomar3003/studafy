@@ -47,6 +47,9 @@ Flavor defaults live in `lib/src/core/config/app_environment.dart`.
 | `staging` | `https://staging-api.studafy.com` | `wss://staging-api.studafy.com` |
 | `prod`    | `https://api.studafy.com`         | `wss://api.studafy.com`         |
 
+The realtime socket is off in every flavor (live updates are deferred) unless the build adds
+`--dart-define=REALTIME_ENABLED=true`; see `AppConfig.realtimeEnabled`.
+
 Override any flavor at build or run time with `API_BASE_URL` / `REALTIME_BASE_URL`:
 
 ```powershell

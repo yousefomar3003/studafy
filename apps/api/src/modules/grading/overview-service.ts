@@ -1,12 +1,12 @@
 import { requireYear } from "./access";
-import { certificateReadiness } from "./certificate-service";
+import { certificateReadinessMany } from "./certificate-service";
 import {
   collectPublishIssues,
   listConfigSummaries,
-  listPrograms,
-  listSectionSubjects,
+  loadYearConfigContext,
+  sectionSubjectsOf,
 } from "./config-service";
-import { computeSection } from "./results-service";
+import { computeLoadedSection, loadSectionsGradingData } from "./results-service";
 
 import type { GradingConfigStatus } from "./access";
 import type { PublishIssue } from "./config-service";
@@ -17,6 +17,10 @@ import type { TransactionSql } from "postgres";
  * overridden, what is missing, and how far marks, approvals, finalization and certificates have
  * got. Every figure comes from the same services the actions use, so "ready" here means the action
  * will succeed.
+ *
+ * Read set-based: the year's configuration, sections, rosters, marks, sheets and certificate state
+ * are loaded in a fixed number of queries (about twenty, whatever the size of the school) and the
+ * per-section figures are computed in memory with the same functions the per-section actions use.
  */
 
 export interface GradingOverview {
@@ -84,9 +88,10 @@ export async function getGradingOverview(
   yearId: string,
 ): Promise<GradingOverview> {
   const year = await requireYear(tx, schoolId, yearId);
-  const programs = await listPrograms(tx, schoolId, yearId);
-  const configSummaries = await listConfigSummaries(tx, schoolId, yearId);
-  const issues = await collectPublishIssues(tx, schoolId, yearId);
+  const context = await loadYearConfigContext(tx, schoolId, yearId);
+  const programs = context.programs;
+  const configSummaries = await listConfigSummaries(tx, schoolId, yearId, context);
+  const issues = await collectPublishIssues(tx, schoolId, yearId, context);
 
   const [pendingSheets] = await tx<{ count: number }[]>`
     SELECT count(*)::int AS count FROM app.mark_sheets
@@ -116,21 +121,42 @@ export async function getGradingOverview(
     certificates_needing_reissue: 0,
   };
 
+  // Sections listed under a program, and the subjects each one has.
+  const programGrades = new Set(programs.map((program) => program.grade_level_id));
+  const listed = context.sections
+    .filter((section) => programGrades.has(section.grade_level_id))
+    .map((section) => ({ section, subjects: sectionSubjectsOf(context, section) }));
+
+  // Incomplete students only mean something once marks can be entered.
+  const computed = listed.filter(
+    ({ section, subjects }) =>
+      year.grading_config_status === "active" && section.student_count > 0 && subjects.length > 0,
+  );
+  const computedIds = new Set(computed.map(({ section }) => section.id));
+  const gradingData =
+    computed.length > 0
+      ? await loadSectionsGradingData(
+          tx,
+          schoolId,
+          yearId,
+          computed.map(({ section }) => section),
+          context,
+        )
+      : null;
+
+  const annualFinalizations = listed.flatMap(({ section }) => {
+    const annual = finalizations.find((f) => f.section_id === section.id && f.term_id === null);
+    return annual ? [{ ...annual, status: "finalized" as const }] : [];
+  });
+  const readiness = await certificateReadinessMany(tx, schoolId, annualFinalizations);
+
   const grades: GradingOverview["grades"] = [];
   for (const program of programs) {
-    const sectionRows = await tx<{ id: string; name: string; student_count: number }[]>`
-      SELECT section.id, section.name,
-             (SELECT count(*)::int FROM app.student_sections AS placement
-              WHERE placement.section_id = section.id AND placement.school_id = section.school_id) AS student_count
-      FROM app.sections AS section
-      WHERE section.school_id = ${schoolId}::uuid AND section.academic_year_id = ${yearId}::uuid
-        AND section.grade_level_id = ${program.grade_level_id}::uuid
-      ORDER BY section.name
-    `;
     const sections: GradingOverview["grades"][number]["sections"] = [];
-    for (const section of sectionRows) {
+    for (const { section, subjects } of listed.filter(
+      (entry) => entry.section.grade_level_id === program.grade_level_id,
+    )) {
       counts.sections += 1;
-      const { subjects } = await listSectionSubjects(tx, schoolId, section.id);
       if (subjects.some((subject) => subject.source !== "inherited"))
         counts.sections_with_overrides += 1;
       counts.outdated_overrides += subjects.filter((subject) => subject.outdated).length;
@@ -138,14 +164,10 @@ export async function getGradingOverview(
         (subject) => subject.source !== "excluded" && subject.teachers.length === 0,
       ).length;
 
-      // Incomplete students only mean something once marks can be entered.
       let incomplete: number | null = null;
-      if (
-        year.grading_config_status === "active" &&
-        section.student_count > 0 &&
-        subjects.length > 0
-      ) {
-        const computation = await computeSection(tx, schoolId, section.id, null);
+      if (computedIds.has(section.id)) {
+        const { student_count: _count, ...sectionRow } = section;
+        const computation = computeLoadedSection(gradingData!, sectionRow, null);
         incomplete = computation.students.filter(
           (student) => student.overall.status === "incomplete",
         ).length;
@@ -160,12 +182,12 @@ export async function getGradingOverview(
         blocked: number;
       } | null = null;
       if (annual) {
-        const readiness = await certificateReadiness(tx, schoolId, annual.id);
+        const rows = readiness.get(annual.id) ?? [];
         certificates = {
-          ready: readiness.filter((row) => row.state === "ready").length,
-          issued: readiness.filter((row) => row.state === "issued").length,
-          needs_reissue: readiness.filter((row) => row.state === "needs_reissue").length,
-          blocked: readiness.filter((row) => row.state === "blocked").length,
+          ready: rows.filter((row) => row.state === "ready").length,
+          issued: rows.filter((row) => row.state === "issued").length,
+          needs_reissue: rows.filter((row) => row.state === "needs_reissue").length,
+          blocked: rows.filter((row) => row.state === "blocked").length,
         };
         counts.certificates_ready += certificates.ready;
         counts.certificates_blocked += certificates.blocked;

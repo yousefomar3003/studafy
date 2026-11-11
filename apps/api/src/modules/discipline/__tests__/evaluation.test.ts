@@ -250,6 +250,53 @@ describeDb("listEvaluations", () => {
     expect(total).toBe(0);
     expect(rows).toHaveLength(0);
   });
+
+  test("each evaluation carries exactly its own scores, as getEvaluation returns them", async () => {
+    const school = await createSchool(db.sql);
+    const teacher = await createTeacher(db.sql, school.id);
+    const user = await createPrincipal(school.id);
+    const criteria = await Promise.all([
+      createEvaluationCriteriaTemplate(db.sql, school.id),
+      createEvaluationCriteriaTemplate(db.sql, school.id),
+    ]);
+
+    const first = await seedEvaluation(school.id, teacher.id, user.id);
+    const second = await seedEvaluation(school.id, teacher.id, user.id);
+    const unscored = await seedEvaluation(school.id, teacher.id, user.id);
+    await createEvaluationScore(db.sql, school.id, {
+      evaluationId: first.id,
+      criteriaTemplateId: criteria[0].id,
+      score: 4,
+    });
+    await createEvaluationScore(db.sql, school.id, {
+      evaluationId: first.id,
+      criteriaTemplateId: criteria[1].id,
+      score: 2,
+    });
+    await createEvaluationScore(db.sql, school.id, {
+      evaluationId: second.id,
+      criteriaTemplateId: criteria[0].id,
+      score: 5,
+    });
+
+    const { rows } = await withTx(school.id, user.id, (tx) =>
+      listEvaluations(tx, school.id, user.id, false, { limit: 10, offset: 0 }),
+    );
+    const singles = await withTx(school.id, user.id, (tx) =>
+      Promise.all(rows.map((row) => getEvaluation(tx, school.id, row.id))),
+    );
+
+    expect(rows.map((row) => row.id).sort()).toEqual([first.id, second.id, unscored.id].sort());
+    expect(rows).toEqual(singles.map((single) => single!));
+    const scoresOf = (id: string) => rows.find((row) => row.id === id)!.scores;
+    expect(
+      scoresOf(first.id)
+        .map((score) => score.score)
+        .sort(),
+    ).toEqual([2, 4]);
+    expect(scoresOf(second.id).map((score) => score.score)).toEqual([5]);
+    expect(scoresOf(unscored.id)).toEqual([]);
+  });
 });
 
 describeDb("getEvaluation", () => {

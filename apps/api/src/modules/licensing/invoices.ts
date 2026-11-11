@@ -3,7 +3,8 @@ import { randomInt } from "node:crypto";
 import { ERROR_CODES } from "@studafy/constants";
 import postgres from "postgres";
 
-import { setTenantScope, withSystemTx } from "../../db/tenant-tx";
+import { CodedHttpException } from "../../coded-http-exception";
+import { pipelinePerSchool, withSystemTx } from "../../db/tenant-tx";
 
 import { auditLicenseChange, licenseError } from "./context";
 import { auditPlatformChange } from "./pricing";
@@ -12,6 +13,7 @@ import { readLicense, transitionLicense } from "./service";
 import type { LicenseActor } from "./context";
 import type { Audience, Changed } from "./service";
 import type { Database, DatabasePools } from "../../db/client";
+import type { SchoolStatement, SchoolStatementResults } from "../../db/tenant-tx";
 import type { PricingLine } from "@studafy/license-pricing";
 import type { TransactionSql } from "postgres";
 
@@ -512,47 +514,77 @@ function invoiceFilterSql(tx: TransactionSql, filters: InvoiceListFilters, today
   `;
 }
 
+/** The armed school's invoices, newest first, as one statement (optionally one keyset page). */
+function schoolInvoicesStatement(
+  tx: TransactionSql,
+  filters: InvoiceListFilters,
+  now: Date,
+  page?: { after: InvoiceCursor | null; limit: number },
+) {
+  return tx<InvoiceRow[]>`
+    SELECT ${INVOICE_COLUMNS(tx)}
+    FROM app.license_invoices AS i
+    JOIN app.currencies AS c ON c.id = i.currency_id
+    WHERE i.school_id = current_setting('app.school_id')::uuid
+      ${invoiceFilterSql(tx, filters, utcDate(now))}
+      ${
+        page?.after
+          ? tx`AND (i.issue_date, i.number) < (${page.after.issueDate}::date, ${page.after.number})`
+          : tx``
+      }
+    ORDER BY i.issue_date DESC, i.number DESC
+    ${page ? tx`LIMIT ${page.limit}` : tx``}
+  `;
+}
+
+function toListItem(row: InvoiceRow, now: Date): InvoiceRecord & { overdue: boolean } {
+  const invoice = toInvoice(row);
+  return { ...invoice, overdue: isOverdue(invoice, now) };
+}
+
 /** The school's invoices, newest first. */
 export async function listSchoolInvoices(
   tx: TransactionSql,
   filters: InvoiceListFilters = {},
   now: Date = new Date(),
 ): Promise<(InvoiceRecord & { overdue: boolean })[]> {
-  const rows = await tx<InvoiceRow[]>`
-    SELECT ${INVOICE_COLUMNS(tx)}
-    FROM app.license_invoices AS i
-    JOIN app.currencies AS c ON c.id = i.currency_id
-    WHERE i.school_id = current_setting('app.school_id')::uuid
-      ${invoiceFilterSql(tx, filters, utcDate(now))}
-    ORDER BY i.issue_date DESC, i.number DESC
+  const rows = await schoolInvoicesStatement(tx, filters, now);
+  return rows.map((row) => toListItem(row, now));
+}
+
+export interface ConsoleSchool {
+  id: string;
+  name: string;
+}
+
+/** The schools a console list walks (all, or the given ones), by name. */
+export async function consoleSchools(
+  tx: TransactionSql,
+  schoolIds: string[] | null,
+): Promise<ConsoleSchool[]> {
+  return tx<ConsoleSchool[]>`
+    SELECT id::text AS id, name FROM app.schools
+    ${schoolIds ? tx`WHERE id = ANY(${schoolIds}::uuid[])` : tx``}
+    ORDER BY name, id
   `;
-  return rows.map((row) => {
-    const invoice = toInvoice(row);
-    return { ...invoice, overdue: isOverdue(invoice, now) };
-  });
 }
 
 /**
- * Walk schools for the console's cross-school lists: one system transaction, each school's scope
- * armed in turn (the platform console's convention -- no policy is ever widened).
+ * Walk schools for the console's cross-school lists: one system transaction, each school's
+ * statements run under its own armed scope (the platform console's convention -- no policy is ever
+ * widened), all schools pipelined in one round trip (`pipelinePerSchool`). `statements` builds the
+ * school's queries without awaiting them; `collect` turns their rows into the school's items.
  */
-export async function forEachSchool<T>(
+export async function forEachSchool<const Q extends readonly SchoolStatement[], T>(
   database: Database | DatabasePools,
   schoolIds: string[] | null,
-  fn: (tx: TransactionSql, school: { id: string; name: string }) => Promise<T[]>,
+  statements: (tx: TransactionSql, school: ConsoleSchool) => Q,
+  collect: (results: SchoolStatementResults<Q>, school: ConsoleSchool) => T[],
 ): Promise<T[]> {
   return withSystemTx(database, async (tx) => {
-    const schools = await tx<{ id: string; name: string }[]>`
-      SELECT id::text AS id, name FROM app.schools
-      ${schoolIds ? tx`WHERE id = ANY(${schoolIds}::uuid[])` : tx``}
-      ORDER BY name, id
-    `;
-    const out: T[] = [];
-    for (const school of schools) {
-      await setTenantScope(tx, school.id);
-      out.push(...(await fn(tx, school)));
-    }
-    return out;
+    const schools = await consoleSchools(tx, schoolIds);
+    const results = await pipelinePerSchool(tx, schools, (school) => statements(tx, school));
+    return schools.flatMap((school, index) => collect(results[index]!, school));
   });
 }
 
@@ -561,26 +593,80 @@ export interface PlatformInvoiceListItem extends InvoiceRecord {
   overdue: boolean;
 }
 
-/** Invoices across schools (or one school), filtered, newest first. */
+/** Where the next page of the cross-school invoice list starts: after this (issue date, number). */
+interface InvoiceCursor {
+  issueDate: string;
+  number: string;
+}
+
+function encodeInvoiceCursor(invoice: { issueDate: string; number: string }): string {
+  return Buffer.from(
+    JSON.stringify({ issueDate: invoice.issueDate, number: invoice.number }),
+  ).toString("base64url");
+}
+
+function decodeInvoiceCursor(cursor: string): InvoiceCursor {
+  try {
+    const decoded: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
+    const { issueDate, number } = (decoded ?? {}) as Partial<InvoiceCursor>;
+    if (
+      typeof issueDate !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(issueDate) ||
+      typeof number !== "string" ||
+      number.length > 64
+    ) {
+      throw new Error("invalid cursor shape");
+    }
+    return { issueDate, number };
+  } catch {
+    throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Invalid pagination cursor");
+  }
+}
+
+/** Default and largest page of the cross-school invoice list. */
+export const PLATFORM_INVOICE_PAGE_DEFAULT = 100;
+export const PLATFORM_INVOICE_PAGE_MAX = 200;
+
+export interface PlatformInvoicePage {
+  invoices: PlatformInvoiceListItem[];
+  /** Pass back as `cursor` for the next page; null on the last page. */
+  nextCursor: string | null;
+}
+
+const newestFirst = (a: PlatformInvoiceListItem, b: PlatformInvoiceListItem) =>
+  a.issueDate === b.issueDate
+    ? b.number.localeCompare(a.number)
+    : b.issueDate.localeCompare(a.issueDate);
+
+/**
+ * Invoices across schools (or one school), filtered, newest first, one keyset page at a time.
+ * Invoice numbers are unique across the platform, so (issue date, number) orders every invoice;
+ * each school returns at most a page (+1, to know whether more follow) after the cursor, and the
+ * merged list is cut to the page.
+ */
 export async function listInvoicesAcrossSchools(
   database: Database | DatabasePools,
-  filters: InvoiceListFilters & { schoolId?: string },
+  filters: InvoiceListFilters & { schoolId?: string; limit?: number; cursor?: string },
   now: Date = new Date(),
-): Promise<PlatformInvoiceListItem[]> {
+): Promise<PlatformInvoicePage> {
+  const limit = Math.min(
+    Math.max(filters.limit ?? PLATFORM_INVOICE_PAGE_DEFAULT, 1),
+    PLATFORM_INVOICE_PAGE_MAX,
+  );
+  const after = filters.cursor ? decodeInvoiceCursor(filters.cursor) : null;
   const items = await forEachSchool(
     database,
     filters.schoolId ? [filters.schoolId] : null,
-    async (tx, school) =>
-      (await listSchoolInvoices(tx, filters, now)).map((invoice) => ({
-        ...invoice,
-        schoolName: school.name,
-      })),
+    (tx) => [schoolInvoicesStatement(tx, filters, now, { after, limit: limit + 1 })] as const,
+    ([rows], school) => rows.map((row) => ({ ...toListItem(row, now), schoolName: school.name })),
   );
-  return items.sort((a, b) =>
-    a.issueDate === b.issueDate
-      ? b.number.localeCompare(a.number)
-      : b.issueDate.localeCompare(a.issueDate),
-  );
+  items.sort(newestFirst);
+  const invoices = items.slice(0, limit);
+  const last = invoices.at(-1);
+  return {
+    invoices,
+    nextCursor: items.length > limit && last ? encodeInvoiceCursor(last) : null,
+  };
 }
 
 export interface PendingReceipt extends ReceiptView {
@@ -595,27 +681,31 @@ export interface PendingReceipt extends ReceiptView {
 export async function listPendingReceipts(
   database: Database | DatabasePools,
 ): Promise<PendingReceipt[]> {
-  const items = await forEachSchool(database, null, async (tx, school) => {
-    const rows = await tx<
-      (ReceiptRow & { number: string; balance_minor: string; currency_code: string })[]
-    >`
-      SELECT ${RECEIPT_COLUMNS(tx)}, i.number, i.balance_minor::text AS balance_minor,
-             c.code AS currency_code
-      FROM app.license_payment_receipts AS r
-      JOIN app.license_invoices AS i ON i.id = r.invoice_id AND i.school_id = r.school_id
-      JOIN app.currencies AS c ON c.id = i.currency_id
-      WHERE r.school_id = current_setting('app.school_id')::uuid AND r.status = 'pending'
-      ORDER BY r.created_at
-    `;
-    return rows.map((row) => ({
-      ...toReceipt(row),
-      schoolId: school.id,
-      schoolName: school.name,
-      invoiceNumber: row.number,
-      invoiceBalanceMinor: Number(row.balance_minor),
-      currencyCode: row.currency_code,
-    }));
-  });
+  const items = await forEachSchool(
+    database,
+    null,
+    (tx) =>
+      [
+        tx<(ReceiptRow & { number: string; balance_minor: string; currency_code: string })[]>`
+          SELECT ${RECEIPT_COLUMNS(tx)}, i.number, i.balance_minor::text AS balance_minor,
+                 c.code AS currency_code
+          FROM app.license_payment_receipts AS r
+          JOIN app.license_invoices AS i ON i.id = r.invoice_id AND i.school_id = r.school_id
+          JOIN app.currencies AS c ON c.id = i.currency_id
+          WHERE r.school_id = current_setting('app.school_id')::uuid AND r.status = 'pending'
+          ORDER BY r.created_at
+        `,
+      ] as const,
+    ([rows], school) =>
+      rows.map((row) => ({
+        ...toReceipt(row),
+        schoolId: school.id,
+        schoolName: school.name,
+        invoiceNumber: row.number,
+        invoiceBalanceMinor: Number(row.balance_minor),
+        currencyCode: row.currency_code,
+      })),
+  );
   return items.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
@@ -642,18 +732,19 @@ export async function financeTotals(
   const rows = await forEachSchool(
     database,
     null,
-    async (tx) =>
-      tx<
-        {
-          currency_code: string;
-          minor_unit: number;
-          received: string;
-          outstanding: string;
-          overdue: string;
-          unpaid: number;
-          overdue_count: number;
-        }[]
-      >`
+    (tx) =>
+      [
+        tx<
+          {
+            currency_code: string;
+            minor_unit: number;
+            received: string;
+            outstanding: string;
+            overdue: string;
+            unpaid: number;
+            overdue_count: number;
+          }[]
+        >`
       WITH open_invoices AS (
         SELECT i.currency_id, i.balance_minor, i.due_date
         FROM app.license_invoices AS i
@@ -683,6 +774,8 @@ export async function financeTotals(
       FROM currencies AS cur
       JOIN app.currencies AS c ON c.id = cur.currency_id
     `,
+      ] as const,
+    ([schoolRows]) => [...schoolRows],
   );
 
   const totals = new Map<string, FinanceTotals>();

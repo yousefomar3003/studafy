@@ -34,9 +34,15 @@ export interface ReportJobContext {
  * so the registry can build it once per job and hand it to the runner.
  */
 export interface ReportRunnerConfig {
+  /** Used only when `sql` is absent: a dedicated pool is opened per job (tests). */
   primaryDatabaseUrl: string;
+  /** Used only when `readSql` is absent, likewise. */
   readDatabaseUrl?: string;
   databaseCaCert?: string;
+  /** The process-wide primary pool (db/pool.ts). Borrowed, never ended here. */
+  sql?: Sql;
+  /** The process-wide read pool (db/pool.ts). Borrowed, never ended here. */
+  readSql?: Sql;
   s3Region?: string;
   s3Endpoint?: string;
   bucket?: string;

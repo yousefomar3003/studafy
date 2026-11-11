@@ -30,3 +30,12 @@ export const TURNSTILE_SITE_KEY =
  */
 export const SHOW_MOCK_LOGIN =
   import.meta.env.DEV || import.meta.env.VITE_ENABLE_MOCK_AUTH === "true";
+
+/**
+ * Whether the app opens the realtime WebSocket (`lib/realtime`) at all. Off unless the build sets
+ * `VITE_REALTIME_ENABLED=true`: live updates are deferred (the gateway's cost was not worth it yet),
+ * every page already loads fresh data when opened, and an attempted socket would both log
+ * handshake errors and wake the scaled-to-zero realtime machine (infra/fly/realtime.toml) on every
+ * signed-in page view. While off, the client stays `idle` and never asks the API for a ticket.
+ */
+export const REALTIME_ENABLED = import.meta.env.VITE_REALTIME_ENABLED === "true";

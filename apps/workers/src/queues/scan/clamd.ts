@@ -30,7 +30,29 @@ export interface ClamdConfig {
   port: number;
   timeoutMs: number;
   maxFileBytes: number;
+  /**
+   * How long {@link scanStream} waits for clamd to answer PING before streaming, for a clamd that
+   * starts on demand (see {@link CLAMD_STARTUP_WAIT_MS}). Unset or 0: no readiness wait, the scan is
+   * attempted straight away.
+   */
+  startupWaitMs?: number;
 }
+
+/**
+ * The readiness wait production uses (registry.ts). On fly.io the scanner app scales to zero
+ * (infra/fly/scanner.toml): the first connection after an idle spell makes fly's proxy start the
+ * machine, and clamd then needs about 30 seconds (freshclam plus loading the signatures) before it
+ * listens. Without the wait, the job's three attempts (5 s and 10 s apart) can all land inside that
+ * window, and the upload would be marked failed although nothing is wrong with it. Two minutes is
+ * several times the measured cold start, and still well inside the job's lock (renewed while the
+ * worker waits).
+ */
+export const CLAMD_STARTUP_WAIT_MS = 120_000;
+/** Pause between readiness probes while clamd is starting. */
+const PING_RETRY_DELAY_MS = 2_000;
+/** A single probe's own limit: PONG is immediate from a running clamd. */
+const PING_TIMEOUT_MS = 5_000;
+const PING_COMMAND = Buffer.from("zPING\0", "utf8");
 
 export type ScanVerdict =
   { kind: "clean" } | { kind: "infected"; virus: string } | { kind: "error"; message: string };
@@ -82,6 +104,70 @@ function writeFrame(socket: Socket, frame: Uint8Array): Promise<void> {
 }
 
 /**
+ * One PING/PONG round trip. Resolves when clamd answers PONG; rejects with a {@link ClamdScanError}
+ * on anything else (refused, reset by fly's proxy while the machine is still booting, timeout).
+ */
+export function pingClamd(config: Pick<ClamdConfig, "host" | "port" | "timeoutMs">): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const socket = createConnection({ host: config.host, port: config.port });
+    let settled = false;
+    let response = "";
+    const finish = (error: string | null) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      if (error === null) resolve();
+      else reject(new ClamdScanError(error));
+    };
+    socket.setTimeout(Math.min(config.timeoutMs, PING_TIMEOUT_MS), () => {
+      finish("clamd did not answer PING in time");
+    });
+    socket.on("error", (error) => finish(`clamd connection error: ${error.message}`));
+    socket.on("data", (chunk: Buffer) => {
+      response += chunk.toString("utf8");
+      if (response.length > MAX_RESPONSE_BYTES) {
+        finish("clamd PING response exceeded the size limit");
+      } else if (response.includes("\0")) {
+        const answer = response.replace(/\0+$/, "").trim();
+        finish(answer === "PONG" ? null : `clamd answered PING with "${answer}"`);
+      }
+    });
+    socket.on("close", () => finish("clamd closed the connection before answering PING"));
+    socket.on("connect", () => {
+      socket.write(PING_COMMAND);
+    });
+  });
+}
+
+/**
+ * Wait until clamd answers PING, probing every couple of seconds for up to `startupWaitMs`. This is
+ * what lets the scanner start on demand: the scan's object stream can only be read once, so it is
+ * not opened until clamd is known to be listening. Throws a {@link ClamdScanError} (the job then
+ * retries, and fails closed on its last attempt) when clamd is still not answering at the deadline.
+ */
+export async function waitForClamd(
+  config: Pick<ClamdConfig, "host" | "port" | "timeoutMs"> & { startupWaitMs: number },
+  sleep: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  now: () => number = Date.now,
+): Promise<void> {
+  const deadline = now() + config.startupWaitMs;
+  for (;;) {
+    try {
+      await pingClamd(config);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (now() + PING_RETRY_DELAY_MS > deadline) {
+        throw new ClamdScanError(
+          `clamd not ready after waiting ${config.startupWaitMs}ms: ${message}`,
+        );
+      }
+    }
+    await sleep(PING_RETRY_DELAY_MS);
+  }
+}
+
+/**
  * Stream `body` to clamd and resolve with the verdict.
  *
  * `body` is an async iterable of bytes — exactly the shape of an S3 `GetObjectCommand` body, so
@@ -93,6 +179,9 @@ export async function scanStream(
   body: AsyncIterable<Uint8Array>,
   config: ClamdConfig,
 ): Promise<ScanVerdict> {
+  if (config.startupWaitMs) {
+    await waitForClamd({ ...config, startupWaitMs: config.startupWaitMs });
+  }
   const socket = createConnection({ host: config.host, port: config.port });
 
   return await new Promise<ScanVerdict>((resolve, reject) => {

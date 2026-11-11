@@ -10,7 +10,7 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import { ClamdScanError, parseClamdResponse, scanStream } from "./clamd";
+import { ClamdScanError, parseClamdResponse, pingClamd, scanStream, waitForClamd } from "./clamd";
 import { startFakeClamd, startSilentServer } from "./test-clamd-server";
 
 import type { ClamdConfig } from "./clamd";
@@ -147,5 +147,93 @@ describe("scanStream", () => {
     await expect(
       scanStream(fromBuffer(new TextEncoder().encode("nowhere")), baseConfig({ port: fake.port })),
     ).rejects.toBeInstanceOf(ClamdScanError);
+  });
+});
+
+describe("on-demand clamd (readiness wait)", () => {
+  const instantSleep = () => Promise.resolve();
+
+  test("pingClamd resolves on PONG", async () => {
+    const fake = await startFakeClamd(() => "stream: OK");
+    try {
+      await pingClamd(baseConfig({ port: fake.port }));
+    } finally {
+      await fake.close();
+    }
+  });
+
+  test("pingClamd rejects with a ClamdScanError when the connection is reset", async () => {
+    const fake = await startFakeClamd(() => "stream: OK", { resetFirst: 1 });
+    try {
+      await expect(pingClamd(baseConfig({ port: fake.port }))).rejects.toBeInstanceOf(
+        ClamdScanError,
+      );
+    } finally {
+      await fake.close();
+    }
+  });
+
+  test("waitForClamd keeps probing while clamd boots, then returns", async () => {
+    const fake = await startFakeClamd(() => "stream: OK", { resetFirst: 3 });
+    try {
+      await waitForClamd(
+        { ...baseConfig({ port: fake.port }), startupWaitMs: 60_000 },
+        instantSleep,
+      );
+      expect(fake.connections()).toBe(4);
+    } finally {
+      await fake.close();
+    }
+  });
+
+  test("waitForClamd gives up at the deadline with a ClamdScanError", async () => {
+    const silent = await startSilentServer();
+    const port = silent.port;
+    await silent.close();
+    let clock = 0;
+    const sleep = (ms: number) => {
+      clock += ms;
+      return Promise.resolve();
+    };
+    const error = await waitForClamd(
+      { ...baseConfig({ port }), startupWaitMs: 10_000 },
+      sleep,
+      () => clock,
+    ).catch((caught: unknown) => caught);
+    expect(error).toBeInstanceOf(ClamdScanError);
+    expect((error as Error).message).toContain("clamd not ready after waiting 10000ms");
+    // Probes every 2 s inside a 10 s window, never past it.
+    expect(clock).toBeLessThanOrEqual(10_000);
+  });
+
+  test("scanStream with a startup wait pings first, then scans on a fresh connection", async () => {
+    const fake = await startFakeClamd(() => "stream: OK");
+    try {
+      const bytes = new TextEncoder().encode("scanned after a readiness probe");
+      const verdict = await scanStream(
+        fromBuffer(bytes),
+        baseConfig({ port: fake.port, startupWaitMs: 5_000 }),
+      );
+      expect(verdict).toEqual({ kind: "clean" });
+      expect(Buffer.from(fake.receivedPayload()).equals(bytes)).toBe(true);
+      expect(fake.connections()).toBe(2);
+    } finally {
+      await fake.close();
+    }
+  });
+
+  test("scanStream rides out a cold start: the object is streamed only once clamd answers", async () => {
+    const fake = await startFakeClamd(() => "stream: OK", { resetFirst: 1 });
+    try {
+      const bytes = new TextEncoder().encode("uploaded while the scanner was stopped");
+      const verdict = await scanStream(
+        fromBuffer(bytes),
+        baseConfig({ port: fake.port, startupWaitMs: 10_000 }),
+      );
+      expect(verdict).toEqual({ kind: "clean" });
+      expect(Buffer.from(fake.receivedPayload()).equals(bytes)).toBe(true);
+    } finally {
+      await fake.close();
+    }
   });
 });

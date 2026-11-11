@@ -104,7 +104,7 @@ export default function PrincipalDashboardPage() {
     approvals: approvals.data?.total ?? 0,
     incidents: incidents.data?.total ?? 0,
     reports: reports.data?.total ?? 0,
-    evaluations: evaluations.data?.length ?? 0,
+    evaluations: evaluations.data?.total ?? 0,
   };
 
   const summary = useSummarySentence(

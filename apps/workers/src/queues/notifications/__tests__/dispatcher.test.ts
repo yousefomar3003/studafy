@@ -717,7 +717,7 @@ describeDb("handleDeadLetter", () => {
         stacktrace: ["Error: boom\n    at somewhere"],
       },
       error: new Error("boom"),
-      databaseUrl: databaseUrl!,
+      database: databaseUrl!,
       queueName: "notifications",
       log,
     });
@@ -769,7 +769,7 @@ describeDb("handleDeadLetter", () => {
         finishedOn: Date.now(),
       },
       error: new Error("boom"),
-      databaseUrl: databaseUrl!,
+      database: databaseUrl!,
       queueName: "notifications",
       log,
     };
