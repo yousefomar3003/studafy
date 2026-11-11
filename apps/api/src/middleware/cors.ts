@@ -111,6 +111,7 @@ export function corsMiddleware(options?: CorsOptions): MiddlewareHandler {
     }
 
     // For non-preflight requests, validate origin if present
+    const headers: [string, string][] = [];
     if (origin) {
       const validationResult = validateOrigin(origin, allowedOrigins);
 
@@ -122,20 +123,25 @@ export function corsMiddleware(options?: CorsOptions): MiddlewareHandler {
         return;
       }
 
-      c.header("Access-Control-Allow-Origin", origin);
+      headers.push(["Access-Control-Allow-Origin", origin]);
       if (allowCredentials) {
-        c.header("Access-Control-Allow-Credentials", "true");
+        headers.push(["Access-Control-Allow-Credentials", "true"]);
       }
     }
 
     // Always set Vary header for proper caching
-    c.header("Vary", "Origin");
+    headers.push(["Vary", "Origin"]);
 
     // Expose headers to the client
     if (exposedHeaders.length > 0) {
-      c.header("Access-Control-Expose-Headers", exposedHeaders.join(", "));
+      headers.push(["Access-Control-Expose-Headers", exposedHeaders.join(", ")]);
     }
 
+    for (const [name, value] of headers) c.header(name, value);
     await next();
+    // Again on the final response: a handler that returns its own `Response` (a file download)
+    // replaces the context's, and Hono drops headers set before one existed. Without this the
+    // browser refuses to hand that response to the page (the Excel template download, 2026-11-11).
+    for (const [name, value] of headers) c.header(name, value);
   };
 }
