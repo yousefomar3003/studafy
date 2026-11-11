@@ -35,6 +35,10 @@ import {
   writeBankDetails,
 } from "../../src/modules/licensing";
 import { inSchool } from "../../src/modules/licensing/context";
+import {
+  listInvoicesAcrossSchools,
+  listSchoolInvoices,
+} from "../../src/modules/licensing/invoices";
 import { readLicense } from "../../src/modules/licensing/service";
 import {
   assignRole,
@@ -942,6 +946,71 @@ describe("tenant isolation", () => {
     expect(await denied("UPDATE app.license_payments SET note = 'x'")).toBe("42501");
     expect(await denied("DELETE FROM app.license_invoices")).toBe("42501");
   });
+});
+
+describe("cross-school invoice list", () => {
+  integrationTest(
+    "matches walking the schools one at a time, and pages through it without gaps",
+    async () => {
+      const a = await school(0, "Paging A");
+      const b = await school(0, "Paging B");
+      await accepted(a, (await sentQuote(a, newTerm(2))).id);
+      await accepted(b, (await sentQuote(b, newTerm(4))).id);
+
+      // The reference: each school's own list under its own scope, merged newest first -- the
+      // walk the console did before it pipelined the schools.
+      const now = new Date();
+      const schools = await asAdmin(
+        null,
+        (tx) =>
+          tx<{ id: string; name: string }[]>`
+          SELECT id::text AS id, name FROM app.schools ORDER BY name, id
+        `,
+      );
+      const expected = [];
+      for (const s of schools) {
+        const own = await asAdmin(s.id, (tx) => listSchoolInvoices(tx, { status: "all" }, now));
+        expected.push(...own.map((invoice) => ({ ...invoice, schoolName: s.name })));
+      }
+      expected.sort((x, y) =>
+        x.issueDate === y.issueDate
+          ? y.number.localeCompare(x.number)
+          : y.issueDate.localeCompare(x.issueDate),
+      );
+      expect(expected.length).toBeGreaterThan(3);
+      expect(expected.length).toBeLessThanOrEqual(200);
+
+      const whole = await listInvoicesAcrossSchools(db.sql, { status: "all", limit: 200 }, now);
+      expect(whole.invoices).toEqual(expected);
+      expect(whole.nextCursor).toBeNull();
+
+      const paged = [];
+      let cursor: string | undefined;
+      for (let page = 0; page < 100; page += 1) {
+        const next = await listInvoicesAcrossSchools(
+          db.sql,
+          { status: "all", limit: 2, cursor },
+          now,
+        );
+        expect(next.invoices.length).toBeLessThanOrEqual(2);
+        paged.push(...next.invoices);
+        if (!next.nextCursor) break;
+        cursor = next.nextCursor;
+      }
+      expect(paged).toEqual(expected);
+
+      const one = await listInvoicesAcrossSchools(
+        db.sql,
+        { status: "all", schoolId: b.schoolId },
+        now,
+      );
+      expect(one.invoices.map((i) => i.schoolId)).toEqual([b.schoolId]);
+
+      expect(
+        await refusal(listInvoicesAcrossSchools(db.sql, { status: "all", cursor: "nope" }, now)),
+      ).toBe("VALIDATION_FAILED");
+    },
+  );
 });
 
 // ---------------------------------------------------------------------------------------------------

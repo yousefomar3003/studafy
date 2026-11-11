@@ -1,6 +1,10 @@
 import { z } from "@hono/zod-openapi";
 
-import { INVOICE_STATUSES } from "./invoices";
+import {
+  INVOICE_STATUSES,
+  PLATFORM_INVOICE_PAGE_DEFAULT,
+  PLATFORM_INVOICE_PAGE_MAX,
+} from "./invoices";
 import { QUOTE_STATUSES } from "./quotes";
 import { audienceSchema } from "./schemas";
 import { AUDIENCES } from "./service";
@@ -74,6 +78,18 @@ export const invoiceListQuerySchema = z.object({
 
 export const platformInvoiceListQuerySchema = invoiceListQuerySchema.extend({
   schoolId: uuid.optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(PLATFORM_INVOICE_PAGE_MAX)
+    .default(PLATFORM_INVOICE_PAGE_DEFAULT)
+    .openapi({ description: "Invoices per page." }),
+  cursor: z
+    .string()
+    .max(512)
+    .optional()
+    .openapi({ description: "The previous page's `nextCursor`, for the page after it." }),
 });
 
 // ---------------------------------------------------------------------------------------------------
@@ -357,6 +373,9 @@ export const platformInvoiceListSchema = z
         .openapi("PlatformLicenseInvoiceListItem"),
     ),
     status: invoiceFilterSchema,
+    nextCursor: z.string().nullable().openapi({
+      description: "Pass as `cursor` to read the next page; null when this is the last page.",
+    }),
   })
   .openapi("PlatformLicenseInvoiceList");
 

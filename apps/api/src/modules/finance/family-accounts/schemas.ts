@@ -269,6 +269,10 @@ export const bulkReminderResultSchema = z
     nothing_overdue: z.number().int(),
     no_guardians: z.number().int(),
     delivered: z.number().int().openapi({ description: "Guardians notified in total." }),
+    remaining: z.number().int().openapi({
+      description:
+        "Families still due a reminder that this request left for the next one (per-request cap).",
+    }),
   })
   .openapi("BulkReminderResult");
 

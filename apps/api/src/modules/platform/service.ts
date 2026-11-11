@@ -7,11 +7,11 @@
  * `studafy_admin` too (ADR-0015), with `current_setting('app.school_id')` read fail-closed. So
  * nothing in this file ever queries a tenant table across schools in one statement. Global tables
  * (`schools`, `plans`, `plan_prices`, `platform_settings`, `countries`, `currencies`) are read
- * directly; per-school figures are read by arming each school's scope in turn with
- * `setTenantScope` inside one `withSystemTx` -- the GUC is transaction-local and re-settable, so a
- * single connection walks the schools one at a time without ever widening any policy. That costs
- * one small query per school, which is the price of keeping isolation provable; list endpoints
- * page the schools first so a page costs at most `limit` of them.
+ * directly; per-school figures are read by arming each school's scope in turn inside one
+ * `withSystemTx` -- the GUC is transaction-local and re-settable, so a single connection walks the
+ * schools one at a time without ever widening any policy. That costs one small query per school,
+ * which is the price of keeping isolation provable; `pipelinePerSchool` sends them all in one round
+ * trip, and list endpoints page the schools first so a page costs at most `limit` of them.
  *
  * ## Audit
  *
@@ -27,7 +27,7 @@ import { FEATURE_FLAGS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { cacheKey } from "../../cache";
-import { setTenantScope, withSystemTx } from "../../db/tenant-tx";
+import { pipelinePerSchool, setTenantScope, withSystemTx } from "../../db/tenant-tx";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import type { MemberStatus, SchoolStatus } from "./schemas";
@@ -145,10 +145,9 @@ async function loadSchool(tx: TransactionSql, schoolId: string, lock = false) {
   return row;
 }
 
-/** Arms `schoolId`'s scope and reads its per-school figures. Leaves the scope armed. */
-async function loadSchoolStats(tx: TransactionSql, schoolId: string): Promise<SchoolStatsRow> {
-  await setTenantScope(tx, schoolId);
-  const rows = await tx<SchoolStatsRow[]>`
+/** The armed school's per-school figures: one row. */
+function schoolStatsStatement(tx: TransactionSql) {
+  return tx<SchoolStatsRow[]>`
     SELECT
       (SELECT count(*)::int FROM app.users WHERE status = 'active') AS active_users,
       (SELECT count(DISTINCT user_id)::int FROM app.user_roles WHERE role = 'STUDENT') AS students,
@@ -163,7 +162,22 @@ async function loadSchoolStats(tx: TransactionSql, schoolId: string): Promise<Sc
     LEFT JOIN app.subscriptions sub ON true
     LEFT JOIN app.plans p ON p.id = sub.plan_id
   `;
+}
+
+/** Arms `schoolId`'s scope and reads its per-school figures. Leaves the scope armed. */
+async function loadSchoolStats(tx: TransactionSql, schoolId: string): Promise<SchoolStatsRow> {
+  await setTenantScope(tx, schoolId);
+  const rows = await schoolStatsStatement(tx);
   return rows[0]!;
+}
+
+/** Each school's per-school figures, in `schools` order, in one round trip. */
+async function loadSchoolStatsFor(
+  tx: TransactionSql,
+  schools: readonly { id: string }[],
+): Promise<SchoolStatsRow[]> {
+  const results = await pipelinePerSchool(tx, schools, () => [schoolStatsStatement(tx)]);
+  return results.map(([rows]) => rows[0]!);
 }
 
 const iso = (value: Date) => value.toISOString();
@@ -255,11 +269,12 @@ export async function getPlatformOverview(database: Database) {
     let trialsEndingIn7Days = 0;
     let activeAiSubscriptions = 0;
 
-    for (const school of schools) {
+    const allStats = await loadSchoolStatsFor(tx, schools);
+    for (const [index, school] of schools.entries()) {
       schoolsByStatus[school.status] += 1;
       if (now - school.created_at.getTime() <= 30 * DAY) newSchoolsLast30Days += 1;
 
-      const stats = await loadSchoolStats(tx, school.id);
+      const stats = allStats[index]!;
       totalActiveUsers += stats.active_users;
       totalStudents += stats.students;
       activeAiSubscriptions += stats.active_ai_subscriptions;
@@ -415,16 +430,36 @@ export async function getPlatformFinance(database: Database) {
       failureReason: string | null;
     }[] = [];
 
-    for (const school of schools) {
-      await setTenantScope(tx, school.id);
-
-      const [sub] = await tx<FinanceSubscriptionRow[]>`
+    const perSchool = await pipelinePerSchool(tx, schools, () => [
+      tx<FinanceSubscriptionRow[]>`
         SELECT sub.status::text AS status, sub.plan_id, p.display_name AS plan_name,
                sub.cancel_at_period_end, sub.grace_period_ends_at, sub.trial_expires_at,
                sub.current_period_end
         FROM app.subscriptions sub
         JOIN app.plans p ON p.id = sub.plan_id
-      `;
+      `,
+      tx<RenewalAggregateRow[]>`
+        SELECT r.currency_code, COALESCE(cur.minor_unit, 2)::int AS minor_unit, r.status::text,
+               count(*)::int AS attempts, COALESCE(sum(r.amount_minor), 0)::text AS amount_minor
+        FROM app.tap_renewal_attempts r
+        LEFT JOIN app.currencies cur ON cur.code = r.currency_code
+        WHERE r.attempted_at >= ${renewalSince}
+        GROUP BY r.currency_code, cur.minor_unit, r.status
+      `,
+      tx<FailedRenewalRow[]>`
+        SELECT r.id, r.subscription_type::text AS subscription_type, r.attempted_at,
+               r.amount_minor::text, r.currency_code, COALESCE(cur.minor_unit, 2)::int AS minor_unit,
+               r.failure_reason
+        FROM app.tap_renewal_attempts r
+        LEFT JOIN app.currencies cur ON cur.code = r.currency_code
+        WHERE r.status = 'failed'
+        ORDER BY r.attempted_at DESC
+        LIMIT ${RECENT_FAILED_RENEWALS_LIMIT}
+      `,
+    ]);
+
+    for (const [index, school] of schools.entries()) {
+      const [[sub], aggregates, failed] = perSchool[index]!;
 
       if (sub) {
         if (BILLED_STATUSES.has(sub.status)) {
@@ -466,14 +501,6 @@ export async function getPlatformFinance(database: Database) {
         }
       }
 
-      const aggregates = await tx<RenewalAggregateRow[]>`
-        SELECT r.currency_code, COALESCE(cur.minor_unit, 2)::int AS minor_unit, r.status::text,
-               count(*)::int AS attempts, COALESCE(sum(r.amount_minor), 0)::text AS amount_minor
-        FROM app.tap_renewal_attempts r
-        LEFT JOIN app.currencies cur ON cur.code = r.currency_code
-        WHERE r.attempted_at >= ${renewalSince}
-        GROUP BY r.currency_code, cur.minor_unit, r.status
-      `;
       for (const row of aggregates) {
         const bucket = renewals.get(row.currency_code) ?? {
           currencyCode: row.currency_code,
@@ -491,16 +518,6 @@ export async function getPlatformFinance(database: Database) {
         renewals.set(row.currency_code, bucket);
       }
 
-      const failed = await tx<FailedRenewalRow[]>`
-        SELECT r.id, r.subscription_type::text AS subscription_type, r.attempted_at,
-               r.amount_minor::text, r.currency_code, COALESCE(cur.minor_unit, 2)::int AS minor_unit,
-               r.failure_reason
-        FROM app.tap_renewal_attempts r
-        LEFT JOIN app.currencies cur ON cur.code = r.currency_code
-        WHERE r.status = 'failed'
-        ORDER BY r.attempted_at DESC
-        LIMIT ${RECENT_FAILED_RENEWALS_LIMIT}
-      `;
       for (const row of failed) {
         failedRenewals.push({
           id: row.id,
@@ -568,10 +585,8 @@ export async function listSchools(database: Database, filters: SchoolListFilters
       LIMIT ${filters.limit} OFFSET ${filters.offset}
     `;
 
-    const schools = [];
-    for (const row of rows) {
-      schools.push(toSummary(row, await loadSchoolStats(tx, row.id)));
-    }
+    const stats = await loadSchoolStatsFor(tx, rows);
+    const schools = rows.map((row, index) => toSummary(row, stats[index]!));
     return { schools, total: total ?? 0 };
   });
 }
