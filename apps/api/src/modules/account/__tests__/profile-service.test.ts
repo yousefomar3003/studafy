@@ -8,6 +8,7 @@
  *   TEST_DATABASE_URL=postgres://... bun test src/modules/account/__tests__/profile-service.test.ts
  */
 
+import { LEGAL_DOCUMENT_VERSIONS } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -56,9 +57,10 @@ describeDb("getAccountProfile", () => {
       member_ids: [],
       deletion_due_at: null,
       deletion_requires_member_credentials: false,
-      terms_version: null,
-      privacy_version: null,
-      legal_accepted_at: null,
+      // Test users are created having accepted the current documents (tests/harness/factories.ts).
+      terms_version: LEGAL_DOCUMENT_VERSIONS.terms,
+      privacy_version: LEGAL_DOCUMENT_VERSIONS.privacy,
+      legal_accepted_at: expect.any(Date),
       school_id: school.id,
       school_name: "Al-Noor Academy",
     });
