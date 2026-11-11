@@ -533,6 +533,8 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           s3Endpoint: workerEnv.S3_ENDPOINT,
           bucket: workerEnv.S3_APP_FILES_BUCKET,
           stripeSecretKey: workerEnv.STRIPE_SECRET_KEY,
+          googlePlayPackageName: workerEnv.GOOGLE_PLAY_PACKAGE_NAME,
+          googlePlayServiceAccount: workerEnv.GOOGLE_PLAY_SERVICE_ACCOUNT,
           recordKeyring: resolveRecordKeyring(workerEnv),
         },
         enqueueDsrJob,

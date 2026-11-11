@@ -2,12 +2,14 @@ import { ApiError } from "@studafy/api-client";
 import { Button, Card, useToast } from "@studafy/ui";
 import { useState } from "react";
 
+import { useAccountProfileQuery } from "../../../components/home/HomeHeader";
 import { useSessionStore } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { ConfirmDialog } from "../sessions/ConfirmDialog";
 
 import { useDeleteAccount } from "./mutations";
 import { useSelfDsrRequestsQuery } from "./queries";
+import { StoreSubscriptionWarning } from "./StoreSubscriptionWarning";
 
 import type { AccountDeletion } from "./mutations";
 
@@ -24,6 +26,10 @@ function apiErrorMessage(error: unknown, fallback: string): string {
  * `POST /api/account/deletion` signs the caller out everywhere, so the success state is rendered
  * from the response alone (no refetch could succeed) and ends with a local sign-out. A request
  * filed earlier through `POST /api/privacy/me/dsr` still shows as pending instead of the action.
+ *
+ * An App Store / Google Play AI subscription (own, or a linked child's) keeps billing after the
+ * deletion, so the profile's `active_store_subscriptions` puts a warning with the store's cancel
+ * steps before the action, and the response's copy repeats it once the deletion is scheduled.
  */
 export default function DeleteAccountPage() {
   const { t } = useTranslation();
@@ -31,6 +37,7 @@ export default function DeleteAccountPage() {
   const { show } = useToast();
   const sessionStore = useSessionStore();
   const requestsQuery = useSelfDsrRequestsQuery();
+  const profileQuery = useAccountProfileQuery();
   const deleteAccount = useDeleteAccount();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deletion, setDeletion] = useState<AccountDeletion | null>(null);
@@ -79,6 +86,7 @@ export default function DeleteAccountPage() {
               date: formatDate(new Date(deletion.completes_by)),
             })}
           </p>
+          <StoreSubscriptionWarning subscriptions={deletion.active_store_subscriptions} />
           <p>{t("accountDeletion.completedRetainedIntro")}</p>
           <ul>
             {deletion.retained_records.map((record) => (
@@ -115,6 +123,9 @@ export default function DeleteAccountPage() {
             </p>
           ) : (
             <>
+              <StoreSubscriptionWarning
+                subscriptions={profileQuery.data?.active_store_subscriptions}
+              />
               <p>{t("accountDeletion.consequenceIntro")}</p>
               <ul>
                 <li>{t("accountDeletion.consequenceSignOut")}</li>

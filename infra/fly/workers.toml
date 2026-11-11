@@ -41,6 +41,9 @@ primary_region = "fra"
   SES_FROM_NAME = "Studafy"
   EMAIL_DRY_RUN = "false"
   PUSH_DRY_RUN = "false"
+  # With the GOOGLE_PLAY_SERVICE_ACCOUNT secret, the account-deletion sweep turns off a deleted
+  # student's Google Play AI add-on renewal. Same package as api.toml.
+  GOOGLE_PLAY_PACKAGE_NAME = "com.studafy.studafy_mobile"
   # The cost report publishes to CloudWatch, which this deployment does not have.
   COST_REPORT_ENABLED = "false"
 

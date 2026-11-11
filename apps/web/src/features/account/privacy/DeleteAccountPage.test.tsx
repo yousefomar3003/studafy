@@ -6,13 +6,23 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import { AuthProvider, createSessionStore } from "../../../lib/auth";
 import { expectNoA11yViolations } from "../../../lib/test/axe";
+import { TEST_PROFILE } from "../../../lib/test/session";
 
 let requests: unknown[] = [];
+let storeSubscriptions: unknown[] = [];
 
-const getMock = mock((_path: string) => Promise.resolve({ data: requests }));
+const getMock = mock((path: string) =>
+  Promise.resolve({
+    data:
+      path === "/api/account/profile"
+        ? { ...TEST_PROFILE, active_store_subscriptions: storeSubscriptions }
+        : requests,
+  }),
+);
 const postMock = mock((_path: string) =>
   Promise.resolve({
     data: {
+      active_store_subscriptions: storeSubscriptions,
       status: "scheduled",
       requested_at: "2026-09-22T09:00:00.000Z",
       scheduled_for: "2026-10-06T09:00:00.000Z",
@@ -57,6 +67,7 @@ async function renderPage() {
 afterEach(() => {
   cleanup();
   requests = [];
+  storeSubscriptions = [];
   getMock.mockClear();
   postMock.mockClear();
   logoutCalls = 0;
@@ -127,7 +138,49 @@ describe("DeleteAccountPage", () => {
     expect(screen.queryByRole("button", { name: "Delete my account" })).toBeNull();
   });
 
+  test("warns before deleting that an App Store subscription keeps billing", async () => {
+    storeSubscriptions = [{ platform: "app_store", for_child: false }];
+
+    await renderPage();
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Cancel your App Store or Google Play subscription",
+      }),
+    ).toBeTruthy();
+    expect(screen.getByText(/Deleting your account doesn't cancel it/)).toBeTruthy();
+    expect(screen.getByText(/^App Store: on the iPhone or iPad/)).toBeTruthy();
+    expect(screen.queryByText(/^Google Play: open the Google Play app/)).toBeNull();
+    // The delete action is still offered: the warning informs, it does not block.
+    expect(screen.getByRole("button", { name: "Delete my account" })).toBeTruthy();
+  });
+
+  test("repeats the warning once the deletion is scheduled", async () => {
+    storeSubscriptions = [{ platform: "google_play", for_child: true }];
+
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Delete my account" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete account" }));
+
+    expect(await screen.findByText("Your account deletion is scheduled")).toBeTruthy();
+    expect(screen.getByText(/A child linked to your account/)).toBeTruthy();
+    expect(screen.getByText(/^Google Play: open the Google Play app/)).toBeTruthy();
+  });
+
+  test("shows no store warning without a store subscription", async () => {
+    await renderPage();
+    await screen.findByRole("button", { name: "Delete my account" });
+
+    expect(
+      screen.queryByRole("heading", { name: "Cancel your App Store or Google Play subscription" }),
+    ).toBeNull();
+  });
+
   test("has no accessibility violations", async () => {
+    storeSubscriptions = [
+      { platform: "app_store", for_child: false },
+      { platform: "google_play", for_child: true },
+    ];
     const { container } = await renderPage();
     await screen.findByRole("button", { name: "Delete my account" });
 

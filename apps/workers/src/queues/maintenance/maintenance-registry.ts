@@ -19,6 +19,7 @@ import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
 import { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
 import { purgeExpiredRetainedData } from "./data-retention-sweep";
 import { processDsrJob } from "./dsr-processor";
+import { GooglePlayAiBillingCanceller } from "./google-play-ai-billing-canceller";
 import { purgeExpiredIpAddresses } from "./ip-address-retention-sweep";
 import { ensureFuturePartitions } from "./partition-maintenance";
 import { resealRecordValues } from "./record-key-rotation";
@@ -51,9 +52,16 @@ export async function processMaintenanceJob(
   }
 
   if (job.name === JOB_NAMES.RUN_ACCOUNT_DELETION_SWEEP) {
-    const billing = config.stripeSecretKey
-      ? new StripeAiBillingCanceller(config.stripeSecretKey)
-      : null;
+    const billing = {
+      stripe: config.stripeSecretKey ? new StripeAiBillingCanceller(config.stripeSecretKey) : null,
+      googlePlay:
+        config.googlePlayPackageName && config.googlePlayServiceAccount
+          ? new GooglePlayAiBillingCanceller({
+              packageName: config.googlePlayPackageName,
+              serviceAccountJson: config.googlePlayServiceAccount,
+            })
+          : null,
+    };
     const result = await withPrimarySql(config, (sql) =>
       runAccountDeletionSweep(sql, new Date(), billing, enqueue, workerLogger),
     );

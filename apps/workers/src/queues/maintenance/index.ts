@@ -1,5 +1,10 @@
 export { runAccountDeletionSweep } from "./account-deletion-sweep";
-export type { AccountDeletionSweepResult, AiBillingCanceller } from "./account-deletion-sweep";
+export type {
+  AccountDeletionSweepResult,
+  AiBillingCanceller,
+  AiBillingCancellers,
+  GooglePlayBillingCanceller,
+} from "./account-deletion-sweep";
 export {
   ACCOUNT_DELETION_SWEEP_CRON_PATTERN,
   scheduleAccountDeletionSweepJob,

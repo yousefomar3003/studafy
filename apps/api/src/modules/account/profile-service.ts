@@ -1,5 +1,8 @@
 import { isMemberPasswordAccount } from "../auth/services/member-password-service";
 
+import { findActiveStoreSubscriptions } from "./store-subscriptions";
+
+import type { ActiveStoreSubscription } from "./store-subscriptions";
 import type { TransactionSql } from "postgres";
 
 export interface AccountProfileRow {
@@ -12,6 +15,8 @@ export interface AccountProfileRow {
   deletion_due_at: Date | null;
   /** Whether deleting this account asks for its member ID and password. */
   deletion_requires_member_credentials: boolean;
+  /** Live App Store / Google Play AI add-ons, own or a linked child's, that deletion leaves billing. */
+  active_store_subscriptions: ActiveStoreSubscription[];
   /** The legal documents the user last accepted (000188); null until they first accept. */
   terms_version: string | null;
   privacy_version: string | null;
@@ -30,7 +35,9 @@ export async function getAccountProfile(
   schoolId: string,
   userId: string,
 ): Promise<AccountProfileRow | undefined> {
-  const [row] = await tx<Omit<AccountProfileRow, "deletion_requires_member_credentials">[]>`
+  const [row] = await tx<
+    Omit<AccountProfileRow, "deletion_requires_member_credentials" | "active_store_subscriptions">[]
+  >`
     SELECT u.id::text AS user_id, u.display_name, u.email,
            ARRAY(
              SELECT mc.code FROM app.member_codes mc
@@ -48,5 +55,6 @@ export async function getAccountProfile(
   return {
     ...row,
     deletion_requires_member_credentials: await isMemberPasswordAccount(tx, userId),
+    active_store_subscriptions: await findActiveStoreSubscriptions(tx, userId),
   };
 }

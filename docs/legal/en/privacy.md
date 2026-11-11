@@ -358,7 +358,7 @@ To have school records about you removed, ask your school. As controller, it dec
 
 ### 11.4 Subscriptions and family accounts
 
-- **Deleting your account does not cancel a store subscription.** If you bought the AI add-on through Google Play or the App Store, cancel it in the store, or it may keep renewing.
+- **Deleting your account does not reliably cancel a store subscription.** Apple does not let us cancel App Store subscriptions; for Google Play, we try to turn off renewal when your account is deleted. If you bought the AI add-on through Google Play or the App Store, cancel it in the store, or it may keep renewing.
 - **Deleting a parent's account does not delete the children's accounts** or cancel a child's AI add-on; it removes the parent's links to the children.
 
 ## 12. Your rights

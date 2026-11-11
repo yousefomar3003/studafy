@@ -109,7 +109,7 @@
     "consequenceIntro": "Deleting your account will:",
     "consequenceSignOut": "Sign you out on every device straight away and remove your access to your school.",
     "consequenceProfile": "Erase your name, contact details and profile from Studafy within 30 days.",
-    "consequenceBilling": "Cancel any AI subscription so it doesn't renew.",
+    "consequenceBilling": "Stop any AI subscription paid for on Studafy's website from renewing. A subscription bought in the App Store or Google Play is billed by Apple or Google: cancel it in the store.",
     "consequenceRetained": "Keep only what your school must legally retain: your grades and attendance (without your name or contact details), plus financial and audit records.",
     "previousFailed": "Your last deletion request couldn't be completed. Please try again or contact your school.",
     "deleteButton": "Delete my account",
@@ -127,6 +127,15 @@
     "pendingGateCancel": "Cancel deletion",
     "pendingGateSignOut": "Sign out",
     "pendingGateFailed": "The deletion couldn't be cancelled. Try again.",
+    "storeWarning": {
+      "title": "Cancel your App Store or Google Play subscription",
+      "ownBody": "You have an AI Study Assistant subscription billed by Apple (App Store) or Google (Google Play), not by Studafy. Deleting your account doesn't cancel it, so you may keep being charged until you cancel it in the store.",
+      "googlePlayNote": "For Google Play, we also try to stop the renewal when your account is finally deleted, but cancel it yourself to be sure.",
+      "childBody": "A child linked to your account has an AI Study Assistant subscription billed by Apple or Google. Deleting your account doesn't cancel it or delete your child's account. If it's billed to your store account and you want it to stop, cancel it in the store.",
+      "stepsIntro": "To cancel:",
+      "appStoreSteps": "App Store: on the iPhone or iPad that bought it, open Settings, tap your name, then Subscriptions, choose Studafy and tap Cancel Subscription.",
+      "googlePlaySteps": "Google Play: open the Google Play app, tap your profile picture, then Payments & subscriptions, then Subscriptions, choose Studafy and tap Cancel subscription."
+    },
     "retained": {
       "academic_grades": "Grades, without your name or contact details",
       "attendance": "Attendance, without your name or contact details",
