@@ -38,7 +38,11 @@ export interface ResolvedEmail {
   content: RenderedEmail;
 }
 
-const INVITATION_ACTION_PATH = "/api/auth/invitations/{token}/activate";
+// The web app's invitation page (apps/web routes/invite/InvitePage), which checks the token and
+// lets the invitee set a password or sign in with Google/Microsoft. Never the API's
+// `/api/auth/invitations/{token}/activate`: that is a POST-only endpoint on another host, so a link
+// to it opened the web app's 404 page.
+const INVITATION_ACTION_PATH = "/invite/{token}";
 const VERIFICATION_ACTION_PATH = "/api/schools/verify-email/{token}";
 // A page, not an API path: the link must not delete anything on a GET, which mail scanners issue
 // on their own. The token rides in the fragment, which browsers never send to a server.
