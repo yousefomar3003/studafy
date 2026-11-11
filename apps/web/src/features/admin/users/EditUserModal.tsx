@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 
 import { useTranslation } from "../../../lib/i18n";
 
-
 import { useUpdateUser, useUpdateUserRole } from "./mutations";
 import { ASSIGNABLE_ROLES, editUserSchema, fieldErrors, ROLE_LABEL_KEYS } from "./schema";
 
