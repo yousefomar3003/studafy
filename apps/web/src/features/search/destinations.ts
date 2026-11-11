@@ -157,6 +157,11 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("invite-staff", "action", "/portal/accounts?invite=1", ADMIN),
   entry("school-members", "page", "/portal/members", ADMIN),
   entry("admin-students", "page", "/portal/admin/students", ADMIN),
+  entry("import-data", "page", "/portal/admin/import", ADMIN),
+  entry("login-slips", "action", "/portal/admin/import/slips", {
+    requiredPermission: P.USER_UPDATE,
+    ...SCHOOL,
+  }),
   // The list only offers "New student" and "Import CSV" to these permissions.
   entry("add-student", "action", "/portal/admin/students?create=1", {
     ...ADMIN,

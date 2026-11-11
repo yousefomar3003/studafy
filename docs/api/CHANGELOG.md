@@ -13,6 +13,12 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Login slips: `POST /api/users/member-setup-codes` (`IssueMemberSetupCodesRequest`) takes optional
+  `include_pending` (also re-issue unused, unexpired codes: a reprint, which invalidates earlier
+  slips) and `after` (page by member ID). `IssuedMemberSetupCodes` gains `last` (send it as `after`),
+  and each item (`IssuedMemberSetupCode`, now a named schema) gains `class_label` (a student's grade
+  and section this year) and `children` (a parent's linked children by name), for printing slips.
+
 - Excel student import template: `GET /api/imports/students/template` takes
   `StudentImportTemplateQuery` (`format=csv|xlsx`, `lang=en|ar`). `format=xlsx` returns an Excel
   workbook with dropdowns of the school's grades and sections, its record fields as columns, and

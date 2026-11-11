@@ -564,6 +564,14 @@ function CompletedPanel({ record, onReset }: CompletedPanelProps) {
             {t("adminPeople.students.import.completed.notImported", { count: record.error_rows })}
           </p>
         ) : null}
+        {(summary?.students_created ?? 0) + (summary?.parents_created ?? 0) > 0 ? (
+          <p className="students-import__next">
+            {t("adminPeople.students.import.completed.slipsHint")}{" "}
+            <Link to="/portal/admin/import/slips">
+              {t("adminPeople.students.import.completed.printSlips")}
+            </Link>
+          </p>
+        ) : null}
         <p>
           <Link to={`/portal/admin/students/imports/${record.id}`}>
             {t("adminPeople.students.import.completed.leftoverColumns")}

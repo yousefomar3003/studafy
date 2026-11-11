@@ -24,7 +24,8 @@
       "audit": "Audit log →",
       "privacy": "Privacy requests →",
       "aiReports": "AI content reports →",
-      "teachers": "Teachers' employment →"
+      "teachers": "Teachers' employment →",
+      "importData": "Import data"
     }
   },
   "tiles": {
