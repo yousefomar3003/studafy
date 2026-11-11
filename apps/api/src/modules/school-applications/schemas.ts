@@ -100,6 +100,12 @@ export const submitApplicationBodySchema = z
     message: optionalText(5000),
     proof_storage_key: z.string().min(1).max(600),
     proof_file_name: z.string().trim().min(1).max(255),
+    /**
+     * The applicant accepts the Terms of Service and the School Agreement on the school's behalf.
+     * Required: an application cannot be submitted without it. The API records the current versions
+     * of both documents with the submission time.
+     */
+    accept_terms: z.literal(true),
   })
   .openapi("SubmitSchoolApplication");
 
@@ -148,6 +154,15 @@ export const platformApplicationSchema = platformApplicationSummarySchema
     schoolId: z.string().uuid().nullable(),
     teamNotifiedAt: isoDateTime.nullable(),
     applicantNotifiedAt: isoDateTime.nullable(),
+    /** What the applicant accepted on submit; null for applications from before acceptance was required. */
+    termsAcceptance: z
+      .object({
+        termsVersion: z.string(),
+        schoolAgreementVersion: z.string(),
+        acceptedAt: isoDateTime,
+      })
+      .openapi("SchoolApplicationTermsAcceptance")
+      .nullable(),
     updatedAt: isoDateTime,
   })
   .openapi("PlatformSchoolApplication");

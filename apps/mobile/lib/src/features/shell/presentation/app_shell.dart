@@ -7,6 +7,7 @@ import '../../../core/push/push_providers.dart';
 import '../application/shell_providers.dart';
 import '../domain/shell_role.dart';
 import 'deletion_pending_screen.dart';
+import 'legal_acceptance_screen.dart';
 import 'locale_toggle_button.dart';
 import 'pill_navigation_bar.dart';
 import 'push_permission_banner.dart';
@@ -29,6 +30,13 @@ class AppShell extends ConsumerWidget {
         ?.deletionScheduledFor;
     if (deletionScheduledFor != null) {
       return DeletionPendingScreen(scheduledFor: deletionScheduledFor);
+    }
+
+    // Until the user accepts the current Terms of Service and Privacy Policy, the API allows only
+    // accepting, deleting the account and signing out, so that screen stands in for the shell.
+    final legal = ref.watch(accountProfileProvider).value?.legalAcceptance;
+    if (legal != null && legal.requiredValue) {
+      return LegalAcceptanceScreen(versions: legal);
     }
 
     final shellRole = ref.watch(shellRoleProvider);

@@ -5,6 +5,7 @@
 // school whose ORG_ADMIN is linked to the applicant's own (provider, subject) -- so the returning-
 // user login resolver finds them -- with audit rows in both the new school and the operator's.
 
+import { LEGAL_DOCUMENT_VERSIONS } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -137,6 +138,12 @@ describe("school applications", () => {
     expect(detail.currencyCode).toBe("SAR");
     expect(detail.proof.contentType).toBe("application/pdf");
     expect(detail.proof.url).toContain("permanent/school-applications/");
+    // The applicant accepted the current terms and school agreement, recorded at submission.
+    expect(detail.termsAcceptance).toEqual({
+      termsVersion: LEGAL_DOCUMENT_VERSIONS.terms,
+      schoolAgreementVersion: LEGAL_DOCUMENT_VERSIONS.schoolAgreement,
+      acceptedAt: expect.any(String),
+    });
 
     const status = await getApplicantStatus(database, applicant(1));
     expect(status.application?.id).toBe(submitted.id);

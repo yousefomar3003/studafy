@@ -98,6 +98,27 @@ export const accountDeletionResponseSchema = z
   })
   .openapi("AccountDeletion");
 
+export const legalAcceptanceSchema = z
+  .object({
+    required: z.boolean().openapi({
+      description:
+        "Whether the caller must accept the current Terms of Service and Privacy Policy. While " +
+        "true, the session may only read this profile, accept, manage its own deletion or log out.",
+    }),
+    terms_version: z.string().openapi({
+      description: "The current Terms of Service version (its last-updated date).",
+      example: "2026-11-11",
+    }),
+    privacy_version: z.string().openapi({
+      description: "The current Privacy Policy version (its last-updated date).",
+      example: "2026-11-11",
+    }),
+    accepted_at: dateTimeSchema.nullable().openapi({
+      description: "When the caller last accepted; null if never.",
+    }),
+  })
+  .openapi("LegalAcceptanceStatus");
+
 export const accountProfileSchema = z
   .object({
     user_id: uuidSchema.openapi({ description: "The caller's own user id." }),
@@ -130,5 +151,33 @@ export const accountProfileSchema = z
         name: z.string().openapi({ example: "Al-Noor Academy" }),
       })
       .openapi({ description: "The school this session is signed in to." }),
+    legal_acceptance: legalAcceptanceSchema,
   })
   .openapi("AccountProfile");
+
+export const legalAcceptanceBodySchema = z
+  .object({
+    terms_version: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .openapi({
+        description: "The version (last-updated date) of the Terms of Service the user accepts.",
+        example: "2026-11-11",
+      }),
+    privacy_version: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/)
+      .openapi({
+        description: "The version (last-updated date) of the Privacy Policy the user has read.",
+        example: "2026-11-11",
+      }),
+  })
+  .openapi("AcceptLegalDocuments");
+
+export const legalAcceptanceResponseSchema = z
+  .object({
+    terms_version: z.string(),
+    privacy_version: z.string(),
+    accepted_at: dateTimeSchema,
+  })
+  .openapi("LegalDocumentsAccepted");

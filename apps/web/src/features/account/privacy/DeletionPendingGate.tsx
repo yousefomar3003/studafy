@@ -6,12 +6,17 @@ import { Loading } from "../../../components/Loading";
 import { api } from "../../../lib/api";
 import { useSessionStore } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { LegalAcceptanceScreen } from "../legal/LegalAcceptanceScreen";
 
 /**
  * Wraps each authenticated layout inside `RequireAuth` (app/routes.tsx). Holds back the guarded content while the signed-in account has a deletion scheduled (its 14-day
  * grace period). The API confines such a session to reading its profile, cancelling the deletion
  * and logging out, so the page offers exactly those two actions instead of a portal whose every
  * request would be refused. Mirrors the mobile app's DeletionPendingScreen.
+ *
+ * It also holds the content back until the user accepts the current Terms of Service and Privacy
+ * Policy (LegalAcceptanceScreen), the same way and for the same reason: the API refuses the session
+ * everything else until then.
  *
  * Shares the `account-profile` query key with the home header, so the profile is fetched once.
  * A failed profile load lets the content through: the API still enforces the restriction.
@@ -31,8 +36,14 @@ export function DeletionPendingGate({ children }: PropsWithChildren) {
 
   if (profile.isPending) return <Loading />;
   const scheduledFor = profile.data?.deletion_scheduled_for;
-  if (!scheduledFor) return <>{children}</>;
-  return <DeletionPending scheduledFor={scheduledFor} />;
+  if (scheduledFor) return <DeletionPending scheduledFor={scheduledFor} />;
+  // Next, the legal documents (000188): until the user accepts the current versions, the API
+  // allows only accepting, deleting the account and signing out.
+  const legal = profile.data?.legal_acceptance;
+  if (legal?.required) {
+    return <LegalAcceptanceScreen versions={legal} isUpdate={legal.accepted_at !== null} />;
+  }
+  return <>{children}</>;
 }
 
 function DeletionPending({ scheduledFor }: { scheduledFor: string }) {

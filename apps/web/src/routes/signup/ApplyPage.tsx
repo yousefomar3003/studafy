@@ -1,5 +1,5 @@
 import { ApiError } from "@studafy/api-client";
-import { Button, Input, Select } from "@studafy/ui";
+import { Button, Checkbox, Input, Select } from "@studafy/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -7,7 +7,7 @@ import { Navigate, useNavigate } from "react-router-dom";
 import { LinkButton } from "../../components/LinkButton";
 import { Loading } from "../../components/Loading";
 import { api } from "../../lib/api";
-import { useFormatters, useLocale, useTranslation } from "../../lib/i18n";
+import { Trans, useFormatters, useLocale, useTranslation } from "../../lib/i18n";
 import { uploadFileToPresignedUrl } from "../../lib/upload";
 import { fieldErrors } from "../onboarding/schema";
 import { displayName } from "../onboarding/SchoolDetailsStep";
@@ -29,7 +29,7 @@ import type { FormEvent } from "react";
 
 type CountryOption = components["schemas"]["CountriesResponse"]["countries"][number];
 type CurrencyOption = components["schemas"]["CurrenciesResponse"]["currencies"][number];
-type FieldErrors = Partial<Record<keyof ApplicationForm | "proof", string>>;
+type FieldErrors = Partial<Record<keyof ApplicationForm | "proof" | "terms", string>>;
 
 /** API refusals the form explains in place; anything else gets the generic message. */
 const KNOWN_SUBMIT_ERRORS = new Set([
@@ -156,6 +156,9 @@ function ApplicationFormView({ me }: { me: ApplicantMe }) {
     applicant_name: me.applicant.name ?? "",
   });
   const [proof, setProof] = useState<File | null>(null);
+  // The applicant accepts the Terms of Service and the School Agreement for the school; the API
+  // refuses a submission without it and records which versions were accepted.
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -185,10 +188,12 @@ function ApplicationFormView({ me }: { me: ApplicantMe }) {
     setSubmitError(null);
     const parsed = applicationFormSchema.safeParse(values);
     const proofError = proofFileError(proof);
-    if (!parsed.success || proofError) {
+    const termsError = acceptedTerms ? null : "onboarding.signup.apply.acceptTermsRequired";
+    if (!parsed.success || proofError || termsError) {
       setErrors({
         ...(parsed.success ? {} : fieldErrors(parsed.error)),
         ...(proofError ? { proof: proofError } : {}),
+        ...(termsError ? { terms: termsError } : {}),
       });
       return;
     }
@@ -225,6 +230,7 @@ function ApplicationFormView({ me }: { me: ApplicantMe }) {
           message: form.message || undefined,
           proof_storage_key: upload.storage_key,
           proof_file_name: file.name,
+          accept_terms: true,
         },
       });
       await queryClient.invalidateQueries({ queryKey: APPLICANT_KEY });
@@ -416,6 +422,31 @@ function ApplicationFormView({ me }: { me: ApplicantMe }) {
             />
           </div>
         </div>
+      </fieldset>
+
+      <fieldset className="apply__fieldset">
+        <legend>{t("onboarding.signup.apply.termsSection")}</legend>
+        <p>
+          <Trans
+            i18nKey="onboarding.signup.apply.termsIntro"
+            components={{
+              // A new tab, so reading the documents does not lose what has been typed.
+              termsLink: <a href="/terms" target="_blank" rel="noopener" />,
+              agreementLink: <a href="/school-agreement" target="_blank" rel="noopener" />,
+              privacyLink: <a href="/privacy" target="_blank" rel="noopener" />,
+            }}
+          />
+        </p>
+        <Checkbox
+          label={t("onboarding.signup.apply.acceptTerms")}
+          checked={acceptedTerms}
+          onChange={(event) => {
+            setAcceptedTerms(event.target.checked);
+            setErrors((prev) => ({ ...prev, terms: undefined }));
+          }}
+          error={err("terms")}
+          required
+        />
       </fieldset>
 
       {submitError ? <p role="alert">{t(submitError)}</p> : null}

@@ -51,6 +51,8 @@
       "portal": "Go to your portal",
       "contact": "Contact us",
       "privacy": "Privacy policy",
+      "terms": "Terms of service",
+      "schoolAgreement": "School agreement",
       "deleteAccount": "Delete your account",
       "copyright": "© {{year}} Studafy. All rights reserved."
     },
@@ -438,6 +440,13 @@
       "limitReached": "Monthly limit reached. It resets on the 1st of next month.",
       "schoolInactive": "Your school's Studafy plan isn't active, so this is paused.",
       "coveredBySchool": "The school already provides this through a seat, so there's nothing to buy."
+    }
+  },
+  "legal": {
+    "descriptions": {
+      "privacy": "How Studafy Limited handles the personal data of school staff, parents and students, and how to exercise your rights.",
+      "terms": "The terms for using Studafy on the web and in the mobile app.",
+      "school-agreement": "The agreement between Studafy Limited and a school that uses Studafy, including how Studafy processes data on the school's behalf."
     }
   }
 }

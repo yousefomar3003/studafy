@@ -173,6 +173,8 @@
   "ACCOUNT_DELETION_ALREADY_SCHEDULED": "A deletion is already scheduled for your account",
   "ACCOUNT_DELETION_NOT_SCHEDULED": "No deletion is scheduled for your account",
   "ACCOUNT_DELETION_VERIFICATION_FAILED": "The member ID or password is incorrect",
+  "LEGAL_ACCEPTANCE_REQUIRED": "Accept the Terms of Service and confirm you have read the Privacy Policy to keep using Studafy.",
+  "LEGAL_VERSION_OUTDATED": "The Terms of Service or the Privacy Policy has changed. Read the current version and accept again.",
   "APPLE_TOKEN_REVOCATION_FAILED": "Your Sign in with Apple access could not be revoked, so your account was not deleted. Please try again.",
   "ANNOUNCEMENT_CLASS_NOT_FOUND": "Class not found",
   "ANNOUNCEMENT_SCOPE_FORBIDDEN": "You can only send a non-mandatory announcement to a class you teach",

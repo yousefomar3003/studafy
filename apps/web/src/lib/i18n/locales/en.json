@@ -134,6 +134,21 @@
       "audit_log": "Security and audit log entries, including the record of this deletion"
     }
   },
+  "legalAcceptance": {
+    "title": "Before you continue",
+    "body": "To use Studafy, please read and accept our Terms of Service and read our Privacy Policy. They explain how Studafy works, what you may use it for, and how your school and Studafy look after your personal data.",
+    "updatedTitle": "We have updated our terms",
+    "updatedBody": "Our Terms of Service or Privacy Policy have changed since you last accepted them. Please read the current versions and accept them to continue using Studafy.",
+    "termsLink": "Terms of Service (opens in a new tab)",
+    "privacyLink": "Privacy Policy (opens in a new tab)",
+    "checkbox": "I accept the Terms of Service and I have read the Privacy Policy.",
+    "required": "Tick the box to accept the Terms of Service and confirm you have read the Privacy Policy.",
+    "accept": "Accept and continue",
+    "signOut": "Sign out",
+    "decline": "If you do not accept, you can sign out or <deleteLink>delete your account</deleteLink>.",
+    "outdated": "The terms changed while this page was open. Reload the page to see the current versions.",
+    "failed": "Your acceptance could not be saved. Please try again."
+  },
   "globalSearch": {
     "triggerLabel": "Search",
     "title": "Search",
