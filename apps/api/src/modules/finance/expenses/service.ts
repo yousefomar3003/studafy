@@ -1,6 +1,7 @@
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { parseStorageKey } from "../../../lib/storage/keys";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
 import { translateErpNextError as translateSharedErpNextError } from "../erpnext-errors";
@@ -255,12 +256,39 @@ async function projectToCache(
   return parseCacheRow(projected!);
 }
 
+/**
+ * Whether `key` is one of this school's own `temp/` or `permanent/` objects. An expense's attachment
+ * key can arrive from the client (create/update bodies), so it is checked before it is stored and
+ * again before it is ever signed: rows saved before the check existed are not trusted either.
+ */
+export function isOwnAttachmentKey(key: string, schoolId: string): boolean {
+  const parsed = parseStorageKey(key);
+  return (
+    parsed !== null &&
+    parsed.schoolId === schoolId &&
+    (parsed.category === "temp" || parsed.category === "permanent")
+  );
+}
+
+/** Refuses a client-supplied attachment key that is not this school's (403, like assertSchoolOwnedKey). */
+export function assertOwnAttachmentKey(key: string | undefined, schoolId: string): void {
+  if (key !== undefined && !isOwnAttachmentKey(key, schoolId)) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.STORAGE_KEY_FORBIDDEN,
+      "Storage key does not belong to this school",
+    );
+  }
+}
+
 export async function resolveStorageUrl(
   storage: StorageService,
   schoolId: string,
   storageKey: string | null,
 ): Promise<string | null> {
   if (!storageKey) return null;
+  // Never sign another school's object, whatever the row says.
+  if (!isOwnAttachmentKey(storageKey, schoolId)) return null;
   try {
     const { url } = await storage.presign(storageKey, "GET");
     return url;
@@ -337,6 +365,7 @@ export async function createExpense(
   params: CreateExpenseParams,
   acceptLanguage?: string,
 ): Promise<ExpenseRow> {
+  assertOwnAttachmentKey(params.attachment_storage_key, schoolId);
   const payload = toErpNextPayload(params.document_type, params, schoolId);
 
   let doc: ErpNextExpenseDoc;
@@ -377,6 +406,7 @@ export async function updateExpense(
   params: UpdateExpenseParams,
   acceptLanguage?: string,
 ): Promise<ExpenseRow> {
+  assertOwnAttachmentKey(params.attachment_storage_key, schoolId);
   const [before] = await tx<Record<string, unknown>[]>`
     SELECT ${tx.unsafe(CACHE_COLUMNS)}
     FROM app.expense_cache AS ec
