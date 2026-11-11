@@ -459,7 +459,9 @@
         "recordAnswers": "Record answers",
         "leftoverColumns": "See the columns Studafy did not use, and map them to records",
         "placed": "Placed in a class",
-        "placementConflicts": "Not placed in a class"
+        "placementConflicts": "Not placed in a class",
+        "slipsHint": "Everyone you just added can sign in once they have their login slip.",
+        "printSlips": "Print login slips"
       },
       "failed": {
         "region": "Import failed",
@@ -789,5 +791,57 @@
     "loadError": "Couldn't load the teachers.",
     "record": "Staff record",
     "recordLabel": "Open {{name}}'s staff record"
+  },
+  "importData": {
+    "title": "Import data",
+    "intro": "Bring your whole school onto Studafy in four steps. Nobody needs an email: every student, parent and teacher gets a Studafy ID and signs in with it.",
+    "history": "Past imports",
+    "steps": {
+      "setup": {
+        "title": "Set up grades and sections",
+        "body": "Add your grades and their sections for this year, so imported students land straight in their class.",
+        "action": "Grades and sections"
+      },
+      "students": {
+        "title": "Import students and parents",
+        "body": "Download the Excel template, fill in one row per student with their parents, and upload it. Brothers and sisters share a family number, so you type their parents once.",
+        "action": "Import students"
+      },
+      "teachers": {
+        "title": "Add teachers and staff",
+        "body": "Add your teachers one by one or import them from a file on the Users page.",
+        "action": "Users"
+      },
+      "slips": {
+        "title": "Print login slips",
+        "body": "Print a slip for everyone who hasn't signed in yet, with their ID and a one-time code. They choose their own password the first time they sign in.",
+        "action": "Login slips"
+      }
+    }
+  },
+  "loginSlips": {
+    "title": "Login slips",
+    "intro": "Each slip has a person's Studafy ID and a one-time code. They sign in with both, then choose their own password, and the code stops working.",
+    "prepareRegion": "Prepare slips",
+    "roleLabel": "Slips for",
+    "roles": {
+      "STUDENT": "Students",
+      "PARENT": "Parents",
+      "INSTRUCTOR": "Teachers"
+    },
+    "reprint": "Also reprint slips that were printed before but not used yet",
+    "reprintWarning": "Reprinting gives those people a new code. Slips you printed for them earlier will stop working.",
+    "prepare": "Prepare slips",
+    "preparing": "Preparing…",
+    "error": "Couldn't prepare the slips. Please try again.",
+    "none": "Everyone has already signed in or has an unused slip. Tick “reprint” to print those again.",
+    "ready_one": "{{count}} slip is ready. The codes are shown only now, so print before you leave this page.",
+    "ready_other": "{{count}} slips are ready. The codes are shown only now, so print before you leave this page.",
+    "print": "Print",
+    "listLabel": "Login slips",
+    "parentOf": "Parent of {{names}}",
+    "id": "Studafy ID",
+    "code": "One-time code",
+    "how": "Go to {{url}}, enter your ID and this code, then choose your own password. The code works until {{date}}."
   }
 }

@@ -670,6 +670,18 @@ export interface IssuedSetupCodeBatch {
   issued: (IssuedSetupCode & { userId: string; displayName: string | null })[];
   /** Members still waiting for a code because the batch was full. */
   remaining: number;
+  /** The last member ID of this batch: pass it as `after` to get the next one. Null when empty. */
+  last: string | null;
+}
+
+export interface IssueUnclaimedOptions {
+  /**
+   * Also re-issue to members whose earlier code is still unused and unexpired -- a reprint. Their
+   * earlier code (and any slip printed with it) stops working.
+   */
+  includePending?: boolean;
+  /** Only members whose member ID sorts after this one: the previous batch's `last`. */
+  after?: string;
 }
 
 /**
@@ -682,20 +694,26 @@ export interface IssuedSetupCodeBatch {
 export async function issueUnclaimedSetupCodes(
   tx: TransactionSql,
   role: Role,
+  { includePending = false, after }: IssueUnclaimedOptions = {},
 ): Promise<IssuedSetupCodeBatch> {
   // eslint-disable-next-line security/detect-object-injection -- `role` is a validated Role
   const kind = MEMBER_CODE_KINDS[role];
-  if (!kind) return { issued: [], remaining: 0 };
+  if (!kind) return { issued: [], remaining: 0, last: null };
 
-  const candidates = await tx<{ user_id: string; display_name: string | null; total: number }[]>`
-    SELECT u.id AS user_id, u.display_name, count(*) OVER ()::int AS total
+  // Paging by member ID (not by "has no live code yet") is what lets a reprint run in batches:
+  // members re-issued a code by an earlier batch still match the filters, but sort before `after`.
+  const candidates = await tx<
+    { user_id: string; display_name: string | null; code: string; total: number }[]
+  >`
+    SELECT u.id AS user_id, u.display_name, mc.code, count(*) OVER ()::int AS total
     FROM app.users u
     JOIN app.member_codes mc ON mc.user_id = u.id AND mc.school_id = u.school_id AND mc.kind = ${kind}
     LEFT JOIN app.member_credentials cr ON cr.user_id = u.id AND cr.school_id = u.school_id
     WHERE u.school_id = current_setting('app.school_id')::uuid
       AND u.status IN ('active', 'invited')
       AND cr.password_hash IS NULL
-      AND coalesce(cr.setup_code_expires_at <= CURRENT_TIMESTAMP, true)
+      AND (${includePending} OR coalesce(cr.setup_code_expires_at <= CURRENT_TIMESTAMP, true))
+      AND (${after ?? null}::text IS NULL OR mc.code > ${after ?? null}::text)
       AND NOT EXISTS (
         SELECT 1 FROM app.user_roles r
         WHERE r.user_id = u.id AND r.school_id = u.school_id
@@ -704,7 +722,7 @@ export async function issueUnclaimedSetupCodes(
     ORDER BY mc.code
     LIMIT ${SETUP_CODE_BATCH_LIMIT}
   `;
-  if (candidates.length === 0) return { issued: [], remaining: 0 };
+  if (candidates.length === 0) return { issued: [], remaining: 0, last: null };
 
   const codes = await tx<{ user_id: string; code: string }[]>`
     SELECT user_id, code FROM app.member_codes
@@ -723,5 +741,9 @@ export async function issueUnclaimedSetupCodes(
       expiresAt,
     });
   }
-  return { issued, remaining: candidates[0]!.total - issued.length };
+  return {
+    issued,
+    remaining: candidates[0]!.total - issued.length,
+    last: candidates[candidates.length - 1]!.code,
+  };
 }

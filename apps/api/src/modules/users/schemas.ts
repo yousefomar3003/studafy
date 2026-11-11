@@ -255,22 +255,49 @@ export const issueSetupCodesBodySchema = z
     role: z.enum(["STUDENT", "INSTRUCTOR", "PARENT", "ATTENDANCE_OFFICER"]).openapi({
       description: "Which members to issue codes to.",
     }),
+    include_pending: z
+      .boolean()
+      .optional()
+      .openapi({
+        description:
+          "Also re-issue to members whose earlier code is unused and unexpired (a reprint). Their " +
+          "earlier code stops working. Page with `after`.",
+      }),
+    after: z.string().trim().min(1).max(40).optional().openapi({
+      description: "Only members whose member ID sorts after this one: the previous `last`.",
+    }),
   })
   .openapi("IssueMemberSetupCodesRequest");
 
+export const issuedSetupCodeSchema = z
+  .object({
+    user_id: z.string().uuid(),
+    display_name: z.string().nullable(),
+    usernames: z.array(z.string()),
+    setup_code: setupCodeField,
+    expires_at: setupCodeExpiresField,
+    class_label: z
+      .string()
+      .nullable()
+      .openapi({
+        description:
+          'A student\'s grade and section this academic year ("Grade 1 – A"), for sorting and ' +
+          "labelling login slips. Null for other roles or an unplaced student.",
+      }),
+    children: z.array(z.string()).openapi({
+      description: "A parent's linked children, by name, so a slip can go home with them.",
+    }),
+  })
+  .openapi("IssuedMemberSetupCode");
+
 export const issuedSetupCodesSchema = z
   .object({
-    issued: z.array(
-      z.object({
-        user_id: z.string().uuid(),
-        display_name: z.string().nullable(),
-        usernames: z.array(z.string()),
-        setup_code: setupCodeField,
-        expires_at: setupCodeExpiresField,
-      }),
-    ),
+    issued: z.array(issuedSetupCodeSchema),
     remaining: z.number().int().nonnegative().openapi({
       description: "Members still waiting for a code; call again to issue the next batch.",
+    }),
+    last: z.string().nullable().openapi({
+      description: "The last member ID of this batch; send it as `after` for the next batch.",
     }),
   })
   .openapi("IssuedMemberSetupCodes");

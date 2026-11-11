@@ -127,6 +127,21 @@ existing data, and it also cannot deliberately clear a field; use the student pr
   unopened. The Students / الطلاب sheet is read, else the first; dates in date-formatted cells become
   `YYYY-MM-DD`; empty rows are kept so line numbers match Excel's row numbers.
 
+## Import data page and login slips
+
+`/portal/admin/import` is where a school starts: grades and sections, then students and parents
+(this import), then teachers, then login slips. `/portal/admin/import/slips` prints one slip per
+student, parent or teacher who has not signed in yet: name, class (students) or children (parents),
+Studafy ID and a one-time setup code (000184; valid 14 days). They sign in with the ID and code and
+must choose their own password. There is deliberately no shared default password: member IDs are
+sequential, so a shared password would let anyone open any account not claimed yet.
+
+Codes exist only in the response (the server keeps a hash), so the page says to print before
+leaving. Running it again skips people whose code is still unused, so printed slips stay valid; the
+"reprint" option re-issues those codes instead (earlier slips stop working), paging by member ID
+(`after`/`last`) because re-issued members keep matching. Slips are sorted by class, parents by
+their first child, and print three to a row with everything else on the page hidden.
+
 ## Header detection and mapping
 
 - **Delimiter.** `,`, `;` or tab, whichever occurs most often (outside quotes) on the first

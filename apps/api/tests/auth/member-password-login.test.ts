@@ -13,6 +13,7 @@ import { createRedisClient } from "../../src/redis";
 import {
   assignRole,
   createSchool,
+  createStudent,
   createTestDatabase,
   createUser,
   integrationEnabled,
@@ -355,6 +356,71 @@ describe("member password sign-in", () => {
     // The signed-up member was not signed out or reset.
     expect((await login(signedUp.code, "Has-A-Pass-1")).status).toBe(200);
   });
+
+  integrationTest(
+    "a reprint re-issues pending codes in pages, and slips name a parent's children",
+    async () => {
+      const parent = await member([ROLES.PARENT]);
+      const child = await createStudent(sql, schoolId, { firstName: "Lina", lastName: "Khaled" });
+      await sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+        const [family] = await tx<{ id: string }[]>`
+          INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+          VALUES (${schoolId}, 'Khaled', ${parent.id}) RETURNING id
+        `;
+        await tx`
+          INSERT INTO app.parent_child_links
+            (school_id, family_id, parent_user_id, student_id, relationship)
+          VALUES (${schoolId}, ${family!.id}, ${parent.id}, ${child.id}, 'mother')
+        `;
+      });
+      const token = await adminToken();
+      interface Batch {
+        issued: (IssuedCode & { user_id: string; children: string[] })[];
+        last: string | null;
+      }
+
+      const first = (await (
+        await post("/api/users/member-setup-codes", { role: "PARENT" }, token)
+      ).json()) as Batch;
+      const slip = first.issued.find((row) => row.user_id === parent.id)!;
+      expect(slip.children).toEqual(["Lina Khaled"]);
+
+      // Without include_pending the parent is skipped: the printed slip stays valid.
+      const again = (await (
+        await post("/api/users/member-setup-codes", { role: "PARENT" }, token)
+      ).json()) as Batch;
+      expect(again.issued.map((row) => row.user_id)).not.toContain(parent.id);
+
+      // A reprint re-issues it, and pages past it with `after` instead of looping.
+      const reprint = (await (
+        await post(
+          "/api/users/member-setup-codes",
+          { role: "PARENT", include_pending: true },
+          token,
+        )
+      ).json()) as Batch;
+      const reissued = reprint.issued.find((row) => row.user_id === parent.id)!;
+      expect(reissued.setup_code).not.toBe(slip.setup_code);
+      const next = (await (
+        await post(
+          "/api/users/member-setup-codes",
+          { role: "PARENT", include_pending: true, after: reprint.last },
+          token,
+        )
+      ).json()) as Batch;
+      expect(next.issued.map((row) => row.user_id)).not.toContain(parent.id);
+
+      // The old slip no longer works; the reprinted one does.
+      expect((await login(parent.code, slip.setup_code)).status).toBe(401);
+      await expectCode(
+        await login(parent.code, reissued.setup_code),
+        403,
+        "AUTH_PASSWORD_CHANGE_REQUIRED",
+      );
+    },
+  );
 
   integrationTest("the member summary no longer publishes a password", async () => {
     const response = await app.request("/api/users/member-summary", {

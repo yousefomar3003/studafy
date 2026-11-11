@@ -145,6 +145,14 @@ const ImportStudentsPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
   () => import("../features/admin/students/ImportStudentsPage"),
 );
+const ImportDataPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/import/ImportDataPage"),
+);
+const LoginSlipsPage = lazyWithCatalogs(
+  ADMIN_CATALOGS,
+  () => import("../features/admin/import/LoginSlipsPage"),
+);
 const ImportHistoryPage = lazyWithCatalogs(
   ADMIN_CATALOGS,
   () => import("../features/admin/students/imports/ImportHistoryPage"),
@@ -732,6 +740,25 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
                 <StudentsListPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Where a school starts bringing its people in: grades, students and parents,
+            // teachers, then everyone's login slips (features/admin/import).
+            path: "admin/import",
+            element: (
+              <RequirePermission permission={PERMISSIONS.ORGANIZATION_MANAGE_SETTINGS}>
+                <ImportDataPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Issuing codes needs user:update (POST /api/users/member-setup-codes).
+            path: "admin/import/slips",
+            element: (
+              <RequirePermission permission={PERMISSIONS.USER_UPDATE}>
+                <LoginSlipsPage />
               </RequirePermission>
             ),
           },
