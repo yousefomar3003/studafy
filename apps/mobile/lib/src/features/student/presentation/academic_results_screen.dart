@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/academic_results_providers.dart';
+import '../application/transcript_providers.dart';
 import '../application/student_context_providers.dart';
 import '../domain/academic_results.dart';
 import 'certificate_detail_screen.dart';
 import 'widgets/academic_result_widgets.dart';
+import 'widgets/transcripts_section.dart';
 
 /// A student's official, finalized results — by academic year, each term report and the annual
 /// result with its overall standing (promoted / supplementary / retained / incomplete) and subject
@@ -70,7 +72,8 @@ class _ResultsBody extends ConsumerWidget {
       onRefresh: () async {
         ref
           ..invalidate(studentResultsProvider(studentId))
-          ..invalidate(studentCertificatesProvider(studentId));
+          ..invalidate(studentCertificatesProvider(studentId))
+          ..invalidate(studentTranscriptsProvider(studentId));
         await ref.read(studentResultsProvider(studentId).future);
       },
       child: results.when(
@@ -137,6 +140,8 @@ class _ResultsBody extends ConsumerWidget {
                           _CertificateTile(certificate: doc),
                       ],
               ),
+              const SizedBox(height: AppSpacing.space16),
+              TranscriptsSection(studentId: studentId),
             ],
           );
         },

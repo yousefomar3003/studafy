@@ -133,7 +133,12 @@ import {
   gradeEntryRoutes,
   publishedGradeRoutes,
 } from "./modules/grades";
-import { gradingConfigRoutes, gradingMarksRoutes, gradingResultsRoutes } from "./modules/grading";
+import {
+  gradingConfigRoutes,
+  gradingMarksRoutes,
+  gradingResultsRoutes,
+  gradingTranscriptRoutes,
+} from "./modules/grading";
 import { importRoutes, importSignalRoutes } from "./modules/imports";
 import { inquiryRoutes } from "./modules/inquiries";
 import {
@@ -1136,6 +1141,7 @@ export function createApp({
     app.route("/", gradingConfigRoutes(database));
     app.route("/", gradingMarksRoutes(database));
     app.route("/", gradingResultsRoutes(database));
+    app.route("/", gradingTranscriptRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

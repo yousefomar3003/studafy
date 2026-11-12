@@ -1,0 +1,37 @@
+/*
+ * Academic transcript: the certificate layout (academic-setup.css, .ag-certificate*) with one block
+ * per academic year. Logical properties only, so Arabic (RTL) mirrors without overrides.
+ */
+
+.ag-transcript-readiness {
+  margin-block: var(--space-8) var(--space-16);
+}
+
+.ag-transcript__year {
+  margin-block: var(--space-16);
+}
+
+.ag-transcript__year-title {
+  margin-block: 0 var(--space-8);
+  font-size: var(--font-size-md);
+}
+
+.ag-transcript__year-overall {
+  margin-block: var(--space-8) 0;
+}
+
+@media print {
+  /* A named page, so A4 applies to transcripts only and not to anything else the portal prints. */
+  .ag-transcript {
+    page: transcript;
+  }
+
+  .ag-transcript__year {
+    break-inside: avoid;
+  }
+}
+
+@page transcript {
+  size: A4;
+  margin: 12mm;
+}

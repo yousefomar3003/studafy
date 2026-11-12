@@ -780,5 +780,29 @@
     "gpaValue": "GPA {{value}} / {{max}}",
     "withPercentage": "{{percentage}}%",
     "gpaUnavailable": "GPA not available"
+  },
+  "transcript": {
+    "title": "Academic Transcript",
+    "back": "Back to the student",
+    "print": "Print",
+    "revoked": "This transcript was revoked: {{reason}}",
+    "superseded": "This transcript was replaced by a newer one.",
+    "outdated": "Results changed since this transcript was issued. Reissue it from the student's page to include them.",
+    "issueDate": "Date of issue",
+    "yearHeading": "{{year}} — {{grade}}, {{section}}",
+    "yearCaption": "Subject results, {{year}}",
+    "gpaPoints": "GPA points",
+    "weight": "Weight",
+    "cumulativeAverage": "Cumulative average",
+    "cumulativeGpa": "Cumulative GPA",
+    "gpaUnavailable": "Not available",
+    "yearsCovered": "Years covered",
+    "gpaReason": {
+      "missing_gpa_points": "No cumulative GPA: these subjects have no GPA points on their grading scale: {{subjects}}.",
+      "incomplete": "No cumulative figures: some results are incomplete.",
+      "no_subjects": "No cumulative figures: no subject counts toward the average."
+    },
+    "method": "The cumulative average and GPA weight every counted subject of every year by its weight in the year's average.",
+    "reissueNote": "Replaces transcript {{serial}}. Reason: {{reason}}"
   }
 }

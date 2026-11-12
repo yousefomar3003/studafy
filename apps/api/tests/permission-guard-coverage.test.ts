@@ -158,6 +158,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/certificates/{certificateId}/revoke",
   "POST /api/grading/exam-structure/apply",
   "POST /api/grading/finalizations/{finalizationId}/certificates",
+  // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
+  "POST /api/grading/students/{studentId}/transcripts",
+  "POST /api/grading/transcripts/{transcriptId}/reissue",
+  "POST /api/grading/transcripts/{transcriptId}/revoke",
   "POST /api/grading/finalizations/{finalizationId}/corrections",
   "POST /api/grading/mark-sheets/{sheetId}/decision",
   "POST /api/grading/sections/{sectionId}/results/finalize",

@@ -123,7 +123,98 @@ const INCIDENT = {
   incident_at: "2026-09-10T08:00:00.000Z",
 };
 
+const TRANSCRIPT_CONTENT = {
+  version: 1,
+  kind: "transcript",
+  serial_number: "TR-7K2M9QX4PB",
+  issued_at: "2026-07-02T10:00:00.000Z",
+  school: { id: "school-1", name: "Al Noor School" },
+  student: { id: "student-1", first_name: "Amara", last_name: "Chen", admission_number: "" },
+  years: [
+    {
+      academic_year: { id: "year-0", code: "2024", name: "2024–2025" },
+      grade_level_name: "Grade 8",
+      section_name: "B",
+      finalization: { id: "fin-0", version: 1, finalized_at: "2025-06-30T10:00:00.000Z" },
+      subjects: [
+        {
+          code: "MATH",
+          name: "Mathematics",
+          requirement: "mandatory",
+          marks_obtained: 90,
+          max_marks: 100,
+          percentage: 90,
+          grade_label: "A",
+          gpa_points: 4,
+          passed: true,
+          exempt: false,
+          include_in_average: true,
+          average_weight: 3,
+        },
+      ],
+      overall: {
+        average_percentage: 90,
+        total_obtained: 90,
+        total_max: 100,
+        grade_label: "A",
+        subjects_failed: 0,
+        academic_status: "promoted",
+        // The grade shows results out of 20: 90% is 18 / 20.
+        display: { format: "out_of", value: 18, max: 20 },
+      },
+    },
+  ],
+  cumulative: {
+    average_percentage: 81.25,
+    gpa: 3.13,
+    gpa_unavailable_reason: null,
+    subjects_without_gpa_points: [],
+    years_covered: 2,
+    subjects_counted: 3,
+  },
+  issued_by: { user_id: "principal-1", name: "Principal Noor" },
+  reissue: null,
+};
+const TRANSCRIPT = {
+  id: "transcript-1",
+  serial_number: "TR-7K2M9QX4PB",
+  status: "issued",
+  student_id: "student-1",
+  issued_at: "2026-07-02T10:00:00.000Z",
+  supersedes_id: null,
+  reissue_reason: null,
+  revoked_at: null,
+  revoke_reason: null,
+  content_sha256: "0".repeat(64),
+  needs_reissue: false,
+  stale_reasons: [],
+  content: TRANSCRIPT_CONTENT,
+};
+const TRANSCRIPT_READY = {
+  state: "ready",
+  reasons: [],
+  current_transcript_id: null,
+  years: [
+    {
+      academic_year_id: "year-0",
+      academic_year_name: "2024–2025",
+      grade_level_name: "Grade 8",
+      section_name: "B",
+      status: "complete",
+    },
+    {
+      academic_year_id: "year-1",
+      academic_year_name: "2025–2026",
+      grade_level_name: "Grade 9",
+      section_name: "C",
+      status: "complete",
+    },
+  ],
+  cumulative: TRANSCRIPT_CONTENT.cumulative,
+};
+
 let studentRecords = recordsFor("student", null);
+let transcripts: (typeof TRANSCRIPT)[] = [];
 
 interface RequestInit {
   params?: { path?: Record<string, string> };
@@ -182,6 +273,28 @@ const getMock = mock((path: string, _init?: RequestInit) => {
   if (path === "/api/discipline/incidents") {
     return Promise.resolve<unknown>({ data: { incidents: [INCIDENT], total: 3 } });
   }
+  if (path === "/api/grading/students/{studentId}/transcript-readiness") {
+    return Promise.resolve<unknown>({
+      data:
+        transcripts.length > 0
+          ? { ...TRANSCRIPT_READY, state: "issued", current_transcript_id: "transcript-1" }
+          : TRANSCRIPT_READY,
+    });
+  }
+  if (path === "/api/grading/students/{studentId}/transcripts") {
+    return Promise.resolve<unknown>({ data: { transcripts } });
+  }
+  if (path === "/api/grading/transcripts/{transcriptId}") {
+    return Promise.resolve<unknown>({ data: TRANSCRIPT });
+  }
+  return Promise.resolve<unknown>({ data: {} });
+});
+
+const postMock = mock((path: string, _init?: RequestInit) => {
+  if (path === "/api/grading/students/{studentId}/transcripts") {
+    transcripts = [TRANSCRIPT];
+    return Promise.resolve<unknown>({ data: TRANSCRIPT });
+  }
   return Promise.resolve<unknown>({ data: {} });
 });
 
@@ -194,7 +307,7 @@ const putMock = mock((path: string, init?: RequestInit) => {
 });
 
 mock.module("../../../lib/api", () => ({
-  api: { GET: getMock, PUT: putMock, POST: mock(), PATCH: mock(), DELETE: mock() },
+  api: { GET: getMock, PUT: putMock, POST: postMock, PATCH: mock(), DELETE: mock() },
 }));
 
 function fakeJwt(payload: unknown): string {
@@ -204,11 +317,12 @@ function fakeJwt(payload: unknown): string {
 }
 
 async function renderAsPrincipal(url: string) {
-  const [StudentsPage, StudentPage, ParentPage, ParentsPage] = (await Promise.all([
+  const [StudentsPage, StudentPage, ParentPage, ParentsPage, TranscriptPage] = (await Promise.all([
     import("./PrincipalStudentsPage"),
     import("./PrincipalStudentPage"),
     import("./PrincipalParentPage"),
     import("../../records/parents/ParentDirectoryPage"),
+    import("./transcripts/TranscriptPage"),
   ]).then((modules) => modules.map((module) => module.default))) as ComponentType[];
   const store = createSessionStore({
     refreshClient: {
@@ -232,6 +346,10 @@ async function renderAsPrincipal(url: string) {
               <Route path="/portal/principal/students/:studentId" element={<StudentPage />} />
               <Route path="/portal/principal/parents" element={<ParentsPage />} />
               <Route path="/portal/principal/parents/:parentUserId" element={<ParentPage />} />
+              <Route
+                path="/portal/principal/students/:studentId/transcripts/:transcriptId"
+                element={<TranscriptPage />}
+              />
             </Routes>
           </MemoryRouter>
         </ToastProvider>
@@ -243,8 +361,10 @@ async function renderAsPrincipal(url: string) {
 afterEach(() => {
   cleanup();
   studentRecords = recordsFor("student", null);
+  transcripts = [];
   getMock.mockClear();
   putMock.mockClear();
+  postMock.mockClear();
 });
 
 describe("Principal > Students", () => {
@@ -322,5 +442,43 @@ describe("Principal > Students", () => {
         .getByRole("link", { name: "Open this student's attendance history" })
         .getAttribute("href"),
     ).toBe("/portal/attendance/students/student-1");
+  });
+
+  test("a principal sees what a transcript would cover and issues it", async () => {
+    await renderAsPrincipal("/portal/principal/students/student-1");
+
+    const panel = await screen.findByRole("region", { name: "Transcript" });
+    expect(await within(panel).findByText("Ready to issue")).toBeTruthy();
+    expect(
+      within(panel).getByText("Covers 2 years: Grade 8 (2024–2025), Grade 9 (2025–2026)."),
+    ).toBeTruthy();
+    expect(within(panel).getByText("81.25%")).toBeTruthy();
+    expect(within(panel).getByText("3.13")).toBeTruthy();
+    expect(within(panel).getByText("No transcript issued yet.")).toBeTruthy();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Issue transcript" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [path, init] = postMock.mock.calls[0] as [string, RequestInit];
+    expect(path).toBe("/api/grading/students/{studentId}/transcripts");
+    expect(init.params?.path).toEqual({ studentId: "student-1" });
+    const link = await within(panel).findByRole("link", { name: /^Transcript TR-7K2M9QX4PB/ });
+    expect(link.getAttribute("href")).toBe(
+      "/portal/principal/students/student-1/transcripts/transcript-1",
+    );
+    expect(await within(panel).findByText("Issued and up to date")).toBeTruthy();
+  });
+
+  test("the transcript prints every year and the cumulative figures as issued", async () => {
+    await renderAsPrincipal("/portal/principal/students/student-1/transcripts/transcript-1");
+
+    const document = await screen.findByRole("article", { name: "Academic Transcript" });
+    expect(within(document).getByText("Al Noor School")).toBeTruthy();
+    expect(within(document).getByText("TR-7K2M9QX4PB")).toBeTruthy();
+    expect(within(document).getByRole("heading", { name: "2024–2025 — Grade 8, B" })).toBeTruthy();
+    expect(within(document).getByRole("rowheader", { name: "Mathematics" })).toBeTruthy();
+    expect(within(document).getByText("18 / 20")).toBeTruthy();
+    expect(within(document).getByText("81.25%")).toBeTruthy();
+    expect(within(document).getByText("3.13")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Print" })).toBeTruthy();
   });
 });

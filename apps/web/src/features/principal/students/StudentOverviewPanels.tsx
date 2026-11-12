@@ -13,6 +13,8 @@ import {
   DISCIPLINE_TYPE_LABEL_KEYS,
 } from "../discipline/labels";
 
+import { TranscriptPanel } from "./transcripts/TranscriptPanel";
+
 import type { DisciplineIncident } from "../discipline/queries";
 import type { components } from "@studafy/api-client";
 
@@ -202,6 +204,8 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
           )}
         </Card.Body>
       </Card>
+
+      <TranscriptPanel studentId={studentId} />
 
       {canReadDiscipline ? (
         <Card as="section" aria-labelledby="student-discipline-heading">
