@@ -146,8 +146,12 @@ class MarkSheetConfig {
     );
   }
 
-  /// `weighted` or `total_points`.
+  /// `weighted`, `total_points` or `descriptive`.
   final String gradingMethod;
+
+  /// Graded with descriptors (kindergarten, early primary): each skill gets a descriptor from
+  /// [MarkSheet.descriptors], never a score; there is no maximum, pass mark or weight.
+  bool get isDescriptive => gradingMethod == 'descriptive';
   final double maxMarks;
   final double passPercentage;
   final double? finalExamPassPercentage;
@@ -168,6 +172,36 @@ class MarkSheetConfig {
 
   /// A second attempt (`attempt: 2`) is accepted only when the subject has a retake policy.
   bool get allowsRetake => retakePolicy != 'none';
+}
+
+/// One step of the grade's descriptor scale (descriptive subjects), highest first.
+class MarkSheetDescriptor {
+  const MarkSheetDescriptor({
+    required this.id,
+    required this.position,
+    required this.label,
+    required this.points,
+    required this.notAchieved,
+  });
+
+  factory MarkSheetDescriptor.fromJson(Map<String, Object?> json) =>
+      MarkSheetDescriptor(
+        id: json['id']! as String,
+        position: (json['position'] as num?)?.toInt() ?? 0,
+        label: json['label'] as String? ?? '',
+        points: _num(json['points']),
+        notAchieved: json['not_achieved'] as bool? ?? false,
+      );
+
+  final String id;
+
+  /// 1 is the highest descriptor.
+  final int position;
+  final String label;
+  final double? points;
+
+  /// A subject that ends on this descriptor is not passed.
+  final bool notAchieved;
 }
 
 class MarkSheetTerm {
@@ -314,6 +348,7 @@ class RecordedMark {
     required this.score,
     required this.remarks,
     required this.updatedAt,
+    this.descriptorId,
   });
 
   factory RecordedMark.fromJson(Map<String, Object?> json) => RecordedMark(
@@ -322,6 +357,7 @@ class RecordedMark {
     attempt: (json['attempt'] as num?)?.toInt() ?? 1,
     status: MarkStatus.fromWire(json['status']) ?? MarkStatus.graded,
     score: _num(json['score']),
+    descriptorId: json['descriptor_id'] as String?,
     remarks: json['remarks'] as String?,
     updatedAt: json['updated_at']! as String,
   );
@@ -331,6 +367,9 @@ class RecordedMark {
   final int attempt;
   final MarkStatus status;
   final double? score;
+
+  /// Descriptive subjects: the descriptor a graded mark chose (it has no [score]).
+  final String? descriptorId;
   final String? remarks;
   final String updatedAt;
 }
@@ -448,6 +487,7 @@ class MarkSheet {
     required this.assessments,
     required this.periods,
     required this.students,
+    this.descriptors = const [],
   });
 
   factory MarkSheet.fromJson(Map<String, Object?> json) {
@@ -467,6 +507,10 @@ class MarkSheet {
       canEditMarks: json['can_edit_marks'] as bool? ?? false,
       canAddAssessments: json['can_add_assessments'] as bool? ?? false,
       config: MarkSheetConfig.fromJson(_map(json['config'])),
+      descriptors: [
+        for (final descriptor in _list(json['descriptors']))
+          MarkSheetDescriptor.fromJson(descriptor),
+      ]..sort((a, b) => a.position.compareTo(b.position)),
       terms: terms,
       categories: [
         for (final category in _list(json['categories']))
@@ -502,6 +546,9 @@ class MarkSheet {
   final bool canAddAssessments;
   final MarkSheetConfig config;
 
+  /// The grade's descriptor scale, highest first; empty unless [MarkSheetConfig.isDescriptive].
+  final List<MarkSheetDescriptor> descriptors;
+
   /// Ascending by sequence number.
   final List<MarkSheetTerm> terms;
   final List<MarkSheetCategory> categories;
@@ -523,6 +570,14 @@ class MarkSheet {
     if (termId == null) return null;
     for (final term in terms) {
       if (term.id == termId) return term;
+    }
+    return null;
+  }
+
+  MarkSheetDescriptor? descriptorById(String? id) {
+    if (id == null) return null;
+    for (final descriptor in descriptors) {
+      if (descriptor.id == id) return descriptor;
     }
     return null;
   }
@@ -638,6 +693,7 @@ class MarkEntryInput {
     required this.attempt,
     required this.status,
     required this.score,
+    this.descriptorId,
     this.remarks,
     this.expectedUpdatedAt,
   });
@@ -649,6 +705,9 @@ class MarkEntryInput {
   /// A [MarkStatus.wire] value, or `pending` to clear.
   final String status;
   final double? score;
+
+  /// Descriptive subjects: the chosen descriptor of a graded mark (sent instead of a score).
+  final String? descriptorId;
   final String? remarks;
   final String? expectedUpdatedAt;
 
@@ -658,6 +717,7 @@ class MarkEntryInput {
     'attempt': attempt,
     'status': status,
     'score': score,
+    'descriptor_id': descriptorId,
     'remarks': remarks,
     'expected_updated_at': expectedUpdatedAt,
   };

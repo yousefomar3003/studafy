@@ -343,6 +343,19 @@ class SubjectResultsTable extends StatelessWidget {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
+                  if (subject.isDescriptive && !subject.isExempt)
+                    for (final skill in subject.skills)
+                      Text(
+                        'academicResults.skillLine'.tr(
+                          namedArgs: {
+                            'skill': skill.name,
+                            'descriptor': skill.descriptor ?? '—',
+                          },
+                        ),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                 ],
               ),
               Text(
@@ -353,7 +366,7 @@ class SubjectResultsTable extends StatelessWidget {
                 style: theme.textTheme.bodyMedium,
               ),
               Text(
-                subject.isExempt
+                subject.isExempt || subject.isDescriptive
                     ? '—'
                     : formatResultPercent(subject.percentage),
                 style: theme.textTheme.bodyMedium,

@@ -7,7 +7,12 @@ import type {
   UpdateSubjectConfigBody,
 } from "./queries";
 import type { Term } from "../../admin/timetable/queries";
-import type { SubjectGradingConfig, ValidationIssue, WeightSummary } from "@studafy/grading-engine";
+import type {
+  EngineDescriptor,
+  SubjectGradingConfig,
+  ValidationIssue,
+  WeightSummary,
+} from "@studafy/grading-engine";
 
 /**
  * The subject configuration editor's form model, and the pure conversions around it: from a saved
@@ -25,7 +30,50 @@ export type CategoryScope = SubjectConfig["categories"][number]["scope"];
 export type Aggregation = SubjectConfig["categories"][number]["aggregation"];
 
 export const REQUIREMENTS: readonly Requirement[] = ["mandatory", "optional", "elective"];
-export const GRADING_METHODS: readonly GradingMethod[] = ["weighted", "total_points"];
+export const GRADING_METHODS: readonly GradingMethod[] = [
+  "weighted",
+  "total_points",
+  "descriptive",
+];
+
+/**
+ * Stand-in scale for live validation when the grade has none yet: the API gives the grade its
+ * default scale (four descriptors with points) the first time a subject is saved as descriptive.
+ */
+export const DEFAULT_SCALE_PREVIEW: readonly EngineDescriptor[] = [4, 3, 2, 1].map((points) => ({
+  id: `default-${points}`,
+  label: `default-${points}`,
+  points,
+  notAchieved: false,
+}));
+
+/**
+ * Switching a draft between marks and descriptors. A descriptive subject never counts in the
+ * average, has no retakes or final-exam rule, and its skills carry no marks (the API stores 1).
+ */
+export function withMethod(draft: ConfigDraft, gradingMethod: GradingMethod): ConfigDraft {
+  if (gradingMethod === draft.gradingMethod) return draft;
+  if (gradingMethod === "descriptive") {
+    return {
+      ...draft,
+      gradingMethod,
+      includeInAverage: false,
+      retakePolicy: "none",
+      retakeCapPercentage: "",
+      finalExamPassPercentage: "",
+      assessments: draft.assessments.map((assessment) => ({
+        ...assessment,
+        maxMarks: "1",
+        weight: "1",
+      })),
+    };
+  }
+  return {
+    ...draft,
+    gradingMethod,
+    includeInAverage: draft.gradingMethod === "descriptive" ? true : draft.includeInAverage,
+  };
+}
 export const ROUNDING_MODES: readonly RoundingMode[] = ["half_up", "half_even", "floor", "ceil"];
 export const MISSING_POLICIES: readonly MissingPolicy[] = ["incomplete", "zero"];
 export const RETAKE_POLICIES: readonly RetakePolicy[] = ["none", "replace", "highest", "capped"];
@@ -264,14 +312,18 @@ export function newCategory(scope: CategoryScope = "term"): CategoryDraft {
   };
 }
 
-export function newAssessment(category: CategoryDraft, termId: string | null): AssessmentDraft {
+export function newAssessment(
+  category: CategoryDraft,
+  termId: string | null,
+  method: GradingMethod = "weighted",
+): AssessmentDraft {
   return {
     key: newKey("assessment"),
     id: null,
     categoryKey: category.key,
     termId: category.scope === "annual" ? null : termId,
     name: "",
-    maxMarks: "100",
+    maxMarks: method === "descriptive" ? "1" : "100",
     weight: "1",
     mandatory: true,
     assessmentDate: "",
@@ -294,6 +346,7 @@ function optionalNumber(value: string): number | null {
 export function draftToEngine(
   draft: ConfigDraft,
   terms: readonly Pick<Term, "id" | "name" | "sequence_number">[],
+  descriptors: readonly EngineDescriptor[] = DEFAULT_SCALE_PREVIEW,
 ): SubjectGradingConfig {
   return {
     method: draft.gradingMethod,
@@ -331,6 +384,9 @@ export function draftToEngine(
       weight: toNumber(assessment.weight),
       mandatory: assessment.mandatory,
     })),
+    ...(draft.gradingMethod === "descriptive"
+      ? { descriptors: descriptors.length > 0 ? [...descriptors] : [...DEFAULT_SCALE_PREVIEW] }
+      : {}),
   };
 }
 
@@ -342,8 +398,9 @@ export interface LiveValidation {
 export function validateDraft(
   draft: ConfigDraft,
   terms: readonly Pick<Term, "id" | "name" | "sequence_number">[],
+  descriptors: readonly EngineDescriptor[] = DEFAULT_SCALE_PREVIEW,
 ): LiveValidation {
-  const engine = draftToEngine(draft, terms);
+  const engine = draftToEngine(draft, terms, descriptors);
   return { summary: summarizeWeights(engine), issues: validateSubjectConfig(engine) };
 }
 

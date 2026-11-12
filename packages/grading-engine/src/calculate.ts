@@ -1,3 +1,4 @@
+import { calculateDescriptiveResult } from "./descriptive";
 import { atLeast, matchBand, roundTo } from "./rounding";
 
 import type {
@@ -267,6 +268,7 @@ export function calculateSubjectResult(
 ): SubjectResult {
   const indexed = indexMarks(marks);
   const termId = options.termId ?? null;
+  if (config.method === "descriptive") return calculateDescriptiveResult(config, indexed, termId);
 
   let provisional: number | null;
   let terms: PeriodOutcome[];
@@ -395,7 +397,10 @@ export function calculateOverallResult(
   policy: OverallPolicy,
 ): OverallResult {
   const considered = subjects.filter((subject) => !subject.exempt);
-  const counted = considered.filter((subject) => subject.includeInAverage);
+  // A descriptive subject has no percentage, so it never counts in the average or the totals.
+  const counted = considered.filter(
+    (subject) => subject.includeInAverage && subject.result?.descriptive !== true,
+  );
   const incompleteSubjectIds = considered
     .filter((subject) => subject.requirement !== "optional" || subject.includeInAverage)
     .filter((subject) => subject.result === null || subject.result.status !== "complete")

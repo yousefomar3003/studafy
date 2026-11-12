@@ -484,6 +484,26 @@
   text-align: start;
 }
 
+.ag-certificate__skills {
+  display: grid;
+  gap: var(--space-12);
+}
+
+.ag-certificate__skills h3 {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
+.ag-certificate__skills caption {
+  padding-block-end: var(--space-4);
+  font-weight: var(--font-weight-medium);
+  text-align: start;
+}
+
+.ag-certificate__skills table {
+  break-inside: avoid;
+}
+
 .ag-certificate__overall {
   padding-block-start: var(--space-8);
   border-block-start: 1px solid var(--color-border);

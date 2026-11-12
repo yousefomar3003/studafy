@@ -31,3 +31,9 @@ export type {
   CumulativeSubjectInput,
   CumulativeYearInput,
 } from "./cumulative";
+export {
+  calculateDescriptiveResult,
+  descriptorsWithPoints,
+  nearestDescriptor,
+  validateDescriptiveConfig,
+} from "./descriptive";

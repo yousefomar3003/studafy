@@ -418,6 +418,53 @@ void main() {
     expect(find.text('Revoked'), findsOneWidget);
   });
 
+  testWidgets('a descriptive subject shows its descriptor and skills', (
+    tester,
+  ) async {
+    final certificate = _certificate();
+    final content = certificate['content']! as Map<String, Object?>;
+    content['subjects'] = [
+      ...(content['subjects']! as List<Object?>),
+      {
+        'code': 'RD',
+        'name': 'Reading',
+        'requirement': 'mandatory',
+        'marks_obtained': null,
+        'max_marks': 100,
+        'percentage': null,
+        'grade_label': 'Very good',
+        'passed': true,
+        'exempt': false,
+        'terms': <Object?>[],
+        'descriptive': true,
+        'skills': [
+          {
+            'name': 'Reads fluently',
+            'category_name': 'Reading',
+            'term_name': 'Term 1',
+            'descriptor_label': 'Excellent',
+          },
+          {
+            'name': 'Knows letters',
+            'category_name': 'Reading',
+            'term_name': 'Term 1',
+            'descriptor_label': 'Good',
+          },
+        ],
+      },
+    ];
+    await _pump(
+      tester,
+      _FakeResultsClient(certificates: [certificate]),
+      home: const CertificateDetailScreen(certificateId: 'cert-1'),
+    );
+
+    expect(find.text('Reading'), findsOneWidget);
+    expect(find.text('Very good'), findsOneWidget);
+    expect(find.text('Reads fluently: Excellent'), findsOneWidget);
+    expect(find.text('Knows letters: Good'), findsOneWidget);
+  });
+
   testWidgets('a superseded certificate is flagged as replaced', (
     tester,
   ) async {

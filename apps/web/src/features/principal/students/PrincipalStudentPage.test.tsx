@@ -215,6 +215,8 @@ const TRANSCRIPT_READY = {
 
 let studentRecords = recordsFor("student", null);
 let transcripts: (typeof TRANSCRIPT)[] = [];
+/** The document GET /api/grading/transcripts/{transcriptId} answers with (TRANSCRIPT when null). */
+let transcriptDocument: unknown = null;
 
 interface RequestInit {
   params?: { path?: Record<string, string> };
@@ -285,7 +287,7 @@ const getMock = mock((path: string, _init?: RequestInit) => {
     return Promise.resolve<unknown>({ data: { transcripts } });
   }
   if (path === "/api/grading/transcripts/{transcriptId}") {
-    return Promise.resolve<unknown>({ data: TRANSCRIPT });
+    return Promise.resolve<unknown>({ data: transcriptDocument ?? TRANSCRIPT });
   }
   return Promise.resolve<unknown>({ data: {} });
 });
@@ -362,6 +364,7 @@ afterEach(() => {
   cleanup();
   studentRecords = recordsFor("student", null);
   transcripts = [];
+  transcriptDocument = null;
   getMock.mockClear();
   putMock.mockClear();
   postMock.mockClear();
@@ -480,5 +483,66 @@ describe("Principal > Students", () => {
     expect(within(document).getByText("81.25%")).toBeTruthy();
     expect(within(document).getByText("3.13")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Print" })).toBeTruthy();
+  });
+
+  test("a transcript lists a descriptive subject's skills and explains a GPA it cannot give", async () => {
+    const [year] = TRANSCRIPT_CONTENT.years;
+    transcriptDocument = {
+      ...TRANSCRIPT,
+      content: {
+        ...TRANSCRIPT_CONTENT,
+        years: [
+          {
+            ...year!,
+            subjects: [
+              ...year!.subjects,
+              {
+                code: "RD",
+                name: "Reading",
+                requirement: "mandatory",
+                marks_obtained: null,
+                max_marks: 100,
+                percentage: null,
+                grade_label: "Very good",
+                gpa_points: null,
+                passed: true,
+                exempt: false,
+                include_in_average: false,
+                average_weight: 1,
+                descriptive: true,
+                skills: [
+                  {
+                    name: "Reads fluently",
+                    category_name: "Reading",
+                    descriptor_label: "Excellent",
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+        cumulative: {
+          ...TRANSCRIPT_CONTENT.cumulative,
+          gpa: null,
+          gpa_unavailable_reason: "mixed_gpa_scales",
+          gpa_scale_max: null,
+          mixed_gpa_scales: [
+            { academic_year_name: "2024–2025", max: 4 },
+            { academic_year_name: "2025–2026", max: 5 },
+          ],
+        },
+      },
+    };
+    await renderAsPrincipal("/portal/principal/students/student-1/transcripts/transcript-1");
+
+    const document = await screen.findByRole("article", { name: "Academic Transcript" });
+    const reading = within(document).getByRole("rowheader", { name: /^Reading/ });
+    expect(within(reading).getByText("Reads fluently: Excellent")).toBeTruthy();
+    expect(within(document).getByText("Very good")).toBeTruthy();
+    expect(
+      within(document).getByText(
+        "No cumulative GPA: the years use different GPA scales (2024–2025: out of 4, 2025–2026: out of 5), so their points can't be averaged.",
+      ),
+    ).toBeTruthy();
   });
 });

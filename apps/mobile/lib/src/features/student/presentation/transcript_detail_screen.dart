@@ -197,6 +197,20 @@ class _Document extends StatelessWidget {
                               namedArgs: {
                                 'subjects': cumulative.subjectsWithoutGpaPoints
                                     .join(', '),
+                                'scales': cumulative.mixedGpaScales
+                                    .map(
+                                      (scale) =>
+                                          'academicResults.transcript.gpaScale'
+                                              .tr(
+                                                namedArgs: {
+                                                  'year': scale.year,
+                                                  'max': formatResultNumber(
+                                                    scale.max,
+                                                  ),
+                                                },
+                                              ),
+                                    )
+                                    .join(', '),
                               },
                             ),
                         style: theme.textTheme.bodySmall?.copyWith(

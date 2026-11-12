@@ -121,9 +121,13 @@ class _AssessmentMarksScreenState extends ConsumerState<AssessmentMarksScreen> {
               children: [
                 Text(assessment.name),
                 Text(
-                  'teacher.marks.entry.outOf'.tr(
-                    namedArgs: {'max': formatMarkNumber(assessment.maxMarks)},
-                  ),
+                  sheet.config.isDescriptive
+                      ? 'teacher.marks.descriptive.pickHint'.tr()
+                      : 'teacher.marks.entry.outOf'.tr(
+                          namedArgs: {
+                            'max': formatMarkNumber(assessment.maxMarks),
+                          },
+                        ),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -201,6 +205,7 @@ class _AssessmentMarksScreenState extends ConsumerState<AssessmentMarksScreen> {
                           ),
                           student: student,
                           assessment: assessment,
+                          descriptors: sheet.descriptors,
                           editor: editor,
                           controller: _controllerFor((
                             studentId: student.studentId,
@@ -348,6 +353,7 @@ class _MarkRow extends StatelessWidget {
     required this.cellKey,
     required this.student,
     required this.assessment,
+    required this.descriptors,
     required this.editor,
     required this.controller,
     required this.editable,
@@ -357,6 +363,10 @@ class _MarkRow extends StatelessWidget {
 
   final MarkCellKey cellKey;
   final MarkSheetStudent student;
+
+  /// The grade's descriptor scale; non-empty only in a descriptive subject, where a descriptor is
+  /// picked instead of a score being typed.
+  final List<MarkSheetDescriptor> descriptors;
   final MarkSheetAssessment assessment;
   final MarkEntryEditor editor;
   final TextEditingController controller;
@@ -454,8 +464,36 @@ class _MarkRow extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.space8),
           SizedBox(
-            width: 120,
-            child: status == null || status == MarkStatus.graded
+            width: editor.descriptive ? 168 : 120,
+            child:
+                (status == null || status == MarkStatus.graded) &&
+                    editor.descriptive
+                ? DropdownButtonFormField<String>(
+                    // Keyed by the value so a reload or discard shows the editor's choice.
+                    key: ValueKey(
+                      'mark-descriptor-${cellKey.studentId}-${cellKey.attempt}-'
+                      '${editor.descriptorFor(cellKey)}',
+                    ),
+                    initialValue: editor.descriptorFor(cellKey),
+                    isExpanded: true,
+                    isDense: true,
+                    hint: const Text('—'),
+                    decoration: const InputDecoration(isDense: true),
+                    items: [
+                      for (final descriptor in descriptors)
+                        DropdownMenuItem(
+                          value: descriptor.id,
+                          child: Text(
+                            descriptor.label,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                    ],
+                    onChanged: editable
+                        ? (id) => editor.setDescriptor(cellKey, id)
+                        : null,
+                  )
+                : status == null || status == MarkStatus.graded
                 ? TextField(
                     key: ValueKey(
                       'mark-field-${cellKey.studentId}-${cellKey.attempt}',

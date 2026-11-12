@@ -32,6 +32,21 @@ const transcriptSubjectSchema = z
     exempt: z.boolean(),
     include_in_average: z.boolean(),
     average_weight: z.number(),
+    descriptive: z.boolean().optional().openapi({
+      description:
+        "Graded with descriptors, not marks: grade_label is the subject's descriptor (if its scale has points). Never counted in the cumulative figures.",
+    }),
+    skills: z
+      .array(
+        z
+          .object({
+            name: z.string(),
+            category_name: z.string(),
+            descriptor_label: z.string().nullable(),
+          })
+          .openapi("TranscriptSkill"),
+      )
+      .optional(),
   })
   .openapi("TranscriptSubject");
 
@@ -69,8 +84,22 @@ const transcriptCumulativeShape = z.object({
     description:
       "Weighted mean of the subjects' GPA points; null when any counted subject has none.",
   }),
-  gpa_unavailable_reason: z.enum(["no_subjects", "incomplete", "missing_gpa_points"]).nullable(),
+  gpa_unavailable_reason: z
+    .enum(["no_subjects", "incomplete", "missing_gpa_points", "mixed_gpa_scales"])
+    .nullable(),
   subjects_without_gpa_points: z.array(z.string()),
+  gpa_scale_max: z.number().nullable().optional().openapi({
+    description: "The GPA maximum every GPA year shares (4, 5...); null when none or they differ.",
+  }),
+  mixed_gpa_scales: z
+    .array(
+      z.object({ academic_year_name: z.string(), max: z.number() }).openapi("TranscriptGpaScale"),
+    )
+    .optional()
+    .openapi({
+      description:
+        "mixed_gpa_scales: each GPA year and its maximum. The cumulative GPA is null because they differ.",
+    }),
   years_covered: z.number().int(),
   subjects_counted: z.number().int(),
 });

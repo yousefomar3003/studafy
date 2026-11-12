@@ -295,6 +295,8 @@ export async function applyExamStructure(
     FROM app.subject_configs AS config
     JOIN app.subjects AS subject ON subject.id = config.subject_id AND subject.school_id = config.school_id
     WHERE config.school_id = ${schoolId}::uuid AND config.academic_year_id = ${year.id}::uuid
+      -- Descriptive subjects have skills, not exams: the exam system never rebuilds them.
+      AND config.grading_method <> 'descriptive'
     ORDER BY config.section_id NULLS FIRST, subject.name
   `;
 

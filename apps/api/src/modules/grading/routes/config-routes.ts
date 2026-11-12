@@ -34,6 +34,7 @@ import {
   upsertProgram,
 } from "../config-service";
 import { copyYearConfiguration } from "../copy-year-service";
+import { loadProgramDescriptorViews } from "../descriptor-service";
 import { applyExamStructure, getExamTemplate } from "../exam-structure";
 import { getGradingOverview } from "../overview-service";
 import {
@@ -714,11 +715,18 @@ export function gradingConfigRoutes(database: Database): OpenAPIHono<AppEnv> {
   routes.openapi(listProgramsRoute, async (c) => {
     const { yearId } = c.req.valid("param");
     const tenant = tenantFrom(c);
-    const programs = await withTenantTx(database, tenant, (tx) =>
-      listPrograms(tx, tenant.schoolId, yearId),
-    );
+    const { programs, descriptors } = await withTenantTx(database, tenant, async (tx) => ({
+      programs: await listPrograms(tx, tenant.schoolId, yearId),
+      descriptors: await loadProgramDescriptorViews(tx, tenant.schoolId, yearId),
+    }));
     return c.json(
-      { programs: programs.map((p) => ({ ...p, updated_at: p.updated_at.toISOString() })) },
+      {
+        programs: programs.map((p) => ({
+          ...p,
+          descriptors: descriptors.get(p.grade_level_id) ?? [],
+          updated_at: p.updated_at.toISOString(),
+        })),
+      },
       200,
     );
   });
@@ -727,10 +735,18 @@ export function gradingConfigRoutes(database: Database): OpenAPIHono<AppEnv> {
     const { yearId, gradeLevelId } = c.req.valid("param");
     const body = c.req.valid("json");
     const tenant = tenantFrom(c);
-    const program = await withTenantTx(database, tenant, (tx) =>
-      upsertProgram(tx, tenant.schoolId, yearId, gradeLevelId, body),
+    const { program, descriptors } = await withTenantTx(database, tenant, async (tx) => ({
+      program: await upsertProgram(tx, tenant.schoolId, yearId, gradeLevelId, body),
+      descriptors: await loadProgramDescriptorViews(tx, tenant.schoolId, yearId),
+    }));
+    return c.json(
+      {
+        ...program,
+        descriptors: descriptors.get(program.grade_level_id) ?? [],
+        updated_at: program.updated_at.toISOString(),
+      },
+      200,
     );
-    return c.json({ ...program, updated_at: program.updated_at.toISOString() }, 200);
   });
 
   routes.openapi(listGradeSubjectsRoute, async (c) => {

@@ -6,6 +6,7 @@ import type {
   CategoryAggregation,
   CategoryKind,
   CategoryScope,
+  EngineDescriptor,
   GradeBand,
   MarkInput,
   OverallPolicy,
@@ -46,7 +47,7 @@ export interface SubjectConfigRow {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: string;
-  grading_method: "weighted" | "total_points";
+  grading_method: "weighted" | "total_points" | "descriptive";
   max_marks: string;
   pass_percentage: string;
   final_exam_pass_percentage: string | null;
@@ -126,6 +127,16 @@ export interface ProgramRow {
   updated_at: Date;
 }
 
+export interface DescriptorRow {
+  id: string;
+  academic_year_id: string;
+  grade_level_id: string;
+  position: number;
+  label: string;
+  points: string | null;
+  not_achieved: boolean;
+}
+
 export interface LoadedConfig {
   config: SubjectConfigRow;
   categories: CategoryRow[];
@@ -134,6 +145,8 @@ export interface LoadedConfig {
   terms: TermRow[];
   scale: GradeBand[];
   scaleName: string | null;
+  /** The grade's descriptor scale, highest first (used by descriptive subjects). */
+  descriptors: EngineDescriptor[];
 }
 
 /** What one section does with one subject. */
@@ -300,6 +313,37 @@ export async function loadScale(
   return toScale(rows);
 }
 
+/** Descriptor scales of a year's grades (all of them, or `gradeLevelIds`), highest first. */
+export async function loadDescriptorRows(
+  tx: TransactionSql,
+  schoolId: string,
+  yearId: string,
+  gradeLevelIds?: readonly string[],
+): Promise<DescriptorRow[]> {
+  const gradeFilter = gradeLevelIds
+    ? tx`AND grade_level_id = ANY (${gradeLevelIds as string[]}::uuid[])`
+    : tx``;
+  return tx<DescriptorRow[]>`
+    SELECT id, academic_year_id, grade_level_id, position, label, points::text AS points,
+           not_achieved
+    FROM app.grade_program_descriptors
+    WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid
+      ${gradeFilter}
+    ORDER BY grade_level_id, position
+  `;
+}
+
+export function toEngineDescriptors(rows: readonly DescriptorRow[]): EngineDescriptor[] {
+  return [...rows]
+    .sort((a, b) => a.position - b.position)
+    .map((row) => ({
+      id: row.id,
+      label: row.label,
+      points: row.points === null ? null : Number(row.points),
+      notAchieved: row.not_achieved,
+    }));
+}
+
 /** A scale's rows (scale LEFT JOIN its bands, highest band first) as the engine's bands. */
 function toScale(
   rows: readonly {
@@ -395,6 +439,9 @@ export async function loadConfigDetail(
     config.grade_level_id,
   );
   const scale = await loadScale(tx, schoolId, config.grade_scale_id ?? program.grade_scale_id);
+  const descriptors = await loadDescriptorRows(tx, schoolId, config.academic_year_id, [
+    config.grade_level_id,
+  ]);
   return {
     config,
     categories,
@@ -403,6 +450,7 @@ export async function loadConfigDetail(
     terms,
     scale: scale.bands,
     scaleName: scale.name,
+    descriptors: toEngineDescriptors(descriptors),
   };
 }
 
@@ -475,40 +523,43 @@ export async function loadConfigDetails(
   configs: readonly SubjectConfigRow[],
 ): Promise<ConfigDetails> {
   const configIds = configs.map((config) => config.id);
-  const [categories, assessments, termWeights, terms, programs] = await Promise.all([
-    configIds.length === 0
-      ? Promise.resolve([] as CategoryRow[])
-      : tx<CategoryRow[]>`
+  const [categories, assessments, termWeights, terms, programs, descriptorRows] = await Promise.all(
+    [
+      configIds.length === 0
+        ? Promise.resolve([] as CategoryRow[])
+        : tx<CategoryRow[]>`
           SELECT id, subject_config_id, name, kind, scope, weight, aggregation, drop_lowest, sort_order
           FROM app.subject_config_categories
           WHERE school_id = ${schoolId}::uuid AND subject_config_id = ANY (${configIds}::uuid[])
           ORDER BY sort_order, name
         `,
-    configIds.length === 0
-      ? Promise.resolve([] as AssessmentRow[])
-      : tx<AssessmentRow[]>`
+      configIds.length === 0
+        ? Promise.resolve([] as AssessmentRow[])
+        : tx<AssessmentRow[]>`
           SELECT ${tx.unsafe(ASSESSMENT_COLUMNS)}
           FROM app.subject_config_assessments AS assessment
           WHERE assessment.school_id = ${schoolId}::uuid
             AND assessment.subject_config_id = ANY (${configIds}::uuid[])
           ORDER BY assessment.sort_order, assessment.name, assessment.id
         `,
-    configIds.length === 0
-      ? Promise.resolve([] as (TermWeightRow & { subject_config_id: string })[])
-      : tx<(TermWeightRow & { subject_config_id: string })[]>`
+      configIds.length === 0
+        ? Promise.resolve([] as (TermWeightRow & { subject_config_id: string })[])
+        : tx<(TermWeightRow & { subject_config_id: string })[]>`
           SELECT subject_config_id, term_id, weight
           FROM app.subject_config_term_weights
           WHERE school_id = ${schoolId}::uuid AND subject_config_id = ANY (${configIds}::uuid[])
         `,
-    loadYearTerms(tx, schoolId, yearId),
-    tx<ProgramRow[]>`
+      loadYearTerms(tx, schoolId, yearId),
+      tx<ProgramRow[]>`
       SELECT ${tx.unsafe(PROGRAM_COLUMNS)}
       FROM app.grade_programs AS program
       JOIN app.grade_levels AS grade
         ON grade.id = program.grade_level_id AND grade.school_id = program.school_id
       WHERE program.school_id = ${schoolId}::uuid AND program.academic_year_id = ${yearId}::uuid
     `,
-  ]);
+      loadDescriptorRows(tx, schoolId, yearId),
+    ],
+  );
   const scaleIds = [
     ...new Set(
       [...configs.map((c) => c.grade_scale_id), ...programs.map((p) => p.grade_scale_id)].filter(
@@ -541,6 +592,12 @@ export async function loadConfigDetails(
   const assessmentsByConfig = groupBy(assessments, (row) => row.subject_config_id);
   const weightsByConfig = groupBy(termWeights, (row) => row.subject_config_id);
   const programByGrade = new Map(programs.map((program) => [program.grade_level_id, program]));
+  const descriptorsByGrade = new Map(
+    [...groupBy(descriptorRows, (row) => row.grade_level_id)].map(([grade, rows]) => [
+      grade,
+      toEngineDescriptors(rows),
+    ]),
+  );
   const scales = new Map(
     [...groupBy(scaleRows, (row) => row.scale_id)].map(([id, rows]) => [id, toScale(rows)]),
   );
@@ -579,6 +636,7 @@ export async function loadConfigDetails(
         terms,
         scale: scale.bands,
         scaleName: scale.name,
+        descriptors: descriptorsByGrade.get(config.grade_level_id) ?? [],
       };
     },
   };
@@ -645,6 +703,7 @@ export function toEngineConfig(
         weight: Number(assessment.weight),
         mandatory: assessment.is_mandatory,
       })),
+    ...(config.grading_method === "descriptive" ? { descriptors: loaded.descriptors } : {}),
   };
 }
 
@@ -948,6 +1007,7 @@ export interface MarkRow {
   attempt: 1 | 2;
   status: MarkInput["status"];
   score: string | null;
+  descriptor_id: string | null;
   remarks: string | null;
   updated_at: Date;
 }
@@ -960,7 +1020,7 @@ export async function loadMarks(
 ): Promise<MarkRow[]> {
   if (assessmentIds.length === 0 || studentIds.length === 0) return [];
   return tx<MarkRow[]>`
-    SELECT id, assessment_id, student_id, attempt, status, score, remarks, updated_at
+    SELECT id, assessment_id, student_id, attempt, status, score, descriptor_id, remarks, updated_at
     FROM app.student_marks
     WHERE school_id = ${schoolId}::uuid
       AND assessment_id = ANY (${assessmentIds}::uuid[])
@@ -976,5 +1036,6 @@ export function toMarkInputs(marks: readonly MarkRow[], studentId: string): Mark
       attempt: mark.attempt === 2 ? 2 : 1,
       status: mark.status,
       score: mark.score === null ? null : Number(mark.score),
+      descriptorId: mark.descriptor_id,
     }));
 }

@@ -43,6 +43,10 @@ export interface TranscriptSubject {
   exempt: boolean;
   include_in_average: boolean;
   average_weight: number;
+  /** Graded with descriptors (no marks): `grade_label` is the subject's descriptor, if any. */
+  descriptive?: boolean;
+  /** A descriptive subject's skills and the descriptor each was given. */
+  skills?: { name: string; category_name: string; descriptor_label: string | null }[];
 }
 
 export interface TranscriptYear {
@@ -68,6 +72,10 @@ export interface TranscriptCumulative {
   gpa: number | null;
   gpa_unavailable_reason: CumulativeResult["gpaUnavailableReason"];
   subjects_without_gpa_points: string[];
+  /** The GPA maximum every GPA year shares (4, 5...); null when none was a GPA, or they differ. */
+  gpa_scale_max?: number | null;
+  /** Each GPA year and its maximum, when they differ (the cumulative GPA is then null). */
+  mixed_gpa_scales?: { academic_year_name: string; max: number }[];
   years_covered: number;
   subjects_counted: number;
 }
@@ -219,6 +227,10 @@ function cumulativeOf(years: readonly CoveredYear[]): TranscriptCumulative {
   const rounding = years.at(-1)?.rounding ?? DEFAULT_ROUNDING;
   const result = calculateCumulativeResult(
     years.map((year) => ({
+      label: year.finalization.year_name,
+      // A year shown as a GPA declares its scale; averaging GPA points across scales is refused.
+      gpaScaleMax:
+        year.result.result_display?.format === "gpa" ? year.result.result_display.max : null,
       subjects: year.result.subjects.map((subject) => ({
         label: `${subject.subject_name} (${year.finalization.year_name})`,
         status: subject.status,
@@ -226,6 +238,7 @@ function cumulativeOf(years: readonly CoveredYear[]): TranscriptCumulative {
         averageWeight: year.weights.get(subject.subject_id) ?? 1,
         percentage: subject.percentage,
         gpaPoints: subject.gpa_points,
+        descriptive: subject.is_descriptive,
       })),
     })),
     rounding,
@@ -235,6 +248,11 @@ function cumulativeOf(years: readonly CoveredYear[]): TranscriptCumulative {
     gpa: result.gpa,
     gpa_unavailable_reason: result.gpaUnavailableReason,
     subjects_without_gpa_points: result.subjectsWithoutGpaPoints,
+    gpa_scale_max: result.gpaScaleMax,
+    mixed_gpa_scales: result.mixedGpaScales.map((scale) => ({
+      academic_year_name: scale.label,
+      max: scale.max,
+    })),
     years_covered: years.length,
     subjects_counted: result.subjectsCounted,
   };
@@ -282,6 +300,16 @@ function renderYear(year: CoveredYear): TranscriptYear {
         exempt: subject.status === "exempt",
         include_in_average: subject.include_in_average,
         average_weight: year.weights.get(subject.subject_id) ?? 1,
+        ...(subject.is_descriptive
+          ? {
+              descriptive: true,
+              skills: subject.skills.map((skill) => ({
+                name: skill.name,
+                category_name: skill.category_name,
+                descriptor_label: skill.descriptor_label,
+              })),
+            }
+          : {}),
       })),
     overall: {
       average_percentage: result.average_percentage,
