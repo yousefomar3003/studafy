@@ -251,6 +251,7 @@ function studentResult(id: string, first: string, status: "complete" | "incomple
     total_obtained: status === "complete" ? 81.5 : null,
     total_max: status === "complete" ? 100 : null,
     grade_label: status === "complete" ? "B" : null,
+    result_display: status === "complete" ? { format: "out_of", value: 16.3, max: 20 } : null,
     subjects_failed: 0,
     academic_status: status === "complete" ? "promoted" : "incomplete",
     subjects: [],
@@ -278,6 +279,8 @@ const GET_RESPONSES: Record<string, unknown> = {
         mark_approval_required: false,
         average_rounding_decimals: 2,
         average_rounding_mode: "half_up",
+        result_format: "percentage",
+        result_scale_max: null,
         updated_at: "2026-10-01T00:00:00.000Z",
       },
     ],
@@ -453,6 +456,42 @@ describe("AcademicSetupPage", () => {
     expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  test("drags a subject's weight on a slider, with an exact box beside it", async () => {
+    await renderAt("/subjects");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Mathematics" }));
+    const slider = (await screen.findByRole("slider", {
+      name: "Weight in the overall average",
+    })) as HTMLInputElement;
+    const exact = screen.getByRole("spinbutton", { name: "Exact weight" }) as HTMLInputElement;
+    expect([slider.value, exact.value]).toEqual(["1", "1"]);
+
+    fireEvent.change(slider, { target: { value: "3.5" } });
+    expect(exact.value).toBe("3.5");
+    expect(slider.getAttribute("aria-valuetext")).toBe("Counts as 3.5×");
+
+    // A weight past the slider's end is kept; the slider rests at its end.
+    fireEvent.change(exact, { target: { value: "15" } });
+    expect([slider.value, exact.value]).toEqual(["10", "15"]);
+  });
+
+  test("a grade can show its final result as a GPA", async () => {
+    await renderAt("/subjects");
+
+    const format = await screen.findByRole("combobox", { name: "Final result shown as" });
+    fireEvent.click(format);
+    fireEvent.click(screen.getByRole("option", { name: "GPA (e.g. out of 4)" }));
+    const max = screen.getByRole("spinbutton", { name: /GPA out of/ }) as HTMLInputElement;
+    expect(max.value).toBe("4");
+    putMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Save policies" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [path, init] = putMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
+    expect(path).toBe("/api/grading/years/{yearId}/programs/{gradeLevelId}");
+    expect(init.body).toMatchObject({ result_format: "gpa", result_scale_max: 4 });
+  });
+
   test("shows the impact of a change to recorded marks and resends the save only once confirmed", async () => {
     putMock.mockImplementationOnce(() =>
       Promise.reject(
@@ -510,6 +549,8 @@ describe("AcademicSetupPage", () => {
     await renderAt("/results");
 
     const blocked = await screen.findByText("Mathematics is incomplete: Exam 2 has no mark.");
+    // The grade shows results out of 20, with the percentage beside it.
+    expect(await screen.findByText("16.3 / 20")).toBeTruthy();
     const row = blocked.closest("tr")!;
     expect(within(row).getByText("Sami Haddad")).toBeTruthy();
     expect(within(row).getByText("Blocked")).toBeTruthy();

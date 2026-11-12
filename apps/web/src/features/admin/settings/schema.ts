@@ -104,18 +104,40 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
  * The school's exam system, mirroring apps/api/src/modules/grading/exam-structure.ts: which parts a
  * term has, in the order a term shows them, and the weights a newly picked system starts from.
  */
-export const EXAM_STRUCTURES = ["midterm", "periods"] as const;
+export const EXAM_STRUCTURES = ["midterm", "periods", "three_periods"] as const;
 export type ExamStructure = (typeof EXAM_STRUCTURES)[number];
 export type ExamPart =
-  "first_period" | "second_period" | "midterm" | "final_exam" | "quiz" | "homework";
+  | "first_period"
+  | "second_period"
+  | "third_period"
+  | "midterm"
+  | "final_exam"
+  | "quiz"
+  | "homework";
 export type ExamWeights = Partial<Record<ExamPart, number>>;
 
 export const EXAM_STRUCTURE_PARTS: Record<ExamStructure, readonly ExamPart[]> = {
   midterm: ["midterm", "final_exam", "quiz", "homework"],
   periods: ["first_period", "second_period", "final_exam", "quiz", "homework"],
+  three_periods: [
+    "first_period",
+    "second_period",
+    "third_period",
+    "final_exam",
+    "quiz",
+    "homework",
+  ],
 };
 
 export const DEFAULT_EXAM_WEIGHTS: Record<ExamStructure, ExamWeights> = {
   midterm: { midterm: 30, final_exam: 40, quiz: 15, homework: 15 },
   periods: { first_period: 20, second_period: 20, final_exam: 30, quiz: 15, homework: 15 },
+  three_periods: {
+    first_period: 15,
+    second_period: 15,
+    third_period: 15,
+    final_exam: 25,
+    quiz: 15,
+    homework: 15,
+  },
 };

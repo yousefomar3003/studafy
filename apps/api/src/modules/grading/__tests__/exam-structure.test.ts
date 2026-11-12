@@ -8,6 +8,7 @@ describe("examWeightsProblem", () => {
   test("accepts each system's defaults", () => {
     expect(examWeightsProblem("midterm", DEFAULT_EXAM_WEIGHTS.midterm)).toBeNull();
     expect(examWeightsProblem("periods", DEFAULT_EXAM_WEIGHTS.periods)).toBeNull();
+    expect(examWeightsProblem("three_periods", DEFAULT_EXAM_WEIGHTS.three_periods)).toBeNull();
   });
 
   test("needs every part of the system, nothing else, totalling 100", () => {
@@ -71,6 +72,34 @@ describe("buildExamTemplate", () => {
     expect(template.assessments).toHaveLength(12);
     // Three terms: the last one takes the rounding remainder.
     expect(template.term_weights.map((t) => t.weight)).toEqual([33.33, 33.33, 33.34]);
+  });
+
+  test("three period exams and a final", () => {
+    const template = buildExamTemplate(
+      "three_periods",
+      DEFAULT_EXAM_WEIGHTS.three_periods,
+      ["t1"],
+      "en",
+    );
+    expect(template.categories.map((c) => [c.kind, c.name, c.weight])).toEqual([
+      ["first_period", "First period exam", 15],
+      ["second_period", "Second period exam", 15],
+      ["third_period", "Third period exam", 15],
+      ["final_exam", "Final exam", 25],
+      ["quiz", "Quizzes", 15],
+      ["homework", "Homework", 15],
+    ]);
+    expect(template.assessments.map((a) => a.max_marks)).toEqual([15, 15, 15, 25, 15, 15]);
+    expect(
+      buildExamTemplate("three_periods", DEFAULT_EXAM_WEIGHTS.three_periods, ["t1"], "ar")
+        .categories[2]!.name,
+    ).toBe("اختبار الفترة الثالثة");
+    expect(
+      updateSchoolSettingsBodySchema.safeParse({
+        exam_structure: "three_periods",
+        exam_weights: DEFAULT_EXAM_WEIGHTS.three_periods,
+      }).success,
+    ).toBe(true);
   });
 });
 

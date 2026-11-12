@@ -953,6 +953,7 @@ describeDb("academic grading", () => {
       total_max: 300,
       grade_label: "C",
       academic_status: "promoted",
+      result_display: { format: "percentage", value: 79, max: 100 },
     });
     expect(
       amal.subjects.map((s) => [s.subject_name, s.percentage, s.grade_label, s.passed]),
@@ -983,6 +984,24 @@ describeDb("academic grading", () => {
   });
 
   test("10: a term report covers only the subjects graded in that term", async () => {
+    // This grade shows its results out of 20 from now on; the year's finalization above keeps its
+    // percentage.
+    expect(
+      await codeOf(
+        admin((tx) =>
+          upsertProgram(tx, tenant.schoolId, tenant.academicYear.id, ids.grade8!, {
+            result_format: "gpa",
+          }),
+        ),
+      ),
+    ).toBe(ERROR_CODES.VALIDATION_FAILED);
+    const program = await admin((tx) =>
+      upsertProgram(tx, tenant.schoolId, tenant.academicYear.id, ids.grade8!, {
+        result_format: "out_of",
+        result_scale_max: 20,
+      }),
+    );
+    expect([program.result_format, program.result_scale_max]).toEqual(["out_of", 20]);
     const finalization = await admin((tx) =>
       finalizeSection(tx, tenant.schoolId, tenant.users.ORG_ADMIN.id, ids["8A"]!, ids.term1!, {
         allowIncomplete: false,
@@ -998,7 +1017,20 @@ describeDb("academic grading", () => {
       status: "complete",
       average_percentage: 88,
       academic_status: "promoted",
+      result_display: { format: "out_of", value: 17.6, max: 20 },
     });
+    const year = await admin((tx) => readFinalizationResults(tx, tenant.schoolId, ids.final8A!));
+    expect(year.find((r) => r.student_id === ids.s1)!.result_display).toEqual({
+      format: "percentage",
+      value: 79,
+      max: 100,
+    });
+    const back = await admin((tx) =>
+      upsertProgram(tx, tenant.schoolId, tenant.academicYear.id, ids.grade8!, {
+        result_format: "percentage",
+      }),
+    );
+    expect([back.result_format, back.result_scale_max]).toEqual(["percentage", null]);
     await characterize();
   });
 
@@ -1090,6 +1122,7 @@ describeDb("academic grading", () => {
       total_obtained: 237,
       total_max: 300,
       academic_status: "promoted",
+      display: { format: "percentage", value: 79, max: 100 },
     });
     expect(amal.content.subjects.map((s) => [s.name, s.marks_obtained, s.max_marks])).toEqual([
       ["Arabic", 81, 100],

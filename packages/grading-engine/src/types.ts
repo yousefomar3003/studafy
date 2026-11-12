@@ -32,6 +32,7 @@ export type CategoryKind =
   | "exam"
   | "first_period"
   | "second_period"
+  | "third_period"
   | "midterm"
   | "final_exam"
   | "other";
@@ -218,12 +219,37 @@ export interface SubjectOutcomeForOverall {
   result: SubjectResult | null;
 }
 
+/**
+ * How a grade shows its final result:
+ *  - `percentage`  the average out of 100 (the default).
+ *  - `out_of`      the average rescaled to `max` (out of 20, out of 10, ...).
+ *  - `gpa`         the subjects' grade-band GPA points, weighted by the subject coefficients, on a
+ *                  `max`-point scale (4 or 5).
+ */
+export type ResultFormatKind = "percentage" | "out_of" | "gpa";
+
+export interface ResultFormat {
+  format: ResultFormatKind;
+  /** The scale's maximum: 100 for `percentage`, the chosen maximum otherwise. */
+  max: number;
+}
+
 export interface OverallPolicy {
   rounding: RoundingRule;
   /** Failing more than this many counted subjects means `retained`; up to it, `supplementary`. */
   maxFailedSubjectsForSupplementary: number;
   /** Optional scale for an overall grade label. */
   scale: GradeBand[] | null;
+  /** How the final result is shown; a percentage when absent. */
+  resultFormat?: ResultFormat;
+}
+
+/** The final result in the grade's chosen format. */
+export interface ResultDisplay {
+  format: ResultFormatKind;
+  /** Null when it cannot be worked out (a GPA with a counted subject that has no GPA points). */
+  value: number | null;
+  max: number;
 }
 
 export type AcademicStatus = "promoted" | "supplementary" | "retained" | "incomplete";
@@ -234,6 +260,8 @@ export interface OverallResult {
   totalObtained: number | null;
   totalMax: number | null;
   gradeLabel: string | null;
+  /** The final result in the grade's chosen format; null while the result is incomplete. */
+  display: ResultDisplay | null;
   subjectsFailed: number;
   failedSubjectIds: string[];
   incompleteSubjectIds: string[];

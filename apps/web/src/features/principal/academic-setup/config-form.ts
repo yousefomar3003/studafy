@@ -39,6 +39,7 @@ export const CATEGORY_KINDS: readonly CategoryKind[] = [
   "exam",
   "first_period",
   "second_period",
+  "third_period",
   "midterm",
   "final_exam",
   "other",

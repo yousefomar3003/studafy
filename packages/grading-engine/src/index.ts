@@ -22,4 +22,5 @@ export {
   calculateOverallResult,
   calculateSubjectResult,
   resolveAssessment,
+  resultDisplay,
 } from "./calculate";

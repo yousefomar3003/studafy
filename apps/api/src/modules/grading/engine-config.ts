@@ -9,6 +9,8 @@ import type {
   GradeBand,
   MarkInput,
   OverallPolicy,
+  ResultFormat,
+  ResultFormatKind,
   RoundingMode,
   SubjectGradingConfig,
   SubjectRequirement,
@@ -118,6 +120,9 @@ export interface ProgramRow {
   mark_approval_required: boolean;
   average_rounding_decimals: number;
   average_rounding_mode: RoundingMode;
+  result_format: ResultFormatKind;
+  /** The out_of or gpa maximum; null for percentage. */
+  result_scale_max: number | null;
   updated_at: Date;
 }
 
@@ -174,6 +179,8 @@ export interface ConfigSnapshot {
     max_failed_subjects_for_supplementary: number;
     rounding: { decimals: number; mode: RoundingMode };
     scale: GradeBand[] | null;
+    /** Absent on snapshots taken before result formats existed: those are percentages. */
+    result_format?: ResultFormat;
   };
 }
 
@@ -324,7 +331,9 @@ export async function requireProgram(
     SELECT program.id, program.academic_year_id, program.grade_level_id,
            grade.name AS grade_level_name, program.grade_scale_id,
            program.max_failed_subjects_for_supplementary, program.mark_approval_required,
-           program.average_rounding_decimals, program.average_rounding_mode, program.updated_at
+           program.average_rounding_decimals, program.average_rounding_mode,
+           program.result_format, program.result_scale_max::float8 AS result_scale_max,
+           program.updated_at
     FROM app.grade_programs AS program
     JOIN app.grade_levels AS grade
       ON grade.id = program.grade_level_id AND grade.school_id = program.school_id
@@ -348,7 +357,8 @@ const PROGRAM_COLUMNS = `
   program.id, program.academic_year_id, program.grade_level_id,
   grade.name AS grade_level_name, program.grade_scale_id,
   program.max_failed_subjects_for_supplementary, program.mark_approval_required,
-  program.average_rounding_decimals, program.average_rounding_mode, program.updated_at`;
+  program.average_rounding_decimals, program.average_rounding_mode,
+  program.result_format, program.result_scale_max::float8 AS result_scale_max, program.updated_at`;
 
 /** A config with its categories, assessments, term weights, the year's terms and its scale. */
 export async function loadConfigDetail(
@@ -646,7 +656,17 @@ export function programPolicy(program: ProgramRow, scale: GradeBand[]): OverallP
     },
     maxFailedSubjectsForSupplementary: program.max_failed_subjects_for_supplementary,
     scale: scale.length > 0 ? scale : null,
+    resultFormat: programResultFormat(program),
   };
+}
+
+/** The program's result format as the engine takes it. */
+export function programResultFormat(
+  program: Pick<ProgramRow, "result_format" | "result_scale_max">,
+): ResultFormat {
+  return program.result_format === "percentage" || program.result_scale_max === null
+    ? { format: "percentage", max: 100 }
+    : { format: program.result_format, max: Number(program.result_scale_max) };
 }
 
 export function buildSnapshot(
@@ -676,6 +696,7 @@ export function buildSnapshot(
         mode: program.average_rounding_mode,
       },
       scale: programScale.length > 0 ? programScale : null,
+      result_format: programResultFormat(program),
     },
   };
 }
