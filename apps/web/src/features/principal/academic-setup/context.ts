@@ -17,6 +17,8 @@ export interface SetupContext {
     finalize: boolean;
     certify: boolean;
     review: boolean;
+    /** Teachers (grade:update) and leadership who finalize: report card comments and conduct. */
+    reportNotes: boolean;
   };
   /** `?year=…`, carried on every link so the chosen year survives moving between screens. */
   search: string;

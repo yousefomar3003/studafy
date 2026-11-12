@@ -990,6 +990,32 @@ export const finalizationListSchema = z
   })
   .openapi("ResultFinalizationList");
 
+/** Report card notes as finalized (000208). */
+export const reportAttendanceSchema = z
+  .object({
+    from: dateSchema,
+    to: dateSchema,
+    days_recorded: z.number().int(),
+    days_present: z.number().int(),
+    days_absent: z.number().int(),
+    days_late: z.number().int(),
+    days_excused: z.number().int(),
+  })
+  .openapi("ReportCardAttendance");
+
+export const reportConductSchema = z
+  .object({ code: z.string(), label: z.string(), label_ar: z.string().nullable() })
+  .openapi("ReportCardConduct");
+
+export const reportNotesSchema = z
+  .object({
+    teacher_comment: z.string().nullable(),
+    principal_comment: z.string().nullable(),
+    conduct: reportConductSchema.nullable(),
+    attendance: reportAttendanceSchema.nullable(),
+  })
+  .openapi("ReportCardNotes");
+
 const storedSubjectResultSchema = z
   .object({
     subject_id: uuidSchema,
@@ -1020,6 +1046,7 @@ const storedSubjectResultSchema = z
         })
         .openapi("GradingStoredSubjectResultFailReason"),
     ),
+    comment: z.string().nullable(),
   })
   .openapi("FinalizedSubjectResult");
 
@@ -1038,6 +1065,7 @@ export const storedStudentResultSchema = z
     subjects_failed: z.number().int(),
     academic_status: z.enum(["promoted", "supplementary", "retained", "incomplete"]),
     subjects: z.array(storedSubjectResultSchema),
+    report: reportNotesSchema.nullable(),
   })
   .openapi("FinalizedStudentResult");
 
@@ -1301,6 +1329,7 @@ export const certificateContentSchema = z
               })
               .openapi("CertificateContentSubjectTerm"),
           ),
+          comment: z.string().optional(),
         })
         .openapi("CertificateContentSubject"),
     ),
@@ -1318,6 +1347,7 @@ export const certificateContentSchema = z
         academic_status: z.string(),
       })
       .openapi("CertificateContentOverall"),
+    report: reportNotesSchema.optional(),
     finalization: z
       .object({
         id: uuidSchema,
@@ -1371,3 +1401,113 @@ export const certificateQuerySchema = z
 export const reasonBodySchema = z
   .object({ reason: z.string().trim().min(5).max(2000) })
   .openapi("CertificateReasonBody");
+
+// ---------------------------------------------------------------------------
+// Report card notes (000208)
+// ---------------------------------------------------------------------------
+
+const conductCodeSchema = z
+  .string()
+  .regex(/^[a-z0-9_]{1,40}$/)
+  .openapi({ description: "Lower-case letters, digits and underscores; up to 40." });
+
+const reportCommentSchema = z.string().max(1000).nullable();
+
+export const conductRatingSchema = z
+  .object({
+    code: conductCodeSchema,
+    label: z.string().trim().min(1).max(60),
+    label_ar: z.string().trim().min(1).max(60).nullable(),
+  })
+  .openapi("ReportCardConductRating");
+
+export const reportCardSettingsSchema = z
+  .object({
+    show_subject_comments: z.boolean(),
+    show_teacher_comment: z.boolean(),
+    show_principal_comment: z.boolean(),
+    show_attendance: z.boolean(),
+    show_conduct: z.boolean(),
+    conduct_ratings: z.array(conductRatingSchema),
+    conduct_ratings_default: z.boolean(),
+  })
+  .openapi("ReportCardSettings");
+
+export const updateReportCardSettingsBodySchema = z
+  .object({
+    show_subject_comments: z.boolean().optional(),
+    show_teacher_comment: z.boolean().optional(),
+    show_principal_comment: z.boolean().optional(),
+    show_attendance: z.boolean().optional(),
+    show_conduct: z.boolean().optional(),
+    conduct_ratings: z.array(conductRatingSchema).min(1).max(12).optional(),
+  })
+  .openapi("UpdateReportCardSettingsBody");
+
+export const sectionReportNotesSchema = z
+  .object({
+    section_id: uuidSchema,
+    term_id: uuidSchema.nullable(),
+    finalized: z.boolean(),
+    editable: z.boolean(),
+    can_edit_class_notes: z.boolean(),
+    can_edit_principal_comment: z.boolean(),
+    settings: reportCardSettingsSchema,
+    subjects: z.array(
+      z
+        .object({ subject_id: uuidSchema, subject_name: z.string(), can_comment: z.boolean() })
+        .openapi("SectionReportNotesSubject"),
+    ),
+    students: z.array(
+      z
+        .object({
+          student_id: uuidSchema,
+          first_name: z.string(),
+          last_name: z.string(),
+          admission_number: z.string(),
+          teacher_comment: z.string().nullable(),
+          principal_comment: z.string().nullable(),
+          conduct_code: z.string().nullable(),
+          subject_comments: z.array(
+            z
+              .object({ subject_id: uuidSchema, body: z.string() })
+              .openapi("SectionReportNotesSubjectComment"),
+          ),
+        })
+        .openapi("SectionReportNotesStudent"),
+    ),
+  })
+  .openapi("SectionReportNotes");
+
+export const saveStudentNotesBodySchema = z
+  .object({
+    term_id: uuidSchema.nullable(),
+    students: z
+      .array(
+        z
+          .object({
+            student_id: uuidSchema,
+            teacher_comment: reportCommentSchema.optional(),
+            principal_comment: reportCommentSchema.optional(),
+            conduct_code: conductCodeSchema.nullable().optional(),
+          })
+          .openapi("SaveStudentNoteItem"),
+      )
+      .min(1)
+      .max(500),
+  })
+  .openapi("SaveStudentNotesBody");
+
+export const saveSubjectCommentsBodySchema = z
+  .object({
+    term_id: uuidSchema.nullable(),
+    comments: z
+      .array(
+        z
+          .object({ student_id: uuidSchema, comment: reportCommentSchema })
+          .openapi("SaveSubjectCommentItem"),
+      )
+      .min(1)
+      .max(500),
+  })
+  .openapi("SaveSubjectCommentsBody");

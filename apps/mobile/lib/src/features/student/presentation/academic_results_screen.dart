@@ -220,6 +220,10 @@ class _ResultCard extends StatelessWidget {
                 ),
               ),
             ],
+            ReportNotesSection(
+              report: result.report,
+              subjects: result.subjects,
+            ),
           ],
         ),
       ),

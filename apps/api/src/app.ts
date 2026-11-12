@@ -136,6 +136,7 @@ import {
 import {
   gradingConfigRoutes,
   gradingMarksRoutes,
+  gradingReportCardRoutes,
   gradingResultsRoutes,
   gradingTranscriptRoutes,
 } from "./modules/grading";
@@ -1142,6 +1143,8 @@ export function createApp({
     app.route("/", gradingMarksRoutes(database));
     app.route("/", gradingResultsRoutes(database));
     app.route("/", gradingTranscriptRoutes(database));
+    // Report card comments, attendance and conduct (000208).
+    app.route("/", gradingReportCardRoutes(database));
   }
 
   // Gradebook configuration (ST-112). Weighted assessment categories per gradebook and

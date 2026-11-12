@@ -489,6 +489,90 @@
   border-block-start: 1px solid var(--color-border);
 }
 
+/* Report card notes (000208): comments, conduct and attendance on a certificate or report card. */
+.ag-certificate__notes {
+  padding-block-start: var(--space-8);
+  border-block-start: 1px solid var(--color-border);
+}
+
+.ag-certificate__note h3 {
+  margin-block: var(--space-12) var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+}
+
+.ag-certificate__note p {
+  margin: 0;
+  white-space: pre-line;
+}
+
+.ag-certificate__comments {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.ag-certificate__comments div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) 1fr;
+  gap: var(--space-8);
+  break-inside: avoid;
+}
+
+.ag-certificate__comments dt {
+  font-weight: var(--font-weight-medium);
+}
+
+.ag-certificate__comments dd {
+  margin: 0;
+  white-space: pre-line;
+}
+
+/* Report cards tab: settings and the per-student notes table. */
+.ag-fieldset {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.ag-conduct-list {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding-inline-start: var(--space-16);
+}
+
+.ag-comment-box {
+  inline-size: 100%;
+  min-inline-size: 12rem;
+  min-block-size: 3lh;
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-background);
+  color: inherit;
+  font: inherit;
+  resize: vertical;
+}
+
+.ag-comment-box:disabled,
+.ag-inline-select:disabled {
+  opacity: 0.7;
+}
+
+.ag-inline-select {
+  min-inline-size: 9rem;
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-background);
+  color: inherit;
+  font: inherit;
+}
+
 .ag-certificate__signatures {
   display: flex;
   flex-wrap: wrap;
