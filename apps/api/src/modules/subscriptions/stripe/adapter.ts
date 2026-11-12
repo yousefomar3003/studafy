@@ -4,6 +4,8 @@ import Stripe from "stripe";
 import { PaymentProviderError } from "../ports/payment-provider";
 
 import type {
+  ChangeSubscriptionPriceInput,
+  ChangeSubscriptionPriceResult,
   CreateCheckoutSessionInput,
   CreateCheckoutSessionResult,
   CreateCustomerInput,
@@ -238,6 +240,38 @@ export class StripeAdapter implements PaymentProviderPort {
     await this.stripe.subscriptions.update(input.providerSubscriptionId, {
       cancel_at_period_end: false,
     });
+  }
+
+  /**
+   * Swap the subscription's one item to another price, prorated.
+   *
+   * `chargeNow` invoices the difference immediately with `payment_behavior: "pending_if_incomplete"`:
+   * Stripe then applies the change only once that invoice is paid and otherwise reports it as a
+   * `pending_update`, so a declined card leaves the subscription exactly as it was. Without it the
+   * proration waits for the next regular invoice.
+   */
+  async changeSubscriptionPrice(
+    input: ChangeSubscriptionPriceInput,
+  ): Promise<ChangeSubscriptionPriceResult> {
+    const subscription = await this.stripe.subscriptions.retrieve(input.providerSubscriptionId);
+    const item = subscription.items.data[0];
+    if (!item) {
+      throw new PaymentProviderError(
+        502,
+        ERROR_CODES.STRIPE_API_ERROR,
+        "Stripe subscription has no item to change",
+      );
+    }
+
+    const updated = await this.stripe.subscriptions.update(input.providerSubscriptionId, {
+      items: [{ id: item.id, price: input.priceId }],
+      metadata: input.metadata,
+      ...(input.chargeNow
+        ? { proration_behavior: "always_invoice", payment_behavior: "pending_if_incomplete" }
+        : { proration_behavior: "create_prorations" }),
+    });
+
+    return { applied: updated.pending_update == null };
   }
 
   async listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult> {

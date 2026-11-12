@@ -40,6 +40,7 @@ export const LEGAL_HOLD_TABLES: ReadonlySet<string> = new Set([
   // legally discoverable for accounting purposes.
   "subscriptions",
   "ai_subscriptions",
+  "storage_subscriptions",
   "entitlement_versions",
   // Tap renewal charges, online fee payments and the payer's provider customer (ST-298): each is
   // the local half of a money movement at a payment provider.

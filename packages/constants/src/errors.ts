@@ -359,6 +359,17 @@ export const ERROR_CODES = {
   // The tenant's storage usage is at its plan's cap; new uploads are blocked.
   STORAGE_QUOTA_EXCEEDED: "STORAGE_QUOTA_EXCEEDED",
 
+  // The paid storage add-on (db/migrations/000205).
+  // The school already has a live storage add-on: change its tier instead of buying a second one.
+  STORAGE_ADDON_ALREADY_ACTIVE: "STORAGE_ADDON_ALREADY_ACTIVE",
+  // There is no live storage add-on to change or cancel.
+  STORAGE_ADDON_NOT_ACTIVE: "STORAGE_ADDON_NOT_ACTIVE",
+  // The add-on can't be bought online for this school (its payment provider has no subscription
+  // changes, or no price is set in its currency).
+  STORAGE_ADDON_UNAVAILABLE: "STORAGE_ADDON_UNAVAILABLE",
+  // The provider could not charge the tier change; nothing was changed.
+  STORAGE_ADDON_PAYMENT_FAILED: "STORAGE_ADDON_PAYMENT_FAILED",
+
   // Materials — upload, ingestion, and AI visibility.
   MATERIAL_NOT_FOUND: "MATERIAL_NOT_FOUND",
   MATERIAL_STORAGE_CONFIRM_FAILED: "MATERIAL_STORAGE_CONFIRM_FAILED",

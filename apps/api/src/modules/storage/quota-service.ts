@@ -27,6 +27,7 @@
  * school's bytes.
  */
 
+import { LIVE_STATUSES } from "@studafy/billing";
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
@@ -71,21 +72,34 @@ export interface StorageUsage {
 }
 
 /**
- * Read the school's current usage and its subscription cap in one tenant-scoped round trip.
+ * Read the school's current usage and its cap in one tenant-scoped round trip.
  * A school with no meter row yet counts as zero; one with no subscription falls back to the plan
  * default so enforcement never disappears for an unprovisioned tenant.
+ *
+ * The cap is the larger of what the subscription includes and the cap of a live storage add-on
+ * (app.storage_subscriptions, 000205). Billing never writes the school's cap: an add-on that is
+ * canceled, expires or is closed after its grace period simply stops counting here, and the school
+ * keeps every file -- only uploads past the smaller cap are refused.
  */
 export async function getStorageUsage(tx: TransactionSql): Promise<StorageUsage> {
-  const [row] = await tx<{ bytes_used: string | null; cap_bytes: string | null }[]>`
+  const [row] = await tx<
+    { bytes_used: string | null; cap_bytes: string | null; addon_cap_bytes: string | null }[]
+  >`
     SELECT
       (SELECT bytes_used::text FROM app.storage_usage_meters
        WHERE school_id = current_setting('app.school_id')::uuid) AS bytes_used,
       (SELECT storage_cap_bytes::text FROM app.subscriptions
-       WHERE school_id = current_setting('app.school_id')::uuid) AS cap_bytes
+       WHERE school_id = current_setting('app.school_id')::uuid) AS cap_bytes,
+      (SELECT cap_bytes::text FROM app.storage_subscriptions
+       WHERE school_id = current_setting('app.school_id')::uuid
+         AND status::text = ANY(${[...LIVE_STATUSES]})) AS addon_cap_bytes
   `;
 
   const bytesUsed = Number(row?.bytes_used ?? 0);
-  const capBytes = Number(row?.cap_bytes ?? DEFAULT_STORAGE_CAP_BYTES);
+  const capBytes = Math.max(
+    Number(row?.cap_bytes ?? DEFAULT_STORAGE_CAP_BYTES),
+    Number(row?.addon_cap_bytes ?? 0),
+  );
 
   return { bytesUsed, capBytes, fractionUsed: capBytes > 0 ? bytesUsed / capBytes : NaN };
 }

@@ -75,3 +75,10 @@ export {
   isServableUploadScanStatus,
 } from "./upload-scan";
 export type { UploadScanStatus, UploadScanTarget } from "./upload-scan";
+export {
+  INCLUDED_STORAGE_BYTES,
+  STORAGE_ADDON_PLAN_CODES,
+  STORAGE_ADDON_TIERS,
+  isStorageAddonPlanCode,
+} from "./storage-addon";
+export type { StorageAddonPlanCode } from "./storage-addon";

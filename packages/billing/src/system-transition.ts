@@ -102,6 +102,16 @@ async function loadRowForUpdate(
     return rows.length > 0 ? { status: rows[0]!.status, studentId: null } : null;
   }
 
+  if (kind === "storage") {
+    const rows = await tx<{ status: SubscriptionStatus }[]>`
+      SELECT status::text AS status
+      FROM app.storage_subscriptions
+      WHERE id = ${subscriptionId}::uuid AND school_id = ${schoolId}::uuid
+      FOR UPDATE
+    `;
+    return rows.length > 0 ? { status: rows[0]!.status, studentId: null } : null;
+  }
+
   const rows = await tx<{ status: SubscriptionStatus; student_id: string }[]>`
     SELECT status::text AS status, student_id
     FROM app.ai_subscriptions

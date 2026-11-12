@@ -29,7 +29,7 @@ import { loadSchoolIds } from "../notifications/email/schools";
 import { dunningStageFor, graceStartedAtFor, isGraceExpired } from "./dunning-schedule";
 import { publishEntitlementChange } from "./entitlement-change-publisher";
 
-import type { BillingLogger } from "@studafy/billing";
+import type { BillingLogger, SubscriptionKind } from "@studafy/billing";
 import type { Sql, TransactionSql } from "postgres";
 
 export interface DunningSweepResult {
@@ -38,6 +38,7 @@ export interface DunningSweepResult {
   emails: number;
   schoolSuspensions: number;
   aiSuspensions: number;
+  storageSuspensions: number;
 }
 
 interface GraceSubscriptionRow {
@@ -78,6 +79,7 @@ export async function runDunningSweep(
     emails: 0,
     schoolSuspensions: 0,
     aiSuspensions: 0,
+    storageSuspensions: 0,
   };
 
   for (const schoolId of schoolIds) {
@@ -87,6 +89,7 @@ export async function runDunningSweep(
     result.emails += perSchool.emails;
     result.schoolSuspensions += perSchool.schoolSuspensions;
     result.aiSuspensions += perSchool.aiSuspensions;
+    result.storageSuspensions += perSchool.storageSuspensions;
   }
 
   log.info({ ...result }, "dunning sweep complete");
@@ -103,8 +106,10 @@ async function processSchool(
   schoolId: string,
   now: Date,
   log: BillingLogger,
-): Promise<Pick<DunningSweepResult, "emails" | "schoolSuspensions" | "aiSuspensions">> {
-  const result = { emails: 0, schoolSuspensions: 0, aiSuspensions: 0 };
+): Promise<
+  Pick<DunningSweepResult, "emails" | "schoolSuspensions" | "aiSuspensions" | "storageSuspensions">
+> {
+  const result = { emails: 0, schoolSuspensions: 0, aiSuspensions: 0, storageSuspensions: 0 };
   const options = { emitAudit: emitAuditLog, publishEntitlementChange, logger: log };
 
   // School phase. `dunning_email_stage` is read inside the same FOR UPDATE lock that guards the
@@ -175,6 +180,29 @@ async function processSchool(
     );
   }
 
+  // Storage add-on phase (000205). Closing it only ends the larger cap: the school keeps its files
+  // and falls back to the storage its plan includes. No reminder emails, as for the AI add-on.
+  const storageRows = await tx<GraceAiSubscriptionRow[]>`
+    SELECT id, grace_period_ends_at::text AS "gracePeriodEndsAt"
+    FROM app.storage_subscriptions
+    WHERE school_id = ${schoolId}::uuid
+      AND status = 'grace_period'
+    FOR UPDATE
+  `;
+
+  for (const row of storageRows) {
+    if (row.gracePeriodEndsAt === null) continue;
+
+    if (!isGraceExpired(new Date(row.gracePeriodEndsAt), now)) continue;
+
+    result.storageSuspensions += await closeSubscription(
+      tx,
+      { kind: "storage", schoolId, subscriptionId: row.id },
+      options,
+      log,
+    );
+  }
+
   return result;
 }
 
@@ -184,7 +212,7 @@ async function processSchool(
  */
 async function closeSubscription(
   tx: TransactionSql,
-  input: { kind: "school" | "ai"; schoolId: string; subscriptionId: string },
+  input: { kind: SubscriptionKind; schoolId: string; subscriptionId: string },
   options: Parameters<typeof applySystemTransition>[2],
   log: BillingLogger,
 ): Promise<number> {

@@ -11,7 +11,8 @@
     "overview": "Overview",
     "seats": "Seats",
     "quotes": "Quotes",
-    "invoices": "Invoices and payments"
+    "invoices": "Invoices and payments",
+    "storage": "Storage"
   },
   "audience": {
     "student": "Students",
@@ -354,5 +355,52 @@
     "status": "{{status}} until {{date}}",
     "seats": "{{audience}}: {{assigned}} of {{purchased}} seats",
     "link": "Open license"
+  },
+  "storage": {
+    "title": "Storage",
+    "description": "Everyone at your school shares one storage allowance for the files they upload: materials, homework, messages, records and reports.",
+    "usageTitle": "Storage used",
+    "usedOf": "{{used}} of {{cap}} used",
+    "usedPercent": "{{percent}} of your school's storage is used",
+    "included": "Your plan includes {{size}}.",
+    "currentRenewing": "Your school has {{size}}. It renews on {{date}}.",
+    "currentEnding": "Your school has {{size}} until {{date}}. After that it goes back to the {{included}} included.",
+    "cancelRenewal": "Stop renewing",
+    "keepRenewing": "Keep renewing",
+    "tiersTitle": "More storage",
+    "billedLabel": "Billing",
+    "interval": {
+      "monthly": "Monthly",
+      "yearly": "Yearly (2 months free)"
+    },
+    "pricePerMonth": "{{price}} per month",
+    "pricePerYear": "{{price}} per year",
+    "noPriceForInterval": "Not available with this billing.",
+    "noPrices": "Extra storage isn't for sale yet.",
+    "notOnline": "Extra storage can't be bought online for your school yet. Contact Studafy to add it.",
+    "upgradeTo": "Upgrade to {{size}}",
+    "switchTo": "Switch to {{size}}",
+    "currentChip": "Your current plan",
+    "confirmPrice": "You'll confirm the price on the payment page before anything is charged.",
+    "nothingDeleted": "Nothing is ever deleted. If you stop renewing or switch to less storage than you use, every file stays and can still be opened; only new uploads wait until you're under your limit.",
+    "checkoutError": "The payment page couldn't be opened",
+    "changeError": "Your storage wasn't changed",
+    "cancelError": "Your storage renewal wasn't changed",
+    "changed": "Your storage was changed",
+    "canceled": "Your storage will stop renewing at the end of this period",
+    "resumed": "Your storage will keep renewing",
+    "successTitle": "Thank you, your payment went through",
+    "successBody": "Your new storage is ready in a minute or two. Refresh this page to see it.",
+    "cancelledTitle": "Payment cancelled",
+    "cancelledBody": "Nothing was charged. You can upgrade whenever you're ready.",
+    "switchTitle": "Switch to {{size}}?",
+    "switchUpBody": "The difference for the rest of this period is charged now, then {{price}}. The new storage starts as soon as the payment goes through.",
+    "switchDownBody": "Your school moves to {{size}} now, and the unused part of this period comes off your next bill. Then {{price}}. No files are deleted.",
+    "switchConfirm": "Switch",
+    "units": {
+      "mb": "{{value}} MB",
+      "gb": "{{value}} GB",
+      "tb": "{{value}} TB"
+    }
   }
 }
