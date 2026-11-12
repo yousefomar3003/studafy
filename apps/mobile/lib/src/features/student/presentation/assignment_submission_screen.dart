@@ -4,7 +4,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:image_picker/image_picker.dart' hide PickedFile;
+import 'package:image_picker/image_picker.dart' show XFile;
 
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/files/picked_file.dart';
@@ -12,6 +12,7 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/assignment_detail_providers.dart';
 import '../application/assignment_list_providers.dart';
 import '../application/submission_form_controller.dart';
+import '../data/submission_photo_picker.dart';
 import '../domain/assignment_list_filter.dart';
 import 'widgets/pending_attachment_tile.dart';
 
@@ -87,10 +88,7 @@ class _AssignmentSubmissionScreenState
   Future<void> _takePhoto() async {
     final XFile? photo;
     try {
-      photo = await ImagePicker().pickImage(
-        source: ImageSource.camera,
-        imageQuality: 85,
-      );
+      photo = await takeSubmissionPhoto();
     } on PlatformException catch (error) {
       // iOS doesn't show the camera prompt again once it's been declined; image_picker throws.
       _showMessage(

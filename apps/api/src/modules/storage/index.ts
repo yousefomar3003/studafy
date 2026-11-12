@@ -10,6 +10,7 @@ export type {
   DownloadClass,
   DownloadClassKey,
 } from "./content-classes";
+export { freeStoredObjects } from "./free-objects";
 export { confirmUpload, requestUpload } from "./service";
 export type {
   ConfirmUploadOptions,

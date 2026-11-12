@@ -5,14 +5,18 @@
  * The metering model is deliberately simple and honest about what the API can and cannot observe:
  *
  *   - The meter is a per-school counter in app.storage_usage_meters, incremented when an object is
- *     promoted into permanent/ and never decremented by a row delete (this codebase orphans the S3
- *     object on delete by documented policy, so the bytes still exist — a decrement there would
- *     drift the meter below the bucket, the exact thing the 1% tolerance guards against).
- *   - The only in-app S3 removal of a permanent object happens in the workers app (malware
- *     quarantine), and report objects self-expire via the bucket lifecycle rule — neither is
- *     observable from here. Both are corrected by the daily reconciliation job, which recomputes
- *     the meter from the bucket itself. That job is what keeps the meter within the acceptance
- *     tolerance; the event-driven increments only keep enforcement fresh between runs.
+ *     promoted into permanent/ and decremented when one is removed. A row delete or replace does
+ *     not decrement it by itself: once the transaction has committed, the caller removes the
+ *     object and releases exactly the bytes it removed (./free-objects.ts), so a file whose
+ *     removal failed stays counted -- the meter never drifts below the bucket, the exact thing the
+ *     1% tolerance guards against. (Records and the import source release in the deleting
+ *     transaction and remove afterwards; a failed removal there is caught by reconciliation.)
+ *   - Removals this process cannot observe -- malware quarantine in the workers app, report
+ *     objects the bucket lifecycle rule expires -- are corrected by the daily reconciliation job,
+ *     which recomputes the meter from the bucket itself. That job is what keeps the meter within
+ *     the acceptance tolerance; the event-driven changes only keep enforcement fresh between runs.
+ *     Objects no row points at any more are found by the orphan sweep
+ *     (apps/workers/src/queues/billing/storage-orphan-sweep.ts).
  *   - Enforcement is claim-based at request-upload (the body's size_bytes) and authoritative at
  *     confirm (the stored size, re-read from the bucket before promotion). A school at 99% cannot
  *     smuggle a 25 MiB file in under a 2 MiB claim: confirm's beforePromote hook re-checks the
@@ -125,7 +129,7 @@ export async function recordStorageUpload(tx: TransactionSql, sizeBytes: number)
 
 /**
  * Release bytes from the meter, floored at zero. Only for actual S3 removals; see the module header
- * for why row deletes do not reach here.
+ * and ./free-objects.ts.
  */
 export async function releaseStorageUsage(tx: TransactionSql, sizeBytes: number): Promise<number> {
   if (sizeBytes <= 0) return 0;

@@ -14,6 +14,7 @@ import { hasPermission, requirePermission } from "../../../../middleware/authz";
 import { openApiValidationHook } from "../../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../../openapi/responses";
 import { DOWNLOAD_PRESIGN_TTL_SECONDS } from "../../../storage/download-service";
+import { freeStoredObjects } from "../../../storage/free-objects";
 import {
   createAssignment,
   deleteAssignment,
@@ -614,8 +615,16 @@ export function assignmentRoutes(
     const auth = requireAuth(c);
     const { assignmentId } = c.req.valid("param");
 
-    await withTenantTx(database, tenantFrom(c), (tx) =>
-      deleteAssignment(tx, auth.schoolId, auth.userId, assignmentId),
+    const removedKeys: string[] = [];
+    await withTenantTx(database, tenantFrom(c), (tx) => {
+      removedKeys.length = 0;
+      return deleteAssignment(tx, auth.schoolId, auth.userId, assignmentId, removedKeys);
+    });
+    await freeStoredObjects(
+      storage,
+      tenantTxRunner(database, tenantFrom(c)),
+      auth.schoolId,
+      removedKeys,
     );
 
     return c.body(null, 204);
@@ -627,6 +636,7 @@ export function assignmentRoutes(
     const body = c.req.valid("json");
 
     const uploadedImageKeys: string[] = [];
+    const droppedImageKeys: string[] = [];
     // A save with new pictures runs short transactions around its storage calls (saveQuestions).
     const assignment = await saveQuestions(
       tenantTxRunner(database, tenantFrom(c)),
@@ -640,6 +650,13 @@ export function assignmentRoutes(
         const [hydrated] = await hydrate(tx, auth.schoolId, [row], storage);
         return hydrated!;
       },
+      droppedImageKeys,
+    );
+    await freeStoredObjects(
+      storage,
+      tenantTxRunner(database, tenantFrom(c)),
+      auth.schoolId,
+      droppedImageKeys,
     );
     await enqueueUploadScans(
       c,
@@ -700,9 +717,12 @@ export function assignmentRoutes(
     const auth = requireAuth(c);
     const { assignmentId, attachmentId } = c.req.valid("param");
 
-    await withTenantTx(database, tenantFrom(c), (tx) =>
+    const { storageKey } = await withTenantTx(database, tenantFrom(c), (tx) =>
       deleteAttachment(tx, auth.schoolId, assignmentId, attachmentId),
     );
+    await freeStoredObjects(storage, tenantTxRunner(database, tenantFrom(c)), auth.schoolId, [
+      storageKey,
+    ]);
 
     return c.body(null, 204);
   });

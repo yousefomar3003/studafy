@@ -198,26 +198,25 @@ export async function confirmSubmissionAttachment(
 }
 
 /**
- * Detach a file from a submission.
- *
- * The database row goes; the stored object stays. Deleting from S3 cannot participate in the
- * transaction, so a rollback after a successful delete would leave a row pointing at bytes that no
- * longer exist -- strictly worse than an orphaned object, which costs storage and nothing else.
+ * Detach a file from a submission. Returns the stored object's key for the caller to free once
+ * this transaction has committed (../../storage/free-objects.ts): deleting from S3 cannot
+ * participate in the transaction, and a rollback after a successful delete would leave a row
+ * pointing at bytes that no longer exist.
  */
 export async function deleteSubmissionAttachment(
   tx: TransactionSql,
   schoolId: string,
   submissionId: string,
   attachmentId: string,
-): Promise<void> {
+): Promise<{ storageKey: string }> {
   await assertOwnsSubmission(tx, schoolId, submissionId);
 
-  const [row] = await tx<{ id: string; original_file_name: string }[]>`
+  const [row] = await tx<{ id: string; original_file_name: string; storage_key: string }[]>`
     DELETE FROM app.submission_attachments
     WHERE id = ${attachmentId}
       AND submission_id = ${submissionId}
       AND school_id = ${schoolId}
-    RETURNING id, original_file_name
+    RETURNING id, original_file_name, storage_key
   `;
 
   if (!row) {
@@ -230,6 +229,8 @@ export async function deleteSubmissionAttachment(
     targetId: row.id,
     oldValues: { submission_id: submissionId, original_file_name: row.original_file_name },
   });
+
+  return { storageKey: row.storage_key };
 }
 
 /**

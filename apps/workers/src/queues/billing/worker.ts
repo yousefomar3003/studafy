@@ -18,6 +18,7 @@ import {
   processBillingEventSchema,
 } from "./schemas";
 import { runSeatReconciliation } from "./seat-reconciliation";
+import { orphanRemovalEnabled } from "./storage-orphan-sweep";
 import { runStorageQuotaReconciliation } from "./storage-quota-reconciliation";
 import { createStorageQuotaS3 } from "./storage-quota-s3";
 import { StripeSeatSubscriptionProvider } from "./stripe-seat-provider";
@@ -291,6 +292,7 @@ async function processStorageQuotaReconciliation(
         bucket: options.bucket,
       }),
       workerLogger,
+      { removeOrphans: orphanRemovalEnabled() },
     );
   } finally {
     await lease.release();

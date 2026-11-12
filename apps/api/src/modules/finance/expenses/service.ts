@@ -422,6 +422,11 @@ export async function updateExpense(
   expenseId: string,
   params: UpdateExpenseParams,
   acceptLanguage?: string,
+  /**
+   * Receives the key of the attachment this update replaced, for the caller to free once the
+   * transaction has committed (../../storage/free-objects.ts).
+   */
+  replacedKeys: string[] = [],
 ): Promise<ExpenseRow> {
   assertOwnAttachmentKey(params.attachment_storage_key, schoolId);
   const [before] = await tx<Record<string, unknown>[]>`
@@ -468,6 +473,10 @@ export async function updateExpense(
   }
 
   const row = await projectToCache(tx, schoolId, documentType, doc, createParams);
+  const previousKey = before.attachment_storage_key as string | null;
+  if (previousKey && previousKey !== createParams.attachment_storage_key) {
+    replacedKeys.push(previousKey);
+  }
 
   await emitAuditLog(tx, {
     action: "update",
@@ -507,6 +516,8 @@ export async function confirmAttachment(
   tempKey: string,
   /** Receives the promoted key, for the caller to hand to the malware scanner after commit (F-14). */
   uploadedKeys: string[] = [],
+  /** Receives the key of the attachment this one replaced, for the caller to free after commit. */
+  replacedKeys: string[] = [],
 ): Promise<ExpenseRow> {
   const { assertSchoolOwnedKey } = await import("../../../lib/storage/keys");
   const { buildPermanentKey } = await import("../../../lib/storage/keys");
@@ -542,8 +553,15 @@ export async function confirmAttachment(
   });
   await copyStagedUploads(storage, runTx, [copy]);
 
+  // Set inside the write transaction; read only once it has committed.
+  const replaced: { key: string | null } = { key: null };
   const row = await runTx(async (tx) => {
     const erpnextName = await findExpense(tx);
+    const [previous] = await tx<{ attachment_storage_key: string | null }[]>`
+      SELECT attachment_storage_key FROM app.expense_cache
+      WHERE school_id = ${schoolId}::uuid AND erpnext_docname = ${erpnextName}
+    `;
+    replaced.key = previous?.attachment_storage_key ?? null;
     await tx`
       UPDATE app.expense_cache
       SET attachment_storage_key = ${copy.permanentKey},
@@ -562,6 +580,7 @@ export async function confirmAttachment(
     return parseCacheRow(updated!, null);
   });
   uploadedKeys.push(copy.permanentKey);
+  if (replaced.key && replaced.key !== copy.permanentKey) replacedKeys.push(replaced.key);
   await discardStagedUploads(storage, [copy]);
   return row;
 }
