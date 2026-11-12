@@ -33,6 +33,7 @@ import type {
   FailReason,
   MarkInput,
   OverallResult,
+  ResultDisplay,
   SubjectOutcomeForOverall,
   SubjectResult,
 } from "@studafy/grading-engine";
@@ -107,6 +108,7 @@ function overallFor(subjects: StudentSubjectComputation[]): OverallResult {
     rounding: first?.rounding ?? { decimals: 2, mode: "half_up" },
     maxFailedSubjectsForSupplementary: first?.max_failed_subjects_for_supplementary ?? 0,
     scale: first?.scale ?? null,
+    resultFormat: first?.result_format,
   });
 }
 
@@ -404,6 +406,7 @@ async function storeComputation(
   }
   const overallRows = students.map((student) => ({
     student_id: student.student.id,
+    ...storedResultFormat(student),
     status: student.overall.status,
     average_percentage: student.overall.averagePercentage,
     total_obtained: student.overall.totalObtained,
@@ -416,17 +419,44 @@ async function storeComputation(
     await tx`
       INSERT INTO app.student_overall_results (
         school_id, finalization_id, student_id, status, average_percentage, total_obtained,
-        total_max, grade_label, subjects_failed, academic_status
+        total_max, grade_label, subjects_failed, academic_status, result_format,
+        result_scale_max, result_value
       )
       SELECT ${schoolId}::uuid, ${finalizationId}::uuid, x.student_id, x.status,
              x.average_percentage, x.total_obtained, x.total_max, x.grade_label,
-             x.subjects_failed, x.academic_status
+             x.subjects_failed, x.academic_status, x.result_format, x.result_scale_max,
+             x.result_value
       FROM jsonb_to_recordset(${tx.json(chunk as never)}::jsonb) AS x(
         student_id uuid, status text, average_percentage numeric, total_obtained numeric,
-        total_max numeric, grade_label text, subjects_failed int, academic_status text
+        total_max numeric, grade_label text, subjects_failed int, academic_status text,
+        result_format text, result_scale_max numeric, result_value numeric
       )
     `;
   }
+}
+
+/**
+ * The result format a finalized overall row records: the computed display when the result is
+ * complete, otherwise the grade's format (from the subjects' snapshots) with no value yet.
+ */
+function storedResultFormat(student: StudentComputation): {
+  result_format: string | null;
+  result_scale_max: number | null;
+  result_value: number | null;
+} {
+  const display = student.overall.display;
+  if (display) {
+    return {
+      result_format: display.format,
+      result_scale_max: display.max,
+      result_value: display.value,
+    };
+  }
+  const format = student.subjects[0]?.snapshot.program.result_format ?? {
+    format: "percentage" as const,
+    max: 100,
+  };
+  return { result_format: format.format, result_scale_max: format.max, result_value: null };
 }
 
 function incompleteSummary(students: StudentComputation[]): string[] {
@@ -758,12 +788,36 @@ export interface StoredStudentResult {
   total_obtained: number | null;
   total_max: number | null;
   grade_label: string | null;
+  /** The final result in the grade's format; null while incomplete. */
+  result_display: ResultDisplay | null;
   subjects_failed: number;
   academic_status: "promoted" | "supplementary" | "retained" | "incomplete";
   subjects: StoredSubjectResult[];
 }
 
 const n = (value: string | null): number | null => (value === null ? null : Number(value));
+
+/**
+ * A finalized row's result display. Rows finalized before result formats existed have no format
+ * and were percentages, so they read back as the average out of 100.
+ */
+function storedDisplay(row: {
+  status: "complete" | "incomplete";
+  average_percentage: string | null;
+  result_format: ResultDisplay["format"] | null;
+  result_scale_max: string | null;
+  result_value: string | null;
+}): ResultDisplay | null {
+  if (row.status !== "complete") return null;
+  if (row.result_format === null || row.result_scale_max === null) {
+    return { format: "percentage", value: n(row.average_percentage), max: 100 };
+  }
+  return {
+    format: row.result_format,
+    value: n(row.result_value),
+    max: Number(row.result_scale_max),
+  };
+}
 
 export async function readFinalizationResults(
   tx: TransactionSql,
@@ -787,11 +841,15 @@ export async function readFinalizationResults(
       grade_label: string | null;
       subjects_failed: number;
       academic_status: StoredStudentResult["academic_status"];
+      result_format: ResultDisplay["format"] | null;
+      result_scale_max: string | null;
+      result_value: string | null;
     }[]
   >`
     SELECT overall.student_id, student.first_name, student.last_name, student.admission_number,
            overall.status, overall.average_percentage, overall.total_obtained, overall.total_max,
-           overall.grade_label, overall.subjects_failed, overall.academic_status
+           overall.grade_label, overall.subjects_failed, overall.academic_status,
+           overall.result_format, overall.result_scale_max, overall.result_value
     FROM app.student_overall_results AS overall
     JOIN app.students AS student ON student.id = overall.student_id AND student.school_id = overall.school_id
     WHERE overall.school_id = ${schoolId}::uuid AND overall.finalization_id = ${finalizationId}::uuid
@@ -836,6 +894,7 @@ export async function readFinalizationResults(
     total_obtained: n(row.total_obtained),
     total_max: n(row.total_max),
     grade_label: row.grade_label,
+    result_display: storedDisplay(row),
     subjects_failed: row.subjects_failed,
     academic_status: row.academic_status,
     subjects: subjects
@@ -992,6 +1051,7 @@ export function computationView(computation: SectionComputation) {
       total_obtained: student.overall.totalObtained,
       total_max: student.overall.totalMax,
       grade_label: student.overall.gradeLabel,
+      result_display: student.overall.display,
       subjects_failed: student.overall.subjectsFailed,
       academic_status: student.overall.academicStatus,
       subjects: student.subjects.map((subject) => ({

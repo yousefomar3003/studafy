@@ -131,10 +131,13 @@ export async function copyYearConfiguration(
       mark_approval_required: boolean;
       average_rounding_decimals: number;
       average_rounding_mode: string;
+      result_format: string;
+      result_scale_max: string | null;
     }[]
   >`
     SELECT grade_level_id, grade_scale_id, max_failed_subjects_for_supplementary,
-           mark_approval_required, average_rounding_decimals, average_rounding_mode
+           mark_approval_required, average_rounding_decimals, average_rounding_mode,
+           result_format, result_scale_max
     FROM app.grade_programs WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${sourceYearId}::uuid
   `;
   for (const program of programs) {
@@ -142,12 +145,13 @@ export async function copyYearConfiguration(
       INSERT INTO app.grade_programs (
         school_id, academic_year_id, grade_level_id, grade_scale_id,
         max_failed_subjects_for_supplementary, mark_approval_required,
-        average_rounding_decimals, average_rounding_mode
+        average_rounding_decimals, average_rounding_mode, result_format, result_scale_max
       ) VALUES (
         ${schoolId}::uuid, ${targetYearId}::uuid, ${program.grade_level_id}::uuid,
         ${mapScale(program.grade_scale_id)}::uuid, ${program.max_failed_subjects_for_supplementary},
         ${program.mark_approval_required}, ${program.average_rounding_decimals},
-        ${program.average_rounding_mode}
+        ${program.average_rounding_mode}, ${program.result_format},
+        ${program.result_scale_max}::numeric
       )
     `;
     summary.grade_programs += 1;

@@ -10,6 +10,7 @@ import type {
   OverallPolicy,
   OverallResult,
   PeriodOutcome,
+  ResultDisplay,
   SubjectGradingConfig,
   SubjectOutcomeForOverall,
   SubjectResult,
@@ -387,6 +388,7 @@ export function calculateSubjectResult(
  *    reported but never holds a student back.
  *  - status: promoted with no failures, supplementary with up to the policy's allowance,
  *    retained beyond it.
+ *  - display: the average in the grade's chosen format (see {@link resultDisplay}).
  */
 export function calculateOverallResult(
   subjects: readonly SubjectOutcomeForOverall[],
@@ -411,6 +413,7 @@ export function calculateOverallResult(
       totalObtained: null,
       totalMax: null,
       gradeLabel: null,
+      display: null,
       subjectsFailed: failedSubjectIds.length,
       failedSubjectIds,
       incompleteSubjectIds,
@@ -449,6 +452,7 @@ export function calculateOverallResult(
     totalObtained,
     totalMax,
     gradeLabel: band?.label ?? null,
+    display: resultDisplay(counted, average, policy),
     subjectsFailed: failed,
     failedSubjectIds,
     incompleteSubjectIds,
@@ -459,4 +463,47 @@ export function calculateOverallResult(
           ? "supplementary"
           : "retained",
   };
+}
+
+/**
+ * The final result in the grade's chosen format.
+ *
+ *  - percentage  the average itself, out of 100.
+ *  - out_of      average x max / 100, rounded like the average (16.5 out of 20 for 82.5%).
+ *  - gpa         sum(subject GPA points x coefficient) / sum(coefficients) over the subjects
+ *                counted in the average. A counted subject whose grade band carries no GPA points
+ *                makes the GPA null rather than an average of the rest; the publish check warns
+ *                about such a scale before results exist.
+ */
+export function resultDisplay(
+  counted: readonly SubjectOutcomeForOverall[],
+  average: number | null,
+  policy: OverallPolicy,
+): ResultDisplay {
+  const format = policy.resultFormat ?? { format: "percentage", max: 100 };
+  if (format.format === "percentage") {
+    return { format: "percentage", value: average, max: 100 };
+  }
+  if (format.format === "out_of") {
+    return {
+      format: "out_of",
+      value: average === null ? null : roundTo((average * format.max) / 100, policy.rounding),
+      max: format.max,
+    };
+  }
+  const coefficients = counted.reduce((total, subject) => total + subject.averageWeight, 0);
+  const missingPoints = counted.some(
+    (subject) => subject.result?.gpaPoints === null || subject.result?.gpaPoints === undefined,
+  );
+  const value =
+    coefficients === 0 || missingPoints
+      ? null
+      : roundTo(
+          counted.reduce(
+            (total, subject) => total + subject.result!.gpaPoints! * subject.averageWeight,
+            0,
+          ) / coefficients,
+          policy.rounding,
+        );
+  return { format: "gpa", value, max: format.max };
 }
