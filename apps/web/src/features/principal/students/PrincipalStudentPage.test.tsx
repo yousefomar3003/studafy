@@ -130,6 +130,27 @@ interface RequestInit {
   body?: { answers?: { field_id: string; value: string }[] };
 }
 
+const PARENT_SUMMARY = {
+  user_id: "parent-1",
+  display_name: "Morgan Lee",
+  email: "morgan@example.edu",
+  phone: "+965 5000 1234",
+  status: "active",
+  member_code: "PAR-100001",
+  last_login_at: null,
+  created_at: "2026-01-01T00:00:00.000Z",
+  children: [
+    {
+      student_id: "student-1",
+      first_name: "Ali",
+      last_name: "Hassan",
+      admission_number: null,
+      relationship: "mother",
+      class_label: "Grade 1 – A",
+    },
+  ],
+};
+
 const getMock = mock((path: string, _init?: RequestInit) => {
   if (path === "/api/students") {
     return Promise.resolve<unknown>({ data: { students: [STUDENT], next_cursor: null } });
@@ -141,6 +162,11 @@ const getMock = mock((path: string, _init?: RequestInit) => {
     });
   }
   if (path === "/api/users/{userId}") return Promise.resolve<unknown>({ data: PARENT });
+  if (path === "/api/parents/{parentUserId}")
+    return Promise.resolve<unknown>({ data: PARENT_SUMMARY });
+  if (path === "/api/parents") {
+    return Promise.resolve<unknown>({ data: { parents: [PARENT_SUMMARY], next_cursor: null } });
+  }
   if (path === "/api/students/{studentId}/records") {
     return Promise.resolve<unknown>({ data: studentRecords });
   }
@@ -178,10 +204,11 @@ function fakeJwt(payload: unknown): string {
 }
 
 async function renderAsPrincipal(url: string) {
-  const [StudentsPage, StudentPage, ParentPage] = (await Promise.all([
+  const [StudentsPage, StudentPage, ParentPage, ParentsPage] = (await Promise.all([
     import("./PrincipalStudentsPage"),
     import("./PrincipalStudentPage"),
     import("./PrincipalParentPage"),
+    import("../../records/parents/ParentDirectoryPage"),
   ]).then((modules) => modules.map((module) => module.default))) as ComponentType[];
   const store = createSessionStore({
     refreshClient: {
@@ -203,6 +230,7 @@ async function renderAsPrincipal(url: string) {
             <Routes>
               <Route path="/portal/principal/students" element={<StudentsPage />} />
               <Route path="/portal/principal/students/:studentId" element={<StudentPage />} />
+              <Route path="/portal/principal/parents" element={<ParentsPage />} />
               <Route path="/portal/principal/parents/:parentUserId" element={<ParentPage />} />
             </Routes>
           </MemoryRouter>
@@ -248,10 +276,25 @@ describe("Principal > Students", () => {
     fireEvent.click(await screen.findByRole("link", { name: "Open Morgan Lee's records" }));
     expect(await screen.findByRole("heading", { name: "Morgan Lee: records" })).toBeTruthy();
     expect(await screen.findByText("Al Noor Clinic")).toBeTruthy();
+    // The principal (user:read) sees how to reach the parent, and their children.
+    const details = await screen.findByRole("region", { name: "Contact details" });
+    expect(await within(details).findByText("+965 5000 1234")).toBeTruthy();
+    expect(within(details).getByText("PAR-100001")).toBeTruthy();
+    expect(within(details).getByRole("link", { name: "Ali Hassan (Grade 1 – A)" })).toBeTruthy();
     expect(screen.getByRole("link", { name: "Back" }).getAttribute("href")).toBe(
       "/portal/principal/students/student-1",
     );
   });
+  test("Parents lists every parent with their phone, children and Studafy ID", async () => {
+    await renderAsPrincipal("/portal/principal/parents");
+
+    const link = await screen.findByRole("link", { name: "Morgan Lee" });
+    expect(link.getAttribute("href")).toBe("/portal/principal/parents/parent-1");
+    expect(screen.getByText("+965 5000 1234")).toBeTruthy();
+    expect(screen.getByText("Ali Hassan (Grade 1 – A) · Mother")).toBeTruthy();
+    expect(screen.getByText("PAR-100001")).toBeTruthy();
+  });
+
   test("the student page sums up results, certificates, discipline and attendance", async () => {
     await renderAsPrincipal("/portal/principal/students/student-1");
 

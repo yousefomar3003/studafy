@@ -133,7 +133,8 @@
     "templates": "School records",
     "templatesDescription": "Choose what your school records about each student and parent, which fields are required, and which are sensitive.",
     "openEditor": "Edit the record forms",
-    "missing": "Missing information"
+    "missing": "Missing information",
+    "parents": "Parents"
   },
   "missing": {
     "title": "Missing information",

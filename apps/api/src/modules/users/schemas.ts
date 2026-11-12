@@ -876,3 +876,73 @@ export const teacherListQuerySchema = z
       .openapi({ description: "Filter by created_at <= this ISO datetime." }),
   })
   .openapi("TeacherListQuery");
+
+// ---------------------------------------------------------------------------
+// Parent directory
+// ---------------------------------------------------------------------------
+
+export const parentChildSchema = z
+  .object({
+    student_id: uuidSchema,
+    first_name: z.string(),
+    last_name: z.string(),
+    admission_number: z.string().nullable().openapi({
+      description: "Shown only to callers with `billing:read`, as on the student list; else null.",
+    }),
+    relationship: parentRelationshipSchema,
+    class_label: z.string().nullable().openapi({
+      description: "Grade and section this academic year, e.g. 'Grade 1 – A'. Null when unplaced.",
+    }),
+  })
+  .openapi("ParentChild");
+
+export const parentSummarySchema = z
+  .object({
+    user_id: uuidSchema,
+    display_name: z.string().nullable(),
+    email: z.string().nullable(),
+    phone: z.string().nullable().openapi({ description: "Contact phone. Null when none given." }),
+    status: userStatusSchema,
+    member_code: z
+      .string()
+      .nullable()
+      .openapi({ description: "The parent's Studafy ID (PAR-…), used to sign in." }),
+    last_login_at: dateTimeSchema.nullable(),
+    created_at: dateTimeSchema,
+    children: z.array(parentChildSchema),
+  })
+  .openapi("ParentSummary");
+
+export type ParentSummary = z.infer<typeof parentSummarySchema>;
+
+export const parentListSchema = z
+  .object({
+    parents: z.array(parentSummarySchema),
+    next_cursor: z.string().nullable().openapi({
+      description: "Opaque cursor for the next page. Null when no more results.",
+    }),
+  })
+  .openapi("ParentList");
+
+export const parentListQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).default(25),
+    cursor: z.string().min(1).optional(),
+    search: z
+      .string()
+      .trim()
+      .min(1)
+      .max(200)
+      .optional()
+      .openapi({ description: "Part of the name, email or Studafy ID." }),
+  })
+  .openapi("ParentListQuery");
+
+export const parentIdParamSchema = z
+  .object({
+    parentUserId: uuidSchema.openapi({
+      param: { name: "parentUserId", in: "path" },
+      description: "The parent's user ID.",
+    }),
+  })
+  .openapi("ParentIdParam");
