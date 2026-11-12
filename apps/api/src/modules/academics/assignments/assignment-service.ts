@@ -581,16 +581,18 @@ export type DeleteOutcome = "deleted" | "archived";
  * and removing the assignment out from under them would orphan a graded record. Archiving instead
  * matches what subjects and courses already do when a dependent exists.
  *
- * Attachments carry ON DELETE CASCADE (000047), so the hard-delete path takes their rows with it.
- * The stored objects are deliberately left in the bucket: deleting them is not transactional with
- * the database, so a rolled-back transaction would have already destroyed a file it then claimed
- * still existed. Reclaiming orphaned permanent objects is a sweep job, not a request-path concern.
+ * Attachments and questions carry ON DELETE CASCADE (000047, 000167), so the hard-delete path
+ * takes their rows with it. Their stored objects are not touched here -- deleting them is not
+ * transactional with the database, so a rolled-back transaction would have already destroyed a
+ * file it then claimed still existed. Their keys are pushed to `removedKeys` instead, for the
+ * caller to free once this transaction has committed (../../storage/free-objects.ts).
  */
 export async function deleteAssignment(
   tx: TransactionSql,
   schoolId: string,
   userId: string,
   assignmentId: string,
+  removedKeys: string[] = [],
 ): Promise<DeleteOutcome> {
   const existing = await getAssignmentForUpdate(tx, schoolId, assignmentId);
   if (!existing) {
@@ -626,10 +628,20 @@ export async function deleteAssignment(
     return "archived";
   }
 
+  const files = await tx<{ storage_key: string }[]>`
+    SELECT storage_key FROM app.assignment_attachments
+    WHERE school_id = ${schoolId} AND assignment_id = ${assignmentId}
+    UNION
+    SELECT image_storage_key FROM app.assignment_questions
+    WHERE school_id = ${schoolId} AND assignment_id = ${assignmentId}
+      AND image_storage_key IS NOT NULL
+  `;
+
   await tx`
     DELETE FROM app.assignments
     WHERE school_id = ${schoolId} AND id = ${assignmentId}
   `;
+  removedKeys.push(...files.map((file) => file.storage_key));
 
   await emitAuditLog(tx, {
     action: "delete",

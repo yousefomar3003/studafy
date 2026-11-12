@@ -274,19 +274,27 @@ export async function updateMaterial(
   return row!;
 }
 
+/**
+ * Delete a material. Returns the stored objects it pointed at -- the file and its derived
+ * thumbnail and preview -- for the caller to free once the transaction has committed
+ * (../storage/free-objects.ts).
+ */
 export async function deleteMaterial(
   tx: TransactionSql,
   schoolId: string,
   materialId: string,
-): Promise<{ deleted: boolean }> {
+): Promise<{ deleted: boolean; storageKeys: string[] }> {
   const existing = await getMaterial(tx, schoolId, materialId);
   if (!existing) {
     throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
   }
 
-  await tx`
+  const [removed] = await tx<
+    { storage_key: string; thumbnail_key: string | null; preview_key: string | null }[]
+  >`
     DELETE FROM app.materials
     WHERE id = ${materialId} AND school_id = ${schoolId}
+    RETURNING storage_key, thumbnail_key, preview_key
   `;
 
   await emitAuditLog(tx, {
@@ -296,7 +304,12 @@ export async function deleteMaterial(
     oldValues: { storage_key: existing.storage_key },
   });
 
-  return { deleted: true };
+  const storageKeys = removed
+    ? [removed.storage_key, removed.thumbnail_key, removed.preview_key].filter(
+        (key): key is string => key !== null,
+      )
+    : [];
+  return { deleted: true, storageKeys };
 }
 
 /**

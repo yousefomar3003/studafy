@@ -3,11 +3,12 @@ import { INGESTION_JOB_OPTIONS, JOB_NAMES, QUEUE_NAMES } from "@studafy/constant
 import { Queue } from "bullmq";
 import { HTTPException } from "hono/http-exception";
 
-import { withTenantTx } from "../../../db/tenant-tx";
+import { tenantTxRunner, withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
+import { freeStoredObjects } from "../../storage/free-objects";
 import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quota-service";
 import {
   confirmUpload,
@@ -172,7 +173,8 @@ const deleteMaterialRoute = createRoute({
   summary: "Delete a material",
   description:
     "Deletes a material and its associated AI chunks (cascaded). " +
-    "The storage object is not removed from the bucket.",
+    "Its stored file, thumbnail and preview are removed and their space freed once the delete " +
+    "has committed.",
   security: [{ bearerAuth: [] }],
   request: { params: materialIdParamSchema },
   responses: {
@@ -365,8 +367,14 @@ export function materialRoutes(
     const auth = requireAuth(c);
     const { materialId } = c.req.valid("param");
 
-    await withTenantTx(database, tenantFrom(c), (tx) =>
+    const { storageKeys } = await withTenantTx(database, tenantFrom(c), (tx) =>
       deleteMaterial(tx, auth.schoolId, materialId),
+    );
+    await freeStoredObjects(
+      storage,
+      tenantTxRunner(database, tenantFrom(c)),
+      auth.schoolId,
+      storageKeys,
     );
 
     return c.body(null, 204);

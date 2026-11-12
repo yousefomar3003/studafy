@@ -249,10 +249,11 @@ the whole request over a download link would take out the feature to protect an 
 
 ### Deleting
 
-The database row goes; the stored object stays, for a storage sweep to reclaim. Deleting from S3
-cannot participate in the transaction, so a rollback after a successful delete would leave a row
-pointing at bytes that no longer exist — strictly worse than an orphaned object, which costs storage
-and nothing else.
+The database row goes; once that transaction has committed, the stored object is removed and its
+bytes are freed from the school's storage meter. Deleting from S3 cannot participate in the
+transaction, so it never happens before the commit — a rollback after a successful delete would
+leave a row pointing at bytes that no longer exist. A failed removal leaves the object for the
+orphan sweep.
 
 ## Audit
 

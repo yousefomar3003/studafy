@@ -691,27 +691,47 @@ describeDb("pictures", () => {
       `;
     });
 
+    const keptDropped: string[] = [];
     const kept = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
-      await replaceQuestions(tx, t.school.id, t.teacherA.userId, draft.id, [
-        {
-          ...pictureOnly,
-          prompt: "Which organ is this?",
-          image: { keep_from_question_id: stored.id },
-        },
-      ]);
+      await replaceQuestions(
+        tx,
+        t.school.id,
+        t.teacherA.userId,
+        draft.id,
+        [
+          {
+            ...pictureOnly,
+            prompt: "Which organ is this?",
+            image: { keep_from_question_id: stored.id },
+          },
+        ],
+        new Map(),
+        keptDropped,
+      );
       return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
     });
     expect(kept[0]!.image_storage_key).toBe(stored.image_storage_key);
     // Re-saving rewrites the question rows; a kept picture keeps its verdict.
     expect(kept[0]!.image_scan_status).toBe("clean");
+    // A kept picture is still in use: nothing is handed back to be freed.
+    expect(keptDropped).toEqual([]);
 
+    const removedDropped: string[] = [];
     const removed = await asUser(t.school.id, t.teacherA.userId, async (tx) => {
-      await replaceQuestions(tx, t.school.id, t.teacherA.userId, draft.id, [
-        { ...QUESTIONS[0]!, image: null },
-      ]);
+      await replaceQuestions(
+        tx,
+        t.school.id,
+        t.teacherA.userId,
+        draft.id,
+        [{ ...QUESTIONS[0]!, image: null }],
+        new Map(),
+        removedDropped,
+      );
       return (await listQuestionsByAssignment(tx, t.school.id, [draft.id])).get(draft.id)!;
     });
     expect(removed[0]!.image_storage_key).toBeNull();
+    // The dropped picture is handed back for the route to remove once the save has committed.
+    expect(removedDropped).toEqual([stored.image_storage_key!]);
   });
 
   test("a kept picture must come from this assignment", async () => {

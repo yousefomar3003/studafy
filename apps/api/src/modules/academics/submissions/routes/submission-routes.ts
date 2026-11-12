@@ -13,6 +13,7 @@ import { requireAuth } from "../../../../middleware/authContext";
 import { requirePermission } from "../../../../middleware/authz";
 import { openApiValidationHook } from "../../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../../openapi/responses";
+import { freeStoredObjects } from "../../../storage/free-objects";
 import { autoScore, listAnswersBySubmission, listQuestionAssignmentIds } from "../answer-service";
 import {
   assignmentIdParamSchema,
@@ -684,9 +685,12 @@ export function submissionRoutes(
     const auth = requireAuth(c);
     const { submissionId, attachmentId } = c.req.valid("param");
 
-    await withTenantTx(database, tenantFrom(c), (tx) =>
+    const { storageKey } = await withTenantTx(database, tenantFrom(c), (tx) =>
       deleteSubmissionAttachment(tx, auth.schoolId, submissionId, attachmentId),
     );
+    await freeStoredObjects(storage, tenantTxRunner(database, tenantFrom(c)), auth.schoolId, [
+      storageKey,
+    ]);
 
     return c.body(null, 204);
   });
