@@ -19,6 +19,7 @@ import {
   resolveAiCascade,
   resolveTransition,
   SCHOOL_TRANSITIONS,
+  STORAGE_TRANSITIONS,
   TERMINAL_STATUSES,
 } from "../state-machine";
 
@@ -29,6 +30,7 @@ const ALL_STATUSES = Object.values(SUBSCRIPTION_STATUSES);
 const TABLES = [
   ["school", SCHOOL_TRANSITIONS],
   ["ai", AI_TRANSITIONS],
+  ["storage", STORAGE_TRANSITIONS],
 ] as const;
 
 describe("transition tables", () => {
@@ -306,6 +308,22 @@ describe("foldStatus", () => {
     ]);
     expect(result.status).toBe("canceled");
     expect(result.skipped.map((step) => step.id)).toEqual(["evt_3"]);
+  });
+
+  test("a storage add-on bought again after it ended starts a new lifecycle", () => {
+    const result = foldStatus("storage", [
+      event("evt_1", "checkout.session.completed"),
+      event("evt_2", "customer.subscription.deleted"),
+      event("evt_3", "checkout.session.completed"),
+    ]);
+    expect(result.status).toBe("active");
+    expect(result.skipped).toEqual([]);
+  });
+
+  test("a storage add-on is never paused by a school suspension", () => {
+    for (const from of LIVE_STATUSES) {
+      expect(resolveTransition("storage", from, "school_suspended")).toBeNull();
+    }
   });
 
   test("a school subscription is not restarted by a new checkout after it ended", () => {

@@ -1,6 +1,7 @@
 export { checkoutRoutes } from "./routes/checkout-routes";
 export { schoolCheckoutRoutes } from "./routes/school-checkout-routes";
 export { aiCheckoutRoutes } from "./routes/ai-checkout-routes";
+export { storageAddonRoutes } from "./routes/storage-addon-routes";
 export { webhookRoutes } from "./routes/webhook-routes";
 export { planRoutes } from "./routes/plan-routes";
 export { adminSubscriptionRoutes } from "./routes/admin-routes";
@@ -38,6 +39,7 @@ export {
   createTieredSchoolCheckoutSession,
   createAiCheckoutSession,
   createBillingPortalSession,
+  createStorageCheckoutSession,
 } from "./services/checkout-service";
 export { getActivePlans, getSchoolSubscription } from "./services/subscription-service";
 export type { SchoolSubscription } from "./services/subscription-service";

@@ -5,6 +5,12 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { selectPaymentProviderForSchool } from "../payment-provider-routing";
 
+import {
+  findLiveStorageAddon,
+  findStoragePrice,
+  requireOnlineStorageProvider,
+} from "./storage-addon-service";
+
 import type { Database } from "../../../db";
 import type { TenantContext } from "../../../db/tenant-tx";
 import type { PaymentProviderRegistry, SelectedPaymentProvider } from "../payment-provider-routing";
@@ -434,6 +440,71 @@ export async function createAiCheckoutSession(
       metadata: {
         school_id: schoolId,
         student_id: studentId,
+        ...renewalMetadata(price),
+      },
+    });
+
+    return { url: session.url, sessionId: session.sessionId };
+  });
+}
+
+export interface StorageCheckoutParams {
+  schoolId: string;
+  priceId: string;
+  successUrl: string;
+  cancelUrl: string;
+  tenantContext: TenantContext;
+}
+
+/**
+ * A checkout for the school's storage add-on (db/migrations/000205).
+ *
+ * `addon: "storage"` on the metadata is what the webhook pipeline attributes it by: without it the
+ * purchase would fall through to the school's own subscription. One add-on per school -- a school
+ * that has one changes its tier (storage-addon-service.ts) rather than buying a second, which would
+ * bill it twice.
+ */
+export async function createStorageCheckoutSession(
+  database: Database,
+  providers: PaymentProviderRegistry,
+  params: StorageCheckoutParams,
+): Promise<CheckoutResult> {
+  const { schoolId, priceId, successUrl, cancelUrl, tenantContext } = params;
+
+  return withTenantTx(database, tenantContext, async (tx) => {
+    const school = await findSchool(tx, schoolId);
+    const selected = await requireOnlineStorageProvider(tx, providers, schoolId);
+
+    const storagePrice = await findStoragePrice(tx, priceId);
+    const price = storagePrice ? await findActivePriceById(tx, storagePrice.id) : undefined;
+    if (!price) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.SUBSCRIPTION_CHECKOUT_FAILED,
+        "Selected price is not available",
+      );
+    }
+
+    if (await findLiveStorageAddon(tx, schoolId)) {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.STORAGE_ADDON_ALREADY_ACTIVE,
+        "The school already has a storage add-on; change its tier instead",
+      );
+    }
+
+    const line = checkoutLine(selected, price);
+    const customerId = await ensureProviderCustomer(tx, selected, school);
+
+    const session = await selected.port.createCheckoutSession({
+      customerId,
+      ...line,
+      successUrl,
+      cancelUrl,
+      metadata: {
+        school_id: schoolId,
+        plan_id: price.plan_id,
+        addon: "storage",
         ...renewalMetadata(price),
       },
     });

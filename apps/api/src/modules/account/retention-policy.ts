@@ -54,6 +54,7 @@ export const RETAINED_RECORD_CATEGORIES: readonly RetainedRecordCategory[] = [
     tables: [
       "subscriptions",
       "ai_subscriptions",
+      "storage_subscriptions",
       "online_fee_payments",
       "payment_provider_customers",
       "tap_renewal_attempts",

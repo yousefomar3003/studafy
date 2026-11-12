@@ -16,7 +16,15 @@
  *      without knowing the policy exists.
  */
 
-import { extractStudentIdHint, extractSubscriptionId } from "./event-mapping";
+import { isStorageAddonPlanCode, STORAGE_ADDON_TIERS } from "@studafy/constants";
+
+import {
+  extractAddonHint,
+  extractLocalPriceIdHint,
+  extractStudentIdHint,
+  extractSubscriptionId,
+} from "./event-mapping";
+import { TERMINAL_STATUSES } from "./state-machine";
 
 import type { BillingEventSource, BillingProvider } from "./billing-event-store";
 import type { SubscriptionKind } from "./state-machine";
@@ -33,6 +41,11 @@ import type { TransactionSql } from "postgres";
  * unchanged.
  */
 const AI_PLACEHOLDER_PERIOD_DAYS = 30;
+
+/** The same placeholder for a storage add-on row, whose period columns are NOT NULL too (000205). */
+const STORAGE_PLACEHOLDER_PERIOD_DAYS = 30;
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface AttributionTarget {
   kind: SubscriptionKind;
@@ -126,6 +139,13 @@ export async function resolveTarget(
     if (byProviderKey) return byProviderKey;
   }
 
+  // A storage add-on is a school purchase with no student, so it must be told apart before the
+  // fall-through to the school's own subscription below -- which would otherwise activate, renew or
+  // cancel the school plan on the strength of a storage payment.
+  if (extractAddonHint(payload) === "storage") {
+    return resolveStorageTarget(tx, schoolId, eventType, payload, stripeSubscriptionId);
+  }
+
   const studentId = extractStudentIdHint(payload);
 
   if (studentId) {
@@ -188,6 +208,22 @@ async function findByProviderSubscriptionId(
     };
   }
 
+  const storage = await tx<{ id: string; status: SubscriptionStatus }[]>`
+    SELECT id, status::text AS status
+    FROM app.storage_subscriptions
+    WHERE school_id = ${schoolId}::uuid AND stripe_subscription_id = ${stripeSubscriptionId}
+    LIMIT 1
+  `;
+  if (storage.length > 0) {
+    return {
+      kind: "storage",
+      id: storage[0]!.id,
+      schoolId,
+      studentId: null,
+      status: storage[0]!.status,
+    };
+  }
+
   const school = await tx<{ id: string; status: SubscriptionStatus }[]>`
     SELECT id, status::text AS status
     FROM app.subscriptions
@@ -225,6 +261,15 @@ async function linkProviderSubscription(
   if (kind === "ai") {
     await tx`
       UPDATE app.ai_subscriptions
+      SET stripe_subscription_id = ${stripeSubscriptionId}, updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${id}::uuid AND stripe_subscription_id IS NULL
+    `;
+    return;
+  }
+
+  if (kind === "storage") {
+    await tx`
+      UPDATE app.storage_subscriptions
       SET stripe_subscription_id = ${stripeSubscriptionId}, updated_at = CURRENT_TIMESTAMP
       WHERE id = ${id}::uuid AND stripe_subscription_id IS NULL
     `;
@@ -274,4 +319,129 @@ async function createAiSubscription(
     LIMIT 1
   `;
   return existing.length > 0 ? existing[0]!.id : null;
+}
+
+// ---------------------------------------------------------------------------
+// Storage add-on (000205)
+// ---------------------------------------------------------------------------
+
+interface StorageRow {
+  id: string;
+  status: SubscriptionStatus;
+  stripe_subscription_id: string | null;
+}
+
+/**
+ * The school's storage add-on row this event moves, creating or re-arming it when the event is the
+ * completed checkout that bought it.
+ *
+ * A checkout completion fixes the tier: the `price_id` our checkout wrote names an `app.plan_prices`
+ * row of a storage plan, and its cap is copied onto the row. A later event never changes the tier --
+ * a tier change is made by the API when the provider has accepted it, which keeps an out-of-order
+ * delivery from undoing it.
+ *
+ * Parked (null) rather than guessed: a completion naming no storage price, any other event for a
+ * school with no storage row, and a second purchase while one is still live (two provider
+ * subscriptions for one add-on is a double charge a person has to sort out, not something to fold).
+ */
+async function resolveStorageTarget(
+  tx: TransactionSql,
+  schoolId: string,
+  eventType: string,
+  payload: Record<string, unknown>,
+  stripeSubscriptionId: string | null,
+): Promise<AttributionTarget | null> {
+  const [existing] = await tx<StorageRow[]>`
+    SELECT id, status::text AS status, stripe_subscription_id
+    FROM app.storage_subscriptions
+    WHERE school_id = ${schoolId}::uuid
+    LIMIT 1
+  `;
+
+  const target = (row: { id: string; status: SubscriptionStatus }): AttributionTarget => ({
+    kind: "storage",
+    id: row.id,
+    schoolId,
+    studentId: null,
+    status: row.status,
+  });
+
+  if (eventType !== "checkout.session.completed") {
+    if (!existing) return null;
+    await linkProviderSubscription(tx, "storage", existing.id, stripeSubscriptionId);
+    return target(existing);
+  }
+
+  const tier = await storageTierOf(tx, extractLocalPriceIdHint(payload));
+  if (tier === null) return null;
+
+  if (!existing) {
+    const inserted = await tx<{ id: string }[]>`
+      INSERT INTO app.storage_subscriptions (
+        school_id, plan_price_id, cap_bytes, status, current_period_start, current_period_end,
+        stripe_subscription_id
+      ) VALUES (
+        ${schoolId}::uuid,
+        ${tier.priceId}::uuid,
+        ${tier.capBytes},
+        'trialing'::app.subscription_status,
+        CURRENT_TIMESTAMP,
+        CURRENT_TIMESTAMP + ${`${STORAGE_PLACEHOLDER_PERIOD_DAYS} days`}::interval,
+        ${stripeSubscriptionId}
+      )
+      ON CONFLICT (school_id) DO NOTHING
+      RETURNING id
+    `;
+    if (inserted.length > 0) return target({ id: inserted[0]!.id, status: "trialing" });
+
+    // A concurrent delivery of the same completion created it first: use that row.
+    const [raced] = await tx<StorageRow[]>`
+      SELECT id, status::text AS status, stripe_subscription_id
+      FROM app.storage_subscriptions
+      WHERE school_id = ${schoolId}::uuid
+      LIMIT 1
+    `;
+    return raced ? target(raced) : null;
+  }
+
+  const sameSubscription =
+    existing.stripe_subscription_id === null ||
+    stripeSubscriptionId === null ||
+    existing.stripe_subscription_id === stripeSubscriptionId;
+  const ended = TERMINAL_STATUSES.has(existing.status);
+
+  // Still live under another provider subscription: a second purchase. Park it for a person.
+  if (!sameSubscription && !ended) return null;
+
+  // Bought again after the last one ended (the fold restarts its lifecycle on this completion), or a
+  // redelivery of the completion that bought this one: the row takes this purchase's tier and
+  // provider subscription.
+  await tx`
+    UPDATE app.storage_subscriptions
+    SET plan_price_id = ${tier.priceId}::uuid,
+        cap_bytes = ${tier.capBytes},
+        stripe_subscription_id = COALESCE(${stripeSubscriptionId}::text, stripe_subscription_id),
+        cancel_at_period_end = CASE WHEN ${ended} THEN false ELSE cancel_at_period_end END,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${existing.id}::uuid
+  `;
+  return target(existing);
+}
+
+/** The storage tier an `app.plan_prices` id sells, or null when it is not a storage plan's price. */
+async function storageTierOf(
+  tx: TransactionSql,
+  priceId: string | null,
+): Promise<{ priceId: string; capBytes: number } | null> {
+  if (priceId === null || !UUID_PATTERN.test(priceId)) return null;
+
+  const [row] = await tx<{ code: string }[]>`
+    SELECT p.code
+    FROM app.plan_prices pp
+    JOIN app.plans p ON p.id = pp.plan_id
+    WHERE pp.id = ${priceId}::uuid
+    LIMIT 1
+  `;
+  if (!row || !isStorageAddonPlanCode(row.code)) return null;
+  return { priceId, capBytes: STORAGE_ADDON_TIERS[row.code].capBytes };
 }

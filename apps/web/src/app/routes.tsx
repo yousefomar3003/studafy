@@ -307,6 +307,10 @@ const LicenseInvoicePage = lazyWithCatalogs(
   LICENSE_CATALOGS,
   () => import("../features/license/InvoiceDetailPage"),
 );
+const LicenseStoragePage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/StoragePage"),
+);
 const PrincipalGradesPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/grades/PrincipalGradesPage"),
@@ -1206,6 +1210,8 @@ export const routes: RouteObject[] = [
               ["license/quotes/:quoteId", <LicenseQuotePage key="quote" />],
               ["license/invoices", <LicenseInvoicesPage key="invoices" />],
               ["license/invoices/:invoiceId", <LicenseInvoicePage key="invoice" />],
+              // The paid storage add-on: buying and changing it need `license:manage` too.
+              ["license/storage", <LicenseStoragePage key="storage" />],
             ] as const
           ).map(([path, page]) => ({
             path,

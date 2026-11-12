@@ -161,6 +161,27 @@ export interface ReverseCancellationInput {
   providerSubscriptionId: string;
 }
 
+/**
+ * Move a subscription to another catalog price (a storage add-on changing tier or interval).
+ *
+ * `chargeNow`: invoice the prorated difference straight away and apply the change only if that
+ * invoice is paid -- for a move to something bigger, so a larger cap is never handed out against a
+ * declined card. Otherwise the proration is credited or charged on the next regular invoice.
+ */
+export interface ChangeSubscriptionPriceInput {
+  providerSubscriptionId: string;
+  /** The provider's price id (Stripe `price_...`). */
+  priceId: string;
+  chargeNow: boolean;
+  /** Replaces the subscription's metadata keys given here (the new local `price_id`, say). */
+  metadata: Record<string, string>;
+}
+
+export interface ChangeSubscriptionPriceResult {
+  /** False when the provider is holding the change until a payment succeeds: nothing changed yet. */
+  applied: boolean;
+}
+
 export interface ListInvoicesInput {
   customerId: string;
   limit?: number;
@@ -238,6 +259,13 @@ export interface PaymentProviderPort {
   scheduleCancellation(input: ScheduleCancellationInput): Promise<void>;
   /** Undo a pending end-of-period cancellation. No-op if the subscription was not scheduled to cancel. */
   reverseCancellation(input: ReverseCancellationInput): Promise<void>;
+  /**
+   * Move a subscription to another price, prorated. Optional: only a provider that keeps the
+   * subscription itself (Stripe) can; Tap has no subscription object to change.
+   */
+  changeSubscriptionPrice?(
+    input: ChangeSubscriptionPriceInput,
+  ): Promise<ChangeSubscriptionPriceResult>;
   /** List invoices billed to a customer, newest first. */
   listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult>;
   /**
