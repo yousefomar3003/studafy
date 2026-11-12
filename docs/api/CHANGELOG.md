@@ -381,6 +381,16 @@ when it required the `version-bump` label.
 
 ### Changed
 
+- Deleting a file now frees its storage. `DELETE /api/academics/materials/{materialId}` (with the
+  material's thumbnail and preview), `DELETE /api/academics/assignments/{assignmentId}` (its
+  attachments and question pictures, when it is deleted rather than archived),
+  `DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}`,
+  `DELETE /api/academics/submissions/{submissionId}/attachments/{attachmentId}`, a question save
+  that drops a picture, and an expense update or attachment that replaces its file all remove the
+  stored object once the change has committed and release its bytes from the school's storage
+  quota. A file another row still points at is kept (000204 `app.referenced_storage_keys`). No
+  request or response shape changed.
+
 - `GET /api/privacy/dsr/{requestId}` (`DataSubjectRequest`): a completed export's `download_url` now
   points at the export's ZIP archive (`dsr-exports/<school>/<request>/export.zip`: a README, the data
   as JSON with one file per table, `manifest.json`, and copies of the person's files) instead of a
