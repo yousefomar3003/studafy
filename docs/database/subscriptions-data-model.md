@@ -34,6 +34,24 @@ student, not a school-plan choice -- the ticket's own description distinguishes 
 exactly this ("school-level: plan, status, period" versus "student-level, status, requires school
 link"). A plan reference was not invented to make the tables symmetric.
 
+## Storage add-on (000205)
+
+`app.storage_subscriptions` holds one paid storage add-on per school (`uq_storage_subscriptions_school`):
+its tier (`plan_price_id`, and `cap_bytes` copied from the tier when bought or changed), status,
+period, Stripe subscription id, `cancel_at_period_end`, and the grace and Tap columns the other two
+subscription tables have. It is the third `app.billing_subscription_type` (`storage`). The webhook
+pipeline attributes an event to it by the `addon: "storage"` metadata the checkout writes. Without
+that metadata, a storage payment would fall through to the school's own subscription. The
+lifecycle is the school table's. As with the AI add-on, buying again after it ended restarts it on
+the same row.
+
+Billing never writes the school's cap. The upload quota takes the larger of
+`app.subscriptions.storage_cap_bytes` (10 GiB included) and the `cap_bytes` of a live add-on. When
+an add-on is canceled, expires or is closed after its 7-day grace period, it stops counting. No
+file is ever deleted. A school over its cap keeps and reads everything, and only new uploads are
+refused. The tiers are `app.plans` `storage_100gb` and `storage_1tb`, and their prices are
+`app.plan_prices` rows: USD is seeded, and other currencies are added as more rows.
+
 ## Subscription state machine
 
 Both `subscriptions.status` and `ai_subscriptions.status` share one enum, `app.subscription_status`,

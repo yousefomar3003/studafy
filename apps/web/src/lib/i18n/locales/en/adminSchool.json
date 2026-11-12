@@ -62,7 +62,8 @@
         "kb": "{{value}} KB",
         "mb": "{{value}} MB",
         "gb": "{{value}} GB"
-      }
+      },
+      "upgrade": "Upgrade storage"
     }
   },
   "announcements": {

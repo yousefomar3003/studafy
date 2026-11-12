@@ -22,6 +22,9 @@ export const MILLIS_PER_DAY = 86_400_000;
 export const DUNNING_EMAIL_DAYS: Readonly<Record<SubscriptionKind, readonly number[]>> = {
   school: [0, 3, 7, 10, 13],
   ai: [0, 3, 6],
+  // No reminder emails are sent for a storage add-on (the sweep only closes it); the schedule
+  // mirrors the AI add-on's seven-day window so the stage arithmetic stays defined.
+  storage: [0, 3, 6],
 };
 
 /**

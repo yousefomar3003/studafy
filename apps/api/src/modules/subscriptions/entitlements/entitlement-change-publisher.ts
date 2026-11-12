@@ -36,6 +36,12 @@ import type { TransactionSql } from "postgres";
  * armed via setTenantScope before any transition is applied.
  */
 export const publishEntitlementChange: EntitlementChangePublisher = async (tx, change) => {
+  // A storage add-on grants no entitlement anything caches: the upload quota reads the add-on's row
+  // on every upload (apps/api storage quota-service), so its next check already sees the change.
+  // Nothing to version, nothing to invalidate -- and bumping the school's counter would expire every
+  // token in the school for nothing.
+  if (change.kind === "storage") return;
+
   if (change.kind === "school") {
     const entitlementsVersion = await bumpEntitlementVersion(tx, "school", change.schoolId);
 
