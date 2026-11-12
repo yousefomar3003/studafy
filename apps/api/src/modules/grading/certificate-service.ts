@@ -7,6 +7,7 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { readFinalizationResults, requireFinalization } from "./results-service";
 
+import type { ReportNotes } from "./report-card-service";
 import type { FinalizationRow, StoredStudentResult } from "./results-service";
 import type { ResultDisplay } from "@studafy/grading-engine";
 import type { TransactionSql } from "postgres";
@@ -44,6 +45,8 @@ export interface CertificateContent {
     passed: boolean | null;
     exempt: boolean;
     terms: { term_id: string | null; term_name: string | null; percentage: number | null }[];
+    /** The subject teacher's comment. Absent on certificates issued before report card notes. */
+    comment?: string;
   }[];
   overall: {
     average_percentage: number | null;
@@ -55,6 +58,11 @@ export interface CertificateContent {
     subjects_failed: number;
     academic_status: string;
   };
+  /**
+   * Report card notes and attendance, as finalized. Absent on certificates issued before report
+   * card notes existed, and on ones whose finalization predates them.
+   */
+  report?: ReportNotes;
   finalization: { id: string; version: number; finalized_at: string };
   issued_by: { user_id: string; name: string | null };
   reissue: { supersedes_serial: string; reason: string } | null;
@@ -231,6 +239,7 @@ function renderContent(
           term_name: terms.find((t) => t.id === term.term_id)?.name ?? null,
           percentage: term.percentage,
         })),
+        ...(subject.comment ? { comment: subject.comment } : {}),
       })),
     overall: {
       average_percentage: result.average_percentage,
@@ -241,6 +250,7 @@ function renderContent(
       subjects_failed: result.subjects_failed,
       academic_status: result.academic_status,
     },
+    ...(result.report ? { report: result.report } : {}),
     finalization: {
       id: finalization.id,
       version: finalization.version,

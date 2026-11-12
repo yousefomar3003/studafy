@@ -13,6 +13,22 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Report card notes (000209): `GET`/`PUT /api/grading/report-card-settings` (`ReportCardSettings`,
+  `UpdateReportCardSettingsBody`) choose which sections report cards and certificates show (subject
+  comments, class teacher comment, principal comment, attendance, conduct; all default to shown)
+  and the school's conduct ratings (`ReportCardConductRating`; the default four when none are
+  saved). Reading needs `academicConfig:read`, changing `academicConfig:manage`.
+  `GET /api/grading/sections/{sectionId}/report-notes?term_id=` returns a section's draft notes
+  (`SectionReportNotes`); `PUT` on it (`SaveStudentNotesBody`) writes class teacher comments and
+  conduct ratings (teachers of the section) and principal comments (school leadership), and
+  `PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments`
+  (`SaveSubjectCommentsBody`) writes a subject teacher's comments. Writes need `grade:update` or
+  `result:finalize`, and are refused once the period is finalized (`RESULTS_ALREADY_FINALIZED`).
+  Finalizing freezes the notes and the period's attendance in days: `FinalizedStudentResult` gains
+  `report` (`ReportCardNotes`, with `ReportCardConduct` and `ReportCardAttendance`; null for results
+  finalized earlier), `FinalizedSubjectResult` gains `comment`, and `CertificateContent` gains
+  optional `report` and `subjects[].comment` (absent on certificates issued earlier).
+
 - Academic transcripts (000207): every finalized end-of-year result of a student on one immutable
   document with cumulative figures. `GET /api/grading/students/{studentId}/transcript-readiness`
   (`TranscriptReadiness`: state `ready` / `issued` / `needs_reissue` / `blocked`, the reasons, the

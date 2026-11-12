@@ -6,6 +6,7 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { Num, Percent, QueryState, ResultValue } from "./components";
 import { setupHref } from "./context";
 import { useCertificate } from "./queries";
+import { ReportNotesBlock } from "./ReportNotesBlock";
 
 import type { SetupContext } from "./context";
 import type { CertificateContent } from "./queries";
@@ -209,6 +210,8 @@ export function CertificateDocument({
           </dd>
         </div>
       </dl>
+
+      <ReportNotesBlock content={content} />
 
       <footer className="ag-certificate__footer">
         <p>

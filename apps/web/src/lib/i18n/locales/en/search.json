@@ -320,6 +320,11 @@
       "where": "Principal › Academic setup › Results",
       "keywords": "results, finalize results, report cards, certificates, term results, annual results, transcripts, print certificate"
     },
+    "academic-report-cards": {
+      "title": "Report card comments",
+      "where": "Principal › Academic setup › Report cards",
+      "keywords": "report card comments, teacher comments, principal comment, conduct, behaviour rating, conduct rating, attendance on report card"
+    },
     "build-record-templates-principal": {
       "title": "Build record templates",
       "where": "Principal › School › Records",
