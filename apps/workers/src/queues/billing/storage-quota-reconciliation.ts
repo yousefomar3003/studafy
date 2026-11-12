@@ -16,6 +16,10 @@
  * shared import because the workers image does not depend on the API. `temp/` and `quarantine/` are
  * never counted, mirroring the API.
  *
+ * The same pass reports orphaned files -- permanent/ objects no row points at any more
+ * (./storage-orphan-sweep.ts) -- and, only when STORAGE_ORPHAN_REMOVAL=enabled, removes them and
+ * leaves their bytes out of the meter.
+ *
  * Each school runs in its own `withSystemTenantTx`, mirroring the dunning and seat-reconciliation
  * sweeps: an S3 or database error rolls that school's transaction back and is counted as a failure
  * for ops telemetry, while the schools after it proceed. `loadSchoolIds` runs on the plain
@@ -26,7 +30,10 @@
 import { withSystemTenantTx } from "../../db/tenant-tx";
 import { loadSchoolIds } from "../notifications/email/schools";
 
-import type { StorageQuotaS3Client } from "./storage-quota-s3";
+import { sweepSchoolOrphans } from "./storage-orphan-sweep";
+
+import type { OrphanReport } from "./storage-orphan-sweep";
+import type { StorageQuotaS3Client, StorageQuotaS3Object } from "./storage-quota-s3";
 import type { BillingLogger } from "@studafy/billing";
 import type { Sql, TransactionSql } from "postgres";
 
@@ -60,12 +67,25 @@ export interface StorageQuotaReconciliationResult {
   failed: number;
   /** Total bytes measured across all reconciled schools (the sum of the corrected meters). */
   bytesMeasured: number;
+  /** Orphaned permanent/ objects found across all schools, and their bytes. */
+  orphans: number;
+  orphanBytes: number;
+  /** Orphans removed (0 unless STORAGE_ORPHAN_REMOVAL=enabled). */
+  orphansRemoved: number;
+  orphanBytesRemoved: number;
+}
+
+export interface StorageQuotaReconciliationOptions {
+  /** Delete orphaned objects instead of only reporting them. Off by default. */
+  removeOrphans?: boolean;
+  now?: Date;
 }
 
 export async function runStorageQuotaReconciliation(
   sql: Sql,
   storage: StorageQuotaS3Client,
   log: BillingLogger,
+  options: StorageQuotaReconciliationOptions = {},
 ): Promise<StorageQuotaReconciliationResult> {
   const schoolIds = await loadSchoolIds(sql);
   const result: StorageQuotaReconciliationResult = {
@@ -74,14 +94,24 @@ export async function runStorageQuotaReconciliation(
     unchanged: 0,
     failed: 0,
     bytesMeasured: 0,
+    orphans: 0,
+    orphanBytes: 0,
+    orphansRemoved: 0,
+    orphanBytesRemoved: 0,
   };
+  const now = options.now ?? new Date();
+  const removeOrphans = options.removeOrphans === true;
 
   for (const schoolId of schoolIds) {
     try {
       const perSchool = await withSystemTenantTx(sql, { schoolId }, (tx) =>
-        reconcileSchool(tx, schoolId, storage, log),
+        reconcileSchool(tx, schoolId, storage, log, now, removeOrphans),
       );
       result.bytesMeasured += perSchool.bytesUsed;
+      result.orphans += perSchool.orphans.orphans;
+      result.orphanBytes += perSchool.orphans.orphanBytes;
+      result.orphansRemoved += perSchool.orphans.removed;
+      result.orphanBytesRemoved += perSchool.orphans.removedBytes;
       if (perSchool.correctedBy !== 0) {
         result.corrected += 1;
       } else {
@@ -108,7 +138,9 @@ async function reconcileSchool(
   schoolId: string,
   storage: StorageQuotaS3Client,
   log: BillingLogger,
-): Promise<{ bytesUsed: number; correctedBy: number }> {
+  now: Date,
+  removeOrphans: boolean,
+): Promise<{ bytesUsed: number; correctedBy: number; orphans: OrphanReport }> {
   const [beforeRow] = await tx<{ bytes_used: string | null }[]>`
     SELECT bytes_used::text AS bytes_used
     FROM app.storage_usage_meters
@@ -117,10 +149,30 @@ async function reconcileSchool(
   const before = Number(beforeRow?.bytes_used ?? 0);
 
   let bytesUsed = 0;
+  const permanentPrefix = `permanent/${schoolId}/`;
+  const permanentObjects: StorageQuotaS3Object[] = [];
   for (const prefix of schoolStoragePrefixes(schoolId)) {
     for await (const object of storage.list(prefix)) {
       bytesUsed += object.sizeBytes;
+      if (prefix === permanentPrefix) permanentObjects.push(object);
     }
+  }
+
+  const orphans = await sweepSchoolOrphans(
+    tx,
+    storage,
+    schoolId,
+    permanentObjects,
+    now,
+    removeOrphans,
+  );
+  bytesUsed -= orphans.removedBytes;
+  if (orphans.orphans > 0) {
+    log.warn(
+      { school_id: schoolId, ...orphans, removal_enabled: removeOrphans },
+      `orphaned files for school: ${orphans.orphans} (${formatBytes(orphans.orphanBytes)}), ` +
+        `${orphans.removed} removed`,
+    );
   }
 
   const rows = await tx<{ set_storage_usage: string }[]>`
@@ -136,5 +188,5 @@ async function reconcileSchool(
     );
   }
 
-  return { bytesUsed: after, correctedBy };
+  return { bytesUsed: after, correctedBy, orphans };
 }

@@ -159,11 +159,13 @@ raw bucket URL in any payload.
 
 ### Deleting
 
-Deleting an attachment removes the row and leaves the stored object for a sweep to reclaim. An
-object delete cannot participate in the database transaction, so a rollback after a successful
-delete would leave a row pointing at bytes that no longer exist — strictly worse than an orphaned
-object, which costs storage and nothing else. The same reasoning applies to the hard-delete path on
-an assignment.
+Deleting an attachment removes the row, then — once that transaction has committed — removes the
+stored object and frees its bytes from the school's storage meter. The object is never removed
+inside the transaction: a rollback after a successful object delete would leave a row pointing at
+bytes that no longer exist. If the removal itself fails, the object stays in the bucket, still
+counted by the daily reconciliation, until the orphan sweep finds it. The hard-delete path on an
+assignment does the same for its attachments and question pictures, and saving questions does it
+for any picture the new set no longer uses.
 
 ## Audit
 

@@ -45,8 +45,9 @@ import type { JSONValue, TransactionSql } from "postgres";
  * Because every save mints new question rows, a picture that should survive the save is named by
  * the id of the question that carries it now (`keep_from_question_id`); a new one arrives as a
  * staged temp/ key (`upload_key`), checked and promoted inside the save like a message image. A
- * picture that is dropped or replaced is left in the bucket unreferenced, for the storage
- * reconciliation to reclaim -- never a row pointing at a missing object.
+ * picture that is dropped or replaced is handed back to the caller, which removes it and frees its
+ * space once the save has committed (../../storage/free-objects.ts) -- never a row pointing at a
+ * missing object.
  */
 
 // ---------------------------------------------------------------------------
@@ -177,6 +178,11 @@ export async function replaceQuestions(
    * saveQuestions. A save with staged pictures goes through saveQuestions; this is its write step.
    */
   promoted: ReadonlyMap<string, PromotedQuestionImage> = new Map(),
+  /**
+   * Receives the key of every picture the old set had and the new set no longer uses, for the
+   * caller to free once this transaction has committed (../../storage/free-objects.ts).
+   */
+  droppedImageKeys: string[] = [],
 ): Promise<AssignmentRow> {
   const { existing, images } = await checkReplaceQuestions(
     tx,
@@ -188,9 +194,10 @@ export async function replaceQuestions(
   const previousCount = await countQuestions(tx, schoolId, assignmentId);
 
   // Options cascade with their question (000167), so one delete clears the set.
-  await tx`
+  const previousImages = await tx<{ image_storage_key: string }[]>`
     DELETE FROM app.assignment_questions
     WHERE school_id = ${schoolId} AND assignment_id = ${assignmentId}
+    RETURNING image_storage_key
   `;
 
   if (questions.length > 0) {
@@ -249,6 +256,12 @@ export async function replaceQuestions(
       FROM jsonb_to_recordset(${tx.json(optionRows as JSONValue)}::jsonb)
         AS x(question_id uuid, position integer, text text, is_correct boolean)
     `;
+  }
+
+  // A kept picture moves to its new row under the same key; only the ones left behind are dropped.
+  const keptKeys = new Set(images.map((image) => storedImage(image ?? null)?.storage_key));
+  for (const { image_storage_key: key } of previousImages) {
+    if (key !== null && !keptKeys.has(key)) droppedImageKeys.push(key);
   }
 
   const totalPoints = questions.reduce((sum, question) => sum + question.points, 0);
@@ -467,14 +480,26 @@ export async function saveQuestions<T>(
    */
   uploadedImageKeys: string[],
   finish: (tx: TransactionSql, row: AssignmentRow) => Promise<T>,
+  /** Receives the keys of the pictures this save dropped, for the caller to free after commit. */
+  droppedImageKeys: string[] = [],
 ): Promise<T> {
   const stagedKeys = [
     ...new Set(questions.flatMap((question) => question.image?.upload_key ?? [])),
   ];
-  const write = (promoted: ReadonlyMap<string, PromotedQuestionImage>) =>
-    runTx(async (tx) =>
-      finish(tx, await replaceQuestions(tx, schoolId, userId, assignmentId, questions, promoted)),
-    );
+  const write = async (promoted: ReadonlyMap<string, PromotedQuestionImage>) => {
+    const dropped: string[] = [];
+    const result = await runTx(async (tx) => {
+      // Reset per attempt: a retried transaction must not report the keys twice.
+      dropped.length = 0;
+      return finish(
+        tx,
+        await replaceQuestions(tx, schoolId, userId, assignmentId, questions, promoted, dropped),
+      );
+    });
+    // Only once the write has committed.
+    droppedImageKeys.push(...dropped);
+    return result;
+  };
   if (stagedKeys.length === 0) return write(new Map());
 
   const store = requireStorage(storage);
