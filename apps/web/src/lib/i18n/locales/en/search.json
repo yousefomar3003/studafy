@@ -529,6 +529,11 @@
       "title": "Print login slips",
       "where": "Admin › Import data",
       "keywords": "login slips, sign-in codes, setup codes, passwords, print, first sign-in, student IDs"
+    },
+    "principal-parents": {
+      "title": "Parents",
+      "where": "Principal › Records › Parents",
+      "keywords": "parents, mothers, fathers, parent phone, parent contact, parent email, children, families"
     }
   }
 }

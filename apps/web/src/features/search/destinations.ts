@@ -314,6 +314,10 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     ...PRINCIPAL,
     variantOf: "admin-students",
   }),
+  entry("principal-parents", "page", "/portal/principal/parents", {
+    requiredPermission: P.USER_READ,
+    ...SCHOOL,
+  }),
 
   // The attendance office.
   entry("attendance-office", "page", "/portal/attendance", ATTENDANCE),
