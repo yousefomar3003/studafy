@@ -12,7 +12,7 @@ import {
   ConfirmModal,
   DateTime,
   Num,
-  Percent,
+  ResultValue,
   QueryState,
   ReasonModal,
   TextArea,
@@ -396,7 +396,10 @@ function StudentResultsTable({
                 ) : null}
               </Table.Cell>
               <Table.Cell>
-                <Percent value={student.average_percentage} />
+                <ResultValue
+                  display={student.result_display}
+                  percentage={student.average_percentage}
+                />
               </Table.Cell>
               <Table.Cell>
                 {student.total_obtained === null ? (

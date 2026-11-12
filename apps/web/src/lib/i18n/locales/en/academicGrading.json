@@ -82,6 +82,7 @@
     "exam": "Exam",
     "first_period": "First period exam",
     "second_period": "Second period exam",
+    "third_period": "Third period exam",
     "midterm": "Midterm exam",
     "final_exam": "Final exam",
     "other": "Other"
@@ -346,7 +347,13 @@
       "save": "Save policies",
       "setUp": "Set up grade",
       "saved": "Grade policies saved",
-      "failed": "Couldn't save the grade policies"
+      "failed": "Couldn't save the grade policies",
+      "resultFormat": "Final result shown as",
+      "resultFormatHelp": "How the year's final result appears on results and certificates. The percentage is always shown alongside.",
+      "outOfMax": "Out of",
+      "outOfMaxHelp": "For example 20: an average of 82.5% shows as 16.5 / 20.",
+      "gpaMax": "GPA out of",
+      "gpaMaxHelp": "Usually 4 or 5. Each subject's GPA points come from its grading scale and are weighted like the average."
     }
   },
   "editor": {
@@ -371,6 +378,8 @@
     "gradeDefaultScale": "The grade's default scale",
     "averageWeight": "Weight in the overall average",
     "averageWeightHelp": "1 counts like any other subject; 2 counts double.",
+    "averageWeightValue": "Counts as {{value}}×",
+    "averageWeightExact": "Exact weight",
     "roundingDecimals": "Decimal places",
     "roundingMode": "Rounding",
     "missingPolicy": "A missing mark",
@@ -762,5 +771,14 @@
       "teacher": "Class teacher",
       "stamp": "School stamp"
     }
+  },
+  "resultFormat": {
+    "percentage": "Percentage (out of 100)",
+    "out_of": "Out of a number (e.g. 20)",
+    "gpa": "GPA (e.g. out of 4)",
+    "valueOutOf": "{{value}} / {{max}}",
+    "gpaValue": "GPA {{value}} / {{max}}",
+    "withPercentage": "{{percentage}}%",
+    "gpaUnavailable": "GPA not available"
   }
 }

@@ -6,7 +6,14 @@ import { useMemo, useState } from "react";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { useTerms } from "../school/queries";
 
-import { Badge, QueryState, SeverityBadge, SourceBadge, TextArea } from "./components";
+import {
+  Badge,
+  QueryState,
+  SeverityBadge,
+  SourceBadge,
+  TextArea,
+  WeightSlider,
+} from "./components";
 import {
   AGGREGATIONS,
   CATEGORY_KINDS,
@@ -320,13 +327,10 @@ function EditorForm({
             onChange={(gradeScaleId) => patch({ gradeScaleId })}
             disabled={readOnly}
           />
-          <Input
-            label={t("academicGrading.editor.averageWeight")}
-            helperText={t("academicGrading.editor.averageWeightHelp")}
-            type="number"
-            min={0}
+          <WeightSlider
             value={draft.averageWeight}
-            onChange={(event) => patch({ averageWeight: event.target.value })}
+            onChange={(averageWeight) => patch({ averageWeight })}
+            disabled={readOnly}
           />
           <Input
             label={t("academicGrading.editor.roundingDecimals")}

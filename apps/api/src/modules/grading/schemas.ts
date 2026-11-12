@@ -69,11 +69,26 @@ const categoryKindSchema = z.enum([
   "exam",
   "first_period",
   "second_period",
+  "third_period",
   "midterm",
   "final_exam",
   "other",
 ]);
 const categoryScopeSchema = z.enum(["term", "annual"]);
+const resultFormatSchema = z.enum(["percentage", "out_of", "gpa"]).openapi("ResultFormat", {
+  description:
+    "How a grade shows its final result: percentage (out of 100), out_of (rescaled to result_scale_max) or gpa (weighted GPA points out of result_scale_max).",
+});
+export const resultDisplaySchema = z
+  .object({
+    format: resultFormatSchema,
+    value: z.number().nullable(),
+    max: z.number(),
+  })
+  .openapi("ResultDisplay", {
+    description:
+      "The final result in the grade's format. value is null when it can't be worked out (a GPA with a subject that has no GPA points).",
+  });
 const aggregationSchema = z.enum(["weighted_average", "total_points"]);
 const markStatusSchema = z.enum(["graded", "absent", "excused", "not_applicable"]);
 const percentage = z.number().min(0).max(100);
@@ -265,6 +280,11 @@ export const programBodySchema = z
     mark_approval_required: z.boolean().optional(),
     average_rounding_decimals: z.number().int().min(0).max(4).optional(),
     average_rounding_mode: roundingModeSchema.optional(),
+    result_format: resultFormatSchema.optional(),
+    result_scale_max: z.number().positive().max(1000).nullable().optional().openapi({
+      description:
+        "The maximum for out_of (e.g. 20) or gpa (4 or 5, up to 10); ignored for percentage.",
+    }),
   })
   .openapi("GradeProgramBody");
 
@@ -279,6 +299,8 @@ export const programSchema = z
     mark_approval_required: z.boolean(),
     average_rounding_decimals: z.number().int(),
     average_rounding_mode: roundingModeSchema,
+    result_format: resultFormatSchema,
+    result_scale_max: z.number().nullable(),
     updated_at: dateTimeSchema,
   })
   .openapi("GradeProgram");
@@ -900,6 +922,7 @@ export const resultPreviewSchema = z
           total_obtained: z.number().nullable(),
           total_max: z.number().nullable(),
           grade_label: z.string().nullable(),
+          result_display: resultDisplaySchema.nullable(),
           subjects_failed: z.number().int(),
           academic_status: z.enum(["promoted", "supplementary", "retained", "incomplete"]),
           subjects: z.array(
@@ -1011,6 +1034,7 @@ export const storedStudentResultSchema = z
     total_obtained: z.number().nullable(),
     total_max: z.number().nullable(),
     grade_label: z.string().nullable(),
+    result_display: resultDisplaySchema.nullable(),
     subjects_failed: z.number().int(),
     academic_status: z.enum(["promoted", "supplementary", "retained", "incomplete"]),
     subjects: z.array(storedSubjectResultSchema),
@@ -1120,14 +1144,16 @@ export const studentReleasedMarksSchema = z
 // Exam structure (School Settings exam system)
 // ---------------------------------------------------------------------------
 
-export const examStructureSchema = z
-  .enum(["midterm", "periods"])
-  .openapi({ description: "midterm: midterm + final; periods: first + second period + final." });
+export const examStructureSchema = z.enum(["midterm", "periods", "three_periods"]).openapi({
+  description:
+    "midterm: midterm + final; periods: first + second period + final; three_periods: first + second + third period + final.",
+});
 
 export const examWeightsSchema = z
   .object({
     first_period: z.number().min(0).max(100).optional(),
     second_period: z.number().min(0).max(100).optional(),
+    third_period: z.number().min(0).max(100).optional(),
     midterm: z.number().min(0).max(100).optional(),
     final_exam: z.number().min(0).max(100).optional(),
     quiz: z.number().min(0).max(100).optional(),
@@ -1284,6 +1310,10 @@ export const certificateContentSchema = z
         total_obtained: z.number().nullable(),
         total_max: z.number().nullable(),
         grade_label: z.string().nullable(),
+        display: resultDisplaySchema.nullable().optional().openapi({
+          description:
+            "The final result in the grade's format. Absent on certificates issued before result formats existed: those show average_percentage.",
+        }),
         subjects_failed: z.number().int(),
         academic_status: z.string(),
       })

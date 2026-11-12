@@ -8,6 +8,7 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 import { readFinalizationResults, requireFinalization } from "./results-service";
 
 import type { FinalizationRow, StoredStudentResult } from "./results-service";
+import type { ResultDisplay } from "@studafy/grading-engine";
 import type { TransactionSql } from "postgres";
 
 /**
@@ -49,6 +50,8 @@ export interface CertificateContent {
     total_obtained: number | null;
     total_max: number | null;
     grade_label: string | null;
+    /** The final result in the grade's format; absent on certificates issued before formats. */
+    display?: ResultDisplay | null;
     subjects_failed: number;
     academic_status: string;
   };
@@ -234,6 +237,7 @@ function renderContent(
       total_obtained: result.total_obtained,
       total_max: result.total_max,
       grade_label: result.grade_label,
+      display: result.result_display,
       subjects_failed: result.subjects_failed,
       academic_status: result.academic_status,
     },

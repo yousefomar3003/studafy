@@ -653,4 +653,54 @@ describe("overall result", () => {
     expect(calculateOverallResult(failing(3), policy).academicStatus).toBe("retained");
     expect(calculateOverallResult(failing(3), policy).subjectsFailed).toBe(3);
   });
+
+  describe("result format", () => {
+    const withPoints = (percentage: number, gpaPoints: number | null): SubjectResult => ({
+      ...complete(percentage, true),
+      gpaPoints,
+    });
+
+    test("a percentage by default", () => {
+      const result = calculateOverallResult([subject("math", complete(82.5, true))], policy);
+      expect(result.display).toEqual({ format: "percentage", value: 82.5, max: 100 });
+    });
+
+    test("out of 20 rescales the average and rounds like it", () => {
+      const result = calculateOverallResult(
+        [subject("math", complete(82.5, true)), subject("art", complete(70, true))],
+        { ...policy, resultFormat: { format: "out_of", max: 20 } },
+      );
+      expect(result.averagePercentage).toBe(76.25);
+      expect(result.display).toEqual({ format: "out_of", value: 15.25, max: 20 });
+    });
+
+    test("GPA weights each subject's points by its coefficient", () => {
+      const result = calculateOverallResult(
+        [
+          subject("math", withPoints(92, 4), { averageWeight: 3 }),
+          subject("arabic", withPoints(75, 2)),
+          subject("art", withPoints(55, 1), { includeInAverage: false }),
+        ],
+        { ...policy, resultFormat: { format: "gpa", max: 4 } },
+      );
+      expect(result.display).toEqual({ format: "gpa", value: 3.5, max: 4 });
+    });
+
+    test("GPA is withheld when a counted subject has no GPA points", () => {
+      const result = calculateOverallResult(
+        [subject("math", withPoints(92, 4)), subject("arabic", withPoints(75, null))],
+        { ...policy, resultFormat: { format: "gpa", max: 4 } },
+      );
+      expect(result.status).toBe("complete");
+      expect(result.display).toEqual({ format: "gpa", value: null, max: 4 });
+    });
+
+    test("no display while the result is incomplete", () => {
+      const result = calculateOverallResult([subject("math", null)], {
+        ...policy,
+        resultFormat: { format: "out_of", max: 20 },
+      });
+      expect(result.display).toBeNull();
+    });
+  });
 });

@@ -48,6 +48,7 @@ Map<String, Object?> _result({
   String academicStatus = 'promoted',
   int version = 1,
   String finalizedAt = '2026-06-20T09:00:00.000Z',
+  Map<String, Object?>? display,
 }) => {
   'finalization_id': id,
   'academic_year_id': 'year-1',
@@ -68,6 +69,7 @@ Map<String, Object?> _result({
     'total_obtained': 162.5,
     'total_max': 200,
     'grade_label': 'B+',
+    'result_display': ?display,
     'subjects_failed': 1,
     'academic_status': academicStatus,
     'subjects': [
@@ -99,6 +101,7 @@ Map<String, Object?> _certificate({
   String? revokedAt,
   String? revokeReason,
   bool needsReissue = false,
+  Map<String, Object?>? display,
 }) => {
   'id': id,
   'kind': 'annual_certificate',
@@ -151,6 +154,7 @@ Map<String, Object?> _certificate({
       'total_obtained': 162.5,
       'total_max': 200,
       'grade_label': 'B+',
+      'display': ?display,
       'subjects_failed': 1,
       'academic_status': 'supplementary',
     },
@@ -262,6 +266,53 @@ void main() {
       expect(find.text('Term 1 90%'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'shows the grade\'s result format with the percentage beside it',
+    (tester) async {
+      await _pump(
+        tester,
+        _FakeResultsClient(
+          results: [
+            _result(
+              id: 'fin-annual',
+              display: {'format': 'out_of', 'value': 16.25, 'max': 20},
+            ),
+            _result(
+              id: 'fin-t1',
+              termId: 't1',
+              termName: 'Term 1',
+              display: {'format': 'gpa', 'value': null, 'max': 4},
+            ),
+          ],
+        ),
+      );
+
+      expect(find.text('16.25 / 20'), findsOneWidget);
+      expect(find.text('GPA not available'), findsOneWidget);
+      // The percentage stays visible as secondary text under each.
+      expect(find.text('81.25%'), findsNWidgets(2));
+    },
+  );
+
+  testWidgets('a certificate shows its GPA; an older one its percentage', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakeResultsClient(
+        results: [_result(id: 'fin-annual')],
+        certificates: [
+          _certificate(display: {'format': 'gpa', 'value': 3.4, 'max': 4}),
+        ],
+      ),
+    );
+    await tester.tap(find.text('Certificate · 2025–2026'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('GPA 3.4 / 4'), findsOneWidget);
+    expect(find.text('81.25%'), findsOneWidget);
+  });
 
   testWidgets('a parent sees the selected child\'s results', (tester) async {
     final client = _FakeResultsClient(results: [_result(id: 'fin-annual')]);

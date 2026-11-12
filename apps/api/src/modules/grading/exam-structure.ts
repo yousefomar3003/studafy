@@ -22,34 +22,58 @@ import type { TransactionSql } from "postgres";
  * Terms share the year equally. A part the admin set to 0% is left out.
  *
  *   midterm  midterm exam, final exam, quizzes, homework
- *   periods  first period exam, second period exam, final exam, quizzes, homework
+ *   periods        first period exam, second period exam, final exam, quizzes, homework
+ *   three_periods  first, second and third period exams, final exam, quizzes, homework
  *
  * New subjects start from it (`GET .../exam-template`, prefilled by the web editor); "apply to all
  * subjects" rebuilds the active year's subjects that have no marks yet.
  */
 
-export type ExamStructure = "midterm" | "periods";
+export type ExamStructure = "midterm" | "periods" | "three_periods";
 export type ExamPart =
-  "first_period" | "second_period" | "midterm" | "final_exam" | "quiz" | "homework";
+  | "first_period"
+  | "second_period"
+  | "third_period"
+  | "midterm"
+  | "final_exam"
+  | "quiz"
+  | "homework";
 export type ExamWeights = Partial<Record<ExamPart, number>>;
 
-export const EXAM_STRUCTURES: readonly ExamStructure[] = ["midterm", "periods"];
+export const EXAM_STRUCTURES: readonly ExamStructure[] = ["midterm", "periods", "three_periods"];
 
 /** Each system's parts, in the order a term shows them. */
 export const EXAM_STRUCTURE_PARTS: Record<ExamStructure, readonly ExamPart[]> = {
   midterm: ["midterm", "final_exam", "quiz", "homework"],
   periods: ["first_period", "second_period", "final_exam", "quiz", "homework"],
+  three_periods: [
+    "first_period",
+    "second_period",
+    "third_period",
+    "final_exam",
+    "quiz",
+    "homework",
+  ],
 };
 
 export const DEFAULT_EXAM_WEIGHTS: Record<ExamStructure, ExamWeights> = {
   midterm: { midterm: 30, final_exam: 40, quiz: 15, homework: 15 },
   periods: { first_period: 20, second_period: 20, final_exam: 30, quiz: 15, homework: 15 },
+  three_periods: {
+    first_period: 15,
+    second_period: 15,
+    third_period: 15,
+    final_exam: 25,
+    quiz: 15,
+    homework: 15,
+  },
 };
 
 const PART_NAMES: Record<"en" | "ar", Record<ExamPart, string>> = {
   en: {
     first_period: "First period exam",
     second_period: "Second period exam",
+    third_period: "Third period exam",
     midterm: "Midterm exam",
     final_exam: "Final exam",
     quiz: "Quizzes",
@@ -58,6 +82,7 @@ const PART_NAMES: Record<"en" | "ar", Record<ExamPart, string>> = {
   ar: {
     first_period: "اختبار الفترة الأولى",
     second_period: "اختبار الفترة الثانية",
+    third_period: "اختبار الفترة الثالثة",
     midterm: "اختبار منتصف الفصل",
     final_exam: "الاختبار النهائي",
     quiz: "الاختبارات القصيرة",
