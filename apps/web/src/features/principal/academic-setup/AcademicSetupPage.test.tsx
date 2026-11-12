@@ -258,7 +258,114 @@ function studentResult(id: string, first: string, status: "complete" | "incomple
   };
 }
 
+const RATINGS = [
+  { code: "excellent", label: "Excellent", label_ar: "ممتاز" },
+  { code: "good", label: "Good", label_ar: "جيد" },
+];
+const REPORT_SETTINGS = {
+  show_subject_comments: true,
+  show_teacher_comment: true,
+  show_principal_comment: true,
+  show_attendance: true,
+  show_conduct: true,
+  conduct_ratings: RATINGS,
+  conduct_ratings_default: false,
+};
+const REPORT_NOTES = {
+  section_id: "sec-10c",
+  term_id: null,
+  finalized: false,
+  editable: true,
+  can_edit_class_notes: true,
+  can_edit_principal_comment: true,
+  settings: REPORT_SETTINGS,
+  subjects: [{ subject_id: "sub-math", subject_name: "Mathematics", can_comment: true }],
+  students: [
+    {
+      student_id: "s-1",
+      first_name: "Lina",
+      last_name: "Haddad",
+      admission_number: "A-1",
+      teacher_comment: null,
+      principal_comment: "Keep it up.",
+      conduct_code: null,
+      subject_comments: [],
+    },
+  ],
+};
+const CERTIFICATE = {
+  id: "cert-1",
+  kind: "annual_certificate",
+  serial_number: "2026-C-ABC",
+  status: "issued",
+  academic_year_id: "year-1",
+  student_id: "s-1",
+  finalization_id: "fin-1",
+  issued_at: "2027-06-30T09:00:00.000Z",
+  supersedes_id: null,
+  reissue_reason: null,
+  revoked_at: null,
+  revoke_reason: null,
+  content_sha256: "a".repeat(64),
+  needs_reissue: false,
+  content: {
+    version: 1,
+    kind: "annual_certificate",
+    serial_number: "2026-C-ABC",
+    issued_at: "2027-06-30T09:00:00.000Z",
+    school: { id: "school-1", name: "Studafy School" },
+    academic_year: { id: "year-1", code: "2026", name: "2026-2027" },
+    term: null,
+    student: { id: "s-1", first_name: "Lina", last_name: "Haddad", admission_number: "A-1" },
+    grade_level_name: "Grade 10",
+    section_name: "C",
+    subjects: [
+      {
+        code: "MATH",
+        name: "Mathematics",
+        requirement: "mandatory",
+        marks_obtained: 81.5,
+        max_marks: 100,
+        percentage: 81.5,
+        grade_label: "B",
+        passed: true,
+        exempt: false,
+        terms: [],
+        comment: "Strong problem solver.",
+      },
+    ],
+    overall: {
+      average_percentage: 81.5,
+      total_obtained: 81.5,
+      total_max: 100,
+      grade_label: "B",
+      subjects_failed: 0,
+      academic_status: "promoted",
+    },
+    report: {
+      teacher_comment: "A kind and focused classmate.",
+      principal_comment: "Well done this year.",
+      conduct: { code: "excellent", label: "Excellent", label_ar: "ممتاز" },
+      attendance: {
+        from: "2026-09-01",
+        to: "2027-06-30",
+        days_recorded: 170,
+        days_present: 164,
+        days_absent: 4,
+        days_late: 3,
+        days_excused: 2,
+      },
+    },
+    finalization: { id: "fin-1", version: 1, finalized_at: "2027-06-29T09:00:00.000Z" },
+    issued_by: { user_id: "user-1", name: "Huda Karim" },
+    reissue: null,
+  },
+};
+
 const GET_RESPONSES: Record<string, unknown> = {
+  "/api/grading/report-card-settings": REPORT_SETTINGS,
+  "/api/grading/sections/{sectionId}/report-notes": REPORT_NOTES,
+  "/api/grading/certificates/{certificateId}": CERTIFICATE,
   "/api/academics/years": { academic_years: [YEAR], total: 1 },
   "/api/academics/years/{yearId}/terms": { terms: TERMS, total: TERMS.length },
   "/api/academics/grade-levels": { grade_levels: [GRADE_10], total: 1 },
@@ -603,6 +710,69 @@ describe("AcademicSetupPage", () => {
   test("has no accessibility violations on the sections screen", async () => {
     const { container } = await renderAt("/sections");
     await screen.findByText("Mathematics");
+    await expectNoA11yViolations(container);
+  });
+
+  test("writes report card comments and conduct, and sends only what changed", async () => {
+    await renderAt("/report-cards");
+
+    const comment = await screen.findByRole("textbox", {
+      name: "Class teacher's comment for Lina Haddad",
+    });
+    fireEvent.change(comment, { target: { value: "A kind and focused classmate." } });
+    fireEvent.change(screen.getByRole("combobox", { name: "Conduct for Lina Haddad" }), {
+      target: { value: "excellent" },
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: "Mathematics comment for Lina Haddad" }), {
+      target: { value: "Strong problem solver." },
+    });
+    putMock.mockImplementation(() => Promise.resolve<unknown>({ data: REPORT_NOTES }));
+    fireEvent.click(screen.getByRole("button", { name: "Save comments" }));
+
+    await waitFor(() =>
+      expect(putMock).toHaveBeenCalledWith("/api/grading/sections/{sectionId}/report-notes", {
+        params: { path: { sectionId: "sec-10c" } },
+        body: {
+          term_id: null,
+          students: [
+            {
+              student_id: "s-1",
+              teacher_comment: "A kind and focused classmate.",
+              conduct_code: "excellent",
+            },
+          ],
+        },
+      }),
+    );
+    await waitFor(() =>
+      expect(putMock).toHaveBeenCalledWith(
+        "/api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
+        {
+          params: { path: { sectionId: "sec-10c", subjectId: "sub-math" } },
+          body: {
+            term_id: null,
+            comments: [{ student_id: "s-1", comment: "Strong problem solver." }],
+          },
+        },
+      ),
+    );
+    expect(await screen.findByText("Comments saved.")).toBeTruthy();
+  });
+
+  test("prints the frozen comments, conduct and attendance on the certificate", async () => {
+    await renderAt("/certificates/cert-1");
+
+    expect(await screen.findByText("A kind and focused classmate.")).toBeTruthy();
+    expect(screen.getByText("Well done this year.")).toBeTruthy();
+    expect(screen.getByText("Strong problem solver.")).toBeTruthy();
+    expect(screen.getByText("Excellent")).toBeTruthy();
+    const facts = screen.getByText("Days absent").closest("div")!;
+    expect(within(facts).getByText("4")).toBeTruthy();
+  });
+
+  test("has no accessibility violations on the report cards screen", async () => {
+    const { container } = await renderAt("/report-cards");
+    await screen.findByRole("textbox", { name: "Class teacher's comment for Lina Haddad" });
     await expectNoA11yViolations(container);
   });
 });

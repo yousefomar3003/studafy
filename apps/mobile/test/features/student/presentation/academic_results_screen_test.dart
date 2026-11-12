@@ -446,4 +446,69 @@ void main() {
     expect(find.text('النتيجة السنوية'), findsOneWidget);
     expect(find.text('ناجح ومنقول'), findsOneWidget);
   });
+
+  const report = {
+    'teacher_comment': 'A kind and focused classmate.',
+    'principal_comment': 'Well done this year.',
+    'conduct': {'code': 'excellent', 'label': 'Excellent', 'label_ar': 'ممتاز'},
+    'attendance': {
+      'from': '2025-09-01',
+      'to': '2026-06-30',
+      'days_recorded': 170,
+      'days_present': 164,
+      'days_absent': 4,
+      'days_late': 3,
+      'days_excused': 2,
+    },
+  };
+
+  testWidgets('shows the frozen comments, conduct and attendance on a result', (
+    tester,
+  ) async {
+    final row = _result(id: 'fin-annual');
+    final result = row['result']! as Map<String, Object?>;
+    result['report'] = report;
+    final subjects = result['subjects']! as List<Map<String, Object?>>;
+    subjects[0] = {...subjects[0], 'comment': 'Strong problem solver.'};
+    await _pump(tester, _FakeResultsClient(results: [row]));
+
+    expect(find.text("Teachers' comments"), findsOneWidget);
+    expect(find.text('Strong problem solver.'), findsOneWidget);
+    expect(find.text('Excellent'), findsOneWidget);
+    expect(find.text('Days absent'), findsOneWidget);
+    expect(find.text('4'), findsOneWidget);
+    expect(find.text('A kind and focused classmate.'), findsOneWidget);
+    expect(find.text('Well done this year.'), findsOneWidget);
+  });
+
+  testWidgets('a result from before report card notes shows none of them', (
+    tester,
+  ) async {
+    await _pump(
+      tester,
+      _FakeResultsClient(results: [_result(id: 'fin-annual')]),
+    );
+
+    expect(find.text("Teachers' comments"), findsNothing);
+    expect(find.text('Conduct'), findsNothing);
+    expect(find.text("Class teacher's comment"), findsNothing);
+  });
+
+  testWidgets('the certificate prints the conduct rating in Arabic', (
+    tester,
+  ) async {
+    final cert = _certificate();
+    final content = cert['content']! as Map<String, Object?>;
+    content['report'] = report;
+    await _pump(
+      tester,
+      _FakeResultsClient(certificates: [cert]),
+      home: const CertificateDetailScreen(certificateId: 'cert-1'),
+      locale: const Locale('ar'),
+    );
+
+    expect(find.text('ممتاز'), findsOneWidget);
+    expect(find.text('ملاحظة المدير'), findsOneWidget);
+    expect(find.text('Well done this year.'), findsOneWidget);
+  });
 }

@@ -36,6 +36,7 @@ class SubjectResult {
     required this.gradeLabel,
     required this.passed,
     required this.terms,
+    this.comment,
   });
 
   factory SubjectResult.fromJson(Map<String, Object?> json) => SubjectResult(
@@ -58,6 +59,7 @@ class SubjectResult {
           percentage: _num(term['percentage']),
         ),
     ],
+    comment: _text(json['comment']),
   );
 
   final String subjectId;
@@ -74,6 +76,10 @@ class SubjectResult {
 
   /// Per-term percentages (`termName` is set only on certificate content).
   final List<({String? termId, String? termName, double? percentage})> terms;
+
+  /// The subject teacher's report card comment; null when there is none (and on results and
+  /// certificates from before report card notes).
+  final String? comment;
 
   bool get isExempt => status == 'exempt';
   bool get isIncomplete => status == 'incomplete';
@@ -150,6 +156,89 @@ class OverallResult {
   final ResultDisplay? display;
 }
 
+/// Days of recorded attendance in the report's period. Late days are counted within present days;
+/// present + absent + excused = recorded.
+class ReportAttendance {
+  const ReportAttendance({
+    required this.from,
+    required this.to,
+    required this.daysRecorded,
+    required this.daysPresent,
+    required this.daysAbsent,
+    required this.daysLate,
+    required this.daysExcused,
+  });
+
+  factory ReportAttendance.fromJson(Map<String, Object?> json) =>
+      ReportAttendance(
+        from: DateTime.tryParse(json['from'] as String? ?? ''),
+        to: DateTime.tryParse(json['to'] as String? ?? ''),
+        daysRecorded: (json['days_recorded'] as num?)?.toInt() ?? 0,
+        daysPresent: (json['days_present'] as num?)?.toInt() ?? 0,
+        daysAbsent: (json['days_absent'] as num?)?.toInt() ?? 0,
+        daysLate: (json['days_late'] as num?)?.toInt() ?? 0,
+        daysExcused: (json['days_excused'] as num?)?.toInt() ?? 0,
+      );
+
+  final DateTime? from;
+  final DateTime? to;
+  final int daysRecorded;
+  final int daysPresent;
+  final int daysAbsent;
+  final int daysLate;
+  final int daysExcused;
+}
+
+/// Report card notes as finalized: comments, conduct and attendance. Any part the school does not
+/// show is null.
+class ReportNotes {
+  const ReportNotes({
+    required this.teacherComment,
+    required this.principalComment,
+    required this.conductLabel,
+    required this.conductLabelAr,
+    required this.attendance,
+  });
+
+  factory ReportNotes.fromJson(Map<String, Object?> json) {
+    final conduct = json['conduct'];
+    final attendance = json['attendance'];
+    return ReportNotes(
+      teacherComment: _text(json['teacher_comment']),
+      principalComment: _text(json['principal_comment']),
+      conductLabel: conduct is Map ? _text(conduct['label']) : null,
+      conductLabelAr: conduct is Map ? _text(conduct['label_ar']) : null,
+      attendance: attendance is Map
+          ? ReportAttendance.fromJson(Map<String, Object?>.from(attendance))
+          : null,
+    );
+  }
+
+  /// Null when the payload has no `report` (results and certificates from before report card
+  /// notes).
+  static ReportNotes? maybe(Object? value) => value is Map
+      ? ReportNotes.fromJson(Map<String, Object?>.from(value))
+      : null;
+
+  final String? teacherComment;
+  final String? principalComment;
+  final String? conductLabel;
+  final String? conductLabelAr;
+  final ReportAttendance? attendance;
+
+  /// The conduct rating in the reader's language: Arabic when given and the app is in Arabic.
+  String? conductFor(String languageCode) =>
+      languageCode == 'ar' && conductLabelAr != null
+      ? conductLabelAr
+      : conductLabel;
+
+  bool get isEmpty =>
+      teacherComment == null &&
+      principalComment == null &&
+      conductLabel == null &&
+      attendance == null;
+}
+
 /// One finalization (a term report or the annual result) for the student, current version only.
 class FinalizedResult {
   const FinalizedResult({
@@ -164,6 +253,7 @@ class FinalizedResult {
     required this.finalizedAt,
     required this.overall,
     required this.subjects,
+    this.report,
   });
 
   factory FinalizedResult.fromJson(Map<String, Object?> json) {
@@ -183,6 +273,7 @@ class FinalizedResult {
         for (final subject in _list(result['subjects']))
           SubjectResult.fromJson(subject),
       ],
+      report: ReportNotes.maybe(result['report']),
     );
   }
 
@@ -201,6 +292,9 @@ class FinalizedResult {
   final DateTime? finalizedAt;
   final OverallResult overall;
   final List<SubjectResult> subjects;
+
+  /// Comments, conduct and attendance; null for results finalized before report card notes.
+  final ReportNotes? report;
 
   bool get isAnnual => termId == null;
 }
@@ -264,6 +358,7 @@ class CertificateContent {
     required this.issuedByName,
     required this.reissueOfSerial,
     required this.reissueReason,
+    this.report,
   });
 
   factory CertificateContent.fromJson(Map<String, Object?> json) {
@@ -299,6 +394,7 @@ class CertificateContent {
           ? reissue['supersedes_serial'] as String?
           : null,
       reissueReason: reissue is Map ? reissue['reason'] as String? : null,
+      report: ReportNotes.maybe(json['report']),
     );
   }
 
@@ -321,6 +417,9 @@ class CertificateContent {
   final String? issuedByName;
   final String? reissueOfSerial;
   final String? reissueReason;
+
+  /// Comments, conduct and attendance as printed; null on certificates issued before them.
+  final ReportNotes? report;
 }
 
 class AcademicCertificate {
@@ -381,3 +480,7 @@ Map<String, Object?> _map(Object? value) =>
     value is Map ? Map<String, Object?>.from(value) : const {};
 
 double? _num(Object? value) => value is num ? value.toDouble() : null;
+
+/// A non-blank string, or null.
+String? _text(Object? value) =>
+    value is String && value.trim().isNotEmpty ? value : null;

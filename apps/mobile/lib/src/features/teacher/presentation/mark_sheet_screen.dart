@@ -12,6 +12,7 @@ import '../../student/presentation/widgets/status_pill.dart';
 import '../application/mark_sheet_providers.dart';
 import '../domain/mark_sheet.dart';
 import 'assessment_marks_screen.dart';
+import 'report_comments_screen.dart';
 import 'widgets/add_mark_assessment_sheet.dart';
 import 'widgets/mark_sheet_common.dart';
 
@@ -137,6 +138,21 @@ class _MarkSheetScreenState extends ConsumerState<MarkSheetScreen> {
                 ),
                 const SizedBox(height: AppSpacing.space12),
                 _RulesCard(sheet: sheet),
+                const SizedBox(height: AppSpacing.space8),
+                Card(
+                  margin: EdgeInsets.zero,
+                  child: ListTile(
+                    leading: const Icon(Icons.rate_review_outlined),
+                    title: Text('teacher.marks.reportComments.entry'.tr()),
+                    subtitle: Text(
+                      'teacher.marks.reportComments.entrySubtitle'.tr(
+                        namedArgs: {'period': markPeriodLabel(sheet, termId)},
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _openReportComments(sheet, termId),
+                  ),
+                ),
                 const SizedBox(height: AppSpacing.space16),
                 _SectionHeader(
                   title: 'teacher.marks.sheet.assessments'.tr(),
@@ -207,6 +223,20 @@ class _MarkSheetScreenState extends ConsumerState<MarkSheetScreen> {
       MaterialPageRoute<void>(
         builder: (_) =>
             AssessmentMarksScreen(sheetKey: _key, assessmentId: assessment.id),
+      ),
+    );
+  }
+
+  void _openReportComments(MarkSheet sheet, String? termId) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReportCommentsScreen(
+          sectionId: widget.sectionId,
+          subjectId: widget.subjectId,
+          termId: termId,
+          subjectName: sheet.subjectName,
+          periodName: markPeriodLabel(sheet, termId),
+        ),
       ),
     );
   }

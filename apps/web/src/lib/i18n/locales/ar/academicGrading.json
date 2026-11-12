@@ -13,7 +13,8 @@
     "sections": "الشُّعب",
     "scales": "سلالم التقدير",
     "approvals": "الاعتمادات",
-    "results": "النتائج والشهادات"
+    "results": "النتائج والشهادات",
+    "reportCards": "الشهادات والملاحظات"
   },
   "common": {
     "loading": "جارٍ التحميل…",
@@ -818,7 +819,17 @@
       "principal": "مدير المدرسة",
       "teacher": "رائد الفصل",
       "stamp": "ختم المدرسة"
-    }
+    },
+    "notesLabel": "الملاحظات والسلوك والحضور",
+    "subjectComments": "ملاحظات معلمي المواد",
+    "conduct": "السلوك",
+    "daysPresent": "أيام الحضور",
+    "daysAbsent": "أيام الغياب",
+    "daysLate": "أيام التأخر",
+    "daysExcused": "أيام الغياب بعذر",
+    "attendancePeriod": "الحضور من {{from}} إلى {{to}}: {{days}} يوم دراسي مسجّل.",
+    "teacherComment": "ملاحظة مربي الصف",
+    "principalComment": "ملاحظة المدير"
   },
   "resultFormat": {
     "percentage": "نسبة مئوية (من 100)",
@@ -852,5 +863,48 @@
     },
     "method": "يحتسب المعدل التراكمي والمعدل بالنقاط كل مادة في كل سنة بحسب وزنها في معدل تلك السنة.",
     "reissueNote": "يحل محل السجل {{serial}}. السبب: {{reason}}"
+  },
+  "reportCards": {
+    "settingsHeading": "ما تعرضه الشهادات",
+    "settingsHelp": "يُطبَّق على النتائج التي تُعتمد من الآن فصاعدًا. تبقى الشهادات المعتمدة أو الصادرة كما هي.",
+    "sectionsLegend": "الأقسام في الشهادات وتقارير الفصول",
+    "sections": {
+      "show_subject_comments": "ملاحظات معلمي المواد",
+      "show_teacher_comment": "ملاحظة مربي الصف",
+      "show_principal_comment": "ملاحظة المدير",
+      "show_attendance": "الحضور (أيام الحضور والغياب والتأخر والغياب بعذر)",
+      "show_conduct": "تقدير السلوك"
+    },
+    "conductLegend": "تقديرات السلوك",
+    "conductHelp": "التقديرات التي يختار منها المعلمون، الأفضل أولًا. أضف اسمًا عربيًا لكل تقدير ليظهر في الشهادات العربية.",
+    "conductLabel": "التقدير {{n}}",
+    "conductLabelAr": "التقدير {{n}} بالعربية",
+    "conductLabelRequired": "أدخل اسمًا لهذا التقدير.",
+    "removeRating": "إزالة التقدير {{label}}",
+    "addRating": "إضافة تقدير",
+    "saveSettings": "حفظ إعدادات الشهادات",
+    "settingsSaved": "حُفظت إعدادات الشهادات.",
+    "readOnlySettings": "لا يغيّر هذه الإعدادات إلا إدارة المدرسة.",
+    "notesHeading": "الملاحظات والسلوك",
+    "notesHelp": "اكتبها قبل اعتماد نتائج الفصل أو السنة. يثبّتها الاعتماد في الشهادة مع حضور الطالب في تلك الفترة.",
+    "subjectLabel": "ملاحظات المادة",
+    "notesCaption": "ملاحظات الشهادة وتقدير السلوك لكل طالب",
+    "columns": {
+      "conduct": "السلوك",
+      "teacherComment": "ملاحظة مربي الصف",
+      "principalComment": "ملاحظة المدير",
+      "subjectComment": "ملاحظة {{subject}}"
+    },
+    "conductFor": "سلوك {{name}}",
+    "noConduct": "بلا تقدير",
+    "teacherCommentFor": "ملاحظة مربي الصف عن {{name}}",
+    "principalCommentFor": "ملاحظة المدير عن {{name}}",
+    "subjectCommentFor": "ملاحظة {{subject}} عن {{name}}",
+    "finalized": "اعتُمدت هذه النتائج، فلم يعد ممكنًا تغيير ملاحظاتها وتقديرات السلوك فيها.",
+    "notOpen": "تُفتح الملاحظات بعد نشر إعداد التقييم للسنة، وتُغلق عند اعتماد النتائج.",
+    "unsaved": "لديك تغييرات غير محفوظة.",
+    "saveNotes": "حفظ الملاحظات",
+    "notesSaved": "حُفظت الملاحظات.",
+    "saveFailed": "تعذّر الحفظ"
   }
 }

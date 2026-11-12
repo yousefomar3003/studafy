@@ -129,6 +129,109 @@ class OverallResultSummary extends StatelessWidget {
   }
 }
 
+/// Comments, conduct and attendance from a finalized report card, as frozen at finalization:
+/// subject teachers' comments, conduct, days present / absent / late / excused, and the class
+/// teacher's and principal's comments. Renders nothing for results and certificates from before
+/// report card notes, or when the school shows none of them.
+class ReportNotesSection extends StatelessWidget {
+  const ReportNotesSection({
+    required this.report,
+    required this.subjects,
+    super.key,
+  });
+
+  final ReportNotes? report;
+  final List<SubjectResult> subjects;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final notes = report;
+    final commented = [
+      for (final subject in subjects)
+        if (subject.comment != null) subject,
+    ];
+    if ((notes == null || notes.isEmpty) && commented.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final conduct = notes?.conductFor(context.locale.languageCode);
+    final attendance = notes?.attendance;
+
+    Widget heading(String key) => Padding(
+      padding: const EdgeInsets.only(
+        top: AppSpacing.space12,
+        bottom: AppSpacing.space4,
+      ),
+      child: Text(key.tr(), style: theme.textTheme.titleSmall),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (commented.isNotEmpty) ...[
+          heading('academicResults.report.subjectComments'),
+          for (final subject in commented)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.space8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    subject.name,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(subject.comment!, style: theme.textTheme.bodyMedium),
+                ],
+              ),
+            ),
+        ],
+        if (conduct != null || attendance != null) ...[
+          const SizedBox(height: AppSpacing.space12),
+          Wrap(
+            spacing: AppSpacing.space24,
+            runSpacing: AppSpacing.space12,
+            children: [
+              if (conduct != null)
+                _Stat(
+                  label: 'academicResults.report.conduct'.tr(),
+                  value: conduct,
+                ),
+              if (attendance != null) ...[
+                _Stat(
+                  label: 'academicResults.report.daysPresent'.tr(),
+                  value: '${attendance.daysPresent}',
+                ),
+                _Stat(
+                  label: 'academicResults.report.daysAbsent'.tr(),
+                  value: '${attendance.daysAbsent}',
+                ),
+                _Stat(
+                  label: 'academicResults.report.daysLate'.tr(),
+                  value: '${attendance.daysLate}',
+                ),
+                _Stat(
+                  label: 'academicResults.report.daysExcused'.tr(),
+                  value: '${attendance.daysExcused}',
+                ),
+              ],
+            ],
+          ),
+        ],
+        if (notes?.teacherComment != null) ...[
+          heading('academicResults.report.teacherComment'),
+          Text(notes!.teacherComment!, style: theme.textTheme.bodyMedium),
+        ],
+        if (notes?.principalComment != null) ...[
+          heading('academicResults.report.principalComment'),
+          Text(notes!.principalComment!, style: theme.textTheme.bodyMedium),
+        ],
+      ],
+    );
+  }
+}
+
 class _Stat extends StatelessWidget {
   const _Stat({required this.label, required this.value, this.detail});
 

@@ -13,7 +13,8 @@
     "sections": "Sections",
     "scales": "Grading scales",
     "approvals": "Approvals",
-    "results": "Results & certificates"
+    "results": "Results & certificates",
+    "reportCards": "Report cards"
   },
   "common": {
     "loading": "Loading…",
@@ -770,7 +771,17 @@
       "principal": "Principal",
       "teacher": "Class teacher",
       "stamp": "School stamp"
-    }
+    },
+    "notesLabel": "Comments, conduct and attendance",
+    "subjectComments": "Subject teachers' comments",
+    "conduct": "Conduct",
+    "daysPresent": "Days present",
+    "daysAbsent": "Days absent",
+    "daysLate": "Days late",
+    "daysExcused": "Days absent with excuse",
+    "attendancePeriod": "Attendance from {{from}} to {{to}}: {{days}} school days recorded.",
+    "teacherComment": "Class teacher's comment",
+    "principalComment": "Principal's comment"
   },
   "resultFormat": {
     "percentage": "Percentage (out of 100)",
@@ -804,5 +815,48 @@
     },
     "method": "The cumulative average and GPA weight every counted subject of every year by its weight in the year's average.",
     "reissueNote": "Replaces transcript {{serial}}. Reason: {{reason}}"
+  },
+  "reportCards": {
+    "settingsHeading": "What report cards show",
+    "settingsHelp": "Applies to results finalized from now on. Report cards already finalized or issued keep what they had.",
+    "sectionsLegend": "Sections on report cards and certificates",
+    "sections": {
+      "show_subject_comments": "Subject teachers' comments",
+      "show_teacher_comment": "Class teacher's comment",
+      "show_principal_comment": "Principal's comment",
+      "show_attendance": "Attendance (days present, absent, late and excused)",
+      "show_conduct": "Conduct rating"
+    },
+    "conductLegend": "Conduct ratings",
+    "conductHelp": "The ratings teachers choose from, best first. Give each an Arabic name to show it on Arabic report cards.",
+    "conductLabel": "Rating {{n}}",
+    "conductLabelAr": "Rating {{n}} in Arabic",
+    "conductLabelRequired": "Give this rating a name.",
+    "removeRating": "Remove rating {{label}}",
+    "addRating": "Add a rating",
+    "saveSettings": "Save report card settings",
+    "settingsSaved": "Report card settings saved.",
+    "readOnlySettings": "Only school leadership can change these settings.",
+    "notesHeading": "Comments and conduct",
+    "notesHelp": "Write these before the term or year is finalized. Finalizing freezes them on the report card, with the student's attendance for the period.",
+    "subjectLabel": "Subject comments for",
+    "notesCaption": "Report card comments and conduct for each student",
+    "columns": {
+      "conduct": "Conduct",
+      "teacherComment": "Class teacher's comment",
+      "principalComment": "Principal's comment",
+      "subjectComment": "{{subject}} comment"
+    },
+    "conductFor": "Conduct for {{name}}",
+    "noConduct": "Not rated",
+    "teacherCommentFor": "Class teacher's comment for {{name}}",
+    "principalCommentFor": "Principal's comment for {{name}}",
+    "subjectCommentFor": "{{subject}} comment for {{name}}",
+    "finalized": "These results are finalized, so their comments and conduct ratings can no longer change.",
+    "notOpen": "Comments open once the year's grading is published, and close when it is finalized.",
+    "unsaved": "You have unsaved changes.",
+    "saveNotes": "Save comments",
+    "notesSaved": "Comments saved.",
+    "saveFailed": "Couldn't save"
   }
 }

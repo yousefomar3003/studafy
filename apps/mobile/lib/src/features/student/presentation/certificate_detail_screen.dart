@@ -191,6 +191,10 @@ class _Document extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.space8),
                   OverallResultSummary(overall: content.overall),
+                  ReportNotesSection(
+                    report: content.report,
+                    subjects: content.subjects,
+                  ),
                   const Divider(height: AppSpacing.space32),
                   _Field(
                     label: 'academicResults.certificate.serialLabel'.tr(),
