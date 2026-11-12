@@ -2161,6 +2161,22 @@
     "certificates": "Certificates and report cards",
     "certificatesEmpty": "No certificates or report cards issued yet.",
     "certificatesError": "Couldn't load certificates.",
+    "transcripts": "Transcripts",
+    "transcriptsEmpty": "No transcript issued yet. The school issues it when it's needed, for example for university applications.",
+    "transcriptsError": "Couldn't load transcripts.",
+    "transcript": {
+      "title": "Academic transcript",
+      "needsReissue": "Results changed after this transcript was issued. The school will issue an updated one.",
+      "cumulative": "Cumulative result",
+      "cumulativeAverage": "Cumulative average",
+      "cumulativeGpa": "Cumulative GPA",
+      "yearsCovered": "Years covered",
+      "gpaReason": {
+        "missingGpaPoints": "No cumulative GPA: these subjects have no GPA points: {subjects}.",
+        "incomplete": "No cumulative figures: some results are incomplete.",
+        "noSubjects": "No cumulative figures: no subject counts toward the average."
+      }
+    },
     "kind": {
       "annualCertificate": "Certificate",
       "termReport": "Report card"

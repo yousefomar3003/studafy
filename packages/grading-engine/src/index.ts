@@ -24,3 +24,10 @@ export {
   resolveAssessment,
   resultDisplay,
 } from "./calculate";
+export { GPA_ROUNDING, calculateCumulativeResult } from "./cumulative";
+export type {
+  CumulativeGpaUnavailableReason,
+  CumulativeResult,
+  CumulativeSubjectInput,
+  CumulativeYearInput,
+} from "./cumulative";

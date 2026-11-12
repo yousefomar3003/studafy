@@ -13,6 +13,24 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Academic transcripts (000207): every finalized end-of-year result of a student on one immutable
+  document with cumulative figures. `GET /api/grading/students/{studentId}/transcript-readiness`
+  (`TranscriptReadiness`: state `ready` / `issued` / `needs_reissue` / `blocked`, the reasons, the
+  covered years and `TranscriptReadinessCumulative`). `POST
+/api/grading/students/{studentId}/transcripts` issues one (`AcademicTranscript`, 409
+  `CERTIFICATE_BLOCKED` when a covered year is incomplete or there are none, 409
+  `CONFLICT_STATE_MISMATCH` when one is already issued). `GET
+/api/grading/students/{studentId}/transcripts` (`AcademicTranscriptList`) and `GET
+/api/grading/transcripts/{transcriptId}` read them; `POST .../reissue` and `.../revoke` take a
+  `CertificateReasonBody`. `TranscriptContent` holds the years oldest first (`TranscriptYear`,
+  `TranscriptSubject` with `gpa_points` and `average_weight`) and `TranscriptCumulative`
+  (`average_percentage` and `gpa` weighted by each subject's average weight across all years; `gpa`
+  is null with `gpa_unavailable_reason` and `subjects_without_gpa_points` when a counted subject has
+  no GPA points). `needs_reissue` and `stale_reasons` (`corrected`, `new_results`) flag a transcript
+  whose results changed since. Readiness, issue, reissue and revoke need
+  `academicCertificate:issue`; reading needs `grade:read` and is limited to school leadership, the
+  student and a linked parent.
+
 - Grading result formats and a third exam system (000206). `ExamStructure` gains `three_periods`
   (first, second and third period exams, a final exam, quizzes and homework) and `ExamWeights` and
   category kinds gain `third_period`. `GradeProgram` / `GradeProgramBody` gain `result_format`

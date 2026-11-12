@@ -230,6 +230,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/certificates/{certificateId}/reissue",
   "POST /api/grading/certificates/{certificateId}/revoke",
   "POST /api/grading/exam-structure/apply",
+  // Transcripts (000207).
+  "POST /api/grading/students/{studentId}/transcripts",
+  "POST /api/grading/transcripts/{transcriptId}/reissue",
+  "POST /api/grading/transcripts/{transcriptId}/revoke",
   // Timetable (ST-101). Version lifecycle + slot CRUD with conflict detection.
   "POST /api/academics/timetable-versions",
   "PATCH /api/academics/timetable-versions/{versionId}",

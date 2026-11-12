@@ -978,6 +978,43 @@
         "heading": "Attendance",
         "open": "Open this student's attendance history"
       }
+    },
+    "transcripts": {
+      "heading": "Transcript",
+      "intro": "Every finalized end-of-year result on one document, with the cumulative average and GPA — for example, for university applications.",
+      "state": {
+        "ready": "Ready to issue",
+        "issued": "Issued and up to date",
+        "needs_reissue": "Needs reissue",
+        "blocked": "Can't be issued yet"
+      },
+      "covers_one": "Covers {{count}} year: {{years}}.",
+      "covers_other": "Covers {{count}} years: {{years}}.",
+      "yearItem": "{{grade}} ({{year}})",
+      "issue": "Issue transcript",
+      "reissue": "Reissue",
+      "revoke": "Revoke",
+      "revokeLabel": "Revoke transcript {{serial}}",
+      "reissueTitle": "Reissue transcript {{serial}}",
+      "reissueDescription": "A new transcript is built from the student's current results. The old one is kept and marked as replaced.",
+      "revokeTitle": "Revoke transcript {{serial}}",
+      "revokeDescription": "The transcript stays on record but is marked as revoked everywhere it is shown or printed.",
+      "issuedToast": "Transcript issued",
+      "reissuedToast": "Transcript reissued",
+      "revokedToast": "Transcript revoked",
+      "actionFailed": "Couldn't update the transcript",
+      "listLabel": "Issued transcripts",
+      "item": "Transcript {{serial}}, issued {{date}}",
+      "status": {
+        "superseded": "replaced",
+        "revoked": "revoked"
+      },
+      "stale": {
+        "corrected": "Results corrected since",
+        "new_results": "Newer year finalized since"
+      },
+      "empty": "No transcript issued yet.",
+      "error": "Couldn't load the transcripts."
     }
   },
   "calendar": {
