@@ -6,8 +6,11 @@ import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/student/application/academic_results_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/transcript_providers.dart';
 import 'package:studafy_mobile/src/features/student/data/academic_results_client.dart';
+import 'package:studafy_mobile/src/features/student/data/transcript_client.dart';
 import 'package:studafy_mobile/src/features/student/domain/academic_results.dart';
+import 'package:studafy_mobile/src/features/student/domain/transcript.dart';
 import 'package:studafy_mobile/src/features/student/presentation/academic_results_screen.dart';
 import 'package:studafy_mobile/src/features/student/presentation/certificate_detail_screen.dart';
 
@@ -192,6 +195,17 @@ class _FakeResultsClient implements AcademicResultsClient {
       );
 }
 
+/// No transcripts: this file covers results and certificates (transcripts have their own test).
+class _NoTranscriptsClient implements TranscriptClient {
+  @override
+  Future<List<AcademicTranscript>> fetchTranscripts(String studentId) async =>
+      const [];
+
+  @override
+  Future<AcademicTranscript> fetchTranscript(String transcriptId) =>
+      throw UnimplementedError();
+}
+
 Future<void> _pump(
   WidgetTester tester,
   _FakeResultsClient client, {
@@ -208,6 +222,7 @@ Future<void> _pump(
       ProviderScope(
         overrides: [
           academicResultsClientProvider.overrideWithValue(client),
+          transcriptClientProvider.overrideWithValue(_NoTranscriptsClient()),
           currentStudentIdProvider.overrideWithValue(currentStudentId),
         ],
         child: Builder(

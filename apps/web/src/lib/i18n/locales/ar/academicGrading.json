@@ -828,5 +828,29 @@
     "gpaValue": "المعدل التراكمي {{value}} / {{max}}",
     "withPercentage": "{{percentage}}٪",
     "gpaUnavailable": "المعدل التراكمي غير متاح"
+  },
+  "transcript": {
+    "title": "السجل الأكاديمي",
+    "back": "العودة إلى صفحة الطالب",
+    "print": "طباعة",
+    "revoked": "أُلغي هذا السجل: {{reason}}",
+    "superseded": "استُبدل هذا السجل بسجل أحدث.",
+    "outdated": "تغيّرت النتائج بعد إصدار هذا السجل. أعد إصداره من صفحة الطالب لتضمينها.",
+    "issueDate": "تاريخ الإصدار",
+    "yearHeading": "{{year}} — {{grade}}، {{section}}",
+    "yearCaption": "نتائج المواد، {{year}}",
+    "gpaPoints": "النقاط",
+    "weight": "الوزن",
+    "cumulativeAverage": "المعدل التراكمي",
+    "cumulativeGpa": "المعدل التراكمي بالنقاط (GPA)",
+    "gpaUnavailable": "غير متوفر",
+    "yearsCovered": "عدد السنوات",
+    "gpaReason": {
+      "missing_gpa_points": "لا يوجد معدل تراكمي بالنقاط: هذه المواد ليس لها نقاط في سلّم الدرجات: {{subjects}}.",
+      "incomplete": "لا توجد أرقام تراكمية: بعض النتائج غير مكتملة.",
+      "no_subjects": "لا توجد أرقام تراكمية: لا توجد مادة تُحتسب في المعدل."
+    },
+    "method": "يحتسب المعدل التراكمي والمعدل بالنقاط كل مادة في كل سنة بحسب وزنها في معدل تلك السنة.",
+    "reissueNote": "يحل محل السجل {{serial}}. السبب: {{reason}}"
   }
 }

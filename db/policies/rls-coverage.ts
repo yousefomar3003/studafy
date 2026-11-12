@@ -163,6 +163,10 @@ approved_flexible_columns(table_name, column_name) AS (
     ('student_subject_results', 'config_snapshot'),
     ('student_subject_results', 'breakdown'),
     ('certificates', 'content'),
+    -- 000207: a transcript exactly as issued -- every covered year and the cumulative figures,
+    -- written once and never joined or filtered on. Student, serial, status and the covered
+    -- finalizations (app.transcript_finalizations) remain normalized, constrained columns.
+    ('transcripts', 'content'),
     -- 000170: a school-defined field's choice list (value + en/ar labels), in display order, read
     -- whole with the field and never joined or filtered on; the published copy is write-once.
     ('record_fields', 'options'),
