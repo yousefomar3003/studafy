@@ -351,16 +351,16 @@ CREATE POLICY role_scope_visibility ON app.finalized_subject_comments
   USING (app.can_read_student_result(student_id, finalization_id));
 
 COMMENT ON TABLE app.report_card_settings IS
-  'Which report card sections a school shows: subject comments, teacher and principal comments, attendance, conduct (000208). No row: all shown.';
+  'Which report card sections a school shows: subject comments, teacher and principal comments, attendance, conduct (000209). No row: all shown.';
 COMMENT ON TABLE app.report_conduct_ratings IS
-  'The school''s conduct ratings for report cards (000208). No rows: the default four.';
+  'The school''s conduct ratings for report cards (000209). No rows: the default four.';
 COMMENT ON TABLE app.report_subject_comments IS
-  'Draft per-subject report card comment for a student and period, from the subject teacher (000208).';
+  'Draft per-subject report card comment for a student and period, from the subject teacher (000209).';
 COMMENT ON TABLE app.report_student_notes IS
-  'Draft class teacher comment, principal comment and conduct rating for a student and period (000208).';
+  'Draft class teacher comment, principal comment and conduct rating for a student and period (000209).';
 COMMENT ON TABLE app.finalized_report_notes IS
-  'Append-only snapshot of a student''s report card notes and attendance summary at finalization (000208).';
+  'Append-only snapshot of a student''s report card notes and attendance summary at finalization (000209).';
 COMMENT ON TABLE app.finalized_subject_comments IS
-  'Append-only snapshot of a student''s per-subject report card comments at finalization (000208).';
+  'Append-only snapshot of a student''s per-subject report card comments at finalization (000209).';
 
 RESET ROLE;

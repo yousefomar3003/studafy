@@ -234,7 +234,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/students/{studentId}/transcripts",
   "POST /api/grading/transcripts/{transcriptId}/reissue",
   "POST /api/grading/transcripts/{transcriptId}/revoke",
-  // Report card notes (000208): each write records its old and new values in the service.
+  // Report card notes (000209): each write records its old and new values in the service.
   "PUT /api/grading/report-card-settings",
   "PUT /api/grading/sections/{sectionId}/report-notes",
   "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",

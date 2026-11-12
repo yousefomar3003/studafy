@@ -13,7 +13,7 @@ when it required the `version-bump` label.
 
 ### Added
 
-- Report card notes (000208): `GET`/`PUT /api/grading/report-card-settings` (`ReportCardSettings`,
+- Report card notes (000209): `GET`/`PUT /api/grading/report-card-settings` (`ReportCardSettings`,
   `UpdateReportCardSettingsBody`) choose which sections report cards and certificates show (subject
   comments, class teacher comment, principal comment, attendance, conduct; all default to shown)
   and the school's conduct ratings (`ReportCardConductRating`; the default four when none are

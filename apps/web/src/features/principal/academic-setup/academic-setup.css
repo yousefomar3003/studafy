@@ -489,7 +489,7 @@
   border-block-start: 1px solid var(--color-border);
 }
 
-/* Report card notes (000208): comments, conduct and attendance on a certificate or report card. */
+/* Report card notes (000209): comments, conduct and attendance on a certificate or report card. */
 .ag-certificate__notes {
   padding-block-start: var(--space-8);
   border-block-start: 1px solid var(--color-border);

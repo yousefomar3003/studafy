@@ -18,7 +18,7 @@ export type SaveSubjectCommentItem = Schemas["SaveSubjectCommentItem"];
 export type ReportCardNotes = Schemas["ReportCardNotes"];
 
 /**
- * Report card notes (000208): the school's choice of report card sections and conduct ratings, and
+ * Report card notes (000209): the school's choice of report card sections and conduct ratings, and
  * a section's draft comments for a period. Kept under {@link GRADING_KEY} so finalizing (which
  * freezes the notes) and saving notes refresh each other.
  */

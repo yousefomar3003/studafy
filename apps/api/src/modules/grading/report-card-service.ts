@@ -9,7 +9,7 @@ import { requireSectionRow, resolveSectionSubjects } from "./engine-config";
 import type { TransactionSql } from "postgres";
 
 /**
- * Report card notes (000208): per-subject comments from subject teachers, the class teacher's
+ * Report card notes (000209): per-subject comments from subject teachers, the class teacher's
  * overall comment and conduct rating, an optional principal comment, and the attendance summary.
  *
  * Draft notes are written while a section's term (or year) is open and are locked once that period
@@ -732,7 +732,7 @@ export interface ReportNotes {
   attendance: AttendanceDays | null;
 }
 
-/** The snapshot for students of one finalization; finalizations from before 000208 have none. */
+/** The snapshot for students of one finalization; finalizations from before 000209 have none. */
 export async function readReportNotes(
   tx: TransactionSql,
   schoolId: string,

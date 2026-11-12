@@ -1,5 +1,5 @@
 /**
- * Report card notes (000208) end to end, against a real migrated database with RLS armed:
+ * Report card notes (000209) end to end, against a real migrated database with RLS armed:
  * subject comments, the class teacher's comment and conduct rating, the principal's comment and
  * the attendance summary are written as drafts, frozen at finalization, and printed on the
  * certificate. Later tests build on earlier ones.

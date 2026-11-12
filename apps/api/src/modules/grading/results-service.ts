@@ -799,7 +799,7 @@ export interface StoredStudentResult {
   subjects_failed: number;
   academic_status: "promoted" | "supplementary" | "retained" | "incomplete";
   subjects: StoredSubjectResult[];
-  /** Report card notes and attendance as finalized; null for finalizations made before 000208. */
+  /** Report card notes and attendance as finalized; null for finalizations made before 000209. */
   report: ReportNotes | null;
 }
 

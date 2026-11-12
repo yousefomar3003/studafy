@@ -990,7 +990,7 @@ export const finalizationListSchema = z
   })
   .openapi("ResultFinalizationList");
 
-/** Report card notes as finalized (000208). */
+/** Report card notes as finalized (000209). */
 export const reportAttendanceSchema = z
   .object({
     from: dateSchema,
@@ -1403,7 +1403,7 @@ export const reasonBodySchema = z
   .openapi("CertificateReasonBody");
 
 // ---------------------------------------------------------------------------
-// Report card notes (000208)
+// Report card notes (000209)
 // ---------------------------------------------------------------------------
 
 const conductCodeSchema = z
