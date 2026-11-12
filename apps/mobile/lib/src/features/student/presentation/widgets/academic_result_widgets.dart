@@ -18,6 +18,28 @@ String formatResultNumber(num value) {
 String formatResultPercent(num? value) =>
     value == null ? '—' : '${formatResultNumber(value)}%';
 
+/// The final result as the grade shows it ("16.5 / 20", "GPA 3.4 / 4"); the percentage when the
+/// grade shows percentages or the result predates result formats.
+String formatResultValue(ResultDisplay? display, num? percentage) {
+  if (display == null || display.format == ResultFormat.percentage) {
+    return formatResultPercent(percentage);
+  }
+  final max = formatResultNumber(display.max);
+  final value = display.value;
+  if (value == null) {
+    return display.format == ResultFormat.gpa
+        ? 'academicResults.gpaUnavailable'.tr()
+        : '—';
+  }
+  return display.format == ResultFormat.gpa
+      ? 'academicResults.gpaValue'.tr(
+          namedArgs: {'value': formatResultNumber(value), 'max': max},
+        )
+      : 'academicResults.valueOutOf'.tr(
+          namedArgs: {'value': formatResultNumber(value), 'max': max},
+        );
+}
+
 /// Promoted (success), supplementary exams (warning), retained (danger), incomplete (neutral).
 class AcademicStatusPill extends StatelessWidget {
   const AcademicStatusPill({required this.status, super.key});
@@ -79,7 +101,17 @@ class OverallResultSummary extends StatelessWidget {
           children: [
             _Stat(
               label: 'academicResults.average'.tr(),
-              value: formatResultPercent(overall.averagePercentage),
+              value: formatResultValue(
+                overall.display,
+                overall.averagePercentage,
+              ),
+              // The percentage stays visible beside another format.
+              detail:
+                  overall.display == null ||
+                      overall.display!.format == ResultFormat.percentage ||
+                      overall.averagePercentage == null
+                  ? null
+                  : formatResultPercent(overall.averagePercentage),
             ),
             _Stat(label: 'academicResults.total'.tr(), value: total),
             _Stat(
@@ -98,10 +130,11 @@ class OverallResultSummary extends StatelessWidget {
 }
 
 class _Stat extends StatelessWidget {
-  const _Stat({required this.label, required this.value});
+  const _Stat({required this.label, required this.value, this.detail});
 
   final String label;
   final String value;
+  final String? detail;
 
   @override
   Widget build(BuildContext context) {
@@ -123,6 +156,13 @@ class _Stat extends StatelessWidget {
             fontWeight: FontWeight.w700,
           ),
         ),
+        if (detail != null)
+          Text(
+            detail!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
       ],
     );
   }

@@ -82,6 +82,9 @@ export function SubjectsTab({ ctx }: { ctx: SetupContext }) {
   );
 }
 
+type ResultFormat = GradeProgram["result_format"];
+const RESULT_FORMATS: readonly ResultFormat[] = ["percentage", "out_of", "gpa"];
+
 function ProgramForm({
   ctx,
   gradeLevelId,
@@ -105,7 +108,20 @@ function ProgramForm({
   );
   const [decimals, setDecimals] = useState(String(program?.average_rounding_decimals ?? 2));
   const [mode, setMode] = useState<RoundingMode>(program?.average_rounding_mode ?? "half_up");
+  const [resultFormat, setResultFormat] = useState<ResultFormat>(
+    program?.result_format ?? "percentage",
+  );
+  const [scaleMax, setScaleMax] = useState(
+    program?.result_scale_max == null ? "" : String(program.result_scale_max),
+  );
   const disabled = !ctx.can.manage || !ctx.configEditable;
+
+  function chooseResultFormat(next: ResultFormat) {
+    setResultFormat(next);
+    // Start each format from its usual maximum: out of 20, a 4-point GPA.
+    if (next !== program?.result_format)
+      setScaleMax(next === "percentage" ? "" : next === "gpa" ? "4" : "20");
+  }
 
   function submit() {
     save.mutate(
@@ -118,6 +134,8 @@ function ProgramForm({
           max_failed_subjects_for_supplementary: Number(maxFailed),
           average_rounding_decimals: Number(decimals),
           average_rounding_mode: mode,
+          result_format: resultFormat,
+          result_scale_max: resultFormat === "percentage" ? null : Number(scaleMax),
         },
       },
       {
@@ -183,6 +201,38 @@ function ProgramForm({
             onChange={setMode}
             disabled={disabled}
           />
+          <Select
+            label={t("academicGrading.subjects.program.resultFormat")}
+            helperText={t("academicGrading.subjects.program.resultFormatHelp")}
+            options={RESULT_FORMATS.map((value) => ({
+              value,
+              label: t(`academicGrading.resultFormat.${value}`),
+            }))}
+            value={resultFormat}
+            onChange={chooseResultFormat}
+            disabled={disabled}
+          />
+          {resultFormat === "percentage" ? null : (
+            <Input
+              label={
+                resultFormat === "gpa"
+                  ? t("academicGrading.subjects.program.gpaMax")
+                  : t("academicGrading.subjects.program.outOfMax")
+              }
+              helperText={
+                resultFormat === "gpa"
+                  ? t("academicGrading.subjects.program.gpaMaxHelp")
+                  : t("academicGrading.subjects.program.outOfMaxHelp")
+              }
+              type="number"
+              min={1}
+              max={resultFormat === "gpa" ? 10 : 1000}
+              step="any"
+              required
+              value={scaleMax}
+              onChange={(event) => setScaleMax(event.target.value)}
+            />
+          )}
         </div>
         <Checkbox
           label={t("academicGrading.subjects.program.approval")}

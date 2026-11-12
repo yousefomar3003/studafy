@@ -42,6 +42,7 @@ import type {
   CategoryKind,
   CategoryScope,
   GradeBand,
+  ResultFormatKind,
   RoundingMode,
   SubjectGradingConfig,
   SubjectRequirement,
@@ -65,6 +66,8 @@ export interface ProgramInput {
   mark_approval_required?: boolean;
   average_rounding_decimals?: number;
   average_rounding_mode?: RoundingMode;
+  result_format?: ResultFormatKind;
+  result_scale_max?: number | null;
 }
 
 export interface CategoryInput {
@@ -548,13 +551,49 @@ export async function listPrograms(
     SELECT program.id, program.academic_year_id, program.grade_level_id,
            grade.name AS grade_level_name, program.grade_scale_id,
            program.max_failed_subjects_for_supplementary, program.mark_approval_required,
-           program.average_rounding_decimals, program.average_rounding_mode, program.updated_at
+           program.average_rounding_decimals, program.average_rounding_mode,
+           program.result_format, program.result_scale_max::float8 AS result_scale_max,
+           program.updated_at
     FROM app.grade_programs AS program
     JOIN app.grade_levels AS grade
       ON grade.id = program.grade_level_id AND grade.school_id = program.school_id
     WHERE program.school_id = ${schoolId}::uuid AND program.academic_year_id = ${yearId}::uuid
     ORDER BY grade.sort_order, grade.name
   `;
+}
+
+/** Highest maximum a grade may show its result out of, per format (mirrors 000206). */
+const RESULT_SCALE_LIMITS = { out_of: 1000, gpa: 10 } as const;
+
+/**
+ * The result format a program saves: the request's choice merged onto the saved one. Switching to
+ * `percentage` clears the maximum; `out_of` and `gpa` need one within their limit (out of 20, GPA
+ * out of 4).
+ */
+function resultFormatValues(
+  input: ProgramInput,
+  existing: Pick<ProgramRow, "result_format" | "result_scale_max"> | undefined,
+): { result_format: ResultFormatKind; result_scale_max: number | null } {
+  const format = input.result_format ?? existing?.result_format ?? "percentage";
+  if (format === "percentage") return { result_format: format, result_scale_max: null };
+  const max =
+    input.result_scale_max !== undefined
+      ? input.result_scale_max
+      : existing?.result_format === format
+        ? existing.result_scale_max
+        : null;
+  // eslint-disable-next-line security/detect-object-injection -- `format` is a closed union
+  const limit = RESULT_SCALE_LIMITS[format];
+  if (max === null || !(max > 0) || max > limit) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      format === "gpa"
+        ? `Give the GPA's maximum (for example 4 or 5), up to ${limit}`
+        : `Give the maximum the result is out of (for example 20), up to ${limit}`,
+    );
+  }
+  return { result_format: format, result_scale_max: max };
 }
 
 /** Sets up a grade for a year (or updates its policies). Idempotent per grade and year. */
@@ -575,7 +614,8 @@ export async function upsertProgram(
 
   const [existing] = await tx<ProgramRow[]>`
     SELECT id, grade_scale_id, max_failed_subjects_for_supplementary, mark_approval_required,
-           average_rounding_decimals, average_rounding_mode
+           average_rounding_decimals, average_rounding_mode,
+           result_format, result_scale_max::float8 AS result_scale_max
     FROM app.grade_programs
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid
       AND grade_level_id = ${gradeLevelId}::uuid
@@ -609,6 +649,7 @@ export async function upsertProgram(
       input.average_rounding_decimals ?? existing?.average_rounding_decimals ?? 2,
     average_rounding_mode:
       input.average_rounding_mode ?? existing?.average_rounding_mode ?? "half_up",
+    ...resultFormatValues(input, existing),
   };
 
   if (existing) {
@@ -619,6 +660,8 @@ export async function upsertProgram(
         mark_approval_required = ${values.mark_approval_required},
         average_rounding_decimals = ${values.average_rounding_decimals},
         average_rounding_mode = ${values.average_rounding_mode},
+        result_format = ${values.result_format},
+        result_scale_max = ${values.result_scale_max},
         updated_at = CURRENT_TIMESTAMP
       WHERE id = ${existing.id}::uuid AND school_id = ${schoolId}::uuid
     `;
@@ -627,11 +670,12 @@ export async function upsertProgram(
       INSERT INTO app.grade_programs (
         school_id, academic_year_id, grade_level_id, grade_scale_id,
         max_failed_subjects_for_supplementary, mark_approval_required,
-        average_rounding_decimals, average_rounding_mode
+        average_rounding_decimals, average_rounding_mode, result_format, result_scale_max
       ) VALUES (
         ${schoolId}::uuid, ${yearId}::uuid, ${gradeLevelId}::uuid, ${values.grade_scale_id}::uuid,
         ${values.max_failed_subjects_for_supplementary}, ${values.mark_approval_required},
-        ${values.average_rounding_decimals}, ${values.average_rounding_mode}
+        ${values.average_rounding_decimals}, ${values.average_rounding_mode},
+        ${values.result_format}, ${values.result_scale_max}
       )
     `;
   }
@@ -2080,6 +2124,43 @@ export interface PublishIssue {
   config_id?: string;
 }
 
+/**
+ * A grade that shows a GPA needs every subject counted in its average to be graded on a scale whose
+ * bands all carry GPA points, or the GPA cannot be worked out; and points above the GPA's maximum
+ * would show a GPA beyond it. Both are warnings: the percentage and the rest still work.
+ */
+function gpaIssues(context: YearConfigContext, program: ProgramRow): PublishIssue[] {
+  const issues: PublishIssue[] = [];
+  const max = program.result_scale_max ?? 0;
+  for (const config of context.configs) {
+    if (config.grade_level_id !== program.grade_level_id || config.is_excluded) continue;
+    const detail = context.details.get(config.id);
+    if (!detail || !detail.config.include_in_average) continue;
+    const where = {
+      grade_level_id: program.grade_level_id,
+      section_id: detail.config.section_id ?? undefined,
+      subject_id: detail.config.subject_id,
+      config_id: detail.config.id,
+    };
+    if (detail.scale.length === 0 || detail.scale.some((band) => band.gpaPoints === null)) {
+      issues.push({
+        severity: "warning",
+        code: "GPA_POINTS_MISSING",
+        message: `${program.grade_level_name}: ${detail.config.subject_name} is graded on a scale without GPA points for every band, so its students' GPA can't be worked out.`,
+        ...where,
+      });
+    } else if (detail.scale.some((band) => (band.gpaPoints ?? 0) > max)) {
+      issues.push({
+        severity: "warning",
+        code: "GPA_POINTS_ABOVE_MAX",
+        message: `${program.grade_level_name}: ${detail.config.subject_name}'s scale gives more GPA points than the GPA's maximum of ${max}.`,
+        ...where,
+      });
+    }
+  }
+  return issues;
+}
+
 /** Everything that must hold before a year's configuration can be published. */
 export async function collectPublishIssues(
   tx: TransactionSql,
@@ -2132,6 +2213,7 @@ export async function collectPublishIssues(
         grade_level_id: program.grade_level_id,
       });
     }
+    if (program.result_format === "gpa") issues.push(...gpaIssues(context, program));
     if (sections.length === 0) {
       issues.push({
         severity: "warning",

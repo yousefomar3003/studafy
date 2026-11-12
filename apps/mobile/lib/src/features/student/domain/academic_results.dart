@@ -80,6 +80,44 @@ class SubjectResult {
 }
 
 /// The overall line of a finalized result or certificate.
+/// How a grade shows its final result.
+enum ResultFormat {
+  percentage,
+  outOf,
+  gpa;
+
+  static ResultFormat? fromWire(Object? value) => switch (value) {
+    'percentage' => ResultFormat.percentage,
+    'out_of' => ResultFormat.outOf,
+    'gpa' => ResultFormat.gpa,
+    _ => null,
+  };
+}
+
+/// The final result in the grade's chosen format: 16.5 out of 20, or a GPA of 3.4 out of 4.
+class ResultDisplay {
+  const ResultDisplay({
+    required this.format,
+    required this.value,
+    required this.max,
+  });
+
+  /// Null for anything that isn't a display object, or a format this app doesn't know yet.
+  static ResultDisplay? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final format = ResultFormat.fromWire(json['format']);
+    final max = _num(json['max']);
+    if (format == null || max == null) return null;
+    return ResultDisplay(format: format, value: _num(json['value']), max: max);
+  }
+
+  final ResultFormat format;
+
+  /// Null when it can't be worked out (a GPA with a subject that has no GPA points).
+  final double? value;
+  final double max;
+}
+
 class OverallResult {
   const OverallResult({
     required this.averagePercentage,
@@ -88,8 +126,11 @@ class OverallResult {
     required this.gradeLabel,
     required this.subjectsFailed,
     required this.academicStatus,
+    this.display,
   });
 
+  /// Reads a finalized result (`result_display`) or a certificate's overall block (`display`).
+  /// Results and certificates from before result formats have neither: they are percentages.
   factory OverallResult.fromJson(Map<String, Object?> json) => OverallResult(
     averagePercentage: _num(json['average_percentage']),
     totalObtained: _num(json['total_obtained']),
@@ -97,6 +138,7 @@ class OverallResult {
     gradeLabel: json['grade_label'] as String?,
     subjectsFailed: (json['subjects_failed'] as num?)?.toInt() ?? 0,
     academicStatus: AcademicStatus.fromWire(json['academic_status']),
+    display: ResultDisplay.fromJson(json['result_display'] ?? json['display']),
   );
 
   final double? averagePercentage;
@@ -105,6 +147,7 @@ class OverallResult {
   final String? gradeLabel;
   final int subjectsFailed;
   final AcademicStatus academicStatus;
+  final ResultDisplay? display;
 }
 
 /// One finalization (a term report or the annual result) for the student, current version only.

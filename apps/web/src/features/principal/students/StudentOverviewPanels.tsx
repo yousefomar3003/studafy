@@ -6,6 +6,7 @@ import { Link } from "react-router-dom";
 import { api } from "../../../lib/api";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { ResultValue } from "../academic-setup/components";
 import {
   DISCIPLINE_SEVERITY_LABEL_KEYS,
   DISCIPLINE_STATUS_LABEL_KEYS,
@@ -73,7 +74,7 @@ function useStudentIncidents(studentId: string, enabled: boolean) {
  */
 export function StudentOverviewPanels({ studentId }: { studentId: string }) {
   const { t } = useTranslation();
-  const { formatDate, formatNumber } = useFormatters();
+  const { formatDate } = useFormatters();
   const permissions = usePermissions();
   const canReadDiscipline = permissions.has(PERMISSIONS.DISCIPLINE_INCIDENT_READ);
   const canOpenAttendance = permissions.has(PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW);
@@ -83,10 +84,6 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
   const incidents = useStudentIncidents(studentId, canReadDiscipline);
 
   const day = (iso: string) => formatDate(new Date(iso), { dateStyle: "medium" });
-  const percent = (value: number | null) =>
-    value === null
-      ? "—"
-      : formatNumber(value / 100, { style: "percent", maximumFractionDigits: 1 });
 
   return (
     <>
@@ -137,7 +134,12 @@ export function StudentOverviewPanels({ studentId }: { studentId: string }) {
                         })}
                   </Table.Cell>
                   <Table.Cell>{`${row.grade_level_name} – ${row.section_name}`}</Table.Cell>
-                  <Table.Cell>{percent(row.result.average_percentage)}</Table.Cell>
+                  <Table.Cell>
+                    <ResultValue
+                      display={row.result.result_display}
+                      percentage={row.result.average_percentage}
+                    />
+                  </Table.Cell>
                   <Table.Cell>{row.result.grade_label ?? "—"}</Table.Cell>
                   <Table.Cell>
                     {t(`academicGrading.academicStatus.${row.result.academic_status}`)}

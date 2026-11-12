@@ -93,6 +93,124 @@ export function Percent({ value }: { value: number | null | undefined }) {
   return <>{formatNumber(value / 100, { style: "percent", maximumFractionDigits: 2 })}</>;
 }
 
+/** The slider's range for a subject's weight; the number box beside it takes any value up to 100. */
+export const WEIGHT_SLIDER = { min: 0.5, max: 10, step: 0.5 } as const;
+
+/**
+ * A subject's weight in the overall average: a slider to drag (0.5 to 10 in halves) and a number
+ * box beside it for an exact or larger value. Both edit the same text value, so a typed 12 is kept
+ * and the slider rests at its end.
+ */
+export function WeightSlider({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  const id = useId();
+  const numeric = Number(value);
+  const known = value.trim() !== "" && Number.isFinite(numeric);
+  const position = known ? Math.min(WEIGHT_SLIDER.max, Math.max(WEIGHT_SLIDER.min, numeric)) : 1;
+  const spoken = known
+    ? t("academicGrading.editor.averageWeightValue", {
+        value: formatNumber(numeric, { maximumFractionDigits: 2 }),
+      })
+    : "—";
+  return (
+    <div className="ag-weight">
+      <label className="sf-field__label" htmlFor={`${id}-range`}>
+        {t("academicGrading.editor.averageWeight")}
+      </label>
+      <div className="ag-weight__controls">
+        <input
+          id={`${id}-range`}
+          className="ag-weight__range"
+          type="range"
+          min={WEIGHT_SLIDER.min}
+          max={WEIGHT_SLIDER.max}
+          step={WEIGHT_SLIDER.step}
+          value={position}
+          aria-valuetext={spoken}
+          aria-describedby={`${id}-help`}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+        />
+        <input
+          id={`${id}-number`}
+          className="ag-weight__number"
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={100}
+          step="any"
+          value={value}
+          aria-label={t("academicGrading.editor.averageWeightExact")}
+          aria-describedby={`${id}-help`}
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+      <p id={`${id}-help`} className="ag-muted ag-weight__help">
+        <output htmlFor={`${id}-range ${id}-number`}>{spoken}</output>
+        {" · "}
+        {t("academicGrading.editor.averageWeightHelp")}
+      </p>
+    </div>
+  );
+}
+
+/** A final result as the grade shows it (see the API's ResultDisplay). */
+export interface ResultDisplayValue {
+  format: "percentage" | "out_of" | "gpa";
+  value: number | null;
+  max: number;
+}
+
+/**
+ * A final result in the grade's chosen format, with the percentage beside it: "16.5 / 20 (82.5%)",
+ * "GPA 3.4 / 4 (85%)". Results with no format (or a percentage format) show the percentage alone.
+ */
+export function ResultValue({
+  display,
+  percentage,
+}: {
+  display: ResultDisplayValue | null | undefined;
+  percentage: number | null | undefined;
+}) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  if (!display || display.format === "percentage") return <Percent value={percentage} />;
+  const value =
+    display.value === null ? null : formatNumber(display.value, { maximumFractionDigits: 2 });
+  const max = formatNumber(display.max, { maximumFractionDigits: 2 });
+  const main =
+    value === null
+      ? display.format === "gpa"
+        ? t("academicGrading.resultFormat.gpaUnavailable")
+        : "—"
+      : display.format === "gpa"
+        ? t("academicGrading.resultFormat.gpaValue", { value, max })
+        : t("academicGrading.resultFormat.valueOutOf", { value, max });
+  return (
+    <>
+      <bdi>{main}</bdi>
+      {percentage === null || percentage === undefined ? null : (
+        <>
+          {" "}
+          <small className="ag-result-percentage">
+            (<Percent value={percentage} />)
+          </small>
+        </>
+      )}
+    </>
+  );
+}
+
 export function Num({ value }: { value: number | null | undefined }) {
   const { formatNumber } = useFormatters();
   if (value === null || value === undefined) return <>—</>;

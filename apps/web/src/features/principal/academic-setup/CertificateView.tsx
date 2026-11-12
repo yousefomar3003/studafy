@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
-import { Num, Percent, QueryState } from "./components";
+import { Num, Percent, QueryState, ResultValue } from "./components";
 import { setupHref } from "./context";
 import { useCertificate } from "./queries";
 
@@ -169,7 +169,10 @@ export function CertificateDocument({
         <div>
           <dt>{t("academicGrading.certificate.average")}</dt>
           <dd>
-            <Percent value={content.overall.average_percentage} />
+            <ResultValue
+              display={content.overall.display}
+              percentage={content.overall.average_percentage}
+            />
           </dd>
         </div>
         <div>

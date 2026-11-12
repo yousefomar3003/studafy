@@ -209,13 +209,15 @@
       "systemLabel": "Each term has",
       "systems": {
         "midterm": "Midterm exam and final exam, plus quizzes and homework",
-        "periods": "First period exam, second period exam and final exam, plus quizzes and homework"
+        "periods": "First period exam, second period exam and final exam, plus quizzes and homework",
+        "three_periods": "First, second and third period exams and final exam, plus quizzes and homework"
       },
       "weightsLabel": "Share of the term (%)",
       "weightsHelp": "Each part is marked out of its share: a 30% midterm is out of 30. Set a part to 0 to leave it out.",
       "parts": {
         "first_period": "First period exam",
         "second_period": "Second period exam",
+        "third_period": "Third period exam",
         "midterm": "Midterm exam",
         "final_exam": "Final exam",
         "quiz": "Quizzes",

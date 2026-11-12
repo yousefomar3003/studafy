@@ -13,6 +13,18 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Grading result formats and a third exam system (000206). `ExamStructure` gains `three_periods`
+  (first, second and third period exams, a final exam, quizzes and homework) and `ExamWeights` and
+  category kinds gain `third_period`. `GradeProgram` / `GradeProgramBody` gain `result_format`
+  (`ResultFormat`: `percentage` (default), `out_of`, `gpa`) and `result_scale_max` (the maximum for
+  `out_of`, up to 1000, or `gpa`, up to 10; null for `percentage`). Results gain
+  `result_display` (`ResultDisplay`: `format`, `value`, `max`) on `ResultPreview` students and
+  `FinalizedStudentResult`, and `CertificateContentOverall` gains optional `display`; certificates
+  and results finalized earlier have none and stay percentages. A GPA averages the subjects'
+  grade-band GPA points by subject weight; `value` is null when a counted subject has none, which
+  the publish check reports as `GPA_POINTS_MISSING` (and `GPA_POINTS_ABOVE_MAX` for points above
+  the maximum).
+
 - Paid storage add-on (000205): `GET /api/subscriptions/storage/offer` (`StorageAddOnOffer`: the
   school's usage and cap, its live add-on `StorageAddOnCurrent`, and each `StorageAddOnTier`
   (`storage_100gb`, `storage_1tb`) with its `StorageAddOnPrice`s in the school's currency, USD

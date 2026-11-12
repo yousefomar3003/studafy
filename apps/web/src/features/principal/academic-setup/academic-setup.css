@@ -513,6 +513,45 @@
   border-block-end: 1px solid var(--color-foreground);
 }
 
+/* Subject weight: a slider with an exact number box beside it. */
+.ag-weight {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.ag-weight__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.ag-weight__range {
+  flex: 1 1 auto;
+  min-inline-size: 0;
+  accent-color: var(--color-accent);
+}
+
+.ag-weight__number {
+  inline-size: 5.5rem;
+  flex: 0 0 auto;
+  padding: var(--space-4) var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font: inherit;
+  background: var(--color-surface);
+  color: inherit;
+}
+
+.ag-weight__help {
+  margin: 0;
+}
+
+.ag-result-percentage {
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+}
+
 @media print {
   /* Print only the certificate when one is on the page, never the portal chrome around it. */
   body:has(.ag-certificate) * {
