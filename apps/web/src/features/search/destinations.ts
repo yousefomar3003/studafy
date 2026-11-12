@@ -299,6 +299,10 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     ...ACADEMIC,
     alsoRequiresAny: [P.RESULT_FINALIZE, P.ACADEMIC_CERTIFICATE_ISSUE],
   }),
+  entry("academic-report-cards", "page", `${SETUP}/report-cards`, {
+    ...ACADEMIC,
+    alsoRequiresAny: [P.ACADEMIC_CONFIG_MANAGE, P.GRADE_UPDATE, P.RESULT_FINALIZE],
+  }),
   entry("build-record-templates-principal", "action", "/portal/principal/school/records", {
     requiredPermission: P.RECORD_TEMPLATE_MANAGE,
     ...SCHOOL,

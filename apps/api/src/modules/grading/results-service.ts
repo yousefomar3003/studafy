@@ -19,6 +19,7 @@ import {
   toEngineConfig,
   toMarkInputs,
 } from "./engine-config";
+import { readReportNotes, snapshotReportNotes } from "./report-card-service";
 
 import type {
   ConfigDetails,
@@ -29,6 +30,7 @@ import type {
   SectionRow,
   SubjectConfigRow,
 } from "./engine-config";
+import type { ReportNotes } from "./report-card-service";
 import type {
   FailReason,
   MarkInput,
@@ -533,6 +535,7 @@ export async function finalizeSection(
     RETURNING ${tx.unsafe(FINALIZATION_COLUMNS)}
   `;
   await storeComputation(tx, schoolId, finalization!.id, computation.students);
+  await snapshotReportNotes(tx, schoolId, finalization!);
   await emitAuditLog(tx, {
     action: "insert",
     targetTable: "result_finalizations",
@@ -746,6 +749,7 @@ export async function correctFinalization(
     RETURNING ${tx.unsafe(FINALIZATION_COLUMNS)}
   `;
   await storeComputation(tx, schoolId, next!.id, recomputed);
+  await snapshotReportNotes(tx, schoolId, next!);
   await emitAuditLog(tx, {
     action: "update",
     targetTable: "result_finalizations",
@@ -776,6 +780,8 @@ export interface StoredSubjectResult {
   requirement: string;
   terms: { term_id: string | null; percentage: number | null }[];
   fail_reasons: FailReason[];
+  /** The subject teacher's report card comment, as finalized; null when there is none. */
+  comment: string | null;
 }
 
 export interface StoredStudentResult {
@@ -793,6 +799,8 @@ export interface StoredStudentResult {
   subjects_failed: number;
   academic_status: "promoted" | "supplementary" | "retained" | "incomplete";
   subjects: StoredSubjectResult[];
+  /** Report card notes and attendance as finalized; null for finalizations made before 000209. */
+  report: ReportNotes | null;
 }
 
 const n = (value: string | null): number | null => (value === null ? null : Number(value));
@@ -884,7 +892,9 @@ export async function readFinalizationResults(
     WHERE result.school_id = ${schoolId}::uuid AND result.finalization_id = ${finalizationId}::uuid
       ${subjectFilter}
   `;
+  const report = await readReportNotes(tx, schoolId, finalizationId, filter.studentId);
   return overall.map((row) => ({
+    report: report.notes.get(row.student_id) ?? null,
     student_id: row.student_id,
     first_name: row.first_name,
     last_name: row.last_name,
@@ -919,6 +929,7 @@ export async function readFinalizationResults(
           percentage: term.percentage,
         })),
         fail_reasons: subject.breakdown.failReasons ?? [],
+        comment: report.subjectComments.get(`${row.student_id}|${subject.subject_id}`) ?? null,
       }))
       .sort((a, b) => a.subject_name.localeCompare(b.subject_name)),
   }));

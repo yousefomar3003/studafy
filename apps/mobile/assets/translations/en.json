@@ -1018,6 +1018,19 @@
       }
     },
     "marks": {
+      "reportComments": {
+        "entry": "Report card comments",
+        "entrySubtitle": "Your comment on each student for {period}",
+        "title": "Report card comments",
+        "help": "Printed on each student's report card for this subject. They are frozen when the results are finalized.",
+        "save": "Save",
+        "saved": "Comments saved",
+        "error": "Couldn't load the comments.",
+        "finalized": "These results are finalized, so the comments can no longer change.",
+        "readOnly": "You can read these comments but not change them now.",
+        "hidden": "Your school doesn't print subject comments on report cards at the moment.",
+        "noStudents": "No students in this section."
+      },
       "entry": {
         "outOf": "Out of {max}",
         "score": "Score",
@@ -2124,6 +2137,16 @@
     }
   },
   "academicResults": {
+    "report": {
+      "subjectComments": "Teachers' comments",
+      "conduct": "Conduct",
+      "daysPresent": "Days present",
+      "daysAbsent": "Days absent",
+      "daysLate": "Days late",
+      "daysExcused": "Absent with excuse",
+      "teacherComment": "Class teacher's comment",
+      "principalComment": "Principal's comment"
+    },
     "title": "Results",
     "entry": "Official results",
     "entrySubtitle": "Finalized results, certificates and report cards",
