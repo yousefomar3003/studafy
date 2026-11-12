@@ -66,8 +66,11 @@ import type { SubscriptionStatus } from "@studafy/constants";
 // Vocabulary
 // ---------------------------------------------------------------------------
 
-/** Which of the two subscription tables a transition applies to. Mirrors `app.billing_subscription_type`. */
-export type SubscriptionKind = "school" | "ai";
+/**
+ * Which subscription table a transition applies to. Mirrors `app.billing_subscription_type`:
+ * `app.subscriptions` (school), `app.ai_subscriptions` (ai), `app.storage_subscriptions` (storage).
+ */
+export type SubscriptionKind = "school" | "ai" | "storage";
 
 /**
  * The normalized meaning of a provider event, as far as subscription status is concerned.
@@ -203,9 +206,19 @@ export const AI_TRANSITIONS: TransitionTable = {
   "paused:expired": SUBSCRIPTION_STATUSES.EXPIRED,
 };
 
+/**
+ * Storage add-on transitions (`app.storage_subscriptions.status`, 000205).
+ *
+ * The school table exactly: a storage add-on is a school purchase with the same paid-access
+ * lifecycle, and nothing pauses it -- a suspended school keeps its files and its cap, because the
+ * cap only ever decides whether new uploads fit.
+ */
+export const STORAGE_TRANSITIONS: TransitionTable = SCHOOL_TRANSITIONS;
+
 const TRANSITION_TABLES: Readonly<Record<SubscriptionKind, TransitionTable>> = {
   school: SCHOOL_TRANSITIONS,
   ai: AI_TRANSITIONS,
+  storage: STORAGE_TRANSITIONS,
 };
 
 /**
@@ -426,13 +439,13 @@ export function foldStatus(kind: SubscriptionKind, events: readonly FoldableEven
     const resolution = deriveIntent(event.eventType, event.payload);
     if (resolution.kind !== "transition") continue;
 
-    // A student whose AI add-on ended can buy it again, and that purchase begins a new lifecycle on
-    // the same (school, student) row. Without this the new checkout would meet an absorbing state and
+    // A student whose AI add-on ended can buy it again (and a school its storage add-on), and that
+    // purchase begins a new lifecycle on the same row. Without this the new checkout would meet an absorbing state and
     // be parked, leaving a paying student locked out. Only a completed checkout restarts -- a stray
     // renewal or failure after the end still hits the terminal state and is rejected -- and the rule
     // depends only on the ordered sequence, so the fold stays a pure function of the event set.
     if (
-      kind === "ai" &&
+      (kind === "ai" || kind === "storage") &&
       TERMINAL_STATUSES.has(status) &&
       event.eventType === "checkout.session.completed"
     ) {

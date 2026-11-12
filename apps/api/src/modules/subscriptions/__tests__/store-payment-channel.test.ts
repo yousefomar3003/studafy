@@ -28,6 +28,7 @@ import { cancellationRoutes } from "../routes/cancellation-routes";
 import { checkoutRoutes } from "../routes/checkout-routes";
 import { refundRequestRoutes } from "../routes/refund-routes";
 import { schoolCheckoutRoutes } from "../routes/school-checkout-routes";
+import { storageAddonRoutes } from "../routes/storage-addon-routes";
 
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
@@ -61,6 +62,10 @@ const PURCHASE_ROUTES: string[] = [
   "/api/subscriptions/current/cancel/reverse",
   "/api/subscriptions/current/refund-requests",
   "/api/subscriptions/ai/refund-requests",
+  "/api/subscriptions/storage/checkout",
+  "/api/subscriptions/storage/change",
+  "/api/subscriptions/storage/cancel",
+  "/api/subscriptions/storage/cancel/reverse",
 ];
 
 function appFor(channel: AuthChannel): OpenAPIHono<AppEnv> {
@@ -84,6 +89,7 @@ function appFor(channel: AuthChannel): OpenAPIHono<AppEnv> {
   app.route("/", checkoutRoutes(database, providers));
   app.route("/", schoolCheckoutRoutes(database, providers));
   app.route("/", aiCheckoutRoutes(database, providers));
+  app.route("/", storageAddonRoutes(database, providers));
   app.route("/", cancellationRoutes(database, providers));
   app.route("/", refundRequestRoutes(database, providers));
   app.onError(errorHandlerMiddleware(silentLogger));

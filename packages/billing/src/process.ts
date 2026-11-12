@@ -64,7 +64,16 @@ import type { TransactionSql } from "postgres";
 export const GRACE_PERIOD_DAYS: Readonly<Record<SubscriptionKind, number>> = {
   school: 14,
   ai: 7,
+  // A storage add-on in grace keeps its larger cap for a week, as an AI add-on keeps its access.
+  storage: 7,
 };
+
+/** The table each kind's rows live in: the audit row's `target_table`. */
+const SUBSCRIPTION_TABLES = {
+  school: "subscriptions",
+  ai: "ai_subscriptions",
+  storage: "storage_subscriptions",
+} as const satisfies Record<SubscriptionKind, string>;
 
 // ---------------------------------------------------------------------------
 // Ports
@@ -73,7 +82,7 @@ export const GRACE_PERIOD_DAYS: Readonly<Record<SubscriptionKind, number>> = {
 /** One audited status change. Structurally the subset of apps/api's `AuditEntry` this needs. */
 export interface BillingAuditEntry {
   action: "update";
-  targetTable: "subscriptions" | "ai_subscriptions";
+  targetTable: (typeof SUBSCRIPTION_TABLES)[SubscriptionKind];
   targetId: string;
   oldValues: { status: SubscriptionStatus };
   newValues: { status: SubscriptionStatus };
@@ -96,7 +105,10 @@ export type BillingAuditWriter = (tx: TransactionSql, entry: BillingAuditEntry) 
 export interface EntitlementChange {
   kind: SubscriptionKind;
   schoolId: string;
-  /** `app.subscriptions.id` for a school change, `app.ai_subscriptions.id` for an AI one. */
+  /**
+   * `app.subscriptions.id` for a school change, `app.ai_subscriptions.id` for an AI one,
+   * `app.storage_subscriptions.id` for a storage add-on.
+   */
   subscriptionId: string;
   /** Non-null exactly when `kind === "ai"`. */
   studentId: string | null;
@@ -391,6 +403,16 @@ async function saveTapPaymentMethod(
     return;
   }
 
+  if (target.kind === "storage") {
+    await tx`
+      UPDATE app.storage_subscriptions
+      SET tap_card_id = ${cardId}, tap_payment_agreement_id = ${agreementId},
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${target.id}::uuid
+    `;
+    return;
+  }
+
   await tx`
     UPDATE app.ai_subscriptions
     SET tap_card_id = ${cardId}, tap_payment_agreement_id = ${agreementId},
@@ -456,6 +478,22 @@ export async function applyTransition(
           stripe_subscription_item_id = COALESCE(
             ${extractSubscriptionItemId(payload)}::text, stripe_subscription_item_id
           ),
+          grace_period_ends_at = CASE
+            WHEN ${enteringGrace} THEN CURRENT_TIMESTAMP + make_interval(days => ${graceDays})
+            WHEN ${leavingGrace} THEN NULL
+            ELSE grace_period_ends_at
+          END,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${target.id}::uuid
+    `;
+  } else if (target.kind === "storage") {
+    // Status and period only. The cap the school is held to is read from this row while it is live
+    // (apps/api storage quota-service), so nothing about the school's cap is written here.
+    await tx`
+      UPDATE app.storage_subscriptions
+      SET status = ${next}::app.subscription_status,
+          current_period_start = COALESCE(${periodStart}::timestamptz, current_period_start),
+          current_period_end = COALESCE(${periodEnd}::timestamptz, current_period_end),
           grace_period_ends_at = CASE
             WHEN ${enteringGrace} THEN CURRENT_TIMESTAMP + make_interval(days => ${graceDays})
             WHEN ${leavingGrace} THEN NULL
@@ -586,7 +624,7 @@ function audit(
 ): Promise<void> {
   return options.emitAudit(tx, {
     action: "update",
-    targetTable: kind === "school" ? "subscriptions" : "ai_subscriptions",
+    targetTable: SUBSCRIPTION_TABLES[kind],
     targetId: id,
     oldValues: { status: from },
     newValues: { status: to },

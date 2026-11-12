@@ -22,6 +22,7 @@ const SECTIONS = [
   { to: "/portal/license/seats", key: "seats", end: false },
   { to: "/portal/license/quotes", key: "quotes", end: false },
   { to: "/portal/license/invoices", key: "invoices", end: false },
+  { to: "/portal/license/storage", key: "storage", end: false },
 ] as const;
 
 /**

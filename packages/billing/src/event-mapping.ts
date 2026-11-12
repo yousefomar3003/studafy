@@ -98,6 +98,22 @@ export function extractStudentIdHint(payload: Record<string, unknown>): string |
 }
 
 /**
+ * Which add-on a checkout sold, when it was not the school plan or a student's AI add-on.
+ *
+ * Our own checkout writes `addon: "storage"` on the session and the subscription (000205), so the
+ * events that follow carry it. Without it a storage purchase would fall through to the school's own
+ * subscription and move that instead.
+ */
+export function extractAddonHint(payload: Record<string, unknown>): "storage" | null {
+  return extractMetadata(payload).addon === "storage" ? "storage" : null;
+}
+
+/** Our `app.plan_prices` id the checkout charged (`price_id`, written by checkout-service). */
+export function extractLocalPriceIdHint(payload: Record<string, unknown>): string | null {
+  return asId(extractMetadata(payload).price_id);
+}
+
+/**
  * The billing period this event reports, if it reports one.
  *
  * Stripe sends Unix *seconds*; the ×1000 is what puts the result in this century. Returns `null`

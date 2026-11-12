@@ -344,6 +344,7 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("license-seats", "page", "/portal/license/seats", LICENSE),
   entry("license-quotes", "page", "/portal/license/quotes", LICENSE),
   entry("license-invoices", "page", "/portal/license/invoices", LICENSE),
+  entry("license-storage", "page", "/portal/license/storage", LICENSE),
 
   // Tuition finance.
   entry("finance-dashboard", "page", "/portal/finance", FINANCE_REPORTS),

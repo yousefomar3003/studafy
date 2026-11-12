@@ -1,4 +1,8 @@
+import { PERMISSIONS } from "@studafy/constants";
+import { Link } from "react-router-dom";
+
 import { DashboardTile } from "../../../components/DashboardTile";
+import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { useBillingOverviewQuery } from "../../billing/queries";
 
@@ -47,6 +51,8 @@ export function StorageUsageTile() {
   const { t } = useTranslation();
   const { formatNumber } = useFormatters();
   const { data, isPending, isError } = useBillingOverviewQuery();
+  // Buying more storage is a license:manage action (ORG_ADMIN and PRINCIPAL), on the license pages.
+  const canUpgrade = usePermissions().has(PERMISSIONS.LICENSE_MANAGE);
 
   const storage = data?.storage;
   // fractionUsed is NaN when no cap is configured (see BillingOverview schema) — that's a real
@@ -97,6 +103,11 @@ export function StorageUsageTile() {
                   used: formatBytes(storage.usedBytes, t, formatNumber),
                 })}
           </p>
+          {canUpgrade ? (
+            <Link className="dashboard-tile__link" to="/portal/license/storage">
+              {t("adminSchool.tiles.storage.upgrade")}
+            </Link>
+          ) : null}
         </>
       )}
     </DashboardTile>
