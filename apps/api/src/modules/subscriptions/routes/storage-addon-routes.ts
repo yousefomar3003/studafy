@@ -197,16 +197,15 @@ export function storageAddonRoutes(
 ): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
 
-  app.use(`${BASE}/*`, requireChannel(AUTH_CHANNELS.WEB));
-  app.use(`${BASE}/offer`, requirePermission(PERMISSIONS.LICENSE_READ));
-  for (const path of [
-    `${BASE}/checkout`,
-    `${BASE}/change`,
-    `${BASE}/cancel`,
-    `${BASE}/cancel/reverse`,
-  ]) {
-    app.use(path, requirePermission(PERMISSIONS.LICENSE_MANAGE));
-  }
+  app.use("/api/subscriptions/storage/*", requireChannel(AUTH_CHANNELS.WEB));
+  app.use("/api/subscriptions/storage/offer", requirePermission(PERMISSIONS.LICENSE_READ));
+  app.use("/api/subscriptions/storage/checkout", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use("/api/subscriptions/storage/change", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use("/api/subscriptions/storage/cancel", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use(
+    "/api/subscriptions/storage/cancel/reverse",
+    requirePermission(PERMISSIONS.LICENSE_MANAGE),
+  );
 
   app.openapi(offerRoute, async (c) => {
     const auth = requireAuth(c);

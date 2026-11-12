@@ -380,6 +380,11 @@
       "where": "License › Invoices",
       "keywords": "license invoices, studafy invoices, subscription bill, pay license, receipts, billing history"
     },
+    "license-storage": {
+      "title": "Storage",
+      "where": "License › Storage",
+      "keywords": "storage, more storage, upgrade storage, storage full, space, 100 GB, 1 TB, files"
+    },
     "finance-dashboard": {
       "title": "Finance dashboard",
       "where": "Finance",
