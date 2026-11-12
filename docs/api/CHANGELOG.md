@@ -398,11 +398,13 @@ when it required the `version-bump` label.
   material's thumbnail and preview), `DELETE /api/academics/assignments/{assignmentId}` (its
   attachments and question pictures, when it is deleted rather than archived),
   `DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}`,
-  `DELETE /api/academics/submissions/{submissionId}/attachments/{attachmentId}`, a question save
-  that drops a picture, and an expense update or attachment that replaces its file all remove the
-  stored object once the change has committed and release its bytes from the school's storage
-  quota. A file another row still points at is kept (000204 `app.referenced_storage_keys`). No
-  request or response shape changed.
+  `DELETE /api/academics/submissions/{submissionId}/attachments/{attachmentId}` and a question save
+  that drops a picture all remove the stored object once the change has committed and release its
+  bytes from the school's storage quota. A file another row still points at is kept (000204
+  `app.referenced_storage_keys`). An expense receipt that is replaced is a finance record and is
+  never removed: `PATCH /api/finance/expenses/{expenseId}` and
+  `POST /api/finance/expenses/{expenseId}/attachments` record the old and new
+  `attachment_storage_key` in the audit log instead. No request or response shape changed.
 
 - `GET /api/privacy/dsr/{requestId}` (`DataSubjectRequest`): a completed export's `download_url` now
   points at the export's ZIP archive (`dsr-exports/<school>/<request>/export.zip`: a README, the data

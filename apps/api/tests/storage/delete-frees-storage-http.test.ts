@@ -389,6 +389,49 @@ describeDb("deleting a file frees its storage", () => {
     expect(await meter(tenant.schoolId)).toBe(900);
   });
 
+  test("a replaced expense receipt is kept, and its audit row names it", async () => {
+    const tenant = await newTenant();
+    const oldReceipt = `permanent/${tenant.schoolId}/${crypto.randomUUID()}/receipt.pdf`;
+    storage.objects.set(oldReceipt, { contentType: "application/pdf", sizeBytes: 300 });
+    const docname = `EXP-${crypto.randomUUID().slice(0, 8)}`;
+    const [expense] = await asAdmin(
+      tenant.schoolId,
+      (tx) => tx<{ id: string }[]>`
+        INSERT INTO app.expense_cache (
+          school_id, document_type, category, vendor, currency_id, amount_minor,
+          erpnext_docname, erpnext_status, last_synced_at, attachment_storage_key
+        ) VALUES (
+          ${tenant.schoolId}, 'expense_claim', 'Supplies', 'Stationer',
+          (SELECT id FROM app.currencies WHERE code = 'USD'), 100,
+          ${docname}, 'Draft', CURRENT_TIMESTAMP, ${oldReceipt}
+        )
+        RETURNING id
+      `,
+    );
+    const tempKey = `temp/${tenant.schoolId}/${crypto.randomUUID()}/new-receipt.pdf`;
+    storage.objects.set(tempKey, { contentType: "application/pdf", sizeBytes: 400 });
+
+    const res = await request(
+      tenant,
+      { userId: tenant.users.ORG_ADMIN.id, roles: [ROLES.ORG_ADMIN] },
+      "POST",
+      `/api/finance/expenses/${expense!.id}/attachments`,
+      { storage_key: tempKey },
+    );
+    expect(res.status).toBe(200);
+    expect(storage.objects.has(oldReceipt)).toBe(true);
+
+    const [audit] = await asAdmin(
+      tenant.schoolId,
+      (tx) => tx<{ old_key: string | null }[]>`
+        SELECT old_values->>'attachment_storage_key' AS old_key FROM app.audit_logs
+        WHERE school_id = ${tenant.schoolId}::uuid AND target_table = 'expense_cache'
+          AND target_id = ${expense!.id}::uuid
+      `,
+    );
+    expect(audit?.old_key).toBe(oldReceipt);
+  });
+
   test("a bucket failure still deletes the row and keeps the bytes counted", async () => {
     const tenant = await newTenant();
     const assignmentId = await createAssignment(tenant, "draft");

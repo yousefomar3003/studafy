@@ -12,7 +12,6 @@ import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
-import { freeStoredObjects } from "../../storage/free-objects";
 
 import {
   confirmAttachmentBodySchema,
@@ -288,26 +287,11 @@ export function expenseRoutes(
     const body = c.req.valid("json");
     const acceptLanguage = c.req.header("Accept-Language");
 
-    const replacedKeys: string[] = [];
+    // A replaced receipt's file is kept: it is a finance record.
     const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
-      replacedKeys.length = 0;
       const erpnext = await erpnextFactory.forSchool(tx, auth.schoolId);
-      return updateExpense(
-        tx,
-        erpnext,
-        auth.schoolId,
-        expenseId,
-        body,
-        acceptLanguage,
-        replacedKeys,
-      );
+      return updateExpense(tx, erpnext, auth.schoolId, expenseId, body, acceptLanguage);
     });
-    await freeStoredObjects(
-      storage,
-      tenantTxRunner(database, tenantFrom(c)),
-      auth.schoolId,
-      replacedKeys,
-    );
     // A changed file is `scanning` (projectToCache); an unchanged one keeps its verdict and the
     // worker skips it.
     if (body.attachment_storage_key) {
@@ -349,18 +333,15 @@ export function expenseRoutes(
     const s3 = requireStorage(storage);
 
     const uploadedKeys: string[] = [];
-    const replacedKeys: string[] = [];
-    const runTx = tenantTxRunner(database, tenantFrom(c));
+    // A replaced receipt's file is kept: it is a finance record.
     const row = await confirmAttachment(
-      runTx,
+      tenantTxRunner(database, tenantFrom(c)),
       s3,
       auth.schoolId,
       expenseId,
       body.storage_key,
       uploadedKeys,
-      replacedKeys,
     );
-    await freeStoredObjects(s3, runTx, auth.schoolId, replacedKeys);
     await enqueueUploadScans(
       c,
       uploadedKeys.map((storageKey) => ({

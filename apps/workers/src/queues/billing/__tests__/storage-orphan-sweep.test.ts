@@ -92,6 +92,21 @@ async function seedSchoolWithExpenseKey(key: (schoolId: string) => string): Prom
   });
 }
 
+/** What the API writes when an expense's receipt is replaced: the old key, kept as a record. */
+async function auditReplacedReceipt(schoolId: string, key: string): Promise<void> {
+  await db!.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    await tx`
+      INSERT INTO app.audit_logs (school_id, action, target_table, target_id, old_values, new_values)
+      VALUES (
+        ${schoolId}::uuid, 'update', 'expense_cache', gen_random_uuid(),
+        ${tx.json({ attachment_storage_key: key })}, ${tx.json({ attachment_storage_key: "x" })}
+      )
+    `;
+  });
+}
+
 async function readMeterBytes(schoolId: string): Promise<number> {
   return db!.begin(async (tx) => {
     await tx.unsafe("SET LOCAL ROLE studafy_admin");
@@ -110,12 +125,14 @@ function world(schoolId: string): { storage: FakeStorage; keys: Record<string, s
     orphan: `permanent/${schoolId}/old/gone.pdf`,
     recent: `permanent/${schoolId}/new/fresh.pdf`,
     undated: `permanent/${schoolId}/undated/u.pdf`,
+    replacedReceipt: `permanent/${schoolId}/old-receipt/r0.pdf`,
   };
   const storage = new FakeStorage();
   storage.put(keys.referenced, 1_000, 30);
   storage.put(keys.orphan, 2_000, 30);
   storage.put(keys.recent, 4_000, 1);
   storage.put(keys.undated, 8_000, null);
+  storage.put(keys.replacedReceipt, 500, 30);
   return { storage, keys };
 }
 
@@ -123,6 +140,7 @@ describe("orphaned files in the storage reconciliation", () => {
   dbTest("reports old unreferenced files and removes nothing by default", async () => {
     const schoolId = await seedSchoolWithExpenseKey((id) => `permanent/${id}/receipt/r.pdf`);
     const { storage, keys } = world(schoolId);
+    await auditReplacedReceipt(schoolId, keys.replacedReceipt!);
 
     const result = await runStorageQuotaReconciliation(db!, storage, silentLogger, { now: NOW });
 
@@ -130,7 +148,7 @@ describe("orphaned files in the storage reconciliation", () => {
     expect(result.orphansRemoved).toBe(0);
     expect(storage.removed).toEqual([]);
     expect(storage.objects.has(keys.orphan!)).toBe(true);
-    expect(await readMeterBytes(schoolId)).toBe(15_000);
+    expect(await readMeterBytes(schoolId)).toBe(15_500);
   });
 
   dbTest(
@@ -138,6 +156,7 @@ describe("orphaned files in the storage reconciliation", () => {
     async () => {
       const schoolId = await seedSchoolWithExpenseKey((id) => `permanent/${id}/receipt/r.pdf`);
       const { storage, keys } = world(schoolId);
+      await auditReplacedReceipt(schoolId, keys.replacedReceipt!);
 
       await runStorageQuotaReconciliation(db!, storage, silentLogger, {
         now: NOW,
@@ -148,7 +167,9 @@ describe("orphaned files in the storage reconciliation", () => {
       expect(storage.objects.has(keys.referenced!)).toBe(true);
       expect(storage.objects.has(keys.recent!)).toBe(true);
       expect(storage.objects.has(keys.undated!)).toBe(true);
-      expect(await readMeterBytes(schoolId)).toBe(13_000);
+      // A replaced receipt named in a finance audit row is a kept finance record.
+      expect(storage.objects.has(keys.replacedReceipt!)).toBe(true);
+      expect(await readMeterBytes(schoolId)).toBe(13_500);
     },
   );
 });
