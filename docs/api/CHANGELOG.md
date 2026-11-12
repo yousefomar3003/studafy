@@ -13,6 +13,12 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Parent directory: `GET /api/parents` (`ParentListQuery`: `search`, `cursor`, `limit`) and
+  `GET /api/parents/{parentUserId}` return `ParentList` / `ParentSummary`: each parent's name,
+  email, phone, status, Studafy ID (`member_code`) and children (`ParentChild`, with
+  relationship and this year's `class_label`). Requires `user:read`, web only. A child's
+  `admission_number` is null unless the caller holds `billing:read`, as on the student list.
+
 - Contact phone for parents and teachers (000203): `UserWithRoles` / `UserListItem` gain `phone`
   (nullable). `CreateUserBody` and `CreateTeacherBody` take optional `phone`; `UpdateUserBody`
   takes `phone` (null removes it). A phone is 6 to 20 digits with `+ - ( ) .` and spaces; Arabic

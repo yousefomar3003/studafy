@@ -56,6 +56,9 @@ const TARGET_MS = 3_500;
 // deliberately asserts against a document produced by a *separate process spawn* — importing the
 // expectation from the in-process suite would couple the two and weaken what this one proves.
 const EXPECTED_PATHS = [
+  // The parent directory (modules/users/routes/parent-routes.ts).
+  "/api/parents",
+  "/api/parents/{parentUserId}",
   // School-defined student and parent records (modules/records).
   "/api/parents/{parentUserId}/records",
   "/api/parents/{parentUserId}/records/{fieldId}/document",

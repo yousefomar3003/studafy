@@ -180,7 +180,13 @@ import { provisioningRoutes } from "./modules/tenancy/provisioning/route";
 import { registerSchoolRoutes } from "./modules/tenancy/registration/route";
 import { schoolSettingsRoutes } from "./modules/tenancy/settings/route";
 import { emailVerificationRoutes } from "./modules/tenancy/verification/route";
-import { familyRoutes, userRoutes, studentRoutes, teacherRoutes } from "./modules/users";
+import {
+  familyRoutes,
+  parentRoutes,
+  userRoutes,
+  studentRoutes,
+  teacherRoutes,
+} from "./modules/users";
 import { registerOpenApiComponents } from "./openapi/components";
 import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
@@ -1051,6 +1057,12 @@ export function createApp({
   // teacher self-view of own profile read-only. Gated on TEACHER_* permissions.
   if (database) {
     app.route("/", teacherRoutes(database));
+  }
+
+  // The parent directory: contact details, Studafy ID and children of every parent, for the
+  // principal's and admin's Parents page. Gated on user:read, web only.
+  if (database) {
+    app.route("/", parentRoutes(database));
   }
 
   // Academic year & term management (ST-091). Full CRUD plus a rollover action that transitions

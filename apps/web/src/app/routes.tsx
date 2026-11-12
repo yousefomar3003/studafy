@@ -361,6 +361,10 @@ const PrincipalStudentPage = lazyWithCatalogs(
   [...PRINCIPAL_CATALOGS, "records", "academicGrading"],
   () => import("../features/principal/students/PrincipalStudentPage"),
 );
+const ParentDirectoryPage = lazyWithCatalogs(
+  [...PRINCIPAL_CATALOGS, "records"],
+  () => import("../features/records/parents/ParentDirectoryPage"),
+);
 const PrincipalParentPage = lazyWithCatalogs(
   [...PRINCIPAL_CATALOGS, "records"],
   () => import("../features/principal/students/PrincipalParentPage"),
@@ -1126,6 +1130,16 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <PrincipalStudentPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Every parent with their phone, email, ID and children. Gated on `user:read` (admins,
+            // principals, finance), as GET /api/parents is: teachers read records but not this.
+            path: "principal/parents",
+            element: (
+              <RequirePermission permission={PERMISSIONS.USER_READ}>
+                <ParentDirectoryPage />
               </RequirePermission>
             ),
           },
