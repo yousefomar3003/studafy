@@ -134,7 +134,7 @@ export async function updateReportCardSettings(
       show_principal_comment = EXCLUDED.show_principal_comment,
       show_attendance = EXCLUDED.show_attendance,
       show_conduct = EXCLUDED.show_conduct,
-      updated_at = CURRENT_TIMESTAMP
+      updated_at = GREATEST(CURRENT_TIMESTAMP, app.report_card_settings.created_at)
   `;
   if (input.conduct_ratings !== undefined) {
     const codes = new Set<string>();
@@ -217,6 +217,18 @@ async function requirePeriod(
     finalized: current !== undefined,
     yearStatus: year.grading_config_status,
   };
+}
+
+/**
+ * Serialize writes to one section period's notes, so two people saving the same student at once
+ * update one row instead of racing to insert two (the unique indexes are partial, per period).
+ */
+async function lockSectionPeriod(
+  tx: TransactionSql,
+  sectionId: string,
+  termId: string | null,
+): Promise<void> {
+  await tx`SELECT pg_advisory_xact_lock(hashtextextended(${`report-notes:${sectionId}:${termId ?? "annual"}`}, 0))`;
 }
 
 /** Notes change only while the period is open: an active year, not yet finalized. */
@@ -393,6 +405,7 @@ export async function saveSubjectComments(
   await assertCanGradeSectionSubject(tx, sectionId, subjectId);
   const period = await requirePeriod(tx, schoolId, sectionId, termId);
   assertNotesOpen(period);
+  await lockSectionPeriod(tx, sectionId, termId);
   const roster = await sectionStudentIds(tx, schoolId, sectionId);
   assertStudentsInSection(
     items.map((item) => item.student_id),
@@ -421,7 +434,7 @@ export async function saveSubjectComments(
     }
     const [updated] = await tx<{ id: string }[]>`
       UPDATE app.report_subject_comments
-      SET body = ${body}, author_user_id = ${userId}::uuid, updated_at = CURRENT_TIMESTAMP
+      SET body = ${body}, author_user_id = ${userId}::uuid, updated_at = GREATEST(CURRENT_TIMESTAMP, app.report_subject_comments.created_at)
       WHERE school_id = ${schoolId}::uuid AND section_id = ${sectionId}::uuid
         AND term_id IS NOT DISTINCT FROM ${termId}::uuid
         AND student_id = ${item.student_id}::uuid AND subject_id = ${subjectId}::uuid
@@ -485,6 +498,7 @@ export async function saveStudentNotes(
   }
   const period = await requirePeriod(tx, schoolId, sectionId, termId);
   assertNotesOpen(period);
+  await lockSectionPeriod(tx, sectionId, termId);
   const roster = await sectionStudentIds(tx, schoolId, sectionId);
   assertStudentsInSection(
     items.map((item) => item.student_id),
@@ -539,7 +553,7 @@ export async function saveStudentNotes(
           conduct_code = CASE WHEN ${conduct !== undefined} THEN ${conduct ?? null} ELSE conduct_code END,
           conduct_by_user_id = CASE WHEN ${conduct !== undefined}
             THEN ${conduct ? userId : null}::uuid ELSE conduct_by_user_id END,
-          updated_at = CURRENT_TIMESTAMP
+          updated_at = GREATEST(CURRENT_TIMESTAMP, app.report_student_notes.created_at)
         WHERE id = ${existing.id}::uuid AND school_id = ${schoolId}::uuid
       `;
     } else {
