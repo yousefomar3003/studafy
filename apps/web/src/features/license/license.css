@@ -305,3 +305,72 @@
     display: none !important;
   }
 }
+
+/* --- Storage (`/portal/license/storage`) --- */
+
+.license-banner[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  border-color: var(--color-success);
+  color: var(--color-success-subtle-foreground);
+}
+
+.storage-heading {
+  margin-block: var(--space-16) var(--space-8);
+  font-size: var(--font-size-lg);
+}
+
+.storage-meter {
+  block-size: var(--space-8);
+  margin-block: var(--space-8);
+  border-radius: var(--radius-full);
+  background-color: var(--color-surface-muted, var(--color-border));
+  overflow: hidden;
+}
+
+.storage-meter__fill {
+  block-size: 100%;
+  background-color: var(--color-success);
+}
+
+.storage-meter__fill[data-tone="warning"] {
+  background-color: var(--color-warning);
+}
+
+.storage-meter__fill[data-tone="danger"] {
+  background-color: var(--color-danger);
+}
+
+.storage-interval {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  margin: 0 0 var(--space-12);
+  padding: 0;
+  border: 0;
+}
+
+.storage-interval legend {
+  margin-block-end: var(--space-4);
+  font-weight: var(--font-weight-semibold);
+}
+
+.storage-interval label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.storage-tiers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-12);
+  margin: 0 0 var(--space-12);
+  padding: 0;
+  list-style: none;
+}
+
+.storage-tier__size {
+  margin: 0 0 var(--space-4);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+}
