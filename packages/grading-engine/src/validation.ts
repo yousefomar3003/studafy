@@ -1,3 +1,4 @@
+import { validateDescriptiveConfig } from "./descriptive";
 import { validateGradeScale, WEIGHT_TOLERANCE } from "./rounding";
 
 import type { SubjectGradingConfig, ValidationIssue, WeightSummary } from "./types";
@@ -14,10 +15,10 @@ const isHundred = (value: number): boolean => Math.abs(value - 100) <= WEIGHT_TO
  *  - The annual grade is built from the weighted terms plus the `annual`-scope categories, so the
  *    term weights and annual category weights together total 100.
  *
- * Total-points configurations carry no weights and are always reported valid here.
+ * Total-points and descriptive configurations carry no weights and are always reported valid here.
  */
 export function summarizeWeights(config: SubjectGradingConfig): WeightSummary {
-  if (config.method === "total_points") {
+  if (config.method !== "weighted") {
     return { termCategoryTotal: 0, annualTotal: 0, valid: true };
   }
   const termCategories = config.categories.filter((category) => category.scope === "term");
@@ -37,6 +38,7 @@ export function summarizeWeights(config: SubjectGradingConfig): WeightSummary {
  * issues are shown but allowed.
  */
 export function validateSubjectConfig(config: SubjectGradingConfig): ValidationIssue[] {
+  if (config.method === "descriptive") return validateDescriptiveConfig(config);
   const issues: ValidationIssue[] = [];
   const error = (code: string, message: string, ref?: string) =>
     issues.push({ code, severity: "error", message, ref });

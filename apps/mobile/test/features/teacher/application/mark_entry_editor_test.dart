@@ -52,6 +52,7 @@ void main() {
       'attempt': 1,
       'status': 'graded',
       'score': 17.5,
+      'descriptor_id': null,
       'remarks': null,
       'expected_updated_at': '2026-09-10T10:00:00.000Z',
     });

@@ -184,6 +184,8 @@ class _MarkRow extends StatelessWidget {
     final theme = Theme.of(context);
     final score = attempt.score;
     final value = switch (attempt.status) {
+      ReleasedMarkStatus.graded when attempt.descriptorLabel != null =>
+        attempt.descriptorLabel!,
       ReleasedMarkStatus.graded when score != null =>
         '${formatResultNumber(score)} / ${formatResultNumber(assessment.maxMarks)}',
       ReleasedMarkStatus.graded => '—',

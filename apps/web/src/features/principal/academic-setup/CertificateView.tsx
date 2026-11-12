@@ -142,7 +142,7 @@ export function CertificateDocument({
                 </td>
               ))}
               <td>
-                {subject.exempt ? (
+                {subject.exempt || subject.descriptive ? (
                   "—"
                 ) : (
                   <>
@@ -150,7 +150,13 @@ export function CertificateDocument({
                   </>
                 )}
               </td>
-              <td>{subject.exempt ? "—" : <Percent value={subject.percentage} />}</td>
+              <td>
+                {subject.exempt || subject.descriptive ? (
+                  "—"
+                ) : (
+                  <Percent value={subject.percentage} />
+                )}
+              </td>
               <td>{subject.grade_label ?? "—"}</td>
               <td>
                 {subject.exempt
@@ -165,6 +171,8 @@ export function CertificateDocument({
           ))}
         </tbody>
       </table>
+
+      <DescriptiveSkills subjects={content.subjects} />
 
       <dl className="ag-certificate__facts ag-certificate__overall">
         <div>
@@ -240,5 +248,45 @@ export function CertificateDocument({
         </div>
       </footer>
     </article>
+  );
+}
+
+/**
+ * Subjects graded with descriptors (kindergarten, early primary): each skill and the descriptor
+ * it was given, grouped by subject. Certificates issued before descriptive grading have none.
+ */
+function DescriptiveSkills({ subjects }: { subjects: CertificateContent["subjects"] }) {
+  const { t } = useTranslation();
+  const descriptive = subjects.filter(
+    (subject) => subject.descriptive && !subject.exempt && (subject.skills?.length ?? 0) > 0,
+  );
+  if (descriptive.length === 0) return null;
+  return (
+    <section className="ag-certificate__skills" aria-labelledby="ag-certificate-skills-heading">
+      <h3 id="ag-certificate-skills-heading">{t("academicGrading.descriptive.skillsHeading")}</h3>
+      {descriptive.map((subject) => (
+        <table key={subject.code} className="ag-certificate__table">
+          <caption>{subject.name}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{t("academicGrading.descriptive.skillName")}</th>
+              <th scope="col">{t("academicGrading.descriptive.skillGroup")}</th>
+              <th scope="col">{t("academicGrading.descriptive.term")}</th>
+              <th scope="col">{t("academicGrading.descriptive.descriptor")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {subject.skills!.map((skill, index) => (
+              <tr key={`${skill.name}-${skill.term_name ?? "annual"}-${index}`}>
+                <th scope="row">{skill.name}</th>
+                <td>{skill.category_name}</td>
+                <td>{skill.term_name ?? t("academicGrading.descriptive.annual")}</td>
+                <td>{skill.descriptor_label ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ))}
+    </section>
   );
 }

@@ -127,7 +127,7 @@ export async function legacyComputeSection(
       engine.assessments
         .filter((assessment) =>
           termId === null
-            ? engine.method === "total_points" ||
+            ? engine.method !== "weighted" ||
               assessment.termId === null ||
               (engine.terms.find((term) => term.termId === assessment.termId)?.weight ?? 0) > 0
             : assessment.termId === termId,

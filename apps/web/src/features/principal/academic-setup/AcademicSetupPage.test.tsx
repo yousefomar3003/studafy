@@ -388,6 +388,7 @@ const GET_RESPONSES: Record<string, unknown> = {
         average_rounding_mode: "half_up",
         result_format: "percentage",
         result_scale_max: null,
+        descriptors: [],
         updated_at: "2026-10-01T00:00:00.000Z",
       },
     ],
@@ -597,6 +598,62 @@ describe("AcademicSetupPage", () => {
     const [path, init] = putMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
     expect(path).toBe("/api/grading/years/{yearId}/programs/{gradeLevelId}");
     expect(init.body).toMatchObject({ result_format: "gpa", result_scale_max: 4 });
+  });
+
+  test("a descriptive subject drops marks and weights for skills and descriptors", async () => {
+    await renderAt("/subjects");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Mathematics" }));
+    const editor = await screen.findByRole("region", { name: "Mathematics grading rules" });
+    expect(within(editor).getByRole("spinbutton", { name: "Maximum marks" })).toBeTruthy();
+    expect(
+      within(editor).getByRole("checkbox", { name: "Counts in the overall average" }),
+    ).toBeTruthy();
+
+    fireEvent.click(within(editor).getByRole("combobox", { name: "Grading method" }));
+    fireEvent.click(await within(editor).findByRole("option", { name: "Descriptive (no marks)" }));
+
+    expect(within(editor).queryByRole("spinbutton", { name: "Maximum marks" })).toBeNull();
+    expect(
+      within(editor).queryByRole("checkbox", { name: "Counts in the overall average" }),
+    ).toBeNull();
+    expect(
+      within(editor).getByText(
+        "Descriptive subjects never count in the average. They still appear on report cards and certificates.",
+      ),
+    ).toBeTruthy();
+    expect(within(editor).getByRole("group", { name: "Skill groups" })).toBeTruthy();
+    expect(within(editor).getAllByRole("button", { name: "Add skill" }).length).toBeGreaterThan(0);
+    // The grade has no scale yet: saving gives it the default one.
+    expect(within(editor).getByText(/Saving this subject gives it the default one/)).toBeTruthy();
+    expect(
+      within(editor).getByText("Descriptive subjects have no weights or marks to total."),
+    ).toBeTruthy();
+  });
+
+  test("a grade's descriptor scale starts from the default and is saved with the grade", async () => {
+    await renderAt("/subjects");
+
+    const scale = await screen.findByRole("region", { name: "Descriptor scale" });
+    fireEvent.click(within(scale).getByRole("button", { name: "Use the default scale" }));
+    expect(within(scale).getAllByRole("group", { name: /^Descriptor: / })).toHaveLength(4);
+    fireEvent.click(
+      within(within(scale).getByRole("group", { name: "Descriptor: Needs improvement" })).getByRole(
+        "checkbox",
+        { name: "Not achieved" },
+      ),
+    );
+    fireEvent.click(within(scale).getByRole("button", { name: "Save scale" }));
+
+    await waitFor(() => expect(putMock).toHaveBeenCalled());
+    const [path, init] = putMock.mock.calls.at(-1) as [string, { body: Record<string, unknown> }];
+    expect(path).toBe("/api/grading/years/{yearId}/programs/{gradeLevelId}");
+    expect(init.body.descriptors).toEqual([
+      { label: "Excellent", points: 4, not_achieved: false },
+      { label: "Very good", points: 3, not_achieved: false },
+      { label: "Good", points: 2, not_achieved: false },
+      { label: "Needs improvement", points: 1, not_achieved: true },
+    ]);
   });
 
   test("shows the impact of a change to recorded marks and resends the save only once confirmed", async () => {

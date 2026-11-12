@@ -500,6 +500,8 @@ interface MarkChange {
   subjectName: string;
   studentName: string;
   assessmentName: string;
+  /** What the corrected mark reads as: the score, or the descriptor of a descriptive subject. */
+  valueLabel: string | null;
   mark: NonNullable<CorrectResultsBody["marks"]>[number];
 }
 
@@ -531,6 +533,7 @@ function CorrectionForm({
   const [attempt, setAttempt] = useState<"1" | "2">("1");
   const [status, setStatus] = useState<MarkStatus>("graded");
   const [score, setScore] = useState("");
+  const [descriptorId, setDescriptorId] = useState<string>();
   const [reason, setReason] = useState("");
   const [allowIncomplete, setAllowIncomplete] = useState(false);
   const [changes, setChanges] = useState<MarkChange[]>([]);
@@ -542,7 +545,15 @@ function CorrectionForm({
   const recorded = sheet.data?.students
     .find((s) => s.student_id === studentId)
     ?.marks.find((m) => m.assessment_id === assessmentId && m.attempt === Number(attempt));
-  const scoreValid = status !== "graded" || (score.trim() !== "" && Number.isFinite(Number(score)));
+  const descriptive = sheet.data?.config.grading_method === "descriptive";
+  const descriptors = sheet.data?.descriptors ?? [];
+  const descriptorLabel = (id: string | null | undefined) =>
+    descriptors.find((descriptor) => descriptor.id === id)?.label ?? null;
+  const scoreValid =
+    status !== "graded" ||
+    (descriptive
+      ? descriptorId !== undefined
+      : score.trim() !== "" && Number.isFinite(Number(score)));
   const canAdd =
     subjectId !== undefined && student !== undefined && assessment !== undefined && scoreValid;
 
@@ -562,16 +573,20 @@ function CorrectionForm({
         subjectName: subjects.get(subjectId) ?? "",
         studentName: `${student.first_name} ${student.last_name}`,
         assessmentName: assessment.name,
+        valueLabel:
+          status !== "graded" ? null : descriptive ? descriptorLabel(descriptorId) : score.trim(),
         mark: {
           assessment_id: assessment.id,
           student_id: student.student_id,
           attempt: attempt === "2" ? 2 : 1,
           status,
-          score: status === "graded" ? Number(score) : null,
+          score: status === "graded" && !descriptive ? Number(score) : null,
+          descriptor_id: status === "graded" && descriptive ? (descriptorId ?? null) : null,
         },
       },
     ]);
     setScore("");
+    setDescriptorId(undefined);
   }
 
   function submit() {
@@ -664,7 +679,18 @@ function CorrectionForm({
             value={status}
             onChange={setStatus}
           />
-          {status === "graded" ? (
+          {status === "graded" && descriptive ? (
+            <Select
+              label={t("academicGrading.descriptive.descriptor")}
+              options={descriptors.map((descriptor) => ({
+                value: descriptor.id,
+                label: descriptor.label,
+              }))}
+              value={descriptorId}
+              onChange={setDescriptorId}
+              placeholder={t("academicGrading.descriptive.pickDescriptor")}
+            />
+          ) : status === "graded" ? (
             <Input
               label={t("academicGrading.correction.score")}
               type="number"
@@ -685,7 +711,9 @@ function CorrectionForm({
             {t("academicGrading.correction.recorded", {
               value:
                 recorded.status === "graded"
-                  ? String(recorded.score)
+                  ? descriptive
+                    ? (descriptorLabel(recorded.descriptor_id) ?? "—")
+                    : String(recorded.score)
                   : t(`academicGrading.markStatus.${recorded.status}`),
             })}
           </p>
@@ -703,7 +731,7 @@ function CorrectionForm({
                   assessment: change.assessmentName,
                   value:
                     change.mark.status === "graded"
-                      ? String(change.mark.score)
+                      ? (change.valueLabel ?? "—")
                       : t(`academicGrading.markStatus.${change.mark.status}`),
                 })}{" "}
                 <Button

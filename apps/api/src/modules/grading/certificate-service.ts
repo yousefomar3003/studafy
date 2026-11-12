@@ -47,6 +47,14 @@ export interface CertificateContent {
     terms: { term_id: string | null; term_name: string | null; percentage: number | null }[];
     /** The subject teacher's comment. Absent on certificates issued before report card notes. */
     comment?: string;
+    /** Graded with descriptors instead of marks (absent on certificates issued before). */
+    descriptive?: boolean;
+    skills?: {
+      name: string;
+      category_name: string;
+      term_name: string | null;
+      descriptor_label: string | null;
+    }[];
   }[];
   overall: {
     average_percentage: number | null;
@@ -240,6 +248,17 @@ function renderContent(
           percentage: term.percentage,
         })),
         ...(subject.comment ? { comment: subject.comment } : {}),
+        ...(subject.is_descriptive
+          ? {
+              descriptive: true,
+              skills: subject.skills.map((skill) => ({
+                name: skill.name,
+                category_name: skill.category_name,
+                term_name: terms.find((t) => t.id === skill.term_id)?.name ?? null,
+                descriptor_label: skill.descriptor_label,
+              })),
+            }
+          : {}),
       })),
     overall: {
       average_percentage: result.average_percentage,

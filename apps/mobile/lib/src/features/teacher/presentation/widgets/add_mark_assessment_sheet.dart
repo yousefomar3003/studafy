@@ -45,7 +45,10 @@ class _AddMarkAssessmentSheetState
     extends ConsumerState<AddMarkAssessmentSheet> {
   final _formKey = GlobalKey<FormState>();
   final _name = TextEditingController();
-  final _maxMarks = TextEditingController();
+  // A descriptive subject's skill has no marks; the API stores a placeholder maximum of 1.
+  late final _maxMarks = TextEditingController(
+    text: widget.sheet.config.isDescriptive ? '1' : '',
+  );
   final _weight = TextEditingController(text: '1');
   String? _categoryId;
   bool _mandatory = true;
@@ -163,37 +166,38 @@ class _AddMarkAssessmentSheetState
                     onChanged: (value) => setState(() => _categoryId = value),
                   ),
                   const SizedBox(height: AppSpacing.space12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextFormField(
-                          controller: _maxMarks,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
+                  if (!widget.sheet.config.isDescriptive)
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextFormField(
+                            controller: _maxMarks,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'teacher.marks.addAssessment.maxMarks'
+                                  .tr(),
+                            ),
+                            validator: _positive,
                           ),
-                          decoration: InputDecoration(
-                            labelText: 'teacher.marks.addAssessment.maxMarks'
-                                .tr(),
-                          ),
-                          validator: _positive,
                         ),
-                      ),
-                      const SizedBox(width: AppSpacing.space12),
-                      Expanded(
-                        child: TextFormField(
-                          controller: _weight,
-                          keyboardType: const TextInputType.numberWithOptions(
-                            decimal: true,
+                        const SizedBox(width: AppSpacing.space12),
+                        Expanded(
+                          child: TextFormField(
+                            controller: _weight,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: InputDecoration(
+                              labelText: 'teacher.marks.addAssessment.weight'
+                                  .tr(),
+                            ),
+                            validator: _positive,
                           ),
-                          decoration: InputDecoration(
-                            labelText: 'teacher.marks.addAssessment.weight'
-                                .tr(),
-                          ),
-                          validator: _positive,
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text('teacher.marks.addAssessment.mandatory'.tr()),
