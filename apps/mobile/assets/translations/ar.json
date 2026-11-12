@@ -1025,6 +1025,12 @@
       }
     },
     "marks": {
+      "descriptive": {
+        "pickHint": "اختر وصفًا لكل طالب",
+        "scale": "سلم الأوصاف",
+        "skillMeta": "مهارة · اختر وصفًا",
+        "complete": "تم تقييم كل المهارات"
+      },
       "reportComments": {
         "entry": "ملاحظات الشهادة",
         "entrySubtitle": "ملاحظتك على كل طالب في {period}",
@@ -1126,6 +1132,7 @@
         "missingInPeriod": "درجات ناقصة: {count}"
       },
       "rules": {
+        "methodDescriptive": "وصفي (بدون درجات)",
         "title": "قواعد التقييم",
         "method": "طريقة الحساب",
         "methodWeighted": "فئات موزونة",
@@ -2156,6 +2163,7 @@
     }
   },
   "academicResults": {
+    "skillLine": "{skill}: {descriptor}",
     "report": {
       "subjectComments": "ملاحظات المعلمين",
       "conduct": "السلوك",

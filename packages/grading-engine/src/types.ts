@@ -13,7 +13,13 @@ export type GradingMethod =
   /** Each category's percentage is multiplied by its weight; weights total 100. */
   | "weighted"
   /** Every counted mark's points are summed and divided by the summed maximums. Weights unused. */
-  | "total_points";
+  | "total_points"
+  /**
+   * No marks: a teacher picks a descriptor ("Excellent", "Needs improvement") for each skill. The
+   * subject never has a percentage and never counts in the numeric average; when every descriptor
+   * carries points, the subject's own descriptor is the one nearest the average points.
+   */
+  | "descriptive";
 
 /** How a category turns its assessments into one percentage before its weight is applied. */
 export type CategoryAggregation =
@@ -67,6 +73,19 @@ export interface GradeBand {
   gpaPoints: number | null;
 }
 
+/**
+ * One step of a grade's descriptor scale (descriptive subjects). The scale is ordered highest
+ * first; the last descriptor is the lowest.
+ */
+export interface EngineDescriptor {
+  id: string;
+  label: string;
+  /** Optional value used to compute a subject descriptor; all or none of a scale carry points. */
+  points: number | null;
+  /** A subject whose resulting descriptor is this one is not passed. */
+  notAchieved: boolean;
+}
+
 export interface EngineTerm {
   termId: string;
   name: string;
@@ -117,6 +136,8 @@ export interface SubjectGradingConfig {
   terms: EngineTerm[];
   categories: EngineCategory[];
   assessments: EngineAssessment[];
+  /** The grade's descriptor scale, highest first. Present only for `descriptive` subjects. */
+  descriptors?: EngineDescriptor[];
 }
 
 export interface MarkInput {
@@ -124,8 +145,10 @@ export interface MarkInput {
   /** 1 = the original sitting, 2 = a retake / supplementary sitting. */
   attempt: 1 | 2;
   status: MarkStatus;
-  /** Raw points, 0..maxMarks. Required when status is `graded`, null otherwise. */
+  /** Raw points, 0..maxMarks. Required when status is `graded` (numeric subjects), null otherwise. */
   score: number | null;
+  /** The chosen descriptor of a `graded` mark in a descriptive subject; null otherwise. */
+  descriptorId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -145,6 +168,9 @@ export interface AssessmentOutcome {
   points: number | null;
   maxMarks: number;
   usedRetake: boolean;
+  /** Descriptive subjects: the descriptor this skill counted with (null when not counted). */
+  descriptorId?: string | null;
+  descriptorLabel?: string | null;
 }
 
 export interface CategoryOutcome {
@@ -195,6 +221,13 @@ export interface SubjectResult {
   terms: PeriodOutcome[];
   /** Annual-scope categories (annual computation only). */
   annualCategories: CategoryOutcome[];
+  /** True for a descriptive subject: no percentage, marks or GPA, ever. */
+  descriptive?: boolean;
+  /**
+   * Descriptive subjects whose descriptors carry points: the subject's descriptor (nearest the
+   * average points) and that average. Null otherwise; the skills' descriptors are in `terms`.
+   */
+  descriptor?: { id: string; label: string; averagePoints: number } | null;
 }
 
 export type FailReason =
@@ -204,7 +237,8 @@ export type FailReason =
       categoryId: string;
       required: number;
       actual: number | null;
-    };
+    }
+  | { code: "DESCRIPTOR_NOT_ACHIEVED"; descriptor: string };
 
 export type SubjectRequirement = "mandatory" | "optional" | "elective";
 

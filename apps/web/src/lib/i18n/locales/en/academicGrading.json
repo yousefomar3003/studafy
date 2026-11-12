@@ -55,7 +55,8 @@
   },
   "method": {
     "weighted": "Weighted categories",
-    "total_points": "Total points"
+    "total_points": "Total points",
+    "descriptive": "Descriptive (no marks)"
   },
   "rounding": {
     "half_up": "Round half up",
@@ -179,7 +180,11 @@
     "TERM_WEIGHT_MISSING": "There are term categories, but no term carries any weight in the year's grade.",
     "TERM_WEIGHT_WITHOUT_TERM_CATEGORIES": "Terms carry weight, but there are no term categories to build a term grade from.",
     "WEIGHT_IGNORED_FOR_TOTAL_POINTS": "Category weights are ignored when the subject is graded by total points.",
-    "FINAL_EXAM_RULE_WITHOUT_FINAL": "The final exam must be passed on its own, but no category is a final exam."
+    "FINAL_EXAM_RULE_WITHOUT_FINAL": "The final exam must be passed on its own, but no category is a final exam.",
+    "DESCRIPTORS_REQUIRED": "Set up this grade's descriptor scale: at least two descriptors, such as Excellent and Needs improvement.",
+    "DESCRIPTOR_POINTS_PARTIAL": "Give every descriptor points, or none. A subject descriptor is only worked out when all have points.",
+    "DESCRIPTOR_NOT_ACHIEVED_UNUSED": "A descriptor is marked \"not achieved\", but without points no subject descriptor is worked out, so no pupil fails this subject.",
+    "NO_SKILLS": "Add at least one skill to assess."
   },
   "overview": {
     "statusHeading": "Grading for {{year}}",
@@ -858,5 +863,42 @@
     "saveNotes": "Save comments",
     "notesSaved": "Comments saved.",
     "saveFailed": "Couldn't save"
+  },
+  "descriptive": {
+    "zeroIsLowest": "For descriptive subjects, \"counts as zero\" means the lowest descriptor.",
+    "notInAverage": "Descriptive subjects never count in the average. They still appear on report cards and certificates.",
+    "skillGroups": "Skill groups",
+    "skillGroupsHelp": "Group the skills teachers assess, such as Reading or Numbers. Each skill belongs to a term, and teachers pick a descriptor for it instead of entering a mark.",
+    "addSkill": "Add skill",
+    "addSkillGroup": "Add skill group",
+    "noSkills": "No skills yet.",
+    "noWeights": "Descriptive subjects have no weights or marks to total.",
+    "skillName": "Skill",
+    "skillGroup": "Group",
+    "term": "Term",
+    "annual": "Whole year",
+    "descriptor": "Descriptor",
+    "pickDescriptor": "Choose a descriptor",
+    "skillsHeading": "Skills",
+    "scaleHeading": "Descriptor scale",
+    "scaleHelp": "The descriptors teachers pick from for this grade's descriptive subjects, highest first. With points on every descriptor, each subject also gets an overall descriptor from the average. A subject that ends on a descriptor marked \"not achieved\" is not passed.",
+    "scaleEmpty": "This grade has no descriptor scale yet. Use the default one or add your own.",
+    "scaleDefaultNote": "This grade has no descriptor scale yet. Saving this subject gives it the default one (Excellent, Very good, Good, Needs improvement), which you can change under the grade's settings.",
+    "scaleEditNote": "Change the scale under the grade's settings on the Subjects tab.",
+    "scaleInvalid": "A scale needs at least two descriptors, each with a name.",
+    "scaleSaved": "Descriptor scale saved",
+    "points": "{{points}} points",
+    "pointsLabel": "Points (optional)",
+    "pointsHelp": "Used to work out a subject's overall descriptor.",
+    "label": "Descriptor",
+    "notAchieved": "Not achieved",
+    "descriptorN": "Descriptor {{n}}",
+    "descriptorGroup": "Descriptor: {{name}}",
+    "moveUp": "Move {{name}} up",
+    "moveDown": "Move {{name}} down",
+    "removeDescriptor": "Remove {{name}}",
+    "useDefaults": "Use the default scale",
+    "addDescriptor": "Add descriptor",
+    "saveScale": "Save scale"
   }
 }

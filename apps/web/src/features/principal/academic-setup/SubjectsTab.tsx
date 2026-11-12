@@ -7,6 +7,7 @@ import { useGradeLevels } from "../sections/queries";
 
 import { Badge, ConfirmModal, QueryState } from "./components";
 import { ROUNDING_MODES } from "./config-form";
+import { DescriptorScaleForm } from "./DescriptorScaleForm";
 import { problemMessage } from "./errors";
 import { useDeleteSubjectConfig, useSaveGradeProgram } from "./mutations";
 import { useGradePrograms, useGradeScales, useGradeSubjectConfigs } from "./queries";
@@ -68,6 +69,14 @@ export function SubjectsTab({ ctx }: { ctx: SetupContext }) {
             program={program}
             scales={scales.data ?? []}
           />
+          {program ? (
+            <DescriptorScaleForm
+              key={`descriptors-${grade.id}-${program.updated_at}`}
+              ctx={ctx}
+              gradeLevelId={grade.id}
+              program={program}
+            />
+          ) : null}
           {program ? (
             <GradeSubjects
               ctx={ctx}

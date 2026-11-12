@@ -154,6 +154,16 @@ export async function copyYearConfiguration(
         ${program.result_scale_max}::numeric
       )
     `;
+    // The grade's descriptor scale (descriptive subjects) comes along with it.
+    await tx`
+      INSERT INTO app.grade_program_descriptors (
+        school_id, academic_year_id, grade_level_id, position, label, points, not_achieved
+      )
+      SELECT school_id, ${targetYearId}::uuid, grade_level_id, position, label, points, not_achieved
+      FROM app.grade_program_descriptors
+      WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${sourceYearId}::uuid
+        AND grade_level_id = ${program.grade_level_id}::uuid
+    `;
     summary.grade_programs += 1;
   }
 

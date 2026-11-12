@@ -11,9 +11,15 @@ import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { assertConfigEditable, requireYear } from "./access";
 import {
+  ensureDefaultDescriptors,
+  normalizeDescriptiveInput,
+  replaceDescriptors,
+} from "./descriptor-service";
+import {
   effectiveSubjects,
   loadConfigDetail,
   loadConfigDetails,
+  loadDescriptorRows,
   loadScale,
   loadYearConfigs,
   loadYearTerms,
@@ -23,9 +29,11 @@ import {
   resolveSectionSubjects,
   sectionConfigs,
   toEngineConfig,
+  toEngineDescriptors,
 } from "./engine-config";
 
 import type { GradingConfigStatus, YearRow } from "./access";
+import type { DescriptorInput } from "./descriptor-service";
 import type {
   AssessmentRow,
   CategoryRow,
@@ -41,6 +49,7 @@ import type {
   CategoryAggregation,
   CategoryKind,
   CategoryScope,
+  EngineDescriptor,
   GradeBand,
   ResultFormatKind,
   RoundingMode,
@@ -68,6 +77,8 @@ export interface ProgramInput {
   average_rounding_mode?: RoundingMode;
   result_format?: ResultFormatKind;
   result_scale_max?: number | null;
+  /** Replaces the grade's descriptor scale (highest first) when given. */
+  descriptors?: DescriptorInput[];
 }
 
 export interface CategoryInput {
@@ -101,7 +112,7 @@ export interface SubjectConfigInput {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: number;
-  grading_method: "weighted" | "total_points";
+  grading_method: "weighted" | "total_points" | "descriptive";
   max_marks: number;
   pass_percentage: number;
   final_exam_pass_percentage: number | null;
@@ -142,7 +153,7 @@ export interface ConfigView {
   include_in_average: boolean;
   include_on_certificate: boolean;
   average_weight: number;
-  grading_method: "weighted" | "total_points";
+  grading_method: "weighted" | "total_points" | "descriptive";
   max_marks: number;
   pass_percentage: number;
   final_exam_pass_percentage: number | null;
@@ -221,6 +232,7 @@ function inputToEngine(
   input: SubjectConfigInput,
   terms: TermRow[],
   scale: GradeBand[],
+  descriptors: EngineDescriptor[] = [],
 ): SubjectGradingConfig {
   const weights = new Map(input.term_weights.map((row) => [row.term_id, row.weight]));
   return {
@@ -258,6 +270,7 @@ function inputToEngine(
       weight: assessment.weight,
       mandatory: assessment.is_mandatory,
     })),
+    ...(input.grading_method === "descriptive" ? { descriptors } : {}),
   };
 }
 
@@ -680,6 +693,9 @@ export async function upsertProgram(
     `;
   }
   const program = await requireProgram(tx, schoolId, yearId, gradeLevelId);
+  if (input.descriptors !== undefined) {
+    await replaceDescriptors(tx, schoolId, program, input.descriptors);
+  }
   await emitAuditLog(tx, {
     action: existing ? "update" : "insert",
     targetTable: "grade_programs",
@@ -1058,7 +1074,13 @@ async function validateInputForYear(
     }
   }
   const scale = await loadScale(tx, schoolId, input.grade_scale_id ?? program.grade_scale_id);
-  const engine = inputToEngine(input, terms, scale.bands);
+  const descriptors =
+    input.grading_method === "descriptive"
+      ? toEngineDescriptors(
+          await loadDescriptorRows(tx, schoolId, year.id, [program.grade_level_id]),
+        )
+      : [];
+  const engine = inputToEngine(input, terms, scale.bands, descriptors);
   const issues = [...checkInputReferences(input, terms), ...validateSubjectConfig(engine)];
   // A live (active) year never runs on a broken configuration; a draft may be saved half-done.
   if (year.grading_config_status === "active" && hasErrors(issues)) invalid(issues);
@@ -1094,11 +1116,13 @@ export async function createSubjectConfig(
   schoolId: string,
   userId: string,
   target: { yearId: string; gradeLevelId: string; sectionId: string | null; subjectId: string },
-  input: SubjectConfigInput,
+  rawInput: SubjectConfigInput,
 ): Promise<SaveResult> {
+  const input = normalizeDescriptiveInput(rawInput);
   const year = await requireYear(tx, schoolId, target.yearId);
   assertConfigEditable(year);
   const program = await requireProgram(tx, schoolId, target.yearId, target.gradeLevelId);
+  if (input.grading_method === "descriptive") await ensureDefaultDescriptors(tx, schoolId, program);
   const [subject] = await tx<{ id: string }[]>`
     SELECT id FROM app.subjects WHERE id = ${target.subjectId}::uuid AND school_id = ${schoolId}::uuid
   `;
@@ -1311,9 +1335,10 @@ export async function updateSubjectConfig(
   schoolId: string,
   userId: string,
   configId: string,
-  input: SubjectConfigInput,
+  rawInput: SubjectConfigInput,
   options: { confirmImpact: boolean; expectedUpdatedAt?: string },
 ): Promise<SaveResult> {
+  const input = normalizeDescriptiveInput(rawInput);
   const before = await loadConfigDetail(tx, schoolId, configId);
   const { config } = before;
   if (config.is_excluded) {
@@ -1341,7 +1366,25 @@ export async function updateSubjectConfig(
     config.academic_year_id,
     config.grade_level_id,
   );
+  if (input.grading_method === "descriptive") await ensureDefaultDescriptors(tx, schoolId, program);
   const { engine: proposed } = await validateInputForYear(tx, schoolId, year, program, input);
+
+  // Marks and descriptors do not convert into each other: once anything is recorded, a subject
+  // stays numeric or descriptive.
+  if ((config.grading_method === "descriptive") !== (input.grading_method === "descriptive")) {
+    const recorded = await markCounts(
+      tx,
+      schoolId,
+      before.assessments.map((assessment) => assessment.id),
+    );
+    if ([...recorded.values()].some((count) => count > 0)) {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.CONFLICT_STATE_MISMATCH,
+        "This subject already has recorded marks, so it cannot switch between marks and descriptors.",
+      );
+    }
+  }
 
   // Shrinking an assessment's maximum below a recorded score would make that mark impossible.
   const highest = await maxScores(

@@ -256,7 +256,8 @@ export function computeLoadedSection(
       engine.assessments
         .filter((assessment) =>
           termId === null
-            ? engine.method === "total_points" ||
+            ? // Total-points and descriptive subjects count every term; weighted ones only weighted terms.
+              engine.method !== "weighted" ||
               assessment.termId === null ||
               (engine.terms.find((term) => term.termId === assessment.termId)?.weight ?? 0) > 0
             : assessment.termId === termId,
@@ -382,6 +383,7 @@ async function storeComputation(
         passed: status === "complete" ? result!.passed : null,
         include_in_average: subject.snapshot.include_in_average,
         include_on_certificate: subject.snapshot.include_on_certificate,
+        is_descriptive: subject.snapshot.engine.method === "descriptive",
         config_snapshot: subject.snapshot,
         breakdown: result ?? { exempt: true },
       };
@@ -392,17 +394,17 @@ async function storeComputation(
       INSERT INTO app.student_subject_results (
         school_id, finalization_id, student_id, subject_id, subject_config_id, status, percentage,
         marks_obtained, max_marks, grade_label, gpa_points, passed, include_in_average,
-        include_on_certificate, config_snapshot, breakdown
+        include_on_certificate, is_descriptive, config_snapshot, breakdown
       )
       SELECT ${schoolId}::uuid, ${finalizationId}::uuid, x.student_id, x.subject_id,
              x.subject_config_id, x.status, x.percentage, x.marks_obtained, x.max_marks,
              x.grade_label, x.gpa_points, x.passed, x.include_in_average,
-             x.include_on_certificate, x.config_snapshot, x.breakdown
+             x.include_on_certificate, x.is_descriptive, x.config_snapshot, x.breakdown
       FROM jsonb_to_recordset(${tx.json(chunk as never)}::jsonb) AS x(
         student_id uuid, subject_id uuid, subject_config_id uuid, status text, percentage numeric,
         marks_obtained numeric, max_marks numeric, grade_label text, gpa_points numeric,
         passed boolean, include_in_average boolean, include_on_certificate boolean,
-        config_snapshot jsonb, breakdown jsonb
+        is_descriptive boolean, config_snapshot jsonb, breakdown jsonb
       )
     `;
   }
@@ -558,6 +560,8 @@ export interface CorrectionInput {
     attempt: 1 | 2;
     status: MarkInput["status"] | "pending";
     score: number | null;
+    /** Descriptive subjects: the corrected descriptor of a graded mark. */
+    descriptor_id?: string | null;
   }[];
   allow_incomplete: boolean;
 }
@@ -641,7 +645,24 @@ export async function correctFinalization(
       );
     }
     const assessment = snapshot.engine.assessments.find((a) => a.id === mark.assessment_id)!;
-    if (
+    const descriptorId = mark.status === "graded" ? (mark.descriptor_id ?? null) : null;
+    if (snapshot.engine.method === "descriptive") {
+      // The snapshot's own scale: a correction is judged by the rules the result was made with.
+      const known = (snapshot.engine.descriptors ?? []).some((d) => d.id === descriptorId);
+      if (mark.score !== null || (mark.status === "graded" && !known)) {
+        throw new CodedHttpException(
+          400,
+          ERROR_CODES.VALIDATION_FAILED,
+          `${assessment.name}: choose one of the grade's descriptors (no score)`,
+        );
+      }
+    } else if ((mark.descriptor_id ?? null) !== null) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.VALIDATION_FAILED,
+        `${assessment.name} is marked with numbers, not descriptors`,
+      );
+    } else if (
       mark.status === "graded" &&
       (mark.score === null || mark.score < 0 || mark.score > assessment.maxMarks)
     ) {
@@ -658,8 +679,10 @@ export async function correctFinalization(
         "Only a graded mark carries a score",
       );
     }
-    const [before] = await tx<{ status: string; score: string | null }[]>`
-      SELECT status, score FROM app.student_marks
+    const [before] = await tx<
+      { status: string; score: string | null; descriptor_id: string | null }[]
+    >`
+      SELECT status, score, descriptor_id FROM app.student_marks
       WHERE school_id = ${schoolId}::uuid AND assessment_id = ${mark.assessment_id}::uuid
         AND student_id = ${mark.student_id}::uuid AND attempt = ${mark.attempt}
     `;
@@ -672,13 +695,15 @@ export async function correctFinalization(
     } else {
       await tx`
         INSERT INTO app.student_marks (
-          school_id, academic_year_id, assessment_id, student_id, attempt, status, score, entered_by_user_id
+          school_id, academic_year_id, assessment_id, student_id, attempt, status, score,
+          descriptor_id, entered_by_user_id
         ) VALUES (
           ${schoolId}::uuid, ${old.academic_year_id}::uuid, ${mark.assessment_id}::uuid,
-          ${mark.student_id}::uuid, ${mark.attempt}, ${mark.status}, ${mark.score}, ${userId}::uuid
+          ${mark.student_id}::uuid, ${mark.attempt}, ${mark.status}, ${mark.score},
+          ${descriptorId}::uuid, ${userId}::uuid
         )
         ON CONFLICT (school_id, assessment_id, student_id, attempt) DO UPDATE SET
-          status = EXCLUDED.status, score = EXCLUDED.score,
+          status = EXCLUDED.status, score = EXCLUDED.score, descriptor_id = EXCLUDED.descriptor_id,
           entered_by_user_id = EXCLUDED.entered_by_user_id, updated_at = CURRENT_TIMESTAMP
       `;
     }
@@ -779,9 +804,51 @@ export interface StoredSubjectResult {
   include_on_certificate: boolean;
   requirement: string;
   terms: { term_id: string | null; percentage: number | null }[];
-  fail_reasons: FailReason[];
+  fail_reasons: StoredFailReason[];
   /** The subject teacher's report card comment, as finalized; null when there is none. */
   comment: string | null;
+  is_descriptive: boolean;
+  /** Descriptive subjects whose descriptors carry points: the skills' average. */
+  average_points: number | null;
+  /** Descriptive subjects: every skill and the descriptor it was given. */
+  skills: DescriptiveSkill[];
+}
+
+export interface DescriptiveSkill {
+  assessment_id: string;
+  name: string;
+  category_name: string;
+  term_id: string | null;
+  descriptor_label: string | null;
+}
+
+/** A fail reason as the API reports it: a descriptor reason carries no percentages. */
+function failReasonView(reason: FailReason): StoredFailReason {
+  return reason.code === "DESCRIPTOR_NOT_ACHIEVED"
+    ? { code: reason.code, required: 0, actual: null, descriptor: reason.descriptor }
+    : reason;
+}
+
+export type StoredFailReason =
+  | Exclude<FailReason, { code: "DESCRIPTOR_NOT_ACHIEVED" }>
+  | { code: "DESCRIPTOR_NOT_ACHIEVED"; required: 0; actual: null; descriptor: string };
+
+/** A descriptive result's skills, in term then group order, from its stored breakdown. */
+export function descriptiveSkills(breakdown: Partial<SubjectResult>): DescriptiveSkill[] {
+  if (breakdown.descriptive !== true) return [];
+  const categories = [
+    ...(breakdown.terms ?? []).flatMap((term) => term.categories),
+    ...(breakdown.annualCategories ?? []),
+  ];
+  return categories.flatMap((category) =>
+    category.assessments.map((assessment) => ({
+      assessment_id: assessment.assessmentId,
+      name: assessment.name,
+      category_name: category.name,
+      term_id: category.termId,
+      descriptor_label: assessment.descriptorLabel ?? null,
+    })),
+  );
 }
 
 export interface StoredStudentResult {
@@ -928,8 +995,11 @@ export async function readFinalizationResults(
           term_id: term.termId,
           percentage: term.percentage,
         })),
-        fail_reasons: subject.breakdown.failReasons ?? [],
+        fail_reasons: (subject.breakdown.failReasons ?? []).map(failReasonView),
         comment: report.subjectComments.get(`${row.student_id}|${subject.subject_id}`) ?? null,
+        is_descriptive: subject.breakdown.descriptive === true,
+        average_points: subject.breakdown.descriptor?.averagePoints ?? null,
+        skills: descriptiveSkills(subject.breakdown),
       }))
       .sort((a, b) => a.subject_name.localeCompare(b.subject_name)),
   }));
@@ -1082,6 +1152,7 @@ export function computationView(computation: SectionComputation) {
         grade_label: subject.result?.gradeLabel ?? null,
         passed: subject.result?.passed ?? null,
         missing_assessments: subject.result?.missingAssessments.map((m) => m.name) ?? [],
+        is_descriptive: subject.snapshot.engine.method === "descriptive",
       })),
     })),
   };

@@ -37,6 +37,8 @@ class SubjectResult {
     required this.passed,
     required this.terms,
     this.comment,
+    this.isDescriptive = false,
+    this.skills = const [],
   });
 
   factory SubjectResult.fromJson(Map<String, Object?> json) => SubjectResult(
@@ -60,6 +62,19 @@ class SubjectResult {
         ),
     ],
     comment: _text(json['comment']),
+    // `is_descriptive` on finalized results, `descriptive` on certificate content.
+    isDescriptive:
+        json['is_descriptive'] == true || json['descriptive'] == true,
+    skills: [
+      for (final skill in _list(json['skills']))
+        (
+          name: skill['name'] as String? ?? '',
+          groupName: skill['category_name'] as String? ?? '',
+          termId: skill['term_id'] as String?,
+          termName: skill['term_name'] as String?,
+          descriptor: skill['descriptor_label'] as String?,
+        ),
+    ],
   );
 
   final String subjectId;
@@ -80,6 +95,22 @@ class SubjectResult {
   /// The subject teacher's report card comment; null when there is none (and on results and
   /// certificates from before report card notes).
   final String? comment;
+  /// Graded with descriptors (kindergarten, early primary): no marks or percentage; [gradeLabel]
+  /// is the subject's descriptor when its scale has points, and [skills] carry the detail.
+  final bool isDescriptive;
+
+  /// A descriptive subject's skills and the descriptor each was given (`termName` is set only on
+  /// certificate content).
+  final List<
+    ({
+      String name,
+      String groupName,
+      String? termId,
+      String? termName,
+      String? descriptor,
+    })
+  >
+  skills;
 
   bool get isExempt => status == 'exempt';
   bool get isIncomplete => status == 'incomplete';
