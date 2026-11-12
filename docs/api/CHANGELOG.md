@@ -75,6 +75,11 @@ when it required the `version-bump` label.
   `descriptor`), and `ReleasedMarkAttempt` gains `descriptor_label`. Certificates issued from now on
   mark such subjects `descriptive` with their `skills` (`CertificateContentSkill`). A subject with
   recorded marks cannot switch between marks and descriptors (409).
+  Transcripts: `TranscriptSubject` gains optional `descriptive` and `skills` (`TranscriptSkill`), and
+  descriptive subjects never count in the cumulative average or GPA. `TranscriptCumulative` gains
+  `gpa_unavailable_reason` value `mixed_gpa_scales` (the covered years were shown as GPAs out of
+  different maximums, e.g. 4 and 5), with `mixed_gpa_scales` (`TranscriptGpaScale`: each year and its
+  maximum) and `gpa_scale_max` (the maximum all GPA years share, otherwise null).
 
 - Paid storage add-on (000205): `GET /api/subscriptions/storage/offer` (`StorageAddOnOffer`: the
   school's usage and cap, its live add-on `StorageAddOnCurrent`, and each `StorageAddOnTier`

@@ -40,13 +40,17 @@ class TranscriptYear {
 enum TranscriptGpaUnavailableReason {
   missingGpaPoints,
   incomplete,
-  noSubjects;
+  noSubjects,
+
+  /// The years were graded on different GPA scales (out of 4 one year, 5 another).
+  mixedGpaScales;
 
   static TranscriptGpaUnavailableReason? fromWire(Object? value) =>
       switch (value) {
         'missing_gpa_points' => missingGpaPoints,
         'incomplete' => incomplete,
         'no_subjects' => noSubjects,
+        'mixed_gpa_scales' => mixedGpaScales,
         _ => null,
       };
 }
@@ -59,6 +63,7 @@ class TranscriptCumulative {
     required this.gpaUnavailableReason,
     required this.subjectsWithoutGpaPoints,
     required this.yearsCovered,
+    this.mixedGpaScales = const [],
   });
 
   factory TranscriptCumulative.fromJson(Map<String, Object?> json) =>
@@ -75,6 +80,13 @@ class TranscriptCumulative {
             '$name',
         ],
         yearsCovered: (json['years_covered'] as num?)?.toInt() ?? 0,
+        mixedGpaScales: [
+          for (final scale in _list(json['mixed_gpa_scales']))
+            (
+              year: scale['academic_year_name'] as String? ?? '',
+              max: _num(scale['max']) ?? 0,
+            ),
+        ],
       );
 
   final double? averagePercentage;
@@ -82,6 +94,10 @@ class TranscriptCumulative {
   final TranscriptGpaUnavailableReason? gpaUnavailableReason;
   final List<String> subjectsWithoutGpaPoints;
   final int yearsCovered;
+
+  /// When [gpaUnavailableReason] is [TranscriptGpaUnavailableReason.mixedGpaScales]: each GPA
+  /// year and its maximum.
+  final List<({String year, double max})> mixedGpaScales;
 }
 
 /// A transcript exactly as issued (`content`).

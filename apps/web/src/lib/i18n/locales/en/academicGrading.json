@@ -816,10 +816,13 @@
     "gpaReason": {
       "missing_gpa_points": "No cumulative GPA: these subjects have no GPA points on their grading scale: {{subjects}}.",
       "incomplete": "No cumulative figures: some results are incomplete.",
-      "no_subjects": "No cumulative figures: no subject counts toward the average."
+      "no_subjects": "No cumulative figures: no subject counts toward the average.",
+      "mixed_gpa_scales": "No cumulative GPA: the years use different GPA scales ({{scales}}), so their points can't be averaged."
     },
     "method": "The cumulative average and GPA weight every counted subject of every year by its weight in the year's average.",
-    "reissueNote": "Replaces transcript {{serial}}. Reason: {{reason}}"
+    "reissueNote": "Replaces transcript {{serial}}. Reason: {{reason}}",
+    "gpaScale": "{{year}}: out of {{max}}",
+    "skillLine": "{{skill}}: {{descriptor}}"
   },
   "reportCards": {
     "settingsHeading": "What report cards show",

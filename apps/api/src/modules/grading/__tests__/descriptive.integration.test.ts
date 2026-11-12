@@ -40,6 +40,7 @@ import {
 } from "../config-service";
 import { getMarkSheet, saveMarks } from "../marks-service";
 import { correctFinalization, finalizeSection, readFinalizationResults } from "../results-service";
+import { issueTranscript } from "../transcript-service";
 
 import type { TestApp, TestDatabase, TenantFixture } from "../../../../tests/harness";
 import type { SubjectConfigInput } from "../config-service";
@@ -520,5 +521,24 @@ describeDb("descriptive grading", () => {
     const badr = results.find((r) => r.student_id === ids.s2)!;
     expect(badr.subjects.find((s) => s.subject_id === ids.reading)!.grade_label).toBe("Good");
     expect(badr.academic_status).toBe("promoted");
+  });
+
+  test("a transcript shows the descriptive subject's skills and leaves it out of the cumulative", async () => {
+    const transcript = await admin((tx) =>
+      issueTranscript(tx, tenant.schoolId, tenant.users.ORG_ADMIN.id, ids.s1!),
+    );
+    const [year] = transcript.content.years;
+    const reading = year!.subjects.find((subject) => subject.code === "RD")!;
+    expect(reading.descriptive).toBe(true);
+    expect(reading.percentage).toBeNull();
+    expect(reading.grade_label).toBe("Excellent");
+    expect(reading.skills).toEqual([
+      { name: "Reads fluently", category_name: "Reading", descriptor_label: "Excellent" },
+      { name: "Knows letters", category_name: "Reading", descriptor_label: "Very good" },
+    ]);
+    expect(year!.subjects.find((subject) => subject.code === "MA")!.descriptive).toBeUndefined();
+    // Only Mathematics (80) counts.
+    expect(transcript.content.cumulative.average_percentage).toBe(80);
+    expect(transcript.content.cumulative.subjects_counted).toBe(1);
   });
 });

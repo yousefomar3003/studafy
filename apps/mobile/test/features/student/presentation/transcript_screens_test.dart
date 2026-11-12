@@ -218,6 +218,71 @@ void main() {
     );
   });
 
+  testWidgets('years on different GPA scales explain the missing GPA', (
+    tester,
+  ) async {
+    final row = _transcript(gpa: null, gpaReason: 'mixed_gpa_scales');
+    final content = row['content']! as Map<String, Object?>;
+    (content['cumulative']! as Map<String, Object?>)['mixed_gpa_scales'] = [
+      {'academic_year_name': '2024–2025', 'max': 4},
+      {'academic_year_name': '2025–2026', 'max': 5},
+    ];
+    await _pump(
+      tester,
+      _FakeTranscriptClient([row]),
+      const TranscriptDetailScreen(transcriptId: 'tr-1'),
+    );
+    expect(
+      find.text(
+        'No cumulative GPA: the years use different GPA scales '
+        '(2024–2025: out of 4, 2025–2026: out of 5), so their points can\'t be averaged.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('a descriptive subject shows its descriptor and skills', (
+    tester,
+  ) async {
+    final row = _transcript();
+    final content = row['content']! as Map<String, Object?>;
+    final year =
+        (content['years']! as List<Object?>).first! as Map<String, Object?>;
+    year['subjects'] = [
+      ...(year['subjects']! as List<Object?>),
+      {
+        'code': 'RD',
+        'name': 'Reading',
+        'requirement': 'mandatory',
+        'marks_obtained': null,
+        'max_marks': 100,
+        'percentage': null,
+        'grade_label': 'Very good',
+        'gpa_points': null,
+        'passed': true,
+        'exempt': false,
+        'include_in_average': false,
+        'average_weight': 1,
+        'descriptive': true,
+        'skills': [
+          {
+            'name': 'Reads fluently',
+            'category_name': 'Reading',
+            'descriptor_label': 'Excellent',
+          },
+        ],
+      },
+    ];
+    await _pump(
+      tester,
+      _FakeTranscriptClient([row]),
+      const TranscriptDetailScreen(transcriptId: 'tr-1'),
+    );
+    expect(find.text('Reading'), findsOneWidget);
+    expect(find.text('Very good'), findsOneWidget);
+    expect(find.text('Reads fluently: Excellent'), findsOneWidget);
+  });
+
   testWidgets('a revoked transcript is flagged, an outdated one says so', (
     tester,
   ) async {
