@@ -116,5 +116,45 @@
     "no": "No",
     "more_one": "and {{count}} more row in this list",
     "more_other": "and {{count}} more rows in this list"
+  },
+  "parents": {
+    "title": "Parents",
+    "description": "Every parent of the school with their phone, email, Studafy ID and children. Open a parent to see their full record.",
+    "search": "Find a parent (name, email or Studafy ID)",
+    "columns": {
+      "name": "Name",
+      "phone": "Phone",
+      "children": "Children",
+      "email": "Email",
+      "memberId": "Studafy ID",
+      "status": "Status"
+    },
+    "empty": "No parents yet. They appear here after an import or when added on Users.",
+    "error": "Couldn't load the parents.",
+    "loadMore": "Show more",
+    "listSeparator": "; ",
+    "noChildren": "Not linked to any student yet.",
+    "status": {
+      "invited": "Invited",
+      "active": "Active",
+      "suspended": "Suspended",
+      "archived": "Archived"
+    },
+    "relationship": {
+      "mother": "Mother",
+      "father": "Father",
+      "guardian": "Guardian",
+      "step_parent": "Step-parent",
+      "grandparent": "Grandparent",
+      "sibling": "Sibling",
+      "other": "Other"
+    },
+    "details": {
+      "title": "Contact details",
+      "error": "Couldn't load this parent's details.",
+      "lastSignIn": "Last sign-in",
+      "never": "Never"
+    },
+    "backToParents": "Back to parents"
   }
 }

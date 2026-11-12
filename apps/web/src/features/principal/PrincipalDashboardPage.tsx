@@ -74,6 +74,12 @@ const PRINCIPAL_LINKS: readonly {
     labelKey: "recordTemplates.links.templates",
   },
   {
+    key: "parents",
+    to: "/portal/principal/parents",
+    permission: PERMISSIONS.USER_READ,
+    labelKey: "recordTemplates.links.parents",
+  },
+  {
     key: "missingRecords",
     to: "/portal/principal/records/missing",
     permission: PERMISSIONS.STUDENT_RECORD_READ,

@@ -609,6 +609,9 @@ describe("structure", () => {
         "/api/subscriptions/webhook/stripe",
         "/api/subscriptions/webhook/tap",
         "/api/teachers",
+        // The parent directory (modules/users/routes/parent-routes.ts).
+        "/api/parents",
+        "/api/parents/{parentUserId}",
 
         "/api/approvals/bulk-decision",
         "/api/approvals/queue",
@@ -1134,6 +1137,8 @@ describe("security", () => {
         "GET /api/subscriptions/current/invoices",
         "GET /api/subscriptions/current/refund-requests",
         "GET /api/teachers",
+        "GET /api/parents",
+        "GET /api/parents/{parentUserId}",
         "GET /api/teachers/me",
         "GET /api/teachers/{teacherId}",
         "GET /api/users",

@@ -89,7 +89,7 @@ export default function PrincipalStudentPage() {
                     t("records.principal.parentFallback");
                   return (
                     <li key={guardian.parent_user_id}>
-                      {canReadRecords ? (
+                      {canReadRecords || permissions.has(PERMISSIONS.USER_READ) ? (
                         <Link
                           to={`/portal/principal/parents/${guardian.parent_user_id}?student=${profile.id}`}
                           aria-label={t("records.principal.openParentRecords", { name })}

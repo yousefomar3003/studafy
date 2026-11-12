@@ -100,3 +100,19 @@
   display: grid;
   gap: var(--space-16);
 }
+
+/* A parent's contact details (records/parents/ParentDetailsCard): label, value pairs. */
+.parent-details {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.375rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.parent-details dt {
+  font-weight: 600;
+}
+
+.parent-details dd {
+  margin: 0;
+}
