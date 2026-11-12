@@ -77,6 +77,34 @@ export function SummaryStrip({ items }: { items: readonly SummaryItem[] }) {
 }
 
 /** A labelled group of related links, rendered as a compact grid. */
+/** A trailing arrow some shortcut labels carry in their translation ("Grades →", "الدرجات ←"). */
+const TRAILING_ARROW = /\s*[→←]\s*$/u;
+
+/**
+ * A shortcut's text with the arrow every shortcut shows. The arrow is drawn here rather than kept
+ * in each translation, so no label can lack one, and it is glued to the label's last word so a
+ * wrapping label never leaves it alone on the next line. It points forward in either direction
+ * (the stylesheet mirrors it in right-to-left pages) and is hidden from screen readers.
+ */
+export function ShortcutLabel({ label }: { label: string }) {
+  const text = label.replace(TRAILING_ARROW, "");
+  const split = text.lastIndexOf(" ");
+  const head = split === -1 ? "" : text.slice(0, split + 1);
+  const tail = split === -1 ? text : text.slice(split + 1);
+  return (
+    <>
+      {head}
+      <span className="home-shortcuts__tail">
+        {tail}
+        {"\u00a0"}
+        <span className="home-shortcuts__arrow" aria-hidden="true">
+          →
+        </span>
+      </span>
+    </>
+  );
+}
+
 export function HomeShortcuts({
   links,
 }: {
@@ -92,7 +120,7 @@ export function HomeShortcuts({
         {links.map((link) => (
           <li key={link.key}>
             <Link to={link.to} className="home-shortcuts__link">
-              {link.label}
+              <ShortcutLabel label={link.label} />
             </Link>
           </li>
         ))}

@@ -212,14 +212,14 @@ describe("PrincipalDashboardPage", () => {
     await renderPage(await loadPrincipalDashboardPage());
 
     for (const [name, href] of [
-      ["Grades →", "/portal/principal/grades"],
-      ["School calendar →", "/portal/principal/calendar"],
-      ["Timetable →", "/portal/principal/timetable"],
-      ["Classes →", "/portal/principal/classes"],
-      ["Students →", "/portal/principal/students"],
-      ["Discipline →", "/portal/principal/discipline"],
-      ["Message reports →", "/portal/principal/message-reports"],
-      ["Approvals →", "/portal/approvals"],
+      ["Grades", "/portal/principal/grades"],
+      ["School calendar", "/portal/principal/calendar"],
+      ["Timetable", "/portal/principal/timetable"],
+      ["Classes", "/portal/principal/classes"],
+      ["Students", "/portal/principal/students"],
+      ["Discipline", "/portal/principal/discipline"],
+      ["Message reports", "/portal/principal/message-reports"],
+      ["Approvals", "/portal/approvals"],
     ] as const) {
       expect(screen.getByRole("link", { name }).getAttribute("href")).toBe(href);
     }

@@ -202,6 +202,20 @@
   border-block-end-color: var(--color-accent);
 }
 
+/* The last word and the arrow never break apart (see ShortcutLabel). */
+.home-shortcuts__tail {
+  white-space: nowrap;
+}
+
+.home-shortcuts__arrow {
+  display: inline-block;
+}
+
+/* Forward in a right-to-left page points left. */
+[dir="rtl"] .home-shortcuts__arrow {
+  transform: scaleX(-1);
+}
+
 .home-shortcuts__link:focus-visible {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
