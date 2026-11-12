@@ -89,7 +89,7 @@ async function renderPage(Page: ComponentType, role = "FINANCE") {
   );
 }
 
-const MANAGEMENT_LINKS = ["Fee structure builder →", "Invoices →", "Payments →", "Expenses →"];
+const MANAGEMENT_LINKS = ["Fee structure builder", "Invoices", "Payments", "Expenses"];
 
 afterEach(() => {
   cleanup();
@@ -190,7 +190,7 @@ describe("FinanceDashboardPage", () => {
 
     await renderPage(await loadFinanceDashboardPage(), "FINANCE");
 
-    for (const name of [...MANAGEMENT_LINKS, "Refunds →", "Reports →"]) {
+    for (const name of [...MANAGEMENT_LINKS, "Refunds", "Reports"]) {
       expect(screen.getByRole("link", { name })).toBeTruthy();
     }
   });
@@ -200,8 +200,8 @@ describe("FinanceDashboardPage", () => {
 
     await renderPage(await loadFinanceDashboardPage(), "ORG_ADMIN");
 
-    expect(screen.getByRole("link", { name: "Refunds →" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Reports →" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Refunds" })).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Reports" })).toBeTruthy();
     for (const name of MANAGEMENT_LINKS) {
       expect(screen.queryByRole("link", { name })).toBeNull();
     }
