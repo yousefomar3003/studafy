@@ -365,6 +365,11 @@ const PrincipalStudentPage = lazyWithCatalogs(
   [...PRINCIPAL_CATALOGS, "records", "academicGrading"],
   () => import("../features/principal/students/PrincipalStudentPage"),
 );
+// A student's transcript, printable. Uses the certificate strings and layout from academicGrading.
+const PrincipalTranscriptPage = lazyWithCatalogs(
+  [...PRINCIPAL_CATALOGS, "academicGrading"],
+  () => import("../features/principal/students/transcripts/TranscriptPage"),
+);
 const ParentDirectoryPage = lazyWithCatalogs(
   [...PRINCIPAL_CATALOGS, "records"],
   () => import("../features/records/parents/ParentDirectoryPage"),
@@ -1134,6 +1139,14 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
                 <PrincipalStudentPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            path: "principal/students/:studentId/transcripts/:transcriptId",
+            element: (
+              <RequirePermission permission={PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW}>
+                <PrincipalTranscriptPage />
               </RequirePermission>
             ),
           },
