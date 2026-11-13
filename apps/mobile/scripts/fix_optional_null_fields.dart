@@ -145,8 +145,9 @@ String _omitNull(String contents, String jsonName) {
       (m) => '@JsonKey(includeIfNull: false, ${m[1]})',
     );
   }
-  if (RegExp("name: '$escaped'").hasMatch(contents))
+  if (RegExp("name: '$escaped'").hasMatch(contents)) {
     return contents; // already patched
+  }
   // No JsonKey (the Dart name equals the JSON name): annotate the nullable field.
   final field = RegExp(
     '(\\n([ \\t]*))(final [^;\\n]+\\? ${RegExp.escape(_camel(jsonName))};)',

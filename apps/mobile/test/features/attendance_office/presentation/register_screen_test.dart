@@ -39,6 +39,7 @@ Future<void> _pump(
   FakeAttendanceOfficeClient office, {
   _RecordingAttendanceClient? attendance,
   bool canCorrect = true,
+  bool allowDateChange = false,
 }) async {
   // Tall enough that the whole roster and the submit bar are on screen.
   tester.view.physicalSize = const Size(1200, 2600);
@@ -73,6 +74,7 @@ Future<void> _pump(
               classCode: '7A',
               date: _date,
               canCorrect: canCorrect,
+              allowDateChange: allowDateChange,
             ),
           ),
         ),
@@ -307,7 +309,9 @@ void main() {
       expect(find.bySemanticsLabel(RegExp('Attendance for')), findsNothing);
     });
 
-    testWidgets('a teacher sees it read-only, without Correct', (tester) async {
+    testWidgets('without correction rights it is read-only, without Correct', (
+      tester,
+    ) async {
       await _pump(tester, submitted(), canCorrect: false);
 
       expect(find.text('Absent'), findsOneWidget);
@@ -371,6 +375,45 @@ void main() {
     await _pump(tester, office);
 
     expect(find.text('Student abcdef'), findsOneWidget);
+  });
+
+  group('changing the date', () {
+    testWidgets('the office register has no date button', (tester) async {
+      await _pump(
+        tester,
+        FakeAttendanceOfficeClient(
+          rosters: {
+            'c1': ['s1'],
+          },
+        ),
+      );
+      expect(find.byKey(const Key('registerChangeDate')), findsNothing);
+    });
+
+    testWidgets(
+      'the teacher picks an earlier day and the register reopens on it',
+      (tester) async {
+        await _pump(
+          tester,
+          FakeAttendanceOfficeClient(
+            rosters: {
+              'c1': ['s1'],
+            },
+          ),
+          allowDateChange: true,
+        );
+        expect(find.text('Tue, Oct 13, 2026'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('registerChangeDate')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('12'));
+        await tester.tap(find.text('OK'));
+        await tester.pumpAndSettle();
+
+        expect(find.text('Mon, Oct 12, 2026'), findsOneWidget);
+        expect(find.byKey(const Key('registerChangeDate')), findsOneWidget);
+      },
+    );
   });
 }
 

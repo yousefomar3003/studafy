@@ -101,6 +101,10 @@ export async function updateGradeLevel(
   gradeLevelId: string,
   params: { name?: string; sort_order?: number; archived?: boolean },
 ): Promise<GradeLevelRow> {
+  const [before] = await tx<{ name: string; sort_order: number; archived_at: Date | null }[]>`
+    SELECT name, sort_order, archived_at FROM app.grade_levels
+    WHERE id = ${gradeLevelId} AND school_id = ${schoolId}
+  `;
   const [row] = await tx<GradeLevelRow[]>`
     UPDATE app.grade_levels
     SET name = COALESCE(${params.name ?? null}, name),
@@ -122,6 +126,9 @@ export async function updateGradeLevel(
     action: "update",
     targetTable: "grade_levels",
     targetId: gradeLevelId,
+    oldValues: before
+      ? { name: before.name, sort_order: before.sort_order, archived: before.archived_at !== null }
+      : null,
     newValues: { ...params },
   });
 
@@ -145,16 +152,21 @@ export async function deleteGradeLevel(
     );
   }
 
-  const deleted = await tx`
+  const deleted = await tx<{ id: string; name: string; sort_order: number }[]>`
     DELETE FROM app.grade_levels
     WHERE id = ${gradeLevelId} AND school_id = ${schoolId}
-    RETURNING id
+    RETURNING id, name, sort_order
   `;
   if (deleted.length === 0) {
     throw new HTTPException(404, { message: "Grade level not found" });
   }
 
-  await emitAuditLog(tx, { action: "delete", targetTable: "grade_levels", targetId: gradeLevelId });
+  await emitAuditLog(tx, {
+    action: "delete",
+    targetTable: "grade_levels",
+    targetId: gradeLevelId,
+    oldValues: { name: deleted[0]!.name, sort_order: deleted[0]!.sort_order },
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +286,9 @@ export async function updateSection(
   sectionId: string,
   params: { name?: string; archived?: boolean },
 ): Promise<SectionRow> {
+  const [before] = await tx<{ name: string; archived_at: Date | null }[]>`
+    SELECT name, archived_at FROM app.sections WHERE id = ${sectionId} AND school_id = ${schoolId}
+  `;
   const updated = await tx`
     UPDATE app.sections
     SET name = COALESCE(${params.name ?? null}, name),
@@ -294,6 +309,7 @@ export async function updateSection(
     action: "update",
     targetTable: "sections",
     targetId: sectionId,
+    oldValues: before ? { name: before.name, archived: before.archived_at !== null } : null,
     newValues: { ...params },
   });
 
@@ -320,16 +336,28 @@ export async function deleteSection(
     );
   }
 
-  const deleted = await tx`
+  const deleted = await tx<
+    { id: string; name: string; grade_level_id: string; academic_year_id: string }[]
+  >`
     DELETE FROM app.sections
     WHERE id = ${sectionId} AND school_id = ${schoolId}
-    RETURNING id
+    RETURNING id, name, grade_level_id, academic_year_id
   `;
   if (deleted.length === 0) {
     throw new HTTPException(404, { message: "Section not found" });
   }
 
-  await emitAuditLog(tx, { action: "delete", targetTable: "sections", targetId: sectionId });
+  const [gone] = deleted;
+  await emitAuditLog(tx, {
+    action: "delete",
+    targetTable: "sections",
+    targetId: sectionId,
+    oldValues: {
+      name: gone!.name,
+      grade_level_id: gone!.grade_level_id,
+      academic_year_id: gone!.academic_year_id,
+    },
+  });
 }
 
 // ---------------------------------------------------------------------------
