@@ -203,7 +203,14 @@ void main() {
         find.byType(RegisterScreen),
       );
       expect(register.classId, 'class-1');
-      expect(register.canCorrect, isFalse);
+      // Teachers correct their own registers within the school's correction window (the API
+      // enforces the window and the class), and can open an earlier day's register.
+      expect(register.canCorrect, isTrue);
+      expect(register.allowDateChange, isTrue);
+      expect(
+        register.windowExpiredMessageKey,
+        'teacher.attendance.correction.windowExpired',
+      );
     });
 
     testWidgets('with several classes, asks which, today\'s first', (
