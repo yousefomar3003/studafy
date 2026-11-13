@@ -19,7 +19,7 @@
 
 .fee-builder__layout {
   display: grid;
-  grid-template-columns: minmax(280px, 1fr) minmax(360px, 2fr);
+  grid-template-columns: minmax(280px, 1fr) minmax(min(360px, 100%), 2fr);
   gap: var(--space-24);
   align-items: start;
 }
@@ -158,6 +158,8 @@
   border-radius: var(--radius-md);
   padding: var(--space-16);
   margin: 0;
+  /* <fieldset> defaults to min-inline-size: min-content, which would let it overflow its column. */
+  min-inline-size: 0;
 }
 
 .fee-builder__components-legend {
@@ -207,8 +209,9 @@
 .fee-builder__component-row-fields {
   flex: 1;
   display: grid;
-  grid-template-columns: 2fr 1fr 2fr;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 2fr);
   gap: var(--space-12);
+  min-inline-size: 0;
   border: none;
   padding: 0;
   margin: 0;

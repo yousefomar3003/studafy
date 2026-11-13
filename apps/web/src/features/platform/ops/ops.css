@@ -25,7 +25,8 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   gap: var(--space-12);
-  align-items: end;
+  /* Top-aligned so a field with helper text doesn't push its neighbours' inputs out of line. */
+  align-items: start;
   margin-bottom: var(--space-8);
 }
 
@@ -33,6 +34,8 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-8);
+  /* Skip one field-label row (label line + field gap) so the buttons line up with the inputs. */
+  padding-top: calc(var(--line-height-sm) + var(--space-4));
 }
 
 .platform-ops-sections {

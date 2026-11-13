@@ -56,62 +56,64 @@ export function UsageRevenueSection({
           {schools.length === 0 ? (
             <p className="platform-muted">{t("platformLicensing.usage.empty")}</p>
           ) : (
-            <table className="platform-table">
-              <caption className="sf-visually-hidden">
-                {t("platformLicensing.usage.caption")}
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">{t("platformLicensing.usage.columns.school")}</th>
-                  {metered.map((feature) => (
-                    <th scope="col" key={feature.key}>
-                      {feature.displayName}
-                    </th>
-                  ))}
-                  <th scope="col">{t("platformLicensing.usage.columns.aiCost")}</th>
-                  <th scope="col">{t("platformLicensing.usage.columns.revenueMonth")}</th>
-                  <th scope="col">{t("platformLicensing.usage.columns.revenueTotal")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {schools.map((school) => {
-                  const cost = aiCostUsdBySchool.get(school.schoolId);
-                  return (
-                    <tr key={school.schoolId}>
-                      <td>
-                        <Link to={`/portal/platform/schools/${school.schoolId}`}>
-                          {school.schoolName}
-                        </Link>
-                      </td>
-                      {metered.map((feature) => (
-                        <td key={feature.key} className="licensing-amount">
-                          {formatNumber(
-                            school.usage.find((u) => u.feature === feature.key)?.used ?? 0,
-                          )}
+            <div className="platform-table-scroll">
+              <table className="platform-table">
+                <caption className="sf-visually-hidden">
+                  {t("platformLicensing.usage.caption")}
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">{t("platformLicensing.usage.columns.school")}</th>
+                    {metered.map((feature) => (
+                      <th scope="col" key={feature.key}>
+                        {feature.displayName}
+                      </th>
+                    ))}
+                    <th scope="col">{t("platformLicensing.usage.columns.aiCost")}</th>
+                    <th scope="col">{t("platformLicensing.usage.columns.revenueMonth")}</th>
+                    <th scope="col">{t("platformLicensing.usage.columns.revenueTotal")}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {schools.map((school) => {
+                    const cost = aiCostUsdBySchool.get(school.schoolId);
+                    return (
+                      <tr key={school.schoolId}>
+                        <td>
+                          <Link to={`/portal/platform/schools/${school.schoolId}`}>
+                            {school.schoolName}
+                          </Link>
                         </td>
-                      ))}
-                      <td className="licensing-amount">
-                        {cost === undefined ? "—" : formatCurrency(cost, "USD")}
-                      </td>
-                      <td className="licensing-amount">
-                        {school.revenue.length === 0
-                          ? "—"
-                          : school.revenue
-                              .map((r) => money(r.thisMonthMinor, r.currencyCode, r.minorUnit))
-                              .join(" · ")}
-                      </td>
-                      <td className="licensing-amount">
-                        {school.revenue.length === 0
-                          ? "—"
-                          : school.revenue
-                              .map((r) => money(r.totalMinor, r.currencyCode, r.minorUnit))
-                              .join(" · ")}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        {metered.map((feature) => (
+                          <td key={feature.key} className="licensing-amount">
+                            {formatNumber(
+                              school.usage.find((u) => u.feature === feature.key)?.used ?? 0,
+                            )}
+                          </td>
+                        ))}
+                        <td className="licensing-amount">
+                          {cost === undefined ? "—" : formatCurrency(cost, "USD")}
+                        </td>
+                        <td className="licensing-amount">
+                          {school.revenue.length === 0
+                            ? "—"
+                            : school.revenue
+                                .map((r) => money(r.thisMonthMinor, r.currencyCode, r.minorUnit))
+                                .join(" · ")}
+                        </td>
+                        <td className="licensing-amount">
+                          {school.revenue.length === 0
+                            ? "—"
+                            : school.revenue
+                                .map((r) => money(r.totalMinor, r.currencyCode, r.minorUnit))
+                                .join(" · ")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </>
       ) : null}

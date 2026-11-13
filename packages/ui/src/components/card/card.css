@@ -43,6 +43,17 @@
   flex: 1;
 }
 
+/* A heading in a header or at the top of a body sits on the card's own padding, not on its
+   default margin as well (which left a tall empty band above "Profile", "Sessions", …). */
+.sf-card__header > :first-child,
+.sf-card__body > :first-child {
+  margin-block-start: 0;
+}
+
+.sf-card__header > :last-child {
+  margin-block-end: 0;
+}
+
 .sf-card__footer {
   display: flex;
   align-items: center;
@@ -62,8 +73,9 @@
   box-shadow: var(--elevation-1);
 }
 
-/* The ring follows the real control inside, so keyboard users see the whole card highlighted. */
-.sf-card--interactive:focus-within {
+/* The ring follows the real control inside, so keyboard users see the whole card highlighted —
+   keyboard focus only, so a mouse click on the card's action draws no ring. */
+.sf-card--interactive:has(:focus-visible) {
   outline: var(--focus-ring-width) solid var(--focus-ring-color);
   outline-offset: var(--focus-ring-offset);
 }

@@ -147,7 +147,6 @@ export default function AdminDashboardPage() {
   return (
     <>
       <HomeHeader title={t("adminSchool.dashboard.title")} summary={summary} />
-      <SummaryStrip items={items} />
 
       <HomeShortcuts
         links={ADMIN_LINKS.map((link) => ({
@@ -155,6 +154,8 @@ export default function AdminDashboardPage() {
           label: t(`adminSchool.dashboard.links.${link.key}`),
         }))}
       />
+
+      <SummaryStrip items={items} />
 
       <section className="home-section" aria-labelledby="admin-account-heading">
         <h2 id="admin-account-heading" className="home-section-heading">

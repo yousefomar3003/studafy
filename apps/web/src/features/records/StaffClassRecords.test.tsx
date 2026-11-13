@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { PortalBackLink, PortalBackProvider } from "../../layouts/portal/PortalBackLink";
 import { AuthProvider } from "../../lib/auth";
 import { expectNoA11yViolations } from "../../lib/test/axe";
 import { createTestSessionStore } from "../../lib/test/session";
@@ -181,11 +182,14 @@ async function renderAt(roles: string[], url: string, route: string, element: Re
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <MemoryRouter initialEntries={[url]}>
-            <main>
-              <Routes>
-                <Route path={route} element={element} />
-              </Routes>
-            </main>
+            <PortalBackProvider>
+              <PortalBackLink routes={() => []} />
+              <main>
+                <Routes>
+                  <Route path={route} element={element} />
+                </Routes>
+              </main>
+            </PortalBackProvider>
           </MemoryRouter>
         </ToastProvider>
       </QueryClientProvider>
@@ -219,7 +223,7 @@ describe("staff record page", () => {
     expect(await screen.findByText("BEd Mathematics")).toBeTruthy();
     expect(screen.queryByText(SALARY)).toBeNull();
     expect(screen.getByRole("button", { name: "Edit record" })).toBeTruthy();
-    expect(screen.getByRole("link", { name: "Back to teachers" }).getAttribute("href")).toBe(
+    expect(screen.getByRole("link", { name: "Back" }).getAttribute("href")).toBe(
       "/portal/admin/teachers",
     );
     await expectNoA11yViolations(container);
@@ -242,9 +246,9 @@ describe("staff record page", () => {
     expect(await screen.findByText("BEd Mathematics")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit record" })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Reveal/ })).toBeNull();
-    expect(
-      screen.getByRole("link", { name: "Back to missing information" }).getAttribute("href"),
-    ).toBe("/portal/principal/records/missing");
+    expect(screen.getByRole("link", { name: "Back" }).getAttribute("href")).toBe(
+      "/portal/principal/records/missing",
+    );
     await expectNoA11yViolations(container);
   });
 });

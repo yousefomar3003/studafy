@@ -3,8 +3,9 @@ import { PERMISSIONS } from "@studafy/constants";
 import { Button, Chip, Input, Table, useToast } from "@studafy/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { api } from "../../lib/api";
 import { usePermissions } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
@@ -58,6 +59,7 @@ function apiErrorDescription(error: unknown): string | undefined {
  */
 export default function RegisterPage() {
   const { t } = useTranslation();
+  usePortalBack("/portal/attendance");
   const { show } = useToast();
   const permissions = usePermissions();
   const queryClient = useQueryClient();
@@ -153,9 +155,6 @@ export default function RegisterPage() {
 
   return (
     <>
-      <p>
-        <Link to="/portal/attendance">{t("attendanceOffice.register.back")}</Link>
-      </p>
       <h1>{title}</h1>
       <p>
         {!canTake

@@ -120,7 +120,7 @@ async function fillForm() {
   await screen.findByText("Grade 5 Fees (1000.000 JOD)");
   fireEvent.click(screen.getByRole("combobox", { name: "Fee structure" }));
   fireEvent.click(screen.getByRole("option", { name: "Grade 5 Fees (1000.000 JOD)" }));
-  fireEvent.change(screen.getByLabelText("Period title"), {
+  fireEvent.change(screen.getByLabelText(/^Period title/), {
     target: { value: "Spring 2026 Term 1" },
   });
 }
@@ -158,7 +158,7 @@ describe("InvoiceBatchPage", () => {
     fireEvent.click(screen.getByRole("combobox", { name: "Fee structure" }));
     fireEvent.click(screen.getByRole("option", { name: "Grade 5 Fees (1000.000 JOD)" }));
 
-    fireEvent.change(screen.getByLabelText("Period title"), {
+    fireEvent.change(screen.getByLabelText(/^Period title/), {
       target: { value: "Spring 2026 Term 1" },
     });
 
@@ -195,7 +195,7 @@ describe("InvoiceBatchPage", () => {
     expect((await screen.findByRole("combobox", { name: "Fee structure" })).textContent).toContain(
       "Grade 5 Fees (1000.000 JOD)",
     );
-    fireEvent.change(screen.getByLabelText("Period title"), { target: { value: "Term 2" } });
+    fireEvent.change(screen.getByLabelText(/^Period title/), { target: { value: "Term 2" } });
     fireEvent.click(screen.getByRole("radio", { name: "Specific students" }));
 
     // Open the list and pick two students; typing a name narrows the list.

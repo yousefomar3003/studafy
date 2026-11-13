@@ -365,7 +365,7 @@
   "editor": {
     "createTitle": "Set up {{subject}}",
     "editTitle": "{{subject}} grading rules",
-    "back": "Back",
+    "back": "Close",
     "gradeDefault": "Grade default",
     "gradeDefaultHelp": "Every section of the grade inherits these rules unless it overrides them.",
     "sectionHelp": "These rules apply to this section only.",

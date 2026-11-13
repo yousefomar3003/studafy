@@ -2,6 +2,7 @@ import { useSeo } from "../../components/Seo";
 import { MARKETING_CONTACT_EMAIL } from "../../lib/config";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
+import { ClosingBand } from "./ClosingBand";
 import { ContactForm } from "./ContactForm";
 import { StartSteps } from "./demos/StartSteps";
 import { reveal } from "./reveal";
@@ -110,6 +111,9 @@ export default function AboutPage() {
           </div>
         </div>
       </section>
+
+      {/* Last on the page, under the contact form its "Talk to us" points back to. */}
+      <ClosingBand titleKey="marketingPages.features.ctaTitle" />
     </>
   );
 }

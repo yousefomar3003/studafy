@@ -44,13 +44,17 @@
 
 .platform-nav {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
   gap: var(--space-4);
   margin-top: var(--space-16);
   border-bottom: 1px solid var(--color-border);
 }
 
 .platform-nav__link {
+  flex-shrink: 0;
+  white-space: nowrap;
   padding: var(--space-8) var(--space-12);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -230,6 +234,11 @@
 
 .platform-flag:last-child {
   border-bottom: none;
+}
+
+/* Tables scroll inside their own box on narrow screens instead of widening the page. */
+.platform-table-scroll {
+  overflow-x: auto;
 }
 
 .platform-table {

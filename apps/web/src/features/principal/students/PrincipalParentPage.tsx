@@ -21,14 +21,7 @@ export default function PrincipalParentPage() {
   return (
     <ParentRecordsView
       parentUserId={parentUserId}
-      back={
-        studentId
-          ? {
-              to: `/portal/principal/students/${studentId}`,
-              label: t("records.principal.backToStudent"),
-            }
-          : { to: "/portal/principal/parents", label: t("records.parents.backToParents") }
-      }
+      back={studentId ? `/portal/principal/students/${studentId}` : "/portal/principal/parents"}
       details={
         permissions.has(PERMISSIONS.USER_READ) ? (
           <ParentDetailsCard

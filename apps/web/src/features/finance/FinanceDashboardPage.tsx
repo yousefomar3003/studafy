@@ -116,7 +116,6 @@ export default function FinanceDashboardPage() {
           <HelpLink to={helpPath("workflows")}>{t("finance.dashboard.readGuide")}</HelpLink>
         </p>
       </HomeHeader>
-      <SummaryStrip items={items} />
 
       <HomeShortcuts
         links={links.map((link) => ({
@@ -125,6 +124,8 @@ export default function FinanceDashboardPage() {
           label: t(`finance.dashboard.nav.${link.key}`),
         }))}
       />
+
+      <SummaryStrip items={items} />
 
       <div className="finance-dashboard-grid">
         <OverdueInstallmentsListTile />

@@ -1,7 +1,7 @@
 import { PERMISSIONS } from "@studafy/constants";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { usePermissions } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
 import { LinkedListsPanel } from "../custom-lists/LinkedListsPanel";
@@ -13,8 +13,8 @@ import type { ReactNode } from "react";
 
 export interface ParentRecordsViewProps {
   parentUserId: string;
-  /** Where the back link goes, and what it says. */
-  back: { to: string; label: string };
+  /** Where the shell's Back link goes. */
+  back: string;
   /** Translation keys for the heading ("{{name}}: records") and its fallbacks. */
   copy: { title: string; fallback: string; loadError: string };
   /** Shown between the heading and the record, e.g. the parent's contact details. */
@@ -28,6 +28,7 @@ export interface ParentRecordsViewProps {
 export function ParentRecordsView({ parentUserId, back, copy, details }: ParentRecordsViewProps) {
   const { t } = useTranslation();
   const permissions = usePermissions();
+  usePortalBack(back);
   const parent = useQuery({
     queryKey: parentIdentityQueryKey(parentUserId),
     queryFn: () => fetchParentIdentity(parentUserId),
@@ -39,9 +40,6 @@ export function ParentRecordsView({ parentUserId, back, copy, details }: ParentR
   const name = parent.data.display_name ?? parent.data.email ?? t(copy.fallback);
   return (
     <>
-      <p>
-        <Link to={back.to}>{back.label}</Link>
-      </p>
       <h1>{t(copy.title, { name })}</h1>
       {details}
       <RecordsPanel

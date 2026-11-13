@@ -113,7 +113,8 @@ export function HomeShortcuts({
   const { t } = useTranslation();
   return (
     <nav className="home-shortcuts" aria-labelledby="home-shortcuts-heading">
-      <h2 id="home-shortcuts-heading" className="home-section-heading">
+      {/* Named for screen readers only: on screen the links sit right under the page title. */}
+      <h2 id="home-shortcuts-heading" className="sf-visually-hidden">
         {t("home.shortcuts")}
       </h2>
       <ul className="home-shortcuts__list">

@@ -3,6 +3,7 @@ import { Card } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../../layouts/portal/PortalBackLink";
 import { usePermissions } from "../../../lib/auth";
 import { useTranslation } from "../../../lib/i18n";
 import {
@@ -31,6 +32,7 @@ export default function PrincipalStudentPage() {
   const { studentId } = useParams<{ studentId: string }>();
   const permissions = usePermissions();
   const canReadRecords = permissions.has(PERMISSIONS.STUDENT_RECORD_READ);
+  usePortalBack("/portal/principal/students");
 
   const student = useQuery({
     queryKey: studentQueryKey(studentId ?? ""),
@@ -50,9 +52,6 @@ export default function PrincipalStudentPage() {
   const profile = student.data;
   return (
     <>
-      <p>
-        <Link to="/portal/principal/students">{t("records.principal.backToStudents")}</Link>
-      </p>
       <h1>{studentDisplayName(profile) || t("records.principal.studentFallback")}</h1>
       <p>
         {t("records.principal.statusLabel")}:{" "}

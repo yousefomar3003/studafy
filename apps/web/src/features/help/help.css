@@ -272,27 +272,6 @@
   border: 1px solid var(--color-border);
 }
 
-/* --- Inline contextual help link (wizard steps, feature pages) --- */
-
-.help-link {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-4);
-  font-size: var(--font-size-sm);
-  color: var(--color-muted-foreground);
-  text-decoration: none;
-}
-
-.help-link:hover {
-  color: var(--color-primary);
-  text-decoration: underline;
-}
-
-.help-link__icon {
-  flex-shrink: 0;
-  vertical-align: middle;
-}
-
 .help-article__action {
   margin: var(--space-12) 0 0;
 }

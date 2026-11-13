@@ -239,7 +239,7 @@ export default function GradesSectionsPage() {
                     <div className="sections-page__row-actions">
                       <Button
                         type="button"
-                        variant="secondary"
+                        variant="tertiary"
                         aria-label={t("principal.sections.sectionList.studentsLabel", {
                           section: label,
                         })}

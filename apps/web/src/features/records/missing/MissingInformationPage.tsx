@@ -406,6 +406,8 @@ function MissingSection<T>({
 
       <DataGrid
         caption={caption}
+        // The section's h2 already names the table on screen.
+        hideCaption
         columns={columns}
         rows={items}
         getRowId={getRowId}

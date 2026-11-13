@@ -7,6 +7,8 @@ import { useTranslation } from "../../../lib/i18n";
 import { childLabel } from "./ParentDetailsCard";
 import { useParentDirectory } from "./queries";
 
+import "../../principal/school/principal-school.css";
+
 const COLUMN_COUNT = 6;
 
 /**
@@ -71,7 +73,13 @@ export default function ParentDirectoryPage() {
               </Table.Cell>
               <Table.Cell>{parent.email ?? "—"}</Table.Cell>
               <Table.Cell>
-                {parent.member_code ? <span dir="ltr">{parent.member_code}</span> : "—"}
+                {parent.member_code ? (
+                  <span dir="ltr" style={{ whiteSpace: "nowrap" }}>
+                    {parent.member_code}
+                  </span>
+                ) : (
+                  "—"
+                )}
               </Table.Cell>
               <Table.Cell>{t(`records.parents.status.${parent.status}`)}</Table.Cell>
             </Table.Row>

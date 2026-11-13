@@ -9,6 +9,13 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-12);
+  margin-block-end: var(--space-16);
+}
+
+/* The page intro under the Lists heading: normal paragraph size, muted. */
+.custom-lists__intro {
+  color: var(--color-muted-foreground);
+  margin: 0;
 }
 
 .custom-lists__actions,
@@ -101,6 +108,25 @@
 .custom-lists__import {
   display: grid;
   gap: var(--space-8);
+  margin-block-start: var(--space-16);
+}
+
+.custom-lists__file {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+}
+
+.custom-lists__file input[type="file"]::file-selector-button {
+  margin-inline-end: var(--space-12);
+  padding: var(--space-8) var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font: inherit;
+  cursor: pointer;
 }
 
 .custom-lists__draft-column,

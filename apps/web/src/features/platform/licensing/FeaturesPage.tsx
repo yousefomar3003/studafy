@@ -1,5 +1,5 @@
 import { ApiError } from "@studafy/api-client";
-import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
+import { Button, Card, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useState } from "react";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
@@ -34,64 +34,72 @@ export default function FeaturesPage() {
       {isPending ? <p role="status">{t("site.common.loading")}</p> : null}
       {isError ? <p role="alert">{t("platformLicensing.common.loadError")}</p> : null}
       {features ? (
-        <table className="platform-table">
-          <caption className="sf-visually-hidden">
-            {t("platformLicensing.features.caption")}
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("platformLicensing.features.columns.feature")}</th>
-              <th scope="col">{t("platformLicensing.features.columns.audience")}</th>
-              <th scope="col">{t("platformLicensing.features.columns.unit")}</th>
-              <th scope="col">{t("platformLicensing.features.columns.defaultLimit")}</th>
-              <th scope="col">{t("platformLicensing.features.columns.tiers")}</th>
-              <th scope="col">{t("platformLicensing.features.columns.status")}</th>
-              <th scope="col">
-                <span className="sf-visually-hidden">{t("platformLicensing.common.actions")}</span>
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {features.map((feature) => (
-              <tr key={feature.key}>
-                <td>
-                  <div className="platform-cell-stack">
-                    <span>{feature.displayName}</span>
-                    <code className="platform-muted">{feature.key}</code>
-                  </div>
-                </td>
-                <td>{t(`platformLicensing.audience.${feature.audience}`)}</td>
-                <td>
-                  {feature.unit
-                    ? t(`platformLicensing.unit.${feature.unit}`)
-                    : t("platformLicensing.features.noUnit")}
-                </td>
-                <td>
-                  {feature.defaultMonthlyLimit === null
-                    ? t("platformLicensing.common.unlimited")
-                    : formatNumber(feature.defaultMonthlyLimit)}
-                </td>
-                <td>{formatNumber(feature.tierCount)}</td>
-                <td>
-                  <span className="platform-pill" data-status={feature.status}>
-                    {t(`platformLicensing.featureStatus.${feature.status}`)}
-                  </span>
-                </td>
-                <td>
-                  <Button
-                    variant="tertiary"
-                    onClick={() => setEditing(feature)}
-                    aria-label={t("platformLicensing.features.editNamed", {
-                      name: feature.displayName,
-                    })}
-                  >
-                    {t("platformLicensing.common.edit")}
-                  </Button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <Card>
+          <Card.Body>
+            <div className="platform-table-scroll">
+              <table className="platform-table">
+                <caption className="sf-visually-hidden">
+                  {t("platformLicensing.features.caption")}
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">{t("platformLicensing.features.columns.feature")}</th>
+                    <th scope="col">{t("platformLicensing.features.columns.audience")}</th>
+                    <th scope="col">{t("platformLicensing.features.columns.unit")}</th>
+                    <th scope="col">{t("platformLicensing.features.columns.defaultLimit")}</th>
+                    <th scope="col">{t("platformLicensing.features.columns.tiers")}</th>
+                    <th scope="col">{t("platformLicensing.features.columns.status")}</th>
+                    <th scope="col">
+                      <span className="sf-visually-hidden">
+                        {t("platformLicensing.common.actions")}
+                      </span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {features.map((feature) => (
+                    <tr key={feature.key}>
+                      <td>
+                        <div className="platform-cell-stack">
+                          <span>{feature.displayName}</span>
+                          <code className="platform-muted">{feature.key}</code>
+                        </div>
+                      </td>
+                      <td>{t(`platformLicensing.audience.${feature.audience}`)}</td>
+                      <td>
+                        {feature.unit
+                          ? t(`platformLicensing.unit.${feature.unit}`)
+                          : t("platformLicensing.features.noUnit")}
+                      </td>
+                      <td>
+                        {feature.defaultMonthlyLimit === null
+                          ? t("platformLicensing.common.unlimited")
+                          : formatNumber(feature.defaultMonthlyLimit)}
+                      </td>
+                      <td>{formatNumber(feature.tierCount)}</td>
+                      <td>
+                        <span className="platform-pill" data-status={feature.status}>
+                          {t(`platformLicensing.featureStatus.${feature.status}`)}
+                        </span>
+                      </td>
+                      <td>
+                        <Button
+                          variant="tertiary"
+                          onClick={() => setEditing(feature)}
+                          aria-label={t("platformLicensing.features.editNamed", {
+                            name: feature.displayName,
+                          })}
+                        >
+                          {t("platformLicensing.common.edit")}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card.Body>
+        </Card>
       ) : null}
       <EditFeatureModal feature={editing} onClose={() => setEditing(null)} />
     </>
