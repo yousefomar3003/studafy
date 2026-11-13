@@ -147,6 +147,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/academics/sections/{sectionId}",
   "POST /api/academics/sections/{sectionId}/students",
   "DELETE /api/academics/sections/{sectionId}/students/{studentId}",
+  "POST /api/academics/promotions/apply",
   // Academic grading (000160): configuration, marks, results and certificates; every route sits
   // behind requirePermission (academicConfig:*, grade:*, approval:review, result:finalize,
   // academicCertificate:issue) and the services add section/subject row scope.

@@ -278,6 +278,10 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
     requiredPermission: P.TIMETABLE_MANAGE,
     ...SCHOOL,
   }),
+  entry("move-students-next-year", "action", "/portal/principal/promotion", {
+    requiredPermission: P.TIMETABLE_MANAGE,
+    ...SCHOOL,
+  }),
   entry("start-new-school-year", "action", "/portal/principal/years", {
     requiredPermission: P.TIMETABLE_MANAGE,
     ...SCHOOL,

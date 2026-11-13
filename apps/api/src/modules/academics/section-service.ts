@@ -461,6 +461,7 @@ export async function placeStudentInSection(
   schoolId: string,
   sectionId: string,
   studentId: string,
+  auditContext?: Record<string, string>,
 ): Promise<PlacementResult> {
   const section = await requireSection(tx, schoolId, sectionId);
 
@@ -501,7 +502,7 @@ export async function placeStudentInSection(
     targetTable: "student_sections",
     targetId: studentId,
     oldValues: previous ? { section_id: previous.section_id } : undefined,
-    newValues: { section_id: sectionId, enrolled_class_ids: enrolled },
+    newValues: { section_id: sectionId, enrolled_class_ids: enrolled, ...auditContext },
   });
 
   const [placed] = await tx<SectionStudentRow[]>`

@@ -724,6 +724,147 @@ export const sectionPlacementResultSchema = z
   .openapi("SectionPlacementResult");
 
 // ---------------------------------------------------------------------------
+// Moving students to the next year
+// ---------------------------------------------------------------------------
+
+const promotionActionSchema = z.enum(["place", "graduate", "skip"]).openapi("PromotionAction", {
+  description: "place: into a target-year section; graduate: mark as graduated; skip: no change.",
+});
+
+const promotionReasonSchema = z
+  .enum([
+    "promoted",
+    "retained",
+    "final_grade",
+    "awaiting_resit",
+    "incomplete_result",
+    "no_result",
+    "no_matching_section",
+    "already_placed",
+    "already_graduated",
+    "inactive_student",
+  ])
+  .openapi("PromotionReason", { description: "Why the destination was proposed." });
+
+const promotionYearSchema = z
+  .object({
+    id: uuidSchema,
+    name: z.string(),
+    status: z.string().openapi({ description: "planned, active, closed or archived." }),
+  })
+  .openapi("PromotionYear");
+
+export const promotionQuerySchema = z
+  .object({
+    source_year_id: uuidSchema.openapi({ description: "The year students are moving from." }),
+    target_year_id: uuidSchema.openapi({ description: "The year students are moving into." }),
+  })
+  .openapi("PromotionQuery");
+
+export const promotionPreviewSchema = z
+  .object({
+    source_year: promotionYearSchema,
+    target_year: promotionYearSchema,
+    target_sections: z.array(
+      z
+        .object({
+          id: uuidSchema,
+          name: z.string(),
+          grade_level_id: uuidSchema,
+          grade_level_name: z.string(),
+          grade_sort_order: z.number().int(),
+          student_count: z.number().int(),
+        })
+        .openapi("PromotionTargetSection"),
+    ),
+    students: z.array(
+      z
+        .object({
+          student_id: uuidSchema,
+          first_name: z.string(),
+          last_name: z.string(),
+          admission_number: z
+            .string()
+            .nullable()
+            .openapi({ description: "Shown only to users who can read billing." }),
+          student_status: z.string(),
+          source_section_id: uuidSchema,
+          source_section_name: z.string(),
+          source_grade_level_id: uuidSchema,
+          source_grade_level_name: z.string(),
+          academic_status: z
+            .enum(["promoted", "supplementary", "retained", "incomplete"])
+            .nullable()
+            .openapi({ description: "From the current annual result; null when there is none." }),
+          average_percentage: z.number().nullable(),
+          proposed_action: promotionActionSchema,
+          proposed_section_id: uuidSchema.nullable(),
+          reason: promotionReasonSchema,
+          needs_decision: z.boolean().openapi({
+            description: "No destination could be proposed; the principal must choose or skip.",
+          }),
+          done: z
+            .enum(["placed", "graduated"])
+            .nullable()
+            .openapi({ description: "Already placed in the target year, or already graduated." }),
+          placed_section_id: uuidSchema.nullable(),
+        })
+        .openapi("PromotionPreviewStudent"),
+    ),
+  })
+  .openapi("PromotionPreview");
+
+export const applyPromotionBodySchema = z
+  .object({
+    source_year_id: uuidSchema,
+    target_year_id: uuidSchema,
+    decisions: z
+      .array(
+        z
+          .object({
+            student_id: uuidSchema,
+            action: promotionActionSchema,
+            target_section_id: uuidSchema.nullable().optional(),
+          })
+          .openapi("PromotionDecision"),
+      )
+      .min(1)
+      .max(100),
+  })
+  .openapi("ApplyPromotionBody");
+
+export const promotionResultSchema = z
+  .object({
+    outcomes: z.array(
+      z
+        .object({
+          student_id: uuidSchema,
+          outcome: z.enum([
+            "moved_up",
+            "retained",
+            "moved",
+            "already_placed",
+            "graduated",
+            "already_graduated",
+            "skipped",
+            "failed",
+          ]),
+          section_id: uuidSchema.nullable(),
+          error: z
+            .string()
+            .nullable()
+            .openapi({
+              description:
+                "Why it failed: not_in_source_year, student_inactive, placed_in_target_year or " +
+                "section_not_in_target_year.",
+            }),
+        })
+        .openapi("PromotionOutcome"),
+    ),
+  })
+  .openapi("PromotionResult");
+
+// ---------------------------------------------------------------------------
 // Rooms
 // ---------------------------------------------------------------------------
 
