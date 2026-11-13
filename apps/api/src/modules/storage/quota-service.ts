@@ -80,10 +80,19 @@ export interface StorageUsage {
  * (app.storage_subscriptions, 000205). Billing never writes the school's cap: an add-on that is
  * canceled, expires or is closed after its grace period simply stops counting here, and the school
  * keeps every file -- only uploads past the smaller cap are refused.
+ *
+ * A storage grant Studafy staff made by hand (app.manual_grants, 000211 -- a cash payment, a pilot)
+ * counts the same way while it is in force: the cap is the largest of the three, and a grant that
+ * ends or is revoked just stops counting.
  */
 export async function getStorageUsage(tx: TransactionSql): Promise<StorageUsage> {
   const [row] = await tx<
-    { bytes_used: string | null; cap_bytes: string | null; addon_cap_bytes: string | null }[]
+    {
+      bytes_used: string | null;
+      cap_bytes: string | null;
+      addon_cap_bytes: string | null;
+      grant_cap_bytes: string | null;
+    }[]
   >`
     SELECT
       (SELECT bytes_used::text FROM app.storage_usage_meters
@@ -92,16 +101,46 @@ export async function getStorageUsage(tx: TransactionSql): Promise<StorageUsage>
        WHERE school_id = current_setting('app.school_id')::uuid) AS cap_bytes,
       (SELECT cap_bytes::text FROM app.storage_subscriptions
        WHERE school_id = current_setting('app.school_id')::uuid
-         AND status::text = ANY(${[...LIVE_STATUSES]})) AS addon_cap_bytes
+         AND status::text = ANY(${[...LIVE_STATUSES]})) AS addon_cap_bytes,
+      (SELECT max(cap_bytes)::text FROM app.manual_grants
+       WHERE school_id = current_setting('app.school_id')::uuid
+         AND kind = 'storage' AND revoked_at IS NULL
+         AND starts_at <= now() AND ends_at > now()) AS grant_cap_bytes
   `;
 
   const bytesUsed = Number(row?.bytes_used ?? 0);
   const capBytes = Math.max(
     Number(row?.cap_bytes ?? DEFAULT_STORAGE_CAP_BYTES),
     Number(row?.addon_cap_bytes ?? 0),
+    Number(row?.grant_cap_bytes ?? 0),
   );
 
   return { bytesUsed, capBytes, fractionUsed: capBytes > 0 ? bytesUsed / capBytes : NaN };
+}
+
+/** The storage grant in force now with the largest cap, or null. */
+export interface StorageGrantInForce {
+  capBytes: number;
+  endsAt: Date;
+}
+
+/**
+ * The in-force manual storage grant (app.manual_grants, 000211) that sets the largest cap -- what the
+ * school's Storage tab shows as "Granted by Studafy until <date>". Tenant-scoped like the rest.
+ */
+export async function findStorageGrantInForce(
+  tx: TransactionSql,
+): Promise<StorageGrantInForce | null> {
+  const [row] = await tx<{ cap_bytes: string; ends_at: Date }[]>`
+    SELECT cap_bytes::text AS cap_bytes, ends_at
+    FROM app.manual_grants
+    WHERE school_id = current_setting('app.school_id')::uuid
+      AND kind = 'storage' AND revoked_at IS NULL
+      AND starts_at <= now() AND ends_at > now()
+    ORDER BY cap_bytes DESC, ends_at DESC
+    LIMIT 1
+  `;
+  return row ? { capBytes: Number(row.cap_bytes), endsAt: row.ends_at } : null;
 }
 
 /**

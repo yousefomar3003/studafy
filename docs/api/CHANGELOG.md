@@ -22,6 +22,24 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Manual grants (000211), for storage and tiers paid in cash or by transfer: `POST
+/api/platform/schools/{schoolId}/grants` (`PlatformCreateManualGrant`) gives a school a storage
+  cap (`kind: "storage"`, `capBytes`: the 100 GB and 1 TB tiers or any custom figure) or one person
+  an active tier of their own audience (`kind: "tier"`, `userId`, `planCode`), from `startsAt`
+  (default now) to `endsAt`, with a required `reason` and an optional amount, currency and receipt
+  (uploaded through `.../license-payments/upload-url`). `POST
+.../grants/{grantId}/revoke` (`PlatformRevokeManualGrant`) stops one now; `GET
+/api/platform/grants` and `GET /api/platform/schools/{schoolId}/grants` list them
+  (`PlatformManualGrantList`, `filter`: active, expiring within 14 days, ended, all); `GET
+.../grants/{grantId}/receipt-file` links the receipt. platform:read / platform:manage, web only.
+  New error codes `MANUAL_GRANT_NOT_FOUND`, `MANUAL_GRANT_ALREADY_REVOKED`,
+  `MANUAL_GRANT_TIER_INVALID`. A storage grant raises the upload cap while in force (the largest of
+  the included storage, a live add-on and any grant); a tier grant counts in `GET /api/me/features`
+  as a purchase alongside store subscriptions and license seats.
+- `GET /api/subscriptions/storage/offer` gains `granted` (`StorageAddOnGrant`: `capBytes`,
+  `endsAt`), the in-force manual storage grant or null.
+- `GET /api/platform/finance` gains `manualPaymentsLast30Days` (`PlatformManualPaymentTotals`):
+  amounts recorded on manual grants in the last 30 days, per currency.
 - Moving students to the next year: `GET /api/academics/promotions/preview?source_year_id=&target_year_id=`
   (`PromotionPreview`, `PromotionPreviewStudent`, `PromotionTargetSection`) proposes a target-year
   destination for every student placed in the source year from their current annual result

@@ -24,6 +24,7 @@ export {
   aiAddonGrants,
   collectGrants,
   licenseSeatGrants,
+  manualTierGrants,
   userSubscriptionGrants,
   type GrantSourceAdapter,
   type PersonEntitlements,

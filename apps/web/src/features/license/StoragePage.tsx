@@ -214,6 +214,14 @@ export default function StoragePage() {
                   {t("schoolLicense.storage.included", { size: size(data.usage.includedBytes) })}
                 </p>
               )}
+              {data.granted ? (
+                <p className="license-muted" data-testid="storage-granted">
+                  {t("schoolLicense.storage.granted", {
+                    size: size(data.granted.capBytes),
+                    date: formatDate(new Date(data.granted.endsAt), { dateStyle: "medium" }),
+                  })}
+                </p>
+              ) : null}
               {current && canManage && data.availableOnline ? (
                 <Button
                   type="button"

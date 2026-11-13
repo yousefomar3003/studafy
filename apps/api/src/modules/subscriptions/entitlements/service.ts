@@ -187,12 +187,14 @@ export function createEntitlementService(deps: EntitlementServiceDeps): Entitlem
           schoolKey,
           userKey,
         );
-        // `seats` is checked too: an entry written before licenses existed is a miss.
+        // `seats` and `manualGrants` are checked too: an entry written before licenses (or manual
+        // grants, 000211) existed is a miss.
         if (
           pair.ai?.value &&
           pair.school?.value &&
           pair.ai.value.schoolVersion === pair.school.version &&
-          pair.ai.value.seats !== undefined
+          pair.ai.value.seats !== undefined &&
+          pair.ai.value.manualGrants !== undefined
         ) {
           return pair.ai.value;
         }
