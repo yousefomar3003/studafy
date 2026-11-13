@@ -72,7 +72,9 @@ class _AskAiComposerState extends ConsumerState<AskAiComposer> {
   }
 
   bool get _canSend =>
-      widget.enabled && _controller.text.trim().isNotEmpty && _controller.text.trim().length <= askAiQuestionMaxChars;
+      widget.enabled &&
+      _controller.text.trim().isNotEmpty &&
+      _controller.text.trim().length <= askAiQuestionMaxChars;
 
   void _send() {
     if (!_canSend) return;
@@ -118,9 +120,16 @@ class _AskAiComposerState extends ConsumerState<AskAiComposer> {
       case _Attachment.gallery:
         await _readPhoto(ImageSource.gallery);
       case _Attachment.material:
-        final picked = await showAskAiMaterialSheet(context, current: widget.materialScope);
-        if (picked != null) widget.onMaterialScopeChanged?.call(picked);
+        await _pickMaterial();
     }
+  }
+
+  /// Opens the material sheet; "All my materials" comes back as [AskAiMaterialScope.all], which
+  /// is no scope.
+  Future<void> _pickMaterial() async {
+    final picked = await showAskAiMaterialSheet(context, current: widget.materialScope);
+    if (!mounted || picked == null) return;
+    widget.onMaterialScopeChanged?.call(picked.isAll ? null : picked);
   }
 
   /// Picks a photo, has the server read its text, and puts that text into the field — after
@@ -203,20 +212,40 @@ class _AskAiComposerState extends ConsumerState<AskAiComposer> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (widget.materialScope case final scope?)
+              if (widget.onMaterialScopeChanged != null)
                 Padding(
                   padding: const EdgeInsets.only(bottom: AppSpacing.space8),
                   child: Align(
                     alignment: AlignmentDirectional.centerStart,
-                    child: InputChip(
-                      avatar: Icon(Icons.menu_book_outlined, size: 18, color: colorScheme.primary),
-                      label: Text(
-                        'askAi.material.chip'.tr(namedArgs: {'title': scope.title}),
-                        overflow: TextOverflow.ellipsis,
+                    child: switch (widget.materialScope) {
+                      final scope? => InputChip(
+                        key: const Key('askAiMaterialScopeChip'),
+                        avatar: Icon(
+                          Icons.menu_book_outlined,
+                          size: 18,
+                          color: colorScheme.primary,
+                        ),
+                        label: Text(
+                          'askAi.material.chip'.tr(namedArgs: {'title': scope.title}),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        onPressed: widget.enabled ? _pickMaterial : null,
+                        onDeleted: widget.enabled
+                            ? () => widget.onMaterialScopeChanged?.call(null)
+                            : null,
+                        deleteButtonTooltipMessage: 'askAi.material.clear'.tr(),
                       ),
-                      onDeleted: widget.enabled ? () => widget.onMaterialScopeChanged?.call(null) : null,
-                      deleteButtonTooltipMessage: 'askAi.material.clear'.tr(),
-                    ),
+                      null => ActionChip(
+                        key: const Key('askAiMaterialScopeChip'),
+                        avatar: Icon(
+                          Icons.library_books_outlined,
+                          size: 18,
+                          color: colorScheme.primary,
+                        ),
+                        label: Text('askAi.material.allChip'.tr()),
+                        onPressed: widget.enabled ? _pickMaterial : null,
+                      ),
+                    },
                   ),
                 ),
               if (_readingPhoto)
@@ -234,7 +263,9 @@ class _AskAiComposerState extends ConsumerState<AskAiComposer> {
                       const SizedBox(width: AppSpacing.space8),
                       Text(
                         'askAi.photo.reading'.tr(),
-                        style: theme.textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
@@ -354,7 +385,10 @@ class _SendButton extends StatelessWidget {
         icon: busy
             ? SizedBox.square(
                 dimension: 16,
-                child: CircularProgressIndicator(strokeWidth: 2, color: colorScheme.onSurfaceVariant),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.onSurfaceVariant,
+                ),
               )
             : const Icon(Icons.arrow_upward_rounded, size: 22),
       ),
