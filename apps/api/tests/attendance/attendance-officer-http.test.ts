@@ -225,6 +225,18 @@ describeDb("attendance taking", () => {
       status: "submitted",
     });
     expect(submit.status).toBe(200);
+
+    // Submitting is what tells parents about absences and lates: the workers' notify consumer
+    // reads this event, written in the same transaction as the status change.
+    const events = await database!.sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      await tx`SELECT set_config('app.school_id', ${world.schoolId}, true)`;
+      return tx<{ payload: { sessionId: string; classId: string } }[]>`
+        SELECT payload FROM app.outbox_events
+        WHERE school_id = ${world.schoolId}::uuid AND event_name = 'attendance.sessionSubmitted'
+      `;
+    });
+    expect(events.map((event) => event.payload)).toEqual([{ sessionId, classId: world.classId }]);
   });
 
   test("a teacher who does not teach the class cannot open or record its register", async () => {

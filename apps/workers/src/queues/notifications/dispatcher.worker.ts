@@ -377,15 +377,20 @@ async function writeInAppNotification(
     course_id: params.context.courseId,
   });
 
+  // push_dispatched_at stamped at insert: this dispatcher sends its own push through the delivery
+  // job, so the generic push consumer (push-consumer.ts) must not send a second one.
   const [row] = await tx<{ id: string }[]>`
-    INSERT INTO app.notifications (school_id, user_id, notification_type, title, body, metadata)
+    INSERT INTO app.notifications (
+      school_id, user_id, notification_type, title, body, metadata, push_dispatched_at
+    )
     VALUES (
       ${params.schoolId}::uuid,
       ${params.recipientId}::uuid,
       ${params.notificationType}::app.notification_type,
       ${params.title},
       ${params.body},
-      ${metadata}
+      ${metadata},
+      CURRENT_TIMESTAMP
     )
     RETURNING id
   `;

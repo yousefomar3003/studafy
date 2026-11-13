@@ -90,6 +90,10 @@ describe("templates — completeness", () => {
                       "daysLeft",
                       "invoiceNumber",
                       "balance",
+                      "who",
+                      "assignmentTitle",
+                      "result",
+                      "status",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -211,6 +215,24 @@ describe("renderNotification — snapshot tests", () => {
     [NOTIFICATION_TYPES.LICENSE_RECEIPT_UPLOADED]: {
       schoolName: "Amman Academy",
       invoiceNumber: "LIC-2026-000042",
+    },
+    [NOTIFICATION_TYPES.ASSIGNMENT_PUBLISHED]: {
+      who: "Amina Tazi · ",
+      assignmentTitle: "Gravity",
+      courseName: "Physics",
+      dueDate: "2026-11-20",
+    },
+    [NOTIFICATION_TYPES.ASSIGNMENT_GRADED]: {
+      who: "",
+      assignmentTitle: "Forces",
+      courseName: "Physics",
+      result: "Score 17 / 20",
+    },
+    [NOTIFICATION_TYPES.ATTENDANCE_MARKED]: {
+      studentName: "Amina Tazi",
+      status: "absent",
+      courseName: "Physics",
+      date: "2026-11-12",
     },
   } as const;
 

@@ -252,6 +252,7 @@ describe("emit", () => {
           boundaryDate: "2026-07-29",
           parentUserIds: [uid],
         },
+        [DOMAIN_EVENTS.ATTENDANCE_SESSION_SUBMITTED]: { sessionId: uid, classId: uid },
         [DOMAIN_EVENTS.DIGEST_SENT]: {
           parentUserId: uid,
           email: "test@example.com",

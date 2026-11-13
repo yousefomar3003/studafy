@@ -9806,7 +9806,10 @@
         "FEE_INVOICE_ISSUED": "[Ñéŵ ƒéé íñṽóíçéš ǝɥʇ ʞɔ]",
         "FEE_PAYMENT_RECEIVED": "[F̃éé ρáýɱéñţš ŕéçéíṽéđ ǝɥʇ ʞɔın]",
         "FEE_PAYMENT_REMINDER": "[Óṽéŕđúé ƒéé ŕéɱíñđéŕš ǝɥʇ ʞɔın]",
-        "FEE_STATEMENT": "[F̃áɱíĺý ƒéé šţáţéɱéñţš ǝɥʇ ʞɔın]"
+        "FEE_STATEMENT": "[F̃áɱíĺý ƒéé šţáţéɱéñţš ǝɥʇ ʞɔın]",
+        "ASSIGNMENT_PUBLISHED": "[Ñéŵ áššíğñɱéñţš ǝɥʇ ʞɔ]",
+        "ASSIGNMENT_GRADED": "[M̃áŕķéđ áššíğñɱéñţš ǝɥʇ ʞɔı]",
+        "ATTENDANCE_MARKED": "[Áƀšéñçéš áñđ ĺáţéš ǝɥʇ ʞɔı]"
       },
       "channels": {
         "in_app": "[Íñ-áρρ ǝɥʇ]",

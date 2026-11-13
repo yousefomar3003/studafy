@@ -118,6 +118,12 @@ export const eventPayloadSchemas = {
     courseId: uid,
   }),
 
+  // ── Attendance ────────────────────────────────────────────────────────
+  [DOMAIN_EVENTS.ATTENDANCE_SESSION_SUBMITTED]: z.object({
+    sessionId: uid,
+    classId: uid,
+  }),
+
   // ── Submission ────────────────────────────────────────────────────────
   [DOMAIN_EVENTS.SUBMISSION_CREATED]: z.object({
     submissionId: uid,

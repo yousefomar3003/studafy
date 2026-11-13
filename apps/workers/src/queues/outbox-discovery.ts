@@ -19,7 +19,7 @@ import { withSystemTx } from "../db/tenant-tx";
 import type { Sql, TransactionSql } from "postgres";
 
 /** Must match the consumer names `app.outbox_pending_school_ids` accepts. */
-export type OutboxConsumer = "relay" | "email" | "entitlement";
+export type OutboxConsumer = "relay" | "email" | "entitlement" | "notify" | "push";
 
 /** For callers already inside a `withSystemTx` that want to add their own checks to the statement. */
 export function pendingSchoolIdsFragment(tx: TransactionSql, consumer: OutboxConsumer) {
