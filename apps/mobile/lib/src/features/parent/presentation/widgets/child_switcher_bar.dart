@@ -18,6 +18,8 @@ class ChildSwitcherBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // A long name is shortened rather than pushing the other children's chips off screen.
+    final maxNameWidth = (MediaQuery.sizeOf(context).width * 0.45).clamp(96.0, 240.0);
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(
@@ -30,7 +32,11 @@ class ChildSwitcherBar extends ConsumerWidget {
             Padding(
               padding: const EdgeInsetsDirectional.only(end: AppSpacing.space8),
               child: ChoiceChip(
-                label: Text(child.studentName),
+                label: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxNameWidth),
+                  child: Text(child.studentName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ),
+                tooltip: child.studentName,
                 avatar: AttendanceAlert.fromMetrics(child.attendance).isElevated
                     ? Icon(
                         Icons.warning_amber_rounded,
