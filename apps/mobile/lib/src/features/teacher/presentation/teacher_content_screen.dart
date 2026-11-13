@@ -12,6 +12,7 @@ import 'package:mime/mime.dart';
 import '../../../core/api/api_exception.dart';
 import '../../../core/api/generated/models/assignment.dart';
 import '../../../core/api/generated/models/assignment_attachment.dart';
+import '../../../core/api/generated/models/assignment_attachment_download_state.dart';
 import '../../../core/api/generated/models/assignment_kind.dart';
 import '../../../core/api/generated/models/assignment_status.dart';
 import '../../../core/api/generated/models/confirm_attachment_body.dart';
@@ -28,6 +29,7 @@ import '../../../core/api/generated/models/update_material_body.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/files/picked_file.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../attachments/presentation/attachment_viewer_screen.dart';
 import '../../student/domain/material_ready_state.dart';
 import '../../student/presentation/widgets/material_ready_state_pill.dart';
 import 'assignment_submissions_screen.dart';
@@ -906,6 +908,25 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.insert_drive_file_outlined),
                 title: Text(attachment.originalFileName),
+                subtitle:
+                    attachment.downloadState ==
+                        AssignmentAttachmentDownloadState.checking
+                    ? Text('attachments.tile.checking'.tr())
+                    : null,
+                // Opens it the way students see it (in-app viewer); the URL in hand is fine here,
+                // the form was opened moments ago.
+                onTap: attachment.downloadUrl == null
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => AttachmentViewerScreen(
+                            attachmentId: attachment.id,
+                            fileName: attachment.originalFileName,
+                            mimeType: attachment.mimeType,
+                            resolveUrl: () async => attachment.downloadUrl,
+                          ),
+                        ),
+                      ),
                 trailing: IconButton(
                   icon: const Icon(Icons.close),
                   tooltip: 'teacher.content.assignmentForm.removeAttachment'
