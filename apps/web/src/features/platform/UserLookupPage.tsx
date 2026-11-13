@@ -99,6 +99,18 @@ export default function UserLookupPage() {
         );
       },
     },
+    {
+      id: "open",
+      header: t("platform.users.columns.open"),
+      renderCell: (match) => (
+        <Link
+          to={`/portal/platform/schools/${match.schoolId}/users/${match.userId}`}
+          aria-label={`${t("platform.support.open")}: ${match.displayName ?? match.email} · ${match.schoolName}`}
+        >
+          {t("platform.support.open")}
+        </Link>
+      ),
+    },
   ];
 
   return (
