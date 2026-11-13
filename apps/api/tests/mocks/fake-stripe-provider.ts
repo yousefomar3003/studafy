@@ -94,16 +94,47 @@ export class FakeStripeProvider implements PaymentProviderPort {
     return { url: input.returnUrl };
   }
 
+  // Idempotent like the real adapter: a stored id this fake already knows is reused, so a repeated
+  // sync in an E2E run does not grow the catalog.
   async syncProduct(input: SyncProductInput): Promise<SyncProductResult> {
+    const existing = input.providerProductId
+      ? this.products.get(input.providerProductId)
+      : undefined;
+    if (existing) {
+      const changed =
+        existing.name !== input.name ||
+        existing.description !== input.description ||
+        existing.active !== input.active;
+      this.products.set(existing.id, { ...input, id: existing.id });
+      return { providerProductId: existing.id, outcome: changed ? "updated" : "unchanged" };
+    }
     const id = `prod_fake_${randomUUID()}`;
     this.products.set(id, { ...input, id });
-    return { providerProductId: id };
+    return { providerProductId: id, outcome: "created" };
   }
 
   async syncPrice(input: SyncPriceInput): Promise<SyncPriceResult> {
+    const existing = input.providerPriceId ? this.prices.get(input.providerPriceId) : undefined;
+    if (
+      existing &&
+      existing.productId === input.productId &&
+      existing.amountMinor === input.amountMinor &&
+      existing.currency === input.currency &&
+      existing.interval === input.interval
+    ) {
+      const changed = existing.active !== input.active;
+      this.prices.set(existing.id, { ...input, id: existing.id });
+      return {
+        providerPriceId: existing.id,
+        outcome: changed ? "updated" : "unchanged",
+        archivedPriceIds: [],
+      };
+    }
     const id = `price_fake_${randomUUID()}`;
     this.prices.set(id, { ...input, id });
-    return { providerPriceId: id };
+    const archivedPriceIds = existing?.active ? [existing.id] : [];
+    if (existing) this.prices.set(existing.id, { ...existing, active: false });
+    return { providerPriceId: id, outcome: "created", archivedPriceIds };
   }
 
   /**
