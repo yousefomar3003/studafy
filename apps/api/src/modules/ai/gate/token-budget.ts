@@ -4,6 +4,7 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { getLocalizedMessage } from "../../../middleware/locale";
 import { getFeatureGate } from "../../features/middleware";
 import { AI_DEFAULT_RESERVE_TOKENS, AI_MONTHLY_TOKEN_BUDGET } from "../config";
+import { monthlyBudgetWindow } from "../usage/budget-window";
 
 import type { SupportedLocale } from "../../../middleware/locale";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -195,8 +196,10 @@ export function aiTokenBudget(): MiddlewareHandler<AppEnv> {
         getLocalizedMessage(ERROR_CODES.AI_QUOTA_UNAVAILABLE, locale),
       );
 
-    const { periodStart, periodEnd } = gate.access;
-    if (!gate.studentId || !periodStart || !periodEnd) throw unavailable();
+    const { periodStart: grantStart, periodEnd: grantEnd } = gate.access;
+    if (!gate.studentId || !grantStart || !grantEnd) throw unavailable();
+    // The budget is monthly even when the grant is a year long (yearly add-on, school license).
+    const { periodStart, periodEnd } = monthlyBudgetWindow(grantStart, grantEnd);
 
     const base = {
       schoolId: gate.schoolId,
