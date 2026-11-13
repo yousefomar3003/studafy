@@ -1,0 +1,9 @@
+# Template for android/key.properties — the real file is written by `fastlane android signing`
+# from CI secrets at release time and is gitignored. Copy this to `key.properties` and fill it in
+# only if you need to produce a Play-signed build from your own machine.
+#
+# storeFile is resolved relative to android/app/. See docs/runbooks/mobile-release.md#android-signing.
+storeFile=studafy-upload.jks
+storePassword=CHANGE_ME
+keyAlias=upload
+keyPassword=CHANGE_ME

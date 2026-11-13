@@ -1,0 +1,452 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "tryAgain": "Please try again.",
+    "previous": "Previous",
+    "next": "Next",
+    "cancel": "Cancel"
+  },
+  "layouts": {
+    "account": "Account",
+    "onboarding": "Onboarding",
+    "setupWizard": "Setup wizard"
+  },
+  "statusCard": {
+    "reference": "Reference: {{requestId}}"
+  },
+  "routeError": {
+    "heading": "Something went wrong",
+    "unexpected": "An unexpected error occurred."
+  },
+  "errorBoundary": {
+    "heading": "Something went wrong",
+    "message": "Please reload the page. If the problem persists, contact support."
+  },
+  "approvalQueueBadge": {
+    "pending_one": "{{count}} pending approval",
+    "pending_other": "{{count}} pending approvals"
+  },
+  "turnstile": {
+    "loadFailed": "Bot-protection challenge failed to load. Check your connection and reload the page."
+  },
+  "marketing": {
+    "nav": {
+      "home": "Home",
+      "features": "Features",
+      "pricing": "Pricing",
+      "about": "About"
+    },
+    "header": {
+      "signIn": "Sign in",
+      "signUp": "Sign up",
+      "talkToUs": "Talk to us"
+    },
+    "footer": {
+      "tagline": "Studafy runs the school day for staff and families, in English and Arabic.",
+      "navAriaLabel": "Footer",
+      "siteHeading": "Studafy",
+      "accountHeading": "Your account",
+      "legalHeading": "Legal",
+      "signIn": "Sign in",
+      "portal": "Go to your portal",
+      "contact": "Contact us",
+      "privacy": "Privacy policy",
+      "terms": "Terms of service",
+      "schoolAgreement": "School agreement",
+      "deleteAccount": "Delete your account",
+      "copyright": "© {{year}} Studafy. All rights reserved."
+    },
+    "cta": {
+      "talkToUs": "Talk to us",
+      "seePricing": "See pricing",
+      "exploreFeatures": "See all features"
+    },
+    "home": {
+      "seoTitle": "School management in English and Arabic",
+      "seoDescription": "Studafy keeps attendance, timetables, homework, marks, fees and family updates in one system for school staff, parents and students, in English and Arabic.",
+      "heroTitle": "The whole school day, in one system.",
+      "heroBody": "Attendance, timetables, homework, marks, fees and updates for families. Studafy gives each person in the school the part they need, in English and Arabic, on the web and on their phone.",
+      "dayTitle": "A Tuesday at a school on Studafy",
+      "dayColumns": {
+        "time": "Time",
+        "what": "What happens",
+        "who": "Who"
+      },
+      "day": {
+        "register": {
+          "time": "07:50",
+          "what": "Register taken for Grade 8B",
+          "who": "Teacher"
+        },
+        "late": {
+          "time": "09:20",
+          "what": "A late arrival corrected, with the reason kept",
+          "who": "Attendance office"
+        },
+        "homework": {
+          "time": "11:05",
+          "what": "Science homework set, due Thursday",
+          "who": "Teacher"
+        },
+        "marks": {
+          "time": "13:30",
+          "what": "Term marks approved and released to families",
+          "who": "Principal"
+        },
+        "payment": {
+          "time": "14:10",
+          "what": "A fee instalment recorded against an invoice",
+          "who": "Finance"
+        },
+        "home": {
+          "time": "16:45",
+          "what": "Today's attendance and homework checked at home",
+          "who": "Parent"
+        },
+        "study": {
+          "time": "19:30",
+          "what": "Quiz on today's lesson, made from the class's own notes",
+          "who": "Student"
+        }
+      },
+      "rolesTitle": "Every role sees its own part of the school",
+      "rolesLede": "Permissions follow the job. A teacher sees their classes, a parent sees their children, finance sees the accounts, and the school decides who can do what.",
+      "modulesTitle": "What Studafy covers",
+      "modulesLede": "Each part works from the same students, classes and staff, so nothing is typed twice.",
+      "modules": {
+        "academics": {
+          "title": "Academics and timetable",
+          "body": "Years, terms, subjects and classes, and a timetable built for each term."
+        },
+        "attendance": {
+          "title": "Attendance",
+          "body": "A register for every lesson, corrections with a reason, and reports for the attendance office."
+        },
+        "homework": {
+          "title": "Homework",
+          "body": "Assignments with due dates, work handed in from the phone, and marking."
+        },
+        "exams": {
+          "title": "Exams and marks",
+          "body": "Your school's own exam structure and weights, mark entry, and approval before release."
+        },
+        "finance": {
+          "title": "Fees and finance",
+          "body": "Fee plans, instalments, invoices, payments, refunds and VAT, with one account per family."
+        },
+        "families": {
+          "title": "Families",
+          "body": "Every child in a family under one account, with the notifications each parent chooses."
+        },
+        "announcements": {
+          "title": "Announcements",
+          "body": "To the whole school, one role or one class, sent now or scheduled for later."
+        },
+        "discipline": {
+          "title": "Discipline and evaluations",
+          "body": "Incidents, the actions taken, and staff evaluations, kept on the record."
+        },
+        "records": {
+          "title": "School records and lists",
+          "body": "The details your school collects on students, parents, staff and classes, and lists for anything else."
+        },
+        "imports": {
+          "title": "Imports",
+          "body": "Students, staff and classes brought in from a spreadsheet, with every change checked before it is saved."
+        }
+      },
+      "languageTitle": "Made for English and Arabic",
+      "languageBody": "Every screen works in both languages, with a right-to-left layout in Arabic. Each person picks their own language, so a teacher can work in English while a parent reads in Arabic.",
+      "languageCaption": "The same words, as each person sees them",
+      "privacyTitle": "Careful with school data",
+      "privacy": {
+        "separate": {
+          "title": "Each school's data stays separate",
+          "body": "Schools never see each other's records, and the database enforces it, not only the app."
+        },
+        "sensitive": {
+          "title": "Sensitive details stay hidden",
+          "body": "ID numbers and medical notes are encrypted and hidden by default, and each time someone opens one is recorded."
+        },
+        "history": {
+          "title": "Changes leave a trail",
+          "body": "Corrections to marks, attendance and fees record who made them and when."
+        },
+        "requests": {
+          "title": "People can ask for their data",
+          "body": "Staff and families can ask for a copy of their data or for it to be deleted, and the school can act on it."
+        }
+      },
+      "pricingTitle": "Free for schools",
+      "pricingBody": "Every school gets all of Studafy at no cost. Students can add the AI study assistant for themselves if they want it.",
+      "pricingLink": "How pricing works",
+      "closingTitle": "Bring Studafy to your school",
+      "closingBody": "Tell us about your school. We'll show you around and help you set it up.",
+      "dayPause": "Pause",
+      "dayPlay": "Play",
+      "registerTitle": "Take the register. Watch the school hear about it.",
+      "registerLede": "Mark a student late or absent. Their parent hears about it straight away, and the attendance office's numbers move with it. Try it.",
+      "exampleNote": "Example data"
+    }
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Welcome back. Choose how you'd like to continue.",
+    "sessionExpired": "Your session expired. Sign in again to continue.",
+    "continueWith": "Continue with {{provider}}",
+    "dev": {
+      "badge": "Dev",
+      "title": "Quick sign-in as a demo account",
+      "selectLabel": "Demo account",
+      "personaWithRole": "{{role}} — {{name}}",
+      "groups": {
+        "administrators": "Administrators",
+        "teachers": "Teachers",
+        "students": "Students",
+        "parents": "Parents"
+      },
+      "roles": {
+        "superAdmin": "Super admin",
+        "schoolAdmin": "School admin",
+        "principal": "Principal",
+        "attendanceOfficer": "Attendance officer",
+        "finance": "Finance officer",
+        "science": "Science",
+        "math": "Math",
+        "arts": "Arts"
+      }
+    }
+  },
+  "authError": {
+    "retry": "Try again",
+    "backToSignIn": "Back to sign in",
+    "stateInvalid": {
+      "heading": "This sign-in link has expired",
+      "message": "The sign-in you started is no longer valid. Start again from the sign-in page."
+    },
+    "noAccount": {
+      "heading": "No account found for this sign-in",
+      "message": "The account you signed in with isn't linked to a Studafy account yet. If you used the wrong account, sign in again — otherwise ask your school administrator for an invitation."
+    },
+    "emailNotVerified": {
+      "heading": "Your sign-in email isn't verified",
+      "message": "The provider hasn't verified the email on the account you signed in with. Verify it there, then try again."
+    },
+    "providerError": {
+      "heading": "We couldn't complete your sign-in",
+      "message": "The sign-in service had a problem. Please try again in a moment."
+    },
+    "suspended": {
+      "heading": "Your school's account is suspended",
+      "message": "Sign-in is paused while your school's account is suspended. Contact your school administrator."
+    },
+    "cancelled": {
+      "heading": "Sign-in cancelled",
+      "message": "You cancelled the sign-in. Nothing changed — try again whenever you're ready."
+    },
+    "generic": {
+      "heading": "We couldn't complete your sign-in",
+      "message": "Something went wrong on our end. Please try again in a moment."
+    },
+    "mobileOnly": {
+      "heading": "Use the Studafy mobile app",
+      "message": "Students, parents, teachers and attendance officers sign in on the Studafy mobile app. The website is for school administrators, principals and finance staff."
+    }
+  },
+  "help": {
+    "breadcrumb": "Breadcrumb",
+    "categories": {
+      "getting-started": "Getting started",
+      "academics": "Academics",
+      "finance": "Finance",
+      "billing": "Billing"
+    }
+  },
+  "search": {
+    "studentStatus": {
+      "applicant": "Applicant",
+      "enrolled": "Enrolled",
+      "suspended": "Suspended",
+      "graduated": "Graduated",
+      "withdrawn": "Withdrawn",
+      "archived": "Archived"
+    },
+    "userStatus": {
+      "invited": "Invited",
+      "active": "Active",
+      "suspended": "Suspended",
+      "archived": "Archived"
+    },
+    "materialStatus": {
+      "uploaded": "Uploaded",
+      "queued": "Queued",
+      "processing": "Processing",
+      "scanning": "Scanning",
+      "ready": "Ready",
+      "failed": "Failed",
+      "quarantined": "Quarantined"
+    }
+  },
+  "notifications": {
+    "types": {
+      "ASSIGNMENT_DUE_SOON": "Assignment due soon",
+      "GRADE_POSTED": "Grade posted",
+      "ENROLLMENT_APPROVED": "Enrollment approved",
+      "COURSE_PUBLISHED": "Course published",
+      "DISCUSSION_REPLY": "Discussion reply",
+      "STUDY_GROUP_INVITE": "Study group invite",
+      "CERTIFICATE_ISSUED": "Certificate issued",
+      "SUPPORT_MESSAGE": "Support message",
+      "ATTENDANCE_ALERT": "Attendance alert",
+      "ADMIN_ANNOUNCEMENT": "School announcement",
+      "ANNOUNCEMENT": "Announcement",
+      "MATERIAL_SCAN_QUARANTINED": "Material blocked by security scan",
+      "MATERIAL_SCAN_FAILED": "Material scan failed",
+      "MATERIAL_OCR_LOW_CONFIDENCE": "Material text quality warning",
+      "MATERIAL_INGESTED": "Material ready for AI search",
+      "MATERIAL_INGEST_FAILED": "Material processing failed",
+      "DIRECT_MESSAGE": "New messages",
+      "FEE_INVOICE_ISSUED": "New fee invoices",
+      "FEE_PAYMENT_RECEIVED": "Fee payments received",
+      "FEE_PAYMENT_REMINDER": "Overdue fee reminders",
+      "FEE_STATEMENT": "Family fee statements"
+    },
+    "channels": {
+      "in_app": "In-app",
+      "push": "Push",
+      "email": "Email"
+    },
+    "inbox": {
+      "title": "Notifications",
+      "description": "Everything sent to you, newest first.",
+      "settings": "Notification settings",
+      "filterLabel": "Filter notifications",
+      "all": "All",
+      "unread": "Unread",
+      "markAllRead": "Mark all as read",
+      "loadError": "Unable to load notifications. Try reloading the page.",
+      "emptyUnread": "No unread notifications.",
+      "empty": "You’re all caught up.",
+      "markAsRead": "Mark as read"
+    },
+    "preferences": {
+      "title": "Notification settings",
+      "description": "Choose which channels deliver each type of notification, and when to batch them into a daily digest.",
+      "backToInbox": "Back to inbox",
+      "loadError": "Unable to load notification preferences. Try reloading the page.",
+      "channelsLabel": "Channel preferences",
+      "channelsHeading": "Channels",
+      "channelsDescription": "A locked type is mandatory and always delivered on every channel.",
+      "tableCaption": "Notification channel preferences",
+      "typeColumn": "Notification type",
+      "digestColumn": "Daily digest",
+      "mandatory": "Mandatory",
+      "cellLabel": "{{type}} — {{channel}}",
+      "digestCellLabel": "{{type}} — daily digest",
+      "saveChannels": "Save channel preferences",
+      "thresholdLabel": "Attendance alert threshold",
+      "attendanceHeading": "Attendance alerts",
+      "attendanceDescription": "Optionally override your school’s attendance alert threshold with your own personal absence count.",
+      "thresholdInput": "Personal absence threshold",
+      "thresholdHelper": "Leave blank to use the school's own threshold.",
+      "saveThreshold": "Save threshold",
+      "savedToast": "Notification preferences updated",
+      "saveError": "Couldn't save preferences",
+      "thresholdSavedToast": "Attendance alert threshold updated",
+      "thresholdSaveError": "Couldn't save the threshold"
+    }
+  },
+  "billing": {
+    "refund": {
+      "link": "Request a refund",
+      "title": "Request a refund",
+      "description": "Tell us what happened and the Studafy team will review your request.",
+      "reasonLabel": "Reason",
+      "reasonPlaceholder": "Choose a reason",
+      "reasonRequired": "Choose a reason first.",
+      "reasons": {
+        "accidental_purchase": "Bought by mistake",
+        "duplicate_charge": "Charged more than once",
+        "service_issue": "The service didn't work as expected",
+        "not_as_described": "Not what was described",
+        "no_longer_needed": "No longer needed",
+        "other": "Other"
+      },
+      "detailsLabel": "Details (optional)",
+      "submit": "Send request",
+      "close": "Close",
+      "submittedToast": "Refund request sent",
+      "errorToast": "Couldn't send the refund request",
+      "openNotice": "You can send another request once this one has been reviewed.",
+      "statusHeading": "Your latest request",
+      "statusLine": "Sent {{date}} · {{status}}",
+      "status": {
+        "pending": "Waiting for review",
+        "approved": "Approved, being processed",
+        "failed": "Approved, being processed",
+        "refunded": "Refunded",
+        "rejected": "Not approved"
+      },
+      "refundedAmount": "Refunded: {{amount}}",
+      "reviewNote": "Note from Studafy: {{note}}"
+    },
+    "ai": {
+      "title": "AI Study Assistant",
+      "intro": "A personal AI tutor built on the student's own class materials: ask anything, practice with quizzes and flashcards, and get quick summaries.",
+      "pricePerMonth": "{{price}} per month",
+      "pricePerYear": "{{price}} per year",
+      "getAiFor": "Get AI for {{name}}",
+      "active": "Active",
+      "confirmPrice": "You'll confirm the price on the next, secure step before anything is charged.",
+      "noPrice": "The AI Study Assistant isn't available to buy yet. Please check back soon.",
+      "noStudents": "The AI Study Assistant is bought for a student. Sign in with a student account, or with a parent account linked to your child.",
+      "loading": "Loading…",
+      "loadError": "We couldn't load this page. Please try again.",
+      "successTitle": "You're all set",
+      "successBody": "The AI Study Assistant is now active. It can take a minute to appear; then open the AI section in the Studafy app to start.",
+      "cancelledTitle": "Checkout cancelled",
+      "cancelledBody": "No charge was made. You can try again below.",
+      "blockedTitle": "Purchase blocked",
+      "blockedBody": "Your school's Studafy account isn't active right now, so the AI Study Assistant can't be bought. Please contact your school.",
+      "checkoutError": "Couldn't start checkout"
+    }
+  },
+  "features": {
+    "providedBy": "Provided by {{school}}",
+    "providedBySchool": "Provided by your school",
+    "bothRenewal": "Your school now covers this. Your subscription won't renew after {{date}}.",
+    "bothRenewalNoDate": "Your school now covers this. Your own subscription won't renew.",
+    "appStoreSteps": "Apple doesn't let Studafy stop App Store renewals, so please turn it off yourself: on your iPhone or iPad open Settings, tap your name, then Subscriptions, choose Studafy and tap Cancel Subscription. You keep access until it ends.",
+    "limitReached": "Monthly limit reached, resets on {{date}}.",
+    "usage": "{{used}} of {{limit}} {{unit}} used this month",
+    "units": {
+      "messages": "messages",
+      "generations": "generations",
+      "pages": "pages",
+      "submissions": "submissions"
+    },
+    "askSchoolTitle": "Ask your school for a seat",
+    "askSchool": "{{school}} provides this through its Studafy license. Ask your school to give you a seat — there's nothing to buy.",
+    "askSchoolOtherTier": "Your seat from {{school}} doesn't include this. Ask your school whether it can move you to a plan that does.",
+    "askSchoolFor": "{{name}}'s school provides this: ask the school for a seat.",
+    "schoolInactiveTitle": "Your school's Studafy plan isn't active",
+    "schoolInactive": "Paid features are paused until your school renews its Studafy plan.",
+    "unavailableTitle": "Temporarily unavailable",
+    "unavailable": "Studafy has switched this off for now. Please try again later.",
+    "expired": "Your access ended on {{date}}.",
+    "errors": {
+      "notIncluded": "This isn't included in what you have now.",
+      "expired": "Your access to this has ended.",
+      "limitReached": "Monthly limit reached. It resets on the 1st of next month.",
+      "schoolInactive": "Your school's Studafy plan isn't active, so this is paused.",
+      "coveredBySchool": "The school already provides this through a seat, so there's nothing to buy."
+    }
+  },
+  "legal": {
+    "descriptions": {
+      "privacy": "How Studafy Limited handles the personal data of school staff, parents and students, and how to exercise your rights.",
+      "terms": "The terms for using Studafy on the web and in the mobile app.",
+      "school-agreement": "The agreement between Studafy Limited and a school that uses Studafy, including how Studafy processes data on the school's behalf."
+    }
+  }
+}

@@ -1,0 +1,306 @@
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/material.dart' hide Material;
+import 'package:flutter_pdfview/flutter_pdfview.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../../core/api/generated/models/material.dart';
+import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../ai/application/ask_ai_controller.dart';
+import '../../ai/presentation/ask_ai_screen.dart';
+import '../../ai/presentation/exam_screen.dart';
+import '../../ai/presentation/key_concepts_screen.dart';
+import '../../ai/presentation/material_summary_screen.dart';
+import '../../ai/presentation/quiz_screen.dart';
+import '../../ai/presentation/widgets/ai_consent_gate.dart';
+import '../application/materials_providers.dart';
+import '../domain/material_ready_state.dart';
+import 'widgets/file_size.dart';
+import 'widgets/material_ready_state_pill.dart';
+import 'widgets/material_type_icon.dart';
+import '../../../core/features/my_features.dart';
+import '../../../core/features/presentation/feature_gate_view.dart';
+import '../../ai/presentation/widgets/ai_paywall.dart';
+
+/// One material: its ready-state gate, then either an in-app preview (PDFs and images —
+/// downloaded and cached on-device via [ensureMaterialDownloadedProvider]) or an "open in
+/// another app" action for every other kind, via a freshly-minted pre-signed URL.
+class MaterialViewerScreen extends StatelessWidget {
+  const MaterialViewerScreen({required this.material, this.initialPage, super.key});
+
+  final Material material;
+
+  /// 1-based page to open a PDF preview at — passed by an Ask AI citation chip so a cited
+  /// answer lands on the exact page it drew from. Null (and any non-PDF kind) opens at the
+  /// start. Ignored for file kinds with no in-app preview.
+  final int? initialPage;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = materialReadyStateFromWireName(material.ingestStatus.name);
+
+    return Scaffold(
+      appBar: AppBar(title: Text(material.title)),
+      body: state.isOpenable
+          ? _MaterialReadyBody(material: material, initialPage: initialPage)
+          : _NotReadyMessage(state: state),
+    );
+  }
+}
+
+class _NotReadyMessage extends StatelessWidget {
+  const _NotReadyMessage({required this.state});
+
+  final MaterialReadyState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.space32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              state == MaterialReadyState.quarantined ? Icons.block : Icons.hourglass_empty,
+              size: 32,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: AppSpacing.space12),
+            MaterialReadyStatePill(state: state),
+            const SizedBox(height: AppSpacing.space12),
+            Text(
+              _messageKeyFor(state).tr(),
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _messageKeyFor(MaterialReadyState state) => switch (state) {
+    MaterialReadyState.quarantined => 'materials.viewer.quarantined',
+    MaterialReadyState.failed => 'materials.viewer.failed',
+    _ => 'materials.viewer.notReadyYet',
+  };
+}
+
+class _MaterialReadyBody extends StatelessWidget {
+  const _MaterialReadyBody({required this.material, this.initialPage});
+
+  final Material material;
+  final int? initialPage;
+
+  @override
+  Widget build(BuildContext context) {
+    final kind = materialFileKindFor(material.mimeType);
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final description = material.description;
+
+    return ListView(
+      padding: const EdgeInsets.all(AppSpacing.space16),
+      children: [
+        Text(
+          formatFileSize(material.sizeBytes),
+          style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        if (description != null && description.isNotEmpty) ...[
+          const SizedBox(height: AppSpacing.space12),
+          Text(description, style: textTheme.bodyMedium),
+        ],
+        if (material.aiVisible) ...[
+          const SizedBox(height: AppSpacing.space12),
+          Text(
+            'materials.viewer.aiVisible'.tr(),
+            style: textTheme.bodySmall?.copyWith(color: colorScheme.primary),
+          ),
+          const SizedBox(height: AppSpacing.space8),
+          Wrap(
+            spacing: AppSpacing.space8,
+            runSpacing: AppSpacing.space8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () => _openStudyTool(
+                  context,
+                  AskAiScreen(
+                    initialMaterial: AskAiMaterialScope(id: material.id, title: material.title),
+                  ),
+                  featureKey: FeatureKeys.aiTutor,
+                ),
+                icon: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                label: Text('aiStudy.openAskAi'.tr()),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openStudyTool(context, MaterialSummaryScreen(material: material)),
+                icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+                label: Text('aiStudy.openSummary'.tr()),
+              ),
+              OutlinedButton.icon(
+                onPressed: () => _openStudyTool(context, KeyConceptsScreen(material: material)),
+                icon: const Icon(Icons.lightbulb_outline, size: 18),
+                label: Text('aiStudy.openConcepts'.tr()),
+              ),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _openStudyTool(context, QuizScreen(initialMaterialIds: {material.id})),
+                icon: const Icon(Icons.quiz_outlined, size: 18),
+                label: Text('aiStudy.openQuiz'.tr()),
+              ),
+              OutlinedButton.icon(
+                onPressed: () =>
+                    _openStudyTool(context, ExamScreen(initialMaterialIds: {material.id})),
+                icon: const Icon(Icons.timer_outlined, size: 18),
+                label: Text('aiStudy.openExam'.tr()),
+              ),
+            ],
+          ),
+        ],
+        const SizedBox(height: AppSpacing.space16),
+        if (kind == MaterialFileKind.pdf || kind == MaterialFileKind.image)
+          _InAppPreview(materialId: material.id, kind: kind, initialPage: initialPage)
+        else
+          _ExternalOpenTile(material: material),
+      ],
+    );
+  }
+}
+
+/// Downloads (if not already cached) and renders [materialId]'s file in-app: [PDFView] for a PDF,
+/// a plain [Image.file] for an image. Both read from the same on-device cache
+/// [ensureMaterialDownloadedProvider] fills, so a material opened once is available with no
+/// connectivity on every later visit.
+/// Opens one of the material's AI tools behind the same gates the AI hub's routes use: its paid
+/// feature (study tools unless given; a paywall when it can be bought) and the AI data-sharing
+/// consent.
+void _openStudyTool(
+  BuildContext context,
+  Widget screen, {
+  String featureKey = FeatureKeys.studyTools,
+}) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => FeatureGate(
+        featureKey: featureKey,
+        whenPurchasable: (_) => const AiPaywall(),
+        child: AiConsentGate(child: screen),
+      ),
+    ),
+  );
+}
+
+class _InAppPreview extends ConsumerWidget {
+  const _InAppPreview({required this.materialId, required this.kind, this.initialPage});
+
+  final String materialId;
+  final MaterialFileKind kind;
+  final int? initialPage;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fileAsync = ref.watch(ensureMaterialDownloadedProvider(materialId));
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return fileAsync.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: AppSpacing.space32),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (error, stackTrace) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.space16),
+        child: Column(
+          children: [
+            Icon(Icons.error_outline, size: 32, color: colorScheme.error),
+            const SizedBox(height: AppSpacing.space8),
+            Text(
+              'materials.viewer.downloadError'.tr(),
+              textAlign: TextAlign.center,
+              style: textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.space12),
+            OutlinedButton(
+              onPressed: () => ref.invalidate(ensureMaterialDownloadedProvider(materialId)),
+              child: Text('materials.viewer.retry'.tr()),
+            ),
+          ],
+        ),
+      ),
+      data: (file) => kind == MaterialFileKind.pdf
+          ? SizedBox(
+              height: MediaQuery.of(context).size.height * 0.7,
+              // PDFView pages are 0-based; citation anchors are 1-based.
+              child: PDFView(
+                filePath: file.path,
+                defaultPage: initialPage == null ? 0 : (initialPage! - 1).clamp(0, 1 << 30),
+              ),
+            )
+: Image.file(
+              file,
+              fit: BoxFit.contain,
+              // Bound the decode to roughly one screen of pixels (logical width × DPR) rather
+              // than the file's full resolution. A multi-megapixel scan decoded at native size
+              // is the biggest memory/first-frame spike this screen can produce on a low-end
+              // device, and the extra fidelity is never visible inside a BoxFit.contain box.
+              cacheWidth: (MediaQuery.sizeOf(context).width *
+                      MediaQuery.devicePixelRatioOf(context))
+                  .ceil(),
+            ),
+        );
+  }
+}
+
+/// A tap-to-open row for a material kind with no in-app preview: mints a fresh pre-signed URL on
+/// every tap (never trusting one minted earlier in the screen's life — see
+/// `materialDownloadUrlProvider`'s doc comment) and hands it to the OS, the same
+/// `launchUrl(..., mode: externalApplication)` pattern `AttachmentDownloadTile` uses for
+/// assignment attachments.
+class _ExternalOpenTile extends ConsumerStatefulWidget {
+  const _ExternalOpenTile({required this.material});
+
+  final Material material;
+
+  @override
+  ConsumerState<_ExternalOpenTile> createState() => _ExternalOpenTileState();
+}
+
+class _ExternalOpenTileState extends ConsumerState<_ExternalOpenTile> {
+  bool _opening = false;
+
+  Future<void> _open() async {
+    setState(() => _opening = true);
+    try {
+      final url = await ref.refresh(materialDownloadUrlProvider(widget.material.id).future);
+      if (!mounted) return;
+      await launchUrl(Uri.parse(url.downloadUrl), mode: LaunchMode.externalApplication);
+    } finally {
+      if (mounted) setState(() => _opening = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(materialTypeIconFor(widget.material.mimeType), color: colorScheme.primary),
+      title: Text('materials.viewer.openExternally'.tr()),
+      subtitle: Text('materials.viewer.noPreview'.tr()),
+      trailing: _opening
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.download_outlined),
+      enabled: !_opening,
+      onTap: _opening ? null : _open,
+    );
+  }
+}

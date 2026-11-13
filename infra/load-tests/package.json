@@ -1,0 +1,13 @@
+{
+  "name": "@studafy/load-tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "k6 load-test scenarios (ST-248). Not a root workspace member — see README.md.",
+  "scripts": {
+    "seed:local": "bun seed/generate-local-fixtures.ts",
+    "attendance": "bash scripts/run.sh morning-attendance-peak",
+    "results-storm": "bash scripts/run.sh results-day-read-storm",
+    "ai-concurrency": "bash scripts/run.sh ai-ask-concurrency"
+  }
+}

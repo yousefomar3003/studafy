@@ -1,0 +1,1 @@
+export { inquiryRoutes } from "./routes";

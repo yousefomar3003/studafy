@@ -1,0 +1,242 @@
+import { HTTPException } from "hono/http-exception";
+
+import { withTenantTx } from "../../../db";
+import { emitAuditLog } from "../../../middleware/auditEmitter";
+
+import type { Database } from "../../../db";
+import type { ExamStructure, ExamWeights } from "../../grading/exam-structure";
+import type { TransactionSql } from "postgres";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+export interface SchoolSettingsRow {
+  school_id: string;
+  locale: string;
+  timezone: string;
+  grading_scheme: string;
+  invitation_expiry_days: number;
+  attendance_alert_threshold: number;
+  absence_alert_threshold: number;
+  parent_discipline_visibility: boolean;
+  attendance_correction_window_hours: number;
+  exam_structure: ExamStructure;
+  exam_weights: ExamWeights;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface UpdateSchoolSettingsParams {
+  locale?: string;
+  timezone?: string;
+  grading_scheme?: string;
+  invitation_expiry_days?: number;
+  attendance_alert_threshold?: number;
+  absence_alert_threshold?: number;
+  parent_discipline_visibility?: boolean;
+  attendance_correction_window_hours?: number;
+  exam_structure?: ExamStructure;
+  exam_weights?: ExamWeights;
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function rowToSettings(row: SchoolSettingsRow): SchoolSettingsRow {
+  return {
+    school_id: row.school_id,
+    locale: row.locale,
+    timezone: row.timezone,
+    grading_scheme: row.grading_scheme,
+    invitation_expiry_days: row.invitation_expiry_days,
+    attendance_alert_threshold: row.attendance_alert_threshold,
+    absence_alert_threshold: row.absence_alert_threshold,
+    parent_discipline_visibility: row.parent_discipline_visibility,
+    attendance_correction_window_hours: row.attendance_correction_window_hours,
+    exam_structure: row.exam_structure,
+    exam_weights: row.exam_weights,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/schools/current/settings
+// ---------------------------------------------------------------------------
+
+/**
+ * Read the school's settings. Creates a default row if none exists (lazy init).
+ */
+export async function getSchoolSettings(
+  database: Database,
+  schoolId: string,
+): Promise<SchoolSettingsRow> {
+  return withTenantTx(database, { schoolId }, async (tx) => {
+    const rows = await tx<SchoolSettingsRow[]>`
+      SELECT
+        school_id::text,
+        locale, timezone, grading_scheme,
+        invitation_expiry_days,
+        attendance_alert_threshold, absence_alert_threshold,
+        parent_discipline_visibility,
+        attendance_correction_window_hours,
+        exam_structure, exam_weights,
+        created_at, updated_at
+      FROM app.school_settings
+      WHERE school_id = ${schoolId}::uuid
+    `;
+
+    if (rows.length > 0) return rowToSettings(rows[0]);
+
+    // Lazy init: create the default settings row for this school.
+    //
+    // ST-249: ON CONFLICT DO UPDATE, not a plain INSERT. Two concurrent first-ever reads for the
+    // same school (two admin tabs, or a client retry racing the original) both see zero rows above
+    // and both reach this insert; the loser used to hit school_settings' primary key violation
+    // directly, surfacing as an unhandled 500 instead of the settings it asked to read. The
+    // `DO UPDATE SET school_id = EXCLUDED.school_id` is a no-op write — Postgres has no
+    // `DO NOTHING ... RETURNING` for the row that already exists, only for the row it just
+    // inserted — so this is the standard way to make RETURNING unconditional.
+    const created = await tx<SchoolSettingsRow[]>`
+      INSERT INTO app.school_settings (school_id)
+      VALUES (${schoolId}::uuid)
+      ON CONFLICT (school_id) DO UPDATE SET school_id = EXCLUDED.school_id
+      RETURNING
+        school_id::text,
+        locale, timezone, grading_scheme,
+        invitation_expiry_days,
+        attendance_alert_threshold, absence_alert_threshold,
+        parent_discipline_visibility,
+        attendance_correction_window_hours,
+        exam_structure, exam_weights,
+        created_at, updated_at
+    `;
+
+    if (created.length === 0) {
+      throw new HTTPException(500, { message: "Failed to initialize school settings." });
+    }
+
+    return rowToSettings(created[0]);
+  });
+}
+
+// ---------------------------------------------------------------------------
+// PATCH /api/schools/current/settings
+// ---------------------------------------------------------------------------
+
+/**
+ * Partially update the school's settings. Every change is recorded as an audit entry
+ * with the full before/after snapshot. Runs atomically.
+ */
+export async function updateSchoolSettings(
+  database: Database,
+  schoolId: string,
+  patch: UpdateSchoolSettingsParams,
+): Promise<SchoolSettingsRow> {
+  const hasAnyField = Object.keys(patch).some(
+    (k) => patch[k as keyof UpdateSchoolSettingsParams] !== undefined,
+  );
+  if (!hasAnyField) {
+    throw new HTTPException(400, { message: "No fields to update." });
+  }
+
+  return withTenantTx(database, { schoolId }, async (tx: TransactionSql) => {
+    // 1. Read current settings (the "before" snapshot for audit).
+    const beforeRows = await tx<SchoolSettingsRow[]>`
+      SELECT
+        school_id::text,
+        locale, timezone, grading_scheme,
+        invitation_expiry_days,
+        attendance_alert_threshold, absence_alert_threshold,
+        parent_discipline_visibility,
+        attendance_correction_window_hours,
+        exam_structure, exam_weights,
+        created_at, updated_at
+      FROM app.school_settings
+      WHERE school_id = ${schoolId}::uuid
+    `;
+
+    const before = beforeRows[0];
+
+    // 2. Ensure the row exists (create defaults if this is the first mutation).
+    // ST-249: ON CONFLICT DO NOTHING — see the matching note in getSchoolSettings above. Two
+    // concurrent first-ever PATCHes can both see `before` as undefined and both reach this insert;
+    // without the conflict clause the loser hit school_settings' primary key violation directly.
+    if (!before) {
+      await tx`
+        INSERT INTO app.school_settings (school_id)
+        VALUES (${schoolId}::uuid)
+        ON CONFLICT (school_id) DO NOTHING
+      `;
+    }
+
+    // 3. Apply the patch. COALESCE keeps existing values for fields the caller omitted.
+    const afterRows = await tx<SchoolSettingsRow[]>`
+      UPDATE app.school_settings SET
+        locale                        = COALESCE(${patch.locale ?? null}, locale),
+        timezone                      = COALESCE(${patch.timezone ?? null}, timezone),
+        grading_scheme                = COALESCE(${patch.grading_scheme ?? null}, grading_scheme),
+        invitation_expiry_days        = COALESCE(${patch.invitation_expiry_days ?? null}, invitation_expiry_days),
+        attendance_alert_threshold    = COALESCE(${patch.attendance_alert_threshold ?? null}, attendance_alert_threshold),
+        absence_alert_threshold       = COALESCE(${patch.absence_alert_threshold ?? null}, absence_alert_threshold),
+        parent_discipline_visibility  = COALESCE(${patch.parent_discipline_visibility ?? null}, parent_discipline_visibility),
+        attendance_correction_window_hours = COALESCE(${patch.attendance_correction_window_hours ?? null}, attendance_correction_window_hours),
+        exam_structure                = COALESCE(${patch.exam_structure ?? null}, exam_structure),
+        exam_weights                  = COALESCE(${patch.exam_weights ? tx.json(patch.exam_weights) : null}::jsonb, exam_weights),
+        updated_at                    = CURRENT_TIMESTAMP
+      WHERE school_id = ${schoolId}::uuid
+      RETURNING
+        school_id::text,
+        locale, timezone, grading_scheme,
+        invitation_expiry_days,
+        attendance_alert_threshold, absence_alert_threshold,
+        parent_discipline_visibility,
+        attendance_correction_window_hours,
+        exam_structure, exam_weights,
+        created_at, updated_at
+    `;
+
+    if (afterRows.length === 0) {
+      throw new HTTPException(500, { message: "Failed to update school settings." });
+    }
+
+    const after = rowToSettings(afterRows[0]);
+
+    // 4. Audit: before/after in the same transaction.
+    await emitAuditLog(tx, {
+      action: "update",
+      targetTable: "school_settings",
+      targetId: schoolId,
+      oldValues: before
+        ? {
+            locale: before.locale,
+            timezone: before.timezone,
+            grading_scheme: before.grading_scheme,
+            invitation_expiry_days: before.invitation_expiry_days,
+            attendance_alert_threshold: before.attendance_alert_threshold,
+            absence_alert_threshold: before.absence_alert_threshold,
+            parent_discipline_visibility: before.parent_discipline_visibility,
+            attendance_correction_window_hours: before.attendance_correction_window_hours,
+            exam_structure: before.exam_structure,
+            exam_weights: before.exam_weights,
+          }
+        : null,
+      newValues: {
+        locale: after.locale,
+        timezone: after.timezone,
+        grading_scheme: after.grading_scheme,
+        invitation_expiry_days: after.invitation_expiry_days,
+        attendance_alert_threshold: after.attendance_alert_threshold,
+        absence_alert_threshold: after.absence_alert_threshold,
+        parent_discipline_visibility: after.parent_discipline_visibility,
+        attendance_correction_window_hours: after.attendance_correction_window_hours,
+        exam_structure: after.exam_structure,
+        exam_weights: after.exam_weights,
+      },
+    });
+
+    return after;
+  });
+}

@@ -1,0 +1,102 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/attendance_record_status.dart';
+import 'package:studafy_mobile/src/core/config/app_config.dart';
+import 'package:studafy_mobile/src/core/config/app_environment.dart';
+import 'package:studafy_mobile/src/core/di/app_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/attendance_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
+import 'package:studafy_mobile/src/features/student/domain/attendance_history.dart';
+
+/// Anything reaching the auth chain (`authSessionProvider` -> `authClientProvider`) reads
+/// `appConfigProvider`, whose own default throws `StateError` until something provides one (since
+/// ST-247's fix to that client's hardcoded-localhost base URL). A bare `ProviderContainer()` needs
+/// this override for the same reason `pumpStudafyApp` and `pumpAppShell` already provide one.
+final _appConfigOverride = appConfigProvider.overrideWithValue(
+  AppConfig.fromEnvironment(AppEnvironment.dev),
+);
+
+/// The signed-in student's context left unresolved — what `currentStudentIdProvider` yields while
+/// `GET /api/students/me` is loading, has failed, or 404s (not a student). Overridden rather than
+/// left to its default, which would reach the real auth session and secure storage.
+final _unresolvedStudent = currentStudentIdProvider.overrideWithValue(null);
+
+/// [attendanceHistoryProvider] is `.autoDispose`; Riverpod only keeps its async work alive
+/// while something watches it, so a bare `container.read(...future)` can be disposed mid-flight.
+/// Keep this subscription open for the rest of the test — same guard the today-grades provider
+/// test uses.
+ProviderSubscription<AsyncValue<AttendanceHistoryStatus>> _keepAlive(
+  ProviderContainer container,
+) {
+  return container.listen(attendanceHistoryProvider, (previous, next) {});
+}
+
+void main() {
+  test(
+    'resolves AttendanceHistoryUnavailable while the records seam is unfilled',
+    () async {
+      final container = ProviderContainer(
+        overrides: [_appConfigOverride, _unresolvedStudent],
+      );
+      addTearDown(container.dispose);
+      _keepAlive(container);
+
+    final status = await container.read(attendanceHistoryProvider.future);
+
+    expect(status, isA<AttendanceHistoryUnavailable>());
+  });
+
+  test('assembles the overridden records into AttendanceHistoryReady', () async {
+    final container = ProviderContainer(
+      overrides: [
+        studentAttendanceRecordsProvider.overrideWith(
+          (ref) async => [
+            StudentAttendanceEntry(
+              date: DateTime(2026, 8, 26),
+              status: AttendanceRecordStatus.absent,
+              reason: 'Family emergency',
+            ),
+            StudentAttendanceEntry(
+              date: DateTime(2026, 8, 4),
+              status: AttendanceRecordStatus.present,
+            ),
+            StudentAttendanceEntry(
+              date: DateTime(2026, 7, 15),
+              status: AttendanceRecordStatus.valueLate,
+              minutesLate: 12,
+            ),
+          ],
+        ),
+      ],
+    );
+    addTearDown(container.dispose);
+    _keepAlive(container);
+
+    final status = await container.read(attendanceHistoryProvider.future);
+
+    expect(status, isA<AttendanceHistoryReady>());
+    final history = (status as AttendanceHistoryReady).history;
+    expect(history.months.map((month) => month.month), [
+      DateTime(2026, 8),
+      DateTime(2026, 7),
+    ]);
+    expect(history.months.first.absentCount, 1);
+    expect(history.months.first.exceptions.single.reason, 'Family emergency');
+    expect(history.months.last.lateCount, 1);
+  });
+
+  test('an empty record list is Ready-and-empty, not Unavailable', () async {
+    final container = ProviderContainer(
+      overrides: [
+        studentAttendanceRecordsProvider.overrideWith((ref) async => const []),
+      ],
+    );
+    addTearDown(container.dispose);
+    _keepAlive(container);
+
+    final status = await container.read(attendanceHistoryProvider.future);
+
+    expect(status, isA<AttendanceHistoryReady>());
+    expect((status as AttendanceHistoryReady).history.isEmpty, isTrue);
+  });
+}

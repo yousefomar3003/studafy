@@ -1,0 +1,725 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:studafy_mobile/src/core/api/generated/studafy_api_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/academics/academics_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/announcements/announcements_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/assignments/assignments_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/attendance/attendance_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/discipline/discipline_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/announcement.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/create_announcement_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/create_incident_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/discipline_incident.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/assignment.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/assignment_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/attendance_record.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/attendance_session.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/attendance_session_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/batch_record_attendance_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/batch_record_attendance_response.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/batch_record_item.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/correct_attendance_record_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/corrected_attendance_record.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/create_attendance_session_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/update_attendance_session_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/update_class_ai_materials_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/class.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/class_ai_materials_setting.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/class_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/course.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/enrollment.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/enrollment_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/status10.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/status11.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/status12.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/status13.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/status9.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/submission.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/submission_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/grade_status.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/grade_submission_body.dart';
+import 'package:studafy_mobile/src/core/api/generated/submissions/submissions_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/teacher_profile.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/timetable_slot.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/timetable_slot_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/timetable_version.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/timetable_version_list.dart';
+import 'package:studafy_mobile/src/core/api/generated/teachers/teachers_client.dart';
+import 'package:studafy_mobile/src/core/api/generated/timetable/timetable_client.dart';
+
+// ---------------------------------------------------------------------------
+// Model fixtures — built via fromJson so a new field on a model doesn't break these
+// ---------------------------------------------------------------------------
+
+const _t0 = '2026-01-01T00:00:00.000Z';
+
+TeacherProfile teacherProfile({String id = 'teacher-1'}) =>
+    TeacherProfile.fromJson({
+      'id': id,
+      'school_id': 'school-1',
+      'user_id': 'user-1',
+      'employee_number': 'EMP-1',
+      'employment_status': 'active',
+      'hire_date': null,
+      'termination_date': null,
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+
+Class classFixture({
+  required String id,
+  required String code,
+  String courseId = 'course-1',
+  String leadTeacherId = 'teacher-1',
+}) => Class.fromJson({
+  'id': id,
+  'school_id': 'school-1',
+  'course_id': courseId,
+  'academic_year_id': 'year-1',
+  'term_id': 'term-1',
+  'lead_teacher_id': leadTeacherId,
+  'room_id': 'room-1',
+  'code': code,
+  'capacity': 30,
+  'status': 'active',
+  'created_at': _t0,
+  'updated_at': _t0,
+});
+
+Course courseFixture({String id = 'course-1', String name = 'Mathematics'}) =>
+    Course.fromJson({
+      'id': id,
+      'code': 'MATH101',
+      'name': name,
+      'credit_hours': 3,
+    });
+
+Enrollment enrollmentFixture({
+  required String studentId,
+  String classId = 'class-1',
+  String enrolledAt = _t0,
+}) => Enrollment.fromJson({
+  'school_id': 'school-1',
+  'class_id': classId,
+  'student_id': studentId,
+  'status': 'active',
+  'enrolled_at': enrolledAt,
+  'withdrawn_at': null,
+  'created_at': _t0,
+  'updated_at': _t0,
+});
+
+TimetableVersion approvedVersion({String id = 'version-1'}) =>
+    TimetableVersion.fromJson({
+      'id': id,
+      'school_id': 'school-1',
+      'academic_year_id': 'year-1',
+      'term_id': 'term-1',
+      'name': 'v1',
+      'status': 'approved',
+      'submitted_at': null,
+      'submitted_by_user_id': null,
+      'approved_at': _t0,
+      'approved_by_user_id': 'admin-1',
+      'rejected_reason': null,
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+
+TimetableSlot slotFixture({
+  required String id,
+  required String classId,
+  required String teacherId,
+  required int weekday,
+  required int period,
+}) => TimetableSlot.fromJson({
+  'id': id,
+  'school_id': 'school-1',
+  'timetable_version_id': 'version-1',
+  'class_id': classId,
+  'teacher_id': teacherId,
+  'room_id': 'room-1',
+  'weekday': weekday,
+  'period': period,
+  'created_at': _t0,
+  'updated_at': _t0,
+});
+
+AttendanceSession attendanceSession({
+  required String classId,
+  required String status,
+  int? period,
+}) => AttendanceSession.fromJson({
+  'id': 'session-$classId-$period',
+  'school_id': 'school-1',
+  'class_id': classId,
+  'session_date': _t0,
+  'period': period,
+  'status': status,
+  'taken_by_user_id': 'user-1',
+  'created_at': _t0,
+  'updated_at': _t0,
+});
+
+Assignment assignmentFixture({
+  required String id,
+  required String classId,
+  String title = 'Worksheet',
+  String status = 'published',
+}) => Assignment.fromJson({
+  'id': id,
+  'school_id': 'school-1',
+  'class_id': classId,
+  'subject_id': 'subject-1',
+  'title': title,
+  'description': null,
+  'instructions': null,
+  'status': status,
+  'available_from': null,
+  'assigned_at': _t0,
+  'due_at': _t0,
+  'max_score': 100,
+  'allow_late_submission': true,
+  'attachments': <Object?>[],
+  'kind': 'written',
+  'questions': <Object?>[],
+  'created_by_user_id': 'teacher-1',
+  'last_edited_by_user_id': 'teacher-1',
+  'created_at': _t0,
+  'updated_at': _t0,
+});
+
+Submission submissionFixture({
+  required String id,
+  required String assignmentId,
+  required String studentId,
+  DateTime? submittedAt,
+  String status = 'submitted',
+  bool isLate = false,
+  String gradeStatus = 'none',
+  num? score,
+  String? feedback,
+}) => Submission.fromJson({
+  'id': id,
+  'school_id': 'school-1',
+  'assignment_id': assignmentId,
+  'student_id': studentId,
+  'content': 'answer',
+  'status': status,
+  'grade_status': gradeStatus,
+  'is_late': isLate,
+  'attempt_number': 1,
+  'submitted_at': (submittedAt ?? DateTime.parse(_t0))
+      .toUtc()
+      .toIso8601String(),
+  'score': score,
+  'feedback': feedback,
+  'graded_at': null,
+  'graded_by_user_id': null,
+  'attachments': <Object?>[],
+  'answers': <Object?>[],
+  'auto_score': null,
+  'last_edited_by_user_id': 'student-1',
+  'created_at': _t0,
+  'updated_at': _t0,
+});
+
+// ---------------------------------------------------------------------------
+// Fake domain clients — only the methods the teacher providers call are implemented
+// ---------------------------------------------------------------------------
+
+class FakeTeachersClient extends Fake implements TeachersClient {
+  FakeTeachersClient(this._profile);
+
+  final TeacherProfile _profile;
+
+  @override
+  Future<TeacherProfile> getTeacherMe() async => _profile;
+}
+
+class FakeAcademicsClient extends Fake implements AcademicsClient {
+  FakeAcademicsClient({
+    this.classes = const [],
+    this.coursesById = const {},
+    this.enrollmentsByClassId = const {},
+  });
+
+  List<Class> classes;
+  Map<String, Course> coursesById;
+  Map<String, List<Enrollment>> enrollmentsByClassId;
+
+  String? lastLeadTeacherId;
+
+  /// The per-class AI materials setting (000196); a class missing here reads as on (the default).
+  Map<String, bool> aiMaterialsEnabledByClassId = {};
+  final List<(String, bool)> aiMaterialsUpdates = [];
+
+  /// When set, `updateClassAiMaterials` throws it instead of applying the change.
+  DioException? throwOnAiMaterialsUpdate;
+
+  @override
+  Future<ClassAiMaterialsSetting> getClassAiMaterials({
+    required String classId,
+  }) async => ClassAiMaterialsSetting(
+    classId: classId,
+    enabled: aiMaterialsEnabledByClassId[classId] ?? true,
+  );
+
+  @override
+  Future<ClassAiMaterialsSetting> updateClassAiMaterials({
+    required String classId,
+    required UpdateClassAiMaterialsBody body,
+  }) async {
+    if (throwOnAiMaterialsUpdate != null) throw throwOnAiMaterialsUpdate!;
+    aiMaterialsUpdates.add((classId, body.enabled));
+    aiMaterialsEnabledByClassId = {
+      ...aiMaterialsEnabledByClassId,
+      classId: body.enabled,
+    };
+    return ClassAiMaterialsSetting(classId: classId, enabled: body.enabled);
+  }
+
+  @override
+  Future<ClassList> listClasses({
+    Status9? status,
+    String? courseId,
+    String? termId,
+    String? leadTeacherId,
+    String? sectionId,
+    int? limit = 20,
+    int? offset = 0,
+  }) async {
+    lastLeadTeacherId = leadTeacherId;
+    final filtered = leadTeacherId == null
+        ? classes
+        : classes.where((c) => c.leadTeacherId == leadTeacherId).toList();
+    return ClassList(classes: filtered, total: filtered.length);
+  }
+
+  /// Every `getClass` id asked for, in order.
+  final List<String> getClassCalls = [];
+
+  @override
+  Future<Class> getClass({required String classId}) async {
+    getClassCalls.add(classId);
+    return classes.firstWhere((c) => c.id == classId);
+  }
+
+  @override
+  Future<Course> getCourse({required String courseId}) async =>
+      coursesById[courseId]!;
+
+  @override
+  Future<EnrollmentList> listEnrollments({
+    required String classId,
+    Status10? status,
+    int? limit = 20,
+    int? offset = 0,
+  }) async {
+    final rows = enrollmentsByClassId[classId] ?? const [];
+    return EnrollmentList(enrollments: rows, total: rows.length);
+  }
+}
+
+class FakeTimetableClient extends Fake implements TimetableClient {
+  FakeTimetableClient({this.versions = const [], this.slots = const []});
+
+  List<TimetableVersion> versions;
+  List<TimetableSlot> slots;
+
+  @override
+  Future<TimetableVersionList> listTimetableVersions({
+    String? termId,
+    Status11? status,
+    int? limit = 20,
+    int? offset = 0,
+  }) async =>
+      TimetableVersionList(timetableVersions: versions, total: versions.length);
+
+  @override
+  Future<TimetableSlotList> listTimetableSlots({
+    required String versionId,
+    String? sectionId,
+    int? limit = 20,
+    int? offset = 0,
+  }) async => TimetableSlotList(timetableSlots: slots, total: slots.length);
+}
+
+class FakeAttendanceClient extends Fake implements AttendanceClient {
+  FakeAttendanceClient({this.sessionsByClassId = const {}});
+
+  Map<String, List<AttendanceSession>> sessionsByClassId;
+
+  /// Every `listAttendanceSessions` class id asked for, in order.
+  final List<String?> listSessionsCalls = [];
+
+  // --- Write path (attendance-taking screen, ST-235) ----------------------
+
+  /// Every `recordAttendanceBatch` body received, in order.
+  final List<BatchRecordAttendanceBody> batchCalls = [];
+
+  /// Session ids moved to `submitted`, in order.
+  final List<String> submittedSessionIds = [];
+
+  /// When set, every write (`openAttendanceSession`, `recordAttendanceBatch`,
+  /// `updateAttendanceSessionStatus`) throws it — the offline / rejection cases.
+  DioException? throwOnWrite;
+
+  /// Result for `correctAttendanceRecord`; defaults to a plausible version-2 record.
+  CorrectedAttendanceRecord? correctionResult;
+  DioException? throwOnCorrect;
+
+  @override
+  Future<AttendanceSessionList> listAttendanceSessions({
+    String? classId,
+    DateTime? sessionDate,
+    int? limit = 20,
+    int? offset = 0,
+  }) async {
+    listSessionsCalls.add(classId);
+    final rows = sessionsByClassId[classId] ?? const [];
+    return AttendanceSessionList(attendanceSessions: rows, total: rows.length);
+  }
+
+  @override
+  Future<AttendanceSession> openAttendanceSession({
+    required CreateAttendanceSessionBody body,
+  }) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    final existing =
+        sessionsByClassId[body.classId] ?? const <AttendanceSession>[];
+    final match = existing.where((s) => s.period == body.period).toList();
+    if (match.isNotEmpty) return match.first;
+
+    final created = AttendanceSession.fromJson({
+      'id': 'session-${body.classId}-${body.period}',
+      'school_id': 'school-1',
+      'class_id': body.classId,
+      'session_date': _t0,
+      'period': body.period,
+      'status': 'open',
+      'taken_by_user_id': 'user-1',
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+    sessionsByClassId = {
+      ...sessionsByClassId,
+      body.classId: [...existing, created],
+    };
+    return created;
+  }
+
+  @override
+  Future<BatchRecordAttendanceResponse> recordAttendanceBatch({
+    required BatchRecordAttendanceBody body,
+  }) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    batchCalls.add(body);
+
+    // Response carries the session's whole record set — accumulate across chunks.
+    final seen = <String, BatchRecordItem>{};
+    for (final call in batchCalls) {
+      for (final item in call.records) {
+        seen[item.studentId] = item;
+      }
+    }
+    final records = [
+      for (final item in seen.values)
+        AttendanceRecord.fromJson({
+          'id': 'rec-${item.studentId}',
+          'school_id': 'school-1',
+          'attendance_session_id': body.attendanceSessionId,
+          'student_id': item.studentId,
+          'status': item.status.json,
+          'minutes_late': item.minutesLate,
+          'reason': item.reason,
+          'recorded_by_user_id': 'user-1',
+          'created_at': _t0,
+        }),
+    ];
+    return BatchRecordAttendanceResponse(
+      attendanceSessionId: body.attendanceSessionId,
+      records: records,
+      createdCount: records.length,
+      totalCount: records.length,
+    );
+  }
+
+  @override
+  Future<AttendanceSession> updateAttendanceSessionStatus({
+    required String sessionId,
+    required UpdateAttendanceSessionBody body,
+  }) async {
+    if (throwOnWrite != null) throw throwOnWrite!;
+    submittedSessionIds.add(sessionId);
+
+    final next = <String, List<AttendanceSession>>{};
+    AttendanceSession? updated;
+    sessionsByClassId.forEach((classId, sessions) {
+      next[classId] = [
+        for (final session in sessions)
+          if (session.id == sessionId)
+            updated = AttendanceSession.fromJson({
+              ...session.toJson(),
+              'status': body.status.json,
+            })
+          else
+            session,
+      ];
+    });
+    sessionsByClassId = next;
+
+    return updated ??
+        AttendanceSession.fromJson({
+          'id': sessionId,
+          'school_id': 'school-1',
+          'class_id': 'class-1',
+          'session_date': _t0,
+          'period': null,
+          'status': body.status.json,
+          'taken_by_user_id': 'user-1',
+          'created_at': _t0,
+          'updated_at': _t0,
+        });
+  }
+
+  @override
+  Future<AttendanceSession> getAttendanceSession({
+    required String sessionId,
+  }) async {
+    return AttendanceSession.fromJson({
+      'id': sessionId,
+      'school_id': 'school-1',
+      'class_id': 'class-1',
+      'session_date': _t0,
+      'period': null,
+      'status': 'submitted',
+      'taken_by_user_id': 'user-1',
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+  }
+
+  @override
+  Future<CorrectedAttendanceRecord> correctAttendanceRecord({
+    required String recordId,
+    required CorrectAttendanceRecordBody body,
+  }) async {
+    if (throwOnCorrect != null) throw throwOnCorrect!;
+    return correctionResult ??
+        CorrectedAttendanceRecord.fromJson({
+          'id': recordId,
+          'school_id': 'school-1',
+          'attendance_session_id': 'session-1',
+          'student_id': 'student-1',
+          'status': body.status.json,
+          'minutes_late': body.minutesLate,
+          'reason': null,
+          'recorded_by_user_id': 'user-1',
+          'version': 2,
+          'out_of_window': false,
+          'session_date': _t0,
+          'created_at': _t0,
+          'updated_at': _t0,
+        });
+  }
+}
+
+class FakeAssignmentsClient extends Fake implements AssignmentsClient {
+  FakeAssignmentsClient({this.byClassId = const {}});
+
+  Map<String, List<Assignment>> byClassId;
+
+  @override
+  Future<AssignmentList> listAssignments({
+    String? cursor,
+    String? classId,
+    String? subjectId,
+    Status12? status,
+    int? limit = 20,
+  }) async {
+    final rows = byClassId[classId] ?? const [];
+    return AssignmentList(assignments: rows, nextCursor: null);
+  }
+}
+
+class FakeSubmissionsClient extends Fake implements SubmissionsClient {
+  FakeSubmissionsClient({this.byAssignmentId = const {}});
+
+  Map<String, List<Submission>> byAssignmentId;
+
+  @override
+  Future<SubmissionList> listSubmissions({
+    required String assignmentId,
+    Status13? status,
+    GradeStatus? gradeStatus,
+    String? studentId,
+    int? limit = 20,
+    int? offset = 0,
+  }) async {
+    final rows = byAssignmentId[assignmentId] ?? const [];
+    return SubmissionList(submissions: rows, total: rows.length);
+  }
+
+  /// Every `listSubmissionsAcrossAssignments` call's `assignment_id` list, in order.
+  final List<List<String>?> acrossAssignmentsCalls = [];
+
+  /// Honours the filters and limit/offset like the API does, over every stubbed row. Rows are
+  /// returned in stub order: the providers under test sort for themselves.
+  @override
+  Future<SubmissionList> listSubmissionsAcrossAssignments({
+    Status13? status,
+    GradeStatus? gradeStatus,
+    List<String>? assignmentId,
+    int? limit = 20,
+    int? offset = 0,
+  }) async {
+    acrossAssignmentsCalls.add(assignmentId);
+    final matching = [
+      for (final entry in byAssignmentId.entries)
+        if (assignmentId == null || assignmentId.contains(entry.key))
+          for (final s in entry.value)
+            if ((status == null || s.status.json == status.json) &&
+                (gradeStatus == null || s.gradeStatus.json == gradeStatus.json))
+              s,
+    ];
+    final start = (offset ?? 0).clamp(0, matching.length);
+    final end = (start + (limit ?? 20)).clamp(0, matching.length);
+    return SubmissionList(
+      submissions: matching.sublist(start, end),
+      total: matching.length,
+    );
+  }
+
+  @override
+  Future<Submission> getSubmission({required String submissionId}) async =>
+      byAssignmentId.values
+          .expand((rows) => rows)
+          .firstWhere((s) => s.id == submissionId);
+
+  /// Every `gradeSubmission` call, as the JSON body actually sent.
+  final List<(String, Map<String, Object?>)> gradeCalls = [];
+
+  @override
+  Future<Submission> gradeSubmission({
+    required String submissionId,
+    required GradeSubmissionBody body,
+  }) async {
+    gradeCalls.add((submissionId, body.toJson()));
+    return getSubmission(submissionId: submissionId);
+  }
+}
+
+class FakeAnnouncementsClient extends Fake implements AnnouncementsClient {
+  FakeAnnouncementsClient({this.throwOnCreate});
+
+  /// Every `createAnnouncement` body received, in order.
+  final List<CreateAnnouncementBody> createCalls = [];
+
+  /// When set, `createAnnouncement` throws it instead of returning — the rejection cases.
+  DioException? throwOnCreate;
+
+  /// Reach reported back on the created announcement.
+  int recipientCount = 1;
+
+  @override
+  Future<Announcement> createAnnouncement({
+    required CreateAnnouncementBody body,
+  }) async {
+    if (throwOnCreate != null) throw throwOnCreate!;
+    createCalls.add(body);
+    return Announcement.fromJson({
+      'id': 'announcement-1',
+      'school_id': 'school-1',
+      'created_by': 'user-1',
+      'created_by_name': null,
+      'title': body.title,
+      'body': body.body,
+      'mandatory': body.mandatory,
+      'audience_type': body.audienceType.json,
+      'audience_role': body.audienceRole?.json,
+      'audience_class_id': body.audienceClassId,
+      'audience_class_code': null,
+      'status': 'published',
+      'scheduled_at': _t0,
+      'published_at': _t0,
+      'recipient_count': recipientCount,
+      'notified_count': recipientCount,
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+  }
+}
+
+class FakeDisciplineClient extends Fake implements DisciplineClient {
+  FakeDisciplineClient({this.throwOnCreate});
+
+  /// Every `createDisciplineIncident` body received, in order.
+  final List<CreateIncidentBody> createCalls = [];
+
+  /// When set, `createDisciplineIncident` throws it instead of returning.
+  DioException? throwOnCreate;
+
+  @override
+  Future<DisciplineIncident> createDisciplineIncident({
+    required CreateIncidentBody body,
+  }) async {
+    if (throwOnCreate != null) throw throwOnCreate!;
+    createCalls.add(body);
+    return DisciplineIncident.fromJson({
+      'id': 'incident-1',
+      'school_id': 'school-1',
+      'student_id': body.studentId,
+      'class_id': body.classId,
+      'reporter_user_id': 'user-1',
+      'incident_type': body.incidentType.json,
+      'severity': body.severity.json,
+      'status': 'reported',
+      'title': body.title,
+      'description': body.description,
+      'incident_at': body.incidentAt.toUtc().toIso8601String(),
+      'resolved_at': null,
+      'created_at': _t0,
+      'updated_at': _t0,
+    });
+  }
+}
+
+/// A [StudafyApiClient] whose domain-client getters return the fakes above; every other getter
+/// throws (via [Fake]) so a test that reaches an unstubbed corner of the API fails loudly.
+class FakeStudafyApiClient extends Fake implements StudafyApiClient {
+  FakeStudafyApiClient({
+    FakeTeachersClient? teachers,
+    FakeAcademicsClient? academics,
+    FakeTimetableClient? timetable,
+    FakeAttendanceClient? attendance,
+    FakeAssignmentsClient? assignments,
+    FakeSubmissionsClient? submissions,
+    FakeAnnouncementsClient? announcements,
+    FakeDisciplineClient? discipline,
+  }) : teachers = teachers ?? FakeTeachersClient(teacherProfile()),
+       academics = academics ?? FakeAcademicsClient(),
+       timetable = timetable ?? FakeTimetableClient(),
+       attendance = attendance ?? FakeAttendanceClient(),
+       assignments = assignments ?? FakeAssignmentsClient(),
+       submissions = submissions ?? FakeSubmissionsClient(),
+       announcements = announcements ?? FakeAnnouncementsClient(),
+       discipline = discipline ?? FakeDisciplineClient();
+
+  @override
+  final FakeTeachersClient teachers;
+  @override
+  final FakeAcademicsClient academics;
+  @override
+  final FakeTimetableClient timetable;
+  @override
+  final FakeAttendanceClient attendance;
+  @override
+  final FakeAssignmentsClient assignments;
+  @override
+  final FakeSubmissionsClient submissions;
+  @override
+  final FakeAnnouncementsClient announcements;
+  @override
+  final FakeDisciplineClient discipline;
+}

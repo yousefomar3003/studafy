@@ -1,0 +1,83 @@
+/**
+ * Grades & sections page: a heading row with its add button above each table, and the roster and
+ * search lists inside the section's students dialog.
+ */
+
+.sections-page__block {
+  margin-block: var(--space-24);
+}
+
+.sections-page__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  margin-block-end: var(--space-12);
+}
+
+.sections-page__head h2 {
+  margin: 0;
+}
+
+.sections-page__row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.sections-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.sections-notice {
+  margin: 0 0 var(--space-12);
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.sections-modal__heading {
+  margin: var(--space-16) 0 var(--space-8);
+  font-size: var(--font-size-base);
+}
+
+.sections-list {
+  list-style: none;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.sections-list__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-4) var(--space-8);
+  border-radius: var(--radius-md);
+}
+
+.sections-list__row:hover {
+  background-color: var(--color-surface);
+}
+
+.sections-list__meta {
+  display: block;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.sections-list__empty {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  padding: var(--space-8);
+}

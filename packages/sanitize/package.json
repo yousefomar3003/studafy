@@ -1,0 +1,30 @@
+{
+  "name": "@studafy/sanitize",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts --outdir dist --packages=external && tsc --project tsconfig.build.json --emitDeclarationOnly --declaration --outDir dist --noEmit false",
+    "check-types": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "sanitize-html": "2.17.7"
+  },
+  "devDependencies": {
+    "@studafy/config": "workspace:*",
+    "@studafy/tsconfig": "workspace:*",
+    "@types/bun": "1.3.14",
+    "@types/sanitize-html": "2.16.1",
+    "typescript": "^5.9.3"
+  }
+}

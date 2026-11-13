@@ -1,0 +1,50 @@
+# Studafy realtime gateway on fly.io (production). Clients connect to wss://api.studafy.com/ws; the
+# API answers that path with a fly-replay header naming this app (REALTIME_FLY_APP in api.toml), so
+# this app needs no domain of its own. Realtime is deferred for now and this app sits stopped; see
+# [http_service] for what turns it back on. Deploy from the repo root:
+#   fly deploy . --config infra/fly/realtime.toml --remote-only
+app = "studafy-core-realtime"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../docker/realtime.Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "3001"
+  HOST = "0.0.0.0"
+  SERVICE_NAME = "realtime"
+  SENTRY_ENVIRONMENT = "production"
+  # Browser origins allowed to open a socket (required in production): every domain the web app is
+  # served on (web.toml). AUTH_REDIS_URL and WS_JWT_SECRET are secrets.
+  WS_ALLOWED_ORIGINS = "https://studafy.com,https://www.studafy.com,https://app.studafy.com,https://school.studafy.com"
+
+[http_service]
+  internal_port = 3001
+  force_https = true
+  # Live updates are deferred (2026-10-28: an always-open socket per signed-in user was not worth
+  # the bandwidth and hosting cost yet), so this app scales to zero and costs about nothing: the web
+  # bundle never opens a socket (VITE_REALTIME_ENABLED in web.toml), neither do new mobile builds
+  # (REALTIME_ENABLED), and the API has no /ws route while REALTIME_FLY_APP is unset (api.toml), so
+  # nothing reaches it. The proxy still starts a machine on a request and never stops one that holds
+  # an open socket. When realtime comes back, set min_machines_running = 1 and auto_stop "off" again:
+  # a socket client should not wait for a cold start on every reconnect.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [http_service.concurrency]
+    type = "connections"
+    soft_limit = 1000
+    hard_limit = 1500
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/healthz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Keeps pinned Action/image versions patched (aquasecurity/trivy-action, semgrep/semgrep,
+  # actions/checkout, etc.) -- the versions this CI pins are exactly the surface a supply-chain
+  # dependency scan is supposed to cover, so leaving them to drift unpatched would undercut
+  # security-scan/sast rather than complement them.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # A newly published release/tag can be malicious or unstable (the same supply-chain risk the
+    # SHA-pinning in ci.yml defends against); waiting a week before proposing it gives a compromised
+    # release time to be caught and yanked upstream.
+    cooldown:
+      default-days: 7

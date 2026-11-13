@@ -1,0 +1,436 @@
+import { ApiError } from "@studafy/api-client";
+import { Button, Input, Select, useToast } from "@studafy/ui";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+
+import { api } from "../../../lib/api";
+import { useTranslation } from "../../../lib/i18n";
+import { FinanceStudentPicker } from "../students/FinanceStudentPicker";
+
+import { FeeComponentsEditor } from "./FeeComponentsEditor";
+import { InvoicePreviewPanel } from "./InvoicePreviewPanel";
+import { feeStructureStatusLabel, feeStructureStatusTone } from "./labels";
+import {
+  useCreateFeeStructure,
+  useSaveFeeStructureStudents,
+  useUpdateFeeStructure,
+} from "./mutations";
+
+import type { FeeComponentDraft } from "./preview";
+import type { AcademicYear, FeeStructure } from "./queries";
+import type { StudentIdentity } from "../students/FinanceStudentPicker";
+import type { SelectOption } from "@studafy/ui";
+import type { FormEvent } from "react";
+
+const CURRENCY_PATTERN = /^[A-Z]{3}$/;
+
+/** Every message here is a translation key, resolved with `t` where the error is rendered. */
+interface FieldErrors {
+  title?: string;
+  currency?: string;
+  /** Set when there are zero rows and at least one is required — there is no row to attach a
+   * per-row error to, so this renders as its own message instead. */
+  componentsGeneral?: string;
+  components?: Record<number, { fee_category?: string; amount?: string }>;
+}
+
+function emptyComponent(): FeeComponentDraft {
+  return { fee_category: "", amount: 0, description: "" };
+}
+
+function validate(
+  title: string,
+  currency: string,
+  components: FeeComponentDraft[],
+  requireComponents: boolean,
+): FieldErrors {
+  const errors: FieldErrors = {};
+
+  if (title.trim() === "") errors.title = "finance.fees.form.titleRequired";
+  if (!CURRENCY_PATTERN.test(currency)) errors.currency = "finance.fees.form.currencyInvalid";
+
+  if (components.length === 0) {
+    if (requireComponents) errors.componentsGeneral = "finance.fees.form.componentsRequired";
+    return errors;
+  }
+
+  const rowErrors: Record<number, { fee_category?: string; amount?: string }> = {};
+  components.forEach((component, index) => {
+    const row: { fee_category?: string; amount?: string } = {};
+    if (component.fee_category.trim() === "") row.fee_category = "finance.fees.form.required";
+    if (!Number.isFinite(component.amount) || component.amount < 0) {
+      row.amount = "finance.fees.form.amountInvalid";
+    }
+    // `index` comes from iterating `components` itself, never external input — the same
+    // bounded-key shape `finance/queries.ts` documents for this rule.
+    // eslint-disable-next-line security/detect-object-injection
+    if (Object.keys(row).length > 0) rowErrors[index] = row;
+  });
+  if (Object.keys(rowErrors).length > 0) errors.components = rowErrors;
+
+  return errors;
+}
+
+export interface FeeStructureFormProps {
+  academicYears: AcademicYear[];
+  /** `null` — building a new structure. Otherwise the structure selected from the list. */
+  editing: FeeStructure | null;
+  onSaved: () => void;
+}
+
+/**
+ * The builder itself: metadata, item composition, and the invoice preview for a sample student.
+ *
+ * Editing an existing structure is metadata-only by default. `GET /api/finance/fee-structures`
+ * doesn't return a structure's components — only its computed totals (see `feeStructureSchema`) — so
+ * there is nothing to pre-fill the composition editor with. Leaving it empty and omitting
+ * `components` from the PATCH keeps the existing components untouched; adding rows here replaces the
+ * full set, same as ERPNext's own PUT semantics.
+ *
+ * **Student** is who the structure is for, picked from the school's list — Studafy's own record
+ * (000150), not ERPNext's, so it stays editable after the structure is submitted. Picking one names
+ * the structure after them, the preview shows their invoice, and generating invoices for the
+ * structure preselects them. It is saved right after the structure itself.
+ */
+export function FeeStructureForm({ academicYears, editing, onSaved }: FeeStructureFormProps) {
+  const { t } = useTranslation();
+  const { show } = useToast();
+  const createFeeStructure = useCreateFeeStructure();
+  const updateFeeStructure = useUpdateFeeStructure();
+  const saveStudents = useSaveFeeStructureStudents();
+
+  const [title, setTitle] = useState("");
+  const [academicYearId, setAcademicYearId] = useState("");
+  const [program, setProgram] = useState("");
+  const [currency, setCurrency] = useState("JOD");
+  const [components, setComponents] = useState<FeeComponentDraft[]>([emptyComponent()]);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [serverError, setServerError] = useState<string | undefined>(undefined);
+  const [students, setStudents] = useState<StudentIdentity[]>([]);
+  const [studentsChanged, setStudentsChanged] = useState(false);
+
+  const savedStudents = useQuery({
+    queryKey: ["finance", "fee-structures", editing?.erpnext_name, "students"],
+    queryFn: async () => {
+      const { data } = await api.GET("/api/finance/fee-structures/{feeStructureId}/students", {
+        params: { path: { feeStructureId: editing!.erpnext_name } },
+      });
+      return (data?.students ?? []) as StudentIdentity[];
+    },
+    enabled: editing !== null,
+  });
+
+  const isReadOnly = editing !== null && editing.erpnext_status !== "draft";
+
+  useEffect(() => {
+    setErrors({});
+    setServerError(undefined);
+    if (editing) {
+      setTitle(editing.title);
+      setAcademicYearId(editing.academic_year_id ?? "");
+      setProgram(editing.program ?? "");
+      setCurrency(editing.currency);
+      setComponents([]);
+    } else {
+      setTitle("");
+      setAcademicYearId("");
+      setProgram("");
+      setCurrency("JOD");
+      setComponents([emptyComponent()]);
+    }
+  }, [editing]);
+
+  useEffect(() => {
+    setStudents(editing ? (savedStudents.data ?? []) : []);
+    setStudentsChanged(false);
+  }, [editing, savedStudents.data]);
+
+  /** A structure is named after its student: the title follows the pick until finance edits it. */
+  function changeStudents(next: StudentIdentity[]) {
+    const previousName = students[0]?.name ?? "";
+    if (!isReadOnly && (title.trim() === "" || title === previousName)) {
+      setTitle(next[0]?.name ?? "");
+    }
+    setStudents(next);
+    setStudentsChanged(true);
+  }
+
+  /** Saves the student list for `feeStructureId` when it was changed, then reports success. */
+  function finishSave(feeStructureId: string, successTitle: string) {
+    const done = () => {
+      show({ variant: "success", title: successTitle });
+      setStudentsChanged(false);
+      onSaved();
+    };
+    if (!studentsChanged) return done();
+    saveStudents.mutate(
+      { feeStructureId, studentIds: students.map((student) => student.id) },
+      {
+        onSuccess: done,
+        onError: (err) =>
+          show({
+            variant: "error",
+            title: t("finance.fees.form.studentsSaveError"),
+            description: err instanceof ApiError ? (err.detail ?? err.title) : undefined,
+          }),
+      },
+    );
+  }
+
+  const yearOptions: SelectOption<string>[] = [
+    { value: "", label: t("finance.fees.form.noYear") },
+    ...academicYears.map((year) => ({
+      value: year.id,
+      label: t("finance.fees.form.yearOption", {
+        name: year.name,
+        start: year.starts_on,
+        end: year.ends_on,
+      }),
+    })),
+  ];
+  const selectedYear = academicYears.find((year) => year.id === academicYearId);
+
+  const isPending =
+    createFeeStructure.isPending || updateFeeStructure.isPending || saveStudents.isPending;
+
+  function translateRowErrors(
+    rowErrors: FieldErrors["components"],
+  ): FieldErrors["components"] | undefined {
+    if (!rowErrors) return undefined;
+    return Object.fromEntries(
+      Object.entries(rowErrors).map(([index, row]) => [
+        index,
+        {
+          fee_category: row.fee_category && t(row.fee_category),
+          amount: row.amount && t(row.amount),
+        },
+      ]),
+    );
+  }
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    setServerError(undefined);
+
+    // Validated against `components` as the admin actually left it — rows are not silently dropped
+    // for being blank, since that would shift indices out from under `errors.components` and
+    // misattribute a row's error to whichever row happened to slide into its old position. An
+    // unwanted row is removed with its own "Remove" button, not by leaving it empty.
+    const validation = validate(title, currency, components, editing === null);
+    setErrors(validation);
+    if (Object.keys(validation).length > 0) return;
+
+    const trimmedComponents = components.map((component) => ({
+      fee_category: component.fee_category.trim(),
+      amount: component.amount,
+      description: component.description?.trim() || undefined,
+    }));
+
+    const onError = (err: unknown) => {
+      const detail = err instanceof ApiError ? (err.detail ?? err.title) : undefined;
+      setServerError(detail ?? t("finance.fees.form.genericError"));
+      show({ variant: "error", title: t("finance.fees.form.saveError"), description: detail });
+    };
+
+    if (editing) {
+      updateFeeStructure.mutate(
+        {
+          feeStructureId: editing.erpnext_name,
+          body: {
+            title: title.trim(),
+            academic_year_id: academicYearId || undefined,
+            program: program.trim() || undefined,
+            currency,
+            ...(trimmedComponents.length > 0 ? { components: trimmedComponents } : {}),
+          },
+        },
+        {
+          onSuccess: () =>
+            finishSave(
+              editing.erpnext_name,
+              t("finance.fees.form.updated", { title: title.trim() }),
+            ),
+          onError,
+        },
+      );
+      return;
+    }
+
+    createFeeStructure.mutate(
+      {
+        title: title.trim(),
+        academic_year_id: academicYearId || undefined,
+        program: program.trim() || undefined,
+        currency,
+        components: trimmedComponents,
+      },
+      {
+        onSuccess: (structure) =>
+          finishSave(
+            structure.erpnext_name,
+            t("finance.fees.form.created", { title: structure.title }),
+          ),
+        onError,
+      },
+    );
+  }
+
+  return (
+    <div className="fee-builder__form-panel">
+      <div className="fee-builder__form-header">
+        <h2>{editing ? t("finance.fees.form.editHeading") : t("finance.fees.form.newHeading")}</h2>
+        {editing ? (
+          <span
+            className="fee-builder__status-pill"
+            data-tone={feeStructureStatusTone(editing.erpnext_status)}
+          >
+            {feeStructureStatusLabel(editing.erpnext_status, t)}
+          </span>
+        ) : null}
+      </div>
+
+      {isReadOnly ? (
+        <p className="fee-builder__readonly-note">
+          {t("finance.fees.form.readOnlyNote", {
+            status: feeStructureStatusLabel(editing!.erpnext_status, t).toLowerCase(),
+          })}
+        </p>
+      ) : null}
+
+      {/* Only a submitted structure can be invoiced (see InvoiceBatchPage's structure filter). */}
+      {editing?.erpnext_status === "submitted" ? (
+        <Link
+          to={`/portal/finance/invoices/batches/new?feeStructure=${encodeURIComponent(editing.erpnext_name)}`}
+        >
+          <Button type="button" variant="secondary">
+            {t("finance.fees.form.billStudents")}
+          </Button>
+        </Link>
+      ) : null}
+
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        aria-label={
+          editing ? t("finance.fees.form.editHeading") : t("finance.fees.form.newHeading")
+        }
+      >
+        <Input
+          label={t("finance.fees.form.title")}
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+          error={errors.title && t(errors.title)}
+          disabled={isReadOnly}
+          required
+          placeholder={t("finance.fees.form.titlePlaceholder")}
+        />
+
+        <Select
+          label={t("finance.fees.builder.academicYear")}
+          options={yearOptions}
+          value={academicYearId}
+          onChange={setAcademicYearId}
+          disabled={isReadOnly}
+          helperText={
+            selectedYear
+              ? t("finance.fees.form.effective", {
+                  start: selectedYear.starts_on,
+                  end: selectedYear.ends_on,
+                })
+              : t("finance.fees.form.noEffectiveDates")
+          }
+        />
+
+        <Input
+          label={t("finance.fees.form.program")}
+          value={program}
+          onChange={(event) => setProgram(event.target.value)}
+          disabled={isReadOnly}
+          placeholder={t("finance.fees.form.programPlaceholder")}
+          helperText={t("finance.fees.form.programHelper")}
+        />
+
+        <FinanceStudentPicker
+          label={t("finance.fees.form.students")}
+          helperText={t("finance.fees.form.studentsHelper")}
+          selected={students}
+          onChange={changeStudents}
+        />
+        {isReadOnly && editing ? (
+          <div className="fee-builder__form-actions">
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!studentsChanged}
+              loading={saveStudents.isPending}
+              onClick={() => finishSave(editing.erpnext_name, t("finance.fees.form.studentsSaved"))}
+            >
+              {t("finance.fees.form.saveStudents")}
+            </Button>
+          </div>
+        ) : null}
+
+        <Input
+          label={t("finance.common.currency")}
+          value={currency}
+          onChange={(event) => setCurrency(event.target.value.toUpperCase())}
+          error={errors.currency && t(errors.currency)}
+          disabled={isReadOnly}
+          required
+          maxLength={3}
+          placeholder="JOD"
+        />
+
+        {isReadOnly ? null : editing && components.length === 0 ? (
+          <div className="fee-builder__components-note">
+            <p>{t("finance.fees.form.componentsNote")}</p>
+            <Button
+              type="button"
+              variant="tertiary"
+              disabled={isReadOnly}
+              onClick={() => setComponents([emptyComponent()])}
+            >
+              {t("finance.fees.form.changeComponents")}
+            </Button>
+          </div>
+        ) : (
+          <>
+            {errors.componentsGeneral ? (
+              <p className="fee-builder__server-error" role="alert">
+                {t(errors.componentsGeneral)}
+              </p>
+            ) : null}
+            <FeeComponentsEditor
+              components={components}
+              onChange={setComponents}
+              errors={translateRowErrors(errors.components)}
+              disabled={isReadOnly}
+              currency={currency}
+            />
+          </>
+        )}
+
+        {serverError ? (
+          <p className="fee-builder__server-error" role="alert">
+            {serverError}
+          </p>
+        ) : null}
+
+        {!isReadOnly ? (
+          <div className="fee-builder__form-actions">
+            <Button type="submit" loading={isPending}>
+              {editing ? t("finance.fees.form.saveChanges") : t("finance.fees.form.create")}
+            </Button>
+          </div>
+        ) : null}
+      </form>
+
+      <InvoicePreviewPanel
+        components={components}
+        currency={currency}
+        student={students[0] ?? null}
+      />
+    </div>
+  );
+}

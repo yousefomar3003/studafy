@@ -1,0 +1,147 @@
+/**
+ * The record template editor (Admin > School settings and the principal's school tools). Its own
+ * stylesheet, loaded with the page, like every other feature's.
+ */
+
+.record-templates {
+  display: grid;
+  gap: var(--space-24);
+}
+
+.record-templates__status p {
+  margin: 0 0 var(--space-8);
+}
+
+.record-templates__actions,
+.record-templates__row-actions,
+.record-templates__badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.record-templates__fields {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.record-templates__field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.record-templates__field-label {
+  font-weight: var(--font-weight-medium);
+}
+
+.record-templates__badge {
+  display: inline-block;
+  padding: var(--space-4) var(--space-12);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  background-color: var(--color-surface);
+  white-space: nowrap;
+}
+
+.record-templates__badge[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.record-templates__badge[data-tone="info"] {
+  background-color: var(--color-info-subtle-bg, var(--color-surface));
+}
+
+.record-templates__muted {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+}
+
+.record-templates__error {
+  color: var(--color-danger-subtle-foreground);
+}
+
+.record-templates__note {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-12) var(--space-16);
+  border-inline-start: 4px solid var(--color-warning-subtle-foreground);
+  background-color: var(--color-warning-subtle-bg);
+  border-radius: var(--radius-md);
+}
+
+.record-templates__note p {
+  margin: 0;
+}
+
+.record-templates__explain {
+  margin: 0;
+  padding-inline-start: var(--space-20, 1.25rem);
+}
+
+.record-templates__options {
+  display: grid;
+  gap: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-12);
+}
+
+.record-templates__option {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  align-items: end;
+  gap: var(--space-8);
+}
+
+.record-templates__preview {
+  padding: var(--space-16);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.record-templates__preview-form {
+  display: grid;
+  gap: var(--space-16);
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.record-templates__preview-field {
+  display: grid;
+  gap: var(--space-4);
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.record-templates__preview-choice {
+  display: inline-flex;
+  gap: var(--space-4);
+  margin-inline-end: var(--space-16);
+}
+
+.record-templates__required {
+  color: var(--color-muted-foreground);
+  font-weight: normal;
+}
+
+.record-templates__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}

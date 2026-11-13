@@ -1,0 +1,233 @@
+/**
+ * Retrying a payment-provider webhook that failed transiently, and dead-lettering it when it will not (ST-132).
+ *
+ * ## Why the job carries only an id
+ *
+ * The verified payload is already durable in `app.billing_events` -- it was written by the claim in
+ * the same transaction that later failed to finish. A job carrying its own copy could disagree with
+ * the row, and there would be no way to tell which was right. So the job carries the provider event
+ * id and this module reads the rest.
+ *
+ * The signature is **not** re-verified on retry, and cannot be: verification happens once, at
+ * intake, over the exact raw bytes of the HTTP request, and those bytes are gone. What is stored is
+ * the parsed object. The trust boundary was crossed at intake; a row in `app.billing_events` exists
+ * only because a valid signature put it there.
+ *
+ * ## Why the processing itself is imported, not reimplemented
+ *
+ * `processBillingEvent`'s sibling `reprocessClaimedEvent` is the same code the API runs, from
+ * `@studafy/billing`. A retry that applied slightly different rules than the original attempt would
+ * be a subscription in the wrong state -- and the difference would never show up as a test failure,
+ * only as a support ticket.
+ */
+
+import { reprocessClaimedEvent, truncateError } from "@studafy/billing";
+import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
+import { recordDeadLetter } from "@studafy/observability";
+
+import { emitAuditLog } from "../../db/audit";
+import { leaseDatabase } from "../../db/pool";
+import { withSystemTx } from "../../db/tenant-tx";
+import { describeError, isTerminalFailure } from "../notifications/dead-letter";
+
+import { publishEntitlementChange } from "./entitlement-change-publisher";
+
+import type { DatabaseSource } from "../../db/pool";
+import type { DeadLetterLogger, FailedHandler } from "../notifications/dead-letter";
+import type { BillingEventSource, BillingLogger, ProcessOutcome } from "@studafy/billing";
+
+/** The subset of the row a retry needs to reconstruct the event. */
+interface StoredEvent {
+  id: string;
+  provider_event_id: string;
+  event_type: string;
+  effective_at: Date;
+  payload: Record<string, unknown>;
+  status: string;
+}
+
+export interface ProcessBillingEventResult {
+  processed: boolean;
+  reason?: string;
+  outcome?: ProcessOutcome["outcome"];
+}
+
+/**
+ * Re-apply one previously claimed billing event.
+ *
+ * Throws on a transient failure, which is what lets BullMQ retry it and, once retries are exhausted,
+ * hand it to the dead-letter listener. Returns without throwing for every terminal outcome --
+ * including "already processed", which is the ordinary result of a retry racing a redelivery that
+ * succeeded first.
+ */
+export async function retryBillingEvent(
+  data: { provider: BillingEventSource; providerEventId: string },
+  database: DatabaseSource,
+  log: BillingLogger,
+): Promise<ProcessBillingEventResult> {
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
+
+  try {
+    return await withSystemTx(sql, async (tx) => {
+      // FOR UPDATE, so a concurrent retry of the same event waits rather than folding the same
+      // history twice. The unique key makes that lock a per-event one.
+      const rows = await tx<StoredEvent[]>`
+        SELECT id, provider_event_id, event_type, effective_at, payload, status::text AS status
+        FROM app.billing_events
+        WHERE provider = ${data.provider} AND provider_event_id = ${data.providerEventId}
+        FOR UPDATE
+      `;
+
+      const row = rows[0];
+      if (!row) {
+        // The claim rolled back with the failed transaction, so there is nothing to retry and the
+        // event was never applied. The provider's own redelivery is the recovery path, not this job.
+        return { processed: false, reason: "no billing_events row for this provider event id" };
+      }
+
+      if (row.status === "processed") {
+        return { processed: true, outcome: "duplicate" as const };
+      }
+
+      if (row.status === "dlq") {
+        // Parked deliberately -- unmapped, unattributable or an illegal transition. Re-running would
+        // reach the same verdict; only a human changes this outcome.
+        return { processed: false, reason: "event is parked in the dead-letter state" };
+      }
+
+      const result = await reprocessClaimedEvent(
+        tx,
+        row.id,
+        {
+          provider: data.provider,
+          id: row.provider_event_id,
+          type: row.event_type,
+          effectiveAt: row.effective_at,
+          data: row.payload,
+        },
+        { emitAudit: emitAuditLog, publishEntitlementChange, logger: log },
+      );
+
+      return { processed: true, outcome: result.outcome };
+    });
+  } finally {
+    await lease.release();
+  }
+}
+
+/**
+ * Mark an event dead-lettered after BullMQ has given up on it.
+ *
+ * The durable dead-letter record is the `app.billing_events` row itself -- `status = 'dlq'`, the
+ * reason in `last_error`, the attempt count, and the verbatim provider payload. A separate
+ * dead-letter table would be a second copy of data this one already holds in full, and a replay tool
+ * would then have to reconcile them. `app.notification_dead_letters` exists because a notification
+ * job's data is *not* otherwise persisted; a billing event's is.
+ *
+ * Runs on its own connection because the job's transaction is long gone by the time BullMQ decides
+ * a failure was terminal.
+ */
+export async function deadLetterBillingEvent(
+  provider: BillingEventSource,
+  providerEventId: string,
+  reason: string,
+  database: DatabaseSource,
+): Promise<void> {
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
+
+  try {
+    await withSystemTx(sql, async (tx) => {
+      await tx`
+        UPDATE app.billing_events
+        SET status = 'dlq',
+            last_error = ${truncateError(reason)},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE provider = ${provider}
+          AND provider_event_id = ${providerEventId}
+          AND status IN ('pending', 'failed')
+      `;
+    });
+  } finally {
+    await lease.release();
+  }
+}
+
+const EVENT_SOURCES: readonly BillingEventSource[] = ["stripe", "tap", "apple", "google"];
+
+/**
+ * The BullMQ `failed` listener for the billing queue.
+ *
+ * Keys terminality on `job.finishedOn`, not on an attempt count, for the three reasons
+ * notifications/dead-letter.ts sets out at length -- `attemptsMade` means opposite things inside a
+ * processor and inside this listener, a stalled job fails without the processor ever running, and
+ * `finishedOn` is assigned only in the no-retry branch. `isTerminalFailure` is imported from there
+ * rather than re-derived, so the two queues cannot drift on what "given up" means.
+ *
+ * Synchronous by signature because BullMQ does not await its listeners: an unhandled rejection here
+ * would take down the worker over a failure it was only trying to record.
+ *
+ * Only `process-billing-event` jobs are dead-lettered this way. A failed ERPNext invoice job shares
+ * the queue but not the ledger, and marking a `billing_events` row for it would be a lie.
+ */
+export function billingDeadLetterListener(
+  database: DatabaseSource,
+  log: DeadLetterLogger,
+): FailedHandler {
+  return (job, error) => {
+    if (!isTerminalFailure(job) || job.name !== JOB_NAMES.PROCESS_BILLING_EVENT) return;
+
+    const jobData = job.data as { provider?: unknown; providerEventId?: unknown } | null;
+    const providerEventId = jobData?.providerEventId;
+    // Same default the job schema applies: a job enqueued before ST-298 is a Stripe event.
+    const provider = EVENT_SOURCES.find((source) => source === jobData?.provider) ?? "stripe";
+    const { errorClass, message } = describeError(error);
+
+    // Unconditional and first: it is the only alert path that does not depend on the database being
+    // reachable, which is the failure most likely to have caused this in the first place.
+    log.error(
+      {
+        event: "billing_event_dead_lettered",
+        provider,
+        provider_event_id: providerEventId ?? null,
+        job_id: job.id ?? null,
+        attempts_made: job.attemptsMade,
+        err: { type: errorClass, message: error.message, stack: error.stack },
+      },
+      "billing event exhausted its retries",
+    );
+
+    // Unconditional and beside the log line, for the identical reason -- see
+    // notifications/dead-letter.ts's own comment at the same point for the two trade-offs this
+    // placement makes (an unattributable job is still counted; a manual replay counts twice).
+    // `source: "billing"` is what separates this from a notification dead letter at alert-routing
+    // time: ST-262 pages `BillingDeadLetterArrived` at critical and its notifications counterpart
+    // at warning, because an unprocessed provider event leaves a school's subscription state wrong.
+    recordDeadLetter("billing", QUEUE_NAMES.BILLING);
+
+    if (typeof providerEventId !== "string" || providerEventId === "") {
+      log.warn(
+        { event: "billing_dead_letter_unattributable", job_id: job.id ?? null },
+        "dead-lettered billing job carries no provider event id; recorded in logs only",
+      );
+      return;
+    }
+
+    void deadLetterBillingEvent(
+      provider,
+      providerEventId,
+      `Retries exhausted after ${job.attemptsMade} attempts: ${errorClass}: ${message}`,
+      database,
+    ).catch((writeError: unknown) => {
+      log.error(
+        {
+          event: "billing_dead_letter_write_failed",
+          provider_event_id: providerEventId,
+          err: writeError,
+        },
+        "could not park a dead-lettered billing event",
+      );
+    });
+  };
+}

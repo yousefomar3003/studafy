@@ -1,0 +1,125 @@
+.import-data__steps {
+  display: grid;
+  gap: var(--space-16);
+  padding: 0;
+  margin: var(--space-16) 0;
+  list-style: none;
+  counter-reset: import-step;
+}
+
+.import-data__steps > li {
+  counter-increment: import-step;
+}
+
+.import-data__step-title::before {
+  content: counter(import-step) ". ";
+}
+
+.import-data__step-title {
+  margin: 0 0 var(--space-8);
+  font-size: 1.125rem;
+}
+
+.import-data__step-link {
+  font-weight: 600;
+}
+
+.login-slips__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  max-width: 28rem;
+}
+
+.login-slips__ready {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-12);
+  margin: var(--space-16) 0;
+}
+
+.login-slips {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-12);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.login-slip {
+  padding: var(--space-12);
+  border: 1px dashed currentcolor;
+  border-radius: 6px;
+  break-inside: avoid;
+}
+
+.login-slip p {
+  margin: 0 0 var(--space-4);
+}
+
+.login-slip__name {
+  font-weight: 700;
+}
+
+.login-slip__detail {
+  color: var(--color-muted-foreground);
+}
+
+.login-slip__codes {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-8) 0;
+}
+
+.login-slip__codes div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.login-slip__codes dt {
+  margin: 0;
+}
+
+.login-slip__codes dd {
+  margin: 0;
+  font-family: ui-monospace, monospace;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.login-slip__how {
+  font-size: 0.8125rem;
+}
+
+/* Printing shows the slips only, three columns, cut along the dashed lines. */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .login-slips,
+  .login-slips * {
+    visibility: visible;
+  }
+
+  .login-slips {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    width: 100%;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    color: #000;
+  }
+
+  .login-slip {
+    border-radius: 0;
+  }
+
+  .login-slip__detail {
+    color: #000;
+  }
+}

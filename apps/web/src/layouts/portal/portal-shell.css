@@ -1,0 +1,585 @@
+/**
+ * Portal shell layout: header + sidebar + content in a CSS grid with fixed track sizes, so nothing
+ * downstream (nav items resolving, the notification/approval counts arriving) changes the shell's
+ * own box and shifts anything (CLS budget for this ticket is <0.1). Async counts are always overlaid
+ * with `position: absolute` on a fixed-size trigger rather than inserted into flow.
+ */
+
+.portal-shell {
+  display: grid;
+  grid-template-columns: 248px 1fr;
+  /* minmax(0, …) lets the row shrink to the viewport so the sidebar and content scroll inside it. */
+  grid-template-rows: 64px minmax(0, 1fr);
+  grid-template-areas: "header header" "sidebar content";
+  /* Fills `main` (see root-shell.css): the header keeps its row and the content scrolls below it. */
+  height: 100%;
+}
+
+/* Header */
+
+.portal-header {
+  grid-area: header;
+  position: relative;
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  padding: 0 var(--space-24);
+  border-bottom: 1px solid var(--color-border);
+  background-color: var(--color-background);
+  transition:
+    margin var(--duration-base) ease,
+    border-radius var(--duration-base) ease,
+    background-color var(--duration-base) ease,
+    box-shadow var(--duration-base) ease,
+    transform var(--duration-base) ease;
+}
+
+/* Scrolled: the bar detaches into a narrower, frosted floating pill, same as the marketing header.
+ * Its grid row stays 64px (the pill is inset and translated, not resized), so the content below
+ * never shifts. */
+.portal-header[data-scrolled="true"] {
+  margin-inline: max(var(--space-16), 22%);
+  border-bottom-color: transparent;
+  border-radius: var(--radius-full);
+  /* Frosted glass: the page shows through, blurred so the bar stays legible over any content. */
+  background-color: color-mix(in srgb, var(--color-background) 72%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  backdrop-filter: saturate(160%) blur(16px);
+  box-shadow: var(--elevation-4);
+  transform: translateY(var(--space-12));
+}
+
+.portal-header__brand {
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-lg);
+  color: var(--color-foreground);
+  text-decoration: none;
+}
+
+.portal-header__brand:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+.portal-header__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-inline-start: auto;
+}
+
+/* Sidebar */
+
+.portal-sidebar {
+  grid-area: sidebar;
+  /* Runs up under the header (see `.portal-content`), so the floating pill's inset shows sidebar. */
+  grid-row: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  border-inline-end: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  padding: var(--space-12);
+  padding-top: calc(64px + var(--space-12));
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+/* Desktop collapse toggle, at the top of the sidebar above the items. Lines up with the item icons
+   (both sit 10px in from the item's edge) so the rail reads as one column. */
+.portal-sidebar__toggle {
+  flex-shrink: 0;
+  color: var(--color-muted-foreground);
+  border-radius: var(--radius-md);
+}
+
+.portal-sidebar__toggle:hover {
+  color: var(--color-foreground);
+  background-color: var(--color-background);
+}
+
+.portal-nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.portal-nav__item {
+  position: relative;
+}
+
+.portal-nav__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  min-block-size: 40px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  color: var(--color-muted-foreground);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  transition:
+    background-color var(--duration-fast) var(--easing-standard),
+    color var(--duration-fast) var(--easing-standard);
+}
+
+.portal-nav__icon {
+  flex-shrink: 0;
+}
+
+.portal-nav__link:hover {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+}
+
+.portal-nav__link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.portal-nav__link--active,
+.portal-nav__link--active:hover {
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Accent bar on the leading edge of the current page's item. */
+.portal-nav__link--active::before {
+  content: "";
+  position: absolute;
+  inset-block: 10px;
+  inset-inline-start: 0;
+  inline-size: 3px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+}
+
+/* The pending-approvals count rides over the nav item rather than in flow, so it appearing or
+   changing width never reflows the item list. */
+.portal-nav__item .approval-queue-badge {
+  position: absolute;
+  inset-block-start: 10px;
+  inset-inline-end: var(--space-8);
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+}
+
+/* Content */
+
+.portal-content {
+  grid-area: content;
+  /* Spans the header's row too, so the page scrolls *behind* the translucent pill (as on the
+   * marketing site). The top padding keeps it clear of the header at rest, and the scrollbar track
+   * is inset by the same 64px so the bar still starts below the header. */
+  grid-row: 1 / -1;
+  /* Own stacking context: page-level z-indexes (a data grid's sticky header cells use the same
+   * `--z-sticky` as the header) stay beneath the pill instead of painting over it. Modals and toasts
+   * portal to <body>, so they are unaffected. */
+  isolation: isolate;
+  padding: var(--space-24);
+  padding-top: calc(64px + var(--space-24));
+  scroll-padding-top: calc(64px + var(--space-24));
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.portal-content::-webkit-scrollbar-track {
+  margin-block-start: 64px;
+}
+
+/* Icon buttons (bell, user menu, nav toggle trigger) */
+
+.portal-icon-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-foreground);
+  cursor: pointer;
+}
+
+.portal-icon-button:hover {
+  background-color: var(--color-surface);
+}
+
+.portal-icon-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Popover panels (notification bell, user menu) */
+
+.portal-notification-bell,
+.portal-user-menu {
+  position: relative;
+}
+
+.portal-popover {
+  position: absolute;
+  inset-block-start: calc(100% + var(--space-8));
+  inset-inline-end: 0;
+  z-index: var(--z-dropdown);
+  min-width: 280px;
+  max-width: 360px;
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-3);
+  padding: var(--space-16);
+}
+
+/* Notification bell */
+
+.portal-notification-bell__badge {
+  position: absolute;
+  inset-block-start: 2px;
+  inset-inline-end: 2px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  background-color: var(--color-danger);
+  color: var(--color-danger-foreground);
+  font-size: var(--font-size-xs);
+  line-height: 16px;
+  text-align: center;
+}
+
+/* Notification panel: fixed header and footer with the list scrolling between them. The panel is
+   a flex column with a viewport-capped height, so the list is the only scroller; its own compositing
+   layer (`translateZ(0)`) keeps Safari from painting the scrolled rows over the footer, which it
+   did when the list scrolled inside the (transformed, transitioned) header. */
+.portal-notification-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(360px, calc(100vw - 2 * var(--space-16)));
+  max-width: none;
+  max-height: min(520px, calc(100dvh - 96px));
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Narrow screens: the bell sits too far from the start edge for a 360px panel anchored to it, so the
+   panel spans the screen width with a gutter instead. */
+@media (max-width: 480px) {
+  .portal-notification-panel {
+    position: fixed;
+    inset-inline: var(--space-16);
+    inset-block-start: calc(64px + var(--space-8));
+    width: auto;
+  }
+}
+
+.portal-notification-panel__header {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.portal-notification-panel__header h2 {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* Text-style actions inside the panel: no pill padding, so they line up with the text around them. */
+.portal-notification-panel .sf-button--tertiary {
+  min-height: 0;
+  padding: var(--space-4) var(--space-8);
+  margin-inline-end: calc(-1 * var(--space-8));
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.portal-notification-panel__state {
+  margin: 0;
+  padding: var(--space-24) var(--space-16);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.portal-notification-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  transform: translateZ(0);
+}
+
+/* Each row: a status dot column, then title, body and the row's action. */
+.portal-notification-list__item {
+  position: relative;
+  padding: var(--space-12) var(--space-16) var(--space-12) var(--space-32);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.portal-notification-list__item:last-child {
+  border-bottom: none;
+}
+
+.portal-notification-list__item[data-unread] {
+  background-color: var(--color-accent-subtle-bg);
+}
+
+.portal-notification-list__item[data-unread]::before {
+  content: "";
+  position: absolute;
+  inset-block-start: calc(var(--space-12) + 0.45em);
+  inset-inline-start: var(--space-16);
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent);
+}
+
+.portal-notification-list__title {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-sm);
+}
+
+.portal-notification-list__body {
+  margin: var(--space-4) 0 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.portal-notification-list__actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-4);
+}
+
+.portal-notification-panel__footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-12) var(--space-16);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+}
+
+.portal-notification-panel__footer a {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+}
+
+.portal-notification-panel__footer a:hover {
+  text-decoration: underline;
+}
+
+.portal-notification-panel__footer a:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+/* User menu */
+
+.portal-user-menu__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-8);
+}
+
+.portal-user-menu__item {
+  display: block;
+  width: 100%;
+  text-align: start;
+  padding: var(--space-8) var(--space-12);
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-foreground);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.portal-user-menu__item:hover {
+  background-color: var(--color-surface);
+}
+
+.portal-user-menu__item:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Device/session panel rows */
+
+.portal-device-session-list {
+  list-style: none;
+  margin: 0 0 var(--space-16);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.portal-device-session-list__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-8) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.portal-device-session-list__meta {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+  margin: 0;
+}
+
+.portal-device-session-list__current {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted-foreground);
+}
+
+/* Narrow viewport: the sidebar becomes an off-canvas drawer, toggled from the header. Closed, it
+   sits one full width off its own start edge (`inset-inline-start: -100%`) — the start edge, and so
+   which physical side it slides off, is exactly what flips between `dir="ltr"` and `dir="rtl"`. This
+   animates `inset-inline-start` rather than `transform: translateX()` on purpose: a physical
+   transform doesn't know about `dir` and would need its own `[dir="rtl"]` override to flip sign. */
+/* The header's toggle only drives the narrow drawer; on desktop the sidebar carries its own. */
+.portal-header__nav-toggle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .portal-shell {
+    grid-template-columns: 1fr;
+    grid-template-areas: "header" "content";
+  }
+
+  .portal-header__nav-toggle {
+    display: inline-flex;
+  }
+
+  .portal-sidebar {
+    position: fixed;
+    inset-block: 64px 0;
+    /* The drawer already starts below the header; drop the desktop under-header offset. */
+    padding-top: var(--space-12);
+    inset-inline-start: -100%;
+    inline-size: 100%;
+    z-index: var(--z-dropdown);
+    transition: inset-inline-start var(--duration-base) var(--easing-standard);
+  }
+
+  .portal-sidebar[data-open] {
+    inset-inline-start: 0;
+  }
+
+  .portal-sidebar__toggle {
+    display: none;
+  }
+}
+
+/* Desktop collapsed: a 72px icon rail. Labels stay in the DOM, visually hidden, so every link keeps
+   its accessible name; the link's `title` (set in PortalSidebar) is the sighted tooltip. */
+@media (min-width: 769px) {
+  .portal-shell[data-nav-collapsed] {
+    grid-template-columns: 72px 1fr;
+  }
+
+  .portal-sidebar[data-collapsed] .portal-nav__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .portal-sidebar[data-collapsed] .portal-nav__link {
+    justify-content: center;
+    padding: 0;
+  }
+
+  .portal-sidebar[data-collapsed] .portal-sidebar__toggle {
+    align-self: center;
+  }
+
+  /* No room for the count beside a label: pin it to the icon's corner instead. */
+  .portal-sidebar[data-collapsed] .approval-queue-badge {
+    inset-block-start: 4px;
+    inset-inline-end: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-sidebar,
+  .portal-nav__link {
+    transition: none;
+  }
+}
+
+/* Shared "Back" link above every portal sub-page (PortalBackLink). Quiet, so the page title leads. */
+.portal-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-block-end: var(--space-12);
+  padding-block: var(--space-4);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-muted-foreground);
+  text-decoration: none;
+}
+
+/* The page right after it starts flush, so its title sits close to "Back" rather than a full
+   heading margin below it. */
+.portal-back-link + *,
+.portal-back-link + * > :first-child,
+.portal-back-link + * > :first-child > h1:first-child {
+  margin-block-start: 0;
+}
+
+.portal-back-link:hover {
+  color: var(--color-foreground);
+}
+
+.portal-back-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-sm);
+}
+
+[dir="rtl"] .portal-back-link svg {
+  transform: scaleX(-1);
+}
+
+@media print {
+  .portal-back-link {
+    display: none;
+  }
+}

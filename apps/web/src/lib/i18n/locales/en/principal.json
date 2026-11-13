@@ -1,0 +1,1322 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "loading": "Loading…"
+  },
+  "dashboard": {
+    "title": "Leadership overview",
+    "description": "Everything you oversee as principal: grades, the school calendar, timetable, classes and students, plus what needs your attention today.",
+    "links": {
+      "grades": "Grades →",
+      "calendar": "School calendar →",
+      "timetable": "Timetable →",
+      "classes": "Classes →",
+      "sections": "Grades & sections →",
+      "academicSetup": "Academic setup →",
+      "students": "Students →",
+      "attendance": "Attendance →",
+      "discipline": "Discipline →",
+      "messageReports": "Message reports →",
+      "evaluations": "Teacher evaluations →",
+      "approvals": "Approvals →",
+      "announcements": "Announcements →",
+      "years": "School years & terms →",
+      "catalog": "Subjects & courses →"
+    }
+  },
+  "tiles": {
+    "pendingApprovals": {
+      "title": "Pending approvals",
+      "error": "Unable to load the approval queue.",
+      "empty": "Nothing is waiting on review.",
+      "caption": "awaiting review",
+      "link": "Review approvals →"
+    },
+    "attendanceHeatMap": {
+      "title": "Attendance heat map",
+      "error": "Unable to load attendance by class.",
+      "caption_one": "Present rate by class, last {{days}} day",
+      "caption_other": "Present rate by class, last {{days}} days",
+      "empty": "No attendance recorded in this window.",
+      "link": "View attendance by class →"
+    },
+    "openIncidents": {
+      "title": "Open discipline incidents",
+      "error": "Unable to load discipline incidents.",
+      "empty": "No open incidents.",
+      "caption": "reported, under review, or escalated",
+      "link": "View discipline incidents →"
+    },
+    "openMessageReports": {
+      "title": "Open message reports",
+      "error": "Unable to load message reports.",
+      "empty": "No open message reports.",
+      "caption": "pending or in review",
+      "link": "Review message reports →"
+    },
+    "draftEvaluations": {
+      "title": "Draft evaluations",
+      "error": "Unable to load evaluations.",
+      "empty": "No evaluations in progress.",
+      "caption": "awaiting scoring, submission, or sharing",
+      "link": "View evaluations →"
+    },
+    "recentAnnouncements": {
+      "title": "Recent announcements",
+      "error": "Unable to load announcements.",
+      "empty": "No announcements published yet.",
+      "link": "View all announcements →"
+    }
+  },
+  "attendanceByClass": {
+    "title": "Attendance by class",
+    "description": "Present, absent, late, and excused rates for the selected period.",
+    "period": "Period",
+    "range": {
+      "7": "Last 7 days",
+      "30": "Last 30 days",
+      "90": "Last 90 days"
+    },
+    "filtered": "Filtered to one class.",
+    "clearFilter": "Clear filter",
+    "caption": "Attendance by class",
+    "columns": {
+      "class": "Class",
+      "present": "Present",
+      "absent": "Absent",
+      "late": "Late",
+      "excused": "Excused"
+    },
+    "error": "Unable to load attendance.",
+    "empty": "No attendance recorded in this period."
+  },
+  "approvals": {
+    "title": "Approvals",
+    "description": "Grade submissions and timetable versions awaiting your review.",
+    "approveSelected": "Approve selected",
+    "approveCountSelected": "Approve {{selected}} selected",
+    "rejectSelected": "Reject selected",
+    "rejectCountSelected": "Reject {{selected}} selected",
+    "tableCaption": "Pending approval items",
+    "selectAll": "Select all pending items",
+    "selectItem": "Select {{summary}}",
+    "columns": {
+      "type": "Type",
+      "summary": "Summary",
+      "requestedBy": "Requested by",
+      "requestedAt": "Requested at",
+      "actions": "Actions"
+    },
+    "error": "Unable to load the approval queue.",
+    "empty": "Nothing is pending review.",
+    "viewDiff": "View diff",
+    "approve": "Approve",
+    "reject": "Reject",
+    "itemType": {
+      "grade_submission": "Grade submission",
+      "grade_revision": "Grade correction",
+      "timetable_version": "Timetable version"
+    },
+    "toast": {
+      "approveFailed": "Couldn't approve item",
+      "approved": "Item approved",
+      "rejectFailed": "Couldn't reject item",
+      "rejected": "Item rejected",
+      "bulkRejectFailed": "Couldn't reject item(s)",
+      "bulkApproveFailed": "Couldn't process approvals",
+      "bulkApprovedAll_one": "{{succeeded}} of {{count}} item approved",
+      "bulkApprovedAll_other": "{{succeeded}} of {{count}} items approved",
+      "bulkApprovedPartial": "{{succeeded}} of {{total}} approved",
+      "bulkRejectedAll_one": "{{succeeded}} of {{count}} item rejected",
+      "bulkRejectedAll_other": "{{succeeded}} of {{count}} items rejected",
+      "bulkRejectedPartial": "{{succeeded}} of {{total}} rejected",
+      "bulkFailedDescription": "{{failed}} failed — see the error on each row below."
+    },
+    "rejectModal": {
+      "titleSingle": "Reject item",
+      "titleBulk": "Reject selected items",
+      "selectedCount_one": "{{count}} item selected",
+      "selectedCount_other": "{{count}} items selected",
+      "reason": "Reason",
+      "reasonRequired": "A reason is required to reject.",
+      "submit": "Reject"
+    },
+    "diff": {
+      "title": "What changed",
+      "class": "Class",
+      "student": "Student",
+      "gradesCaption": "Grades in this submission for {{student}}",
+      "label": "Label",
+      "score": "Score",
+      "maxScore": "Max score",
+      "weight": "Weight",
+      "empty": "No grade records in this submission.",
+      "version": "Version",
+      "term": "Term",
+      "slots": "Timetable slots",
+      "reason": "Teacher's reason",
+      "changesCaption": "Proposed corrections to {{student}}'s published grades",
+      "publishedScore": "Published score",
+      "proposedScore": "Proposed score",
+      "noChanges": "No score changes in this correction."
+    }
+  },
+  "discipline": {
+    "type": {
+      "behavioral": "Behavioral",
+      "academic_integrity": "Academic integrity",
+      "attendance": "Attendance",
+      "bullying": "Bullying",
+      "substance": "Substance",
+      "vandalism": "Vandalism",
+      "safety": "Safety",
+      "other": "Other"
+    },
+    "status": {
+      "reported": "Reported",
+      "under_review": "Under review",
+      "resolved": "Resolved",
+      "escalated": "Escalated",
+      "closed": "Closed"
+    },
+    "severity": {
+      "minor": "Minor",
+      "moderate": "Moderate",
+      "major": "Major",
+      "critical": "Critical"
+    },
+    "actionType": {
+      "verbal_warning": "Verbal warning",
+      "written_warning": "Written warning",
+      "detention": "Detention",
+      "in_school_suspension": "In-school suspension",
+      "out_of_school_suspension": "Out-of-school suspension",
+      "expulsion": "Expulsion",
+      "parent_meeting": "Parent meeting",
+      "counseling_referral": "Counseling referral",
+      "community_service": "Community service",
+      "other": "Other"
+    },
+    "actionStatus": {
+      "pending": "Pending",
+      "active": "Active",
+      "completed": "Completed",
+      "revoked": "Revoked"
+    },
+    "transition": {
+      "under_review": "Start review",
+      "escalated": "Escalate",
+      "closed": "Close"
+    },
+    "list": {
+      "title": "Discipline incidents",
+      "description": "Incidents reported across the school.",
+      "inboxTab": "Teacher-reported inbox",
+      "allTab": "All incidents",
+      "filterOpen": "Open (reported, under review, escalated)",
+      "filterAll": "All statuses",
+      "statusLabel": "Status",
+      "inboxEmpty": "No incidents are waiting for triage.",
+      "filterEmpty": "No incidents match this filter.",
+      "caption": "Discipline incidents",
+      "error": "Unable to load discipline incidents.",
+      "columns": {
+        "title": "Title",
+        "type": "Type",
+        "severity": "Severity",
+        "status": "Status",
+        "reportedAt": "Reported at"
+      }
+    },
+    "detail": {
+      "back": "← Back to discipline incidents",
+      "loadError": "Unable to load this discipline incident.",
+      "markedToast": {
+        "reported": "Incident marked reported",
+        "under_review": "Incident marked under review",
+        "escalated": "Incident marked escalated",
+        "closed": "Incident marked closed"
+      },
+      "updateFailed": "Couldn't update incident",
+      "type": "Type",
+      "severity": "Severity",
+      "status": "Status",
+      "reportedAt": "Reported at",
+      "resolvedAt": "Resolved at",
+      "parentVisibility": "Parent visibility",
+      "visible": "Visible to the student's parent",
+      "notVisibleOff": "Not visible — parent discipline visibility is off for this school",
+      "notVisibleYet": "Not visible yet — only resolved incidents can be shown to parents",
+      "workflow": "Workflow",
+      "resolve": "Resolve",
+      "resolveHint": "Record at least one disciplinary action before resolving this incident.",
+      "actionsTaken": "Actions taken",
+      "addAction": "Add action",
+      "actionsCaption": "Disciplinary actions taken",
+      "actionColumns": {
+        "type": "Type",
+        "status": "Status",
+        "details": "Details",
+        "effective": "Effective"
+      },
+      "actionsError": "Unable to load actions for this incident.",
+      "actionsEmpty": "No actions have been recorded yet.",
+      "effectiveRange": "{{from}} – {{until}}"
+    },
+    "addAction": {
+      "title": "Record a disciplinary action",
+      "actionType": "Action type",
+      "details": "Details",
+      "detailsHelper": "Optional — what the action involved.",
+      "effectiveFrom": "Effective from",
+      "effectiveUntil": "Effective until",
+      "errorFallback": "The action could not be recorded.",
+      "submit": "Record action",
+      "success": "Action recorded",
+      "failed": "Couldn't record action"
+    },
+    "resolve": {
+      "title": "Resolve incident",
+      "description": "Marks the incident resolved. If this school allows parent visibility, it becomes visible to the student's parent.",
+      "notes": "Resolution notes",
+      "errorFallback": "The incident could not be resolved.",
+      "submit": "Resolve",
+      "success": "Incident resolved",
+      "failed": "Couldn't resolve incident"
+    },
+    "report": {
+      "open": "Report an incident",
+      "title": "Report an incident",
+      "student": "Student",
+      "studentPlaceholder": "Name or admission number",
+      "noMatches": "No students match.",
+      "changeStudent": "Change",
+      "type": "Type",
+      "severity": "Severity",
+      "titleLabel": "Title",
+      "titlePlaceholder": "Fight in the playground",
+      "when": "When it happened",
+      "description": "What happened",
+      "submit": "Report incident",
+      "created": "Incident reported",
+      "failed": "Couldn't report the incident"
+    }
+  },
+  "messageReports": {
+    "status": {
+      "pending": "Pending",
+      "in_review": "In review",
+      "actioned": "Actioned",
+      "dismissed": "Dismissed"
+    },
+    "priority": {
+      "urgent": "Urgent",
+      "high": "High",
+      "normal": "Normal"
+    },
+    "reason": {
+      "harassment": "Harassment",
+      "inappropriate": "Inappropriate content",
+      "spam": "Spam",
+      "safety_concern": "Safety concern",
+      "other": "Other"
+    },
+    "role": {
+      "parent": "Parent",
+      "teacher": "Teacher"
+    },
+    "party": "{{name}} ({{role}})",
+    "overdue": "Overdue",
+    "respondBy": "Respond by {{time}}",
+    "list": {
+      "title": "Message reports",
+      "description": "Reports parents and teachers have filed about messages. Urgent and overdue reports come first.",
+      "statusLabel": "Status",
+      "filterOpen": "Open",
+      "filterAll": "All",
+      "caption": "Message reports",
+      "columns": {
+        "priority": "Priority",
+        "reason": "Reason",
+        "reported": "Reported user",
+        "reporter": "Reported by",
+        "student": "Student",
+        "createdAt": "Reported at",
+        "status": "Status",
+        "review": "Review"
+      },
+      "reviewLink": "Review",
+      "reviewLinkLabel": "Review report about {{name}}",
+      "empty": "No message reports match this filter.",
+      "error": "Unable to load message reports.",
+      "range": "Showing {{from}}–{{to}} of {{total}}",
+      "previous": "← Previous",
+      "next": "Next →"
+    },
+    "detail": {
+      "back": "← Back to message reports",
+      "loadError": "Unable to load this report.",
+      "notFound": "This report doesn't exist or is no longer available.",
+      "overdueWarning": "Overdue — a response was due by {{time}}.",
+      "priority": "Priority",
+      "status": "Status",
+      "respondBy": "Respond by",
+      "reporter": "Reported by",
+      "reported": "Reported user",
+      "student": "Student",
+      "createdAt": "Reported at",
+      "block": "Messaging block",
+      "blockYes": "Blocked",
+      "blockNo": "Not blocked",
+      "details": "Reporter's details",
+      "noDetails": "The reporter didn't add any details.",
+      "review": "Review",
+      "startReview": "Start review",
+      "markActioned": "Mark actioned",
+      "dismiss": "Dismiss",
+      "inReviewBy": "Review started by {{name}}.",
+      "resolutionNote": "Resolution note",
+      "reviewedBy": "Reviewed by",
+      "reviewedAt": "Reviewed at",
+      "transcript": "Conversation evidence",
+      "transcriptHint": "The messages as they read when the report was filed, oldest first.",
+      "transcriptHintImages": "The messages as they read when the report was filed, oldest first. Image links expire after 5 minutes — refresh them if an image won't open.",
+      "transcriptEmpty": "No messages were captured with this report.",
+      "reportedMessage": "Reported message",
+      "refreshImages": "Refresh images",
+      "imageAlt": "Image sent by {{name}}",
+      "openImage": "Open full-size image sent by {{name}} in a new tab",
+      "imageUnavailable": "Image unavailable",
+      "toast": {
+        "in_review": "Review started",
+        "actioned": "Report marked as actioned",
+        "dismissed": "Report dismissed"
+      },
+      "updateFailed": "Couldn't update the report",
+      "conflictTitle": "This report was already updated",
+      "conflictDescription": "Someone else changed its status. The latest version is shown now."
+    },
+    "resolve": {
+      "actionedTitle": "Mark report as actioned",
+      "dismissedTitle": "Dismiss report",
+      "description": "Closing a report is final. Record what was done or why no action is needed.",
+      "note": "Resolution note",
+      "noteRequired": "Enter a resolution note (up to 2000 characters).",
+      "actionedSubmit": "Mark actioned",
+      "dismissedSubmit": "Dismiss report"
+    }
+  },
+  "evaluations": {
+    "type": {
+      "formal_observation": "Formal observation",
+      "peer_review": "Peer review",
+      "self_assessment": "Self-assessment",
+      "student_feedback": "Student feedback",
+      "annual_review": "Annual review",
+      "probationary_review": "Probationary review"
+    },
+    "status": {
+      "draft": "Draft",
+      "submitted": "Submitted",
+      "finalized": "Finalized"
+    },
+    "rating": {
+      "unsatisfactory": "Unsatisfactory",
+      "developing": "Developing",
+      "proficient": "Proficient",
+      "exemplary": "Exemplary"
+    },
+    "backToList": "← Back to evaluations",
+    "list": {
+      "title": "Teacher evaluations",
+      "description": "Evaluation cycles, criteria scoring, and sharing with teachers.",
+      "manageTemplates": "Manage criteria templates",
+      "newEvaluation": "New evaluation",
+      "statusLabel": "Status",
+      "teacherLabel": "Teacher",
+      "allStatuses": "All statuses",
+      "allTeachers": "All teachers",
+      "caption": "Teacher evaluations",
+      "columns": {
+        "teacher": "Teacher",
+        "type": "Type",
+        "status": "Status",
+        "rating": "Rating",
+        "shared": "Shared with teacher",
+        "evaluatedAt": "Evaluated at"
+      },
+      "error": "Unable to load evaluations.",
+      "empty": "No evaluations match this filter.",
+      "shared": "Shared",
+      "notShared": "Not shared"
+    },
+    "create": {
+      "title": "Start a teacher evaluation",
+      "teacher": "Teacher",
+      "teacherPlaceholder": "Select a teacher",
+      "type": "Evaluation type",
+      "evaluatedAt": "Evaluated at",
+      "errorFallback": "The evaluation could not be started.",
+      "submit": "Start evaluation",
+      "success": "Evaluation started",
+      "failed": "Couldn't start evaluation"
+    },
+    "templates": {
+      "title": "Criteria templates",
+      "description": "Reusable scoring criteria for evaluation cycles.",
+      "newTemplate": "New template",
+      "caption": "Evaluation criteria templates",
+      "columns": {
+        "title": "Title",
+        "maxScore": "Max score",
+        "sortOrder": "Sort order",
+        "status": "Status",
+        "actions": "Actions"
+      },
+      "error": "Unable to load criteria templates.",
+      "empty": "No criteria templates yet.",
+      "active": "Active",
+      "inactive": "Inactive",
+      "edit": "Edit",
+      "reactivate": "Reactivate",
+      "deactivate": "Deactivate",
+      "reactivated": "Template reactivated",
+      "reactivateFailed": "Couldn't reactivate template",
+      "deactivated": "Template deactivated",
+      "deactivateFailed": "Couldn't deactivate template",
+      "import": {
+        "title": "Import criteria templates",
+        "maxScorePositive": "Max score must be greater than 0.",
+        "sortOrderMin": "Sort order can't be negative."
+      }
+    },
+    "templateModal": {
+      "editTitle": "Edit criteria template",
+      "newTitle": "New criteria template",
+      "title": "Title",
+      "description": "Description",
+      "descriptionHelper": "Optional — what this criterion evaluates.",
+      "maxScore": "Max score",
+      "sortOrder": "Sort order",
+      "sortOrderHelper": "Lower numbers appear first in the scoring form.",
+      "errorFallback": "The template could not be saved.",
+      "saveChanges": "Save changes",
+      "create": "Create template",
+      "updated": "Template updated",
+      "created": "Template created",
+      "updateFailed": "Couldn't update template",
+      "createFailed": "Couldn't create template"
+    },
+    "detail": {
+      "loadError": "Unable to load this evaluation.",
+      "autosave": {
+        "saving": "Saving…",
+        "saved": "Saved",
+        "error": "Couldn't save"
+      },
+      "scoreLabel": "Score (0–{{max}})",
+      "outOfRange": "Out of range",
+      "comment": "Comment",
+      "historyTitle": "Evaluation history",
+      "historyEmpty": "No earlier evaluations for this teacher.",
+      "historyItem": "{{type}} — {{date}}",
+      "submitted": "Evaluation submitted",
+      "submitFailed": "Couldn't submit evaluation",
+      "sharedToast": "Shared with teacher",
+      "shareFailed": "Couldn't share evaluation",
+      "type": "Type",
+      "status": "Status",
+      "rating": "Rating",
+      "evaluatedAt": "Evaluated at",
+      "sharedWithTeacher": "Shared with teacher",
+      "sharedOn": "Shared on {{date}}",
+      "notShared": "Not shared — invisible to the teacher",
+      "workflow": "Workflow",
+      "submit": "Submit",
+      "share": "Share with teacher",
+      "submitHint": "Submit this evaluation before sharing it with the teacher.",
+      "criteriaScoring": "Criteria scoring",
+      "noTemplates": "No active criteria templates. <link>Add one</link> to start scoring.",
+      "noTemplatesShort": "No active criteria templates.",
+      "scoresCaption": "Criteria scores",
+      "scoreColumns": {
+        "criteria": "Criteria",
+        "score": "Score",
+        "comment": "Comment",
+        "saved": "Saved"
+      },
+      "narrative": "Narrative",
+      "readOnlyHint": "This evaluation has been shared with the teacher and can no longer be edited.",
+      "overallRating": "Overall rating",
+      "noRating": "No rating yet",
+      "strengths": "Strengths",
+      "areasForImprovement": "Areas for improvement",
+      "comments": "Comments"
+    }
+  },
+  "attendance": {
+    "status": {
+      "present": "Present",
+      "absent": "Absent",
+      "late": "Tardy",
+      "excused": "Excused"
+    },
+    "interval": {
+      "day": "Daily",
+      "week": "Weekly",
+      "month": "Monthly",
+      "term": "Term overview"
+    },
+    "dashboard": {
+      "eyebrow": "Principal · Attendance",
+      "title": "Attendance monitoring",
+      "description": "School-wide visibility, daily records, trends, and intervention alerts.",
+      "viewToggle": "Attendance view",
+      "schoolView": "School view",
+      "classView": "Class view",
+      "filtersTitle": "Attendance filters",
+      "searchLabel": "Student search",
+      "searchPlaceholder": "Name or admission number",
+      "grade": "Grade",
+      "gradeOption": "Grade {{grade}}",
+      "allGrades": "All grades",
+      "section": "Section",
+      "allSections": "All sections",
+      "statusLabel": "Attendance status",
+      "allStatuses": "All statuses",
+      "intervalLabel": "Trend interval",
+      "breachesOnly": "Threshold breaches only",
+      "classDrillDown": "Class drill-down",
+      "summaryError": "Unable to load attendance summary.",
+      "classBreakdown": "Class breakdown",
+      "classCaption": "Attendance summary by class",
+      "classColumns": {
+        "class": "Class",
+        "present": "Present",
+        "absent": "Absent",
+        "tardy": "Tardy"
+      },
+      "classEmpty": "No classes recorded in this period.",
+      "dailyTitle": "Daily attendance",
+      "studentCount_one": "{{formatted}} student in the active view",
+      "studentCount_other": "{{formatted}} students in the active view",
+      "refreshing": "Refreshing…"
+    },
+    "export": {
+      "unavailable": "Export unavailable",
+      "xlsx": "Export XLSX",
+      "pdf": "Export PDF",
+      "error": "Unable to create the export.",
+      "download": "Download report"
+    },
+    "summary": {
+      "label": "Attendance summary",
+      "overall": "Overall attendance",
+      "totalAbsences": "Total absences",
+      "unexcused": "Unexcused absences",
+      "tardy": "Tardy"
+    },
+    "correction": {
+      "title": "Request attendance correction",
+      "description": "{{date}} · Current status: {{status}}",
+      "correctedStatus": "Corrected status",
+      "minutesLate": "Minutes late",
+      "reason": "Reason",
+      "reasonHelper": "This justification is added to the attendance audit history.",
+      "canOverride": "You may correct records outside the standard correction window.",
+      "cannotOverride": "Corrections outside the standard window require an administrator override.",
+      "rejected": "The correction was rejected. Check the correction window and your permissions.",
+      "submit": "Submit correction",
+      "errors": {
+        "sameStatus": "Choose a status different from the current status.",
+        "reasonRequired": "Enter a correction reason.",
+        "minutesRequired": "Enter a positive number of minutes late."
+      }
+    },
+    "grid": {
+      "caption": "Daily student attendance",
+      "empty": "No students match the active filters.",
+      "columns": {
+        "student": "Student",
+        "admission": "Admission no.",
+        "class": "Class",
+        "section": "Section",
+        "status": "Status",
+        "minutesLate": "Minutes late"
+      }
+    },
+    "history": {
+      "fallbackTitle": "Student attendance history",
+      "description": "{{admissionNumber}} · {{classCode}} · {{percent}} attendance",
+      "loadingDescription": "Loading student attendance…",
+      "loading": "Loading attendance history…",
+      "error": "Unable to load the student history.",
+      "minutesLate_one": "{{formatted}} minute late",
+      "minutesLate_other": "{{formatted}} minutes late",
+      "version": "Version {{version}}",
+      "versionOverride": "Version {{version}} · Administrative override",
+      "requestCorrection": "Request correction",
+      "readOnly": "Read only"
+    },
+    "breaches": {
+      "title": "Chronic absenteeism alerts",
+      "description": "Students above {{threshold}} unexcused absence",
+      "alertCount_one": "{{count}} alert",
+      "alertCount_other": "{{count}} alerts",
+      "empty": "No threshold breaches in this view."
+    }
+  },
+  "school": {
+    "yearLabel": "Academic year",
+    "termLabel": "Term",
+    "classLabel": "Class",
+    "noYears": "No academic years set up yet",
+    "noTerms": "No terms in this year",
+    "noClasses": "No classes in this term."
+  },
+  "grades": {
+    "title": "Grades",
+    "description": "Each class's gradebook for the term: scores per assessment, every student's weighted average, and where their grades are in the approval workflow.",
+    "caption": "Gradebook for {{class}}",
+    "empty": "No grades have been entered for this class yet.",
+    "error": "Unable to load this class's gradebook.",
+    "reviewPending_one": "Review {{count}} pending submission →",
+    "reviewPending_other": "Review {{count}} pending submissions →",
+    "columns": {
+      "student": "Student",
+      "average": "Average",
+      "status": "Status"
+    },
+    "status": {
+      "draft": "Draft",
+      "submitted": "Awaiting approval",
+      "approved": "Approved",
+      "rejected": "Returned",
+      "published": "Published"
+    }
+  },
+  "timetable": {
+    "title": "Timetable",
+    "description": "The weekly timetable for each term. Narrow it to one class or teacher, or edit a draft and publish it."
+  },
+  "classes": {
+    "title": "Classes",
+    "description": "Every class running this term, with its lead teacher, grade section, and how full it is.",
+    "caption": "Classes this term",
+    "error": "Unable to load classes.",
+    "ofCapacity": "{{enrolled}} of {{capacity}}",
+    "columns": {
+      "class": "Class",
+      "teacher": "Lead teacher",
+      "section": "Section",
+      "enrolled": "Enrolled",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "planned": "Planned",
+      "active": "Active",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "capacity": "Capacity",
+    "section": {
+      "label": "Grade section",
+      "none": "No section",
+      "noSections": "This year has no sections yet. Add them on the Grades & sections page.",
+      "helper": "The class's lessons appear on this section's timetable, and students placed in it are enrolled in the class."
+    },
+    "import": {
+      "title": "Import classes",
+      "fields": {
+        "code": "Class code",
+        "course": "Course code",
+        "term": "Term (code or name; blank = selected term)",
+        "teacher": "Lead teacher employee number",
+        "capacity": "Capacity",
+        "status": "Status"
+      },
+      "unknownCourse": "No course with code \"{{value}}\".",
+      "unknownTerm": "No term \"{{value}}\" in the selected year.",
+      "noTerm": "No term is selected; add a term to the row.",
+      "unknownTeacher": "No teacher with employee number \"{{value}}\".",
+      "capacityMin": "Capacity must be at least 1."
+    },
+    "add": "Add class",
+    "edit": "Edit",
+    "editLabel": "Edit {{code}}",
+    "sectionsLink": "Grades & sections",
+    "form": {
+      "addTitle": "Add a class",
+      "editTitle": "Edit {{code}}",
+      "editDescription": "A class's course, academic year and term can't be changed once it exists.",
+      "course": "Course",
+      "coursePlaceholder": "Choose a course",
+      "noCourses": "No courses yet — add one",
+      "courseOption": "{{code}} – {{name}}",
+      "addCourse": "Add new course",
+      "year": "Academic year",
+      "term": "Term",
+      "teacher": "Lead teacher",
+      "teacherPlaceholder": "Choose a teacher",
+      "code": "Class code",
+      "codePlaceholder": "e.g. MATH101-A",
+      "capacityHelper": "Leave blank for no limit.",
+      "capacityInvalid": "Capacity must be a whole number of at least 1.",
+      "status": "Status",
+      "add": "Add class",
+      "save": "Save changes",
+      "created": "Class added",
+      "updated": "Class saved",
+      "saveFailed": "Couldn't save the class",
+      "duplicateCode": "A class with the code \"{{code}}\" already exists. Choose another code.",
+      "sectionNotInYear": "That section isn't part of this class's academic year. Choose a section of the same year.",
+      "aiMaterials": "Use this class's materials with the AI study assistant",
+      "aiMaterialsOnHelper": "Students can ask the AI about this class's materials and make quizzes, flashcards and exams from them. Their text is sent to our AI provider.",
+      "aiMaterialsOffHelper": "This class's materials are not used by the AI study assistant and are not sent to our AI provider. Saving deletes their AI copies and anything generated from them.",
+      "aiMaterialsLoadError": "Couldn't load this class's AI setting."
+    },
+    "courseModal": {
+      "title": "Add a course",
+      "description": "Courses belong to a subject. Pick an existing subject or create a new one.",
+      "subject": "Subject",
+      "subjectPlaceholder": "Choose a subject",
+      "subjectOption": "{{name}} ({{code}})",
+      "newSubject": "New subject…",
+      "subjectName": "Subject name",
+      "subjectNamePlaceholder": "e.g. Mathematics",
+      "subjectCode": "Subject code",
+      "subjectCodePlaceholder": "e.g. MATH",
+      "courseName": "Course name",
+      "courseNamePlaceholder": "e.g. Algebra I",
+      "courseCode": "Course code",
+      "courseCodePlaceholder": "e.g. MATH101",
+      "add": "Add course",
+      "created": "Course added",
+      "saveFailed": "Couldn't add the course",
+      "duplicateCode": "That code is already in use. Choose another code."
+    },
+    "delete": {
+      "action": "Delete",
+      "label": "Delete {{code}}",
+      "title": "Delete {{code}}?",
+      "description": "A class with enrolled students is cancelled instead of deleted, so its records are kept. A class with no enrolments is removed.",
+      "confirm": "Delete",
+      "deleted": "Class removed",
+      "failed": "Couldn't delete the class"
+    },
+    "record": "Record",
+    "recordLabel": "Open the record of class {{code}}"
+  },
+  "sections": {
+    "title": "Grades & sections",
+    "description": "Set up the school's grades and, for each academic year, the sections of every grade and the students in them. Each section gets its own timetable.",
+    "sectionLabel": "{{grade}} – {{section}}",
+    "edit": "Edit",
+    "columns": {
+      "actions": "Actions"
+    },
+    "grades": {
+      "heading": "Grades",
+      "add": "Add grade",
+      "caption": "The school's grades",
+      "columns": {
+        "name": "Grade",
+        "order": "Order",
+        "sections": "Sections this year"
+      },
+      "error": "Unable to load grades.",
+      "empty": "No grades yet. Add the first one, e.g. \"Grade 10\".",
+      "editLabel": "Edit {{name}}",
+      "deleteLabel": "Delete {{name}}"
+    },
+    "sectionList": {
+      "heading": "Sections",
+      "add": "Add section",
+      "caption": "Sections in the selected year",
+      "columns": {
+        "grade": "Grade",
+        "section": "Section",
+        "students": "Students"
+      },
+      "error": "Unable to load sections.",
+      "empty": "No sections in this year yet.",
+      "students": "Students",
+      "studentsLabel": "Students of {{section}}",
+      "rename": "Rename",
+      "renameLabel": "Rename {{section}}",
+      "deleteLabel": "Delete {{section}}"
+    },
+    "delete": {
+      "action": "Delete",
+      "confirm": "Delete",
+      "deleted": "Deleted",
+      "failed": "Couldn't delete",
+      "gradeTitle": "Delete {{name}}?",
+      "gradeDescription": "Only a grade with no sections in any year can be deleted.",
+      "sectionTitle": "Delete {{section}}?",
+      "sectionDescription": "Only a section with no classes and no students can be deleted.",
+      "gradeHasSections": "This grade still has sections (in this or another year). Delete them first.",
+      "sectionInUse": "This section still has classes or students. Move them out first."
+    },
+    "gradeModal": {
+      "addTitle": "Add grade",
+      "editTitle": "Edit grade",
+      "name": "Name",
+      "namePlaceholder": "e.g. Grade 10",
+      "sortOrder": "Order",
+      "sortOrderHelper": "Grades are listed from the lowest number up.",
+      "sortOrderInvalid": "Enter a whole number from 0 to 32767.",
+      "add": "Add grade",
+      "save": "Save changes",
+      "created": "Grade added",
+      "updated": "Grade saved",
+      "saveFailed": "Couldn't save the grade"
+    },
+    "sectionModal": {
+      "addTitle": "Add section",
+      "editTitle": "Rename section",
+      "grade": "Grade",
+      "gradePlaceholder": "Choose a grade",
+      "name": "Section name",
+      "namePlaceholder": "e.g. C",
+      "add": "Add section",
+      "save": "Save changes",
+      "created": "Section added",
+      "updated": "Section saved",
+      "saveFailed": "Couldn't save the section"
+    },
+    "students": {
+      "title": "Students of {{section}}",
+      "description": "Adding a student moves them out of any other section this year and enrols them in this section's classes.",
+      "search": "Find a student",
+      "searchPlaceholder": "Name or admission number",
+      "searchResults": "Matching students",
+      "add": "Add",
+      "addLabel": "Add {{name}}",
+      "alreadyPlaced": "In this section",
+      "noMatches": "No students match.",
+      "rosterHeading_one": "{{count}} student",
+      "rosterHeading_other": "{{count}} students",
+      "loadError": "Unable to load the students.",
+      "empty": "No students in this section yet.",
+      "remove": "Remove",
+      "removeLabel": "Remove {{name}}",
+      "removed": "{{name}} removed from the section",
+      "removeFailed": "Couldn't remove the student",
+      "added": "{{name}} added to the section",
+      "addFailed": "Couldn't add the student",
+      "skipped_one": "Not enrolled in {{count}} class because it is full: {{classes}}.",
+      "skipped_other": "Not enrolled in {{count}} classes because they are full: {{classes}}.",
+      "unknownClass": "a class",
+      "done": "Done"
+    },
+    "classesLink": "Classes",
+    "promotionLink": "Move students to next year"
+  },
+  "students": {
+    "title": "Students",
+    "description": "The school's student roll. Search by name or filter by status.",
+    "search": "Search by name",
+    "statusLabel": "Status",
+    "allStatuses": "All statuses",
+    "caption": "Students",
+    "empty": "No students match.",
+    "error": "Unable to load students.",
+    "count_one": "{{count}} student",
+    "count_other": "{{count}} students",
+    "columns": {
+      "name": "Name",
+      "admissionNumber": "Admission no.",
+      "dateOfBirth": "Date of birth",
+      "status": "Status"
+    },
+    "status": {
+      "applicant": "Applicant",
+      "enrolled": "Enrolled",
+      "suspended": "Suspended",
+      "graduated": "Graduated",
+      "withdrawn": "Withdrawn",
+      "archived": "Archived"
+    },
+    "overview": {
+      "results": {
+        "heading": "Results",
+        "caption": "Finalized results, newest first",
+        "period": "Period",
+        "section": "Class",
+        "average": "Average",
+        "grade": "Grade",
+        "outcome": "Outcome",
+        "termOf": "{{term}}, {{year}}",
+        "annualOf": "Whole year {{year}}",
+        "failed_one": "{{count}} subject failed",
+        "failed_other": "{{count}} subjects failed",
+        "empty": "No results have been finalized for this student yet.",
+        "error": "Couldn't load the results."
+      },
+      "certificates": {
+        "heading": "Report cards & certificates",
+        "kind": {
+          "annual_certificate": "Certificate {{serial}}, issued {{date}}",
+          "term_report": "Report card {{serial}}, issued {{date}}"
+        },
+        "status": {
+          "superseded": "replaced",
+          "revoked": "revoked"
+        },
+        "empty": "None issued yet.",
+        "error": "Couldn't load the report cards and certificates."
+      },
+      "discipline": {
+        "heading": "Discipline",
+        "empty": "No incidents recorded.",
+        "error": "Couldn't load the incidents.",
+        "more_one": "And {{count}} older incident.",
+        "more_other": "And {{count}} older incidents."
+      },
+      "attendance": {
+        "heading": "Attendance",
+        "open": "Open this student's attendance history"
+      }
+    },
+    "transcripts": {
+      "heading": "Transcript",
+      "intro": "Every finalized end-of-year result on one document, with the cumulative average and GPA — for example, for university applications.",
+      "state": {
+        "ready": "Ready to issue",
+        "issued": "Issued and up to date",
+        "needs_reissue": "Needs reissue",
+        "blocked": "Can't be issued yet"
+      },
+      "covers_one": "Covers {{count}} year: {{years}}.",
+      "covers_other": "Covers {{count}} years: {{years}}.",
+      "yearItem": "{{grade}} ({{year}})",
+      "issue": "Issue transcript",
+      "reissue": "Reissue",
+      "revoke": "Revoke",
+      "revokeLabel": "Revoke transcript {{serial}}",
+      "reissueTitle": "Reissue transcript {{serial}}",
+      "reissueDescription": "A new transcript is built from the student's current results. The old one is kept and marked as replaced.",
+      "revokeTitle": "Revoke transcript {{serial}}",
+      "revokeDescription": "The transcript stays on record but is marked as revoked everywhere it is shown or printed.",
+      "issuedToast": "Transcript issued",
+      "reissuedToast": "Transcript reissued",
+      "revokedToast": "Transcript revoked",
+      "actionFailed": "Couldn't update the transcript",
+      "listLabel": "Issued transcripts",
+      "item": "Transcript {{serial}}, issued {{date}}",
+      "status": {
+        "superseded": "replaced",
+        "revoked": "revoked"
+      },
+      "stale": {
+        "corrected": "Results corrected since",
+        "new_results": "Newer year finalized since"
+      },
+      "empty": "No transcript issued yet.",
+      "error": "Couldn't load the transcripts."
+    }
+  },
+  "calendar": {
+    "title": "School calendar",
+    "description": "Term dates, every class's exams, and the school's holidays, events and meetings.",
+    "previous": "← Previous",
+    "next": "Next →",
+    "today": "Today",
+    "addEvent": "Add event",
+    "legend": "Legend",
+    "error": "Unable to load calendar events.",
+    "termStarts": "{{term}} starts",
+    "termEnds": "{{term}} ends",
+    "exam": "{{title}} ({{class}})",
+    "agenda": "This month",
+    "agendaEmpty": "Nothing on the calendar this month.",
+    "kinds": {
+      "term": "Term dates",
+      "exam": "Exam",
+      "holiday": "Holiday",
+      "event": "School event",
+      "meeting": "Meeting",
+      "exam_period": "Exam period"
+    },
+    "form": {
+      "addTitle": "Add calendar event",
+      "editTitle": "Edit calendar event",
+      "title": "Title",
+      "kind": "Type",
+      "startsOn": "Starts",
+      "endsOn": "Ends",
+      "description": "Details (optional)",
+      "save": "Save",
+      "cancel": "Cancel",
+      "remove": "Remove",
+      "saved": "Calendar updated",
+      "removed": "Event removed",
+      "saveFailed": "Couldn't save the event. Try again.",
+      "removeFailed": "Couldn't remove the event. Try again.",
+      "titleRequired": "Enter a title.",
+      "datesRequired": "Choose a start and end date.",
+      "endBeforeStart": "The end date can't be before the start date."
+    }
+  },
+  "home": {
+    "stats": {
+      "approvalsHint": "Awaiting your review",
+      "incidents": "Open incidents",
+      "incidentsHint": "Reported, under review or escalated",
+      "reports": "Message reports",
+      "reportsHint": "Pending or in review",
+      "evaluationsHint": "Awaiting scoring, submission or sharing"
+    },
+    "summary": {
+      "approvals_one": "{{count}} grade approval is waiting on you",
+      "approvals_other": "{{count}} grade approvals are waiting on you",
+      "incidents_one": "{{count}} discipline incident is still open",
+      "incidents_other": "{{count}} discipline incidents are still open",
+      "reports_one": "{{count}} message report needs a response",
+      "reports_other": "{{count}} message reports need a response"
+    },
+    "attentionHeading": "Needs attention",
+    "activityHeading": "School activity"
+  },
+  "years": {
+    "title": "School years & terms",
+    "description": "Set up each academic year and its terms. Starting a new year makes it the school's current year and closes the one before it.",
+    "edit": "Edit",
+    "startsOn": "Starts on",
+    "endsOn": "Ends on",
+    "datesInvalid": "The end date must be after the start date.",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "dates": "Dates",
+      "status": "Status",
+      "actions": "Actions",
+      "order": "#"
+    },
+    "status": {
+      "planned": "Planned",
+      "active": "Current",
+      "closed": "Closed",
+      "archived": "Archived"
+    },
+    "yearList": {
+      "heading": "Academic years",
+      "add": "Add year",
+      "caption": "Every academic year, newest first",
+      "empty": "No academic years yet. Add the first one.",
+      "error": "Couldn't load the academic years.",
+      "editLabel": "Edit {{name}}",
+      "deleteLabel": "Delete {{name}}"
+    },
+    "termList": {
+      "heading": "Terms",
+      "headingFor": "Terms of {{name}}",
+      "add": "Add term",
+      "caption": "The selected year's terms in order",
+      "empty": "This year has no terms yet.",
+      "noYear": "Add an academic year first.",
+      "error": "Couldn't load the terms.",
+      "editLabel": "Edit {{name}}",
+      "deleteLabel": "Delete {{name}}"
+    },
+    "yearModal": {
+      "addTitle": "Add academic year",
+      "editTitle": "Edit academic year",
+      "name": "Name",
+      "namePlaceholder": "2026–2027",
+      "code": "Code",
+      "codePlaceholder": "2026-27",
+      "codeHelper": "A short code, unique in the school.",
+      "add": "Add year",
+      "save": "Save",
+      "created": "Academic year added",
+      "updated": "Academic year saved",
+      "saveFailed": "Couldn't save the academic year"
+    },
+    "termModal": {
+      "addTitle": "Add term",
+      "editTitle": "Edit term",
+      "name": "Name",
+      "namePlaceholder": "Term 2",
+      "code": "Code",
+      "codePlaceholder": "T2",
+      "codeHelper": "A short code, unique within the year.",
+      "sequence": "Order in the year",
+      "sequenceHelper": "1 for the first term, 2 for the second, and so on.",
+      "status": "Status",
+      "add": "Add term",
+      "save": "Save",
+      "created": "Term added",
+      "updated": "Term saved",
+      "saveFailed": "Couldn't save the term"
+    },
+    "delete": {
+      "action": "Delete",
+      "title": "Delete {{name}}?",
+      "body": "Only a planned year or term can be deleted.",
+      "deleted": "Deleted",
+      "failed": "Couldn't delete it"
+    },
+    "rollover": {
+      "start": "Start this year",
+      "startLabel": "Start {{name}} as the current year",
+      "title": "Start {{name}}?",
+      "bodyWithActive": "{{name}} becomes the school's current year. {{current}} is closed, and every student's class enrolment in it is marked completed.",
+      "bodyFirst": "{{name}} becomes the school's current year.",
+      "irreversible": "This can't be undone here, so start the new year only after the old year's results are finalized.",
+      "understand": "I understand",
+      "confirm": "Start the year",
+      "done": "{{name}} is now the current year",
+      "archived_one": "{{count}} enrolment marked completed.",
+      "archived_other": "{{count}} enrolments marked completed.",
+      "failed": "Couldn't start the year"
+    }
+  },
+  "catalog": {
+    "title": "Subjects & courses",
+    "description": "The school's course catalog: every subject and the courses taught under it. Classes on the Classes page are built from these courses.",
+    "addCourse": "Add course",
+    "caption": "Subjects with their courses",
+    "columns": {
+      "name": "Name",
+      "code": "Code",
+      "credits": "Credits",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "status": {
+      "draft": "Draft",
+      "active": "Active",
+      "inactive": "Inactive",
+      "archived": "Archived"
+    },
+    "courseCount_one": "{{count}} course",
+    "courseCount_other": "{{count}} courses",
+    "edit": "Edit",
+    "editLabel": "Edit {{name}}",
+    "removeLabel": "Remove {{name}}",
+    "empty": "No subjects yet. Add a course to create the first one.",
+    "error": "Couldn't load the catalog.",
+    "remove": {
+      "action": "Remove",
+      "title": "Remove {{name}}?",
+      "subjectBody": "A subject that already has courses is archived instead of deleted, so its courses and grades keep it.",
+      "courseBody": "A course that already has classes is archived instead of deleted, so its classes and grades keep it.",
+      "done": "Removed",
+      "failed": "Couldn't remove it"
+    },
+    "modal": {
+      "subject": {
+        "title": "Edit subject",
+        "saved": "Subject saved",
+        "saveFailed": "Couldn't save the subject"
+      },
+      "course": {
+        "title": "Edit course",
+        "saved": "Course saved",
+        "saveFailed": "Couldn't save the course"
+      },
+      "name": "Name",
+      "code": "Code",
+      "credits": "Credit hours",
+      "creditsInvalid": "Enter a number above 0.",
+      "status": "Status",
+      "statusHelper": "Only active courses are offered for new classes.",
+      "save": "Save"
+    }
+  },
+  "promotion": {
+    "title": "Move students to next year",
+    "description": "After the year's results are finalized, move every student into next year's classes. Each student gets a suggested class from their result; check it, change any you want, then confirm. Nothing in this year changes, and you can run it again safely.",
+    "sectionsLink": "Grades & sections",
+    "yearsLink": "School years & terms",
+    "fromYear": "From year",
+    "toYear": "To year",
+    "noTargetYear": "No next year yet",
+    "createYearFirst": "Create next year first (School years & terms), then copy this year's set-up and sections into it in Academic setup.",
+    "loadError": "Unable to load the students. Try again.",
+    "empty": "No students are placed in this year's sections.",
+    "counts": "{{place}} to place · {{graduate}} graduating · {{skip}} not moving · {{done}} already done",
+    "targets": {
+      "heading": "Next year's sections",
+      "caption": "Next year's sections with their current and incoming students",
+      "empty": "Next year has no sections yet. Add them on Grades & sections, or copy them from this year in Academic setup.",
+      "section": "Section",
+      "placed": "Placed already",
+      "incoming": "Incoming"
+    },
+    "bulk": {
+      "selected_one": "{{count}} student selected",
+      "selected_other": "{{count}} students selected",
+      "label": "Move selected to",
+      "apply": "Apply to selected"
+    },
+    "groupLabel": "Students from {{section}}",
+    "selectAll": "Select all in {{section}}",
+    "selectStudent": "Select {{name}}",
+    "destinationFor": "Destination for {{name}}",
+    "columns": {
+      "select": "Select",
+      "student": "Student",
+      "result": "Result",
+      "destination": "Moves to",
+      "note": "Why"
+    },
+    "result": {
+      "promoted": "Promoted",
+      "retained": "Retained",
+      "supplementary": "Resit",
+      "incomplete": "Incomplete",
+      "none": "No result"
+    },
+    "choice": {
+      "placeholder": "Choose…",
+      "graduate": "Graduate",
+      "skip": "Don't move"
+    },
+    "reason": {
+      "promoted": "Passed: next grade, same section",
+      "retained": "Retained: same grade",
+      "final_grade": "Passed the final grade",
+      "awaiting_resit": "Waiting for the resit result",
+      "incomplete_result": "Result is incomplete: choose a destination",
+      "no_result": "No final result: choose a destination",
+      "no_matching_section": "No section with this name next year: choose one",
+      "already_placed": "Already moved",
+      "already_graduated": "Already graduated",
+      "inactive_student": "Withdrawn or archived"
+    },
+    "needsDecision": "Choose a destination",
+    "doneGraduated": "Graduated",
+    "donePlaced": "Moved to {{section}}",
+    "unresolved_one": "{{count}} student still needs a destination.",
+    "unresolved_other": "{{count}} students still need a destination.",
+    "confirm": "Move students",
+    "confirmTitle": "Move students to {{target}}?",
+    "confirmDescription": "{{place}} will be placed in next year's sections, {{graduate}} will be marked as graduated and {{skip}} won't move. This year's classes, results and certificates stay as they are.",
+    "confirmAction": "Move students",
+    "done": {
+      "toast": "Students moved",
+      "failed": "Couldn't move the students",
+      "heading": "Done",
+      "movedUp_one": "{{count}} moved up a grade",
+      "movedUp_other": "{{count}} moved up a grade",
+      "retained_one": "{{count}} kept in the same grade",
+      "retained_other": "{{count}} kept in the same grade",
+      "moved_one": "{{count}} placed in another grade",
+      "moved_other": "{{count}} placed in another grade",
+      "graduated_one": "{{count}} graduated",
+      "graduated_other": "{{count}} graduated",
+      "awaitingResit_one": "{{count}} waiting for a resit",
+      "awaitingResit_other": "{{count}} waiting for a resit",
+      "skipped_one": "{{count}} not moved",
+      "skipped_other": "{{count}} not moved",
+      "alreadyDone_one": "{{count}} already done before",
+      "alreadyDone_other": "{{count}} already done before",
+      "failedCount_one": "{{count}} couldn't be moved (withdrawn, or the section is no longer there)",
+      "failedCount_other": "{{count}} couldn't be moved (withdrawn, or the section is no longer there)"
+    }
+  }
+}

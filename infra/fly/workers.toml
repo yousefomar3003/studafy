@@ -1,0 +1,55 @@
+# Studafy background workers on fly.io (production): queues only, no inbound traffic. Deploy from
+# the repo root:
+#   fly deploy . --config infra/fly/workers.toml --remote-only
+app = "studafy-core-workers"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../docker/workers.Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  SERVICE_NAME = "workers"
+  SENTRY_ENVIRONMENT = "production"
+  FRONTEND_URL = "https://app.studafy.com"
+  DATABASE_HOST = "aws-1-eu-central-1.pooler.supabase.com"
+  DATABASE_PORT = "6543"
+  DATABASE_NAME = "postgres"
+  # Required in production (src/env.ts). Supabase has no separate read replica here, so reads use
+  # the same transaction pooler as writes.
+  READ_DATABASE_HOST = "aws-1-eu-central-1.pooler.supabase.com"
+  READ_DATABASE_PORT = "6543"
+  READ_DATABASE_NAME = "postgres"
+  # Every pool verifies the pooler's certificate; Bun adds Supabase's root CA (written below) to
+  # its trust store.
+  DATABASE_SSL_MODE = "verify-full"
+  NODE_EXTRA_CA_CERTS = "/etc/studafy/supabase-ca.pem"
+  S3_REGION = "auto"
+  S3_APP_FILES_BUCKET = "studafy-prod-files"
+  # The AWS SDK's own credential chain reads the R2 keys from AWS_ACCESS_KEY_ID/SECRET (secrets).
+  AWS_REGION = "auto"
+  # clamd runs as its own app, reached over the organisation's private network (scanner.toml).
+  CLAMAV_HOST = "studafy-core-scanner.flycast"
+  CLAMAV_PORT = "3310"
+  AI_LLM_PROVIDER = "openai-compatible"
+  AI_LLM_BASE_URL = "https://api.together.xyz/v1"
+  # Resend sends only from a domain verified with it, and the verified one is send.studafy.com
+  # (resend._domainkey.send and the send.send return path in Vercel DNS). From studafy.com every
+  # email was refused. A sending subdomain also keeps bulk mail off the root domain's reputation.
+  EMAIL_FROM_ADDRESS = "no-reply@send.studafy.com"
+  EMAIL_FROM_NAME = "Studafy"
+  EMAIL_DRY_RUN = "false"
+  PUSH_DRY_RUN = "false"
+  # With the GOOGLE_PLAY_SERVICE_ACCOUNT secret, the account-deletion sweep turns off a deleted
+  # student's Google Play AI add-on renewal. Same package as api.toml.
+  GOOGLE_PLAY_PACKAGE_NAME = "com.studafy.studafy_mobile"
+
+# Supabase's root CA, from the base64 secret SUPABASE_CA_CERT_B64 (fly files from secrets are
+# base64), written before the process starts so NODE_EXTRA_CA_CERTS can load it.
+[[files]]
+  guest_path = "/etc/studafy/supabase-ca.pem"
+  secret_name = "SUPABASE_CA_CERT_B64"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "2gb"

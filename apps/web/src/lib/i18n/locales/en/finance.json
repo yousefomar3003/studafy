@@ -1,0 +1,721 @@
+{
+  "common": {
+    "previous": "Previous",
+    "next": "Next",
+    "loading": "Loading…",
+    "allStatuses": "All statuses",
+    "status": "Status",
+    "student": "Student",
+    "admissionNumber": "Student ID",
+    "total": "Total",
+    "outstanding": "Outstanding",
+    "amount": "Amount",
+    "date": "Date",
+    "category": "Category",
+    "currency": "Currency",
+    "description": "Description (optional)",
+    "invoice": "Invoice",
+    "method": "Method",
+    "type": "Type",
+    "vendor": "Vendor",
+    "issued": "Issued",
+    "due": "Due",
+    "erpnextDocument": "ERPNext document",
+    "openReceipt": "Open receipt",
+    "recordPayment": "Record payment",
+    "recordExpense": "Record expense",
+    "defaultsToToday": "Defaults to today.",
+    "checkFormAndRetry": "Please check the form and try again.",
+    "searchByStudentOrInvoice": "Search by student or invoice number",
+    "cancel": "Cancel",
+    "receiptError": "The receipt could not be opened. Try again.",
+    "family": "Family"
+  },
+  "docStatus": {
+    "draft": "Draft",
+    "submitted": "Submitted",
+    "cancelled": "Cancelled"
+  },
+  "paymentMode": {
+    "cash": "Cash",
+    "bank_transfer": "Bank transfer",
+    "card_external": "Card (external)",
+    "unknown": "Unknown mode"
+  },
+  "paymentStatus": {
+    "pending": "Pending",
+    "confirmed": "Confirmed",
+    "failed": "Failed",
+    "reversed": "Reversed"
+  },
+  "dashboard": {
+    "title": "Finance overview",
+    "intro": "Collections vs due this term, receivables aging, overdue installments, and recent payments.",
+    "readGuide": "Read the guide",
+    "nav": {
+      "fees": "Fee structure builder →",
+      "invoices": "Invoices →",
+      "payments": "Payments →",
+      "refunds": "Refunds →",
+      "scholarships": "Scholarships →",
+      "reports": "Reports →",
+      "expenses": "Expenses →",
+      "families": "Families →",
+      "tax": "Sales tax (VAT)"
+    }
+  },
+  "overdue": {
+    "title": "Overdue installments",
+    "intro": "Installments past due with a balance still owed, from the collections vs due report.",
+    "filteredTo": "Filtered to {{bucket}}.",
+    "clearFilter": "Clear filter",
+    "buckets": {
+      "range1": "0–30 days overdue",
+      "range2": "31–60 days overdue",
+      "range3": "61–90 days overdue",
+      "range4": "90+ days overdue"
+    },
+    "columns": {
+      "party": "Party",
+      "reference": "Reference",
+      "dueDate": "Due date",
+      "outstanding": "Outstanding"
+    },
+    "loadError": "Unable to load the collections report.",
+    "missingColumns": "The collections report didn't include the columns this needs.",
+    "empty": "Nothing is overdue."
+  },
+  "tiles": {
+    "aging": {
+      "title": "Aging buckets",
+      "error": "Unable to load the accounts receivable aging report.",
+      "empty": "No outstanding receivables to age.",
+      "viewOverdue": "View overdue installments →"
+    },
+    "collections": {
+      "title": "Collections vs due this term",
+      "error": "Unable to load the collections report.",
+      "empty": "No collections summary for this term yet.",
+      "invoiced": "Invoiced (open invoices)",
+      "collected": "Collected on open invoices",
+      "outstanding": "Outstanding receivables"
+    },
+    "overdue": {
+      "title": "Overdue installments",
+      "error": "Unable to load overdue installments.",
+      "missingColumns": "The collections report didn’t include the columns this needs.",
+      "empty": "Nothing is overdue.",
+      "dueLine_one": "Due {{date}} · {{count}}d overdue",
+      "dueLine_other": "Due {{date}} · {{count}}d overdue",
+      "viewAll": "View all overdue installments →"
+    },
+    "payments": {
+      "title": "Recent payments",
+      "error": "Unable to load recent payments.",
+      "empty": "No payments recorded yet.",
+      "viewAll": "View all payments →"
+    }
+  },
+  "invoices": {
+    "backToInvoices": "← Back to invoices",
+    "batchStatus": {
+      "pending": "Queued",
+      "processing": "Generating…",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "batchItemStatus": {
+      "pending": "Pending",
+      "succeeded": "Created",
+      "already_existed": "Already existed",
+      "failed": "Failed"
+    },
+    "list": {
+      "title": "Invoices",
+      "intro": "Search by student or invoice number, and filter by status.",
+      "generate": "Generate invoices",
+      "searchPlaceholder": "Search by student or invoice number…",
+      "invoiceNumber": "Invoice #",
+      "caption": "Invoices",
+      "loadError": "Unable to load invoices.",
+      "empty": "No invoices match this filter.",
+      "batchHistory": "Batch history",
+      "issuedFrom": "Issued from",
+      "issuedTo": "Issued to",
+      "dueFrom": "Due from",
+      "dueTo": "Due to"
+    },
+    "detail": {
+      "loadError": "Couldn't load this invoice. Please try again.",
+      "title": "Invoice {{number}}",
+      "print": "Print / Save as PDF",
+      "summary": "Invoice summary",
+      "lines": "Lines",
+      "linesLabel": "Invoice lines",
+      "noLines": "No line items on this invoice.",
+      "feeCategory": "Fee category",
+      "lineDescription": "Description",
+      "quantity": "Qty",
+      "cancelInvoice": "Cancel invoice",
+      "creditNote": "Credit note",
+      "writeOff": "Write off balance",
+      "taxRegistration": "Tax registration number",
+      "netTotal": "Net total",
+      "corrections": "Refunds and corrections"
+    },
+    "batch": {
+      "title": "Generate invoices",
+      "startError": "Couldn't start the batch",
+      "formLabel": "Batch generation form",
+      "feeStructure": "Fee structure",
+      "periodTitle": "Period title",
+      "periodPlaceholder": "e.g. Spring 2026 Term 1",
+      "dueDate": "Due date (optional)",
+      "target": "Target students",
+      "targetAll": "Every enrolled student in the school",
+      "targetClasses": "Students actively enrolled in specific classes",
+      "targetStudents": "Specific students",
+      "students": "Students to bill",
+      "classes": "Classes",
+      "loadingClasses": "Loading classes…",
+      "noClasses": "No active classes.",
+      "start": "Start batch",
+      "loadingStructures": "Loading fee structures…",
+      "noStructures": "No submitted fee structures",
+      "selectStructure": "Select a fee structure",
+      "result": "Result",
+      "progress": "Batch progress",
+      "progressStatus": "{{status}} — {{period}}",
+      "generationProgress": "Generation progress",
+      "startAnother": "Start another batch",
+      "longRunning": "This can take a while for large batches. You can leave this page — it keeps running.",
+      "filterByStatus": "Filter by status",
+      "resultsCaption": "Batch results",
+      "resultsError": "Unable to load results.",
+      "resultsEmpty": "No students match this filter.",
+      "unlinked": {
+        "title": "Some students in this batch have no family",
+        "summary_one": "{{count}} of the {{total}} students to bill has no guardian linked.",
+        "summary_other": "{{count}} of the {{total}} students to bill have no guardian linked.",
+        "why": "Their invoices get no sibling discount, appear in no family account or statement, and no parent can see or pay them in the app. You can still generate the batch and link guardians later.",
+        "listLabel": "Students with no guardian",
+        "more_one": "…and {{count}} more.",
+        "more_other": "…and {{count}} more.",
+        "review": "Review unlinked students",
+        "back": "Go back",
+        "confirm": "Generate anyway"
+      }
+    },
+    "history": {
+      "title": "Invoice batch history",
+      "intro": "Every batch run, newest first. Open one to see which students were billed and which failed.",
+      "caption": "Invoice batch runs",
+      "started": "Started",
+      "period": "Billing period",
+      "feeStructure": "Fee structure",
+      "results": "Results",
+      "counts": "{{succeeded}} of {{total}} billed · {{failed}} failed",
+      "loadError": "Unable to load batch runs.",
+      "empty": "No batch has been run yet.",
+      "detailTitle": "Invoice batch"
+    }
+  },
+  "payments": {
+    "list": {
+      "title": "Payments",
+      "intro": "Every payment recorded for this school, with receipts for confirmed ones.",
+      "receipt": "Receipt",
+      "caption": "Payments",
+      "loadError": "Unable to load payments.",
+      "empty": "No payments match this filter.",
+      "allMethods": "All methods",
+      "actions": "Actions",
+      "reverse": "Reverse",
+      "search": "Search",
+      "searchPlaceholder": "Payment or invoice number, student name or ID",
+      "dateFrom": "Paid from",
+      "dateTo": "Paid to",
+      "noConfirmedTotal": "No confirmed payments match these filters.",
+      "confirmedTotal_one": "Confirmed: {{amount}} {{currency}} from {{count}} payment",
+      "confirmedTotal_other": "Confirmed: {{amount}} {{currency}} from {{count}} payments"
+    },
+    "record": {
+      "back": "← Back to payments",
+      "title": "Record a payment",
+      "conflict": "This submission may have already been recorded with different details. Check the payment history before retrying.",
+      "error": "Couldn't record the payment",
+      "formLabel": "Payment form",
+      "exceeds": "This exceeds the invoice's outstanding balance of {{amount}} {{currency}}. ERPNext will reject an overpayment.",
+      "full": "Full payment — this invoice will be fully settled.",
+      "partial": "Partial payment — {{amount}} {{currency}} will remain outstanding.",
+      "method": "Payment method",
+      "referenceNumber": "Reference number",
+      "referenceRequired": "Required by ERPNext for bank transfer and card payments.",
+      "referenceOptional": "Bank or terminal reference, if any.",
+      "referenceDate": "Reference date (optional)",
+      "postingDate": "Posting date (optional)",
+      "remarks": "Remarks (optional)",
+      "recordedLabel": "Payment recorded",
+      "recordedHeadline": "Payment recorded — {{amount}} {{currency}}",
+      "awaiting": "Awaiting confirmation from ERPNext. The receipt will appear here once confirmed.",
+      "rejected": "ERPNext ultimately rejected this payment. Check the payment history for details.",
+      "recordAnother": "Record another payment",
+      "viewHistory": "View payment history"
+    },
+    "picker": {
+      "outstanding": "Outstanding: {{amount}} {{currency}}",
+      "change": "Change",
+      "helper": "Only submitted invoices with an outstanding balance can be paid.",
+      "resultOutstanding": "Outstanding {{amount}} {{currency}}",
+      "empty": "No payable invoices match."
+    }
+  },
+  "fees": {
+    "builder": {
+      "allYears": "All academic years",
+      "title": "Fee structures",
+      "intro": "Build fee structures, preview the invoice each one produces, and track versions.",
+      "newStructure": "New fee structure",
+      "academicYear": "Academic year",
+      "existing": "Existing fee structures",
+      "empty": "No fee structures yet for this filter.",
+      "caption": "Fee structures",
+      "colTitle": "Title",
+      "colProgram": "Program"
+    },
+    "form": {
+      "titleRequired": "Title is required",
+      "currencyInvalid": "Use a 3-letter ISO code, e.g. JOD",
+      "componentsRequired": "Add at least one fee component",
+      "required": "Required",
+      "amountInvalid": "Enter a non-negative amount",
+      "noYear": "No academic year",
+      "yearOption": "{{name}} ({{start}} – {{end}})",
+      "genericError": "Something went wrong. Try again.",
+      "saveError": "Couldn't save fee structure",
+      "updated": "Updated \"{{title}}\"",
+      "created": "Created \"{{title}}\"",
+      "editHeading": "Edit fee structure",
+      "newHeading": "New fee structure",
+      "readOnlyNote": "This structure is {{status}} and immutable in ERPNext — create a new fee structure instead of editing this one.",
+      "title": "Title",
+      "titlePlaceholder": "Grade 5 — 2025/2026",
+      "effective": "Effective {{start}} through {{end}}.",
+      "noEffectiveDates": "Fee structures don't carry their own effective dates — the academic year they belong to is what dates them.",
+      "program": "Program (ERPNext, grade/year grouping)",
+      "programPlaceholder": "Grade 5",
+      "programHelper": "The ERPNext Program document name this structure applies to.",
+      "students": "Student (optional)",
+      "studentsHelper": "Who this fee structure is for. Pick from the list or type a name; the title becomes the student's name. Leave empty for a whole grade or program.",
+      "saveStudents": "Save students",
+      "studentsSaved": "Students saved",
+      "studentsSaveError": "The structure was saved, but its students weren't",
+      "componentsNote": "Component breakdown isn't returned by the list API, so it starts empty here. Leave it empty to keep the existing components unchanged, or add the full replacement set below — saving replaces all components at once, it doesn't merge.",
+      "changeComponents": "Change components",
+      "saveChanges": "Save changes",
+      "create": "Create fee structure",
+      "billStudents": "Bill students with this structure"
+    },
+    "components": {
+      "legend": "Fee components",
+      "empty": "No components yet.",
+      "rowLegend": "Component {{number}}",
+      "feeCategory": "Fee category",
+      "feeCategoryPlaceholder": "Tuition",
+      "remove": "Remove",
+      "removeLabel": "Remove component {{number}}",
+      "add": "Add component",
+      "subtotal": "Subtotal: {{amount}} {{currency}}"
+    },
+    "preview": {
+      "title": "Invoice preview",
+      "note": "Estimated from the components below, computed the same way invoice generation computes a real one. ERPNext's own total is authoritative once an invoice actually exists.",
+      "empty": "Add at least one component to see a preview.",
+      "caption": "Estimated invoice line items",
+      "student": "Preview for a student (optional)",
+      "studentHelper": "Pick a student to see their invoice with their approved scholarships.",
+      "scholarships": "Scholarships ({{names}})",
+      "noScholarships": "No approved scholarships",
+      "studentTotal": "Total for {{name}}"
+    },
+    "plan": {
+      "title": "Payment plan",
+      "intro": "Split this structure into installments for the students it is for. ERPNext divides the total over the due dates.",
+      "notSubmitted": "Submit this structure in ERPNext before scheduling installments.",
+      "noStudents": "Save the students this structure is for first.",
+      "forStudents_one": "For {{count}} student.",
+      "forStudents_other": "For {{count}} students.",
+      "scheduleTypeLabel": "Schedule",
+      "scheduleType": {
+        "term_wise": "By term",
+        "monthly": "Monthly",
+        "quarterly": "Quarterly",
+        "yearly": "Yearly"
+      },
+      "dueDates": "Due dates",
+      "dueDate": "Due date {{number}}",
+      "addDate": "Add a due date",
+      "removeDate": "Remove",
+      "duplicateDate": "Each due date can be used once.",
+      "generate": "Create installments",
+      "error": "The installments could not be created.",
+      "createdToast_one": "{{count}} installment created",
+      "createdToast_other": "{{count}} installments created",
+      "created_one": "{{count}} installment created.",
+      "created_other": "{{count}} installments created.",
+      "viewOverdue": "View overdue installments"
+    }
+  },
+  "expenses": {
+    "back": "← Back to expenses",
+    "documentType": {
+      "purchase_invoice": "Purchase invoice",
+      "journal_entry": "Journal entry"
+    },
+    "categoryField": {
+      "default": "Category",
+      "purchase_invoice": "Expense account",
+      "journal_entry": "Account"
+    },
+    "vendorField": {
+      "default": "Vendor",
+      "purchase_invoice": "Supplier",
+      "journal_entry": "Reference"
+    },
+    "list": {
+      "title": "Expenses",
+      "intro": "Filter by category or month, then select an expense to view its receipt.",
+      "filterCategory": "Filter by category",
+      "filterCategoryPlaceholder": "Filter by category…",
+      "filterMonth": "Filter by month",
+      "caption": "Expenses",
+      "loadError": "Unable to load expenses.",
+      "empty": "No expenses match this filter.",
+      "summaryLabel": "Monthly summary",
+      "summaryHeading": "Monthly summary — {{month}}",
+      "summaryError": "Unable to load the monthly summary.",
+      "count": "Count",
+      "grandTotal": "Grand total",
+      "summaryEmpty": "No expenses recorded for this month."
+    },
+    "detail": {
+      "loadError": "Unable to load this expense.",
+      "label": "Expense detail",
+      "viewReceipt": "View receipt",
+      "noReceipt": "No receipt attached.",
+      "edit": "Edit expense",
+      "attachReceipt": "Attach a receipt",
+      "uploading": "Uploading…",
+      "attachedToast": "Receipt attached",
+      "attachError": "The receipt could not be attached."
+    },
+    "new": {
+      "title": "Record an expense",
+      "error": "Couldn't record the expense",
+      "selectType": "Select a document type",
+      "formLabel": "Expense form",
+      "documentType": "Document type",
+      "categoryHelper": "Must match an existing ERPNext document — ERPNext validates it on submit.",
+      "currencyInvalid": "Use a 3-letter currency code.",
+      "expenseDate": "Expense date (optional)",
+      "receipt": "Receipt (optional)",
+      "recordedLabel": "Expense recorded",
+      "recordedHeadline": "Expense recorded — {{amount}} {{currency}}",
+      "viewThisPrompt": "<expenseLink>View this expense</expenseLink> to open its receipt, if one was attached.",
+      "recordAnother": "Record another expense",
+      "viewAll": "View expenses"
+    },
+    "import": {
+      "title": "Import expenses",
+      "amountPositive": "Amount must be greater than zero."
+    },
+    "edit": {
+      "label": "Edit expense",
+      "save": "Save changes",
+      "savedToast": "Expense updated",
+      "error": "The expense could not be updated."
+    }
+  },
+  "invoiceStatus": {
+    "Paid": "Paid",
+    "Unpaid": "Unpaid",
+    "PartlyPaid": "Partly Paid",
+    "Overdue": "Overdue",
+    "Return": "Return",
+    "CreditNoteIssued": "Credit Note Issued",
+    "Cancelled": "Cancelled",
+    "Draft": "Draft"
+  },
+  "home": {
+    "stats": {
+      "collections": "Collections",
+      "thisTerm": "This term",
+      "overdueHint": "Past due with a balance owed"
+    },
+    "summary": {
+      "overdue_one": "{{count}} installment is overdue",
+      "overdue_other": "{{count}} installments are overdue"
+    }
+  },
+  "studentPicker": {
+    "placeholder": "Pick a student or type a name",
+    "helper": "Open the list and pick a student, or type a name to narrow it.",
+    "noMatches": "No students match.",
+    "change": "Change",
+    "selected": "{{count}} students selected",
+    "remove": "Remove {{name}}",
+    "loading": "Loading students…",
+    "showList": "Show students"
+  },
+  "families": {
+    "position": {
+      "eldest": "Eldest",
+      "second": "2nd child",
+      "third": "3rd child",
+      "nth": "Child {{position}}",
+      "notEnrolled": "Not enrolled"
+    },
+    "siblingDiscountBadge": "{{position}} · {{percentage}}% sibling discount",
+    "sendError": "The message could not be sent. Try again.",
+    "list": {
+      "title": "Families",
+      "intro": "Every household with its guardians, children and what it owes across all of them. Open a family to take one payment for several children, or to send a reminder or statement.",
+      "caption": "Families",
+      "empty": "No families match these filters.",
+      "loadError": "Families could not be loaded."
+    },
+    "columns": {
+      "family": "Family",
+      "children": "Children",
+      "outstanding": "Outstanding",
+      "overdue": "Overdue",
+      "lastPayment": "Last payment",
+      "lastReminder": "Last reminder"
+    },
+    "filters": {
+      "search": "Search",
+      "searchPlaceholder": "Family, child or guardian",
+      "balance": "Balance",
+      "allBalances": "All families",
+      "outstanding": "Owes money",
+      "overdue": "Has overdue fees",
+      "sort": "Sort by",
+      "sortName": "Name",
+      "sortOutstanding": "Largest balance first",
+      "siblingsOnly": "Only families with 2 or more children"
+    },
+    "bulk": {
+      "button": "Remind all overdue families",
+      "confirmTitle": "Remind every family with overdue fees?",
+      "confirmBody": "Each family's guardians get a notification with the amount overdue. Families reminded in the last 24 hours are skipped.",
+      "confirm": "Send reminders",
+      "sentTitle_one": "Reminder sent to {{count}} family",
+      "sentTitle_other": "Reminders sent to {{count}} families",
+      "sentDetail": "{{guardians}} guardians notified. {{skipped}} families were already reminded today.",
+      "remaining": "Families still due a reminder: {{remaining}}. Send again to reach them.",
+      "error": "Reminders could not be sent. Try again."
+    },
+    "detail": {
+      "loadError": "This family could not be loaded.",
+      "householdError": "The children's invoices could not be loaded.",
+      "primary": "Primary contact",
+      "recordPayment": "Record family payment",
+      "sendReminder": "Send overdue reminder",
+      "sendStatement": "Send statement",
+      "lastReminded": "Last reminded on {{date}}.",
+      "acrossChildren_one": "Across {{count}} child",
+      "acrossChildren_other": "Across {{count}} children",
+      "overdueInvoices_one": "{{count}} invoice past due",
+      "overdueInvoices_other": "{{count}} invoices past due",
+      "billed": "Billed",
+      "lastPaid": "Last payment on {{date}}",
+      "noPayments": "No payments yet.",
+      "childrenHeading": "Children",
+      "messagesHeading": "Messages sent to guardians",
+      "siblingDiscount": "{{percentage}}% sibling discount on new invoices",
+      "overdueTag": "overdue",
+      "invoicesCaption": "Invoices for {{name}}",
+      "paymentsCaption": "Payments for {{name}}",
+      "noInvoices": "No invoices yet.",
+      "reminderSent_one": "Reminder sent to {{count}} guardian",
+      "reminderSent_other": "Reminder sent to {{count}} guardians",
+      "statementSent_one": "Statement sent to {{count}} guardian",
+      "statementSent_other": "Statement sent to {{count}} guardians",
+      "suppressed_one": "{{count}} guardian has turned these notifications off.",
+      "suppressed_other": "{{count}} guardians have turned these notifications off.",
+      "notSent": {
+        "nothing_overdue": "Nothing is overdue, so no reminder was sent.",
+        "recently_reminded": "This family was already reminded in the last 24 hours.",
+        "no_guardians": "This family has no active guardian to notify."
+      }
+    },
+    "messages": {
+      "kind": "Message",
+      "recipient": "Guardian",
+      "sentBy": "Sent by",
+      "automatic": "Automatic",
+      "delivered": "Delivered",
+      "turnedOff": "Turned off by guardian",
+      "caption": "Fee messages sent to this family",
+      "empty": "No fee messages have been sent yet.",
+      "kinds": {
+        "invoice_issued": "New invoice",
+        "payment_received": "Payment received",
+        "payment_reminder": "Overdue reminder",
+        "statement": "Statement"
+      }
+    },
+    "payment": {
+      "title": "Family payment — {{family}}",
+      "backToFamily": "Back to the family",
+      "nothingOwed": "This family owes nothing right now.",
+      "formLabel": "Family payment",
+      "amount": "Amount paid",
+      "owes": "The family owes {{amount}} {{currency}}.",
+      "payAll": "Pay the full balance",
+      "manual": "Choose how much goes to each invoice",
+      "manualHint": "Enter each invoice's share. The shares must add up to the amount paid.",
+      "autoHint": "The amount pays the oldest-due invoice first, then the next, across all children.",
+      "splitCaption": "How the payment is split",
+      "share": "This payment",
+      "shareFor": "Amount for {{invoice}}",
+      "exceeds": "The family owes {{amount}} {{currency}}; the amount cannot be more than that.",
+      "invalidShare": "Each share must be a positive amount.",
+      "shareTooLarge": "A share is more than its invoice owes.",
+      "unbalanced": "The shares add up to {{allocated}} {{currency}}, but the amount paid is {{amount}} {{currency}}.",
+      "submit": "Record payment",
+      "resultLabel": "Payment result",
+      "detail": "Detail",
+      "receiptsLater": "Each payment is confirmed by ERPNext within a few seconds; receipts open from here once it is.",
+      "retry": "Retry the invoices that failed",
+      "outcome": {
+        "completed": "Payment recorded against every invoice.",
+        "partial": "Some invoices were paid and some were not. Retry to pay only the rest.",
+        "failed": "The payment could not be recorded. Nothing was charged; try again."
+      },
+      "results": {
+        "recorded": "Recorded",
+        "replayed": "Already recorded",
+        "failed": "Failed",
+        "confirmed": "Confirmed",
+        "awaiting": "Awaiting ERPNext"
+      }
+    },
+    "unlinked": {
+      "summary": "Not in any family — enrolled students with no guardian: {{students}} · parents with no children: {{parents}}.",
+      "review": "Review and link them"
+    },
+    "manage": {
+      "title": "Manage household",
+      "intro": "Rename the family, choose who invoices are addressed to, or move a child's guardian to another household.",
+      "name": "Family name",
+      "primary": "Primary guardian",
+      "save": "Save",
+      "savedToast": "Household updated",
+      "saveError": "The household could not be updated.",
+      "links": "Guardians and children",
+      "noLinks": "No one is linked to this family any more.",
+      "delete": "Delete family",
+      "deletedToast": "Family deleted",
+      "deleteError": "The family could not be deleted.",
+      "link": "{{guardian}} → {{child}}",
+      "move": "Move",
+      "remove": "Remove",
+      "moveTo": "Move {{link}} to the family named",
+      "movedToast": "Moved to the other family",
+      "moveError": "The link could not be moved.",
+      "removedToast": "Link removed",
+      "removeError": "The link could not be removed."
+    }
+  },
+  "unlinked": {
+    "title": "Unlinked students and parents",
+    "intro": "People no family reaches. A student with no guardian gets no sibling discount, appears in no family account or statement, and no parent can see or pay their invoices. A parent with no children sees no fees and gets no fee notices.",
+    "backToFamilies": "← Families",
+    "askAdmin": "Ask a school admin to link them",
+    "loadError": "Unable to load this list.",
+    "columns": {
+      "fix": "Fix",
+      "parent": "Parent"
+    },
+    "students": {
+      "title": "Enrolled students with no guardian",
+      "intro": "Link a guardian from the student's Guardians tab.",
+      "search": "Search students",
+      "caption": "Enrolled students with no guardian",
+      "empty": "Every enrolled student has a guardian.",
+      "addGuardian": "Add a guardian"
+    },
+    "parents": {
+      "title": "Parents with no children",
+      "intro": "Link the students this parent is a guardian of.",
+      "search": "Search parents",
+      "caption": "Parents with no children",
+      "empty": "Every parent account is linked to a child.",
+      "linkChildren": "Link children to {{name}}"
+    },
+    "linkChildren": {
+      "title": "Link children to {{name}}",
+      "description": "Each child joins this parent's household.",
+      "legend": "Children",
+      "submit": "Link children",
+      "linkedToast_one": "Linked {{count}} child to {{name}}",
+      "linkedToast_other": "Linked {{count}} children to {{name}}",
+      "error": "Couldn't link every child",
+      "partial_one": "{{count}} child was linked before the error.",
+      "partial_other": "{{count}} children were linked before the error."
+    }
+  },
+  "studentAccount": {
+    "loadError": "Unable to load this student's account.",
+    "owed": "Owed",
+    "noFamily": "No family linked",
+    "kind": "Type",
+    "invoices": "Invoices",
+    "noInvoices": "No invoices yet.",
+    "installments": "Installment plan",
+    "noInstallments": "No installments scheduled.",
+    "installmentsError": "Unable to load installments.",
+    "payments": "Payments",
+    "noPayments": "No payments yet.",
+    "corrections": "Refunds and corrections",
+    "noCorrections": "None requested.",
+    "correctionsError": "Unable to load refunds and corrections.",
+    "installmentStatus": {
+      "pending": "Pending",
+      "partially_paid": "Partly paid",
+      "paid": "Paid",
+      "overdue": "Overdue"
+    },
+    "status": {
+      "applicant": "Applicant",
+      "enrolled": "Enrolled",
+      "suspended": "Suspended",
+      "graduated": "Graduated",
+      "withdrawn": "Withdrawn",
+      "archived": "Archived"
+    }
+  },
+  "taxSettings": {
+    "title": "Sales tax (VAT)",
+    "intro": "Whether invoices carry VAT, at what rate, and which fees are exempt. Off unless the school turns it on.",
+    "readOnly": "Only a school admin can change these settings.",
+    "enabled": "Charge tax on new invoices",
+    "name": "Tax name on invoices",
+    "rate": "Rate",
+    "rateInvalid": "Enter a rate between 0 and 100.",
+    "account": "ERPNext tax account",
+    "accountHelp": "The account the tax posts to, e.g. VAT 5% - SCH.",
+    "registration": "Tax registration number",
+    "registrationHelp": "Printed on invoices and receipts.",
+    "inclusive": "Fee amounts already include tax",
+    "exempt": "Exempt fee categories",
+    "exemptHelp": "One fee category per line (as named in ERPNext). These lines are not taxed.",
+    "needRateAndAccount": "Turning tax on needs a rate above 0 and the ERPNext tax account.",
+    "notRetroactive": "Changes apply to invoices generated from now on. Issued invoices are not changed; correct one with a credit note.",
+    "save": "Save tax settings",
+    "savedToast": "Tax settings saved",
+    "saveError": "The tax settings could not be saved.",
+    "loadError": "Unable to load the tax settings."
+  }
+}

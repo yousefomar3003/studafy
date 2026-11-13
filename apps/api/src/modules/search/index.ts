@@ -1,0 +1,1 @@
+export { searchRoutes } from "./routes";

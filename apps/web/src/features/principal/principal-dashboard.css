@@ -1,0 +1,97 @@
+/**
+ * Principal dashboard page layout and tile-specific content. Shared tile chrome
+ * (`dashboard-tile__*`) lives in `apps/web/src/components/dashboard-tile.css`, imported by
+ * `PrincipalDashboardPage.tsx` alongside this file.
+ */
+
+.principal-dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-16);
+}
+
+/* Attendance heat map */
+
+.principal-heat-map {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  list-style: none;
+  margin: var(--space-8) 0;
+  padding: 0;
+}
+
+.principal-heat-map__cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 64px;
+  padding: var(--space-8) var(--space-12);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+}
+
+.principal-heat-map__cell[data-tone="success"] {
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.principal-heat-map__cell[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.principal-heat-map__cell[data-tone="danger"] {
+  background-color: var(--color-danger-subtle-bg);
+  color: var(--color-danger-subtle-foreground);
+}
+
+.principal-heat-map__code {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.principal-heat-map__percent {
+  font-size: var(--font-size-sm);
+}
+
+/* Open discipline incidents */
+
+.principal-incident-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  list-style: none;
+  margin: var(--space-8) 0;
+  padding: 0;
+}
+
+.principal-incident-list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.principal-incident-list__title {
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Recent announcements */
+
+.principal-announcements-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  list-style: none;
+  margin: var(--space-8) 0;
+  padding: 0;
+}
+
+.principal-announcements-list__title {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}

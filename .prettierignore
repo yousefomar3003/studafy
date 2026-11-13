@@ -1,0 +1,12 @@
+dist
+.turbo
+node_modules
+apps/mobile
+packages/ui/storybook-static
+graphify-out
+bun.lock
+*.tsbuildinfo
+# Committed codegen output — raw, deterministic openapi-typescript, owned by the generator not Prettier.
+packages/api-client/src/generated-types.ts
+.claude
+.serena

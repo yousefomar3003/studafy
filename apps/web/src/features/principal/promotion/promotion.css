@@ -1,0 +1,46 @@
+/**
+ * Move students to next year: the bulk bar above the section tables, the outcome summary, and the
+ * footer with the confirm button.
+ */
+
+.promotion__notice,
+.promotion__summary {
+  margin-block: var(--space-16);
+  padding: var(--space-12) var(--space-16);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+}
+
+.promotion__summary h2 {
+  margin-block-start: 0;
+}
+
+.promotion__counts {
+  font-weight: 600;
+}
+
+.promotion__bulk {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-12);
+  margin-block: var(--space-16);
+}
+
+.promotion__muted {
+  color: var(--color-muted-foreground);
+}
+
+.promotion__footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-12);
+  margin-block: var(--space-24);
+}
+
+.promotion__footer p {
+  margin: 0;
+}

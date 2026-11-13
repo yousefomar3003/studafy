@@ -1,0 +1,66 @@
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart';
+
+import 'crash_reporter.dart';
+import 'pii_scrubber.dart';
+
+/// Wires the app to Firebase Crashlytics.
+///
+/// Crashlytics has no `beforeSend`/`beforeBreadcrumb` hook of its own — unlike
+/// [SentryCrashReporter], everything it receives here is already scrubbed by whichever caller
+/// is feeding it (normally [CompositeCrashReporter]), plus a defensive [PiiScrubber] pass on the
+/// free-text fields this class controls directly ([addBreadcrumb]'s message, [recordError]'s
+/// reason).
+class FirebaseCrashlyticsReporter implements CrashReporter {
+  FirebaseCrashlyticsReporter({this._scrubber = const PiiScrubber()});
+
+  final PiiScrubber _scrubber;
+
+  // Crashlytics is gated on Firebase being initialized, which happens post-first-frame (deferred
+  // init, see app_bootstrap.dart). Until then `FirebaseCrashlytics.instance` throws, and the first
+  // frame's `identifyUser` (monitoring_providers.dart) would otherwise trip on it. Every call is
+  // a no-op until [initialize] has set this.
+  bool _initialized = false;
+
+  FirebaseCrashlytics get _crashlytics => FirebaseCrashlytics.instance;
+
+  @override
+  Future<void> initialize() async {
+    await _crashlytics.setCrashlyticsCollectionEnabled(true);
+    _initialized = true;
+  }
+
+  @override
+  void identifyUser(String? userId) {
+    if (!_initialized) return;
+    _crashlytics.setUserIdentifier(userId ?? '');
+  }
+
+  @override
+  void addBreadcrumb(String message, {String category = 'app', Map<String, Object?>? data}) {
+    if (!_initialized) return;
+    _crashlytics.log('[$category] ${_scrubber.scrubText(message)}');
+  }
+
+  @override
+  Future<void> recordError(
+    Object error,
+    StackTrace stackTrace, {
+    bool fatal = false,
+    String? reason,
+  }) {
+    if (!_initialized) return Future.value();
+    return _crashlytics.recordError(
+      error,
+      stackTrace,
+      reason: reason == null ? null : _scrubber.scrubText(reason),
+      fatal: fatal,
+    );
+  }
+
+  @override
+  Future<void> recordFlutterError(FlutterErrorDetails details) {
+    if (!_initialized) return Future.value();
+    return _crashlytics.recordFlutterFatalError(details);
+  }
+}

@@ -1,0 +1,663 @@
+import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
+import { PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
+import { Queue } from "bullmq";
+
+import { withTenantTx } from "../../../db/tenant-tx";
+import { auditAction } from "../../../middleware/auditEmitter";
+import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
+import { openApiValidationHook } from "../../../openapi/hook";
+import { standardResponses } from "../../../openapi/responses";
+import {
+  bulkUpdateGradesBodySchema,
+  classIdQuerySchema,
+  createAssessmentBodySchema,
+  decideBodySchema,
+  gradeSchema,
+  gradeSubmissionSchema,
+  gradebookEntryListSchema,
+  gradebookEntryQuerySchema,
+  gradebookIdParamSchema,
+  gradebookSchema,
+  gradeRevisionSchema,
+  requestRevisionBodySchema,
+  revisionIdParamSchema,
+  submissionIdParamSchema,
+  submitBodySchema,
+  unlockBodySchema,
+} from "../config/schemas";
+import { enqueueNotificationDispatch } from "../enqueue-dispatch";
+import {
+  assertCanManageGradebook,
+  bulkUpdateGrades,
+  createAssessment,
+  decideSubmission,
+  ensureDraftSubmissions,
+  getGradebookByClassId,
+  getGradebookById,
+  getSubmissionsWithGrades,
+  submitSubmission,
+  unlockSubmission,
+} from "../grade-entry-service";
+import {
+  getLatestRevisionsForGradebook,
+  requestRevision,
+  withdrawRevision,
+} from "../grade-revision-service";
+
+import type { Database } from "../../../db/client";
+import type { AppEnv } from "../../../middleware/requestId";
+import type { RedisClient } from "../../../redis";
+import type { GradebookRow } from "../config/gradebook-config-service";
+import type { GradeRow, GradeSubmissionWithGrades } from "../grade-entry-service";
+import type { GradeRevisionRow } from "../grade-revision-service";
+import type { Context } from "hono";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function tenantFrom(c: Context<AppEnv>): {
+  schoolId: string;
+  userId: string;
+  requestId?: string;
+} {
+  const auth = requireAuth(c);
+  return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
+}
+
+function toGradebookResponse(row: GradebookRow): {
+  id: string;
+  class_id: string;
+  status: "draft" | "active" | "archived";
+  grading_scheme_id: string | null;
+  created_at: string;
+  updated_at: string;
+} {
+  return {
+    id: row.id,
+    class_id: row.class_id,
+    status: row.status as "draft" | "active" | "archived",
+    grading_scheme_id: row.grading_scheme_id,
+    created_at: row.created_at.toISOString(),
+    updated_at: row.updated_at.toISOString(),
+  };
+}
+
+function toGradeResponse(row: GradeRow): {
+  id: string;
+  grade_submission_id: string;
+  score: number | null;
+  max_score: number;
+  weight: number;
+  label: string;
+  created_at: string;
+  updated_at: string;
+} {
+  return {
+    id: row.id,
+    grade_submission_id: row.grade_submission_id,
+    score: row.score !== null ? Number(row.score) : null,
+    max_score: Number(row.max_score),
+    weight: Number(row.weight),
+    label: row.label,
+    created_at: row.created_at.toISOString(),
+    updated_at: row.updated_at.toISOString(),
+  };
+}
+
+function toRevisionResponse(row: GradeRevisionRow): {
+  id: string;
+  grade_submission_id: string;
+  status: GradeRevisionRow["status"];
+  reason: string;
+  changes: GradeRevisionRow["changes"];
+  rejection_reason: string | null;
+  requested_by_user_id: string;
+  requested_at: string;
+  decided_by_user_id: string | null;
+  decided_at: string | null;
+} {
+  return {
+    id: row.id,
+    grade_submission_id: row.grade_submission_id,
+    status: row.status,
+    reason: row.reason,
+    changes: row.changes,
+    rejection_reason: row.rejection_reason,
+    requested_by_user_id: row.requested_by_user_id,
+    requested_at: row.requested_at.toISOString(),
+    decided_by_user_id: row.decided_by_user_id,
+    decided_at: row.decided_at?.toISOString() ?? null,
+  };
+}
+
+function toSubmissionResponse(
+  row: GradeSubmissionWithGrades & { grades: GradeRow[] },
+  latestRevision: GradeRevisionRow | null = null,
+): {
+  id: string;
+  gradebook_id: string;
+  student_id: string;
+  status: "draft" | "submitted" | "approved" | "rejected" | "published";
+  submitted_by_user_id: string | null;
+  decided_by_user_id: string | null;
+  rejection_reason: string | null;
+  submitted_at: string | null;
+  decided_at: string | null;
+  created_at: string;
+  updated_at: string;
+  grades: ReturnType<typeof toGradeResponse>[];
+  latest_revision: ReturnType<typeof toRevisionResponse> | null;
+} {
+  return {
+    id: row.id,
+    gradebook_id: row.gradebook_id,
+    student_id: row.student_id,
+    status: row.status as "draft" | "submitted" | "approved" | "rejected" | "published",
+    submitted_by_user_id: row.submitted_by_user_id,
+    decided_by_user_id: row.decided_by_user_id,
+    rejection_reason: row.rejection_reason,
+    submitted_at: row.submitted_at?.toISOString() ?? null,
+    decided_at: row.decided_at?.toISOString() ?? null,
+    created_at: row.created_at.toISOString(),
+    updated_at: row.updated_at.toISOString(),
+    grades: row.grades.map(toGradeResponse),
+    latest_revision: latestRevision ? toRevisionResponse(latestRevision) : null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Route definitions
+// ---------------------------------------------------------------------------
+
+const resolveGradebookRoute = createRoute({
+  method: "get",
+  path: "/api/grades/gradebooks",
+  tags: ["Grade Entry"],
+  operationId: "resolveGradebook",
+  summary: "Resolve the gradebook for a class",
+  description:
+    "Returns the class's gradebook, creating an empty draft one on first access. " +
+    "Every other grade-entry route is keyed by `gradebookId`; this is how a caller that only " +
+    "knows the class obtains it.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    query: classIdQuerySchema,
+  },
+  responses: standardResponses(
+    { 200: { description: "The class's gradebook.", schema: gradebookSchema } },
+    [400, 401, 403, 404, 500],
+  ),
+});
+
+const createAssessmentRoute = createRoute({
+  method: "post",
+  path: "/api/grades/gradebooks/{gradebookId}/assessments",
+  tags: ["Grade Entry"],
+  operationId: "createAssessment",
+  summary: "Add an assessment to the gradebook",
+  description:
+    "Writes one ungraded grade record (a `label` + `max_score` + `weight`) into every enrolled " +
+    "student's draft submission, seeding those drafts first if needed. Idempotent per " +
+    "(student, label); students whose submission is already past draft are skipped. Returns the " +
+    "refreshed entry grid.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: createAssessmentBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    {
+      200: { description: "The refreshed gradebook entry grid.", schema: gradebookEntryListSchema },
+    },
+    [400, 401, 403, 404, 500],
+  ),
+});
+
+const getGradebookEntryRoute = createRoute({
+  method: "get",
+  path: "/api/grades/gradebooks/{gradebookId}/entry",
+  tags: ["Grade Entry"],
+  operationId: "getGradebookEntry",
+  summary: "Get gradebook entry grid",
+  description:
+    "Returns all grade submissions for a gradebook, each populated with their grade records. " +
+    "Auto-creates draft submissions for enrolled students who do not yet have one. " +
+    "Optionally filter by submission status.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema,
+    query: gradebookEntryQuerySchema,
+  },
+  responses: standardResponses(
+    { 200: { description: "Gradebook entry grid.", schema: gradebookEntryListSchema } },
+    [400, 401, 403, 404, 500],
+  ),
+});
+
+const bulkUpdateGradesRoute = createRoute({
+  method: "patch",
+  path: "/api/grades/gradebooks/{gradebookId}/grades",
+  tags: ["Grade Entry"],
+  operationId: "bulkUpdateGrades",
+  summary: "Bulk update grade scores",
+  description:
+    "Atomically update up to 100 grade scores in a single transaction. " +
+    "Each entry must carry the `updated_at` token from the client's last read. " +
+    "If the row has been modified since then, the entire batch is rejected with 409. " +
+    "Scores are validated against each grade record's max_score.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema,
+    body: {
+      required: true,
+      content: { "application/json": { schema: bulkUpdateGradesBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    {
+      200: {
+        description: "Updated grade records in input order.",
+        schema: z.array(gradeSchema),
+      },
+    },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const submitSubmissionRoute = createRoute({
+  method: "patch",
+  path: "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+  tags: ["Grade Workflow"],
+  operationId: "submitGradeSubmission",
+  summary: "Submit draft grade for approval",
+  description:
+    "Submit a draft grade submission for administrative review. " +
+    "Only the assigned teacher may perform this action. " +
+    "Emits a grades.submitted domain event.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema.merge(submissionIdParamSchema),
+    body: {
+      required: true,
+      content: { "application/json": { schema: submitBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "The updated submission.", schema: gradeSubmissionSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const decideSubmissionRoute = createRoute({
+  method: "patch",
+  path: "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+  tags: ["Grade Workflow"],
+  operationId: "decideGradeSubmission",
+  summary: "Approve or reject a submitted grade",
+  description:
+    "Administrative decision on a submitted grade. " +
+    "Approve auto-publishes the submission and emits a grades.published event. " +
+    "Reject requires a rejection reason and returns the submission to rejected status. " +
+    "Only school administrators may perform this action.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema.merge(submissionIdParamSchema),
+    body: {
+      required: true,
+      content: { "application/json": { schema: decideBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "The updated submission.", schema: gradeSubmissionSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const unlockSubmissionRoute = createRoute({
+  method: "patch",
+  path: "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+  tags: ["Grade Workflow"],
+  operationId: "unlockGradeSubmission",
+  summary: "Unlock a rejected submission for editing",
+  description:
+    "Return a rejected submission to draft so the teacher can edit and resubmit. " +
+    "Only the assigned teacher may perform this action.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema.merge(submissionIdParamSchema),
+    body: {
+      required: true,
+      content: { "application/json": { schema: unlockBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 200: { description: "The updated submission.", schema: gradeSubmissionSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const requestRevisionRoute = createRoute({
+  method: "post",
+  path: "/api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/revisions",
+  tags: ["Grade Workflow"],
+  operationId: "requestGradeRevision",
+  summary: "Request a correction to published grades",
+  description:
+    "Files corrected scores for a published submission, with a reason. The published grades are " +
+    "unchanged — students and parents keep seeing them — until a school admin or principal " +
+    "approves the revision from the approvals queue. Only the assigned teacher may file, and at " +
+    "most one revision per submission may be pending (409 otherwise).",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema.merge(submissionIdParamSchema),
+    body: {
+      required: true,
+      content: { "application/json": { schema: requestRevisionBodySchema } },
+    },
+  },
+  responses: standardResponses(
+    { 201: { description: "The pending revision.", schema: gradeRevisionSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const withdrawRevisionRoute = createRoute({
+  method: "patch",
+  path: "/api/grades/gradebooks/{gradebookId}/revisions/{revisionId}/withdraw",
+  tags: ["Grade Workflow"],
+  operationId: "withdrawGradeRevision",
+  summary: "Withdraw a pending grade revision",
+  description:
+    "Takes back a pending correction before it is decided, so the teacher can file a new one. " +
+    "Only the assigned teacher may withdraw.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    params: gradebookIdParamSchema.merge(revisionIdParamSchema),
+  },
+  responses: standardResponses(
+    { 200: { description: "The withdrawn revision.", schema: gradeRevisionSchema } },
+    [401, 403, 404, 409, 500],
+  ),
+});
+
+// ---------------------------------------------------------------------------
+// Route factory
+// ---------------------------------------------------------------------------
+
+export function gradeEntryRoutes(
+  database: Database,
+  redis: RedisClient | null = null,
+): OpenAPIHono<AppEnv> {
+  const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
+
+  // Nullable for the same reason every other producer in this app is: REDIS_URL is optional, and
+  // dev, test and the OpenAPI generator all run without it. Without Redis the API still publishes
+  // grades perfectly well; it simply notifies nobody.
+  const notificationsQueue = redis
+    ? new Queue(QUEUE_NAMES.NOTIFICATIONS, { connection: redis as never })
+    : null;
+
+  routes.use("/api/grades/gradebooks", requirePermission(PERMISSIONS.GRADE_READ));
+
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/assessments",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use("/api/grades/gradebooks/:gradebookId/assessments", auditAction("insert", "grades"));
+
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/entry",
+    requirePermission(PERMISSIONS.GRADE_READ),
+  );
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/grades",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use("/api/grades/gradebooks/:gradebookId/grades", auditAction("update", "grades"));
+
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/submit",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/submit",
+    auditAction("update", "grade_submissions"),
+  );
+
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/decide",
+    requirePermission(PERMISSIONS.GRADE_OVERRIDE),
+  );
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/decide",
+    auditAction("update", "grade_submissions"),
+  );
+
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/unlock",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/unlock",
+    auditAction("update", "grade_submissions"),
+  );
+
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/revisions",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/submissions/:submissionId/revisions",
+    auditAction("insert", "grade_revisions"),
+  );
+
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/revisions/:revisionId/withdraw",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+  );
+  routes.use(
+    "/api/grades/gradebooks/:gradebookId/revisions/:revisionId/withdraw",
+    auditAction("update", "grade_revisions"),
+  );
+
+  // --- Resolve the gradebook for a class ---
+
+  routes.openapi(resolveGradebookRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { classId } = c.req.valid("query");
+
+    const gradebook = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      await assertCanManageGradebook(tx, classId);
+      return getGradebookByClassId(tx, auth.schoolId, classId);
+    });
+
+    return c.json(toGradebookResponse(gradebook), 200);
+  });
+
+  // --- Add an assessment to the gradebook ---
+
+  routes.openapi(createAssessmentRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const { submissions, revisions } = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return {
+        submissions: await createAssessment(tx, auth.schoolId, gradebookId, gradebook.class_id, {
+          label: body.label,
+          maxScore: body.max_score,
+          weight: body.weight ?? 1,
+        }),
+        revisions: await getLatestRevisionsForGradebook(tx, auth.schoolId, gradebookId),
+      };
+    });
+
+    return c.json(
+      {
+        submissions: submissions.map((s) => toSubmissionResponse(s, revisions.get(s.id) ?? null)),
+      },
+      200,
+    );
+  });
+
+  // --- Get gradebook entry grid ---
+
+  routes.openapi(getGradebookEntryRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId } = c.req.valid("param");
+    const { status } = c.req.valid("query");
+
+    const { submissions, revisions } = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      // Seed a draft submission per enrolled student so the grid always reflects the full
+      // roster — the entry screen shows every student even before the first assessment exists,
+      // and a `status` filter still narrows the result.
+      await ensureDraftSubmissions(tx, auth.schoolId, gradebookId, gradebook.class_id);
+      return {
+        submissions: await getSubmissionsWithGrades(tx, auth.schoolId, gradebookId, status),
+        revisions: await getLatestRevisionsForGradebook(tx, auth.schoolId, gradebookId),
+      };
+    });
+
+    return c.json(
+      {
+        submissions: submissions.map((s) => toSubmissionResponse(s, revisions.get(s.id) ?? null)),
+      },
+      200,
+    );
+  });
+
+  // --- Bulk update grades ---
+
+  routes.openapi(bulkUpdateGradesRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const grades = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return bulkUpdateGrades(tx, auth.schoolId, gradebookId, body.grades);
+    });
+
+    return c.json(grades.map(toGradeResponse), 200);
+  });
+
+  // --- Submit draft for approval ---
+
+  routes.openapi(submitSubmissionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId, submissionId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const submission = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return submitSubmission(
+        tx,
+        auth.schoolId,
+        gradebookId,
+        submissionId,
+        body.updated_at,
+        auth.userId,
+      );
+    });
+
+    return c.json(toSubmissionResponse({ ...submission, grades: [] }), 200);
+  });
+
+  // --- Approve or reject ---
+
+  routes.openapi(decideSubmissionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId, submissionId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const submission = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return decideSubmission(
+        tx,
+        auth.schoolId,
+        submissionId,
+        body.action,
+        body.updated_at,
+        auth.userId,
+        body.rejection_reason,
+      );
+    });
+
+    // ST-139: approve chains straight through to published, so this is the moment the student and
+    // their parents become notifiable.
+    //
+    // Enqueued after the transaction commits, not inside it — a job referencing rows that were
+    // rolled back is worse than a job that was never queued. The cost is a genuine gap: a crash
+    // between COMMIT and this line loses the notification for that publication, and only a replay
+    // recovers it. Same trade, for the same reason, as ../attendance/enqueue-alerts.ts.
+    if (submission.status === "published") {
+      await enqueueNotificationDispatch(notificationsQueue, c, {
+        schoolId: auth.schoolId,
+        submissionId,
+      });
+    }
+
+    return c.json(toSubmissionResponse({ ...submission, grades: [] }), 200);
+  });
+
+  // --- Unlock rejected submission ---
+
+  routes.openapi(unlockSubmissionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId, submissionId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const submission = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return unlockSubmission(tx, auth.schoolId, gradebookId, submissionId, body.updated_at);
+    });
+
+    return c.json(toSubmissionResponse({ ...submission, grades: [] }), 200);
+  });
+
+  // --- Request a correction to published grades ---
+
+  routes.openapi(requestRevisionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId, submissionId } = c.req.valid("param");
+    const body = c.req.valid("json");
+
+    const revision = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return requestRevision(tx, auth.schoolId, gradebookId, submissionId, auth.userId, body);
+    });
+
+    return c.json(toRevisionResponse(revision), 201);
+  });
+
+  // --- Withdraw a pending revision ---
+
+  routes.openapi(withdrawRevisionRoute, async (c) => {
+    const auth = requireAuth(c);
+    const { gradebookId, revisionId } = c.req.valid("param");
+
+    const revision = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const gradebook = await getGradebookById(tx, auth.schoolId, gradebookId);
+      await assertCanManageGradebook(tx, gradebook.class_id);
+      return withdrawRevision(tx, auth.schoolId, gradebookId, revisionId);
+    });
+
+    return c.json(toRevisionResponse(revision), 200);
+  });
+
+  return routes;
+}

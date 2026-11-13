@@ -1,0 +1,45 @@
+/**
+ * School years & terms page: the year name that selects whose terms are listed, and each period's
+ * status label (the active one stands out; closed and archived ones recede).
+ */
+
+.years-page__pick {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.years-page__pick[aria-pressed="true"] {
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.years-page__status {
+  display: inline-block;
+  padding: 0 var(--space-8);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.years-page__status[data-status="active"] {
+  border-color: transparent;
+  background-color: var(--color-success-subtle-bg);
+  color: var(--color-success-subtle-foreground);
+}
+
+.years-page__status[data-status="planned"] {
+  border-color: transparent;
+  background-color: var(--color-accent-subtle-bg);
+  color: var(--color-accent-subtle-foreground);
+}
+
+.years-page__status[data-status="closed"],
+.years-page__status[data-status="archived"] {
+  color: var(--color-muted-foreground);
+}

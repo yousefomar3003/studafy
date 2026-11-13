@@ -1,0 +1,136 @@
+name: Containers
+
+on:
+  pull_request:
+    paths:
+      [
+        "apps/**",
+        "packages/**",
+        "db/**",
+        "infra/docker/**",
+        "bun.lock",
+        ".github/workflows/containers.yml",
+      ]
+  push:
+    branches: [dev]
+    paths:
+      [
+        "apps/**",
+        "packages/**",
+        "db/**",
+        "infra/docker/**",
+        "bun.lock",
+        ".github/workflows/containers.yml",
+      ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # trivy_exit_code gates whether a CRITICAL image finding fails the job. The app-owned
+          # images (built from slim bases we control) stay strict at "1". erpnext rides the large,
+          # unmodified third-party frappe/erpnext base (see infra/docker/erpnext.Dockerfile) whose
+          # CVEs the team does not patch directly and whose vuln set churns with trivy's DB, so its
+          # scan is report-only ("0") -- findings still surface in the logs/SBOM but don't block.
+          - service: api
+            dockerfile: infra/docker/api.Dockerfile
+            max_mb: 150
+            trivy_exit_code: "1"
+          - service: realtime
+            dockerfile: infra/docker/realtime.Dockerfile
+            max_mb: 200
+            trivy_exit_code: "1"
+          - service: workers
+            dockerfile: infra/docker/workers.Dockerfile
+            max_mb: 250
+            trivy_exit_code: "1"
+          - service: migrations
+            dockerfile: infra/docker/migrations.Dockerfile
+            max_mb: 100
+            trivy_exit_code: "1"
+          - service: web
+            dockerfile: infra/docker/web.Dockerfile
+            max_mb: 120
+            trivy_exit_code: "1"
+          # The workers' malware-scanning sidecar: our clamd settings layered on the unmodified
+          # upstream clamav/clamav image, so -- like erpnext below -- its scan is report-only. The
+          # budget leaves room for the bundled signature database, which CI's overlay2 store
+          # measures larger than a local Docker Desktop build does.
+          - service: clamav
+            dockerfile: infra/docker/clamav.Dockerfile
+            max_mb: 600
+            trivy_exit_code: "0"
+          # 3072 (not 2500) because the real image, as CI's classic overlay2 Docker measures it,
+          # runs ~2683MB: full frappe/erpnext bench + the education app. Local Docker Desktop
+          # builds under-report this (containerd snapshotter image store dedups/sizes differently
+          # from the overlay2 driver ubuntu-latest uses), so don't trust a local number here --
+          # check the "image size:" line this step echoes on an actual CI run.
+          - service: erpnext
+            dockerfile: infra/docker/erpnext.Dockerfile
+            max_mb: 3072
+            trivy_exit_code: "0"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # erpnext's image (~2.7 GB) exhausts ubuntu-latest's default free disk when trivy exports
+      # it for analysis.  Pre-installed toolchains (Android SDK, .NET, GHC, Boost) are irrelevant
+      # to a Docker build and together account for ~25 GB — removing them gives trivy enough room.
+      - name: Free disk space
+        if: matrix.service == 'erpnext'
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android /usr/local/share/boost
+          docker system prune -af
+          df -h
+      # Authenticated Docker Hub pulls are rate-limited far less aggressively and avoid the
+      # "context deadline exceeded" timeouts that unauthenticated pulls hit on GH Actions runners.
+      # Conditional so the job doesn't fail when the secrets haven't been configured yet.
+      - uses: docker/login-action@v3
+        if: ${{ env.DOCKERHUB_USERNAME != '' }}
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # Retry the build because Docker Hub pulls are flaky on GH Actions runners — network
+      # timeouts on oven/bun or nginx base images are common and transient.
+      - name: Build image
+        run: |
+          for attempt in 1 2 3; do
+            echo "--- Build attempt $attempt/3 ---"
+            if docker build -f ${{ matrix.dockerfile }} -t studafy/${{ matrix.service }}:ci .; then
+              exit 0
+            fi
+            echo "Build failed, retrying in 15s..."
+            sleep 15
+          done
+          echo "Build failed after 3 attempts" >&2
+          exit 1
+      - uses: anchore/sbom-action@v0
+        with:
+          image: studafy/${{ matrix.service }}:ci
+          artifact-name: ${{ matrix.service }}.spdx.json
+          format: spdx-json
+      - name: Enforce image size budget
+        run: |
+          bytes=$(docker image inspect studafy/${{ matrix.service }}:ci --format '{{.Size}}')
+          max=$(( ${{ matrix.max_mb }} * 1024 * 1024 ))
+          echo "image size: $((bytes / 1024 / 1024))MB ($bytes bytes) -- budget: ${{ matrix.max_mb }}MB ($max bytes)"
+          test "$bytes" -le "$max"
+      - uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          version: v0.72.0
+          image-ref: studafy/${{ matrix.service }}:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: ${{ matrix.trivy_exit_code }}
+          trivyignores: .trivyignore
+        env:
+          # trivy's default vuln-DB mirror (mirror.gcr.io) intermittently black-holes connections
+          # from GH Actions runners (SYN never completes, so the download hangs ~7m then fails).
+          # ghcr.io shares GitHub's infrastructure with the runner and is reliably reachable.
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+          TRIVY_JAVA_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-java-db:1

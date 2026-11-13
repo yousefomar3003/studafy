@@ -1,0 +1,165 @@
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
+import { describe, expect, test } from "bun:test";
+
+import { i18next } from "../../../lib/i18n/i18next";
+
+import {
+  assignColumn,
+  assignRecordColumn,
+  confirmBlocker,
+  isSameMapping,
+  mappedHeaders,
+  mappingFitsHeaders,
+  matchConfidence,
+  missingRequiredFields,
+  parentPairWarning,
+  withPartialSuggestions,
+} from "./columnMapping";
+
+// The helpers take the caller's `t`; the default-language instance renders the English catalog.
+const t = i18next.getFixedT("en");
+
+const COMPLETE = {
+  admission_number: "Student ID",
+  email: "Email",
+  first_name: "First Name",
+  last_name: "Surname",
+};
+
+describe("matchConfidence", () => {
+  test("rates a header by how its name relates to the field", () => {
+    expect(matchConfidence("first_name", "First Name")).toBe("exact");
+    expect(matchConfidence("last_name", "Surname")).toBe("alias");
+    expect(matchConfidence("last_name", "Student Last Name")).toBe("partial");
+    expect(matchConfidence("email", "Column 4")).toBe("manual");
+  });
+
+  test("does not treat short aliases as partial matches inside longer headers", () => {
+    // "last" and "dob" are aliases, but too generic to find inside another word.
+    expect(matchConfidence("last_name", "Last Login")).toBe("manual");
+    expect(matchConfidence("date_of_birth", "Adobe ID")).toBe("manual");
+  });
+});
+
+describe("withPartialSuggestions", () => {
+  test("fills unmapped fields from unclaimed headers and keeps the server's mapping", () => {
+    const headers = ["Student ID", "Student First Name", "Student Last Name", "Email"];
+    const suggested = withPartialSuggestions(
+      { admission_number: "Student ID", email: "Email" },
+      headers,
+    );
+    expect(suggested).toEqual({
+      admission_number: "Student ID",
+      email: "Email",
+      first_name: "Student First Name",
+      last_name: "Student Last Name",
+    });
+  });
+
+  test("never suggests a header the mapping already uses", () => {
+    const suggested = withPartialSuggestions({ email: "Parent Email Contact" }, [
+      "Parent Email Contact",
+    ]);
+    expect(suggested).toEqual({ email: "Parent Email Contact" });
+  });
+});
+
+describe("assignColumn", () => {
+  test("moves a header that another field was using", () => {
+    expect(assignColumn(COMPLETE, "middle_name", "Surname")).toEqual({
+      admission_number: "Student ID",
+      email: "Email",
+      first_name: "First Name",
+      middle_name: "Surname",
+    });
+  });
+
+  test("unmaps a field", () => {
+    expect(assignColumn(COMPLETE, "email", undefined).email).toBeUndefined();
+  });
+});
+
+describe("missingRequiredFields / isSameMapping / mappingFitsHeaders", () => {
+  test("lists required fields without a column", () => {
+    expect(missingRequiredFields({ admission_number: "ID" })).toEqual(["first_name", "last_name"]);
+    expect(missingRequiredFields(COMPLETE)).toEqual([]);
+  });
+
+  test("compares mappings field by field", () => {
+    expect(isSameMapping(COMPLETE, { ...COMPLETE })).toBe(true);
+    expect(isSameMapping(COMPLETE, { ...COMPLETE, status: "Status" })).toBe(false);
+  });
+
+  test("checks a saved mapping's headers against the file the way the server does", () => {
+    const headers = ["student id", "EMAIL", "First name", "surname"];
+    expect(mappingFitsHeaders(COMPLETE, headers)).toBe(true);
+    expect(mappingFitsHeaders({ ...COMPLETE, status: "Status" }, headers)).toBe(false);
+  });
+});
+
+describe("parentPairWarning", () => {
+  test("warns when a parent's name or email and its relationship are not mapped together", () => {
+    expect(parentPairWarning(COMPLETE, t)).toBeNull();
+    const phone = { parent_phone: "p" };
+    expect(
+      parentPairWarning({ ...phone, parent_email: "a", parent_relationship: "b" }, t),
+    ).toBeNull();
+    expect(
+      parentPairWarning({ ...phone, parent_name: "a", parent_relationship: "b" }, t),
+    ).toBeNull();
+    expect(parentPairWarning({ parent_email: "a" }, t)).toContain("Parent 1 relationship");
+    expect(parentPairWarning({ parent2_name: "a" }, t)).toContain("Parent 2 relationship");
+  });
+
+  test("warns when a parent is mapped without a phone column", () => {
+    expect(parentPairWarning({ parent_name: "a", parent_relationship: "b" }, t)).toBe(
+      "Every parent needs a phone number: map a column to Parent 1 phone. Rows that give a parent without a phone are rejected.",
+    );
+    expect(
+      parentPairWarning(
+        {
+          parent_name: "a",
+          parent_relationship: "b",
+          parent_phone: "c",
+          parent2_name: "d",
+          parent2_relationship: "e",
+        },
+        t,
+      ),
+    ).toContain("Parent 2 phone");
+  });
+});
+
+describe("confirmBlocker", () => {
+  test("blocks on missing required fields first, naming them", () => {
+    expect(confirmBlocker({ admission_number: "Student ID" }, {}, 0, t)).toBe(
+      "Map a column to every required field before confirming. Missing: First name, Last name.",
+    );
+  });
+
+  test("blocks on unapplied changes, then on no valid rows", () => {
+    expect(confirmBlocker(COMPLETE, {}, 5, t)).toContain("Apply it");
+    expect(confirmBlocker(COMPLETE, COMPLETE, 0, t)).toContain("No rows passed validation");
+    expect(confirmBlocker(COMPLETE, COMPLETE, 5, t)).toBeNull();
+  });
+});
+
+describe("student record template columns in the mapping", () => {
+  test("a column moves between a fixed field and a template field, never feeding both", () => {
+    const mapping = assignRecordColumn({ email: "Contact" }, "field-1", "Contact");
+    expect(mapping).toEqual({ records: { "field-1": "Contact" } });
+    expect(assignColumn(mapping, "email", "Contact")).toEqual({ email: "Contact" });
+    expect(assignRecordColumn(mapping, "field-1", undefined)).toEqual({});
+  });
+
+  test("comparison and fit include template columns", () => {
+    const a = { email: "Contact", records: { "field-1": "National ID" } };
+    expect(isSameMapping(a, { email: "Contact" })).toBe(false);
+    expect(isSameMapping(a, { email: "Contact", records: { "field-1": "National ID" } })).toBe(
+      true,
+    );
+    expect(mappingFitsHeaders(a, ["contact", "national id"])).toBe(true);
+    expect(mappingFitsHeaders(a, ["contact"])).toBe(false);
+    expect(mappedHeaders(a)).toEqual(["Contact", "National ID"]);
+  });
+});

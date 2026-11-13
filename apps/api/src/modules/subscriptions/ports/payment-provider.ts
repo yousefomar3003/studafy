@@ -1,0 +1,276 @@
+import { CodedHttpException } from "../../../coded-http-exception";
+
+import type { ErrorCode } from "@studafy/constants";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+
+/**
+ * A failure an adapter reports through the port.
+ *
+ * A coded HTTP exception, so the error handler answers it with its own status and code: a 400 for
+ * input the provider cannot take, a 501 for an operation the provider has no equivalent for, a 502
+ * when the provider itself failed. Adapters map provider-side failures to 502 rather than passing
+ * the provider's status through -- the provider answering 401 means our key is wrong, not the
+ * caller's session.
+ */
+export class PaymentProviderError extends CodedHttpException {
+  constructor(status: ContentfulStatusCode, code: ErrorCode, message: string) {
+    super(status, code, message);
+    this.name = "PaymentProviderError";
+  }
+}
+
+export interface CreateCustomerInput {
+  name: string;
+  email: string;
+  metadata: Record<string, string>;
+}
+
+export interface CreateCustomerResult {
+  providerCustomerId: string;
+}
+
+export interface CreateCheckoutSessionInput {
+  customerId: string;
+  /** The provider's price id (Stripe), or `app.plan_prices.id` for a provider with no catalog (Tap). */
+  priceId: string;
+  /**
+   * The unit price in minor units and its ISO 4217 code, as `app.plan_prices` records them.
+   *
+   * Required because Tap has no price catalog: a Tap charge carries its amount, so without these it
+   * cannot be created at all. Stripe charges the catalog price behind `priceId`, which price sync
+   * created from these same columns, and does not read them.
+   */
+  amountMinor: number;
+  currency: string;
+  quantity?: number;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}
+
+export interface CreateCheckoutSessionResult {
+  url: string;
+  sessionId: string;
+}
+
+/**
+ * A one-time hosted payment, not a subscription: online fee collection (ST-298).
+ *
+ * The amount is charged exactly as given. `metadata` must identify the local payment record so the
+ * provider's webhook can settle it; nothing in it may be a subscription `billing_reason`, or the
+ * billing state machine would read a fee as a subscription payment.
+ */
+export interface CreatePaymentSessionInput {
+  customerId: string;
+  amountMinor: number;
+  currency: string;
+  description: string;
+  successUrl: string;
+  cancelUrl: string;
+  metadata: Record<string, string>;
+}
+
+export interface CreatePaymentSessionResult {
+  url: string;
+  sessionId: string;
+}
+
+export interface CreateBillingPortalSessionInput {
+  customerId: string;
+  returnUrl: string;
+}
+
+export interface CreateBillingPortalSessionResult {
+  url: string;
+}
+
+export interface SyncProductInput {
+  localId: string;
+  name: string;
+  description?: string;
+  active: boolean;
+}
+
+export interface SyncProductResult {
+  providerProductId: string;
+}
+
+export interface SyncPriceInput {
+  localId: string;
+  productId: string;
+  amountMinor: number;
+  currency: string;
+  interval: "month" | "year";
+  active: boolean;
+}
+
+export interface SyncPriceResult {
+  providerPriceId: string;
+}
+
+/**
+ * One verified inbound webhook, normalized off the provider's envelope.
+ *
+ * `id` and `effectiveAt` are envelope fields, not payload fields, and both are load-bearing:
+ *
+ * - `id` is the idempotency key the processor claims on (app.billing_events.provider_event_id).
+ *   It must be the *event's* identity, never the identity of the object the event describes --
+ *   several events can concern one subscription, and keying on the object id would make the second
+ *   of them look like a replay of the first and silently drop it.
+ * - `effectiveAt` is when the provider says the change happened. Delivery order is not guaranteed,
+ *   so every ordering decision is made on this and never on receipt time.
+ *
+ * `data` stays the provider's own object, unmodelled: what a `customer.subscription.updated`
+ * carries is the provider's business, and this port does not pretend to normalize it.
+ */
+export interface ParsedWebhookEvent {
+  id: string;
+  type: string;
+  effectiveAt: Date;
+  /** False for provider test-mode traffic. Recorded so a test event is never mistaken for real billing. */
+  livemode: boolean;
+  data: Record<string, unknown>;
+}
+
+export interface LookupProductResult {
+  id: string;
+  name: string;
+}
+
+export interface LookupPriceResult {
+  id: string;
+  productId: string;
+  amountMinor: number;
+  currency: string;
+  interval: string;
+}
+
+export interface PauseSubscriptionInput {
+  providerSubscriptionId: string;
+}
+
+export interface ResumeSubscriptionInput {
+  providerSubscriptionId: string;
+}
+
+export interface ScheduleCancellationInput {
+  providerSubscriptionId: string;
+}
+
+export interface ReverseCancellationInput {
+  providerSubscriptionId: string;
+}
+
+/**
+ * Move a subscription to another catalog price (a storage add-on changing tier or interval).
+ *
+ * `chargeNow`: invoice the prorated difference straight away and apply the change only if that
+ * invoice is paid -- for a move to something bigger, so a larger cap is never handed out against a
+ * declined card. Otherwise the proration is credited or charged on the next regular invoice.
+ */
+export interface ChangeSubscriptionPriceInput {
+  providerSubscriptionId: string;
+  /** The provider's price id (Stripe `price_...`). */
+  priceId: string;
+  chargeNow: boolean;
+  /** Replaces the subscription's metadata keys given here (the new local `price_id`, say). */
+  metadata: Record<string, string>;
+}
+
+export interface ChangeSubscriptionPriceResult {
+  /** False when the provider is holding the change until a payment succeeds: nothing changed yet. */
+  applied: boolean;
+}
+
+export interface ListInvoicesInput {
+  customerId: string;
+  limit?: number;
+  startingAfter?: string;
+}
+
+export interface InvoiceSummary {
+  id: string;
+  status: string | null;
+  amountDue: number;
+  amountPaid: number;
+  currency: string;
+  created: Date;
+  periodStart: Date;
+  periodEnd: Date;
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+}
+
+export interface ListInvoicesResult {
+  invoices: InvoiceSummary[];
+  hasMore: boolean;
+}
+
+/**
+ * Return money for one payment, in full or in part.
+ *
+ * `invoiceId` is the payment exactly as `listInvoices` names it -- a Stripe invoice, or a Tap
+ * charge -- so a caller never has to know which provider-side object actually holds the money.
+ * `idempotencyKey` must be stable for one refund attempt: a retried call with the same key must not
+ * refund twice where the provider supports it.
+ */
+export interface RefundInput {
+  invoiceId: string;
+  amountMinor: number;
+  currency: string;
+  idempotencyKey: string;
+  metadata: Record<string, string>;
+}
+
+export interface RefundResult {
+  providerRefundId: string;
+  /** `pending` when the provider accepted the refund but settles it asynchronously. */
+  status: "succeeded" | "pending";
+}
+
+export interface PaymentProviderPort {
+  createCustomer(input: CreateCustomerInput): Promise<CreateCustomerResult>;
+  createCheckoutSession(input: CreateCheckoutSessionInput): Promise<CreateCheckoutSessionResult>;
+  /** A one-time hosted payment (fees). See `CreatePaymentSessionInput`. */
+  createPaymentSession(input: CreatePaymentSessionInput): Promise<CreatePaymentSessionResult>;
+  createBillingPortalSession(
+    input: CreateBillingPortalSessionInput,
+  ): Promise<CreateBillingPortalSessionResult>;
+  syncProduct(input: SyncProductInput): Promise<SyncProductResult>;
+  syncPrice(input: SyncPriceInput): Promise<SyncPriceResult>;
+  parseWebhook(payload: Buffer, signature: string): Promise<ParsedWebhookEvent>;
+  lookupProductById(providerProductId: string): Promise<LookupProductResult | null>;
+  lookupPriceById(providerPriceId: string): Promise<LookupPriceResult | null>;
+  /**
+   * Stop billing a subscription without canceling it. Used to pause a student's AI subscription
+   * when their school is suspended; must be resumable via `resumeSubscription`. Idempotent: pausing
+   * an already-paused subscription is a no-op update, not an error.
+   */
+  pauseSubscription(input: PauseSubscriptionInput): Promise<void>;
+  /**
+   * Resume billing a subscription paused via `pauseSubscription`. Idempotent for the same reason.
+   */
+  resumeSubscription(input: ResumeSubscriptionInput): Promise<void>;
+  /**
+   * Schedule a subscription to cancel at the end of its current billing period. Does not end access
+   * immediately and does not itself move local subscription status -- the eventual
+   * `customer.subscription.deleted` webhook is what does that, through the existing state machine.
+   */
+  scheduleCancellation(input: ScheduleCancellationInput): Promise<void>;
+  /** Undo a pending end-of-period cancellation. No-op if the subscription was not scheduled to cancel. */
+  reverseCancellation(input: ReverseCancellationInput): Promise<void>;
+  /**
+   * Move a subscription to another price, prorated. Optional: only a provider that keeps the
+   * subscription itself (Stripe) can; Tap has no subscription object to change.
+   */
+  changeSubscriptionPrice?(
+    input: ChangeSubscriptionPriceInput,
+  ): Promise<ChangeSubscriptionPriceResult>;
+  /** List invoices billed to a customer, newest first. */
+  listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult>;
+  /**
+   * Refund one paid invoice (or Tap charge), fully or partially. A provider that cannot refund
+   * throws a 501 `PAYMENT_PROVIDER_OPERATION_UNSUPPORTED`; a provider-side failure is a 502.
+   */
+  refund(input: RefundInput): Promise<RefundResult>;
+}

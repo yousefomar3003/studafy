@@ -1,0 +1,367 @@
+/**
+ * Marketing site chrome and palette: the header, the footer, and the tokens every marketing page
+ * shares (marketing-pages.css).
+ *
+ * The site has its own look, set here rather than in @studafy/ui, so the app is untouched: warm
+ * paper, the logo's navy as the one strong colour, a single amber for numerals, and hairline rules
+ * instead of shadows. Nothing floats, blurs, glows or moves on its own; hover states change colour
+ * only. The app's own tokens are re-pointed inside `.marketing-shell`, so @studafy/ui buttons and
+ * inputs on these pages pick up the same palette. Light only, like the rest of the web app
+ * (index.html pins data-theme="light").
+ */
+
+.marketing-shell {
+  --mk-paper: #fbfaf7;
+  --mk-paper-alt: #f3f1ea;
+  --mk-ink: #161551;
+  --mk-text: #1d1e2c;
+  --mk-muted: #555768;
+  --mk-rule: #dcd8cd;
+  --mk-mark: #a14a07;
+  --mk-band: #161551;
+  --mk-band-text: #f4f3ff;
+  --mk-band-muted: #c9c8ec;
+  --mk-max: 1180px;
+  --mk-gutter: var(--space-24);
+
+  --color-background: var(--mk-paper);
+  --color-surface: var(--mk-paper-alt);
+  --color-foreground: var(--mk-text);
+  --color-muted-foreground: var(--mk-muted);
+  --color-border: var(--mk-rule);
+  --color-accent: var(--mk-ink);
+  --color-accent-foreground: #ffffff;
+  --color-accent-subtle-bg: #e7e6f4;
+  --color-accent-subtle-foreground: var(--mk-ink);
+
+  position: relative;
+  block-size: 100%;
+  background-color: var(--mk-paper);
+  color: var(--mk-text);
+}
+
+/* The header is laid over the scroll region rather than above it, so the page scrolls *behind* the
+ * shrunken bar. The region's top padding keeps the page clear of the header at rest, and its
+ * scrollbar track is inset by the same 64px, so the bar still starts below the header
+ * (Chromium/Safari; Firefox has no track pseudo-element and shows a full bar). */
+.marketing-shell__scroll {
+  block-size: 100%;
+  padding-top: 64px;
+  overflow-y: auto;
+  /* Anchor jumps (`/about#contact`) land below the header instead of under it. */
+  scroll-padding-top: calc(64px + var(--space-24));
+}
+
+.marketing-shell__scroll::-webkit-scrollbar-track {
+  margin-block-start: 64px;
+}
+
+.marketing-container {
+  max-width: var(--mk-max);
+  margin: 0 auto;
+  padding-inline: var(--mk-gutter);
+}
+
+/* Header ---------------------------------------------------------------------------------------- */
+
+/* The dark bar from before: global.css gives `.marketing-header` the shared dark-header tokens, so
+ * every rule here reads `--color-*`, not the page's `--mk-*` palette. At the top of the page it is a
+ * full-width bar; once the page scrolls it shrinks into a narrower rounded bar (useScrolled), and
+ * grows back at the top. */
+.marketing-header {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  z-index: var(--z-sticky);
+  background-color: var(--color-background);
+  border-bottom: 1px solid var(--color-border);
+  transition:
+    background-color var(--duration-base) ease,
+    border-color var(--duration-base) ease;
+}
+
+.marketing-header__row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+  max-width: 1200px;
+  block-size: 64px;
+  margin: 0 auto;
+  padding: 0 var(--space-24);
+  border-radius: var(--radius-full);
+  transition:
+    max-width var(--duration-base) ease,
+    transform var(--duration-base) ease,
+    box-shadow var(--duration-base) ease,
+    background-color var(--duration-base) ease;
+}
+
+/* Scrolled: the full-width bar shrinks into a rounded bar. The header box keeps its 64px height
+ * (the bar is only moved down), so content under the header never shifts. */
+.marketing-header[data-scrolled="true"] {
+  background-color: transparent;
+  border-bottom-color: transparent;
+}
+
+.marketing-header[data-scrolled="true"] .marketing-header__row {
+  max-width: min(1100px, calc(100% - 2 * var(--space-16)));
+  transform: translateY(var(--space-12));
+  /* Frosted glass: the page shows through, blurred so the nav stays legible over any content. */
+  background-color: color-mix(in srgb, var(--color-background) 72%, transparent);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  backdrop-filter: saturate(160%) blur(16px);
+  box-shadow: var(--elevation-4);
+}
+
+.marketing-header[data-scrolled="true"] .marketing-nav__actions .sf-button {
+  border-radius: var(--radius-full);
+}
+
+.marketing-header__brand {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+}
+
+.marketing-header__brand:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.marketing-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 40px;
+  block-size: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-foreground);
+  cursor: pointer;
+}
+
+.marketing-icon-button:hover {
+  background-color: var(--color-surface);
+}
+
+.marketing-icon-button:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Must follow .marketing-icon-button: same specificity, and that rule's display would win. */
+.marketing-header__nav-toggle {
+  display: none;
+  margin-inline-start: auto;
+}
+
+.marketing-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-32);
+  margin-inline-start: auto;
+}
+
+.marketing-nav__list {
+  display: flex;
+  align-items: center;
+  gap: var(--space-24);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A thin rule grows under a link on hover and stays under the current page. */
+.marketing-nav__link {
+  position: relative;
+  padding: var(--space-8) 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition: color var(--duration-base) ease;
+}
+
+.marketing-nav__link::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 2px;
+  block-size: 2px;
+  background-color: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--duration-slow) var(--easing-emphasized);
+}
+
+:dir(rtl) .marketing-nav__link::after {
+  transform-origin: right;
+}
+
+.marketing-nav__link:hover {
+  color: var(--color-foreground);
+}
+
+.marketing-nav__link:hover::after,
+.marketing-nav__link--active::after {
+  transform: scaleX(1);
+}
+
+.marketing-nav__link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.marketing-nav__link--active {
+  color: var(--color-accent);
+}
+
+.marketing-nav__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* Footer ---------------------------------------------------------------------------------------- */
+
+.marketing-footer {
+  border-top: 1px solid var(--mk-rule);
+  background-color: var(--mk-paper);
+  padding: var(--space-64) var(--mk-gutter) var(--space-32);
+}
+
+.marketing-footer__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--space-48);
+  max-width: calc(var(--mk-max) - 2 * var(--mk-gutter));
+  margin: 0 auto;
+}
+
+.marketing-footer__brand-name {
+  color: var(--mk-ink);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+}
+
+.marketing-footer__tagline {
+  max-inline-size: 22rem;
+  margin: var(--space-8) 0 0;
+  color: var(--mk-muted);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}
+
+.marketing-footer__nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-32);
+}
+
+.marketing-footer__heading {
+  margin: 0 0 var(--space-12);
+  color: var(--mk-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.marketing-footer__column ul {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.marketing-footer__column a {
+  color: var(--mk-muted);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+}
+
+.marketing-footer__column a:hover {
+  color: var(--mk-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.marketing-footer__column a:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.marketing-footer__copyright {
+  max-width: calc(var(--mk-max) - 2 * var(--mk-gutter));
+  margin: var(--space-48) auto 0;
+  padding-top: var(--space-24);
+  border-top: 1px solid var(--mk-rule);
+  color: var(--mk-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* Narrow: the nav folds into a panel under the header row, opened by the menu button. */
+@media (max-width: 860px) {
+  .marketing-shell {
+    --mk-gutter: var(--space-16);
+  }
+
+  .marketing-header__nav-toggle {
+    display: inline-flex;
+  }
+
+  .marketing-nav {
+    position: absolute;
+    inset-block-start: 64px;
+    inset-inline: 0;
+    display: none;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-16);
+    block-size: auto;
+    margin-inline-start: 0;
+    padding: var(--space-8) var(--mk-gutter) var(--space-24);
+    background-color: var(--color-background);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .marketing-nav[data-open="true"] {
+    display: flex;
+  }
+
+  /* Shrunken: the moved row is the panel's containing block, so it drops just below the bar at the
+   * bar's width; round it to match. */
+  .marketing-header[data-scrolled="true"] .marketing-nav {
+    inset-block-start: calc(64px + var(--space-8));
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--elevation-4);
+  }
+
+  .marketing-nav__list {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .marketing-nav__link {
+    flex: 1;
+    padding-block: var(--space-12);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .marketing-nav__link::after {
+    display: none;
+  }
+
+  .marketing-nav__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .marketing-footer__row,
+  .marketing-footer__nav {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-32);
+  }
+}

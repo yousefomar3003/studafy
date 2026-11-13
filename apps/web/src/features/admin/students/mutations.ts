@@ -1,0 +1,339 @@
+import { ApiError } from "@studafy/api-client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+
+import { api } from "../../../lib/api";
+import { uploadFileToPresignedUrl } from "../../../lib/upload";
+import { invalidateLinkViews } from "../people-links/queries";
+
+import {
+  STUDENT_IMPORT_MAPPINGS_KEY,
+  STUDENTS_LIST_KEY,
+  studentGuardiansQueryKey,
+  studentQueryKey,
+  uploadStudentImportCsv,
+} from "./queries";
+
+import type { ColumnMapping } from "./columnMapping";
+import type { GuardianContact, StudentImport, StudentProfile, UploadProgress } from "./queries";
+import type { CreateStudentValues, LinkGuardianValues } from "./schema";
+import type { components } from "@studafy/api-client";
+import type { QueryClient, QueryKey } from "@tanstack/react-query";
+
+interface StudentsListResult {
+  students: StudentProfile[];
+  next_cursor: string | null;
+}
+
+type Snapshot = [QueryKey, StudentsListResult | undefined][];
+
+/**
+ * Optimistic-update plumbing shared by the list-affecting mutations below, mirroring the users
+ * feature's `snapshotUserLists`/`restoreUserLists`/`patchUserInLists` (see `admin/users/mutations.ts`)
+ * — a student can appear on any cached filter/cursor combination, so these operate on every query
+ * keyed under `STUDENTS_LIST_KEY` at once, not just the page on screen.
+ */
+function snapshotStudentLists(queryClient: QueryClient): Snapshot {
+  return queryClient.getQueriesData<StudentsListResult>({ queryKey: STUDENTS_LIST_KEY });
+}
+
+function restoreStudentLists(queryClient: QueryClient, snapshot: Snapshot): void {
+  for (const [key, data] of snapshot) {
+    queryClient.setQueryData(key, data);
+  }
+}
+
+function patchStudentInLists(
+  queryClient: QueryClient,
+  studentId: string,
+  patch: (student: StudentProfile) => StudentProfile,
+): void {
+  queryClient.setQueriesData<StudentsListResult>({ queryKey: STUDENTS_LIST_KEY }, (data) => {
+    if (!data) return data;
+    return {
+      ...data,
+      students: data.students.map((student) =>
+        student.id === studentId ? patch(student) : student,
+      ),
+    };
+  });
+}
+
+function invalidateStudentLists(queryClient: QueryClient): void {
+  void queryClient.invalidateQueries({ queryKey: STUDENTS_LIST_KEY });
+}
+
+// ---------------------------------------------------------------------------
+// Create
+// ---------------------------------------------------------------------------
+
+/** A locally-generated id for the optimistic row, replaced by the real one once the server responds
+ * (or removed on rollback). Prefixed so it can never collide with a real UUID. */
+function tempId(): string {
+  return `optimistic-${crypto.randomUUID()}`;
+}
+
+export type CreateStudentGuardian = NonNullable<
+  components["schemas"]["CreateStudentBody"]["guardians"]
+>[number];
+
+export function useCreateStudent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (
+      values: CreateStudentValues & {
+        guardians?: CreateStudentGuardian[];
+        records?: components["schemas"]["RecordAnswerInput"][];
+      },
+    ) => {
+      const { data } = await api.POST("/api/students", { body: values });
+      if (!data) throw new Error("Student creation returned no data.");
+      return data as StudentProfile;
+    },
+    onMutate: async (values) => {
+      await queryClient.cancelQueries({ queryKey: STUDENTS_LIST_KEY });
+      const snapshot = snapshotStudentLists(queryClient);
+
+      const now = new Date().toISOString();
+      // New students sort first (the list orders by created_at DESC, matching the users list), so
+      // the optimistic row only belongs on whichever cached page has no cursor — i.e. the first page
+      // of each filter set.
+      const optimistic: StudentProfile = {
+        id: tempId(),
+        school_id: "",
+        user_id: "",
+        first_name: values.first_name,
+        middle_name: values.middle_name ?? null,
+        last_name: values.last_name,
+        preferred_name: values.preferred_name ?? null,
+        date_of_birth: values.date_of_birth ?? null,
+        nationality_country_id: null,
+        admission_number: values.admission_number,
+        admission_date: values.admission_date ?? null,
+        status: values.status,
+        created_at: now,
+        updated_at: now,
+      };
+      queryClient.setQueriesData<StudentsListResult>(
+        { queryKey: STUDENTS_LIST_KEY, predicate: (query) => query.queryKey.at(-1) === undefined },
+        (data) => (data ? { ...data, students: [optimistic, ...data.students] } : data),
+      );
+
+      return { snapshot };
+    },
+    onError: (_error, _values, context) => {
+      if (context) restoreStudentLists(queryClient, context.snapshot);
+    },
+    onSettled: (_data, _error, values) => {
+      invalidateStudentLists(queryClient);
+      if (values.guardians?.length) invalidateLinkViews(queryClient);
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Update
+// ---------------------------------------------------------------------------
+
+export type UpdateStudentBody = components["schemas"]["UpdateStudentBody"];
+
+export interface UpdateStudentVariables {
+  studentId: string;
+  patch: UpdateStudentBody;
+}
+
+/** Backs both the demographics form and the (separately permission-gated) admission-fields form on
+ * the profile page — both send a partial `UpdateStudentBody` through the same endpoint. */
+export function useUpdateStudent() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ studentId, patch }: UpdateStudentVariables) => {
+      const { data } = await api.PATCH("/api/students/{studentId}", {
+        params: { path: { studentId } },
+        body: patch,
+      });
+      if (!data) throw new Error("Student update returned no data.");
+      return data as StudentProfile;
+    },
+    onMutate: async ({ studentId, patch }) => {
+      await queryClient.cancelQueries({ queryKey: STUDENTS_LIST_KEY });
+      const snapshot = snapshotStudentLists(queryClient);
+      const previousDetail = queryClient.getQueryData<StudentProfile>(studentQueryKey(studentId));
+
+      patchStudentInLists(queryClient, studentId, (student) => ({ ...student, ...patch }));
+      if (previousDetail) {
+        queryClient.setQueryData(studentQueryKey(studentId), { ...previousDetail, ...patch });
+      }
+
+      return { snapshot, previousDetail, studentId };
+    },
+    onError: (_error, _vars, context) => {
+      if (!context) return;
+      restoreStudentLists(queryClient, context.snapshot);
+      if (context.previousDetail) {
+        queryClient.setQueryData(studentQueryKey(context.studentId), context.previousDetail);
+      }
+    },
+    onSettled: (_data, _error, { studentId }) => {
+      invalidateStudentLists(queryClient);
+      void queryClient.invalidateQueries({ queryKey: studentQueryKey(studentId) });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Guardian link / unlink
+// ---------------------------------------------------------------------------
+
+export interface LinkGuardianVariables extends LinkGuardianValues {
+  studentId: string;
+}
+
+export function useLinkGuardian() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ studentId, ...body }: LinkGuardianVariables) => {
+      const { data } = await api.POST("/api/students/{studentId}/guardians", {
+        params: { path: { studentId } },
+        body,
+      });
+      if (!data) throw new Error("Guardian link returned no data.");
+      return data;
+    },
+    onSuccess: (_data, { studentId }) => {
+      void queryClient.invalidateQueries({ queryKey: studentGuardiansQueryKey(studentId) });
+      invalidateLinkViews(queryClient);
+    },
+  });
+}
+
+export interface UnlinkGuardianVariables {
+  studentId: string;
+  userId: string;
+}
+
+export function useUnlinkGuardian() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ studentId, userId }: UnlinkGuardianVariables) => {
+      await api.DELETE("/api/students/{studentId}/guardians/{userId}", {
+        params: { path: { studentId, userId } },
+      });
+    },
+    onMutate: async ({ studentId, userId }) => {
+      await queryClient.cancelQueries({ queryKey: studentGuardiansQueryKey(studentId) });
+      const previous = queryClient.getQueryData<GuardianContact[]>(
+        studentGuardiansQueryKey(studentId),
+      );
+      queryClient.setQueryData<GuardianContact[]>(studentGuardiansQueryKey(studentId), (data) =>
+        data?.filter((guardian) => guardian.parent_user_id !== userId),
+      );
+      return { previous, studentId };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(studentGuardiansQueryKey(context.studentId), context.previous);
+      }
+    },
+    onSettled: (_data, _error, { studentId }) => {
+      void queryClient.invalidateQueries({ queryKey: studentGuardiansQueryKey(studentId) });
+      invalidateLinkViews(queryClient);
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// CSV import
+// ---------------------------------------------------------------------------
+
+export interface UploadStudentImportVariables {
+  file: File;
+  onProgress?: (progress: UploadProgress) => void;
+}
+
+/**
+ * Stage the file in object storage under the `import.source` content class, so the import keeps
+ * the school's original (docs/modules/student-import-mapping-guide.md "Import history and unmapped
+ * columns"). Sent as `text/csv` whatever the browser calls it (Windows often says
+ * `application/vnd.ms-excel`): the class accepts only that type, and the bytes are unchanged, which
+ * is what the API checks. Returns null only when the deployment has no object storage (503
+ * STORAGE_NOT_CONFIGURED): the import then works as before, without an original.
+ */
+async function stageImportSource(file: File): Promise<string | null> {
+  try {
+    const { data } = await api.POST("/api/storage/uploads/request-upload", {
+      body: {
+        content_class: "import.source",
+        file_name: file.name,
+        content_type: "text/csv",
+        size_bytes: file.size,
+      },
+    });
+    if (!data) throw new Error("Upload URL missing.");
+    await uploadFileToPresignedUrl(
+      data.upload_url,
+      new File([file], file.name, { type: "text/csv" }),
+    );
+    return data.storage_key;
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "STORAGE_NOT_CONFIGURED") return null;
+    throw error;
+  }
+}
+
+/** The dry-run upload — nothing is committed until `useConfirmStudentImport` runs. */
+export function useUploadStudentImport() {
+  return useMutation({
+    mutationFn: async ({ file, onProgress }: UploadStudentImportVariables) =>
+      uploadStudentImportCsv(file, onProgress, (await stageImportSource(file)) ?? undefined),
+  });
+}
+
+/** Confirms a validated import, handing it to the async worker. The students it creates land in the
+ * directory once the worker finishes — the caller invalidates `STUDENTS_LIST_KEY` when polling
+ * observes the `completed` status, not here, since this call only reaches `confirmed`. */
+export function useConfirmStudentImport() {
+  return useMutation({
+    mutationFn: async (importId: string) => {
+      const { data } = await api.POST("/api/imports/students/{importId}/confirm", {
+        params: { path: { importId } },
+        body: {},
+      });
+      if (!data) throw new Error("Import confirmation returned no data.");
+      return data as StudentImport;
+    },
+  });
+}
+
+export interface UpdateStudentImportMappingVariables {
+  importId: string;
+  columnMapping: ColumnMapping;
+  /** Also save the mapping for the school under this name. A taken name fails the whole request
+   * (409), re-map included: the API does both in one transaction. */
+  saveAs?: string;
+}
+
+/** Re-maps an unconfirmed import's staged rows and re-validates them, without a re-upload. */
+export function useUpdateStudentImportMapping() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      importId,
+      columnMapping,
+      saveAs,
+    }: UpdateStudentImportMappingVariables) => {
+      const { data } = await api.PUT("/api/imports/students/{importId}/mapping", {
+        params: { path: { importId } },
+        body: { column_mapping: columnMapping, save_as: saveAs },
+      });
+      if (!data) throw new Error("Import re-mapping returned no data.");
+      return data as StudentImport;
+    },
+    onSuccess: (_data, { saveAs }) => {
+      if (saveAs) void queryClient.invalidateQueries({ queryKey: STUDENT_IMPORT_MAPPINGS_KEY });
+    },
+  });
+}

@@ -1,0 +1,85 @@
+import js from "@eslint/js";
+import { defineConfig } from "eslint/config";
+import eslintConfigPrettier from "eslint-config-prettier/flat";
+import { createTypeScriptImportResolver } from "eslint-import-resolver-typescript";
+import { createNodeResolver, importX } from "eslint-plugin-import-x";
+import securityPlugin from "eslint-plugin-security";
+import globals from "globals";
+import tseslint from "typescript-eslint";
+
+import noAnalyticsPii from "./rules/no-analytics-pii.js";
+import noInterpolatedSql from "./rules/no-interpolated-sql.js";
+import noRawPoolQuery from "./rules/no-raw-pool-query.js";
+import noSessionSet from "./rules/no-session-set.js";
+import noUnsafeHtmlRender from "./rules/no-unsafe-html-render.js";
+
+const studafyPlugin = {
+  rules: {
+    "no-session-set": noSessionSet,
+    "no-analytics-pii": noAnalyticsPii,
+    "no-unsafe-html-render": noUnsafeHtmlRender,
+    "no-interpolated-sql": noInterpolatedSql,
+    "no-raw-pool-query": noRawPoolQuery,
+  },
+};
+
+export default defineConfig([
+  {
+    ignores: [
+      "**/dist/**",
+      "**/.turbo/**",
+      "**/node_modules/**",
+      "**/*.tsbuildinfo",
+      "**/graphify-out/**",
+    ],
+  },
+  {
+    files: ["**/*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}"],
+    extends: [
+      js.configs.recommended,
+      tseslint.configs.recommended,
+      tseslint.configs.stylistic,
+      importX.flatConfigs.recommended,
+      importX.flatConfigs.typescript,
+      securityPlugin.configs.recommended,
+    ],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.es2022,
+      },
+    },
+    settings: {
+      "import-x/resolver-next": [createTypeScriptImportResolver(), createNodeResolver()],
+    },
+    plugins: {
+      studafy: studafyPlugin,
+    },
+    rules: {
+      "studafy/no-session-set": "error",
+      "studafy/no-analytics-pii": "error",
+      "studafy/no-unsafe-html-render": "error",
+      eqeqeq: ["error", "smart"],
+      "no-var": "error",
+      "prefer-const": "error",
+      "no-implicit-coercion": "error",
+      curly: ["error", "all"],
+      "object-shorthand": "error",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "import-x/order": [
+        "error",
+        {
+          groups: ["builtin", "external", "internal", "parent", "sibling", "index", "type"],
+          "newlines-between": "always",
+          alphabetize: { order: "asc", caseInsensitive: true },
+        },
+      ],
+      "import-x/no-duplicates": "error",
+      "import-x/newline-after-import": "error",
+    },
+  },
+  eslintConfigPrettier,
+]);
