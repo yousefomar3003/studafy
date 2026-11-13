@@ -398,6 +398,31 @@ export async function adminRevokeUserSessions(
   return { revokedTokens: revoked.length, denylistedJtis: denylisted };
 }
 
+/** What {@link revokeUserSessionsInTx} revoked: the rows the caller denylists after commit. */
+export type RevokedSessionRow = RevokedRow;
+
+/**
+ * Revoke every session of one user in the transaction's tenant, inside the caller's transaction.
+ *
+ * The same SECURITY DEFINER path as {@link adminRevokeUserSessions}, for a caller that cannot open a
+ * transaction as an administrator of the target's school -- the platform console acts on a school
+ * its operator does not belong to, so it arms the target school's scope in a system transaction and
+ * writes its own audit rows. The caller denylists the returned rows with {@link denylistRevoked}
+ * once its transaction has committed.
+ */
+export async function revokeUserSessionsInTx(
+  tx: TransactionSql,
+  targetUserId: string,
+): Promise<RevokedSessionRow[]> {
+  return tx<RevokedRow[]>`
+    SELECT revoked_token_id AS id,
+           revoked_family_id AS family_id,
+           revoked_access_jti AS access_jti,
+           revoked_access_expires_at AS access_expires_at
+      FROM app.admin_revoke_user_sessions(${targetUserId}, NULL)
+  `;
+}
+
 // ---------------------------------------------------------------------------
 // School-wide teardown
 // ---------------------------------------------------------------------------

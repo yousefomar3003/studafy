@@ -247,6 +247,10 @@ const PlatformUserLookupPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/UserLookupPage"),
 );
+const PlatformUserSupportPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/UserSupportPage"),
+);
 const PlatformRefundsPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/RefundsPage"),
@@ -692,6 +696,10 @@ export const routes: RouteObject[] = [
               ["platform/plans", <PlatformPlansPage key="plans" />],
               ["platform/settings", <PlatformSettingsPage key="settings" />],
               ["platform/users", <PlatformUserLookupPage key="users" />],
+              [
+                "platform/schools/:schoolId/users/:userId",
+                <PlatformUserSupportPage key="user-support" />,
+              ],
               // The license console (docs/billing/feature-licensing.md, session 4).
               ["platform/features", <PlatformFeaturesPage key="features" />],
               ["platform/tiers", <PlatformTiersPage key="tiers" />],

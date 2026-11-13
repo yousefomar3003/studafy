@@ -153,7 +153,7 @@ import {
 import { messagingRoutes } from "./modules/messaging";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
-import { platformGrantRoutes, platformRoutes } from "./modules/platform";
+import { platformGrantRoutes, platformRoutes, platformUserSupportRoutes } from "./modules/platform";
 import { privacyRoutes } from "./modules/privacy";
 import { realtimeTicketRoutes } from "./modules/realtime";
 import { DEVELOPMENT_RECORD_KEYRING, recordRoutes } from "./modules/records";
@@ -1360,6 +1360,9 @@ export function createApp({
       "/",
       platformGrantRoutes({ database, redis: redis ?? null, storage: storage ?? null, logger }),
     );
+    // Per-account support actions in the console (re-invite, sign out everywhere, unlock,
+    // deactivate/reactivate, read-only panel). platform:read / platform:manage; no impersonation.
+    app.route("/", platformUserSupportRoutes({ database, denylist: jtiDenylist, logger }));
     // The console's school sign-up review queue; approval creates and provisions the school.
     app.route(
       "/",

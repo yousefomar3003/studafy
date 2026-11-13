@@ -293,6 +293,31 @@ async function verifyStoredPassword(
   return hash === null ? "OK_SETUP" : "OK";
 }
 
+/**
+ * Clears the account-wide sign-in lockout of a member in the armed tenant: the failed-attempt count
+ * and `locked_until`, exactly what a successful sign-in resets. Leaves the password, any setup code
+ * and trusted devices alone. Returns whether the account was locked or had failures counted.
+ */
+export async function clearMemberLockoutInTx(
+  tx: TransactionSql,
+  userId: string,
+): Promise<{ wasLocked: boolean; failedAttempts: number }> {
+  const [before] = await tx<{ failed_attempts: number; locked: boolean }[]>`
+    SELECT failed_attempts, coalesce(locked_until > CURRENT_TIMESTAMP, false) AS locked
+    FROM app.member_credentials
+    WHERE user_id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
+    FOR UPDATE
+  `;
+  if (!before) return { wasLocked: false, failedAttempts: 0 };
+  await tx`
+    UPDATE app.member_credentials
+    SET failed_attempts = 0, locked_until = NULL, updated_at = CURRENT_TIMESTAMP
+    WHERE user_id = ${userId}::uuid AND school_id = current_setting('app.school_id')::uuid
+      AND (failed_attempts > 0 OR locked_until IS NOT NULL)
+  `;
+  return { wasLocked: before.locked, failedAttempts: before.failed_attempts };
+}
+
 /** Stores the member's password, consuming any setup code. */
 async function storePassword(tx: TransactionSql, userId: string, password: string): Promise<void> {
   const hash = await hashMemberPassword(password);
