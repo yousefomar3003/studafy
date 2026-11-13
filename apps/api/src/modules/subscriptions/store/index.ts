@@ -13,6 +13,8 @@ export type { StoreBilling } from "./service";
  */
 export function createStoreBilling(env: {
   AI_STORE_PRODUCT_ID?: string;
+  /** Comma-separated; see env.ts. */
+  AI_STORE_EXTRA_PRODUCT_IDS?: string;
   APPLE_IAP_BUNDLE_ID?: string;
   APPLE_IAP_APP_APPLE_ID?: number;
   GOOGLE_PLAY_PACKAGE_NAME?: string;
@@ -39,6 +41,15 @@ export function createStoreBilling(env: {
   if (!apple && !google) return null;
   return {
     productId: env.AI_STORE_PRODUCT_ID,
+    productIds: [
+      ...new Set([
+        env.AI_STORE_PRODUCT_ID,
+        ...(env.AI_STORE_EXTRA_PRODUCT_IDS ?? "")
+          .split(",")
+          .map((id) => id.trim())
+          .filter(Boolean),
+      ]),
+    ],
     apple,
     google,
     googleNotificationToken: env.GOOGLE_PLAY_RTDN_TOKEN ?? null,
