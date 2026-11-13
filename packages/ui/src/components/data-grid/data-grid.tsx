@@ -31,6 +31,8 @@ export interface DataGridSort {
 export interface DataGridProps<TRow> {
   /** Accessible name for the grid and its scroll region. */
   caption: string;
+  /** Keeps the caption for screen readers only, when a visible heading already names the grid. */
+  hideCaption?: boolean;
   columns: readonly DataGridColumn<TRow>[];
   /** The current page of rows. Sorting and pagination are the caller's responsibility — see the
    * `sort` and `useCursorPagination` docs. */
@@ -103,6 +105,7 @@ function cellStyle(align: DataGridAlign | undefined): CSSProperties | undefined 
  */
 export function DataGrid<TRow>({
   caption,
+  hideCaption = false,
   columns,
   rows,
   getRowId,
@@ -249,7 +252,9 @@ export function DataGrid<TRow>({
         onScroll={handleScroll}
       >
         <table className="sf-table">
-          <caption className="sf-table__caption">{caption}</caption>
+          <caption className={cx("sf-table__caption", hideCaption && "sf-visually-hidden")}>
+            {caption}
+          </caption>
           <colgroup>
             {selectable ? <col style={{ width: 48 }} /> : null}
             {columns.map((column) => (

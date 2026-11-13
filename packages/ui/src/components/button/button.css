@@ -33,6 +33,15 @@
   opacity: 0.5;
 }
 
+/* A faded filled button read as white on pale blue: disabled filled buttons go neutral instead,
+   readable and clearly unavailable in both themes. */
+.sf-button--primary:disabled {
+  opacity: 1;
+  background-color: var(--color-surface);
+  border-color: var(--color-border);
+  color: var(--color-muted-foreground);
+}
+
 .sf-button--full-width {
   display: flex;
   width: 100%;
@@ -55,11 +64,11 @@
 }
 
 .sf-button--primary:hover:not(:disabled) {
-  background-color: var(--color-accent-700);
+  background-color: var(--color-accent-hover);
 }
 
 .sf-button--primary:active:not(:disabled) {
-  background-color: var(--color-accent-800);
+  background-color: var(--color-accent-active);
 }
 
 .sf-button--secondary {
@@ -88,6 +97,13 @@
 .sf-button--tertiary:active:not(:disabled) {
   background-color: var(--color-accent-subtle-bg);
   color: var(--color-accent-subtle-foreground);
+}
+
+/* A disabled text button has no shape to fade, so half opacity left a faint floating word: it
+   keeps full opacity and turns muted instead, still readable beside a disabled bordered button. */
+.sf-button--tertiary:disabled {
+  opacity: 1;
+  color: var(--color-muted-foreground);
 }
 
 /* Loading */

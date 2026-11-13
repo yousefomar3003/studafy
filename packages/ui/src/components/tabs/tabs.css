@@ -21,11 +21,19 @@
 .sf-tabs--horizontal > .sf-tabs__list {
   flex-direction: row;
   border-bottom: 1px solid var(--color-border);
+  /* Too many (or too long) tabs for a narrow screen scroll sideways rather than wrap or overflow. */
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.sf-tabs--horizontal > .sf-tabs__list > .sf-tabs__tab {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .sf-tabs--vertical > .sf-tabs__list {
   flex-direction: column;
-  border-right: 1px solid var(--color-border);
+  border-inline-end: 1px solid var(--color-border);
 }
 
 .sf-tabs__tab {
@@ -66,6 +74,11 @@
 
 .sf-tabs--vertical .sf-tabs__tab--selected {
   box-shadow: inset -2px 0 0 var(--color-accent);
+}
+
+/* box-shadow has no logical form: mirror the selected bar onto the list's inner edge in RTL. */
+[dir="rtl"] .sf-tabs--vertical .sf-tabs__tab--selected {
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .sf-tabs__panel {

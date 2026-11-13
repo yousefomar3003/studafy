@@ -20,6 +20,8 @@
   width: 100%;
   max-width: 480px;
   max-height: calc(100vh - var(--space-32));
+  /* The visible height on phones, where 100vh runs under the browser's toolbars. */
+  max-height: calc(100dvh - var(--space-32));
 
   background-color: var(--color-background);
   border: 1px solid var(--color-border);
