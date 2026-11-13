@@ -333,5 +333,8 @@
   "INVOICE_NOT_CANCELLABLE": "This invoice cannot be cancelled. Only a submitted invoice with no payment or credit note against it can be.",
   "PAYMENT_NOT_REVERSIBLE": "This payment cannot be reversed. Only a confirmed payment against an invoice can be.",
   "WRITE_OFF_EXCEEDS_OUTSTANDING": "A write-off cannot be more than the invoice's outstanding balance",
-  "ADJUSTMENT_ALREADY_REQUESTED": "A correction for this is already waiting for approval or done"
+  "ADJUSTMENT_ALREADY_REQUESTED": "A correction for this is already waiting for approval or done",
+  "MANUAL_GRANT_NOT_FOUND": "No such grant in this school",
+  "MANUAL_GRANT_ALREADY_REVOKED": "This grant was already revoked",
+  "MANUAL_GRANT_TIER_INVALID": "This person can't hold that tier: choose an active tier for their role (student, teacher or parent)"
 }

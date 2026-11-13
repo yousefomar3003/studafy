@@ -456,10 +456,37 @@ export async function getPlatformFinance(database: Database) {
         ORDER BY r.attempted_at DESC
         LIMIT ${RECENT_FAILED_RENEWALS_LIMIT}
       `,
+      // Cash and transfer payments recorded on hand-made grants (000211); revoked ones excluded.
+      tx<{ currency_code: string; minor_unit: number; grants: number; amount_minor: string }[]>`
+        SELECT cur.code AS currency_code, cur.minor_unit::int AS minor_unit, count(*)::int AS grants,
+               COALESCE(sum(g.amount_minor), 0)::text AS amount_minor
+        FROM app.manual_grants g
+        JOIN app.currencies cur ON cur.id = g.currency_id
+        WHERE g.amount_minor IS NOT NULL AND g.revoked_at IS NULL
+          AND g.created_at >= ${renewalSince}
+        GROUP BY cur.code, cur.minor_unit
+      `,
     ]);
 
+    const manualPayments = new Map<
+      string,
+      { currencyCode: string; minorUnit: number; collectedMinor: number; grants: number }
+    >();
+
     for (const [index, school] of schools.entries()) {
-      const [[sub], aggregates, failed] = perSchool[index]!;
+      const [[sub], aggregates, failed, manual] = perSchool[index]!;
+
+      for (const row of manual) {
+        const bucket = manualPayments.get(row.currency_code) ?? {
+          currencyCode: row.currency_code,
+          minorUnit: row.minor_unit,
+          collectedMinor: 0,
+          grants: 0,
+        };
+        bucket.collectedMinor += Number(row.amount_minor);
+        bucket.grants += row.grants;
+        manualPayments.set(row.currency_code, bucket);
+      }
 
       if (sub) {
         if (BILLED_STATUSES.has(sub.status)) {
@@ -539,6 +566,7 @@ export async function getPlatformFinance(database: Database) {
     return {
       revenueByCurrency: byCurrency(revenue.values()),
       renewalsLast30Days: byCurrency(renewals.values()),
+      manualPaymentsLast30Days: byCurrency(manualPayments.values()),
       attention,
       recentFailedRenewals: failedRenewals
         .sort((a, b) => b.attemptedAt.localeCompare(a.attemptedAt))

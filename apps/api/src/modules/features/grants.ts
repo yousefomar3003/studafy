@@ -88,10 +88,38 @@ export const licenseSeatGrants: GrantSourceAdapter = ({ user }, now) =>
     ];
   });
 
+/**
+ * Tiers Studafy staff granted by hand (`app.manual_grants`, 000211), usually after a cash payment.
+ * Reported as a purchase -- it is one, paid outside the online checkout. Decided from its dates at
+ * read time like a seat:
+ *
+ *   - inside the period  -> live
+ *   - past the end       -> ended (FEATURE_EXPIRED)
+ *   - not started yet    -> no grant
+ *
+ * It adds to whatever else the person holds: with an App Store or Google Play subscription on the
+ * same tier, the feature is on while either covers it, and the latest end is the one reported.
+ */
+export const manualTierGrants: GrantSourceAdapter = ({ user }, now) =>
+  (user.manualGrants ?? []).flatMap((grant) => {
+    if (Date.parse(grant.startsAt) > now.getTime()) return [];
+    return [
+      {
+        source: "purchase" as const,
+        tierCode: grant.planCode,
+        live: now.getTime() < Date.parse(grant.endsAt),
+        periodStart: grant.startsAt,
+        periodEnd: grant.endsAt,
+        ref: `manual_grants:${grant.grantId}`,
+      },
+    ];
+  });
+
 export const GRANT_SOURCES: readonly GrantSourceAdapter[] = [
   aiAddonGrants,
   userSubscriptionGrants,
   licenseSeatGrants,
+  manualTierGrants,
 ];
 
 export function collectGrants(

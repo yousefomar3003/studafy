@@ -1,0 +1,11 @@
+/* Manual grants (db/migrations/000211): the receipt picker in the grant dialog. */
+.platform-file {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-block-start: var(--space-12);
+}
+
+.platform-file > span {
+  font-weight: 600;
+}

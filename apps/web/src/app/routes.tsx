@@ -275,6 +275,10 @@ const PlatformPaymentsPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/licensing/PaymentsPage"),
 );
+const PlatformManualGrantsPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/grants/ManualGrantsPage"),
+);
 const PlatformInvoicePage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/licensing/InvoicePage"),
@@ -695,6 +699,7 @@ export const routes: RouteObject[] = [
               ["platform/quotes", <PlatformQuotesPage key="quotes" />],
               ["platform/licenses", <PlatformLicensesPage key="licenses" />],
               ["platform/payments", <PlatformPaymentsPage key="payments" />],
+              ["platform/grants", <PlatformManualGrantsPage key="grants" />],
               ["platform/payments/:schoolId/:invoiceId", <PlatformInvoicePage key="invoice" />],
             ] as const
           ).map(([path, page]) => ({

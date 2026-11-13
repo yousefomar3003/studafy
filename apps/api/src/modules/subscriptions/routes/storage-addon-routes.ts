@@ -69,6 +69,17 @@ const StorageOfferSchema = z
         "Whether this school can buy, change or cancel the add-on online. False when its payment " +
         "provider cannot manage subscriptions (Tap) or is not configured.",
     }),
+    granted: z
+      .object({
+        capBytes: z.number().int(),
+        endsAt: z.string().datetime(),
+      })
+      .openapi("StorageAddOnGrant", {
+        description:
+          "Storage Studafy granted by hand (for example after a cash payment), in force now. The " +
+          "cap uploads are held to is the largest of the included storage, a live add-on and this.",
+      })
+      .nullable(),
   })
   .openapi("StorageAddOnOffer");
 
@@ -215,7 +226,13 @@ export function storageAddonRoutes(
       requestId: c.get("requestId"),
     });
     return c.json(
-      { ...offer, current: offer.current ? serializeCurrent(offer.current) : null },
+      {
+        ...offer,
+        current: offer.current ? serializeCurrent(offer.current) : null,
+        granted: offer.granted
+          ? { capBytes: offer.granted.capBytes, endsAt: offer.granted.endsAt.toISOString() }
+          : null,
+      },
       200,
     );
   });

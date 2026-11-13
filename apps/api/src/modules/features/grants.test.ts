@@ -15,6 +15,7 @@ import {
 import type { FeatureCatalog, Tier } from "./catalog";
 import type {
   LicenseSeatGrant,
+  ManualTierGrant,
   UserSubscriptionGrant,
 } from "../subscriptions/entitlements/resolve";
 
@@ -79,9 +80,20 @@ function personal(overrides: Partial<UserSubscriptionGrant> = {}): UserSubscript
   };
 }
 
+function manual(overrides: Partial<ManualTierGrant> = {}): ManualTierGrant {
+  return {
+    grantId: "grant-1",
+    planCode: "student_plus",
+    startsAt: "2026-11-01T00:00:00.000Z",
+    endsAt: "2027-05-01T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
 async function resolve(input: {
   seats?: LicenseSeatGrant[];
   subscriptions?: UserSubscriptionGrant[];
+  manualGrants?: ManualTierGrant[];
   schoolActive?: boolean;
   studentId?: string | null;
   now?: Date;
@@ -95,6 +107,7 @@ async function resolve(input: {
         studentId: input.studentId === undefined ? "student-1" : input.studentId,
         seats: input.seats ?? [],
         subscriptions: input.subscriptions ?? [],
+        manualGrants: input.manualGrants ?? [],
       }),
     }),
   });
@@ -229,5 +242,39 @@ describe("school-license seats in the resolver", () => {
     const features = await resolve({ seats: [seat({ planCode: null })] });
 
     expect(features.ai_tutor).toMatchObject({ active: false, reason: "not_included" });
+  });
+});
+
+describe("manual tier grants in the resolver", () => {
+  test("an in-force grant covers its tier as a purchase", async () => {
+    const features = await resolve({ manualGrants: [manual()] });
+    expect(features.ai_tutor).toMatchObject({ active: true, source: "purchase", limit: 300 });
+    expect(features.ai_tutor.periodEnd).toBe("2027-05-01T00:00:00.000Z");
+  });
+
+  test("an ended grant reads as expired, a future one as not included", async () => {
+    const ended = await resolve({
+      manualGrants: [
+        manual({ startsAt: "2026-09-01T00:00:00.000Z", endsAt: "2026-10-01T00:00:00.000Z" }),
+      ],
+    });
+    expect(ended.ai_tutor.active).toBe(false);
+    expect(ended.ai_tutor.reason).toBe("expired");
+    const future = await resolve({
+      manualGrants: [manual({ startsAt: "2027-01-01T00:00:00.000Z" })],
+    });
+    expect(future.ai_tutor).toMatchObject({ active: false, reason: "not_included" });
+  });
+
+  test("with a store subscription on a lower tier, both count and the later end is reported", async () => {
+    const features = await resolve({
+      subscriptions: [personal()],
+      manualGrants: [manual()],
+    });
+    expect(features.ai_tutor.active).toBe(true);
+    expect(features.ai_tutor.sources).toHaveLength(2);
+    expect(features.ai_tutor.periodEnd).toBe("2027-05-01T00:00:00.000Z");
+    // The grant's tier gives the notebook the basic subscription does not.
+    expect(features.notebook.active).toBe(true);
   });
 });

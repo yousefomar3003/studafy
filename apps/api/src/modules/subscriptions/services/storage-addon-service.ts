@@ -25,7 +25,7 @@ import {
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
-import { getStorageUsage } from "../../storage/quota-service";
+import { findStorageGrantInForce, getStorageUsage } from "../../storage/quota-service";
 import { selectPaymentProviderForSchool } from "../payment-provider-routing";
 
 import type { Database } from "../../../db";
@@ -69,6 +69,11 @@ export interface StorageOffer {
   currency: string | null;
   /** Whether this school can buy, change or cancel online (its provider is Stripe and configured). */
   availableOnline: boolean;
+  /**
+   * Storage Studafy granted by hand (a cash payment, a pilot) that is in force now, or null
+   * (app.manual_grants, 000211).
+   */
+  granted: { capBytes: number; endsAt: Date } | null;
 }
 
 interface PriceRow {
@@ -225,6 +230,7 @@ export async function getStorageOffer(
       tiers,
       currency,
       availableOnline: (await onlineProvider(tx, providers, context.schoolId)) !== null,
+      granted: await findStorageGrantInForce(tx),
     };
   });
 }

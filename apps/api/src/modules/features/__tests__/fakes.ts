@@ -103,6 +103,7 @@ export function userEntitlement(overrides: Partial<UserEntitlement> = {}): UserE
     studentId: STUDENT_ID,
     subscriptions: [],
     seats: [],
+    manualGrants: [],
     ...overrides,
   };
 }

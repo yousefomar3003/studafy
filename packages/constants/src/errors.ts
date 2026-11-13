@@ -370,6 +370,14 @@ export const ERROR_CODES = {
   // The provider could not charge the tier change; nothing was changed.
   STORAGE_ADDON_PAYMENT_FAILED: "STORAGE_ADDON_PAYMENT_FAILED",
 
+  // Manual grants (db/migrations/000211): storage and tiers Studafy staff grant by hand.
+  // No such grant in this school.
+  MANUAL_GRANT_NOT_FOUND: "MANUAL_GRANT_NOT_FOUND",
+  // The grant was already revoked.
+  MANUAL_GRANT_ALREADY_REVOKED: "MANUAL_GRANT_ALREADY_REVOKED",
+  // The tier does not exist, is not a tier, or is not one the person's role can hold.
+  MANUAL_GRANT_TIER_INVALID: "MANUAL_GRANT_TIER_INVALID",
+
   // Materials — upload, ingestion, and AI visibility.
   MATERIAL_NOT_FOUND: "MATERIAL_NOT_FOUND",
   MATERIAL_STORAGE_CONFIRM_FAILED: "MATERIAL_STORAGE_CONFIRM_FAILED",
