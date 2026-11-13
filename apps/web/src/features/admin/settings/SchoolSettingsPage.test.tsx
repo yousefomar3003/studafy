@@ -27,6 +27,7 @@ let schoolSettings = {
   attendance_alert_threshold: 75,
   absence_alert_threshold: 25,
   parent_discipline_visibility: false,
+  allow_parent_device_signin: true,
   attendance_correction_window_hours: 48,
   exam_structure: "midterm" as "midterm" | "periods",
   exam_weights: { midterm: 30, final_exam: 40, quiz: 15, homework: 15 } as Record<string, number>,
@@ -167,6 +168,7 @@ afterEach(() => {
     attendance_alert_threshold: 75,
     absence_alert_threshold: 25,
     parent_discipline_visibility: false,
+    allow_parent_device_signin: true,
     attendance_correction_window_hours: 48,
     exam_structure: "midterm",
     exam_weights: { midterm: 30, final_exam: 40, quiz: 15, homework: 15 },
@@ -300,6 +302,27 @@ describe("SchoolSettingsPage", () => {
         }),
       );
     });
+  });
+
+  test("parents adding a child to their phone is on by default and can be turned off", async () => {
+    await renderAsOrgAdmin(await loadPage());
+
+    const toggle = (await screen.findByLabelText(
+      "Parents can add their child's account to their phone",
+    )) as HTMLInputElement;
+    await waitFor(() => expect(toggle.checked).toBe(true));
+    fireEvent.click(toggle);
+
+    const card = screen.getByRole("region", { name: "Parent app" });
+    fireEvent.click(within(card).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => {
+      expect(patchMock).toHaveBeenCalledWith(
+        "/api/schools/current/settings",
+        expect.objectContaining({ body: { allow_parent_device_signin: false } }),
+      );
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   test("exam system: switching to periods shows its parts with defaults and saves them", async () => {

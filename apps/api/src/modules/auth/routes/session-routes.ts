@@ -84,6 +84,14 @@ const sessionSchema = z
     ip_address: z.string().nullable(),
     issued_at: z.iso.datetime(),
     expires_at: z.iso.datetime(),
+    opened_by_guardian_user_id: z
+      .uuid()
+      .nullable()
+      .openapi({
+        description:
+          "The parent who put this account on their phone from the parent app, or null for a session " +
+          "the account holder signed in to themselves.",
+      }),
   })
   .openapi("Session");
 

@@ -10,6 +10,7 @@ import { AttendanceAlertsSection } from "./AttendanceAlertsSection";
 import { ExamStructureSection } from "./ExamStructureSection";
 import { GradingSchemeSection } from "./GradingSchemeSection";
 import { LocaleTimezoneSection } from "./LocaleTimezoneSection";
+import { ParentAppSection } from "./ParentAppSection";
 import { ProfileSection } from "./ProfileSection";
 import { fetchSchoolSettings, SCHOOL_SETTINGS_KEY } from "./queries";
 
@@ -47,6 +48,7 @@ export default function SchoolSettingsPage() {
         <GradingSchemeSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
         <ExamStructureSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
         <AttendanceAlertsSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
+        <ParentAppSection settings={settingsQuery.data} loading={settingsQuery.isPending} />
         {permissions.has(PERMISSIONS.RECORD_TEMPLATE_MANAGE) ? (
           <Card as="section" aria-label={t("recordTemplates.links.templates")}>
             <Card.Header>

@@ -203,6 +203,13 @@
       "hideBody": "Parents will immediately lose access to their child's resolved discipline incidents in the portal.",
       "updated": "Attendance alerts updated"
     },
+    "parentApp": {
+      "title": "Parent app",
+      "description": "What parents can do from the Studafy app on their phone.",
+      "deviceSignin": "Parents can add their child's account to their phone",
+      "deviceSigninHelp": "A parent taps \"Add to this phone\" next to their child, and the child's own account opens on that phone with one tap, without the child's ID and password. Turning this off stops new ones; accounts already added stay signed in until they are ended in the child's sessions.",
+      "updated": "Parent app settings saved"
+    },
     "exams": {
       "title": "Exam system",
       "description": "How every term is examined. Subjects are set up from this, so teachers enter exactly these parts each term.",
