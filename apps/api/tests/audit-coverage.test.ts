@@ -457,6 +457,10 @@ const EXPECTED_MUTATING_ROUTES = [
   // notification-preferences-service.ts's updatePreferences, alongside the preference writes — see
   // routes/notification-preferences-routes.ts.
   "PATCH /api/notification-preferences",
+  // The caller's own quiet hours and test notice: declared with auditAction in
+  // routes/notification-preferences-routes.ts.
+  "PUT /api/notification-preferences/quiet-hours",
+  "POST /api/notifications/test",
   // School billing portal (ST-137). Cancellation is the one mutating pair in this feature; the
   // GET overview/invoices and the POST portal-session route stay on the `app` naming convention the
   // rest of the subscriptions module uses (see the NOTE above), matching the checkout routes'

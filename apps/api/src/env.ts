@@ -271,6 +271,11 @@ export const envSchema = z
     // on only when its own values are set; an empty string means unset. See
     // docs/runbooks/in-app-purchase-setup.md.
     AI_STORE_PRODUCT_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // More product ids for the same add-on, comma-separated, offered in this order after
+    // AI_STORE_PRODUCT_ID. One App Store / Google Play account holds one subscription per product,
+    // so a family buying for several children on one phone needs one product per child (on the App
+    // Store, each in its own subscription group). Unset: one product, one child per store account.
+    AI_STORE_EXTRA_PRODUCT_IDS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     APPLE_IAP_BUNDLE_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // The app's numeric Apple id (App Store Connect > App Information). Apple needs it to verify
     // production purchases, so production refuses an Apple setup without it.

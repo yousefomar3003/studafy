@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../di/app_providers.dart';
+import '../push/push_providers.dart';
 import '../realtime/realtime_providers.dart';
 import 'auth_session.dart';
 import 'auth_state.dart';
@@ -168,7 +169,7 @@ class AuthNotifier extends Notifier<AuthStatus> {
   /// Logs out of the active account only. When other accounts are signed in on this device, the
   /// most recently used one takes over, as Instagram does; otherwise the app returns to login.
   Future<void> logout() async {
-    await _session.logout();
+    await _session.logout(fcmToken: await _pushToken());
     final next = ref.read(savedAccountsProvider).firstOrNull;
     if (next != null && await switchTo(next.userId)) return;
     state = AuthStatus.unauthenticated;
@@ -224,8 +225,31 @@ class AuthNotifier extends Notifier<AuthStatus> {
   /// Puts another account on this device without making it active: a child's account a parent
   /// added from the parent app ("Add (child) to this phone"). It then sits in the switcher like any
   /// account set aside, and opens with [switchTo].
-  Future<void> addSavedAccount(SavedAccount account) =>
-      ref.read(savedAccountsProvider.notifier).put(account);
+  Future<void> addSavedAccount(SavedAccount account) async {
+    await ref.read(savedAccountsProvider.notifier).put(account);
+    // The account never becomes active here, so it would not register for notifications until it
+    // was first opened; register it now with its own token.
+    try {
+      await ref
+          .read(pushServiceProvider)
+          .registerForAccount(account.accessToken);
+    } catch (_) {
+      // Push is best-effort.
+    }
+  }
+
+  /// This phone's push token, sent on sign-out so that account's notices stop arriving here.
+  Future<String?> _pushToken() async {
+    try {
+      // Bounded: signing out never waits on Firebase.
+      return await ref
+          .read(pushServiceProvider)
+          .currentToken()
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+    } catch (_) {
+      return null;
+    }
+  }
 
   /// Forgets a saved account and ends its session on the server (best-effort).
   Future<void> removeSavedAccount(String userId) async {
@@ -234,7 +258,10 @@ class AuthNotifier extends Notifier<AuthStatus> {
     if (account == null) return;
     await saved.remove(userId);
     try {
-      await _authClient.logout(account.refreshToken);
+      await _authClient.logout(
+        account.refreshToken,
+        fcmToken: await _pushToken(),
+      );
     } catch (_) {
       // The session expires on its own; it is already gone from this device.
     }

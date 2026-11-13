@@ -386,6 +386,75 @@ describeDb("push consumer", () => {
     expect(planned).toHaveLength(0);
   });
 
+  test("a phone shared by two accounts gets a copy naming whose notice it is", async () => {
+    const f = await seed();
+    await addDevice(f, f.parentUserId, "parent-own");
+    await addDevice(f, f.parentUserId, "family-phone");
+    await addDevice(f, f.studentUserId, "family-phone");
+    await addNotification(f, f.studentUserId);
+    await addNotification(f, f.parentUserId);
+    const sender = recordingSender();
+
+    await pushSchoolNotifications(sql, sender, f.schoolId, 100, silent);
+
+    const sends = sender.sent.map((entry) => ({
+      title: entry.message.title,
+      user: entry.message.recipientUserId,
+      tokens: entry.devices.map((device) => device.token).sort(),
+    }));
+    expect(sends).toContainEqual({
+      title: "Amina · New message from Ms Noor",
+      user: f.studentUserId,
+      tokens: ["family-phone"],
+    });
+    expect(sends).toContainEqual({
+      title: "New message from Ms Noor",
+      user: f.parentUserId,
+      tokens: ["parent-own"],
+    });
+    expect(sends).toContainEqual({
+      title: "Parent · New message from Ms Noor",
+      user: f.parentUserId,
+      tokens: ["family-phone"],
+    });
+    expect(sender.sent.every((entry) => entry.message.schoolId === f.schoolId)).toBe(true);
+  });
+
+  test("a test notice is pushed even with push turned off and inside quiet hours", async () => {
+    const f = await seed();
+    await addDevice(f, f.parentUserId, "live");
+    await asAdmin(
+      f.schoolId,
+      (tx) => tx`
+      INSERT INTO app.notification_preferences (school_id, user_id, notification_type, channel, enabled)
+      VALUES (${f.schoolId}::uuid, ${f.parentUserId}::uuid, 'DIRECT_MESSAGE', 'push', false)
+      ON CONFLICT (user_id, notification_type, channel) DO UPDATE SET enabled = false
+    `,
+    );
+    await asAdmin(
+      f.schoolId,
+      (tx) => tx`
+      INSERT INTO app.user_notification_settings
+        (user_id, school_id, quiet_hours_start, quiet_hours_end, timezone)
+      VALUES (${f.parentUserId}::uuid, ${f.schoolId}::uuid, '00:00', '23:59', 'Asia/Amman')
+    `,
+    );
+    await asAdmin(
+      f.schoolId,
+      (tx) => tx`
+      INSERT INTO app.notifications (school_id, user_id, notification_type, title, body, metadata)
+      VALUES (${f.schoolId}::uuid, ${f.parentUserId}::uuid, 'DIRECT_MESSAGE',
+              'Test notification', 'Works', ${tx.json({ test: true })}),
+             (${f.schoolId}::uuid, ${f.parentUserId}::uuid, 'DIRECT_MESSAGE',
+              'Real notice', 'Held back', ${tx.json({})})
+    `,
+    );
+
+    const { claimed, planned } = await claimPushes(sql, f.schoolId, 100);
+    expect(claimed).toBe(2);
+    expect(planned.map((push) => push.title)).toEqual(["Test notification"]);
+  });
+
   test("a stale row is stamped without a push", async () => {
     const f = await seed();
     await addDevice(f, f.parentUserId, "live");

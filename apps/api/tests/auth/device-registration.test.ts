@@ -11,7 +11,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import { withTenantTx } from "../../src/db/tenant-tx";
-import { registerDeviceToken } from "../../src/modules/auth/services/session-service";
+import {
+  deregisterDeviceToken,
+  registerDeviceToken,
+} from "../../src/modules/auth/services/session-service";
 import {
   createFullTenant,
   createTestDatabase,
@@ -98,4 +101,45 @@ describe("registerDeviceToken", () => {
     expect(after!.last_seen.getTime()).toBeGreaterThan(before!.last_seen.getTime());
     expect(after!.platform).toBe("ios");
   });
+
+  /** Live user ids holding [token], read with admin rights (rows of other users are RLS-hidden). */
+  async function liveHolders(token: string): Promise<string[]> {
+    const rows = await database!.sql<{ user_id: string }[]>`
+      SELECT user_id FROM app.user_devices WHERE fcm_token = ${token} AND revoked_at IS NULL
+    `;
+    return rows.map((row) => row.user_id).sort();
+  }
+
+  async function register(userId: string, token: string, keepOtherAccounts?: boolean) {
+    await withTenantTx(database!.sql, { schoolId: tenant.schoolId, userId }, (tx) =>
+      registerDeviceToken(tx, userId, tenant.schoolId, token, "ios", { keepOtherAccounts }),
+    );
+  }
+
+  integrationTest("a second account on the same phone takes the token by default", async () => {
+    const token = `fcm-token-${crypto.randomUUID()}`;
+    await register(tenant.users.PARENT.id, token);
+    await register(tenant.users.STUDENT.id, token);
+    expect(await liveHolders(token)).toEqual([tenant.users.STUDENT.id]);
+  });
+
+  integrationTest(
+    "with keep_other_accounts, every account on the phone keeps the token",
+    async () => {
+      const token = `fcm-token-${crypto.randomUUID()}`;
+      await register(tenant.users.PARENT.id, token, true);
+      await register(tenant.users.STUDENT.id, token, true);
+      expect(await liveHolders(token)).toEqual(
+        [tenant.users.PARENT.id, tenant.users.STUDENT.id].sort(),
+      );
+
+      // One account signing out removes only its own registration.
+      await withTenantTx(
+        database!.sql,
+        { schoolId: tenant.schoolId, userId: tenant.users.STUDENT.id },
+        (tx) => deregisterDeviceToken(tx, tenant.users.STUDENT.id, token),
+      );
+      expect(await liveHolders(token)).toEqual([tenant.users.PARENT.id]);
+    },
+  );
 });

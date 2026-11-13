@@ -267,11 +267,11 @@ class AuthSession {
   }
 
   /// Logout: tell the server to revoke the token family, then clear locally.
-  Future<void> logout() async {
+  Future<void> logout({String? fcmToken}) async {
     final refreshToken = _refreshToken;
     if (refreshToken != null) {
       try {
-        await _authClient.logout(refreshToken);
+        await _authClient.logout(refreshToken, fcmToken: fcmToken);
       } catch (_) {
         // Logout is best-effort — always clear locally regardless.
       }

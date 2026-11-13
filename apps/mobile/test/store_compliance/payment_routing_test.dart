@@ -89,6 +89,8 @@ void main() {
           'file download',
       'lib/src/features/attachments/presentation/attachment_viewer_screen.dart':
           'file download — an assignment or submission attachment opened in the phone\'s own app',
+      'lib/src/core/push/push_service.dart':
+          "the app's own page in iOS Settings (app-settings:) to turn notifications on — not a web link",
     };
     final launch = RegExp(r'\blaunchUrl(String)?\s*\(');
 

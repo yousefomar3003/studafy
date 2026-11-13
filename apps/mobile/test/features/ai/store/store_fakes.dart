@@ -10,16 +10,29 @@ import 'package:studafy_mobile/src/features/ai/store/withdrawal_waiver_store.dar
 const studentId = '6f1c9d52-3b7a-4c1e-9a55-0d2b8e4f7a10';
 const schoolId = '1a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d';
 
-AiStoreSetup storeSetup({bool purchasable = true, bool google = true, bool apple = true}) =>
-    AiStoreSetup(
-      enabled: true,
-      productId: 'studafy_ai_monthly',
-      apple: apple,
-      google: google,
-      purchasable: purchasable,
-      accountToken: purchasable ? studentId : null,
-      profileId: purchasable ? schoolId : null,
-    );
+const siblingId = '9c0d4e21-7f3b-4a6e-8b11-2c5d6e7f8a90';
+
+AiStoreSetup storeSetup({
+  bool purchasable = true,
+  bool google = true,
+  bool apple = true,
+  String productId = 'studafy_ai_monthly',
+  bool subscribed = false,
+  AiStoreUnavailableReason? unavailableReason,
+  String forStudent = studentId,
+}) => AiStoreSetup(
+  enabled: true,
+  productId: purchasable ? productId : null,
+  apple: apple,
+  google: google,
+  purchasable: purchasable,
+  accountToken: purchasable ? forStudent : null,
+  profileId: purchasable ? schoolId : null,
+  studentId: forStudent,
+  studentFirstName: 'Sara',
+  subscribed: subscribed,
+  unavailableReason: unavailableReason,
+);
 
 class FakeGateway implements StoreGateway {
   final purchases = StreamController<List<PurchaseDetails>>.broadcast();
@@ -67,15 +80,24 @@ class FakeBackend implements AiStoreBackend {
   AiStoreSetup config;
   final registered = <(StorePlatform, String)>[];
 
+  /// The student each setup was asked for (null: the signed-in student).
+  final askedFor = <String?>[];
+
   /// The withdrawal waiver sent with each registration, in the same order as [registered].
   final waivers = <DateTime?>[];
   Object? refusal;
 
-  @override
-  Future<AiStoreSetup> setup() async => config;
+  /// Who the server credits a registered purchase to; defaults to the offer's student.
+  String? creditTo;
 
   @override
-  Future<void> register(
+  Future<AiStoreSetup> setup({String? studentId}) async {
+    askedFor.add(studentId);
+    return config;
+  }
+
+  @override
+  Future<String> register(
     StorePlatform platform,
     String verificationData, {
     DateTime? withdrawalWaiverAcknowledgedAt,
@@ -83,6 +105,7 @@ class FakeBackend implements AiStoreBackend {
     registered.add((platform, verificationData));
     waivers.add(withdrawalWaiverAcknowledgedAt);
     if (refusal != null) throw refusal!;
+    return creditTo ?? config.studentId ?? studentId;
   }
 }
 

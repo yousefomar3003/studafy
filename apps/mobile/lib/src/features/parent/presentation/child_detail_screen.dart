@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/generated/models/child_comparison_item.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../ai/store/child_ai_store_button.dart';
 import '../application/parent_providers.dart';
 import 'widgets/child_assignments_view.dart';
 import 'widgets/child_attendance_view.dart';
@@ -72,9 +73,17 @@ class _ChildDetail extends ConsumerWidget {
             ),
             child: Align(
               alignment: AlignmentDirectional.centerStart,
-              child: ChildPhoneAccountButton(
-                studentId: child.studentId,
-                childName: child.studentName,
+              child: Wrap(
+                spacing: AppSpacing.space8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ChildPhoneAccountButton(
+                    studentId: child.studentId,
+                    childName: child.studentName,
+                  ),
+                  // Buying Studafy AI for this child, on the parent's phone.
+                  ChildAiStoreButton(studentId: child.studentId, childName: child.studentName),
+                ],
               ),
             ),
           ),

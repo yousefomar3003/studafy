@@ -185,3 +185,45 @@ export const updateNotificationPreferencesRequestSchema = z
 export type UpdateNotificationPreferencesRequest = z.infer<
   typeof updateNotificationPreferencesRequestSchema
 >;
+
+// ---------------------------------------------------------------------------
+// Quiet hours and the test notification
+// ---------------------------------------------------------------------------
+
+const wallClockTime = z
+  .string()
+  .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "must be HH:MM (24-hour)")
+  .nullable();
+
+export const notificationQuietHoursSchema = z
+  .object({
+    start: wallClockTime.openapi({
+      description: "Start of the quiet window, HH:MM in `timezone`. Null when quiet hours are off.",
+    }),
+    end: wallClockTime.openapi({
+      description: "End of the quiet window, HH:MM in `timezone`. Null when quiet hours are off.",
+    }),
+    timezone: z.string().openapi({
+      description: "The IANA time zone the window is read in (the user's, else the school's).",
+    }),
+  })
+  .openapi("NotificationQuietHours");
+
+export const updateNotificationQuietHoursRequestSchema = z
+  .object({
+    start: wallClockTime.openapi({ description: "HH:MM, or null to turn quiet hours off." }),
+    end: wallClockTime.openapi({ description: "HH:MM, or null to turn quiet hours off." }),
+  })
+  .refine((value) => (value.start === null) === (value.end === null), {
+    message: "start and end must both be set, or both be null.",
+  })
+  .refine((value) => value.start === null || value.start !== value.end, {
+    message: "start and end must differ.",
+  })
+  .openapi("UpdateNotificationQuietHoursRequest");
+
+export const testNotificationResultSchema = z
+  .object({
+    notification_id: uuidSchema.openapi({ description: "The test notice added to the inbox." }),
+  })
+  .openapi("TestNotificationResult");

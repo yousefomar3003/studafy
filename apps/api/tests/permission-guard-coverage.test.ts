@@ -385,6 +385,9 @@ const EXPECTED_MUTATING_ROUTES = [
   // and digest-eligibility rules are enforced in the handler and, redundantly, by CHECK constraints
   // in migration 000083 — there is no other user's row this could reach.
   "PATCH /api/notification-preferences",
+  // Quiet hours and the test notice: the caller's own settings row and own inbox row, RLS-fenced.
+  "PUT /api/notification-preferences/quiet-hours",
+  "POST /api/notifications/test",
   // School billing portal (ST-137). Guarded by requirePermission(ORGANIZATION_MANAGE_BILLING) in
   // cancellation-routes.ts.
   "POST /api/subscriptions/current/cancel",
@@ -634,6 +637,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Notification preferences (ST-143) — personal per-user rows; RLS
   // (`notification_preferences_owner`, `user_id = app.current_user_id()`) is the fence.
   "PATCH /api/notification-preferences",
+  // Quiet hours (`user_notification_settings_owner`) and the caller's own test notice.
+  "PUT /api/notification-preferences/quiet-hours",
+  "POST /api/notifications/test",
   // Self-service account deletion/export — the subject is always the caller (never a body
   // parameter), so there is no other user's data to protect.
   "POST /api/privacy/me/dsr",
