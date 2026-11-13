@@ -10,6 +10,7 @@ import 'deletion_pending_screen.dart';
 import 'legal_acceptance_screen.dart';
 import 'locale_toggle_button.dart';
 import 'pill_navigation_bar.dart';
+import 'platform_banner.dart';
 import 'push_permission_banner.dart';
 import 'shell_destinations.dart';
 import 'view_only_banner.dart';
@@ -120,6 +121,7 @@ class _AppShellScaffoldState extends ConsumerState<_AppShellScaffold> {
       ),
       body: Column(
         children: [
+          const PlatformBannerStrip(),
           if (widget.shellRole == ShellRole.viewer) const ViewOnlyBanner(),
           if (pushSetup == PushSetup.needsPermission)
             const PushPermissionBanner(),

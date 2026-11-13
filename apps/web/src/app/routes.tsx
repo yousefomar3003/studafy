@@ -219,6 +219,22 @@ const PlatformSchoolDetailPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/SchoolDetailPage"),
 );
+const PlatformAnnouncementsPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/ops/AnnouncementsPage"),
+);
+const PlatformActivityPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/ops/ActivityPage"),
+);
+const PlatformHealthPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/ops/HealthPage"),
+);
+const PlatformFlagsPage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/ops/FlagsPage"),
+);
 const PlatformPlansPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/PlansPage"),
@@ -700,6 +716,10 @@ export const routes: RouteObject[] = [
                 "platform/schools/:schoolId/users/:userId",
                 <PlatformUserSupportPage key="user-support" />,
               ],
+              ["platform/announcements", <PlatformAnnouncementsPage key="announcements" />],
+              ["platform/activity", <PlatformActivityPage key="activity" />],
+              ["platform/health", <PlatformHealthPage key="health" />],
+              ["platform/flags", <PlatformFlagsPage key="flags" />],
               // The license console (docs/billing/feature-licensing.md, session 4).
               ["platform/features", <PlatformFeaturesPage key="features" />],
               ["platform/tiers", <PlatformTiersPage key="tiers" />],

@@ -21,6 +21,10 @@ const SECTIONS = [
   { to: "/portal/platform/pricing", labelKey: "platformLicensing.nav.pricing", end: false },
   { to: "/portal/platform/settings", labelKey: "platform.nav.settings", end: false },
   { to: "/portal/platform/users", labelKey: "platform.nav.users", end: false },
+  { to: "/portal/platform/announcements", labelKey: "platform.nav.announcements", end: false },
+  { to: "/portal/platform/activity", labelKey: "platform.nav.activity", end: false },
+  { to: "/portal/platform/health", labelKey: "platform.nav.health", end: false },
+  { to: "/portal/platform/flags", labelKey: "platform.nav.flags", end: false },
 ] as const;
 
 /**

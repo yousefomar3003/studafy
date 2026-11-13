@@ -65,6 +65,20 @@ when it required the `version-bump` label.
   (`PlatformSupportUnlocked`), `POST .../deactivate` and `POST .../reactivate`
   (`PlatformSupportStatusChanged`). Reading needs `platform:read`, actions `platform:manage`; web
   only. Another SUPER_ADMIN's account is refused; there is no impersonation route.
+- Platform console operations (000214), all web-only and `platform:read`, writes `platform:manage`:
+  `GET`/`POST /api/platform/announcements` and `PATCH /api/platform/announcements/{announcementId}`
+  (`PlatformAnnouncement`, `CreatePlatformAnnouncement`, `UpdatePlatformAnnouncement` with a
+  required `reason` and `endNow`) schedule Studafy-wide banners for everyone or school staff only,
+  with `info`, `warning` or non-dismissible `maintenance` severity; `GET /api/platform/activity`
+  (`PlatformActivityList`, keyset `cursor`, filters `actorId`, `action`, `targetTable`, `schoolId`,
+  `from`, `to`) and `GET /api/platform/activity/operators` (`PlatformOperatorList`) list what
+  SUPER_ADMIN and SUPPORT_AGENT accounts did, with the school each change touched;
+  `GET /api/platform/health` (`PlatformSystemHealth`) reports job queues, scheduled runs,
+  notification dead letters, payment webhook failures, email bounces and the latest storage
+  orphan report, plus `notAvailable` signals; `GET /api/platform/feature-flags`
+  (`PlatformFlagOverviewList`) shows every flag's deployment default and per-school overrides.
+  `GET /api/platform-banners` (`PlatformBannerList`) returns the banners live for any signed-in
+  user, web or mobile.
 - Moving students to the next year: `GET /api/academics/promotions/preview?source_year_id=&target_year_id=`
   (`PromotionPreview`, `PromotionPreviewStudent`, `PromotionTargetSection`) proposes a target-year
   destination for every student placed in the source year from their current annual result

@@ -4,7 +4,13 @@
     "primaryNavAriaLabel": "التنقل الرئيسي",
     "toggleNav": "تبديل التنقل",
     "homeLink": "الصفحة الرئيسية لـ Studafy",
-    "back": "رجوع"
+    "back": "رجوع",
+    "platformBanner": {
+      "info": "تنبيه:",
+      "warning": "تحذير:",
+      "maintenance": "صيانة:",
+      "dismiss": "إخفاء هذا الإعلان"
+    }
   },
   "nav": {
     "ariaLabel": "البوابة",

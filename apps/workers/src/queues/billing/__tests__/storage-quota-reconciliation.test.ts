@@ -137,6 +137,12 @@ describe("storage quota reconciliation sweep", () => {
       const result = await runStorageQuotaReconciliation(db!, storage, silentLogger);
       expect(result.corrected).toBeGreaterThanOrEqual(1);
       expect(result.bytesMeasured).toBeGreaterThan(0);
+      // The per-school line the platform console's system health page reads.
+      const line = result.perSchool.find((entry) => entry.schoolId === schoolId);
+      expect(line).toMatchObject({
+        bytesUsed: countedBytes(schoolId, storage.objects),
+        failed: false,
+      });
 
       expect(await readMeterBytes(schoolId)).toBe(countedBytes(schoolId, storage.objects));
     },
@@ -174,6 +180,8 @@ describe("storage quota reconciliation sweep", () => {
 
       const result = await runStorageQuotaReconciliation(db!, storage, silentLogger);
       expect(result.failed).toBeGreaterThanOrEqual(1);
+      expect(result.perSchool.find((entry) => entry.schoolId === first)?.failed).toBe(true);
+      expect(result.perSchool.find((entry) => entry.schoolId === second)?.failed).toBe(false);
 
       expect(await readMeterBytes(first)).toBe(1234);
       expect(await readMeterBytes(second)).toBe(500);
