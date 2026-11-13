@@ -27,6 +27,7 @@ import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { buildMemberLoginRateLimitKey, MEMBER_LOGIN_BUDGETS } from "../../../config/rateLimits";
+import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { extractClientIp, takeRateLimitToken } from "../../../middleware/rateLimiter";
@@ -242,7 +243,7 @@ export function memberPasswordRoutes(
       body.device_token !== undefined &&
       (await isTrustedMemberDevice(db, body.username, body.device_token));
     if (!trustedDevice) await throttleMemberLogin(c, redis, eventSink, body.username);
-    const clientIp = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? null;
+    const clientIp = clientIpFrom(c);
     const userAgent = c.req.header("user-agent") ?? null;
 
     const result = await loginMember(db, config, {

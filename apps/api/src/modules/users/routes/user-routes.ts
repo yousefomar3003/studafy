@@ -3,6 +3,7 @@ import { PERMISSIONS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
+import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission, requirePermissionIn } from "../../../middleware/authz";
@@ -67,13 +68,6 @@ function tenantFrom(c: Context<AppEnv>): {
 } {
   const auth = requireAuth(c);
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
-}
-
-function clientIpFrom(c: Context<AppEnv>): string | null {
-  const forwarded = c.req.header("X-Forwarded-For");
-  if (forwarded === undefined) return null;
-  const first = forwarded.split(",")[0]?.trim();
-  return first !== undefined && first.length > 0 ? first : null;
 }
 
 // ---------------------------------------------------------------------------
