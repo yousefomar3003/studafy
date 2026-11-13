@@ -5,12 +5,15 @@ import { Link, useParams } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
+import { EditSchoolProfileDialog } from "./EditSchoolProfileDialog";
 import { SchoolGrantsCard } from "./grants/SchoolGrantsCard";
 import { SchoolLicenseSection } from "./licensing/SchoolLicenseSection";
 import { useChangeSchoolStatus, useSetFeatureFlag } from "./mutations";
 import { PlatformPageHeader, SchoolStatusPill } from "./PlatformNav";
 import { useSchoolDetailQuery } from "./queries";
+import { SchoolExportsCard } from "./SchoolExportsCard";
 import { SchoolMembersCard } from "./SchoolMembersCard";
+import { SchoolUsageCard } from "./SchoolUsageCard";
 
 import "./platform.css";
 
@@ -63,6 +66,8 @@ export default function SchoolDetailPage() {
       </div>
 
       <div className="platform-stack">
+        <SchoolUsageCard schoolId={school.id} />
+
         <Card as="section" aria-labelledby="platform-lifecycle-title">
           <Card.Header>
             <h2 id="platform-lifecycle-title">{t("platform.school.lifecycle.title")}</h2>
@@ -93,6 +98,8 @@ export default function SchoolDetailPage() {
 
         <SchoolGrantsCard schoolId={school.id} schoolName={school.name} />
 
+        <SchoolExportsCard schoolId={school.id} schoolName={school.name} />
+
         <FeatureFlagsCard school={school} />
       </div>
 
@@ -104,6 +111,7 @@ export default function SchoolDetailPage() {
 function ProfileCard({ school }: { school: PlatformSchoolDetail }) {
   const { t } = useTranslation();
   const { formatDate } = useFormatters();
+  const [editing, setEditing] = useState(false);
   const date = (value: string | null) =>
     value ? formatDate(new Date(value), { dateStyle: "medium" }) : t("platform.common.never");
 
@@ -122,6 +130,14 @@ function ProfileCard({ school }: { school: PlatformSchoolDetail }) {
           <dd>{school.schoolNumber}</dd>
           <dt>{t("platform.school.profile.region")}</dt>
           <dd>{`${school.countryCode} · ${school.currencyCode}`}</dd>
+          <dt>{t("platform.school.profile.language")}</dt>
+          <dd>
+            {school.locale
+              ? t(`platform.languages.${school.locale}`, { defaultValue: school.locale })
+              : t("platform.school.profile.defaultSetting")}
+          </dd>
+          <dt>{t("platform.school.profile.timezone")}</dt>
+          <dd>{school.timezone ?? t("platform.school.profile.defaultSetting")}</dd>
           <dt>{t("platform.school.profile.created")}</dt>
           <dd>{date(school.createdAt)}</dd>
           <dt>{t("platform.school.profile.emailVerified")}</dt>
@@ -133,6 +149,15 @@ function ProfileCard({ school }: { school: PlatformSchoolDetail }) {
             </>
           ) : null}
         </dl>
+        <div className="platform-card-actions">
+          <Button variant="secondary" onClick={() => setEditing(true)}>
+            {t("platform.school.editProfile.open")}
+          </Button>
+        </div>
+        {/* Mounted only while open, so the form always starts from the school as it is now. */}
+        {editing ? (
+          <EditSchoolProfileDialog school={school} open onClose={() => setEditing(false)} />
+        ) : null}
       </Card.Body>
     </Card>
   );

@@ -22,6 +22,20 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Platform console school administration (super admin only, web only):
+  `PATCH /api/platform/schools/{schoolId}/profile` (`UpdatePlatformSchoolProfile`, with a required
+  `reason`) edits a school's name, contact email, country, currency, default language and timezone;
+  country and currency are refused (409) once the school has billing records, and an email another
+  school uses is refused (409). `GET /api/platform/schools/{schoolId}/usage` (`PlatformSchoolUsage`)
+  returns accounts per role (active and not yet activated), open invitations, storage against the
+  cap, AI add-ons and this month's feature use, last sign-in, and the active licence's seats.
+  `POST`/`GET /api/platform/schools/{schoolId}/exports` (`CreatePlatformSchoolExport`,
+  `PlatformSchoolExport`, `PlatformSchoolExportList`) file and list whole-school data exports, and
+  `GET /api/platform/schools/{schoolId}/exports/{exportId}` issues a one-hour download link once an
+  export completes (audited). `PlatformSchoolSummary` gains `storageBytesUsed`, `storageCapBytes`
+  and `lastActivityAt`; `PlatformSchoolDetail` gains `locale` and `timezone`;
+  `GET /api/platform/schools` gains `sort` (`created`, `name`, `students`, `storage`,
+  `lastActivity`), `order`, `activity=inactive30d` and `storage=nearCap`.
 - Manual grants (000211), for storage and tiers paid in cash or by transfer: `POST
 /api/platform/schools/{schoolId}/grants` (`PlatformCreateManualGrant`) gives a school a storage
   cap (`kind: "storage"`, `capBytes`: the 100 GB and 1 TB tiers or any custom figure) or one person

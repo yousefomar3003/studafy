@@ -6,7 +6,11 @@
 
 export type DsrRequestType = "export" | "erasure";
 export type DsrSubjectScope = "tenant" | "user";
-export type DsrReason = "tenant_closure" | "user_request";
+/**
+ * `platform_export`: a whole-school export the platform console filed for an open school (000212).
+ * Never an erasure, and never mistaken for the closure export (see findLatestTenantClosureRequest).
+ */
+export type DsrReason = "tenant_closure" | "user_request" | "platform_export";
 export type DsrStatus = "queued" | "processing" | "completed" | "failed";
 
 /** One table an erasure pass actually changed. Stored in app.data_subject_requests.redacted_tables. */
@@ -30,7 +34,8 @@ export interface DataSubjectRequestRow {
   subjectScope: DsrSubjectScope;
   reason: DsrReason;
   subjectUserId: string | null;
-  requestedByUserId: string;
+  /** Null only for a platform export: the operator belongs to another school (000213). */
+  requestedByUserId: string | null;
   status: DsrStatus;
   storageKey: string | null;
   redactedTables: RedactedTableEntry[];
