@@ -911,7 +911,8 @@
       "unknownClass": "a class",
       "done": "Done"
     },
-    "classesLink": "Classes"
+    "classesLink": "Classes",
+    "promotionLink": "Move students to next year"
   },
   "students": {
     "title": "Students",
@@ -1224,6 +1225,98 @@
       "status": "Status",
       "statusHelper": "Only active courses are offered for new classes.",
       "save": "Save"
+    }
+  },
+  "promotion": {
+    "title": "Move students to next year",
+    "description": "After the year's results are finalized, move every student into next year's classes. Each student gets a suggested class from their result; check it, change any you want, then confirm. Nothing in this year changes, and you can run it again safely.",
+    "sectionsLink": "Grades & sections",
+    "yearsLink": "School years & terms",
+    "fromYear": "From year",
+    "toYear": "To year",
+    "noTargetYear": "No next year yet",
+    "createYearFirst": "Create next year first (School years & terms), then copy this year's set-up and sections into it in Academic setup.",
+    "loadError": "Unable to load the students. Try again.",
+    "empty": "No students are placed in this year's sections.",
+    "counts": "{{place}} to place · {{graduate}} graduating · {{skip}} not moving · {{done}} already done",
+    "targets": {
+      "heading": "Next year's sections",
+      "caption": "Next year's sections with their current and incoming students",
+      "empty": "Next year has no sections yet. Add them on Grades & sections, or copy them from this year in Academic setup.",
+      "section": "Section",
+      "placed": "Placed already",
+      "incoming": "Incoming"
+    },
+    "bulk": {
+      "selected_one": "{{count}} student selected",
+      "selected_other": "{{count}} students selected",
+      "label": "Move selected to",
+      "apply": "Apply to selected"
+    },
+    "groupLabel": "Students from {{section}}",
+    "selectAll": "Select all in {{section}}",
+    "selectStudent": "Select {{name}}",
+    "destinationFor": "Destination for {{name}}",
+    "columns": {
+      "select": "Select",
+      "student": "Student",
+      "result": "Result",
+      "destination": "Moves to",
+      "note": "Why"
+    },
+    "result": {
+      "promoted": "Promoted",
+      "retained": "Retained",
+      "supplementary": "Resit",
+      "incomplete": "Incomplete",
+      "none": "No result"
+    },
+    "choice": {
+      "placeholder": "Choose…",
+      "graduate": "Graduate",
+      "skip": "Don't move"
+    },
+    "reason": {
+      "promoted": "Passed: next grade, same section",
+      "retained": "Retained: same grade",
+      "final_grade": "Passed the final grade",
+      "awaiting_resit": "Waiting for the resit result",
+      "incomplete_result": "Result is incomplete: choose a destination",
+      "no_result": "No final result: choose a destination",
+      "no_matching_section": "No section with this name next year: choose one",
+      "already_placed": "Already moved",
+      "already_graduated": "Already graduated",
+      "inactive_student": "Withdrawn or archived"
+    },
+    "needsDecision": "Choose a destination",
+    "doneGraduated": "Graduated",
+    "donePlaced": "Moved to {{section}}",
+    "unresolved_one": "{{count}} student still needs a destination.",
+    "unresolved_other": "{{count}} students still need a destination.",
+    "confirm": "Move students",
+    "confirmTitle": "Move students to {{target}}?",
+    "confirmDescription": "{{place}} will be placed in next year's sections, {{graduate}} will be marked as graduated and {{skip}} won't move. This year's classes, results and certificates stay as they are.",
+    "confirmAction": "Move students",
+    "done": {
+      "toast": "Students moved",
+      "failed": "Couldn't move the students",
+      "heading": "Done",
+      "movedUp_one": "{{count}} moved up a grade",
+      "movedUp_other": "{{count}} moved up a grade",
+      "retained_one": "{{count}} kept in the same grade",
+      "retained_other": "{{count}} kept in the same grade",
+      "moved_one": "{{count}} placed in another grade",
+      "moved_other": "{{count}} placed in another grade",
+      "graduated_one": "{{count}} graduated",
+      "graduated_other": "{{count}} graduated",
+      "awaitingResit_one": "{{count}} waiting for a resit",
+      "awaitingResit_other": "{{count}} waiting for a resit",
+      "skipped_one": "{{count}} not moved",
+      "skipped_other": "{{count}} not moved",
+      "alreadyDone_one": "{{count}} already done before",
+      "alreadyDone_other": "{{count}} already done before",
+      "failedCount_one": "{{count}} couldn't be moved (withdrawn, or the section is no longer there)",
+      "failedCount_other": "{{count}} couldn't be moved (withdrawn, or the section is no longer there)"
     }
   }
 }

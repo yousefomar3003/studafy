@@ -325,6 +325,8 @@ describe("structure", () => {
         "/api/academics/sections/{sectionId}",
         "/api/academics/sections/{sectionId}/students",
         "/api/academics/sections/{sectionId}/students/{studentId}",
+        "/api/academics/promotions/preview",
+        "/api/academics/promotions/apply",
         // Academic grading (000160).
         "/api/grading/assessments/{assessmentId}/decision",
         "/api/grading/certificates",
@@ -1014,6 +1016,7 @@ describe("security", () => {
         "GET /api/academics/sections",
         "GET /api/academics/sections/{sectionId}",
         "GET /api/academics/sections/{sectionId}/students",
+        "GET /api/academics/promotions/preview",
         "GET /api/academics/materials",
         "GET /api/academics/materials/{materialId}",
         "GET /api/academics/slots/{slotId}",
@@ -1215,6 +1218,7 @@ describe("security", () => {
         "POST /api/academics/grade-levels",
         "POST /api/academics/sections",
         "POST /api/academics/sections/{sectionId}/students",
+        "POST /api/academics/promotions/apply",
         // Academic grading (000160). Every route is authenticated and permission-gated.
         "DELETE /api/grading/scales/{scaleId}",
         "DELETE /api/grading/subject-configs/{configId}",

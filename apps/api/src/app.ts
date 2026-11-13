@@ -33,6 +33,7 @@ import {
   classRoutes,
   roomRoutes,
   sectionRoutes,
+  promotionRoutes,
   enrollmentRoutes,
   timetableRoutes,
   examRoutes,
@@ -1097,6 +1098,12 @@ export function createApp({
   // in a section, which enrolls them into its classes. Writes gated on TIMETABLE_MANAGE.
   if (database) {
     app.route("/", sectionRoutes(database));
+  }
+
+  // Moving students to the next year after results are finalized: preview proposed destinations,
+  // then apply them in batches. Web only; TIMETABLE_MANAGE and ACADEMIC_CONFIG_MANAGE.
+  if (database) {
+    app.route("/", promotionRoutes(database));
   }
 
   // Room directory (read-only). Rooms are provisioned during school setup; this only exposes the

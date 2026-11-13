@@ -110,11 +110,18 @@ export default function GradesSectionsPage() {
     <>
       <div className="principal-school__header">
         <h1>{t("principal.sections.title")}</h1>
-        {permissions.has(PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW) ? (
-          <LinkButton href="/portal/principal/classes" variant="secondary">
-            {t("principal.sections.classesLink")}
-          </LinkButton>
-        ) : null}
+        <div className="sections-page__row-actions">
+          {permissions.has(PERMISSIONS.ACADEMIC_CONFIG_MANAGE) ? (
+            <LinkButton href="/portal/principal/promotion" variant="secondary">
+              {t("principal.sections.promotionLink")}
+            </LinkButton>
+          ) : null}
+          {permissions.has(PERMISSIONS.PRINCIPAL_DASHBOARD_VIEW) ? (
+            <LinkButton href="/portal/principal/classes" variant="secondary">
+              {t("principal.sections.classesLink")}
+            </LinkButton>
+          ) : null}
+        </div>
       </div>
       <p>{t("principal.sections.description")}</p>
 
