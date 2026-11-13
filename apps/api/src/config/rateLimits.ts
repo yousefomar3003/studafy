@@ -100,7 +100,7 @@ export const MEMBER_LOGIN_BUDGETS = {
 } as const satisfies Record<string, RateLimitBudget>;
 
 /**
- * "Add <child> to this phone" (000215): per parent. A family adds each child once per phone, so ten
+ * "Add <child> to this phone" (000217): per parent. A family adds each child once per phone, so ten
  * an hour is generous for real use and stops a stolen parent session from minting child sessions in
  * bulk. On top of the per-IP `auth` class.
  */

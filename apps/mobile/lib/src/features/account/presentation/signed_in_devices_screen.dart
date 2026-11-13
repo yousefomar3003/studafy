@@ -174,7 +174,7 @@ class _SessionTile extends StatelessWidget {
             : 'account.devices.channel.${session.channel == SessionChannel.$unknown ? 'api' : session.channel.name}'
                   .tr(),
       ),
-      // A parent who put this account on their phone from the parent app (000215) says so, so a
+      // A parent who put this account on their phone from the parent app (000217) says so, so a
       // student knows where that session came from and can end it like any other.
       subtitle: Text(
         session.openedByGuardianUserId != null

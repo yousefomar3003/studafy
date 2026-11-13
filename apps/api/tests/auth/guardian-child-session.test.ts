@@ -28,7 +28,7 @@ import type { Role } from "@studafy/constants";
 import type { Sql } from "postgres";
 
 /**
- * "Add <child> to this phone" (000215): a parent opens their linked child's own session from the
+ * "Add <child> to this phone" (000217): a parent opens their linked child's own session from the
  * parent app. Only a parent, only for a linked child, only while the school allows it and the
  * child's account is in use; the session is the child's, marked as opened by the parent in the
  * child's session list, and the parent is the audit actor.

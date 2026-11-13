@@ -587,7 +587,7 @@ export interface ActiveSession {
   ipAddress: string | null;
   issuedAt: Date;
   expiresAt: Date;
-  /** The parent who opened this session from the parent app (000215), or null for an ordinary sign-in. */
+  /** The parent who opened this session from the parent app (000217), or null for an ordinary sign-in. */
   openedByGuardianUserId: string | null;
 }
 

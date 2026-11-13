@@ -17,7 +17,7 @@ export interface ParentAppSectionProps {
 
 /**
  * What parents can do from the mobile app: today, whether a linked parent may put their child's own
- * account on their phone with one tap ("Add <child> to this phone", 000215). Saves directly: turning
+ * account on their phone with one tap ("Add <child> to this phone", 000217). Saves directly: turning
  * it off only stops new ones, so there is nothing for a confirmation to warn about.
  */
 export function ParentAppSection({ settings, loading }: ParentAppSectionProps) {

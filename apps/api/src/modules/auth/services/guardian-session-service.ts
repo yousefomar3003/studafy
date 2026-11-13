@@ -1,5 +1,5 @@
 /**
- * "Add <child> to this phone" (000215): a parent signed in on the mobile app puts a linked child's
+ * "Add <child> to this phone" (000217): a parent signed in on the mobile app puts a linked child's
  * own account on the family phone with one tap, instead of typing the child's long member ID and
  * password. The result is an ordinary student session -- the same token pair, lifetimes and
  * rotation family a member sign-in produces -- so everything the child does afterwards is done as

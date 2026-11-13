@@ -28,7 +28,7 @@ ALTER TABLE app.school_settings
 
 COMMENT ON COLUMN app.school_settings.allow_parent_device_signin IS
   'When true, a linked parent can put the child''s own account on their phone from the parent app '
-  '(guardian-issued student session, 000215).';
+  '(guardian-issued student session, 000217).';
 
 CREATE TABLE app.guardian_issued_sessions (
   school_id uuid NOT NULL,
@@ -54,7 +54,7 @@ CREATE INDEX idx_guardian_issued_sessions_guardian
   ON app.guardian_issued_sessions (guardian_user_id, school_id);
 
 COMMENT ON TABLE app.guardian_issued_sessions IS
-  'Refresh-token families a linked parent opened for their child from the parent app (000215). '
+  'Refresh-token families a linked parent opened for their child from the parent app (000217). '
   'The session itself lives in refresh_tokens and is revoked there.';
 
 REVOKE ALL PRIVILEGES ON TABLE app.guardian_issued_sessions FROM PUBLIC, studafy_app;
