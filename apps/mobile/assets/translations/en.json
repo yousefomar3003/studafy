@@ -1174,7 +1174,7 @@
       "retry": "Try again",
       "list": {
         "title": "Marks",
-        "empty": "You aren't assigned to grade any subject this year.",
+        "empty": "No subjects to grade yet. Marks open once your school has activated this year's grading in Academic setup, set up grading for your class's subject and grade, and you teach that section. Ask your principal if this looks wrong.",
         "error": "Couldn't load your subjects.",
         "sectionLine": "{grade} · {section}",
         "statusCount": "{status}: {count}"

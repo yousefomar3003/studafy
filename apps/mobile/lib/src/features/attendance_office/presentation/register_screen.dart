@@ -37,6 +37,8 @@ class RegisterScreen extends ConsumerStatefulWidget {
     required this.classCode,
     required this.date,
     this.canCorrect = true,
+    this.allowDateChange = false,
+    this.windowExpiredMessageKey = 'attendanceOffice.register.windowExpired',
     super.key,
   });
 
@@ -46,6 +48,13 @@ class RegisterScreen extends ConsumerStatefulWidget {
 
   /// Whether a submitted register offers "Correct" on each record (the caller can correct).
   final bool canCorrect;
+
+  /// Whether the app bar offers a date picker that reopens this class's register on another day
+  /// (today or earlier). The teacher's entry point turns it on; the office has its own date bar.
+  final bool allowDateChange;
+
+  /// Shown when a correction is refused because the school's correction window has closed.
+  final String windowExpiredMessageKey;
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -91,6 +100,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             Text(dateLabel, style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
+        actions: [
+          if (widget.allowDateChange)
+            IconButton(
+              key: const Key('registerChangeDate'),
+              tooltip: 'attendanceOffice.registers.changeDate'.tr(),
+              icon: const Icon(Icons.calendar_today_outlined),
+              onPressed: _pickDate,
+            ),
+        ],
       ),
       body: registerAsync.when(
         skipLoadingOnRefresh: true,
@@ -347,12 +365,41 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       context,
       record: record,
       studentLabel: name,
-      windowExpiredMessageKey: 'attendanceOffice.register.windowExpired',
+      windowExpiredMessageKey: widget.windowExpiredMessageKey,
     );
     if (saved == true && mounted) {
       ref.invalidate(officeSessionRecordsProvider(record.attendanceSessionId));
       _snack('attendanceOffice.register.corrected'.tr());
     }
+  }
+
+  /// Reopens the same class's register on the picked day (never a future one).
+  Future<void> _pickDate() async {
+    final today = dateOnly(DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: dateOnly(widget.date),
+      firstDate: DateTime(today.year - 1, today.month, today.day),
+      lastDate: today,
+      helpText: 'attendanceOffice.registers.date'.tr(),
+    );
+    if (picked == null ||
+        !mounted ||
+        dateOnly(picked) == dateOnly(widget.date)) {
+      return;
+    }
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => RegisterScreen(
+          classId: widget.classId,
+          classCode: widget.classCode,
+          date: dateOnly(picked),
+          canCorrect: widget.canCorrect,
+          allowDateChange: widget.allowDateChange,
+          windowExpiredMessageKey: widget.windowExpiredMessageKey,
+        ),
+      ),
+    );
   }
 
   // --- Helpers -------------------------------------------------------------

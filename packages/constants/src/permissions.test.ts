@@ -70,14 +70,17 @@ describe("ROLE_PERMISSIONS", () => {
   });
 
   // Registers are taken by the attendance office and by teachers (row scope keeps a teacher to their
-  // own classes); corrections stay with the office and the principal. SUPER_ADMIN holds every
-  // permission by design.
+  // own classes). Teachers also correct their own classes within the correction window; correcting
+  // past it stays with the office and the principal. SUPER_ADMIN holds every permission by design.
   test("the attendance officer and teachers take registers", () => {
     expect(rolesHolding(PERMISSIONS.ATTENDANCE_RECORD_CREATE)).toEqual(
       [ROLES.ATTENDANCE_OFFICER, ROLES.INSTRUCTOR, ROLES.SUPER_ADMIN].sort(),
     );
     expect(rolesHolding(PERMISSIONS.ATTENDANCE_RECORD_CORRECT)).toEqual(
-      [ROLES.ATTENDANCE_OFFICER, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
+      [ROLES.ATTENDANCE_OFFICER, ROLES.INSTRUCTOR, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
+    );
+    expect(rolesHolding(PERMISSIONS.ATTENDANCE_CORRECTION_OVERRIDE)).not.toContain(
+      ROLES.INSTRUCTOR,
     );
   });
 

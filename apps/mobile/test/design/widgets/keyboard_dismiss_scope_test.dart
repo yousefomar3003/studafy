@@ -20,8 +20,15 @@ void main() {
         home: Scaffold(
           body: Column(
             children: [
-              TextField(key: const Key('field'), focusNode: focusNode, maxLines: 4),
-              TextButton(onPressed: () => buttonTaps++, child: const Text('Tap me')),
+              TextField(
+                key: const Key('field'),
+                focusNode: focusNode,
+                maxLines: 4,
+              ),
+              TextButton(
+                onPressed: () => buttonTaps++,
+                child: const Text('Tap me'),
+              ),
               const Expanded(child: SizedBox.expand(key: Key('blank'))),
             ],
           ),
@@ -56,6 +63,56 @@ void main() {
     await tester.tap(find.byKey(const Key('field')));
     await tester.pump();
     await tester.tap(find.byKey(const Key('field')));
+    await tester.pump();
+    expect(focusNode.hasFocus, isTrue);
+  });
+
+  testWidgets(
+    'tapping a list tile closes the keyboard and the tile still gets its tap',
+    (tester) async {
+      var tileTaps = 0;
+      await tester.pumpWidget(
+        MaterialApp(
+          builder: (context, child) => KeyboardDismissScope(child: child!),
+          home: Scaffold(
+            body: ListView(
+              children: [
+                TextField(key: const Key('field'), focusNode: focusNode),
+                ListTile(title: const Text('Row'), onTap: () => tileTaps++),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('field')));
+      await tester.pump();
+      expect(focusNode.hasFocus, isTrue);
+
+      await tester.tap(find.text('Row'));
+      await tester.pump();
+      expect(tileTaps, 1);
+      expect(focusNode.hasFocus, isFalse);
+    },
+  );
+
+  testWidgets('scrolling a form keeps the keyboard open', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => KeyboardDismissScope(child: child!),
+        home: Scaffold(
+          body: ListView(
+            children: [
+              TextField(key: const Key('field'), focusNode: focusNode),
+              for (var i = 0; i < 30; i++) ListTile(title: Text('Row $i')),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.byKey(const Key('field')));
+    await tester.pump();
+
+    await tester.drag(find.text('Row 5'), const Offset(0, -200));
     await tester.pump();
     expect(focusNode.hasFocus, isTrue);
   });

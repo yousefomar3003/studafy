@@ -368,9 +368,12 @@ const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
   PERMISSIONS.DISCIPLINE_INCIDENT_CREATE,
   PERMISSIONS.DISCIPLINE_INCIDENT_READ,
   // Takes registers for their own classes (row scope limits writes to classes they teach, as it
-  // does reads); corrections stay with the attendance officer and the principal.
+  // does reads), and corrects them within the school's correction window: the correction service
+  // checks app.teaches_class and refuses a teacher once the window has closed. Correcting past the
+  // window (ATTENDANCE_CORRECTION_OVERRIDE) stays with the attendance officer and the principal.
   PERMISSIONS.ATTENDANCE_DASHBOARD_VIEW,
   PERMISSIONS.ATTENDANCE_RECORD_CREATE,
+  PERMISSIONS.ATTENDANCE_RECORD_CORRECT,
   PERMISSIONS.ATTENDANCE_RECORD_READ,
   PERMISSIONS.ATTENDANCE_REPORT_READ,
   // Reads the record fields the school marked teacher-visible (an allergy, a bus stop) for

@@ -92,6 +92,32 @@ export function redactPayload(data: Record<string, unknown>): Record<string, unk
 // ---------------------------------------------------------------------------
 
 /**
+ * The before/after pair shaped to what `ck_audit_logs_payload` requires: an insert has no before
+ * and an after, an update has both, a delete has a before and no after. A caller that leaves a
+ * required side out gets an empty object there instead of a failed statement -- before this,
+ * an "update" or "delete" written without `oldValues` aborted the whole transaction with 500
+ * (saving marks, deleting a class, section and enrolment changes, payment webhooks among them).
+ * A side the action forbids is dropped. Other actions pass through unchanged.
+ */
+export function auditPayload(entry: Pick<AuditEntry, "action" | "oldValues" | "newValues">): {
+  oldValues: Record<string, unknown> | null;
+  newValues: Record<string, unknown> | null;
+} {
+  const oldValues = entry.oldValues ?? null;
+  const newValues = entry.newValues ?? null;
+  switch (entry.action) {
+    case "insert":
+      return { oldValues: null, newValues: newValues ?? {} };
+    case "update":
+      return { oldValues: oldValues ?? {}, newValues: newValues ?? {} };
+    case "delete":
+      return { oldValues: oldValues ?? {}, newValues: null };
+    default:
+      return { oldValues, newValues };
+  }
+}
+
+/**
  * Insert one app.audit_logs row in the current transaction.
  *
  * Identity columns (school_id, actor_id, request_id) are read from PostgreSQL
@@ -104,8 +130,9 @@ export async function emitAuditLog(tx: TransactionSql, entry: AuditEntry): Promi
   // stringified value would therefore encode it a second time and store a JSON string, which the
   // audit table's object-only constraints correctly reject. SQL NULL must stay distinct from the
   // JSON value null for the same reason.
-  const oldJson = entry.oldValues != null ? tx.json(entry.oldValues as JSONValue) : null;
-  const newJson = entry.newValues != null ? tx.json(entry.newValues as JSONValue) : null;
+  const { oldValues, newValues } = auditPayload(entry);
+  const oldJson = oldValues != null ? tx.json(oldValues as JSONValue) : null;
+  const newJson = newValues != null ? tx.json(newValues as JSONValue) : null;
 
   await tx`
     INSERT INTO app.audit_logs (
