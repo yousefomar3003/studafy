@@ -227,38 +227,52 @@ async function confirmAndComplete(tenant: Tenant, importId: string) {
     tenant.schoolId,
     (tx) =>
       tx<
-        { line_number: number; record: { admission_number: string; parent_email: string | null } }[]
+        {
+          line_number: number;
+          record: {
+            admission_number: string;
+            parent_email: string | null;
+            parent2_email?: string | null;
+          };
+        }[]
       >`
       SELECT line_number, record FROM app.student_import_rows
       WHERE import_id = ${importId}::uuid AND record IS NOT NULL ORDER BY line_number
     `,
   );
   const parents = new Map<string, string>();
-  const written: { line: number; studentId: string; parentId: string | null }[] = [];
+  const written: {
+    line: number;
+    studentId: string;
+    parentId: string | null;
+    parent2Id: string | null;
+  }[] = [];
+  const parentFor = async (email: string | null | undefined, line: number, slot: number) => {
+    if (!email) return null;
+    const known = parents.get(email);
+    if (known) return known;
+    const parent = await createUser(database!.sql, tenant.schoolId, {
+      displayName: `Parent ${slot} of line ${line}`,
+    });
+    await assignRole(database!.sql, tenant.schoolId, parent.id, "PARENT");
+    parents.set(email, parent.id);
+    return parent.id;
+  };
   for (const row of rows) {
     const student = await createStudent(database!.sql, tenant.schoolId, {
       admissionNumber: row.record.admission_number,
       firstName: `First${row.line_number}`,
     });
-    let parentId: string | null = null;
-    if (row.record.parent_email) {
-      parentId = parents.get(row.record.parent_email) ?? null;
-      if (!parentId) {
-        const parent = await createUser(database!.sql, tenant.schoolId, {
-          displayName: `Parent of line ${row.line_number}`,
-        });
-        await assignRole(database!.sql, tenant.schoolId, parent.id, "PARENT");
-        parentId = parent.id;
-        parents.set(row.record.parent_email, parentId);
-      }
-    }
-    written.push({ line: row.line_number, studentId: student.id, parentId });
+    const parentId = await parentFor(row.record.parent_email, row.line_number, 1);
+    const parent2Id = await parentFor(row.record.parent2_email, row.line_number, 2);
+    written.push({ line: row.line_number, studentId: student.id, parentId, parent2Id });
   }
   await asSchool(tenant.schoolId, async (tx) => {
     for (const line of written) {
       await tx`
         UPDATE app.student_import_rows
         SET student_id = ${line.studentId}::uuid, parent_user_id = ${line.parentId}::uuid,
+            parent2_user_id = ${line.parent2Id}::uuid,
             record = NULL
         WHERE import_id = ${importId}::uuid AND line_number = ${line.line}
       `;
@@ -883,6 +897,95 @@ describeDb("unmapped columns", () => {
       }),
     );
     expect(applied.written).toBe(1);
+  });
+});
+
+describeDb("parent columns reach the parent they belong to", () => {
+  async function importTwoParents(tenant: Tenant) {
+    const job = await field(tenant, "parent", { field_type: "short_text", label_en: "Job" });
+    await publish(tenant, "parent");
+    const csv = [
+      "Student ID,First,Last,Email,Guardian Email,Relationship,Parent Phone," +
+        "Parent 2 Email,Parent 2 Relationship,Parent 2 Phone,Mother job,Father job,Home area",
+      `S-1,Rana,Haddad,rana@${tenant.slug}.local,mum@${tenant.slug}.local,mother,0501110001,` +
+        `dad@${tenant.slug}.local,father,0501110002,Teacher,Engineer,North`,
+    ].join("\n");
+    const uploaded = await json<ImportDto>(
+      await upload(tenant, csv, await stageSource(tenant.admin, csv)),
+    );
+    const [line] = await confirmAndComplete(tenant, uploaded.id);
+    return { job, importId: uploaded.id, mother: line!.parentId!, father: line!.parent2Id! };
+  }
+
+  async function apply(tenant: Tenant, importId: string, target: Record<string, unknown>) {
+    const preview = await json<PreviewDto>(
+      await call(tenant.admin, "POST", `/api/imports/students/${importId}/columns/preview`, target),
+    );
+    const response = await call(
+      tenant.admin,
+      "POST",
+      `/api/imports/students/${importId}/columns/apply`,
+      { ...target, preview_token: preview.preview_token },
+    );
+    expect(response.status).toBe(200);
+    return json<{ written: number }>(response);
+  }
+
+  async function jobOf(tenant: Tenant, parentId: string, fieldId: string) {
+    const response = await call(tenant.admin, "GET", `/api/parents/${parentId}/records`);
+    expect(response.status).toBe(200);
+    const body = await json<{ entries: { field: { id: string }; value: unknown }[] }>(response);
+    return body.entries.find((entry) => entry.field.id === fieldId)?.value ?? null;
+  }
+
+  test("counts each parent slot, and writes parent 2's column to parent 2 only", async () => {
+    const tenant = await createTenant();
+    const { job, importId, mother, father } = await importTwoParents(tenant);
+
+    const columns = await json<{
+      columns: { header: string; parent_count: number; parent2_count: number }[];
+    }>(await call(tenant.admin, "GET", `/api/imports/students/${importId}/columns`));
+    expect(columns.columns.find((column) => column.header === "Father job")).toMatchObject({
+      parent_count: 1,
+      parent2_count: 1,
+    });
+
+    const fatherJob = await apply(tenant, importId, {
+      position: 11,
+      subject_kind: "parent",
+      parent_slot: "parent2",
+      field_id: job,
+    });
+    expect(fatherJob.written).toBe(1);
+    expect(await jobOf(tenant, father, job)).toBe("Engineer");
+    expect(await jobOf(tenant, mother, job)).toBeNull();
+
+    const motherJob = await apply(tenant, importId, {
+      position: 10,
+      subject_kind: "parent",
+      parent_slot: "parent1",
+      field_id: job,
+    });
+    expect(motherJob.written).toBe(1);
+    expect(await jobOf(tenant, mother, job)).toBe("Teacher");
+    expect(await jobOf(tenant, father, job)).toBe("Engineer");
+  });
+
+  test("a shared column can be written to both parents", async () => {
+    const tenant = await createTenant();
+    const area = await field(tenant, "parent", { field_type: "short_text", label_en: "Area" });
+    await publish(tenant, "parent");
+    const { importId, mother, father } = await importTwoParents(tenant);
+
+    const written = await apply(tenant, importId, {
+      position: 12,
+      subject_kind: "parent",
+      parent_slot: "both",
+      field_id: area,
+    });
+    expect(written.written).toBe(2);
+    expect(await jobOf(tenant, mother, area)).toBe("North");
+    expect(await jobOf(tenant, father, area)).toBe("North");
   });
 });
 
