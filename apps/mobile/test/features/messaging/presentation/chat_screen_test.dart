@@ -132,10 +132,12 @@ void main() {
     final client = _clientWithThread();
     await _pumpChat(tester, client);
 
-    expect(_sendButton(tester).onPressed, isNull);
+    // Nothing to send: the button is the voice-note microphone, not send.
+    expect(find.byTooltip('Record a voice message'), findsOneWidget);
+    expect(find.widgetWithIcon(IconButton, Icons.arrow_upward), findsNothing);
     await tester.enterText(find.byType(TextField), '   ');
     await tester.pump();
-    expect(_sendButton(tester).onPressed, isNull);
+    expect(find.byTooltip('Record a voice message'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), '  See you at pickup ');
     await tester.pump();

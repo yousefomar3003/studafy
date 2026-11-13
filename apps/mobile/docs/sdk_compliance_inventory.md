@@ -91,6 +91,8 @@ Status values:
 | `image_picker` | 1.2.3 | Camera capture for materials | None. Uploads go to Studafy's API | Eligible |
 | `mime` | 2.0.0 | MIME detection | None | Eligible, on-device only |
 | `flutter_pdfview` | 1.4.5 | PDF rendering (`AndroidPdfViewer` / PDFKit) | None | Eligible, on-device only |
+| `record` | 7.2.0 | Voice notes in parent–teacher chats: records AAC to a local file (`AVAudioRecorder` / `MediaRecorder`) | None. The file is uploaded to Studafy's API only when the user taps send | Eligible, on-device only |
+| `audioplayers` | 6.8.1 | Plays voice notes (`AVPlayer` / `MediaPlayer`) from Studafy's pre-signed storage URLs | None beyond fetching the note from Studafy's storage | Eligible, on-device only |
 
 Dev dependencies such as `integration_test` are not in this table. Flutter leaves dev-dependency
 plugins out of release builds.

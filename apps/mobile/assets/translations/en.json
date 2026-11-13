@@ -1958,9 +1958,25 @@
     }
   },
   "messaging": {
+    "voice": {
+      "record": "Record a voice message",
+      "recordingLabel": "Recording voice message, {elapsed}",
+      "stop": "Stop recording",
+      "delete": "Delete voice message",
+      "send": "Send voice message",
+      "play": "Play voice message",
+      "pause": "Pause voice message",
+      "progress": "{position} of {length}",
+      "speed": "Playback speed {speed}",
+      "checking": "Checking for safety…",
+      "permissionDenied": "Microphone access is off. Turn it on in Settings to record voice messages.",
+      "recordFailed": "Couldn't start recording. Try again.",
+      "disabled": "Your school has turned off voice messages"
+    },
     "title": "Messages",
     "newMessage": "New message",
     "list": {
+      "voiceNote": "🎤 Voice message",
       "empty": "No conversations yet.",
       "emptyParentHint": "Tap New message to write to one of {name}'s teachers.",
       "emptyTeacherHint": "Tap New message to write to a parent of one of your students.",

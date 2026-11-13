@@ -19,7 +19,27 @@ export const MESSAGE_ATTACHMENT_CONTENT_TYPES = [
   "image/webp",
   "image/heic",
 ] as const;
-export type MessageAttachmentContentType = (typeof MESSAGE_ATTACHMENT_CONTENT_TYPES)[number];
+/** Mirrors ck_message_attachments_mime_type (000218) and the `message.voice` content class. */
+export const MESSAGE_VOICE_CONTENT_TYPES = ["audio/mp4", "audio/aac"] as const;
+export type MessageVoiceContentType = (typeof MESSAGE_VOICE_CONTENT_TYPES)[number];
+
+export type MessageAttachmentContentType =
+  (typeof MESSAGE_ATTACHMENT_CONTENT_TYPES)[number] | MessageVoiceContentType;
+
+/** Every type a stored message attachment may have: images and voice notes. */
+const STORED_ATTACHMENT_CONTENT_TYPES = [
+  ...MESSAGE_ATTACHMENT_CONTENT_TYPES,
+  ...MESSAGE_VOICE_CONTENT_TYPES,
+] as const;
+
+/** The storage content class a client stages a voice note under. */
+export const MESSAGE_VOICE_CONTENT_CLASS = "message.voice";
+
+/**
+ * Longest voice note the API accepts, in milliseconds. The app stops recording at 120 s; the extra
+ * second absorbs recorder overshoot. Mirrors ck_message_attachments_duration (000218).
+ */
+export const MESSAGE_VOICE_MAX_DURATION_MS = 121_000;
 
 /** The storage content class a client stages message images under. */
 export const MESSAGE_ATTACHMENT_CONTENT_CLASS = "message.attachment";
@@ -55,17 +75,22 @@ const personSchema = z
 export const messageAttachmentSchema = z
   .object({
     id: uuidSchema,
-    content_type: z.enum(MESSAGE_ATTACHMENT_CONTENT_TYPES),
+    content_type: z.enum(STORED_ATTACHMENT_CONTENT_TYPES).openapi({
+      description: "An image type, or audio/mp4 / audio/aac for a voice note.",
+    }),
     size_bytes: z.number().int().positive(),
+    duration_ms: z.number().int().positive().nullable().openapi({
+      description: "Length of a voice note in milliseconds; null for an image.",
+    }),
     // The storage key itself is never serialized; the pre-signed URL is the only handle.
     download_url: z
       .string()
       .nullable()
       .openapi({
         description:
-          "Short-lived (5 minute) pre-signed GET URL for the image. Null when object storage is not " +
-          "configured for this deployment, and until the image has passed its malware scan (an " +
-          "infected image never gets one). Treat it as opaque and re-fetch the message list for a " +
+          "Short-lived (5 minute) pre-signed GET URL for the file. Null when object storage is not " +
+          "configured for this deployment, and until the file has passed its malware scan (an " +
+          "infected file never gets one). Treat it as opaque and re-fetch the message list for a " +
           "fresh one after `download_url_expires_at`.",
       }),
     download_url_expires_at: dateTimeSchema.nullable().openapi({
@@ -83,7 +108,9 @@ export const messageSchema = z
       description: 'The text. Empty ("") for an image-only message.',
     }),
     attachments: z.array(messageAttachmentSchema).openapi({
-      description: "Attached images in display order (0-4). Empty for a text-only message.",
+      description:
+        "Attached images in display order (0-4), or exactly one voice note (an audio " +
+        "`content_type` with `duration_ms`). Empty for a text-only message.",
     }),
     created_at: dateTimeSchema,
   })
@@ -112,6 +139,9 @@ export const conversationSchema = z
         attachment_count: z.number().int().min(0).max(MESSAGE_ATTACHMENT_MAX_COUNT).openapi({
           description: 'Images on the newest message; show e.g. "Photo" when the body is empty.',
         }),
+        voice_note: z.boolean().openapi({
+          description: 'The newest message is a voice note; show e.g. "Voice message".',
+        }),
         sender_id: uuidSchema,
         created_at: dateTimeSchema,
       })
@@ -130,6 +160,11 @@ export const conversationSchema = z
     }),
     has_blocked_me: z.boolean().openapi({
       description: "The other participant has blocked the caller.",
+    }),
+    voice_notes_allowed: z.boolean().openapi({
+      description:
+        "The school lets this thread send voice notes (school setting `allow_voice_notes`). When " +
+        "false, hide the record button; notes already sent stay playable.",
     }),
   })
   .openapi("Conversation");
@@ -307,11 +342,55 @@ export const sendMessageBodySchema = z
       .max(MESSAGE_ATTACHMENT_MAX_COUNT)
       .optional()
       .openapi({ description: "Up to 4 staged images, in display order." }),
+    voice_note: z
+      .object({
+        storage_key: z
+          .string()
+          .min(1)
+          .max(1024)
+          .openapi({
+            description:
+              "The temp/ `storage_key` returned by POST /api/storage/uploads/request-upload " +
+              "(content_class `message.voice`, audio/mp4 or audio/aac, at most 2 MiB), after the " +
+              "client has PUT the recording. The send confirms it.",
+          }),
+        duration_ms: z
+          .number()
+          .int()
+          .min(1)
+          .max(MESSAGE_VOICE_MAX_DURATION_MS)
+          .openapi({ description: "Length of the recording in milliseconds (at most 2 minutes)." }),
+        checksum_sha256: z
+          .string()
+          .regex(SHA256_HEX, "checksum_sha256 must be a 64-character lowercase hex SHA-256 digest")
+          .optional()
+          .openapi({ description: "Optional lowercase hex SHA-256 the server verifies." }),
+      })
+      // No description on the optional property itself: a described optional $ref generates a Dart
+      // wrapper class that does not compile (dart-client-generator gotcha). It lives on the schema.
+      .openapi("SendMessageVoiceNote", {
+        description:
+          "A staged voice note. Sent on its own: no `body` and no `attachments` with it. Refused " +
+          "with 403 MESSAGING_VOICE_NOTES_DISABLED when the school has turned voice notes off.",
+      })
+      .optional(),
   })
-  .refine((value) => (value.body ?? "").length > 0 || (value.attachments?.length ?? 0) > 0, {
-    path: ["body"],
-    message: "Message is required",
-  })
+  .refine(
+    (value) =>
+      (value.body ?? "").length > 0 ||
+      (value.attachments?.length ?? 0) > 0 ||
+      value.voice_note !== undefined,
+    {
+      path: ["body"],
+      message: "Message is required",
+    },
+  )
+  .refine(
+    (value) =>
+      value.voice_note === undefined ||
+      ((value.body ?? "").length === 0 && (value.attachments?.length ?? 0) === 0),
+    { path: ["voice_note"], message: "A voice note is sent on its own" },
+  )
   .refine(
     (value) =>
       new Set((value.attachments ?? []).map((a) => a.storage_key)).size ===

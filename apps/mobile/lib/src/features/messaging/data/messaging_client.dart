@@ -119,16 +119,26 @@ class MessagingClient {
 
   /// `POST /conversations/{id}/messages` — returns the stored message. [body] may be empty when
   /// [storageKeys] (staged by [requestAttachmentUpload] + [uploadAttachment]) carries 1–4 images.
+  /// A voice note ([voiceNoteKey], staged under `message.voice`, with its [voiceNoteDuration]) is
+  /// sent on its own: no body, no images.
   Future<ChatMessage> sendMessage(
     String conversationId,
     String body, {
     List<String> storageKeys = const [],
+    String? voiceNoteKey,
+    Duration? voiceNoteDuration,
   }) async {
     final response = await _dio.post<Map<String, Object?>>(
       '$_base/conversations/$conversationId/messages',
       data: {
-        'body': body,
-        if (storageKeys.isNotEmpty)
+        if (voiceNoteKey != null)
+          'voice_note': {
+            'storage_key': voiceNoteKey,
+            'duration_ms': (voiceNoteDuration ?? Duration.zero).inMilliseconds.clamp(1, 121000),
+          }
+        else
+          'body': body,
+        if (storageKeys.isNotEmpty && voiceNoteKey == null)
           'attachments': [
             for (final key in storageKeys) {'storage_key': key},
           ],
@@ -137,17 +147,19 @@ class MessagingClient {
     return ChatMessage.fromJson(Map<String, Object?>.from(response.data!['message']! as Map));
   }
 
-  /// `POST /api/storage/uploads/request-upload` for the `message.attachment` content class — a
-  /// pre-signed PUT slot for one image. Not confirmed afterwards: the send does that.
+  /// `POST /api/storage/uploads/request-upload` for the `message.attachment` content class (or
+  /// `message.voice` for a voice note) — a pre-signed PUT slot for one file. Not confirmed
+  /// afterwards: the send does that.
   Future<AttachmentUploadTicket> requestAttachmentUpload({
     required String fileName,
     required String contentType,
     required int sizeBytes,
+    String contentClass = 'message.attachment',
   }) async {
     final response = await _dio.post<Map<String, Object?>>(
       '/api/storage/uploads/request-upload',
       data: {
-        'content_class': 'message.attachment',
+        'content_class': contentClass,
         'file_name': fileName,
         'content_type': contentType,
         'size_bytes': sizeBytes,

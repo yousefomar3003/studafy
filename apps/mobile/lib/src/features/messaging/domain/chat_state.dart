@@ -9,8 +9,17 @@ enum PendingStatus { sending, failed }
 /// - [quotaExceeded] — 402 `STORAGE_QUOTA_EXCEEDED`, the school's storage is full;
 /// - [storageUnavailable] — 503 `STORAGE_NOT_CONFIGURED`, images can't be sent at all;
 /// - [invalid] — 400 (`VALIDATION_FAILED` and the storage key / checksum errors);
+/// - [voiceNotesDisabled] — 403 `MESSAGING_VOICE_NOTES_DISABLED`, the school turned them off;
 /// - [other] — anything else.
-enum PendingFailure { rateLimited, blocked, quotaExceeded, storageUnavailable, invalid, other }
+enum PendingFailure {
+  rateLimited,
+  blocked,
+  quotaExceeded,
+  storageUnavailable,
+  invalid,
+  voiceNotesDisabled,
+  other,
+}
 
 /// An image already uploaded for a message: the local file shown while sending and the staged
 /// object's [storageKey], which stays sendable (and re-sendable on retry) for about a day.
@@ -19,6 +28,29 @@ class PendingImage {
 
   final String localPath;
   final String storageKey;
+}
+
+/// A recorded voice note going with a message: the local file (played while sending) and, once
+/// uploaded, the staged object's [storageKey] — kept so a retry does not upload it again.
+class PendingVoiceNote {
+  const PendingVoiceNote({
+    required this.localPath,
+    required this.duration,
+    required this.sizeBytes,
+    this.storageKey,
+  });
+
+  final String localPath;
+  final Duration duration;
+  final int sizeBytes;
+  final String? storageKey;
+
+  PendingVoiceNote withStorageKey(String key) => PendingVoiceNote(
+    localPath: localPath,
+    duration: duration,
+    sizeBytes: sizeBytes,
+    storageKey: key,
+  );
 }
 
 /// A message the user sent that the server has not confirmed yet — shown immediately, marked
@@ -30,6 +62,7 @@ class PendingMessage {
     required this.createdAt,
     required this.status,
     this.images = const [],
+    this.voiceNote,
     this.failure,
   });
 
@@ -41,14 +74,22 @@ class PendingMessage {
   /// Uploaded images going with the message, in display order.
   final List<PendingImage> images;
 
+  /// The voice note this message is, if it is one (then [body] is empty and [images] too).
+  final PendingVoiceNote? voiceNote;
+
   /// Set only while [status] is [PendingStatus.failed].
   final PendingFailure? failure;
 
-  PendingMessage copyWith({PendingStatus? status, PendingFailure? failure}) => PendingMessage(
+  PendingMessage copyWith({
+    PendingStatus? status,
+    PendingFailure? failure,
+    PendingVoiceNote? voiceNote,
+  }) => PendingMessage(
     localId: localId,
     body: body,
     createdAt: createdAt,
     images: images,
+    voiceNote: voiceNote ?? this.voiceNote,
     status: status ?? this.status,
     failure: (status ?? this.status) == PendingStatus.failed ? (failure ?? this.failure) : null,
   );
