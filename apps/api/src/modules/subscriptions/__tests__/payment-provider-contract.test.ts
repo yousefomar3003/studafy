@@ -274,14 +274,21 @@ class MockAdapter implements PaymentProviderPort {
     if (!input.name) {
       throw new PaymentProviderError(400, "VALIDATION_FAILED" as never, "Product name is required");
     }
-    return { providerProductId: `prod_mock_${input.localId}` };
+    return {
+      providerProductId: `prod_mock_${input.localId}`,
+      outcome: input.providerProductId ? "unchanged" : "created",
+    };
   }
 
   async syncPrice(input: SyncPriceInput): Promise<SyncPriceResult> {
     if (!input.productId) {
       throw new PaymentProviderError(400, "VALIDATION_FAILED" as never, "productId is required");
     }
-    return { providerPriceId: `price_mock_${input.localId}` };
+    return {
+      providerPriceId: `price_mock_${input.localId}`,
+      outcome: input.providerPriceId ? "unchanged" : "created",
+      archivedPriceIds: [],
+    };
   }
 
   async parseWebhook(payload: Buffer, signature: string): Promise<ParsedWebhookEvent> {
