@@ -109,6 +109,20 @@ describeDb("listUsers", () => {
     expect(bob!.roles).toContain("STUDENT");
   });
 
+  test("leaves out Studafy's own staff (SUPER_ADMIN, SUPPORT_AGENT) in the school's tenant", async () => {
+    const school = await createSchool(db.sql);
+    const teacher = await createUserFactory(db.sql, school.id, { email: "teacher@test.local" });
+    const superAdmin = await createUserFactory(db.sql, school.id, { email: "super@test.local" });
+    const support = await createUserFactory(db.sql, school.id, { email: "support@test.local" });
+    await assignRole(db.sql, school.id, teacher.id, "INSTRUCTOR");
+    await assignRole(db.sql, school.id, superAdmin.id, "SUPER_ADMIN");
+    await assignRole(db.sql, school.id, support.id, "SUPPORT_AGENT");
+
+    const { rows } = await withTx(school.id, (tx) => listUsers(tx, school.id, { limit: 10 }));
+
+    expect(rows.map((r) => r.email)).toEqual(["teacher@test.local"]);
+  });
+
   test("filters by role", async () => {
     const school = await createSchool(db.sql);
     const user1 = await createUserFactory(db.sql, school.id, {
@@ -212,6 +226,20 @@ describeDb("getUserStatusCounts", () => {
     const counts = await withTx(school.id, (tx) => getUserStatusCounts(tx, school.id));
 
     expect(counts).toEqual({ invited: 1, active: 2, suspended: 1, archived: 0 });
+  });
+
+  test("does not count Studafy's own staff", async () => {
+    const school = await createSchool(db.sql);
+    await createUserFactory(db.sql, school.id, { email: "a@test.local", status: "active" });
+    const superAdmin = await createUserFactory(db.sql, school.id, {
+      email: "super@test.local",
+      status: "active",
+    });
+    await assignRole(db.sql, school.id, superAdmin.id, "SUPER_ADMIN");
+
+    const counts = await withTx(school.id, (tx) => getUserStatusCounts(tx, school.id));
+
+    expect(counts).toEqual({ invited: 0, active: 1, suspended: 0, archived: 0 });
   });
 
   test("returns all-zero counts for a school with no users", async () => {

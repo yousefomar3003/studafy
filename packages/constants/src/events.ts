@@ -72,6 +72,9 @@ export const DOMAIN_EVENTS = {
   // school's configured threshold and the linked parents have been notified — so consumers see
   // the breach, not each individual absence.
   ATTENDANCE_ALERT_RAISED: "attendance.alertRaised",
+  // A register moved open -> submitted. The workers' notify consumer tells the parents of every
+  // student it marks absent or late (ATTENDANCE_MARKED).
+  ATTENDANCE_SESSION_SUBMITTED: "attendance.sessionSubmitted",
 
   // Parent digest (deliverability R-08). Raised by the workers digest producer, once per parent
   // per run, aggregating the parent-facing outbox events (attendance.alertRaised,

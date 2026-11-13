@@ -34,7 +34,7 @@ export function SettingsCard({
   return (
     <Card as="section" aria-label={title}>
       <Card.Header>
-        <h2>{title}</h2>
+        <h2 className="settings-card__title">{title}</h2>
         <p className="settings-card__description">{description}</p>
       </Card.Header>
       <form className="settings-card__form" onSubmit={onSubmit} noValidate aria-label={title}>

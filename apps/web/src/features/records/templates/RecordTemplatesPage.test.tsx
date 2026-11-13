@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter } from "react-router-dom";
 
+import { PortalBackLink, PortalBackProvider } from "../../../layouts/portal/PortalBackLink";
 import { AuthProvider } from "../../../lib/auth";
 import { createTestSessionStore } from "../../../lib/test/session";
 
@@ -122,7 +123,10 @@ async function renderAs(roles: string[], portal: "admin" | "principal") {
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <MemoryRouter>
-            <Page portal={portal} />
+            <PortalBackProvider>
+              <PortalBackLink routes={() => []} />
+              <Page portal={portal} />
+            </PortalBackProvider>
           </MemoryRouter>
         </ToastProvider>
       </QueryClientProvider>
@@ -166,7 +170,7 @@ describe("RecordTemplatesPage", () => {
       expect((await screen.findByText(/Not published yet/)).textContent).toContain(
         "Not published yet",
       );
-      expect(screen.getByRole("link", { name: /Back to/ }).getAttribute("href")).toBe(back);
+      expect(screen.getByRole("link", { name: "Back" }).getAttribute("href")).toBe(back);
 
       const dialog = await addField("Bus stop", "موقف الحافلة");
       fireEvent.click(within(dialog).getByRole("checkbox", { name: "Required" }));

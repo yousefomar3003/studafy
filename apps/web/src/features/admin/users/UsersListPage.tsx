@@ -2,9 +2,10 @@ import { PERMISSIONS, SCHOOL_STAFF_ROLES } from "@studafy/constants";
 import { Button, DataGrid, FilterBar, Select } from "@studafy/ui";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 
 import { ImportCsvButton } from "../../../components/ImportCsvButton";
+import { LinkButton } from "../../../components/LinkButton";
 import { api } from "../../../lib/api";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
@@ -101,10 +102,8 @@ export default function UsersListPage() {
 
   const roleOptions: SelectOption<Role | "">[] = [
     { value: "", label: t("adminPeople.users.list.allRoles") },
-    ...(Object.entries(ROLE_LABEL_KEYS) as [Role, string][]).map(([value, key]) => ({
-      value,
-      label: t(key),
-    })),
+    // School roles only: Studafy's own staff roles never appear in a school's user list.
+    ...ASSIGNABLE_ROLES.map((value) => ({ value, label: t(ROLE_LABEL_KEYS[value]) })),
   ];
 
   const statusOptions: SelectOption<UsersFilters["status"]>[] = [
@@ -180,24 +179,26 @@ export default function UsersListPage() {
             {t("adminPeople.users.list.sessions")}
           </Button>
           {canReadRecords && user.roles.includes("PARENT") ? (
-            <Link
-              to={`/portal/admin/parents/${user.id}/records`}
+            <LinkButton
+              href={`/portal/admin/parents/${user.id}/records`}
+              variant="tertiary"
               aria-label={t("records.principal.openParentRecords", {
                 name: user.display_name ?? user.email ?? t("records.admin.parentFallback"),
               })}
             >
               {t("records.admin.openRecords")}
-            </Link>
+            </LinkButton>
           ) : null}
           {canReadStaffRecords && user.roles.some((role) => SCHOOL_STAFF_ROLES.includes(role)) ? (
-            <Link
-              to={`/portal/admin/staff/${user.id}/records`}
+            <LinkButton
+              href={`/portal/admin/staff/${user.id}/records`}
+              variant="tertiary"
               aria-label={t("records.staff.openRecord", {
                 name: user.display_name ?? user.email ?? t("records.staff.fallback"),
               })}
             >
               {t("records.staff.openShort")}
-            </Link>
+            </LinkButton>
           ) : null}
           {user.status !== "suspended" && user.status !== "archived" ? (
             <Button variant="tertiary" onClick={() => setDeactivatingUser(user)}>

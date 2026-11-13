@@ -28,6 +28,7 @@ function formatSettingsResponse(row: SchoolSettingsRow): SchoolSettingsResponse 
     attendance_alert_threshold: row.attendance_alert_threshold,
     absence_alert_threshold: row.absence_alert_threshold,
     parent_discipline_visibility: row.parent_discipline_visibility,
+    allow_parent_device_signin: row.allow_parent_device_signin,
     attendance_correction_window_hours: row.attendance_correction_window_hours,
     exam_structure: row.exam_structure,
     exam_weights: row.exam_weights,

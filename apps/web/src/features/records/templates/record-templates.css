@@ -105,6 +105,8 @@
 }
 
 .record-templates__preview {
+  /* Clear of the language buttons above it, so they never sit on the box's edge. */
+  margin-block-start: var(--space-12);
   padding: var(--space-16);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);

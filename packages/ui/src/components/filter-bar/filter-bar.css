@@ -6,17 +6,62 @@
 }
 
 .sf-filter-bar__date-range {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  display: block;
+  min-inline-size: 0;
   margin: 0;
   padding: 0;
   border: none;
 }
 
+/* A legend is laid out outside the fieldset's flex/gap and keeps the browser's 2px padding, which
+   left "Created between" ~2px off the other labels: spaced here exactly like a field's label. */
+.sf-filter-bar__date-range > legend {
+  display: block;
+  float: inline-start;
+  inline-size: 100%;
+  margin-block-end: var(--space-4);
+  padding: 0;
+}
+
+.sf-filter-bar__date-range > legend + * {
+  clear: both;
+}
+
+/* From and To sit side by side under the one "Created between" label, so the range takes a single
+   label row and its inputs line up with the search box and the selects beside it. */
 .sf-filter-bar__date-inputs {
   display: flex;
   gap: var(--space-8);
+}
+
+.sf-filter-bar__date-inputs > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.sf-filter-bar__date-inputs > .sf-field {
+  inline-size: 10.5rem;
+}
+
+/* "From" / "To" stay as each input's accessible name; on screen the legend names the pair. */
+.sf-filter-bar__date-inputs .sf-field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* On a phone the pair shares the full width instead of a fixed size each. */
+@media (max-width: 480px) {
+  .sf-filter-bar__date-range {
+    flex: 1 1 100%;
+  }
+
+  .sf-filter-bar__date-inputs > .sf-field {
+    inline-size: auto;
+  }
 }
 
 .sf-filter-bar__chips {

@@ -1,8 +1,9 @@
 import { Button, Checkbox, Input, Select } from "@studafy/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { api } from "../../lib/api";
 import { useAuth } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
@@ -63,6 +64,7 @@ export default function CustomListImportPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fileId = useId();
+  usePortalBack(LISTS_PATH);
   const audiences = audiencesFor(roles);
   const [sheet, setSheet] = useState<PendingSheet | null>(() => takePendingSheet());
   const [nameEn, setNameEn] = useState(() => (sheet ? baseName(sheet.fileName) : ""));
@@ -189,9 +191,6 @@ export default function CustomListImportPage() {
 
   return (
     <>
-      <p>
-        <Link to={LISTS_PATH}>{t("customLists.list.back")}</Link>
-      </p>
       <h1>{t("customLists.import.title")}</h1>
       <p className="custom-lists__muted">{t("customLists.import.intro")}</p>
 
@@ -201,7 +200,9 @@ export default function CustomListImportPage() {
         noValidate
       >
         <div className="custom-lists__file">
-          <label htmlFor={fileId}>{t("customLists.import.file")}</label>
+          <label className="sf-field__label" htmlFor={fileId}>
+            {t("customLists.import.file")}
+          </label>
           <input
             id={fileId}
             type="file"

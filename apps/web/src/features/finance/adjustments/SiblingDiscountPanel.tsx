@@ -126,7 +126,7 @@ export function SiblingDiscountPanel() {
           </dl>
         )}
         {!canEdit ? (
-          <p className="adjustments-form__math">
+          <p className="adjustments-form__math adjustments-form__math--standalone">
             {t("financeReports.adjustments.siblingDiscount.adminOnly")}
           </p>
         ) : null}

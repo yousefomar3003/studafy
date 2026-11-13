@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { LinkButton } from "../../../components/LinkButton";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { useSearchParamFlag } from "../../../lib/use-search-param-flag";
 
@@ -97,12 +98,9 @@ export default function EvaluationListPage() {
           <p>{t("principal.evaluations.list.description")}</p>
         </div>
         <div className="evaluations-list__header-actions">
-          <Link
-            className="evaluations-list__templates-link"
-            to="/portal/principal/evaluations/templates"
-          >
+          <LinkButton href="/portal/principal/evaluations/templates" variant="secondary">
             {t("principal.evaluations.list.manageTemplates")}
-          </Link>
+          </LinkButton>
           <Button type="button" variant="primary" onClick={() => setCreateOpen(true)}>
             {t("principal.evaluations.list.newEvaluation")}
           </Button>

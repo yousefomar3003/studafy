@@ -25,6 +25,7 @@
   "AUTH_PASSWORD_CHANGE_REQUIRED": "عيّن كلمة مرور جديدة لإكمال تسجيل الدخول",
   "AUTH_ACCOUNT_LOCKED": "محاولات خاطئة كثيرة؛ حاول لاحقًا",
   "AUTH_PASSWORD_REJECTED": "كلمة المرور الجديدة لا تستوفي الشروط",
+  "GUARDIAN_CHILD_UNAVAILABLE": "لا يمكن استخدام حساب هذا الطفل حاليًا",
   "INVITATION_INVALID": "الدعوة غير صالحة",
   "EXPIRED": "انتهت صلاحية الدعوة",
   "REVOKED": "تم إلغاء الدعوة",

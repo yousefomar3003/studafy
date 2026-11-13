@@ -1,7 +1,8 @@
 import { PERMISSIONS } from "@studafy/constants";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { usePermissions } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
 import { LinkedListsPanel } from "../custom-lists/LinkedListsPanel";
@@ -24,6 +25,9 @@ export default function StaffRecordPage({ portal = "admin" }: StaffRecordPagePro
   const { t } = useTranslation();
   const permissions = usePermissions();
   const { staffUserId } = useParams<{ staffUserId: string }>();
+  usePortalBack(
+    portal === "admin" ? "/portal/admin/teachers" : "/portal/principal/records/missing",
+  );
   const staff = useQuery({
     queryKey: staffIdentityQueryKey(staffUserId ?? ""),
     queryFn: () => fetchStaffIdentity(staffUserId!),
@@ -35,15 +39,8 @@ export default function StaffRecordPage({ portal = "admin" }: StaffRecordPagePro
   if (staff.isError) return <p role="alert">{t("records.staff.loadError")}</p>;
 
   const name = staff.data.display_name ?? staff.data.email ?? t("records.staff.fallback");
-  const back =
-    portal === "admin"
-      ? { to: "/portal/admin/teachers", label: t("records.staff.backToTeachers") }
-      : { to: "/portal/principal/records/missing", label: t("records.staff.backToMissing") };
   return (
     <>
-      <p>
-        <Link to={back.to}>{back.label}</Link>
-      </p>
       <h1>{t("records.staff.title", { name })}</h1>
       <RecordsPanel
         subject={{ kind: "staff", id: staffUserId }}

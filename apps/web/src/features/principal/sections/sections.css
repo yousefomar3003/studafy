@@ -23,7 +23,7 @@
 .sections-page__row-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-4);
+  gap: var(--space-8);
 }
 
 .sections-form {

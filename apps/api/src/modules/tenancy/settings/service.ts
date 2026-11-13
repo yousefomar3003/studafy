@@ -20,6 +20,7 @@ export interface SchoolSettingsRow {
   attendance_alert_threshold: number;
   absence_alert_threshold: number;
   parent_discipline_visibility: boolean;
+  allow_parent_device_signin: boolean;
   attendance_correction_window_hours: number;
   exam_structure: ExamStructure;
   exam_weights: ExamWeights;
@@ -35,6 +36,7 @@ export interface UpdateSchoolSettingsParams {
   attendance_alert_threshold?: number;
   absence_alert_threshold?: number;
   parent_discipline_visibility?: boolean;
+  allow_parent_device_signin?: boolean;
   attendance_correction_window_hours?: number;
   exam_structure?: ExamStructure;
   exam_weights?: ExamWeights;
@@ -54,6 +56,7 @@ function rowToSettings(row: SchoolSettingsRow): SchoolSettingsRow {
     attendance_alert_threshold: row.attendance_alert_threshold,
     absence_alert_threshold: row.absence_alert_threshold,
     parent_discipline_visibility: row.parent_discipline_visibility,
+    allow_parent_device_signin: row.allow_parent_device_signin,
     attendance_correction_window_hours: row.attendance_correction_window_hours,
     exam_structure: row.exam_structure,
     exam_weights: row.exam_weights,
@@ -81,6 +84,7 @@ export async function getSchoolSettings(
         invitation_expiry_days,
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
+        allow_parent_device_signin,
         attendance_correction_window_hours,
         exam_structure, exam_weights,
         created_at, updated_at
@@ -109,6 +113,7 @@ export async function getSchoolSettings(
         invitation_expiry_days,
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
+        allow_parent_device_signin,
         attendance_correction_window_hours,
         exam_structure, exam_weights,
         created_at, updated_at
@@ -151,6 +156,7 @@ export async function updateSchoolSettings(
         invitation_expiry_days,
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
+        allow_parent_device_signin,
         attendance_correction_window_hours,
         exam_structure, exam_weights,
         created_at, updated_at
@@ -158,7 +164,7 @@ export async function updateSchoolSettings(
       WHERE school_id = ${schoolId}::uuid
     `;
 
-    const before = beforeRows[0];
+    let before = beforeRows[0];
 
     // 2. Ensure the row exists (create defaults if this is the first mutation).
     // ST-249: ON CONFLICT DO NOTHING — see the matching note in getSchoolSettings above. Two
@@ -169,6 +175,23 @@ export async function updateSchoolSettings(
         INSERT INTO app.school_settings (school_id)
         VALUES (${schoolId}::uuid)
         ON CONFLICT (school_id) DO NOTHING
+      `;
+      // The defaults are the "before" of this first change. Without them the audit row would be an
+      // update with no old values, which ck_audit_logs_payload refuses -- the very first save of a
+      // school's settings used to fail with a 500 unless something had read the settings first.
+      [before] = await tx<SchoolSettingsRow[]>`
+        SELECT
+          school_id::text,
+          locale, timezone, grading_scheme,
+          invitation_expiry_days,
+          attendance_alert_threshold, absence_alert_threshold,
+          parent_discipline_visibility,
+          allow_parent_device_signin,
+          attendance_correction_window_hours,
+          exam_structure, exam_weights,
+          created_at, updated_at
+        FROM app.school_settings
+        WHERE school_id = ${schoolId}::uuid
       `;
     }
 
@@ -182,6 +205,7 @@ export async function updateSchoolSettings(
         attendance_alert_threshold    = COALESCE(${patch.attendance_alert_threshold ?? null}, attendance_alert_threshold),
         absence_alert_threshold       = COALESCE(${patch.absence_alert_threshold ?? null}, absence_alert_threshold),
         parent_discipline_visibility  = COALESCE(${patch.parent_discipline_visibility ?? null}, parent_discipline_visibility),
+        allow_parent_device_signin    = COALESCE(${patch.allow_parent_device_signin ?? null}, allow_parent_device_signin),
         attendance_correction_window_hours = COALESCE(${patch.attendance_correction_window_hours ?? null}, attendance_correction_window_hours),
         exam_structure                = COALESCE(${patch.exam_structure ?? null}, exam_structure),
         exam_weights                  = COALESCE(${patch.exam_weights ? tx.json(patch.exam_weights) : null}::jsonb, exam_weights),
@@ -193,6 +217,7 @@ export async function updateSchoolSettings(
         invitation_expiry_days,
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
+        allow_parent_device_signin,
         attendance_correction_window_hours,
         exam_structure, exam_weights,
         created_at, updated_at
@@ -218,6 +243,7 @@ export async function updateSchoolSettings(
             attendance_alert_threshold: before.attendance_alert_threshold,
             absence_alert_threshold: before.absence_alert_threshold,
             parent_discipline_visibility: before.parent_discipline_visibility,
+            allow_parent_device_signin: before.allow_parent_device_signin,
             attendance_correction_window_hours: before.attendance_correction_window_hours,
             exam_structure: before.exam_structure,
             exam_weights: before.exam_weights,
@@ -231,6 +257,7 @@ export async function updateSchoolSettings(
         attendance_alert_threshold: after.attendance_alert_threshold,
         absence_alert_threshold: after.absence_alert_threshold,
         parent_discipline_visibility: after.parent_discipline_visibility,
+        allow_parent_device_signin: after.allow_parent_device_signin,
         attendance_correction_window_hours: after.attendance_correction_window_hours,
         exam_structure: after.exam_structure,
         exam_weights: after.exam_weights,

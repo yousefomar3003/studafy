@@ -177,7 +177,6 @@ export default function PrincipalDashboardPage() {
   return (
     <>
       <HomeHeader title={t("principal.dashboard.title")} summary={summary} />
-      <SummaryStrip items={items} />
 
       <HomeShortcuts
         links={PRINCIPAL_LINKS.filter(
@@ -188,6 +187,8 @@ export default function PrincipalDashboardPage() {
           label: t(link.labelKey ?? `principal.dashboard.links.${link.key}`),
         }))}
       />
+
+      <SummaryStrip items={items} />
 
       <section className="home-section" aria-labelledby="principal-attention-heading">
         <h2 id="principal-attention-heading" className="home-section-heading">

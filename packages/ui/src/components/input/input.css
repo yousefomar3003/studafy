@@ -20,7 +20,9 @@
   border-color: var(--color-accent);
 }
 
-.sf-input--invalid {
+.sf-input--invalid,
+.sf-input--invalid:focus-within {
+  /* Stays red while focused, which is exactly when the user is fixing it. */
   border-color: var(--color-danger);
 }
 
@@ -58,4 +60,11 @@
   align-items: center;
   font-size: var(--font-size-sm);
   color: var(--color-muted-foreground);
+}
+
+/* Chrome's date/time fields lay out 2px taller than text (22px for a 20px line), so a date range sat
+   2px off the fields beside it: pin them to the same height as every other input. */
+.sf-input__control:is([type="date"], [type="time"], [type="datetime-local"], [type="month"]) {
+  box-sizing: border-box;
+  block-size: calc(var(--line-height-sm) + 2 * var(--space-8));
 }

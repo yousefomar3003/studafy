@@ -1,27 +1,179 @@
+/* Import data: a header (title, intro, Past imports) over the four steps as numbered cards. */
+
+.import-data {
+  display: grid;
+  gap: var(--space-32);
+  max-width: 72rem;
+}
+
+.import-data__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16) var(--space-24);
+}
+
+.import-data__heading {
+  flex: 1 1 28rem;
+  min-width: 0;
+}
+
+.import-data__heading h1 {
+  margin: 0 0 var(--space-8);
+}
+
+.import-data__intro {
+  max-width: 44rem;
+  margin: 0;
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-base);
+  color: var(--color-muted-foreground);
+}
+
+/* A link that reads as a secondary button, the same look as the UI kit's. */
+.import-data__button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-background);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-foreground);
+  text-decoration: none;
+  transition: background-color var(--duration-fast) var(--easing-standard);
+}
+
+.import-data__button:hover {
+  background-color: var(--color-surface);
+}
+
 .import-data__steps {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-16);
+  margin: 0;
   padding: 0;
-  margin: var(--space-16) 0;
   list-style: none;
-  counter-reset: import-step;
 }
 
-.import-data__steps > li {
-  counter-increment: import-step;
+.import-data__step {
+  display: flex;
 }
 
-.import-data__step-title::before {
-  content: counter(import-step) ". ";
+/* Every card in a row is as tall as the tallest, with its action pinned to the bottom. */
+.import-data__card {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-8);
+  padding: var(--space-24);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-background);
+  box-shadow: var(--elevation-1);
+  transition:
+    border-color var(--duration-fast) var(--easing-standard),
+    box-shadow var(--duration-fast) var(--easing-standard);
+}
+
+.import-data__card:hover {
+  border-color: var(--color-accent);
+  box-shadow: var(--elevation-2);
+}
+
+.import-data__number {
+  display: inline-grid;
+  place-items: center;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  margin-block-end: var(--space-8);
+  border-radius: var(--radius-full);
+  background-color: var(--color-accent-subtle-bg);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent-subtle-foreground);
 }
 
 .import-data__step-title {
-  margin: 0 0 var(--space-8);
-  font-size: 1.125rem;
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-lg);
+}
+
+.import-data__step-body {
+  flex: 1;
+  margin: 0 0 var(--space-12);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  color: var(--color-muted-foreground);
 }
 
 .import-data__step-link {
-  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-16);
+  border-radius: var(--radius-md);
+  background-color: var(--color-accent);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent-foreground);
+  text-decoration: none;
+  transition: filter var(--duration-fast) var(--easing-standard);
+}
+
+.import-data__step-link:hover {
+  filter: brightness(0.92);
+}
+
+.import-data__arrow {
+  display: inline-block;
+  transition: transform var(--duration-fast) var(--easing-standard);
+}
+
+.import-data__step-link:hover .import-data__arrow {
+  transform: translateX(2px);
+}
+
+/* Forward in a right-to-left page points left. */
+[dir="rtl"] .import-data__arrow {
+  transform: scaleX(-1);
+}
+
+[dir="rtl"] .import-data__step-link:hover .import-data__arrow {
+  transform: scaleX(-1) translateX(2px);
+}
+
+.import-data__button:focus-visible,
+.import-data__step-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+@media (max-width: 720px) {
+  .import-data__steps {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .import-data__card {
+    padding: var(--space-16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .import-data__button,
+  .import-data__card,
+  .import-data__step-link,
+  .import-data__arrow {
+    transition: none;
+  }
 }
 
 .login-slips__form {

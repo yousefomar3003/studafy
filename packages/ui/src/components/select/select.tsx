@@ -129,10 +129,15 @@ export function Select<Value extends string = string>({
         POPUP_MAX_HEIGHT,
       );
       const flip = spaceBelow < natural && spaceAbove > spaceBelow;
+      // In a right-to-left page the list lines up with the trigger's right edge and grows leftward.
+      const rtl = getComputedStyle(trigger).direction === "rtl";
       setPopupStyle({
-        left: rect.left,
+        ...(rtl ? { right: window.innerWidth - rect.right } : { left: rect.left }),
         minWidth: rect.width,
-        maxWidth: Math.max(window.innerWidth - rect.left - VIEWPORT_MARGIN, rect.width),
+        maxWidth: Math.max(
+          rtl ? rect.right - VIEWPORT_MARGIN : window.innerWidth - rect.left - VIEWPORT_MARGIN,
+          rect.width,
+        ),
         maxHeight: Math.max(Math.min(POPUP_MAX_HEIGHT, flip ? spaceAbove : spaceBelow), 0),
         ...(flip
           ? { bottom: window.innerHeight - rect.top + POPUP_GAP }

@@ -154,4 +154,21 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "رفعت {schoolName} إيصال تحويل بنكي للفاتورة {invoiceNumber}. سجّل الدفعة وطابق الإيصال معها في لوحة التراخيص.",
   },
+  [NOTIFICATION_TYPES.ASSIGNMENT_PUBLISHED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "واجب جديد: {assignmentTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{who}{courseName} · موعد التسليم {dueDate}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "نُشر واجب جديد بعنوان {assignmentTitle} في {courseName}، وموعد تسليمه {dueDate}.",
+  },
+  [NOTIFICATION_TYPES.ASSIGNMENT_GRADED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تم التصحيح: {assignmentTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{who}{result}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "تم تصحيح {assignmentTitle} في {courseName}: {result}.",
+  },
+  [NOTIFICATION_TYPES.ATTENDANCE_MARKED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تسجيل {status} لـ {studentName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{courseName} · {date}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "تم تسجيل {status} لـ {studentName} في {courseName} بتاريخ {date}.",
+  },
 } as const satisfies LocaleTemplateSet;

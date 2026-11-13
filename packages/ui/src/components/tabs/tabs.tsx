@@ -59,8 +59,14 @@ export const TabList = forwardRef<HTMLDivElement, TabListProps>(function TabList
       return;
     }
 
+    // Horizontal arrows follow what the user sees: in a right-to-left page the next tab is on the left.
+    const rtl = getComputedStyle(list).direction === "rtl";
     const [previousKey, nextKey] =
-      orientation === "horizontal" ? ["ArrowLeft", "ArrowRight"] : ["ArrowUp", "ArrowDown"];
+      orientation === "vertical"
+        ? ["ArrowUp", "ArrowDown"]
+        : rtl
+          ? ["ArrowRight", "ArrowLeft"]
+          : ["ArrowLeft", "ArrowRight"];
 
     let target: number | undefined;
     if (event.key === nextKey) {

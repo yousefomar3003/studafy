@@ -3,6 +3,7 @@ import { Button, Card, Input, Modal, useToast } from "@studafy/ui";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
 import { PlatformPageHeader, SchoolStatusPill } from "./PlatformNav";
@@ -21,6 +22,7 @@ import type { PlatformSupportUser, SupportActionName } from "./user-support";
 export default function UserSupportPage() {
   const { schoolId = "", userId = "" } = useParams();
   const { t } = useTranslation();
+  usePortalBack("/portal/platform/users");
   const { data: user, isPending, isError } = useSupportUserQuery(schoolId, userId);
   const [action, setAction] = useState<SupportActionName | null>(null);
 
@@ -29,7 +31,6 @@ export default function UserSupportPage() {
     return (
       <>
         <p role="alert">{t("platform.support.loadError")}</p>
-        <Link to="/portal/platform/users">{t("platform.support.back")}</Link>
       </>
     );
   }
@@ -45,8 +46,6 @@ export default function UserSupportPage() {
         actions={<SchoolStatusPill status={user.school.status} />}
       />
       <p>
-        <Link to="/portal/platform/users">{t("platform.support.back")}</Link>
-        {" · "}
         <Link to={`/portal/platform/schools/${user.school.id}`}>
           {t("platform.support.openSchool")}
         </Link>

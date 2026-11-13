@@ -114,80 +114,82 @@ function AudienceTiers({
         {columns.length === 0 ? (
           <p className="platform-muted">{t("platformLicensing.tiers.empty")}</p>
         ) : (
-          <table className="platform-table licensing-compare">
-            <caption className="sf-visually-hidden">
-              {t("platformLicensing.tiers.compareCaption", {
-                audience: t(`platformLicensing.audience.${audience}`),
-              })}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">{t("platformLicensing.tiers.columns.feature")}</th>
-                {columns.map((tier) => (
-                  <th scope="col" key={tier.id}>
-                    <div className="platform-cell-stack">
-                      <span>{tier.displayName}</span>
-                      <span className="platform-muted">
-                        {tier.isActive
-                          ? t("platformLicensing.tiers.rank", { rank: tier.rank })
-                          : t("platformLicensing.tiers.retired")}
-                      </span>
-                      <Button
-                        variant="tertiary"
-                        onClick={() => onEdit(tier)}
-                        aria-label={t("platformLicensing.tiers.editNamed", {
-                          name: tier.displayName,
-                        })}
-                      >
-                        {t("platformLicensing.common.edit")}
-                      </Button>
-                    </div>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {features.map((feature) => (
-                <tr key={feature.key}>
-                  <th scope="row">{feature.displayName}</th>
+          <div className="platform-table-scroll">
+            <table className="platform-table licensing-compare">
+              <caption className="sf-visually-hidden">
+                {t("platformLicensing.tiers.compareCaption", {
+                  audience: t(`platformLicensing.audience.${audience}`),
+                })}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">{t("platformLicensing.tiers.columns.feature")}</th>
                   {columns.map((tier) => (
-                    <td key={tier.id}>{limitLabel(tier, feature, t, formatNumber)}</td>
+                    <th scope="col" key={tier.id}>
+                      <div className="platform-cell-stack">
+                        <span>{tier.displayName}</span>
+                        <span className="platform-muted">
+                          {tier.isActive
+                            ? t("platformLicensing.tiers.rank", { rank: tier.rank })
+                            : t("platformLicensing.tiers.retired")}
+                        </span>
+                        <Button
+                          variant="tertiary"
+                          onClick={() => onEdit(tier)}
+                          aria-label={t("platformLicensing.tiers.editNamed", {
+                            name: tier.displayName,
+                          })}
+                        >
+                          {t("platformLicensing.common.edit")}
+                        </Button>
+                      </div>
+                    </th>
                   ))}
                 </tr>
-              ))}
-              <tr>
-                <th scope="row">{t("platformLicensing.tiers.includesAll")}</th>
-                {columns.map((tier) => (
-                  <td key={tier.id}>
-                    {tier.includesAllFeatures
-                      ? t("platform.common.yes")
-                      : t("platformLicensing.common.no")}
-                  </td>
+              </thead>
+              <tbody>
+                {features.map((feature) => (
+                  <tr key={feature.key}>
+                    <th scope="row">{feature.displayName}</th>
+                    {columns.map((tier) => (
+                      <td key={tier.id}>{limitLabel(tier, feature, t, formatNumber)}</td>
+                    ))}
+                  </tr>
                 ))}
-              </tr>
-              {currencies.map((currency) => (
-                <tr key={currency}>
-                  <th scope="row">{t("platformLicensing.tiers.pricePerSeat", { currency })}</th>
-                  {columns.map((tier) => {
-                    const price = tier.prices.find(
-                      (p) => p.currencyCode === currency && p.isActive,
-                    );
-                    return (
-                      <td key={tier.id}>
-                        {price ? money(price.amountMinor, currency, price.minorUnit) : "—"}
-                      </td>
-                    );
-                  })}
+                <tr>
+                  <th scope="row">{t("platformLicensing.tiers.includesAll")}</th>
+                  {columns.map((tier) => (
+                    <td key={tier.id}>
+                      {tier.includesAllFeatures
+                        ? t("platform.common.yes")
+                        : t("platformLicensing.common.no")}
+                    </td>
+                  ))}
                 </tr>
-              ))}
-              <tr>
-                <th scope="row">{t("platformLicensing.tiers.inUse")}</th>
-                {columns.map((tier) => (
-                  <td key={tier.id}>{formatNumber(tier.inUse)}</td>
+                {currencies.map((currency) => (
+                  <tr key={currency}>
+                    <th scope="row">{t("platformLicensing.tiers.pricePerSeat", { currency })}</th>
+                    {columns.map((tier) => {
+                      const price = tier.prices.find(
+                        (p) => p.currencyCode === currency && p.isActive,
+                      );
+                      return (
+                        <td key={tier.id}>
+                          {price ? money(price.amountMinor, currency, price.minorUnit) : "—"}
+                        </td>
+                      );
+                    })}
+                  </tr>
                 ))}
-              </tr>
-            </tbody>
-          </table>
+                <tr>
+                  <th scope="row">{t("platformLicensing.tiers.inUse")}</th>
+                  {columns.map((tier) => (
+                    <td key={tier.id}>{formatNumber(tier.inUse)}</td>
+                  ))}
+                </tr>
+              </tbody>
+            </table>
+          </div>
         )}
       </Card.Body>
     </Card>

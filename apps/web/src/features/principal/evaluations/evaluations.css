@@ -8,6 +8,7 @@
 .evaluations-list__header {
   display: flex;
   align-items: flex-start;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-16);
   margin-bottom: var(--space-16);
@@ -15,12 +16,9 @@
 
 .evaluations-list__header-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-16);
-}
-
-.evaluations-list__templates-link {
-  white-space: nowrap;
+  gap: var(--space-8);
 }
 
 .evaluations-list__filters {

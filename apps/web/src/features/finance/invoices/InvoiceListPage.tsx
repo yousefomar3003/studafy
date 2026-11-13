@@ -141,13 +141,10 @@ export default function InvoiceListPage() {
       </div>
 
       <div className="invoices-list__toolbar">
-        <label className="sf-visually-hidden" htmlFor="invoices-search">
-          {t("finance.common.searchByStudentOrInvoice")}
-        </label>
-        <input
+        <Input
           id="invoices-search"
           type="search"
-          className="invoices-list__search"
+          label={t("finance.common.searchByStudentOrInvoice")}
           placeholder={t("finance.invoices.list.searchPlaceholder")}
           value={searchInput}
           onChange={(event) => setSearchInput(event.target.value)}

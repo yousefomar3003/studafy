@@ -10,6 +10,8 @@ import { LegalAcceptanceScreen } from "../legal/LegalAcceptanceScreen";
 
 import { StoreSubscriptionWarning } from "./StoreSubscriptionWarning";
 
+import "./account-gate.css";
+
 /**
  * Wraps each authenticated layout inside `RequireAuth` (app/routes.tsx). Holds back the guarded content while the signed-in account has a deletion scheduled (its 14-day
  * grace period). The API confines such a session to reading its profile, cancelling the deletion
@@ -40,17 +42,23 @@ export function DeletionPendingGate({ children }: PropsWithChildren) {
   const scheduledFor = profile.data?.deletion_scheduled_for;
   if (scheduledFor) {
     return (
-      <DeletionPending
-        scheduledFor={scheduledFor}
-        storeSubscriptions={profile.data?.active_store_subscriptions}
-      />
+      <div className="account-gate">
+        <DeletionPending
+          scheduledFor={scheduledFor}
+          storeSubscriptions={profile.data?.active_store_subscriptions}
+        />
+      </div>
     );
   }
   // Next, the legal documents (000188): until the user accepts the current versions, the API
   // allows only accepting, deleting the account and signing out.
   const legal = profile.data?.legal_acceptance;
   if (legal?.required) {
-    return <LegalAcceptanceScreen versions={legal} isUpdate={legal.accepted_at !== null} />;
+    return (
+      <div className="account-gate">
+        <LegalAcceptanceScreen versions={legal} isUpdate={legal.accepted_at !== null} />
+      </div>
+    );
   }
   return <>{children}</>;
 }
@@ -91,17 +99,19 @@ function DeletionPending({
         </p>
         {failed ? <p role="alert">{t("accountDeletion.pendingGateFailed")}</p> : null}
         <StoreSubscriptionWarning subscriptions={storeSubscriptions} />
-        <Button type="button" onClick={() => void cancel()} disabled={cancelling}>
-          {t("accountDeletion.pendingGateCancel")}
-        </Button>{" "}
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => void store.logout()}
-          disabled={cancelling}
-        >
-          {t("accountDeletion.pendingGateSignOut")}
-        </Button>
+        <div className="account-gate__actions">
+          <Button type="button" onClick={() => void cancel()} disabled={cancelling}>
+            {t("accountDeletion.pendingGateCancel")}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => void store.logout()}
+            disabled={cancelling}
+          >
+            {t("accountDeletion.pendingGateSignOut")}
+          </Button>
+        </div>
       </Card.Body>
     </Card>
   );
