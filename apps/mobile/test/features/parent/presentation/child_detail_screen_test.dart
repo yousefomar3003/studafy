@@ -69,6 +69,15 @@ ProviderScope _scope({
   );
 }
 
+/// A phone-height surface. The child page now starts with the "Add (child) to this phone" row, so
+/// the default 800x600 test surface no longer fits two subject cards or the finance tab's first
+/// invoice above the fold.
+void _tallScreen(WidgetTester tester) {
+  tester.view.physicalSize = const Size(800, 1400);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+}
+
 void main() {
   setUpAll(ensureDateFormattingInitialized);
 
@@ -89,6 +98,7 @@ void main() {
 
   testWidgets('grades tab: term summary and one card per subject, reusing SubjectGradesCard',
       (tester) async {
+    _tallScreen(tester);
     await tester.pumpWidget(wrapWithLocalization(_scope(
       childIds: const ['child-1'],
       breakdowns: {
@@ -306,6 +316,7 @@ void main() {
 
     testWidgets('renders the balance, an invoice with its pay-online action, an installment, '
         'and a receipt', (tester) async {
+      _tallScreen(tester);
       await tester.pumpWidget(wrapWithLocalization(_scope(
         childIds: const ['child-1'],
         breakdowns: {'child-1': childBreakdown(id: 'child-1')},

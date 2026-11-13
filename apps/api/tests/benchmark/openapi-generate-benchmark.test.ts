@@ -216,6 +216,7 @@ const EXPECTED_PATHS = [
   "/api/auth/devices",
   "/api/auth/devices/{deviceId}",
   "/api/auth/devices/{deviceId}/sessions",
+  "/api/auth/guardian/children/{studentId}/session",
   "/api/auth/invitations/{token}/activate",
   "/api/auth/invitations/{token}/oauth/google/mobile-exchange",
   "/api/auth/invitations/{token}/oauth/google/mobile-start",

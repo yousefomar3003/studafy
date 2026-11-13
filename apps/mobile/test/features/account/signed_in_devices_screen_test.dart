@@ -25,6 +25,7 @@ Session _session(
     ipAddress: null,
     issuedAt: issued,
     expiresAt: issued.add(const Duration(days: 30)),
+    openedByGuardianUserId: null,
   );
 }
 
