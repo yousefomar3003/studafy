@@ -35,6 +35,7 @@ import {
   sectionRoutes,
   promotionRoutes,
   enrollmentRoutes,
+  studentOverviewRoutes,
   timetableRoutes,
   examRoutes,
   materialRoutes,
@@ -1093,6 +1094,7 @@ export function createApp({
   if (database) {
     app.route("/", classRoutes(database));
     app.route("/", enrollmentRoutes(database));
+    app.route("/", studentOverviewRoutes(database));
   }
 
   // Grades and sections (the "Grade 10 - Section C" a timetable is built for), and placing students
