@@ -56,4 +56,16 @@ class FakeSecureTokenStore extends SecureTokenStore {
   @override
   Future<void> writeMemberDeviceToken(String memberId, String token) async =>
       memberDeviceTokens[memberId.trim().toUpperCase()] = token;
+
+  /// The Studafy ID "Remember me" keeps for the sign-in form.
+  String? rememberedMemberId;
+
+  @override
+  Future<String?> readRememberedMemberId() async => rememberedMemberId;
+
+  @override
+  Future<void> writeRememberedMemberId(String? memberId) async {
+    final value = memberId?.trim();
+    rememberedMemberId = value == null || value.isEmpty ? null : value;
+  }
 }

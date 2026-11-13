@@ -7,6 +7,7 @@ import '../../../core/api/api_client.dart';
 import '../../../core/api/generated/models/member_password_change_request.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../../design/widgets/password_form_field.dart';
 
 const _memberRoles = {'STUDENT', 'PARENT', 'INSTRUCTOR', 'ATTENDANCE_OFFICER'};
 const _privilegedRoles = {
@@ -109,11 +110,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    TextFormField(
+                    PasswordFormField(
                       key: const Key('changePasswordCurrent'),
                       controller: _current,
                       enabled: !_submitting,
-                      obscureText: true,
                       autofillHints: const [AutofillHints.password],
                       textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
@@ -124,11 +124,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                           : null,
                     ),
                     const SizedBox(height: AppSpacing.space12),
-                    TextFormField(
+                    PasswordFormField(
                       key: const Key('changePasswordNew'),
                       controller: _next,
                       enabled: !_submitting,
-                      obscureText: true,
                       autofillHints: const [AutofillHints.newPassword],
                       textInputAction: TextInputAction.next,
                       decoration: InputDecoration(
@@ -140,11 +139,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
                           : null,
                     ),
                     const SizedBox(height: AppSpacing.space12),
-                    TextFormField(
+                    PasswordFormField(
                       key: const Key('changePasswordConfirm'),
                       controller: _confirm,
                       enabled: !_submitting,
-                      obscureText: true,
                       autofillHints: const [AutofillHints.newPassword],
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _submit(),
