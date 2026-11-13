@@ -546,6 +546,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/platform/schools/{schoolId}/users/{userId}/unlock",
   "POST /api/platform/schools/{schoolId}/users/{userId}/deactivate",
   "POST /api/platform/schools/{schoolId}/users/{userId}/reactivate",
+  // Studafy-wide banners (modules/platform/ops/routes.ts): platform:manage, audited in the
+  // operator's home school with the reason.
+  "POST /api/platform/announcements",
+  "PATCH /api/platform/announcements/{announcementId}",
   // School application decisions: audited in the operator's home school; approval also writes
   // system-attributed rows in the new school -- see modules/school-applications/service.ts.
   "POST /api/platform/school-applications/{applicationId}/approve",
