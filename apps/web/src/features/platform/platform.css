@@ -316,3 +316,38 @@
   border-radius: var(--radius-md);
   object-fit: contain;
 }
+
+/* School usage panel and exports table (SchoolUsageCard, SchoolExportsCard). */
+.platform-usage {
+  display: grid;
+  gap: var(--space-20);
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+}
+
+.platform-usage h3 {
+  margin: 0 0 var(--space-8);
+  font-size: 1rem;
+}
+
+.platform-usage-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.platform-usage-table th,
+.platform-usage-table td {
+  padding: var(--space-8);
+  border-block-end: 1px solid var(--color-border);
+  text-align: start;
+}
+
+.platform-usage-meter {
+  inline-size: 100%;
+  block-size: 0.75rem;
+}
+
+.platform-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: var(--space-12);
+}

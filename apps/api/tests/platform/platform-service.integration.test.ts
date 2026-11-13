@@ -195,6 +195,9 @@ describe("platform console reads", () => {
         activeUsers: detail.activeUsers,
         students: detail.students,
         subscription: detail.subscription,
+        storageBytesUsed: detail.storageBytesUsed,
+        storageCapBytes: detail.storageCapBytes,
+        lastActivityAt: detail.lastActivityAt,
       });
     }
   });

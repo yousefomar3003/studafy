@@ -23,14 +23,19 @@
  * school of their own and are audited in the operator's home school only.
  */
 
+import { LIVE_STATUSES } from "@studafy/billing";
 import { FEATURE_FLAGS } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { cacheKey } from "../../cache";
 import { pipelinePerSchool, setTenantScope, withSystemTx } from "../../db/tenant-tx";
 import { emitAuditLog } from "../../middleware/auditEmitter";
+import {
+  DEFAULT_STORAGE_CAP_BYTES,
+  STORAGE_QUOTA_WARNING_THRESHOLD,
+} from "../storage/quota-service";
 
-import type { MemberStatus, SchoolStatus } from "./schemas";
+import type { MemberStatus, SchoolSort, SchoolStatus } from "./schemas";
 import type { Database } from "../../db/client";
 import type { AuditEntry } from "../../middleware/auditEmitter";
 import type { RedisClient } from "../../redis";
@@ -113,6 +118,11 @@ interface SchoolStatsRow {
   trial_expires_at: Date | null;
   current_period_end: Date | null;
   active_ai_subscriptions: number;
+  storage_bytes_used: string | null;
+  storage_cap_bytes: string | null;
+  storage_addon_cap_bytes: string | null;
+  storage_grant_cap_bytes: string | null;
+  last_activity_at: Date | null;
 }
 
 export interface Actor {
@@ -157,7 +167,15 @@ function schoolStatsStatement(tx: TransactionSql) {
       sub.student_cap,
       sub.trial_expires_at,
       sub.current_period_end,
-      (SELECT count(*)::int FROM app.ai_subscriptions WHERE status = 'active') AS active_ai_subscriptions
+      (SELECT count(*)::int FROM app.ai_subscriptions WHERE status = 'active') AS active_ai_subscriptions,
+      (SELECT bytes_used::text FROM app.storage_usage_meters) AS storage_bytes_used,
+      sub.storage_cap_bytes::text AS storage_cap_bytes,
+      (SELECT max(cap_bytes)::text FROM app.storage_subscriptions
+       WHERE status::text = ANY(${[...LIVE_STATUSES]})) AS storage_addon_cap_bytes,
+      (SELECT max(cap_bytes)::text FROM app.manual_grants
+       WHERE kind = 'storage' AND revoked_at IS NULL
+         AND starts_at <= now() AND ends_at > now()) AS storage_grant_cap_bytes,
+      (SELECT max(last_login_at) FROM app.users) AS last_activity_at
     FROM (SELECT 1) AS one
     LEFT JOIN app.subscriptions sub ON true
     LEFT JOIN app.plans p ON p.id = sub.plan_id
@@ -183,7 +201,19 @@ async function loadSchoolStatsFor(
 const iso = (value: Date) => value.toISOString();
 const isoOrNull = (value: Date | null) => (value ? value.toISOString() : null);
 
+/** The same cap rule as the upload quota (storage/quota-service.ts `getStorageUsage`). */
+function storageFigures(stats: SchoolStatsRow) {
+  const bytesUsed = Number(stats.storage_bytes_used ?? 0);
+  const capBytes = Math.max(
+    Number(stats.storage_cap_bytes ?? DEFAULT_STORAGE_CAP_BYTES),
+    Number(stats.storage_addon_cap_bytes ?? 0),
+    Number(stats.storage_grant_cap_bytes ?? 0),
+  );
+  return { bytesUsed, capBytes };
+}
+
 function toSummary(school: SchoolRow, stats: SchoolStatsRow) {
+  const storage = storageFigures(stats);
   return {
     id: school.id,
     slug: school.slug,
@@ -208,6 +238,9 @@ function toSummary(school: SchoolRow, stats: SchoolStatsRow) {
             currentPeriodEnd: iso(stats.current_period_end),
           }
         : null,
+    storageBytesUsed: storage.bytesUsed,
+    storageCapBytes: storage.capBytes,
+    lastActivityAt: isoOrNull(stats.last_activity_at),
   };
 }
 
@@ -583,8 +616,59 @@ export async function getPlatformFinance(database: Database) {
 export interface SchoolListFilters {
   search?: string;
   status?: SchoolStatus;
+  sort?: SchoolSort;
+  order?: "asc" | "desc";
+  activity?: "inactive30d";
+  storage?: "nearCap";
   limit: number;
   offset: number;
+}
+
+const INACTIVE_DAYS = 30;
+
+type SchoolSummary = ReturnType<typeof toSummary>;
+
+/** The usage filters, applied to a summary (they need per-school figures, so never in SQL). */
+export function matchesUsageFilters(
+  summary: SchoolSummary,
+  filters: Pick<SchoolListFilters, "activity" | "storage">,
+  now: number,
+): boolean {
+  if (filters.activity === "inactive30d") {
+    const last = summary.lastActivityAt ? Date.parse(summary.lastActivityAt) : null;
+    if (last !== null && now - last < INACTIVE_DAYS * 86_400_000) return false;
+  }
+  if (filters.storage === "nearCap") {
+    if (summary.storageCapBytes <= 0) return false;
+    if (summary.storageBytesUsed / summary.storageCapBytes < STORAGE_QUOTA_WARNING_THRESHOLD) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Orders summaries by a usage figure, ties broken by newest school then id so a page boundary is
+ * stable. A school that never had activity sorts as the oldest activity.
+ */
+export function compareByUsage(sort: SchoolSort, order: "asc" | "desc") {
+  const value = (summary: SchoolSummary): number => {
+    if (sort === "students") return summary.students;
+    if (sort === "storage") {
+      return summary.storageCapBytes > 0 ? summary.storageBytesUsed / summary.storageCapBytes : 0;
+    }
+    if (sort === "lastActivity") {
+      return summary.lastActivityAt ? Date.parse(summary.lastActivityAt) : -Infinity;
+    }
+    return Date.parse(summary.createdAt);
+  };
+  const direction = order === "asc" ? 1 : -1;
+  return (a: SchoolSummary, b: SchoolSummary): number => {
+    const diff = value(a) - value(b);
+    if (diff !== 0 && !Number.isNaN(diff)) return diff * direction;
+    if (a.createdAt !== b.createdAt) return b.createdAt.localeCompare(a.createdAt);
+    return a.id.localeCompare(b.id);
+  };
 }
 
 export async function listSchools(database: Database, filters: SchoolListFilters) {
@@ -600,6 +684,50 @@ export async function listSchools(database: Database, filters: SchoolListFilters
       }
     `;
 
+    const sort = filters.sort ?? "created";
+    const order = filters.order ?? (sort === "name" ? "asc" : "desc");
+    const sqlOrder =
+      sort === "name"
+        ? order === "asc"
+          ? tx`ORDER BY lower(s.name) ASC, s.id`
+          : tx`ORDER BY lower(s.name) DESC, s.id`
+        : order === "asc"
+          ? tx`ORDER BY s.created_at ASC, s.id`
+          : tx`ORDER BY s.created_at DESC, s.id`;
+
+    // A usage sort or filter needs every matching school's figures before it can page, so it reads
+    // them all (one pipelined round trip, as the overview already does for every school) and pages
+    // in memory. Plain listings keep paging in SQL and read figures for one page only.
+    const needsAll =
+      sort === "students" ||
+      sort === "storage" ||
+      sort === "lastActivity" ||
+      filters.activity !== undefined ||
+      filters.storage !== undefined;
+
+    if (needsAll) {
+      const rows = await tx<SchoolRow[]>`
+        SELECT ${SCHOOL_COLUMNS(tx)}
+        FROM app.schools s
+        JOIN app.countries c ON c.id = s.country_id
+        JOIN app.currencies cur ON cur.id = s.default_currency_id
+        ${where}
+        ${sqlOrder}
+      `;
+      const stats = await loadSchoolStatsFor(tx, rows);
+      const now = Date.now();
+      let summaries = rows
+        .map((row, index) => toSummary(row, stats[index]!))
+        .filter((summary) => matchesUsageFilters(summary, filters, now));
+      if (sort !== "created" && sort !== "name") {
+        summaries = summaries.sort(compareByUsage(sort, order));
+      }
+      return {
+        schools: summaries.slice(filters.offset, filters.offset + filters.limit),
+        total: summaries.length,
+      };
+    }
+
     const [{ total }] = await tx<{ total: number }[]>`
       SELECT count(*)::int AS total FROM app.schools s ${where}
     `;
@@ -609,7 +737,7 @@ export async function listSchools(database: Database, filters: SchoolListFilters
       JOIN app.countries c ON c.id = s.country_id
       JOIN app.currencies cur ON cur.id = s.default_currency_id
       ${where}
-      ORDER BY s.created_at DESC, s.id
+      ${sqlOrder}
       LIMIT ${filters.limit} OFFSET ${filters.offset}
     `;
 
@@ -619,9 +747,12 @@ export async function listSchools(database: Database, filters: SchoolListFilters
   });
 }
 
-async function buildSchoolDetail(tx: TransactionSql, schoolId: string) {
+export async function buildSchoolDetail(tx: TransactionSql, schoolId: string) {
   const school = await loadSchool(tx, schoolId);
   const stats = await loadSchoolStats(tx, schoolId);
+  const [settings] = await tx<{ locale: string; timezone: string }[]>`
+    SELECT locale, timezone FROM app.school_settings
+  `;
 
   const roleRows = await tx<{ role: string; count: number }[]>`
     SELECT role::text AS role, count(*)::int AS count FROM app.user_roles GROUP BY role
@@ -645,6 +776,8 @@ async function buildSchoolDetail(tx: TransactionSql, schoolId: string) {
       }),
     ),
     allowedTransitions: [...allowedTransitions(school.status)],
+    locale: settings?.locale ?? null,
+    timezone: settings?.timezone ?? null,
   };
 }
 
