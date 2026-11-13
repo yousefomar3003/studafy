@@ -8,6 +8,7 @@ import { getLocalizedMessage } from "../../../middleware/locale";
 import { standardResponses } from "../../../openapi/responses";
 import { getFeatureService } from "../../features/middleware";
 import { AI_MONTHLY_TOKEN_BUDGET } from "../config";
+import { monthlyBudgetWindow } from "../usage/budget-window";
 
 import type { SupportedLocale } from "../../../middleware/locale";
 import type { AppEnv } from "../../../middleware/requestId";
@@ -99,11 +100,13 @@ export function aiUsageRoutes(deps: {
     if (!active.periodStart || !active.periodEnd)
       throw refuse(503, ERROR_CODES.AI_QUOTA_UNAVAILABLE);
 
+    // The same monthly window the budget gate counts in.
+    const window = monthlyBudgetWindow(active.periodStart, active.periodEnd);
     const snapshot = await meter.snapshot({
       schoolId: auth.schoolId,
       studentId: resolved.studentId,
-      periodStart: active.periodStart,
-      periodEnd: active.periodEnd,
+      periodStart: window.periodStart,
+      periodEnd: window.periodEnd,
       budget: monthlyTokenBudget,
     });
 
