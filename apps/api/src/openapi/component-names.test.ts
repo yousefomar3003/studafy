@@ -102,5 +102,7 @@ describe("OpenAPI component names", () => {
       .sort();
     // A failure lists the names. Give each schema its own name (e.g. prefix it with its module).
     expect(collisions).toEqual([]);
-  });
+    // Renders ~3,000 schemas one by one: well under a second alone, but the pre-push run shares the
+    // machine with every other suite, so the 5s default is not enough headroom.
+  }, 60_000);
 });
