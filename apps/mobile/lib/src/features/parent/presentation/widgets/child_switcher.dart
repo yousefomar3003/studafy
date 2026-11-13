@@ -21,11 +21,44 @@ import '../comparison_screen.dart';
 ///
 /// With two or more linked children, the header also carries the entry point to
 /// [ChildComparisonScreen] — there is nothing to compare with only one.
-class ChildSwitcher extends ConsumerWidget {
+///
+/// The children row scrolls inside the card and is clipped at its rounded edge, a long name is
+/// shortened with an ellipsis, and the selected child is scrolled into view — so a chip is never
+/// half off the card (as "elaf mohammad omar" was on a phone).
+class ChildSwitcher extends ConsumerStatefulWidget {
   const ChildSwitcher({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChildSwitcher> createState() => _ChildSwitcherState();
+}
+
+class _ChildSwitcherState extends ConsumerState<ChildSwitcher> {
+  /// One key per child tile, so the selected one can be brought into view.
+  final Map<String, GlobalKey> _tileKeys = {};
+
+  /// The child last scrolled into view, so a rebuild doesn't scroll again.
+  String? _revealed;
+
+  GlobalKey _keyFor(String studentId) => _tileKeys.putIfAbsent(studentId, GlobalKey.new);
+
+  /// Scrolls the selected child's tile into view, centred when the row is wider than the card.
+  void _revealSelected(String? studentId) {
+    if (studentId == null || studentId == _revealed) return;
+    _revealed = studentId;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final tileContext = _tileKeys[studentId]?.currentContext;
+      if (tileContext == null || !tileContext.mounted) return;
+      Scrollable.ensureVisible(
+        tileContext,
+        alignment: 0.5,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final children = ref.watch(linkedChildrenProvider);
     final selected = ref.watch(selectedChildProvider).value;
@@ -35,7 +68,8 @@ class ChildSwitcher extends ConsumerWidget {
     // sits on the brand blue (the same in both themes) rather than the plain white card the
     // summary cards use, under today's date and time.
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.space16),
+      clipBehavior: Clip.antiAlias,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.space16),
       decoration: BoxDecoration(
         color: AppColorTokens.accent600,
         borderRadius: AppRadius.xlRadius,
@@ -50,58 +84,91 @@ class ChildSwitcher extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const LiveDateHeader(color: _onHero),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.space16),
+            child: LiveDateHeader(color: _onHero),
+          ),
           const SizedBox(height: AppSpacing.space16),
-          Divider(height: 1, color: _onHero.withValues(alpha: 0.16)),
+          Divider(
+            height: 1,
+            indent: AppSpacing.space16,
+            endIndent: AppSpacing.space16,
+            color: _onHero.withValues(alpha: 0.16),
+          ),
           const SizedBox(height: AppSpacing.space12),
-          Row(
-            children: [
-              Icon(Icons.family_restroom_outlined, size: 20, color: _onHero),
-              const SizedBox(width: AppSpacing.space8),
-              Expanded(
-                child: Text(
-                  'parent.switcher.title'.tr(),
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    color: _onHero,
-                    fontWeight: FontWeight.w600,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
+            child: Row(
+              children: [
+                const Icon(Icons.family_restroom_outlined, size: 20, color: _onHero),
+                const SizedBox(width: AppSpacing.space8),
+                Expanded(
+                  child: Text(
+                    'parent.switcher.title'.tr(),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: _onHero,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-              if (canCompare)
-                IconButton(
-                  icon: const Icon(Icons.compare_arrows),
-                  tooltip: 'parent.comparison.title'.tr(),
-                  style: IconButton.styleFrom(
-                    foregroundColor: _onHero,
-                    backgroundColor: _onHero.withValues(alpha: 0.14),
+                // Labelled, not a bare icon: the arrows alone read as "switch child", which the
+                // chips below already do.
+                if (canCompare)
+                  TextButton.icon(
+                    icon: const Icon(Icons.compare_arrows, size: 18),
+                    label: Text('parent.switcher.compare'.tr()),
+                    style: TextButton.styleFrom(
+                      foregroundColor: _onHero,
+                      backgroundColor: _onHero.withValues(alpha: 0.14),
+                      shape: const StadiumBorder(),
+                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space12),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const ChildComparisonScreen()),
+                    ),
                   ),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const ChildComparisonScreen()),
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.space12),
           children.when(
-            loading: () => const _ChildTileSkeleton(),
-            error: (_, _) => _HeroMessage(
-              messageKey: 'parent.children.error',
-              icon: Icons.error_outline,
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.space16),
+              child: _ChildTileSkeleton(),
+            ),
+            error: (_, _) => const Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppSpacing.space16),
+              child: _HeroMessage(messageKey: 'parent.children.error', icon: Icons.error_outline),
             ),
             data: (list) {
               if (list.isEmpty) {
-                return _HeroMessage(messageKey: 'parent.children.empty', icon: Icons.info_outline);
+                return const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSpacing.space16),
+                  child: _HeroMessage(
+                    messageKey: 'parent.children.empty',
+                    icon: Icons.info_outline,
+                  ),
+                );
               }
+              // A name never takes more than about half the screen, so with two or more children
+              // the next chip always peeks in and the row reads as scrollable.
+              final maxNameWidth = (MediaQuery.sizeOf(context).width * 0.45).clamp(96.0, 240.0);
+              if (list.length > 1) _revealSelected(selected?.studentId);
               return SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
-                clipBehavior: Clip.none,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.space16),
                 child: Row(
                   children: [
                     for (final child in list)
                       Padding(
                         padding: const EdgeInsetsDirectional.only(end: AppSpacing.space8),
                         child: _ChildTile(
+                          key: _keyFor(child.studentId),
                           name: child.studentName,
+                          maxNameWidth: maxNameWidth,
                           selected: child.studentId == selected?.studentId,
                           needsAttention: AttendanceAlert.fromMetrics(child.attendance).isElevated,
                           onTap: () => ref
@@ -125,12 +192,17 @@ class ChildSwitcher extends ConsumerWidget {
 class _ChildTile extends StatelessWidget {
   const _ChildTile({
     required this.name,
+    required this.maxNameWidth,
     required this.selected,
     required this.needsAttention,
     required this.onTap,
+    super.key,
   });
 
   final String name;
+
+  /// The widest the name may grow before it is shortened with an ellipsis.
+  final double maxNameWidth;
   final bool selected;
   final bool needsAttention;
   final VoidCallback onTap;
@@ -183,11 +255,16 @@ class _ChildTile extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.space8),
-                Text(
-                  name,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: foreground,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxNameWidth),
+                  child: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: foreground,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
                   ),
                 ),
                 if (needsAttention) ...[

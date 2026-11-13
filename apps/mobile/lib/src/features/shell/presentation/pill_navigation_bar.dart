@@ -90,7 +90,26 @@ class _PillNavigationBarState extends State<PillNavigationBar> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final background = Theme.of(context).scaffoldBackgroundColor;
 
+    // Tab content scrolls on behind the floating bar (`extendBody`). Without a backdrop the gap
+    // between the bar and the screen edge showed stray lines of whatever card was underneath (a
+    // cut-off "school." on the parent home). The backdrop fades from clear at the bar's top to the
+    // page colour by its middle, so content disappears under the bar instead of peeking below it.
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [background.withValues(alpha: 0), background, background],
+          stops: const [0, 0.45, 1],
+        ),
+      ),
+      child: _bar(context, colors),
+    );
+  }
+
+  Widget _bar(BuildContext context, ColorScheme colors) {
     return SafeArea(
       top: false,
       minimum: const EdgeInsets.only(bottom: AppSpacing.space12),
