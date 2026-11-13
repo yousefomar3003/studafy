@@ -13,6 +13,16 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Moving students to the next year: `GET /api/academics/promotions/preview?source_year_id=&target_year_id=`
+  (`PromotionPreview`, `PromotionPreviewStudent`, `PromotionTargetSection`) proposes a target-year
+  destination for every student placed in the source year from their current annual result
+  (`PromotionReason`: promoted to the next grade's section with the same name, retained, graduating
+  from the top grade, awaiting a resit, or needing a decision when there is no result or no matching
+  section); `POST /api/academics/promotions/apply` (`ApplyPromotionBody`, up to 100
+  `PromotionDecision`s, returning `PromotionResult`) places students with the existing section
+  placement, marks graduates `graduated`, or skips them. Re-running is a no-op; the source year is
+  never changed. Web only; needs `timetable:manage` and `academicConfig:manage`. Admission numbers
+  in the preview are null without `billing:read`.
 - Report card notes (000209): `GET`/`PUT /api/grading/report-card-settings` (`ReportCardSettings`,
   `UpdateReportCardSettingsBody`) choose which sections report cards and certificates show (subject
   comments, class teacher comment, principal comment, attendance, conduct; all default to shown)

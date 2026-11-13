@@ -485,6 +485,11 @@
       "where": "Principal › School years & terms",
       "keywords": "academic year, school year, terms, semesters, term dates, add term, term 2, edit year, year dates, quarters, trimesters"
     },
+    "move-students-next-year": {
+      "title": "Move students to next year",
+      "where": "Principal › Grades & sections",
+      "keywords": "promote students, promotion, move up a grade, next grade, graduate, graduation, end of year, retained, repeat year, place students next year"
+    },
     "start-new-school-year": {
       "title": "Start a new school year",
       "where": "Principal › School years & terms",

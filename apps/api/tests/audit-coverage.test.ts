@@ -201,6 +201,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/academics/sections/{sectionId}",
   "POST /api/academics/sections/{sectionId}/students",
   "DELETE /api/academics/sections/{sectionId}/students/{studentId}",
+  // Moving students to the next year: per-student audit rows are written by the service
+  // (student_sections placements and students graduations).
+  "POST /api/academics/promotions/apply",
   // Academic grading (000160): configuration, marks, mark-sheet approval, finalization, corrections
   // and certificates. Every mutation writes its app.audit_logs row inside the service transaction
   // (modules/grading/*-service.ts), mark changes with their old and new values.

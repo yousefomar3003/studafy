@@ -336,6 +336,10 @@ const SubjectsCoursesPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/catalog/SubjectsCoursesPage"),
 );
+const PromotionPage = lazyWithCatalogs(
+  PRINCIPAL_CATALOGS,
+  () => import("../features/principal/promotion/PromotionPage"),
+);
 const SchoolYearsPage = lazyWithCatalogs(
   PRINCIPAL_CATALOGS,
   () => import("../features/principal/years/SchoolYearsPage"),
@@ -1074,6 +1078,16 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.TIMETABLE_MANAGE}>
                 <GradesSectionsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // Moving every student to next year's sections after results are finalized (or marking
+            // them graduated). Needs `timetable:manage`; the API also needs `academicConfig:manage`.
+            path: "principal/promotion",
+            element: (
+              <RequirePermission permission={PERMISSIONS.TIMETABLE_MANAGE}>
+                <PromotionPage />
               </RequirePermission>
             ),
           },
