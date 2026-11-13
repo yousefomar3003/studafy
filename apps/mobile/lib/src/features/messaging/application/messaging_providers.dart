@@ -5,23 +5,17 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/api_exception.dart';
-import '../../../core/api/auth_interceptor.dart';
-import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/auth/auth_providers.dart';
-import '../../../core/di/app_providers.dart';
+import '../../../core/auth/authenticated_dio.dart';
 import '../data/messaging_client.dart';
 import '../domain/chat_state.dart';
 import '../domain/messaging.dart';
 
-/// [MessagingClient] on its own [Dio], wired exactly like `familyFinanceClientProvider` — same
-/// base URL, same bearer injection, same [ErrorMappingInterceptor].
+/// [MessagingClient] on the app's [authenticatedDio]: bearer injection WITH 401 recovery (renew the
+/// token once, retry) and the closed-school sign-out. A bare AuthInterceptor here used to leave
+/// every chat request failing with 401 once the short-lived access token expired.
 final messagingClientProvider = Provider<MessagingClient>((ref) {
-  final baseUrl = ref.watch(networkConfigProvider).apiBaseUrl;
-  final session = ref.watch(authSessionProvider);
-  final dio = Dio(BaseOptions(baseUrl: baseUrl.toString()))
-    ..interceptors.add(AuthInterceptor(() => session.tokenProvider))
-    ..interceptors.add(ErrorMappingInterceptor());
-  return MessagingClient(dio);
+  return MessagingClient(authenticatedDio(ref));
 });
 
 /// The signed-in user's id (the token's `sub`), which `sender_id` is compared against to tell

@@ -1,4 +1,4 @@
-export { createStorageService, requireStorage } from "./client";
+export { createStorageService, isInlineSafeContentType, requireStorage } from "./client";
 export type {
   ListedObject,
   ObjectMetadata,

@@ -167,9 +167,26 @@ class _AssignmentSummary extends StatelessWidget {
           ),
           for (final attachment in assignment.attachments)
             AttachmentDownloadTile(
+              attachmentId: attachment.id,
               fileName: attachment.originalFileName,
+              mimeType: attachment.mimeType,
               sizeBytes: attachment.sizeBytes,
               downloadUrl: attachment.downloadUrl,
+              downloadUrlExpiresAt: attachment.downloadUrlExpiresAt,
+              availability: attachmentAvailabilityFrom(
+                attachment.downloadState.json,
+                hasUrl: attachment.downloadUrl != null,
+              ),
+              refreshUrl: () async {
+                final fresh = await ProviderScope.containerOf(
+                  context,
+                  listen: false,
+                ).refresh(assignmentDetailProvider(assignment.id).future);
+                for (final a in fresh.attachments) {
+                  if (a.id == attachment.id) return a.downloadUrl;
+                }
+                return null;
+              },
             ),
         ],
       ],
@@ -290,9 +307,26 @@ class _SubmissionSection extends StatelessWidget {
           const SizedBox(height: AppSpacing.space12),
           for (final attachment in submission.attachments)
             AttachmentDownloadTile(
+              attachmentId: attachment.id,
               fileName: attachment.originalFileName,
+              mimeType: attachment.mimeType,
               sizeBytes: attachment.sizeBytes,
               downloadUrl: attachment.downloadUrl,
+              downloadUrlExpiresAt: attachment.downloadUrlExpiresAt,
+              availability: attachmentAvailabilityFrom(
+                attachment.downloadState.json,
+                hasUrl: attachment.downloadUrl != null,
+              ),
+              refreshUrl: () async {
+                final fresh = await ProviderScope.containerOf(
+                  context,
+                  listen: false,
+                ).refresh(assignmentSubmissionProvider(assignment.id).future);
+                for (final a in fresh?.attachments ?? const []) {
+                  if (a.id == attachment.id) return a.downloadUrl;
+                }
+                return null;
+              },
             ),
         ],
         const SizedBox(height: AppSpacing.space16),
