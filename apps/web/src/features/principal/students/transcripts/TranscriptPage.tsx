@@ -135,21 +135,41 @@ export function TranscriptDocument({
             <tbody>
               {year.subjects.map((subject) => (
                 <tr key={subject.code}>
-                  <th scope="row">{subject.name}</th>
+                  <th scope="row">
+                    {subject.name}
+                    {subject.descriptive && !subject.exempt && (subject.skills?.length ?? 0) > 0 ? (
+                      <ul className="ag-transcript__skills">
+                        {subject.skills!.map((skill, index) => (
+                          <li key={`${skill.name}-${index}`}>
+                            {t("academicGrading.transcript.skillLine", {
+                              skill: skill.name,
+                              descriptor: skill.descriptor_label ?? "—",
+                            })}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </th>
                   <td>
                     {subject.exempt ? (
                       t("academicGrading.certificate.exempt")
+                    ) : subject.descriptive ? (
+                      "—"
                     ) : (
                       <>
                         <Num value={subject.marks_obtained} /> / <Num value={subject.max_marks} />
                       </>
                     )}
                   </td>
-                  <td>{subject.exempt ? "—" : <Percent value={subject.percentage} />}</td>
-                  <td>{subject.grade_label ?? "—"}</td>
                   <td>
-                    <Num value={subject.gpa_points} />
+                    {subject.exempt || subject.descriptive ? (
+                      "—"
+                    ) : (
+                      <Percent value={subject.percentage} />
+                    )}
                   </td>
+                  <td>{subject.grade_label ?? "—"}</td>
+                  <td>{subject.descriptive ? "—" : <Num value={subject.gpa_points} />}</td>
                   <td>
                     {subject.include_in_average ? <Num value={subject.average_weight} /> : "—"}
                   </td>
@@ -209,6 +229,14 @@ export function TranscriptDocument({
         <p className="ag-muted">
           {t(`academicGrading.transcript.gpaReason.${cumulative.gpa_unavailable_reason}`, {
             subjects: cumulative.subjects_without_gpa_points.join(", "),
+            scales: (cumulative.mixed_gpa_scales ?? [])
+              .map((scale) =>
+                t("academicGrading.transcript.gpaScale", {
+                  year: scale.academic_year_name,
+                  max: scale.max,
+                }),
+              )
+              .join(", "),
           })}
         </p>
       ) : null}

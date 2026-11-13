@@ -91,6 +91,10 @@ export const resultDisplaySchema = z
   });
 const aggregationSchema = z.enum(["weighted_average", "total_points"]);
 const markStatusSchema = z.enum(["graded", "absent", "excused", "not_applicable"]);
+const gradingMethodSchema = z.enum(["weighted", "total_points", "descriptive"]).openapi({
+  description:
+    "weighted / total_points: marked out of numbers. descriptive: no marks; each skill gets a descriptor from the grade's descriptor scale, and the subject never counts in the numeric average.",
+});
 const percentage = z.number().min(0).max(100);
 
 export const validationIssueSchema = z
@@ -273,6 +277,27 @@ export const scaleSchema = z
 
 export const scaleListSchema = z.object({ scales: z.array(scaleSchema) }).openapi("GradeScaleList");
 
+export const descriptorSchema = z
+  .object({
+    id: uuidSchema,
+    position: z.number().int().openapi({ description: "1 is the highest descriptor." }),
+    label: z.string(),
+    points: z.number().nullable(),
+    not_achieved: z.boolean(),
+  })
+  .openapi("GradeDescriptor");
+
+const descriptorBodySchema = z
+  .object({
+    id: uuidSchema.optional().openapi({
+      description: "An existing descriptor to keep (and rename); omit for a new one.",
+    }),
+    label: z.string().trim().min(1).max(60),
+    points: z.number().min(0).max(1000).nullable().default(null),
+    not_achieved: z.boolean().default(false),
+  })
+  .openapi("GradeDescriptorBody");
+
 export const programBodySchema = z
   .object({
     grade_scale_id: uuidSchema.nullable().optional(),
@@ -284,6 +309,10 @@ export const programBodySchema = z
     result_scale_max: z.number().positive().max(1000).nullable().optional().openapi({
       description:
         "The maximum for out_of (e.g. 20) or gpa (4 or 5, up to 10); ignored for percentage.",
+    }),
+    descriptors: z.array(descriptorBodySchema).max(20).optional().openapi({
+      description:
+        "Replaces the grade's descriptor scale (descriptive subjects), highest first. Descriptors left out are removed; one that marks use cannot be removed.",
     }),
   })
   .openapi("GradeProgramBody");
@@ -301,6 +330,7 @@ export const programSchema = z
     average_rounding_mode: roundingModeSchema,
     result_format: resultFormatSchema,
     result_scale_max: z.number().nullable(),
+    descriptors: z.array(descriptorSchema),
     updated_at: dateTimeSchema,
   })
   .openapi("GradeProgram");
@@ -318,7 +348,7 @@ const configFields = {
   include_in_average: z.boolean().default(true),
   include_on_certificate: z.boolean().default(true),
   average_weight: z.number().positive().max(100).default(1),
-  grading_method: z.enum(["weighted", "total_points"]).default("weighted"),
+  grading_method: gradingMethodSchema.default("weighted"),
   max_marks: z.number().positive().max(100000).default(100),
   pass_percentage: percentage.default(50),
   final_exam_pass_percentage: percentage.nullable().default(null),
@@ -413,7 +443,7 @@ export const subjectConfigSchema = z
     include_in_average: z.boolean(),
     include_on_certificate: z.boolean(),
     average_weight: z.number(),
-    grading_method: z.enum(["weighted", "total_points"]),
+    grading_method: gradingMethodSchema,
     max_marks: z.number(),
     pass_percentage: z.number(),
     final_exam_pass_percentage: z.number().nullable(),
@@ -694,7 +724,7 @@ export const markSheetSchema = z
     can_add_assessments: z.boolean(),
     config: z
       .object({
-        grading_method: z.enum(["weighted", "total_points"]),
+        grading_method: gradingMethodSchema,
         max_marks: z.number(),
         pass_percentage: z.number(),
         final_exam_pass_percentage: z.number().nullable(),
@@ -706,6 +736,9 @@ export const markSheetSchema = z
         weight_summary: weightSummarySchema,
       })
       .openapi("MarkSheetConfig"),
+    descriptors: z.array(descriptorSchema).openapi({
+      description: "The grade's descriptor scale (descriptive subjects); empty otherwise.",
+    }),
     terms: z.array(
       z
         .object({
@@ -774,6 +807,7 @@ export const markSheetSchema = z
                 attempt: z.number().int(),
                 status: markStatusSchema,
                 score: z.number().nullable(),
+                descriptor_id: uuidSchema.nullable(),
                 remarks: z.string().nullable(),
                 updated_at: dateTimeSchema,
               })
@@ -797,6 +831,10 @@ export const saveMarksBodySchema = z
             attempt: z.union([z.literal(1), z.literal(2)]).default(1),
             status: z.enum(["graded", "absent", "excused", "not_applicable", "pending"]),
             score: z.number().min(0).max(100000).nullable().default(null),
+            descriptor_id: uuidSchema.nullable().default(null).openapi({
+              description:
+                "A graded mark in a descriptive subject: the chosen descriptor (no score).",
+            }),
             remarks: z.string().trim().min(1).max(1000).nullable().default(null),
             expected_updated_at: dateTimeSchema.nullable().optional(),
           })
@@ -939,6 +977,7 @@ export const resultPreviewSchema = z
                 grade_label: z.string().nullable(),
                 passed: z.boolean().nullable(),
                 missing_assessments: z.array(z.string()),
+                is_descriptive: z.boolean(),
               })
               .openapi("ResultPreviewSubject"),
           ),
@@ -1015,6 +1054,15 @@ export const reportNotesSchema = z
     attendance: reportAttendanceSchema.nullable(),
   })
   .openapi("ReportCardNotes");
+const descriptiveSkillSchema = z
+  .object({
+    assessment_id: uuidSchema,
+    name: z.string(),
+    category_name: z.string(),
+    term_id: uuidSchema.nullable(),
+    descriptor_label: z.string().nullable(),
+  })
+  .openapi("DescriptiveSkillResult");
 
 const storedSubjectResultSchema = z
   .object({
@@ -1039,14 +1087,30 @@ const storedSubjectResultSchema = z
     fail_reasons: z.array(
       z
         .object({
-          code: z.enum(["BELOW_PASS_PERCENTAGE", "FINAL_EXAM_BELOW_REQUIRED"]),
+          code: z.enum([
+            "BELOW_PASS_PERCENTAGE",
+            "FINAL_EXAM_BELOW_REQUIRED",
+            "DESCRIPTOR_NOT_ACHIEVED",
+          ]),
           categoryId: z.string().optional(),
-          required: z.number(),
+          required: z.number().openapi({
+            description: "The percentage required (0 for DESCRIPTOR_NOT_ACHIEVED).",
+          }),
           actual: z.number().nullable(),
+          descriptor: z.string().optional().openapi({
+            description: "DESCRIPTOR_NOT_ACHIEVED: the descriptor the subject ended on.",
+          }),
         })
         .openapi("GradingStoredSubjectResultFailReason"),
     ),
     comment: z.string().nullable(),
+    is_descriptive: z.boolean(),
+    average_points: z.number().nullable().openapi({
+      description: "Descriptive subjects whose descriptors carry points: the skills' average.",
+    }),
+    skills: z.array(descriptiveSkillSchema).openapi({
+      description: "Descriptive subjects: each skill and its descriptor. Empty otherwise.",
+    }),
   })
   .openapi("FinalizedSubjectResult");
 
@@ -1085,6 +1149,7 @@ export const correctionBodySchema = z
             attempt: z.union([z.literal(1), z.literal(2)]).default(1),
             status: z.enum(["graded", "absent", "excused", "not_applicable", "pending"]),
             score: z.number().min(0).nullable().default(null),
+            descriptor_id: uuidSchema.nullable().default(null),
           })
           .openapi("GradingCorrectionBodyMark"),
       )
@@ -1150,6 +1215,7 @@ export const studentReleasedMarksSchema = z
                                   attempt: z.number().int(),
                                   status: markStatusSchema,
                                   score: z.number().nullable(),
+                                  descriptor_label: z.string().nullable(),
                                 })
                                 .openapi("ReleasedMarkAttempt"),
                             ),
@@ -1330,6 +1396,22 @@ export const certificateContentSchema = z
               .openapi("CertificateContentSubjectTerm"),
           ),
           comment: z.string().optional(),
+          descriptive: z.boolean().optional().openapi({
+            description:
+              "Graded with descriptors, not marks (certificates issued after descriptive grading shipped).",
+          }),
+          skills: z
+            .array(
+              z
+                .object({
+                  name: z.string(),
+                  category_name: z.string(),
+                  term_name: z.string().nullable(),
+                  descriptor_label: z.string().nullable(),
+                })
+                .openapi("CertificateContentSkill"),
+            )
+            .optional(),
         })
         .openapi("CertificateContentSubject"),
     ),

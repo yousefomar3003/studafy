@@ -691,10 +691,12 @@ class _RulesCard extends StatelessWidget {
         leading: const Icon(Icons.rule_outlined),
         title: Text('teacher.marks.rules.title'.tr()),
         subtitle: Text(
-          '${'teacher.marks.rules.maxMarks'.tr()}: '
-          '${formatMarkNumber(config.maxMarks)} · '
-          '${'teacher.marks.rules.passMark'.tr()}: '
-          '${percent(config.passPercentage)}',
+          config.isDescriptive
+              ? 'teacher.marks.rules.methodDescriptive'.tr()
+              : '${'teacher.marks.rules.maxMarks'.tr()}: '
+                    '${formatMarkNumber(config.maxMarks)} · '
+                    '${'teacher.marks.rules.passMark'.tr()}: '
+                    '${percent(config.passPercentage)}',
           style: theme.textTheme.bodySmall,
         ),
         childrenPadding: const EdgeInsets.fromLTRB(
@@ -707,27 +709,38 @@ class _RulesCard extends StatelessWidget {
         children: [
           _RuleRow(
             label: 'teacher.marks.rules.method'.tr(),
-            value: config.gradingMethod == 'total_points'
-                ? 'teacher.marks.rules.methodTotal'.tr()
-                : 'teacher.marks.rules.methodWeighted'.tr(),
+            value: switch (config.gradingMethod) {
+              'total_points' => 'teacher.marks.rules.methodTotal'.tr(),
+              'descriptive' => 'teacher.marks.rules.methodDescriptive'.tr(),
+              _ => 'teacher.marks.rules.methodWeighted'.tr(),
+            },
           ),
-          _RuleRow(
-            label: 'teacher.marks.rules.maxMarks'.tr(),
-            value: formatMarkNumber(config.maxMarks),
-          ),
-          _RuleRow(
-            label: 'teacher.marks.rules.passMark'.tr(),
-            value: percent(config.passPercentage),
-          ),
-          if (config.finalExamPassPercentage != null)
+          if (config.isDescriptive)
             _RuleRow(
-              label: 'teacher.marks.rules.finalExamPass'.tr(),
-              value: percent(config.finalExamPassPercentage!),
+              label: 'teacher.marks.descriptive.scale'.tr(),
+              value: [
+                for (final descriptor in sheet.descriptors) descriptor.label,
+              ].join(' · '),
+            )
+          else ...[
+            _RuleRow(
+              label: 'teacher.marks.rules.maxMarks'.tr(),
+              value: formatMarkNumber(config.maxMarks),
             ),
-          _RuleRow(
-            label: 'teacher.marks.rules.rounding'.tr(),
-            value: '${config.roundingDecimals}',
-          ),
+            _RuleRow(
+              label: 'teacher.marks.rules.passMark'.tr(),
+              value: percent(config.passPercentage),
+            ),
+            if (config.finalExamPassPercentage != null)
+              _RuleRow(
+                label: 'teacher.marks.rules.finalExamPass'.tr(),
+                value: percent(config.finalExamPassPercentage!),
+              ),
+            _RuleRow(
+              label: 'teacher.marks.rules.rounding'.tr(),
+              value: '${config.roundingDecimals}',
+            ),
+          ],
           _RuleRow(
             label: 'teacher.marks.rules.missingPolicy'.tr(),
             value: _policy(config.missingMarkPolicy),
@@ -736,11 +749,12 @@ class _RulesCard extends StatelessWidget {
             label: 'teacher.marks.rules.absentPolicy'.tr(),
             value: _policy(config.absentPolicy),
           ),
-          _RuleRow(
-            label: 'teacher.marks.rules.retakePolicy'.tr(),
-            value: _retake(config.retakePolicy),
-          ),
-          if (sheet.terms.isNotEmpty) ...[
+          if (!config.isDescriptive)
+            _RuleRow(
+              label: 'teacher.marks.rules.retakePolicy'.tr(),
+              value: _retake(config.retakePolicy),
+            ),
+          if (sheet.terms.isNotEmpty && !config.isDescriptive) ...[
             const SizedBox(height: AppSpacing.space8),
             Text(
               'teacher.marks.rules.termWeights'.tr(),
@@ -923,12 +937,14 @@ class _AssessmentTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'teacher.marks.sheet.assessmentMeta'.tr(
-                namedArgs: {
-                  'max': formatMarkNumber(assessment.maxMarks),
-                  'weight': formatMarkNumber(assessment.weight),
-                },
-              ),
+              sheet.config.isDescriptive
+                  ? 'teacher.marks.descriptive.skillMeta'.tr()
+                  : 'teacher.marks.sheet.assessmentMeta'.tr(
+                      namedArgs: {
+                        'max': formatMarkNumber(assessment.maxMarks),
+                        'weight': formatMarkNumber(assessment.weight),
+                      },
+                    ),
             ),
             const SizedBox(height: AppSpacing.space4),
             Wrap(
@@ -1048,6 +1064,30 @@ class MarkPreviewBadge extends StatelessWidget {
     }
     final preview = student.preview;
     if (preview == null) return const SizedBox.shrink();
+
+    // A descriptive subject: no percentage, only the subject's descriptor (when its scale has
+    // points) and pass/fail.
+    if (preview.isComplete && preview.percentage == null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            preview.gradeLabel ?? 'teacher.marks.descriptive.complete'.tr(),
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (preview.passed == false) ...[
+            const SizedBox(height: AppSpacing.space4),
+            StatusPill(
+              label: 'teacher.marks.preview.failed'.tr(),
+              tone: StatusPillTone.danger,
+            ),
+          ],
+        ],
+      );
+    }
 
     if (preview.isComplete && preview.percentage != null) {
       return Column(
@@ -1200,6 +1240,8 @@ class _StudentMarksSheet extends StatelessWidget {
 
   String _markText(MarkSheetAssessment assessment, bool isMissing) {
     String one(RecordedMark mark) => switch (mark.status) {
+      MarkStatus.graded when sheet.config.isDescriptive =>
+        sheet.descriptorById(mark.descriptorId)?.label ?? '—',
       MarkStatus.graded =>
         '${formatMarkNumber(mark.score ?? 0)} / ${formatMarkNumber(assessment.maxMarks)}',
       MarkStatus.absent => 'teacher.marks.entry.markStatus.absent'.tr(),

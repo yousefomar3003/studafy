@@ -27,6 +27,7 @@ class ReleasedMarkAttempt {
     required this.attempt,
     required this.status,
     required this.score,
+    this.descriptorLabel,
   });
 
   factory ReleasedMarkAttempt.fromJson(Map<String, Object?> json) =>
@@ -34,12 +35,16 @@ class ReleasedMarkAttempt {
         attempt: (json['attempt'] as num?)?.toInt() ?? 1,
         status: ReleasedMarkStatus.fromWire(json['status']),
         score: _num(json['score']),
+        descriptorLabel: json['descriptor_label'] as String?,
       );
 
   /// 1, or 2 for a retake.
   final int attempt;
   final ReleasedMarkStatus status;
   final double? score;
+
+  /// Descriptive subjects (no marks): the descriptor the skill was given.
+  final String? descriptorLabel;
 }
 
 class ReleasedAssessment {

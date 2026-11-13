@@ -1018,6 +1018,12 @@
       }
     },
     "marks": {
+      "descriptive": {
+        "pickHint": "Pick a descriptor for each pupil",
+        "scale": "Descriptor scale",
+        "skillMeta": "Skill · pick a descriptor",
+        "complete": "All skills assessed"
+      },
       "reportComments": {
         "entry": "Report card comments",
         "entrySubtitle": "Your comment on each student for {period}",
@@ -1119,6 +1125,7 @@
         "missingInPeriod": "Missing marks: {count}"
       },
       "rules": {
+        "methodDescriptive": "Descriptive (no marks)",
         "title": "Grading rules",
         "method": "Method",
         "methodWeighted": "Weighted categories",
@@ -2137,6 +2144,7 @@
     }
   },
   "academicResults": {
+    "skillLine": "{skill}: {descriptor}",
     "report": {
       "subjectComments": "Teachers' comments",
       "conduct": "Conduct",
@@ -2194,10 +2202,12 @@
       "cumulativeAverage": "Cumulative average",
       "cumulativeGpa": "Cumulative GPA",
       "yearsCovered": "Years covered",
+      "gpaScale": "{year}: out of {max}",
       "gpaReason": {
         "missingGpaPoints": "No cumulative GPA: these subjects have no GPA points: {subjects}.",
         "incomplete": "No cumulative figures: some results are incomplete.",
-        "noSubjects": "No cumulative figures: no subject counts toward the average."
+        "noSubjects": "No cumulative figures: no subject counts toward the average.",
+        "mixedGpaScales": "No cumulative GPA: the years use different GPA scales ({scales}), so their points can't be averaged."
       }
     },
     "kind": {

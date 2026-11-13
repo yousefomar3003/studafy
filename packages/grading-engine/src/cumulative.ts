@@ -14,7 +14,13 @@ import type { RoundingRule } from "./types";
  *  - any counted subject without a percentage makes the cumulative average null;
  *  - the cumulative GPA is the same weighted mean over each subject's GPA points, and is null when
  *    any counted subject has none (its grade scale band carries no points), with the reason and the
- *    subjects named so the school can fix its scale.
+ *    subjects named so the school can fix its scale;
+ *  - the cumulative GPA is also null when the years were graded on different GPA scales (out of 4
+ *    one year, out of 5 another): averaging those points would mix two scales, so the years and
+ *    their maximums are reported instead.
+ *
+ * Descriptive subjects (graded with descriptors, never with a percentage) never count, exactly as
+ * they never count in their own year's average.
  */
 
 export interface CumulativeSubjectInput {
@@ -25,13 +31,20 @@ export interface CumulativeSubjectInput {
   averageWeight: number;
   percentage: number | null;
   gpaPoints: number | null;
+  /** Graded with descriptors: never counted. */
+  descriptive?: boolean;
 }
 
 export interface CumulativeYearInput {
   subjects: readonly CumulativeSubjectInput[];
+  /** Shown when the GPA scales differ, e.g. "2025-2026". */
+  label?: string;
+  /** The GPA maximum the year's result was shown on (4, 5...); null when it was not a GPA. */
+  gpaScaleMax?: number | null;
 }
 
-export type CumulativeGpaUnavailableReason = "no_subjects" | "incomplete" | "missing_gpa_points";
+export type CumulativeGpaUnavailableReason =
+  "no_subjects" | "incomplete" | "missing_gpa_points" | "mixed_gpa_scales";
 
 export interface CumulativeResult {
   /** Weighted mean percentage over every counted subject of every year; null when not computable. */
@@ -41,6 +54,10 @@ export interface CumulativeResult {
   gpaUnavailableReason: CumulativeGpaUnavailableReason | null;
   /** Counted subjects with no GPA points, by label (only when that is the reason). */
   subjectsWithoutGpaPoints: string[];
+  /** The GPA maximum every GPA year shares (4, 5...); null when none was a GPA, or they differ. */
+  gpaScaleMax: number | null;
+  /** Each GPA year and its maximum (only when the maximums differ). */
+  mixedGpaScales: { label: string; max: number }[];
   /** Number of subject results counted, across all years. */
   subjectsCounted: number;
   /** Sum of the counted subjects' weights. */
@@ -56,7 +73,19 @@ export function calculateCumulativeResult(
 ): CumulativeResult {
   const counted = years
     .flatMap((year) => year.subjects)
-    .filter((subject) => subject.status !== "exempt" && subject.includeInAverage);
+    .filter(
+      (subject) => subject.status !== "exempt" && subject.includeInAverage && !subject.descriptive,
+    );
+  const gpaYears = years.flatMap((year) =>
+    year.gpaScaleMax === null || year.gpaScaleMax === undefined
+      ? []
+      : [{ label: year.label ?? "", max: year.gpaScaleMax }],
+  );
+  const scaleMaxima = new Set(gpaYears.map((year) => year.max));
+  const scale = {
+    gpaScaleMax: scaleMaxima.size === 1 ? gpaYears[0]!.max : null,
+    mixedGpaScales: [] as { label: string; max: number }[],
+  };
   const totalWeight = counted.reduce((total, subject) => total + subject.averageWeight, 0);
 
   if (counted.length === 0 || totalWeight <= 0) {
@@ -65,6 +94,7 @@ export function calculateCumulativeResult(
       gpa: null,
       gpaUnavailableReason: "no_subjects",
       subjectsWithoutGpaPoints: [],
+      ...scale,
       subjectsCounted: counted.length,
       totalWeight,
     };
@@ -79,6 +109,7 @@ export function calculateCumulativeResult(
       gpa: null,
       gpaUnavailableReason: "incomplete",
       subjectsWithoutGpaPoints: [],
+      ...scale,
       subjectsCounted: counted.length,
       totalWeight,
     };
@@ -90,6 +121,19 @@ export function calculateCumulativeResult(
     rounding,
   );
 
+  if (scaleMaxima.size > 1) {
+    return {
+      averagePercentage,
+      gpa: null,
+      gpaUnavailableReason: "mixed_gpa_scales",
+      subjectsWithoutGpaPoints: [],
+      gpaScaleMax: null,
+      mixedGpaScales: gpaYears,
+      subjectsCounted: counted.length,
+      totalWeight,
+    };
+  }
+
   const withoutPoints = counted.filter((subject) => subject.gpaPoints === null);
   if (withoutPoints.length > 0) {
     return {
@@ -97,6 +141,7 @@ export function calculateCumulativeResult(
       gpa: null,
       gpaUnavailableReason: "missing_gpa_points",
       subjectsWithoutGpaPoints: withoutPoints.map((subject) => subject.label),
+      ...scale,
       subjectsCounted: counted.length,
       totalWeight,
     };
@@ -112,6 +157,7 @@ export function calculateCumulativeResult(
     gpa,
     gpaUnavailableReason: null,
     subjectsWithoutGpaPoints: [],
+    ...scale,
     subjectsCounted: counted.length,
     totalWeight,
   };

@@ -28,7 +28,8 @@ class _CellDraft {
   /// The status chosen in the editor; null = no mark (cleared or never entered).
   MarkStatus? status;
 
-  /// The raw score text, meaningful only while [status] is [MarkStatus.graded].
+  /// The raw score text — or, in a descriptive subject, the chosen descriptor's id — meaningful
+  /// only while [status] is [MarkStatus.graded].
   String text;
 }
 
@@ -39,9 +40,13 @@ class _CellDraft {
 /// review a column (and its validation) before any of it is written. A value outside
 /// `0..maxMarks` is flagged inline and blocks the save — it is never sent to the API.
 class MarkEntryEditor extends ChangeNotifier {
-  MarkEntryEditor({required this.assessment, required MarkSheet sheet}) {
+  MarkEntryEditor({required this.assessment, required MarkSheet sheet})
+    : descriptive = sheet.config.isDescriptive {
     seed(sheet);
   }
+
+  /// A descriptive subject: each cell holds a descriptor id instead of a score.
+  bool descriptive;
 
   /// The column being edited. Refreshed by [seed] (its maximum could change on a reload).
   MarkSheetAssessment assessment;
@@ -53,6 +58,7 @@ class MarkEntryEditor extends ChangeNotifier {
   /// unsaved edits.
   void seed(MarkSheet sheet) {
     assessment = sheet.assessmentById(assessment.id) ?? assessment;
+    descriptive = sheet.config.isDescriptive;
     final live = <MarkCellKey>{};
     for (final student in sheet.students) {
       if (student.isExempt) continue;
@@ -64,13 +70,13 @@ class MarkEntryEditor extends ChangeNotifier {
         if (attempt == 2 && mark == null && existing == null) continue;
         live.add(key);
         if (existing == null) {
-          _drafts[key] = _fromMark(mark);
+          _drafts[key] = _draftFrom(mark);
           continue;
         }
         final wasClean = !_isDirty(existing);
         existing.original = mark;
         if (wasClean || !_isDirty(existing)) {
-          final fresh = _fromMark(mark);
+          final fresh = _draftFrom(mark);
           existing
             ..status = fresh.status
             ..text = fresh.text;
@@ -84,7 +90,7 @@ class MarkEntryEditor extends ChangeNotifier {
   /// Drop every unsaved edit (after a concurrent-edit conflict, before re-reading the sheet).
   void discardChanges() {
     for (final draft in _drafts.values) {
-      final fresh = _fromMark(draft.original);
+      final fresh = _draftFrom(draft.original);
       draft
         ..status = fresh.status
         ..text = fresh.text;
@@ -134,7 +140,18 @@ class MarkEntryEditor extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Choose a descriptor (descriptive subjects); null clears the cell.
+  void setDescriptor(MarkCellKey key, String? descriptorId) =>
+      setText(key, descriptorId ?? '');
+
+  /// The descriptor chosen in a descriptive subject's cell, if any.
+  String? descriptorFor(MarkCellKey key) {
+    final text = textFor(key).trim();
+    return descriptive && text.isNotEmpty ? text : null;
+  }
+
   MarkCellError? errorFor(MarkCellKey key) {
+    if (descriptive) return null;
     final draft = _drafts[key];
     if (draft == null || draft.status != MarkStatus.graded) return null;
     final trimmed = draft.text.trim();
@@ -179,6 +196,7 @@ class MarkEntryEditor extends ChangeNotifier {
           attempt: key.attempt,
           status: effective?.status.wire ?? 'pending',
           score: effective?.score,
+          descriptorId: effective?.descriptorId,
           remarks: effective == null ? null : draft.original?.remarks,
           expectedUpdatedAt: draft.original?.updatedAt,
         ),
@@ -187,29 +205,40 @@ class MarkEntryEditor extends ChangeNotifier {
     return entries;
   }
 
-  static _CellDraft _fromMark(RecordedMark? mark) => _CellDraft(
+  _CellDraft _draftFrom(RecordedMark? mark) => _CellDraft(
     original: mark,
     status: mark?.status,
-    text: mark?.status == MarkStatus.graded ? formatMarkScore(mark?.score) : '',
+    text: mark?.status != MarkStatus.graded
+        ? ''
+        : descriptive
+        ? (mark?.descriptorId ?? '')
+        : formatMarkScore(mark?.score),
   );
 
   /// What saving [draft] would record: null for "no mark".
-  static ({MarkStatus status, double? score})? _effective(_CellDraft draft) {
+  ({MarkStatus status, double? score, String? descriptorId})? _effective(
+    _CellDraft draft,
+  ) {
     final status = draft.status;
     if (status == null) return null;
-    if (status != MarkStatus.graded) return (status: status, score: null);
+    if (status != MarkStatus.graded) {
+      return (status: status, score: null, descriptorId: null);
+    }
     final trimmed = draft.text.trim();
     if (trimmed.isEmpty) return null;
-    return (status: status, score: double.tryParse(trimmed));
+    return descriptive
+        ? (status: status, score: null, descriptorId: trimmed)
+        : (status: status, score: double.tryParse(trimmed), descriptorId: null);
   }
 
-  static bool _isDirty(_CellDraft draft) {
+  bool _isDirty(_CellDraft draft) {
     final effective = _effective(draft);
     final original = draft.original;
     if (effective == null) return original != null;
     if (original == null) return true;
     return effective.status != original.status ||
-        effective.score != original.score;
+        effective.score != original.score ||
+        effective.descriptorId != original.descriptorId;
   }
 }
 

@@ -33,17 +33,19 @@ import {
   newAssessment,
   newCategory,
   validateDraft,
+  withMethod,
 } from "./config-form";
 import { isProblem, problemMessage } from "./errors";
 import { ImpactModal } from "./ImpactModal";
 import { issueText } from "./issues";
 import { useCreateSubjectConfig, useUpdateSubjectConfig } from "./mutations";
-import { useExamTemplate, useGradeScales, useSubjectConfig } from "./queries";
+import { useExamTemplate, useGradePrograms, useGradeScales, useSubjectConfig } from "./queries";
 
 import type { AssessmentDraft, CategoryDraft, ConfigDraft } from "./config-form";
 import type { SetupContext } from "./context";
-import type { GradeScale, SaveSubjectConfigResult, SubjectConfig } from "./queries";
+import type { GradeProgram, GradeScale, SaveSubjectConfigResult, SubjectConfig } from "./queries";
 import type { Term } from "../../admin/timetable/queries";
+import type { EngineDescriptor } from "@studafy/grading-engine";
 
 export type EditorTarget =
   | {
@@ -72,18 +74,23 @@ export function SubjectConfigEditor({
 }) {
   const terms = useTerms(ctx.year.id);
   const scales = useGradeScales(ctx.year.id);
+  const programs = useGradePrograms(ctx.year.id);
   const config = useSubjectConfig(target.kind === "edit" ? target.configId : undefined);
   // A new subject starts from the school's exam system; without it (not loaded), from an empty draft.
   const template = useExamTemplate(target.kind === "create" ? ctx.year.id : undefined);
   const loading =
     terms.isPending ||
     scales.isPending ||
+    programs.isPending ||
     (target.kind === "edit" && config.isPending) ||
     (target.kind === "create" && template.isPending);
   const error = terms.error ?? scales.error ?? (target.kind === "edit" ? config.error : null);
 
   if (loading || error) return <QueryState isPending={loading} error={error} />;
   const termList = [...(terms.data ?? [])].sort((a, b) => a.sequence_number - b.sequence_number);
+  const gradeLevelId = target.kind === "create" ? target.gradeLevelId : config.data?.grade_level_id;
+  const descriptors =
+    programs.data?.find((program) => program.grade_level_id === gradeLevelId)?.descriptors ?? [];
 
   if (target.kind === "create") {
     return (
@@ -93,6 +100,7 @@ export function SubjectConfigEditor({
         config={null}
         terms={termList}
         scales={scales.data ?? []}
+        descriptors={descriptors}
         initial={template.data ? draftFromTemplate(termList, template.data) : emptyDraft(termList)}
         onClose={onClose}
       />
@@ -107,6 +115,7 @@ export function SubjectConfigEditor({
       config={saved}
       terms={termList}
       scales={scales.data ?? []}
+      descriptors={descriptors}
       initial={draftFromConfig(saved)}
       onClose={onClose}
     />
@@ -119,6 +128,7 @@ function EditorForm({
   config,
   terms,
   scales,
+  descriptors,
   initial,
   onClose,
 }: {
@@ -127,6 +137,8 @@ function EditorForm({
   config: SubjectConfig | null;
   terms: Term[];
   scales: readonly GradeScale[];
+  /** The grade's descriptor scale (descriptive subjects); empty until the grade has one. */
+  descriptors: GradeProgram["descriptors"];
   initial: ConfigDraft;
   onClose: () => void;
 }) {
@@ -140,11 +152,25 @@ function EditorForm({
   const create = useCreateSubjectConfig();
   const update = useUpdateSubjectConfig();
 
-  const live = useMemo(() => validateDraft(draft, terms), [draft, terms]);
+  const engineDescriptors = useMemo<EngineDescriptor[]>(
+    () =>
+      descriptors.map((descriptor) => ({
+        id: descriptor.id,
+        label: descriptor.label,
+        points: descriptor.points,
+        notAchieved: descriptor.not_achieved,
+      })),
+    [descriptors],
+  );
+  const live = useMemo(
+    () => validateDraft(draft, terms, engineDescriptors),
+    [draft, terms, engineDescriptors],
+  );
   const readOnly = !ctx.can.manage || !ctx.configEditable;
   // A published year never runs on a broken configuration: the API refuses such a save.
   const blockedByErrors = ctx.status === "active" && hasErrors(live.issues);
   const weighted = draft.gradingMethod === "weighted";
+  const descriptive = draft.gradingMethod === "descriptive";
   const termCategories = draft.categories.filter((category) => category.scope === "term");
   const subjectName = config?.subject.name ?? (target.kind === "create" ? target.subjectName : "");
   const sectionId = config ? config.section_id : target.kind === "create" ? target.sectionId : null;
@@ -293,65 +319,70 @@ function EditorForm({
               label: t(`academicGrading.method.${value}`),
             }))}
             value={draft.gradingMethod}
-            onChange={(gradingMethod) => patch({ gradingMethod })}
+            onChange={(gradingMethod) => setDraft((prev) => withMethod(prev, gradingMethod))}
             disabled={readOnly}
           />
-          <Input
-            label={t("academicGrading.editor.maxMarks")}
-            type="number"
-            min={0}
-            value={draft.maxMarks}
-            onChange={(event) => patch({ maxMarks: event.target.value })}
-          />
-          <Input
-            label={t("academicGrading.editor.passPercentage")}
-            type="number"
-            min={0}
-            max={100}
-            value={draft.passPercentage}
-            onChange={(event) => patch({ passPercentage: event.target.value })}
-          />
-          <Input
-            label={t("academicGrading.editor.finalExamPass")}
-            helperText={t("academicGrading.editor.finalExamPassHelp")}
-            type="number"
-            min={0}
-            max={100}
-            value={draft.finalExamPassPercentage}
-            onChange={(event) => patch({ finalExamPassPercentage: event.target.value })}
-          />
-          <Select
-            label={t("academicGrading.editor.scale")}
-            options={scaleOptions}
-            value={draft.gradeScaleId}
-            onChange={(gradeScaleId) => patch({ gradeScaleId })}
-            disabled={readOnly}
-          />
-          <WeightSlider
-            value={draft.averageWeight}
-            onChange={(averageWeight) => patch({ averageWeight })}
-            disabled={readOnly}
-          />
-          <Input
-            label={t("academicGrading.editor.roundingDecimals")}
-            type="number"
-            min={0}
-            max={4}
-            value={draft.roundingDecimals}
-            onChange={(event) => patch({ roundingDecimals: event.target.value })}
-          />
-          <Select
-            label={t("academicGrading.editor.roundingMode")}
-            options={ROUNDING_MODES.map((value) => ({
-              value,
-              label: t(`academicGrading.rounding.${value}`),
-            }))}
-            value={draft.roundingMode}
-            onChange={(roundingMode) => patch({ roundingMode })}
-            disabled={readOnly}
-          />
+          {descriptive ? null : (
+            <>
+              <Input
+                label={t("academicGrading.editor.maxMarks")}
+                type="number"
+                min={0}
+                value={draft.maxMarks}
+                onChange={(event) => patch({ maxMarks: event.target.value })}
+              />
+              <Input
+                label={t("academicGrading.editor.passPercentage")}
+                type="number"
+                min={0}
+                max={100}
+                value={draft.passPercentage}
+                onChange={(event) => patch({ passPercentage: event.target.value })}
+              />
+              <Input
+                label={t("academicGrading.editor.finalExamPass")}
+                helperText={t("academicGrading.editor.finalExamPassHelp")}
+                type="number"
+                min={0}
+                max={100}
+                value={draft.finalExamPassPercentage}
+                onChange={(event) => patch({ finalExamPassPercentage: event.target.value })}
+              />
+              <Select
+                label={t("academicGrading.editor.scale")}
+                options={scaleOptions}
+                value={draft.gradeScaleId}
+                onChange={(gradeScaleId) => patch({ gradeScaleId })}
+                disabled={readOnly}
+              />
+              <WeightSlider
+                value={draft.averageWeight}
+                onChange={(averageWeight) => patch({ averageWeight })}
+                disabled={readOnly}
+              />
+              <Input
+                label={t("academicGrading.editor.roundingDecimals")}
+                type="number"
+                min={0}
+                max={4}
+                value={draft.roundingDecimals}
+                onChange={(event) => patch({ roundingDecimals: event.target.value })}
+              />
+              <Select
+                label={t("academicGrading.editor.roundingMode")}
+                options={ROUNDING_MODES.map((value) => ({
+                  value,
+                  label: t(`academicGrading.rounding.${value}`),
+                }))}
+                value={draft.roundingMode}
+                onChange={(roundingMode) => patch({ roundingMode })}
+                disabled={readOnly}
+              />
+            </>
+          )}
           <Select
             label={t("academicGrading.editor.missingPolicy")}
+            helperText={descriptive ? t("academicGrading.descriptive.zeroIsLowest") : undefined}
             options={MISSING_POLICIES.map((value) => ({
               value,
               label: t(`academicGrading.missingPolicy.${value}`),
@@ -370,17 +401,19 @@ function EditorForm({
             onChange={(absentPolicy) => patch({ absentPolicy })}
             disabled={readOnly}
           />
-          <Select
-            label={t("academicGrading.editor.retakePolicy")}
-            options={RETAKE_POLICIES.map((value) => ({
-              value,
-              label: t(`academicGrading.retakePolicy.${value}`),
-            }))}
-            value={draft.retakePolicy}
-            onChange={(retakePolicy) => patch({ retakePolicy })}
-            disabled={readOnly}
-          />
-          {draft.retakePolicy === "capped" ? (
+          {descriptive ? null : (
+            <Select
+              label={t("academicGrading.editor.retakePolicy")}
+              options={RETAKE_POLICIES.map((value) => ({
+                value,
+                label: t(`academicGrading.retakePolicy.${value}`),
+              }))}
+              value={draft.retakePolicy}
+              onChange={(retakePolicy) => patch({ retakePolicy })}
+              disabled={readOnly}
+            />
+          )}
+          {!descriptive && draft.retakePolicy === "capped" ? (
             <Input
               label={t("academicGrading.editor.retakeCap")}
               type="number"
@@ -392,11 +425,15 @@ function EditorForm({
           ) : null}
         </div>
         <div className="ag-checks">
-          <Checkbox
-            label={t("academicGrading.editor.includeInAverage")}
-            checked={draft.includeInAverage}
-            onChange={(event) => patch({ includeInAverage: event.target.checked })}
-          />
+          {descriptive ? (
+            <p className="ag-muted">{t("academicGrading.descriptive.notInAverage")}</p>
+          ) : (
+            <Checkbox
+              label={t("academicGrading.editor.includeInAverage")}
+              checked={draft.includeInAverage}
+              onChange={(event) => patch({ includeInAverage: event.target.checked })}
+            />
+          )}
           <Checkbox
             label={t("academicGrading.editor.includeOnCertificate")}
             checked={draft.includeOnCertificate}
@@ -424,6 +461,8 @@ function EditorForm({
           disabled={readOnly}
         />
       </fieldset>
+
+      {descriptive ? <DescriptorScaleSummary descriptors={descriptors} /> : null}
 
       {weighted ? (
         <fieldset className="ag-fieldset" disabled={readOnly}>
@@ -453,11 +492,17 @@ function EditorForm({
       ) : null}
 
       <fieldset className="ag-fieldset" disabled={readOnly}>
-        <legend>{t("academicGrading.editor.categories")}</legend>
+        <legend>
+          {descriptive
+            ? t("academicGrading.descriptive.skillGroups")
+            : t("academicGrading.editor.categories")}
+        </legend>
         <p className="ag-muted">
-          {weighted
-            ? t("academicGrading.editor.categoriesHelpWeighted")
-            : t("academicGrading.editor.categoriesHelpTotal")}
+          {descriptive
+            ? t("academicGrading.descriptive.skillGroupsHelp")
+            : weighted
+              ? t("academicGrading.editor.categoriesHelpWeighted")
+              : t("academicGrading.editor.categoriesHelpTotal")}
         </p>
         {draft.categories.length === 0 ? (
           <p className="ag-muted">{t("academicGrading.editor.noCategories")}</p>
@@ -482,16 +527,18 @@ function EditorForm({
                   required
                   onChange={(event) => patchCategory(category.key, { name: event.target.value })}
                 />
-                <Select
-                  label={t("academicGrading.editor.categoryKind")}
-                  options={CATEGORY_KINDS.map((value) => ({
-                    value,
-                    label: t(`academicGrading.kind.${value}`),
-                  }))}
-                  value={category.kind}
-                  onChange={(kind) => patchCategory(category.key, { kind })}
-                  disabled={readOnly}
-                />
+                {descriptive ? null : (
+                  <Select
+                    label={t("academicGrading.editor.categoryKind")}
+                    options={CATEGORY_KINDS.map((value) => ({
+                      value,
+                      label: t(`academicGrading.kind.${value}`),
+                    }))}
+                    value={category.kind}
+                    onChange={(kind) => patchCategory(category.key, { kind })}
+                    disabled={readOnly}
+                  />
+                )}
                 <Select
                   label={t("academicGrading.editor.categoryScope")}
                   options={CATEGORY_SCOPES.map((value) => ({
@@ -515,26 +562,30 @@ function EditorForm({
                     }
                   />
                 ) : null}
-                <Select
-                  label={t("academicGrading.editor.aggregation")}
-                  options={AGGREGATIONS.map((value) => ({
-                    value,
-                    label: t(`academicGrading.aggregation.${value}`),
-                  }))}
-                  value={category.aggregation}
-                  onChange={(aggregation) => patchCategory(category.key, { aggregation })}
-                  disabled={readOnly}
-                />
-                <Input
-                  label={t("academicGrading.editor.dropLowest")}
-                  type="number"
-                  min={0}
-                  max={20}
-                  value={category.dropLowest}
-                  onChange={(event) =>
-                    patchCategory(category.key, { dropLowest: event.target.value })
-                  }
-                />
+                {descriptive ? null : (
+                  <>
+                    <Select
+                      label={t("academicGrading.editor.aggregation")}
+                      options={AGGREGATIONS.map((value) => ({
+                        value,
+                        label: t(`academicGrading.aggregation.${value}`),
+                      }))}
+                      value={category.aggregation}
+                      onChange={(aggregation) => patchCategory(category.key, { aggregation })}
+                      disabled={readOnly}
+                    />
+                    <Input
+                      label={t("academicGrading.editor.dropLowest")}
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={category.dropLowest}
+                      onChange={(event) =>
+                        patchCategory(category.key, { dropLowest: event.target.value })
+                      }
+                    />
+                  </>
+                )}
               </div>
               <div className="ag-row__actions">
                 <Button
@@ -550,12 +601,15 @@ function EditorForm({
                           terms.find((term) => (Number(prev.termWeights[term.id]) || 0) > 0)?.id ??
                             terms[0]?.id ??
                             null,
+                          prev.gradingMethod,
                         ),
                       ],
                     }))
                   }
                 >
-                  {t("academicGrading.editor.addAssessment")}
+                  {descriptive
+                    ? t("academicGrading.descriptive.addSkill")
+                    : t("academicGrading.editor.addAssessment")}
                 </Button>
                 <Button
                   type="button"
@@ -578,6 +632,7 @@ function EditorForm({
                 assessments={draft.assessments.filter((a) => a.categoryKey === category.key)}
                 terms={terms}
                 readOnly={readOnly}
+                descriptive={descriptive}
                 onChange={patchAssessment}
                 onRemove={(key) =>
                   setDraft((prev) => ({
@@ -594,7 +649,9 @@ function EditorForm({
           variant="secondary"
           onClick={() => patch({ categories: [...draft.categories, newCategory()] })}
         >
-          {t("academicGrading.editor.addCategory")}
+          {descriptive
+            ? t("academicGrading.descriptive.addSkillGroup")
+            : t("academicGrading.editor.addCategory")}
         </Button>
       </fieldset>
 
@@ -627,7 +684,11 @@ function EditorForm({
             </li>
           </ul>
         ) : (
-          <p className="ag-muted">{t("academicGrading.editor.totalPointsNoWeights")}</p>
+          <p className="ag-muted">
+            {descriptive
+              ? t("academicGrading.descriptive.noWeights")
+              : t("academicGrading.editor.totalPointsNoWeights")}
+          </p>
         )}
         {live.issues.length === 0 ? (
           <p>{t("academicGrading.editor.noIssues")}</p>
@@ -702,6 +763,7 @@ function AssessmentRows({
   assessments,
   terms,
   readOnly,
+  descriptive,
   onChange,
   onRemove,
 }: {
@@ -709,12 +771,20 @@ function AssessmentRows({
   assessments: AssessmentDraft[];
   terms: Term[];
   readOnly: boolean;
+  /** Skills of a descriptive subject: no marks, weight or dates. */
+  descriptive: boolean;
   onChange: (key: string, changes: Partial<AssessmentDraft>) => void;
   onRemove: (key: string) => void;
 }) {
   const { t } = useTranslation();
   if (assessments.length === 0) {
-    return <p className="ag-muted">{t("academicGrading.editor.noAssessments")}</p>;
+    return (
+      <p className="ag-muted">
+        {descriptive
+          ? t("academicGrading.descriptive.noSkills")
+          : t("academicGrading.editor.noAssessments")}
+      </p>
+    );
   }
   return (
     <ul className="ag-assessments">
@@ -730,7 +800,11 @@ function AssessmentRows({
           >
             <div className="ag-grid ag-grid--dense">
               <Input
-                label={t("academicGrading.editor.assessmentName")}
+                label={
+                  descriptive
+                    ? t("academicGrading.descriptive.skillName")
+                    : t("academicGrading.editor.assessmentName")
+                }
                 value={assessment.name}
                 required
                 onChange={(event) => onChange(assessment.key, { name: event.target.value })}
@@ -744,34 +818,38 @@ function AssessmentRows({
                   disabled={readOnly}
                 />
               ) : null}
-              <Input
-                label={t("academicGrading.editor.assessmentMax")}
-                type="number"
-                min={0}
-                value={assessment.maxMarks}
-                onChange={(event) => onChange(assessment.key, { maxMarks: event.target.value })}
-              />
-              <Input
-                label={t("academicGrading.editor.assessmentWeight")}
-                type="number"
-                min={0}
-                value={assessment.weight}
-                onChange={(event) => onChange(assessment.key, { weight: event.target.value })}
-              />
-              <Input
-                label={t("academicGrading.editor.assessmentDate")}
-                type="date"
-                value={assessment.assessmentDate}
-                onChange={(event) =>
-                  onChange(assessment.key, { assessmentDate: event.target.value })
-                }
-              />
-              <Input
-                label={t("academicGrading.editor.dueDate")}
-                type="date"
-                value={assessment.dueDate}
-                onChange={(event) => onChange(assessment.key, { dueDate: event.target.value })}
-              />
+              {descriptive ? null : (
+                <>
+                  <Input
+                    label={t("academicGrading.editor.assessmentMax")}
+                    type="number"
+                    min={0}
+                    value={assessment.maxMarks}
+                    onChange={(event) => onChange(assessment.key, { maxMarks: event.target.value })}
+                  />
+                  <Input
+                    label={t("academicGrading.editor.assessmentWeight")}
+                    type="number"
+                    min={0}
+                    value={assessment.weight}
+                    onChange={(event) => onChange(assessment.key, { weight: event.target.value })}
+                  />
+                  <Input
+                    label={t("academicGrading.editor.assessmentDate")}
+                    type="date"
+                    value={assessment.assessmentDate}
+                    onChange={(event) =>
+                      onChange(assessment.key, { assessmentDate: event.target.value })
+                    }
+                  />
+                  <Input
+                    label={t("academicGrading.editor.dueDate")}
+                    type="date"
+                    value={assessment.dueDate}
+                    onChange={(event) => onChange(assessment.key, { dueDate: event.target.value })}
+                  />
+                </>
+              )}
             </div>
             <div className="ag-row__actions">
               <Checkbox
@@ -803,5 +881,40 @@ function AssessmentRows({
         );
       })}
     </ul>
+  );
+}
+
+/** The grade's descriptor scale, as a descriptive subject is graded with it. */
+function DescriptorScaleSummary({ descriptors }: { descriptors: GradeProgram["descriptors"] }) {
+  const { t } = useTranslation();
+  return (
+    <section className="ag-card" aria-labelledby="ag-descriptor-scale-heading">
+      <h3 id="ag-descriptor-scale-heading" className="ag-subheading">
+        {t("academicGrading.descriptive.scaleHeading")}
+      </h3>
+      {descriptors.length === 0 ? (
+        <p className="ag-muted">{t("academicGrading.descriptive.scaleDefaultNote")}</p>
+      ) : (
+        <>
+          <ol className="ag-list">
+            {descriptors.map((descriptor) => (
+              <li key={descriptor.id}>
+                {descriptor.label}
+                {descriptor.points === null
+                  ? null
+                  : ` · ${t("academicGrading.descriptive.points", { points: descriptor.points })}`}
+                {descriptor.not_achieved ? (
+                  <>
+                    {" "}
+                    <Badge tone="warning">{t("academicGrading.descriptive.notAchieved")}</Badge>
+                  </>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+          <p className="ag-muted">{t("academicGrading.descriptive.scaleEditNote")}</p>
+        </>
+      )}
+    </section>
   );
 }

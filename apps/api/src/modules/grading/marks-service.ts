@@ -11,6 +11,7 @@ import {
   isSchoolLeadership,
   requireYear,
 } from "./access";
+import { descriptorViews } from "./descriptor-service";
 import {
   effectiveSubjects,
   loadConfigDetail,
@@ -26,6 +27,7 @@ import {
 } from "./engine-config";
 
 import type { GradingConfigStatus } from "./access";
+import type { DescriptorView } from "./descriptor-service";
 import type {
   EffectiveSubject,
   LoadedConfig,
@@ -63,6 +65,8 @@ export interface MarkEntryInput {
   /** `pending` clears the mark (back to "not yet graded"). */
   status: MarkStatus | "pending";
   score: number | null;
+  /** A graded mark in a descriptive subject: the chosen descriptor, instead of a score. */
+  descriptor_id?: string | null;
   remarks: string | null;
   /** The mark's updated_at as last read; a mismatch is a concurrent edit. */
   expected_updated_at?: string | null;
@@ -77,7 +81,7 @@ export interface MarkSheetView {
   can_edit_marks: boolean;
   can_add_assessments: boolean;
   config: {
-    grading_method: "weighted" | "total_points";
+    grading_method: "weighted" | "total_points" | "descriptive";
     max_marks: number;
     pass_percentage: number;
     final_exam_pass_percentage: number | null;
@@ -88,6 +92,7 @@ export interface MarkSheetView {
     instructions: string | null;
     weight_summary: ReturnType<typeof summarizeWeights>;
   };
+  descriptors: DescriptorView[];
   terms: { id: string; name: string; sequence_number: number; weight: number }[];
   categories: {
     id: string;
@@ -131,6 +136,7 @@ export interface MarkSheetView {
       attempt: number;
       status: MarkStatus;
       score: number | null;
+      descriptor_id: string | null;
       remarks: string | null;
       updated_at: string;
     }[];
@@ -393,6 +399,8 @@ export async function getMarkSheet(
       instructions: loaded.config.instructions,
       weight_summary: summarizeWeights(engine),
     },
+    descriptors:
+      loaded.config.grading_method === "descriptive" ? descriptorViews(loaded.descriptors) : [],
     terms: engine.terms.map((term) => ({
       id: term.termId,
       name: term.name,
@@ -443,6 +451,7 @@ export async function getMarkSheet(
           attempt: mark.attempt,
           status: mark.status,
           score: mark.score === null ? null : Number(mark.score),
+          descriptor_id: mark.descriptor_id,
           remarks: mark.remarks,
           updated_at: mark.updated_at.toISOString(),
         })),
@@ -458,6 +467,40 @@ export async function getMarkSheet(
 // ---------------------------------------------------------------------------
 // Mark entry
 // ---------------------------------------------------------------------------
+
+/**
+ * A descriptive subject's mark: a graded one names a descriptor of the grade's scale and carries no
+ * score; any other status carries neither.
+ */
+function assertDescriptorEntry(
+  entry: MarkEntryInput,
+  assessmentName: string,
+  descriptorIds: ReadonlySet<string>,
+): void {
+  if (entry.score !== null) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      `${assessmentName} is assessed with descriptors, not marks`,
+    );
+  }
+  const descriptorId = entry.descriptor_id ?? null;
+  if (entry.status === "graded") {
+    if (descriptorId === null || !descriptorIds.has(descriptorId)) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.VALIDATION_FAILED,
+        `${assessmentName}: choose one of this grade's descriptors`,
+      );
+    }
+  } else if (descriptorId !== null) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      `A mark recorded as ${entry.status} carries no descriptor`,
+    );
+  }
+}
 
 const BATCH_LIMIT = 500;
 
@@ -496,6 +539,8 @@ export async function saveMarks(
   );
   const students = new Map(roster.map((student) => [student.student_id, student]));
   const sheets = await loadSheets(tx, schoolId, sectionId, subjectId);
+  const descriptive = loaded.config.grading_method === "descriptive";
+  const descriptorIds = new Set(loaded.descriptors.map((descriptor) => descriptor.id));
 
   for (const entry of entries) {
     const assessment = assessments.get(entry.assessment_id);
@@ -521,7 +566,15 @@ export async function saveMarks(
         `${student.first_name} ${student.last_name} is exempt from this subject`,
       );
     }
-    if (entry.status === "graded") {
+    if (descriptive) {
+      assertDescriptorEntry(entry, assessment.name, descriptorIds);
+    } else if ((entry.descriptor_id ?? null) !== null) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.VALIDATION_FAILED,
+        `${assessment.name} is marked with numbers, not descriptors`,
+      );
+    } else if (entry.status === "graded") {
       if (entry.score === null || entry.score < 0 || entry.score > Number(assessment.max_marks)) {
         throw new CodedHttpException(
           400,
@@ -586,8 +639,14 @@ export async function saveMarks(
         );
       }
       const old = current
-        ? { status: current.status, score: current.score, remarks: current.remarks }
+        ? {
+            status: current.status,
+            score: current.score,
+            descriptor_id: current.descriptor_id,
+            remarks: current.remarks,
+          }
         : null;
+      const descriptorId = entry.status === "graded" ? (entry.descriptor_id ?? null) : null;
       if (entry.status === "pending") {
         if (!current) continue;
         await tx.savepoint(
@@ -599,14 +658,15 @@ export async function saveMarks(
           (sp) => sp`
             INSERT INTO app.student_marks (
               school_id, academic_year_id, assessment_id, student_id, attempt, status, score,
-              remarks, entered_by_user_id
+              descriptor_id, remarks, entered_by_user_id
             ) VALUES (
               ${schoolId}::uuid, ${section.academic_year_id}::uuid, ${entry.assessment_id}::uuid,
               ${entry.student_id}::uuid, ${entry.attempt}, ${entry.status}, ${entry.score},
-              ${entry.remarks}, ${userId}::uuid
+              ${descriptorId}::uuid, ${entry.remarks}, ${userId}::uuid
             )
             ON CONFLICT (school_id, assessment_id, student_id, attempt) DO UPDATE SET
-              status = EXCLUDED.status, score = EXCLUDED.score, remarks = EXCLUDED.remarks,
+              status = EXCLUDED.status, score = EXCLUDED.score,
+              descriptor_id = EXCLUDED.descriptor_id, remarks = EXCLUDED.remarks,
               entered_by_user_id = EXCLUDED.entered_by_user_id, updated_at = CURRENT_TIMESTAMP
           `,
         );
@@ -619,7 +679,12 @@ export async function saveMarks(
         new:
           entry.status === "pending"
             ? null
-            : { status: entry.status, score: entry.score, remarks: entry.remarks },
+            : {
+                status: entry.status,
+                score: entry.score,
+                descriptor_id: descriptorId,
+                remarks: entry.remarks,
+              },
       });
     }
   } catch (error) {
@@ -728,6 +793,8 @@ export async function addSectionAssessment(
   }
   const status =
     !leadership && loaded.config.teacher_assessments_require_approval ? "proposed" : "active";
+  // A descriptive subject's skills carry no marks; max_marks is a fixed placeholder.
+  const maxMarks = loaded.config.grading_method === "descriptive" ? 1 : input.max_marks;
   // On an override the whole config is the section's; on a grade default the row is section-scoped.
   const scopedSection = loaded.config.section_id === null ? sectionId : null;
   const [row] = await tx<{ id: string }[]>`
@@ -737,7 +804,7 @@ export async function addSectionAssessment(
     ) VALUES (
       ${schoolId}::uuid, ${loaded.config.id}::uuid, ${loaded.config.academic_year_id}::uuid,
       ${input.category_id}::uuid, ${input.term_id}::uuid, ${scopedSection}::uuid, ${input.name},
-      ${input.max_marks}, ${input.weight}, ${input.is_mandatory}, ${input.assessment_date}::date,
+      ${maxMarks}, ${input.weight}, ${input.is_mandatory}, ${input.assessment_date}::date,
       ${input.due_date}::date, ${status}, ${userId}::uuid, 1000
     )
     RETURNING id
@@ -1057,6 +1124,8 @@ export interface ReleasedMarkAttempt {
   attempt: number;
   status: MarkStatus;
   score: number | null;
+  /** Descriptive subjects: the chosen descriptor of a graded mark. */
+  descriptor_label: string | null;
 }
 
 export interface ReleasedAssessment {
@@ -1123,6 +1192,7 @@ export async function listReleasedStudentMarks(
       attempt: number;
       status: MarkStatus;
       score: string | null;
+      descriptor_label: string | null;
     }[]
   >`
     SELECT year.id AS academic_year_id, year.name AS academic_year_name,
@@ -1132,8 +1202,10 @@ export async function listReleasedStudentMarks(
            category.id AS category_id, category.name AS category_name, category.kind AS category_kind,
            assessment.id AS assessment_id, assessment.name AS assessment_name, assessment.max_marks,
            assessment.assessment_date::text AS assessment_date,
-           mark.attempt, mark.status, mark.score
+           mark.attempt, mark.status, mark.score, descriptor.label AS descriptor_label
     FROM app.student_marks AS mark
+    LEFT JOIN app.grade_program_descriptors AS descriptor
+      ON descriptor.id = mark.descriptor_id AND descriptor.school_id = mark.school_id
     JOIN app.subject_config_assessments AS assessment
       ON assessment.id = mark.assessment_id AND assessment.school_id = mark.school_id
     JOIN app.subject_config_categories AS category
@@ -1223,6 +1295,7 @@ export async function listReleasedStudentMarks(
       attempt: row.attempt,
       status: row.status,
       score: row.score === null ? null : Number(row.score),
+      descriptor_label: row.descriptor_label,
     });
   }
   return periods;

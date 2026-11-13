@@ -134,4 +134,77 @@ describe("calculateCumulativeResult", () => {
       calculateCumulativeResult(years, { decimals: 0, mode: "half_up" }).averagePercentage,
     ).toBe(86);
   });
+
+  test("descriptive subjects never count, even if one claims to be in the average", () => {
+    // Only Math counts: 80, GPA 3.
+    const result = calculateCumulativeResult(
+      [
+        {
+          subjects: [
+            subject({ label: "Math", percentage: 80, gpaPoints: 3 }),
+            subject({
+              label: "Reading",
+              descriptive: true,
+              includeInAverage: true,
+              percentage: null,
+              gpaPoints: null,
+            }),
+          ],
+        },
+      ],
+      ROUND_2,
+    );
+    expect(result.averagePercentage).toBe(80);
+    expect(result.gpa).toBe(3);
+    expect(result.subjectsCounted).toBe(1);
+  });
+
+  test("a year of only descriptive subjects has nothing to count", () => {
+    const result = calculateCumulativeResult(
+      [{ subjects: [subject({ descriptive: true, percentage: null, includeInAverage: false })] }],
+      ROUND_2,
+    );
+    expect(result.averagePercentage).toBeNull();
+    expect(result.gpaUnavailableReason).toBe("no_subjects");
+  });
+
+  test("years on different GPA scales give no cumulative GPA, but keep the average", () => {
+    const result = calculateCumulativeResult(
+      [
+        {
+          label: "2024-2025",
+          gpaScaleMax: 4,
+          subjects: [subject({ percentage: 90, gpaPoints: 4 })],
+        },
+        {
+          label: "2025-2026",
+          gpaScaleMax: 5,
+          subjects: [subject({ percentage: 70, gpaPoints: 4 })],
+        },
+        { label: "2026-2027", gpaScaleMax: null, subjects: [subject({ percentage: 80 })] },
+      ],
+      ROUND_2,
+    );
+    expect(result.averagePercentage).toBe(80);
+    expect(result.gpa).toBeNull();
+    expect(result.gpaUnavailableReason).toBe("mixed_gpa_scales");
+    expect(result.gpaScaleMax).toBeNull();
+    expect(result.mixedGpaScales).toEqual([
+      { label: "2024-2025", max: 4 },
+      { label: "2025-2026", max: 5 },
+    ]);
+  });
+
+  test("years on the same GPA scale report it", () => {
+    const result = calculateCumulativeResult(
+      [
+        { label: "2024-2025", gpaScaleMax: 4, subjects: [subject({ gpaPoints: 4 })] },
+        { label: "2025-2026", gpaScaleMax: 4, subjects: [subject({ gpaPoints: 3 })] },
+      ],
+      ROUND_2,
+    );
+    expect(result.gpa).toBe(3.5);
+    expect(result.gpaScaleMax).toBe(4);
+    expect(result.mixedGpaScales).toEqual([]);
+  });
 });

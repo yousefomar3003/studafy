@@ -59,6 +59,28 @@ when it required the `version-bump` label.
   the publish check reports as `GPA_POINTS_MISSING` (and `GPA_POINTS_ABOVE_MAX` for points above
   the maximum).
 
+- Descriptive grading (000210), for subjects graded without numbers: `grading_method` takes
+  `descriptive` (subject configs, `MarkSheetConfig`). A descriptive subject's assessments are
+  skills; it never counts in the numeric average (`include_in_average` is forced false, retakes,
+  weights and the final-exam rule are dropped). Each grade has a descriptor scale:
+  `GradeProgram.descriptors` (`GradeDescriptor`: `position`, `label`, optional `points`,
+  `not_achieved`), replaced through `GradeProgramBody.descriptors` (`GradeDescriptorBody`; a
+  descriptor that marks use cannot be removed, 409). A grade gets a default scale (Excellent / Very
+  good / Good / Needs improvement, or the Arabic equivalent) the first time a subject is made
+  descriptive. `MarkSheet.descriptors` lists the scale; marks carry `descriptor_id`
+  (`MarkSheetMark`, `GradingSaveMarksBodyEntry`, `GradingCorrectionBodyMark`), and a graded mark in
+  a descriptive subject has a descriptor and no score. Results: `FinalizedSubjectResult` gains
+  `is_descriptive`, `average_points` and `skills` (`DescriptiveSkillResult`),
+  `ResultPreviewSubject` gains `is_descriptive`, fail reasons gain `DESCRIPTOR_NOT_ACHIEVED` (with
+  `descriptor`), and `ReleasedMarkAttempt` gains `descriptor_label`. Certificates issued from now on
+  mark such subjects `descriptive` with their `skills` (`CertificateContentSkill`). A subject with
+  recorded marks cannot switch between marks and descriptors (409).
+  Transcripts: `TranscriptSubject` gains optional `descriptive` and `skills` (`TranscriptSkill`), and
+  descriptive subjects never count in the cumulative average or GPA. `TranscriptCumulative` gains
+  `gpa_unavailable_reason` value `mixed_gpa_scales` (the covered years were shown as GPAs out of
+  different maximums, e.g. 4 and 5), with `mixed_gpa_scales` (`TranscriptGpaScale`: each year and its
+  maximum) and `gpa_scale_max` (the maximum all GPA years share, otherwise null).
+
 - Paid storage add-on (000205): `GET /api/subscriptions/storage/offer` (`StorageAddOnOffer`: the
   school's usage and cap, its live add-on `StorageAddOnCurrent`, and each `StorageAddOnTier`
   (`storage_100gb`, `storage_1tb`) with its `StorageAddOnPrice`s in the school's currency, USD
