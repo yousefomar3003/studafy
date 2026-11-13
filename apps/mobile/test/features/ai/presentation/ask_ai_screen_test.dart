@@ -1,11 +1,13 @@
 import 'dart:typed_data';
 
 import 'package:easy_localization/easy_localization.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Material;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:studafy_mobile/src/core/api/api_exception.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/material.dart';
+import 'package:studafy_mobile/src/core/offline/cached_value.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/ai/application/ask_ai_controller.dart';
 import 'package:studafy_mobile/src/features/ai/application/ask_ai_providers.dart';
@@ -15,6 +17,8 @@ import 'package:studafy_mobile/src/features/ai/data/ask_ai_events.dart';
 import 'package:studafy_mobile/src/features/ai/domain/ask_ai_conversation.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/ask_ai_screen.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/widgets/ask_ai_citation_chip.dart';
+import 'package:studafy_mobile/src/features/student/application/materials_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 
 import '../../../support/wrap_with_localization.dart';
 
@@ -80,6 +84,34 @@ class _FakePhotoTextClient implements AiPhotoTextClient {
   }
 }
 
+Material _material({
+  required String id,
+  required String title,
+  required bool aiVisible,
+  String ingestStatus = 'ready',
+}) {
+  return Material.fromJson({
+    'id': id,
+    'school_id': 'school-1',
+    'class_id': 'class-1',
+    'uploaded_by_user_id': 'teacher-1',
+    'last_edited_by_user_id': 'teacher-1',
+    'title': title,
+    'description': null,
+    'storage_key': 'permanent/school-1/materials/$id.pdf',
+    'original_file_name': '$id.pdf',
+    'mime_type': 'application/pdf',
+    'size_bytes': 1024,
+    'checksum_sha256': null,
+    'ai_visible': aiVisible,
+    'ingest_status': ingestStatus,
+    'ingest_error': null,
+    'ingested_at': null,
+    'created_at': '2026-01-01T00:00:00.000Z',
+    'updated_at': '2026-01-01T00:00:00.000Z',
+  });
+}
+
 final _jpeg = Uint8List.fromList([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
 
 Widget _screen({
@@ -88,6 +120,7 @@ Widget _screen({
   AskAiMaterialScope? initialMaterial,
   AiPhotoPicker? picker,
   AiPhotoTextClient? photoClient,
+  List<dynamic> extraOverrides = const [],
 }) {
   return wrapWithLocalization(
     ProviderScope(
@@ -96,6 +129,7 @@ Widget _screen({
         askAiStudentIdProvider.overrideWithValue(studentId),
         if (picker != null) aiPhotoPickerProvider.overrideWithValue(picker),
         if (photoClient != null) aiPhotoTextClientProvider.overrideWithValue(photoClient),
+        ...extraOverrides.cast(),
       ],
       child: Builder(
         builder: (context) => MaterialApp(
@@ -161,6 +195,63 @@ void main() {
 
     await _ask(tester, 'And diffusion?');
     expect(asked.last, ('And diffusion?', null));
+  });
+
+  testWidgets('the material picker is always on screen and explains unavailable materials', (
+    tester,
+  ) async {
+    final asked = <(String, String?)>[];
+    await tester.pumpWidget(
+      _screen(
+        client: _RecordingAskAiClient((question, materialId) => asked.add((question, materialId))),
+        extraOverrides: [
+          currentEnrolledClassIdsProvider.overrideWithValue(const ['class-1']),
+          materialsClassCodeProvider('class-1').overrideWith((ref) async => 'BIO-A'),
+          materialsForClassProvider('class-1').overrideWith(
+            (ref) => Stream.value(
+              CachedValue(
+                data: [
+                  _material(id: 'm-ready', title: 'Cells', aiVisible: true),
+                  _material(id: 'm-busy', title: 'Genetics', aiVisible: true, ingestStatus: 'processing'),
+                  _material(id: 'm-private', title: 'Answer key', aiVisible: false),
+                ],
+                fetchedAt: DateTime(2026, 11, 14),
+                source: CacheSource.network,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Visible without opening the + menu.
+    expect(find.text('Asking about: all my materials'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('askAiMaterialScopeChip')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('All my materials'), findsOneWidget);
+    expect(find.text('Being prepared for the AI…'), findsOneWidget);
+    expect(find.text("Your teacher hasn't shared this with the AI."), findsOneWidget);
+
+    // An unavailable material can't be picked.
+    await tester.tap(find.text('Genetics'));
+    await tester.pumpAndSettle();
+    expect(find.text('All my materials'), findsOneWidget);
+
+    await tester.tap(find.text('Cells'));
+    await tester.pumpAndSettle();
+    expect(find.text('Asking about: Cells'), findsOneWidget);
+
+    await _ask(tester, 'What is a cell wall?');
+    expect(asked.last, ('What is a cell wall?', 'm-ready'));
+
+    // Back to every material through the sheet's first row.
+    await tester.tap(find.byKey(const Key('askAiMaterialScopeChip')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('askAiMaterialAll')));
+    await tester.pumpAndSettle();
+    expect(find.text('Asking about: all my materials'), findsOneWidget);
   });
 
   testWidgets('a photo\'s text is put into the field to check before sending', (tester) async {

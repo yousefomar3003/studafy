@@ -638,7 +638,13 @@
       "sheetHint": "Answers will come only from the material you choose.",
       "none": "You don't have any class materials yet.",
       "chip": "Asking about: {title}",
-      "clear": "Ask about all materials"
+      "clear": "Ask about all materials",
+      "all": "All my materials",
+      "allHint": "Answers can come from any material your classes share with the AI.",
+      "allChip": "Asking about: all my materials",
+      "notShared": "Your teacher hasn't shared this with the AI.",
+      "preparing": "Being prepared for the AI…",
+      "unavailable": "Couldn't be prepared for the AI."
     },
     "photo": {
       "reading": "Reading the photo…",
