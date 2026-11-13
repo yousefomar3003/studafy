@@ -121,7 +121,7 @@ async function countRoutes(
  * live devices there are in total. `total` is what makes the cap visible — routesResolved alone
  * would silently understate the route count for a heavy-device user.
  */
-async function loadPushRoutes(
+export async function loadPushRoutes(
   tx: TransactionSql,
   schoolId: string,
   recipientId: string,
@@ -155,7 +155,7 @@ async function loadPushRoutes(
 }
 
 /** Soft-revoke device rows FCM no longer recognises. The trail stays; only the route dies. */
-async function revokeDevices(
+export async function revokeDevices(
   tx: TransactionSql,
   schoolId: string,
   deviceIds: string[],

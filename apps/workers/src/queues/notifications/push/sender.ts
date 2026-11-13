@@ -23,7 +23,7 @@
  * The sender never has to guess about those, because it never sees them as a response.
  */
 
-import { cert, initializeApp } from "firebase-admin/app";
+import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
 
 import type { App } from "firebase-admin/app";
@@ -122,6 +122,10 @@ export function createFcmSender(env: PushSenderEnv, logger: PushSenderLogger): P
         tokens: devices.map((device) => device.token),
         notification: { title: message.title, body: message.body },
         data: buildDataPayload(message),
+        // Without these a notification can arrive silently: Android delivers normal-priority
+        // messages late on a dozing phone, and iOS plays no sound unless the payload asks for one.
+        android: { priority: "high", notification: { sound: "default" } },
+        apns: { payload: { aps: { sound: "default" } } },
       });
 
       const unregisteredDeviceIds: string[] = [];
@@ -162,6 +166,10 @@ function buildFirebaseApp(serviceAccountJson: string): App {
     throw new Error("FIREBASE_SERVICE_ACCOUNT is missing project_id, client_email or private_key");
   }
 
+  // One process can build more than one sender (the delivery job and the push consumer); the
+  // default app can only be initialised once, so the second reuses it.
+  const existing = getApps().find((app) => app.name === "[DEFAULT]");
+  if (existing) return existing;
   return initializeApp({
     credential: cert({ projectId, clientEmail, privateKey }),
   });

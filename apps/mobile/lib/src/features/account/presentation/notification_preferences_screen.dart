@@ -27,9 +27,12 @@ NotificationCategory notificationCategoryOf(
   NotificationPreferenceNotificationType.gradePosted ||
   NotificationPreferenceNotificationType.enrollmentApproved ||
   NotificationPreferenceNotificationType.coursePublished ||
-  NotificationPreferenceNotificationType.certificateIssued =>
+  NotificationPreferenceNotificationType.certificateIssued ||
+  NotificationPreferenceNotificationType.assignmentPublished ||
+  NotificationPreferenceNotificationType.assignmentGraded =>
     NotificationCategory.academic,
-  NotificationPreferenceNotificationType.attendanceAlert =>
+  NotificationPreferenceNotificationType.attendanceAlert ||
+  NotificationPreferenceNotificationType.attendanceMarked =>
     NotificationCategory.family,
   NotificationPreferenceNotificationType.materialScanQuarantined ||
   NotificationPreferenceNotificationType.materialScanFailed ||

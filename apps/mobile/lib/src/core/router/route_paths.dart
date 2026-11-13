@@ -47,6 +47,10 @@ abstract final class RoutePaths {
   /// notification type here directly instead of reading `route` off the payload.
   static const parentAlerts = '/parent/alerts';
 
+  /// The signed-in user's notification inbox, opened from the app bar's bell — and where a
+  /// tapped push lands when its own deep link is not one this app can open.
+  static const notifications = '/notifications';
+
   // Notification deep-link destinations.
   // Paths match the route templates in packages/notification-templates/src/registry.ts.
   static const grades = '/courses/:courseId/grades';

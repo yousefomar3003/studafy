@@ -469,6 +469,13 @@ class FakeNotificationsClient extends Fake implements NotificationsClient {
   }
 
   @override
+  Future<UnreadCount> getUnreadCount() async =>
+      UnreadCount(unreadCount: notifications.where((n) => n.readAt == null).length);
+
+  @override
+  Future<UnreadCount> markAllRead() async => const UnreadCount(unreadCount: 0);
+
+  @override
   Future<NotificationPreferences> getNotificationPreferences() async {
     return preferences;
   }

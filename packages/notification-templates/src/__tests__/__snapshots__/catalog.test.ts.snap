@@ -164,6 +164,24 @@ exports[`renderNotification — snapshot tests en LICENSE_RECEIPT_UPLOADED / pus
 
 exports[`renderNotification — snapshot tests en LICENSE_RECEIPT_UPLOADED / email renders correctly 1`] = `"Amman Academy uploaded a bank transfer receipt for invoice LIC-2026-000042. Record the payment and match the receipt to it in the license console."`;
 
+exports[`renderNotification — snapshot tests en ASSIGNMENT_PUBLISHED / in_app renders correctly 1`] = `"New assignment: Gravity"`;
+
+exports[`renderNotification — snapshot tests en ASSIGNMENT_PUBLISHED / push renders correctly 1`] = `"Amina Tazi · Physics · due 2026-11-20"`;
+
+exports[`renderNotification — snapshot tests en ASSIGNMENT_PUBLISHED / email renders correctly 1`] = `"A new assignment, Gravity, was posted in Physics. It is due on 2026-11-20."`;
+
+exports[`renderNotification — snapshot tests en ASSIGNMENT_GRADED / in_app renders correctly 1`] = `"Marked: Forces"`;
+
+exports[`renderNotification — snapshot tests en ASSIGNMENT_GRADED / push renders correctly 1`] = `"Score 17 / 20"`;
+
+exports[`renderNotification — snapshot tests en ASSIGNMENT_GRADED / email renders correctly 1`] = `"Forces in Physics has been marked: Score 17 / 20."`;
+
+exports[`renderNotification — snapshot tests en ATTENDANCE_MARKED / in_app renders correctly 1`] = `"Amina Tazi was marked absent"`;
+
+exports[`renderNotification — snapshot tests en ATTENDANCE_MARKED / push renders correctly 1`] = `"Physics · 2026-11-12"`;
+
+exports[`renderNotification — snapshot tests en ATTENDANCE_MARKED / email renders correctly 1`] = `"Amina Tazi was marked absent in Physics on 2026-11-12."`;
+
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / in_app renders correctly 1`] = `"موعد تسليم Homework 5 هو 2026-08-15"`;
 
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / push renders correctly 1`] = `"Algebra II — Homework 5 مستحق في 2026-08-15"`;
@@ -327,3 +345,21 @@ exports[`renderNotification — snapshot tests ar LICENSE_RECEIPT_UPLOADED / in_
 exports[`renderNotification — snapshot tests ar LICENSE_RECEIPT_UPLOADED / push renders correctly 1`] = `"رفعت Amman Academy إيصالاً للفاتورة LIC-2026-000042"`;
 
 exports[`renderNotification — snapshot tests ar LICENSE_RECEIPT_UPLOADED / email renders correctly 1`] = `"رفعت Amman Academy إيصال تحويل بنكي للفاتورة LIC-2026-000042. سجّل الدفعة وطابق الإيصال معها في لوحة التراخيص."`;
+
+exports[`renderNotification — snapshot tests ar ASSIGNMENT_PUBLISHED / in_app renders correctly 1`] = `"واجب جديد: Gravity"`;
+
+exports[`renderNotification — snapshot tests ar ASSIGNMENT_PUBLISHED / push renders correctly 1`] = `"Amina Tazi · Physics · موعد التسليم 2026-11-20"`;
+
+exports[`renderNotification — snapshot tests ar ASSIGNMENT_PUBLISHED / email renders correctly 1`] = `"نُشر واجب جديد بعنوان Gravity في Physics، وموعد تسليمه 2026-11-20."`;
+
+exports[`renderNotification — snapshot tests ar ASSIGNMENT_GRADED / in_app renders correctly 1`] = `"تم التصحيح: Forces"`;
+
+exports[`renderNotification — snapshot tests ar ASSIGNMENT_GRADED / push renders correctly 1`] = `"Score 17 / 20"`;
+
+exports[`renderNotification — snapshot tests ar ASSIGNMENT_GRADED / email renders correctly 1`] = `"تم تصحيح Forces في Physics: Score 17 / 20."`;
+
+exports[`renderNotification — snapshot tests ar ATTENDANCE_MARKED / in_app renders correctly 1`] = `"تسجيل absent لـ Amina Tazi"`;
+
+exports[`renderNotification — snapshot tests ar ATTENDANCE_MARKED / push renders correctly 1`] = `"Physics · 2026-11-12"`;
+
+exports[`renderNotification — snapshot tests ar ATTENDANCE_MARKED / email renders correctly 1`] = `"تم تسجيل absent لـ Amina Tazi في Physics بتاريخ 2026-11-12."`;

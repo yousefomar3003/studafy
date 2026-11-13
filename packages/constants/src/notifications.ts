@@ -76,6 +76,14 @@ export const NOTIFICATION_TYPES = {
   LICENSE_INVOICE_DUE: "LICENSE_INVOICE_DUE",
   LICENSE_INVOICE_OVERDUE: "LICENSE_INVOICE_OVERDUE",
   LICENSE_RECEIPT_UPLOADED: "LICENSE_RECEIPT_UPLOADED",
+  // Everyday school events, written by the workers' outbox notify consumer
+  // (apps/workers/src/queues/notifications/school-events.ts): an assignment published (to the class's
+  // students and their parents), a hand-in's mark released (to that student and their parents), and a
+  // submitted register marking a student absent or late (to their parents). Optional and
+  // immediate-only. Mirrored in app.notification_type by migration 000215.
+  ASSIGNMENT_PUBLISHED: "ASSIGNMENT_PUBLISHED",
+  ASSIGNMENT_GRADED: "ASSIGNMENT_GRADED",
+  ATTENDANCE_MARKED: "ATTENDANCE_MARKED",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

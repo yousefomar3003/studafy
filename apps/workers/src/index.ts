@@ -39,6 +39,9 @@ import {
   startEmailDispatcher,
   TokenBucket,
 } from "./queues/notifications/email";
+import { createFcmSender } from "./queues/notifications/push";
+import { startPushConsumer } from "./queues/notifications/push-consumer";
+import { startSchoolEventNotifier } from "./queues/notifications/school-events";
 import { startRelay } from "./queues/outbox-relay";
 import { scheduleReportExpiryJob } from "./queues/reports";
 import { QUEUE_REGISTRY } from "./registry";
@@ -171,6 +174,21 @@ const emailDispatcher = startEmailDispatcher({
     frontendUrl: env.FRONTEND_URL,
   },
   logger: emailLogger,
+});
+
+// School-event notices: assignment.published, submission.graded and attendance.sessionSubmitted
+// outbox rows become inbox notifications for the students and parents concerned. Its own pool, like
+// the other always-on consumers; idle cycles back off to one discovery statement every 5 s.
+const notifyDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const schoolEventNotifier = startSchoolEventNotifier({ db: notifyDb, logger: workerLogger });
+
+// Push for every inbox notification (messages, announcements, fees, attendance, school events):
+// before this only the grades dispatcher ever reached a phone.
+const pushDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const pushConsumer = startPushConsumer({
+  db: pushDb,
+  sender: createFcmSender(env, workerLogger),
+  logger: workerLogger,
 });
 
 // Digest scheduler: idempotently register the daily 06:00 parent-digest on the notifications
@@ -316,6 +334,8 @@ const shutdown = (signal: string) => {
   relayHandle?.stop();
   emailDispatcher.stop();
   entitlementInvalidator.stop();
+  schoolEventNotifier.stop();
+  pushConsumer.stop();
 
   void shutdownWorkers(workers, env.SHUTDOWN_TIMEOUT_MS).then(async () => {
     connection.disconnect();
@@ -324,6 +344,8 @@ const shutdown = (signal: string) => {
     await relayDb.end({ timeout: 5 });
     await emailDb.end({ timeout: 5 });
     await entitlementDb.end({ timeout: 5 });
+    await notifyDb.end({ timeout: 5 });
+    await pushDb.end({ timeout: 5 });
     // The process-wide pools every job processor borrows (db/pool.ts) — after the drain above.
     await closeWorkerPools();
     // startQueueGauges() was given queueMetricsConnection as a live IORedis instance rather
