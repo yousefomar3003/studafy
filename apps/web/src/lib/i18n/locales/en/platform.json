@@ -206,8 +206,17 @@
       "plan": "Plan",
       "users": "People",
       "country": "Region",
-      "created": "Joined"
-    }
+      "created": "Joined",
+      "storage": "Storage",
+      "lastActivity": "Last sign-in"
+    },
+    "storageCell": "{{used}} of {{cap}}",
+    "activityFilter": "Activity",
+    "anyActivity": "Any activity",
+    "inactive30d": "No sign-in for 30 days",
+    "storageFilter": "Storage",
+    "anyStorage": "Any storage",
+    "nearCap": "Near the cap (80%+)"
   },
   "school": {
     "loadError": "Couldn't load this school.",
@@ -219,7 +228,10 @@
       "region": "Country · currency",
       "created": "Joined",
       "emailVerified": "Email verified",
-      "reviewTenant": "App-store review tenant"
+      "reviewTenant": "App-store review tenant",
+      "language": "Default language",
+      "timezone": "Timezone",
+      "defaultSetting": "Not set (default)"
     },
     "subscription": {
       "title": "Subscription",
@@ -312,6 +324,81 @@
       "valueLabel": "Setting for {{flag}}",
       "saved": "Feature flag updated.",
       "error": "Couldn't update the feature flag."
+    },
+    "editProfile": {
+      "open": "Edit profile",
+      "title": "Edit school profile",
+      "name": "School name",
+      "email": "Contact email",
+      "country": "Country",
+      "currency": "Currency",
+      "billingLockHelp": "Country and currency can't change once the school has billing records (a payment account, licence quotes or invoices, or paid add-ons).",
+      "language": "Default language",
+      "notSet": "Not set",
+      "timezone": "Timezone",
+      "timezoneHelp": "An IANA timezone, for example Asia/Amman or Africa/Cairo.",
+      "reason": "Reason",
+      "reasonHelp": "Recorded in the audit log, in the school and in Studafy's.",
+      "save": "Save changes",
+      "saved": "School profile saved",
+      "error": "Couldn't save the school profile"
+    },
+    "usage": {
+      "title": "Usage",
+      "loadError": "Couldn't load this school's usage.",
+      "people": "Accounts",
+      "role": "Role",
+      "active": "Active",
+      "invited": "Not activated",
+      "pendingInvitations_one": "{{count}} open invitation",
+      "pendingInvitations_other": "{{count}} open invitations",
+      "storage": "Storage",
+      "storageValue": "{{used}} of {{cap}} used",
+      "storagePercent": "{{percent}} of the cap",
+      "activity": "Activity",
+      "lastActivity": "Last sign-in",
+      "activeLast30": "Signed in during the last 30 days",
+      "ai": "AI and features",
+      "aiSubscriptions": "Students with the AI add-on",
+      "aiTokens": "AI tokens this billing period",
+      "noFeatureUse": "No feature use this month.",
+      "license": "Licence",
+      "licensePeriod": "{{from}} – {{to}}",
+      "seatsValue": "{{used}} of {{bought}} seats",
+      "noLicense": "No active licence.",
+      "audience": {
+        "student": "Students",
+        "teacher": "Teachers",
+        "parent": "Parents"
+      }
+    },
+    "exports": {
+      "title": "Data exports",
+      "description": "A ZIP of every record and stored file this school owns. It's built in the background and deleted 30 days after it's ready. Exporting never changes or deletes the school's data.",
+      "request": "Export school data",
+      "empty": "No exports yet.",
+      "loadError": "Couldn't load this school's exports.",
+      "caption": "This school's data exports",
+      "requested": "Requested",
+      "status": "Status",
+      "expires": "Deleted on",
+      "actions": "Actions",
+      "statuses": {
+        "queued": "Waiting",
+        "processing": "Building",
+        "completed": "Ready",
+        "failed": "Failed"
+      },
+      "deleted": "Deleted",
+      "download": "Download",
+      "noLink": "This export can no longer be downloaded.",
+      "linkError": "Couldn't get a download link",
+      "consequence": "Studafy will build a ZIP of all this school's records and files. Only one export can run at a time. Each download link is recorded in the audit log.",
+      "reasonLabel": "Reason",
+      "reasonHelp": "Recorded in the audit log, in the school and in Studafy's.",
+      "confirm": "Start export",
+      "queued": "Export started",
+      "requestError": "Couldn't start the export"
     }
   },
   "plans": {
@@ -676,5 +763,20 @@
         "success": "Account reactivated"
       }
     }
+  },
+  "units": {
+    "b": "{{value}} B",
+    "kb": "{{value}} KB",
+    "mb": "{{value}} MB",
+    "gb": "{{value}} GB",
+    "tb": "{{value}} TB"
+  },
+  "languages": {
+    "en": "English",
+    "ar": "Arabic",
+    "fr": "French",
+    "es": "Spanish",
+    "pt": "Portuguese",
+    "de": "German"
   }
 }

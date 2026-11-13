@@ -6,11 +6,24 @@ import { useFormatters, useTranslation } from "../../lib/i18n";
 
 import { PlatformPageHeader, SchoolStatusPill } from "./PlatformNav";
 import { SCHOOLS_PAGE_SIZE, useSchoolsListQuery } from "./queries";
+import { formatStorage } from "./SchoolUsageCard";
 
 import "./platform.css";
 
-import type { PlatformSchoolStatus, PlatformSchoolSummary } from "./queries";
-import type { DataGridColumn, SelectOption } from "@studafy/ui";
+import type { PlatformSchoolSort, PlatformSchoolStatus, PlatformSchoolSummary } from "./queries";
+import type { DataGridColumn, DataGridSort, SelectOption } from "@studafy/ui";
+
+/** Grid columns that sort on the server, by the API's `sort` value. */
+const SORTABLE: Record<string, PlatformSchoolSort> = {
+  name: "name",
+  users: "students",
+  storage: "storage",
+  lastActivity: "lastActivity",
+  created: "created",
+};
+
+type ActivityFilter = "" | "inactive30d";
+type StorageFilter = "" | "nearCap";
 
 const SEARCH_DEBOUNCE_MS = 300;
 const STATUSES: readonly PlatformSchoolStatus[] = [
@@ -39,18 +52,38 @@ export default function SchoolsListPage() {
     parseStatus(searchParams.get("status")),
   );
   const [page, setPage] = useState(0);
+  const [sort, setSort] = useState<DataGridSort | null>(null);
+  const [activity, setActivity] = useState<ActivityFilter>("");
+  const [storage, setStorage] = useState<StorageFilter>("");
 
   useEffect(() => {
     const handle = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(handle);
   }, [searchInput]);
 
-  // A new filter always starts back at page one.
-  useEffect(() => setPage(0), [search, status]);
+  // A new filter or order always starts back at page one.
+  useEffect(() => setPage(0), [search, status, sort, activity, storage]);
 
-  const { data, isPending, isError } = useSchoolsListQuery({ search, status, page });
+  const { data, isPending, isError } = useSchoolsListQuery({
+    search,
+    status,
+    page,
+    sort: sort ? SORTABLE[sort.columnId] : undefined,
+    order: sort?.direction,
+    activity,
+    storage,
+  });
   const total = data?.total ?? 0;
   const lastPage = Math.max(0, Math.ceil(total / SCHOOLS_PAGE_SIZE) - 1);
+
+  const activityOptions: SelectOption<ActivityFilter>[] = [
+    { value: "", label: t("platform.schools.anyActivity") },
+    { value: "inactive30d", label: t("platform.schools.inactive30d") },
+  ];
+  const storageOptions: SelectOption<StorageFilter>[] = [
+    { value: "", label: t("platform.schools.anyStorage") },
+    { value: "nearCap", label: t("platform.schools.nearCap") },
+  ];
 
   const statusOptions: SelectOption<PlatformSchoolStatus | "">[] = [
     { value: "", label: t("platform.schools.allStatuses") },
@@ -61,6 +94,7 @@ export default function SchoolsListPage() {
     {
       id: "name",
       header: t("platform.schools.columns.school"),
+      sortable: true,
       renderCell: (school) => (
         <div className="platform-cell-stack">
           <Link to={`/portal/platform/schools/${school.id}`}>{school.name}</Link>
@@ -93,11 +127,44 @@ export default function SchoolsListPage() {
     {
       id: "users",
       header: t("platform.schools.columns.users"),
+      sortable: true,
       renderCell: (school) =>
         t("platform.schools.usersCell", {
           users: formatNumber(school.activeUsers),
           students: formatNumber(school.students),
         }),
+    },
+    {
+      id: "storage",
+      header: t("platform.schools.columns.storage"),
+      sortable: true,
+      renderCell: (school) => (
+        <div className="platform-cell-stack">
+          <span>
+            {school.storageCapBytes > 0
+              ? formatNumber(school.storageBytesUsed / school.storageCapBytes, {
+                  style: "percent",
+                  maximumFractionDigits: 0,
+                })
+              : "—"}
+          </span>
+          <span className="platform-muted">
+            {t("platform.schools.storageCell", {
+              used: formatStorage(school.storageBytesUsed, t, formatNumber),
+              cap: formatStorage(school.storageCapBytes, t, formatNumber),
+            })}
+          </span>
+        </div>
+      ),
+    },
+    {
+      id: "lastActivity",
+      header: t("platform.schools.columns.lastActivity"),
+      sortable: true,
+      renderCell: (school) =>
+        school.lastActivityAt
+          ? formatDate(new Date(school.lastActivityAt), { dateStyle: "medium" })
+          : t("platform.common.never"),
     },
     {
       id: "country",
@@ -107,6 +174,7 @@ export default function SchoolsListPage() {
     {
       id: "created",
       header: t("platform.schools.columns.created"),
+      sortable: true,
       renderCell: (school) => formatDate(new Date(school.createdAt), { dateStyle: "medium" }),
     },
   ];
@@ -132,6 +200,18 @@ export default function SchoolsListPage() {
           value={status}
           onChange={(value) => setStatus(value)}
         />
+        <Select
+          label={t("platform.schools.activityFilter")}
+          options={activityOptions}
+          value={activity}
+          onChange={(value) => setActivity(value)}
+        />
+        <Select
+          label={t("platform.schools.storageFilter")}
+          options={storageOptions}
+          value={storage}
+          onChange={(value) => setStorage(value)}
+        />
       </div>
 
       <DataGrid
@@ -140,6 +220,8 @@ export default function SchoolsListPage() {
         rows={data?.schools ?? []}
         getRowId={(school) => school.id}
         getRowLabel={(school) => school.name}
+        sort={sort}
+        onSortChange={setSort}
         loading={isPending}
         empty={isError ? t("platform.schools.loadError") : t("platform.schools.empty")}
       />

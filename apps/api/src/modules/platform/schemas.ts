@@ -57,12 +57,29 @@ export const schoolSummarySchema = z
     activeUsers: z.number().int().nonnegative(),
     students: z.number().int().nonnegative(),
     subscription: schoolSubscriptionSchema.nullable(),
+    /** Bytes the school stores (app.storage_usage_meters), against its upload cap below. */
+    storageBytesUsed: z.number().int().nonnegative(),
+    /** The school's upload cap: its plan's cap, or a live storage add-on's when larger. */
+    storageCapBytes: z.number().int().nonnegative(),
+    /** The latest sign-in of any of the school's users; null when nobody has signed in yet. */
+    lastActivityAt: isoDateTime.nullable(),
   })
   .openapi("PlatformSchoolSummary");
+
+export const SCHOOL_SORTS = ["created", "name", "students", "storage", "lastActivity"] as const;
+export type SchoolSort = (typeof SCHOOL_SORTS)[number];
 
 export const schoolListQuerySchema = z.object({
   search: z.string().trim().max(200).optional(),
   status: schoolStatusSchema.optional(),
+  /** `created` (default) and `name` sort in SQL; the usage sorts rank the filtered schools. */
+  sort: z.enum(SCHOOL_SORTS).default("created"),
+  /** Defaults to newest/most first (`desc`); `name` reads naturally `asc`. */
+  order: z.enum(["asc", "desc"]).optional(),
+  /** `inactive30d`: nobody has signed in for 30 days (or ever). */
+  activity: z.enum(["inactive30d"]).optional(),
+  /** `nearCap`: at or above 80% of the storage cap (the upload warning threshold). */
+  storage: z.enum(["nearCap"]).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(25),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -92,6 +109,10 @@ export const schoolDetailSchema = schoolSummarySchema
     featureFlags: z.array(featureFlagStateSchema),
     /** The lifecycle states this school may move to next, from the transition table. */
     allowedTransitions: z.array(schoolStatusSchema),
+    /** The school's default language (app.school_settings); null before its settings row exists. */
+    locale: z.string().nullable(),
+    /** The school's IANA timezone (app.school_settings); null before its settings row exists. */
+    timezone: z.string().nullable(),
   })
   .openapi("PlatformSchoolDetail");
 

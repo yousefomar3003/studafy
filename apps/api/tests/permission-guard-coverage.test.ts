@@ -456,6 +456,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/platform/plans/{planId}",
   "PATCH /api/platform/plans/{planId}/prices/{priceId}",
   "PATCH /api/platform/settings/{key}",
+  // Per-school administration (modules/platform/school-admin-routes.ts): profile edit and
+  // whole-school export, platform:manage; both write audit rows in the school and the operator's.
+  "PATCH /api/platform/schools/{schoolId}/profile",
+  "POST /api/platform/schools/{schoolId}/exports",
   "PATCH /api/platform/inquiries/{inquiryId}",
   // Per-account support actions, platform:manage in modules/platform/user-support-routes.ts.
   "POST /api/platform/schools/{schoolId}/users/{userId}/invitation/resend",

@@ -44,6 +44,7 @@ import {
   userLookupQuerySchema,
   userLookupResponseSchema,
 } from "./schemas";
+import { registerSchoolAdminRoutes } from "./school-admin-routes";
 import {
   changeSchoolStatus,
   getPlatformFinance,
@@ -64,6 +65,7 @@ import {
 
 import type { Actor } from "./service";
 import type { Database } from "../../db/client";
+import type { StorageService } from "../../lib/storage";
 import type { Logger } from "../../logger";
 import type { AppEnv } from "../../middleware/requestId";
 import type { RedisClient } from "../../redis";
@@ -357,6 +359,8 @@ export interface PlatformRoutesDeps {
   /** Stripe, for pausing/resuming AI subscriptions on suspension. Null skips that step. */
   paymentProvider: PaymentProviderPort | null;
   logger: Logger;
+  /** Signs school-export download links. Null leaves exports listable but not downloadable. */
+  storage?: StorageService | null;
 }
 
 function actorFrom(c: Context<AppEnv>): Actor {
@@ -395,6 +399,9 @@ export function platformRoutes(deps: PlatformRoutesDeps): OpenAPIHono<AppEnv> {
   routes.use("/api/platform/settings/:key", auditAction("update", "platform_settings"));
   routes.use("/api/platform/inquiries/:inquiryId", manage);
   routes.use("/api/platform/inquiries/:inquiryId", auditAction("update", "sales_inquiries"));
+
+  // Per-school administration: profile, usage and whole-school exports (school-admin-routes.ts).
+  registerSchoolAdminRoutes(routes, { database, redis, storage: deps.storage ?? null });
 
   routes.openapi(overviewRoute, async (c) => c.json(await getPlatformOverview(database), 200));
 

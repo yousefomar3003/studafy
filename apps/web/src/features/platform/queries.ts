@@ -37,10 +37,18 @@ export const PLATFORM_SETTINGS_KEY = [...PLATFORM_KEY, "settings"] as const;
 export const PLATFORM_FINANCE_KEY = [...PLATFORM_KEY, "finance"] as const;
 export const PLATFORM_AI_METRICS_KEY = [...PLATFORM_KEY, "ai-metrics"] as const;
 
+type SchoolListQuery = NonNullable<operations["listPlatformSchools"]["parameters"]["query"]>;
+export type PlatformSchoolSort = NonNullable<SchoolListQuery["sort"]>;
+
 export interface SchoolListFilters {
   search: string;
   status: PlatformSchoolStatus | "";
   page: number;
+  /** Omitted: newest first. */
+  sort?: PlatformSchoolSort;
+  order?: "asc" | "desc";
+  activity?: "inactive30d" | "";
+  storage?: "nearCap" | "";
 }
 
 export const SCHOOLS_PAGE_SIZE = 25;
@@ -140,6 +148,10 @@ export function useSchoolsListQuery(filters: SchoolListFilters) {
           query: {
             search: filters.search || undefined,
             status: filters.status || undefined,
+            sort: filters.sort,
+            order: filters.order,
+            activity: filters.activity || undefined,
+            storage: filters.storage || undefined,
             limit: SCHOOLS_PAGE_SIZE,
             offset: filters.page * SCHOOLS_PAGE_SIZE,
           },

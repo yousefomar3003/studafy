@@ -18,7 +18,7 @@ function parseRow(row: Record<string, unknown>): DataSubjectRequestRow {
     subjectScope: row.subject_scope as DataSubjectRequestRow["subjectScope"],
     reason: row.reason as DataSubjectRequestRow["reason"],
     subjectUserId: row.subject_user_id as string | null,
-    requestedByUserId: row.requested_by_user_id as string,
+    requestedByUserId: (row.requested_by_user_id as string | null) ?? null,
     status: row.status as DataSubjectRequestRow["status"],
     storageKey: row.storage_key as string | null,
     redactedTables: row.redacted_tables as RedactedTableEntry[],
@@ -140,7 +140,12 @@ export async function createDsrRequest(
   return parseRow(row);
 }
 
-/** The most recent tenant-closure request of this type, whatever its status -- for the sweep's idempotency check. */
+/**
+ * The most recent tenant-closure request of this type, whatever its status -- for the sweep's
+ * idempotency check. Narrowed to reason 'tenant_closure': a platform-console export of an open
+ * school (reason 'platform_export') is also tenant-scoped, and counting it here would let a later
+ * closure skip its own export and file erasure against that older, stale bundle.
+ */
 export async function findLatestTenantClosureRequest(
   tx: TransactionSql,
   schoolId: string,
@@ -150,6 +155,7 @@ export async function findLatestTenantClosureRequest(
     SELECT ${tx.unsafe(ROW_COLUMNS)}
     FROM app.data_subject_requests
     WHERE school_id = ${schoolId}::uuid AND subject_scope = 'tenant' AND request_type = ${requestType}
+      AND reason = 'tenant_closure'
     ORDER BY created_at DESC
     LIMIT 1
   `;
