@@ -148,7 +148,7 @@ export const confirmAttachmentBodySchema = z
       description: "The storage key returned by the upload-url endpoint, now confirmed uploaded.",
     }),
   })
-  .openapi("ConfirmAttachmentBody");
+  .openapi("ExpenseConfirmAttachmentBody");
 
 export const expenseSummaryQuerySchema = z
   .object({
