@@ -237,8 +237,16 @@ describeDb("deleting a file frees its storage", () => {
     });
 
     expect(confirmed.status).toBe(201);
-    const body = (await confirmed.json()) as { mime_type?: string; content_type?: string };
+    const body = (await confirmed.json()) as {
+      mime_type?: string;
+      content_type?: string;
+      download_url: string | null;
+      download_state: string;
+    };
     expect(body.mime_type ?? body.content_type).toBe(docx);
+    // Just confirmed: the malware scan hasn't run, so no URL yet -- and the client is told why.
+    expect(body.download_url).toBeNull();
+    expect(body.download_state).toBe("checking");
   });
 
   test("an assignment attachment: the object goes and the meter drops by its size", async () => {

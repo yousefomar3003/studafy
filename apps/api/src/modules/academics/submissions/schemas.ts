@@ -104,6 +104,12 @@ export const submissionAttachmentSchema = z
     download_url_expires_at: dateTimeSchema.nullable().openapi({
       description: "When `download_url` stops working.",
     }),
+    download_state: z.enum(["ready", "checking", "unavailable"]).openapi({
+      description:
+        "Why `download_url` is or isn't set: `ready` (a URL is present), `checking` (the malware " +
+        "scan hasn't finished -- refetch shortly), `unavailable` (the scan failed or flagged the " +
+        "file, or storage is not configured).",
+    }),
     uploaded_by_user_id: uuidSchema.openapi({ description: "User who confirmed the upload." }),
     created_at: dateTimeSchema,
   })

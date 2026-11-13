@@ -56,7 +56,9 @@ final cancelAccountDeletionProvider = Provider<Future<void> Function()>((ref) {
   return () async {
     await api.account.cancelOwnAccountDeletion();
     await session.refresh();
-    ref.invalidate(accountProfileProvider);
+    // Every screen that loaded during the cancel-only state cached a refusal: reload them all
+    // (the profile included, which is built on the API client).
+    ref.read(sessionDataEpochProvider.notifier).bump();
   };
 });
 
@@ -76,7 +78,10 @@ final acceptLegalDocumentsProvider =
           ),
         );
         await session.refresh();
-        ref.invalidate(accountProfileProvider);
+        // Anything that loaded while acceptance was pending holds LEGAL_ACCEPTANCE_REQUIRED as a
+        // cached error (the parent's children report did, which left attendance and messages
+        // unloadable): reload every API-backed provider, the profile included.
+        ref.read(sessionDataEpochProvider.notifier).bump();
       };
     });
 

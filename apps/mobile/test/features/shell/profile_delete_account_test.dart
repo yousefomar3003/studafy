@@ -10,6 +10,7 @@ import 'package:studafy_mobile/src/core/api/generated/models/legal_acceptance_st
 import 'package:studafy_mobile/src/core/api/generated/models/school3.dart';
 import 'package:studafy_mobile/src/core/auth/auth_notifier.dart';
 import 'package:studafy_mobile/src/core/auth/auth_state.dart';
+import 'package:studafy_mobile/src/features/parent/application/parent_providers.dart';
 import 'package:studafy_mobile/src/features/shell/application/shell_providers.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/delete_account_screen.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/deletion_pending_screen.dart';
@@ -240,6 +241,38 @@ void main() {
     expect(find.byType(DeletionPendingScreen), findsNothing);
     expect(find.byType(PillNavigationBar), findsOneWidget);
   });
+
+  testWidgets(
+    'no tab is built (so nothing loads) until the profile says whether terms are pending',
+    (tester) async {
+      // A first sign-in: the session is held at the Terms until accepted. Tabs built before the
+      // profile answered used to fire into LEGAL_ACCEPTANCE_REQUIRED and keep that error.
+      var profileAnswered = false;
+      var reportRequestedEarly = false;
+      var reportRequests = 0;
+      await pumpAppShell(
+        tester,
+        session: await fakeAuthenticatedSession(roles: const ['PARENT']),
+        overrides: [
+          accountProfileProvider.overrideWith((ref) async {
+            await Future<void>.delayed(const Duration(seconds: 1));
+            profileAnswered = true;
+            return _profile(memberAccount: false);
+          }),
+          // The parent home's children report: what used to be requested too early.
+          childComparisonProvider.overrideWith((ref) async {
+            reportRequests++;
+            if (!profileAnswered) reportRequestedEarly = true;
+            throw StateError('not under test');
+          }),
+        ],
+      );
+
+      expect(find.byType(PillNavigationBar), findsOneWidget);
+      expect(reportRequests, greaterThan(0));
+      expect(reportRequestedEarly, isFalse);
+    },
+  );
 
   testWidgets('the shell waits until the user accepts the terms', (
     tester,
