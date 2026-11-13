@@ -7,12 +7,12 @@ import { examStructureSchema, examWeightsSchema } from "../../grading/schemas";
 // Shared enums
 // ---------------------------------------------------------------------------
 
-const localeEnum = z.enum(["en", "fr", "ar", "es", "pt", "de"]).openapi({
+export const localeEnum = z.enum(["en", "fr", "ar", "es", "pt", "de"]).openapi({
   description: "ISO 639-1 locale code for the school's default language.",
   example: "en",
 });
 
-const timezoneSchema = z
+export const timezoneSchema = z
   .string()
   .min(1)
   .max(50)

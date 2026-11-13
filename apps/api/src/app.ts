@@ -1352,7 +1352,13 @@ export function createApp({
     // only SUPER_ADMIN holds. Stripe is the provider whose AI subscriptions a suspension pauses.
     app.route(
       "/",
-      platformRoutes({ database, redis: redis ?? null, paymentProvider: stripeProvider, logger }),
+      platformRoutes({
+        database,
+        redis: redis ?? null,
+        paymentProvider: stripeProvider,
+        logger,
+        storage,
+      }),
     );
     // Manual grants (000211): storage caps and feature tiers given by hand, e.g. after a cash
     // payment. `storage` carries the optional receipt; null answers 503 only when one is attached.

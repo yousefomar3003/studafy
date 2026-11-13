@@ -138,4 +138,41 @@ describe("tenant closure sweep", () => {
       expect((await closureRequests(open)).length).toBe(0);
     },
   );
+
+  sweepTest(
+    "a platform-console export of the school never stands in for its closure export",
+    async () => {
+      const schoolId = await seedSchool("platform-export", true);
+      // The console exported the school while it was still open, long enough ago that, if it
+      // counted, the hold would already have elapsed and the sweep would go straight to erasure.
+      await db!.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+        await tx`
+          INSERT INTO app.data_subject_requests
+            (school_id, request_type, subject_scope, reason, sla_due_at, status, storage_key,
+             created_at, completed_at, updated_at)
+          VALUES (
+            ${schoolId}::uuid, 'export', 'tenant', 'platform_export', now(), 'completed',
+            'dsr-exports/platform-test/export.zip',
+            now() - make_interval(days => ${CLOSURE_ERASURE_RETENTION_HOLD_DAYS + 10}),
+            now() - make_interval(days => ${CLOSURE_ERASURE_RETENTION_HOLD_DAYS + 9}),
+            now()
+          )
+        `;
+      });
+
+      const enqueued: string[] = [];
+      await runTenantClosureSweep(
+        db!,
+        new Date(),
+        async (job) => {
+          if (job.schoolId === schoolId) enqueued.push(job.kind);
+        },
+        silentLogger,
+      );
+      // A fresh closure export is filed; no erasure.
+      expect(enqueued).toEqual(["export"]);
+    },
+  );
 });
