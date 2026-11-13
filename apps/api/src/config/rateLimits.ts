@@ -99,6 +99,23 @@ export const MEMBER_LOGIN_BUDGETS = {
   global: { maxTokens: 600, refillRate: 10, windowSeconds: 60 },
 } as const satisfies Record<string, RateLimitBudget>;
 
+/**
+ * "Add <child> to this phone" (000215): per parent. A family adds each child once per phone, so ten
+ * an hour is generous for real use and stops a stolen parent session from minting child sessions in
+ * bulk. On top of the per-IP `auth` class.
+ */
+export const GUARDIAN_DEVICE_SIGNIN_BUDGET = {
+  maxTokens: 10,
+  refillRate: 10 / 3600,
+  windowSeconds: 3600,
+} as const satisfies RateLimitBudget;
+
+/** Redis key for one parent's guardian device sign-in bucket. */
+export function buildGuardianDeviceSigninRateLimitKey(guardianUserId: string): string {
+  const window = Math.floor(Date.now() / 1000 / GUARDIAN_DEVICE_SIGNIN_BUDGET.windowSeconds);
+  return `rl:guardian-device:user:${guardianUserId}:${window}`;
+}
+
 /** Redis key for a member sign-in bucket: per normalized member ID, or the one global bucket. */
 export function buildMemberLoginRateLimitKey(
   scope: keyof typeof MEMBER_LOGIN_BUDGETS,
@@ -140,6 +157,7 @@ export const ROUTE_CLASS_MAP: Record<string, RouteClass> = {
   "/api/auth/sessions": "auth",
   "/api/auth/sessions/*": "auth",
   "/api/auth/devices/*": "auth",
+  "/api/auth/guardian/*": "auth",
   // Invitations — authenticated, IP-scoped
   "/api/invitations": "auth",
   "/api/invitations/*": "auth",

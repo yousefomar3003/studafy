@@ -80,6 +80,9 @@ export const HARD_DELETE_TABLES: ReadonlySet<string> = new Set([
   "refresh_tokens",
   "user_devices",
   "oauth_identities",
+  // 000215: which refresh-token families a parent opened for their child. A session artifact like
+  // refresh_tokens itself, and meaningless once the session is gone.
+  "guardian_issued_sessions",
 ]);
 
 /**
