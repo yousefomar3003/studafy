@@ -277,8 +277,8 @@ When the worker completes an import it no longer deletes every staged row. It ke
 `app.student_import_rows`, only:
 
 - the lines whose student this run **created or updated** (`student_id`), each also tagged with
-  the parent this run created for it, if any (`parent_user_id`; sibling lines share their one new
-  parent); lines skipped as `conflict` or `unchanged` wrote no one and are deleted;
+  the parents this run created for it, if any (`parent_user_id` for the first parent,
+  `parent2_user_id` for the second; sibling lines share their new parents); lines skipped as `conflict` or `unchanged` wrote no one and are deleted;
 - on those lines, only the **non-empty cells of unmapped columns**. Mapped cells already live in
   the records they were written to. `record` is set to NULL.
 
@@ -291,7 +291,8 @@ number in the file: these ids are the ones the import itself wrote.
 normalized form, never a cell), written at upload and replaced on re-map, plus what each was later
 applied to. `GET /api/imports/students/{importId}/columns` lists them for any import, with:
 
-- `non_empty_count`, `student_count`, `parent_count`;
+- `non_empty_count`, `student_count`, `parent_count` (first parents) and `parent2_count` (second
+  parents);
 - `suggested_field_type`, from the values, computed on the server
   ([`packages/student-import/src/unmapped.ts`](../../packages/student-import/src/unmapped.ts)):
   yes/no, date (only when every value is already `YYYY-MM-DD`: `03/04/2010` is ambiguous and stays
@@ -311,19 +312,25 @@ Two calls, so nothing is written without a preview and an explicit confirm:
 
 1. `POST /api/imports/students/{importId}/columns/preview` with `position`, `subject_kind`
    (`student`: the students this import created or updated; `parent`: the parents it created),
-   either `field_id` (a published, non-document field) or `new_field` (`label_en`, `label_ar`,
+   `parent_slot` for a parent column (`parent1`: the file's first parent, the `parent_*` columns;
+   `parent2`: its second, `parent2_*`; `both`: the same value for each, such as a home area; default
+   `parent1`), either `field_id` (a published, non-document field) or `new_field` (`label_en`, `label_ar`,
    `field_type`, `options`, `sensitivity`, `visibility`), and `overwrite` (default false). The
    response lists, per person, `write`, `unchanged`, `kept` (has a different answer and overwrite is
    off), `invalid` (with the rule broken, never the value) or `conflict` (a parent's siblings
    disagree), with counts including `empty`. A sensitive target shows masks only. It also returns
    a `preview_token`.
 2. `POST /api/imports/students/{importId}/columns/apply` with the same body plus `preview_token`.
-   The plan is recomputed under a lock on the import; a different outcome (a field changed, someone's
-   answer changed) is refused with 409 `IMPORT_COLUMN_PREVIEW_STALE`. The token hashes the field
-   and each person's status, never a value: the cells are immutable once the import completed.
-   Values are written with the records module's own `writeAnswers`, one person at a time, so
-   validation, sealing of sensitive values (ADR-019), per-answer audit rows and the
-   missing-information lists all behave as for a record edit.
+
+A line's two parents are two people. A parent column is written only to the slot chosen, never to
+the first parent because the second is the one it describes; the web asks which parent whenever
+the import created any second parent, and offers no default.
+The plan is recomputed under a lock on the import; a different outcome (a field changed, someone's
+answer changed) is refused with 409 `IMPORT_COLUMN_PREVIEW_STALE`. The token hashes the field
+and each person's status, never a value: the cells are immutable once the import completed.
+Values are written with the records module's own `writeAnswers`, one person at a time, so
+validation, sealing of sensitive values (ADR-019), per-answer audit rows and the
+missing-information lists all behave as for a record edit.
 
 Creating a field (`new_field`) also needs `recordTemplate:manage` (403 otherwise). It creates the
 field and publishes the template in the same transaction, and is refused with 409

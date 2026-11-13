@@ -7,6 +7,7 @@ export type ImportRecord = components["schemas"]["ImportRecord"];
 export type UnmappedColumns = components["schemas"]["UnmappedColumns"];
 export type UnmappedColumn = components["schemas"]["UnmappedColumn"];
 export type ImportColumnTarget = components["schemas"]["ImportColumnTarget"];
+export type ParentSlot = components["schemas"]["ImportParentSlot"];
 export type ImportColumnPreview = components["schemas"]["ImportColumnPreview"];
 export type ImportColumnPreviewRow = components["schemas"]["ImportColumnPreviewRow"];
 export type ImportColumnApplyResult = components["schemas"]["ImportColumnApplyResult"];
