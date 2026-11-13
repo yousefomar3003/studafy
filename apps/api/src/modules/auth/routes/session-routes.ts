@@ -11,6 +11,7 @@ import { clearRefreshCookie, deliverTokenPair, readPresentedToken } from "../del
 import { REVOCATION_REASONS, revokeAndDenylist } from "../services/revocation-service";
 import {
   deregisterDevice,
+  deregisterDeviceToken,
   deviceToResponse,
   listActiveSessions,
   listUserDevices,
@@ -101,6 +102,24 @@ export const sessionListSchema = z
 
 const logoutResponseSchema = z.object({ ended: z.literal(true) }).openapi("LogoutResult");
 
+const logoutRequestSchema = z
+  .object({
+    refresh_token: z.string().min(1).optional().openapi({
+      description:
+        "The current refresh token. Omit for web sessions, which send it automatically as a cookie.",
+    }),
+    fcm_token: z
+      .string()
+      .min(1)
+      .optional()
+      .openapi({
+        description:
+          "This device's push token. When given, the signed-out account's registration of it is " +
+          "removed too, so the phone stops receiving that account's notifications.",
+      }),
+  })
+  .openapi("LogoutRequest");
+
 const revocationSchema = z
   .object({
     revoked: z.number().int().openapi({ description: "Tokens revoked." }),
@@ -134,6 +153,17 @@ const registerDeviceRequestSchema = z
   .object({
     fcm_token: z.string().min(1).openapi({ description: "FCM registration token." }),
     platform: z.enum(["ios", "android", "web"]).openapi({ description: "Device platform." }),
+    keep_other_accounts: z
+      .boolean()
+      .optional()
+      .openapi({
+        description:
+          "True when several accounts are signed in on this device (the app's account switcher): the " +
+          "token is added for the caller without taking it from the other accounts, so every account " +
+          "on the phone keeps receiving its notifications. Each account removes its own registration " +
+          "when it signs out (`fcm_token` on `POST /api/auth/logout`). Omitted or false keeps the " +
+          "single-account behaviour: other users in the school routing to this token are revoked.",
+      }),
   })
   .openapi("RegisterDeviceRequest");
 
@@ -200,7 +230,7 @@ const logoutRoute = createRoute({
   request: {
     body: {
       required: false,
-      content: { "application/json": { schema: refreshRequestSchema } },
+      content: { "application/json": { schema: logoutRequestSchema } },
     },
   },
   responses: standardResponses(
@@ -320,9 +350,9 @@ const registerDeviceRoute = createRoute({
   operationId: "registerDevice",
   summary: "Register a push-notification device",
   description:
-    "Upserts an FCM registration token for the authenticated user. Calls `app.claim_device_token()` " +
-    "first to soft-revoke any other user in the same school who is still routing to this token, " +
-    "then inserts or reactivates the caller's own row. Re-registration after a token refresh is " +
+    "Upserts an FCM registration token for the authenticated user. Unless `keep_other_accounts` is " +
+    "true, calls `app.claim_device_token()` first to soft-revoke any other user in the same school " +
+    "who is still routing to this token; then inserts or reactivates the caller's own row. Re-registration after a token refresh is " +
     "idempotent — the row's `last_seen` is bumped and `revoked_at` is cleared.",
   security: [{ bearerAuth: [] }],
   request: {
@@ -437,7 +467,8 @@ export function sessionRoutes(
   });
 
   routes.openapi(logoutRoute, async (c) => {
-    const presented = readPresentedToken(c, c.req.valid("json"));
+    const body = c.req.valid("json");
+    const presented = readPresentedToken(c, body);
     const requestId = c.get("requestId");
 
     if (presented !== undefined) {
@@ -463,6 +494,17 @@ export function sessionRoutes(
           userAgent: family.userAgent,
           clientIp: family.ipAddress,
         });
+
+        // The signed-out account stops routing to this phone. Only its own row: another account
+        // still signed in on the same device keeps its registration of the same token.
+        const fcmToken = body?.fcm_token;
+        if (fcmToken !== undefined) {
+          await withTenantTx(
+            database,
+            { schoolId: family.schoolId, userId: family.userId, requestId },
+            (tx) => deregisterDeviceToken(tx, family.userId, fcmToken),
+          );
+        }
       }
     }
 
@@ -494,10 +536,12 @@ export function sessionRoutes(
 
   routes.openapi(registerDeviceRoute, async (c) => {
     const auth = requireAuth(c);
-    const { fcm_token, platform } = c.req.valid("json");
+    const { fcm_token, platform, keep_other_accounts } = c.req.valid("json");
 
     const { id } = await withTenantTx(database, tenantFrom(c), (tx) =>
-      registerDeviceToken(tx, auth.userId, auth.schoolId, fcm_token, platform),
+      registerDeviceToken(tx, auth.userId, auth.schoolId, fcm_token, platform, {
+        keepOtherAccounts: keep_other_accounts === true,
+      }),
     );
 
     return c.json({ id }, 200);

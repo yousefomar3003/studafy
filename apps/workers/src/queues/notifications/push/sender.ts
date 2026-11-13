@@ -42,6 +42,12 @@ export interface PushMessage {
   route: string;
   notificationType: string;
   dispatchLogId: string;
+  /**
+   * Which account the notice is for. The app uses it to switch to that account when the
+   * notification is tapped on a phone with several signed-in accounts. Absent on legacy jobs.
+   */
+  recipientUserId?: string;
+  schoolId?: string;
 }
 
 export interface PushSendResult {
@@ -74,6 +80,12 @@ const UNREGISTERED_ERROR_CODES = new Set([
   "messaging/unregistered",
 ]);
 
+/**
+ * The Android channel the app creates with high importance (FirebasePushService). Naming it here
+ * makes the phone show a heads-up banner rather than file the notice silently.
+ */
+export const ANDROID_CHANNEL_ID = "studafy_push";
+
 /** Whether a per-token error means the token itself has stopped being a valid route. */
 export function isUnregisteredToken(error: { code?: string }): boolean {
   return error.code !== undefined && UNREGISTERED_ERROR_CODES.has(error.code);
@@ -85,6 +97,8 @@ export function buildDataPayload(message: PushMessage): Record<string, string> {
     notification_type: message.notificationType,
     dispatch_log_id: message.dispatchLogId,
   };
+  if (message.recipientUserId !== undefined) data.user_id = message.recipientUserId;
+  if (message.schoolId !== undefined) data.school_id = message.schoolId;
   // Omitted when empty rather than sent as "": a bogus deep link is worse than none.
   if (message.route !== "") {
     data.route = message.route;
@@ -124,8 +138,15 @@ export function createFcmSender(env: PushSenderEnv, logger: PushSenderLogger): P
         data: buildDataPayload(message),
         // Without these a notification can arrive silently: Android delivers normal-priority
         // messages late on a dozing phone, and iOS plays no sound unless the payload asks for one.
-        android: { priority: "high", notification: { sound: "default" } },
-        apns: { payload: { aps: { sound: "default" } } },
+        android: {
+          priority: "high",
+          notification: { sound: "default", channelId: ANDROID_CHANNEL_ID },
+        },
+        // apns-priority 10 + push-type alert: shown at once, including on the lock screen.
+        apns: {
+          headers: { "apns-priority": "10", "apns-push-type": "alert" },
+          payload: { aps: { sound: "default" } },
+        },
       });
 
       const unregisteredDeviceIds: string[] = [];

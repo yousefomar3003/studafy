@@ -12,8 +12,10 @@ import 'package:studafy_mobile/src/core/auth/saved_account.dart';
 import 'package:studafy_mobile/src/core/config/app_config.dart';
 import 'package:studafy_mobile/src/core/config/app_environment.dart';
 import 'package:studafy_mobile/src/core/di/app_providers.dart';
+import 'package:studafy_mobile/src/core/push/push_providers.dart';
 
 import '../../support/fake_access_token.dart';
+import '../../support/fake_push_service.dart';
 import '../../support/fake_secure_token_store.dart';
 
 /// Several accounts on one phone (a parent with children at two schools): setting the active one
@@ -247,6 +249,28 @@ void main() {
     },
   );
 
+  test('signing out tells the server to stop pushing to this phone', () async {
+    final harness = await _Harness.signedIn('parent-a');
+
+    await harness.auth.logout();
+
+    final body = harness.bodies['/api/auth/logout'] as Map<String, dynamic>;
+    expect(body['refresh_token'], 'refresh-parent-a');
+    expect(body['fcm_token'], 'fake-fcm-token');
+  });
+
+  test(
+    'a child account added to the phone is registered for notifications',
+    () async {
+      final harness = await _Harness.signedIn('parent-a');
+      final child = _saved('child-1', roles: const ['STUDENT']);
+
+      await harness.auth.addSavedAccount(child);
+
+      expect(harness.push.registeredAccounts, [child.accessToken]);
+    },
+  );
+
   test('removing a saved account ends its session on the server', () async {
     final harness = await _Harness.signedIn(
       'parent-a',
@@ -257,6 +281,10 @@ void main() {
 
     expect(harness.container.read(savedAccountsProvider), isEmpty);
     expect(harness.paths, contains('/api/auth/logout'));
+    expect(
+      (harness.bodies['/api/auth/logout'] as Map<String, dynamic>)['fcm_token'],
+      'fake-fcm-token',
+    );
     expect(harness.store.savedAccounts, isNull);
     // The active account is untouched.
     expect(harness.session.userId, 'parent-a');
@@ -284,12 +312,23 @@ SavedAccount _saved(
 );
 
 class _Harness {
-  _Harness(this.container, this.session, this.store, this.paths);
+  _Harness(
+    this.container,
+    this.session,
+    this.store,
+    this.paths,
+    this.bodies,
+    this.push,
+  );
 
   final ProviderContainer container;
   final AuthSession session;
   final FakeSecureTokenStore store;
   final List<String> paths;
+
+  /// The last request body sent to each path.
+  final Map<String, Object?> bodies;
+  final FakePushService push;
 
   AuthNotifier get auth => container.read(authNotifierProvider.notifier);
   AuthStatus get status => container.read(authNotifierProvider);
@@ -301,9 +340,12 @@ class _Harness {
     ResponseBody Function(RequestOptions options)? respond,
   }) async {
     final paths = <String>[];
+    final bodies = <String, Object?>{};
+    final push = FakePushService();
     final dio = Dio(BaseOptions(baseUrl: 'http://localhost'))
       ..httpClientAdapter = _Adapter((options) {
         paths.add(options.path);
+        bodies[options.path] = options.data;
         return respond?.call(options) ?? ResponseBody.fromString('', 204);
       });
     final client = MobileAuthClient(baseUrl: 'http://localhost', dio: dio);
@@ -327,6 +369,7 @@ class _Harness {
         authClientProvider.overrideWithValue(client),
         authSessionProvider.overrideWithValue(session),
         secureTokenStoreProvider.overrideWithValue(store),
+        pushServiceProvider.overrideWithValue(push),
       ],
     );
     addTearDown(container.dispose);
@@ -341,7 +384,7 @@ class _Harness {
       await Future<void>.delayed(Duration.zero);
     }
     expect(container.read(authNotifierProvider), AuthStatus.authenticated);
-    return _Harness(container, session, store, paths);
+    return _Harness(container, session, store, paths, bodies, push);
   }
 }
 
