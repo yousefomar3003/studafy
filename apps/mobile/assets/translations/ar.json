@@ -60,6 +60,17 @@
       "title": "إشعار",
       "heading": "وجهة الرابط",
       "body": "هذه الشاشة مؤقتة إلى حين توفّر الوجهة الفعلية."
+    },
+    "title": "الإشعارات",
+    "markAllRead": "تعليم الكل كمقروء",
+    "empty": "لا جديد الآن. ستظهر هنا إشعارات مدرستك الجديدة.",
+    "loadError": "تعذّر تحميل إشعاراتك.",
+    "retry": "حاول مجددًا",
+    "loadMore": "عرض المزيد",
+    "unread": "غير مقروء",
+    "bell": {
+      "label": "الإشعارات",
+      "unread": "الإشعارات، {count} غير مقروءة"
     }
   },
   "shell": {
@@ -2145,7 +2156,19 @@
         "materialOcrLowConfidence": "صعوبة قراءة نص الملف",
         "materialIngested": "الملف جاهز للذكاء الاصطناعي",
         "materialIngestFailed": "تعذّر تجهيز الملف للذكاء الاصطناعي",
-        "directMessage": "الرسائل"
+        "directMessage": "الرسائل",
+        "assignmentPublished": "الواجبات الجديدة",
+        "assignmentGraded": "الواجبات المصححة",
+        "attendanceMarked": "الغياب والتأخير",
+        "feeInvoiceIssued": "فواتير الرسوم الجديدة",
+        "feePaymentReceived": "استلام دفعات الرسوم",
+        "feePaymentReminder": "تذكير بالرسوم المتأخرة",
+        "feeStatement": "كشوف رسوم العائلة",
+        "licenseSeatAppleRenewal": "خطة المدرسة تغطي اشتراكك",
+        "licenseExpiring": "قرب انتهاء الترخيص",
+        "licenseInvoiceDue": "استحقاق فاتورة الترخيص",
+        "licenseInvoiceOverdue": "تأخر فاتورة الترخيص",
+        "licenseReceiptUploaded": "رفع إيصال الترخيص"
       }
     },
     "staffRecord": {

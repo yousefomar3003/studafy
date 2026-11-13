@@ -15,6 +15,7 @@ import 'push_permission_banner.dart';
 import 'shell_destinations.dart';
 import 'view_only_banner.dart';
 import '../../../design/widgets/studafy_logo.dart';
+import '../../notifications/presentation/notification_bell_button.dart';
 
 /// The authenticated app's home: bottom navigation scoped to the session's resolved
 /// [ShellRole], with a view-only banner and no mutation affordances for [ShellRole.viewer].
@@ -117,7 +118,7 @@ class _AppShellScaffoldState extends ConsumerState<_AppShellScaffold> {
                 ref.watch(hasPersonalSubscriptionProvider)
             ? const StudafyLogo.subscriber()
             : const StudafyLogo(),
-        actions: const [LocaleToggleButton()],
+        actions: const [NotificationBellButton(), LocaleToggleButton()],
       ),
       body: Column(
         children: [

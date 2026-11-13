@@ -5,6 +5,7 @@ import '../../attendance_office/presentation/registers_screen.dart';
 import '../../messaging/presentation/parent_messages_screen.dart';
 import '../../messaging/presentation/teacher_messages_screen.dart';
 import '../../messaging/presentation/widgets/unread_messages_badge.dart';
+import '../../notifications/presentation/notifications_screen.dart';
 import '../../parent/presentation/child_detail_screen.dart';
 import '../../parent/presentation/parent_communication_screen.dart';
 import '../../parent/presentation/parent_home_screen.dart';
@@ -17,7 +18,6 @@ import '../../teacher/presentation/teacher_timetable_screen.dart';
 import '../../viewer/presentation/viewer_home_screen.dart';
 import '../domain/shell_role.dart';
 import 'profile_tab_screen.dart';
-import 'shell_tab_placeholder.dart';
 
 /// One entry in a shell's bottom navigation: its translated label, icon, and tab body.
 class ShellDestination {
@@ -153,7 +153,7 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
         ShellDestination(
           labelKey: 'shell.tabs.notifications',
           icon: Icons.notifications_none_outlined,
-          body: ShellTabPlaceholder(titleKey: 'shell.tabs.notifications'),
+          body: NotificationsInboxView(),
         ),
         profile,
       ];

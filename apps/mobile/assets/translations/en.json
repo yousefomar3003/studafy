@@ -60,6 +60,17 @@
       "title": "Notification",
       "heading": "Deep link target",
       "body": "This screen is a placeholder for the real destination."
+    },
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "empty": "You're all caught up. New notices from your school will show up here.",
+    "loadError": "Couldn't load your notifications.",
+    "retry": "Try again",
+    "loadMore": "Show more",
+    "unread": "Unread",
+    "bell": {
+      "label": "Notifications",
+      "unread": "Notifications, {count} unread"
     }
   },
   "shell": {
@@ -2138,7 +2149,19 @@
         "materialOcrLowConfidence": "File text hard to read",
         "materialIngested": "File ready for AI",
         "materialIngestFailed": "File couldn't be prepared for AI",
-        "directMessage": "Messages"
+        "directMessage": "Messages",
+        "assignmentPublished": "New assignments",
+        "assignmentGraded": "Marked assignments",
+        "attendanceMarked": "Absences and lates",
+        "feeInvoiceIssued": "New fee invoices",
+        "feePaymentReceived": "Fee payments received",
+        "feePaymentReminder": "Overdue fee reminders",
+        "feeStatement": "Family fee statements",
+        "licenseSeatAppleRenewal": "School plan covers your subscription",
+        "licenseExpiring": "License ending soon",
+        "licenseInvoiceDue": "License invoice due",
+        "licenseInvoiceOverdue": "License invoice overdue",
+        "licenseReceiptUploaded": "License receipt uploaded"
       }
     },
     "staffRecord": {
