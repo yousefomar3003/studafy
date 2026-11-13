@@ -10,6 +10,7 @@ import '../../../core/auth/auth_providers.dart';
 import '../../../design/theme/app_semantic_colors.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../../../design/widgets/password_form_field.dart';
 import '../application/shell_providers.dart';
 
 /// "Delete my account": any signed-in user schedules deletion of their own account
@@ -193,13 +194,10 @@ class _DeleteAccountScreenState extends ConsumerState<DeleteAccountScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.space12),
-                TextField(
+                PasswordFormField(
                   key: const Key('deleteAccountPassword'),
                   controller: _passwordController,
                   enabled: !_submitting,
-                  obscureText: true,
-                  autocorrect: false,
-                  enableSuggestions: false,
                   autofillHints: const [AutofillHints.password],
                   decoration: InputDecoration(
                     labelText: 'shell.profile.deleteAccount.passwordLabel'.tr(),

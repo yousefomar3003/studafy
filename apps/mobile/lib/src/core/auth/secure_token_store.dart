@@ -36,6 +36,11 @@ class SecureTokenStore {
   /// guesses have the account locked (`member-password-service.ts`, trusted devices).
   static const _keyMemberDeviceTokens = 'member_device_tokens';
 
+  /// The Studafy ID the member chose to have remembered ("Remember me" on the sign-in form), so the
+  /// form opens with it filled in. Only the ID: a password is never stored anywhere on the device.
+  /// Kept across sign-out on purpose, like the device tokens; dropped on reinstall.
+  static const _keyRememberedMemberId = 'remembered_member_id';
+
   /// Plain SharedPreferences flag (not a secret) marking that this install has run before.
   static const _keyInstallMarker = 'secure_token_store.installed';
 
@@ -101,6 +106,18 @@ class SecureTokenStore {
     }
   }
 
+  /// The Studafy ID remembered on this device, or null.
+  Future<String?> readRememberedMemberId() =>
+      _storage.read(key: _keyRememberedMemberId);
+
+  /// Remembers [memberId] for the sign-in form; `null` forgets it.
+  Future<void> writeRememberedMemberId(String? memberId) {
+    final value = memberId?.trim();
+    return value == null || value.isEmpty
+        ? _storage.delete(key: _keyRememberedMemberId)
+        : _storage.write(key: _keyRememberedMemberId, value: value);
+  }
+
   static String _normalizeMemberId(String memberId) =>
       memberId.trim().toUpperCase();
 
@@ -116,6 +133,7 @@ class SecureTokenStore {
       clear(),
       writeSavedAccounts(null),
       _storage.delete(key: _keyMemberDeviceTokens),
+      _storage.delete(key: _keyRememberedMemberId),
     ]);
     await prefs.setBool(_keyInstallMarker, true);
   }
