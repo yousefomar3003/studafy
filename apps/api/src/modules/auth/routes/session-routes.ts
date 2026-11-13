@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../../db/tenant-tx";
+import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { openApiValidationHook } from "../../../openapi/hook";
@@ -605,20 +606,4 @@ function deviceContextFrom(c: Context<AppEnv>): {
     userAgent: c.req.header("User-Agent") ?? null,
     ipAddress: clientIpFrom(c),
   };
-}
-
-/**
- * The client address, or null.
- *
- * Null rather than a placeholder string when the address cannot be determined: the column is `inet`,
- * and PostgreSQL rejects a non-address value for the whole statement. The security event sink hit
- * the same edge (see toInetOrNull in lib/security/securityEventSink.ts) — this is the same guard for
- * the same reason.
- */
-function clientIpFrom(c: Context<AppEnv>): string | null {
-  const forwarded = c.req.header("X-Forwarded-For");
-  if (forwarded === undefined) return null;
-
-  const first = forwarded.split(",")[0]?.trim();
-  return first !== undefined && first.length > 0 ? first : null;
 }
