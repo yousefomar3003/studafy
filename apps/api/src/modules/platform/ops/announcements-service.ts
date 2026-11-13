@@ -1,5 +1,5 @@
 /**
- * Platform announcements (000212): Studafy-wide banners a super admin schedules from the console,
+ * Platform announcements (000214): Studafy-wide banners a super admin schedules from the console,
  * and the read every signed-in client makes to show the ones that are live for it.
  *
  * The table is global and reachable by studafy_admin only, so both sides run inside withSystemTx.

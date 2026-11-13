@@ -65,7 +65,7 @@ when it required the `version-bump` label.
   (`PlatformSupportUnlocked`), `POST .../deactivate` and `POST .../reactivate`
   (`PlatformSupportStatusChanged`). Reading needs `platform:read`, actions `platform:manage`; web
   only. Another SUPER_ADMIN's account is refused; there is no impersonation route.
-- Platform console operations (000212), all web-only and `platform:read`, writes `platform:manage`:
+- Platform console operations (000214), all web-only and `platform:read`, writes `platform:manage`:
   `GET`/`POST /api/platform/announcements` and `PATCH /api/platform/announcements/{announcementId}`
   (`PlatformAnnouncement`, `CreatePlatformAnnouncement`, `UpdatePlatformAnnouncement` with a
   required `reason` and `endNow`) schedule Studafy-wide banners for everyone or school staff only,

@@ -68,6 +68,6 @@ CREATE POLICY global_admin_only ON app.platform_announcements
   AS PERMISSIVE FOR ALL TO studafy_admin USING (true) WITH CHECK (true);
 
 COMMENT ON TABLE app.platform_announcements IS
-  'Studafy-wide banners (000212): message, audience, severity and time window. Global, studafy_admin only.';
+  'Studafy-wide banners (000214): message, audience, severity and time window. Global, studafy_admin only.';
 
 RESET ROLE;

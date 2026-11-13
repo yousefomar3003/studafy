@@ -28,7 +28,7 @@ Every `app` table must either contain `school_id` or appear in the reviewed glob
 `platform_announcements`;
 `features` and `plan_features` are the paid-feature catalog and tier contents from migration 000161,
 global like `plans`; the last three are the license price list and the invoice number sequence from
-000165, admin-only; `platform_announcements` is the Studafy-wide banner from 000212, admin-only). `public.schema_migrations` is outside the application schema and therefore outside
+000165, admin-only; `platform_announcements` is the Studafy-wide banner from 000214, admin-only). `public.schema_migrations` is outside the application schema and therefore outside
 this audit. A new global table fails until its scope is documented and reviewed.
 
 Every tenant relation must have:
