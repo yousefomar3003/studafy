@@ -8,13 +8,49 @@ import { integrationEnabled, runnerEnv, testDatabase } from "../../../../package
 import { createSchool, createUser } from "../../tests/harness";
 import { withTenantTx } from "../db/tenant-tx";
 
-import { SENSITIVE_KEYS, auditAction, emitAuditLog, redactPayload } from "./auditEmitter";
+import {
+  SENSITIVE_KEYS,
+  auditAction,
+  auditPayload,
+  emitAuditLog,
+  redactPayload,
+} from "./auditEmitter";
 
 import type { AuditAction } from "./auditEmitter";
 
 // ---------------------------------------------------------------------------
 // Unit tests -- redactPayload
 // ---------------------------------------------------------------------------
+
+describe("auditPayload", () => {
+  // ck_audit_logs_payload: insert = (null, after), update = (before, after), delete = (before, null).
+  test("an update without before-values gets an empty object, not a failed statement", () => {
+    expect(auditPayload({ action: "update", newValues: { a: 1 } })).toEqual({
+      oldValues: {},
+      newValues: { a: 1 },
+    });
+    expect(auditPayload({ action: "update" })).toEqual({ oldValues: {}, newValues: {} });
+  });
+
+  test("a delete keeps its before-values and drops any after", () => {
+    expect(auditPayload({ action: "delete" })).toEqual({ oldValues: {}, newValues: null });
+    expect(auditPayload({ action: "delete", oldValues: { a: 1 }, newValues: { b: 2 } })).toEqual({
+      oldValues: { a: 1 },
+      newValues: null,
+    });
+  });
+
+  test("an insert has no before-values and always an after", () => {
+    expect(auditPayload({ action: "insert", oldValues: { a: 1 } })).toEqual({
+      oldValues: null,
+      newValues: {},
+    });
+  });
+
+  test("other actions pass through", () => {
+    expect(auditPayload({ action: "login" })).toEqual({ oldValues: null, newValues: null });
+  });
+});
 
 describe("redactPayload", () => {
   test("redacts root-level sensitive keys", () => {
