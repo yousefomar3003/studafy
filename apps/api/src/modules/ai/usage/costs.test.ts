@@ -16,18 +16,24 @@ describe("usage/costs", () => {
       expect(estimateCostByTier(0, 0)).toBe(0);
     });
 
-    test("small-tier tokens cost less than large-tier for the same count", () => {
+    test("small-tier tokens never cost more than large-tier for the same count", () => {
       const smallCost = estimateCostByTier(1_000_000, 0);
       const largeCost = estimateCostByTier(0, 1_000_000);
-      expect(smallCost).toBeLessThan(largeCost);
+      expect(smallCost).toBeLessThanOrEqual(largeCost);
     });
 
     test("mixed tier cost is between pure small and pure large", () => {
       const pureSmall = estimateCostByTier(2_000_000, 0);
       const pureLarge = estimateCostByTier(0, 2_000_000);
       const mixed = estimateCostByTier(1_000_000, 1_000_000);
-      expect(mixed).toBeGreaterThan(pureSmall);
-      expect(mixed).toBeLessThan(pureLarge);
+      expect(mixed).toBeGreaterThanOrEqual(pureSmall);
+      expect(mixed).toBeLessThanOrEqual(pureLarge);
+    });
+
+    test("prices Qwen3.5-9B on Together: a full 3M-token month costs well under $1", () => {
+      // 0.7 × $0.17 + 0.3 × $0.25 = $0.194 per 1M tokens.
+      expect(estimateCostByTier(3_000_000, 0)).toBe(0.58);
+      expect(estimateCostByTier(0, 3_000_000)).toBe(0.58);
     });
 
     test("cost is rounded to cents", () => {
@@ -46,14 +52,14 @@ describe("usage/costs", () => {
       const cost1x = estimateCostUsd(1_000_000);
       const cost2x = estimateCostUsd(2_000_000);
       // Each call rounds to cents independently, so allow 1 cent tolerance.
-      expect(Math.abs(cost2x - cost1x * 2)).toBeLessThanOrEqual(0.01);
+      expect(Math.abs(cost2x - cost1x * 2)).toBeLessThanOrEqual(0.01 + 1e-9);
     });
 
     test("blended cost per token is between small and large tier costs", () => {
-      const smallTierCost = (0.7 * 0.8 + 0.3 * 4.0) / 1_000_000;
-      const largeTierCost = (0.7 * 3.0 + 0.3 * 15.0) / 1_000_000;
-      expect(BLENDED_COST_PER_TOKEN).toBeGreaterThan(smallTierCost);
-      expect(BLENDED_COST_PER_TOKEN).toBeLessThan(largeTierCost);
+      const smallTierCost = (0.7 * 0.17 + 0.3 * 0.25) / 1_000_000;
+      const largeTierCost = (0.7 * 0.17 + 0.3 * 0.25) / 1_000_000;
+      expect(BLENDED_COST_PER_TOKEN).toBeGreaterThanOrEqual(smallTierCost - 1e-15);
+      expect(BLENDED_COST_PER_TOKEN).toBeLessThanOrEqual(largeTierCost + 1e-15);
     });
   });
 
@@ -104,6 +110,6 @@ describe("usage/costs", () => {
   });
 
   test("DEFAULT_MONTHLY_BUDGET is exported", () => {
-    expect(DEFAULT_MONTHLY_BUDGET).toBe(1_000_000);
+    expect(DEFAULT_MONTHLY_BUDGET).toBe(3_000_000);
   });
 });

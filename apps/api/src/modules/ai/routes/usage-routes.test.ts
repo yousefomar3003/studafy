@@ -93,7 +93,7 @@ describe("GET /api/ai/usage", () => {
         studentId: STUDENT_ID,
         periodStart: PERIOD_START,
         periodEnd: PERIOD_END,
-        budget: 1_000_000,
+        budget: 3_000_000,
       },
     ]);
   });

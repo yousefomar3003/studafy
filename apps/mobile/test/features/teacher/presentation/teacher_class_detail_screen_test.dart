@@ -7,9 +7,13 @@ import 'package:studafy_mobile/src/features/custom_lists/application/custom_list
 import 'package:studafy_mobile/src/features/custom_lists/data/custom_lists_client.dart';
 import 'package:studafy_mobile/src/features/custom_lists/domain/custom_list.dart';
 import 'package:studafy_mobile/src/features/custom_lists/presentation/student_custom_lists_screen.dart';
+import 'package:studafy_mobile/src/features/messaging/application/messaging_providers.dart';
 import 'package:studafy_mobile/src/features/shell/application/shell_providers.dart';
+import 'package:studafy_mobile/src/features/teacher/application/student_overview_providers.dart';
 import 'package:studafy_mobile/src/features/teacher/application/teacher_providers.dart';
+import 'package:studafy_mobile/src/features/teacher/domain/student_overview.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/teacher_class_detail_screen.dart';
+import 'package:studafy_mobile/src/features/teacher/presentation/teacher_student_screen.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/widgets/roster_entry_tile.dart';
 
 import '../../../support/ensure_date_formatting.dart';
@@ -171,7 +175,7 @@ void main() {
   });
 
   testWidgets(
-    'a teacher opens what the school lists hold about a student from the roster',
+    "a teacher opens the student's page from the roster, and the school lists from there",
     (tester) async {
       final lists = _NoLinkedRows();
       await _pump(
@@ -189,6 +193,30 @@ void main() {
             rosterStudentNameProvider(
               'student-abcdef',
             ).overrideWithValue('Sara Ahmed'),
+            studentOverviewProvider((
+              classId: 'class-1',
+              studentId: 'student-abcdef',
+            )).overrideWith(
+              (ref) => StudentOverview.fromJson(const {
+                'class': {
+                  'code': 'MATH101-A',
+                  'subject_name': 'Math',
+                  'term_name': 'Term 1',
+                },
+                'student': {
+                  'id': 'student-abcdef',
+                  'first_name': 'Sara',
+                  'last_name': 'Ahmed',
+                },
+                'marks': null,
+                'marks_unavailable': 'no_section',
+                'attendance': {'sessions': 0},
+                'homework': {'total': 0},
+                'report_comments': <String, Object?>{},
+                'records': <Object?>[],
+              }),
+            ),
+            teacherMessagingContactsProvider.overrideWith((ref) => const []),
           ],
           child: _detailApp(),
         ),
@@ -199,6 +227,15 @@ void main() {
       expect(find.byKey(const Key('linkedCustomLists')), findsNothing);
 
       await tester.tap(find.text('Sara Ahmed'));
+      await tester.pumpAndSettle();
+      expect(find.byType(TeacherStudentScreen), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text("See this student in the school's lists"),
+        200,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.tap(find.text("See this student in the school's lists"));
       await tester.pumpAndSettle();
       expect(find.byType(StudentCustomListsScreen), findsOneWidget);
       expect(lists.linkedCalls.last, ('student', 'student-abcdef'));

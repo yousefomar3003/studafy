@@ -183,6 +183,12 @@ describe("attachment bodies", () => {
     ).toBe(false);
   });
 
+  test("confirm accepts a body with only storage_key (the mobile app's shape)", () => {
+    expect(confirmAttachmentBodySchema.safeParse({ storage_key: "temp/a/b/c.docx" }).success).toBe(
+      true,
+    );
+  });
+
   test("rejects a checksum that is not lowercase hex sha-256", () => {
     const base = { storage_key: "temp/a/b/c.pdf", content_type: "application/pdf" };
 

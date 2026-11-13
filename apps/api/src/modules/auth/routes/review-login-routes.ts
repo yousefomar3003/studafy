@@ -22,6 +22,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
@@ -102,7 +103,7 @@ export function reviewLoginRoutes(
     }
 
     const { email, password, channel } = c.req.valid("json");
-    const clientIp = c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? null;
+    const clientIp = clientIpFrom(c);
     const userAgent = c.req.header("user-agent") ?? null;
 
     const result = await loginReviewUser(db, config, {

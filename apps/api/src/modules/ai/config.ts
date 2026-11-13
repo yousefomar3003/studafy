@@ -6,8 +6,12 @@
  * middleware's shape.
  */
 
-/** Default monthly token budget per AI subscription, reset on each billing renewal. */
-export const AI_MONTHLY_TOKEN_BUDGET = 1_000_000;
+/**
+ * Monthly token budget per AI student. It resets every month, including inside a yearly add-on or a
+ * school-license seat (see usage/budget-window.ts). 3M chosen 2026-11-13: on Qwen3.5-9B a student
+ * who spends all of it costs about $0.60 a month (see the cost constants below).
+ */
+export const AI_MONTHLY_TOKEN_BUDGET = 3_000_000;
 
 /** How many tokens a request reserves up front while it runs, before it has produced anything. */
 export const AI_DEFAULT_RESERVE_TOKENS = 1_000;
@@ -327,17 +331,21 @@ export const AI_EXAM_MAX_RESERVE_TOKENS = 25_000;
 // calculations; reconcile against the provider billing statement monthly.
 // ---------------------------------------------------------------------------
 
-/** Provider input cost per 1M tokens (USD) for the small tier (Claude Haiku 4.5). */
-export const AI_COST_INPUT_PER_M_SMALL = 1.0;
+// Production runs Qwen3.5-9B on Together AI for both tiers (infra/fly/api.toml AI_LLM_*_MODEL),
+// listed on together.ai at $0.17 input / $0.25 output per 1M tokens (checked 2026-11-13). Change
+// these together with the models: the Claude defaults in AI_LLM_DEFAULT_*_MODEL cost ~10-60x more.
+
+/** Provider input cost per 1M tokens (USD) for the small tier (Qwen3.5-9B on Together AI). */
+export const AI_COST_INPUT_PER_M_SMALL = 0.17;
 
 /** Provider output cost per 1M tokens (USD) for the small tier. */
-export const AI_COST_OUTPUT_PER_M_SMALL = 5.0;
+export const AI_COST_OUTPUT_PER_M_SMALL = 0.25;
 
-/** Provider input cost per 1M tokens (USD) for the large tier (e.g. Claude Sonnet 4). */
-export const AI_COST_INPUT_PER_M_LARGE = 3.0;
+/** Provider input cost per 1M tokens (USD) for the large tier (Qwen3.5-9B on Together AI). */
+export const AI_COST_INPUT_PER_M_LARGE = 0.17;
 
 /** Provider output cost per 1M tokens (USD) for the large tier. */
-export const AI_COST_OUTPUT_PER_M_LARGE = 15.0;
+export const AI_COST_OUTPUT_PER_M_LARGE = 0.25;
 
 /**
  * AI add-on monthly price per student (USD).
