@@ -1,11 +1,8 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/auth_interceptor.dart';
-import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/api/generated/models/child_comparison_breakdown.dart';
 import '../../../core/auth/auth_providers.dart';
-import '../../../core/di/app_providers.dart';
+import '../../../core/auth/authenticated_dio.dart';
 // `currentTermProvider` is school-scoped context (active year + term), not student-specific — the
 // same call the parent home already makes for the comparison report. See
 // [[mobile_parent_home_st239]] for why it still lives in the student feature.
@@ -33,15 +30,10 @@ final childBreakdownProvider = FutureProvider.autoDispose
           .getChildComparisonBreakdown(studentId: studentId, termId: term.id);
     });
 
-/// [ChildTimetableClient] on its own [Dio], wired exactly like
-/// `familyFinanceClientProvider`.
+/// [ChildTimetableClient] on the app's [authenticatedDio] (token renewal on 401, like the
+/// generated client).
 final childTimetableClientProvider = Provider<ChildTimetableClient>((ref) {
-  final baseUrl = ref.watch(networkConfigProvider).apiBaseUrl;
-  final session = ref.watch(authSessionProvider);
-  final dio = Dio(BaseOptions(baseUrl: baseUrl.toString()))
-    ..interceptors.add(AuthInterceptor(() => session.tokenProvider))
-    ..interceptors.add(ErrorMappingInterceptor());
-  return ChildTimetableClient(dio);
+  return ChildTimetableClient(authenticatedDio(ref));
 });
 
 /// One linked child's approved weekly timetable for the current term, behind the Timetable tab

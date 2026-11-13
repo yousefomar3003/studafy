@@ -26,10 +26,15 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // A scheduled deletion confines the session to cancelling it or signing out (the API refuses
     // everything else), so the shell gives way to that choice until it is made.
-    final deletionScheduledFor = ref
-        .watch(accountProfileProvider)
-        .value
-        ?.deletionScheduledFor;
+    // Until the first profile load answers, the shell can't know whether the session is held at the
+    // Terms (or a scheduled deletion). Building the tabs now would fire their requests into a 403
+    // the screens then keep as errors, so wait. A failed load falls through to the shell as before.
+    final profile = ref.watch(accountProfileProvider);
+    if (profile.isLoading && !profile.hasValue && !profile.hasError) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final deletionScheduledFor = profile.value?.deletionScheduledFor;
     if (deletionScheduledFor != null) {
       return DeletionPendingScreen(scheduledFor: deletionScheduledFor);
     }

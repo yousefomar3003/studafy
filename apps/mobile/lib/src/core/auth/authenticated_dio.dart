@@ -17,6 +17,7 @@ import 'auth_providers.dart';
 Dio authenticatedDio(Ref ref) {
   final baseUrl = ref.watch(networkConfigProvider).apiBaseUrl;
   final session = ref.watch(authSessionProvider);
+  ref.watch(sessionDataEpochProvider);
   final dio = Dio(BaseOptions(baseUrl: baseUrl.toString()));
   dio.interceptors
     ..add(

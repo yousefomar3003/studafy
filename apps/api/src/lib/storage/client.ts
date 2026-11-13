@@ -19,6 +19,61 @@ import type { Env } from "../../env";
 
 export type PresignMethod = "GET" | "PUT";
 
+/**
+ * A Content-Disposition value safe for any file name (RFC 6266 / RFC 5987).
+ *
+ * Header values are ASCII. A raw non-ASCII name -- an Arabic file name, say -- inside
+ * `filename="..."` is not a valid header, and S3-compatible stores and browsers handle it
+ * unpredictably (the download can fail outright). So: an ASCII-only `filename` fallback (anything
+ * else, and `"` / `\`, become `_`) for old clients, plus `filename*=UTF-8''<percent-encoded>` that
+ * every current browser and OS prefers.
+ */
+export function attachmentContentDisposition(
+  fileName: string,
+  disposition: "attachment" | "inline" = "attachment",
+): string {
+  const name = fileName.length > 0 ? fileName : "download";
+  const ascii = name.replace(/[^\x20-\x7e]|["\\]/g, "_");
+  const encoded = encodeURIComponent(name).replace(
+    /['()*]/g,
+    (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
+  return `${disposition}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+}
+
+/**
+ * Types a browser may display in place (`inline`) rather than only save. The mobile app opens a
+ * Word/Excel/PowerPoint attachment in the phone's own app via the pre-signed URL; with `attachment`
+ * Safari just downloads it, with `inline` it shows it. Deliberately excludes anything a browser
+ * would execute or that can carry script (HTML, SVG, XML, JS): those stay downloads.
+ */
+const INLINE_SAFE_CONTENT_TYPES = new Set([
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/heic",
+  "text/plain",
+  "text/csv",
+  "application/msword",
+  "application/vnd.ms-excel",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+]);
+
+export function isInlineSafeContentType(contentType: string): boolean {
+  return INLINE_SAFE_CONTENT_TYPES.has(contentType.split(";")[0]!.trim().toLowerCase());
+}
+
+/** Options for a GET presign. */
+export interface PresignGetOptions {
+  /** Let the browser display the file instead of only saving it. Ignored for PUT. */
+  inline?: boolean;
+}
+
 export interface PresignedUrl {
   url: string;
   expiresAt: Date;
@@ -48,6 +103,7 @@ export interface StorageService {
     method: PresignMethod,
     contentType?: string,
     ttlOverrideSeconds?: number,
+    options?: PresignGetOptions,
   ): PresignedUrl | Promise<PresignedUrl>;
   exists(key: string): Promise<boolean>;
   size(key: string): Promise<number>;
@@ -102,7 +158,7 @@ export function createStorageService(env: Env): StorageService | null {
       }
     },
 
-    async presign(key, method, contentType, ttlOverrideSeconds) {
+    async presign(key, method, contentType, ttlOverrideSeconds, options) {
       const expiresIn = ttlOverrideSeconds ?? ttlSeconds;
       const command =
         method === "PUT"
@@ -114,7 +170,10 @@ export function createStorageService(env: Env): StorageService | null {
           : new GetObjectCommand({
               Bucket: bucket,
               Key: key,
-              ResponseContentDisposition: `attachment; filename="${key.split("/").at(-1) ?? "download"}"`,
+              ResponseContentDisposition: attachmentContentDisposition(
+                key.split("/").at(-1) ?? "download",
+                options?.inline ? "inline" : "attachment",
+              ),
             });
       const url = await getSignedUrl(client, command, { expiresIn });
       return { url, expiresAt: new Date(Date.now() + expiresIn * 1000) };
