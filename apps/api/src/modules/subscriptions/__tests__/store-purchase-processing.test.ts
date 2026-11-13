@@ -22,6 +22,7 @@ import { aiStoreRoutes } from "../store/routes";
 import {
   handleAppleNotification,
   handleGooglePlayNotification,
+  readStoreOffer,
   registerStorePurchase,
 } from "../store/service";
 import { StoreVerificationError } from "../store/types";
@@ -263,6 +264,226 @@ describe("registering a purchase", () => {
     expect(code).toBe(ERROR_CODES.STORE_PURCHASE_ACCOUNT_MISMATCH);
   });
 });
+
+/**
+ * A second child of the fixture's school, and one parent linked to both: a family sharing a phone.
+ * Seeded the way createBillingFixture seeds, as studafy_admin with the tenant GUC set.
+ */
+async function addFamily(f: BillingFixture): Promise<{
+  parentUserId: string;
+  sister: { studentId: string; userId: string };
+}> {
+  return f.db.sql.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+    const tag = crypto.randomUUID().slice(0, 8);
+    const [parent] = await tx<{ id: string }[]>`
+      INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+      VALUES (${f.schoolId}::uuid, ${`parent-${tag}@local`}, ${`parent-${tag}@local`}, 'Parent', 'active')
+      RETURNING id
+    `;
+    const [sisterUser] = await tx<{ id: string }[]>`
+      INSERT INTO app.users (school_id, email, normalized_email, display_name, status)
+      VALUES (${f.schoolId}::uuid, ${`sister-${tag}@local`}, ${`sister-${tag}@local`}, 'Sister', 'active')
+      RETURNING id
+    `;
+    const [sister] = await tx<{ id: string }[]>`
+      INSERT INTO app.students (school_id, user_id, admission_number, first_name, last_name, status)
+      VALUES (${f.schoolId}::uuid, ${sisterUser!.id}::uuid, ${`SIS-${tag}`}, 'Sara', 'Student', 'enrolled')
+      RETURNING id
+    `;
+    const [familyRow] = await tx<{ id: string }[]>`
+      INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+      VALUES (${f.schoolId}::uuid, 'Family', ${parent!.id}::uuid)
+      RETURNING id
+    `;
+    for (const studentId of [f.studentId, sister!.id]) {
+      await tx`
+        INSERT INTO app.parent_child_links (school_id, family_id, parent_user_id, student_id, relationship)
+        VALUES (
+          ${f.schoolId}::uuid, ${familyRow!.id}::uuid, ${parent!.id}::uuid, ${studentId}::uuid, 'mother'
+        )
+      `;
+    }
+    return { parentUserId: parent!.id, sister: { studentId: sister!.id, userId: sisterUser!.id } };
+  });
+}
+
+describe("a family buying on one phone", () => {
+  const SECOND = "studafy_ai_monthly_2";
+
+  function familyStores(transaction: StoreSubscription) {
+    const { store } = fakeStores({ transaction });
+    return { ...store, productIds: [PRODUCT, SECOND] };
+  }
+
+  integrationTest("a parent buying for a child turns AI on for that child", async () => {
+    const f = await createBillingFixture(database!);
+    const family = await addFamily(f);
+    const transaction = subscriptionFor(f, { studentId: family.sister.studentId });
+
+    const result = await registerStorePurchase(f.db.sql, familyStores(transaction), silentLogger, {
+      schoolId: f.schoolId,
+      userId: family.parentUserId,
+      platform: "apple",
+      verificationData: "signed",
+      locale: "en",
+      withdrawalWaiver: { acknowledgedAt: new Date(Date.now() - 1_000) },
+    });
+
+    expect(result.studentId).toBe(family.sister.studentId);
+    expect(await readAiSubscriptionStatuses(f)).toEqual(["active"]);
+    const [row] = await f.db.sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+      return tx<{ student_id: string; purchase_ref: string | null }[]>`
+        SELECT student_id::text, withdrawal_waiver_purchase_ref AS purchase_ref
+        FROM app.ai_subscriptions WHERE school_id = ${f.schoolId}::uuid
+      `;
+    });
+    // The child's row, with the parent's waiver recorded on it.
+    expect(row).toEqual({
+      student_id: family.sister.studentId,
+      purchase_ref: purchaseRef("apple", transaction.transactionId),
+    });
+  });
+
+  integrationTest(
+    "a sister's purchase redelivered to her brother's open account goes to her, without a waiver",
+    async () => {
+      const f = await createBillingFixture(database!);
+      const family = await addFamily(f);
+      const transaction = subscriptionFor(f, { studentId: family.sister.studentId });
+
+      // The brother (the fixture's student) is the open account when the store redelivers it.
+      const result = await register(f, familyStores(transaction), "apple", {
+        acknowledgedAt: new Date(),
+      });
+
+      expect(result.studentId).toBe(family.sister.studentId);
+      const rows = await f.db.sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+        return tx<{ student_id: string; purchase_ref: string | null }[]>`
+          SELECT student_id::text, withdrawal_waiver_purchase_ref AS purchase_ref
+          FROM app.ai_subscriptions WHERE school_id = ${f.schoolId}::uuid
+        `;
+      });
+      expect([...rows]).toEqual([{ student_id: family.sister.studentId, purchase_ref: null }]);
+    },
+  );
+
+  integrationTest("a purchase for a student outside the family is still refused", async () => {
+    const f = await createBillingFixture(database!);
+    await addFamily(f);
+    const stranger = await createBillingFixture(database!);
+    const transaction = subscriptionFor(stranger);
+
+    expect(await rejectionCode(register(f, familyStores(transaction)))).toBe(
+      ERROR_CODES.STORE_PURCHASE_ACCOUNT_MISMATCH,
+    );
+  });
+
+  integrationTest(
+    "the second child is offered the second product; the first keeps hers",
+    async () => {
+      const f = await createBillingFixture(database!);
+      const family = await addFamily(f);
+      await activateSchoolPlan(f);
+      const store = familyStores(subscriptionFor(f));
+      await register(f, store);
+
+      const forSister = await readStoreOffer(f.db.sql, store, {
+        schoolId: f.schoolId,
+        userId: family.parentUserId,
+        studentId: family.sister.studentId,
+      });
+      const forBrother = await readStoreOffer(f.db.sql, store, {
+        schoolId: f.schoolId,
+        userId: f.studentUserId,
+      });
+
+      expect(forSister).toEqual({
+        studentId: family.sister.studentId,
+        studentFirstName: "Sara",
+        subscribed: false,
+        productId: SECOND,
+        unavailableReason: null,
+      });
+      expect(forBrother).toMatchObject({
+        studentId: f.studentId,
+        subscribed: true,
+        productId: PRODUCT,
+        unavailableReason: null,
+      });
+    },
+  );
+
+  integrationTest(
+    "with one product only, a second child has none left and is told so",
+    async () => {
+      const f = await createBillingFixture(database!);
+      const family = await addFamily(f);
+      await activateSchoolPlan(f);
+      const { store } = fakeStores({ transaction: subscriptionFor(f) });
+      await register(f, store);
+
+      const offer = await readStoreOffer(f.db.sql, store, {
+        schoolId: f.schoolId,
+        userId: family.sister.userId,
+      });
+
+      expect(offer).toMatchObject({ productId: null, unavailableReason: "no_free_product" });
+    },
+  );
+
+  integrationTest("a parent cannot ask about a child who is not linked to them", async () => {
+    const f = await createBillingFixture(database!);
+    const family = await addFamily(f);
+    const stranger = await createBillingFixture(database!);
+    const { store } = fakeStores();
+
+    const offer = await readStoreOffer(f.db.sql, store, {
+      schoolId: f.schoolId,
+      userId: family.parentUserId,
+      studentId: stranger.studentId,
+    });
+
+    expect(offer).toMatchObject({ studentId: null, unavailableReason: "not_student" });
+  });
+
+  integrationTest("says when the school's own plan is not live", async () => {
+    const f = await createBillingFixture(database!);
+    await setSchoolPlanStatus(f, "canceled");
+    const { store } = fakeStores();
+
+    const offer = await readStoreOffer(f.db.sql, store, {
+      schoolId: f.schoolId,
+      userId: f.studentUserId,
+    });
+
+    expect(offer).toMatchObject({
+      studentId: f.studentId,
+      unavailableReason: "school_plan_inactive",
+    });
+  });
+});
+
+async function setSchoolPlanStatus(f: BillingFixture, status: string): Promise<void> {
+  await f.db.sql.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+    await tx`
+      UPDATE app.subscriptions SET status = ${status}::app.subscription_status
+      WHERE id = ${f.subscriptionId}::uuid
+    `;
+  });
+}
+
+/** The fixture's school plan starts `trialing`, which already counts as live; made explicit. */
+async function activateSchoolPlan(f: BillingFixture): Promise<void> {
+  await setSchoolPlanStatus(f, "active");
+}
 
 describe("store notifications", () => {
   function appleNotification(

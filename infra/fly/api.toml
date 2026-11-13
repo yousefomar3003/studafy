@@ -47,6 +47,10 @@ primary_region = "fra"
   AI_LLM_SMALL_MODEL = "Qwen/Qwen3.5-9B"
   AI_LLM_LARGE_MODEL = "Qwen/Qwen3.5-9B"
   AI_STORE_PRODUCT_ID = "studafy_ai_monthly"
+  # One store account holds one subscription per product: a family buying for several children on
+  # one phone uses the next product per child. Until a product exists in the store, the app says it
+  # can't be bought for that child yet. See docs/runbooks/in-app-purchase-setup.md.
+  AI_STORE_EXTRA_PRODUCT_IDS = "studafy_ai_monthly_2,studafy_ai_monthly_3,studafy_ai_monthly_4"
   APPLE_IAP_BUNDLE_ID = "com.studafy.studafyMobile"
   APPLE_IAP_APP_APPLE_ID = "6826890449"
   GOOGLE_PLAY_PACKAGE_NAME = "com.studafy.studafy_mobile"
