@@ -2440,5 +2440,20 @@
         "body": "Sign in as a student, a parent or a sibling, and switch between accounts in a tap."
       }
     }
+  },
+  "attachments": {
+    "tile": {
+      "checking": "Being checked for safety…",
+      "unavailable": "This file can't be opened"
+    },
+    "viewer": {
+      "open": "Open",
+      "openExternally": "Open in another app",
+      "openFailed": "No app on this phone can open this file.",
+      "unavailable": "This file isn't available right now.",
+      "downloadError": "Couldn't load the file. Check your connection and try again.",
+      "retry": "Try again",
+      "noPreview": "This file opens in your phone's app for it."
+    }
   }
 }

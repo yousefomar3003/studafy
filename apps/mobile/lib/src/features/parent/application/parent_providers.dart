@@ -1,8 +1,5 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/api/auth_interceptor.dart';
-import '../../../core/api/error_mapping_interceptor.dart';
 import '../../../core/api/generated/models/child_comparison_item.dart';
 import '../../../core/api/generated/models/child_comparison_report.dart';
 // Aliased: the generated model class is named `Notification`, which collides with the Flutter
@@ -11,7 +8,7 @@ import '../../../core/api/generated/models/notification.dart' as api_models;
 import '../../../core/api/generated/models/notification_preferences.dart';
 import '../../../core/api/generated/models/update_notification_preferences_request.dart';
 import '../../../core/auth/auth_providers.dart';
-import '../../../core/di/app_providers.dart';
+import '../../../core/auth/authenticated_dio.dart';
 import '../../../core/offline/offline_providers.dart';
 // `currentTermProvider` resolves the school's active year + term — school-scoped context, not
 // student-specific. It still lives in the student feature (its first consumer); this is now its
@@ -121,15 +118,10 @@ final parentFamilyIdProvider = FutureProvider<String?>((ref) async {
   return page.families.isEmpty ? null : page.families.first.id;
 });
 
-/// [FamilyFinanceClient] on its own [Dio], wired exactly like `createApiClient` and
-/// `askAiClientProvider` — same base URL, same bearer injection, same [ErrorMappingInterceptor].
+/// [FamilyFinanceClient] on the app's [authenticatedDio]: same base URL, bearer injection with 401
+/// recovery (token renewal), and [ErrorMappingInterceptor] like the generated client.
 final familyFinanceClientProvider = Provider<FamilyFinanceClient>((ref) {
-  final baseUrl = ref.watch(networkConfigProvider).apiBaseUrl;
-  final session = ref.watch(authSessionProvider);
-  final dio = Dio(BaseOptions(baseUrl: baseUrl.toString()))
-    ..interceptors.add(AuthInterceptor(() => session.tokenProvider))
-    ..interceptors.add(ErrorMappingInterceptor());
-  return FamilyFinanceClient(dio);
+  return FamilyFinanceClient(authenticatedDio(ref));
 });
 
 /// The household's full finance detail — invoices, fee-schedule installments, receipts, and
