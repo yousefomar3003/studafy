@@ -524,11 +524,18 @@ export const confirmAttachmentBodySchema = z
       .string()
       .min(1)
       .openapi({ description: "The `storage_key` returned by the upload-url endpoint." }),
+    // Optional: the bucket already knows the type it was uploaded with. The mobile app's generated
+    // client sends only `storage_key` (the expense module registers a schema under the same OpenAPI
+    // name with that one field), so requiring it here rejected every attachment from the app.
     content_type: z
       .string()
       .trim()
       .regex(/^[^/\s]+\/[^/\s]+$/, "must be a MIME type")
-      .openapi({ description: "MIME type of the uploaded object." }),
+      .optional()
+      .openapi({
+        description:
+          "MIME type of the uploaded object. Optional: when omitted, the type the object was uploaded with is used.",
+      }),
     checksum_sha256: z
       .string()
       .regex(/^[0-9a-f]{64}$/, "must be lowercase hex SHA-256")
