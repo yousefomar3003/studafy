@@ -176,6 +176,34 @@ describe("POST /api/auth/logout", () => {
     expect(await isDenylisted(seed.accessJti!)).toBe(true);
   });
 
+  integrationTest(
+    "with fcm_token, removes only the signed-out account's push registration",
+    async () => {
+      const token = `fcm-${crypto.randomUUID()}`;
+      for (const userId of [tenant.users.STUDENT.id, tenant.users.PARENT.id]) {
+        await sql`
+        INSERT INTO app.user_devices (school_id, user_id, fcm_token, platform)
+        VALUES (${tenant.schoolId}::uuid, ${userId}::uuid, ${token}, 'ios')
+      `;
+      }
+      const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.STUDENT.id, {
+        channel: "mobile",
+      });
+
+      const res = await app.request("/api/auth/logout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refresh_token: seed.token, fcm_token: token }),
+      });
+      expect(res.status).toBe(200);
+
+      const live = await sql<{ user_id: string }[]>`
+      SELECT user_id FROM app.user_devices WHERE fcm_token = ${token} AND revoked_at IS NULL
+    `;
+      expect(live.map((row) => row.user_id)).toEqual([tenant.users.PARENT.id]);
+    },
+  );
+
   integrationTest("makes the revoked refresh token fail to rotate", async () => {
     const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.STUDENT.id, {
       channel: "mobile",

@@ -29,6 +29,25 @@ Code: `apps/api/src/modules/subscriptions/store/` (server), `apps/mobile/lib/fea
 Cancelling is done in the store's own subscription settings (the app links there); access lasts to
 the end of the paid period.
 
+### Families: several children on one phone
+
+One App Store / Google Play account can hold **one** subscription to a product. A parent buying
+for two children on the same phone therefore needs a second product for the second child, or the
+store answers "you're already subscribed" with the first child's purchase.
+
+- The add-on is sold under `AI_STORE_PRODUCT_ID` plus `AI_STORE_EXTRA_PRODUCT_IDS`
+  (`studafy_ai_monthly_2`, `_3`, `_4`). The config picks, for each child, the product they already
+  hold, else the first one no brother or sister (students sharing a linked parent) holds. With none
+  left it answers `unavailableReason: no_free_product`, and the app says so.
+- A parent buys from the child's page in the parent app (`?studentId=` on the config), and the
+  purchase is stamped with the **child's** id.
+- `POST .../purchases` credits a purchase to the student stamped on it, never to the caller. The
+  caller must be that student, a parent linked to them, or a brother or sister: the store
+  redelivers every purchase made on the phone to whichever account is open. Only the student or
+  the parent who bought it records a withdrawal waiver.
+- Until a product exists in a store, the app says the add-on can't be bought for that child on
+  this phone yet (`aiStore.unavailable.notListed`).
+
 ## The 14-day right of withdrawal
 
 Under EU consumer law (Directive 2011/83/EU art. 16(m), as amended) a consumer keeps a 14-day right
@@ -66,6 +85,7 @@ time).
 | Where                            | Value                         | dev / staging / prod                                                         |
 | -------------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
 | `infra/fly/api.toml` `[env]`     | `AI_STORE_PRODUCT_ID`         | `studafy_ai_monthly` (same id in both stores)                                |
+|                                  | `AI_STORE_EXTRA_PRODUCT_IDS`  | `studafy_ai_monthly_2,studafy_ai_monthly_3,studafy_ai_monthly_4` (families)  |
 |                                  | `APPLE_IAP_BUNDLE_ID`         | `com.studafy.studafyMobile.dev` / `.staging` / `com.studafy.studafyMobile`   |
 |                                  | `APPLE_IAP_APP_APPLE_ID`      | App Store Connect → the app → App Information → **Apple ID** (a number)      |
 |                                  | `GOOGLE_PLAY_PACKAGE_NAME`    | `com.studafy.studafy_mobile.dev` / `.staging` / `com.studafy.studafy_mobile` |
@@ -83,6 +103,9 @@ Each store is off while its values are empty; the api refuses to boot with a hal
    then an auto-renewable subscription with Product ID `studafy_ai_monthly`, duration 1 month, a
    price, and a localized display name and description (English and Arabic). Add the review
    screenshot (the purchase screen) and review notes.
+   **For families**, repeat for `studafy_ai_monthly_2`, `_3` and `_4`, each in **its own**
+   subscription group ("Studafy AI – 2nd child", ...) at the same price. Products in one group are
+   mutually exclusive (an upgrade/downgrade), so they must not share the first group.
 3. **Billing grace period** (recommended): Subscriptions → Billing Grace Period → On, 16 days. The
    student keeps AI while Apple retries the card; the API keeps the add-on `past_due` meanwhile.
 4. **Server notifications.** The app → App Information → App Store Server Notifications →
@@ -103,7 +126,7 @@ never counted as revenue (`payload->>'environment'`).
 1. **Payments profile.** Play Console → Settings → Payments profile, linked to the developer account.
 2. **Product.** The app → Monetize → Products → Subscriptions → create `studafy_ai_monthly` with one
    base plan (monthly, auto-renewing), prices, and a grace period (recommended: 7 days) and account
-   hold. The app must have been uploaded to a testing track with the `BILLING` permission (the
+   hold. **For families**, create `studafy_ai_monthly_2`, `_3` and `_4` the same way. The app must have been uploaded to a testing track with the `BILLING` permission (the
    `in_app_purchase` plugin adds it) before products can be created.
 3. **Service account** for the server:
    1. Google Cloud console → the project linked to Play → IAM → Service Accounts → create

@@ -1,3 +1,4 @@
+import '../../../core/api/generated/models/ai_store_config_unavailable_reason.dart';
 import '../../../core/api/generated/models/ai_store_purchase_request.dart';
 import '../../../core/api/generated/models/ai_store_purchase_request_platform.dart';
 import '../../../core/api/generated/models/ai_store_waiver_confirmation.dart';
@@ -25,8 +26,23 @@ class AiStorePurchaseConfirmation {
   final bool emailed;
 }
 
-/// What the server says about selling the AI add-on in the app to the signed-in user
-/// (`GET /api/subscriptions/ai/store/config`).
+/// Why the server will not sell the add-on for this student, so the app can say so.
+enum AiStoreUnavailableReason {
+  /// No store is set up on the server yet.
+  notConfigured,
+
+  /// Not a student, nor a parent asking about their own child.
+  notStudent,
+
+  /// The school's own Studafy plan is not live; the add-on only works on top of it.
+  schoolPlanInactive,
+
+  /// Brothers and sisters already hold every product this phone's store account could buy.
+  noFreeProduct,
+}
+
+/// What the server says about selling the AI add-on in the app for one student — the signed-in
+/// student, or a parent's child (`GET /api/subscriptions/ai/store/config?studentId=`).
 class AiStoreSetup {
   const AiStoreSetup({
     required this.enabled,
@@ -36,16 +52,34 @@ class AiStoreSetup {
     required this.purchasable,
     required this.accountToken,
     required this.profileId,
+    this.studentId,
+    this.studentFirstName,
+    this.subscribed = false,
+    this.unavailableReason,
     this.purchaseConfirmation,
   });
 
   final bool enabled;
+
+  /// The product to buy for this student. One App Store / Google Play account holds one
+  /// subscription per product, so a brother or sister already holding the first is offered the
+  /// next one.
   final String? productId;
   final bool apple;
   final bool google;
 
-  /// A student whose school's own plan is live — the add-on only works on top of that.
+  /// Whether it can be bought for this student right now.
   final bool purchasable;
+
+  /// The student it is for, and their first name for "AI for (name)".
+  final String? studentId;
+  final String? studentFirstName;
+
+  /// Whether that student's AI add-on is already on, however it was paid for.
+  final bool subscribed;
+
+  /// Why it cannot be bought; null when it can.
+  final AiStoreUnavailableReason? unavailableReason;
 
   /// The student's id, stamped on the purchase (Apple `appAccountToken`, Google
   /// `obfuscatedAccountId`). The server refuses a purchase that does not carry it.
@@ -69,14 +103,17 @@ class AiStoreSetup {
 /// The server side of an in-app purchase: the setup to offer, and registering a completed
 /// purchase so the server verifies it with the store and turns the add-on on.
 abstract interface class AiStoreBackend {
-  Future<AiStoreSetup> setup();
+  /// The offer for the signed-in student, or — for a parent — for their child [studentId].
+  Future<AiStoreSetup> setup({String? studentId});
 
   /// Throws a `DioException` carrying an `ApiException` when the server refuses the purchase.
+  /// Returns the id of the student the purchase turned AI on for: the one it was bought for, which
+  /// may be a brother or sister when the phone's store redelivers their purchase.
   ///
-  /// [withdrawalWaiverAcknowledgedAt] is when the student, before the store's purchase sheet
-  /// opened, asked for the add-on to start now and acknowledged losing the 14-day right to cancel.
-  /// Sent with a new purchase only — never with a restored one, which they did not just agree to.
-  Future<void> register(
+  /// [withdrawalWaiverAcknowledgedAt] is when the buyer, before the store's purchase sheet opened,
+  /// asked for the add-on to start now and acknowledged losing the 14-day right to cancel. Sent
+  /// with a new purchase only — never with a restored one, which they did not just agree to.
+  Future<String> register(
     StorePlatform platform,
     String verificationData, {
     DateTime? withdrawalWaiverAcknowledgedAt,
@@ -91,8 +128,8 @@ class ApiAiStoreBackend implements AiStoreBackend {
   final SubscriptionsClient _client;
 
   @override
-  Future<AiStoreSetup> setup() async {
-    final config = await _client.getAiStoreConfig();
+  Future<AiStoreSetup> setup({String? studentId}) async {
+    final config = await _client.getAiStoreConfig(studentId: studentId);
     return AiStoreSetup(
       enabled: config.enabled,
       productId: config.productId,
@@ -101,6 +138,17 @@ class ApiAiStoreBackend implements AiStoreBackend {
       purchasable: config.purchasable,
       accountToken: config.accountToken,
       profileId: config.profileId,
+      studentId: config.studentId,
+      studentFirstName: config.studentFirstName,
+      subscribed: config.subscribed,
+      unavailableReason: switch (config.unavailableReason) {
+        AiStoreConfigUnavailableReason.notConfigured => AiStoreUnavailableReason.notConfigured,
+        AiStoreConfigUnavailableReason.notStudent => AiStoreUnavailableReason.notStudent,
+        AiStoreConfigUnavailableReason.schoolPlanInactive =>
+          AiStoreUnavailableReason.schoolPlanInactive,
+        AiStoreConfigUnavailableReason.noFreeProduct => AiStoreUnavailableReason.noFreeProduct,
+        _ => null,
+      },
       purchaseConfirmation: switch (config.purchaseConfirmation) {
         final confirmation? => AiStorePurchaseConfirmation(
           acknowledgedAt: confirmation.acknowledgedAt,
@@ -113,12 +161,12 @@ class ApiAiStoreBackend implements AiStoreBackend {
   }
 
   @override
-  Future<void> register(
+  Future<String> register(
     StorePlatform platform,
     String verificationData, {
     DateTime? withdrawalWaiverAcknowledgedAt,
   }) async {
-    await _client.registerAiStorePurchase(
+    final result = await _client.registerAiStorePurchase(
       body: AiStorePurchaseRequest(
         platform: platform == StorePlatform.apple
             ? AiStorePurchaseRequestPlatform.apple
@@ -128,5 +176,6 @@ class ApiAiStoreBackend implements AiStoreBackend {
         withdrawalWaiverAcknowledgedAt: withdrawalWaiverAcknowledgedAt?.toUtc(),
       ),
     );
+    return result.studentId;
   }
 }

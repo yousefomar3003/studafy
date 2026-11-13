@@ -17,11 +17,13 @@ import 'package:studafy_mobile/src/core/auth/saved_account.dart';
 import 'package:studafy_mobile/src/core/config/app_config.dart';
 import 'package:studafy_mobile/src/core/config/app_environment.dart';
 import 'package:studafy_mobile/src/core/di/app_providers.dart';
+import 'package:studafy_mobile/src/core/push/push_providers.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/parent/application/child_device_providers.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/widgets/child_phone_account_button.dart';
 
 import '../../../support/fake_access_token.dart';
+import '../../../support/fake_push_service.dart';
 import '../../../support/fake_secure_token_store.dart';
 import '../../../support/wrap_with_localization.dart';
 
@@ -244,6 +246,7 @@ class _Harness {
       baseUrl: 'http://localhost',
       dio: fakeDio(),
     );
+    final push = FakePushService();
     final store = FakeSecureTokenStore()
       ..savedAccounts = saved.isEmpty
           ? null
@@ -264,6 +267,7 @@ class _Harness {
         authClientProvider.overrideWithValue(authClient),
         authSessionProvider.overrideWithValue(session),
         secureTokenStoreProvider.overrideWithValue(store),
+        pushServiceProvider.overrideWithValue(push),
         apiClientProvider.overrideWithValue(
           createApiClient(
             baseUrl: Uri.parse('http://localhost'),

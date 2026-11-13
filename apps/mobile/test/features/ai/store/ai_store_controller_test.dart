@@ -55,12 +55,12 @@ void main() {
   });
 
   Future<AiStoreState> load() async {
-    final subscription = container.listen(aiStoreProvider, (_, _) {});
+    final subscription = container.listen(aiStoreProvider(null), (_, _) {});
     addTearDown(subscription.close);
-    return container.read(aiStoreProvider.future);
+    return container.read(aiStoreProvider(null).future);
   }
 
-  AiStoreState current() => container.read(aiStoreProvider).requireValue;
+  AiStoreState current() => container.read(aiStoreProvider(null)).requireValue;
 
   Future<void> deliver(PurchaseDetails purchase) async {
     gateway.purchases.add([purchase]);
@@ -75,19 +75,37 @@ void main() {
       expect((state as AiStoreOffering).price, 'JOD 2.990');
     });
 
-    test('nothing for a user the server does not sell it to', () async {
-      backend.config = storeSetup(purchasable: false);
+    test('nothing for a user who is not a student or a parent of this child', () async {
+      backend.config = storeSetup(
+        purchasable: false,
+        unavailableReason: AiStoreUnavailableReason.notStudent,
+      );
       expect(await load(), isA<AiStoreHidden>());
     });
 
-    test('nothing when this device\'s store is not configured', () async {
+    test('says why when it cannot be bought, instead of showing nothing', () async {
+      for (final (reason, key) in [
+        (AiStoreUnavailableReason.schoolPlanInactive, 'aiStore.unavailable.schoolPlan'),
+        (AiStoreUnavailableReason.noFreeProduct, 'aiStore.unavailable.familyFull'),
+        (AiStoreUnavailableReason.notConfigured, 'aiStore.unavailable.notConfigured'),
+      ]) {
+        backend.config = storeSetup(purchasable: false, unavailableReason: reason);
+        container.invalidate(aiStoreProvider(null));
+        final state = await load();
+        expect(state, isA<AiStoreUnavailable>(), reason: '$reason');
+        expect((state as AiStoreUnavailable).messageKey, key);
+        expect(state.name, 'Sara');
+      }
+    });
+
+    test("says so when this device's store is not configured", () async {
       backend.config = storeSetup(google: false);
-      expect(await load(), isA<AiStoreHidden>());
+      expect(await load(), isA<AiStoreUnavailable>());
     });
 
-    test('nothing when the store is unreachable or does not list the product', () async {
+    test('says so when the store is unreachable or does not list the product', () async {
       gateway.available = false;
-      expect(await load(), isA<AiStoreHidden>());
+      expect((await load() as AiStoreUnavailable).messageKey, 'aiStore.unavailable.store');
 
       container.dispose();
       gateway = FakeGateway()..listed = null;
@@ -97,7 +115,28 @@ void main() {
           aiStoreBackendProvider.overrideWithValue(backend),
         ],
       );
-      expect(await load(), isA<AiStoreHidden>());
+      expect((await load() as AiStoreUnavailable).messageKey, 'aiStore.unavailable.notListed');
+    });
+
+    test('a student whose add-on is already on is shown as on', () async {
+      backend.config = storeSetup(purchasable: false, subscribed: true);
+      expect(await load(), isA<AiStoreSubscribed>());
+    });
+
+    test('a parent gets the offer for the child they picked', () async {
+      backend.config = storeSetup(forStudent: siblingId, productId: 'studafy_ai_monthly_2');
+      final subscription = container.listen(aiStoreProvider(siblingId), (_, _) {});
+      addTearDown(subscription.close);
+
+      final state = await container.read(aiStoreProvider(siblingId).future);
+
+      expect(backend.askedFor, [siblingId]);
+      expect((state as AiStoreOffering).name, 'Sara');
+      final controller = container.read(aiStoreProvider(siblingId).notifier)
+        ..acknowledgeWaiver(true);
+      await controller.buy();
+      // Stamped with the child's id, so the server credits the child.
+      expect(gateway.bought.single.accountToken, siblingId);
     });
 
     test('nothing on a device with no store', () async {
@@ -110,8 +149,8 @@ void main() {
     test("stamps the purchase with the student's and the school's ids", () async {
       await load();
 
-      container.read(aiStoreProvider.notifier).acknowledgeWaiver(true);
-      await container.read(aiStoreProvider.notifier).buy();
+      container.read(aiStoreProvider(null).notifier).acknowledgeWaiver(true);
+      await container.read(aiStoreProvider(null).notifier).buy();
 
       expect(gateway.bought.single, (accountToken: studentId, profileId: schoolId));
       expect((current() as AiStoreOffering).busy, AiStoreBusy.purchasing);
@@ -119,7 +158,7 @@ void main() {
 
     test('opens the store only once the withdrawal waiver is ticked', () async {
       await load();
-      final controller = container.read(aiStoreProvider.notifier);
+      final controller = container.read(aiStoreProvider(null).notifier);
       expect((current() as AiStoreOffering).waiverAcknowledged, isFalse);
 
       await controller.buy();
@@ -135,7 +174,7 @@ void main() {
 
     test('sends the waiver with the purchase it was given for, then forgets it', () async {
       await load();
-      final controller = container.read(aiStoreProvider.notifier)..acknowledgeWaiver(true);
+      final controller = container.read(aiStoreProvider(null).notifier)..acknowledgeWaiver(true);
       final before = DateTime.now().toUtc();
 
       await controller.buy();
@@ -220,7 +259,7 @@ void main() {
 
     test('a cancelled sheet goes back to the offer; a store error says so', () async {
       await load();
-      final controller = container.read(aiStoreProvider.notifier)..acknowledgeWaiver(true);
+      final controller = container.read(aiStoreProvider(null).notifier)..acknowledgeWaiver(true);
       await controller.buy();
 
       await deliver(_purchase(PurchaseStatus.canceled));
@@ -248,7 +287,7 @@ void main() {
     test('a restored purchase is registered like a new one', () async {
       await load();
 
-      unawaited(container.read(aiStoreProvider.notifier).restore());
+      unawaited(container.read(aiStoreProvider(null).notifier).restore());
       await deliver(_purchase(PurchaseStatus.restored));
 
       expect(gateway.restores, 1);
@@ -260,17 +299,49 @@ void main() {
       waivers.kept = DateTime.utc(2026, 11, 11);
       await load();
 
-      unawaited(container.read(aiStoreProvider.notifier).restore());
+      unawaited(container.read(aiStoreProvider(null).notifier).restore());
       await deliver(_purchase(PurchaseStatus.restored));
 
       expect(backend.waivers, [null]);
     });
 
     // testWidgets for its fake clock: the restore waits restoreSettle for a redelivery.
+    testWidgets("a brother or sister's purchase is credited to them, and this offer stays", (
+      tester,
+    ) async {
+      await load();
+      backend.creditTo = siblingId;
+
+      unawaited(container.read(aiStoreProvider(null).notifier).restore());
+      await tester.pump();
+      gateway.purchases.add([_purchase(PurchaseStatus.restored)]);
+      await tester.pump();
+      await tester.pump(AiStoreController.restoreSettle);
+
+      final offer = current() as AiStoreOffering;
+      expect(offer.busy, AiStoreBusy.none);
+      expect(offer.messageKey, 'aiStore.restore.forSibling');
+      expect(offer.messageIsError, isFalse);
+      // Finished with the store: it is recorded for the sister.
+      expect(gateway.completed, hasLength(1));
+    });
+
+    testWidgets('a second product redelivered here is recognised as the add-on', (tester) async {
+      await load();
+      backend.creditTo = siblingId;
+
+      gateway.purchases.add([
+        _purchase(PurchaseStatus.restored, productId: 'studafy_ai_monthly_2'),
+      ]);
+      await tester.pump();
+
+      expect(backend.registered, hasLength(1));
+    });
+
     testWidgets('says so when there was nothing to restore', (tester) async {
       await load();
 
-      unawaited(container.read(aiStoreProvider.notifier).restore());
+      unawaited(container.read(aiStoreProvider(null).notifier).restore());
       await tester.pump();
       expect((current() as AiStoreOffering).busy, AiStoreBusy.restoring);
 

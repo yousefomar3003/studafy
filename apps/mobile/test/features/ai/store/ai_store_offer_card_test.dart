@@ -97,6 +97,59 @@ void main() {
     expect(find.widgetWithText(TextButton, 'Terms of Service'), findsOneWidget);
   });
 
+  testWidgets('Restore purchases asks first, and Cancel does nothing', (tester) async {
+    await pump(tester, const AiStoreOfferCard());
+
+    await tester.ensureVisible(find.byKey(const ValueKey('aiStore.restore')));
+    await tester.tap(find.byKey(const ValueKey('aiStore.restore')));
+    await tester.pumpAndSettle();
+    expect(find.text('Restore purchases?'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(gateway.restores, 0);
+    // Still there after the dialog: it never disappears from the offer.
+    expect(find.byKey(const ValueKey('aiStore.restore')), findsOneWidget);
+  });
+
+  testWidgets('a confirmed restore shows progress, then the outcome', (tester) async {
+    await pump(tester, const AiStoreOfferCard());
+
+    await tester.ensureVisible(find.byKey(const ValueKey('aiStore.restore')));
+    await tester.tap(find.byKey(const ValueKey('aiStore.restore')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('aiStore.restore.confirm')));
+    await tester.pump();
+    await tester.pump();
+
+    expect(gateway.restores, 1);
+    expect(find.byKey(const ValueKey('aiStore.restoring')), findsOneWidget);
+
+    await tester.pump(AiStoreController.restoreSettle);
+    await tester.pumpAndSettle();
+    expect(find.text('No purchases to restore for this account.'), findsOneWidget);
+    expect(find.byKey(const ValueKey('aiStore.restore')), findsOneWidget);
+  });
+
+  testWidgets('when it cannot be bought for a child, says why with their name', (tester) async {
+    backend.config = storeSetup(
+      purchasable: false,
+      unavailableReason: AiStoreUnavailableReason.noFreeProduct,
+    );
+    await pump(tester, const AiStoreOfferCard(studentId: siblingId));
+
+    expect(find.byKey(const ValueKey('aiStore.unavailable')), findsOneWidget);
+    expect(find.textContaining('To add Sara'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Subscribe'), findsNothing);
+  });
+
+  testWidgets('a parent sees the offer titled with the child it is for', (tester) async {
+    backend.config = storeSetup(forStudent: siblingId);
+    await pump(tester, const AiStoreOfferCard(studentId: siblingId));
+
+    expect(find.text('Studafy AI for Sara'), findsOneWidget);
+  });
+
   testWidgets('the waiver is in Arabic for an Arabic reader', (tester) async {
     await pump(tester, const AiStoreOfferCard(), locale: const Locale('ar'));
 

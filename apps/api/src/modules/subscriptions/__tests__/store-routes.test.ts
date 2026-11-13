@@ -155,8 +155,13 @@ describe("store setup", () => {
     expect(await res.json()).toEqual({
       enabled: false,
       productId: null,
+      productIds: [],
       platforms: { apple: false, google: false },
       purchasable: false,
+      studentId: null,
+      studentFirstName: null,
+      subscribed: false,
+      unavailableReason: "not_configured",
       accountToken: null,
       profileId: null,
       purchaseConfirmation: null,
