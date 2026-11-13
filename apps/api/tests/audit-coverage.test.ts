@@ -536,6 +536,12 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/platform/plans/{planId}/prices/{priceId}",
   "PATCH /api/platform/settings/{key}",
   "PATCH /api/platform/inquiries/{inquiryId}",
+  // Per-account support actions, platform:manage in modules/platform/user-support-routes.ts.
+  "POST /api/platform/schools/{schoolId}/users/{userId}/invitation/resend",
+  "POST /api/platform/schools/{schoolId}/users/{userId}/sessions/revoke",
+  "POST /api/platform/schools/{schoolId}/users/{userId}/unlock",
+  "POST /api/platform/schools/{schoolId}/users/{userId}/deactivate",
+  "POST /api/platform/schools/{schoolId}/users/{userId}/reactivate",
   // School application decisions: audited in the operator's home school; approval also writes
   // system-attributed rows in the new school -- see modules/school-applications/service.ts.
   "POST /api/platform/school-applications/{applicationId}/approve",

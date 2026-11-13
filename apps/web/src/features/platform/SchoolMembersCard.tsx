@@ -1,5 +1,6 @@
 import { Button, Card, DataGrid, Input, Select, useToast } from "@studafy/ui";
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
@@ -89,7 +90,11 @@ export function SchoolMembersCard({ school }: { school: PlatformSchoolDetail }) 
     {
       id: "name",
       header: t("platform.school.members.columns.name"),
-      renderCell: (member) => member.displayName ?? "—",
+      renderCell: (member) => (
+        <Link to={`/portal/platform/schools/${school.id}/users/${member.userId}`}>
+          {member.displayName ?? member.memberCodes[0] ?? member.email ?? "—"}
+        </Link>
+      ),
     },
     {
       id: "memberCode",

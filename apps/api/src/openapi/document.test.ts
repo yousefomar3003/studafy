@@ -526,6 +526,12 @@ describe("structure", () => {
         "/api/platform/settings",
         "/api/platform/settings/{key}",
         "/api/platform/users/lookup",
+        "/api/platform/schools/{schoolId}/users/{userId}",
+        "/api/platform/schools/{schoolId}/users/{userId}/invitation/resend",
+        "/api/platform/schools/{schoolId}/users/{userId}/sessions/revoke",
+        "/api/platform/schools/{schoolId}/users/{userId}/unlock",
+        "/api/platform/schools/{schoolId}/users/{userId}/deactivate",
+        "/api/platform/schools/{schoolId}/users/{userId}/reactivate",
         // Self-service account deletion and profile. Bearer-authenticated; the caller is the subject.
         "/api/account/deletion",
         "/api/account/legal-acceptance",
@@ -1140,6 +1146,12 @@ describe("security", () => {
         "GET /api/platform/settings",
         "PATCH /api/platform/settings/{key}",
         "GET /api/platform/users/lookup",
+        "GET /api/platform/schools/{schoolId}/users/{userId}",
+        "POST /api/platform/schools/{schoolId}/users/{userId}/invitation/resend",
+        "POST /api/platform/schools/{schoolId}/users/{userId}/sessions/revoke",
+        "POST /api/platform/schools/{schoolId}/users/{userId}/unlock",
+        "POST /api/platform/schools/{schoolId}/users/{userId}/deactivate",
+        "POST /api/platform/schools/{schoolId}/users/{userId}/reactivate",
         // Self-service account deletion/export history. Bearer-authenticated only.
         "GET /api/privacy/me/dsr",
         // Realtime handshake ticket (QA-14): minted for the bearer's own session only.

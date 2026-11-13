@@ -386,7 +386,8 @@
       "name": "Name",
       "roles": "Roles",
       "status": "Status",
-      "lastLogin": "Last sign-in"
+      "lastLogin": "Last sign-in",
+      "open": "Support"
     }
   },
   "refunds": {
@@ -584,6 +585,96 @@
       "header": "Column header",
       "schools": "Schools",
       "imports": "Imports"
+    }
+  },
+  "support": {
+    "title": "Account support",
+    "back": "← Account lookup",
+    "openSchool": "Open school",
+    "loadError": "Couldn't load this account.",
+    "open": "Open",
+    "account": {
+      "title": "Account",
+      "email": "Email",
+      "memberCodes": "Studafy ID",
+      "roles": "Roles",
+      "status": "Status",
+      "activated": "Activated",
+      "notYet": "Not yet",
+      "created": "Created",
+      "lastLogin": "Last sign-in"
+    },
+    "signIn": {
+      "title": "Sign-in",
+      "methods": "Signs in with",
+      "memberPassword": "Studafy ID and password",
+      "noMethod": "No sign-in set up yet",
+      "provider": {
+        "google": "Google",
+        "microsoft": "Microsoft"
+      },
+      "locked": "Lockout",
+      "lockedUntil": "Locked until {{time}} after wrong passwords",
+      "failedAttempts_one": "{{count}} wrong password since the last sign-in",
+      "failedAttempts_other": "{{count}} wrong passwords since the last sign-in",
+      "notLocked": "Not locked",
+      "sessions": "Signed-in sessions",
+      "invitation": "Invitation",
+      "invitationStatus": {
+        "pending": "Pending, expires {{date}}",
+        "expired": "Expired on {{date}}",
+        "revoked": "Withdrawn",
+        "accepted": "Accepted"
+      }
+    },
+    "links": {
+      "children": "Children",
+      "parents": "Parents",
+      "none": "No linked children or parents.",
+      "relationship": {
+        "mother": "Mother",
+        "father": "Father",
+        "guardian": "Guardian",
+        "other": "Other",
+        "step_parent": "Step-parent",
+        "grandparent": "Grandparent",
+        "sibling": "Sibling"
+      }
+    },
+    "actions": {
+      "title": "Support actions",
+      "none": "No support action applies to this account right now.",
+      "protected": "This is another Studafy platform administrator. Support actions can't be used on their account.",
+      "noImpersonation": "For safety, Studafy staff can't sign in as a school member.",
+      "reasonLabel": "Reason",
+      "reasonHelp": "Required. Saved in the school's audit log and yours, for example the support ticket number.",
+      "confirm": "Confirm",
+      "error": "That didn't work.",
+      "resendInvitation": {
+        "label": "Re-send invitation",
+        "consequence": "A new invitation is emailed to the account's own address. The old link stops working.",
+        "success": "Invitation re-sent"
+      },
+      "signOut": {
+        "label": "Sign out everywhere",
+        "consequence": "Every session on every device ends. The person will have to sign in again.",
+        "success": "Signed out everywhere"
+      },
+      "unlock": {
+        "label": "Unlock sign-in",
+        "consequence": "Clears the lockout after wrong passwords. The password stays the same.",
+        "success": "Sign-in unlocked"
+      },
+      "deactivate": {
+        "label": "Deactivate account",
+        "consequence": "The person can't sign in, every session ends and any pending invitation is withdrawn. Their records stay.",
+        "success": "Account deactivated"
+      },
+      "reactivate": {
+        "label": "Reactivate account",
+        "consequence": "The person can sign in again. An account that was never activated goes back to invited.",
+        "success": "Account reactivated"
+      }
     }
   }
 }

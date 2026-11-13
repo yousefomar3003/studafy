@@ -131,7 +131,7 @@ const SCHOOL_COLUMNS = (tx: TransactionSql) => tx`
   s.is_review_tenant, s.email_verified_at, s.created_at, s.updated_at
 `;
 
-async function loadSchool(tx: TransactionSql, schoolId: string, lock = false) {
+export async function loadSchool(tx: TransactionSql, schoolId: string, lock = false) {
   const rows = await tx<SchoolRow[]>`
     SELECT ${SCHOOL_COLUMNS(tx)}
     FROM app.schools s
@@ -228,7 +228,7 @@ async function auditIn(
 }
 
 /** The affected school's system-attributed row, plus the operator's own attributed row. */
-async function auditSchoolChange(
+export async function auditSchoolChange(
   tx: TransactionSql,
   schoolId: string,
   actor: Actor,

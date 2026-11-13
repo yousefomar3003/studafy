@@ -458,6 +458,42 @@ export async function updateUserRole(
 // ---------------------------------------------------------------------------
 
 /**
+ * The status half of deactivation, in the caller's transaction and the armed tenant: suspends the
+ * user and revokes their pending invitations. Returns how many invitations were revoked. Throws 404
+ * when the user does not exist in the tenant or is already suspended. Writes no audit row and
+ * revokes no session -- the caller does both, since who the actor is differs between callers.
+ */
+export async function suspendUserInTx(tx: TransactionSql, targetUserId: string): Promise<number> {
+  const [updated] = await tx<{ id: string }[]>`
+    UPDATE app.users
+    SET status = 'suspended'::app.user_status,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${targetUserId}::uuid
+      AND school_id = current_setting('app.school_id')::uuid
+      AND status != 'suspended'::app.user_status
+    RETURNING id
+  `;
+
+  if (!updated) {
+    throw new HTTPException(404, { message: "User not found or already suspended" });
+  }
+
+  const inviteResult = await tx`
+    UPDATE app.invitations
+    SET revoked_at = CURRENT_TIMESTAMP
+    WHERE school_id = current_setting('app.school_id')::uuid
+      AND normalized_email = (
+        SELECT normalized_email FROM app.users
+        WHERE id = ${targetUserId}::uuid AND school_id = current_setting('app.school_id')::uuid
+      )
+      AND revoked_at IS NULL
+      AND consumed_at IS NULL
+  `;
+
+  return inviteResult.count;
+}
+
+/**
  * Deactivate a user: set status to suspended, revoke all sessions, and revoke pending invitations.
  *
  * The session revocation is handled by adminRevokeUserSessions (which opens its own transaction)
@@ -469,31 +505,7 @@ export async function deactivateUser(params: DeactivateUserParams): Promise<Deac
 
   // 1. Update status + revoke invitations + emit audit (one transaction)
   const invitationsRevoked = await withTenantTx(database, tenant, async (tx) => {
-    const [updated] = await tx<{ id: string }[]>`
-      UPDATE app.users
-      SET status = 'suspended'::app.user_status,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${targetUserId}::uuid
-        AND school_id = current_setting('app.school_id')::uuid
-        AND status != 'suspended'::app.user_status
-      RETURNING id
-    `;
-
-    if (!updated) {
-      throw new HTTPException(404, { message: "User not found or already suspended" });
-    }
-
-    const inviteResult = await tx`
-      UPDATE app.invitations
-      SET revoked_at = CURRENT_TIMESTAMP
-      WHERE school_id = current_setting('app.school_id')::uuid
-        AND normalized_email = (
-          SELECT normalized_email FROM app.users
-          WHERE id = ${targetUserId}::uuid AND school_id = current_setting('app.school_id')::uuid
-        )
-        AND revoked_at IS NULL
-        AND consumed_at IS NULL
-    `;
+    const revokedCount = await suspendUserInTx(tx, targetUserId);
 
     await emitAuditLog(tx, {
       action: "update",
@@ -503,7 +515,7 @@ export async function deactivateUser(params: DeactivateUserParams): Promise<Deac
       newValues: { status: "suspended" },
     });
 
-    return inviteResult.count;
+    return revokedCount;
   });
 
   // 2. Revoke all sessions + denylist access tokens (separate transaction via SECURITY DEFINER)
