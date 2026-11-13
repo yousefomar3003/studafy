@@ -980,6 +980,81 @@
     }
   },
   "teacher": {
+    "student": {
+      "error": "تعذّر تحميل بيانات الطالب. اسحب للأسفل للمحاولة مجددًا.",
+      "admissionNumber": "رقم القيد {number}",
+      "marks": {
+        "title": "الدرجات في هذه المادة",
+        "percent": "{value}٪",
+        "outOf": "{value} من {max}",
+        "gpa": "المعدل {value} من {max}",
+        "noResult": "لا توجد نتيجة بعد",
+        "provisional": "حتى الآن",
+        "passed": "ناجح",
+        "failed": "غير ناجح",
+        "thisTerm": "هذا الفصل: {value}٪",
+        "exempt": "معفى من هذه المادة.",
+        "noAssessments": "لم تُعدّ أي تقييمات بعد.",
+        "status": {
+          "pending": "لم يُرصد",
+          "graded": "مرصود",
+          "absent": "غائب",
+          "excused": "معذور",
+          "not_applicable": "لا ينطبق"
+        },
+        "unavailable": {
+          "no_section": "هذا الصف غير مرتبط بشعبة، لذلك لا توجد له درجات.",
+          "not_configured": "لم يُضبط نظام الدرجات لهذه المادة بعد.",
+          "not_in_roster": "هذا الطالب لا يدرس هذه المادة ضمن درجات شعبته."
+        }
+      },
+      "attendance": {
+        "title": "الحضور هذا الفصل",
+        "none": "لم يُسجَّل أي حضور بعد.",
+        "present": "حاضر",
+        "absent": "غائب",
+        "late": "متأخر",
+        "lateMinutes": "متأخر {minutes} دقيقة",
+        "excused": "معذور",
+        "sessions": "من أصل {count} حصة"
+      },
+      "homework": {
+        "title": "الواجبات",
+        "none": "لا توجد واجبات بعد.",
+        "handedIn": "مُسلَّمة",
+        "missing": "ناقصة",
+        "upcoming": "قادمة",
+        "due": "موعد التسليم {date}",
+        "status": {
+          "submitted": "مُسلَّم",
+          "late": "مُسلَّم متأخرًا",
+          "graded": "مُصحَّح",
+          "returned": "مُعاد",
+          "missing": "لم يُسلَّم",
+          "upcoming": "لم يحن موعده"
+        }
+      },
+      "comments": {
+        "title": "ملاحظات الشهادة",
+        "none": "لم تُكتب أي ملاحظات بعد.",
+        "term": "هذه المادة، هذا الفصل",
+        "annual": "هذه المادة، نهاية العام",
+        "classTeacher": "مربي الصف، هذا الفصل"
+      },
+      "parents": {
+        "title": "أولياء الأمور",
+        "none": "لا يوجد أولياء أمور يمكنك مراسلتهم.",
+        "error": "تعذّر تحميل أولياء الأمور.",
+        "message": "مراسلة"
+      },
+      "records": {
+        "title": "معلومات المدرسة"
+      },
+      "lists": {
+        "title": "قوائم المدرسة",
+        "open": "عرض هذا الطالب في قوائم المدرسة"
+      }
+    },
     "questions": {
       "title": "الأسئلة",
       "summary": "{count} أسئلة · {points} درجة إجمالاً",
