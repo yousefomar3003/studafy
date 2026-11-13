@@ -79,6 +79,7 @@ function columns(overrides: Record<string, unknown> = {}) {
         non_empty_count: 3,
         student_count: 3,
         parent_count: 0,
+        parent2_count: 0,
         suggested_field_type: "short_text",
         suggested_options: [],
         suggested_sensitive: true,
@@ -91,6 +92,7 @@ function columns(overrides: Record<string, unknown> = {}) {
         non_empty_count: 2,
         student_count: 2,
         parent_count: 0,
+        parent2_count: 0,
         suggested_field_type: "short_text",
         suggested_options: [],
         suggested_sensitive: false,
@@ -453,6 +455,48 @@ describe("ImportDetailPage", () => {
       (within(dialog).getByRole("button", { name: "Write to 0 people" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+  });
+
+  test("a parent column must say which parent it belongs to when the file has second parents", async () => {
+    columnsResponse = columns({
+      columns: [
+        {
+          position: 7,
+          header: "Father job",
+          non_empty_count: 2,
+          student_count: 2,
+          parent_count: 2,
+          parent2_count: 2,
+          suggested_field_type: "short_text",
+          suggested_options: [],
+          suggested_sensitive: false,
+          sensitive_reason: null,
+          applied: null,
+        },
+      ],
+    });
+    await renderDetail();
+    fireEvent.click(await screen.findByRole("button", { name: "Map column Father job" }));
+    const dialog = await screen.findByRole("dialog", { name: "Map “Father job”" });
+    fireEvent.click(within(dialog).getByRole("radio", { name: /Parents this import created/ }));
+
+    const second = within(dialog).getByRole("radio", { name: /Second parent in the file/ });
+    // Nothing is assumed: with second parents in the file, previewing before choosing is refused.
+    fireEvent.click(within(dialog).getByRole("button", { name: "Preview" }));
+    expect(
+      await within(dialog).findByText("Choose which parent this column belongs to."),
+    ).toBeTruthy();
+    expect(postMock).not.toHaveBeenCalled();
+
+    fireEvent.click(second);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Preview" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalled());
+    expect(postMock.mock.calls[0]![1]?.body).toMatchObject({
+      position: 7,
+      subject_kind: "parent",
+      parent_slot: "parent2",
+    });
+    await expectNoA11yViolations(dialog);
   });
 
   test("an existing field offers only fields that take values", async () => {

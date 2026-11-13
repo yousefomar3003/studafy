@@ -11,6 +11,15 @@ when it required the `version-bump` label.
 
 ## Unreleased
 
+### Fixed
+
+- Student import columns kept as parent records reach the parent they belong to:
+  `ImportColumnTarget` and `ApplyImportColumnBody` take `parent_slot` (`ImportParentSlot`:
+  `parent1`, the file's first parent; `parent2`, its second; `both`; default `parent1`, the old
+  behaviour). Before, a parent column was always written to the first parent, so the second parent
+  (often the father) never got it. `UnmappedColumn` adds `parent2_count`; `parent_count` is the
+  first parents' count, as before.
+
 ### Added
 
 - Moving students to the next year: `GET /api/academics/promotions/preview?source_year_id=&target_year_id=`

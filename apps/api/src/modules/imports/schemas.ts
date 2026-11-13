@@ -582,6 +582,12 @@ export const importableFieldTypeSchema = recordFieldTypeSchema.exclude(["documen
 // parents only, so the staff and class kinds of RecordSubjectKind are not offered here.
 export const importSubjectKindSchema = z.enum(["student", "parent"]).openapi("ImportSubjectKind");
 
+// Which of a line's parents a parent column belongs to: the file's first parent columns (parent_*),
+// its second (parent2_*), or both of them (a value the household shares, such as a home address).
+export const importParentSlotSchema = z
+  .enum(["parent1", "parent2", "both"])
+  .openapi("ImportParentSlot");
+
 export const unmappedColumnSchema = z
   .object({
     position: z.number().int().min(0).openapi({ description: "0-based index in source_headers." }),
@@ -591,7 +597,12 @@ export const unmappedColumnSchema = z
       description: "Students this import created or updated that have a value in the column.",
     }),
     parent_count: z.number().int().openapi({
-      description: "Parents this import created that have a value in the column.",
+      description:
+        "First parents (the parent_* columns) this import created on lines with a value in the column.",
+    }),
+    parent2_count: z.number().int().openapi({
+      description:
+        "Second parents (the parent2_* columns) this import created on lines with a value in the column.",
     }),
     suggested_field_type: importableFieldTypeSchema,
     suggested_options: z.array(recordFieldOptionSchema).openapi({
@@ -651,6 +662,8 @@ const columnTargetShape = {
   // The enum as is: a description here would wrap the $ref, which the Dart client generator turns
   // into a class it cannot compile. The body schema's description says what it means.
   subject_kind: importSubjectKindSchema,
+  // The enum as is, for the same reason as subject_kind; the body schema's description explains it.
+  parent_slot: importParentSlotSchema.default("parent1"),
   field_id: z.string().uuid().optional().openapi({
     description: "An existing field on the published form. Give this or new_field.",
   }),
@@ -672,7 +685,9 @@ export const columnTargetBodySchema = z
   .openapi("ImportColumnTarget", {
     description:
       "A column and the record field to write it to. subject_kind student: the students this " +
-      "import created or updated; parent: the parents it created.",
+      "import created or updated; parent: the parents it created, in parent_slot -- parent1 the " +
+      "file's first parent (parent_*), parent2 its second (parent2_*), both of them. parent_slot " +
+      "is ignored for students.",
   });
 
 export type ColumnTargetInput = z.infer<typeof columnTargetBodySchema>;
