@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Outlet } from "react-router-dom";
 
+import { PlatformBanners } from "../features/platform/ops/PlatformBanners";
+
 import { PortalBackLink } from "./portal/PortalBackLink";
 import { PortalHeader } from "./portal/PortalHeader";
 import { PortalSidebar } from "./portal/PortalSidebar";
@@ -41,6 +43,7 @@ export function PortalLayout({ routes }: { routes?: () => readonly RouteObject[]
         onNavigate={() => setDrawerOpen(false)}
       />
       <div className="portal-content" data-scroll-root="">
+        <PlatformBanners />
         {routes ? <PortalBackLink routes={routes} /> : null}
         <Outlet />
       </div>

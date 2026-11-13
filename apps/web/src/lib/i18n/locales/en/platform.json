@@ -12,7 +12,11 @@
     "users": "Account lookup",
     "refunds": "Refunds",
     "applications": "Applications",
-    "importSignals": "Import columns"
+    "importSignals": "Import columns",
+    "announcements": "Announcements",
+    "activity": "Staff activity",
+    "health": "System health",
+    "flags": "Feature switches"
   },
   "status": {
     "registered": "Awaiting email verification",
@@ -56,7 +60,8 @@
     "never": "Never",
     "yes": "Yes",
     "on": "On",
-    "off": "Off"
+    "off": "Off",
+    "reason": "Reason"
   },
   "overview": {
     "title": "Platform overview",
@@ -778,5 +783,174 @@
     "es": "Spanish",
     "pt": "Portuguese",
     "de": "German"
+  },
+  "announcements": {
+    "title": "Announcements",
+    "description": "Banners every signed-in user, or only school staff, sees at the top of the website and the app during a time window.",
+    "formLabel": "New announcement",
+    "newHeading": "New announcement",
+    "messageEn": "Message (English)",
+    "messageAr": "Message (Arabic)",
+    "messageArHelp": "Optional. Shown when the user's language is Arabic; otherwise the English message is used.",
+    "audienceLabel": "Who sees it",
+    "severityLabel": "Type",
+    "maintenanceHelp": "Maintenance banners can't be dismissed until their window ends.",
+    "startsAt": "Starts",
+    "endsAt": "Ends",
+    "windowError": "The end must be after the start and in the future.",
+    "reasonHelp": "Why you're posting this. Recorded in the activity log.",
+    "publish": "Publish announcement",
+    "created": "Announcement scheduled",
+    "ended": "Announcement ended",
+    "saveError": "Couldn't save the announcement",
+    "endNow": "End now",
+    "endTitle": "End this announcement now?",
+    "caption": "Announcements",
+    "empty": "No announcements yet.",
+    "loadError": "Couldn't load announcements.",
+    "columns": {
+      "message": "Message",
+      "state": "State",
+      "severity": "Type",
+      "audience": "Who sees it",
+      "window": "Window",
+      "actions": "Actions"
+    },
+    "state": {
+      "scheduled": "Scheduled",
+      "live": "Live",
+      "ended": "Ended"
+    },
+    "severity": {
+      "info": "Information",
+      "warning": "Warning",
+      "maintenance": "Maintenance"
+    },
+    "audience": {
+      "all": "Everyone",
+      "staff": "School staff only"
+    }
+  },
+  "activity": {
+    "title": "Staff activity",
+    "description": "Every change Studafy staff made in the console, across all schools, with the school it touched and the reason given.",
+    "filtersLabel": "Filter activity",
+    "who": "Who",
+    "anyone": "Anyone",
+    "actionLabel": "Action",
+    "anyAction": "Any action",
+    "tableLabel": "Table",
+    "tableHelp": "For example feature_flags or licenses.",
+    "schoolLabel": "School affected",
+    "anySchool": "Any school",
+    "from": "From",
+    "to": "To",
+    "apply": "Apply filters",
+    "clear": "Clear",
+    "windowHint": "Without dates, the last 30 days are shown. At most one year at a time.",
+    "caption": "Staff activity",
+    "empty": "No activity matches these filters.",
+    "loadError": "Couldn't load activity.",
+    "more": "Show more",
+    "platformWide": "Platform-wide",
+    "columns": {
+      "when": "When",
+      "who": "Who",
+      "what": "What",
+      "school": "School",
+      "reason": "Reason"
+    },
+    "action": {
+      "insert": "Created",
+      "update": "Changed",
+      "delete": "Deleted",
+      "login": "Signed in",
+      "logout": "Signed out",
+      "export": "Exported",
+      "permission_change": "Changed permissions",
+      "read": "Viewed"
+    }
+  },
+  "health": {
+    "title": "System health",
+    "description": "Background jobs, failed notifications, payment webhooks, email bounces and storage, from what Studafy already records. Read-only.",
+    "refresh": "Refresh",
+    "loading": "Loading system health…",
+    "loadError": "Couldn't load system health.",
+    "generated": "As of {{when}}. Counts cover the last {{days}} days.",
+    "jobsHeading": "Background jobs",
+    "jobsUnavailable": "Background job data isn't available: the server can't reach the job queue.",
+    "queuesCaption": "Queues",
+    "scheduledCaption": "Scheduled jobs",
+    "deadLetter": "dead letters",
+    "noRecentRun": "No run in recent history",
+    "outcome": {
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "deadLettersHeading": "Failed notifications ({{count}})",
+    "deadLettersCaption": "Failed notifications by school",
+    "webhooksHeading": "Payment webhooks",
+    "failedEvents": "{{provider}}: {{count}} failed",
+    "signature": {
+      "stripe_webhook_signature_invalid": "Stripe requests with a bad signature",
+      "tap_webhook_signature_invalid": "Tap requests with a bad signature"
+    },
+    "noWebhookFailures": "No webhook failures.",
+    "webhookFailuresCaption": "Latest webhook failures",
+    "emailHeading": "Email",
+    "bounces": "Bounces",
+    "complaints": "Spam complaints",
+    "deliveries": "Delivered",
+    "storageHeading": "Storage",
+    "storageUnavailable": "Storage report isn't available: the server can't reach the job queue.",
+    "storageNoRun": "The daily storage check hasn't run recently.",
+    "storageSummary": "Last check {{when}}: {{schools}} schools, {{orphans}} leftover files ({{size}}).",
+    "storageReportOnly": "Leftover files are files no longer used by anything in Studafy. This is a report only; nothing is deleted.",
+    "storageCaption": "Schools with leftover files",
+    "noOrphans": "No school has leftover files.",
+    "reconcileFailed": "Check failed",
+    "notAvailableHeading": "Not recorded",
+    "notAvailable": {
+      "google_play_webhook_failures": "Google Play webhook failures (only written to the server logs)",
+      "resend_webhook_signature_failures": "Email provider webhooks with a bad signature (only written to the server logs)",
+      "erpnext_webhook_failures": "ERPNext webhook failures",
+      "background_jobs": "Background jobs (job queue unreachable)",
+      "storage_report": "Storage report (job queue unreachable)"
+    },
+    "none": "None.",
+    "columns": {
+      "queue": "Queue",
+      "waiting": "Waiting",
+      "active": "Running",
+      "delayed": "Delayed",
+      "failed": "Failed",
+      "latestFailure": "Latest failure",
+      "job": "Job",
+      "lastRun": "Last run",
+      "nextRun": "Next run",
+      "school": "School",
+      "count": "Count",
+      "lastFailed": "Last failure",
+      "event": "Event",
+      "status": "Status (attempts)",
+      "received": "Received",
+      "used": "Storage used",
+      "orphans": "Leftover files"
+    }
+  },
+  "flags": {
+    "title": "Feature switches",
+    "description": "Each switch's default for this deployment and the schools that override it.",
+    "loading": "Loading feature switches…",
+    "loadError": "Couldn't load feature switches.",
+    "deploymentDefault": "Default",
+    "registryDefault": "built-in default",
+    "enabledIn": "On for {{count}} of {{total}} schools",
+    "noOverrides": "No school overrides this switch.",
+    "overridesCaption": "Schools that override {{name}}",
+    "school": "School",
+    "override": "Override",
+    "howToChange": "To change a school's switch, open the school's page. The default for every school is a server setting, so it changes with a deployment, not here."
   }
 }

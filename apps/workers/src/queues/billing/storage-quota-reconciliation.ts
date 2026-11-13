@@ -73,6 +73,21 @@ export interface StorageQuotaReconciliationResult {
   /** Orphans removed (0 unless STORAGE_ORPHAN_REMOVAL=enabled). */
   orphansRemoved: number;
   orphanBytesRemoved: number;
+  /**
+   * One line per school reconciled this run. The job's return value is what BullMQ keeps for the
+   * completed job, and the platform console's system health page reads the latest one, so this is
+   * the per-school orphan report there -- no table of its own (it is only a report).
+   */
+  perSchool: StorageReconciliationSchoolLine[];
+}
+
+export interface StorageReconciliationSchoolLine {
+  schoolId: string;
+  bytesUsed: number;
+  orphans: number;
+  orphanBytes: number;
+  /** The school's transaction aborted this run; its figures are not measured. */
+  failed: boolean;
 }
 
 export interface StorageQuotaReconciliationOptions {
@@ -98,6 +113,7 @@ export async function runStorageQuotaReconciliation(
     orphanBytes: 0,
     orphansRemoved: 0,
     orphanBytesRemoved: 0,
+    perSchool: [],
   };
   const now = options.now ?? new Date();
   const removeOrphans = options.removeOrphans === true;
@@ -112,6 +128,13 @@ export async function runStorageQuotaReconciliation(
       result.orphanBytes += perSchool.orphans.orphanBytes;
       result.orphansRemoved += perSchool.orphans.removed;
       result.orphanBytesRemoved += perSchool.orphans.removedBytes;
+      result.perSchool.push({
+        schoolId,
+        bytesUsed: perSchool.bytesUsed,
+        orphans: perSchool.orphans.orphans,
+        orphanBytes: perSchool.orphans.orphanBytes,
+        failed: false,
+      });
       if (perSchool.correctedBy !== 0) {
         result.corrected += 1;
       } else {
@@ -122,6 +145,7 @@ export async function runStorageQuotaReconciliation(
       // back, so the meter keeps its stale value and the next run corrects it; count it for ops
       // and keep the schools after it moving.
       result.failed += 1;
+      result.perSchool.push({ schoolId, bytesUsed: 0, orphans: 0, orphanBytes: 0, failed: true });
       log.warn(
         { school_id: schoolId, error },
         "storage quota reconciliation failed for school; rolled back and skipped",
@@ -129,7 +153,8 @@ export async function runStorageQuotaReconciliation(
     }
   }
 
-  log.info({ ...result }, "storage quota reconciliation complete");
+  const { perSchool: _perSchool, ...totals } = result;
+  log.info({ ...totals }, "storage quota reconciliation complete");
   return result;
 }
 

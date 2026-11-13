@@ -21,13 +21,14 @@ complete state dump, run `db/policies/rls-coverage-diagnostics.sql` with `psql`.
 ## Classification and RLS rules
 
 Every `app` table must either contain `school_id` or appear in the reviewed global allowlist:
-`approved_globals` in `db/policies/rls-coverage.ts` (17 tables today: `countries`, `currencies`,
+`approved_globals` in `db/policies/rls-coverage.ts` (18 tables today: `countries`, `currencies`,
 `schools`, `plans`, `plan_prices`, `platform_settings`, `billing_events`, `security_events`,
 `email_events`, `email_suppressions`, `sales_inquiries`, `school_applications`, `features`,
-`plan_features`, `license_price_settings`, `license_price_brackets`, `license_invoice_counters`;
+`plan_features`, `license_price_settings`, `license_price_brackets`, `license_invoice_counters`,
+`platform_announcements`;
 `features` and `plan_features` are the paid-feature catalog and tier contents from migration 000161,
 global like `plans`; the last three are the license price list and the invoice number sequence from
-000165, admin-only). `public.schema_migrations` is outside the application schema and therefore outside
+000165, admin-only; `platform_announcements` is the Studafy-wide banner from 000214, admin-only). `public.schema_migrations` is outside the application schema and therefore outside
 this audit. A new global table fails until its scope is documented and reviewed.
 
 Every tenant relation must have:

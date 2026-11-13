@@ -554,6 +554,26 @@
       "title": "Parents",
       "where": "Principal › Records › Parents",
       "keywords": "parents, mothers, fathers, parent phone, parent contact, parent email, children, families"
+    },
+    "platform-announcements": {
+      "title": "Announcements",
+      "where": "Studafy platform › Announcements",
+      "keywords": "announcements, banner, maintenance notice, downtime, platform message, notice to schools"
+    },
+    "platform-activity": {
+      "title": "Staff activity",
+      "where": "Studafy platform › Staff activity",
+      "keywords": "activity log, super admin actions, who changed, platform audit, staff changes, console history"
+    },
+    "platform-health": {
+      "title": "System health",
+      "where": "Studafy platform › System health",
+      "keywords": "system health, failed jobs, queues, webhooks, bounces, dead letters, status, monitoring"
+    },
+    "platform-flags": {
+      "title": "Feature switches",
+      "where": "Studafy platform › Feature switches",
+      "keywords": "feature switches, kill switch, flag overrides, rollout, school overrides"
     }
   }
 }

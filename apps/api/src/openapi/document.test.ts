@@ -536,6 +536,14 @@ describe("structure", () => {
         "/api/platform/schools/{schoolId}/users/{userId}/unlock",
         "/api/platform/schools/{schoolId}/users/{userId}/deactivate",
         "/api/platform/schools/{schoolId}/users/{userId}/reactivate",
+        // Console operations (modules/platform/ops): banners, activity log, system health, flags.
+        "/api/platform/announcements",
+        "/api/platform/announcements/{announcementId}",
+        "/api/platform-banners",
+        "/api/platform/activity",
+        "/api/platform/activity/operators",
+        "/api/platform/health",
+        "/api/platform/feature-flags",
         // Self-service account deletion and profile. Bearer-authenticated; the caller is the subject.
         "/api/account/deletion",
         "/api/account/legal-acceptance",
@@ -1161,6 +1169,14 @@ describe("security", () => {
         "POST /api/platform/schools/{schoolId}/users/{userId}/unlock",
         "POST /api/platform/schools/{schoolId}/users/{userId}/deactivate",
         "POST /api/platform/schools/{schoolId}/users/{userId}/reactivate",
+        "GET /api/platform/announcements",
+        "POST /api/platform/announcements",
+        "PATCH /api/platform/announcements/{announcementId}",
+        "GET /api/platform-banners",
+        "GET /api/platform/activity",
+        "GET /api/platform/activity/operators",
+        "GET /api/platform/health",
+        "GET /api/platform/feature-flags",
         // Self-service account deletion/export history. Bearer-authenticated only.
         "GET /api/privacy/me/dsr",
         // Realtime handshake ticket (QA-14): minted for the bearer's own session only.

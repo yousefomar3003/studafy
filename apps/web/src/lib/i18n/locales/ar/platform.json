@@ -12,7 +12,11 @@
     "users": "البحث عن حساب",
     "refunds": "المبالغ المستردة",
     "applications": "طلبات التسجيل",
-    "importSignals": "أعمدة الاستيراد"
+    "importSignals": "أعمدة الاستيراد",
+    "announcements": "الإعلانات",
+    "activity": "نشاط الفريق",
+    "health": "حالة النظام",
+    "flags": "مفاتيح الميزات"
   },
   "status": {
     "registered": "بانتظار تأكيد البريد",
@@ -56,7 +60,8 @@
     "never": "أبدًا",
     "yes": "نعم",
     "on": "مفعّل",
-    "off": "معطّل"
+    "off": "معطّل",
+    "reason": "السبب"
   },
   "overview": {
     "title": "نظرة عامة على المنصة",
@@ -834,5 +839,174 @@
     "es": "الإسبانية",
     "pt": "البرتغالية",
     "de": "الألمانية"
+  },
+  "announcements": {
+    "title": "الإعلانات",
+    "description": "رسائل تظهر أعلى الموقع والتطبيق لجميع المستخدمين أو لموظفي المدارس فقط خلال فترة زمنية محددة.",
+    "formLabel": "إعلان جديد",
+    "newHeading": "إعلان جديد",
+    "messageEn": "الرسالة (بالإنجليزية)",
+    "messageAr": "الرسالة (بالعربية)",
+    "messageArHelp": "اختياري. تظهر عندما تكون لغة المستخدم العربية، وإلا تظهر الرسالة الإنجليزية.",
+    "audienceLabel": "من يراها",
+    "severityLabel": "النوع",
+    "maintenanceHelp": "لا يمكن إخفاء إعلانات الصيانة حتى تنتهي فترتها.",
+    "startsAt": "يبدأ",
+    "endsAt": "ينتهي",
+    "windowError": "يجب أن يكون الانتهاء بعد البداية وفي المستقبل.",
+    "reasonHelp": "سبب النشر. يُسجَّل في سجل النشاط.",
+    "publish": "نشر الإعلان",
+    "created": "تمت جدولة الإعلان",
+    "ended": "تم إنهاء الإعلان",
+    "saveError": "تعذّر حفظ الإعلان",
+    "endNow": "إنهاء الآن",
+    "endTitle": "إنهاء هذا الإعلان الآن؟",
+    "caption": "الإعلانات",
+    "empty": "لا توجد إعلانات بعد.",
+    "loadError": "تعذّر تحميل الإعلانات.",
+    "columns": {
+      "message": "الرسالة",
+      "state": "الحالة",
+      "severity": "النوع",
+      "audience": "من يراها",
+      "window": "الفترة",
+      "actions": "الإجراءات"
+    },
+    "state": {
+      "scheduled": "مجدول",
+      "live": "ظاهر الآن",
+      "ended": "منتهٍ"
+    },
+    "severity": {
+      "info": "معلومة",
+      "warning": "تنبيه",
+      "maintenance": "صيانة"
+    },
+    "audience": {
+      "all": "الجميع",
+      "staff": "موظفو المدارس فقط"
+    }
+  },
+  "activity": {
+    "title": "نشاط فريق Studafy",
+    "description": "كل تغيير أجراه فريق Studafy في لوحة التحكم عبر جميع المدارس، مع المدرسة المتأثرة والسبب المذكور.",
+    "filtersLabel": "تصفية النشاط",
+    "who": "من",
+    "anyone": "أي شخص",
+    "actionLabel": "الإجراء",
+    "anyAction": "أي إجراء",
+    "tableLabel": "الجدول",
+    "tableHelp": "مثلًا feature_flags أو licenses.",
+    "schoolLabel": "المدرسة المتأثرة",
+    "anySchool": "أي مدرسة",
+    "from": "من تاريخ",
+    "to": "إلى تاريخ",
+    "apply": "تطبيق",
+    "clear": "مسح",
+    "windowHint": "بدون تواريخ تظهر آخر 30 يومًا. سنة واحدة كحد أقصى في كل مرة.",
+    "caption": "نشاط فريق Studafy",
+    "empty": "لا يوجد نشاط يطابق هذه الشروط.",
+    "loadError": "تعذّر تحميل النشاط.",
+    "more": "عرض المزيد",
+    "platformWide": "على مستوى المنصة",
+    "columns": {
+      "when": "متى",
+      "who": "من",
+      "what": "ماذا",
+      "school": "المدرسة",
+      "reason": "السبب"
+    },
+    "action": {
+      "insert": "أنشأ",
+      "update": "عدّل",
+      "delete": "حذف",
+      "login": "سجّل الدخول",
+      "logout": "سجّل الخروج",
+      "export": "صدّر",
+      "permission_change": "عدّل الصلاحيات",
+      "read": "اطّلع"
+    }
+  },
+  "health": {
+    "title": "حالة النظام",
+    "description": "المهام الخلفية والإشعارات الفاشلة وإشعارات الدفع وارتداد البريد والتخزين، مما يسجّله Studafy أصلًا. للعرض فقط.",
+    "refresh": "تحديث",
+    "loading": "جارٍ تحميل حالة النظام…",
+    "loadError": "تعذّر تحميل حالة النظام.",
+    "generated": "حتى {{when}}. الأعداد تغطي آخر {{days}} أيام.",
+    "jobsHeading": "المهام الخلفية",
+    "jobsUnavailable": "بيانات المهام الخلفية غير متاحة: لا يستطيع الخادم الوصول إلى طابور المهام.",
+    "queuesCaption": "الطوابير",
+    "scheduledCaption": "المهام المجدولة",
+    "deadLetter": "رسائل فاشلة",
+    "noRecentRun": "لا يوجد تشغيل في السجل الحديث",
+    "outcome": {
+      "completed": "اكتمل",
+      "failed": "فشل"
+    },
+    "deadLettersHeading": "إشعارات فاشلة ({{count}})",
+    "deadLettersCaption": "الإشعارات الفاشلة حسب المدرسة",
+    "webhooksHeading": "إشعارات الدفع",
+    "failedEvents": "{{provider}}: {{count}} فاشلة",
+    "signature": {
+      "stripe_webhook_signature_invalid": "طلبات Stripe بتوقيع غير صالح",
+      "tap_webhook_signature_invalid": "طلبات Tap بتوقيع غير صالح"
+    },
+    "noWebhookFailures": "لا توجد إخفاقات.",
+    "webhookFailuresCaption": "آخر الإخفاقات",
+    "emailHeading": "البريد الإلكتروني",
+    "bounces": "مرتدّ",
+    "complaints": "بلاغات بريد مزعج",
+    "deliveries": "تم التسليم",
+    "storageHeading": "التخزين",
+    "storageUnavailable": "تقرير التخزين غير متاح: لا يستطيع الخادم الوصول إلى طابور المهام.",
+    "storageNoRun": "لم يُشغَّل فحص التخزين اليومي مؤخرًا.",
+    "storageSummary": "آخر فحص {{when}}: {{schools}} مدرسة، {{orphans}} ملفًا متبقيًا ({{size}}).",
+    "storageReportOnly": "الملفات المتبقية هي ملفات لم يعد يستخدمها أي شيء في Studafy. هذا تقرير فقط ولا يُحذف شيء.",
+    "storageCaption": "مدارس لديها ملفات متبقية",
+    "noOrphans": "لا توجد مدرسة لديها ملفات متبقية.",
+    "reconcileFailed": "فشل الفحص",
+    "notAvailableHeading": "غير مسجَّل",
+    "notAvailable": {
+      "google_play_webhook_failures": "إخفاقات إشعارات Google Play (تُكتب في سجلات الخادم فقط)",
+      "resend_webhook_signature_failures": "إشعارات مزوّد البريد بتوقيع غير صالح (تُكتب في سجلات الخادم فقط)",
+      "erpnext_webhook_failures": "إخفاقات إشعارات ERPNext",
+      "background_jobs": "المهام الخلفية (طابور المهام غير متاح)",
+      "storage_report": "تقرير التخزين (طابور المهام غير متاح)"
+    },
+    "none": "لا شيء.",
+    "columns": {
+      "queue": "الطابور",
+      "waiting": "بالانتظار",
+      "active": "قيد التشغيل",
+      "delayed": "مؤجّلة",
+      "failed": "فاشلة",
+      "latestFailure": "آخر إخفاق",
+      "job": "المهمة",
+      "lastRun": "آخر تشغيل",
+      "nextRun": "التشغيل التالي",
+      "school": "المدرسة",
+      "count": "العدد",
+      "lastFailed": "آخر إخفاق",
+      "event": "الحدث",
+      "status": "الحالة (المحاولات)",
+      "received": "وقت الاستلام",
+      "used": "المساحة المستخدمة",
+      "orphans": "ملفات متبقية"
+    }
+  },
+  "flags": {
+    "title": "مفاتيح الميزات",
+    "description": "القيمة الافتراضية لكل مفتاح في هذا النشر والمدارس التي تتجاوزها.",
+    "loading": "جارٍ تحميل مفاتيح الميزات…",
+    "loadError": "تعذّر تحميل مفاتيح الميزات.",
+    "deploymentDefault": "الافتراضي",
+    "registryDefault": "الافتراضي المدمج",
+    "enabledIn": "مفعّل في {{count}} من {{total}} مدرسة",
+    "noOverrides": "لا توجد مدرسة تتجاوز هذا المفتاح.",
+    "overridesCaption": "مدارس تتجاوز {{name}}",
+    "school": "المدرسة",
+    "override": "القيمة المخصصة",
+    "howToChange": "لتغيير مفتاح مدرسة، افتح صفحة المدرسة. القيمة الافتراضية لجميع المدارس إعداد في الخادم، فتتغير مع النشر وليس من هنا."
   }
 }
