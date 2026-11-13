@@ -1,5 +1,5 @@
 import { ApiError } from "@studafy/api-client";
-import { Button, Card, DataGrid, Modal, Select, useToast } from "@studafy/ui";
+import { Button, Card, DataGrid, Input, Modal, Select, useToast } from "@studafy/ui";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -214,31 +214,27 @@ function BatchForm({ onCreated }: BatchFormProps) {
             required
           />
 
-          <div className="sf-field">
-            <label htmlFor="invoice-batch-period">{t("finance.invoices.batch.periodTitle")}</label>
-            <input
-              id="invoice-batch-period"
-              type="text"
-              value={periodTitle}
-              onChange={(event) => setPeriodTitle(event.target.value)}
-              placeholder={t("finance.invoices.batch.periodPlaceholder")}
-              maxLength={200}
-              required
-            />
-          </div>
+          <Input
+            id="invoice-batch-period"
+            label={t("finance.invoices.batch.periodTitle")}
+            type="text"
+            value={periodTitle}
+            onChange={(event) => setPeriodTitle(event.target.value)}
+            placeholder={t("finance.invoices.batch.periodPlaceholder")}
+            maxLength={200}
+            required
+          />
 
-          <div className="sf-field">
-            <label htmlFor="invoice-batch-due-date">{t("finance.invoices.batch.dueDate")}</label>
-            <input
-              id="invoice-batch-due-date"
-              type="date"
-              value={dueDate}
-              onChange={(event) => setDueDate(event.target.value)}
-            />
-          </div>
+          <Input
+            id="invoice-batch-due-date"
+            label={t("finance.invoices.batch.dueDate")}
+            type="date"
+            value={dueDate}
+            onChange={(event) => setDueDate(event.target.value)}
+          />
 
           <fieldset className="invoices-batch__target">
-            <legend>{t("finance.invoices.batch.target")}</legend>
+            <legend className="sf-field__label">{t("finance.invoices.batch.target")}</legend>
             <label className="invoices-batch__target-option">
               <input
                 type="radio"

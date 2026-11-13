@@ -1,3 +1,5 @@
+import "./help-link.css";
+
 import type { ReactNode } from "react";
 
 /**

@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { LinkButton } from "../../../components/LinkButton";
 import { buildImportErrorReportCsv, downloadBlob, downloadTextFile } from "../../../lib/csv";
 import { useTranslation } from "../../../lib/i18n";
 import { SheetOffer } from "../../custom-lists/SheetOffer";
@@ -240,13 +241,17 @@ export default function ImportStudentsPage() {
 
   return (
     <>
-      <h1>{t("adminPeople.students.import.page.title")}</h1>
-      <p>{t("adminPeople.students.import.page.intro")}</p>
-      <p>
-        <Link to="/portal/admin/students/imports">
-          {t("adminPeople.students.import.page.history")}
-        </Link>
-      </p>
+      <div className="students-list__header">
+        <div>
+          <h1>{t("adminPeople.students.import.page.title")}</h1>
+          <p>{t("adminPeople.students.import.page.intro")}</p>
+        </div>
+        <div className="students-list__header-actions">
+          <LinkButton href="/portal/admin/students/imports" variant="secondary">
+            {t("adminPeople.students.import.page.history")}
+          </LinkButton>
+        </div>
+      </div>
 
       {banner ? (
         <p role="alert" className="students-import__banner">
@@ -270,7 +275,7 @@ export default function ImportStudentsPage() {
             </p>
 
             <div className="students-import__upload">
-              <label htmlFor="student-csv-file">
+              <label className="sf-field__label" htmlFor="student-csv-file">
                 {t("adminPeople.students.import.page.fileLabel")}
               </label>
               <input

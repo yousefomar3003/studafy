@@ -1,0 +1,23 @@
+/**
+ * Inline contextual help link (`HelpLink`). Lives beside the component rather than in help.css,
+ * which only the help pages load, so the link is styled on every page that renders it.
+ */
+
+.help-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-muted-foreground);
+  text-decoration: none;
+}
+
+.help-link:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
+.help-link__icon {
+  flex-shrink: 0;
+  vertical-align: middle;
+}

@@ -3,6 +3,26 @@
  * on the portal's design tokens; `@studafy/ui` components bring their own chrome.
  */
 
+.import-history__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.import-history__cards {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.import-history__cards h2 {
+  margin-block-start: 0;
+  font-size: var(--font-size-lg);
+}
+
 .import-history__banner {
   color: var(--color-danger-subtle-foreground);
   background-color: var(--color-danger-subtle-bg);

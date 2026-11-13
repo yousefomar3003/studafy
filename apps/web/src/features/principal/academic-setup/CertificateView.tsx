@@ -1,6 +1,7 @@
 import { Button } from "@studafy/ui";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../../layouts/portal/PortalBackLink";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import { Num, Percent, QueryState, ResultValue } from "./components";
@@ -20,11 +21,11 @@ export function CertificateView({ ctx }: { ctx: SetupContext }) {
   const { t } = useTranslation();
   const { certificateId } = useParams();
   const certificate = useCertificate(certificateId);
+  usePortalBack(setupHref(ctx, "results"));
 
   return (
     <>
       <div className="ag-head ag-no-print">
-        <Link to={setupHref(ctx, "results")}>{t("academicGrading.certificate.back")}</Link>
         <Button type="button" onClick={() => window.print()} disabled={!certificate.data}>
           {t("academicGrading.certificate.print")}
         </Button>

@@ -8,6 +8,7 @@ export { roomRoutes } from "./routes/room-routes";
 export { sectionRoutes } from "./routes/section-routes";
 export { promotionRoutes } from "./routes/promotion-routes";
 export { enrollmentRoutes } from "./routes/enrollment-routes";
+export { studentOverviewRoutes } from "./routes/student-overview-routes";
 export { timetableRoutes } from "./routes/timetable-routes";
 export { examRoutes } from "./routes/exam-routes";
 export { materialRoutes } from "./routes/material-routes";

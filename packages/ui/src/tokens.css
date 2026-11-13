@@ -74,6 +74,8 @@
   --color-accent-foreground: #ffffff;
   --color-accent-subtle-bg: var(--color-accent-100);
   --color-accent-subtle-foreground: var(--color-accent-800);
+  --color-accent-hover: var(--color-accent-700);
+  --color-accent-active: var(--color-accent-800);
 
   --color-success: var(--color-success-700);
   --color-success-foreground: #ffffff;
@@ -190,6 +192,7 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --color-background: var(--color-neutral-950);
     --color-surface: var(--color-neutral-900);
     --color-foreground: var(--color-neutral-50);
@@ -200,6 +203,8 @@
     --color-accent-foreground: var(--color-neutral-950);
     --color-accent-subtle-bg: var(--color-neutral-900);
     --color-accent-subtle-foreground: var(--color-accent-400);
+    --color-accent-hover: var(--color-accent-300);
+    --color-accent-active: var(--color-accent-200);
 
     --color-success: var(--color-success-400);
     --color-success-foreground: var(--color-neutral-950);
@@ -224,6 +229,7 @@
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --color-background: var(--color-neutral-950);
   --color-surface: var(--color-neutral-900);
   --color-foreground: var(--color-neutral-50);
@@ -234,6 +240,8 @@
   --color-accent-foreground: var(--color-neutral-950);
   --color-accent-subtle-bg: var(--color-neutral-900);
   --color-accent-subtle-foreground: var(--color-accent-400);
+  --color-accent-hover: var(--color-accent-300);
+  --color-accent-active: var(--color-accent-200);
 
   --color-success: var(--color-success-400);
   --color-success-foreground: var(--color-neutral-950);
@@ -257,6 +265,7 @@
 }
 
 :root[data-theme="light"] {
+  color-scheme: light;
   --color-background: #ffffff;
   --color-surface: var(--color-neutral-50);
   --color-foreground: var(--color-neutral-900);
@@ -267,6 +276,8 @@
   --color-accent-foreground: #ffffff;
   --color-accent-subtle-bg: var(--color-accent-100);
   --color-accent-subtle-foreground: var(--color-accent-800);
+  --color-accent-hover: var(--color-accent-700);
+  --color-accent-active: var(--color-accent-800);
 
   --color-success: var(--color-success-700);
   --color-success-foreground: #ffffff;

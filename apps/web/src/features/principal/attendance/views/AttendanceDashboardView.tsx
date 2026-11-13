@@ -152,7 +152,7 @@ export default function AttendanceDashboardView() {
         </Button>
       </div>
 
-      <section aria-labelledby="attendance-filters-title">
+      <section className="attendance-filters" aria-labelledby="attendance-filters-title">
         <h2 id="attendance-filters-title" className="attendance-visually-hidden">
           {t("principal.attendance.dashboard.filtersTitle")}
         </h2>

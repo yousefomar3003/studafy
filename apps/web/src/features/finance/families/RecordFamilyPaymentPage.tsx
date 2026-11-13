@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../../layouts/portal/PortalBackLink";
 import { useTranslation } from "../../../lib/i18n";
 import { PAYMENT_MODE_LABEL_KEYS } from "../labels";
 import { ReceiptButton } from "../ReceiptButton";
@@ -47,6 +48,7 @@ interface OpenRow extends OpenInvoice {
 export default function RecordFamilyPaymentPage() {
   const { t } = useTranslation();
   const { familyId = "" } = useParams<{ familyId: string }>();
+  usePortalBack(`/portal/finance/families/${familyId}`);
 
   const profile = useQuery({
     queryKey: [...FAMILIES_KEY, familyId, "profile"],
@@ -90,11 +92,6 @@ export default function RecordFamilyPaymentPage() {
   return (
     <>
       <h1>{t("finance.families.payment.title", { family: profile.data.display_name })}</h1>
-      <p>
-        <Link to={`/portal/finance/families/${familyId}`}>
-          {t("finance.families.payment.backToFamily")}
-        </Link>
-      </p>
       {open.length === 0 ? (
         <p role="status">{t("finance.families.payment.nothingOwed")}</p>
       ) : (

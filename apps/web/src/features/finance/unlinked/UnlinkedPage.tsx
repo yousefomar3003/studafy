@@ -4,6 +4,7 @@ import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { usePortalBack } from "../../../layouts/portal/PortalBackLink";
 import { usePermissions } from "../../../lib/auth";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
@@ -34,6 +35,7 @@ import type { ReactNode } from "react";
  */
 export default function UnlinkedPage() {
   const { t } = useTranslation();
+  usePortalBack("/portal/finance/families");
   const permissions = usePermissions();
   // The student profile route is behind organization:manageSettings; the link call needs
   // student:update, and the children picker reads /api/students (student:read).
@@ -100,7 +102,6 @@ export default function UnlinkedPage() {
           <h1>{t("finance.unlinked.title")}</h1>
           <p>{t("finance.unlinked.intro")}</p>
         </div>
-        <Link to="/portal/finance/families">{t("finance.unlinked.backToFamilies")}</Link>
       </div>
 
       <UnlinkedSection<UnlinkedStudent>

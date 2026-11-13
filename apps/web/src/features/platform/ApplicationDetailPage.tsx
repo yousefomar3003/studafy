@@ -3,6 +3,7 @@ import { Button, Card, Modal, useToast } from "@studafy/ui";
 import { useId, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
 import { useApplicationQuery, useApproveApplication, useRejectApplication } from "./applications";
@@ -23,6 +24,7 @@ type Decision = "approve" | "reject";
 export default function ApplicationDetailPage() {
   const { applicationId = "" } = useParams();
   const { t } = useTranslation();
+  usePortalBack("/portal/platform/applications");
   const { data: application, isPending, isError } = useApplicationQuery(applicationId);
   const [decision, setDecision] = useState<Decision | null>(null);
 
@@ -33,7 +35,6 @@ export default function ApplicationDetailPage() {
     return (
       <>
         <p role="alert">{t("platform.applications.detail.loadError")}</p>
-        <Link to="/portal/platform/applications">{t("platform.applications.detail.back")}</Link>
       </>
     );
   }
@@ -45,9 +46,6 @@ export default function ApplicationDetailPage() {
         description={`${application.city}, ${application.countryName}`}
         actions={<ApplicationStatusPill status={application.status} />}
       />
-      <p>
-        <Link to="/portal/platform/applications">{t("platform.applications.detail.back")}</Link>
-      </p>
 
       <div className="platform-grid">
         <SchoolCard application={application} />

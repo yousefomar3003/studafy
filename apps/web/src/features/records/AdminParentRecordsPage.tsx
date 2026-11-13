@@ -13,7 +13,7 @@ export default function AdminParentRecordsPage() {
   return (
     <ParentRecordsView
       parentUserId={parentUserId}
-      back={{ to: "/portal/admin/users", label: t("records.admin.backToUsers") }}
+      back="/portal/admin/users"
       copy={{
         title: "records.admin.parentTitle",
         fallback: "records.admin.parentFallback",

@@ -973,6 +973,81 @@
     }
   },
   "teacher": {
+    "student": {
+      "error": "Couldn't load this student. Pull to try again.",
+      "admissionNumber": "Admission no. {number}",
+      "marks": {
+        "title": "Marks in this subject",
+        "percent": "{value}%",
+        "outOf": "{value} out of {max}",
+        "gpa": "GPA {value} of {max}",
+        "noResult": "No result yet",
+        "provisional": "So far",
+        "passed": "Passing",
+        "failed": "Not passing",
+        "thisTerm": "This term: {value}%",
+        "exempt": "Exempt from this subject.",
+        "noAssessments": "No assessments set up yet.",
+        "status": {
+          "pending": "Not marked",
+          "graded": "Marked",
+          "absent": "Absent",
+          "excused": "Excused",
+          "not_applicable": "Not applicable"
+        },
+        "unavailable": {
+          "no_section": "This class isn't linked to a grade section, so it has no marks.",
+          "not_configured": "Grading isn't set up for this subject yet.",
+          "not_in_roster": "This student doesn't take this subject in their section's grading."
+        }
+      },
+      "attendance": {
+        "title": "Attendance this term",
+        "none": "No attendance taken yet.",
+        "present": "Present",
+        "absent": "Absent",
+        "late": "Late",
+        "lateMinutes": "Late {minutes} min",
+        "excused": "Excused",
+        "sessions": "Out of {count} lessons"
+      },
+      "homework": {
+        "title": "Homework",
+        "none": "No homework set yet.",
+        "handedIn": "Handed in",
+        "missing": "Missing",
+        "upcoming": "Upcoming",
+        "due": "Due {date}",
+        "status": {
+          "submitted": "Handed in",
+          "late": "Handed in late",
+          "graded": "Marked",
+          "returned": "Returned",
+          "missing": "Missing",
+          "upcoming": "Not due yet"
+        }
+      },
+      "comments": {
+        "title": "Report card comments",
+        "none": "No comments written yet.",
+        "term": "This subject, this term",
+        "annual": "This subject, end of year",
+        "classTeacher": "Class teacher, this term"
+      },
+      "parents": {
+        "title": "Parents",
+        "none": "No parents you can message.",
+        "error": "Couldn't load the parents.",
+        "message": "Message"
+      },
+      "records": {
+        "title": "School information"
+      },
+      "lists": {
+        "title": "School lists",
+        "open": "See this student in the school's lists"
+      }
+    },
     "questions": {
       "title": "Questions",
       "summary": "{count} questions · {points} points in total",

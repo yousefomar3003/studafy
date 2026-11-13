@@ -1,7 +1,8 @@
 import { PERMISSIONS } from "@studafy/constants";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { usePermissions } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
 import { LinkedListsPanel } from "../custom-lists/LinkedListsPanel";
@@ -23,6 +24,8 @@ export default function ClassRecordPage(_props: ClassRecordPageProps) {
   const { t } = useTranslation();
   const permissions = usePermissions();
   const { classId } = useParams<{ classId: string }>();
+  // Both portals' class list is the shared Classes page (ORG_ADMIN holds principalDashboard:view).
+  usePortalBack("/portal/principal/classes");
   const cls = useQuery({
     queryKey: classIdentityQueryKey(classId ?? ""),
     queryFn: () => fetchClassIdentity(classId!),
@@ -33,13 +36,8 @@ export default function ClassRecordPage(_props: ClassRecordPageProps) {
   if (cls.isPending) return <p role="status">{t("records.panel.loading")}</p>;
   if (cls.isError) return <p role="alert">{t("records.class.loadError")}</p>;
 
-  // Both portals' class list is the shared Classes page (ORG_ADMIN holds principalDashboard:view).
-  const back = { to: "/portal/principal/classes", label: t("records.class.backToClasses") };
   return (
     <>
-      <p>
-        <Link to={back.to}>{back.label}</Link>
-      </p>
       <h1>{t("records.class.title", { code: cls.data.code })}</h1>
       <RecordsPanel
         subject={{ kind: "class", id: classId }}

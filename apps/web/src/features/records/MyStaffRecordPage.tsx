@@ -1,5 +1,3 @@
-import { Link } from "react-router-dom";
-
 import { useAuth } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
 
@@ -18,9 +16,6 @@ export default function MyStaffRecordPage() {
 
   return (
     <>
-      <p>
-        <Link to="/account">{t("records.self.backToAccount")}</Link>
-      </p>
       <h1>{t("records.self.title")}</h1>
       <p>{t("records.self.intro")}</p>
       {holdsStaffRole(roles) && userId ? (

@@ -1,6 +1,7 @@
 import { Button } from "@studafy/ui";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../../../layouts/portal/PortalBackLink";
 import { useFormatters, useTranslation } from "../../../../lib/i18n";
 import { Num, Percent, QueryState, ResultValue } from "../../academic-setup/components";
 
@@ -20,13 +21,11 @@ export default function TranscriptPage() {
   const { t } = useTranslation();
   const { studentId, transcriptId } = useParams();
   const transcript = useTranscript(transcriptId);
+  usePortalBack(`/portal/principal/students/${studentId ?? ""}`);
 
   return (
     <>
       <div className="ag-head ag-no-print">
-        <Link to={`/portal/principal/students/${studentId ?? ""}`}>
-          {t("academicGrading.transcript.back")}
-        </Link>
         <Button type="button" onClick={() => window.print()} disabled={!transcript.data}>
           {t("academicGrading.transcript.print")}
         </Button>

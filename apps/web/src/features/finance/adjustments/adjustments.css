@@ -35,6 +35,7 @@
 
 .adjustments-list__header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-16);
@@ -62,6 +63,18 @@
   gap: var(--space-8);
 }
 
+/* Header: the title block takes the free space and wraps its text; the trailing actions keep their
+   natural width (no crushed/stacked buttons) and drop below the title on narrow screens. */
+.adjustments-list__header > :first-child {
+  flex: 1 1 20rem;
+  min-width: 0;
+}
+
+.adjustments-list__header > :last-child:not(:first-child) {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 /* --- Form --- */
 
 .adjustments-form {
@@ -75,6 +88,11 @@
   margin: calc(-1 * var(--space-8)) 0 0;
   font-size: var(--font-size-sm);
   color: var(--color-muted-foreground);
+}
+
+/* The same muted note when it follows a read-only summary (<dl>) rather than a form field. */
+.adjustments-form__math--standalone {
+  margin-top: var(--space-12);
 }
 
 .adjustments-form__math[data-tone="danger"] {

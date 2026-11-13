@@ -4,6 +4,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { LinkButton } from "../../../../components/LinkButton";
 import { useFormatters, useTranslation } from "../../../../lib/i18n";
 
 import { useUpdateImportSettings } from "./mutations";
@@ -44,13 +45,15 @@ export default function ImportHistoryPage() {
 
   return (
     <>
-      <h1>{t("adminPeople.students.importHistory.page.title")}</h1>
-      <p>{t("adminPeople.students.importHistory.page.intro")}</p>
-      <p>
-        <Link to="/portal/admin/students/import">
+      <div className="import-history__header">
+        <div>
+          <h1>{t("adminPeople.students.importHistory.page.title")}</h1>
+          <p>{t("adminPeople.students.importHistory.page.intro")}</p>
+        </div>
+        <LinkButton href="/portal/admin/students/import" variant="secondary">
           {t("adminPeople.students.importHistory.page.newImport")}
-        </Link>
-      </p>
+        </LinkButton>
+      </div>
 
       {banner ? (
         <p role="alert" className="import-history__banner">
@@ -58,34 +61,36 @@ export default function ImportHistoryPage() {
         </p>
       ) : null}
 
-      <RetentionCard onError={setBanner} />
+      <div className="import-history__cards">
+        <RetentionCard onError={setBanner} />
 
-      <Card as="section" aria-labelledby="import-history-list-heading">
-        <Card.Body>
-          <h2 id="import-history-list-heading">
-            {t("adminPeople.students.importHistory.list.heading")}
-          </h2>
-          {history.isPending ? (
-            <p role="status">{t("adminPeople.students.importHistory.common.loading")}</p>
-          ) : history.isError ? (
-            <p role="alert">{t("adminPeople.students.importHistory.list.loadError")}</p>
-          ) : imports.length === 0 ? (
-            <p>{t("adminPeople.students.importHistory.list.empty")}</p>
-          ) : (
-            <HistoryTable imports={imports} onError={setBanner} />
-          )}
-          {history.hasNextPage ? (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => void history.fetchNextPage()}
-              loading={history.isFetchingNextPage}
-            >
-              {t("adminPeople.students.importHistory.list.loadMore")}
-            </Button>
-          ) : null}
-        </Card.Body>
-      </Card>
+        <Card as="section" aria-labelledby="import-history-list-heading">
+          <Card.Body>
+            <h2 id="import-history-list-heading">
+              {t("adminPeople.students.importHistory.list.heading")}
+            </h2>
+            {history.isPending ? (
+              <p role="status">{t("adminPeople.students.importHistory.common.loading")}</p>
+            ) : history.isError ? (
+              <p role="alert">{t("adminPeople.students.importHistory.list.loadError")}</p>
+            ) : imports.length === 0 ? (
+              <p>{t("adminPeople.students.importHistory.list.empty")}</p>
+            ) : (
+              <HistoryTable imports={imports} onError={setBanner} />
+            )}
+            {history.hasNextPage ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => void history.fetchNextPage()}
+                loading={history.isFetchingNextPage}
+              >
+                {t("adminPeople.students.importHistory.list.loadMore")}
+              </Button>
+            ) : null}
+          </Card.Body>
+        </Card>
+      </div>
     </>
   );
 }

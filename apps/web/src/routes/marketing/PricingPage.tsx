@@ -2,6 +2,7 @@ import { LinkButton } from "../../components/LinkButton";
 import { useSeo } from "../../components/Seo";
 import { useTranslation } from "../../lib/i18n";
 
+import { ClosingBand } from "./ClosingBand";
 import { SchoolSize } from "./demos/SchoolSize";
 import { reveal } from "./reveal";
 
@@ -104,6 +105,8 @@ export default function PricingPage() {
           </div>
         </div>
       </section>
+
+      <ClosingBand titleKey="marketingPages.features.ctaTitle" />
     </>
   );
 }

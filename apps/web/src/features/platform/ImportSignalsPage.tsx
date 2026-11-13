@@ -43,25 +43,27 @@ export default function ImportSignalsPage() {
       ) : signal.data.headers.length === 0 ? (
         <p>{t("platform.importSignals.empty", { count: signal.data.min_schools })}</p>
       ) : (
-        <table className="platform-table">
-          <caption>{t("platform.importSignals.caption")}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("platform.importSignals.columns.header")}</th>
-              <th scope="col">{t("platform.importSignals.columns.schools")}</th>
-              <th scope="col">{t("platform.importSignals.columns.imports")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {signal.data.headers.map((row) => (
-              <tr key={row.normalized_header}>
-                <td>{row.header}</td>
-                <td>{formatNumber(row.schools)}</td>
-                <td>{formatNumber(row.imports)}</td>
+        <div className="platform-table-scroll">
+          <table className="platform-table">
+            <caption>{t("platform.importSignals.caption")}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{t("platform.importSignals.columns.header")}</th>
+                <th scope="col">{t("platform.importSignals.columns.schools")}</th>
+                <th scope="col">{t("platform.importSignals.columns.imports")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {signal.data.headers.map((row) => (
+                <tr key={row.normalized_header}>
+                  <td>{row.header}</td>
+                  <td>{formatNumber(row.schools)}</td>
+                  <td>{formatNumber(row.imports)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </>
   );

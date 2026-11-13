@@ -1,6 +1,7 @@
 import { Card, Chip, Table } from "@studafy/ui";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { ONE_DECIMAL_PERCENT_OPTIONS } from "../principal/format";
 import { studentDisplayName } from "../principal/school/queries";
@@ -31,6 +32,7 @@ const STATUS_VARIANT: Record<string, ChipVariant> = {
  */
 export default function StudentAttendancePage() {
   const { t } = useTranslation();
+  usePortalBack("/portal/attendance");
   const { formatNumber } = useFormatters();
   const { studentId = "" } = useParams();
   const selection = useTermSelection();
@@ -79,9 +81,6 @@ export default function StudentAttendancePage() {
 
   return (
     <>
-      <p>
-        <Link to="/portal/attendance">{t("attendanceOffice.register.back")}</Link>
-      </p>
       <h1>{student.isError ? t("attendanceOffice.student.notFound") : name || "…"}</h1>
       {student.data ? (
         <p className="attendance-office__muted">

@@ -17,6 +17,7 @@ import type { ImportSpec } from "../../../lib/data-transfer";
 
 import "../../principal/sections/sections.css";
 import "../../principal/years/years.css";
+import "../users/users.css";
 
 const COLUMN_COUNT = 6;
 const EMPLOYMENT_STATUSES: readonly EmploymentStatus[] = [
@@ -257,15 +258,21 @@ export default function TeachersPage() {
 
   return (
     <>
-      <h1>{t("adminPeople.teachers.title")}</h1>
-      <p>{t("adminPeople.teachers.description")}</p>
-      {permissions.has(PERMISSIONS.TEACHER_CREATE) ? (
-        <ImportCsvButton
-          spec={importSpec}
-          title={t("adminPeople.teachers.importTitle")}
-          onImported={() => void queryClient.invalidateQueries({ queryKey: TEACHERS_KEY })}
-        />
-      ) : null}
+      <div className="users-list__header">
+        <div>
+          <h1>{t("adminPeople.teachers.title")}</h1>
+          <p>{t("adminPeople.teachers.description")}</p>
+        </div>
+        {permissions.has(PERMISSIONS.TEACHER_CREATE) ? (
+          <div className="users-list__header-actions">
+            <ImportCsvButton
+              spec={importSpec}
+              title={t("adminPeople.teachers.importTitle")}
+              onImported={() => void queryClient.invalidateQueries({ queryKey: TEACHERS_KEY })}
+            />
+          </div>
+        ) : null}
+      </div>
 
       <Table caption={t("adminPeople.teachers.caption")} hideCaption>
         <Table.Header>
