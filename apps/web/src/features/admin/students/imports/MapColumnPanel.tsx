@@ -22,6 +22,7 @@ import type {
   ImportColumnPreview,
   ImportColumnPreviewRow,
   ImportColumnTarget,
+  ParentSlot,
   RecordSubjectKind,
   UnmappedColumn,
 } from "./queries";
@@ -60,6 +61,11 @@ export function MapColumnPanel({ importId, column, onClose }: MapColumnPanelProp
   const { t } = useTranslation();
   const base = "adminPeople.students.importHistory.map";
   const [subjectKind, setSubjectKind] = useState<RecordSubjectKind>("student");
+  // Whose parent record: the file's first parent, its second, or both. Never assumed when the import
+  // created second parents -- a "father" column must not land on the mother because she is listed
+  // first -- so with any second parent the choice starts empty and must be made.
+  const hasSecondParents = column.parent2_count > 0;
+  const [parentSlot, setParentSlot] = useState<ParentSlot | "">(hasSecondParents ? "" : "parent1");
   const [mode, setMode] = useState<"existing" | "new">("new");
   const [fieldId, setFieldId] = useState<string>("");
   const [labelEn, setLabelEn] = useState(column.header);
@@ -100,14 +106,19 @@ export function MapColumnPanel({ importId, column, onClose }: MapColumnPanelProp
   }));
 
   function target(): ImportColumnTarget | null {
+    if (subjectKind === "parent" && parentSlot === "") return null;
+    const whose = {
+      position: column.position,
+      subject_kind: subjectKind,
+      ...(subjectKind === "parent" ? { parent_slot: parentSlot as ParentSlot } : {}),
+    };
     if (mode === "existing") {
       if (!fieldId) return null;
-      return { position: column.position, subject_kind: subjectKind, field_id: fieldId, overwrite };
+      return { ...whose, field_id: fieldId, overwrite };
     }
     if (!labelEn.trim() || !labelAr.trim()) return null;
     return {
-      position: column.position,
-      subject_kind: subjectKind,
+      ...whose,
       overwrite,
       new_field: {
         label_en: labelEn.trim(),
@@ -123,7 +134,11 @@ export function MapColumnPanel({ importId, column, onClose }: MapColumnPanelProp
   function handlePreview() {
     const body = target();
     if (!body) {
-      setError(t(`${base}.incomplete`));
+      setError(
+        subjectKind === "parent" && parentSlot === ""
+          ? t(`${base}.parentSlotRequired`)
+          : t(`${base}.incomplete`),
+      );
       return;
     }
     setError(null);
@@ -172,10 +187,32 @@ export function MapColumnPanel({ importId, column, onClose }: MapColumnPanelProp
           />
           <Radio
             value="parent"
-            label={t(`${base}.subjectParent`, { count: column.parent_count })}
-            disabled={column.parent_count === 0}
+            label={t(`${base}.subjectParent`, {
+              count: column.parent_count + column.parent2_count,
+            })}
+            disabled={column.parent_count + column.parent2_count === 0}
           />
         </RadioGroup>
+
+        {subjectKind === "parent" && hasSecondParents ? (
+          <RadioGroup
+            label={t(`${base}.parentSlot`)}
+            name="map-parent-slot"
+            value={parentSlot}
+            onChange={(value) => edit(setParentSlot)(value as ParentSlot)}
+          >
+            <Radio
+              value="parent1"
+              label={t(`${base}.parentSlotFirst`, { count: column.parent_count })}
+              disabled={column.parent_count === 0}
+            />
+            <Radio
+              value="parent2"
+              label={t(`${base}.parentSlotSecond`, { count: column.parent2_count })}
+            />
+            <Radio value="both" label={t(`${base}.parentSlotBoth`)} />
+          </RadioGroup>
+        ) : null}
 
         <RadioGroup
           label={t(`${base}.target`)}

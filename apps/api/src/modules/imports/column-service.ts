@@ -56,6 +56,7 @@ interface CellRow {
   line_number: number;
   student_id: string | null;
   parent_user_id: string | null;
+  parent2_user_id: string | null;
   source: Record<string, string>;
 }
 
@@ -70,7 +71,7 @@ async function loadCells(
 ): Promise<CellRow[]> {
   const appliedOnly = record.status === "completed" ? tx`AND student_id IS NOT NULL` : tx``;
   return tx<CellRow[]>`
-    SELECT line_number, student_id, parent_user_id, source
+    SELECT line_number, student_id, parent_user_id, parent2_user_id, source
     FROM app.student_import_rows
     WHERE school_id = ${schoolId} AND import_id = ${record.id}::uuid
       ${appliedOnly}
@@ -127,6 +128,7 @@ export async function listUnmappedColumns(
         non_empty_count: withValue.length,
         student_count: new Set(withValue.flatMap((cell) => cell.student_id ?? [])).size,
         parent_count: new Set(withValue.flatMap((cell) => cell.parent_user_id ?? [])).size,
+        parent2_count: new Set(withValue.flatMap((cell) => cell.parent2_user_id ?? [])).size,
         suggested_field_type: guess.field_type,
         suggested_options: guess.options,
         suggested_sensitive: guess.sensitive_reason !== null,
@@ -157,6 +159,17 @@ interface ColumnPlanForImport {
   header: string;
   plan: ColumnPlan;
   token: string;
+}
+
+/** Whom one line's cell is written to, for the column's subject kind and parent slot. */
+function subjectsOf(cell: CellRow, input: ColumnTargetInput): string[] {
+  if (input.subject_kind === "student") return cell.student_id ? [cell.student_id] : [];
+  const slot = input.parent_slot ?? "parent1";
+  const ids = [
+    slot === "parent2" ? null : cell.parent_user_id,
+    slot === "parent1" ? null : cell.parent2_user_id,
+  ];
+  return [...new Set(ids.filter((id): id is string => id !== null))];
 }
 
 async function planColumn(
@@ -193,15 +206,17 @@ async function planColumn(
   }
   const target = await resolveColumnTarget(tx, schoolId, input.subject_kind, input);
 
-  // One entry per person this import wrote: the students it created or updated, or the parents
-  // it created. A parent of several imported siblings has a cell on each sibling's line.
+  // One entry per person this import wrote: the students it created or updated, or the parents it
+  // created in the chosen slot (the file's first parent, its second, or both). A parent of several
+  // imported siblings has a cell on each sibling's line. A line's two parents are two people: a
+  // column is never written to one of them because the other is the one it describes.
   const bySubject = new Map<string, ColumnSubjectCells>();
   for (const cell of cells) {
-    const subjectId = input.subject_kind === "student" ? cell.student_id : cell.parent_user_id;
-    if (!subjectId) continue;
-    const entry = bySubject.get(subjectId) ?? { subjectId, line: cell.line_number, cells: [] };
-    entry.cells.push(cell.source[column.header] ?? "");
-    bySubject.set(subjectId, entry);
+    for (const subjectId of subjectsOf(cell, input)) {
+      const entry = bySubject.get(subjectId) ?? { subjectId, line: cell.line_number, cells: [] };
+      entry.cells.push(cell.source[column.header] ?? "");
+      bySubject.set(subjectId, entry);
+    }
   }
   const subjects = [...bySubject.values()];
   const names = await loadSubjectNames(
@@ -222,6 +237,7 @@ async function planColumn(
       import_id: record.id,
       position: column.position,
       subject_kind: input.subject_kind,
+      parent_slot: input.subject_kind === "parent" ? (input.parent_slot ?? "parent1") : null,
       overwrite: input.overwrite,
     },
     plan,
@@ -330,6 +346,7 @@ export async function applyColumn(
       position: input.position,
       header,
       subject_kind: input.subject_kind,
+      parent_slot: input.subject_kind === "parent" ? (input.parent_slot ?? "parent1") : null,
       field_id: fieldId,
       field_created: fieldCreated,
       written,
