@@ -1,4 +1,4 @@
-import { canChangeRoleOf, isPlatformRole } from "@studafy/constants";
+import { PLATFORM_ROLES, canChangeRoleOf, isPlatformRole } from "@studafy/constants";
 import { normalizePhoneNumber } from "@studafy/records";
 import { HTTPException } from "hono/http-exception";
 
@@ -109,6 +109,18 @@ export interface DeactivateUserResult {
 // Queries
 // ---------------------------------------------------------------------------
 
+/**
+ * Studafy's own staff (SUPER_ADMIN, SUPPORT_AGENT) can sit in a school's tenant — the demo school's
+ * super admin does — but they are Studafy, not the school: a school's user list and counts never
+ * show them. `u` is the `app.users` row being filtered.
+ */
+function notPlatformStaff(tx: TransactionSql) {
+  return tx`NOT EXISTS (
+    SELECT 1 FROM app.user_roles pr
+    WHERE pr.user_id = u.id AND pr.role = ANY(${[...PLATFORM_ROLES]}::app.user_role[])
+  )`;
+}
+
 export async function listUsers(
   tx: TransactionSql,
   schoolId: string,
@@ -158,6 +170,7 @@ export async function listUsers(
     FROM app.users u
     LEFT JOIN app.user_roles ur ON ur.user_id = u.id AND ur.school_id = u.school_id
     WHERE u.school_id = ${schoolId}
+      AND ${notPlatformStaff(tx)}
       ${statusFilter}
       ${searchFilter}
       ${createdFromFilter}
@@ -204,10 +217,11 @@ export async function getUserStatusCounts(
   schoolId: string,
 ): Promise<Record<UserStatus, number>> {
   const rows = await tx<{ status: UserStatus; count: string }[]>`
-    SELECT status, COUNT(*) AS count
-    FROM app.users
-    WHERE school_id = ${schoolId}
-    GROUP BY status
+    SELECT u.status, COUNT(*) AS count
+    FROM app.users u
+    WHERE u.school_id = ${schoolId}
+      AND ${notPlatformStaff(tx)}
+    GROUP BY u.status
   `;
 
   const counts = { ...ZERO_STATUS_COUNTS };
