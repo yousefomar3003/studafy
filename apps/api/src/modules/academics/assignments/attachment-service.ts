@@ -65,7 +65,8 @@ export interface AttachmentRow {
 
 export interface ConfirmAttachmentParams {
   storage_key: string;
-  content_type: string;
+  /** Omitted by the mobile app; the staged object's stored type is used instead. */
+  content_type?: string;
   checksum_sha256?: string;
 }
 
@@ -125,6 +126,17 @@ export async function createUploadUrl(
   };
 }
 
+const MIME_TYPE = /^[^/\s]+\/[^/\s]+$/;
+
+/**
+ * The type the staged object was uploaded with (bound into the pre-signed PUT), for a confirm that
+ * did not name one. Falls back to application/octet-stream, which downloads as a plain file.
+ */
+async function stagedContentType(storage: StorageService, tempKey: string): Promise<string> {
+  const stored = (await storage.head(tempKey))?.contentType?.trim();
+  return stored && MIME_TYPE.test(stored) ? stored : "application/octet-stream";
+}
+
 /**
  * Verify a staged upload, move it under `permanent/`, and record it.
  *
@@ -151,6 +163,7 @@ export async function confirmAttachment(
     permanentKey: buildPermanentKey(schoolId, staged.objectId, staged.filename),
     sizeBytes: await readStagedSize(storage, params.storage_key),
   };
+  const mimeType = params.content_type ?? (await stagedContentType(storage, params.storage_key));
 
   // The quota hard stop runs on the stored size before the copy, so a refused promotion leaves
   // the staged object untouched in temp/.
@@ -169,7 +182,7 @@ export async function confirmAttachment(
         storage_key, original_file_name, mime_type, size_bytes, checksum_sha256
       ) VALUES (
         ${schoolId}, ${assignmentId}, ${userId},
-        ${copy.permanentKey}, ${staged.filename}, ${params.content_type},
+        ${copy.permanentKey}, ${staged.filename}, ${mimeType},
         ${copy.sizeBytes}, ${params.checksum_sha256 ?? null}
       )
       RETURNING id, assignment_id, storage_key, original_file_name, mime_type,
