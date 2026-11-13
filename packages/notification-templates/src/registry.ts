@@ -278,4 +278,36 @@ export const NOTIFICATION_CATALOG = {
       route: "/",
     },
   },
+  // Everyday school events (000215). The route is the student's; a parent's row carries its own
+  // (the parent home, or the alert center for attendance) in metadata.route.
+  [NOTIFICATION_TYPES.ASSIGNMENT_PUBLISHED]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/courses/{courseId}/assignments/{assignmentId}",
+    },
+  },
+  [NOTIFICATION_TYPES.ASSIGNMENT_GRADED]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/courses/{courseId}/assignments/{assignmentId}",
+    },
+  },
+  [NOTIFICATION_TYPES.ATTENDANCE_MARKED]: {
+    channels: [
+      NOTIFICATION_CHANNELS.IN_APP,
+      NOTIFICATION_CHANNELS.PUSH,
+      NOTIFICATION_CHANNELS.EMAIL,
+    ],
+    metadataDefaults: {
+      route: "/parent/alerts",
+    },
+  },
 } as const satisfies NotificationCatalog;

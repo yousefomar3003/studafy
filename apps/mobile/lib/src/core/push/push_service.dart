@@ -10,6 +10,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../api/auth_interceptor.dart';
 import '../router/route_paths.dart';
+import '../../features/notifications/domain/notification_target.dart';
 
 const _androidChannelId = 'studafy_push';
 const _androidChannelName = 'Push Notifications';
@@ -24,12 +25,19 @@ const _permissionRequestedKey = 'push_permission_requested';
 /// template placeholder is never filled in and `route` arrives empty. `notification_type` itself
 /// is always present (see `buildDataPayload` on the delivery worker), so routing on it directly
 /// reaches the parent's alert center regardless of what `route` says.
+///
+/// Any other route is followed only when the app can open it on its own
+/// ([isOpenableNotificationRoute]); otherwise the tap opens the notification inbox, where the
+/// notice is listed in full. Server templates for many types point at web-only pages or still
+/// hold `{placeholders}`, and pushing those would land on an error page.
 String? resolveNotificationTapRoute(Map<String, dynamic> data) {
-  if (data['notification_type'] == 'ATTENDANCE_ALERT') {
+  final type = data['notification_type'];
+  if (type == 'ATTENDANCE_ALERT' || type == 'ATTENDANCE_MARKED') {
     return RoutePaths.parentAlerts;
   }
   final route = data['route'];
-  return route is String && route.isNotEmpty ? route : null;
+  if (route is String && isOpenableNotificationRoute(route)) return route;
+  return type is String && type.isNotEmpty ? RoutePaths.notifications : null;
 }
 
 /// [pushServiceProvider]'s contract — the surface [StudafyApp] and [PushSetupNotifier] depend on.

@@ -1,7 +1,8 @@
-import { ERROR_CODES } from "@studafy/constants";
+import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../coded-http-exception";
+import { emit } from "../../lib/events/emitter";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import type { AttendanceSessionStatus, AttendanceStatus } from "./schemas";
@@ -327,6 +328,18 @@ export async function updateAttendanceSessionStatus(
     oldValues: { status: existing.status },
     newValues: { status: params.status },
   });
+
+  // Submitting the register is what makes its absences and lates official, so that is the moment
+  // parents are told (ATTENDANCE_MARKED, via the workers' outbox notify consumer). In the same
+  // transaction as the status change, so a rolled-back submit tells nobody.
+  if (params.status === "submitted") {
+    const session = parseSessionRow(row);
+    await emit(tx, DOMAIN_EVENTS.ATTENDANCE_SESSION_SUBMITTED, {
+      sessionId,
+      classId: session.class_id,
+    });
+    return session;
+  }
 
   return parseSessionRow(row);
 }

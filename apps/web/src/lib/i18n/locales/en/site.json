@@ -309,7 +309,10 @@
       "FEE_INVOICE_ISSUED": "New fee invoices",
       "FEE_PAYMENT_RECEIVED": "Fee payments received",
       "FEE_PAYMENT_REMINDER": "Overdue fee reminders",
-      "FEE_STATEMENT": "Family fee statements"
+      "FEE_STATEMENT": "Family fee statements",
+      "ASSIGNMENT_PUBLISHED": "New assignments",
+      "ASSIGNMENT_GRADED": "Marked assignments",
+      "ATTENDANCE_MARKED": "Absences and lates"
     },
     "channels": {
       "in_app": "In-app",
