@@ -9,6 +9,7 @@ import 'package:studafy_mobile/src/core/auth/oauth_client.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/pill_navigation_bar.dart';
 
 import '../../support/fake_access_token.dart';
+import '../../support/fake_secure_token_store.dart';
 import '../../support/pump_studafy_app.dart';
 
 /// Member-ID + password sign-in driven through the real app: login screen, [AuthNotifier],
@@ -91,6 +92,97 @@ void main() {
     expect(requests, 1);
   });
 
+  testWidgets('the eye button shows and hides the password', (tester) async {
+    await _pumpWith(
+      tester,
+      (_) => _problem(401, 'AUTH_INVALID_CREDENTIALS', 'No.'),
+    );
+
+    await _enter(tester, 'memberSignInPassword', 'Blue-Kite-42');
+    bool obscured() => tester
+        .widget<EditableText>(
+          find.descendant(
+            of: find.byKey(const Key('memberSignInPassword')),
+            matching: find.byType(EditableText),
+          ),
+        )
+        .obscureText;
+
+    expect(obscured(), isTrue);
+    expect(find.byTooltip('Show password'), findsOneWidget);
+
+    await _tap(tester, 'memberSignInPasswordVisibility');
+    expect(obscured(), isFalse);
+    expect(find.byTooltip('Hide password'), findsOneWidget);
+
+    await _tap(tester, 'memberSignInPasswordVisibility');
+    expect(obscured(), isTrue);
+  });
+
+  testWidgets('"Remember me" keeps the ID after a successful sign-in', (
+    tester,
+  ) async {
+    final store = FakeSecureTokenStore();
+    await _pumpWith(tester, (_) => _signedIn(), secureStore: store);
+
+    final remember = tester.widget<CheckboxListTile>(
+      find.byKey(const Key('memberSignInRememberMe')),
+    );
+    expect(remember.value, isTrue);
+
+    await _enter(tester, 'memberSignInUsername', ' stu-100001 ');
+    await _enter(tester, 'memberSignInPassword', 'Blue-Kite-42');
+    await _tap(tester, 'memberSignInSubmit');
+
+    expect(find.byType(PillNavigationBar), findsOneWidget);
+    expect(store.rememberedMemberId, 'stu-100001');
+  });
+
+  testWidgets('a remembered ID is filled in on the sign-in form', (
+    tester,
+  ) async {
+    final store = FakeSecureTokenStore()..rememberedMemberId = 'STU-100001';
+    await _pumpWith(tester, (_) => _signedIn(), secureStore: store);
+
+    final field = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const Key('memberSignInUsername')),
+        matching: find.byType(EditableText),
+      ),
+    );
+    expect(field.controller.text, 'STU-100001');
+  });
+
+  testWidgets('unticking "Remember me" forgets the ID at sign-in', (
+    tester,
+  ) async {
+    final store = FakeSecureTokenStore()..rememberedMemberId = 'STU-100001';
+    await _pumpWith(tester, (_) => _signedIn(), secureStore: store);
+
+    await _tap(tester, 'memberSignInRememberMe');
+    await _enter(tester, 'memberSignInPassword', 'Blue-Kite-42');
+    await _tap(tester, 'memberSignInSubmit');
+
+    expect(find.byType(PillNavigationBar), findsOneWidget);
+    expect(store.rememberedMemberId, isNull);
+  });
+
+  testWidgets('a failed sign-in does not remember the ID', (tester) async {
+    final store = FakeSecureTokenStore();
+    await _pumpWith(
+      tester,
+      (_) => _problem(401, 'AUTH_INVALID_CREDENTIALS', 'No.'),
+      secureStore: store,
+    );
+
+    await _enter(tester, 'memberSignInUsername', 'STU-1OOOO1');
+    await _enter(tester, 'memberSignInPassword', 'wrong');
+    await _tap(tester, 'memberSignInSubmit');
+
+    expect(find.byKey(const Key('memberSignInError')), findsOneWidget);
+    expect(store.rememberedMemberId, isNull);
+  });
+
   testWidgets('a locked account says so', (tester) async {
     await _pumpWith(
       tester,
@@ -106,14 +198,24 @@ void main() {
   });
 }
 
+ResponseBody _signedIn() => _json(200, {
+  'access_token': fakeAccessToken(roles: const ['STUDENT'], sub: 'student'),
+  'token_type': 'Bearer',
+  'expires_in': 900,
+  'session_id': '00000000-0000-0000-0000-000000000001',
+  'refresh_token': 'refresh',
+});
+
 Future<void> _pumpWith(
   WidgetTester tester,
-  ResponseBody Function(RequestOptions options) respond,
-) {
+  ResponseBody Function(RequestOptions options) respond, {
+  FakeSecureTokenStore? secureStore,
+}) {
   final dio = Dio(BaseOptions(baseUrl: 'http://localhost'))
     ..httpClientAdapter = _FakeAdapter(respond);
   return pumpStudafyApp(
     tester,
+    secureStore: secureStore,
     extraOverrides: [
       authClientProvider.overrideWithValue(
         MobileAuthClient(baseUrl: 'http://localhost', dio: dio),
