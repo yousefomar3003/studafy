@@ -496,6 +496,8 @@ describe("structure", () => {
         // Notification preferences (ST-143). Per-user channel toggles, digest mode, and personal
         // attendance-alert threshold, all RLS-fenced to the authenticated user.
         "/api/notification-preferences",
+        "/api/notification-preferences/quiet-hours",
+        "/api/notifications/test",
         // Data subject requests (ST-268). File and check the status of a GDPR export/erasure
         // request for one user, PRIVACY_DSR_MANAGE-gated.
         "/api/privacy/dsr",
@@ -1132,6 +1134,9 @@ describe("security", () => {
         "GET /api/notifications/unread-count",
         // Notification preferences (ST-143). Self-service on the caller's own rows.
         "GET /api/notification-preferences",
+        "GET /api/notification-preferences/quiet-hours",
+        "PUT /api/notification-preferences/quiet-hours",
+        "POST /api/notifications/test",
         // Data subject requests (ST-268). Bearer-authenticated, then PRIVACY_DSR_MANAGE-gated.
         "GET /api/privacy/dsr",
         "GET /api/privacy/dsr/{requestId}",

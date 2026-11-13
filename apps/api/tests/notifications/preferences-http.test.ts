@@ -240,3 +240,69 @@ describeDb("notification preferences HTTP", () => {
     expect(res.status).toBe(401);
   });
 });
+
+describeDb("quiet hours and the test notification", () => {
+  test("quiet hours are off by default, can be set, and cleared", async () => {
+    const school = await createSchool(database!.sql);
+    const user = await createUserFactory(database!.sql, school.id);
+    const auth = { schoolId: school.id, userId: user.id };
+    const path = "/api/notification-preferences/quiet-hours";
+
+    const initial = await authenticatedRequest(harness!, "GET", path, auth);
+    expect(initial.status).toBe(200);
+    expect(await initial.json()).toMatchObject({ start: null, end: null });
+
+    const set = await authenticatedRequest(
+      harness!,
+      "PUT",
+      path,
+      auth,
+      jsonBody({ start: "22:00", end: "06:30" }),
+    );
+    expect(set.status).toBe(200);
+    expect(await set.json()).toMatchObject({ start: "22:00", end: "06:30" });
+
+    const cleared = await authenticatedRequest(
+      harness!,
+      "PUT",
+      path,
+      auth,
+      jsonBody({ start: null, end: null }),
+    );
+    expect(await cleared.json()).toMatchObject({ start: null, end: null });
+  });
+
+  test("half a window or a malformed time is refused", async () => {
+    const school = await createSchool(database!.sql);
+    const user = await createUserFactory(database!.sql, school.id);
+    const auth = { schoolId: school.id, userId: user.id };
+    const path = "/api/notification-preferences/quiet-hours";
+
+    for (const body of [
+      { start: "22:00", end: null },
+      { start: "25:00", end: "06:00" },
+    ]) {
+      const res = await authenticatedRequest(harness!, "PUT", path, auth, jsonBody(body));
+      expect(res.status).toBe(400);
+    }
+  });
+
+  test("the test button adds a test notice to the caller's inbox, at most every 20 seconds", async () => {
+    const school = await createSchool(database!.sql);
+    const user = await createUserFactory(database!.sql, school.id);
+    const auth = { schoolId: school.id, userId: user.id };
+
+    const first = await authenticatedRequest(harness!, "POST", "/api/notifications/test", auth);
+    expect(first.status).toBe(201);
+    const { notification_id } = (await first.json()) as { notification_id: string };
+
+    const [row] = await database!.sql<{ user_id: string; test: string }[]>`
+      SELECT user_id, metadata ->> 'test' AS test FROM app.notifications
+      WHERE id = ${notification_id}::uuid
+    `;
+    expect(row).toEqual({ user_id: user.id, test: "true" });
+
+    const again = await authenticatedRequest(harness!, "POST", "/api/notifications/test", auth);
+    expect(again.status).toBe(429);
+  });
+});

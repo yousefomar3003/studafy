@@ -484,13 +484,27 @@
         "resets": "يُعاد التعيين في {date}"
       },
       "features": {
-        "ask": { "label": "اسأل الذكاء الاصطناعي" },
-        "exam": { "label": "وضع الاختبار" },
-        "summary": { "label": "الملخّصات" },
-        "concepts": { "label": "المفاهيم الأساسية" },
-        "flashcards": { "label": "البطاقات التعليمية" },
-        "quiz": { "label": "الاختبارات القصيرة" },
-        "explain": { "label": "اشرحها ببساطة" }
+        "ask": {
+          "label": "اسأل الذكاء الاصطناعي"
+        },
+        "exam": {
+          "label": "وضع الاختبار"
+        },
+        "summary": {
+          "label": "الملخّصات"
+        },
+        "concepts": {
+          "label": "المفاهيم الأساسية"
+        },
+        "flashcards": {
+          "label": "البطاقات التعليمية"
+        },
+        "quiz": {
+          "label": "الاختبارات القصيرة"
+        },
+        "explain": {
+          "label": "اشرحها ببساطة"
+        }
       }
     },
     "usage": {
@@ -663,7 +677,10 @@
       "failed": "تعذّرت قراءة هذه الصورة. حاول مرة أخرى."
     },
     "assistantName": "مساعد ستودافي",
-    "copy": { "action": "نسخ الإجابة", "done": "تم نسخ الإجابة" },
+    "copy": {
+      "action": "نسخ الإجابة",
+      "done": "تم نسخ الإجابة"
+    },
     "signedOut": "سجّل الدخول لطرح سؤال على مساعد ستودافي.",
     "thinking": "جارٍ التفكير…",
     "empty": {
@@ -2147,51 +2164,65 @@
     },
     "notifications": {
       "title": "الإشعارات",
-      "intro": "اختر كيف يصلك كل نوع من الإشعارات: داخل التطبيق، أو كإشعار فوري، أو عبر البريد الإلكتروني.",
       "loadError": "تعذّر تحميل إعدادات الإشعارات.",
-      "saveFailed": "تعذّر حفظ هذا التغيير. تحقق من اتصالك وحاول مرة أخرى.",
-      "mandatory": "تشترط مدرستك هذا الإشعار.",
-      "categories": {
-        "academic": "الشؤون الأكاديمية",
-        "communications": "التواصل",
-        "family": "العائلة",
-        "teaching": "المواد التعليمية"
-      },
+      "saveFailed": "تعذّر حفظ هذا التغيير. حاول مرة أخرى.",
+      "mandatory": "مطلوب من مدرستك",
       "channels": {
-        "inApp": "داخل التطبيق",
-        "push": "إشعار فوري",
-        "email": "البريد الإلكتروني"
+        "push": "الهاتف",
+        "email": "البريد"
       },
-      "types": {
-        "assignmentDueSoon": "اقتراب موعد تسليم واجب",
-        "gradePosted": "نشر درجة",
-        "enrollmentApproved": "قبول التسجيل",
-        "coursePublished": "نشر مقرر",
-        "discussionReply": "الردود على النقاشات",
-        "studyGroupInvite": "دعوات مجموعات الدراسة",
-        "certificateIssued": "إصدار شهادة",
-        "supportMessage": "رسائل الدعم",
-        "attendanceAlert": "تنبيهات الحضور",
-        "adminAnnouncement": "إعلانات المدرسة",
-        "announcement": "إعلانات الصف",
-        "materialScanQuarantined": "ملف حظره الفحص الأمني",
-        "materialScanFailed": "فشل الفحص الأمني للملف",
-        "materialOcrLowConfidence": "صعوبة قراءة نص الملف",
-        "materialIngested": "الملف جاهز للذكاء الاصطناعي",
-        "materialIngestFailed": "تعذّر تجهيز الملف للذكاء الاصطناعي",
-        "directMessage": "الرسائل",
-        "assignmentPublished": "الواجبات الجديدة",
-        "assignmentGraded": "الواجبات المصححة",
-        "attendanceMarked": "الغياب والتأخير",
-        "feeInvoiceIssued": "فواتير الرسوم الجديدة",
-        "feePaymentReceived": "استلام دفعات الرسوم",
-        "feePaymentReminder": "تذكير بالرسوم المتأخرة",
-        "feeStatement": "كشوف رسوم العائلة",
-        "licenseSeatAppleRenewal": "خطة المدرسة تغطي اشتراكك",
-        "licenseExpiring": "قرب انتهاء الترخيص",
-        "licenseInvoiceDue": "استحقاق فاتورة الترخيص",
-        "licenseInvoiceOverdue": "تأخر فاتورة الترخيص",
-        "licenseReceiptUploaded": "رفع إيصال الترخيص"
+      "phone": {
+        "title": "الإشعارات على هذا الهاتف",
+        "on": "مفعّلة. تظهر الإشعارات على شاشة القفل وكتنبيهات.",
+        "off": "متوقفة من إعدادات الهاتف، لذلك لا يمكن أن يظهر شيء على هذا الهاتف.",
+        "notAsked": "لم تُفعّل بعد.",
+        "unavailable": "غير متاحة في هذا الإصدار من التطبيق.",
+        "checking": "جارٍ التحقق…",
+        "turnOn": "تفعيل الإشعارات",
+        "openSettings": "افتح الإعدادات لتفعيلها",
+        "sendTest": "إرسال إشعار تجريبي",
+        "testSent": "تم الإرسال. سيصل إلى هذا الهاتف خلال ثوانٍ.",
+        "testFailed": "تعذّر إرسال الإشعار التجريبي. انتظر قليلاً وحاول مرة أخرى."
+      },
+      "kinds": {
+        "title": "ما الذي أريد أن أُبلّغ به",
+        "intro": "يظهر كل شيء دائماً تحت الجرس. تحدد هذه المفاتيح ما يصل أيضاً إلى هاتفك أو بريدك.",
+        "assignments": {
+          "title": "الواجبات",
+          "subtitle": "واجبات جديدة وتذكير بموعد التسليم"
+        },
+        "grades": {
+          "title": "العلامات",
+          "subtitle": "العلامات المنشورة والشهادات"
+        },
+        "attendance": {
+          "title": "الحضور",
+          "subtitle": "الغياب والتأخر"
+        },
+        "messages": {
+          "title": "الرسائل",
+          "subtitle": "رسائل المحادثة الجديدة"
+        },
+        "announcements": {
+          "title": "الإعلانات",
+          "subtitle": "أخبار المدرسة والمعلمين"
+        },
+        "fees": {
+          "title": "الرسوم والفواتير",
+          "subtitle": "الفواتير والدفعات والتذكيرات"
+        },
+        "schoolUpdates": {
+          "title": "تحديثات المدرسة",
+          "subtitle": "التسجيل والمقررات وتحديثات أخرى"
+        }
+      },
+      "quiet": {
+        "title": "ساعات الهدوء",
+        "toggle": "ساعات الهدوء",
+        "subtitle": "لا إشعارات على الهاتف في هذه الساعات. تصل الإشعارات العاجلة رغم ذلك.",
+        "from": "من",
+        "until": "حتى",
+        "timezone": "الأوقات بتوقيت {zone}"
       }
     },
     "staffRecord": {

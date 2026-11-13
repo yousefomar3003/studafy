@@ -5,8 +5,10 @@ import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../api/auth_interceptor.dart';
 import '../router/route_paths.dart';
@@ -40,6 +42,32 @@ String? resolveNotificationTapRoute(Map<String, dynamic> data) {
   return type is String && type.isNotEmpty ? RoutePaths.notifications : null;
 }
 
+/// A tapped notification: where to go, and which account it was for. [userId] is the recipient
+/// the server named in the payload (`user_id`); on a phone with several signed-in accounts the app
+/// switches to that account before opening [route]. Null on payloads from older servers.
+@immutable
+class PushTap {
+  const PushTap(this.route, {this.userId});
+
+  final String route;
+  final String? userId;
+}
+
+/// What the phone allows for this app's notifications.
+enum PushPermission {
+  /// Notifications show (including iOS "provisional", delivered quietly).
+  granted,
+
+  /// Turned off in the phone's settings, or refused. Only the settings app can turn them back on.
+  denied,
+
+  /// Never asked yet: the app can show the OS prompt.
+  notDetermined,
+
+  /// Push isn't available in this build (no Firebase configuration).
+  unavailable,
+}
+
 /// [pushServiceProvider]'s contract — the surface [StudafyApp] and [PushSetupNotifier] depend on.
 ///
 /// A real deployment always gets [FirebasePushService]; widget tests override the provider with a
@@ -50,8 +78,8 @@ abstract class PushService {
   /// Stream of messages received while the app is in the foreground.
   Stream<RemoteMessage> get onMessage;
 
-  /// Stream of deep-link routes extracted from notification taps.
-  Stream<String> get onNotificationTap;
+  /// Taps on notifications, with the route to open and the account they were for.
+  Stream<PushTap> get onNotificationTap;
 
   /// Initialize Firebase and, if notification permission is already granted, get the token and
   /// register it with the API. Never shows the OS permission prompt — see [requestPermission].
@@ -69,6 +97,20 @@ abstract class PushService {
   /// Manually trigger registration (e.g. after login when the service was
   /// already initialized but had no auth token at the time).
   Future<void> registerIfAuthenticated();
+
+  /// This phone's push token, or null when push isn't set up (no permission, no Firebase). Never
+  /// prompts. Sent on sign-out so the server stops routing that account's notices here.
+  Future<String?> currentToken();
+
+  /// Registers this phone's token for another signed-in account, using that account's own access
+  /// token: a child's account a parent just added to the phone, which is not the active one.
+  Future<void> registerForAccount(String accessToken);
+
+  /// What the phone currently allows. Never prompts.
+  Future<PushPermission> permissionStatus();
+
+  /// Opens this app's notification settings in the phone's Settings app.
+  Future<void> openSystemSettings();
 
   /// Tear down listeners. Call on logout or app dispose.
   void dispose();
@@ -100,21 +142,21 @@ class FirebasePushService implements PushService {
   late final FlutterLocalNotificationsPlugin _localNotifications;
 
   final _messageController = StreamController<RemoteMessage>.broadcast();
-  final _tapController = StreamController<String>.broadcast();
+  final _tapController = StreamController<PushTap>.broadcast();
 
   StreamSubscription<RemoteMessage>? _foregroundSub;
   StreamSubscription<RemoteMessage>? _tapSub;
   StreamSubscription<String>? _tokenRefreshSub;
 
   bool _initialized = false;
+  bool _messagingStarted = false;
 
   /// Stream of messages received while the app is in the foreground.
   @override
   Stream<RemoteMessage> get onMessage => _messageController.stream;
 
-  /// Stream of deep-link routes extracted from notification taps.
   @override
-  Stream<String> get onNotificationTap => _tapController.stream;
+  Stream<PushTap> get onNotificationTap => _tapController.stream;
 
   @override
   Future<String?> initialize() async {
@@ -126,12 +168,14 @@ class FirebasePushService implements PushService {
     await _initLocalNotifications();
 
     final settings = await _messaging.getNotificationSettings();
-    if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-      return null;
-    }
+    if (!_allowed(settings.authorizationStatus)) return null;
 
     return _startMessaging();
   }
+
+  static bool _allowed(AuthorizationStatus status) =>
+      status == AuthorizationStatus.authorized ||
+      status == AuthorizationStatus.provisional;
 
   @override
   Future<bool> canRequestPermission() async {
@@ -159,16 +203,31 @@ class FirebasePushService implements PushService {
       badge: true,
       sound: true,
     );
-    if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-      return null;
-    }
+    if (!_allowed(settings.authorizationStatus)) return null;
 
+    if (!_initialized) {
+      _initialized = true;
+      await _initLocalNotifications();
+    }
     return _startMessaging();
   }
 
   /// Listen for messages and token refreshes, register the token, and handle the notification
   /// that launched the app, if any. Runs once permission is granted.
   Future<String?> _startMessaging() async {
+    if (_messagingStarted) {
+      final token = await _messaging.getToken();
+      if (token != null) await _registerToken(token);
+      return token;
+    }
+    _messagingStarted = true;
+    // iOS shows a notice that arrives while the app is open as a normal banner. Android does not,
+    // which is why _onForegroundMessage posts a local notification there.
+    await _messaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
     // `onMessage` / `onMessageOpenedApp` are static on `FirebaseMessaging`; only
     // `onTokenRefresh` is an instance stream.
     _foregroundSub = FirebaseMessaging.onMessage.listen(_onForegroundMessage);
@@ -192,10 +251,62 @@ class FirebasePushService implements PushService {
   /// already initialized but had no auth token at the time).
   @override
   Future<void> registerIfAuthenticated() async {
-    await _ensureFirebase();
-    final token = await _messaging.getToken();
+    final token = await currentToken();
     if (token != null) {
       await _registerToken(token);
+    }
+  }
+
+  @override
+  Future<String?> currentToken() async {
+    try {
+      await _ensureFirebase();
+      final settings = await _messaging.getNotificationSettings();
+      if (!_allowed(settings.authorizationStatus)) return null;
+      return await _messaging.getToken();
+    } catch (e) {
+      // No Firebase configuration in this build, or (iOS) no APNs token yet.
+      debugPrint('FCM token unavailable: $e');
+      return null;
+    }
+  }
+
+  @override
+  Future<void> registerForAccount(String accessToken) async {
+    final token = await currentToken();
+    if (token != null) {
+      await _registerToken(token, bearerToken: accessToken);
+    }
+  }
+
+  @override
+  Future<PushPermission> permissionStatus() async {
+    try {
+      await _ensureFirebase();
+      final settings = await _messaging.getNotificationSettings();
+      return switch (settings.authorizationStatus) {
+        AuthorizationStatus.authorized ||
+        AuthorizationStatus.provisional => PushPermission.granted,
+        AuthorizationStatus.notDetermined => PushPermission.notDetermined,
+        AuthorizationStatus.denied =>
+          await canRequestPermission()
+              ? PushPermission.notDetermined
+              : PushPermission.denied,
+      };
+    } catch (_) {
+      return PushPermission.unavailable;
+    }
+  }
+
+  static const _systemSettings = MethodChannel('studafy/system_settings');
+
+  @override
+  Future<void> openSystemSettings() async {
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      await _systemSettings.invokeMethod<bool>('openNotificationSettings');
+    } else {
+      // UIApplication.openSettingsURLString: this app's page in the Settings app.
+      await launchUrl(Uri.parse('app-settings:'));
     }
   }
 
@@ -228,7 +339,12 @@ class FirebasePushService implements PushService {
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
     );
-    const iosSettings = DarwinInitializationSettings();
+    // No prompts from this plugin: the app asks through Firebase Messaging, after explaining why.
+    const iosSettings = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
     const settings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
@@ -260,6 +376,9 @@ class FirebasePushService implements PushService {
   void _onForegroundMessage(RemoteMessage message) {
     _messageController.add(message);
 
+    // iOS already shows the banner (setForegroundNotificationPresentationOptions); a local copy
+    // there would show it twice.
+    if (defaultTargetPlatform != TargetPlatform.android) return;
     final notification = message.notification;
     if (notification == null) return;
 
@@ -286,7 +405,13 @@ class FirebasePushService implements PushService {
   void _handleTap(Map<String, dynamic> data) {
     final route = resolveNotificationTapRoute(data);
     if (route != null) {
-      _tapController.add(route);
+      final userId = data['user_id'];
+      _tapController.add(
+        PushTap(
+          route,
+          userId: userId is String && userId.isNotEmpty ? userId : null,
+        ),
+      );
     }
   }
 
@@ -294,8 +419,8 @@ class FirebasePushService implements PushService {
     await _registerToken(token);
   }
 
-  Future<void> _registerToken(String fcmToken) async {
-    final bearerToken = await _getToken();
+  Future<void> _registerToken(String fcmToken, {String? bearerToken}) async {
+    bearerToken ??= await _getToken();
     if (bearerToken == null) return;
 
     final platform = defaultTargetPlatform == TargetPlatform.iOS
@@ -305,7 +430,13 @@ class FirebasePushService implements PushService {
     try {
       await _dio.post(
         '/api/auth/devices',
-        data: {'fcm_token': fcmToken, 'platform': platform},
+        // Every account signed in on this phone keeps receiving its notices; each one removes its
+        // own registration when it signs out (fcm_token on POST /api/auth/logout).
+        data: {
+          'fcm_token': fcmToken,
+          'platform': platform,
+          'keep_other_accounts': true,
+        },
         options: Options(headers: {'Authorization': 'Bearer $bearerToken'}),
       );
     } catch (e) {
