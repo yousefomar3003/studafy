@@ -40,6 +40,17 @@ when it required the `version-bump` label.
   `endsAt`), the in-force manual storage grant or null.
 - `GET /api/platform/finance` gains `manualPaymentsLast30Days` (`PlatformManualPaymentTotals`):
   amounts recorded on manual grants in the last 30 days, per currency.
+- Platform console account support: `GET /api/platform/schools/{schoolId}/users/{userId}`
+  (`PlatformSupportUser`, `PlatformSupportLinkedPerson`) is a read-only panel of one account — its
+  school, roles, status, activation, sign-in methods and lockout, live session count, latest
+  invitation, linked children or parents by name, and whether it is the operator's own (`isSelf`)
+  or another platform administrator's (`actionable: false`). Actions, each with a required `reason`
+  (`PlatformSupportActionBody`) recorded in the school's and the operator's audit log:
+  `POST .../invitation/resend` (`PlatformSupportInvitationResent`; the token is only emailed),
+  `POST .../sessions/revoke` (`PlatformSupportSignedOut`), `POST .../unlock`
+  (`PlatformSupportUnlocked`), `POST .../deactivate` and `POST .../reactivate`
+  (`PlatformSupportStatusChanged`). Reading needs `platform:read`, actions `platform:manage`; web
+  only. Another SUPER_ADMIN's account is refused; there is no impersonation route.
 - Moving students to the next year: `GET /api/academics/promotions/preview?source_year_id=&target_year_id=`
   (`PromotionPreview`, `PromotionPreviewStudent`, `PromotionTargetSection`) proposes a target-year
   destination for every student placed in the source year from their current annual result

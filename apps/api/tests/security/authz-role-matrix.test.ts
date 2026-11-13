@@ -889,6 +889,22 @@ const GUARD_CASES: GuardCase[] = [
     source: "imports/routes/import-signal-routes.ts",
     allowedRole: ROLES.SUPER_ADMIN,
   },
+  // Platform console per-account support: the panel on platform:read, every action on
+  // platform:manage. Unlock is the probe for the actions: it is idempotent and touches no session.
+  {
+    method: "GET",
+    path: "/api/platform/schools/{schoolId}/users/{userId}",
+    permission: "platform:read",
+    source: "platform/user-support-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  {
+    method: "POST",
+    path: "/api/platform/schools/{schoolId}/users/{userId}/unlock",
+    permission: "platform:manage",
+    source: "platform/user-support-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
   // Staff and class records (000181). Literal subject kinds on record-imports: each kind has its
   // own guard, mounted on its own path.
   {
