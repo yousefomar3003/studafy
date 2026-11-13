@@ -18,6 +18,11 @@ const int askAiQuestionMaxChars = 2000;
 class AskAiMaterialScope {
   const AskAiMaterialScope({required this.id, required this.title});
 
+  /// "All my materials": what the material sheet returns to clear a single-material scope.
+  static const all = AskAiMaterialScope(id: '', title: '');
+
+  bool get isAll => id.isEmpty;
+
   final String id;
   final String title;
 
@@ -63,6 +68,7 @@ class AskAiController extends ChangeNotifier {
   AskAiMaterialScope? get materialScope => _materialScope;
 
   set materialScope(AskAiMaterialScope? scope) {
+    if (scope != null && scope.isAll) scope = null;
     if (scope == _materialScope) return;
     _materialScope = scope;
     notifyListeners();
