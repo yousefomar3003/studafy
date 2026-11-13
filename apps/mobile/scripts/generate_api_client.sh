@@ -18,6 +18,7 @@ dart run swagger_parser generate
 # the fix. Both are no-ops against already-correct output, so this is safe to run unconditionally.
 dart run scripts/fix_sealed_union_imports.dart
 dart run scripts/fix_boolean_enum_literals.dart
+dart run scripts/fix_optional_null_fields.dart
 
 dart run build_runner build --delete-conflicting-outputs
 
