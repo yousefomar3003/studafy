@@ -330,6 +330,62 @@ describeDb("deleting a file frees its storage", () => {
     expect(await meter(tenant.schoolId)).toBe(0);
   });
 
+  test("material upload with the mobile client's bodies: explicit nulls are refused, omitted keys work", async () => {
+    const tenant = await newTenant();
+    const body = {
+      class_id: tenant.cls.id,
+      title: "math",
+      description: "math to study",
+      original_file_name: `Studafy TAM SAM SOM ${crypto.randomUUID().slice(0, 8)}.pdf`,
+      mime_type: "application/pdf",
+      size_bytes: 5_000,
+    };
+    // What builds up to 1485 sent: every unset optional key as an explicit null.
+    const withNull = await request(
+      tenant,
+      teacher(tenant),
+      "POST",
+      "/api/academics/materials/upload",
+      {
+        ...body,
+        checksum_sha256: null,
+      },
+    );
+    expect(withNull.status).toBe(400);
+
+    // What the client sends now (scripts/fix_optional_null_fields.dart): the key left out.
+    const started = await request(
+      tenant,
+      teacher(tenant),
+      "POST",
+      "/api/academics/materials/upload",
+      body,
+    );
+    expect(started.status).toBe(201);
+    const { storage_key: key } = (await started.json()) as { storage_key: string };
+    storage.objects.set(key, { contentType: "application/pdf", sizeBytes: 5_000 });
+    const listed = await request(
+      tenant,
+      teacher(tenant),
+      "GET",
+      `/api/academics/materials?class_id=${tenant.cls.id}&limit=100`,
+    );
+    expect(listed.status).toBe(200);
+    const { materials } = (await listed.json()) as {
+      materials: { id: string; storage_key: string }[];
+    };
+    const pending = materials.find((m) => m.storage_key === key);
+    expect(pending).toBeDefined();
+    const confirmed = await request(
+      tenant,
+      teacher(tenant),
+      "POST",
+      `/api/academics/materials/${pending!.id}/confirm`,
+      { storage_key: key },
+    );
+    expect(confirmed.status).toBe(200);
+  });
+
   test("a material is freed together with its thumbnail and preview", async () => {
     const tenant = await newTenant();
     const started = await request(

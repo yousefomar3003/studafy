@@ -103,6 +103,12 @@ A fourth tag (`AI`) is scoped out for a structural reason rather than a bug — 
   A `oneOf` variant with an inline enum property (e.g. a discriminated request body) gets a
   correctly-generated enum file that the variant's own file never imports, so it fails to
   compile. Fixed by adding the missing import — no schema semantics change.
+- **Unset optional request fields are sent as `null`**
+  ([`scripts/fix_optional_null_fields.dart`](../../../../scripts/fix_optional_null_fields.dart)).
+  `@JsonSerializable()` defaults to `includeIfNull: true`, but the API's Zod `.optional()` accepts
+  a missing key and rejects `null` (400). This broke material upload and submission attachments.
+  Fixed by adding `includeIfNull: false` to request-body fields that are optional and not
+  nullable; nullable fields keep sending `null`, which on PATCH means "clear".
 - **Boolean single-value enums use a quoted string literal**
   ([`scripts/fix_boolean_enum_literals.dart`](../../../../scripts/fix_boolean_enum_literals.dart)).
   This API's recurring "always-true acknowledgement" idiom
