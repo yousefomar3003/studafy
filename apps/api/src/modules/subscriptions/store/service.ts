@@ -461,6 +461,14 @@ export async function handleGooglePlayNotification(
     }
     throw error;
   }
+  if (notification.otherPackage) {
+    // Another app's RTDN topic points at this endpoint: Play Console needs fixing, not the payload.
+    logger.warn(
+      { package: notification.otherPackage, eventId: notification.eventId },
+      "google play notification for another package ignored",
+    );
+    return "ignored";
+  }
   if (!notification.kind || !notification.purchaseToken) return "ignored";
 
   const subscription = await store.google.getSubscription(notification.purchaseToken);

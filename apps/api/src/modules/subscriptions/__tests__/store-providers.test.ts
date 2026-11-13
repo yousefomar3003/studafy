@@ -224,12 +224,25 @@ describe("Google Play", () => {
     ).toBeNull();
   });
 
-  test("refuses another package's notification and anything that is not a push", () => {
+  test("marks another package's notification inert instead of refusing it", () => {
     const { store } = playServing({});
 
-    expect(() => store.parseNotification(push({ packageName: "com.other.app" }))).toThrow(
-      StoreVerificationError,
+    // Refusing it would only make Pub/Sub redeliver it for days; it must still change nothing.
+    const notification = store.parseNotification(
+      push({
+        packageName: "com.other.app",
+        subscriptionNotification: { notificationType: 13, purchaseToken: "tok" },
+      }),
     );
+
+    expect(notification.otherPackage).toBe("com.other.app");
+    expect(notification.kind).toBeNull();
+    expect(notification.purchaseToken).toBeNull();
+  });
+
+  test("refuses anything that is not a Pub/Sub push", () => {
+    const { store } = playServing({});
+
     expect(() => store.parseNotification({ hello: "world" })).toThrow(StoreVerificationError);
   });
 });
