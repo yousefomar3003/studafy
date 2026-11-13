@@ -3,6 +3,7 @@ import { Button, Card, Checkbox, Input, Modal, Select, useToast } from "@studafy
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { LinkButton } from "../../../components/LinkButton";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { PlatformPageHeader } from "../PlatformNav";
 
@@ -36,7 +37,9 @@ export default function LicensesPage() {
         title={t("platformLicensing.licenses.title")}
         description={t("platformLicensing.licenses.description")}
         actions={
-          <Link to="/portal/platform/quotes">{t("platformLicensing.licenses.newQuote")}</Link>
+          <LinkButton href="/portal/platform/quotes" variant="secondary">
+            {t("platformLicensing.licenses.newQuote")}
+          </LinkButton>
         }
       />
 
@@ -99,64 +102,70 @@ function LicenseTable({ licenses }: { licenses: ConsoleLicense[] }) {
   const { formatDate, formatNumber } = useFormatters();
   const money = useMoney();
   return (
-    <table className="platform-table">
-      <caption className="sf-visually-hidden">{t("platformLicensing.licenses.listTitle")}</caption>
-      <thead>
-        <tr>
-          <th scope="col">{t("platformLicensing.licenses.columns.school")}</th>
-          <th scope="col">{t("platformLicensing.licenses.columns.status")}</th>
-          <th scope="col">{t("platformLicensing.licenses.columns.period")}</th>
-          <th scope="col">{t("platformLicensing.licenses.columns.seats")}</th>
-          <th scope="col">{t("platformLicensing.licenses.columns.balance")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {licenses.map((license) => (
-          <tr key={license.id}>
-            <td>
-              <Link to={`/portal/platform/schools/${license.schoolId}`}>{license.schoolName}</Link>
-            </td>
-            <td>
-              <LicenseStatusPill status={license.status} />
-            </td>
-            <td>
-              <div className="platform-cell-stack">
-                <span>
-                  {formatDate(new Date(license.startsAt), { dateStyle: "medium" })} –{" "}
-                  {formatDate(new Date(license.endsAt), { dateStyle: "medium" })}
-                </span>
-                {license.status === "active" && license.daysLeft >= 0 ? (
-                  <span className="platform-muted">
-                    {t("platformLicensing.licenses.daysLeft", { count: license.daysLeft })}
-                  </span>
-                ) : null}
-              </div>
-            </td>
-            <td>
-              <div className="platform-cell-stack">
-                {license.audiences
-                  .filter((a) => a.purchased > 0)
-                  .map((a) => (
-                    <span key={a.audience}>
-                      {t("platformLicensing.licenses.seatsCell", {
-                        audience: t(`platformLicensing.audience.${a.audience}`),
-                        assigned: formatNumber(a.assigned),
-                        purchased: formatNumber(a.purchased),
-                      })}
-                      <SeatMeter assigned={a.assigned} purchased={a.purchased} />
-                    </span>
-                  ))}
-              </div>
-            </td>
-            <td className="licensing-amount">
-              {license.balanceMinor > 0
-                ? money(license.balanceMinor, license.currencyCode, license.minorUnit)
-                : "—"}
-            </td>
+    <div className="platform-table-scroll">
+      <table className="platform-table">
+        <caption className="sf-visually-hidden">
+          {t("platformLicensing.licenses.listTitle")}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">{t("platformLicensing.licenses.columns.school")}</th>
+            <th scope="col">{t("platformLicensing.licenses.columns.status")}</th>
+            <th scope="col">{t("platformLicensing.licenses.columns.period")}</th>
+            <th scope="col">{t("platformLicensing.licenses.columns.seats")}</th>
+            <th scope="col">{t("platformLicensing.licenses.columns.balance")}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {licenses.map((license) => (
+            <tr key={license.id}>
+              <td>
+                <Link to={`/portal/platform/schools/${license.schoolId}`}>
+                  {license.schoolName}
+                </Link>
+              </td>
+              <td>
+                <LicenseStatusPill status={license.status} />
+              </td>
+              <td>
+                <div className="platform-cell-stack">
+                  <span>
+                    {formatDate(new Date(license.startsAt), { dateStyle: "medium" })} –{" "}
+                    {formatDate(new Date(license.endsAt), { dateStyle: "medium" })}
+                  </span>
+                  {license.status === "active" && license.daysLeft >= 0 ? (
+                    <span className="platform-muted">
+                      {t("platformLicensing.licenses.daysLeft", { count: license.daysLeft })}
+                    </span>
+                  ) : null}
+                </div>
+              </td>
+              <td>
+                <div className="platform-cell-stack">
+                  {license.audiences
+                    .filter((a) => a.purchased > 0)
+                    .map((a) => (
+                      <span key={a.audience}>
+                        {t("platformLicensing.licenses.seatsCell", {
+                          audience: t(`platformLicensing.audience.${a.audience}`),
+                          assigned: formatNumber(a.assigned),
+                          purchased: formatNumber(a.purchased),
+                        })}
+                        <SeatMeter assigned={a.assigned} purchased={a.purchased} />
+                      </span>
+                    ))}
+                </div>
+              </td>
+              <td className="licensing-amount">
+                {license.balanceMinor > 0
+                  ? money(license.balanceMinor, license.currencyCode, license.minorUnit)
+                  : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

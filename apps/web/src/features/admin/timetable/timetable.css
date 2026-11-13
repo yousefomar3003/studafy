@@ -388,7 +388,9 @@
   grid-area: class;
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
-  overflow-wrap: anywhere;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* The lesson's grade section ("10-C"), shown while the grid isn't already filtered to one. */

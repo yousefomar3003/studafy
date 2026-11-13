@@ -179,15 +179,28 @@
 
 .home-shortcuts__list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(180px, 100%), 1fr));
+  /* Wide enough for the longest shortcut label on one line. */
+  grid-template-columns: repeat(auto-fill, minmax(min(210px, 100%), 1fr));
   gap: var(--space-4) var(--space-16);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Every cell in a row stretches to the tallest one, so the underlines line up even when a
+   label wraps onto a second line. */
+.home-shortcuts__list > li {
+  display: flex;
+}
+
 .home-shortcuts__link {
   display: block;
+  flex: 1;
+  min-width: 0;
+  /* Shortcuts are always one line; a label too long for its column is cut with "…", never wrapped. */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   padding: var(--space-8) 0;
   border-block-end: 1px solid var(--color-border);
   font-size: var(--font-size-sm);
@@ -230,8 +243,14 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  /* An odd last KPI spans the row, so no empty (divider-grey) cell is left beside it. */
+  .home-summary__item:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  /* One column on a phone: two would be too narrow to keep each label on one line. */
   .home-shortcuts__list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .home-summary__cell {

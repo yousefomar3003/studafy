@@ -7,7 +7,8 @@
 
 .portal-shell {
   display: grid;
-  grid-template-columns: 248px 1fr;
+  /* minmax(0, 1fr): the content column never grows past the viewport to fit wide content. */
+  grid-template-columns: 248px minmax(0, 1fr);
   /* minmax(0, …) lets the row shrink to the viewport so the sidebar and content scroll inside it. */
   grid-template-rows: 64px minmax(0, 1fr);
   grid-template-areas: "header header" "sidebar content";
@@ -67,7 +68,19 @@
   display: flex;
   align-items: center;
   gap: var(--space-8);
+  min-width: 0;
   margin-inline-start: auto;
+}
+
+@media (max-width: 768px) {
+  .portal-header {
+    gap: var(--space-8);
+    padding-inline: var(--space-16);
+  }
+
+  .portal-header__actions {
+    gap: var(--space-4);
+  }
 }
 
 /* Sidebar */
@@ -476,7 +489,8 @@
 
 @media (max-width: 768px) {
   .portal-shell {
-    grid-template-columns: 1fr;
+    /* A plain 1fr grows to the header's full width (~530px), pushing every phone page off-screen. */
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas: "header" "content";
   }
 
@@ -508,7 +522,7 @@
    its accessible name; the link's `title` (set in PortalSidebar) is the sighted tooltip. */
 @media (min-width: 769px) {
   .portal-shell[data-nav-collapsed] {
-    grid-template-columns: 72px 1fr;
+    grid-template-columns: 72px minmax(0, 1fr);
   }
 
   .portal-sidebar[data-collapsed] .portal-nav__label {

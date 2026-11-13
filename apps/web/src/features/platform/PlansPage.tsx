@@ -115,50 +115,55 @@ function PlanCard({ plan, onEdit }: { plan: PlatformPlan; onEdit: () => void }) 
         {plan.prices.length === 0 ? (
           <p className="platform-muted">{t("platform.plans.noPrices")}</p>
         ) : (
-          <table className="platform-table">
-            <caption className="sf-visually-hidden">
-              {t("platform.plans.pricesCaption", { plan: plan.displayName })}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">{t("platform.plans.columns.currency")}</th>
-                <th scope="col">{t("platform.plans.columns.interval")}</th>
-                <th scope="col">{t("platform.plans.columns.amount")}</th>
-                <th scope="col">{t("platform.plans.columns.available")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {plan.prices.map((price) => (
-                <tr key={price.id}>
-                  <td>{price.currencyCode}</td>
-                  <td>
-                    {t(`platform.plans.interval.${price.billingInterval}`, {
-                      defaultValue: price.billingInterval,
-                    })}
-                  </td>
-                  <td>
-                    {formatCurrency(price.amountMinor / 10 ** price.minorUnit, price.currencyCode)}
-                  </td>
-                  <td>
-                    <Checkbox
-                      label={t("platform.plans.priceAvailable", {
-                        currency: price.currencyCode,
-                        interval: price.billingInterval,
-                      })}
-                      checked={price.isActive}
-                      disabled={updatePrice.isPending}
-                      onChange={(event) =>
-                        updatePrice.mutate(
-                          { planId: plan.id, priceId: price.id, isActive: event.target.checked },
-                          { onError },
-                        )
-                      }
-                    />
-                  </td>
+          <div className="platform-table-scroll">
+            <table className="platform-table">
+              <caption className="sf-visually-hidden">
+                {t("platform.plans.pricesCaption", { plan: plan.displayName })}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">{t("platform.plans.columns.currency")}</th>
+                  <th scope="col">{t("platform.plans.columns.interval")}</th>
+                  <th scope="col">{t("platform.plans.columns.amount")}</th>
+                  <th scope="col">{t("platform.plans.columns.available")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {plan.prices.map((price) => (
+                  <tr key={price.id}>
+                    <td>{price.currencyCode}</td>
+                    <td>
+                      {t(`platform.plans.interval.${price.billingInterval}`, {
+                        defaultValue: price.billingInterval,
+                      })}
+                    </td>
+                    <td>
+                      {formatCurrency(
+                        price.amountMinor / 10 ** price.minorUnit,
+                        price.currencyCode,
+                      )}
+                    </td>
+                    <td>
+                      <Checkbox
+                        label={t("platform.plans.priceAvailable", {
+                          currency: price.currencyCode,
+                          interval: price.billingInterval,
+                        })}
+                        checked={price.isActive}
+                        disabled={updatePrice.isPending}
+                        onChange={(event) =>
+                          updatePrice.mutate(
+                            { planId: plan.id, priceId: price.id, isActive: event.target.checked },
+                            { onError },
+                          )
+                        }
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card.Body>
     </Card>

@@ -160,4 +160,20 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "{schoolName} uploaded a bank transfer receipt for invoice {invoiceNumber}. Record the payment and match the receipt to it in the license console.",
   },
+  [NOTIFICATION_TYPES.ASSIGNMENT_PUBLISHED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "New assignment: {assignmentTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{who}{courseName} · due {dueDate}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "A new assignment, {assignmentTitle}, was posted in {courseName}. It is due on {dueDate}.",
+  },
+  [NOTIFICATION_TYPES.ASSIGNMENT_GRADED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Marked: {assignmentTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{who}{result}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "{assignmentTitle} in {courseName} has been marked: {result}.",
+  },
+  [NOTIFICATION_TYPES.ATTENDANCE_MARKED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{studentName} was marked {status}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{courseName} · {date}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "{studentName} was marked {status} in {courseName} on {date}.",
+  },
 } as const satisfies LocaleTemplateSet;

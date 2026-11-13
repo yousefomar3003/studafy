@@ -3,17 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/generated/models/child_comparison_item.dart';
+import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/parent_providers.dart';
 import 'widgets/child_assignments_view.dart';
 import 'widgets/child_attendance_view.dart';
 import 'widgets/child_detail_placeholders.dart';
 import 'widgets/child_finance_view.dart';
 import 'widgets/child_grades_view.dart';
+import 'widgets/child_phone_account_button.dart';
 import 'widgets/child_switcher_bar.dart';
 import 'widgets/child_timetable_view.dart';
 
 /// The parent shell's "Children" tab: one linked child's academic detail — grades, attendance,
-/// timetable, assignment status and finance — with a chip bar to move between children.
+/// timetable, assignment status and finance — with a chip bar to move between children, and a
+/// button that puts the child's own account on this phone ([ChildPhoneAccountButton]).
 ///
 /// The active child is [selectedChildProvider] (this session's switcher pick, else the choice
 /// persisted on this device, else the first linked child), shared with the parent home so the
@@ -59,6 +62,22 @@ class _ChildDetail extends ConsumerWidget {
         children: [
           if (children.length > 1)
             ChildSwitcherBar(children: children, selectedId: child.studentId),
+          // "Add (name) to this phone" / "Open (name)": the child's own account in the switcher.
+          Padding(
+            padding: const EdgeInsetsDirectional.fromSTEB(
+              AppSpacing.space16,
+              AppSpacing.space8,
+              AppSpacing.space16,
+              AppSpacing.space4,
+            ),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: ChildPhoneAccountButton(
+                studentId: child.studentId,
+                childName: child.studentName,
+              ),
+            ),
+          ),
           Material(
             color: Theme.of(context).colorScheme.surface,
             child: TabBar(

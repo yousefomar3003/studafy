@@ -587,6 +587,8 @@ export interface ActiveSession {
   ipAddress: string | null;
   issuedAt: Date;
   expiresAt: Date;
+  /** The parent who opened this session from the parent app (000217), or null for an ordinary sign-in. */
+  openedByGuardianUserId: string | null;
 }
 
 /**
@@ -610,16 +612,20 @@ export async function listActiveSessions(
       ip_address: string | null;
       issued_at: Date;
       expires_at: Date;
+      opened_by_guardian_user_id: string | null;
     }[]
   >`
-    SELECT DISTINCT ON (family_id)
-      id, device_id, device_name, channel, user_agent, ip_address, issued_at, expires_at
-    FROM app.refresh_tokens
-    WHERE user_id = ${userId}
-      AND revoked_at IS NULL
-      AND rotated_at IS NULL
-      AND expires_at > CURRENT_TIMESTAMP
-    ORDER BY family_id, issued_at DESC
+    SELECT DISTINCT ON (rt.family_id)
+      rt.id, rt.device_id, rt.device_name, rt.channel, rt.user_agent, rt.ip_address,
+      rt.issued_at, rt.expires_at, g.guardian_user_id AS opened_by_guardian_user_id
+    FROM app.refresh_tokens AS rt
+    LEFT JOIN app.guardian_issued_sessions AS g
+      ON g.school_id = rt.school_id AND g.family_id = rt.family_id
+    WHERE rt.user_id = ${userId}
+      AND rt.revoked_at IS NULL
+      AND rt.rotated_at IS NULL
+      AND rt.expires_at > CURRENT_TIMESTAMP
+    ORDER BY rt.family_id, rt.issued_at DESC
   `;
 
   // token_hash is absent from the projection by design, not by oversight: this response
@@ -633,6 +639,7 @@ export async function listActiveSessions(
     ipAddress: row.ip_address,
     issuedAt: row.issued_at,
     expiresAt: row.expires_at,
+    openedByGuardianUserId: row.opened_by_guardian_user_id ?? null,
   }));
 }
 
@@ -716,6 +723,7 @@ export async function adminListUserSessions(
       ip_address: string | null;
       issued_at: Date;
       expires_at: Date;
+      opened_by_guardian_user_id: string | null;
     }[]
   >`SELECT * FROM app.admin_list_user_sessions(${targetUserId})`;
 
@@ -728,6 +736,7 @@ export async function adminListUserSessions(
     ipAddress: row.ip_address,
     issuedAt: row.issued_at,
     expiresAt: row.expires_at,
+    openedByGuardianUserId: row.opened_by_guardian_user_id ?? null,
   }));
 }
 
@@ -765,6 +774,7 @@ export function sessionToResponse(session: ActiveSession): {
   ip_address: string | null;
   issued_at: string;
   expires_at: string;
+  opened_by_guardian_user_id: string | null;
 } {
   return {
     id: session.id,
@@ -775,6 +785,7 @@ export function sessionToResponse(session: ActiveSession): {
     ip_address: session.ipAddress,
     issued_at: session.issuedAt.toISOString(),
     expires_at: session.expiresAt.toISOString(),
+    opened_by_guardian_user_id: session.openedByGuardianUserId,
   };
 }
 

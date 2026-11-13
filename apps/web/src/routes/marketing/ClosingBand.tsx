@@ -1,9 +1,8 @@
 import { LinkButton } from "../../components/LinkButton";
 import { useTranslation } from "../../lib/i18n";
 
-import { reveal } from "./reveal";
-
-/** The navy band that ends the home and features pages: one sentence and one way forward. */
+/** The navy band near the end of every marketing page (home, features, pricing, about): one
+ * sentence and one way forward. */
 export function ClosingBand({
   titleKey = "site.marketing.home.closingTitle",
 }: {
@@ -12,7 +11,8 @@ export function ClosingBand({
   const { t } = useTranslation();
   return (
     <section className="mk-band" aria-labelledby="mk-closing">
-      <div className="marketing-container mk-band__inner" {...reveal()}>
+      {/* Shown as is, not revealed on scroll: the last thing on the page stays still. */}
+      <div className="marketing-container mk-band__inner">
         <div>
           <h2 id="mk-closing" className="mk-band__title">
             {t(titleKey)}

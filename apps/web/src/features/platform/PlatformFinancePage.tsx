@@ -144,24 +144,26 @@ export default function PlatformFinancePage() {
           errorMessage={errorMessage}
         >
           {data?.renewalsLast30Days.length ? (
-            <table className="platform-table">
-              <thead>
-                <tr>
-                  <th scope="col">{t("platform.finance.columns.collected")}</th>
-                  <th scope="col">{t("platform.finance.columns.succeeded")}</th>
-                  <th scope="col">{t("platform.finance.columns.failed")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.renewalsLast30Days.map((row) => (
-                  <tr key={row.currencyCode}>
-                    <td>{money(row.collectedMinor, row.currencyCode, row.minorUnit)}</td>
-                    <td>{formatNumber(row.succeeded)}</td>
-                    <td>{formatNumber(row.failed)}</td>
+            <div className="platform-table-scroll">
+              <table className="platform-table">
+                <thead>
+                  <tr>
+                    <th scope="col">{t("platform.finance.columns.collected")}</th>
+                    <th scope="col">{t("platform.finance.columns.succeeded")}</th>
+                    <th scope="col">{t("platform.finance.columns.failed")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {data.renewalsLast30Days.map((row) => (
+                    <tr key={row.currencyCode}>
+                      <td>{money(row.collectedMinor, row.currencyCode, row.minorUnit)}</td>
+                      <td>{formatNumber(row.succeeded)}</td>
+                      <td>{formatNumber(row.failed)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p>{t("platform.overview.none")}</p>
           )}

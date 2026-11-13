@@ -237,7 +237,11 @@ export default function ApprovalQueuePage() {
             ? t("principal.approvals.approveCountSelected", { selected: selectedIds.size })
             : t("principal.approvals.approveSelected")}
         </Button>
-        <Button variant="tertiary" disabled={selectedIds.size === 0} onClick={handleRejectSelected}>
+        <Button
+          variant="secondary"
+          disabled={selectedIds.size === 0}
+          onClick={handleRejectSelected}
+        >
           {selectedIds.size > 0
             ? t("principal.approvals.rejectCountSelected", { selected: selectedIds.size })
             : t("principal.approvals.rejectSelected")}

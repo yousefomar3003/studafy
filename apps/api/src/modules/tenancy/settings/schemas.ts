@@ -71,6 +71,15 @@ export const updateSchoolSettingsBodySchema = z
       description: "When true, parents can view their own child's resolved discipline incidents.",
       example: false,
     }),
+    allow_parent_device_signin: z
+      .boolean()
+      .optional()
+      .openapi({
+        description:
+          "When true, a linked parent can put their child's own account on their phone from the " +
+          "parent app, without the child's member ID and password.",
+        example: true,
+      }),
     attendance_correction_window_hours: attendanceCorrectionWindowHoursSchema.optional().openapi({
       description: "Attendance correction window, in hours.",
     }),
@@ -114,6 +123,12 @@ export const schoolSettingsResponseSchema = z
     parent_discipline_visibility: z.boolean().openapi({
       description: "When true, parents can view their own child's resolved discipline incidents.",
       example: false,
+    }),
+    allow_parent_device_signin: z.boolean().openapi({
+      description:
+        "When true, a linked parent can put their child's own account on their phone from the " +
+        "parent app, without the child's member ID and password.",
+      example: true,
     }),
     attendance_correction_window_hours: attendanceCorrectionWindowHoursSchema.openapi({
       description: "Attendance correction window, in hours.",

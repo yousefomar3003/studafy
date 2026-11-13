@@ -14,6 +14,7 @@ import '../../features/ai/presentation/widgets/ai_paywall.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
 import '../../features/notifications/presentation/notification_destination_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/parent/presentation/parent_communication_screen.dart';
 import '../../features/student/presentation/assignment_detail_screen.dart';
 import '../../features/student/presentation/grades_screen.dart';
@@ -126,6 +127,12 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
       GoRoute(
         path: RoutePaths.parentAlerts,
         builder: (context, state) => const ParentCommunicationScreen(initialTabIndex: 1),
+      ),
+
+      // The notification inbox, for every role (the app bar's bell).
+      GoRoute(
+        path: RoutePaths.notifications,
+        builder: (context, state) => const NotificationsScreen(),
       ),
 
       // Notification deep-link destinations. Each maps to the placeholder

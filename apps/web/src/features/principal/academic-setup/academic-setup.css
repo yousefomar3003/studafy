@@ -56,6 +56,10 @@
   background-color: var(--color-background);
 }
 
+.ag-card > :first-child {
+  margin-block-start: 0;
+}
+
 .ag-actions {
   display: flex;
   flex-wrap: wrap;
@@ -89,7 +93,9 @@
 
 .ag-tabs {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
   gap: var(--space-4);
   border-block-end: 1px solid var(--color-border);
   margin-block-end: var(--space-16);
@@ -101,6 +107,8 @@
   color: var(--color-muted-foreground);
   text-decoration: none;
   font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .ag-tab:hover {
@@ -563,6 +571,11 @@
   gap: var(--space-8);
   margin: 0;
   padding-inline-start: var(--space-16);
+}
+
+/* Each rating row's "Remove" button lines up with the inputs, not their labels. */
+.ag-conduct-list .ag-grid {
+  align-items: end;
 }
 
 .ag-comment-box {

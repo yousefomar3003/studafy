@@ -221,6 +221,12 @@ class AuthNotifier extends Notifier<AuthStatus> {
     return true;
   }
 
+  /// Puts another account on this device without making it active: a child's account a parent
+  /// added from the parent app ("Add (child) to this phone"). It then sits in the switcher like any
+  /// account set aside, and opens with [switchTo].
+  Future<void> addSavedAccount(SavedAccount account) =>
+      ref.read(savedAccountsProvider.notifier).put(account);
+
   /// Forgets a saved account and ends its session on the server (best-effort).
   Future<void> removeSavedAccount(String userId) async {
     final saved = ref.read(savedAccountsProvider.notifier);

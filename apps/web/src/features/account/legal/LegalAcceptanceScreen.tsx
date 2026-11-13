@@ -92,17 +92,19 @@ export function LegalAcceptanceScreen({
             {t(failed === "outdated" ? "legalAcceptance.outdated" : "legalAcceptance.failed")}
           </p>
         ) : null}
-        <Button type="button" onClick={() => void accept()} loading={submitting}>
-          {t("legalAcceptance.accept")}
-        </Button>{" "}
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => void store.logout()}
-          disabled={submitting}
-        >
-          {t("legalAcceptance.signOut")}
-        </Button>
+        <div className="account-gate__actions">
+          <Button type="button" onClick={() => void accept()} loading={submitting}>
+            {t("legalAcceptance.accept")}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => void store.logout()}
+            disabled={submitting}
+          >
+            {t("legalAcceptance.signOut")}
+          </Button>
+        </div>
         <p>
           <Trans
             i18nKey="legalAcceptance.decline"

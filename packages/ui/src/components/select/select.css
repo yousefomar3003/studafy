@@ -41,7 +41,9 @@
   opacity: 0.7;
 }
 
-.sf-select__trigger--invalid {
+.sf-select__trigger--invalid,
+.sf-select__trigger--invalid:focus-visible {
+  /* Stays red while focused, which is exactly when the user is fixing it. */
   border-color: var(--color-danger);
 }
 

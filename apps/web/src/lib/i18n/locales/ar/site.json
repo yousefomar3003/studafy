@@ -313,7 +313,10 @@
       "FEE_INVOICE_ISSUED": "فواتير الرسوم الجديدة",
       "FEE_PAYMENT_RECEIVED": "دفعات الرسوم المستلمة",
       "FEE_PAYMENT_REMINDER": "تذكيرات الرسوم المتأخرة",
-      "FEE_STATEMENT": "كشوف حساب رسوم العائلة"
+      "FEE_STATEMENT": "كشوف حساب رسوم العائلة",
+      "ASSIGNMENT_PUBLISHED": "الواجبات الجديدة",
+      "ASSIGNMENT_GRADED": "الواجبات المصححة",
+      "ATTENDANCE_MARKED": "الغياب والتأخير"
     },
     "channels": {
       "in_app": "داخل التطبيق",

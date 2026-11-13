@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Outlet } from "react-router-dom";
 
 import { PlatformBanners } from "../features/platform/ops/PlatformBanners";
+import { useHeadingTitle } from "../lib/use-heading-title";
 
-import { PortalBackLink } from "./portal/PortalBackLink";
+import { PortalBackLink, PortalBackProvider } from "./portal/PortalBackLink";
 import { PortalHeader } from "./portal/PortalHeader";
 import { PortalSidebar } from "./portal/PortalSidebar";
 
@@ -27,6 +28,9 @@ const NAV_ID = "portal-nav";
 export function PortalLayout({ routes }: { routes?: () => readonly RouteObject[] } = {}) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  // The browser tab is named after the open page's heading ("Approvals | Studafy").
+  const contentRef = useRef<HTMLDivElement>(null);
+  useHeadingTitle(contentRef);
 
   return (
     <div className="portal-shell" data-nav-collapsed={collapsed || undefined}>
@@ -42,10 +46,12 @@ export function PortalLayout({ routes }: { routes?: () => readonly RouteObject[]
         onToggleCollapsed={() => setCollapsed((current) => !current)}
         onNavigate={() => setDrawerOpen(false)}
       />
-      <div className="portal-content" data-scroll-root="">
+      <div className="portal-content" data-scroll-root="" ref={contentRef}>
         <PlatformBanners />
-        {routes ? <PortalBackLink routes={routes} /> : null}
-        <Outlet />
+        <PortalBackProvider>
+          {routes ? <PortalBackLink routes={routes} /> : null}
+          <Outlet />
+        </PortalBackProvider>
       </div>
     </div>
   );

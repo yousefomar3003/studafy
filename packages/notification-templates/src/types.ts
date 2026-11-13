@@ -132,4 +132,25 @@ export interface NotificationTypeVars {
     schoolName: string;
     invoiceNumber: string;
   };
+  /** `who` is "" for the student, "<child's name> · " for a parent. */
+  ASSIGNMENT_PUBLISHED: {
+    who: string;
+    assignmentTitle: string;
+    courseName: string;
+    dueDate: string;
+  };
+  /** `result` is the localized "Score 17 / 20" line, or "Feedback is ready" without a score. */
+  ASSIGNMENT_GRADED: {
+    who: string;
+    assignmentTitle: string;
+    courseName: string;
+    result: string;
+  };
+  /** `status` is the localized "absent" / "late". */
+  ATTENDANCE_MARKED: {
+    studentName: string;
+    status: string;
+    courseName: string;
+    date: string;
+  };
 }

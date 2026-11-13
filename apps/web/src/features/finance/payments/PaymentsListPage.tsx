@@ -221,7 +221,10 @@ export default function PaymentsListPage() {
 
       <p className="payments-list__totals" role="status">
         {totals.length === 0
-          ? t("finance.payments.list.noConfirmedTotal")
+          ? // Only worth saying when the list is empty too; with (pending) rows below it misleads.
+            items.length === 0 && !query.isPending
+            ? t("finance.payments.list.noConfirmedTotal")
+            : null
           : totals
               .map((sum) =>
                 t("finance.payments.list.confirmedTotal", {

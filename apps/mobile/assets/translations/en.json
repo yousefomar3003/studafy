@@ -46,7 +46,13 @@
       "tooShort": "Use at least 8 characters",
       "mismatch": "The passwords don't match",
       "saveAndSignIn": "Save and sign in",
-      "back": "Back"
+      "back": "Back",
+      "rememberMe": "Remember me",
+      "rememberMeHelp": "Keeps your ID on this phone. Your password is never saved."
+    },
+    "password": {
+      "show": "Show password",
+      "hide": "Hide password"
     }
   },
   "notifications": {
@@ -54,6 +60,17 @@
       "title": "Notification",
       "heading": "Deep link target",
       "body": "This screen is a placeholder for the real destination."
+    },
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "empty": "You're all caught up. New notices from your school will show up here.",
+    "loadError": "Couldn't load your notifications.",
+    "retry": "Try again",
+    "loadMore": "Show more",
+    "unread": "Unread",
+    "bell": {
+      "label": "Notifications",
+      "unread": "Notifications, {count} unread"
     }
   },
   "shell": {
@@ -1719,6 +1736,21 @@
         "errorGeneric": "Couldn't save this setting. Try again."
       }
     },
+    "childDevice": {
+      "add": "Add {name} to this phone",
+      "open": "Open {name}",
+      "added": "{name} is on this phone. They can open their own app from the account switcher.",
+      "openNow": "Open now",
+      "expired": "That account was signed out. Add it to this phone again.",
+      "errors": {
+        "disabled": "Your school has turned this off. Sign in with your child's ID and password instead.",
+        "locked": "Too many wrong passwords on your child's account. Try again in 15 minutes or ask the school.",
+        "unavailable": "Your child's account can't be used right now. Contact the school.",
+        "notLinked": "This child isn't linked to your account. Contact the school.",
+        "tooMany": "Too many tries. Try again in a little while.",
+        "generic": "Couldn't add the account. Check your connection and try again."
+      }
+    },
     "childDetail": {
       "error": "Couldn't load this term's detail.",
       "tabs": {
@@ -2083,6 +2115,7 @@
       "loadError": "Couldn't load your signed-in devices.",
       "failed": "Couldn't sign out. Check your connection and try again.",
       "signedIn": "Signed in {when}",
+      "addedByParent": "Added by a parent from the parent app {when}",
       "thisDevice": "This device",
       "signOut": "Sign out",
       "channel": {
@@ -2132,7 +2165,19 @@
         "materialOcrLowConfidence": "File text hard to read",
         "materialIngested": "File ready for AI",
         "materialIngestFailed": "File couldn't be prepared for AI",
-        "directMessage": "Messages"
+        "directMessage": "Messages",
+        "assignmentPublished": "New assignments",
+        "assignmentGraded": "Marked assignments",
+        "attendanceMarked": "Absences and lates",
+        "feeInvoiceIssued": "New fee invoices",
+        "feePaymentReceived": "Fee payments received",
+        "feePaymentReminder": "Overdue fee reminders",
+        "feeStatement": "Family fee statements",
+        "licenseSeatAppleRenewal": "School plan covers your subscription",
+        "licenseExpiring": "License ending soon",
+        "licenseInvoiceDue": "License invoice due",
+        "licenseInvoiceOverdue": "License invoice overdue",
+        "licenseReceiptUploaded": "License receipt uploaded"
       }
     },
     "staffRecord": {

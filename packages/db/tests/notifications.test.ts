@@ -60,6 +60,10 @@ const NOTIFICATION_TYPES = [
   "LICENSE_INVOICE_DUE",
   "LICENSE_INVOICE_OVERDUE",
   "LICENSE_RECEIPT_UPLOADED",
+  // Everyday school events (outbox notify consumer). Appended by 000215, in that order; sort last.
+  "ASSIGNMENT_PUBLISHED",
+  "ASSIGNMENT_GRADED",
+  "ATTENDANCE_MARKED",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;
@@ -337,6 +341,7 @@ integrationTest(
       expect(indexes.map((row) => row.name)).toEqual([
         "idx_notification_preferences_school_user_type_channel",
         "idx_notifications_digest_pending",
+        "idx_notifications_push_pending",
         "idx_notifications_school_user_created",
         "idx_notifications_school_user_unread",
         "idx_user_devices_school_user_platform_last_seen",
