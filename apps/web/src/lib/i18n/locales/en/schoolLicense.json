@@ -363,6 +363,7 @@
     "usedOf": "{{used}} of {{cap}} used",
     "usedPercent": "{{percent}} of your school's storage is used",
     "included": "Your plan includes {{size}}.",
+    "granted": "Granted by Studafy: {{size}} until {{date}}.",
     "currentRenewing": "Your school has {{size}}. It renews on {{date}}.",
     "currentEnding": "Your school has {{size}} until {{date}}. After that it goes back to the {{included}} included.",
     "cancelRenewal": "Stop renewing",

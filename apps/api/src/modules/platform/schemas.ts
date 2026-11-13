@@ -189,6 +189,19 @@ export const financeSchema = z
         })
         .openapi("PlatformRenewalTotals"),
     ),
+    /**
+     * Cash and transfer payments recorded on manual grants (storage, tiers) in the last 30 days,
+     * revoked grants excluded. Shown as "manual / cash".
+     */
+    manualPaymentsLast30Days: z.array(
+      z
+        .object({
+          ...money,
+          collectedMinor: z.number().int().nonnegative(),
+          grants: z.number().int().nonnegative(),
+        })
+        .openapi("PlatformManualPaymentTotals"),
+    ),
     /** Schools whose billing needs a human: overdue, in grace, paused, cancelling, trial ending. */
     attention: z.array(
       z

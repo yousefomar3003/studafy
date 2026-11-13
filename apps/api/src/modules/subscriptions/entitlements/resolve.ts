@@ -304,6 +304,21 @@ export interface UserEntitlement {
    * cached before a license's end date stops covering exactly at it.
    */
   seats: LicenseSeatGrant[];
+  /**
+   * Tiers Studafy staff granted this person by hand (app.manual_grants, 000211), revoked ones
+   * excluded. Like seats, whether one covers them *now* is decided from its dates at read time, so a
+   * cached entry stops covering exactly at a grant's end.
+   */
+  manualGrants: ManualTierGrant[];
+}
+
+/** One hand-made tier grant, as the feature resolver needs it. */
+export interface ManualTierGrant {
+  grantId: string;
+  /** The tier's `app.plans.code`. */
+  planCode: string;
+  startsAt: string;
+  endsAt: string;
 }
 
 /** One assigned seat, as the feature resolver needs it. */
@@ -428,6 +443,23 @@ export async function resolveUserEntitlement(
     ORDER BY l.ends_at DESC
   `;
 
+  // Revoked grants are left out: a revocation is a correction, not an ending, so it reads as "not
+  // included" rather than "expired". Ended ones are kept so a lapsed feature answers FEATURE_EXPIRED.
+  const manualGrants = await tx<
+    { grant_id: string; plan_code: string; starts_at: Date; ends_at: Date }[]
+  >`
+    SELECT g.id::text AS grant_id, p.code AS plan_code, g.starts_at, g.ends_at
+    FROM app.manual_grants AS g
+    JOIN app.plans AS p
+      ON p.id = g.plan_id
+    WHERE g.school_id = current_setting('app.school_id')::uuid
+      AND g.user_id = ${userId}::uuid
+      AND g.kind = 'tier'
+      AND g.revoked_at IS NULL
+    ORDER BY g.ends_at DESC
+    LIMIT ${USER_SUBSCRIPTION_READ_LIMIT}
+  `;
+
   return {
     schoolId,
     userId,
@@ -450,6 +482,12 @@ export async function resolveUserEntitlement(
       audience: row.audience,
       planCode: row.plan_code,
       licenseStatus: row.license_status,
+      startsAt: row.starts_at.toISOString(),
+      endsAt: row.ends_at.toISOString(),
+    })),
+    manualGrants: manualGrants.map((row) => ({
+      grantId: row.grant_id,
+      planCode: row.plan_code,
       startsAt: row.starts_at.toISOString(),
       endsAt: row.ends_at.toISOString(),
     })),

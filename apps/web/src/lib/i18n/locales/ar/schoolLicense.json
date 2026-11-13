@@ -446,6 +446,7 @@
     "usedOf": "تم استخدام {{used}} من {{cap}}",
     "usedPercent": "تم استخدام {{percent}} من مساحة تخزين مدرستك",
     "included": "تتضمن خطتك {{size}}.",
+    "granted": "منحة من Studafy: {{size}} حتى {{date}}.",
     "currentRenewing": "لدى مدرستك {{size}}. تتجدد في {{date}}.",
     "currentEnding": "لدى مدرستك {{size}} حتى {{date}}. بعد ذلك تعود إلى {{included}} المضمّنة.",
     "cancelRenewal": "إيقاف التجديد",
