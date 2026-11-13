@@ -166,7 +166,7 @@ describe("GET /api/ai/admin/metrics", () => {
     expect(body.tenants[0]!.totalTokens).toBe(1_200_000);
     expect(body.tenants[0]!.smallTokens).toBe(480_000);
     expect(body.tenants[0]!.largeTokens).toBe(720_000);
-    expect(body.tenants[0]!.budgetTokens).toBe(30_000_000);
+    expect(body.tenants[0]!.budgetTokens).toBe(90_000_000);
     expect(body.tenants[0]!.estimatedCostUsd).toBeGreaterThan(0);
     expect(body.tenants[0]!.revenueUsd).toBe(360); // 30 × $12
     expect(body.tenants[0]!.marginPercent).toBeTypeOf("number");
@@ -263,13 +263,13 @@ describe("GET /api/ai/admin/metrics", () => {
 
     expect(res.status).toBe(200);
     const tenant = body.tenants[0]!;
-    // 10 students × 1,000,000 budget = 10,000,000 total budget.
-    expect(tenant.budgetTokens).toBe(10_000_000);
+    // 10 students × 3,000,000 budget = 30,000,000 total budget.
+    expect(tenant.budgetTokens).toBe(30_000_000);
     expect(tenant.totalTokens).toBe(250_000);
     expect(tenant.smallTokens).toBe(100_000);
     expect(tenant.largeTokens).toBe(150_000);
-    // 250,000 / 10,000,000 = 2.5%
-    expect(tenant.utilizationPercent).toBe(2.5);
+    // 250,000 / 30,000,000 = 0.83%
+    expect(tenant.utilizationPercent).toBeCloseTo(0.83, 1);
   });
 
   test("flags negative-margin tenants when cost exceeds revenue", async () => {
@@ -279,9 +279,9 @@ describe("GET /api/ai/admin/metrics", () => {
         school_id: SCHOOL_A,
         school_name: "Alpha Academy",
         subscribed_students: 1,
-        total_tokens: "5000000",
-        small_tokens: "2000000",
-        large_tokens: "3000000",
+        total_tokens: "100000000",
+        small_tokens: "40000000",
+        large_tokens: "60000000",
         period_start: new Date("2026-08-01T00:00:00.000Z"),
         period_end: new Date("2026-08-31T23:59:59.000Z"),
       },
@@ -302,7 +302,7 @@ describe("GET /api/ai/admin/metrics", () => {
 
     expect(res.status).toBe(200);
     const tenant = body.tenants[0]!;
-    // Revenue: 1 × $12 = $12. Cost at 5M tokens is well above $12.
+    // Revenue: 1 × $12 = $12. Cost at 100M Qwen tokens (~$19.40) is above $12.
     expect(tenant.revenueUsd).toBe(12);
     expect(tenant.estimatedCostUsd).toBeGreaterThan(tenant.revenueUsd);
     expect(tenant.negativeMargin).toBe(true);
