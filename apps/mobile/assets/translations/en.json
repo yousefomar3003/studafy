@@ -1650,7 +1650,8 @@
       "error": "Couldn't load your children."
     },
     "switcher": {
-      "title": "Children"
+      "title": "Children",
+      "compare": "Compare"
     },
     "comparison": {
       "title": "Compare children",
