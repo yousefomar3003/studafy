@@ -248,9 +248,25 @@ class _SubmissionMarkingScreenState
         ],
         for (final attachment in submission.attachments)
           AttachmentDownloadTile(
+            attachmentId: attachment.id,
             fileName: attachment.originalFileName,
+            mimeType: attachment.mimeType,
             sizeBytes: attachment.sizeBytes,
             downloadUrl: attachment.downloadUrl,
+            downloadUrlExpiresAt: attachment.downloadUrlExpiresAt,
+            availability: attachmentAvailabilityFrom(
+              attachment.downloadState.json,
+              hasUrl: attachment.downloadUrl != null,
+            ),
+            refreshUrl: () async {
+              final fresh = await ref.refresh(
+                submissionDetailProvider(widget.submissionId).future,
+              );
+              for (final a in fresh.attachments) {
+                if (a.id == attachment.id) return a.downloadUrl;
+              }
+              return null;
+            },
           ),
         const Divider(height: AppSpacing.space32),
         TextField(

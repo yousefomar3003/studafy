@@ -13,6 +13,7 @@ import 'package:studafy_mobile/src/core/api/generated/models/grade_submission_bo
 import 'package:studafy_mobile/src/core/api/generated/models/status13.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/submission.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/submission_attachment.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/submission_attachment_download_state.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/submission_grade_status.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/submission_list.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/submission_status.dart';
@@ -61,6 +62,7 @@ SubmissionAttachment _fakeAttachment(String id) {
     attemptNumber: 1,
     downloadUrl: 'https://storage.example/homework.pdf',
     downloadUrlExpiresAt: now.add(const Duration(minutes: 5)),
+    downloadState: SubmissionAttachmentDownloadState.ready,
     uploadedByUserId: 'student-1',
     createdAt: now,
   );

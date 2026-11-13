@@ -87,8 +87,8 @@ void main() {
           'terms of service, privacy policy and the public account-deletion page',
       'lib/src/features/student/presentation/material_viewer_screen.dart':
           'file download',
-      'lib/src/features/student/presentation/widgets/attachment_download_tile.dart':
-          'file download',
+      'lib/src/features/attachments/presentation/attachment_viewer_screen.dart':
+          'file download — an assignment or submission attachment opened in the phone\'s own app',
     };
     final launch = RegExp(r'\blaunchUrl(String)?\s*\(');
 

@@ -3,7 +3,7 @@ import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../../coded-http-exception";
 import { tenantTxRunner, withTenantTx } from "../../../../db/tenant-tx";
-import { requireStorage } from "../../../../lib/storage";
+import { isInlineSafeContentType, requireStorage } from "../../../../lib/storage";
 import {
   enqueueUploadScans,
   isServableUploadScanStatus,
@@ -113,7 +113,9 @@ async function toAttachmentResponse(
   // file is listed without one.
   const presigned =
     storage && isServableUploadScanStatus(row.scan_status)
-      ? await storage.presign(row.storage_key, "GET")
+      ? await storage.presign(row.storage_key, "GET", undefined, undefined, {
+          inline: isInlineSafeContentType(row.mime_type),
+        })
       : null;
 
   return {
@@ -126,6 +128,11 @@ async function toAttachmentResponse(
     attempt_number: row.attempt_number,
     download_url: presigned?.url ?? null,
     download_url_expires_at: presigned?.expiresAt.toISOString() ?? null,
+    download_state: presigned
+      ? "ready"
+      : storage && row.scan_status === "scanning"
+        ? "checking"
+        : "unavailable",
     uploaded_by_user_id: row.uploaded_by_user_id,
     created_at: row.created_at.toISOString(),
   };
