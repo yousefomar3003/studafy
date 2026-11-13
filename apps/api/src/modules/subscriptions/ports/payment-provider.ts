@@ -84,17 +84,35 @@ export interface CreateBillingPortalSessionResult {
   url: string;
 }
 
+/**
+ * What a catalog sync did to the provider's object: made a new one, changed one that already
+ * existed, or found it already as wanted. The sync reports these counts, and an operator re-running
+ * it expects the second run to say "unchanged" everywhere.
+ */
+export type SyncOutcome = "created" | "updated" | "unchanged";
+
+/**
+ * Publish one `app.plans` row as a provider product. Must be safe to repeat: a product the provider
+ * already holds for this plan is reused and brought up to date, never duplicated.
+ */
 export interface SyncProductInput {
   localId: string;
   name: string;
   description?: string;
   active: boolean;
+  /** The id we stored last time (`app.plans.stripe_product_id`), if any. */
+  providerProductId?: string | null;
 }
 
 export interface SyncProductResult {
   providerProductId: string;
+  outcome: SyncOutcome;
 }
 
+/**
+ * Publish one `app.plan_prices` row as a provider price. Must be safe to repeat, like
+ * `SyncProductInput`.
+ */
 export interface SyncPriceInput {
   localId: string;
   productId: string;
@@ -102,10 +120,18 @@ export interface SyncPriceInput {
   currency: string;
   interval: "month" | "year";
   active: boolean;
+  /** The id we stored last time (`app.plan_prices.stripe_price_id`), if any. */
+  providerPriceId?: string | null;
 }
 
 export interface SyncPriceResult {
   providerPriceId: string;
+  outcome: SyncOutcome;
+  /**
+   * Prices this sync retired because they no longer match the local row (an amount the owner
+   * changed). Retired, not deleted: subscriptions already on them keep billing.
+   */
+  archivedPriceIds: string[];
 }
 
 /**
