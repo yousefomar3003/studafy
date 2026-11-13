@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono, z } from "@hono/zod-openapi";
 import { PERMISSIONS } from "@studafy/constants";
 
 import { withTenantTx } from "../../../db/tenant-tx";
+import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
@@ -255,19 +256,4 @@ export function adminDeviceRoutes(
   }
 
   return routes;
-}
-
-/**
- * The client address, or null.
- *
- * Null rather than a placeholder when the address cannot be determined: the column is `inet` and
- * PostgreSQL rejects a non-address value for the whole statement. Same guard, for the same reason,
- * as clientIpFrom in session-routes.ts and toInetOrNull in lib/security/securityEventSink.ts.
- */
-function clientIpFrom(c: Context<AppEnv>): string | null {
-  const forwarded = c.req.header("X-Forwarded-For");
-  if (forwarded === undefined) return null;
-
-  const first = forwarded.split(",")[0]?.trim();
-  return first !== undefined && first.length > 0 ? first : null;
 }

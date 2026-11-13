@@ -265,7 +265,7 @@ describe("AI add-on subscribers keep exactly today's access", () => {
               studentId: STUDENT_ID,
               periodStart: PERIOD_START,
               periodEnd: PERIOD_END,
-              budget: 1_000_000,
+              budget: 3_000_000,
               amount: 1_000,
             },
           ]);
@@ -343,6 +343,47 @@ describe("AI add-on subscribers keep exactly today's access", () => {
   });
 });
 
+describe("the budget is counted per month inside a longer grant", () => {
+  test("a yearly subscriber is metered in this month's window, not the whole year", async () => {
+    const { meter, calls } = recordingMeter();
+    const yearStart = new Date(Date.now() - 45 * 86_400_000);
+    const yearEnd = new Date(yearStart.getTime() + 365 * 86_400_000);
+    const features = fakeFeatureService({
+      entitlements: fakeEntitlements({
+        ai: aiEntitlement(null),
+        user: userEntitlement({
+          subscriptions: [
+            {
+              id: "us-yearly",
+              planCode: "ai_addon",
+              provider: "app_store",
+              status: "active",
+              live: true,
+              autoRenew: true,
+              currentPeriodStart: yearStart.toISOString(),
+              currentPeriodEnd: yearEnd.toISOString(),
+            },
+          ],
+        }),
+      }),
+    });
+    const app = buildApp(features, { meter }, commitChatRoute);
+
+    const res = await chat(app);
+
+    expect(res.status).toBe(200);
+    const reserved = calls.reserve[0];
+    expect(reserved?.budget).toBe(3_000_000);
+    const windowStart = Date.parse(reserved?.periodStart ?? "");
+    const windowEnd = Date.parse(reserved?.periodEnd ?? "");
+    // 45 days in: the second monthly window, which holds "now" and is at most a month long.
+    expect(windowStart).toBeGreaterThan(yearStart.getTime());
+    expect(windowStart).toBeLessThanOrEqual(Date.now());
+    expect(windowEnd).toBeGreaterThan(Date.now());
+    expect(windowEnd - windowStart).toBeLessThanOrEqual(31 * 86_400_000);
+  });
+});
+
 describe("AI token reservation lifecycle", () => {
   test("reserves quota, passes the handle, and releases nothing when the handler commits", async () => {
     const { meter, calls } = recordingMeter();
@@ -360,7 +401,7 @@ describe("AI token reservation lifecycle", () => {
       schoolId: SCHOOL_ID,
       studentId: STUDENT_ID,
       amount: 1000,
-      budget: 1000000,
+      budget: 3_000_000,
     });
     expect(calls.commit).toHaveLength(1);
     expect(calls.commit[0]).toMatchObject({ reservationId: "res-1", consumedTokens: 12 });

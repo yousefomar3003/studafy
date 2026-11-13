@@ -195,6 +195,45 @@ describe("member password sign-in", () => {
     );
   });
 
+  integrationTest(
+    "behind a proxy that forwards a list of addresses, setting the password still signs in",
+    async () => {
+      // Production regression: fly's edge forwards "visitor, edge" in X-Forwarded-For. The raw
+      // header reached an inet column and the sign-in answered 500 after the code was accepted.
+      const student = await member([ROLES.STUDENT]);
+      const issued = await issueCode(student.id);
+      const proxied = { "x-forwarded-for": "151.247.101.16, 66.241.125.144" };
+      const response = await post(
+        LOGIN,
+        {
+          username: student.code,
+          password: issued.setup_code,
+          new_password: "Proxied-Pass-1",
+          channel: "mobile",
+        },
+        undefined,
+        app,
+        proxied,
+      );
+      expect(response.status).toBe(200);
+      expect(
+        (
+          await post(
+            LOGIN,
+            {
+              username: student.code,
+              password: "Proxied-Pass-1",
+              channel: "mobile",
+            },
+            undefined,
+            app,
+            proxied,
+          )
+        ).status,
+      ).toBe(200);
+    },
+  );
+
   integrationTest("a setup code gives no session until a new password is set", async () => {
     const student = await member([ROLES.STUDENT]);
     const issued = await issueCode(student.id);

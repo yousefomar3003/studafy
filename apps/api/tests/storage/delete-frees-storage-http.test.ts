@@ -219,6 +219,28 @@ async function attachToAssignment(
 // ---------------------------------------------------------------------------
 
 describeDb("deleting a file frees its storage", () => {
+  test("confirming without content_type (as the mobile app does) keeps the uploaded type", async () => {
+    const tenant = await newTenant();
+    const assignmentId = await createAssignment(tenant, "published");
+    const base = `/api/academics/assignments/${assignmentId}/attachments`;
+    const docx = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const minted = await request(tenant, teacher(tenant), "POST", `${base}/upload-url`, {
+      file_name: "فلسطين كما خلقها الله - نسخة النشر.docx",
+      content_type: docx,
+    });
+    expect(minted.status).toBe(201);
+    const { storage_key: tempKey } = (await minted.json()) as { storage_key: string };
+    storage.objects.set(tempKey, { contentType: docx, sizeBytes: 2_000 });
+
+    const confirmed = await request(tenant, teacher(tenant), "POST", base, {
+      storage_key: tempKey,
+    });
+
+    expect(confirmed.status).toBe(201);
+    const body = (await confirmed.json()) as { mime_type?: string; content_type?: string };
+    expect(body.mime_type ?? body.content_type).toBe(docx);
+  });
+
   test("an assignment attachment: the object goes and the meter drops by its size", async () => {
     const tenant = await newTenant();
     const assignmentId = await createAssignment(tenant, "draft");
