@@ -20,6 +20,9 @@ export const ERROR_CODES = {
   AUTH_ACCOUNT_LOCKED: "AUTH_ACCOUNT_LOCKED",
   // The proposed new password breaks the password policy (too short, the default, the username, …).
   AUTH_PASSWORD_REJECTED: "AUTH_PASSWORD_REJECTED",
+  // "Add <child> to this phone" (000215): the linked child's account is not in use (suspended,
+  // graduated, withdrawn or archived, or not a member-ID student account).
+  GUARDIAN_CHILD_UNAVAILABLE: "GUARDIAN_CHILD_UNAVAILABLE",
 
   // Invitation verification — public invitation lifecycle resolution.
   INVITATION_INVALID: "INVITATION_INVALID",

@@ -93,6 +93,8 @@ import {
   mobileOAuthRoutes,
   mockOAuthRoutes,
   memberPasswordRoutes,
+  guardianSessionRoutes,
+  redisGuardianSigninLimiter,
   providerLinkRoutes,
   returningUserLoginRoutes,
   reviewLoginRoutes,
@@ -966,6 +968,21 @@ export function createApp({
         },
         rateLimitDisabled ? null : (redis ?? null),
         eventSink,
+      ),
+    );
+    // "Add <child> to this phone" (000217): a parent puts a linked child's own account on the phone.
+    app.route(
+      "/",
+      guardianSessionRoutes(
+        database,
+        {
+          keyStore,
+          issuer: jwtIssuer,
+          audience: jwtAudience,
+          accessTtlSeconds: jwtAccessTtlSeconds,
+          refreshTtlSeconds: jwtRefreshTtlSeconds,
+        },
+        redisGuardianSigninLimiter(rateLimitDisabled ? null : (redis ?? null)),
       ),
     );
   }

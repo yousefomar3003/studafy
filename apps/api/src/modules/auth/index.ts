@@ -110,6 +110,10 @@ export { reviewLoginRoutes } from "./routes/review-login-routes";
 export { qaLoginRoutes } from "./routes/qa-login-routes";
 export { memberPasswordRoutes } from "./routes/member-password-routes";
 export {
+  guardianSessionRoutes,
+  redisGuardianSigninLimiter,
+} from "./routes/guardian-session-routes";
+export {
   loginReviewUser,
   REVIEW_LOGIN_PROVIDER,
   type ReviewLoginParams,

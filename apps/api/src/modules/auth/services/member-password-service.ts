@@ -46,7 +46,7 @@ export const MEMBER_PASSWORD_ROLES: readonly Role[] = [
 ];
 
 /** Holding any of these keeps an account on Google / Microsoft sign-in only. */
-const PRIVILEGED_ROLES: readonly Role[] = [
+export const PRIVILEGED_ROLES: readonly Role[] = [
   ROLES.SUPER_ADMIN,
   ROLES.ORG_ADMIN,
   ROLES.PRINCIPAL,
