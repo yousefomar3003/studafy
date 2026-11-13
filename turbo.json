@@ -1,0 +1,75 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "generate": {
+      "dependsOn": ["^build"],
+      "outputs": [],
+      "env": ["LOCALAPPDATA"]
+    },
+    "@studafy/api#generate": {
+      "dependsOn": ["^build"],
+      "outputs": ["openapi.json"]
+    },
+    "@studafy/api-client#generate": {
+      "dependsOn": ["@studafy/api#generate", "^build"],
+      "outputs": ["src/generated-types.ts"],
+      "env": ["LOCALAPPDATA"]
+    },
+    // The reference site's build validates every guide's examples against apps/api/openapi.json
+    // (ST-269) and its own build.test.ts does the same in "test" — both need the document generated
+    // first, the same edge @studafy/api-client#generate declares for the same file.
+    "@studafy/docs-api#build": {
+      "dependsOn": ["@studafy/api#generate", "^build"],
+      "outputs": ["dist/**"],
+      "env": ["DOCS_API_RELEASE_TAG"]
+    },
+    "@studafy/docs-api#test": {
+      "dependsOn": ["@studafy/api#generate", "^build"],
+      "outputs": []
+    },
+    // Local development servers (api, realtime, workers, web): long-running, never cached. Needs
+    // the dev Postgres/Redis up first (`docker compose up -d --wait postgres redis`).
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "build": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": ["dist/**", "build/**"],
+      "env": ["LOCALAPPDATA"]
+    },
+    "@studafy/web#build": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": ["dist/**"],
+      // Baked into the bundle at build time (see infra/docker/web.Dockerfile) -- a cache hit on an
+      // unchanged source tree must still miss when any of these differ, since they change what
+      // vite.config.ts's sentryReleaseUploadEnabled produces and what release name a captured
+      // error is tagged with.
+      "env": [
+        "LOCALAPPDATA",
+        "VITE_RELEASE_VERSION",
+        "VITE_SENTRY_DSN",
+        "SENTRY_ORG",
+        "SENTRY_PROJECT",
+        "SENTRY_AUTH_TOKEN"
+      ]
+    },
+    "check-types": {
+      "dependsOn": ["^build", "generate"],
+      "outputs": []
+    },
+    "lint": {
+      "dependsOn": ["^build", "^lint"],
+      "outputs": []
+    },
+    "test": {
+      "dependsOn": ["^build", "generate"],
+      // "coverage/**" lets a cache hit restore the lcov report the CI coverage-upload step reads,
+      // instead of silently leaving a stale or missing file behind when a package's test task
+      // wasn't re-run.
+      "outputs": ["coverage/**"],
+      "env": ["LOCALAPPDATA"]
+    }
+  }
+}

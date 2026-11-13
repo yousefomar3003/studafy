@@ -1,0 +1,652 @@
+/**
+ * Marketing pages. Palette and type tokens (`--mk-*`) come from marketing-shell.css.
+ *
+ * The pages are typographic: large left-aligned headings, ruled lists and tables, one navy band.
+ * No cards, shadows, gradients, icons or images, so every section reads as information about the
+ * product rather than decoration. Motion (at the end) only ever settles things into place. Arabic gets normal letter spacing and roomier lines:
+ * tightened tracking breaks the joins between Arabic letters.
+ */
+
+/* Type ------------------------------------------------------------------------------------------ */
+
+.mk-hero__title,
+.mk-section__title,
+.mk-band__title {
+  color: var(--mk-ink);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+:lang(ar) .mk-hero__title,
+:lang(ar) .mk-section__title,
+:lang(ar) .mk-band__title {
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
+.mk-label {
+  margin: 0 0 var(--space-8);
+  color: var(--mk-mark);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-link {
+  color: var(--mk-ink);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 4px;
+}
+
+.mk-link {
+  transition:
+    text-decoration-thickness var(--duration-base) ease,
+    text-underline-offset var(--duration-base) ease;
+}
+
+.mk-link:hover {
+  text-decoration-thickness: 2px;
+  text-underline-offset: 6px;
+}
+
+.mk-link:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: 2px;
+}
+
+.mk-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-16) var(--space-24);
+  margin-top: var(--space-32);
+}
+
+/* Hero ------------------------------------------------------------------------------------------ */
+
+.mk-hero {
+  padding-block: var(--space-80) var(--space-64);
+  border-bottom: 1px solid var(--mk-rule);
+}
+
+.mk-hero__title {
+  max-inline-size: 18ch;
+  margin: 0;
+  font-size: clamp(2.25rem, 4.6vw + 0.5rem, 4rem);
+  line-height: 1.05;
+}
+
+.mk-hero__body {
+  max-inline-size: 38rem;
+  margin: var(--space-24) 0 0;
+  color: var(--mk-muted);
+  font-size: clamp(1.0625rem, 0.6vw + 0.9rem, 1.25rem);
+  line-height: 1.6;
+}
+
+.mk-hero__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: var(--space-64);
+  align-items: start;
+}
+
+/* A day in the school: a plain table, ruled top and bottom, part of the hero rather than a frame
+ * laid over it. */
+.mk-day {
+  margin: var(--space-8) 0 0;
+  border-top: 2px solid var(--mk-ink);
+}
+
+.mk-day__title {
+  padding-block: var(--space-12);
+  border-bottom: 1px solid var(--mk-rule);
+  color: var(--mk-text);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-day__table {
+  inline-size: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.mk-day__table td {
+  padding-block: var(--space-12);
+  border-bottom: 1px solid var(--mk-rule);
+  vertical-align: top;
+  text-align: start;
+}
+
+.mk-day__time {
+  inline-size: 4.75rem;
+  padding-inline-start: var(--space-8);
+  color: var(--mk-mark);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-day__what {
+  padding-inline-end: var(--space-16);
+  color: var(--mk-text);
+  line-height: 1.5;
+}
+
+.mk-day__who {
+  inline-size: 8.5rem;
+  color: var(--mk-muted);
+  text-align: end;
+}
+
+/* Sections -------------------------------------------------------------------------------------- */
+
+.mk-section,
+.marketing-section {
+  padding-block: var(--space-80);
+}
+
+.mk-section--alt {
+  background-color: var(--mk-paper-alt);
+  border-block: 1px solid var(--mk-rule);
+}
+
+.mk-section--flush {
+  padding-top: var(--space-48);
+}
+
+.mk-section__header {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: var(--space-24) var(--space-64);
+  align-items: end;
+  margin-bottom: var(--space-48);
+}
+
+.mk-section__title {
+  margin: 0;
+  font-size: clamp(1.75rem, 2.2vw + 0.9rem, 2.5rem);
+  line-height: 1.12;
+}
+
+.mk-section__lede {
+  max-inline-size: 36rem;
+  margin: 0;
+  color: var(--mk-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1.6;
+}
+
+.mk-section__title + .mk-section__lede {
+  margin-top: var(--space-16);
+}
+
+.mk-section__more {
+  margin: var(--space-32) 0 0;
+}
+
+/* Two columns: a heading on one side, its content on the other. */
+.mk-split {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: var(--space-32) var(--space-64);
+  align-items: start;
+}
+
+.mk-split--center {
+  align-items: center;
+}
+
+/* A numbered, ruled index in two columns: the modules on the home page. */
+.mk-index {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: var(--space-64);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mk-index__item {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: var(--space-16);
+  padding-block: var(--space-20);
+  border-top: 1px solid var(--mk-rule);
+}
+
+.mk-index__number {
+  color: var(--mk-mark);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.6;
+}
+
+.mk-index__title {
+  margin: 0;
+  color: var(--mk-text);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-index__body {
+  margin: var(--space-4) 0 0;
+  color: var(--mk-muted);
+  line-height: 1.55;
+}
+
+/* The same words in English and Arabic, side by side. */
+.mk-pairs {
+  inline-size: 100%;
+  border-collapse: collapse;
+  border-top: 2px solid var(--mk-ink);
+}
+
+.mk-pairs__caption {
+  padding-block: var(--space-12);
+  color: var(--mk-muted);
+  font-size: var(--font-size-sm);
+  text-align: start;
+  caption-side: bottom;
+}
+
+.mk-pairs th,
+.mk-pairs td {
+  padding: var(--space-12) var(--space-8);
+  border-bottom: 1px solid var(--mk-rule);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-regular);
+  text-align: start;
+  inline-size: 50%;
+}
+
+.mk-pairs th {
+  color: var(--mk-muted);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-pairs td {
+  color: var(--mk-text);
+}
+
+/* Facts: titled paragraphs in two columns, each under its own rule. */
+.mk-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-40) var(--space-64);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mk-facts__item {
+  padding-top: var(--space-20);
+  border-top: 1px solid var(--mk-ink);
+}
+
+.mk-facts__title {
+  margin: 0;
+  color: var(--mk-text);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-facts__body {
+  margin: var(--space-8) 0 0;
+  color: var(--mk-muted);
+  line-height: 1.6;
+}
+
+/* The closing band: a flat navy block, one sentence and one button. */
+.mk-band {
+  padding-block: var(--space-64);
+  background-color: var(--mk-band);
+  color: var(--mk-band-text);
+}
+
+.mk-band__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-32);
+}
+
+.mk-band__title {
+  margin: 0;
+  color: var(--mk-band-text);
+  font-size: clamp(1.75rem, 2vw + 1rem, 2.5rem);
+  line-height: 1.15;
+}
+
+.mk-band__body {
+  max-inline-size: 34rem;
+  margin: var(--space-12) 0 0;
+  color: var(--mk-band-muted);
+  font-size: var(--font-size-lg);
+  line-height: 1.6;
+}
+
+/* On the navy band the secondary button is the light one: paper on navy. */
+.mk-band .sf-button--secondary {
+  border-color: var(--mk-band-text);
+  background-color: var(--mk-band-text);
+  color: #161551;
+}
+
+.mk-band .sf-button--secondary:hover {
+  background-color: transparent;
+  color: var(--mk-band-text);
+}
+
+.mk-band .sf-button:focus-visible {
+  outline-color: var(--mk-band-text);
+}
+
+/* About and contact ------------------------------------------------------------------------------ */
+
+.marketing-about-body {
+  max-inline-size: 44rem;
+}
+
+.marketing-about-body p {
+  margin: 0;
+  color: var(--mk-text);
+  font-size: var(--font-size-lg);
+  line-height: 1.7;
+}
+
+.marketing-about-body p + p {
+  margin-top: var(--space-20);
+}
+
+/* The highlighted moment of the day (SchoolDay.tsx): a tint and a navy edge, nothing that moves. */
+.mk-day__row {
+  transition:
+    background-color 600ms var(--easing-standard),
+    box-shadow 600ms var(--easing-standard);
+}
+
+.mk-day__row[data-active="true"] {
+  background-color: color-mix(in srgb, var(--mk-ink) 7%, transparent);
+  box-shadow: inset 3px 0 0 var(--mk-ink);
+}
+
+:dir(rtl) .mk-day__row[data-active="true"] {
+  box-shadow: inset -3px 0 0 var(--mk-ink);
+}
+
+.mk-day__row[data-active="true"] .mk-day__what {
+  color: var(--mk-ink);
+}
+
+/* Live demos (demos/*.tsx) ---------------------------------------------------------------------
+ * Small working pieces of the product, in the page's flow: panes with a hairline border, like the
+ * app's own screens. They change when the visitor uses them; nothing in them floats. */
+
+.mk-example {
+  margin: var(--space-12) 0 0;
+  color: var(--mk-muted);
+  font-size: var(--font-size-xs);
+}
+
+.mk-text-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--mk-ink);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.mk-text-button:focus-visible,
+.mk-mini-button:focus-visible,
+.mk-tour__tab:focus-visible,
+.mk-flip__option:focus-visible,
+.mk-segmented__option:has(input:focus-visible) {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.mk-day__title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+}
+
+.mk-pane__role {
+  color: var(--mk-mark);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* The language flip */
+.mk-language {
+  display: grid;
+  gap: var(--space-32);
+}
+
+/* The sensitive field */
+.mk-privacy {
+  display: grid;
+  grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+  gap: var(--space-48) var(--space-64);
+  align-items: start;
+}
+
+.mk-facts--stacked {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-24);
+}
+
+/* Entrances inside the demos: new things arrive, then sit still. */
+
+@keyframes mk-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-grow {
+  from {
+    inline-size: 0;
+  }
+}
+
+@keyframes mk-flip-in {
+  from {
+    opacity: 0;
+    transform: translateX(-16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-flip-in-rtl {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mk-mini__form select:focus-visible,
+.mk-mini__form input:focus-visible,
+.mk-mini__select:focus-visible,
+.mk-mini__check input:focus-visible,
+.mk-pills button:focus-visible,
+.mk-steps__step:focus-visible,
+.mk-size__range:focus-visible,
+.mk-weight input:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Motion ------------------------------------------------------------------------------------------
+ * Everything here settles once and stops: the hero rises in on load, the day's rule draws across and
+ * its rows follow one by one, and content further down rises a few pixels into place the first time
+ * it scrolls into view (data-reveal, layouts/marketing/use-reveal.ts). Nothing loops, drifts or
+ * hovers, and none of it runs for visitors who prefer reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+  /* The headline only slides: it is the page's largest paint, and a fade would hold that paint
+   * back until it was visible (Lighthouse's LCP budget, lighthouserc.json). */
+  .mk-hero__title {
+    animation: mk-settle 900ms var(--easing-emphasized) both;
+  }
+
+  .mk-hero__body,
+  .mk-hero .mk-actions {
+    animation: mk-rise 900ms var(--easing-emphasized) both;
+  }
+
+  .mk-hero__body {
+    animation-delay: 120ms;
+  }
+
+  .mk-hero .mk-actions {
+    animation-delay: 240ms;
+  }
+
+  .mk-day {
+    border-top-color: transparent;
+  }
+
+  .mk-day::before {
+    content: "";
+    display: block;
+    block-size: 2px;
+    margin-block-start: -2px;
+    background-color: var(--mk-ink);
+    transform-origin: left;
+    animation: mk-draw 900ms var(--easing-emphasized) 200ms both;
+  }
+
+  :dir(rtl) .mk-day::before {
+    transform-origin: right;
+  }
+
+  .mk-day__title {
+    animation: mk-fade 700ms ease 350ms both;
+  }
+
+  .mk-day__row {
+    animation: mk-rise 700ms var(--easing-emphasized) both;
+    animation-delay: calc(450ms + var(--i, 0) * 90ms);
+  }
+
+  [data-reveal-ready] [data-reveal] {
+    opacity: 0;
+    transform: translateY(18px);
+    transition:
+      opacity 800ms var(--easing-standard),
+      transform 800ms var(--easing-emphasized);
+    transition-delay: calc(min(var(--reveal-index, 0), 8) * 70ms);
+  }
+
+  [data-reveal-ready] [data-reveal][data-revealed="true"] {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes mk-settle {
+  from {
+    transform: translateY(18px);
+  }
+
+  to {
+    transform: none;
+  }
+}
+
+@keyframes mk-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes mk-draw {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Narrow screens --------------------------------------------------------------------------------- */
+
+@media (max-width: 960px) {
+  .mk-privacy,
+  .mk-hero__grid,
+  .mk-section__header,
+  .mk-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mk-hero__grid {
+    gap: var(--space-48);
+  }
+}
+
+@media (max-width: 640px) {
+  .mk-hero {
+    padding-block: var(--space-48);
+  }
+
+  .mk-section,
+  .marketing-section {
+    padding-block: var(--space-48);
+  }
+
+  .mk-index,
+  .mk-facts,
+  .mk-day__who {
+    inline-size: auto;
+  }
+}
+
+/* Where a home page demo will appear, while its chunk loads. */
+.mk-demo-slot {
+  border: 1px dashed var(--mk-rule);
+  border-radius: var(--radius-lg);
+}

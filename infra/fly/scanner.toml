@@ -1,0 +1,47 @@
+# ClamAV for the workers' file-scan queue, on fly.io (production). It is its own app, so it binds
+# every interface and is reachable only through its
+# Flycast (private) address — it has no public IP. It runs only while there are scans ([[services]]
+# below). Deploy from the repo root:
+#   fly deploy . --config infra/fly/scanner.toml --remote-only
+app = "studafy-core-scanner"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../docker/clamav.Dockerfile"
+
+  [build.args]
+    CLAMAV_TCP_ADDRS = "0.0.0.0 ::"
+
+[[services]]
+  internal_port = 3310
+  protocol = "tcp"
+  # On demand: scans are occasional (an upload now and then), so the 2 GB machine runs only while
+  # there is work. The workers reach clamd through this service's Flycast address
+  # (studafy-core-scanner.flycast, workers.toml), i.e. through fly's proxy, which starts the stopped
+  # machine on the first connection and stops it again once no connection has been open for a few
+  # minutes. A cold start measured about 30 s (machine 3 s, freshclam update and signature load the
+  # rest); the scan worker waits up to 2 minutes for clamd to answer PING before it streams the
+  # object (CLAMD_STARTUP_WAIT_MS, apps/workers/src/queues/scan/clamd.ts), so a cold start delays the
+  # first scan rather than failing it. Every cold start runs freshclam before clamd listens, so a
+  # scan uses signatures fetched at most a few minutes earlier (if the update mirror refuses one,
+  # clamd starts with the image's own database and freshclam retries on its usual schedule).
+  # "stop", not "suspend": a suspended clamd would resume with signatures as old as its snapshot,
+  # since freshclam's timer does not run while the machine is suspended.
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 3310
+
+  [[services.tcp_checks]]
+    interval = "30s"
+    timeout = "5s"
+    # freshclam and the signature load take a couple of minutes on first boot.
+    grace_period = "5m"
+
+# The ~1.5 GB signature database plus clamd itself; ConcurrentDatabaseReload is off (Dockerfile),
+# so a reload never holds two copies.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "2gb"

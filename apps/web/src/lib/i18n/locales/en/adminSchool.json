@@ -1,0 +1,643 @@
+{
+  "roles": {
+    "SUPER_ADMIN": "Super admin",
+    "ORG_ADMIN": "Org admin",
+    "PRINCIPAL": "Principal",
+    "FINANCE": "Finance",
+    "INSTRUCTOR": "Instructor",
+    "STUDENT": "Student",
+    "PARENT": "Parent",
+    "GUEST": "Guest",
+    "SUPPORT_AGENT": "Support agent"
+  },
+  "dashboard": {
+    "title": "School overview",
+    "intro": "A live snapshot of activation, attendance, approvals, and account health.",
+    "links": {
+      "users": "Manage users →",
+      "students": "Manage students →",
+      "timetable": "Build timetable →",
+      "classes": "Classes and class records →",
+      "calendar": "School calendar →",
+      "settings": "School settings →",
+      "announcements": "Announcements →",
+      "audit": "Audit log →",
+      "privacy": "Privacy requests →",
+      "aiReports": "AI content reports →",
+      "teachers": "Teachers' employment →",
+      "importData": "Import data"
+    }
+  },
+  "tiles": {
+    "activation": {
+      "title": "Activation funnel",
+      "error": "Unable to load user activation counts.",
+      "empty": "No invited or active users yet.",
+      "invited": "Invited",
+      "active": "Active"
+    },
+    "attendance": {
+      "title": "Attendance today",
+      "error": "Unable to load today's attendance.",
+      "empty": "No attendance recorded yet today.",
+      "summary_one": "{{present}} present of {{total}} record",
+      "summary_other": "{{present}} present of {{total}} records"
+    },
+    "approvals": {
+      "title": "Pending approvals",
+      "error": "Unable to load the approval queue.",
+      "empty": "Nothing is waiting on your review.",
+      "awaiting": "awaiting review"
+    },
+    "storage": {
+      "title": "Storage usage",
+      "error": "Unable to load storage usage.",
+      "empty": "No storage data available.",
+      "meterLabel": "{{percent}} of storage used",
+      "noCap": "Storage cap not configured",
+      "usedOfCap": "{{used}} of {{cap}} used",
+      "usedNoCap": "{{used}} used · no cap configured",
+      "units": {
+        "b": "{{value}} B",
+        "kb": "{{value}} KB",
+        "mb": "{{value}} MB",
+        "gb": "{{value}} GB"
+      },
+      "upgrade": "Upgrade storage"
+    }
+  },
+  "announcements": {
+    "title": "Announcements",
+    "intro": "Compose and publish school notices, targeted by role or class, now or on a schedule.",
+    "tabs": {
+      "compose": "Compose",
+      "history": "History"
+    },
+    "audience": {
+      "school": "Everyone in the school",
+      "role": "Everyone with a role",
+      "class": "Everyone in a class"
+    },
+    "validation": {
+      "titleRequired": "Title is required",
+      "titleTooLong": "Keep it under 200 characters",
+      "bodyRequired": "Message is required",
+      "bodyTooLong": "Keep it under 5,000 characters",
+      "chooseRole": "Choose a role",
+      "chooseClass": "Choose a class",
+      "invalidDateTime": "Invalid date/time"
+    },
+    "compose": {
+      "ariaLabel": "Compose announcement",
+      "titleLabel": "Title",
+      "messageLabel": "Message",
+      "mandatory": "Mandatory — recipients cannot disable this notice",
+      "audienceLabel": "Audience",
+      "roleLabel": "Role",
+      "classLabel": "Class",
+      "loadingClasses": "Loading classes…",
+      "selectClass": "Select a class",
+      "publishAtLabel": "Publish at",
+      "publishAtHelp": "Leave blank to publish immediately. Uses your device’s local time zone — converted to a fixed instant, so recipients see it at the same moment everywhere.",
+      "schedule": "Schedule announcement",
+      "publishNow": "Publish now",
+      "published": "Announcement published",
+      "scheduled": "Announcement scheduled",
+      "sendFailed": "Couldn't send announcement"
+    },
+    "history": {
+      "allStatuses": "All statuses",
+      "statusLabel": "Status",
+      "status": {
+        "scheduled": "Scheduled",
+        "published": "Published"
+      },
+      "audienceRole": "Role: {{role}}",
+      "audienceClass": "Class: {{code}}",
+      "mandatory": "Mandatory",
+      "columns": {
+        "title": "Title",
+        "audience": "Audience",
+        "status": "Status",
+        "when": "When",
+        "reach": "Reach",
+        "sentBy": "Sent by"
+      },
+      "reach": "{{notified}} / {{recipients}}",
+      "caption": "Announcement history",
+      "loadError": "Unable to load announcements.",
+      "empty": "No announcements yet.",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "intro": "Configure your profile, school defaults, invitation and attendance policy, and storage.",
+    "loadError": "Unable to load school settings. Try reloading the page.",
+    "saveChanges": "Save changes",
+    "saveFailed": "Couldn't save changes",
+    "confirm": {
+      "cancel": "Cancel",
+      "saveAnyway": "Save anyway"
+    },
+    "validation": {
+      "nameRequired": "Name is required",
+      "nameTooLong": "Keep it under 200 characters",
+      "invalidTimezone": "Must be a valid IANA timezone (e.g. Africa/Casablanca).",
+      "percentRange": "Must be between 0 and 100.",
+      "wholeHours": "Enter a whole number of hours.",
+      "minHours": "Must be at least 1 hour.",
+      "maxHours": "Must be 8760 hours (1 year) or fewer."
+    },
+    "profile": {
+      "title": "Profile",
+      "description": "How you show up to other staff, students, and parents across the portal.",
+      "displayName": "Display name",
+      "displayNameHelp": "Shown instead of your email wherever your name appears in the portal.",
+      "email": "Email",
+      "emailHelp": "Your sign-in email. Changing it isn't supported from this screen.",
+      "role": "Role",
+      "roleHelp": "Assigned by another admin from the Users screen, not editable here.",
+      "updated": "Profile updated"
+    },
+    "locale": {
+      "title": "Locale and timezone",
+      "description": "Default language and timezone for this school, used in emails, the portal, and timetable rendering.",
+      "language": "Default language",
+      "languageHelp": "Applied to system emails and the portal's default language for new users.",
+      "timezone": "Timezone",
+      "timezoneHelp": "IANA timezone, e.g. Africa/Casablanca. Used to render the timetable and schedule alerts.",
+      "updated": "Locale and timezone updated"
+    },
+    "grading": {
+      "title": "Grading scheme",
+      "description": "How grades are displayed across report cards and gradebooks school-wide.",
+      "label": "Grading scheme",
+      "help": "Changes how every existing grade is labeled, not just new ones.",
+      "updated": "Grading scheme updated",
+      "confirmTitle": "Change grading scheme?",
+      "confirmBody": "This changes how every existing grade at this school is displayed — from {{from}} to {{to}}. It takes effect immediately across every report card and gradebook.",
+      "currentScheme": "the current scheme",
+      "schemes": {
+        "letter": "Letter (A, B, C…)",
+        "percentage": "Percentage (0-100%)",
+        "gpa": "GPA (0-4.5)",
+        "numeric": "Numeric score",
+        "pass_fail": "Pass / fail"
+      }
+    },
+    "attendance": {
+      "title": "Attendance alerts",
+      "description": "Thresholds that trigger attendance alerts, the teacher correction window, and discipline visibility for parents.",
+      "attendanceThreshold": "Attendance alert threshold (%)",
+      "attendanceThresholdHelp": "An alert fires when a student's attendance rate falls below this percentage.",
+      "absenceThreshold": "Absence alert threshold (%)",
+      "absenceThresholdHelp": "An alert fires when a student's absence rate rises above this percentage.",
+      "correctionWindow": "Correction window (hours)",
+      "correctionWindowHelp": "How long after a session teachers can still correct its attendance. After it, only a principal can.",
+      "parentVisibility": "Parents can view their child's resolved discipline incidents",
+      "showTitle": "Show discipline incidents to parents?",
+      "hideTitle": "Hide discipline incidents from parents?",
+      "showBody": "Every parent at this school will immediately be able to see their own child's resolved discipline incidents in the portal.",
+      "hideBody": "Parents will immediately lose access to their child's resolved discipline incidents in the portal.",
+      "updated": "Attendance alerts updated"
+    },
+    "exams": {
+      "title": "Exam system",
+      "description": "How every term is examined. Subjects are set up from this, so teachers enter exactly these parts each term.",
+      "systemLabel": "Each term has",
+      "systems": {
+        "midterm": "Midterm exam and final exam, plus quizzes and homework",
+        "periods": "First period exam, second period exam and final exam, plus quizzes and homework",
+        "three_periods": "First, second and third period exams and final exam, plus quizzes and homework"
+      },
+      "weightsLabel": "Share of the term (%)",
+      "weightsHelp": "Each part is marked out of its share: a 30% midterm is out of 30. Set a part to 0 to leave it out.",
+      "parts": {
+        "first_period": "First period exam",
+        "second_period": "Second period exam",
+        "third_period": "Third period exam",
+        "midterm": "Midterm exam",
+        "final_exam": "Final exam",
+        "quiz": "Quizzes",
+        "homework": "Homework"
+      },
+      "total": "Total: {{total}}% (must be 100%)",
+      "updated": "Exam system saved",
+      "apply": "Apply to all subjects",
+      "applyHelp": "Rebuilds every subject of the current academic year on this system. Subjects that already have marks are left as they are.",
+      "saveBeforeApply": "Save your changes before applying them to subjects.",
+      "confirmTitle": "Apply the exam system to all subjects?",
+      "confirmBody": "Every subject of the current academic year without marks gets this system's parts for each term, replacing its current categories and assessments. Subjects that already have marks are not changed.",
+      "applied": "Subjects set up: {{count}}",
+      "applyFailed": "Couldn't apply the exam system",
+      "resultUpdated": "{{count}} subjects in {{year}} now use this system.",
+      "resultHasMarks": "Not changed because they already have marks: {{subjects}}.",
+      "resultOther": "Not changed (set these up in Academic Setup): {{subjects}}."
+    }
+  },
+  "timetable": {
+    "weekdays": {
+      "1": "Monday",
+      "2": "Tuesday",
+      "3": "Wednesday",
+      "4": "Thursday",
+      "5": "Friday",
+      "6": "Saturday",
+      "7": "Sunday"
+    },
+    "weekdaysShort": {
+      "1": "Mon",
+      "2": "Tue",
+      "3": "Wed",
+      "4": "Thu",
+      "5": "Fri",
+      "6": "Sat",
+      "7": "Sun"
+    },
+    "dayFallback": "Day {{weekday}}",
+    "status": {
+      "draft": "Draft",
+      "pending": "Submitted",
+      "approved": "Approved"
+    },
+    "title": "Timetable",
+    "intro": "The weekly timetable for each term. Edit a draft copy, then publish it when it's ready.",
+    "guide": "Read the guide",
+    "academicYear": "Academic year",
+    "term": "Term",
+    "sentBack": "Sent back: {{reason}}",
+    "selectTerm": "Select a term to build its timetable.",
+    "loading": "Loading…",
+    "toast": {
+      "slotUpdated": "Slot updated",
+      "slotUpdateFailed": "Couldn't update slot",
+      "slotRemoved": "Slot removed",
+      "slotRemoveFailed": "Couldn't remove slot",
+      "placeFailed": "Couldn't place slot",
+      "slotAdded": "Lesson added",
+      "editFailed": "Couldn't open a draft to edit",
+      "published": "Timetable published",
+      "publishFailed": "Couldn't publish the timetable",
+      "discarded": "Draft discarded",
+      "discardFailed": "Couldn't discard the draft",
+      "returnFailed": "Couldn't send the timetable back to draft"
+    },
+    "editModal": {
+      "title": "Edit slot",
+      "description": "{{classCode}} — {{day}}, period {{period}}",
+      "teacher": "Teacher",
+      "cancel": "Cancel",
+      "remove": "Remove",
+      "save": "Save changes"
+    },
+    "unknownClass": "Unknown class",
+    "unknownTeacher": "Unknown teacher",
+    "unknownSection": "Unknown section",
+    "sectionLabel": "{{grade}} – {{section}}",
+    "conflict": {
+      "teacher": "Teacher \"{{label}}\" is already scheduled for class \"{{classCode}}\" on {{day}}, period {{period}}.",
+      "section": "Section \"{{label}}\" also has class \"{{classCode}}\" on {{day}}, period {{period}}. The lesson was saved — check this is intended."
+    },
+    "grid": {
+      "dismiss": "Dismiss",
+      "classes": "Classes",
+      "picked": "{{code}} picked — choose a cell to place it, or press Escape to cancel.",
+      "instructions": "Drag a class onto the grid, or press Enter to pick it up and then Enter on a cell.",
+      "noClasses": "No schedulable classes in this term.",
+      "caption": "Weekly timetable grid for {{name}}",
+      "period": "Period",
+      "slotLabel": "{{classCode}}, {{day}} period {{period}}, taught by {{teacher}}. Activate to edit.",
+      "slotLabelSection": "{{classCode}}, {{day}} period {{period}}, section {{section}}, taught by {{teacher}}. Activate to edit.",
+      "placeLabel": "Place {{code}} on {{day}} period {{period}}",
+      "addLabel": "Add a lesson on {{day}} period {{period}}"
+    },
+    "slotModal": {
+      "addTitle": "Add lesson",
+      "addDescription": "{{day}}, period {{period}}",
+      "class": "Class",
+      "classPlaceholder": "Choose a class",
+      "day": "Day",
+      "periodOption": "Period {{period}}",
+      "add": "Add lesson"
+    },
+    "schoolWeek": {
+      "title": "School week",
+      "description": "Choose the days the school teaches and how many periods each day has. Lessons already scheduled are never removed.",
+      "days": "Teaching days",
+      "presets": {
+        "sunThu": "Sunday–Thursday",
+        "monFri": "Monday–Friday"
+      },
+      "daysRequired": "Choose at least one day.",
+      "periods": "Periods per day",
+      "periodsInvalid": "Enter a whole number from 1 to {{max}}.",
+      "save": "Save school week",
+      "saved": "School week saved",
+      "saveFailed": "Couldn't save the school week"
+    },
+    "workspace": {
+      "live": "Live",
+      "liveSince": "Teachers and students are following this timetable. Published {{date}}.",
+      "liveNote": "Teachers and students are following this timetable.",
+      "draftWaiting": "You have unpublished changes in a draft.",
+      "pendingWaiting": "A timetable is waiting for review.",
+      "review": "Review",
+      "continueEditing": "Continue editing",
+      "edit": "Edit timetable",
+      "create": "Create timetable",
+      "pendingNote": "This timetable was submitted for review. Approve it to make it live, or send it back to draft to keep editing.",
+      "viewLive": "View live timetable",
+      "returnToDraft": "Send back to draft",
+      "approve": "Approve and publish",
+      "draft": "Draft",
+      "draftNote": "You're editing a draft. Teachers and students keep seeing the live timetable until you publish.",
+      "draftNoteFirst": "You're building this term's first timetable. Nobody sees it until you publish.",
+      "discard": "Discard draft",
+      "publish": "Publish",
+      "discardTitle": "Discard this draft?",
+      "discardDescription": "All unpublished changes will be lost. The live timetable stays as it is.",
+      "discardConfirm": "Discard draft",
+      "loadError": "Unable to load the timetable.",
+      "emptyTitle": "No timetable for this term yet",
+      "emptyManage": "Create the timetable, add lessons, then publish it for teachers and students.",
+      "emptyView": "The timetable for this term hasn't been published yet.",
+      "schoolWeek": "School week",
+      "gradeFilter": "Grade",
+      "allGrades": "All grades",
+      "sectionFilter": "Section",
+      "allSections": "All sections",
+      "teacherFilter": "Teacher",
+      "allTeachers": "All teachers",
+      "summary_one": "{{count}} lesson a week · {{classes}} classes",
+      "summary_other": "{{count}} lessons a week · {{classes}} classes",
+      "defaultName": "{{term}} timetable"
+    },
+    "import": {
+      "title": "Import lessons",
+      "fields": {
+        "day": "Day (1 = Monday … 7 = Sunday)",
+        "period": "Period",
+        "class": "Class code",
+        "teacher": "Teacher employee number"
+      },
+      "dayNotInWeek": "Day {{value}} isn't a school day.",
+      "periodRange": "Period must be between 1 and {{max}}.",
+      "unknownClass": "No class with code \"{{value}}\" in this term.",
+      "unknownTeacher": "No teacher with employee number \"{{value}}\"."
+    }
+  },
+  "home": {
+    "accountHeading": "School account",
+    "stats": {
+      "active": "Active users",
+      "activeHint": "Accounts in use",
+      "invitedHint": "Yet to activate",
+      "approvalsHint": "Awaiting your review"
+    },
+    "summary": {
+      "approvals_one": "{{count}} grade approval is waiting on you",
+      "approvals_other": "{{count}} grade approvals are waiting on you",
+      "invited_one": "{{count}} invited user hasn't activated yet",
+      "invited_other": "{{count}} invited users haven't activated yet"
+    }
+  },
+  "audit": {
+    "actions": {
+      "insert": "Created",
+      "update": "Updated",
+      "delete": "Deleted",
+      "login": "Logged in",
+      "logout": "Logged out",
+      "export": "Exported",
+      "permission_change": "Permission changed",
+      "read": "Viewed"
+    },
+    "allActions": "All actions",
+    "exportStatus": {
+      "queued": "Queued",
+      "processing": "Processing",
+      "completed": "Ready",
+      "failed": "Failed"
+    },
+    "title": "Audit log",
+    "intro": "Search the school’s audit trail by actor, action, resource, and date.",
+    "exportCsv": "Export CSV",
+    "filters": {
+      "action": "Action",
+      "resourceTable": "Resource table",
+      "resourceTablePlaceholder": "e.g. students, grades, users",
+      "from": "From",
+      "to": "To",
+      "clear": "Clear filters"
+    },
+    "actor": {
+      "label": "Actor",
+      "clear": "Clear",
+      "placeholder": "Search by name or email",
+      "noMatches": "No users match."
+    },
+    "export": {
+      "statusLabel": "Export status",
+      "download": "Download CSV",
+      "failedFallback": "The export could not be completed.",
+      "ready": "Audit export ready",
+      "readyDescription": "Download it below.",
+      "failed": "Audit export failed",
+      "queued": "Audit export queued",
+      "queuedDescription": "We'll let you know when it's ready.",
+      "startFailed": "Couldn't start export",
+      "tryAgain": "Please try again."
+    },
+    "columns": {
+      "timestamp": "Timestamp",
+      "actor": "Actor",
+      "action": "Action",
+      "resource": "Resource",
+      "ipAddress": "IP address",
+      "diff": "Diff"
+    },
+    "system": "System",
+    "viewDiff": "View diff",
+    "caption": "Audit log entries",
+    "rowLabel": "{{action}} on {{table}}",
+    "loadError": "Unable to load the audit log.",
+    "empty": "No entries match these filters.",
+    "previous": "Previous",
+    "next": "Next",
+    "diff": {
+      "title": "Audit entry diff",
+      "description": "{{action}} · {{table}}",
+      "empty": "No field-level changes recorded for this entry.",
+      "caption": "Before and after values",
+      "field": "Field",
+      "before": "Before",
+      "after": "After",
+      "close": "Close"
+    }
+  },
+  "privacy": {
+    "title": "Privacy requests",
+    "description": "Give a person a copy of everything the school holds about them, or erase it. Each request runs in the background and must be finished within 30 days of filing.",
+    "newRequest": "New request",
+    "caption": "Every privacy request, newest first",
+    "columns": {
+      "person": "Person",
+      "type": "Request",
+      "status": "Status",
+      "filed": "Filed",
+      "due": "Due by",
+      "result": "Result"
+    },
+    "type": {
+      "export": "Data export",
+      "erasure": "Erasure"
+    },
+    "status": {
+      "queued": "Waiting",
+      "processing": "In progress",
+      "completed": "Done",
+      "failed": "Failed"
+    },
+    "completedOn": "Done {{date}}",
+    "removedPerson": "Erased person",
+    "download": "Download",
+    "downloadLabel": "Download the data export for {{name}}",
+    "downloadFailed": "Couldn't get the download link. Try again.",
+    "exportDeleted": "Deleted after 30 days",
+    "exportDeletedToast": {
+      "title": "This export has been deleted",
+      "description": "Exports are kept for 30 days after they finish. File a new request for a fresh copy."
+    },
+    "failedFallback": "The request failed. File it again, or contact Studafy support.",
+    "empty": "No privacy requests yet.",
+    "loadError": "Couldn't load the privacy requests.",
+    "new": {
+      "title": "New privacy request",
+      "person": "Person",
+      "type": "What do they want?",
+      "explain": {
+        "export": "Collects everything the school holds about this person into one file, which you can download here for 30 days once it's ready. Nothing is changed.",
+        "erasure": "Removes this person's name, contact details and other personal data from the school's records, and signs them out of every device. Financial and audit records the school must keep by law stay as they are. This can't be undone."
+      },
+      "understandErasure": "I understand this person's data will be erased for good",
+      "submit": {
+        "export": "Request export",
+        "erasure": "Erase their data"
+      },
+      "cancel": "Cancel",
+      "filed": {
+        "export": "Export requested for {{name}}",
+        "erasure": "Erasure requested for {{name}}"
+      },
+      "failed": "Couldn't file the request",
+      "alreadyPending": "A request of this kind is already waiting or in progress for this person.",
+      "unavailable": "Privacy requests can't be processed on this server right now. Contact Studafy support."
+    }
+  },
+  "aiReports": {
+    "title": "AI content reports",
+    "description": "What students reported about AI answers, quizzes and summaries, and what the safety filter escalated. Child-safety reports must be answered within 24 hours.",
+    "filter": "Show",
+    "openReports": "Open reports",
+    "caption": "AI content reports, most urgent first",
+    "columns": {
+      "reason": "Reason",
+      "priority": "Priority",
+      "student": "Student",
+      "content": "Content",
+      "status": "Status",
+      "filed": "Reported"
+    },
+    "reason": {
+      "child_safety": "Child safety",
+      "unsafe": "Unsafe content",
+      "inappropriate": "Inappropriate content",
+      "inaccurate": "Inaccurate content",
+      "other": "Other"
+    },
+    "priority": {
+      "urgent": "Urgent",
+      "high": "High",
+      "normal": "Normal"
+    },
+    "status": {
+      "pending": "New",
+      "in_review": "In review",
+      "escalated": "Escalated",
+      "actioned": "Actioned",
+      "dismissed": "Dismissed"
+    },
+    "source": {
+      "user_report": "Reported by a student",
+      "safety_filter": "Flagged by the safety filter"
+    },
+    "contentType": {
+      "ask_question": "Question to the AI",
+      "ask_answer": "AI answer",
+      "quiz": "Quiz",
+      "flashcard_deck": "Flashcards",
+      "summary": "Summary"
+    },
+    "respondBy": "Respond by {{time}}",
+    "overdueSince": "Overdue since {{time}}",
+    "overdueWarning": "This report is overdue. It should have been answered by {{time}}.",
+    "emptyOpen": "No open reports. Nothing needs your attention.",
+    "empty": "No reports with this status.",
+    "loadError": "Couldn't load the reports.",
+    "loading": "Loading…",
+    "notFound": "This report doesn't exist or isn't in your school.",
+    "previous": "Previous",
+    "next": "Next",
+    "pageOf": "Page {{page}} of {{pages}}",
+    "back": "← All AI content reports",
+    "cancel": "Cancel",
+    "conflict": "Someone else updated this report first. It now shows their change.",
+    "updateFailed": "Couldn't update the report",
+    "toast": {
+      "in_review": "Review started",
+      "escalated": "Report escalated",
+      "actioned": "Report marked actioned",
+      "dismissed": "Report dismissed"
+    },
+    "detail": {
+      "respondBy": "Respond by",
+      "source": "Source",
+      "studentSaid": "What the student said",
+      "noReason": "No details given.",
+      "content": "Reported content",
+      "showContent": "Show the content",
+      "hideContent": "Hide the content",
+      "contentHidden": "Hidden because it may be harmful. Opening this report was recorded in the audit log.",
+      "review": "Review",
+      "note": "Note: {{note}}",
+      "reviewedAt": "Last reviewed {{time}}",
+      "startReview": "Start review",
+      "action": {
+        "escalated": "Escalate",
+        "actioned": "Mark actioned",
+        "dismissed": "Dismiss"
+      }
+    },
+    "note": {
+      "label": "Note",
+      "required": "Write a note before you continue.",
+      "title": {
+        "escalated": "Escalate this report",
+        "actioned": "Mark as actioned",
+        "dismissed": "Dismiss this report"
+      },
+      "description": {
+        "escalated": "Say who you escalated it to (the police, a social worker, Studafy) and any reference number.",
+        "actioned": "Say what was done, for example that the student and their parents were contacted.",
+        "dismissed": "Say why nothing needs doing."
+      },
+      "submit": {
+        "escalated": "Escalate",
+        "actioned": "Mark actioned",
+        "dismissed": "Dismiss"
+      }
+    }
+  }
+}

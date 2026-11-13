@@ -1,0 +1,183 @@
+import 'package:flutter/widgets.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../features/ai/presentation/ai_data_sharing_screen.dart';
+import '../../features/ai/presentation/ai_usage_screen.dart';
+import '../../features/ai/presentation/ask_ai_screen.dart';
+import '../../features/ai/presentation/exam_screen.dart';
+import '../../features/ai/presentation/explain_screen.dart';
+import '../../features/ai/presentation/flashcards_screen.dart';
+import '../../features/ai/presentation/quiz_screen.dart';
+import '../../features/ai/presentation/widgets/ai_consent_gate.dart';
+import '../../features/ai/presentation/widgets/ai_paywall.dart';
+import '../../features/auth/presentation/login_screen.dart';
+import '../../features/shell/presentation/app_shell.dart';
+import '../../features/notifications/presentation/notification_destination_screen.dart';
+import '../../features/parent/presentation/parent_communication_screen.dart';
+import '../../features/student/presentation/assignment_detail_screen.dart';
+import '../../features/student/presentation/grades_screen.dart';
+import '../../features/student/presentation/attendance_screen.dart';
+import '../../features/student/presentation/exams_screen.dart';
+import '../auth/auth_guard.dart';
+import '../config/app_config.dart';
+import '../config/app_environment.dart';
+import '../features/my_features.dart';
+import '../features/presentation/feature_gate_view.dart';
+import '../update/forced_update_screen.dart';
+import '../update/update_providers.dart';
+import '../update/update_status.dart';
+import 'route_paths.dart';
+
+GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListenable}) {
+  return GoRouter(
+    debugLogDiagnostics: appConfig.environment == AppEnvironment.dev,
+    initialLocation: RoutePaths.home,
+    // Forced-update first, and it fully owns the decision when it fires: a build below the release
+    // floor is pinned to /forced-update regardless of auth state, and authGuard never runs (it
+    // would otherwise bounce an unauthenticated user off /forced-update to /login). authGuard runs
+    // only once the update check has let the app through. `updateStatusProvider` is fail-open — a
+    // still-loading or errored check reads as "not required" here.
+    redirect: (context, state) {
+      final updateRequired =
+          ProviderScope.containerOf(context).read(updateStatusProvider).value ==
+          UpdateStatus.updateRequired;
+      final onForcedUpdate = state.matchedLocation == RoutePaths.forcedUpdate;
+
+      if (updateRequired) return onForcedUpdate ? null : RoutePaths.forcedUpdate;
+      if (onForcedUpdate) return RoutePaths.home;
+      return authGuard(context, state);
+    },
+    refreshListenable: refreshListenable,
+    routes: [
+      GoRoute(
+        path: RoutePaths.forcedUpdate,
+        builder: (context, state) => const ForcedUpdateScreen(),
+      ),
+      GoRoute(path: RoutePaths.login, builder: (context, state) => const LoginScreen()),
+      GoRoute(path: RoutePaths.home, builder: (context, state) => const AppShell()),
+
+      // The signed-in student's personal attendance history.
+      GoRoute(
+        path: RoutePaths.studentAttendance,
+        builder: (context, state) => const StudentAttendanceScreen(),
+      ),
+
+      // The signed-in student's upcoming-exams calendar.
+      GoRoute(
+        path: RoutePaths.studentExams,
+        builder: (context, state) => const StudentExamsScreen(),
+      ),
+
+      // The AI feature screens below send the student's inputs to the third-party model provider,
+      // so each sits behind AiConsentGate (ST-305) and is only built once consent is recorded. Each
+      // is a paid feature too, gated on it by FeatureGate (docs/billing/feature-licensing.md): the
+      // AI tutor for Ask AI, study tools for quizzes, exams and flashcards.
+
+      // The signed-in student's Ask AI chat.
+      GoRoute(
+        path: RoutePaths.askAi,
+        builder: (context, state) => _paid(FeatureKeys.aiTutor, const AskAiScreen()),
+      ),
+
+      // The signed-in student's quiz player.
+      GoRoute(
+        path: RoutePaths.quiz,
+        builder: (context, state) => _paid(FeatureKeys.studyTools, const QuizScreen()),
+      ),
+
+      // The signed-in student's timed mock-exam experience.
+      GoRoute(
+        path: RoutePaths.examMode,
+        builder: (context, state) => _paid(FeatureKeys.studyTools, const ExamScreen()),
+      ),
+
+      // The signed-in student's flashcard deck browser and spaced-repetition review flow.
+      GoRoute(
+        path: RoutePaths.flashcards,
+        builder: (context, state) => _paid(FeatureKeys.studyTools, const FlashcardsScreen()),
+      ),
+
+      // The signed-in student's "Explain it simply". Study tools pay for the explanation, and the
+      // passage it explains is found with the AI tutor's search, so it needs both.
+      GoRoute(
+        path: RoutePaths.explain,
+        builder: (context, state) => FeatureGate(
+          featureKey: FeatureKeys.studyTools,
+          whenPurchasable: (_) => const AiPaywall(),
+          child: _paid(FeatureKeys.aiTutor, const ExplainScreen()),
+        ),
+      ),
+
+      // The signed-in student's AI usage meter.
+      GoRoute(
+        path: RoutePaths.aiUsage,
+        builder: (context, state) => const AiUsageScreen(),
+      ),
+
+      // The signed-in user's AI data-sharing consent and its withdrawal (ST-305).
+      GoRoute(
+        path: RoutePaths.aiDataSharing,
+        builder: (context, state) => const AiDataSharingScreen(),
+      ),
+
+      // The signed-in parent's attendance-alert center, opened on its Alerts tab. Deep-linked
+      // from an `ATTENDANCE_ALERT` push — see the routing note on `RoutePaths.parentAlerts`.
+      GoRoute(
+        path: RoutePaths.parentAlerts,
+        builder: (context, state) => const ParentCommunicationScreen(initialTabIndex: 1),
+      ),
+
+      // Notification deep-link destinations. Each maps to the placeholder
+      // screen until the real feature screen is built. The route path comes
+      // from the FCM data payload `route` field, which is set server-side by
+      // the notification templates registry.
+      GoRoute(
+        path: '/courses/:courseId/grades',
+        builder: (context, state) =>
+            GradesScreen(courseId: state.pathParameters['courseId']),
+      ),
+      GoRoute(
+        path: '/courses/:courseId/attendance',
+        builder: (context, state) => NotificationDestinationScreen(route: state.matchedLocation),
+      ),
+      GoRoute(
+        path: '/announcements',
+        builder: (context, state) => NotificationDestinationScreen(route: state.matchedLocation),
+      ),
+      GoRoute(
+        path: '/courses/:courseId',
+        builder: (context, state) => NotificationDestinationScreen(route: state.matchedLocation),
+      ),
+      GoRoute(
+        path: '/courses/:courseId/assignments/:assignmentId',
+        builder: (context, state) =>
+            AssignmentDetailScreen(assignmentId: state.pathParameters['assignmentId']!),
+      ),
+      GoRoute(
+        path: '/courses/:courseId/discussions/:discussionId',
+        builder: (context, state) => NotificationDestinationScreen(route: state.matchedLocation),
+      ),
+      GoRoute(
+        path: '/groups/:groupId',
+        builder: (context, state) => NotificationDestinationScreen(route: state.matchedLocation),
+      ),
+      GoRoute(
+        path: '/certificates/:certificateId',
+        builder: (context, state) => NotificationDestinationScreen(route: state.matchedLocation),
+      ),
+      GoRoute(
+        path: '/support/tickets/:ticketId',
+        builder: (context, state) => NotificationDestinationScreen(route: state.matchedLocation),
+      ),
+    ],
+  );
+}
+
+/// A paid AI screen: gated on [featureKey] (the AI paywall where the person may buy it), then on
+/// AI data-sharing consent.
+Widget _paid(String featureKey, Widget screen) => FeatureGate(
+  featureKey: featureKey,
+  whenPurchasable: (_) => const AiPaywall(),
+  child: AiConsentGate(child: screen),
+);

@@ -1,0 +1,135 @@
+{
+  "home": {
+    "title": "Attendance",
+    "description": "Today's attendance, every class's daily register and the students to watch. Take the registers not started, finish the ones in progress, and open a submitted register to correct a record.",
+    "links": {
+      "reports": "Attendance reports"
+    },
+    "dateLabel": "Date",
+    "count": {
+      "notStarted_one": "{{count}} not started",
+      "notStarted_other": "{{count}} not started",
+      "inProgress_one": "{{count}} in progress",
+      "inProgress_other": "{{count}} in progress",
+      "submitted_one": "{{count}} submitted",
+      "submitted_other": "{{count}} submitted"
+    },
+    "tableCaption": "Daily registers for {{date}}",
+    "columns": {
+      "class": "Class",
+      "register": "Register",
+      "action": "Action"
+    },
+    "action": {
+      "notStarted": "Take attendance",
+      "inProgress": "Finish register",
+      "submitted": "View register",
+      "view": "View register"
+    },
+    "actionLabel": {
+      "notStarted": "Take attendance for {{class}}",
+      "inProgress": "Finish the register for {{class}}",
+      "submitted": "View the register for {{class}}",
+      "view": "View the register for {{class}}"
+    },
+    "error": "Unable to load classes or registers.",
+    "empty": "No classes in this term.",
+    "viewOnly": "Attendance for the classes you can see. Registers are taken by the attendance office, so this view is read-only.",
+    "registersTitle": "Daily registers",
+    "notTakenYet": "Not taken yet"
+  },
+  "state": {
+    "notStarted": "Not started",
+    "inProgress": "In progress",
+    "submitted": "Submitted"
+  },
+  "status": {
+    "present": "Present",
+    "absent": "Absent",
+    "late": "Late",
+    "excused": "Excused",
+    "remote": "Remote"
+  },
+  "register": {
+    "back": "← Attendance",
+    "title": "{{class}} — {{date}}",
+    "description": "Everyone starts as present. Change who is absent, late or excused, then submit the register.",
+    "submittedDescription": "This register is submitted. Use Correct to change a record; the change is kept in its history.",
+    "markAllPresent": "Mark all present",
+    "submitRecorded": "Submit register",
+    "submit_one": "Submit register ({{count}} student)",
+    "submit_other": "Submit register ({{count}} students)",
+    "lateNeedsMinutes": "Enter minutes late for every student marked late.",
+    "submitted": "Register submitted.",
+    "submitFailed": "Couldn't submit the register.",
+    "columns": {
+      "student": "Student",
+      "status": "Status",
+      "detail": "Details"
+    },
+    "error": "Unable to load this class's roster.",
+    "empty": "No students are enrolled in this class.",
+    "unknownStudent": "Unknown student",
+    "minutesLate": "Minutes late",
+    "minutesLateInvalid": "Enter a whole number of minutes, 1 or more.",
+    "minutesLateValue_one": "{{count}} minute late",
+    "minutesLateValue_other": "{{count}} minutes late",
+    "statusFor": "Attendance for {{student}}",
+    "alreadyRecorded": "Already recorded",
+    "correct": "Correct",
+    "correctLabel": "Correct the record for {{student}}",
+    "corrected": "Record corrected.",
+    "viewOnlyDescription": "View-only. Registers are taken by the attendance office.",
+    "notRecorded": "Not recorded"
+  },
+  "day": {
+    "title": "Attendance on {{date}}",
+    "empty": "No attendance recorded on this day yet.",
+    "error": "Unable to load this day's attendance."
+  },
+  "metrics": {
+    "rate": "Attendance rate"
+  },
+  "atRisk": {
+    "title": "Students at risk",
+    "description": "Students whose attendance rate (present and late) this term is below the school's alert threshold of {{threshold}}.",
+    "noThreshold": "The school has no attendance alert threshold set, so no students are flagged.",
+    "empty": "No students are below the threshold this term.",
+    "more_one": "{{count}} more student is below the threshold; see the table below.",
+    "more_other": "{{count}} more students are below the threshold; see the table below.",
+    "caption": "Students below the alert threshold"
+  },
+  "students": {
+    "title": "Students",
+    "filterLabel": "Filter by name or admission number",
+    "columns": {
+      "student": "Student",
+      "admissionNumber": "Admission no."
+    },
+    "empty": "No attendance recorded for any student this term.",
+    "error": "Unable to load student attendance.",
+    "caption": "Term attendance by student"
+  },
+  "search": {
+    "label": "Search students",
+    "placeholder": "Name or admission number",
+    "searching": "Searching…",
+    "empty": "No students match.",
+    "error": "Search failed. Try again."
+  },
+  "student": {
+    "notFound": "Student not found",
+    "admissionNumber": "Admission no. {{number}}",
+    "termTitle": "This term: {{term}}",
+    "historyTitle": "Attendance history",
+    "historyEmpty": "No attendance recorded for this student this term.",
+    "error": "Unable to load this student's attendance.",
+    "columns": {
+      "date": "Date",
+      "class": "Class",
+      "status": "Status",
+      "detail": "Details"
+    },
+    "classPeriod": "{{class}} · period {{period}}"
+  }
+}

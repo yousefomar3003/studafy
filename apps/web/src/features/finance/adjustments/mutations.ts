@@ -1,0 +1,100 @@
+import { useMutation } from "@tanstack/react-query";
+
+import { api } from "../../../lib/api";
+
+import type { InitiateRefundBody, Refund } from "./queries";
+
+// ---------------------------------------------------------------------------
+// Refunds
+// ---------------------------------------------------------------------------
+
+export interface InitiateRefundInput {
+  body: InitiateRefundBody;
+  /** Caller-supplied `Idempotency-Key`, same lifetime rules as `payments/mutations.ts`'s
+   * `CreatePaymentInput.idempotencyKey`: one key per submission *attempt*, regenerated only when a
+   * fresh form mounts. */
+  idempotencyKey: string;
+}
+
+/** Maker step: creates a pending refund request. */
+export function useInitiateRefund() {
+  return useMutation({
+    mutationFn: async ({ body, idempotencyKey }: InitiateRefundInput) => {
+      const { data } = await api.POST("/api/finance/refunds/initiate", {
+        params: { header: { "idempotency-key": idempotencyKey } },
+        body,
+      });
+      if (!data) throw new Error("Refund initiation returned no data.");
+      return data as Refund;
+    },
+  });
+}
+
+/** Checker step: approves a pending refund and forwards it to ERPNext as a credit note. */
+export function useApproveRefund() {
+  return useMutation({
+    mutationFn: async (refundId: string) => {
+      const { data } = await api.POST("/api/finance/refunds/{refundId}/approve", {
+        params: { path: { refundId } },
+        body: {},
+      });
+      if (!data) throw new Error("Refund approval returned no data.");
+      return data as Refund;
+    },
+  });
+}
+
+export interface RejectRefundInput {
+  refundId: string;
+  reasonNotes: string;
+}
+
+/** Checker step: rejects a pending refund with mandatory notes. */
+export function useRejectRefund() {
+  return useMutation({
+    mutationFn: async ({ refundId, reasonNotes }: RejectRefundInput) => {
+      const { data } = await api.POST("/api/finance/refunds/{refundId}/reject", {
+        params: { path: { refundId } },
+        body: { reason_notes: reasonNotes },
+      });
+      if (!data) throw new Error("Refund rejection returned no data.");
+      return data as Refund;
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Corrections through the same queue: cancel an invoice, reverse a payment (maker step). Approval
+// is the refund approve endpoint, so `useApproveRefund` above covers both.
+// ---------------------------------------------------------------------------
+
+export interface CorrectionRequestInput {
+  id: string;
+  reasonNotes: string;
+}
+
+export function useRequestInvoiceCancellation() {
+  return useMutation({
+    mutationFn: async ({ id, reasonNotes }: CorrectionRequestInput) => {
+      const { data } = await api.POST("/api/finance/invoices/{invoiceId}/cancellation", {
+        params: { path: { invoiceId: id } },
+        body: { reason_code: "error_correction", reason_notes: reasonNotes },
+      });
+      if (!data) throw new Error("Cancellation request returned no data.");
+      return data as Refund;
+    },
+  });
+}
+
+export function useRequestPaymentReversal() {
+  return useMutation({
+    mutationFn: async ({ id, reasonNotes }: CorrectionRequestInput) => {
+      const { data } = await api.POST("/api/finance/payments/{paymentId}/reversal", {
+        params: { path: { paymentId: id } },
+        body: { reason_code: "error_correction", reason_notes: reasonNotes },
+      });
+      if (!data) throw new Error("Reversal request returned no data.");
+      return data as Refund;
+    },
+  });
+}

@@ -1,0 +1,77 @@
+/**
+ * Settings hub. `@studafy/ui`'s Card/Modal supply the chrome; everything here is layout for the
+ * section grid and the section-level description text `SettingsCard` renders under each title.
+ */
+
+.settings-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: var(--space-16);
+  /* Stretch so every card in a row shares its height; the form below then pins each save footer
+   * to the card's bottom edge, keeping the buttons in line across the row. */
+  align-items: stretch;
+}
+
+/* The form sits between Card and its Body/Footer, so it has to carry on the Card's flex column for
+ * Body's `flex: 1` to take up the slack. */
+.settings-card__form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.settings-card__form .sf-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.settings-page__error {
+  color: var(--color-danger-subtle-foreground);
+  background-color: var(--color-danger-subtle-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-8) var(--space-12);
+  margin: var(--space-16) 0;
+}
+
+.settings-card__description {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: var(--space-4) 0 0;
+}
+
+/* Exam system: the weights fieldset, its running total, and the apply-to-subjects block. */
+.exam-structure__weights {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.exam-structure__total {
+  font-weight: 600;
+  margin: 0;
+}
+
+.exam-structure__total--off {
+  color: var(--color-danger-subtle-foreground);
+}
+
+.exam-structure__apply {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-8);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-16);
+}
+
+.exam-structure__result {
+  font-size: var(--font-size-sm);
+}
+
+.exam-structure__result p {
+  margin: 0 0 var(--space-4);
+}

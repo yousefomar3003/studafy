@@ -1,0 +1,23 @@
+# Ships every fly app's logs in the `personal` org (the studafy-core-* apps) to Axiom (EU), the
+# dataset `studafy-logs`. Moved here from the retired Lite repo (studafy-app) on 2026-11-11 so
+# everything Studafy runs on fly is defined in this repo. The values match the running app.
+# HTTP_TOKEN (Axiom ingest token) and ACCESS_TOKEN (fly read-only org token) are fly secrets.
+# Deploy from the repo root:
+#   fly deploy . --config infra/fly/log-shipper.toml --remote-only
+app = "studafy-log-shipper"
+primary_region = "fra"
+
+[build]
+  image = "ghcr.io/superfly/fly-log-shipper:latest@sha256:844d084753fa29f2f45e3fa37711615793816859929727fb4f01a11c62a3c642"
+
+[env]
+  ORG = "personal"
+  HTTP_URL = "https://eu-central-1.aws.edge.axiom.co/v1/ingest/studafy-logs"
+
+[[services]]
+  internal_port = 8686
+  protocol = "tcp"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

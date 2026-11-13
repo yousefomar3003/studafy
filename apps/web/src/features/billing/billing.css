@@ -1,0 +1,116 @@
+/**
+ * The AI add-on purchase page (`/account/ai`). Loaded only with that page, matching the rest of the
+ * app (see `admin/students/students.css`'s doc comment for why each feature owns its own stylesheet
+ * rather than a shared one).
+ */
+
+/* --- Outcome banner (checkout cancelled, school inactive) --- */
+
+.billing-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-16);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-16);
+  margin-bottom: var(--space-16);
+}
+
+.billing-banner[data-tone="warning"] {
+  background-color: var(--color-warning-subtle-bg);
+  border-color: var(--color-warning);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.billing-banner[data-tone="neutral"] {
+  background-color: var(--color-surface);
+}
+
+.billing-banner__title {
+  margin: 0 0 var(--space-4);
+  font-weight: var(--font-weight-semibold);
+}
+
+.billing-banner__body {
+  margin: 0;
+}
+
+.billing-overview__caption {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  margin: 0;
+}
+
+.billing-overview__notice {
+  margin: var(--space-16) 0 0;
+  padding: var(--space-12);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  font-size: var(--font-size-sm);
+}
+
+/* --- AI add-on purchase --- */
+
+.ai-purchase__intro {
+  max-width: 60ch;
+}
+
+.ai-purchase__price {
+  margin: 0 0 var(--space-16);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.ai-purchase__students {
+  list-style: none;
+  margin: 0 0 var(--space-16);
+  padding: 0;
+  display: grid;
+  gap: var(--space-12);
+}
+
+.ai-purchase__student {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+/* --- Refund request: a plain text link, deliberately quieter than the buttons beside it --- */
+
+.billing-refund {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.billing-refund__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-muted-foreground);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.billing-refund__link:hover {
+  color: var(--color-foreground);
+}
+
+.billing-refund__status {
+  margin-bottom: var(--space-16);
+}
+
+.billing-refund__status-title {
+  margin: 0 0 var(--space-4);
+  font-weight: var(--font-weight-medium);
+}
+
+.ai-purchase__active {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-12);
+}

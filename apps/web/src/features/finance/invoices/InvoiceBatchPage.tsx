@@ -1,0 +1,583 @@
+import { ApiError } from "@studafy/api-client";
+import { Button, Card, DataGrid, Modal, Select, useToast } from "@studafy/ui";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+
+import { api } from "../../../lib/api";
+import { useTranslation } from "../../../lib/i18n";
+import { fetchActiveClasses } from "../../admin/announcements/queries";
+import { fetchFeeStructures } from "../fees/queries";
+import { FinanceStudentPicker } from "../students/FinanceStudentPicker";
+
+import {
+  invoiceBatchItemStatusLabel,
+  invoiceBatchItemStatusTone,
+  invoiceBatchStatusLabel,
+} from "./labels";
+import { useCreateInvoiceBatch, usePreflightInvoiceBatch } from "./mutations";
+import { fetchInvoiceBatch, fetchInvoiceBatchItemsPage, invoiceBatchQueryKey } from "./queries";
+
+import "./invoices.css";
+
+import type {
+  CreateInvoiceBatchBody,
+  InvoiceBatch,
+  InvoiceBatchItem,
+  InvoiceBatchItemStatus,
+  InvoiceBatchPreflight,
+} from "./queries";
+import type { ClassOption } from "../../admin/announcements/queries";
+import type { FeeStructure } from "../fees/queries";
+import type { StudentIdentity } from "../students/FinanceStudentPicker";
+import type { DataGridColumn, SelectOption } from "@studafy/ui";
+import type { TFunction } from "i18next";
+import type { FormEvent } from "react";
+
+function apiErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof ApiError ? (error.detail ?? error.title) : fallback;
+}
+
+/**
+ * Batch invoice generation (`/portal/finance/invoices/batches/new`), gated by `billing:update` —
+ * the write gate `POST /api/finance/invoices/batches` itself requires. A small state machine keyed
+ * on whether a batch has been created yet: the form (fee structure, period, due date, target), then
+ * the progress panel once `useCreateInvoiceBatch` returns a batch id. The target is every enrolled
+ * student, chosen classes, or hand-picked students. `?feeStructure=<erpnext name>` preselects the
+ * structure, which is how the fee structure builder's "Bill students" link opens it.
+ *
+ * Starting a batch first runs its preflight: when some targets belong to no family (no guardian
+ * linked), finance is told how many and who, and why it matters, before confirming. A warning, not
+ * a block -- "Generate anyway" starts the batch as it is.
+ */
+export default function InvoiceBatchPage() {
+  const { t } = useTranslation();
+  const [batchId, setBatchId] = useState<string | null>(null);
+
+  return (
+    <>
+      <h1>{t("finance.invoices.batch.title")}</h1>
+
+      {batchId ? (
+        <BatchProgress batchId={batchId} onReset={() => setBatchId(null)} />
+      ) : (
+        <BatchForm onCreated={setBatchId} />
+      )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Form
+// ---------------------------------------------------------------------------
+
+interface BatchFormProps {
+  onCreated: (batchId: string) => void;
+}
+
+function BatchForm({ onCreated }: BatchFormProps) {
+  const { t } = useTranslation();
+  const { show } = useToast();
+  const createBatch = useCreateInvoiceBatch();
+  const preflight = usePreflightInvoiceBatch();
+  const [searchParams] = useSearchParams();
+  const [warning, setWarning] = useState<{
+    body: CreateInvoiceBatchBody;
+    result: InvoiceBatchPreflight;
+  } | null>(null);
+
+  const feeStructuresQuery = useQuery({
+    queryKey: ["finance", "fee-structures", "all"],
+    queryFn: () => fetchFeeStructures(""),
+  });
+  const classesQuery = useQuery({
+    queryKey: ["academics", "classes", "active"],
+    queryFn: fetchActiveClasses,
+  });
+
+  const [feeStructureErpnextName, setFeeStructureErpnextName] = useState(
+    searchParams.get("feeStructure") ?? "",
+  );
+  const [periodTitle, setPeriodTitle] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [targetMode, setTargetMode] = useState<"all" | "classes" | "students">("all");
+  const [selectedClassIds, setSelectedClassIds] = useState<Set<string>>(new Set());
+  const [selectedStudents, setSelectedStudents] = useState<StudentIdentity[]>([]);
+
+  // A structure tied to particular students (its "Students" in the fee structure builder) bills
+  // exactly them by default; finance can still switch the target.
+  const assignedStudents = useQuery({
+    queryKey: ["finance", "fee-structures", feeStructureErpnextName, "students"],
+    queryFn: async () => {
+      const { data } = await api.GET("/api/finance/fee-structures/{feeStructureId}/students", {
+        params: { path: { feeStructureId: feeStructureErpnextName } },
+      });
+      return (data?.students ?? []) as StudentIdentity[];
+    },
+    enabled: feeStructureErpnextName !== "",
+  });
+  useEffect(() => {
+    if (assignedStudents.data && assignedStudents.data.length > 0) {
+      setTargetMode("students");
+      setSelectedStudents(assignedStudents.data);
+    }
+  }, [assignedStudents.data]);
+
+  // Only a submitted structure has confirmed components ERPNext will actually invoice against — a
+  // draft is still editable and a cancelled one is dead, matching `feeStructureStatusTone`'s own
+  // "only draft is editable" note in `../fees/labels.ts`.
+  const structures = (feeStructuresQuery.data ?? []).filter(
+    (structure: FeeStructure) => structure.erpnext_status === "submitted",
+  );
+  const structureOptions: SelectOption<string>[] = [
+    {
+      value: "",
+      label: structuresPlaceholder(feeStructuresQuery.isPending, structures.length, t),
+    },
+    ...structures.map((structure) => ({
+      value: structure.erpnext_name,
+      label: `${structure.title} (${structure.total_amount} ${structure.currency})`,
+    })),
+  ];
+
+  const classes = (classesQuery.data ?? []) as ClassOption[];
+
+  function toggleClass(classId: string) {
+    setSelectedClassIds((current) => {
+      const next = new Set(current);
+      if (next.has(classId)) next.delete(classId);
+      else next.add(classId);
+      return next;
+    });
+  }
+
+  const canSubmit =
+    feeStructureErpnextName !== "" &&
+    periodTitle.trim() !== "" &&
+    (targetMode === "all" ||
+      (targetMode === "classes" && selectedClassIds.size > 0) ||
+      (targetMode === "students" && selectedStudents.length > 0));
+
+  function showStartError(error: unknown) {
+    show({
+      variant: "error",
+      title: t("finance.invoices.batch.startError"),
+      description: apiErrorMessage(error, t("finance.common.checkFormAndRetry")),
+    });
+  }
+
+  function start(body: CreateInvoiceBatchBody) {
+    createBatch.mutate(body, {
+      onSuccess: (batch) => {
+        setWarning(null);
+        onCreated(batch.id);
+      },
+      onError: showStartError,
+    });
+  }
+
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (!canSubmit) return;
+
+    const body: CreateInvoiceBatchBody = {
+      fee_structure_erpnext_name: feeStructureErpnextName,
+      period_title: periodTitle.trim(),
+      due_date: dueDate || undefined,
+      target_class_ids: targetMode === "classes" ? Array.from(selectedClassIds) : undefined,
+      target_student_ids:
+        targetMode === "students" ? selectedStudents.map((student) => student.id) : undefined,
+    };
+
+    preflight.mutate(
+      { target_class_ids: body.target_class_ids, target_student_ids: body.target_student_ids },
+      {
+        onSuccess: (result) => {
+          if (result.unlinked_count > 0) setWarning({ body, result });
+          else start(body);
+        },
+        onError: showStartError,
+      },
+    );
+  }
+
+  return (
+    <Card as="section" aria-label={t("finance.invoices.batch.formLabel")}>
+      <Card.Body>
+        <form onSubmit={handleSubmit} className="invoices-batch__form">
+          <Select
+            label={t("finance.invoices.batch.feeStructure")}
+            options={structureOptions}
+            value={feeStructureErpnextName}
+            onChange={setFeeStructureErpnextName}
+            disabled={feeStructuresQuery.isPending}
+            required
+          />
+
+          <div className="sf-field">
+            <label htmlFor="invoice-batch-period">{t("finance.invoices.batch.periodTitle")}</label>
+            <input
+              id="invoice-batch-period"
+              type="text"
+              value={periodTitle}
+              onChange={(event) => setPeriodTitle(event.target.value)}
+              placeholder={t("finance.invoices.batch.periodPlaceholder")}
+              maxLength={200}
+              required
+            />
+          </div>
+
+          <div className="sf-field">
+            <label htmlFor="invoice-batch-due-date">{t("finance.invoices.batch.dueDate")}</label>
+            <input
+              id="invoice-batch-due-date"
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+            />
+          </div>
+
+          <fieldset className="invoices-batch__target">
+            <legend>{t("finance.invoices.batch.target")}</legend>
+            <label className="invoices-batch__target-option">
+              <input
+                type="radio"
+                name="invoice-batch-target-mode"
+                checked={targetMode === "all"}
+                onChange={() => setTargetMode("all")}
+              />
+              {t("finance.invoices.batch.targetAll")}
+            </label>
+            <label className="invoices-batch__target-option">
+              <input
+                type="radio"
+                name="invoice-batch-target-mode"
+                checked={targetMode === "classes"}
+                onChange={() => setTargetMode("classes")}
+              />
+              {t("finance.invoices.batch.targetClasses")}
+            </label>
+            <label className="invoices-batch__target-option">
+              <input
+                type="radio"
+                name="invoice-batch-target-mode"
+                checked={targetMode === "students"}
+                onChange={() => setTargetMode("students")}
+              />
+              {t("finance.invoices.batch.targetStudents")}
+            </label>
+
+            {targetMode === "classes" ? (
+              <div
+                className="invoices-batch__classes"
+                role="group"
+                aria-label={t("finance.invoices.batch.classes")}
+              >
+                {classesQuery.isPending ? (
+                  <p>{t("finance.invoices.batch.loadingClasses")}</p>
+                ) : classes.length === 0 ? (
+                  <p>{t("finance.invoices.batch.noClasses")}</p>
+                ) : (
+                  classes.map((klass) => (
+                    <label key={klass.id} className="invoices-batch__class-option">
+                      <input
+                        type="checkbox"
+                        checked={selectedClassIds.has(klass.id)}
+                        onChange={() => toggleClass(klass.id)}
+                      />
+                      {klass.code}
+                    </label>
+                  ))
+                )}
+              </div>
+            ) : null}
+
+            {targetMode === "students" ? (
+              <FinanceStudentPicker
+                multiple
+                label={t("finance.invoices.batch.students")}
+                selected={selectedStudents}
+                onChange={setSelectedStudents}
+              />
+            ) : null}
+          </fieldset>
+
+          <div className="invoices-batch__form-actions">
+            <Button
+              type="submit"
+              loading={preflight.isPending || (createBatch.isPending && !warning)}
+              disabled={!canSubmit}
+            >
+              {t("finance.invoices.batch.start")}
+            </Button>
+          </div>
+        </form>
+      </Card.Body>
+
+      <UnlinkedWarning
+        warning={warning?.result ?? null}
+        starting={createBatch.isPending}
+        onCancel={() => setWarning(null)}
+        onConfirm={() => warning && start(warning.body)}
+      />
+    </Card>
+  );
+}
+
+interface UnlinkedWarningProps {
+  warning: InvoiceBatchPreflight | null;
+  starting: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+/** Who in the batch has no family, and why that matters, before finance confirms the batch. */
+function UnlinkedWarning({ warning, starting, onCancel, onConfirm }: UnlinkedWarningProps) {
+  const { t } = useTranslation();
+  const listed = warning?.unlinked_students ?? [];
+  const unlisted = warning ? warning.unlinked_count - listed.length : 0;
+
+  return (
+    <Modal
+      open={warning !== null}
+      onClose={onCancel}
+      title={t("finance.invoices.batch.unlinked.title")}
+      description={
+        warning
+          ? t("finance.invoices.batch.unlinked.summary", {
+              count: warning.unlinked_count,
+              total: warning.total_count,
+            })
+          : undefined
+      }
+    >
+      <Modal.Body>
+        <p>{t("finance.invoices.batch.unlinked.why")}</p>
+        <ul
+          className="invoices-batch__unlinked"
+          aria-label={t("finance.invoices.batch.unlinked.listLabel")}
+        >
+          {listed.map((student) => (
+            <li key={student.id}>
+              {student.name} <span>{student.admission_number}</span>
+            </li>
+          ))}
+        </ul>
+        {unlisted > 0 ? (
+          <p>{t("finance.invoices.batch.unlinked.more", { count: unlisted })}</p>
+        ) : null}
+        <p>
+          <Link to="/portal/finance/unlinked">{t("finance.invoices.batch.unlinked.review")}</Link>
+        </p>
+      </Modal.Body>
+      <Modal.Footer>
+        <Button type="button" variant="tertiary" onClick={onCancel}>
+          {t("finance.invoices.batch.unlinked.back")}
+        </Button>
+        <Button type="button" loading={starting} onClick={onConfirm}>
+          {t("finance.invoices.batch.unlinked.confirm")}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+function structuresPlaceholder(isPending: boolean, count: number, t: TFunction): string {
+  if (isPending) return t("finance.invoices.batch.loadingStructures");
+  if (count === 0) return t("finance.invoices.batch.noStructures");
+  return t("finance.invoices.batch.selectStructure");
+}
+
+// ---------------------------------------------------------------------------
+// Progress
+// ---------------------------------------------------------------------------
+
+export interface BatchProgressProps {
+  batchId: string;
+  /** Offers "Start another batch" once the run is done; omitted on the batch history page. */
+  onReset?: () => void;
+}
+
+/** Batches still being worked are polled every 3s — this is what keeps a 1,000-student run cheap on
+ * the client: the item table is cursor-paginated (20 rows at a time), never one giant list. */
+const IN_FLIGHT_STATUSES = new Set<InvoiceBatch["status"]>(["pending", "processing"]);
+const POLL_INTERVAL_MS = 3000;
+
+export function BatchProgress({ batchId, onReset }: BatchProgressProps) {
+  const { t } = useTranslation();
+  const [statusFilter, setStatusFilter] = useState<InvoiceBatchItemStatus | "">("");
+  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>([]);
+
+  const batchQuery = useQuery({
+    queryKey: invoiceBatchQueryKey(batchId),
+    queryFn: () => fetchInvoiceBatch(batchId),
+    refetchInterval: (query) =>
+      query.state.data && IN_FLIGHT_STATUSES.has(query.state.data.status)
+        ? POLL_INTERVAL_MS
+        : false,
+  });
+
+  const itemsQuery = useQuery({
+    queryKey: [...invoiceBatchQueryKey(batchId), "items", statusFilter, cursor],
+    queryFn: () => fetchInvoiceBatchItemsPage(batchId, cursor, statusFilter),
+    placeholderData: keepPreviousData,
+    refetchInterval: () =>
+      batchQuery.data && IN_FLIGHT_STATUSES.has(batchQuery.data.status) ? POLL_INTERVAL_MS : false,
+  });
+
+  const batch = batchQuery.data;
+  const processed = batch
+    ? batch.succeeded_count + batch.already_existed_count + batch.failed_count
+    : 0;
+  const progressPercent =
+    batch && batch.total_count > 0 ? Math.round((processed / batch.total_count) * 100) : 0;
+
+  const statusOptions: SelectOption<InvoiceBatchItemStatus | "">[] = [
+    { value: "", label: t("finance.common.allStatuses") },
+    { value: "pending", label: invoiceBatchItemStatusLabel("pending", t) },
+    { value: "succeeded", label: invoiceBatchItemStatusLabel("succeeded", t) },
+    { value: "already_existed", label: invoiceBatchItemStatusLabel("already_existed", t) },
+    { value: "failed", label: invoiceBatchItemStatusLabel("failed", t) },
+  ];
+
+  const columns: DataGridColumn<InvoiceBatchItem>[] = [
+    {
+      id: "student_name",
+      header: t("finance.common.student"),
+      renderCell: (row) => row.student_name,
+    },
+    {
+      id: "admission_number",
+      header: t("finance.common.admissionNumber"),
+      renderCell: (row) => row.admission_number,
+    },
+    {
+      id: "status",
+      header: t("finance.common.status"),
+      renderCell: (row) => (
+        <span className="invoices-status-pill" data-tone={invoiceBatchItemStatusTone(row.status)}>
+          {invoiceBatchItemStatusLabel(row.status, t)}
+        </span>
+      ),
+    },
+    {
+      id: "result",
+      header: t("finance.invoices.batch.result"),
+      renderCell: (row) => row.erpnext_docname ?? row.error_message ?? "—",
+    },
+  ];
+
+  return (
+    <>
+      {batch ? (
+        <Card as="section" aria-label={t("finance.invoices.batch.progress")}>
+          <Card.Body>
+            <p role="status">
+              {t("finance.invoices.batch.progressStatus", {
+                status: invoiceBatchStatusLabel(batch.status, t),
+                period: batch.period_title,
+              })}
+            </p>
+            <dl className="invoices-batch__stats">
+              <div>
+                <dt>{t("finance.common.total")}</dt>
+                <dd>{batch.total_count}</dd>
+              </div>
+              <div>
+                <dt>{invoiceBatchItemStatusLabel("succeeded", t)}</dt>
+                <dd>{batch.succeeded_count}</dd>
+              </div>
+              <div>
+                <dt>{invoiceBatchItemStatusLabel("already_existed", t)}</dt>
+                <dd>{batch.already_existed_count}</dd>
+              </div>
+              <div>
+                <dt>{invoiceBatchItemStatusLabel("failed", t)}</dt>
+                <dd>{batch.failed_count}</dd>
+              </div>
+            </dl>
+            <div
+              className="invoices-batch__meter"
+              role="progressbar"
+              aria-label={t("finance.invoices.batch.generationProgress")}
+              aria-valuenow={progressPercent}
+              aria-valuemin={0}
+              aria-valuemax={100}
+            >
+              <div
+                className="invoices-batch__meter-fill"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            {batch.status === "completed" || batch.status === "failed" ? (
+              onReset ? (
+                <Button type="button" onClick={onReset}>
+                  {t("finance.invoices.batch.startAnother")}
+                </Button>
+              ) : null
+            ) : (
+              <p>{t("finance.invoices.batch.longRunning")}</p>
+            )}
+          </Card.Body>
+        </Card>
+      ) : (
+        <p role="status">{t("finance.common.loading")}</p>
+      )}
+
+      <div className="invoices-batch__toolbar">
+        <Select
+          label={t("finance.invoices.batch.filterByStatus")}
+          options={statusOptions}
+          value={statusFilter}
+          onChange={(value) => {
+            setStatusFilter(value);
+            setCursor(undefined);
+            setCursorHistory([]);
+          }}
+        />
+      </div>
+
+      <DataGrid
+        caption={t("finance.invoices.batch.resultsCaption")}
+        columns={columns}
+        rows={itemsQuery.data?.items ?? []}
+        getRowId={(row) => row.id}
+        getRowLabel={(row) => row.student_name}
+        loading={itemsQuery.isPending}
+        empty={
+          itemsQuery.isError
+            ? t("finance.invoices.batch.resultsError")
+            : t("finance.invoices.batch.resultsEmpty")
+        }
+      />
+
+      <div className="invoices-batch__pagination">
+        <Button
+          variant="secondary"
+          disabled={cursorHistory.length === 0}
+          onClick={() => {
+            const next = [...cursorHistory];
+            const previous = next.pop();
+            setCursorHistory(next);
+            setCursor(previous);
+          }}
+        >
+          {t("finance.common.previous")}
+        </Button>
+        <Button
+          variant="secondary"
+          disabled={!itemsQuery.data?.next_cursor}
+          onClick={() => {
+            const nextCursor = itemsQuery.data?.next_cursor;
+            if (!nextCursor) return;
+            setCursorHistory([...cursorHistory, cursor]);
+            setCursor(nextCursor);
+          }}
+        >
+          {t("finance.common.next")}
+        </Button>
+      </div>
+    </>
+  );
+}

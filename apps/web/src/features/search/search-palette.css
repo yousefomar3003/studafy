@@ -1,0 +1,238 @@
+/**
+ * Global search: the header trigger (`.global-search-trigger`) and the command palette it opens
+ * (`.search-palette`, rendered inside `@studafy/ui`'s `Modal`). Logical properties throughout per
+ * `apps/web/docs/i18n-contribution-guide.md` -- this ships in both `dir="ltr"` and `dir="rtl"`.
+ */
+
+.global-search-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+  height: 40px;
+  padding-inline: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.global-search-trigger:hover {
+  background-color: var(--color-surface);
+  color: var(--color-foreground);
+}
+
+.global-search-trigger:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.global-search-trigger__shortcut {
+  padding-inline: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: var(--font-size-xs);
+  line-height: 1.6;
+  color: var(--color-muted-foreground);
+}
+
+/* Palette */
+
+.search-palette__input-row {
+  margin: calc(var(--space-16) * -1) calc(var(--space-16) * -1) 0;
+  padding: 0 var(--space-16) var(--space-12);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.search-palette__input {
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: var(--color-foreground);
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
+}
+
+.search-palette__input:focus {
+  outline: none;
+}
+
+.search-palette__input::placeholder {
+  color: var(--color-muted-foreground);
+}
+
+.search-palette__results {
+  margin-top: var(--space-12);
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.search-palette__group-heading-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.search-palette__group-heading {
+  margin: var(--space-12) 0 var(--space-4);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-snug);
+}
+
+.search-palette__clear-recent {
+  border: none;
+  background: transparent;
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.search-palette__clear-recent:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.search-palette__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-8) var(--space-8);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.search-palette__item:hover,
+.search-palette__item--active {
+  background-color: var(--color-accent-subtle-bg);
+}
+
+.search-palette__item--active .search-palette__item-title {
+  color: var(--color-accent-subtle-foreground);
+}
+
+.search-palette__item--disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.search-palette__item--disabled:hover {
+  background-color: transparent;
+}
+
+/* The title keeps its room; a long subtitle (a help article's description) truncates instead. */
+.search-palette__item-title {
+  flex: 0 0 auto;
+  max-width: 65%;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-palette__item-subtitle {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-palette__empty {
+  padding: var(--space-16) var(--space-8);
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+
+.search-palette__hint {
+  color: var(--color-muted-foreground);
+  font-size: var(--font-size-xs);
+}
+
+.search-palette__item--see-all .search-palette__item-title {
+  color: var(--color-accent);
+  font-weight: 500;
+}
+
+/* --- Full results page (/portal/search) --- */
+
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.search-results__form {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.search-results__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.search-results__filter {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: var(--space-4) var(--space-12);
+  color: var(--color-foreground);
+  text-decoration: none;
+}
+
+.search-results__filter[aria-current="page"] {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-foreground);
+}
+
+.search-results__filter-count,
+.search-results__group-count {
+  color: inherit;
+  opacity: 0.75;
+  font-weight: 400;
+}
+
+.search-results__group h2 {
+  font-size: var(--font-size-lg);
+  margin: 0 0 var(--space-8);
+}
+
+.search-results__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.search-results__item {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-results__item-subtitle,
+.search-results__empty {
+  color: var(--color-muted-foreground);
+}
+
+.search-results__pager {
+  display: flex;
+  align-items: center;
+  gap: var(--space-16);
+}

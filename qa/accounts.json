@@ -1,0 +1,122 @@
+[
+  {
+    "school": "platform",
+    "school_name": "Studafy QA Platform",
+    "role": "SUPER_ADMIN",
+    "email": "superadmin@qa-platform.studafy.test",
+    "channel": "web",
+    "token_variable": "QA_TOKEN_PLATFORM_SUPER_ADMIN"
+  },
+  {
+    "school": "a",
+    "school_name": "Studafy QA School A",
+    "role": "ORG_ADMIN",
+    "email": "admin@qa-a.studafy.test",
+    "channel": "web",
+    "token_variable": "QA_TOKEN_A_ORG_ADMIN"
+  },
+  {
+    "school": "a",
+    "school_name": "Studafy QA School A",
+    "role": "PRINCIPAL",
+    "email": "principal@qa-a.studafy.test",
+    "channel": "web",
+    "token_variable": "QA_TOKEN_A_PRINCIPAL"
+  },
+  {
+    "school": "a",
+    "school_name": "Studafy QA School A",
+    "role": "INSTRUCTOR",
+    "email": "layla.nasser@qa-a.studafy.test",
+    "channel": "mobile",
+    "token_variable": "QA_TOKEN_A_INSTRUCTOR"
+  },
+  {
+    "school": "a",
+    "school_name": "Studafy QA School A",
+    "role": "STUDENT",
+    "email": "yara.khalil@qa-a.studafy.test",
+    "channel": "mobile",
+    "token_variable": "QA_TOKEN_A_STUDENT"
+  },
+  {
+    "school": "a",
+    "school_name": "Studafy QA School A",
+    "role": "PARENT",
+    "email": "khalil.parent@qa-a.studafy.test",
+    "channel": "mobile",
+    "token_variable": "QA_TOKEN_A_PARENT"
+  },
+  {
+    "school": "a",
+    "school_name": "Studafy QA School A",
+    "role": "FINANCE",
+    "email": "finance@qa-a.studafy.test",
+    "channel": "web",
+    "token_variable": "QA_TOKEN_A_FINANCE"
+  },
+  {
+    "school": "a",
+    "school_name": "Studafy QA School A",
+    "role": "ATTENDANCE_OFFICER",
+    "email": "attendance@qa-a.studafy.test",
+    "channel": "mobile",
+    "token_variable": "QA_TOKEN_A_ATTENDANCE_OFFICER"
+  },
+  {
+    "school": "b",
+    "school_name": "Studafy QA School B",
+    "role": "ORG_ADMIN",
+    "email": "admin@qa-b.studafy.test",
+    "channel": "web",
+    "token_variable": "QA_TOKEN_B_ORG_ADMIN"
+  },
+  {
+    "school": "b",
+    "school_name": "Studafy QA School B",
+    "role": "PRINCIPAL",
+    "email": "principal@qa-b.studafy.test",
+    "channel": "web",
+    "token_variable": "QA_TOKEN_B_PRINCIPAL"
+  },
+  {
+    "school": "b",
+    "school_name": "Studafy QA School B",
+    "role": "INSTRUCTOR",
+    "email": "layla.nasser@qa-b.studafy.test",
+    "channel": "mobile",
+    "token_variable": "QA_TOKEN_B_INSTRUCTOR"
+  },
+  {
+    "school": "b",
+    "school_name": "Studafy QA School B",
+    "role": "STUDENT",
+    "email": "yara.khalil@qa-b.studafy.test",
+    "channel": "mobile",
+    "token_variable": "QA_TOKEN_B_STUDENT"
+  },
+  {
+    "school": "b",
+    "school_name": "Studafy QA School B",
+    "role": "PARENT",
+    "email": "khalil.parent@qa-b.studafy.test",
+    "channel": "mobile",
+    "token_variable": "QA_TOKEN_B_PARENT"
+  },
+  {
+    "school": "b",
+    "school_name": "Studafy QA School B",
+    "role": "FINANCE",
+    "email": "finance@qa-b.studafy.test",
+    "channel": "web",
+    "token_variable": "QA_TOKEN_B_FINANCE"
+  },
+  {
+    "school": "b",
+    "school_name": "Studafy QA School B",
+    "role": "ATTENDANCE_OFFICER",
+    "email": "attendance@qa-b.studafy.test",
+    "channel": "mobile",
+    "token_variable": "QA_TOKEN_B_ATTENDANCE_OFFICER"
+  }
+]

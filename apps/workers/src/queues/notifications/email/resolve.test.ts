@@ -1,0 +1,151 @@
+import { DOMAIN_EVENTS } from "@studafy/constants";
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
+import { describe, expect, test } from "bun:test";
+
+import { EMAIL_EVENT_NAMES, resolveEmail } from "./resolve";
+
+import type { ClaimedOutboxRow } from "./resolve";
+
+const context = { frontendUrl: "https://app.studafy.test", schoolName: "Hill <School>" };
+
+function row(event_name: string, payload: Record<string, unknown>): ClaimedOutboxRow {
+  return {
+    id: "1",
+    school_id: "00000000-0000-4000-8000-000000000001",
+    event_name,
+    payload,
+    created_at: "2026-09-27T00:00:00.000Z",
+  };
+}
+
+describe("invitation emails", () => {
+  test("the link opens the web app's invitation page, not an API endpoint", () => {
+    const token = "b".repeat(64);
+    const email = resolveEmail(
+      row(DOMAIN_EVENTS.INVITATION_SENT, {
+        email: "principal@example.com",
+        token,
+        expiresAt: "2026-10-04T00:00:00.000Z",
+      }),
+      context,
+    );
+
+    expect(email.template).toBe("invitation");
+    expect(email.recipient).toBe("principal@example.com");
+    expect(email.content.text).toContain(`https://app.studafy.test/invite/${token}`);
+    expect(email.content.html).toContain(`https://app.studafy.test/invite/${token}`);
+    expect(email.content.text).not.toContain("/api/");
+  });
+});
+
+describe("account deletion emails", () => {
+  test("both events are claimed by the email dispatcher", () => {
+    expect(EMAIL_EVENT_NAMES).toContain(DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED);
+    expect(EMAIL_EVENT_NAMES).toContain(DOMAIN_EVENTS.ACCOUNT_DELETED);
+  });
+
+  test("the verification link opens the confirm page with the token in the fragment", () => {
+    const email = resolveEmail(
+      row(DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED, {
+        email: "parent@example.com",
+        token: "a".repeat(64),
+        expiresAt: "2026-09-27T01:00:00.000Z",
+        schoolNames: ["Hill <School>", "Lake Academy"],
+      }),
+      context,
+    );
+
+    expect(email.template).toBe("account-deletion-verification");
+    expect(email.recipient).toBe("parent@example.com");
+    expect(email.content.text).toContain(
+      `https://app.studafy.test/legal/delete-account/confirm#token=${"a".repeat(64)}`,
+    );
+    expect(email.content.text).toContain("Hill <School>, Lake Academy");
+    expect(email.content.html).toContain("Hill &lt;School&gt;, Lake Academy");
+    expect(email.content.html).not.toContain("<School>");
+  });
+
+  test("the confirmation names the school and the erasure deadline", () => {
+    const email = resolveEmail(
+      row(DOMAIN_EVENTS.ACCOUNT_DELETED, {
+        userId: "00000000-0000-4000-8000-000000000002",
+        email: "parent@example.com",
+        completesBy: "2026-10-27T00:00:00.000Z",
+      }),
+      context,
+    );
+
+    expect(email.template).toBe("account-deletion-confirmation");
+    expect(email.recipient).toBe("parent@example.com");
+    expect(email.content.subject).toBe("Your Studafy account has been deleted");
+    expect(email.content.text).toContain("Your Studafy account at Hill <School> has been deleted");
+    expect(email.content.text).toContain(new Date("2026-10-27T00:00:00.000Z").toUTCString());
+    expect(email.content.html).not.toContain("<School>");
+  });
+});
+
+describe("school verification emails", () => {
+  test("the link opens the web verify page with the token in the fragment, not the API", () => {
+    const token = "b".repeat(64);
+    const email = resolveEmail(
+      row(DOMAIN_EVENTS.SCHOOL_VERIFICATION_EMAIL_SENT, {
+        email: "office@hill.example",
+        token,
+        expiresAt: "2026-09-28T00:00:00.000Z",
+      }),
+      context,
+    );
+
+    const link = `https://app.studafy.test/verify-email#token=${token}`;
+    expect(email.template).toBe("verification");
+    expect(email.recipient).toBe("office@hill.example");
+    expect(email.content.text).toContain(link);
+    expect(email.content.html).toContain(`href="${link}"`);
+    expect(email.content.text).not.toContain("/api/");
+    expect(email.content.html).not.toContain("/api/");
+  });
+});
+
+describe("AI add-on purchase confirmation", () => {
+  const payload = {
+    schoolId: "00000000-0000-4000-8000-000000000001",
+    aiSubscriptionId: "00000000-0000-4000-8000-000000000003",
+    studentId: "00000000-0000-4000-8000-000000000004",
+    email: "student@example.com",
+    platform: "google",
+    acknowledgedAt: "2026-11-11T09:59:30.000Z",
+    recordedAt: "2026-11-11T10:00:00.000Z",
+    termsVersion: "2026-11-11",
+  };
+
+  test("is claimed by the email dispatcher", () => {
+    expect(EMAIL_EVENT_NAMES).toContain(DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED);
+  });
+
+  test("confirms the purchase and the waiver of the 14-day right, with the terms", () => {
+    const email = resolveEmail(row(DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED, payload), context);
+
+    expect(email.template).toBe("ai-store-purchase-confirmation");
+    expect(email.recipient).toBe("student@example.com");
+    expect(email.content.subject).toBe("Your Studafy AI Study Assistant purchase");
+    for (const body of [email.content.text, email.content.html]) {
+      expect(body).toContain("through Google Play");
+      expect(body).toContain(new Date(payload.acknowledgedAt).toUTCString());
+      expect(body).toContain(new Date(payload.recordedAt).toUTCString());
+      expect(body).toContain("you lose your 14-day right to cancel once it starts");
+      expect(body).toContain("Terms of Service last updated 2026-11-11");
+      expect(body).toContain("https://app.studafy.test/terms");
+    }
+    // A Studafy purchase, not the school's: the school's name is not the sender.
+    expect(email.content.html).not.toContain("Hill");
+  });
+
+  test("names the App Store for an Apple purchase", () => {
+    const email = resolveEmail(
+      row(DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED, { ...payload, platform: "apple" }),
+      context,
+    );
+    expect(email.content.text).toContain("through the App Store");
+    expect(email.content.text).toContain("cancel it in the App Store");
+  });
+});

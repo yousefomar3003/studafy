@@ -1,0 +1,28 @@
+/**
+ * The store-subscription warning on the account-deletion pages (StoreSubscriptionWarning.tsx).
+ * Same warning tokens as lib/features/features.css's notice.
+ */
+
+.store-subscription-warning {
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  padding: var(--space-12) var(--space-16);
+  margin-block: var(--space-16);
+  background-color: var(--color-warning-subtle-bg);
+  color: var(--color-warning-subtle-foreground);
+}
+
+.store-subscription-warning__title {
+  margin: 0 0 var(--space-8);
+  font-size: inherit;
+  font-weight: var(--font-weight-semibold);
+}
+
+.store-subscription-warning p {
+  margin: 0 0 var(--space-8);
+}
+
+.store-subscription-warning ul {
+  margin: 0;
+  padding-inline-start: var(--space-20);
+}

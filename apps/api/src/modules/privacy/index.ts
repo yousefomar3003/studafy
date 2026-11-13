@@ -1,0 +1,1 @@
+export { privacyRoutes } from "./routes";

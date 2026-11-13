@@ -1,0 +1,1 @@
+export { messagingRoutes } from "./routes";

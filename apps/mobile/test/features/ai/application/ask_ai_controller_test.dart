@@ -1,0 +1,298 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:studafy_mobile/src/core/api/api_exception.dart';
+import 'package:studafy_mobile/src/features/ai/application/ask_ai_controller.dart';
+import 'package:studafy_mobile/src/features/ai/data/ask_ai_client.dart';
+import 'package:studafy_mobile/src/features/ai/data/ask_ai_events.dart';
+import 'package:studafy_mobile/src/features/ai/domain/ask_ai_conversation.dart';
+import 'package:studafy_mobile/src/features/ai/domain/ask_ai_history.dart';
+
+/// Hand-written fake — same rationale as `_FakeSubmissionsClient`
+/// (`submission_form_controller_test.dart`): [AskAiClient] is a thin wrapper over Dio, and a
+/// mocking library would only add ceremony. Its one field is private, so `implements` needs
+/// nothing but the two methods.
+class _FakeAskAiClient implements AskAiClient {
+  _FakeAskAiClient(this._events);
+
+  /// Produces the event stream for one `ask` call. Throwing from here simulates a pre-stream
+  /// problem response; returning a stream that emits an error simulates the same via the
+  /// listener's `onError`.
+  final Stream<AskAiEvent> Function() _events;
+
+  final List<String?> conversationIdsSeen = [];
+  int askCalls = 0;
+
+  @override
+  Stream<AskAiEvent> ask({
+    required String studentId,
+    required String question,
+    String? conversationId,
+    String? materialId,
+    String level = 'high',
+  }) {
+    askCalls++;
+    conversationIdsSeen.add(conversationId);
+    return _events();
+  }
+}
+
+AskAiController _controllerFor(_FakeAskAiClient client) =>
+    AskAiController(client: client, studentId: 'student-1');
+
+void main() {
+  group('AskAiController.send', () {
+    test('folds sources + deltas + done into one completed turn', () async {
+      final client = _FakeAskAiClient(
+        () => Stream.fromIterable([
+          const AskAiSourcesEvent(conversationId: 'conv-1', sources: []),
+          const AskAiDeltaEvent('Photo'),
+          const AskAiDeltaEvent('synthesis'),
+          const AskAiDoneEvent(
+            messageId: 'msg-1',
+            text: 'Photosynthesis converts light. [1]',
+            citations: [
+              AskAiCitation(
+                order: 1,
+                chunkId: 'chunk-1',
+                materialId: 'material-1',
+                materialTitle: 'Biology Unit 3',
+                pageNumber: 12,
+              ),
+            ],
+          ),
+        ]),
+      );
+      final controller = _controllerFor(client);
+
+      await controller.send('How does photosynthesis work?');
+
+      expect(controller.state.turns, hasLength(1));
+      expect(controller.state.turns.single.question, 'How does photosynthesis work?');
+      expect(controller.state.conversationId, 'conv-1');
+      expect(controller.state.isStreaming, isFalse);
+
+      final answer = controller.state.turns.single.answer;
+      expect(answer, isA<AskAiAnswerComplete>());
+      answer as AskAiAnswerComplete;
+      expect(answer.messageId, 'msg-1');
+      expect(answer.text, 'Photosynthesis converts light. [1]');
+      expect(answer.citations.single.pageNumber, 12);
+    });
+
+    test('exposes the running text token by token while streaming', () async {
+      final events = StreamController<AskAiEvent>();
+      final client = _FakeAskAiClient(() => events.stream);
+      final controller = _controllerFor(client);
+
+      final pending = controller.send('question');
+      await Future<void>.value();
+
+      events.add(const AskAiDeltaEvent('Hel'));
+      await Future<void>.value();
+      expect((controller.state.turns.single.answer as AskAiAnswerStreaming).text, 'Hel');
+      expect(controller.state.isStreaming, isTrue);
+
+      events.add(const AskAiDeltaEvent('lo'));
+      await Future<void>.value();
+      expect((controller.state.turns.single.answer as AskAiAnswerStreaming).text, 'Hello');
+
+      events.add(const AskAiDoneEvent(messageId: 'm', text: 'Hello.', citations: []));
+      await events.close();
+      await pending;
+
+      expect(controller.state.turns.single.answer, isA<AskAiAnswerComplete>());
+    });
+
+    test('renders a grounding refusal with its nearest topics', () async {
+      final client = _FakeAskAiClient(
+        () => Stream.fromIterable([
+          const AskAiRefusalEvent([
+            AskAiNearestTopic(chunkId: 'c1', materialTitle: 'Algebra Basics'),
+          ]),
+        ]),
+      );
+      final controller = _controllerFor(client);
+
+      await controller.send('Explain the Riemann hypothesis');
+
+      final answer = controller.state.turns.single.answer;
+      expect(answer, isA<AskAiAnswerRefused>());
+      expect((answer as AskAiAnswerRefused).nearestTopics.single.materialTitle, 'Algebra Basics');
+      expect(controller.state.isStreaming, isFalse);
+    });
+
+    test('a rejected-request stream error is a non-retryable failure', () async {
+      final client = _FakeAskAiClient(
+        () => Stream.fromIterable([
+          const AskAiStreamErrorEvent(code: 'AI_LLM_REQUEST_REJECTED', message: 'no'),
+        ]),
+      );
+      final controller = _controllerFor(client);
+
+      await controller.send('question');
+
+      final answer = controller.state.turns.single.answer as AskAiAnswerFailed;
+      expect(answer.isRetryable, isFalse);
+    });
+
+    test('output moderation block replaces any partial answer', () async {
+      final client = _FakeAskAiClient(
+        () => Stream.fromIterable([
+          const AskAiDeltaEvent('partial unsafe text'),
+          const AskAiModerationBlockedEvent('Try rephrasing your question.'),
+        ]),
+      );
+      final controller = _controllerFor(client);
+
+      await controller.send('question');
+
+      final answer = controller.state.turns.single.answer;
+      expect(answer, isA<AskAiAnswerBlocked>());
+      expect((answer as AskAiAnswerBlocked).guidance, 'Try rephrasing your question.');
+    });
+
+    test('a pre-stream quota error drops the turn and raises a banner', () async {
+      final client = _FakeAskAiClient(
+        () => Stream<AskAiEvent>.error(
+          const ApiException(status: 429, title: 'quota', code: 'AI_QUOTA_EXCEEDED'),
+        ),
+      );
+      final controller = _controllerFor(client);
+
+      await controller.send('question');
+
+      expect(controller.state.turns, isEmpty);
+      expect(controller.state.sendError, AskAiSendError.quotaExceeded);
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.retryableQuestion, isNull);
+    });
+
+    test('feature refusals map to their own errors (limit reached, not included, expired)', () async {
+      for (final (code, status, expected) in [
+        ('FEATURE_LIMIT_REACHED', 429, AskAiSendError.featureLimitReached),
+        ('FEATURE_NOT_INCLUDED', 402, AskAiSendError.subscriptionInactive),
+        ('FEATURE_EXPIRED', 402, AskAiSendError.subscriptionInactive),
+      ]) {
+        final client = _FakeAskAiClient(
+          () => Stream<AskAiEvent>.error(ApiException(status: status, title: code, code: code)),
+        );
+        final controller = _controllerFor(client);
+
+        await controller.send('question');
+
+        expect(controller.state.sendError, expected, reason: code);
+      }
+    });
+
+    test('a connectivity failure keeps the question for retry', () async {
+      final client = _FakeAskAiClient(
+        () => Stream<AskAiEvent>.error(
+          DioException(
+            requestOptions: RequestOptions(path: '/ask'),
+            type: DioExceptionType.connectionError,
+          ),
+        ),
+      );
+      final controller = _controllerFor(client);
+
+      await controller.send('a lasting question');
+
+      expect(controller.state.sendError, AskAiSendError.network);
+      expect(controller.retryableQuestion, 'a lasting question');
+    });
+
+    test('threads the conversation id onto follow-up questions', () async {
+      var call = 0;
+      final client = _FakeAskAiClient(() {
+        call++;
+        return Stream.fromIterable([
+          AskAiSourcesEvent(conversationId: 'conv-$call', sources: const []),
+          AskAiDoneEvent(messageId: 'm-$call', text: 'answer $call', citations: const []),
+        ]);
+      });
+      final controller = _controllerFor(client);
+
+      await controller.send('first');
+      await controller.send('second');
+
+      expect(client.conversationIdsSeen, [null, 'conv-1']);
+    });
+
+    test('ignores a blank or over-long question', () async {
+      final client = _FakeAskAiClient(() => const Stream.empty());
+      final controller = _controllerFor(client);
+
+      await controller.send('   ');
+      await controller.send('x' * (askAiQuestionMaxChars + 1));
+
+      expect(client.askCalls, 0);
+      expect(controller.state.turns, isEmpty);
+    });
+  });
+
+  group('AskAiController history', () {
+    AskAiController answeredController() => _controllerFor(
+      _FakeAskAiClient(
+        () => Stream.fromIterable([
+          const AskAiSourcesEvent(conversationId: 'conv-1', sources: []),
+          const AskAiDoneEvent(messageId: 'msg-1', text: 'Answer.', citations: []),
+        ]),
+      ),
+    );
+
+    test('startNewChat clears the turns and the conversation id', () async {
+      final controller = answeredController();
+      await controller.send('first');
+
+      controller.startNewChat();
+
+      expect(controller.state.turns, isEmpty);
+      expect(controller.state.conversationId, isNull);
+    });
+
+    test('startNewChat settles a send still streaming', () async {
+      final events = StreamController<AskAiEvent>();
+      final controller = _controllerFor(_FakeAskAiClient(() => events.stream));
+      final pending = controller.send('slow question');
+      events.add(const AskAiDeltaEvent('Par'));
+      await Future<void>.delayed(Duration.zero);
+
+      controller.startNewChat();
+
+      await expectLater(pending, completes);
+      expect(controller.state.isStreaming, isFalse);
+      expect(controller.state.turns, isEmpty);
+      await events.close();
+    });
+
+    test('restore reopens a stored chat and threads the next question onto it', () async {
+      final client = _FakeAskAiClient(
+        () => Stream.fromIterable([
+          const AskAiDoneEvent(messageId: 'msg-3', text: 'Follow-up answer.', citations: []),
+        ]),
+      );
+      final controller = _controllerFor(client);
+
+      controller.restore(
+        const AskAiStoredConversation(
+          id: 'conv-old',
+          turns: [
+            AskAiTurn(
+              question: 'Earlier question',
+              answer: AskAiAnswerComplete(messageId: 'msg-2', text: 'Earlier.', citations: []),
+            ),
+          ],
+        ),
+      );
+      expect(controller.state.turns.single.question, 'Earlier question');
+      expect(controller.state.conversationId, 'conv-old');
+
+      await controller.send('And then?');
+
+      expect(client.conversationIdsSeen, ['conv-old']);
+      expect(controller.state.turns, hasLength(2));
+    });
+  });
+}

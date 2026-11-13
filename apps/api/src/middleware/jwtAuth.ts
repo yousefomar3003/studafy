@@ -1,0 +1,427 @@
+import { ERROR_CODES } from "@studafy/constants";
+import { HTTPException } from "hono/http-exception";
+
+import { TokenVerificationError, verifyAccessToken } from "../modules/auth/jwt/verify";
+import { isSchoolClosed, schoolClosedException } from "../modules/auth/school-access";
+
+import type { AuthContext } from "./authContext";
+import type { AppEnv } from "./requestId";
+import type { JtiDenylist } from "../modules/auth/denylist";
+import type { KeyStore } from "../modules/auth/jwt/key-store";
+import type { TokenFailureReason } from "../modules/auth/jwt/verify";
+import type { SchoolStatusReader } from "../modules/auth/school-access";
+import type { ErrorCode } from "@studafy/constants";
+import type { MiddlewareHandler } from "hono";
+
+/**
+ * JWT verification middleware — the authentication boundary for protected routes.
+ *
+ * Verifies an RS256 bearer token against the local key store, checks it has not been revoked, and
+ * hydrates `c.set("auth", …)` with a fully validated session. Nothing downstream ever sees an
+ * unauthenticated request or a partially trusted claim.
+ *
+ * @example
+ * ```typescript
+ * app.use("/api/*", jwtAuthMiddleware({ keyStore, denylist, issuer, audience }));
+ * ```
+ */
+
+// ---------------------------------------------------------------------------
+// Options
+// ---------------------------------------------------------------------------
+
+/**
+ * The subset of the entitlement service this middleware needs.
+ *
+ * Declared here as a structural type rather than imported from the subscriptions module so the auth
+ * boundary does not depend on billing: anything that can answer "what version is this school on" is
+ * a valid reader, which is also what makes the unit tests able to supply a counting fake.
+ */
+export interface EntitlementVersionReader {
+  /** The school's current entitlement version. Must throw rather than guess. */
+  currentVersion(schoolId: string): Promise<number>;
+}
+
+export interface JwtAuthOptions {
+  /** Key store holding the live signing/verification keys. */
+  keyStore: KeyStore;
+  /**
+   * Revocation denylist. `null` disables the revocation check — acceptable only where Redis is
+   * genuinely absent (local development without a Redis instance), and logged as a warning on
+   * every request so it cannot pass unnoticed in a deployed environment.
+   */
+  denylist: JtiDenylist | null;
+  /**
+   * Entitlement staleness check (ST-133). `null` disables it — same shape and same rationale as
+   * `denylist`: dev, tests and the OpenAPI generator all run without Redis, and a warning on every
+   * request keeps it from passing unnoticed in a deployed environment.
+   */
+  entitlements?: EntitlementVersionReader | null;
+  /**
+   * School lifecycle lookup, consulted only for a token that failed the entitlement check above.
+   * Closing a school bumps its entitlement version, so every outstanding token in it arrives here as
+   * stale; this lookup turns that into SCHOOL_SUSPENDED rather than "refresh and retry", which is the
+   * answer the client can act on. `null` (the default) keeps every stale token on the refresh path.
+   */
+  schoolStatus?: SchoolStatusReader | null;
+  /** Required `iss` claim. Threaded from env.JWT_ISSUER. */
+  issuer: string;
+  /** Required `aud` claim. Threaded from env.JWT_AUDIENCE. */
+  audience: string;
+  /**
+   * Path prefixes below the mount point that skip authentication entirely.
+   *
+   * Defaults to the webhook prefix, which authenticates by HMAC signature rather than by session
+   * token (see src/erpnext/webhook.ts), plus the two session-lifecycle endpoints that authenticate
+   * with a refresh token instead (see modules/auth/routes/session-routes.ts). Kept as an explicit
+   * list rather than an opt-in flag on each route so that the set of unauthenticated endpoints is
+   * enumerable in one place.
+   */
+  publicPaths?: string[];
+}
+
+/**
+ * Every endpoint under /api that does not authenticate with a bearer access token.
+ *
+ * `/api/auth/refresh` and `/api/auth/logout` are here because a client reaches them precisely when
+ * its access token is expired or gone — requiring one would make them unreachable exactly when they
+ * are needed. Their credential is the refresh token, verified against app.refresh_tokens by the
+ * session service, so they are not unauthenticated so much as authenticated by other means.
+ *
+ * Note these are exact paths, not prefixes like /api/webhooks: the rest of /api/auth (session
+ * enumeration and termination) must stay behind the boundary, and a `/api/auth` prefix would open
+ * all of it. isPublicPath below matches accordingly.
+ */
+const DEFAULT_PUBLIC_PATHS = [
+  "/api/webhooks",
+  "/api/auth/refresh",
+  "/api/auth/logout",
+  "/api/auth/oauth",
+  "/api/auth/login",
+  "/api/schools/register",
+  // The rest of the self-registration flow (ST-184): verifying the emailed link and resending it
+  // are, like registration itself, unauthenticated by design — there is no session to bear a token
+  // yet. Previously missing here, which meant only /api/schools/register itself was reachable
+  // anonymously; verify-email 401'd and resend-verification never got this far (see csrf.ts).
+  "/api/schools/verify-email",
+  "/api/schools/resend-verification",
+  // Public account deletion (ST-302): Google Play requires it to work without the app or a session.
+  // The request is captcha-gated; its /confirm child authenticates with the emailed token.
+  "/api/account/deletion-requests",
+  // "Talk to us" sales inquiries from the marketing site: the visitor has no account. Captcha-gated
+  // and rate-limited like registration; nothing else lives under /api/inquiries.
+  "/api/inquiries",
+  // School sign-up applicants (website "Sign up"): signed in with Google/Microsoft but holding no
+  // Studafy account, so no bearer token exists. These endpoints authenticate with the applicant
+  // session cookie instead (modules/school-applications/applicant-session.ts). Matches /me and its
+  // children only; nothing else lives under /api/school-applications.
+  "/api/school-applications/me",
+  // Reference-data lookups (ST-184): public, read-only, feed the registration form's country/
+  // currency selectors before a school (and therefore a token) exists.
+  "/api/lookups/countries",
+  "/api/lookups/currencies",
+  "/api/subscriptions/webhook/stripe",
+  "/api/subscriptions/webhook/tap",
+  "/api/subscriptions/webhook/apple",
+  "/api/subscriptions/webhook/google",
+  // Authenticated by their own HMAC signature (ERPNext finance webhooks) and X-Api-Key service key
+  // (reconciliation, called by the workers' scheduler) rather than a user token -- see csrf.ts.
+  "/api/finance/webhooks/erpnext",
+  "/api/finance/reconciliation/run",
+  // Plan/price listing is pre-signup content (the marketing pricing page reads it anonymously) and
+  // the query is not school-scoped — see getActivePlans in subscription-service.ts.
+  "/api/subscriptions/plans",
+  // Mobile release floor (ST-257): the native app reads this on launch to decide whether to block
+  // itself behind a forced-update screen — necessarily before it has a session to bear a token.
+  // Exact path, not a prefix: nothing else lives under /api/mobile.
+  "/api/mobile/config",
+  // Same endpoint, canonical name (ST-283) — see config-routes.ts. Also unauthenticated.
+  "/meta/mobile-versions",
+  // AI subsystem health (ST-264): a black-box synthetic probe has no session to bear a token, the
+  // same reasoning as every other entry here. See health.ts's aiHealthRoute.
+  "/api/ai/health",
+];
+
+function isInvitationSubPath(path: string, action: "verify" | "activate"): boolean {
+  const segments = path.split("/");
+  return (
+    segments.length === 6 &&
+    segments[0] === "" &&
+    segments[1] === "api" &&
+    segments[2] === "auth" &&
+    segments[3] === "invitations" &&
+    segments[4] !== "" &&
+    segments[5] === action
+  );
+}
+
+function isInvitationVerificationPath(path: string): boolean {
+  return isInvitationSubPath(path, "verify");
+}
+
+// Account activation (ST-078) authenticates with the invitation token in the path plus a verified
+// Microsoft OIDC identity in the body, not a bearer session — so, like verification, it is exempt
+// from the JWT boundary. The exemption is scoped to exactly `.../invitations/{token}/activate`; the
+// rest of /api/auth stays protected.
+function isInvitationActivationPath(path: string): boolean {
+  return isInvitationSubPath(path, "activate");
+}
+
+const INVITATION_OAUTH_ACTIONS = new Set(["start", "mobile-start", "mobile-exchange"]);
+
+/**
+ * The OAuth arms of the same activation (ST-078 browser, ST-215 mobile):
+ * `/api/auth/invitations/{token}/oauth/{provider}/{start|mobile-start|mobile-exchange}`.
+ *
+ * An invitee has no account and therefore no bearer token; the invitation token in the path plus
+ * the provider-verified identity are the credential, exactly as for `.../activate`. Scoped to those
+ * exact eight-segment shapes so nothing else under /api/auth/invitations is opened.
+ */
+export function isInvitationOAuthPath(path: string): boolean {
+  const segments = path.split("/");
+  return (
+    segments.length === 8 &&
+    segments[0] === "" &&
+    segments[1] === "api" &&
+    segments[2] === "auth" &&
+    segments[3] === "invitations" &&
+    segments[4] !== "" &&
+    segments[5] === "oauth" &&
+    segments[6] !== "" &&
+    INVITATION_OAUTH_ACTIONS.has(segments[7] ?? "")
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Failure taxonomy
+// ---------------------------------------------------------------------------
+
+/**
+ * Map a verification failure onto a client-facing error code.
+ *
+ * Only expiry is distinguished, and that is intentional. An expired token is an ordinary,
+ * non-adversarial event — the client's correct response is to refresh, and telling it so avoids a
+ * pointless retry loop. Everything else collapses to AUTH_TOKEN_INVALID: separating "bad signature"
+ * from "unknown kid" from "malformed claims" in the response would tell an attacker which part of
+ * a forged token to fix next. The precise reason is still recorded server-side, in the log line.
+ */
+const FAILURE_CODES: Record<TokenFailureReason, ErrorCode> = {
+  malformed: ERROR_CODES.AUTH_TOKEN_INVALID,
+  key: ERROR_CODES.AUTH_TOKEN_INVALID,
+  signature: ERROR_CODES.AUTH_TOKEN_INVALID,
+  expired: ERROR_CODES.AUTH_TOKEN_EXPIRED,
+  claims: ERROR_CODES.AUTH_TOKEN_INVALID,
+  no_keys: ERROR_CODES.INTERNAL_ERROR,
+};
+
+/**
+ * A 401 that carries the specific error code rather than letting the status decide it.
+ *
+ * errorHandlerMiddleware derives a code from the HTTP status by default, which would flatten every
+ * authentication failure to AUTH_TOKEN_INVALID. This subclass lets the handler recover the code we
+ * actually determined; see the `AuthException` branch in errorHandler.ts.
+ */
+export class AuthException extends HTTPException {
+  constructor(
+    readonly code: ErrorCode,
+    message: string,
+  ) {
+    super(401, { message });
+    this.name = "AuthException";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Middleware factory
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the JWT verification middleware.
+ *
+ * The order of operations inside is the performance strategy, not just control flow. Each step is
+ * cheaper than the one after it, and every rejection returns before the next step runs:
+ *
+ * 1. Path exemption — a string comparison.
+ * 2. Header parse — no crypto, no I/O. Catches the entire class of unauthenticated requests.
+ * 3. Signature, `exp`, `iss`/`aud`, and claim shape — one RSA verification against the key the
+ *    token's own `kid` resolves to. This dominates the measured cost of the whole middleware.
+ * 4. Revocation lookup — a single Redis `EXISTS`, and the first network hop in the path.
+ * 5. Entitlement freshness — one more Redis `GET`, and only for a token that is otherwise valid.
+ *
+ * Steps 4 and 5 running last is the part that matters most: a tampered or expired token is rejected
+ * without ever touching Redis, so a flood of garbage tokens costs no cache I/O at all. Inverting
+ * 3 and 4 would put a network round-trip in front of every forged request.
+ * tests/auth/short-circuit.test.ts holds this ordering by counting denylist lookups — a status
+ * code alone cannot tell the two arrangements apart.
+ *
+ * 5 sits after 4 rather than before it so a revoked token never pays for the second lookup.
+ */
+/**
+ * Whether a path is exempt from authentication.
+ *
+ * An entry matches the path exactly, or as a path-segment prefix — never as a bare string prefix.
+ * The difference is load-bearing now that the list holds exact endpoints as well as trees:
+ * `"/api/auth/refresh"` must not exempt `/api/auth/refresh-everything`, and a plain `startsWith`
+ * would. Segment-aware matching keeps `/api/webhooks` covering `/api/webhooks/erpnext` while making
+ * an entry incapable of opening a sibling route that merely shares its opening characters.
+ */
+function isPublicPath(path: string, publicPaths: readonly string[]): boolean {
+  return (
+    isInvitationVerificationPath(path) ||
+    isInvitationActivationPath(path) ||
+    isInvitationOAuthPath(path) ||
+    publicPaths.some((entry) => path === entry || path.startsWith(`${entry}/`))
+  );
+}
+
+export function jwtAuthMiddleware({
+  keyStore,
+  denylist,
+  entitlements = null,
+  schoolStatus = null,
+  issuer,
+  audience,
+  publicPaths = DEFAULT_PUBLIC_PATHS,
+}: JwtAuthOptions): MiddlewareHandler<AppEnv> {
+  return async (c, next) => {
+    if (isPublicPath(c.req.path, publicPaths)) {
+      await next();
+      return;
+    }
+
+    const log = c.get("log");
+
+    // --- 1. Bearer header ---------------------------------------------------
+    const header = c.req.header("Authorization");
+    if (!header) {
+      log?.warn({ reason: "missing_header" }, "authentication failed");
+      throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Missing bearer token");
+    }
+
+    // Scheme match is case-insensitive: RFC 7235 defines the auth-scheme token as case-insensitive,
+    // and real clients do send "bearer".
+    const [scheme, ...rest] = header.split(" ");
+    const token = rest.join(" ").trim();
+    if (scheme?.toLowerCase() !== "bearer" || token.length === 0) {
+      log?.warn({ reason: "malformed_header" }, "authentication failed");
+      throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Malformed Authorization header");
+    }
+
+    // --- 2. Cryptographic verification (before any I/O) ---------------------
+    let payload;
+    try {
+      payload = await verifyAccessToken(keyStore, token, { issuer, audience });
+    } catch (err) {
+      const failure: TokenFailureReason =
+        err instanceof TokenVerificationError ? err.failure : "signature";
+
+      // An empty key store is our fault, not the caller's, and answering 401 would send clients
+      // into a refresh loop against a server that cannot verify anything.
+      if (failure === "no_keys") {
+        log?.error({ err }, "authentication failed: key store empty");
+        throw new HTTPException(503, { message: "Authentication temporarily unavailable" });
+      }
+
+      // The token itself is never logged, in any form. It is a live credential until it expires,
+      // and log sinks are a wider audience than the request path it arrived on.
+      log?.warn({ reason: failure }, "authentication failed");
+      throw new AuthException(FAILURE_CODES[failure], "Invalid authentication token");
+    }
+
+    // --- 3. Revocation ------------------------------------------------------
+    if (denylist) {
+      let revoked: boolean;
+      try {
+        revoked = await denylist.isRevoked(payload.jti);
+      } catch (err) {
+        // Fail closed. See the rationale on createJtiDenylist: unlike the rate limiter, letting
+        // traffic through here would silently resurrect every logged-out session.
+        log?.error({ err }, "denylist lookup failed");
+        throw new HTTPException(503, { message: "Authentication temporarily unavailable" });
+      }
+
+      if (revoked) {
+        log?.warn({ reason: "revoked" }, "authentication failed");
+        throw new AuthException(ERROR_CODES.AUTH_TOKEN_INVALID, "Token has been revoked");
+      }
+    } else {
+      log?.warn("jti denylist unavailable — token revocation is not enforced");
+    }
+
+    // --- 4. Entitlement freshness -------------------------------------------
+    if (entitlements) {
+      let current: number;
+      try {
+        current = await entitlements.currentVersion(payload.school_id);
+      } catch (err) {
+        // Fail closed, matching the denylist three lines above. Redis is already a hard dependency
+        // of this middleware, so failing open here would buy no additional availability while
+        // accepting entitlement decisions of unknown freshness — the exact failure ST-133 exists to
+        // remove. The cost is real and accepted: a Redis outage becomes an authentication outage
+        // rather than up to JWT_ACCESS_TTL_SECONDS of service for a canceled school.
+        log?.error({ err }, "entitlement version lookup failed");
+        throw new HTTPException(503, { message: "Authentication temporarily unavailable" });
+      }
+
+      // Strictly less-than, never inequality. A token minted a moment ahead of the cached value must
+      // not be rejected, and neither must a pre-ST-133 token carrying the genesis version 1 — which
+      // is exactly what a school with no counter row resolves to.
+      if (payload.entitlements_ver < current) {
+        // Only now, and only for a stale token, is the school's lifecycle worth a lookup: a closure
+        // is one of the things that bumps the version, and its tokens must not be sent to refresh.
+        if (schoolStatus) {
+          let status: string | null;
+          try {
+            status = await schoolStatus.status(payload.school_id);
+          } catch (err) {
+            log?.error({ err }, "school status lookup failed");
+            throw new HTTPException(503, { message: "Authentication temporarily unavailable" });
+          }
+          if (isSchoolClosed(status)) {
+            log?.warn({ reason: "school_closed" }, "authentication failed");
+            throw schoolClosedException();
+          }
+        }
+
+        log?.warn(
+          { reason: "entitlements_stale", claim: payload.entitlements_ver, current },
+          "authentication failed",
+        );
+        // 401 with its own code, not a generic one: the credential is no longer acceptable and the
+        // remedy is to obtain a new one, which is what 401 means. /api/auth/refresh is already in
+        // DEFAULT_PUBLIC_PATHS, so a client receiving this always recovers in a single call.
+        throw new AuthException(
+          ERROR_CODES.AUTH_ENTITLEMENTS_STALE,
+          "Entitlements have changed; obtain a new access token",
+        );
+      }
+    } else {
+      log?.warn("entitlement version reader unavailable — token staleness is not enforced");
+    }
+
+    // --- 5. Hydrate context -------------------------------------------------
+    const auth: AuthContext = {
+      userId: payload.sub,
+      schoolId: payload.school_id,
+      roles: payload.roles,
+      channel: payload.channel,
+      jti: payload.jti,
+      exp: payload.exp,
+      entitlementsVer: payload.entitlements_ver,
+      subscriptionStatus: payload.subscription_status,
+      ...(payload.deletion_pending ? { deletionPending: true } : {}),
+      ...(payload.legal_acceptance_pending ? { legalAcceptancePending: true } : {}),
+    };
+    c.set("auth", auth);
+
+    // Re-child the logger with the identity we just established. This is the seam described in
+    // docs/architecture/SAD_28_logging_conventions.md: requestIdMiddleware binds school_id/user_id
+    // as null on the way in because no identity exists yet, and this line rebinds them. The keys
+    // are duplicated in the serialized output by design — last one wins.
+    if (log) {
+      c.set("log", log.child({ school_id: auth.schoolId, user_id: auth.userId }));
+    }
+
+    await next();
+  };
+}

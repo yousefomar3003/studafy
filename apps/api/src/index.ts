@@ -1,0 +1,321 @@
+import {
+  forwardLog,
+  initErrorMonitoring,
+  startMetricsServer,
+  startTracing,
+  withErrorMonitoringScope,
+} from "@studafy/observability";
+import { TesseractOcrEngine } from "@studafy/ocr";
+
+import { createApp } from "./app";
+import { closeDatabasePools, createDatabase, createReadDatabase } from "./database";
+import { loadEnv } from "./env";
+import { RedisCircuitBreaker } from "./lib/circuit-breaker";
+import { createSecurityEventSink } from "./lib/security/securityEventSink";
+import { createStorageService } from "./lib/storage";
+import { createInflightTracker, gracefulShutdown } from "./lifecycle";
+import { createLogger } from "./logger";
+import {
+  AI_DATA_SHARING_DISCLOSURE,
+  createAnthropicProvider,
+  isTransientLlmFailure,
+  type AiModelTier,
+  type LlmProvider,
+} from "./modules/ai";
+import { KeyStore } from "./modules/auth";
+import { syncFeatureCatalog } from "./modules/features";
+import { createFlagsService } from "./modules/flags";
+import { startGradePublishedSubscriber } from "./modules/grades/subscribers/grade-published.subscriber";
+import { resolveMobileReleaseConfig } from "./modules/mobile";
+import { resolveRecordKeyring } from "./modules/records";
+import {
+  startEntitlementInvalidationSubscriber,
+  StripeAdapter,
+  TapAdapter,
+} from "./modules/subscriptions";
+import { createStoreBilling } from "./modules/subscriptions/store";
+import { createReadinessProbe } from "./readiness";
+import { closeRedis, createRedisClient } from "./redis";
+
+// Fail fast: an invalid environment throws EnvValidationError here, before the server binds a port.
+const env = loadEnv();
+
+// Sentry error monitoring — null (and every reporting call a no-op) when SENTRY_DSN is unset. Must
+// run before startTracing() below: it registers the OTel context manager both share, and
+// startTracing() keeps that registration (see @studafy/observability's errorMonitoring.ts).
+const errorMonitoring = initErrorMonitoring({
+  dsn: env.SENTRY_DSN,
+  environment: env.SENTRY_ENVIRONMENT ?? env.APP_ENV,
+  release: env.RELEASE_VERSION,
+  serviceName: env.SERVICE_NAME,
+});
+
+// Prometheus-format metrics (ST-259), on its own port — must run before createApp() registers
+// createRedMetricsMiddleware(), since an OTel instrument stays bound to whichever meter created
+// it and this call is what registers the real global MeterProvider (see
+// packages/observability/src/redMetrics.ts).
+const metricsServer = startMetricsServer({ serviceName: env.SERVICE_NAME, port: env.METRICS_PORT });
+
+// Distributed tracing (ST-260), same "before anything can call trace.getTracer()" ordering
+// requirement — null when OTEL_EXPORTER_OTLP_ENDPOINT is unset (dev, test, the OpenAPI generator).
+const tracing = startTracing({
+  serviceName: env.SERVICE_NAME,
+  // `|| undefined`, not the bare env value: dev's task definition sets this to "" rather than
+  // omitting it (see env.ts's own comment), and startTracing() only treats undefined as "disabled".
+  otlpEndpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT || undefined,
+});
+
+// The root logger. Every line this process writes descends from it, so stdout is uniformly NDJSON —
+// a single unparseable line would break JSON filters across the whole log group.
+const logger = createLogger({
+  level: env.LOG_LEVEL,
+  base: {
+    service: env.SERVICE_NAME,
+    env: env.NODE_ENV,
+    release_version: env.RELEASE_VERSION,
+  },
+  // warn → breadcrumb, error/fatal → Sentry event, on top of the unchanged stdout line. Left unset
+  // without a DSN so the logger never materializes its bindings for nobody to read.
+  ...(errorMonitoring
+    ? {
+        observer: (level, msg, fields, bindings) =>
+          forwardLog(level, msg ?? "", { ...bindings, ...fields }),
+      }
+    : {}),
+});
+
+const state = { ready: true };
+const tracker = createInflightTracker();
+const database = createDatabase(env);
+const readDatabase = createReadDatabase(env, database);
+const redis = env.REDIS_URL ? createRedisClient({ url: env.REDIS_URL, logger }) : null;
+const gradePublishedSubscriber = redis
+  ? await startGradePublishedSubscriber({ redis, logger }).catch((err) => {
+      logger.error({ err }, "failed to start grades.published cache subscriber");
+      return null;
+    })
+  : null;
+// The fast half of ST-133's invalidation. The durable half is the workers-side poller; a failure to
+// start here degrades propagation to that poller's interval rather than breaking correctness, so it
+// is logged and swallowed exactly as the grades subscriber above is.
+const entitlementInvalidationSubscriber = redis
+  ? await startEntitlementInvalidationSubscriber({ redis, logger }).catch((err) => {
+      logger.error({ err }, "failed to start entitlement invalidation subscriber");
+      return null;
+    })
+  : null;
+
+// Paid features (docs/billing/feature-licensing.md): insert any feature key new to the code list
+// into app.features, leaving the super admin's settings alone. A failure is logged, not fatal: every
+// existing feature already has its row, and only a feature added in this deploy is affected -- its
+// metered routes fail on the usage meter's foreign key until a later boot's sync succeeds.
+if (database) {
+  await syncFeatureCatalog(database)
+    .then((inserted) => {
+      if (inserted.length > 0) logger.info({ features: inserted }, "registered new paid features");
+    })
+    .catch((err: unknown) => {
+      logger.error({ err }, "paid feature catalog sync failed");
+    });
+}
+
+// Persists CORS/CSRF rejections off the request path. Returns a no-op sink when no database is
+// configured, so nothing downstream has to branch on that.
+const securityEventSink = createSecurityEventSink({ database, logger });
+
+// Object storage for assignment attachments. Null when the S3_* variables are absent, which is the
+// normal state in development — the attachment endpoints then answer 503 rather than the process
+// refusing to start over a feature the developer may not be touching.
+const storage = createStorageService(env);
+
+// Stripe billing adapter. Null when STRIPE_SECRET_KEY is absent — the checkout and webhook routes
+// still register but answer 503 at request time.
+const stripeProvider =
+  env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET
+    ? new StripeAdapter({
+        secretKey: env.STRIPE_SECRET_KEY,
+        webhookSecret: env.STRIPE_WEBHOOK_SECRET,
+      })
+    : null;
+
+// Tap Payments adapter (ST-298) for MENA-region schools. Null unless both variables are set; env.ts
+// refuses one without the other. Tap signs webhooks with the secret key itself, so there is no
+// separate webhook secret -- the URL is needed because Tap takes it per charge, not per account.
+const tapProvider =
+  env.TAP_SECRET_KEY && env.TAP_WEBHOOK_URL
+    ? new TapAdapter({ secretKey: env.TAP_SECRET_KEY, webhookUrl: env.TAP_WEBHOOK_URL })
+    : null;
+
+// App Store / Google Play billing of the AI add-on bought in the mobile app. Null unless a store is
+// configured (env.ts checks the values come in complete sets).
+const storeBilling = createStoreBilling(env);
+
+// LLM gateway (ST-164). The provider is built here — the only place with the environment, the
+// logger, and Redis together — and handed to createApp as an option, so the app itself stays
+// environment-free. It is null when the AI_LLM_ENABLED kill switch is off (or Redis is absent, in
+// which case the whole AI surface is already unmounted): the generate route still registers and
+// answers 503 AI_LLM_DISABLED. The per-school circuit breaker lives on `cb:ai` keys, is named for
+// its logs, and shares the provider's failure predicate so the breaker and the retry loop cannot
+// disagree on what "a failure" means. AI_LLM_PROVIDER picks the wire format and with it which
+// credential and endpoint apply; env.ts has already required the matching pair.
+// The consent modal names the company the inputs go to (modules/ai/consent/disclosure.ts). With AI on,
+// a provider the disclosure does not describe would have students agree to the wrong company, so
+// that is a boot failure, not a warning.
+if (env.AI_LLM_ENABLED && env.AI_LLM_PROVIDER !== AI_DATA_SHARING_DISCLOSURE.llmProvider) {
+  throw new Error(
+    `AI_LLM_PROVIDER=${env.AI_LLM_PROVIDER} but the AI consent disclosure describes ` +
+      `${AI_DATA_SHARING_DISCLOSURE.llmProvider} (${AI_DATA_SHARING_DISCLOSURE.provider.name}); ` +
+      "update modules/ai/consent/disclosure.ts and bump its version",
+  );
+}
+const aiLlmOpenAiCompatible = env.AI_LLM_PROVIDER === "openai-compatible";
+const aiLlmApiKey = aiLlmOpenAiCompatible ? env.AI_LLM_API_KEY : env.ANTHROPIC_API_KEY;
+const aiLlmProvider: LlmProvider | null =
+  env.AI_LLM_ENABLED && redis && aiLlmApiKey
+    ? createAnthropicProvider({
+        apiKey: aiLlmApiKey,
+        apiFormat: env.AI_LLM_PROVIDER,
+        baseUrl: aiLlmOpenAiCompatible ? env.AI_LLM_BASE_URL : env.ANTHROPIC_BASE_URL,
+        timeoutMs: env.AI_LLM_TIMEOUT_MS,
+        defaultMaxTokens: env.AI_LLM_MAX_TOKENS,
+        zeroRetention: env.AI_LLM_ZERO_RETENTION,
+        logger,
+        circuitBreaker: new RedisCircuitBreaker(redis, logger, {
+          keyPrefix: "cb:ai",
+          component: "ai-circuit-breaker",
+          isFailure: isTransientLlmFailure,
+        }),
+      })
+    : null;
+
+// Ask AI photo text: English and Arabic in one pass, the two languages students' work is written in.
+// One shared tesseract worker thread, spawned on the first photo.
+const photoTextReader = new TesseractOcrEngine({
+  languages: ["eng", "ara"],
+  languageCandidates: [],
+  ...(env.OCR_WORKER_PATH !== undefined ? { workerPath: env.OCR_WORKER_PATH } : {}),
+  ...(env.OCR_LANG_PATH !== undefined ? { langPath: env.OCR_LANG_PATH } : {}),
+});
+
+const aiLlmModelOverrides: Partial<Record<AiModelTier, string>> = {
+  ...(env.AI_LLM_SMALL_MODEL ? { small: env.AI_LLM_SMALL_MODEL } : {}),
+  ...(env.AI_LLM_LARGE_MODEL ? { large: env.AI_LLM_LARGE_MODEL } : {}),
+};
+
+// Feature-flag service (ST-277). The deployment defaults are the two AI kill-switch variables, so
+// flipping a fleet-wide default stays an env change; a per-tenant override in `app.feature_flags`
+// outranks them for its school and propagates within the flag cache TTL (see
+// docs/database/feature-flags-data-model.md). The defaults map is type-checked against the
+// registry, so a mistyped flag name is a build error here, not a runtime miss.
+const flags = createFlagsService({
+  database,
+  redis,
+  logger,
+  defaults: {
+    "ai.llm": env.AI_LLM_ENABLED,
+    "ai.rerank": env.AI_RERANK_ENABLED,
+  },
+});
+
+const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
+  logger.info({ kid }, "jwt key rotated");
+});
+await keyStore.init();
+
+// The readiness probe: /readyz's question, composed here rather than in createApp so the app stays
+// dependency-free. The draining flag is synchronous (state.ready flips in the shutdown handler) and
+// short-circuits before any dependency I/O; the probe then races the database/Redis/storage checks
+// against READINESS_TIMEOUT_MS so a hung dependency flips readiness within that bound.
+const readiness = createReadinessProbe({
+  database,
+  readDatabase,
+  redis,
+  storage,
+  timeoutMs: env.READINESS_TIMEOUT_MS,
+});
+
+const app = createApp({
+  isReady: async () => state.ready && (await readiness()),
+  tracker,
+  logger,
+  redis,
+  database,
+  readDatabase,
+  keyStore,
+  jwtIssuer: env.JWT_ISSUER,
+  jwtAudience: env.JWT_AUDIENCE,
+  jwtAccessTtlSeconds: env.JWT_ACCESS_TTL_SECONDS,
+  jwtRefreshTtlSeconds: env.JWT_REFRESH_TTL_SECONDS,
+  realtimeTicketSecret: env.WS_JWT_SECRET,
+  reviewLoginPassword: env.REVIEW_LOGIN_PASSWORD,
+  qaLoginPassword: env.QA_LOGIN_PASSWORD,
+  rateLimitDisabled: env.RATE_LIMIT_DISABLED === "true",
+  securityEventSink,
+  storage,
+  stripeProvider,
+  tapProvider,
+  tapCountries: env.TAP_COUNTRIES,
+  storeBilling,
+  realtimeFlyApp: env.REALTIME_FLY_APP,
+  // The reference site is a development and staging affordance. Production does not serve it: its
+  // page loads a bundle from a CDN, and an API contract is not something production needs to render.
+  docsEnabled: env.NODE_ENV !== "production",
+  flags,
+  aiLlmProvider,
+  aiLlmModelOverrides,
+  photoTextReader,
+  // Folds MOBILE_MIN_SUPPORTED_VERSION_* / MOBILE_LATEST_VERSION_* into the shape
+  // GET /api/mobile/config serves (ST-257). An unset variable becomes "0.0.0" ("no floor").
+  mobileReleaseConfig: resolveMobileReleaseConfig(env),
+  // Sensitive record values (ADR-019). env.ts has already validated the keyring.
+  recordKeyring: resolveRecordKeyring(env),
+});
+
+const server = Bun.serve({
+  port: env.PORT,
+  hostname: env.HOST,
+  // Each request gets its own Sentry scope, so the breadcrumbs its warn logs leave behind ride along
+  // with that request's error report and no other. A plain pass-through without a DSN.
+  fetch: (request, bunServer) => withErrorMonitoringScope(() => app.fetch(request, bunServer)),
+});
+
+logger.info(
+  { host: server.hostname, port: server.port, database: database !== null, redis: redis !== null },
+  "api listening",
+);
+
+let shuttingDown = false;
+
+const shutdown = (signal: string) => {
+  if (shuttingDown) {
+    return;
+  }
+  shuttingDown = true;
+
+  void gracefulShutdown(server, {
+    onStart: () => {
+      state.ready = false;
+      logger.info({ signal }, "draining in-flight requests");
+    },
+    tracker,
+    timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
+  }).then(async () => {
+    keyStore.destroy();
+    // Drains buffered security events. Must run before closeDatabase, which it writes through.
+    await securityEventSink.close();
+    await photoTextReader.close();
+    await gradePublishedSubscriber?.close();
+    await entitlementInvalidationSubscriber?.close();
+    await closeRedis(redis);
+    await closeDatabasePools(database, readDatabase);
+    await metricsServer.shutdown();
+    await tracing?.shutdown();
+    // Last, so anything the steps above reported still goes out before the process exits.
+    await errorMonitoring?.shutdown();
+    logger.info({ signal }, "shutdown complete");
+    process.exit(0);
+  });
+};
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

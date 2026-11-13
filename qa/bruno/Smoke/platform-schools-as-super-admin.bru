@@ -1,0 +1,19 @@
+meta {
+  name: Platform schools (SUPER_ADMIN)
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/platform/schools
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{QA_TOKEN_PLATFORM_SUPER_ADMIN}}
+}
+
+tests {
+  test("platform access", () => expect(res.status).to.equal(200));
+}

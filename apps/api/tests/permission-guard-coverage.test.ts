@@ -1,0 +1,877 @@
+/**
+ * CI gate: every mutating route that acts on another user's data must carry a
+ * requirePermission() guard.
+ *
+ * Mirrors the structure of audit-coverage.test.ts: scan source files for mutating
+ * route registrations, verify each is accompanied by a requirePermission() call in
+ * the same file, and pin the expected count so a blind scanner fails loudly.
+ *
+ * Self-service routes (session lifecycle) and webhook routes (HMAC-authenticated)
+ * are exempt — they either operate on the caller's own data or authenticate by
+ * other means. The exemption list is explicit and enumerable.
+ *
+ * ## Why per-file, not per-route
+ *
+ * `requirePermission` is mounted as `routes.use(path, guard)` before the route
+ * handler is registered, so it lives in the same file but on a different line.
+ * A 15-line proximity window (like audit-coverage) would work, but per-file is
+ * simpler and equally correct because Hono route files are small and focused —
+ * a single file never mixes guarded and unguarded admin routes.
+ */
+
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
+
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
+import { describe, expect, test } from "bun:test";
+
+const SRC_DIR = resolve(import.meta.dir, "../src");
+const EXCLUDE_PATTERNS = [/\.test\.ts$/, /\.d\.ts$/, /__tests__/];
+const MUTATING_METHODS = ["post", "put", "patch", "delete"] as const;
+
+/**
+ * Every mutating route that currently exists, by "METHOD path".
+ *
+ * Kept in sync with audit-coverage.test.ts's list. A new mutating route must be
+ * added here and to audit-coverage.test.ts simultaneously.
+ */
+const EXPECTED_MUTATING_ROUTES = [
+  "POST /api/invitations",
+  "POST /api/invitations/{id}/revoke",
+  "POST /api/invitations/{id}/regenerate",
+  "POST /api/auth/invitations/{token}/activate",
+  "POST /api/auth/login/oauth",
+  "POST /api/auth/providers/link/start",
+  "POST /api/schools/register",
+  "POST /erpnext/webhooks",
+  "POST /email/webhooks/resend",
+  "POST /api/subscriptions/webhook/stripe",
+  "POST /api/subscriptions/webhook/tap",
+  "POST /api/auth/refresh",
+  "POST /api/auth/logout",
+  "DELETE /api/auth/sessions/{sessionId}",
+  // Self-service "sign out other sessions" (ST-280). Revokes only the caller's own families.
+  "POST /api/auth/sessions/revoke-others",
+  "DELETE /api/auth/devices/{deviceId}/sessions",
+  // Device token registration (ST-218). Self-service; RLS-scoped to the caller's own row.
+  "POST /api/auth/devices",
+  "DELETE /api/auth/devices/{deviceId}",
+  "DELETE /api/auth/providers/{provider}",
+  "DELETE /api/admin/users/{userId}/devices",
+  "DELETE /api/admin/users/{userId}/devices/{deviceId}",
+  "DELETE /api/admin/users/{userId}/providers/{provider}",
+  // School email verification (ST-088). Self-service; authorized by the caller's school identity.
+  "POST /api/schools/resend-verification",
+  // School settings (ST-090). Gated on ORGANIZATION_MANAGE_SETTINGS.
+  "PATCH /api/schools/current/settings",
+  // School closure. Gated on ORGANIZATION_CLOSE, plus an ORG_ADMIN role check in the handler.
+  "POST /api/schools/current/closure",
+  // Tenant provisioning (ST-089). School admin triggers provisioning for their own school;
+  // school context is sufficient — no cross-user row-level permission.
+  "POST /api/schools/{schoolId}/provision",
+  // Academic year & term management (ST-091). Writes guarded by requirePermission(TIMETABLE_MANAGE).
+  "POST /api/academics/years",
+  "PATCH /api/academics/years/{yearId}",
+  "DELETE /api/academics/years/{yearId}",
+  "POST /api/academics/years/{yearId}/rollover",
+  "POST /api/academics/years/{yearId}/terms",
+  "PATCH /api/academics/terms/{termId}",
+  "DELETE /api/academics/terms/{termId}",
+  // Subjects & courses (ST-099). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/subjects",
+  "PATCH /api/academics/subjects/{subjectId}",
+  "DELETE /api/academics/subjects/{subjectId}",
+  "POST /api/academics/subjects/{subjectId}/courses",
+  "PATCH /api/academics/courses/{courseId}",
+  "DELETE /api/academics/courses/{courseId}",
+  // User management & administration (ST-093). Authenticated, tenant-scoped CRUD with per-route
+  // requirePermission() guards for USER_READ, USER_CREATE, USER_UPDATE, ROLE_ASSIGN, and USER_SUSPEND.
+  "POST /api/users",
+  "PATCH /api/users/{userId}",
+  "PATCH /api/users/{userId}/role",
+  "PATCH /api/users/{userId}/deactivate",
+  // Member password reset and bulk setup codes (000141, 000184), gated on USER_UPDATE.
+  "POST /api/users/{userId}/password/reset",
+  "POST /api/users/member-setup-codes",
+  // Student profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards
+  // for STUDENT_READ, STUDENT_CREATE, and STUDENT_UPDATE.
+  "POST /api/students",
+  "PATCH /api/students/{studentId}",
+  // Teacher profiles. Authenticated, tenant-scoped CRUD with per-route requirePermission() guards
+  // for TEACHER_READ, TEACHER_CREATE, and TEACHER_UPDATE.
+  "POST /api/teachers",
+  "PATCH /api/teachers/{teacherId}",
+  // Student guardian (parent-child) linking. Authenticated, tenant-scoped CRUD with per-route
+  // requirePermission() guards for STUDENT_READ and STUDENT_UPDATE.
+  "POST /api/students/{studentId}/guardians",
+  "DELETE /api/students/{studentId}/guardians/{userId}",
+  // Family household management is guarded by PARENT_LINK/PARENT_UNLINK.
+  "POST /api/families",
+  "PATCH /api/families/{familyId}",
+  "DELETE /api/families/{familyId}",
+  "POST /api/families/{familyId}/links",
+  "PATCH /api/families/{familyId}/links/{parentUserId}/{studentId}",
+  "DELETE /api/families/{familyId}/links/{parentUserId}/{studentId}",
+  // Student CSV imports. Upload and confirm are mutating; guarded by STUDENT_IMPORT permission.
+  "POST /api/imports/students/upload",
+  "POST /api/imports/students/{importId}/confirm",
+  // ST-299: re-map a staged import, and saved-mapping CRUD. Guarded by STUDENT_IMPORT.
+  "PUT /api/imports/students/{importId}/mapping",
+  "POST /api/imports/students/mappings",
+  "PATCH /api/imports/students/mappings/{mappingId}",
+  "DELETE /api/imports/students/mappings/{mappingId}",
+  "DELETE /api/imports/students/{importId}/source",
+  "POST /api/imports/students/{importId}/columns/preview",
+  "POST /api/imports/students/{importId}/columns/apply",
+  "PUT /api/imports/students/settings",
+  // Bulk invitations. Admin dispatches invitations in batches; guarded by USER_INVITE permission.
+  "POST /api/invitations/bulk",
+  "POST /api/invitations/bulk/{bulkInviteId}/retry",
+  // Classes & enrollments (ST-100). Writes guarded by requirePermission(TIMETABLE_MANAGE).
+  "POST /api/academics/classes",
+  "PATCH /api/academics/classes/{classId}",
+  "DELETE /api/academics/classes/{classId}",
+  "POST /api/academics/classes/{classId}/enrollments",
+  "DELETE /api/academics/classes/{classId}/enrollments/{studentId}",
+  "POST /api/academics/classes/{classId}/enrollments/transfer",
+  // Class AI materials setting (000196). Guarded by requirePermission(MATERIAL_MANAGE_AI); the
+  // service then narrows a teacher to the classes they teach.
+  "PUT /api/academics/classes/{classId}/ai-materials",
+  // Grades & sections (000147). Every write guarded by requirePermission(TIMETABLE_MANAGE).
+  "POST /api/academics/grade-levels",
+  "PATCH /api/academics/grade-levels/{gradeLevelId}",
+  "DELETE /api/academics/grade-levels/{gradeLevelId}",
+  "POST /api/academics/sections",
+  "PATCH /api/academics/sections/{sectionId}",
+  "DELETE /api/academics/sections/{sectionId}",
+  "POST /api/academics/sections/{sectionId}/students",
+  "DELETE /api/academics/sections/{sectionId}/students/{studentId}",
+  "POST /api/academics/promotions/apply",
+  // Academic grading (000160): configuration, marks, results and certificates; every route sits
+  // behind requirePermission (academicConfig:*, grade:*, approval:review, result:finalize,
+  // academicCertificate:issue) and the services add section/subject row scope.
+  "DELETE /api/grading/scales/{scaleId}",
+  "DELETE /api/grading/subject-configs/{configId}",
+  "DELETE /api/grading/teacher-assignments/{assignmentId}",
+  "POST /api/grading/assessments/{assessmentId}/decision",
+  "POST /api/grading/certificates/{certificateId}/reissue",
+  "POST /api/grading/certificates/{certificateId}/revoke",
+  "POST /api/grading/exam-structure/apply",
+  // Report card notes (000209): each write records its old and new values in the service.
+  "PUT /api/grading/report-card-settings",
+  "PUT /api/grading/sections/{sectionId}/report-notes",
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/report-comments",
+  "POST /api/grading/finalizations/{finalizationId}/certificates",
+  // Transcripts (000207): issue, reissue and revoke behind academicCertificate:issue.
+  "POST /api/grading/students/{studentId}/transcripts",
+  "POST /api/grading/transcripts/{transcriptId}/reissue",
+  "POST /api/grading/transcripts/{transcriptId}/revoke",
+  "POST /api/grading/finalizations/{finalizationId}/corrections",
+  "POST /api/grading/mark-sheets/{sheetId}/decision",
+  "POST /api/grading/sections/{sectionId}/results/finalize",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/assessments",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/mark-sheets/submit",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/override",
+  "POST /api/grading/subject-configs/{configId}/keep",
+  "POST /api/grading/subject-configs/{configId}/reset",
+  "POST /api/grading/teacher-assignments",
+  "POST /api/grading/years/{yearId}/copy",
+  "POST /api/grading/years/{yearId}/programs/{gradeLevelId}/subjects",
+  "POST /api/grading/years/{yearId}/scales",
+  "POST /api/grading/years/{yearId}/status",
+  "PUT /api/grading/scales/{scaleId}",
+  "PUT /api/grading/sections/{sectionId}/subject-enrollments",
+  "PUT /api/grading/sections/{sectionId}/subjects/{subjectId}/marks",
+  "PUT /api/grading/subject-configs/{configId}",
+  "PUT /api/grading/years/{yearId}/programs/{gradeLevelId}",
+  // Timetable (ST-101). Every write guarded by requirePermission(TIMETABLE_MANAGE), method-scoped
+  // with onlyMethods() where a path also serves reads.
+  "POST /api/academics/timetable-versions",
+  "PATCH /api/academics/timetable-versions/{versionId}",
+  "DELETE /api/academics/timetable-versions/{versionId}",
+  "POST /api/academics/timetable-versions/{versionId}/submit",
+  "POST /api/academics/timetable-versions/{versionId}/approve",
+  "POST /api/academics/timetable-versions/{versionId}/reject",
+  "POST /api/academics/timetable-versions/copy",
+  "POST /api/academics/timetable-versions/{versionId}/slots",
+  "PATCH /api/academics/slots/{slotId}",
+  "DELETE /api/academics/slots/{slotId}",
+  "POST /api/academics/timetable-versions/{versionId}/publish",
+  "PUT /api/academics/timetable-settings",
+  // Assignments (ST-103). Guarded per method by requirePermission() on ASSIGNMENT_CREATE,
+  // ASSIGNMENT_UPDATE, and ASSIGNMENT_DELETE — see permissionByMethod() in the route file. These
+  // are genuinely row-level: a teacher may only act on classes they teach, so unlike the rest of
+  // academics they are NOT exempt below.
+  "POST /api/academics/assignments",
+  "PATCH /api/academics/assignments/{assignmentId}",
+  "DELETE /api/academics/assignments/{assignmentId}",
+  "POST /api/academics/assignments/{assignmentId}/attachments/upload-url",
+  "POST /api/academics/assignments/{assignmentId}/attachments",
+  "DELETE /api/academics/assignments/{assignmentId}/attachments/{attachmentId}",
+  "PUT /api/academics/assignments/{assignmentId}/questions",
+  // Submissions (ST-104). Guarded per method by requirePermission() on SUBMISSION_CREATE,
+  // SUBMISSION_GRADE, and SUBMISSION_UPDATE — see permissionByMethod() in the route file. Row-level
+  // for the same reason the assignments routes are, and then some: a student may only act on their
+  // own submission and a teacher only on classes they teach, so these are NOT exempt below. The
+  // attachment routes gate on SUBMISSION_UPDATE specifically because INSTRUCTOR does not hold it —
+  // a teacher can read the work they are marking but cannot alter it.
+  "POST /api/academics/assignments/{assignmentId}/submissions",
+  "PATCH /api/academics/submissions/{submissionId}/grade",
+  "POST /api/academics/submissions/{submissionId}/attachments/upload-url",
+  "POST /api/academics/submissions/{submissionId}/attachments",
+  "DELETE /api/academics/submissions/{submissionId}/attachments/{attachmentId}",
+  // Exam scheduling (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission to check.
+  "POST /api/academics/exams",
+  "PATCH /api/academics/exams/{examId}",
+  "DELETE /api/academics/exams/{examId}",
+  // Gradebook configuration (ST-112). Guarded by requirePermission() on GRADE_READ/GRADE_UPDATE.
+  // Row-level: only the teaching teacher or a school admin may manage a gradebook.
+  "POST /api/grades/config/gradebooks/{gradebookId}/categories",
+  "PATCH /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+  "DELETE /api/grades/config/gradebooks/{gradebookId}/categories/{categoryId}",
+  "POST /api/grades/config/gradebooks/{gradebookId}/scheme/link",
+  "POST /api/grades/config/schemes",
+  // Attendance. Batch recording and session open/status changes are guarded by requirePermission()
+  // on ATTENDANCE_RECORD_CREATE; report export on ATTENDANCE_REPORT_EXPORT.
+  "POST /api/attendance/records/batch",
+  "POST /api/attendance/reports/export",
+  "POST /api/attendance/sessions",
+  "PATCH /api/attendance/sessions/{sessionId}",
+  // Attendance corrections (ST-109). Guarded by requirePermission() on
+  // ATTENDANCE_RECORD_CORRECT; ATTENDANCE_CORRECTION_OVERRIDE is then checked in the handler to
+  // decide whether the caller may correct past the school's window.
+  "PATCH /api/attendance/records/{recordId}",
+  // Grade entry (ST-113). Guarded by requirePermission() on GRADE_UPDATE.
+  "POST /api/grades/gradebooks/{gradebookId}/assessments",
+  "PATCH /api/grades/gradebooks/{gradebookId}/grades",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/decide",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/submit",
+  "PATCH /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/unlock",
+  "POST /api/grades/gradebooks/{gradebookId}/submissions/{submissionId}/revisions",
+  "PATCH /api/grades/gradebooks/{gradebookId}/revisions/{revisionId}/withdraw",
+  // Discipline incidents & actions. Guarded per method by requirePermissionIn() on
+  // DISCIPLIN_INCIDENT_CREATE/READ/UPDATE/RESOLVE and DISCIPLINE_ACTION_CREATE/READ/UPDATE.
+  // Finance gateway (ST-119). Guarded by requirePermission(BILLING_UPDATE); FINANCE_PERMISSIONS
+  // already holds it, so the FINANCE role gains this surface without a matrix change.
+  "POST /api/finance/fee-structures",
+  "PATCH /api/finance/fee-structures/{feeStructureId}",
+  "PUT /api/finance/fee-structures/{feeStructureId}/students",
+  "POST /api/finance/expenses",
+  "PATCH /api/finance/expenses/{expenseId}",
+  "POST /api/finance/expenses/upload-url",
+  "POST /api/finance/expenses/{expenseId}/attachments",
+  "POST /api/finance/reports/export",
+  // ST-046x. Audit explorer export queue, gated on AUDIT_LOG_EXPORT via requirePermission.
+  "POST /api/audit/logs/export",
+  // ST-194. Announcement composition, gated on NOTIFICATION_MANAGE via requirePermission.
+  "POST /api/announcements",
+  // School calendar entries (000121), gated on CALENDAR_EVENT_MANAGE via requirePermission.
+  "POST /api/school-events",
+  "PATCH /api/school-events/{eventId}",
+  "DELETE /api/school-events/{eventId}",
+  // Parent<->teacher messaging (000127), gated on MESSAGE_SEND / MESSAGE_READ via requirePermission;
+  // RLS then limits every thread to its two participants.
+  "POST /api/messaging/conversations",
+  "POST /api/messaging/conversations/{conversationId}/messages",
+  "POST /api/messaging/conversations/{conversationId}/read",
+  // Teacher-initiated threads (000130), gated on MESSAGE_SEND via requirePermission.
+  "POST /api/messaging/teacher-conversations",
+  // Blocks (000135) and reports (000136): gated on MESSAGE_READ (safety actions open to every
+  // reader of a thread); the review-queue update on MESSAGE_REPORT_REVIEW.
+  "POST /api/messaging/conversations/{conversationId}/block",
+  "DELETE /api/messaging/conversations/{conversationId}/block",
+  "POST /api/messaging/conversations/{conversationId}/reports",
+  "PATCH /api/messaging/reports/{reportId}",
+  // ST-122. Fee schedule generation gated on BILLING_UPDATE via requirePermission middleware.
+  "POST /api/finance/fee-schedules/generate",
+  // ST-122. Internal API-key-authenticated reconciliation job; listed here for inventory accuracy
+  // but added to GUARD_EXEMPT_ROUTES below because there is no bearer token to check.
+  "POST /api/finance/reconciliation/run",
+  // ST-121. Guarded by billing:update. The payment-confirmed webhook is not listed here because it
+  // carries no requirePermission — it authenticates by HMAC over the raw body, not by a bearer token.
+  "POST /api/finance/payments",
+  // ST-298. Online fee collection; authorized in the service (linked parent or billing:update).
+  "POST /api/finance/online-payments",
+  // ST-202. GET and POST /api/finance/invoices/batches share one path with different required
+  // permissions per verb, so each handler asserts its own via requirePermissionIn() rather than a
+  // path-mounted requirePermission() (see finance/invoices/routes.ts).
+  "POST /api/finance/invoices/batches",
+  // Read-only check of a batch's targets (who has no family); billing:read via batches/*.
+  "POST /api/finance/invoices/batches/preflight",
+  "POST /api/discipline/incidents",
+  "PATCH /api/discipline/incidents/{incidentId}",
+  "POST /api/discipline/incidents/{incidentId}/resolve",
+  "POST /api/discipline/incidents/{incidentId}/actions",
+  "PATCH /api/discipline/incidents/{incidentId}/actions/{actionId}",
+  // Evaluation criteria templates. Guarded per method by requirePermission() on
+  // EVALUATION_TEMPLATE_CREATE/UPDATE/DELETE.
+  "POST /api/evaluations/templates",
+  "PATCH /api/evaluations/templates/{templateId}",
+  "DELETE /api/evaluations/templates/{templateId}",
+  // Teacher evaluations. Guarded per method by requirePermission() on
+  // EVALUATION_CREATE/UPDATE/SUBMIT/SHARE.
+  "POST /api/evaluations",
+  "PATCH /api/evaluations/{evaluationId}",
+  "POST /api/evaluations/{evaluationId}/submit",
+  "POST /api/evaluations/{evaluationId}/share",
+  // Evaluation scores. Guarded per method by requirePermission() on
+  // EVALUATION_SCORE_CREATE/DELETE.
+  "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
+  // Learning materials (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
+  // catalog data with no cross-user row-level permission.
+  "POST /api/academics/materials/upload",
+  "POST /api/academics/materials/{materialId}/confirm",
+  "PATCH /api/academics/materials/{materialId}",
+  "PATCH /api/academics/materials/{materialId}/ai-visible",
+  "DELETE /api/academics/materials/{materialId}",
+  // Generic object storage gateway (SAD §22). Authorized per content class by requirePermissionIn()
+  // in the handler — the required permission arrives in the request body, so the mount-time
+  // requirePermission() form cannot see it. Exempted below on that basis.
+  "POST /api/storage/uploads/request-upload",
+  "POST /api/storage/uploads/confirm",
+  // Approval queue (ST-115). Atomic bulk approve/reject with per-item partial-failure.
+  // Gated on APPROVAL_REVIEW permission via requirePermission middleware.
+  "POST /api/approvals/bulk-decision",
+  // Refund processing (ST-124). Maker-checker workflow gated on BILLING_REFUND permission
+  // via requirePermission middleware in routes.ts.
+  "POST /api/finance/refunds/initiate",
+  "POST /api/finance/refunds/{refundId}/approve",
+  "POST /api/finance/refunds/{refundId}/reject",
+  "POST /api/finance/invoices/{invoiceId}/cancellation",
+  "POST /api/finance/payments/{paymentId}/reversal",
+  "POST /api/finance/scholarships",
+  "PATCH /api/finance/scholarships/{scholarshipId}",
+  "POST /api/finance/scholarship-awards",
+  "POST /api/finance/scholarship-awards/{awardId}/approve",
+  "POST /api/finance/scholarship-awards/{awardId}/reject",
+  "POST /api/finance/scholarship-awards/{awardId}/revoke",
+  // Family finance (finance/family-accounts): billing:update, guarded in that module's routes.
+  "POST /api/finance/families/{familyId}/payments",
+  "POST /api/finance/families/{familyId}/reminders",
+  "POST /api/finance/families/{familyId}/statements",
+  "POST /api/finance/reminders",
+  // In-app inbox (ST-142). Personal per-user read state; RLS already fences every row to the
+  // authenticated user (user_id = app.current_user_id()), so the caller's identity is sufficient
+  // authorization and there is no other user's row to protect. Listed here for inventory accuracy
+  // and added to GUARD_EXEMPT_ROUTES below for the same reason the session-lifecycle routes are.
+  "POST /api/notifications/{notificationId}/read",
+  "POST /api/notifications/read-all",
+  // Data subject requests (ST-268). Guarded by PRIVACY_DSR_MANAGE — filing a DSR about another
+  // user is exactly the "acts on another user's data" case this gate exists for.
+  "POST /api/privacy/dsr",
+  // Self-service account deletion/export. The subject is always the caller (never a body
+  // parameter), so there is no other user's data this could reach — same rationale as the
+  // notification-preferences and device-registration self-service routes below.
+  "POST /api/privacy/me/dsr",
+  // Self-service account deletion — the caller is always the subject (never a parameter).
+  "POST /api/account/deletion",
+  "DELETE /api/account/deletion",
+  // Accepting the legal documents (000188) — the caller is always the subject.
+  "POST /api/account/legal-acceptance",
+  // Public account deletion (ST-302) — unauthenticated; captcha-gated request, then a one-time
+  // emailed token.
+  "POST /api/account/deletion-requests",
+  "POST /api/account/deletion-requests/confirm",
+  // Public "Talk to us" sales inquiry — unauthenticated; captcha-gated and rate-limited.
+  "POST /api/inquiries",
+  // School sign-up applicants — no account yet; authenticated by the applicant session cookie.
+  "POST /api/school-applications/me",
+  "POST /api/school-applications/me/proof-upload-url",
+  "POST /api/school-applications/me/sign-out",
+  // Notification preferences (ST-143). Self-service on the caller's own rows; the mandatory-type
+  // and digest-eligibility rules are enforced in the handler and, redundantly, by CHECK constraints
+  // in migration 000083 — there is no other user's row this could reach.
+  "PATCH /api/notification-preferences",
+  // School billing portal (ST-137). Guarded by requirePermission(ORGANIZATION_MANAGE_BILLING) in
+  // cancellation-routes.ts.
+  "POST /api/subscriptions/current/cancel",
+  "POST /api/subscriptions/current/cancel/reverse",
+  // Subscription refund requests. The school plan's is guarded by ORGANIZATION_MANAGE_BILLING and
+  // the console decisions by platform:manage (subscriptions/routes/refund-*.ts); the AI add-on's is
+  // exempt below.
+  "POST /api/subscriptions/current/refund-requests",
+  "POST /api/subscriptions/ai/refund-requests",
+  "POST /api/platform/refund-requests/{schoolId}/{requestId}/approve",
+  "POST /api/platform/refund-requests/{schoolId}/{requestId}/reject",
+  // Hybrid retrieval (ST-162). Gated by the ST-155 AI entitlement gate (403/402/429), not the
+  // permission matrix; exempt below because the gate is the authorization surface for every
+  // /api/ai/* route and the search's one write is the metered student's own usage ledger.
+  "POST /api/ai/students/{studentId}/search",
+  // LLM gateway (ST-164). Same gate and same rationale as the retrieval route above: the gate is
+  // the authorization surface for every /api/ai/* route, and the generate route's one write is the
+  // metered student's own usage ledger.
+  "POST /api/ai/students/{studentId}/generate",
+  // Ask AI streaming (ST-165). Same gate and same rationale as the gateway route above; the ask
+  // route's writes are the grounded answer's messages, citations, and the student's usage ledger.
+  "POST /api/ai/students/{studentId}/ask",
+  // Ask AI photo text. Gated by the caller's own Ask AI feature, not the permission matrix; it reads
+  // a photo in memory and writes nothing.
+  "POST /api/ai/photo-text",
+  // Study-material summarizer. Same gate and same rationale as the retrieval route above; the
+  // summarize route's one write is the metered student's own usage ledger.
+  "POST /api/ai/students/{studentId}/summarize",
+  // Key-concept extraction (ST-169). Same gate and same rationale as the summarizer route above;
+  // the concepts route's one write is the metered student's own usage ledger.
+  "POST /api/ai/students/{studentId}/concepts",
+  // Simplified explanations (ST-170). Same gate and same rationale as the concepts route above;
+  // the explain route's one write is the metered student's own usage ledger, and the passage it
+  // rewrites is scoped by the tenant transaction (see explain/materials.ts).
+  "POST /api/ai/students/{studentId}/explain",
+  // Quiz generation and grading (ST-167). Same gate and same rationale as the retrieval route
+  // above; generation's writes are the quiz, its questions, and the student's usage ledger, and
+  // grading acts only on the requesting student's own quiz (scoped by student_id, see
+  // quiz/persistence.ts's loadQuizForGrading).
+  "POST /api/ai/students/{studentId}/quizzes",
+  "POST /api/ai/students/{studentId}/quizzes/{quizId}/grade",
+  // Flashcard deck generation and spaced-repetition reviews (ST-168). Same gate and same rationale
+  // as the quiz routes above; generation's writes are the deck, its cards, and the student's usage
+  // ledger, and the review endpoints act only on the requesting student's own deck (scoped by
+  // student_id, see flashcards/persistence.ts's loadDeckCards / loadDueCards).
+  "POST /api/ai/students/{studentId}/decks",
+  "POST /api/ai/students/{studentId}/decks/{deckId}/review",
+  // Exam mode (ST-171). Same gate and same rationale as the quiz/flashcard routes above; create's
+  // writes are the exam session and the student's usage ledger, and start/submit act only on the
+  // requesting student's own session (scoped by student_id, see exam/persistence.ts's
+  // loadExamSession).
+  "POST /api/ai/students/{studentId}/exams",
+  "POST /api/ai/students/{studentId}/exams/{examId}/start",
+  "POST /api/ai/students/{studentId}/exams/{examId}/submit",
+  // Answer report (ST-172). Self-service: student reports their own AI answer; caller's identity
+  // is sufficient authorization — no cross-user row-level permission.
+  "POST /api/ai/students/{studentId}/messages/{messageId}/report",
+  // AI content reports (ST-306). Self-service: a student reports their own AI output. The review
+  // PATCH is guarded by aiContent:moderate.
+  "POST /api/ai/students/{studentId}/reports",
+  "PATCH /api/ai/moderation/reports/{reportId}",
+  // AI data-sharing consent (ST-305). Self-service on the caller's own consent record.
+  "PUT /api/ai/consent",
+  "DELETE /api/ai/consent",
+  // Studafy platform console. Guarded on platform:manage (SUPER_ADMIN only) in
+  // modules/platform/routes.ts.
+  "PATCH /api/platform/schools/{schoolId}/status",
+  "PUT /api/platform/schools/{schoolId}/feature-flags/{flagName}",
+  "PATCH /api/platform/plans/{planId}",
+  "PATCH /api/platform/plans/{planId}/prices/{priceId}",
+  "PATCH /api/platform/settings/{key}",
+  // Per-school administration (modules/platform/school-admin-routes.ts): profile edit and
+  // whole-school export, platform:manage; both write audit rows in the school and the operator's.
+  "PATCH /api/platform/schools/{schoolId}/profile",
+  "POST /api/platform/schools/{schoolId}/exports",
+  "PATCH /api/platform/inquiries/{inquiryId}",
+  // Per-account support actions, platform:manage in modules/platform/user-support-routes.ts.
+  "POST /api/platform/schools/{schoolId}/users/{userId}/invitation/resend",
+  "POST /api/platform/schools/{schoolId}/users/{userId}/sessions/revoke",
+  "POST /api/platform/schools/{schoolId}/users/{userId}/unlock",
+  "POST /api/platform/schools/{schoolId}/users/{userId}/deactivate",
+  "POST /api/platform/schools/{schoolId}/users/{userId}/reactivate",
+  // Studafy-wide banners (modules/platform/ops/routes.ts): platform:manage, audited in the
+  // operator's home school with the reason.
+  "POST /api/platform/announcements",
+  "PATCH /api/platform/announcements/{announcementId}",
+  // Guarded on platform:manage in modules/school-applications/routes.ts.
+  "POST /api/platform/school-applications/{applicationId}/approve",
+  "POST /api/platform/school-applications/{applicationId}/reject",
+  // School licenses on the super admin's side (docs/billing/feature-licensing.md). Guarded on
+  // platform:manage for writes in modules/licensing/platform-routes.ts.
+  "POST /api/platform/schools/{schoolId}/licenses",
+  "PATCH /api/platform/schools/{schoolId}/licenses/{licenseId}",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/status",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/extend",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/seats",
+  "DELETE /api/platform/schools/{schoolId}/licenses/{licenseId}/seats/{seatId}",
+  "POST /api/platform/schools/{schoolId}/license-requests/{requestId}/resolve",
+  // The school's own seats. Guarded on license:manage (ORG_ADMIN, PRINCIPAL) in
+  // modules/licensing/school-routes.ts.
+  "POST /api/school/license/seats",
+  "DELETE /api/school/license/seats/{seatId}",
+  "POST /api/school/license/change-requests",
+  // License billing (session 3): the console's routes on platform:manage (web channel), the
+  // school's accept and receipt upload on license:manage, in modules/licensing/billing-*-routes.ts.
+  "PUT /api/platform/licenses/price-settings/{currencyCode}",
+  "PUT /api/platform/licenses/bank-details",
+  "POST /api/platform/licenses/quote",
+  "POST /api/platform/schools/{schoolId}/license-quotes",
+  "PUT /api/platform/schools/{schoolId}/license-quotes/{quoteId}",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/send",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/accept",
+  "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/withdraw",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/void",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
+  "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payments",
+  "POST /api/platform/schools/{schoolId}/license-payments/{paymentId}/void",
+  "POST /api/platform/schools/{schoolId}/license-payments/upload-url",
+  "POST /api/platform/schools/{schoolId}/license-receipts/{receiptId}/match",
+  "POST /api/school/license/quotes/{quoteId}/accept",
+  "POST /api/school/license/invoices/{invoiceId}/receipts",
+  // The license console's catalog (session 4): features and tiers are global, audited in the
+  // operator's home school.
+  "PATCH /api/platform/features/{featureKey}",
+  "POST /api/platform/tiers",
+  "PUT /api/platform/tiers/{planId}",
+  // Manual grants (000211): platform:manage, web channel (modules/platform/grants-routes.ts).
+  "POST /api/platform/schools/{schoolId}/grants",
+  "POST /api/platform/schools/{schoolId}/grants/{grantId}/revoke",
+  // School-defined student and parent records (modules/records/routes.ts): the template editor
+  // (recordTemplate:manage), filling records in and documents (studentRecord:update), and the
+  // sensitive reveal (studentRecord:readSensitive), which is audited as a read.
+  "POST /api/record-templates/{subjectKind}/fields",
+  "PATCH /api/record-templates/{subjectKind}/fields/{fieldId}",
+  "PUT /api/record-templates/{subjectKind}/field-order",
+  "POST /api/record-templates/{subjectKind}/publish",
+  "PUT /api/students/{studentId}/records",
+  "POST /api/students/{studentId}/records/{fieldId}/reveal",
+  "PUT /api/students/{studentId}/records/{fieldId}/document",
+  "PATCH /api/students/{studentId}/records/{fieldId}/document",
+  "DELETE /api/students/{studentId}/records/{fieldId}/document",
+  "PUT /api/parents/{parentUserId}/records",
+  "POST /api/parents/{parentUserId}/records/{fieldId}/reveal",
+  "PUT /api/parents/{parentUserId}/records/{fieldId}/document",
+  "PATCH /api/parents/{parentUserId}/records/{fieldId}/document",
+  "DELETE /api/parents/{parentUserId}/records/{fieldId}/document",
+  // Staff and class records (000181), and imported columns kept as record fields.
+  "PUT /api/staff/{staffUserId}/records",
+  "POST /api/staff/{staffUserId}/records/{fieldId}/reveal",
+  "PUT /api/staff/{staffUserId}/records/{fieldId}/document",
+  "PATCH /api/staff/{staffUserId}/records/{fieldId}/document",
+  "DELETE /api/staff/{staffUserId}/records/{fieldId}/document",
+  "PUT /api/classes/{classId}/records",
+  "PUT /api/classes/{classId}/records/{fieldId}/document",
+  "PATCH /api/classes/{classId}/records/{fieldId}/document",
+  "DELETE /api/classes/{classId}/records/{fieldId}/document",
+  "POST /api/record-imports/{subjectKind}/preview",
+  "POST /api/record-imports/{subjectKind}/apply",
+  // Custom lists (000182): shaping a list (customList:manage), its rows (customList:use, narrowed
+  // by the list's audience), the audited sensitive-cell reveal, and imports from a sheet.
+  "POST /api/custom-lists",
+  "POST /api/custom-lists/imports/preview",
+  "POST /api/custom-lists/imports/apply",
+  "PATCH /api/custom-lists/{listId}",
+  "DELETE /api/custom-lists/{listId}",
+  "POST /api/custom-lists/{listId}/columns",
+  "PATCH /api/custom-lists/{listId}/columns/{columnId}",
+  "PUT /api/custom-lists/{listId}/column-order",
+  "POST /api/custom-lists/{listId}/rows",
+  "PATCH /api/custom-lists/{listId}/rows/{rowId}",
+  "DELETE /api/custom-lists/{listId}/rows/{rowId}",
+  "POST /api/custom-lists/{listId}/rows/{rowId}/cells/{columnId}/reveal",
+];
+
+/**
+ * Mutating routes exempt from the requirePermission() guard.
+ *
+ * Self-service routes operate on the caller's own data — the caller's identity
+ * (established by jwtAuth.ts) is sufficient authorization; there is no
+ * "someone else's row" to protect. Webhook routes authenticate by HMAC signature,
+ * not by bearer token, and are structurally outside the permission model.
+ *
+ * Invitation routes predate the permission guard and use inline role checks
+ * instead of requirePermission(). They carry equivalent authorization but not
+ * through the standardised middleware. They are exempt until migrated.
+ */
+const GUARD_EXEMPT_ROUTES = new Set([
+  // Session lifecycle — caller's own data.
+  "POST /api/auth/refresh",
+  "POST /api/auth/logout",
+  "DELETE /api/auth/sessions/{sessionId}",
+  // Self-service "sign out other sessions" (ST-280) — caller's own families only.
+  "POST /api/auth/sessions/revoke-others",
+  "DELETE /api/auth/devices/{deviceId}/sessions",
+  // Device token registration (ST-218). Self-service upsert; caller's own user_devices row.
+  "POST /api/auth/devices",
+  "DELETE /api/auth/devices/{deviceId}",
+  // Webhook — HMAC-authenticated, not bearer.
+  "POST /erpnext/webhooks",
+  // Resend email-event webhook (R-08) — Svix-signature-authenticated, not bearer.
+  "POST /email/webhooks/resend",
+  // Stripe billing webhook (ST-132) — authenticated by the Stripe-Signature HMAC over the raw
+  // request body, not by a bearer token. Stripe holds no Studafy identity and no permission could
+  // be checked against one, so this is the same exemption the two webhooks above take.
+  "POST /api/subscriptions/webhook/stripe",
+  // Tap billing webhook (ST-298) — the same exemption: authenticated by the `hashstring` HMAC
+  // keyed with the Tap secret key, and Tap holds no Studafy identity to check a permission against.
+  "POST /api/subscriptions/webhook/tap",
+  // Daily reconciliation (ST-122) — API-key-authenticated, not bearer; no JWT to check.
+  "POST /api/finance/reconciliation/run",
+  // Account activation (ST-078) — public self-service onboarding. Authorized by the invitation
+  // token in the path plus a verified Microsoft OIDC identity, not by a bearer permission; there is
+  // no other user's data to protect.
+  "POST /api/auth/invitations/{token}/activate",
+  // Returning-user OAuth login (ST-079) — public self-service login. Authorized by a verified
+  // Microsoft OIDC id_token, not by a bearer permission; authenticates the caller, not another user.
+  "POST /api/auth/login/oauth",
+  // Provider linking (ST-080) — self-service link/unlink on the caller's own data.
+  "POST /api/auth/providers/link/start",
+  "DELETE /api/auth/providers/{provider}",
+  // School self-registration (ST-081) — public unauthenticated endpoint; no caller identity or
+  // bearer permission; authorized by Turnstile captcha only.
+  "POST /api/schools/register",
+  // School email verification (ST-088) — self-service resend for the caller's own school.
+  // School email verification (ST-088) — public self-service endpoint; authorized by a one-time
+  // verification token, not by a bearer permission; no other user's data to protect.
+  "POST /api/schools/resend-verification",
+  // Pre-ST-072 inline role checks — migrate to requirePermission and remove.
+  "POST /api/invitations",
+  "POST /api/invitations/{id}/revoke",
+  "POST /api/invitations/{id}/regenerate",
+  // Academic years, terms, class enrolments and exams are NOT exempt: RLS fences them to the
+  // school but not to a role, so without TIMETABLE_MANAGE any signed-in student or parent could
+  // roll the year over (archiving every enrolment) or delete an exam.
+  // Learning materials (ST-106) — storage-triggered upload flow, authorized by
+  // signed upload URL and row ownership, not by the permission guard.
+  "POST /api/academics/materials/upload",
+  "POST /api/academics/materials/{materialId}/confirm",
+  "PATCH /api/academics/materials/{materialId}",
+  "PATCH /api/academics/materials/{materialId}/ai-visible",
+  "DELETE /api/academics/materials/{materialId}",
+  // In-app inbox (ST-142) — personal per-user read state; the caller's own rows only. RLS
+  // (`user_id = app.current_user_id()`) is the fence, so the bearer identity is sufficient
+  // authorization — same rationale as the session-lifecycle routes above.
+  "POST /api/notifications/{notificationId}/read",
+  "POST /api/notifications/read-all",
+  // Notification preferences (ST-143) — personal per-user rows; RLS
+  // (`notification_preferences_owner`, `user_id = app.current_user_id()`) is the fence.
+  "PATCH /api/notification-preferences",
+  // Self-service account deletion/export — the subject is always the caller (never a body
+  // parameter), so there is no other user's data to protect.
+  "POST /api/privacy/me/dsr",
+  "POST /api/account/deletion",
+  "DELETE /api/account/deletion",
+  // Accepting the legal documents (000188): the caller's own row, never a parameter.
+  "POST /api/account/legal-acceptance",
+  // Public account deletion (ST-302) — no caller identity or bearer permission. The request is
+  // authorized by Turnstile only and discloses nothing; confirm is authorized by the one-time token
+  // emailed to the account's address, and acts only on the accounts under that address.
+  "POST /api/account/deletion-requests",
+  "POST /api/account/deletion-requests/confirm",
+  // Public "Talk to us" sales inquiry — no caller identity or bearer permission. Authorized by
+  // Turnstile only; it files a row in the studafy_admin-only app.sales_inquiries and reads nothing.
+  "POST /api/inquiries",
+  // School sign-up applicants — no bearer identity or permission. Authorized by the applicant
+  // session cookie (a verified Google/Microsoft identity), and they act only on that identity's own
+  // application in the studafy_admin-only app.school_applications.
+  "POST /api/school-applications/me",
+  "POST /api/school-applications/me/proof-upload-url",
+  "POST /api/school-applications/me/sign-out",
+  // Generic object storage gateway (SAD §22) — authorized per content class. The class (and thus
+  // the required permission) is in the request body, so it is asserted in the handler via
+  // requirePermissionIn() rather than mounted at route time — the same per-method pattern the
+  // discipline and evaluation routes use, but with no class-independent READ gate to mount. A
+  // caller still cannot reach a class's upload without holding that class's permission.
+  "POST /api/storage/uploads/request-upload",
+  "POST /api/storage/uploads/confirm",
+  // Online fee collection (ST-298) — authorized in startOnlineFeePayment: the caller must be a
+  // parent linked to the named student (app.parent_child_links) or hold billing:update. "Parent of
+  // this student" depends on the request body, so no route-time permission can express it; a
+  // path-mounted billing:update would lock out exactly the parents the endpoint exists for.
+  "POST /api/finance/online-payments",
+  // AI add-on refund request — authorized in createAiRefundRequest: the caller must be the student
+  // or a parent linked to them (app.parent_child_links). Same body-dependent rule as the online fee
+  // payment above, and the request is reviewed under platform:manage before any money moves.
+  "POST /api/subscriptions/ai/refund-requests",
+  // Hybrid retrieval (ST-162) — the ST-155 AI entitlement gate (school active -> AI add-on active ->
+  // quota available; 403/402/429), not the permission matrix, is the authorization surface for every
+  // /api/ai/* route. The search reads only the school's own corpus under forced RLS, and its one
+  // write is the metered student's own ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/search",
+  // LLM gateway (ST-164) — same gate, same RLS, same single write to the metered student's own
+  // ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/generate",
+  // Ask AI streaming (ST-165) — same gate, same RLS; its writes are the answer's messages,
+  // citations, and the student's ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/ask",
+  // Ask AI photo text — the caller's own Ask AI feature is the gate (the subject is the caller, so
+  // there is no other person's data to authorize against); it reads the photo in memory, touches no
+  // table, and writes nothing.
+  "POST /api/ai/photo-text",
+  // Study-material summarizer — same gate, same RLS, same single write to the metered student's
+  // own ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/summarize",
+  // Key-concept extraction (ST-169) — same gate, same RLS, same single write to the metered
+  // student's own ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/concepts",
+  // Simplified explanations (ST-170) — same gate, same RLS, same single write to the metered
+  // student's own ai_usage_meters row.
+  "POST /api/ai/students/{studentId}/explain",
+  // Quiz generation and grading (ST-167) — same gate, same RLS. Generation writes the quiz, its
+  // questions, and the student's own ai_usage_meters row; grading is explicitly scoped to the
+  // requesting student's own quiz (student_id filter in quiz/persistence.ts) and writes nothing.
+  "POST /api/ai/students/{studentId}/quizzes",
+  "POST /api/ai/students/{studentId}/quizzes/{quizId}/grade",
+  // Flashcard deck generation and spaced-repetition reviews (ST-168) — same gate, same RLS.
+  // Generation writes the deck, its cards, and the student's own ai_usage_meters row; the review
+  // endpoints are explicitly scoped to the requesting student's own deck (student_id filter in
+  // flashcards/persistence.ts) and update only that student's per-card progress rows.
+  "POST /api/ai/students/{studentId}/decks",
+  "POST /api/ai/students/{studentId}/decks/{deckId}/review",
+  // Exam mode (ST-171) — same gate, same RLS. Create writes the exam session and the student's own
+  // ai_usage_meters row; start/submit are explicitly scoped to the requesting student's own session
+  // (student_id filter in exam/persistence.ts) and act only on that session's own child rows.
+  "POST /api/ai/students/{studentId}/exams",
+  "POST /api/ai/students/{studentId}/exams/{examId}/start",
+  "POST /api/ai/students/{studentId}/exams/{examId}/submit",
+  // Answer report (ST-172) — same gate, same RLS. Writes the student's own report row;
+  // self-service: the reporter must be the authenticated student (auth.userId === studentId check).
+  "POST /api/ai/students/{studentId}/messages/{messageId}/report",
+  // AI content report (ST-306) — same gate pass-through, same RLS, same self-service rule as the
+  // answer report above (auth.userId === studentId), and every content read is scoped to that
+  // student (moderation/snapshots.ts).
+  "POST /api/ai/students/{studentId}/reports",
+  // AI data-sharing consent (ST-305) — self-service: the subject is always the caller
+  // (auth.userId, never a path or body parameter), so there is no other user's record to reach.
+  "PUT /api/ai/consent",
+  "DELETE /api/ai/consent",
+]);
+
+// ---------------------------------------------------------------------------
+// File scanning (same pattern as audit-coverage.test.ts)
+// ---------------------------------------------------------------------------
+
+function collectSourceFiles(dir: string): string[] {
+  const entries = readdirSync(dir);
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const fullPath = join(dir, entry);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is built from a readdir of our own src tree
+    const stat = statSync(fullPath);
+
+    if (stat.isDirectory()) {
+      files.push(...collectSourceFiles(fullPath));
+    } else if (entry.endsWith(".ts") && !EXCLUDE_PATTERNS.some((p) => p.test(entry))) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
+
+function stripComments(source: string): string[] {
+  let inBlockComment = false;
+
+  return source.split("\n").map((line) => {
+    const trimmed = line.trim();
+
+    if (inBlockComment) {
+      if (trimmed.includes("*/")) inBlockComment = false;
+      return "";
+    }
+    if (trimmed.startsWith("/*")) {
+      if (!trimmed.includes("*/")) inBlockComment = true;
+      return "";
+    }
+    if (trimmed.startsWith("//") || trimmed.startsWith("*")) return "";
+
+    return line;
+  });
+}
+
+interface MutatingRoute {
+  file: string;
+  line: number;
+  method: string;
+  path: string;
+  hasRequirePermission: boolean;
+}
+
+function hasRequirePermissionInFile(source: string): boolean {
+  return /\brequirePermission\s*\(/.test(source);
+}
+
+function findMutatingRoutes(files: string[]): MutatingRoute[] {
+  const routes: MutatingRoute[] = [];
+  const methods = MUTATING_METHODS.join("|");
+
+  for (const file of files) {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- path comes from our own src tree
+    const lines = stripComments(readFileSync(file, "utf-8"));
+    const relFile = relative(SRC_DIR, file);
+    const source = lines.join("\n");
+    const guarded = hasRequirePermissionInFile(source);
+
+    const record = (line: number, method: string, path: string) => {
+      routes.push({
+        file: relFile,
+        line,
+        method: method.toUpperCase(),
+        path,
+        hasRequirePermission: guarded,
+      });
+    };
+
+    // Style 1: plain Hono — routes.post("/path", ...)
+    const directPattern = new RegExp(
+      "routes\\.(" + methods + ")\\s*\\(\\s*[\"'`](/[^\"'`]+)[\"'`]",
+      "g",
+    );
+    for (let i = 0; i < lines.length; i++) {
+      directPattern.lastIndex = 0;
+      const match = directPattern.exec(lines[i]!);
+      if (match) record(i + 1, match[1]!, match[2]!);
+    }
+
+    // Style 2: @hono/zod-openapi — createRoute({ method: "post", path: "/path", ... }).
+    if (/routes\.openapi\s*\(/.test(source)) {
+      const createRoutePattern = /createRoute\s*\(\s*\{([\s\S]*?)\n\}\s*\)/g;
+      let block: RegExpExecArray | null;
+
+      while ((block = createRoutePattern.exec(source)) !== null) {
+        const body = block[1]!;
+        const method = new RegExp(`method:\\s*["'\`](${methods})["'\`]`).exec(body);
+        const path = /path:\s*["'`](\/[^"'`]*)["'`]/.exec(body);
+        if (!method || !path) continue;
+
+        record(source.slice(0, block.index).split("\n").length, method[1]!, path[1]!);
+      }
+    }
+  }
+
+  return routes;
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("permission guard route coverage", () => {
+  test("every mutating route is accounted for in the expected list", () => {
+    const files = collectSourceFiles(SRC_DIR);
+    const routes = findMutatingRoutes(files);
+
+    expect(routes.map((r) => `${r.method} ${r.path}`).sort()).toEqual(
+      [...EXPECTED_MUTATING_ROUTES].sort(),
+    );
+  });
+
+  test("every non-exempt mutating route has requirePermission in its file", () => {
+    const files = collectSourceFiles(SRC_DIR);
+    const routes = findMutatingRoutes(files);
+
+    const unguarded = routes.filter(
+      (r) => !GUARD_EXEMPT_ROUTES.has(`${r.method} ${r.path}`) && !r.hasRequirePermission,
+    );
+
+    if (unguarded.length > 0) {
+      const detail = unguarded
+        .map((r) => `  ${r.file}:${r.line}  ${r.method} ${r.path}`)
+        .join("\n");
+      throw new Error(
+        `Mutating routes without requirePermission():\n${detail}\n\n` +
+          "Every mutating route that acts on another user's data must use requirePermission(). " +
+          "Self-service and webhook routes are exempt — add them to GUARD_EXEMPT_ROUTES.",
+      );
+    }
+
+    expect(unguarded).toHaveLength(0);
+  });
+
+  test("does not mistake doc-comment examples for routes", () => {
+    const routes = findMutatingRoutes(collectSourceFiles(SRC_DIR));
+
+    expect(
+      routes.filter((r) => r.file.includes("authz") || r.file.includes("auditEmitter")),
+    ).toEqual([]);
+  });
+});

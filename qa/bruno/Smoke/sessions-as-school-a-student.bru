@@ -1,0 +1,19 @@
+meta {
+  name: Own sessions (School A STUDENT)
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/auth/sessions
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{QA_TOKEN_A_STUDENT}}
+}
+
+tests {
+  test("authenticated", () => expect(res.status).to.equal(200));
+}

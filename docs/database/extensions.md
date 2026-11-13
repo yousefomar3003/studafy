@@ -1,0 +1,314 @@
+# PostgreSQL extension policy
+
+Studafy's PostgreSQL 16 cluster enables five extensions. Four are turned on by the ordered migration
+[`db/migrations/000003_enable_required_postgresql_extensions.sql`](../../db/migrations/000003_enable_required_postgresql_extensions.sql)
+using the ST-030 framework ([migration policy](./migration-policy.md)) and the ST-031 role model
+([role model](./role-model.md)); `btree_gist` is turned on later, in
+[`db/migrations/000010_create_timetable_tables.sql`](../../db/migrations/000010_create_timetable_tables.sql),
+by the same rule (superuser-owned, not `studafy_admin`) since it is the first migration that needs
+it. This document is the authority for why each extension is enabled, how it is secured, and the
+normalization/indexing rules that govern its use.
+
+Enabling an extension grants a **capability**, not a schema. `000003` added no application tables
+and no extension-backed indexes. `000010` is the first migration to actually use an extension-backed
+constraint (`EXCLUDE USING gist`, via `btree_gist`) — see [timetable-model.md](./timetable-model.md)
+for the domain design; this document covers only the extension itself (see
+[Indexing rules](#indexing-rules)).
+
+## Required extensions
+
+| Extension          | Exact name           | Why it is enabled                                                                                                              | Preload required |
+| ------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------- |
+| pgcrypto           | `pgcrypto`           | Cryptographic hashing (`digest`, `hmac`) and secure random bytes.                                                              | No               |
+| pg_trgm            | `pg_trgm`            | Trigram similarity and index operator classes for fuzzy / ILIKE search.                                                        | No               |
+| pgvector           | `vector`             | Vector type and distance operators for embedding similarity search.                                                            | No               |
+| pg_stat_statements | `pg_stat_statements` | Aggregated query-execution telemetry for performance observability.                                                            | **Yes**          |
+| btree_gist         | `btree_gist`         | GiST operator support for scalar equality (uuid, smallint), required to declare `EXCLUDE USING gist` on `app.timetable_slots`. | No               |
+
+- **Supported PostgreSQL version:** 16 or later. Local/CI use `pgvector/pgvector:pg16`; production
+  runs whatever version the Supabase project runs (read it with `SHOW server_version`).
+- **The pgvector extension name is `vector`, not `pgvector`.** The migration uses
+  `CREATE EXTENSION IF NOT EXISTS vector;`.
+- **Recorded versions:** run `SELECT extname, extversion FROM pg_extension ORDER BY extname;` in each
+  environment and record the result there. Versions come from the running server / image and are not
+  pinned by this repository; they may differ between the local `pgvector/pgvector:pg16` image and
+  Supabase's builds. Do not assume a version — read it from `pg_extension`.
+
+### pgcrypto — approved use cases
+
+- Hashing (`digest`, `hmac`) and secure random material (`gen_random_bytes`).
+- **UUIDs use core `gen_random_uuid()`** (built into PostgreSQL 13+), not pgcrypto and not
+  application-generated IDs. The database is the canonical UUID generator; do not duplicate that in
+  application code.
+- **Not** approved: SQL-level password hashing/storage (`crypt`/`gen_salt`) — authentication is an
+  application-security boundary and no design requires database-side password handling. Ad-hoc
+  column encryption is **not** a substitute for that boundary and must not be introduced without a
+  documented design.
+- pgcrypto functions are pure computation; they keep the PostgreSQL default (`EXECUTE` to `PUBLIC`).
+  `studafy_app` is granted nothing extra. Revisit if an authentication or key-management design ever
+  introduces sensitive key material into SQL.
+
+### btree_gist — approved use case
+
+- Adds GiST support for standard scalar equality operators. It exists solely so
+  `EXCLUDE USING gist` can be declared over ordinary equality columns (`uuid`, `smallint`), used by
+  `app.timetable_slots` (`db/migrations/000010_create_timetable_tables.sql`) to reject a teacher or
+  room being double-booked at the same weekday/period within one timetable version — see
+  [timetable-model.md](./timetable-model.md).
+- Not approved for range/geometric exclusion until a design calls for one; it is installed for the
+  operator classes it provides, not a specific index.
+- Like pgcrypto/pg_trgm/vector, btree_gist opclasses are pure computation and keep the PostgreSQL
+  default (`EXECUTE`/`USAGE` to `PUBLIC`); no extra grant to `studafy_app` and no monitoring
+  implication (no telemetry view, unlike `pg_stat_statements`).
+
+## Ownership model
+
+Installing any of these extensions requires an administrative login (superuser locally; Supabase's
+`postgres` role, which is not a superuser, in production). They are therefore owned by the
+**migration-runner identity** — the login that runs migrations (local/CI: the `studafy_test`
+superuser; production: Supabase's `postgres`). The migration deliberately does **not**
+`SET ROLE studafy_admin`: `studafy_admin` is `NOSUPERUSER` and cannot create extensions, and
+extension installation must stay an administrative operation.
+
+- `studafy_app` owns **no** extension and cannot `CREATE`/`ALTER`/`DROP` any extension.
+- `studafy_monitor` owns **no** extension and cannot manage extensions.
+- Verify:
+  ```sql
+  SELECT extname, pg_get_userbyid(extowner) AS owner FROM pg_extension ORDER BY extname;
+  ```
+
+## Runtime-role restrictions
+
+`studafy_app` (application runtime, per [role model](./role-model.md)) receives **no** additional
+grant from this migration:
+
+- pgcrypto / pg_trgm / vector functions and types are usable via their PostgreSQL default
+  (`EXECUTE`/`USAGE` to `PUBLIC`) — pure computation with no privilege implication.
+- `studafy_app` has **no** access to `pg_stat_statements` (see below).
+- Extension management (`CREATE`/`ALTER`/`DROP EXTENSION`) is denied.
+
+## pg_stat_statements — monitoring policy
+
+### Preload requirement (infrastructure-controlled)
+
+`CREATE EXTENSION pg_stat_statements` succeeding does **not** mean it is collecting statistics. The
+module must be loaded through `shared_preload_libraries`, which is a **static** server parameter:
+
+- **Production (Supabase):** controlled by Supabase, not by this repo. Supabase installs
+  `pg_stat_statements` itself, in its own `extensions` schema, so the `public.pg_stat_statements`
+  grants below do not apply there (see "Production on Supabase" below).
+- **Local / CI:** `compose.yml` (test profile) starts Postgres with
+  `-c shared_preload_libraries=pg_stat_statements`, so operationality is genuinely exercised.
+
+The migration warns (does not fail) when the library is not preloaded, so the other three extensions
+still enable on any Postgres 16. The hard, fail-closed check lives in the tests and the
+[verification procedure](#environment-verification-procedure).
+
+### Access control
+
+The extension grants `SELECT` on its views to `PUBLIC` by default, exposing call counts and timing
+to every role. The migration removes that and grants read access to `studafy_monitor` only:
+
+```sql
+REVOKE ALL ON public.pg_stat_statements FROM PUBLIC;      -- and pg_stat_statements_info
+GRANT  SELECT ON public.pg_stat_statements TO studafy_monitor;
+GRANT  pg_read_all_stats TO studafy_monitor;
+```
+
+- **`studafy_monitor`** is a `NOLOGIN` privilege/group role (same pattern as ST-031's roles): a
+  login identity is provisioned outside the repository and granted membership; no password is
+  written in SQL. It carries the same safe attribute baseline
+  (`NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS NOLOGIN`) and receives only
+  `CONNECT` on the database plus the grants above.
+- **`pg_read_all_stats`, not `pg_monitor`.** `pg_read_all_stats` is the narrowest built-in role that
+  lets a non-superuser see the **full query text** of other roles' statements in
+  `pg_stat_statements`. `pg_monitor` additionally bundles `pg_read_all_settings` and
+  `pg_stat_scan_tables`, which monitoring here does not need.
+- **`studafy_app` and `PUBLIC` get nothing.** `studafy_app` cannot read the view (denied by
+  privilege, before the view is evaluated).
+- **`pg_stat_statements_reset()` stays superuser-only** (its default). Resetting telemetry is an
+  administrative action; `studafy_monitor` is read-only.
+
+### Query-text sensitivity and privacy
+
+Statement text can embed literals (identifiers, search terms, and — if code inlines them instead of
+using bind parameters — personal data). Treat it as sensitive:
+
+- Never expose `pg_stat_statements` rows or query text through an application API.
+- Only `studafy_monitor` (and superusers) may read it. Non-privileged roles that could otherwise see
+  the view get `<insufficient privilege>` for other users' text; here they get no access at all.
+- Monitoring credentials must never reach application runtime configuration.
+
+### Reset and retention behavior
+
+`pg_stat_statements` keeps an **in-memory**, fixed-size table (`pg_stat_statements.max`, default
+5000 statements) — not durable history. Entries are evicted under pressure, cleared by
+`pg_stat_statements_reset()`, and lost on server restart/failover. It is a live sampling tool, not an
+audit log; export to a metrics pipeline if history is needed.
+
+## Environment coverage
+
+The migration is identical locally, in CI, and in production. Only these differ per environment and
+must be verified/documented:
+
+| Aspect                           | Where it is controlled                                                       |
+| -------------------------------- | ---------------------------------------------------------------------------- |
+| PostgreSQL major version         | Supabase project (production) / local image                                  |
+| Extension availability + version | Provider / image; read from `pg_extension`                                   |
+| `pg_stat_statements` preload     | Supabase (production) / compose command (local, CI)                          |
+| Permission to install            | Supabase's `postgres` role, not a superuser (production) / superuser (local) |
+| Credentials / connection         | `prod` GitHub Environment secrets / `TEST_DATABASE_URL` (local, CI)          |
+
+**Production on Supabase:** Supabase keeps `pg_stat_statements` in its own `extensions` schema and
+keeps the admin option on `pg_read_all_stats`, so migration 000003's three `studafy_monitor` grants
+cannot run there. Production applied 000003 without those three statements; the app does not use
+`studafy_monitor` (`infra/fly/README.md`, "Where Supabase differs from RDS").
+
+## Environment verification procedure
+
+Run against each accessible environment (never destructively against production):
+
+```sql
+-- 1. All four present, with versions.
+SELECT extname, extversion, pg_get_userbyid(extowner) AS owner
+FROM pg_extension WHERE extname IN ('pgcrypto','pg_trgm','vector','pg_stat_statements')
+ORDER BY extname;
+
+-- 2. pg_stat_statements is actually operational (raises if not preloaded -- treat as a failure).
+SELECT count(*) FROM pg_stat_statements;
+
+-- 3. Access is restricted.
+SELECT has_table_privilege('studafy_app', 'public.pg_stat_statements', 'SELECT')      AS app_can_read,      -- expect false
+       has_table_privilege('studafy_monitor', 'public.pg_stat_statements', 'SELECT')  AS monitor_can_read,  -- expect true
+       pg_has_role('studafy_monitor', 'pg_read_all_stats', 'USAGE')                   AS monitor_reads_stats; -- expect true
+```
+
+If step 2 raises `pg_stat_statements must be loaded via shared_preload_libraries`, the environment is
+**not** operational: fix the parameter group and reboot; do not report success.
+
+## Local development setup
+
+```bash
+POSTGRES_PASSWORD='<local-only>' docker compose up -d --wait test-postgres test-redis
+export TEST_DATABASE_URL='postgresql://studafy_test:<local-only>@127.0.0.1:54329/postgres?sslmode=disable'
+bun run db:migrate            # applies 000001..000003
+bun test --cwd packages/db    # includes extensions.test.ts and roles.test.ts
+docker compose rm -sfv test-postgres test-redis
+```
+
+PowerShell uses the same values via `$env:POSTGRES_PASSWORD` / `$env:TEST_DATABASE_URL`.
+
+## CI validation
+
+The `database-migrations` job in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) starts
+the database from `compose.yml` (test profile) (so the pgvector image and `pg_stat_statements` preload match
+local development) and runs the whole `packages/db` suite, which applies the migrations to a fresh
+disposable database and verifies every extension, including that `pg_stat_statements` collects
+statistics.
+
+## Failure modes
+
+| Symptom                                                          | Cause / action                                                                                |
+| ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `CREATE EXTENSION vector` fails: extension not available         | Image/provider lacks pgvector. Use `pgvector/pgvector:pg16`; confirm the provider offers it.  |
+| Migration warns "not in shared_preload_libraries"                | Preload not configured (provider setting / compose command); the other extensions still work. |
+| `SELECT ... FROM pg_stat_statements` raises "must be loaded ..." | Same as above — not operational until preloaded and restarted.                                |
+| `permission denied for view pg_stat_statements` as the app role  | Expected: only `studafy_monitor` may read it.                                                 |
+| `studafy_app` blocked from `CREATE/ALTER/DROP EXTENSION`         | Expected: extension management is administrative.                                             |
+
+## Upgrade policy
+
+Extension versions are **not** auto-bumped. `CREATE EXTENSION IF NOT EXISTS` installs the default
+version for the server and leaves an already-installed extension untouched. Upgrading (`ALTER
+EXTENSION ... UPDATE`) is a deliberate, separately reviewed migration — pgvector in particular can
+change index build behavior between versions. Record the before/after `extversion` and test against
+representative data before upgrading a shared environment.
+
+## Security considerations
+
+- No credentials, connection strings, or secrets appear in the migration, this document, or CI —
+  only role names and placeholders, which are not secrets.
+- Extension installation stays superuser-only; runtime and monitoring roles cannot manage extensions.
+- `pg_stat_statements` is readable only by `studafy_monitor`; `PUBLIC` and `studafy_app` have no
+  access. Monitoring credentials never enter application runtime.
+- No `CREATE` on the database is granted to the app so it could self-install extensions.
+
+## Normalization rules
+
+Extensions add capabilities; they do not relax the [normalization standard](./migration-policy.md#normalization-standard)
+(1NF–3NF by default). Extension-specific rules:
+
+- **pgcrypto.** UUIDs from `gen_random_uuid()` do not replace primary-key/uniqueness design.
+  Encrypted payloads are not a substitute for structured relational columns; never encrypt values
+  that must be searched, joined, or constrained without a documented design. Store cryptographic
+  metadata (algorithm, key version) separately when lifecycle/versioning requires it.
+- **pgvector.** An embedding is **derived** data, never the source of truth. A future embedding table
+  must reference its entity with an explicit foreign key, store the model identity + version and a
+  consistent dimension, and preserve the normalized source content. Do not mix unrelated entity
+  types in one generic vector table without a strong polymorphic design, and do not use vectors to
+  replace normalized tags, categories, relationships, or permissions. Document how embeddings are
+  regenerated when source content changes.
+- **pg_trgm.** Fuzzy/similarity matching does not establish identity and does not replace unique
+  constraints. Normalize canonical names, emails, identifiers, and codes with their own columns and
+  constraints. Add a search-oriented derived column only when justified, documenting its source
+  fields and refresh strategy; do not store pre-concatenated search blobs casually.
+- **pg_stat_statements.** Operational telemetry, not application domain data. Do not copy statement
+  statistics into business tables and do not expose query text through APIs.
+- **btree_gist.** Provides operator support, not a domain concept; it does not license storing
+  overlap/exclusion state as anything other than plain equality columns already in 3NF. See
+  [timetable-model.md](./timetable-model.md) for why `app.timetable_slots` uses `EXCLUDE` instead of
+  a `UNIQUE` constraint.
+
+No application/domain tables were invented in the original four-extension ticket. `000010` is a
+separate, later migration that adds `app.timetable_versions` / `app.timetable_slots` and is the
+reason `btree_gist` exists in this cluster at all.
+
+## Indexing rules
+
+Follow the [indexing standard](./migration-policy.md#indexing-standard). **Enabling an extension does
+not justify an index.** No vector or trigram index is added here because no schema and no query
+workload exist yet; adding one would be speculative. `public.schema_migrations` already has its
+primary key on `version` and unique constraint on `name` (ST-030), which cover version lookup and
+ordered status — no additional index is warranted.
+
+### pgvector index decision framework
+
+Create a vector index only when **all** of the following are known: target table, vector column,
+dimensions, distance operator (`<=>` cosine, `<#>` inner product, `<->` L2, `<+>` L1 where
+supported), query pattern, approximate recall target, expected row count, insert/update frequency,
+and latency requirement.
+
+- **Exact scan** (no index): perfect recall, cost grows with row count — fine for small tables.
+- **HNSW**: high recall and query speed, higher build cost/memory, slower writes. Tune build-time
+  `m` and `ef_construction`; tune query-time `ef_search` for the recall/latency trade-off.
+- **IVFFlat**: cheaper to build, needs **representative data present before creation** to cluster
+  well. Tune `lists` at build time and `probes` at query time, and `ANALYZE` after loading.
+
+Never create a vector index on an empty table to satisfy a task, and never claim one algorithm is
+universally better — the choice depends on the factors above.
+
+### pg_trgm index decision framework
+
+Add a trigram index only for a **known** search query. Choose the operator class by workload:
+
+- **GIN** (`gin_trgm_ops`): fast lookups, smaller/faster for read-heavy `LIKE`/`ILIKE`/`%` similarity
+  searches; slower to update.
+- **GiST** (`gist_trgm_ops`): supports distance-ordered (`<->`) nearest-match queries and cheaper
+  incremental updates; generally slower lookups than GIN.
+
+Validate locale, collation, and case-sensitivity for the target column. Name trigram indexes
+`idx_<table>_<column>_trgm`. Do not index low-value text columns, and do not use a trigram index
+where a normalized exact-match B-tree index is the right tool.
+
+### Verifying any future extension-backed index
+
+`EXPLAIN` (and `EXPLAIN ANALYZE` only on safe test data) to confirm the intended operator class is
+used and the planner selects the index; confirm it is not redundant; benchmark on representative
+data. Never claim a performance gain without evidence.
+
+## What remains infrastructure-controlled
+
+- `shared_preload_libraries` and any restart to apply it (Supabase in production).
+- Provider extension allowlist and the concrete extension versions available.
+- The external login roles that receive membership in `studafy_app` / `studafy_monitor` /
+  `studafy_admin`, and their credentials (outside the repository).

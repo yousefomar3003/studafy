@@ -1,0 +1,14 @@
+# Ruby toolchain for the mobile release lane (ST-257). fastlane only — every plugin this repo
+# would otherwise reach for (flutter_version, versioning) is replaced by a few lines of Fastfile,
+# so there is no Pluginfile and no plugin supply chain to pin.
+#
+# Pinned exact, matching this repo's "no mutable version references" posture (see
+# the SHA-pinned actions in .github/workflows/). `bundle install` in CI resolves and
+# writes Gemfile.lock; committing that lock once it has been generated on a real machine is the
+# follow-up — see docs/runbooks/mobile-release.md#toolchain.
+source "https://rubygems.org"
+
+gem "fastlane", "2.228.0"
+# `flutter build ipa` runs inside `bundle exec fastlane`, where the runner image's own CocoaPods
+# (installed under a different Ruby) reports itself broken and pod install is skipped.
+gem "cocoapods", "1.16.2"

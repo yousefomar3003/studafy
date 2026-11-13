@@ -1,0 +1,401 @@
+// eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
+import { describe, expect, test } from "bun:test";
+
+import { detectDelimiter, parseCsv } from "./csv";
+import {
+  normalizeHeader,
+  readCsvSource,
+  stageRows,
+  suggestColumnMapping,
+  validateColumnMapping,
+} from "./mapping";
+import { toStudentImportRecord } from "./record";
+
+import type { ImportRecordField } from "./fields";
+
+const TEMPLATE_HEADER =
+  "admission_number,email,first_name,middle_name,last_name,preferred_name,date_of_birth,status,parent_email,parent_relationship";
+
+describe("parseCsv", () => {
+  test("handles quotes, escaped quotes, quoted delimiters and quoted line breaks", () => {
+    const records = parseCsv('a,b,c\n"x, y","say ""hi""","line\nbreak"\n\nlast,,\n');
+    expect(records).toEqual([
+      { line: 1, cells: ["a", "b", "c"] },
+      { line: 2, cells: ["x, y", 'say "hi"', "line\nbreak"] },
+      { line: 5, cells: ["last", "", ""] },
+    ]);
+  });
+
+  test("strips a UTF-8 BOM, accepts CRLF and skips all-blank lines", () => {
+    expect(parseCsv("﻿a,b\r\n,\r\n1,2")).toEqual([
+      { line: 1, cells: ["a", "b"] },
+      { line: 3, cells: ["1", "2"] },
+    ]);
+  });
+
+  test("detects semicolon and tab delimiters from the first line", () => {
+    expect(detectDelimiter("a;b;c\n1,5;2;3")).toBe(";");
+    expect(detectDelimiter("a\tb\n")).toBe("\t");
+    expect(detectDelimiter('"a;b",c\n')).toBe(",");
+    expect(parseCsv("a;b\n1;2")[1]!.cells).toEqual(["1", "2"]);
+  });
+});
+
+describe("header detection and suggested mapping", () => {
+  test("finds the header below title lines and maps renamed, reordered headers", () => {
+    const source = readCsvSource(
+      [
+        "Student export,,,",
+        "Generated 2026-09-01,,,",
+        "Surname,Given Name,Student ID,E-mail,DOB,Guardian Email,Relationship",
+        "Doe,Jane,ADM-1,jane@example.edu,2010-03-15,mum@example.edu,Mother",
+      ].join("\n"),
+    );
+
+    expect(source.header_line).toBe(3);
+    expect(source.rows).toEqual([
+      {
+        line_number: 4,
+        source: {
+          Surname: "Doe",
+          "Given Name": "Jane",
+          "Student ID": "ADM-1",
+          "E-mail": "jane@example.edu",
+          DOB: "2010-03-15",
+          "Guardian Email": "mum@example.edu",
+          Relationship: "Mother",
+        },
+      },
+    ]);
+    expect(suggestColumnMapping(source.headers)).toEqual({
+      last_name: "Surname",
+      first_name: "Given Name",
+      admission_number: "Student ID",
+      email: "E-mail",
+      date_of_birth: "DOB",
+      parent_email: "Guardian Email",
+      parent_relationship: "Relationship",
+    });
+  });
+
+  test("Arabic headers map, parent 2 and placement included", () => {
+    const { headers } = readCsvSource(
+      "رقم الطالب,الاسم الأول,اسم العائلة,الصف,الشعبة,رقم العائلة,اسم ولي الأمر 1,صلة القرابة 1,هاتف ولي الأمر 1,اسم ولي الأمر 2,صلة القرابة 2,هاتف ولي الأمر 2\n",
+    );
+    expect(suggestColumnMapping(headers)).toEqual({
+      admission_number: "رقم الطالب",
+      first_name: "الاسم الأول",
+      last_name: "اسم العائلة",
+      grade: "الصف",
+      section: "الشعبة",
+      family: "رقم العائلة",
+      parent_name: "اسم ولي الأمر 1",
+      parent_relationship: "صلة القرابة 1",
+      parent_phone: "هاتف ولي الأمر 1",
+      parent2_name: "اسم ولي الأمر 2",
+      parent2_relationship: "صلة القرابة 2",
+      parent2_phone: "هاتف ولي الأمر 2",
+    });
+  });
+
+  test("the fixed template maps onto itself", () => {
+    const { headers } = readCsvSource(`${TEMPLATE_HEADER}\n`);
+    const mapping = suggestColumnMapping(headers);
+    for (const header of headers) expect(mapping[header as keyof typeof mapping]).toBe(header);
+  });
+
+  test("names blank header cells and disambiguates repeated ones", () => {
+    const { headers } = readCsvSource("Email,,email,Notes\n");
+    expect(headers).toEqual(["Email", "Column 2", "email (2)", "Notes"]);
+  });
+
+  test("a header spelled __proto__ is stored as a column, not as the prototype", () => {
+    const { rows } = readCsvSource("__proto__,b\nx,y\n");
+    expect(Object.keys(rows[0]!.source)).toEqual(["__proto__", "b"]);
+    expect(Object.getPrototypeOf(rows[0]!.source)).toBe(Object.prototype);
+  });
+
+  test("normalizeHeader ignores case, spacing and punctuation in any script", () => {
+    expect(normalizeHeader(" Student ID # ")).toBe("studentid");
+    expect(normalizeHeader("رقم القيد")).toBe("رقمالقيد");
+  });
+});
+
+describe("validateColumnMapping", () => {
+  const headers = ["ID", "Mail", "First", "Last"];
+
+  test("accepts a complete mapping, matching headers loosely", () => {
+    expect(
+      validateColumnMapping(
+        { admission_number: "id", email: "MAIL", first_name: "First", last_name: "Last" },
+        headers,
+        1,
+      ),
+    ).toEqual([]);
+  });
+
+  test("reports unmapped required fields, missing columns and double-mapped columns", () => {
+    const issues = validateColumnMapping(
+      { admission_number: "ID", email: "ID", first_name: "Given" },
+      headers,
+      2,
+    );
+    expect(issues).toEqual([
+      { line: 2, field: "last_name", message: 'Map a column to "last_name".' },
+      { line: 2, field: "email", message: 'Column "ID" is already mapped to "admission_number".' },
+      { line: 2, field: "first_name", message: 'Column "Given" is not in this file.' },
+    ]);
+  });
+});
+
+describe("stageRows", () => {
+  const source = readCsvSource(
+    [
+      "ID,Mail,First,Last,Status,Parent,Relation,Parent phone",
+      "A1,a1@example.edu,Ann,Lee,Enrolled,p1@example.edu,Step-Parent,٠٧٩ ١٢٣ ٤٥٦٧",
+      "A2,not-an-email,Bob,,,p2@example.edu,,",
+    ].join("\n"),
+  );
+  const mapping = {
+    admission_number: "ID",
+    email: "Mail",
+    first_name: "First",
+    last_name: "Last",
+    status: "Status",
+    parent_email: "Parent",
+    parent_relationship: "Relation",
+    parent_phone: "Parent phone",
+  } as const;
+
+  test("maps valid lines to records and reports invalid lines by their file line", () => {
+    const staged = stageRows(source, mapping);
+
+    expect(staged.rows[0]!.record).toEqual({
+      admission_number: "A1",
+      email: "a1@example.edu",
+      first_name: "Ann",
+      middle_name: null,
+      last_name: "Lee",
+      preferred_name: null,
+      date_of_birth: null,
+      status: "enrolled",
+      grade: null,
+      section: null,
+      family: null,
+      parent_email: "p1@example.edu",
+      parent_name: null,
+      parent_phone: "079 123 4567",
+      parent_relationship: "step_parent",
+      parent2_email: null,
+      parent2_name: null,
+      parent2_phone: null,
+      parent2_relationship: null,
+    });
+    expect(staged.rows[1]!.record).toBeNull();
+    expect(staged.issues.map((i) => [i.line, i.field])).toEqual([
+      [3, "email"],
+      [3, "last_name"],
+      [3, "parent_relationship"],
+      [3, "parent_phone"],
+    ]);
+  });
+
+  test("an unusable mapping stages raw rows only and reports just the mapping", () => {
+    const staged = stageRows(source, { admission_number: "ID" });
+    expect(staged.rows.every((row) => row.record === null && row.source.ID)).toBe(true);
+    expect(staged.issues.every((issue) => issue.line === 1)).toBe(true);
+  });
+});
+
+describe("toStudentImportRecord", () => {
+  const base = { admission_number: "A1", email: "a@x.edu", first_name: "A", last_name: "B" };
+
+  test("rejects non-ISO dates rather than guessing day/month order", () => {
+    const result = toStudentImportRecord(2, { ...base, date_of_birth: "03/04/2010" });
+    expect(result.issues).toEqual([
+      { line: 2, field: "date_of_birth", message: "Use the YYYY-MM-DD format." },
+    ]);
+  });
+
+  test("a parent email equal to the student's is rejected", () => {
+    const result = toStudentImportRecord(2, {
+      ...base,
+      parent_email: "A@X.edu",
+      parent_phone: "+965 5000 1234",
+      parent_relationship: "mother",
+    });
+    expect(result.issues.map((i) => i.field)).toEqual(["parent_email"]);
+  });
+
+  test("a parent named without a relationship is rejected", () => {
+    const result = toStudentImportRecord(2, {
+      ...base,
+      parent_name: "Pat",
+      parent_phone: "0501234567",
+    });
+    expect(result.issues.map((i) => i.field)).toEqual(["parent_relationship"]);
+  });
+
+  test("every parent named needs a phone number", () => {
+    const missing = toStudentImportRecord(2, {
+      ...base,
+      parent_name: "Pat",
+      parent_relationship: "mother",
+      parent2_email: "q@x.edu",
+      parent2_relationship: "father",
+      parent2_phone: "0501234567",
+    });
+    expect(missing.issues).toEqual([
+      { line: 2, field: "parent_phone", message: "Required when the parent is given." },
+    ]);
+
+    const invalid = toStudentImportRecord(2, {
+      ...base,
+      parent_name: "Pat",
+      parent_relationship: "mother",
+      parent_phone: "call me",
+    });
+    expect(invalid.issues).toEqual([
+      { line: 2, field: "parent_phone", message: "Not a valid phone number." },
+    ]);
+  });
+
+  test("a line with no parent needs no phone, and a phone alone is not a parent", () => {
+    expect(toStudentImportRecord(2, base).issues).toEqual([]);
+    const result = toStudentImportRecord(2, { ...base, parent2_phone: "0501234567" });
+    expect(result.issues.map((i) => i.field)).toEqual(["parent2_name"]);
+  });
+
+  test("a relationship with no parent name or email is rejected", () => {
+    const result = toStudentImportRecord(2, { ...base, parent2_relationship: "father" });
+    expect(result.issues.map((i) => i.field)).toEqual(["parent2_name"]);
+  });
+
+  test("students and parents need no email", () => {
+    const result = toStudentImportRecord(2, {
+      admission_number: "A1",
+      first_name: "Ali",
+      last_name: "Hassan",
+      parent_name: "Mona Hassan",
+      parent_relationship: "الأم",
+      parent_phone: "٠٥٠١٢٣٤٥٦٧",
+      parent2_name: "Omar Hassan",
+      parent2_relationship: "أب",
+      parent2_phone: "+965 5000 1234",
+      status: "منتظم",
+    });
+    expect(result.issues).toEqual([]);
+    expect(result.record).toMatchObject({
+      email: null,
+      status: "enrolled",
+      parent_email: null,
+      parent_phone: "0501234567",
+      parent_relationship: "mother",
+      parent2_phone: "+965 5000 1234",
+      parent2_relationship: "father",
+    });
+  });
+
+  test("parent 2's email must differ from parent 1's", () => {
+    const result = toStudentImportRecord(2, {
+      ...base,
+      parent_email: "p@x.edu",
+      parent_phone: "0501234567",
+      parent_relationship: "mother",
+      parent2_email: "P@x.edu",
+      parent2_phone: "0501234568",
+      parent2_relationship: "father",
+    });
+    expect(result.issues.map((i) => i.field)).toEqual(["parent2_email"]);
+  });
+
+  test("a section without a grade is rejected", () => {
+    const result = toStudentImportRecord(2, { ...base, section: "A" });
+    expect(result.issues.map((i) => i.field)).toEqual(["grade"]);
+  });
+});
+
+describe("student record template columns", () => {
+  const fields: ImportRecordField[] = [
+    {
+      id: "11111111-1111-4111-8111-111111111111",
+      field_type: "single_choice",
+      options: [{ value: "red", label_en: "Red", label_ar: "أحمر" }],
+      label_en: "Bus route",
+      label_ar: "خط الحافلة",
+      sensitivity: "standard",
+    },
+    {
+      id: "22222222-2222-4222-8222-222222222222",
+      field_type: "short_text",
+      options: [],
+      label_en: "National ID",
+      label_ar: "رقم الهوية",
+      sensitivity: "sensitive",
+    },
+    {
+      id: "33333333-3333-4333-8333-333333333333",
+      field_type: "document",
+      options: [],
+      label_en: "Birth certificate",
+      label_ar: "شهادة الميلاد",
+      sensitivity: "standard",
+    },
+  ];
+  const [route, nationalId, certificate] = fields as [
+    ImportRecordField,
+    ImportRecordField,
+    ImportRecordField,
+  ];
+  const csv = [
+    "admission_number,email,first_name,last_name,Bus Route,رقم الهوية,Birth certificate",
+    "A-1,a@x.test,Ali,Saleh,red,784-1990-1234567-1,",
+    "A-2,b@x.test,Huda,Saleh,purple,784-1990-7654321-1,",
+  ].join("\n");
+
+  test("suggests template columns by English or Arabic label, never a document field", () => {
+    const source = readCsvSource(csv);
+    expect(suggestColumnMapping(source.headers, fields).records).toEqual({
+      [route.id]: "Bus Route",
+      [nationalId.id]: "رقم الهوية",
+    });
+  });
+
+  test("a document field cannot be imported", () => {
+    const source = readCsvSource(csv);
+    const issues = validateColumnMapping(
+      {
+        ...suggestColumnMapping(source.headers, fields),
+        records: { [certificate.id]: "Birth certificate" },
+      },
+      source.headers,
+      source.header_line,
+      fields,
+    );
+    expect(issues).toEqual([
+      {
+        line: 1,
+        field: `record:${certificate.id}`,
+        message: '"Birth certificate" is a document field: upload its files on the Records tab.',
+      },
+    ]);
+  });
+
+  test("stages valid answers by field id; an invalid cell is reported without its value", () => {
+    const source = readCsvSource(csv);
+    const staged = stageRows(source, suggestColumnMapping(source.headers, fields), fields);
+    expect(staged.rows[0]!.record?.records).toEqual({
+      [route.id]: "red",
+      [nationalId.id]: "784-1990-1234567-1",
+    });
+    expect(staged.rows[1]!.record).toBeNull();
+    expect(staged.issues).toEqual([
+      {
+        line: 3,
+        field: `record:${route.id}`,
+        message: '"Bus route": Not one of this field\'s choices.',
+      },
+    ]);
+    expect(JSON.stringify(staged.issues)).not.toContain("purple");
+  });
+});

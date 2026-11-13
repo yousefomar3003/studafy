@@ -1,0 +1,360 @@
+/**
+ * The features, pricing and about pages' own styles: imported by those (lazily loaded) pages, so
+ * they stay out of the CSS every page downloads first, sign-in included -- whose Lighthouse budget
+ * (lighthouserc.json) is close enough that a few kilobytes cost a whole simulated round trip.
+ * Shared marketing styles stay in marketing-pages.css.
+ */
+
+.mk-plan__price,
+.features-index__title {
+  color: var(--mk-ink);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+
+:lang(ar) .mk-plan__price,
+:lang(ar) .features-index__title {
+  letter-spacing: 0;
+  line-height: 1.35;
+}
+
+/* Features: the ruled index ---------------------------------------------------------------------- */
+.features-index {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 2px solid var(--mk-ink);
+}
+
+.features-index__row {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 5fr) minmax(0, 6fr);
+  gap: var(--space-16) var(--space-40);
+  align-items: start;
+  padding-block: var(--space-40);
+  border-bottom: 1px solid var(--mk-rule);
+}
+
+.features-index__intro .features-index__items {
+  margin-top: var(--space-20);
+}
+
+/* Each area's working example, beside its description. */
+.features-index__demo {
+  display: grid;
+  gap: var(--space-8);
+  padding: var(--space-20);
+  border: 1px solid var(--mk-rule);
+  border-radius: var(--radius-lg);
+  background-color: #ffffff;
+}
+
+.features-index__number {
+  color: var(--mk-mark);
+  font-size: var(--font-size-lg);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+}
+
+.features-index__title {
+  margin: 0;
+  font-size: var(--font-size-2xl);
+  line-height: 1.2;
+}
+
+.features-index__body {
+  margin: var(--space-8) 0 0;
+  color: var(--mk-muted);
+  line-height: 1.55;
+}
+
+.features-index__items {
+  display: grid;
+  gap: var(--space-8);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--mk-text);
+  line-height: 1.5;
+}
+
+.features-index__items li {
+  padding-bottom: var(--space-8);
+  border-bottom: 1px dashed var(--mk-rule);
+}
+
+.features-index__items li:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+/* Pricing ---------------------------------------------------------------------------------------- */
+.mk-plans {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  gap: var(--space-64);
+  align-items: start;
+}
+
+.mk-plan {
+  padding-top: var(--space-24);
+  border-top: 1px solid var(--mk-rule);
+}
+
+.mk-plan--main {
+  border-top: 2px solid var(--mk-ink);
+}
+
+.mk-plan__name {
+  margin: 0;
+  color: var(--mk-text);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-plan__price {
+  margin: var(--space-16) 0 0;
+  font-size: clamp(3rem, 5vw + 1rem, 4.5rem);
+  line-height: 1;
+}
+
+.mk-plan__note {
+  max-inline-size: 34rem;
+  margin: var(--space-16) 0 0;
+  color: var(--mk-muted);
+  line-height: 1.6;
+}
+
+.mk-plan__list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--space-32);
+  margin: var(--space-32) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mk-plan__list li {
+  padding-block: var(--space-12);
+  border-bottom: 1px solid var(--mk-rule);
+  color: var(--mk-text);
+}
+
+.mk-plan__aside {
+  margin: var(--space-16) 0 0;
+  color: var(--mk-text);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-contact {
+  display: grid;
+  grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
+  gap: var(--space-48) var(--space-64);
+  align-items: start;
+}
+
+.mk-contact__email {
+  display: grid;
+  gap: var(--space-4);
+  margin: var(--space-32) 0 0;
+}
+
+.mk-contact__form {
+  padding: var(--space-32);
+  border: 1px solid var(--mk-rule);
+  border-top: 2px solid var(--mk-ink);
+  background-color: var(--mk-paper);
+}
+
+.marketing-contact-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+}
+
+.marketing-contact-form__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-20) var(--space-24);
+}
+
+.marketing-contact-form__textarea textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.marketing-contact-form__footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-16);
+  padding-top: var(--space-8);
+}
+
+.marketing-contact-form__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+.marketing-contact-form__sent h3 {
+  margin: 0 0 var(--space-8);
+  color: var(--mk-ink);
+}
+
+.mk-faq__question:focus-visible {
+  outline: var(--focus-ring-width) solid var(--focus-ring-color);
+  outline-offset: var(--focus-ring-offset);
+}
+
+/* Pricing: questions */
+.mk-faq {
+  border-top: 2px solid var(--mk-ink);
+}
+
+.mk-faq__item {
+  border-bottom: 1px solid var(--mk-rule);
+}
+
+.mk-faq__question {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding-block: var(--space-20);
+  color: var(--mk-text);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  list-style: none;
+  cursor: pointer;
+}
+
+.mk-faq__question::-webkit-details-marker {
+  display: none;
+}
+
+/* A plus that turns into a minus: two bars, the upright one folding away. */
+.mk-faq__question::after {
+  content: "";
+  flex: none;
+  inline-size: 14px;
+  block-size: 14px;
+  background:
+    linear-gradient(var(--mk-ink), var(--mk-ink)) center / 14px 2px no-repeat,
+    linear-gradient(var(--mk-ink), var(--mk-ink)) center / 2px 14px no-repeat;
+  transition: background-size var(--duration-slow) var(--easing-emphasized);
+}
+
+.mk-faq__item[open] .mk-faq__question::after {
+  background-size:
+    14px 2px,
+    2px 0;
+}
+
+.mk-faq__answer {
+  max-inline-size: 40rem;
+  margin: 0;
+  padding-bottom: var(--space-20);
+  color: var(--mk-muted);
+  line-height: 1.6;
+}
+
+/* About: principles */
+.mk-principles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-32);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mk-principles__item {
+  padding-top: var(--space-20);
+  border-top: 2px solid var(--mk-ink);
+}
+
+.mk-principles__number {
+  display: block;
+  margin-bottom: var(--space-12);
+  color: var(--mk-mark);
+  font-size: var(--font-size-2xl);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-bold);
+}
+
+/* About: what happens after the form */
+.mk-contact__next-title {
+  margin: var(--space-32) 0 var(--space-12);
+  color: var(--mk-text);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.mk-contact__next {
+  display: grid;
+  gap: var(--space-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: mk-next;
+}
+
+.mk-contact__next li {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  align-items: baseline;
+  color: var(--mk-text);
+  counter-increment: mk-next;
+}
+
+.mk-contact__next li::before {
+  content: counter(mk-next);
+  color: var(--mk-mark);
+  font-weight: var(--font-weight-bold);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .mk-faq__item[open] .mk-faq__answer {
+    animation: mk-arrive 300ms var(--easing-emphasized) both;
+  }
+}
+
+@media (max-width: 960px) {
+  .mk-principles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mk-plans,
+  .mk-contact {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mk-plans {
+    gap: var(--space-48);
+  }
+
+  .features-index__row {
+    grid-template-columns: 2.5rem minmax(0, 1fr);
+  }
+
+  .features-index__demo {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .mk-principles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mk-plan__list,
+  .marketing-contact-form__grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mk-contact__form {
+    padding: var(--space-20);
+  }
+}

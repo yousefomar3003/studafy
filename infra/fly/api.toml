@@ -1,0 +1,71 @@
+# Studafy API on fly.io (production). See infra/fly/README.md for the first-time setup, the secrets
+# it needs and the deploy order. Deploy from the repo root:
+#   fly deploy . --config infra/fly/api.toml --remote-only
+app = "studafy-core-api"
+primary_region = "fra"
+
+[build]
+  dockerfile = "../docker/api.Dockerfile"
+
+# Non-secret settings only; credentials and connection strings are fly secrets (README).
+[env]
+  NODE_ENV = "production"
+  APP_ENV = "production"
+  PORT = "3000"
+  HOST = "0.0.0.0"
+  LOG_LEVEL = "info"
+  SERVICE_NAME = "api"
+  SENTRY_ENVIRONMENT = "production"
+  # fly's proxy puts the visitor's address in Fly-Client-IP (and its own address last in
+  # X-Forwarded-For), so rate limits, audit rows and security events key on this header.
+  CLIENT_IP_HEADER = "fly-client-ip"
+  CORS_ALLOWED_ORIGINS = "https://studafy.com,https://www.studafy.com,https://app.studafy.com,https://school.studafy.com"
+  FRONTEND_URL = "https://app.studafy.com"
+  GOOGLE_OAUTH_REDIRECT_URI = "https://api.studafy.com/api/auth/oauth/google/callback"
+  MICROSOFT_OAUTH_REDIRECT_URI = "https://api.studafy.com/api/auth/oauth/microsoft/callback"
+  # Clients open the realtime socket at this host's /ws and the API hands it to the app named here
+  # (app.ts). Unset while live updates are deferred: /ws then has no route, so a client still
+  # trying to connect (a mobile build from before REALTIME_ENABLED) gets a 404 from this always-on
+  # app instead of waking the scaled-to-zero realtime app. Turn realtime back on with
+  # REALTIME_FLY_APP = "studafy-core-realtime" (and realtime.toml, web.toml, the mobile flag).
+  # REALTIME_FLY_APP = "studafy-core-realtime"
+  # Supabase's transaction pooler stands in for PgBouncer; every pool already runs prepare: false.
+  # No read replica on Supabase's plan: reads go to the same pooler.
+  DATABASE_HOST = "aws-1-eu-central-1.pooler.supabase.com"
+  DATABASE_PORT = "6543"
+  DATABASE_NAME = "postgres"
+  READ_DATABASE_HOST = "aws-1-eu-central-1.pooler.supabase.com"
+  READ_DATABASE_PORT = "6543"
+  READ_DATABASE_NAME = "postgres"
+  DATABASE_SSL_MODE = "verify-full"
+  S3_REGION = "auto"
+  S3_APP_FILES_BUCKET = "studafy-prod-files"
+  S3_PRESIGN_TTL_SECONDS = "900"
+  AI_LLM_ENABLED = "true"
+  AI_LLM_PROVIDER = "openai-compatible"
+  AI_LLM_BASE_URL = "https://api.together.xyz/v1"
+  AI_LLM_SMALL_MODEL = "Qwen/Qwen3.5-9B"
+  AI_LLM_LARGE_MODEL = "Qwen/Qwen3.5-9B"
+  AI_STORE_PRODUCT_ID = "studafy_ai_monthly"
+  APPLE_IAP_BUNDLE_ID = "com.studafy.studafyMobile"
+  APPLE_IAP_APP_APPLE_ID = "6826890449"
+  GOOGLE_PLAY_PACKAGE_NAME = "com.studafy.studafy_mobile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  # Always on, deliberately: a cold start would land on a real request (sign-in, a teacher taking
+  # attendance), and the API also answers webhooks and the mobile apps' background refreshes.
+  auto_stop_machines = "off"
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    interval = "15s"
+    timeout = "3s"
+    grace_period = "20s"
+    method = "GET"
+    path = "/readyz"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "1gb"
