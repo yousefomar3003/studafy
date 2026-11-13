@@ -57,6 +57,7 @@ Future<void> pumpStudafyApp(
   Locale startLocale = AppLocales.fallback,
   UpdateStatus updateStatus = UpdateStatus.upToDate,
   List<Override> extraOverrides = const [],
+  FakeSecureTokenStore? secureStore,
 }) async {
   await tester.pumpWidget(
     // Keyed uniquely so each call gets a genuinely fresh element tree. Without this, two
@@ -74,7 +75,9 @@ Future<void> pumpStudafyApp(
             ),
             authSessionProvider.overrideWithValue(session ?? fakeAuthSession()),
             // Saved accounts (account switching) read the Keychain, which has no plugin here.
-            secureTokenStoreProvider.overrideWithValue(FakeSecureTokenStore()),
+            secureTokenStoreProvider.overrideWithValue(
+              secureStore ?? FakeSecureTokenStore(),
+            ),
             crashReporterProvider.overrideWithValue(FakeCrashReporter()),
             // StudafyApp reads this in didChangeDependencies (_subscribeToPushTaps) regardless of
             // auth status — see fake_push_service.dart for why a real PushService can't exist here.

@@ -14,6 +14,7 @@ import '../../../core/auth/saved_account.dart';
 import '../../../core/auth/school_closed_notice.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
+import '../../../design/widgets/password_form_field.dart';
 import '../../../design/widgets/studafy_logo.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../shell/presentation/account_switcher.dart';
@@ -472,6 +473,27 @@ class _MemberSignInFormState extends ConsumerState<_MemberSignInForm> {
   bool _submitting = false;
   String? _error;
 
+  /// "Remember me": keep this Studafy ID on the phone so the form opens with it filled in. On by
+  /// default: the ID is printed on the member's login slip and is no secret on its own, and the
+  /// password is never stored. Unticked (a shared phone), the ID is forgotten at sign-in.
+  /// Staying signed in needs no option: the session already survives app restarts (a 30-day
+  /// sliding refresh token in secure storage) until the member signs out.
+  bool _rememberMe = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _prefillRememberedId();
+  }
+
+  Future<void> _prefillRememberedId() async {
+    final remembered = await ref
+        .read(secureTokenStoreProvider)
+        .readRememberedMemberId();
+    if (!mounted || remembered == null || _username.text.isNotEmpty) return;
+    setState(() => _username.text = remembered);
+  }
+
   @override
   void dispose() {
     _username.dispose();
@@ -487,14 +509,20 @@ class _MemberSignInFormState extends ConsumerState<_MemberSignInForm> {
       _submitting = true;
       _error = null;
     });
+    // Read before signing in: on success the auth guard navigates away and this form is disposed.
+    final store = ref.read(secureTokenStoreProvider);
+    final username = _username.text.trim();
+    final rememberMe = _rememberMe;
     try {
       await ref
           .read(authNotifierProvider.notifier)
           .loginWithMember(
-            username: _username.text.trim(),
+            username: username,
             password: _password.text,
             newPassword: _choosingNewPassword ? _newPassword.text : null,
           );
+      // Only a successful sign-in changes what is remembered, so a mistyped ID is never kept.
+      await store.writeRememberedMemberId(rememberMe ? username : null);
       // On success the auth guard navigates away.
     } catch (error) {
       final apiError = error is DioException ? error.apiError : null;
@@ -559,11 +587,10 @@ class _MemberSignInFormState extends ConsumerState<_MemberSignInForm> {
                     : null,
               ),
               const SizedBox(height: AppSpacing.space12),
-              TextFormField(
+              PasswordFormField(
                 key: const Key('memberSignInPassword'),
                 controller: _password,
                 enabled: !_submitting,
-                obscureText: true,
                 autofillHints: const [AutofillHints.password],
                 textInputAction: TextInputAction.done,
                 onFieldSubmitted: (_) => _submit(),
@@ -573,6 +600,19 @@ class _MemberSignInFormState extends ConsumerState<_MemberSignInForm> {
                 validator: (value) => (value ?? '').isEmpty
                     ? 'auth.emailForm.passwordRequired'.tr()
                     : null,
+              ),
+              const SizedBox(height: AppSpacing.space4),
+              CheckboxListTile(
+                key: const Key('memberSignInRememberMe'),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                dense: true,
+                value: _rememberMe,
+                onChanged: _submitting
+                    ? null
+                    : (value) => setState(() => _rememberMe = value ?? false),
+                title: Text('auth.memberForm.rememberMe'.tr()),
+                subtitle: Text('auth.memberForm.rememberMeHelp'.tr()),
               ),
             ] else ...[
               Text(
@@ -586,11 +626,10 @@ class _MemberSignInFormState extends ConsumerState<_MemberSignInForm> {
                 style: theme.textTheme.bodyMedium,
               ),
               const SizedBox(height: AppSpacing.space12),
-              TextFormField(
+              PasswordFormField(
                 key: const Key('memberSignInNewPassword'),
                 controller: _newPassword,
                 enabled: !_submitting,
-                obscureText: true,
                 autofillHints: const [AutofillHints.newPassword],
                 textInputAction: TextInputAction.next,
                 decoration: InputDecoration(
@@ -602,11 +641,10 @@ class _MemberSignInFormState extends ConsumerState<_MemberSignInForm> {
                     : null,
               ),
               const SizedBox(height: AppSpacing.space12),
-              TextFormField(
+              PasswordFormField(
                 key: const Key('memberSignInConfirmPassword'),
                 controller: _confirmPassword,
                 enabled: !_submitting,
-                obscureText: true,
                 autofillHints: const [AutofillHints.newPassword],
                 textInputAction: TextInputAction.done,
                 onFieldSubmitted: (_) => _submit(),

@@ -46,7 +46,13 @@
       "tooShort": "Use at least 8 characters",
       "mismatch": "The passwords don't match",
       "saveAndSignIn": "Save and sign in",
-      "back": "Back"
+      "back": "Back",
+      "rememberMe": "Remember me",
+      "rememberMeHelp": "Keeps your ID on this phone. Your password is never saved."
+    },
+    "password": {
+      "show": "Show password",
+      "hide": "Hide password"
     }
   },
   "notifications": {
