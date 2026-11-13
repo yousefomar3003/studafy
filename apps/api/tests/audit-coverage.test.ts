@@ -578,6 +578,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/platform/features/{featureKey}",
   "POST /api/platform/tiers",
   "PUT /api/platform/tiers/{planId}",
+  // Manual grants (000211): audited from inside the service transaction (the console's two rows
+  // for a super admin acting on another school).
+  "POST /api/platform/schools/{schoolId}/grants",
+  "POST /api/platform/schools/{schoolId}/grants/{grantId}/revoke",
   // School-defined student and parent records (modules/records/routes.ts): the template editor
   // (recordTemplate:manage), filling records in and documents (studentRecord:update), and the
   // sensitive reveal (studentRecord:readSensitive), which is audited as a read.

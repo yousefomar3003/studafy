@@ -140,6 +140,7 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("build-license-quote", "action", "/portal/platform/quotes", PLATFORM),
   entry("platform-licenses", "page", "/portal/platform/licenses", PLATFORM),
   entry("platform-payments", "page", "/portal/platform/payments", PLATFORM),
+  entry("platform-manual-grants", "page", "/portal/platform/grants", PLATFORM),
 
   // The school admin's console.
   entry("run-setup-wizard", "action", "/onboarding/setup", ADMIN),

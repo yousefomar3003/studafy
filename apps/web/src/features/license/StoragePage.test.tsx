@@ -20,6 +20,7 @@ const P1TY = "44444444-4444-4444-8444-444444444444";
 
 let current: Record<string, unknown> | null = null;
 let availableOnline = true;
+let granted: { capBytes: number; endsAt: string } | null = null;
 
 function offer() {
   return {
@@ -31,6 +32,7 @@ function offer() {
     current,
     currency: "USD",
     availableOnline,
+    granted,
     tiers: [
       {
         planCode: "storage_100gb",
@@ -100,6 +102,7 @@ afterEach(() => {
   cleanup();
   current = null;
   availableOnline = true;
+  granted = null;
   getMock.mockClear();
   postMock.mockClear();
   assign.mockClear();
@@ -160,6 +163,13 @@ describe("StoragePage", () => {
 
     expect(await screen.findByText("$10.00 per month")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /Upgrade to/ })).toBeNull();
+  });
+
+  test("storage Studafy granted by hand is shown with its end date", async () => {
+    granted = { capBytes: 100 * GIB, endsAt: "2027-11-13T00:00:00.000Z" };
+    await renderPage();
+
+    expect(await screen.findByText(/Granted by Studafy: 100 GB until/)).toBeTruthy();
   });
 
   test("a school that cannot buy online is told to contact Studafy", async () => {

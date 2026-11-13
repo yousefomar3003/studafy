@@ -4,11 +4,13 @@ import { Link } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
+import { audiencesFromRoles, GrantDialog } from "./grants/GrantComponents";
 import { PlatformPageHeader, SchoolStatusPill } from "./PlatformNav";
 import { useUserLookupQuery } from "./queries";
 
 import "./platform.css";
 
+import type { TierGrantTarget } from "./grants/GrantComponents";
 import type { PlatformUserLookupResult } from "./queries";
 import type { DataGridColumn } from "@studafy/ui";
 import type { FormEvent } from "react";
@@ -27,6 +29,7 @@ export default function UserLookupPage() {
   const [submitted, setSubmitted] = useState("");
   const { data, isFetching, isError } = useUserLookupQuery(submitted);
   const valid = EMAIL_PATTERN.test(input.trim());
+  const [granting, setGranting] = useState<TierGrantTarget | null>(null);
 
   function onSubmit(event: FormEvent) {
     event.preventDefault();
@@ -70,6 +73,32 @@ export default function UserLookupPage() {
           ? formatDate(new Date(match.lastLoginAt), { dateStyle: "medium", timeStyle: "short" })
           : t("platform.common.never"),
     },
+    {
+      id: "grant",
+      header: t("platformLicensing.grants.lookupColumn"),
+      renderCell: (match) => {
+        const audiences = audiencesFromRoles(match.roles);
+        return audiences.length > 0 ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() =>
+              setGranting({
+                schoolId: match.schoolId,
+                schoolName: match.schoolName,
+                userId: match.userId,
+                userLabel: match.displayName ?? match.email,
+                audiences,
+              })
+            }
+          >
+            {t("platformLicensing.grants.grantTier")}
+          </Button>
+        ) : (
+          "—"
+        );
+      },
+    },
   ];
 
   return (
@@ -104,6 +133,15 @@ export default function UserLookupPage() {
       ) : (
         <p className="platform-muted">{t("platform.users.hint")}</p>
       )}
+      {granting ? (
+        <GrantDialog
+          open
+          onClose={() => setGranting(null)}
+          schoolId={granting.schoolId}
+          schoolName={granting.schoolName}
+          tierTarget={granting}
+        />
+      ) : null}
     </>
   );
 }

@@ -153,7 +153,7 @@ import {
 import { messagingRoutes } from "./modules/messaging";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
-import { platformRoutes } from "./modules/platform";
+import { platformGrantRoutes, platformRoutes } from "./modules/platform";
 import { privacyRoutes } from "./modules/privacy";
 import { realtimeTicketRoutes } from "./modules/realtime";
 import { DEVELOPMENT_RECORD_KEYRING, recordRoutes } from "./modules/records";
@@ -1353,6 +1353,12 @@ export function createApp({
     app.route(
       "/",
       platformRoutes({ database, redis: redis ?? null, paymentProvider: stripeProvider, logger }),
+    );
+    // Manual grants (000211): storage caps and feature tiers given by hand, e.g. after a cash
+    // payment. `storage` carries the optional receipt; null answers 503 only when one is attached.
+    app.route(
+      "/",
+      platformGrantRoutes({ database, redis: redis ?? null, storage: storage ?? null, logger }),
     );
     // The console's school sign-up review queue; approval creates and provisions the school.
     app.route(

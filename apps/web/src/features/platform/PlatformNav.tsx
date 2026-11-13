@@ -12,6 +12,7 @@ const SECTIONS = [
   { to: "/portal/platform/licenses", labelKey: "platformLicensing.nav.licenses", end: false },
   { to: "/portal/platform/quotes", labelKey: "platformLicensing.nav.quotes", end: false },
   { to: "/portal/platform/payments", labelKey: "platformLicensing.nav.payments", end: false },
+  { to: "/portal/platform/grants", labelKey: "platformLicensing.nav.grants", end: false },
   { to: "/portal/platform/ai", labelKey: "platform.nav.ai", end: false },
   { to: "/portal/platform/import-signals", labelKey: "platform.nav.importSignals", end: false },
   { to: "/portal/platform/plans", labelKey: "platform.nav.plans", end: false },

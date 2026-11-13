@@ -5,7 +5,8 @@
     "payments": "Payments",
     "tiers": "Tiers",
     "features": "Features",
-    "pricing": "Pricing"
+    "pricing": "Pricing",
+    "grants": "Manual grants"
   },
   "common": {
     "actions": "Actions",
@@ -558,6 +559,82 @@
       "aiCost": "AI cost (this period)",
       "revenueMonth": "License revenue this month",
       "revenueTotal": "License revenue, all time"
+    }
+  },
+  "grants": {
+    "pageTitle": "Manual grants",
+    "pageDescription": "Storage and paid tiers given by hand, for example after a cash payment. A grant counts from today until its end date, then stops on its own; nothing is ever deleted.",
+    "cardTitle": "Manual grants",
+    "cardDescription": "Storage and paid tiers Studafy gave this school or its people by hand, for example after a cash payment.",
+    "grantStorage": "Grant storage",
+    "grantTier": "Grant paid tier",
+    "lookupColumn": "Paid tier",
+    "storageTitle": "Grant storage",
+    "tierTitle": "Grant a paid tier",
+    "storageExplain": "The school's upload limit becomes the largest of what its plan includes, any storage it bought online, and this grant.",
+    "tierExplain": "The person gets every feature of the tier. If they also pay through the App Store or Google Play, the feature stays on while either covers it.",
+    "sizeLabel": "Storage",
+    "customSize": "Custom size",
+    "customGbLabel": "Size in GB",
+    "customGbError": "Enter a size above 0 GB.",
+    "tierLabel": "Tier",
+    "tierPlaceholder": "Choose a tier",
+    "noTiers": "There's no active tier for this person's role. Create one on the Tiers page first.",
+    "monthsLabel": "Months",
+    "monthsHelp": "Starts today.",
+    "monthsError": "Enter 1 to 120 months.",
+    "reasonLabel": "Reason",
+    "reasonHelp": "Kept in the audit log, for example \"Paid 100 USD in cash on 13 Nov\".",
+    "amountLabel": "Amount paid (optional)",
+    "amountHelp": "Counted in Finance as manual / cash.",
+    "amountError": "Enter an amount like 100 or 99.50.",
+    "currencyLabel": "Currency",
+    "currencyError": "Use a 3-letter code like USD.",
+    "receiptLabel": "Receipt (optional, PDF or image)",
+    "confirm": "Grant",
+    "created": "Granted",
+    "createError": "The grant couldn't be saved",
+    "revoke": "Revoke",
+    "revokeTitle": "Revoke this grant?",
+    "revokeExplain": "It stops counting now. The record stays in the list, and no files or data are deleted.",
+    "revoked": "Grant revoked",
+    "revokeError": "The grant couldn't be revoked",
+    "revokedBecause": "Revoked: {{reason}}",
+    "receipt": "Receipt",
+    "receiptError": "The receipt couldn't be opened",
+    "loadError": "Grants couldn't be loaded.",
+    "emptySchool": "No grants for this school yet.",
+    "emptyAll": "No grants match.",
+    "storageWhat": "Storage: {{size}}",
+    "period": "{{start}} – {{end}}",
+    "free": "Free",
+    "filterLabel": "Show",
+    "kindLabel": "Kind",
+    "filter": {
+      "active": "Active and upcoming",
+      "expiring": "Ending within 14 days",
+      "ended": "Ended or revoked",
+      "all": "All"
+    },
+    "kind": {
+      "all": "All kinds",
+      "storage": "Storage",
+      "tier": "Paid tiers"
+    },
+    "state": {
+      "scheduled": "Starts later",
+      "active": "Active",
+      "ended": "Ended",
+      "revoked": "Revoked"
+    },
+    "columns": {
+      "school": "School",
+      "what": "Grant",
+      "period": "Period",
+      "state": "Status",
+      "paid": "Paid",
+      "reason": "Reason",
+      "actions": "Actions"
     }
   }
 }

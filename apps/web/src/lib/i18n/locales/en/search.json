@@ -125,6 +125,11 @@
       "where": "Studafy platform › Payments",
       "keywords": "license payments, license invoices, receivables, paid invoices, payment status, collections"
     },
+    "platform-manual-grants": {
+      "title": "Manual grants",
+      "where": "Studafy platform › Manual grants",
+      "keywords": "cash payment, manual grant, give storage, free storage, grant paid tier, comp, offline payment"
+    },
     "run-setup-wizard": {
       "title": "Run the school setup wizard",
       "where": "Admin › Setup",

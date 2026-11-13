@@ -233,7 +233,7 @@ export function useResolveChangeRequest() {
  * Upload a receipt file to the school's storage through the console's upload URL, and hand back
  * the temp key the payment then promotes.
  */
-async function uploadReceipt(schoolId: string, file: File): Promise<string> {
+export async function uploadReceipt(schoolId: string, file: File): Promise<string> {
   const { data } = await api.POST("/api/platform/schools/{schoolId}/license-payments/upload-url", {
     params: { path: { schoolId } },
     body: { fileName: file.name, contentType: file.type, sizeBytes: file.size },
