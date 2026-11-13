@@ -31,7 +31,7 @@ import {
   reserveStorage,
 } from "../storage/staged-promotion";
 
-import { MESSAGE_ATTACHMENT_CONTENT_CLASS } from "./schemas";
+import { MESSAGE_ATTACHMENT_CONTENT_CLASS, MESSAGE_VOICE_CONTENT_CLASS } from "./schemas";
 
 import type {
   BlockState,
@@ -68,6 +68,10 @@ const NOTIFICATION_PREVIEW_LENGTH = 140;
 /** Notification preview for a message with images and no text, by recipient locale. */
 const PHOTO_PREVIEW_EN = "📷 Photo";
 const PHOTO_PREVIEW_AR = "📷 صورة";
+
+/** Notification preview for a voice note, by recipient locale. */
+const VOICE_PREVIEW_EN = "🎤 Voice message";
+const VOICE_PREVIEW_AR = "🎤 رسالة صوتية";
 
 function notFound(what: string): CodedHttpException {
   return new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, `${what} not found`);
@@ -342,9 +346,11 @@ interface ConversationRow {
   last_sender_id: string | null;
   last_created_at: Date | null;
   last_attachment_count: number | null;
+  last_voice_note: boolean | null;
   unread_count: number;
   blocked_by_me: boolean;
   has_blocked_me: boolean;
+  voice_notes_allowed: boolean;
 }
 
 /**
@@ -370,6 +376,11 @@ async function selectConversations(
       lm.sender_user_id AS last_sender_id,
       lm.created_at AS last_created_at,
       lm.attachment_count AS last_attachment_count,
+      lm.voice_note AS last_voice_note,
+      coalesce(
+        (SELECT ss.allow_voice_notes FROM app.school_settings AS ss WHERE ss.school_id = mc.school_id),
+        true
+      ) AS voice_notes_allowed,
       EXISTS (
         SELECT 1
         FROM app.message_blocks AS mb
@@ -406,7 +417,12 @@ async function selectConversations(
           SELECT count(*)::int
           FROM app.message_attachments AS ma
           WHERE ma.school_id = m.school_id AND ma.message_id = m.id
-        ) AS attachment_count
+        ) AS attachment_count,
+        EXISTS (
+          SELECT 1
+          FROM app.message_attachments AS ma
+          WHERE ma.school_id = m.school_id AND ma.message_id = m.id AND ma.duration_ms IS NOT NULL
+        ) AS voice_note
       FROM app.messages AS m
       WHERE m.school_id = mc.school_id AND m.conversation_id = mc.id
       ORDER BY m.created_at DESC, m.id DESC
@@ -440,6 +456,7 @@ async function selectConversations(
         ? {
             body: row.last_body,
             attachment_count: row.last_attachment_count ?? 0,
+            voice_note: row.last_voice_note ?? false,
             sender_id: row.last_sender_id,
             created_at: row.last_created_at.toISOString(),
           }
@@ -448,6 +465,7 @@ async function selectConversations(
     updated_at: row.last_message_at.toISOString(),
     blocked_by_me: row.blocked_by_me,
     has_blocked_me: row.has_blocked_me,
+    voice_notes_allowed: row.voice_notes_allowed,
   }));
 }
 
@@ -611,6 +629,8 @@ interface AttachmentRow {
   size_bytes: string;
   /** Malware scan state (000192). */
   scan_status: UploadScanStatus;
+  /** A voice note's length (000218); null for an image. */
+  duration_ms: number | null;
 }
 
 /**
@@ -630,6 +650,8 @@ export async function toAttachmentResponse(
     size_bytes: string | number;
     /** Omitted when the caller already withheld an unservable key (the report snapshot). */
     scan_status?: UploadScanStatus;
+    /** A voice note's length; null or omitted for an image. */
+    duration_ms?: number | null;
   },
 ): Promise<MessageAttachment> {
   const servable =
@@ -643,6 +665,7 @@ export async function toAttachmentResponse(
     id: row.id,
     content_type: row.mime_type,
     size_bytes: Number(row.size_bytes),
+    duration_ms: row.duration_ms ?? null,
     download_url: presigned?.url ?? null,
     download_url_expires_at: presigned?.expiresAt.toISOString() ?? null,
   };
@@ -659,7 +682,7 @@ async function loadAttachments(
   if (messageIds.length === 0) return byMessage;
   const rows = await tx<AttachmentRow[]>`
     SELECT id, message_id, storage_key, mime_type, size_bytes::text AS size_bytes,
-           scan_status::text AS scan_status
+           scan_status::text AS scan_status, duration_ms
     FROM app.message_attachments
     WHERE school_id = ${actor.schoolId}::uuid
       AND message_id = ANY(${messageIds as string[]}::uuid[])
@@ -820,8 +843,9 @@ async function inspectAttachments(
   storage: StorageService,
   actor: MessagingActor,
   attachments: NonNullable<SendMessageInput["attachments"]>,
+  contentClassName: string = MESSAGE_ATTACHMENT_CONTENT_CLASS,
 ): Promise<(InspectedStagedUpload & { tempKey: string })[]> {
-  const contentClass = getContentClass(MESSAGE_ATTACHMENT_CONTENT_CLASS);
+  const contentClass = getContentClass(contentClassName);
   const inspected: (InspectedStagedUpload & { tempKey: string })[] = [];
   for (const attachment of attachments) {
     const upload = await inspectStagedUpload(storage, actor.schoolId, contentClass, {
@@ -837,6 +861,8 @@ async function inspectAttachments(
 interface PromotedAttachment {
   permanentKey: string;
   upload: InspectedStagedUpload;
+  /** Set for a voice note (000218). */
+  durationMs?: number;
 }
 
 /**
@@ -870,7 +896,9 @@ export async function sendMessage(
   uploadedKeys: string[] = [],
 ): Promise<Message> {
   const body = input.body ?? "";
-  const staged = input.attachments ?? [];
+  const voice = input.voice_note;
+  // A voice note travels the same staged-upload path as an image, as the message's only attachment.
+  const staged = voice ? [voice] : (input.attachments ?? []);
   if (body.length === 0 && staged.length === 0) {
     throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Message is required");
   }
@@ -879,7 +907,12 @@ export async function sendMessage(
   }
 
   const store = requireStorage(storage);
-  const inspected = await inspectAttachments(store, actor, staged);
+  const inspected = await inspectAttachments(
+    store,
+    actor,
+    staged,
+    voice ? MESSAGE_VOICE_CONTENT_CLASS : MESSAGE_ATTACHMENT_CONTENT_CLASS,
+  );
   const copies: StagedCopy[] = inspected.map((upload) => ({
     tempKey: upload.tempKey,
     permanentKey: buildPermanentKey(actor.schoolId, upload.parsed.objectId, upload.parsed.filename),
@@ -888,6 +921,7 @@ export async function sendMessage(
 
   await runTx(async (tx) => {
     await assertCanSend(tx, actor, conversationId);
+    if (voice) await assertVoiceNotesAllowed(tx, actor);
     await reserveStorage(
       tx,
       copies.reduce((total, copy) => total + copy.sizeBytes, 0),
@@ -902,12 +936,33 @@ export async function sendMessage(
       actor,
       conversationId,
       body,
-      inspected.map((upload, index) => ({ permanentKey: copies[index]!.permanentKey, upload })),
+      inspected.map((upload, index) => ({
+        permanentKey: copies[index]!.permanentKey,
+        upload,
+        durationMs: voice?.duration_ms,
+      })),
     ),
   );
   uploadedKeys.push(...copies.map((copy) => copy.permanentKey));
   await discardStagedUploads(store, copies);
   return message;
+}
+
+/** The school has not turned voice notes off (school_settings.allow_voice_notes, 000218). */
+async function assertVoiceNotesAllowed(tx: TransactionSql, actor: MessagingActor): Promise<void> {
+  const [row] = await tx<{ allowed: boolean }[]>`
+    SELECT coalesce(
+      (SELECT allow_voice_notes FROM app.school_settings WHERE school_id = ${actor.schoolId}::uuid),
+      true
+    ) AS allowed
+  `;
+  if (!row?.allowed) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.MESSAGING_VOICE_NOTES_DISABLED,
+      "Voice notes are turned off for this school",
+    );
+  }
 }
 
 /** The caller is a participant of the thread and the pair is not blocked. */
@@ -933,6 +988,9 @@ async function writeMessage(
   promoted: PromotedAttachment[],
 ): Promise<Message> {
   const participants = await assertCanSend(tx, actor, conversationId);
+  if (promoted.some((attachment) => attachment.durationMs !== undefined)) {
+    await assertVoiceNotesAllowed(tx, actor);
+  }
   const callerIsParent = participants.parent_user_id === actor.userId;
   const recipientId = callerIsParent ? participants.teacher_user_id : participants.parent_user_id;
 
@@ -944,18 +1002,18 @@ async function writeMessage(
   if (!row) throw new Error("INSERT INTO app.messages returned no row");
 
   const attachments: MessageAttachment[] = [];
-  for (const [position, { permanentKey, upload }] of promoted.entries()) {
+  for (const [position, { permanentKey, upload, durationMs }] of promoted.entries()) {
     const [attachment] = await tx<AttachmentRow[]>`
       INSERT INTO app.message_attachments (
         school_id, message_id, position, storage_key, original_file_name, mime_type, size_bytes,
-        checksum_sha256
+        checksum_sha256, duration_ms
       ) VALUES (
         ${actor.schoolId}::uuid, ${row.id}::uuid, ${position}, ${permanentKey},
         ${upload.parsed.filename}, ${upload.contentType}, ${upload.sizeBytes},
-        ${upload.checksumSha256}
+        ${upload.checksumSha256}, ${durationMs ?? null}
       )
       RETURNING id, message_id, storage_key, mime_type, size_bytes::text AS size_bytes,
-                scan_status::text AS scan_status
+                scan_status::text AS scan_status, duration_ms
     `;
     attachments.push(await toAttachmentResponse(storage, attachment!));
   }
@@ -983,6 +1041,7 @@ async function writeMessage(
     recipientId,
     body: row.body,
     attachmentCount: attachments.length,
+    voiceNote: attachments.some((attachment) => attachment.duration_ms !== null),
   });
 
   // The body is deliberately not copied into the audit trail: a private message does not belong in
@@ -995,6 +1054,7 @@ async function writeMessage(
       conversation_id: conversationId,
       body_length: row.body.length,
       attachment_count: attachments.length,
+      voice_note: attachments.some((attachment) => attachment.duration_ms !== null),
     },
   });
 
@@ -1004,7 +1064,13 @@ async function writeMessage(
 async function notifyRecipient(
   tx: TransactionSql,
   actor: MessagingActor,
-  params: { conversationId: string; recipientId: string; body: string; attachmentCount: number },
+  params: {
+    conversationId: string;
+    recipientId: string;
+    body: string;
+    attachmentCount: number;
+    voiceNote: boolean;
+  },
 ): Promise<void> {
   const [settings] = await tx<{ in_app_enabled: boolean; locale: string | null }[]>`
     SELECT in_app_enabled, locale
@@ -1019,8 +1085,11 @@ async function notifyRecipient(
   `;
   const locale = isTemplateLocale(settings.locale) ? settings.locale : "en";
   // An image-only message has no text to excerpt; the preview names what was sent instead.
-  const preview =
-    params.body.length === 0 && params.attachmentCount > 0
+  const preview = params.voiceNote
+    ? locale === "ar"
+      ? VOICE_PREVIEW_AR
+      : VOICE_PREVIEW_EN
+    : params.body.length === 0 && params.attachmentCount > 0
       ? locale === "ar"
         ? PHOTO_PREVIEW_AR
         : PHOTO_PREVIEW_EN

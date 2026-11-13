@@ -149,6 +149,12 @@ class FakeMessagingClient extends Fake implements MessagingClient {
   final sentStorageKeys = <List<String>>[];
   final uploadRequests =
       <({String fileName, String contentType, int sizeBytes})>[];
+
+  /// The content class of each [uploadRequests] entry, in order.
+  final uploadContentClasses = <String>[];
+
+  /// Voice notes sent: their staged key and duration.
+  final sentVoiceNotes = <({String key, Duration duration})>[];
   final uploadedUrls = <String>[];
   final blockCalls = <String>[];
   final unblockCalls = <String>[];
@@ -285,9 +291,14 @@ class FakeMessagingClient extends Fake implements MessagingClient {
     String conversationId,
     String body, {
     List<String> storageKeys = const [],
+    String? voiceNoteKey,
+    Duration? voiceNoteDuration,
   }) async {
     sentBodies.add(body);
     sentStorageKeys.add(storageKeys);
+    if (voiceNoteKey != null) {
+      sentVoiceNotes.add((key: voiceNoteKey, duration: voiceNoteDuration ?? Duration.zero));
+    }
     if (sendGate case final gate?) await gate.future;
     if (sendError case final error?) throw error;
     final message = ChatMessage(
@@ -298,6 +309,15 @@ class FakeMessagingClient extends Fake implements MessagingClient {
       createdAt: sendClock,
       attachments: [
         for (final key in storageKeys) attachmentFixture('att-$key'),
+        if (voiceNoteKey != null)
+          MessageAttachment(
+            id: 'att-$voiceNoteKey',
+            contentType: 'audio/mp4',
+            sizeBytes: 1000,
+            downloadUrl: 'https://storage.test/$voiceNoteKey.m4a',
+            downloadUrlExpiresAt: fixedNow.add(const Duration(minutes: 5)),
+            durationMs: voiceNoteDuration?.inMilliseconds,
+          ),
       ],
     );
     final stored = messages[conversationId] ??= [];
@@ -317,7 +337,9 @@ class FakeMessagingClient extends Fake implements MessagingClient {
     required String fileName,
     required String contentType,
     required int sizeBytes,
+    String contentClass = 'message.attachment',
   }) async {
+    uploadContentClasses.add(contentClass);
     uploadRequests.add((
       fileName: fileName,
       contentType: contentType,

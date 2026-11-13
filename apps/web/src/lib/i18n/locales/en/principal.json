@@ -387,6 +387,9 @@
       "imageAlt": "Image sent by {{name}}",
       "openImage": "Open full-size image sent by {{name}} in a new tab",
       "imageUnavailable": "Image unavailable",
+      "voiceCaption": "Voice message · {{duration}}",
+      "voiceLabel": "Voice message from {{name}}, {{duration}}",
+      "voiceUnavailable": "Voice message · {{duration}} — unavailable",
       "toast": {
         "in_review": "Review started",
         "actioned": "Report marked as actioned",

@@ -629,6 +629,8 @@ export const ERROR_CODES = {
   // general report, same thread). MESSAGE_REPORT_NOT_FOUND covers a review-queue lookup and
   // MESSAGE_REPORT_INVALID_TRANSITION a status change the review workflow does not allow.
   MESSAGING_BLOCKED: "MESSAGING_BLOCKED",
+  // The school turned voice notes off (school_settings.allow_voice_notes, 000218).
+  MESSAGING_VOICE_NOTES_DISABLED: "MESSAGING_VOICE_NOTES_DISABLED",
   MESSAGE_REPORT_ALREADY_OPEN: "MESSAGE_REPORT_ALREADY_OPEN",
   MESSAGE_REPORT_NOT_FOUND: "MESSAGE_REPORT_NOT_FOUND",
   MESSAGE_REPORT_INVALID_TRANSITION: "MESSAGE_REPORT_INVALID_TRANSITION",

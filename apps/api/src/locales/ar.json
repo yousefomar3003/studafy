@@ -295,6 +295,7 @@
   "SUBSCRIPTION_REFUND_PAYMENT_REQUIRED": "اختر الدفعة المراد استردادها",
   "SUBSCRIPTION_REFUND_AMOUNT_EXCEEDS_PAYMENT": "مبلغ الاسترداد أكبر من مبلغ الدفعة",
   "MESSAGING_BLOCKED": "المراسلة محظورة بينك وبين هذا الشخص",
+  "MESSAGING_VOICE_NOTES_DISABLED": "أوقفت مدرستك الرسائل الصوتية",
   "MESSAGE_REPORT_ALREADY_OPEN": "لقد أبلغت عن هذا بالفعل ولا يزال البلاغ مفتوحًا",
   "MESSAGE_REPORT_NOT_FOUND": "لم يتم العثور على البلاغ",
   "MESSAGE_REPORT_INVALID_TRANSITION": "لا يمكن نقل هذا البلاغ إلى تلك الحالة من حالته الحالية",

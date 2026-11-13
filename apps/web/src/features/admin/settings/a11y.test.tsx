@@ -28,6 +28,7 @@ const SCHOOL_SETTINGS = {
   absence_alert_threshold: 25,
   parent_discipline_visibility: false,
   allow_parent_device_signin: true,
+  allow_voice_notes: true,
   attendance_correction_window_hours: 48,
   exam_structure: "midterm" as "midterm" | "periods",
   exam_weights: { midterm: 30, final_exam: 40, quiz: 15, homework: 15 } as Record<string, number>,

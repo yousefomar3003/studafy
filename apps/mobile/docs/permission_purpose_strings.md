@@ -14,11 +14,30 @@ photos, files or notifications changes, or a new `Info.plist` key or manifest pe
 | ----------------------- | ---------------------------------------------- | ------------------------------------------ | -------------------------------------------------------------------------- |
 | Camera                  | `NSCameraUsageDescription`, shown by iOS       | None. Capture runs in the system camera app | Teacher taps **Camera** in Upload material                                 |
 | Notifications           | iOS standard prompt (no custom string allowed) | `POST_NOTIFICATIONS` on Android 13+        | User taps **Continue** on the in-app explanation banner, after sign-in     |
+| Microphone              | `NSMicrophoneUsageDescription`, shown by iOS   | `RECORD_AUDIO` (runtime)                   | Parent or teacher first taps the microphone in a chat (voice notes)        |
 | Photo library           | `NSPhotoLibraryUsageDescription`, never shown  | None                                       | Never. Declared because linked code references the API (see below)         |
 | Music / media library   | `NSAppleMusicUsageDescription`, never shown    | None                                       | Never. Same reason                                                          |
 | Files / storage         | None needed                                    | None needed                                | n/a. The system document picker grants access to the chosen file only      |
 
-Nothing else is requested: no location, contacts, microphone, Bluetooth or tracking (ATT). `NSUserTrackingUsageDescription` must stay absent (`child_directed_sdks_test.dart`).
+Nothing else is requested: no location, contacts, Bluetooth or tracking (ATT). `NSUserTrackingUsageDescription` must stay absent (`child_directed_sdks_test.dart`).
+
+## Microphone (voice notes, added 2026-11-14)
+
+**iOS string** (`ios/Runner/Info.plist`):
+
+> Studafy uses the microphone only while you record a voice message in a chat with your child's
+> teacher or a student's parent.
+
+- **Where it's asked:** Messages → a chat → the **microphone** button (shown when the text field is
+  empty and the school allows voice notes). `record`'s `hasPermission()` shows the OS prompt at
+  that tap, the first time only. Nothing asks at launch.
+- **Who sees it:** parents and teachers (the only chat participants). Students have no chat.
+- **If declined:** the chat says "Microphone access is off. Turn it on in Settings to record voice
+  messages." (en/ar). Typing and photos keep working.
+- **Android:** `RECORD_AUDIO`, a runtime permission requested at the same tap. The `record` plugin
+  merges it; the app's manifest declares it too so the store review sees it stated.
+- **Data:** the recording stays on the phone until the user taps send; it is then uploaded to
+  Studafy's storage like a chat photo (scanned, visible to the two participants only).
 
 ## Camera
 

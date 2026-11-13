@@ -149,6 +149,7 @@ class ConversationTile extends StatelessWidget {
 /// The preview text for a conversation's newest message: its body, or "📷 Photo(s)" for an
 /// image-only one.
 String previewBody(ConversationPreview last) {
+  if (last.voiceNote) return 'messaging.list.voiceNote'.tr();
   if (last.body.isNotEmpty || last.attachmentCount == 0) return last.body;
   return last.attachmentCount == 1 ? 'messaging.list.photo'.tr() : 'messaging.list.photos'.tr();
 }

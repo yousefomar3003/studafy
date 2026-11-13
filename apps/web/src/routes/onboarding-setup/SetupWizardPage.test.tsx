@@ -23,6 +23,7 @@ const SETTINGS_RESPONSE = {
   absence_alert_threshold: 25,
   parent_discipline_visibility: false,
   allow_parent_device_signin: true,
+  allow_voice_notes: true,
   attendance_correction_window_hours: 48,
   created_at: "2026-08-01T00:00:00.000Z",
   updated_at: "2026-08-01T00:00:00.000Z",
