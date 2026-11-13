@@ -154,6 +154,7 @@ import { messagingRoutes } from "./modules/messaging";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
 import { platformGrantRoutes, platformRoutes, platformUserSupportRoutes } from "./modules/platform";
+import { platformOpsRoutes } from "./modules/platform/ops/routes";
 import { privacyRoutes } from "./modules/privacy";
 import { realtimeTicketRoutes } from "./modules/realtime";
 import { DEVELOPMENT_RECORD_KEYRING, recordRoutes } from "./modules/records";
@@ -1369,6 +1370,9 @@ export function createApp({
     // Per-account support actions in the console (re-invite, sign out everywhere, unlock,
     // deactivate/reactivate, read-only panel). platform:read / platform:manage; no impersonation.
     app.route("/", platformUserSupportRoutes({ database, denylist: jtiDenylist, logger }));
+    // Console operations: Studafy-wide banners, the staff activity log, system health and the
+    // cross-school flag view; plus GET /api/platform-banners, which every signed-in client reads.
+    app.route("/", platformOpsRoutes({ database, redis: redis ?? null, flags }));
     // The console's school sign-up review queue; approval creates and provisions the school.
     app.route(
       "/",

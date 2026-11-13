@@ -93,7 +93,10 @@ approved_globals(table_name) AS (
     -- numbering function is SECURITY DEFINER.
     ('license_price_settings'),
     ('license_price_brackets'),
-    ('license_invoice_counters')
+    ('license_invoice_counters'),
+    -- Studafy-wide banners (000214): one row is shown in every school, so there is no school_id
+    -- to isolate by. Reachable by studafy_admin only, like sales_inquiries.
+    ('platform_announcements')
 ),
 approved_flexible_columns(table_name, column_name) AS (
   VALUES

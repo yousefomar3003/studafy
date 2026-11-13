@@ -4,7 +4,13 @@
     "primaryNavAriaLabel": "Primary",
     "toggleNav": "Toggle navigation",
     "homeLink": "Studafy home",
-    "back": "Back"
+    "back": "Back",
+    "platformBanner": {
+      "info": "Notice:",
+      "warning": "Warning:",
+      "maintenance": "Maintenance:",
+      "dismiss": "Dismiss this announcement"
+    }
   },
   "nav": {
     "ariaLabel": "Portal",
