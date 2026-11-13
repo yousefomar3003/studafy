@@ -1220,3 +1220,222 @@ describeDb("messaging reports and the review queue", () => {
     expect(updated).toBe(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Voice notes (000218)
+// ---------------------------------------------------------------------------
+
+/** Stage a recording the way the app does: request-upload under `message.voice`, then "PUT". */
+async function stageVoice(
+  actor: Actor,
+  options: { contentType?: string; sizeBytes?: number } = {},
+): Promise<Response | string> {
+  const contentType = options.contentType ?? "audio/mp4";
+  const sizeBytes = options.sizeBytes ?? 240_000;
+  const res = await request(actor, "POST", "/api/storage/uploads/request-upload", {
+    content_class: "message.voice",
+    file_name: "voice-note.m4a",
+    content_type: contentType,
+    size_bytes: sizeBytes,
+  });
+  if (res.status !== 201) return res;
+  const { storage_key } = (await res.json()) as { storage_key: string };
+  storage.objects.set(storage_key, { contentType, sizeBytes });
+  return storage_key;
+}
+
+async function setVoiceNotesAllowed(schoolId: string, allowed: boolean): Promise<void> {
+  await asAdminTx(schoolId, async (tx) => {
+    await tx`
+      INSERT INTO app.school_settings (school_id, allow_voice_notes)
+      VALUES (${schoolId}::uuid, ${allowed})
+      ON CONFLICT (school_id) DO UPDATE SET allow_voice_notes = EXCLUDED.allow_voice_notes
+    `;
+  });
+}
+
+interface VoiceAttachmentBody extends AttachmentBody {
+  duration_ms: number | null;
+}
+
+describeDb("messaging voice notes", () => {
+  test("a parent sends a voice note: stored, charged, listed with its length, previewed", async () => {
+    const world = await buildWorld();
+    const conversation = (await openConversation(world)) as ConversationBody & {
+      voice_notes_allowed: boolean;
+    };
+    expect(conversation.voice_notes_allowed).toBe(true);
+    const before = await meterBytes(world.schoolId);
+    const key = (await stageVoice(world.parent)) as string;
+
+    const message = await send(world.parent, conversation.id, {
+      voice_note: { storage_key: key, duration_ms: 7_400 },
+    });
+    expect(message.body).toBe("");
+    expect(message.attachments).toHaveLength(1);
+    expect(message.attachments[0]).toMatchObject({
+      content_type: "audio/mp4",
+      size_bytes: 240_000,
+      duration_ms: 7_400,
+    });
+    const permanentKey = key.replace(/^temp\//, "permanent/");
+    expect(storage.objects.has(permanentKey)).toBe(true);
+    expect(storage.objects.has(key)).toBe(false);
+    expect(await meterBytes(world.schoolId)).toBe(before + 240_000);
+    // Scanned like any upload before anyone can play it.
+    expect(scanJobs).toContainEqual({
+      target: "message_attachment",
+      schoolId: world.schoolId,
+      storageKey: permanentKey,
+    });
+    expect(message.attachments[0]!.download_url).toBeNull();
+    await recordScanVerdict(world.schoolId, permanentKey, "clean");
+
+    const page = await json<{ messages: MessageBody[] }>(
+      await request(
+        world.teacher,
+        "GET",
+        `/api/messaging/conversations/${conversation.id}/messages`,
+      ),
+      200,
+    );
+    const listed = page.messages.find((m) => m.id === message.id)!;
+    expect(listed.attachments[0]).toMatchObject({ content_type: "audio/mp4", duration_ms: 7_400 });
+    expect(listed.attachments[0]!.download_url).toContain(`permanent/${world.schoolId}/`);
+
+    const inbox = await json<{ conversation: { last_message: { voice_note: boolean } } }>(
+      await request(world.teacher, "GET", `/api/messaging/conversations/${conversation.id}`),
+      200,
+    );
+    expect(inbox.conversation.last_message.voice_note).toBe(true);
+
+    const [notification] = await database!.sql<{ body: string }[]>`
+      SELECT body FROM app.notifications
+      WHERE school_id = ${world.schoolId} AND user_id = ${world.teacher.userId}
+        AND notification_type = 'DIRECT_MESSAGE'
+    `;
+    expect(notification!.body).toBe("🎤 Voice message");
+
+    const [audit] = await database!.sql<{ voice_note: string }[]>`
+      SELECT new_values->>'voice_note' AS voice_note
+      FROM app.audit_logs
+      WHERE school_id = ${world.schoolId} AND target_table = 'messages' AND target_id = ${message.id}
+    `;
+    expect(audit).toEqual({ voice_note: "true" });
+
+    // A reviewer hears the reported note, with its length.
+    const report = await json<{ report: ReportBody }>(
+      await request(
+        world.teacher,
+        "POST",
+        `/api/messaging/conversations/${conversation.id}/reports`,
+        { message_id: message.id, reason_category: "harassment" },
+      ),
+      201,
+    );
+    const detail = await json<{ report: ReportDetailBody }>(
+      await request(world.principal, "GET", `/api/messaging/reports/${report.report.id}`),
+      200,
+    );
+    const reported = detail.report.messages.find((m) => m.id === message.id)!;
+    expect(reported.attachments[0] as VoiceAttachmentBody).toMatchObject({
+      content_type: "audio/mp4",
+      duration_ms: 7_400,
+    });
+    expect(reported.attachments[0]!.download_url).toContain(`permanent/${world.schoolId}/`);
+  });
+
+  test("limits: audio types only, 2 MiB, 2 minutes, sent on its own", async () => {
+    const world = await buildWorld();
+    const conversation = await openConversation(world);
+    const path = `/api/messaging/conversations/${conversation.id}/messages`;
+
+    const image = await stageVoice(world.parent, { contentType: "image/jpeg" });
+    expect((image as Response).status).toBe(400);
+    const tooBig = await stageVoice(world.parent, { sizeBytes: 3 * 1024 * 1024 });
+    expect((tooBig as Response).status).toBe(400);
+
+    const key = (await stageVoice(world.parent)) as string;
+    const tooLong = await request(world.parent, "POST", path, {
+      voice_note: { storage_key: key, duration_ms: 125_000 },
+    });
+    expect(tooLong.status).toBe(400);
+    const withText = await request(world.parent, "POST", path, {
+      body: "hello",
+      voice_note: { storage_key: key, duration_ms: 3_000 },
+    });
+    expect(withText.status).toBe(400);
+    const imageKey = await stageImage(world.parent);
+    const withImage = await request(world.parent, "POST", path, {
+      attachments: [{ storage_key: imageKey }],
+      voice_note: { storage_key: key, duration_ms: 3_000 },
+    });
+    expect(withImage.status).toBe(400);
+
+    // An image staged under the image class cannot be smuggled in as a voice note.
+    const smuggled = await request(world.parent, "POST", path, {
+      voice_note: { storage_key: imageKey, duration_ms: 3_000 },
+    });
+    expect(smuggled.status).toBe(400);
+
+    // Nothing above was stored; the staged recording is still there for a retry.
+    expect(storage.objects.has(key)).toBe(true);
+    await send(world.parent, conversation.id, {
+      voice_note: { storage_key: key, duration_ms: 3_000 },
+    });
+  });
+
+  test("a school that turns voice notes off: sending refused, old notes still listed", async () => {
+    const world = await buildWorld();
+    const conversation = await openConversation(world);
+    const first = (await stageVoice(world.teacher)) as string;
+    const sent = await send(world.teacher, conversation.id, {
+      voice_note: { storage_key: first, duration_ms: 2_000 },
+    });
+
+    await setVoiceNotesAllowed(world.schoolId, false);
+    const key = (await stageVoice(world.teacher)) as string;
+    const refused = await request(
+      world.teacher,
+      "POST",
+      `/api/messaging/conversations/${conversation.id}/messages`,
+      { voice_note: { storage_key: key, duration_ms: 2_000 } },
+    );
+    expect(refused.status).toBe(403);
+    expect(((await refused.json()) as { code: string }).code).toBe(
+      "MESSAGING_VOICE_NOTES_DISABLED",
+    );
+    // Refused before anything was charged or promoted.
+    expect(storage.objects.has(key)).toBe(true);
+
+    const thread = await json<{ conversation: { voice_notes_allowed: boolean } }>(
+      await request(world.parent, "GET", `/api/messaging/conversations/${conversation.id}`),
+      200,
+    );
+    expect(thread.conversation.voice_notes_allowed).toBe(false);
+    const page = await json<{ messages: MessageBody[] }>(
+      await request(
+        world.parent,
+        "GET",
+        `/api/messaging/conversations/${conversation.id}/messages`,
+      ),
+      200,
+    );
+    expect(page.messages.map((m) => m.id)).toContain(sent.id);
+    // Text keeps working.
+    await send(world.teacher, conversation.id, { body: "typed instead" });
+  });
+
+  test("the same participant rule as text: an outsider cannot send a voice note", async () => {
+    const world = await buildWorld();
+    const conversation = await openConversation(world);
+    const key = (await stageVoice(world.otherParent)) as string;
+    const res = await request(
+      world.otherParent,
+      "POST",
+      `/api/messaging/conversations/${conversation.id}/messages`,
+      { voice_note: { storage_key: key, duration_ms: 2_000 } },
+    );
+    expect(res.status).toBe(404);
+  });
+});

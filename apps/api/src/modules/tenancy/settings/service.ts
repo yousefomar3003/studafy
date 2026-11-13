@@ -21,6 +21,7 @@ export interface SchoolSettingsRow {
   absence_alert_threshold: number;
   parent_discipline_visibility: boolean;
   allow_parent_device_signin: boolean;
+  allow_voice_notes: boolean;
   attendance_correction_window_hours: number;
   exam_structure: ExamStructure;
   exam_weights: ExamWeights;
@@ -37,6 +38,7 @@ export interface UpdateSchoolSettingsParams {
   absence_alert_threshold?: number;
   parent_discipline_visibility?: boolean;
   allow_parent_device_signin?: boolean;
+  allow_voice_notes?: boolean;
   attendance_correction_window_hours?: number;
   exam_structure?: ExamStructure;
   exam_weights?: ExamWeights;
@@ -57,6 +59,7 @@ function rowToSettings(row: SchoolSettingsRow): SchoolSettingsRow {
     absence_alert_threshold: row.absence_alert_threshold,
     parent_discipline_visibility: row.parent_discipline_visibility,
     allow_parent_device_signin: row.allow_parent_device_signin,
+    allow_voice_notes: row.allow_voice_notes,
     attendance_correction_window_hours: row.attendance_correction_window_hours,
     exam_structure: row.exam_structure,
     exam_weights: row.exam_weights,
@@ -85,6 +88,7 @@ export async function getSchoolSettings(
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
         allow_parent_device_signin,
+        allow_voice_notes,
         attendance_correction_window_hours,
         exam_structure, exam_weights,
         created_at, updated_at
@@ -114,6 +118,7 @@ export async function getSchoolSettings(
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
         allow_parent_device_signin,
+        allow_voice_notes,
         attendance_correction_window_hours,
         exam_structure, exam_weights,
         created_at, updated_at
@@ -157,6 +162,7 @@ export async function updateSchoolSettings(
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
         allow_parent_device_signin,
+        allow_voice_notes,
         attendance_correction_window_hours,
         exam_structure, exam_weights,
         created_at, updated_at
@@ -187,6 +193,7 @@ export async function updateSchoolSettings(
           attendance_alert_threshold, absence_alert_threshold,
           parent_discipline_visibility,
           allow_parent_device_signin,
+          allow_voice_notes,
           attendance_correction_window_hours,
           exam_structure, exam_weights,
           created_at, updated_at
@@ -206,6 +213,7 @@ export async function updateSchoolSettings(
         absence_alert_threshold       = COALESCE(${patch.absence_alert_threshold ?? null}, absence_alert_threshold),
         parent_discipline_visibility  = COALESCE(${patch.parent_discipline_visibility ?? null}, parent_discipline_visibility),
         allow_parent_device_signin    = COALESCE(${patch.allow_parent_device_signin ?? null}, allow_parent_device_signin),
+        allow_voice_notes    = COALESCE(${patch.allow_voice_notes ?? null}, allow_voice_notes),
         attendance_correction_window_hours = COALESCE(${patch.attendance_correction_window_hours ?? null}, attendance_correction_window_hours),
         exam_structure                = COALESCE(${patch.exam_structure ?? null}, exam_structure),
         exam_weights                  = COALESCE(${patch.exam_weights ? tx.json(patch.exam_weights) : null}::jsonb, exam_weights),
@@ -218,6 +226,7 @@ export async function updateSchoolSettings(
         attendance_alert_threshold, absence_alert_threshold,
         parent_discipline_visibility,
         allow_parent_device_signin,
+        allow_voice_notes,
         attendance_correction_window_hours,
         exam_structure, exam_weights,
         created_at, updated_at
@@ -244,6 +253,7 @@ export async function updateSchoolSettings(
             absence_alert_threshold: before.absence_alert_threshold,
             parent_discipline_visibility: before.parent_discipline_visibility,
             allow_parent_device_signin: before.allow_parent_device_signin,
+            allow_voice_notes: before.allow_voice_notes,
             attendance_correction_window_hours: before.attendance_correction_window_hours,
             exam_structure: before.exam_structure,
             exam_weights: before.exam_weights,
@@ -258,6 +268,7 @@ export async function updateSchoolSettings(
         absence_alert_threshold: after.absence_alert_threshold,
         parent_discipline_visibility: after.parent_discipline_visibility,
         allow_parent_device_signin: after.allow_parent_device_signin,
+        allow_voice_notes: after.allow_voice_notes,
         attendance_correction_window_hours: after.attendance_correction_window_hours,
         exam_structure: after.exam_structure,
         exam_weights: after.exam_weights,

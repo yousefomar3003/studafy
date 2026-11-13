@@ -19,6 +19,17 @@ const maxMessageAttachmentBytes = 10 * 1024 * 1024;
 /// The image types a message attachment may be.
 const messageAttachmentContentTypes = {'image/jpeg', 'image/png', 'image/webp', 'image/heic'};
 
+/// The longest voice note the app records. The API accepts a little over this (recorder
+/// overshoot); recording stops itself here.
+const maxVoiceNoteDuration = Duration(minutes: 2);
+
+/// The type voice notes are recorded and uploaded as: AAC in an .m4a container.
+const voiceNoteContentType = 'audio/mp4';
+
+/// The largest voice note the API accepts: 2 MiB (about 2 minutes at 64 kbps; the app records at
+/// 32 kbps, so a full-length note is about half that).
+const maxVoiceNoteBytes = 2 * 1024 * 1024;
+
 /// The longest report details the API accepts, in characters.
 const maxReportDetailsLength = 1000;
 
@@ -43,6 +54,7 @@ class ConversationPreview {
     required this.senderId,
     required this.createdAt,
     this.attachmentCount = 0,
+    this.voiceNote = false,
   });
 
   factory ConversationPreview.fromJson(Map<String, Object?> json) => ConversationPreview(
@@ -50,6 +62,7 @@ class ConversationPreview {
     senderId: json['sender_id']! as String,
     createdAt: DateTime.parse(json['created_at']! as String),
     attachmentCount: (json['attachment_count'] as num?)?.toInt() ?? 0,
+    voiceNote: (json['voice_note'] as bool?) ?? false,
   );
 
   /// Empty for an image-only message.
@@ -59,6 +72,9 @@ class ConversationPreview {
 
   /// Images on the newest message.
   final int attachmentCount;
+
+  /// The newest message is a voice note.
+  final bool voiceNote;
 }
 
 /// Who has blocked whom in one conversation, from the caller's side. While either is true the
@@ -106,6 +122,7 @@ class Conversation {
     required this.unreadCount,
     required this.updatedAt,
     this.block = BlockState.none,
+    this.voiceNotesAllowed = true,
   });
 
   factory Conversation.fromJson(Map<String, Object?> json) {
@@ -119,6 +136,9 @@ class Conversation {
       unreadCount: (json['unread_count'] as num?)?.toInt() ?? 0,
       updatedAt: DateTime.parse(json['updated_at']! as String),
       block: BlockState.fromJson(json),
+      // Older servers do not send it; they also do not accept voice notes, but a missing flag
+      // reads as "allowed" so a slightly newer app against a newer server is never wrongly hidden.
+      voiceNotesAllowed: (json['voice_notes_allowed'] as bool?) ?? true,
     );
   }
 
@@ -133,6 +153,10 @@ class Conversation {
   /// The block flags as of when this conversation was fetched.
   final BlockState block;
 
+  /// Whether the school lets this thread send voice notes (`allow_voice_notes`). Notes already
+  /// sent stay playable either way.
+  final bool voiceNotesAllowed;
+
   /// The participant on the other side from [viewer].
   MessagingParty counterpart(MessagingViewer viewer) =>
       viewer == MessagingViewer.parent ? teacher : parent;
@@ -142,7 +166,7 @@ class Conversation {
       viewer == MessagingViewer.parent ? parent : teacher;
 }
 
-/// An image attached to a message. [downloadUrl] is a pre-signed GET that stops working at
+/// An image or voice note attached to a message. [downloadUrl] is a pre-signed GET that stops working at
 /// [downloadUrlExpiresAt] (about five minutes after the fetch); a fresh one comes with the next
 /// fetch of the message. Both are null when the deployment has no object storage configured.
 class MessageAttachment {
@@ -152,6 +176,7 @@ class MessageAttachment {
     required this.sizeBytes,
     required this.downloadUrl,
     required this.downloadUrlExpiresAt,
+    this.durationMs,
   });
 
   factory MessageAttachment.fromJson(Map<String, Object?> json) {
@@ -162,6 +187,7 @@ class MessageAttachment {
       sizeBytes: (json['size_bytes'] as num?)?.toInt() ?? 0,
       downloadUrl: json['download_url'] as String?,
       downloadUrlExpiresAt: expires == null ? null : DateTime.parse(expires),
+      durationMs: (json['duration_ms'] as num?)?.toInt(),
     );
   }
 
@@ -170,6 +196,15 @@ class MessageAttachment {
   final int sizeBytes;
   final String? downloadUrl;
   final DateTime? downloadUrlExpiresAt;
+
+  /// A voice note's length; null for an image.
+  final int? durationMs;
+
+  /// A voice note (an audio attachment) rather than an image.
+  bool get isVoiceNote => contentType.startsWith('audio/');
+
+  /// [durationMs] as a [Duration] (zero when unknown).
+  Duration get duration => Duration(milliseconds: durationMs ?? 0);
 }
 
 /// One message in a conversation. [body] is empty for an image-only message.
@@ -201,8 +236,22 @@ class ChatMessage {
   final String body;
   final DateTime createdAt;
 
-  /// Attached images in display order (0–4).
+  /// Attached images in display order (0–4), or exactly one voice note.
   final List<MessageAttachment> attachments;
+
+  /// The message's voice note, if it is one.
+  MessageAttachment? get voiceNote {
+    for (final attachment in attachments) {
+      if (attachment.isVoiceNote) return attachment;
+    }
+    return null;
+  }
+
+  /// The message's images (never the voice note).
+  List<MessageAttachment> get images => [
+    for (final attachment in attachments)
+      if (!attachment.isVoiceNote) attachment,
+  ];
 }
 
 /// A pre-signed upload slot for one message image: PUT the bytes to [uploadUrl], then send the

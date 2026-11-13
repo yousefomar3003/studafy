@@ -43,6 +43,7 @@ used for tracking**. The only purpose is **App Functionality**. The manifest key
 | Identifiers → User ID | `NSPrivacyCollectedDataTypeUserID` | `AuthSession.userId` is the JWT `sub`. It scopes every API call and is set as the crash-report user (`monitoring_providers.dart`). |
 | Identifiers → Device ID | `NSPrivacyCollectedDataTypeDeviceID` | The FCM token, registered to `POST /api/auth/devices` with the bearer token (`push_service.dart`). The token is created only after sign-in (ST-307). The Firebase Installation ID and the Crashlytics/Sentry installation UUIDs also fall here. |
 | User Content → Photos or Videos | `NSPrivacyCollectedDataTypePhotosorVideos` | Camera capture only (`teacher_content_screen.dart`, `ImageSource.camera`). There is no photo-library access. |
+| User Content → Audio Data | `NSPrivacyCollectedDataTypeAudioData` | Voice notes in parent–teacher chats (added 2026-11-14): recorded only when the user taps the microphone, uploaded when they tap send, visible to the two chat participants (and a school reviewer if reported) (`voice_note_controllers.dart`, `apps/api/src/modules/messaging`). |
 | User Content → Other User Content | `NSPrivacyCollectedDataTypeOtherUserContent` | Uploaded files (`file_picker`), assignment and exam submissions, announcements, discipline incidents, attendance and grading entries, quiz attempts and flashcard reviews, AI questions, and AI content reports. |
 | Purchases → Purchase History | `NSPrivacyCollectedDataTypePurchaseHistory` | A student who buys the AI add-on in the app: the API verifies the store purchase and keeps its product, transaction id and paid period on the account to turn the add-on on and off (`ai_store_controller.dart`, `apps/api/src/modules/subscriptions/store/`). No card or payment details reach Studafy. |
 | Diagnostics → Crash Data | `NSPrivacyCollectedDataTypeCrashData` | Crashlytics and Sentry, tagged with the user ID. |
@@ -59,10 +60,10 @@ used for tracking**. The only purpose is **App Functionality**. The manifest key
   API returns, and fees are paid on the school's page in the system browser
   (`docs/store_payment_routing.md`). Displaying data the server already holds is not collection
   under either store's definition.
-- **Location, Contacts, Health, Sensitive Info, Browsing or Search History, Audio.** There is no
+- **Location, Contacts, Health, Sensitive Info, Browsing or Search History.** There is no
   code path or permission for any of them. `file_picker`'s audio picker is compiled into a
   SwiftPM build but never shown: the app only opens the document picker (see
-  [Native build](#native-build)).
+  [Native build](#native-build)). Audio *is* collected, but only as chat voice notes (above).
 - **Usage Data (Product Interaction, Advertising Data).** There is no analytics SDK. Firebase's
   own manifests list "Other Data" and "Other Diagnostic Data" for analytics. That is Google's
   internal service telemetry for FCM and installations. Studafy reads none of it, and it is covered
@@ -94,6 +95,7 @@ service providers as sharing), and **not ephemeral**.
 | Personal info → User IDs | Required | App functionality, Account management | User ID |
 | Personal info → Other info | Required | App functionality | Education records a teacher enters: grades, attendance, discipline incidents |
 | Photos and videos → Photos | Optional | App functionality | Photos or Videos |
+| Audio → Voice or sound recordings | Optional | App functionality | Audio Data (chat voice notes) |
 | Files and docs → Files and docs | Optional | App functionality | Uploaded materials and submission attachments |
 | Messages → Other in-app messages | Optional | App functionality | Class announcements |
 | App activity → Other user-generated content | Optional | App functionality | Submissions, AI questions, AI content reports |
@@ -166,6 +168,7 @@ The `sqlite3` pod that `sqlite3_flutter_libs` adds is built from the same SQLite
 | Plugin | Manifest | Required-reason APIs declared |
 | --- | --- | --- |
 | `app_links` | Own | None |
+| `audioplayers_darwin` | None. Native code (AVPlayer playback) calls no required-reason API (checked 6.5.0) | None |
 | `file_picker_darwin` | Own | None |
 | `firebase_core` | None. Wrapper only: native code calls no required-reason API (checked) | Covered by the Firebase pods below |
 | `firebase_crashlytics` | None. Wrapper only (checked) | Covered by the Firebase pods below |
@@ -177,6 +180,7 @@ The `sqlite3` pod that `sqlite3_flutter_libs` adds is built from the same SQLite
 | `image_picker_ios` | Own | None |
 | `in_app_purchase_storekit` | Own | None |
 | `package_info_plus` | Own | None |
+| `record_darwin` | Own | None |
 | `path_provider_foundation` | No native target. Dart FFI through `objective_c`, calling only `NSFileManager` directory lookups | None needed |
 | `sentry_flutter` | None. Wrapper only (checked) | Covered by the `Sentry` pod |
 | `shared_preferences_foundation` | Own | UserDefaults `CA92.1` |

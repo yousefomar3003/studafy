@@ -257,7 +257,10 @@ const sendMessageRoute = createRoute({
     'previews as "📷 Photo"). Images are staged first via POST /api/storage/uploads/request-upload ' +
     "with content_class `message.attachment` (image/jpeg, image/png, image/webp, image/heic; " +
     "10 MiB each) and PUT to the returned URL; this call then re-checks each stored object's type " +
-    "and size, promotes it, and records it in the same transaction as the message. 400 for a bad " +
+    "and size, promotes it, and records it in the same transaction as the message. A voice note " +
+    "(`voice_note`, sent on its own) is staged the same way under content_class `message.voice` " +
+    '(audio/mp4 or audio/aac, 2 MiB, at most 2 minutes) and previews as "🎤 Voice message"; ' +
+    "403 MESSAGING_VOICE_NOTES_DISABLED when the school has turned voice notes off. 400 for a bad " +
     "body or an image that fails the checks, 402 STORAGE_QUOTA_EXCEEDED, 403 MESSAGING_BLOCKED " +
     "when a block stands between the participants (either direction), 403 STORAGE_KEY_FORBIDDEN " +
     "for a key outside the caller's school, 404 for a non-participant or STORAGE_OBJECT_NOT_FOUND " +
