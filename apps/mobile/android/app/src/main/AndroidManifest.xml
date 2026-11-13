@@ -2,6 +2,8 @@
     xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Android 13+: without it the phone never shows a notification (asked for at run time). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- No CAMERA permission: image_picker hands capture to the system camera app, which needs
          none. Declaring CAMERA would make image_picker ask for it at runtime for no benefit. See
          docs/permission_purpose_strings.md. -->

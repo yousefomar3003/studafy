@@ -822,8 +822,14 @@ export async function registerDeviceToken(
   schoolId: string,
   fcmToken: string,
   platform: "ios" | "android" | "web",
+  options: { keepOtherAccounts?: boolean } = {},
 ): Promise<{ id: string }> {
-  await tx`SELECT app.claim_device_token(${fcmToken})`;
+  // Skipped when the phone holds several signed-in accounts (the app's account switcher): each of
+  // them registers the same token under its own session and removes its own row when it signs
+  // out, so taking the token from the others would leave only the active account notified.
+  if (options.keepOtherAccounts !== true) {
+    await tx`SELECT app.claim_device_token(${fcmToken})`;
+  }
 
   const [row] = await tx<{ id: string }[]>`
     INSERT INTO app.user_devices (school_id, user_id, fcm_token, platform)
@@ -841,6 +847,27 @@ export async function registerDeviceToken(
   `;
 
   return { id: row!.id };
+}
+
+/**
+ * Soft-revoke the caller's own registration of one push token, on sign-out. Returns how many rows
+ * it revoked (0 or 1). Another user's registration of the same token is never touched: on a phone
+ * with several signed-in accounts, the others keep receiving their notifications.
+ */
+export async function deregisterDeviceToken(
+  tx: TransactionSql,
+  userId: string,
+  fcmToken: string,
+): Promise<number> {
+  const rows = await tx`
+    UPDATE app.user_devices
+       SET revoked_at = CURRENT_TIMESTAMP,
+           updated_at = GREATEST(CURRENT_TIMESTAMP, created_at)
+     WHERE user_id = ${userId}::uuid
+       AND fcm_token = ${fcmToken}
+       AND revoked_at IS NULL
+  `;
+  return rows.count;
 }
 
 /**

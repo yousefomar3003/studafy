@@ -481,13 +481,27 @@
         "resets": "Resets {date}"
       },
       "features": {
-        "ask": { "label": "Ask AI" },
-        "exam": { "label": "Exam mode" },
-        "summary": { "label": "Summaries" },
-        "concepts": { "label": "Key concepts" },
-        "flashcards": { "label": "Flashcards" },
-        "quiz": { "label": "Quizzes" },
-        "explain": { "label": "Explain it simply" }
+        "ask": {
+          "label": "Ask AI"
+        },
+        "exam": {
+          "label": "Exam mode"
+        },
+        "summary": {
+          "label": "Summaries"
+        },
+        "concepts": {
+          "label": "Key concepts"
+        },
+        "flashcards": {
+          "label": "Flashcards"
+        },
+        "quiz": {
+          "label": "Quizzes"
+        },
+        "explain": {
+          "label": "Explain it simply"
+        }
       }
     },
     "usage": {
@@ -656,7 +670,10 @@
       "failed": "Couldn't read that photo. Try again."
     },
     "assistantName": "Studafy Assistant",
-    "copy": { "action": "Copy answer", "done": "Answer copied" },
+    "copy": {
+      "action": "Copy answer",
+      "done": "Answer copied"
+    },
     "signedOut": "Sign in to ask Studafy Assistant a question.",
     "thinking": "Thinking…",
     "empty": {
@@ -2140,51 +2157,65 @@
     },
     "notifications": {
       "title": "Notifications",
-      "intro": "Choose how each kind of notification reaches you: in the app, as a push notification, or by email.",
       "loadError": "Couldn't load your notification settings.",
-      "saveFailed": "Couldn't save that change. Check your connection and try again.",
-      "mandatory": "Your school requires this notification.",
-      "categories": {
-        "academic": "Academic",
-        "communications": "Communications",
-        "family": "Family",
-        "teaching": "Teaching materials"
-      },
+      "saveFailed": "Couldn't save that change. Try again.",
+      "mandatory": "Required by your school",
       "channels": {
-        "inApp": "In app",
-        "push": "Push",
+        "push": "Phone",
         "email": "Email"
       },
-      "types": {
-        "assignmentDueSoon": "Assignment due soon",
-        "gradePosted": "Grade published",
-        "enrollmentApproved": "Enrolment approved",
-        "coursePublished": "Course published",
-        "discussionReply": "Discussion replies",
-        "studyGroupInvite": "Study group invitations",
-        "certificateIssued": "Certificate issued",
-        "supportMessage": "Support messages",
-        "attendanceAlert": "Attendance alerts",
-        "adminAnnouncement": "School announcements",
-        "announcement": "Class announcements",
-        "materialScanQuarantined": "File blocked by the safety scan",
-        "materialScanFailed": "File safety scan failed",
-        "materialOcrLowConfidence": "File text hard to read",
-        "materialIngested": "File ready for AI",
-        "materialIngestFailed": "File couldn't be prepared for AI",
-        "directMessage": "Messages",
-        "assignmentPublished": "New assignments",
-        "assignmentGraded": "Marked assignments",
-        "attendanceMarked": "Absences and lates",
-        "feeInvoiceIssued": "New fee invoices",
-        "feePaymentReceived": "Fee payments received",
-        "feePaymentReminder": "Overdue fee reminders",
-        "feeStatement": "Family fee statements",
-        "licenseSeatAppleRenewal": "School plan covers your subscription",
-        "licenseExpiring": "License ending soon",
-        "licenseInvoiceDue": "License invoice due",
-        "licenseInvoiceOverdue": "License invoice overdue",
-        "licenseReceiptUploaded": "License receipt uploaded"
+      "phone": {
+        "title": "Notifications on this phone",
+        "on": "On. Notices show on your lock screen and as banners.",
+        "off": "Off in your phone's settings, so nothing can show on this phone.",
+        "notAsked": "Not turned on yet.",
+        "unavailable": "Not available in this version of the app.",
+        "checking": "Checking…",
+        "turnOn": "Turn on notifications",
+        "openSettings": "Open Settings to turn them on",
+        "sendTest": "Send a test notification",
+        "testSent": "Sent. It should arrive on this phone in a few seconds.",
+        "testFailed": "Couldn't send the test. Wait a moment and try again."
+      },
+      "kinds": {
+        "title": "What to notify me about",
+        "intro": "Everything always appears under the bell. These switches decide what also reaches your phone or your email.",
+        "assignments": {
+          "title": "Homework",
+          "subtitle": "New homework and due-date reminders"
+        },
+        "grades": {
+          "title": "Marks",
+          "subtitle": "Released marks and certificates"
+        },
+        "attendance": {
+          "title": "Attendance",
+          "subtitle": "Absences and late arrivals"
+        },
+        "messages": {
+          "title": "Messages",
+          "subtitle": "New chat messages"
+        },
+        "announcements": {
+          "title": "Announcements",
+          "subtitle": "News from the school and teachers"
+        },
+        "fees": {
+          "title": "Fees and billing",
+          "subtitle": "Invoices, payments and reminders"
+        },
+        "schoolUpdates": {
+          "title": "School updates",
+          "subtitle": "Enrolment, courses and other updates"
+        }
+      },
+      "quiet": {
+        "title": "Quiet hours",
+        "toggle": "Quiet hours",
+        "subtitle": "No phone notifications during these hours. Urgent notices still come through.",
+        "from": "From",
+        "until": "Until",
+        "timezone": "Times in {zone}"
       }
     },
     "staffRecord": {
