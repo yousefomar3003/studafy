@@ -400,6 +400,13 @@ export async function deleteClass(
     action: "delete",
     targetTable: "classes",
     targetId: classId,
+    oldValues: {
+      code: existing.code,
+      status: existing.status,
+      course_id: existing.course_id,
+      section_id: existing.section_id,
+      lead_teacher_id: existing.lead_teacher_id,
+    },
   });
 
   return { deleted: true };
