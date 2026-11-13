@@ -521,48 +521,54 @@ function Breakdown({
                 ? t("platformLicensing.calculator.period.days", { days: calculation.prorateDays })
                 : t("platformLicensing.calculator.period.months", { months: calculation.months })}
             </p>
-            <table className="platform-table">
-              <caption className="sf-visually-hidden">
-                {t("platformLicensing.calculator.breakdownTitle")}
-              </caption>
-              <tbody>
-                {calculation.breakdown.lines.map((line, index) =>
-                  line.kind === "seats" ? (
-                    <SeatRows key={index} line={line} currency={currency} />
-                  ) : line.kind === "overlap_credit" ? (
-                    <tr key={index}>
-                      <th scope="row">{line.description}</th>
-                      <td className="licensing-amount licensing-negative">{m(line.amountMinor)}</td>
-                    </tr>
-                  ) : (
-                    <tr key={index}>
-                      <th scope="row">
-                        {t("platformLicensing.calculator.adjustmentLine", { reason: line.reason })}
-                      </th>
-                      <td className="licensing-amount">{m(line.amountMinor)}</td>
-                    </tr>
-                  ),
-                )}
-                <tr>
-                  <th scope="row">{t("platformLicensing.calculator.listTotal")}</th>
-                  <td className="licensing-amount">{m(calculation.breakdown.listTotalMinor)}</td>
-                </tr>
-                {calculation.breakdown.creditTotalMinor > 0 ? (
+            <div className="platform-table-scroll">
+              <table className="platform-table">
+                <caption className="sf-visually-hidden">
+                  {t("platformLicensing.calculator.breakdownTitle")}
+                </caption>
+                <tbody>
+                  {calculation.breakdown.lines.map((line, index) =>
+                    line.kind === "seats" ? (
+                      <SeatRows key={index} line={line} currency={currency} />
+                    ) : line.kind === "overlap_credit" ? (
+                      <tr key={index}>
+                        <th scope="row">{line.description}</th>
+                        <td className="licensing-amount licensing-negative">
+                          {m(line.amountMinor)}
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr key={index}>
+                        <th scope="row">
+                          {t("platformLicensing.calculator.adjustmentLine", {
+                            reason: line.reason,
+                          })}
+                        </th>
+                        <td className="licensing-amount">{m(line.amountMinor)}</td>
+                      </tr>
+                    ),
+                  )}
                   <tr>
-                    <th scope="row">{t("platformLicensing.calculator.creditTotal")}</th>
-                    <td className="licensing-amount licensing-negative">
-                      {m(-calculation.breakdown.creditTotalMinor)}
+                    <th scope="row">{t("platformLicensing.calculator.listTotal")}</th>
+                    <td className="licensing-amount">{m(calculation.breakdown.listTotalMinor)}</td>
+                  </tr>
+                  {calculation.breakdown.creditTotalMinor > 0 ? (
+                    <tr>
+                      <th scope="row">{t("platformLicensing.calculator.creditTotal")}</th>
+                      <td className="licensing-amount licensing-negative">
+                        {m(-calculation.breakdown.creditTotalMinor)}
+                      </td>
+                    </tr>
+                  ) : null}
+                  <tr>
+                    <th scope="row">{t("platformLicensing.calculator.total")}</th>
+                    <td className="licensing-amount licensing-total">
+                      {m(calculation.breakdown.totalMinor)}
                     </td>
                   </tr>
-                ) : null}
-                <tr>
-                  <th scope="row">{t("platformLicensing.calculator.total")}</th>
-                  <td className="licensing-amount licensing-total">
-                    {m(calculation.breakdown.totalMinor)}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            </div>
             {calculation.breakdown.savingsMinor > 0 ? (
               <p className="licensing-savings">
                 {t("platformLicensing.calculator.youSave", {
@@ -649,36 +655,40 @@ function NextBrackets({ calculation }: { calculation: QuoteCalculation }) {
         <h2 id="calculator-next">{t("platformLicensing.calculator.nextTitle")}</h2>
       </Card.Header>
       <Card.Body>
-        <table className="platform-table">
-          <caption className="sf-visually-hidden">
-            {t("platformLicensing.calculator.nextTitle")}
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("platformLicensing.calculator.nextColumns.audience")}</th>
-              <th scope="col">{t("platformLicensing.calculator.nextColumns.offer")}</th>
-              <th scope="col">{t("platformLicensing.calculator.nextColumns.now")}</th>
-              <th scope="col">{t("platformLicensing.calculator.nextColumns.then")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((line) => (
-              <tr key={line.audience}>
-                <td>{t(`platformLicensing.audience.${line.audience}`)}</td>
-                <td>
-                  {t("platformLicensing.calculator.nextOffer", {
-                    count: line.nextVolumeBracket!.seatsToAdd,
-                    percent: bpsToPercent(line.nextVolumeBracket!.discountBps),
-                  })}
-                </td>
-                <td className="licensing-amount">{money(line.pricePerSeatMonthMinor, currency)}</td>
-                <td className="licensing-amount">
-                  {money(line.nextVolumeBracket!.pricePerSeatMonthMinor, currency)}
-                </td>
+        <div className="platform-table-scroll">
+          <table className="platform-table">
+            <caption className="sf-visually-hidden">
+              {t("platformLicensing.calculator.nextTitle")}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">{t("platformLicensing.calculator.nextColumns.audience")}</th>
+                <th scope="col">{t("platformLicensing.calculator.nextColumns.offer")}</th>
+                <th scope="col">{t("platformLicensing.calculator.nextColumns.now")}</th>
+                <th scope="col">{t("platformLicensing.calculator.nextColumns.then")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {lines.map((line) => (
+                <tr key={line.audience}>
+                  <td>{t(`platformLicensing.audience.${line.audience}`)}</td>
+                  <td>
+                    {t("platformLicensing.calculator.nextOffer", {
+                      count: line.nextVolumeBracket!.seatsToAdd,
+                      percent: bpsToPercent(line.nextVolumeBracket!.discountBps),
+                    })}
+                  </td>
+                  <td className="licensing-amount">
+                    {money(line.pricePerSeatMonthMinor, currency)}
+                  </td>
+                  <td className="licensing-amount">
+                    {money(line.nextVolumeBracket!.pricePerSeatMonthMinor, currency)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card.Body>
     </Card>
   );
@@ -728,59 +738,63 @@ export function SchoolQuotes({ schoolId }: { schoolId: string }) {
           <p className="platform-muted">{t("platformLicensing.quotes.empty")}</p>
         ) : null}
         {quotes.data && quotes.data.length > 0 ? (
-          <table className="platform-table">
-            <caption className="sf-visually-hidden">{t("platformLicensing.quotes.title")}</caption>
-            <thead>
-              <tr>
-                <th scope="col">{t("platformLicensing.quotes.columns.created")}</th>
-                <th scope="col">{t("platformLicensing.quotes.columns.kind")}</th>
-                <th scope="col">{t("platformLicensing.quotes.columns.total")}</th>
-                <th scope="col">{t("platformLicensing.quotes.columns.validUntil")}</th>
-                <th scope="col">{t("platformLicensing.quotes.columns.status")}</th>
-                <th scope="col">
-                  <span className="sf-visually-hidden">
-                    {t("platformLicensing.common.actions")}
-                  </span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {quotes.data.map((quote) => (
-                <tr key={quote.id}>
-                  <td>{formatDate(new Date(quote.createdAt), { dateStyle: "medium" })}</td>
-                  <td>{t(`platformLicensing.quoteKind.${quote.kind}`)}</td>
-                  <td className="licensing-amount">
-                    {money(quote.totalMinor, quote.currencyCode, quote.minorUnit)}
-                  </td>
-                  <td>{formatDate(new Date(quote.validUntil), { dateStyle: "medium" })}</td>
-                  <td>
-                    <span className="platform-pill" data-status={quote.status}>
-                      {t(`platformLicensing.quoteStatus.${quote.status}`)}
+          <div className="platform-table-scroll">
+            <table className="platform-table">
+              <caption className="sf-visually-hidden">
+                {t("platformLicensing.quotes.title")}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">{t("platformLicensing.quotes.columns.created")}</th>
+                  <th scope="col">{t("platformLicensing.quotes.columns.kind")}</th>
+                  <th scope="col">{t("platformLicensing.quotes.columns.total")}</th>
+                  <th scope="col">{t("platformLicensing.quotes.columns.validUntil")}</th>
+                  <th scope="col">{t("platformLicensing.quotes.columns.status")}</th>
+                  <th scope="col">
+                    <span className="sf-visually-hidden">
+                      {t("platformLicensing.common.actions")}
                     </span>
-                  </td>
-                  <td>
-                    <div className="platform-actions">
-                      {QUOTE_ACTIONS[quote.status].map((move) => (
-                        <Button
-                          key={move}
-                          variant={move === "send" ? "secondary" : "tertiary"}
-                          disabled={action.isPending}
-                          onClick={() => run(quote, move)}
-                        >
-                          {t(`platformLicensing.quotes.actions.${move}`)}
-                        </Button>
-                      ))}
-                      {quote.invoiceId ? (
-                        <Link to={`/portal/platform/payments/${schoolId}/${quote.invoiceId}`}>
-                          {t("platformLicensing.quotes.openInvoice")}
-                        </Link>
-                      ) : null}
-                    </div>
-                  </td>
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {quotes.data.map((quote) => (
+                  <tr key={quote.id}>
+                    <td>{formatDate(new Date(quote.createdAt), { dateStyle: "medium" })}</td>
+                    <td>{t(`platformLicensing.quoteKind.${quote.kind}`)}</td>
+                    <td className="licensing-amount">
+                      {money(quote.totalMinor, quote.currencyCode, quote.minorUnit)}
+                    </td>
+                    <td>{formatDate(new Date(quote.validUntil), { dateStyle: "medium" })}</td>
+                    <td>
+                      <span className="platform-pill" data-status={quote.status}>
+                        {t(`platformLicensing.quoteStatus.${quote.status}`)}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="platform-actions">
+                        {QUOTE_ACTIONS[quote.status].map((move) => (
+                          <Button
+                            key={move}
+                            variant={move === "send" ? "secondary" : "tertiary"}
+                            disabled={action.isPending}
+                            onClick={() => run(quote, move)}
+                          >
+                            {t(`platformLicensing.quotes.actions.${move}`)}
+                          </Button>
+                        ))}
+                        {quote.invoiceId ? (
+                          <Link to={`/portal/platform/payments/${schoolId}/${quote.invoiceId}`}>
+                            {t("platformLicensing.quotes.openInvoice")}
+                          </Link>
+                        ) : null}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : null}
       </Card.Body>
     </Card>

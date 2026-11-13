@@ -28,6 +28,27 @@
   outline-offset: var(--focus-ring-offset);
 }
 
+/* On a phone the trigger is just its icon: the label stays for screen readers, the shortcut hint
+   (no keyboard there) goes. */
+@media (max-width: 768px) {
+  .global-search-trigger {
+    padding-inline: var(--space-8);
+  }
+
+  .global-search-trigger > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .global-search-trigger__shortcut {
+    display: none;
+  }
+}
+
 .global-search-trigger__shortcut {
   padding-inline: var(--space-4);
   border: 1px solid var(--color-border);

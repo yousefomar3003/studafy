@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useId, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
+import { LinkButton } from "../../components/LinkButton";
 import { api } from "../../lib/api";
 import { useAuth, usePermissions } from "../../lib/auth";
 import { useTranslation } from "../../lib/i18n";
@@ -52,11 +53,13 @@ export default function CustomListsPage() {
       <div className="custom-lists__header">
         <div>
           <h1>{t("customLists.index.title")}</h1>
-          <p className="custom-lists__muted">{t("customLists.index.intro")}</p>
+          <p className="custom-lists__intro">{t("customLists.index.intro")}</p>
         </div>
         {canManage ? (
           <div className="custom-lists__actions">
-            <Link to={`${LISTS_PATH}/import`}>{t("customLists.index.fromSheet")}</Link>
+            <LinkButton href={`${LISTS_PATH}/import`} variant="secondary">
+              {t("customLists.index.fromSheet")}
+            </LinkButton>
             <Button onClick={() => setCreating(true)}>{t("customLists.index.create")}</Button>
           </div>
         ) : null}

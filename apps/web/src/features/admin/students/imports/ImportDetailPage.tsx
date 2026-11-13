@@ -1,7 +1,7 @@
 import { Button, Card, Chip } from "@studafy/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../../lib/i18n";
 
@@ -46,9 +46,6 @@ export default function ImportDetailPage() {
 
   return (
     <>
-      <p>
-        <Link to="/portal/admin/students/imports">{t(`${base}.back`)}</Link>
-      </p>
       <h1>{t(`${base}.title`, { name: data.file_name })}</h1>
       <p>
         {t(`${base}.uploadedOn`, {

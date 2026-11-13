@@ -1,6 +1,6 @@
 .attendance-dashboard {
   display: grid;
-  gap: var(--sf-space-6, 1.5rem);
+  gap: var(--space-24);
   min-width: 0;
 }
 .attendance-header,
@@ -20,7 +20,7 @@
 .attendance-card-heading p,
 .attendance-section-heading p {
   margin: 0;
-  color: var(--sf-color-text-muted, #5b6472);
+  color: var(--color-muted-foreground);
 }
 .attendance-eyebrow {
   font-size: 0.75rem;
@@ -36,6 +36,13 @@
   gap: 0.75rem;
   align-items: end;
 }
+.attendance-facets {
+  gap: var(--space-16);
+}
+.attendance-filters {
+  display: grid;
+  gap: var(--space-16);
+}
 .attendance-export {
   justify-content: flex-end;
 }
@@ -49,7 +56,7 @@
 }
 .attendance-summary__label {
   margin: 0 0 0.4rem;
-  color: var(--sf-color-text-muted, #5b6472);
+  color: var(--color-muted-foreground);
 }
 .attendance-summary__value {
   font-size: 1.75rem;
@@ -58,6 +65,14 @@
 .attendance-facets > .sf-select {
   min-width: 10rem;
   flex: 1;
+}
+/* The checkbox has no label row, so give it the selects' control height and centre it there
+   rather than letting it sit on their bottom edge. */
+.attendance-facets > .sf-field:has(> .sf-checkbox) {
+  min-width: 0;
+  flex: 0 0 auto;
+  justify-content: center;
+  min-block-size: calc(var(--line-height-sm) + 2 * var(--space-8) + 2px);
 }
 .attendance-analytics-grid {
   display: grid;
@@ -75,8 +90,8 @@
   min-width: 2rem;
   height: 2rem;
   border-radius: 999px;
-  color: #fff;
-  background: var(--sf-color-danger, #b42318);
+  color: var(--color-danger-foreground);
+  background: var(--color-danger);
   font-weight: 700;
 }
 .attendance-breach-list,
@@ -92,7 +107,7 @@
   gap: 1rem;
   padding: 0.7rem 0;
   border: 0;
-  border-bottom: 1px solid var(--sf-color-border, #d8dde5);
+  border-bottom: 1px solid var(--color-border);
   background: transparent;
   color: inherit;
   text-align: start;
@@ -105,13 +120,13 @@
 }
 .attendance-breach-list small,
 .attendance-timeline small {
-  color: var(--sf-color-text-muted, #5b6472);
+  color: var(--color-muted-foreground);
 }
 .attendance-student-link {
   border: 0;
   padding: 0;
   background: transparent;
-  color: var(--sf-color-primary, #2457d6);
+  color: var(--color-accent);
   font: inherit;
   font-weight: 600;
   text-decoration: underline;
@@ -149,23 +164,23 @@
   align-items: center;
   gap: 1rem;
   padding: 0.85rem 0;
-  border-bottom: 1px solid var(--sf-color-border, #d8dde5);
+  border-bottom: 1px solid var(--color-border);
 }
 .attendance-form {
   display: grid;
   gap: 1rem;
 }
 .attendance-error {
-  color: var(--sf-color-danger, #b42318);
+  color: var(--color-danger);
 }
 .attendance-permission-note,
 .attendance-readonly-badge {
-  color: var(--sf-color-text-muted, #5b6472);
+  color: var(--color-muted-foreground);
   font-size: 0.85rem;
 }
 .attendance-readonly-badge {
   display: inline-flex;
-  border: 1px solid var(--sf-color-border, #d8dde5);
+  border: 1px solid var(--color-border);
   border-radius: 999px;
   padding: 0.25rem 0.6rem;
 }

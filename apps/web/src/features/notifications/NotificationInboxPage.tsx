@@ -92,7 +92,7 @@ export default function NotificationInboxPage() {
 
         <Button
           type="button"
-          variant="tertiary"
+          variant="secondary"
           disabled={!hasUnread}
           loading={markAllRead.isPending}
           onClick={() => markAllRead.mutate()}
@@ -148,19 +148,21 @@ export default function NotificationInboxPage() {
         </ul>
       )}
 
-      <div className="notifications-page__pagination">
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={!hasPreviousPage}
-          onClick={goToPreviousPage}
-        >
-          {t("site.common.previous")}
-        </Button>
-        <Button type="button" variant="secondary" disabled={!hasNextPage} onClick={goToNextPage}>
-          {t("site.common.next")}
-        </Button>
-      </div>
+      {hasPreviousPage || hasNextPage ? (
+        <div className="notifications-page__pagination">
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={!hasPreviousPage}
+            onClick={goToPreviousPage}
+          >
+            {t("site.common.previous")}
+          </Button>
+          <Button type="button" variant="secondary" disabled={!hasNextPage} onClick={goToNextPage}>
+            {t("site.common.next")}
+          </Button>
+        </div>
+      ) : null}
     </>
   );
 }

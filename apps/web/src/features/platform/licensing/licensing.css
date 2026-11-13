@@ -87,6 +87,16 @@
   text-align: center;
 }
 
+/* Tier column headers line up with their centred cells; the feature column stays start-aligned. */
+.licensing-compare thead th:not(:first-child) {
+  text-align: center;
+  vertical-align: bottom;
+}
+
+.licensing-compare thead th .platform-cell-stack {
+  align-items: center;
+}
+
 .licensing-meter {
   display: block;
   width: 100%;

@@ -34,6 +34,11 @@
   margin: var(--space-16) 0;
 }
 
+.settings-card__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+
 .settings-card__description {
   color: var(--color-muted-foreground);
   font-size: var(--font-size-sm);

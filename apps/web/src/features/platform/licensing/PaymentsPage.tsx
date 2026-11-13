@@ -229,45 +229,47 @@ function InvoiceTable({ invoices }: { invoices: InvoiceListItem[] }) {
   const { formatDate } = useFormatters();
   const money = useMoney();
   return (
-    <table className="platform-table">
-      <caption className="sf-visually-hidden">
-        {t("platformLicensing.payments.invoicesTitle")}
-      </caption>
-      <thead>
-        <tr>
-          <th scope="col">{t("platformLicensing.payments.columns.number")}</th>
-          <th scope="col">{t("platformLicensing.payments.columns.school")}</th>
-          <th scope="col">{t("platformLicensing.payments.columns.issued")}</th>
-          <th scope="col">{t("platformLicensing.payments.columns.due")}</th>
-          <th scope="col">{t("platformLicensing.payments.columns.total")}</th>
-          <th scope="col">{t("platformLicensing.payments.columns.balance")}</th>
-          <th scope="col">{t("platformLicensing.payments.columns.status")}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {invoices.map((invoice) => (
-          <tr key={invoice.id}>
-            <td>
-              <Link to={`/portal/platform/payments/${invoice.schoolId}/${invoice.id}`}>
-                {invoice.number}
-              </Link>
-            </td>
-            <td>{invoice.schoolName}</td>
-            <td>{formatDate(new Date(invoice.issueDate), { dateStyle: "medium" })}</td>
-            <td>{formatDate(new Date(invoice.dueDate), { dateStyle: "medium" })}</td>
-            <td className="licensing-amount">
-              {money(invoice.totalMinor, invoice.currencyCode, invoice.minorUnit)}
-            </td>
-            <td className="licensing-amount">
-              {money(invoice.balanceMinor, invoice.currencyCode, invoice.minorUnit)}
-            </td>
-            <td>
-              <InvoiceStatusPill status={invoice.status} overdue={invoice.overdue} />
-            </td>
+    <div className="platform-table-scroll">
+      <table className="platform-table">
+        <caption className="sf-visually-hidden">
+          {t("platformLicensing.payments.invoicesTitle")}
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">{t("platformLicensing.payments.columns.number")}</th>
+            <th scope="col">{t("platformLicensing.payments.columns.school")}</th>
+            <th scope="col">{t("platformLicensing.payments.columns.issued")}</th>
+            <th scope="col">{t("platformLicensing.payments.columns.due")}</th>
+            <th scope="col">{t("platformLicensing.payments.columns.total")}</th>
+            <th scope="col">{t("platformLicensing.payments.columns.balance")}</th>
+            <th scope="col">{t("platformLicensing.payments.columns.status")}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {invoices.map((invoice) => (
+            <tr key={invoice.id}>
+              <td>
+                <Link to={`/portal/platform/payments/${invoice.schoolId}/${invoice.id}`}>
+                  {invoice.number}
+                </Link>
+              </td>
+              <td>{invoice.schoolName}</td>
+              <td>{formatDate(new Date(invoice.issueDate), { dateStyle: "medium" })}</td>
+              <td>{formatDate(new Date(invoice.dueDate), { dateStyle: "medium" })}</td>
+              <td className="licensing-amount">
+                {money(invoice.totalMinor, invoice.currencyCode, invoice.minorUnit)}
+              </td>
+              <td className="licensing-amount">
+                {money(invoice.balanceMinor, invoice.currencyCode, invoice.minorUnit)}
+              </td>
+              <td>
+                <InvoiceStatusPill status={invoice.status} overdue={invoice.overdue} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

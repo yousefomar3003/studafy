@@ -2,8 +2,9 @@ import { PERMISSIONS } from "@studafy/constants";
 import { Button, Chip, Input, Modal, Select, useToast } from "@studafy/ui";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { api } from "../../lib/api";
 import { usePermissions } from "../../lib/auth";
 import { useLocale, useTranslation } from "../../lib/i18n";
@@ -49,6 +50,7 @@ export default function CustomListPage() {
   const permissions = usePermissions();
   const canManage = permissions.has(PERMISSIONS.CUSTOM_LIST_MANAGE);
   const canReveal = permissions.has(PERMISSIONS.CUSTOM_LIST_READ_SENSITIVE);
+  usePortalBack(LISTS_PATH);
   const language = i18n.language;
   const words = { yes: t("customLists.common.yes"), no: t("customLists.common.no") };
 
@@ -196,9 +198,6 @@ export default function CustomListPage() {
 
   return (
     <>
-      <p>
-        <Link to={LISTS_PATH}>{t("customLists.list.back")}</Link>
-      </p>
       <div className="custom-lists__header">
         <div>
           <h1>

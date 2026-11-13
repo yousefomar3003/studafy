@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { usePermissions } from "../../../lib/auth";
-import { useTranslation } from "../../../lib/i18n";
+import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { useSearchParamFlag } from "../../../lib/use-search-param-flag";
 
 import { CreateStudentModal } from "./CreateStudentModal";
@@ -25,6 +25,12 @@ import type { DateRangeValue, SelectOption } from "@studafy/ui";
 
 const SEARCH_DEBOUNCE_MS = 300;
 
+/** A `YYYY-MM-DD` value as a local calendar date (the API may send a midnight-UTC timestamp). */
+function parseIsoDate(value: string): Date {
+  const [year, month, day] = value.slice(0, 10).split("-").map(Number);
+  return new Date(year!, month! - 1, day!);
+}
+
 function fullName(student: StudentProfile): string {
   return [student.first_name, student.middle_name, student.last_name].filter(Boolean).join(" ");
 }
@@ -42,6 +48,7 @@ function fullName(student: StudentProfile): string {
  */
 export default function StudentsListPage() {
   const { t } = useTranslation();
+  const { formatDate } = useFormatters();
   const navigate = useNavigate();
   const permissions = usePermissions();
   const canViewAdmissionData = permissions.has(PERMISSIONS.BILLING_READ);
@@ -146,7 +153,10 @@ export default function StudentsListPage() {
     {
       id: "date_of_birth",
       header: t("adminPeople.students.list.columns.dateOfBirth"),
-      renderCell: (student: StudentProfile) => student.date_of_birth ?? "—",
+      renderCell: (student: StudentProfile) =>
+        student.date_of_birth
+          ? formatDate(parseIsoDate(student.date_of_birth), { dateStyle: "medium" })
+          : "—",
     },
     {
       id: "actions",

@@ -373,7 +373,7 @@
   "editor": {
     "createTitle": "إعداد {{subject}}",
     "editTitle": "قواعد تقييم {{subject}}",
-    "back": "رجوع",
+    "back": "إغلاق",
     "gradeDefault": "افتراضي الصف",
     "gradeDefaultHelp": "ترث جميع شعب الصف هذه القواعد ما لم تخصِّصها.",
     "sectionHelp": "تسري هذه القواعد على هذه الشعبة فقط.",

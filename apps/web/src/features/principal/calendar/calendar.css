@@ -52,7 +52,8 @@
 }
 
 [data-tone="meeting"] {
-  --tone-bg: var(--color-surface);
+  /* The border token: a visible neutral in both themes (surface vanished on white). */
+  --tone-bg: var(--color-border);
   --tone-fg: var(--color-foreground);
 }
 

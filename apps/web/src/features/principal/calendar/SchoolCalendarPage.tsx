@@ -187,13 +187,13 @@ export default function SchoolCalendarPage() {
 
       <div className="principal-calendar__toolbar">
         <div className="principal-calendar__nav">
-          <Button type="button" variant="tertiary" onClick={() => shiftMonth(-1)}>
+          <Button type="button" variant="secondary" onClick={() => shiftMonth(-1)}>
             {t("principal.calendar.previous")}
           </Button>
           <h2 className="principal-calendar__month" aria-live="polite">
             {formatDate(month, { month: "long", year: "numeric" })}
           </h2>
-          <Button type="button" variant="tertiary" onClick={() => shiftMonth(1)}>
+          <Button type="button" variant="secondary" onClick={() => shiftMonth(1)}>
             {t("principal.calendar.next")}
           </Button>
           <Button

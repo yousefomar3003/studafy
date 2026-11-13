@@ -1,7 +1,7 @@
 import { PERMISSIONS } from "@studafy/constants";
 import { Tabs } from "@studafy/ui";
-import { Link } from "react-router-dom";
 
+import { usePortalBack } from "../../../layouts/portal/PortalBackLink";
 import { usePermissions } from "../../../lib/auth";
 import { useTranslation } from "../../../lib/i18n";
 
@@ -24,7 +24,7 @@ export default function RecordTemplatesPage({ portal = "admin" }: RecordTemplate
   const { t } = useTranslation();
   const permissions = usePermissions();
   const canManage = permissions.has(PERMISSIONS.RECORD_TEMPLATE_MANAGE);
-  const back = portal === "admin" ? "/portal/admin/settings" : "/portal/principal";
+  usePortalBack(portal === "admin" ? "/portal/admin/settings" : "/portal/principal");
 
   return (
     <>
@@ -33,13 +33,6 @@ export default function RecordTemplatesPage({ portal = "admin" }: RecordTemplate
           <h1>{t("recordTemplates.page.title")}</h1>
           <p>{t("recordTemplates.page.intro")}</p>
         </div>
-        <Link to={back}>
-          {t(
-            portal === "admin"
-              ? "recordTemplates.page.backToSettings"
-              : "recordTemplates.page.backToDashboard",
-          )}
-        </Link>
       </div>
       <Tabs defaultValue="student">
         <Tabs.List aria-label={t("recordTemplates.page.subjects")}>

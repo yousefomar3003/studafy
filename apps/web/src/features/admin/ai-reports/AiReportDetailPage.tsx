@@ -1,8 +1,9 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Modal, useToast } from "@studafy/ui";
 import { useEffect, useId, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../../layouts/portal/PortalBackLink";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 
 import {
@@ -115,6 +116,7 @@ function NoteModal({ target, submitting, onClose, onSubmit }: NoteModalProps) {
 export default function AiReportDetailPage() {
   const { reportId = "" } = useParams<{ reportId: string }>();
   const { t } = useTranslation();
+  usePortalBack("/portal/admin/ai-reports");
   const { formatDate } = useFormatters();
   const { show } = useToast();
   const [revealed, setRevealed] = useState(false);
@@ -161,9 +163,6 @@ export default function AiReportDetailPage() {
 
   return (
     <>
-      <p>
-        <Link to="/portal/admin/ai-reports">{t("adminSchool.aiReports.back")}</Link>
-      </p>
       <h1>{t(`adminSchool.aiReports.reason.${report.reason_category}`)}</h1>
 
       {report.overdue ? (

@@ -5,6 +5,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 
+import { PortalBackLink, PortalBackProvider } from "../../../layouts/portal/PortalBackLink";
 import { AuthProvider, createSessionStore } from "../../../lib/auth";
 
 import type { SessionTokens } from "../../../lib/auth";
@@ -343,16 +344,19 @@ async function renderAsPrincipal(url: string) {
       <QueryClientProvider client={queryClient}>
         <ToastProvider>
           <MemoryRouter initialEntries={[url]}>
-            <Routes>
-              <Route path="/portal/principal/students" element={<StudentsPage />} />
-              <Route path="/portal/principal/students/:studentId" element={<StudentPage />} />
-              <Route path="/portal/principal/parents" element={<ParentsPage />} />
-              <Route path="/portal/principal/parents/:parentUserId" element={<ParentPage />} />
-              <Route
-                path="/portal/principal/students/:studentId/transcripts/:transcriptId"
-                element={<TranscriptPage />}
-              />
-            </Routes>
+            <PortalBackProvider>
+              <PortalBackLink routes={() => []} />
+              <Routes>
+                <Route path="/portal/principal/students" element={<StudentsPage />} />
+                <Route path="/portal/principal/students/:studentId" element={<StudentPage />} />
+                <Route path="/portal/principal/parents" element={<ParentsPage />} />
+                <Route path="/portal/principal/parents/:parentUserId" element={<ParentPage />} />
+                <Route
+                  path="/portal/principal/students/:studentId/transcripts/:transcriptId"
+                  element={<TranscriptPage />}
+                />
+              </Routes>
+            </PortalBackProvider>
           </MemoryRouter>
         </ToastProvider>
       </QueryClientProvider>

@@ -1,8 +1,9 @@
 import { ApiError } from "@studafy/api-client";
 import { Button, Card, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 
+import { usePortalBack } from "../../layouts/portal/PortalBackLink";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 
 import { EditSchoolProfileDialog } from "./EditSchoolProfileDialog";
@@ -33,6 +34,7 @@ type FlagChoice = "default" | "on" | "off";
 export default function SchoolDetailPage() {
   const { schoolId = "" } = useParams();
   const { t } = useTranslation();
+  usePortalBack("/portal/platform/schools");
   const { data: school, isPending, isError } = useSchoolDetailQuery(schoolId);
   const [target, setTarget] = useState<PlatformSchoolStatus | null>(null);
 
@@ -43,7 +45,6 @@ export default function SchoolDetailPage() {
     return (
       <>
         <p role="alert">{t("platform.school.loadError")}</p>
-        <Link to="/portal/platform/schools">{t("platform.school.back")}</Link>
       </>
     );
   }
@@ -55,9 +56,6 @@ export default function SchoolDetailPage() {
         description={`${school.slug} · ${school.email}`}
         actions={<SchoolStatusPill status={school.status} />}
       />
-      <p>
-        <Link to="/portal/platform/schools">{t("platform.school.back")}</Link>
-      </p>
 
       <div className="platform-grid">
         <ProfileCard school={school} />

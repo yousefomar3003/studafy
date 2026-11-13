@@ -3,6 +3,7 @@ import { Button, Card, Checkbox, Input, Modal, Select, useToast } from "@studafy
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { LinkButton } from "../../../components/LinkButton";
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { useSchoolMembersQuery } from "../queries";
 
@@ -62,9 +63,9 @@ export function SchoolLicenseSection({
     <section aria-labelledby="school-license" className="platform-stack">
       <div className="platform-header__row">
         <h2 id="school-license">{t("platformLicensing.school.title")}</h2>
-        <Link to={`/portal/platform/quotes?schoolId=${schoolId}`}>
+        <LinkButton href={`/portal/platform/quotes?schoolId=${schoolId}`} variant="secondary">
           {t("platformLicensing.school.newQuote")}
-        </Link>
+        </LinkButton>
       </div>
       {overview.isPending ? <p role="status">{t("site.common.loading")}</p> : null}
       {overview.isError ? <p role="alert">{t("platformLicensing.common.loadError")}</p> : null}
@@ -157,33 +158,35 @@ function LicenseSummary({
         </div>
       </Card.Header>
       <Card.Body>
-        <table className="platform-table">
-          <caption className="sf-visually-hidden">
-            {t("platformLicensing.school.seatsCaption")}
-          </caption>
-          <thead>
-            <tr>
-              <th scope="col">{t("platformLicensing.school.columns.audience")}</th>
-              <th scope="col">{t("platformLicensing.school.columns.tier")}</th>
-              <th scope="col">{t("platformLicensing.school.columns.seats")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {license.audiences.map((row) => (
-              <tr key={row.audience}>
-                <td>{t(`platformLicensing.audience.${row.audience}`)}</td>
-                <td>{row.tier?.displayName ?? "—"}</td>
-                <td>
-                  {t("platformLicensing.school.seatsUsed", {
-                    assigned: formatNumber(row.assigned),
-                    purchased: formatNumber(row.purchased),
-                  })}
-                  <SeatMeter assigned={row.assigned} purchased={row.purchased} />
-                </td>
+        <div className="platform-table-scroll">
+          <table className="platform-table">
+            <caption className="sf-visually-hidden">
+              {t("platformLicensing.school.seatsCaption")}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">{t("platformLicensing.school.columns.audience")}</th>
+                <th scope="col">{t("platformLicensing.school.columns.tier")}</th>
+                <th scope="col">{t("platformLicensing.school.columns.seats")}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {license.audiences.map((row) => (
+                <tr key={row.audience}>
+                  <td>{t(`platformLicensing.audience.${row.audience}`)}</td>
+                  <td>{row.tier?.displayName ?? "—"}</td>
+                  <td>
+                    {t("platformLicensing.school.seatsUsed", {
+                      assigned: formatNumber(row.assigned),
+                      purchased: formatNumber(row.purchased),
+                    })}
+                    <SeatMeter assigned={row.assigned} purchased={row.purchased} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         <dl className="platform-dl">
           <dt>{t("platformLicensing.school.familyPlus")}</dt>
           <dd>
@@ -448,61 +451,65 @@ function SeatsCard({
               <p className="platform-muted">{t("platformLicensing.seats.empty")}</p>
             ) : null}
             {seats.data && seats.data.seats.length > 0 ? (
-              <table className="platform-table">
-                <caption className="sf-visually-hidden">
-                  {t("platformLicensing.seats.caption", { school: schoolName })}
-                </caption>
-                <thead>
-                  <tr>
-                    <th scope="col">{t("platformLicensing.seats.columns.person")}</th>
-                    <th scope="col">{t("platformLicensing.seats.columns.assigned")}</th>
-                    <th scope="col">{t("platformLicensing.seats.columns.overlap")}</th>
-                    <th scope="col">
-                      <span className="sf-visually-hidden">
-                        {t("platformLicensing.common.actions")}
-                      </span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {seats.data.seats.map((seat) => (
-                    <tr key={seat.seatId}>
-                      <td>
-                        <div className="platform-cell-stack">
-                          <span>{seat.name}</span>
-                          <span className="platform-muted">{seat.email}</span>
-                        </div>
-                      </td>
-                      <td>
-                        {formatDate(new Date(seat.assignedAt), { dateStyle: "medium" })}
-                        {seat.assignedByPlatform ? (
-                          <span className="platform-muted">
-                            {" "}
-                            · {t("platformLicensing.seats.byPlatform")}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td>
-                        {seat.overlap
-                          ? t("platformLicensing.seats.overlap", { days: seat.overlap.overlapDays })
-                          : "—"}
-                      </td>
-                      <td>
-                        <Button
-                          variant="tertiary"
-                          disabled={unassign.isPending}
-                          onClick={() => remove(seat.seatId)}
-                          aria-label={t("platformLicensing.seats.unassignNamed", {
-                            name: seat.name,
-                          })}
-                        >
-                          {t("platformLicensing.seats.unassign")}
-                        </Button>
-                      </td>
+              <div className="platform-table-scroll">
+                <table className="platform-table">
+                  <caption className="sf-visually-hidden">
+                    {t("platformLicensing.seats.caption", { school: schoolName })}
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">{t("platformLicensing.seats.columns.person")}</th>
+                      <th scope="col">{t("platformLicensing.seats.columns.assigned")}</th>
+                      <th scope="col">{t("platformLicensing.seats.columns.overlap")}</th>
+                      <th scope="col">
+                        <span className="sf-visually-hidden">
+                          {t("platformLicensing.common.actions")}
+                        </span>
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {seats.data.seats.map((seat) => (
+                      <tr key={seat.seatId}>
+                        <td>
+                          <div className="platform-cell-stack">
+                            <span>{seat.name}</span>
+                            <span className="platform-muted">{seat.email}</span>
+                          </div>
+                        </td>
+                        <td>
+                          {formatDate(new Date(seat.assignedAt), { dateStyle: "medium" })}
+                          {seat.assignedByPlatform ? (
+                            <span className="platform-muted">
+                              {" "}
+                              · {t("platformLicensing.seats.byPlatform")}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td>
+                          {seat.overlap
+                            ? t("platformLicensing.seats.overlap", {
+                                days: seat.overlap.overlapDays,
+                              })
+                            : "—"}
+                        </td>
+                        <td>
+                          <Button
+                            variant="tertiary"
+                            disabled={unassign.isPending}
+                            onClick={() => remove(seat.seatId)}
+                            aria-label={t("platformLicensing.seats.unassignNamed", {
+                              name: seat.name,
+                            })}
+                          >
+                            {t("platformLicensing.seats.unassign")}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : null}
           </>
         )}
@@ -660,41 +667,43 @@ function InvoicesCard({ schoolId, invoices }: { schoolId: string; invoices: Invo
         {invoices.length === 0 ? (
           <p className="platform-muted">{t("platformLicensing.school.noInvoices")}</p>
         ) : (
-          <table className="platform-table">
-            <caption className="sf-visually-hidden">
-              {t("platformLicensing.school.invoicesTitle")}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">{t("platformLicensing.payments.columns.number")}</th>
-                <th scope="col">{t("platformLicensing.payments.columns.due")}</th>
-                <th scope="col">{t("platformLicensing.payments.columns.total")}</th>
-                <th scope="col">{t("platformLicensing.payments.columns.balance")}</th>
-                <th scope="col">{t("platformLicensing.payments.columns.status")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoices.map((invoice) => (
-                <tr key={invoice.id}>
-                  <td>
-                    <Link to={`/portal/platform/payments/${schoolId}/${invoice.id}`}>
-                      {invoice.number}
-                    </Link>
-                  </td>
-                  <td>{formatDate(new Date(invoice.dueDate), { dateStyle: "medium" })}</td>
-                  <td className="licensing-amount">
-                    {money(invoice.totalMinor, invoice.currencyCode, invoice.minorUnit)}
-                  </td>
-                  <td className="licensing-amount">
-                    {money(invoice.balanceMinor, invoice.currencyCode, invoice.minorUnit)}
-                  </td>
-                  <td>
-                    <InvoiceStatusPill status={invoice.status} overdue={invoice.overdue} />
-                  </td>
+          <div className="platform-table-scroll">
+            <table className="platform-table">
+              <caption className="sf-visually-hidden">
+                {t("platformLicensing.school.invoicesTitle")}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">{t("platformLicensing.payments.columns.number")}</th>
+                  <th scope="col">{t("platformLicensing.payments.columns.due")}</th>
+                  <th scope="col">{t("platformLicensing.payments.columns.total")}</th>
+                  <th scope="col">{t("platformLicensing.payments.columns.balance")}</th>
+                  <th scope="col">{t("platformLicensing.payments.columns.status")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {invoices.map((invoice) => (
+                  <tr key={invoice.id}>
+                    <td>
+                      <Link to={`/portal/platform/payments/${schoolId}/${invoice.id}`}>
+                        {invoice.number}
+                      </Link>
+                    </td>
+                    <td>{formatDate(new Date(invoice.dueDate), { dateStyle: "medium" })}</td>
+                    <td className="licensing-amount">
+                      {money(invoice.totalMinor, invoice.currencyCode, invoice.minorUnit)}
+                    </td>
+                    <td className="licensing-amount">
+                      {money(invoice.balanceMinor, invoice.currencyCode, invoice.minorUnit)}
+                    </td>
+                    <td>
+                      <InvoiceStatusPill status={invoice.status} overdue={invoice.overdue} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </Card.Body>
     </Card>

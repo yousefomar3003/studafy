@@ -184,46 +184,48 @@ function InvoiceDocument({
           </div>
         </Card.Header>
         <Card.Body>
-          <table className="platform-table">
-            <caption className="sf-visually-hidden">
-              {t("platformLicensing.invoice.linesCaption")}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">{t("platformLicensing.invoice.columns.description")}</th>
-                <th scope="col">{t("platformLicensing.invoice.columns.list")}</th>
-                <th scope="col">{t("platformLicensing.invoice.columns.discounts")}</th>
-                <th scope="col">{t("platformLicensing.invoice.columns.amount")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {invoice.lines.map((line) => (
-                <tr key={line.position}>
-                  <td>{line.description}</td>
-                  <td className="licensing-amount">{m(line.listAmountMinor)}</td>
-                  <td>
-                    {line.kind === "seats"
-                      ? [
-                          line.volumeDiscountBps
-                            ? t("platformLicensing.invoice.volume", {
-                                percent: bpsToPercent(line.volumeDiscountBps),
-                              })
-                            : null,
-                          line.durationDiscountBps
-                            ? t("platformLicensing.invoice.duration", {
-                                percent: bpsToPercent(line.durationDiscountBps),
-                              })
-                            : null,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ") || "—"
-                      : "—"}
-                  </td>
-                  <td className="licensing-amount">{m(line.amountMinor)}</td>
+          <div className="platform-table-scroll">
+            <table className="platform-table">
+              <caption className="sf-visually-hidden">
+                {t("platformLicensing.invoice.linesCaption")}
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">{t("platformLicensing.invoice.columns.description")}</th>
+                  <th scope="col">{t("platformLicensing.invoice.columns.list")}</th>
+                  <th scope="col">{t("platformLicensing.invoice.columns.discounts")}</th>
+                  <th scope="col">{t("platformLicensing.invoice.columns.amount")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {invoice.lines.map((line) => (
+                  <tr key={line.position}>
+                    <td>{line.description}</td>
+                    <td className="licensing-amount">{m(line.listAmountMinor)}</td>
+                    <td>
+                      {line.kind === "seats"
+                        ? [
+                            line.volumeDiscountBps
+                              ? t("platformLicensing.invoice.volume", {
+                                  percent: bpsToPercent(line.volumeDiscountBps),
+                                })
+                              : null,
+                            line.durationDiscountBps
+                              ? t("platformLicensing.invoice.duration", {
+                                  percent: bpsToPercent(line.durationDiscountBps),
+                                })
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "—"
+                        : "—"}
+                    </td>
+                    <td className="licensing-amount">{m(line.amountMinor)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <ul className="platform-breakdown">
             <li>
               <span>{t("platformLicensing.invoice.total")}</span>
@@ -300,77 +302,79 @@ function PaymentsCard({
           {invoice.payments.length === 0 ? (
             <p className="platform-muted">{t("platformLicensing.invoice.noPayments")}</p>
           ) : (
-            <table className="platform-table">
-              <caption className="sf-visually-hidden">
-                {t("platformLicensing.invoice.paymentsTitle")}
-              </caption>
-              <thead>
-                <tr>
-                  <th scope="col">{t("platformLicensing.invoice.paymentColumns.received")}</th>
-                  <th scope="col">{t("platformLicensing.invoice.paymentColumns.reference")}</th>
-                  <th scope="col">{t("platformLicensing.invoice.paymentColumns.amount")}</th>
-                  <th scope="col">{t("platformLicensing.invoice.paymentColumns.status")}</th>
-                  <th scope="col">
-                    <span className="sf-visually-hidden">
-                      {t("platformLicensing.common.actions")}
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {invoice.payments.map((payment) => (
-                  <tr key={payment.id}>
-                    <td>{formatDate(new Date(payment.receivedAt), { dateStyle: "medium" })}</td>
-                    <td>
-                      <div className="platform-cell-stack">
-                        <span>{payment.bankReference}</span>
-                        {payment.note ? (
-                          <span className="platform-muted">{payment.note}</span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="licensing-amount">
-                      {money(payment.amountMinor, payment.currencyCode, invoice.minorUnit)}
-                    </td>
-                    <td>
-                      {payment.voidedAt
-                        ? t("platformLicensing.invoice.paymentVoided", {
-                            reason: payment.voidReason,
-                          })
-                        : t("platformLicensing.invoice.paymentRecorded")}
-                    </td>
-                    <td>
-                      <div className="platform-actions">
-                        {payment.hasReceiptFile ? (
-                          <Button
-                            variant="tertiary"
-                            onClick={() =>
-                              void openFile(
-                                { schoolId, paymentId: payment.id },
-                                errorToast(show, t),
-                              )
-                            }
-                          >
-                            {t("platformLicensing.invoice.openFile")}
-                          </Button>
-                        ) : null}
-                        {payment.voidedAt ? null : (
-                          <Button
-                            variant="tertiary"
-                            onClick={() => onVoid(payment)}
-                            aria-label={t("platformLicensing.invoice.voidPaymentNamed", {
-                              reference: payment.bankReference,
-                            })}
-                          >
-                            {t("platformLicensing.invoice.voidPayment")}
-                          </Button>
-                        )}
-                      </div>
-                    </td>
+            <div className="platform-table-scroll">
+              <table className="platform-table">
+                <caption className="sf-visually-hidden">
+                  {t("platformLicensing.invoice.paymentsTitle")}
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col">{t("platformLicensing.invoice.paymentColumns.received")}</th>
+                    <th scope="col">{t("platformLicensing.invoice.paymentColumns.reference")}</th>
+                    <th scope="col">{t("platformLicensing.invoice.paymentColumns.amount")}</th>
+                    <th scope="col">{t("platformLicensing.invoice.paymentColumns.status")}</th>
+                    <th scope="col">
+                      <span className="sf-visually-hidden">
+                        {t("platformLicensing.common.actions")}
+                      </span>
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {invoice.payments.map((payment) => (
+                    <tr key={payment.id}>
+                      <td>{formatDate(new Date(payment.receivedAt), { dateStyle: "medium" })}</td>
+                      <td>
+                        <div className="platform-cell-stack">
+                          <span>{payment.bankReference}</span>
+                          {payment.note ? (
+                            <span className="platform-muted">{payment.note}</span>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="licensing-amount">
+                        {money(payment.amountMinor, payment.currencyCode, invoice.minorUnit)}
+                      </td>
+                      <td>
+                        {payment.voidedAt
+                          ? t("platformLicensing.invoice.paymentVoided", {
+                              reason: payment.voidReason,
+                            })
+                          : t("platformLicensing.invoice.paymentRecorded")}
+                      </td>
+                      <td>
+                        <div className="platform-actions">
+                          {payment.hasReceiptFile ? (
+                            <Button
+                              variant="tertiary"
+                              onClick={() =>
+                                void openFile(
+                                  { schoolId, paymentId: payment.id },
+                                  errorToast(show, t),
+                                )
+                              }
+                            >
+                              {t("platformLicensing.invoice.openFile")}
+                            </Button>
+                          ) : null}
+                          {payment.voidedAt ? null : (
+                            <Button
+                              variant="tertiary"
+                              onClick={() => onVoid(payment)}
+                              aria-label={t("platformLicensing.invoice.voidPaymentNamed", {
+                                reference: payment.bankReference,
+                              })}
+                            >
+                              {t("platformLicensing.invoice.voidPayment")}
+                            </Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card.Body>
       </Card>
