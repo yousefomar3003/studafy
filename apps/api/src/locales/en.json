@@ -295,6 +295,7 @@
   "SUBSCRIPTION_REFUND_PAYMENT_REQUIRED": "Choose the payment to refund",
   "SUBSCRIPTION_REFUND_AMOUNT_EXCEEDS_PAYMENT": "The refund amount is more than the payment",
   "MESSAGING_BLOCKED": "Messaging is blocked between you and this person",
+  "MESSAGING_VOICE_NOTES_DISABLED": "Your school has turned off voice messages",
   "MESSAGE_REPORT_ALREADY_OPEN": "You have already reported this and the report is still open",
   "MESSAGE_REPORT_NOT_FOUND": "Message report not found",
   "MESSAGE_REPORT_INVALID_TRANSITION": "This report cannot move to that status from its current one",

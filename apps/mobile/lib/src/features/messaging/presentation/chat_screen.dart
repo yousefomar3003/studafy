@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/chat_draft_controller.dart';
 import '../application/messaging_providers.dart';
+import '../application/voice_note_controllers.dart';
 import '../domain/chat_state.dart';
 import '../domain/draft_attachment.dart';
 import '../domain/messaging.dart';
@@ -15,6 +16,7 @@ import 'widgets/chat_composer.dart';
 import 'widgets/chat_image.dart';
 import 'widgets/conversation_tile.dart';
 import 'widgets/participant_profile_sheet.dart';
+import 'widgets/voice_note_widgets.dart';
 
 /// Pushes the chat for [conversation] and, once it is closed, re-fetches the conversation lists
 /// (previews, unread counts, the tab badge) so they reflect what was read and sent.
@@ -151,6 +153,37 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
   }
 
   String get _counterpartName => widget.conversation.counterpart(widget.viewer).name;
+
+  /// The microphone button: asks for the microphone the first time, then records.
+  Future<void> _startVoiceNote() async {
+    FocusScope.of(context).unfocus();
+    await ref.read(voiceNotePlaybackProvider.notifier).stopAll();
+    final refusal = await ref
+        .read(voiceNoteRecorderControllerProvider(_conversationId).notifier)
+        .start();
+    if (!mounted || refusal == null) return;
+    _showSnack(
+      switch (refusal) {
+        VoiceRecordingRefusal.permissionDenied => 'messaging.voice.permissionDenied',
+        VoiceRecordingRefusal.failed => 'messaging.voice.recordFailed',
+      }.tr(),
+    );
+  }
+
+  /// Sends the recorded voice note and returns to the composer.
+  void _sendVoiceNote() {
+    final note = ref.read(voiceNoteRecorderControllerProvider(_conversationId).notifier).take();
+    if (note == null) return;
+    ref.read(voiceNotePlaybackProvider.notifier).stopAll();
+    ref.read(chatControllerProvider(_conversationId).notifier).sendVoiceNote(note);
+    if (_scrollController.hasClients && _scrollController.offset > 0) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+      );
+    }
+  }
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context)
@@ -296,6 +329,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
       );
     } else if (block.hasBlockedMe) {
       bottom = _BlockedBanner(message: 'messaging.block.blockedByThem'.tr());
+    } else if (ref.watch(voiceNoteRecorderControllerProvider(_conversationId)).isActive) {
+      bottom = VoiceNoteRecorderBar(conversationId: _conversationId, onSend: _sendVoiceNote);
     } else {
       bottom = ChatComposer(
         onSend: _send,
@@ -304,6 +339,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> with WidgetsBindingObse
         onAttach: drafts.length >= maxMessageAttachments ? null : _attach,
         onRemoveAttachment: draftController.remove,
         onRetryAttachment: draftController.retry,
+        onRecordVoice: conversation.voiceNotesAllowed ? _startVoiceNote : null,
       );
     }
 
@@ -587,9 +623,19 @@ class _ChatBody extends StatelessWidget {
           next.createdAt.difference(message.createdAt) >= const Duration(minutes: 5);
       final mine = isMine(message.senderId);
       final images = ChatImage.ofMessage(message);
+      final voiceNote = message.voiceNote;
       items.add(
         ChatBubble(
           key: ValueKey(message.id),
+          voice: voiceNote == null
+              ? null
+              : VoiceNotePlayerView(
+                  id: voiceNote.id,
+                  source: voiceNote.downloadUrl,
+                  duration: voiceNote.duration,
+                  isMine: mine,
+                  onSourceError: onImageError,
+                ),
           body: message.body,
           createdAt: message.createdAt,
           isMine: mine,
@@ -610,9 +656,18 @@ class _ChatBody extends StatelessWidget {
     for (final pending in state.pending) {
       separatorFor(pending.createdAt);
       final images = [for (final image in pending.images) ChatImage.file(image.localPath)];
+      final voiceNote = pending.voiceNote;
       items.add(
         ChatBubble(
           key: ValueKey(pending.localId),
+          voice: voiceNote == null
+              ? null
+              : VoiceNotePlayerView(
+                  id: pending.localId,
+                  source: voiceNote.localPath,
+                  duration: voiceNote.duration,
+                  isMine: true,
+                ),
           body: pending.body,
           createdAt: pending.createdAt,
           isMine: true,
@@ -626,6 +681,8 @@ class _ChatBody extends StatelessWidget {
             (PendingStatus.failed, PendingFailure.storageUnavailable) =>
               BubbleDelivery.storageUnavailable,
             (PendingStatus.failed, PendingFailure.invalid) => BubbleDelivery.invalid,
+            (PendingStatus.failed, PendingFailure.voiceNotesDisabled) =>
+              BubbleDelivery.voiceNotesDisabled,
             (PendingStatus.failed, _) => BubbleDelivery.failed,
           },
           onRetry: () => onRetrySend(pending.localId),
