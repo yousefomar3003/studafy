@@ -15,6 +15,7 @@ import { useSchoolDetailQuery } from "./queries";
 import { SchoolExportsCard } from "./SchoolExportsCard";
 import { SchoolMembersCard } from "./SchoolMembersCard";
 import { SchoolUsageCard } from "./SchoolUsageCard";
+import { SchoolStorageCard } from "./storage/SchoolStorageCard";
 
 import "./platform.css";
 
@@ -95,6 +96,8 @@ export default function SchoolDetailPage() {
         <SchoolLicenseSection schoolId={school.id} schoolName={school.name} />
 
         <SchoolGrantsCard schoolId={school.id} schoolName={school.name} />
+
+        <SchoolStorageCard schoolId={school.id} />
 
         <SchoolExportsCard schoolId={school.id} schoolName={school.name} />
 

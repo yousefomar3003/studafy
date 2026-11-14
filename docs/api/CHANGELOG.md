@@ -13,6 +13,26 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Storage billing works like an app-store subscription (migration 000224, ADR-022).
+  `StorageAddOnChangePreview` adds `timing` (`now`: more storage on the same interval, charged at
+  once; `renewal`: less storage or the other interval, applied at the next renewal with nothing
+  charged) and `effectiveAt`; `chargeNow` is true only when something is charged now.
+  `StorageAddOnCurrent` adds `pendingChange` (the change scheduled for the renewal). A change is
+  refused with 409 `STORAGE_ADDON_CHANGE_PENDING` while one is scheduled and 409
+  `STORAGE_ADDON_UNSETTLED` while a payment is due or an earlier change left an amount pending. New
+  `POST /api/subscriptions/storage/change/undo` (409 `STORAGE_ADDON_NO_PENDING_CHANGE`),
+  `GET /api/subscriptions/storage/billing` (`StorageAddOnBilling`: card, next bill, invoices) and
+  `POST /api/subscriptions/storage/payment-method` (a card-only Stripe Billing Portal page),
+  `GET /api/subscriptions/storage/cards` (`StorageAddOnCard[]`: brand, last 4, expiry, `isDefault`)
+  and `POST /api/subscriptions/storage/cards/setup` (save a new card, nothing charged). The change
+  body takes optional `paymentMethodId` (the card to charge; only that card is tried; 422
+  `STORAGE_ADDON_CARD_INVALID` when it is not the school's) and `useForRenewals` (default false).
+  Platform:
+  `GET /api/platform/schools/{schoolId}/storage-subscription` (`PlatformStorageSubscription`) and
+  `POST /api/platform/schools/{schoolId}/storage-subscription/invoices/{invoiceId}/refund`
+  (`PlatformStorageRefund`; 422 `STORAGE_ADDON_REFUND_INVALID`). `GET /api/platform/health` adds
+  `storageIncidents` (`PlatformStorageIncidents`): storage changes that charged more than confirmed,
+  refunded automatically or left for review.
 - A school can decline a licence quote (migration 000223): `POST
 /api/school/license/quotes/{quoteId}/decline` (`license:manage`) with an optional `reason`
   (`DeclineLicenseQuoteBody`, at most 1000 characters) answers the `LicenseQuote`. Only a sent quote

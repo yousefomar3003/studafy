@@ -67,6 +67,7 @@ The platform's core decision set maps to this index as follows:
 11. Academic grading → ADR-0017
 12. Paid features and licensing → ADR-0018 (+ ADR-0014, [billing/feature-licensing.md](../billing/feature-licensing.md))
 13. Licence payment plans (at once, monthly, custom) → ADR-0021
+14. Storage billing like an app-store subscription → ADR-0022
 
 ## Review
 

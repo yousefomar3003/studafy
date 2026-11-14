@@ -172,3 +172,15 @@ export function extractSubscriptionItemId(payload: Record<string, unknown>): str
   if (!Array.isArray(items)) return null;
   return asId(asRecord(items[0])?.id);
 }
+
+/**
+ * The price of a subscription's first item, from a subscription object (`customer.subscription.*`).
+ * Null for any other payload. A storage add-on's scheduled change is applied when this becomes the
+ * price it was scheduled to move to.
+ */
+export function extractSubscriptionPriceId(payload: Record<string, unknown>): string | null {
+  if (payload.object !== "subscription") return null;
+  const items = asRecord(payload.items)?.data;
+  if (!Array.isArray(items)) return null;
+  return asId(asRecord(asRecord(items[0])?.price)?.id);
+}

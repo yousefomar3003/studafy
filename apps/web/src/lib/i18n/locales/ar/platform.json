@@ -997,7 +997,10 @@
       "duplicateSubscription": "الاشتراك المكرر",
       "refund": "المبلغ المسترد",
       "detected": "تاريخ الاكتشاف",
-      "note": "ما يحدث"
+      "note": "ما يحدث",
+      "incidentStatus": "الحالة",
+      "incidentAmounts": "ما حدث",
+      "incidentRefund": "الاسترداد"
     },
     "duplicatesHeading": "اشتراكات تخزين مكررة ({{count}} مفتوحة)",
     "duplicatesHelp": "مدرسة دُفع منها مقابل خطتي تخزين في الوقت نفسه. يُحتفظ بآخر عملية شراء، ويُلغى الاشتراك الأقدم في Stripe ويُسترد تلقائياً الجزء غير المستخدم من مدته.",
@@ -1013,7 +1016,16 @@
       "pending": "قيد المعالجة",
       "resolved": "تمت المعالجة",
       "needs_review": "يحتاج إلى مراجعة"
-    }
+    },
+    "incidentsHeading": "مساحة تخزين خُصم مقابلها أكثر من المؤكد ({{count}} بحاجة إلى مراجعة)",
+    "incidentsHelp": "خصم تغيير في مساحة التخزين أكثر مما أكدته المدرسة. يُسترد الفرق تلقائياً، وما تعذّر استرداده تحتاج إلى إكماله في Stripe.",
+    "incidentsCaption": "زيادات في خصم مساحة التخزين",
+    "noIncidents": "لم يخصم أي تغيير في مساحة التخزين أكثر من المؤكد.",
+    "incidentStatus": {
+      "refunded": "تم الاسترداد",
+      "needs_review": "بحاجة إلى مراجعة"
+    },
+    "incidentNote": "خُصم {{charged}} بدلاً من {{expected}}"
   },
   "flags": {
     "title": "مفاتيح الميزات",
@@ -1028,5 +1040,43 @@
     "school": "المدرسة",
     "override": "القيمة المخصصة",
     "howToChange": "لتغيير مفتاح مدرسة، افتح صفحة المدرسة. القيمة الافتراضية لجميع المدارس إعداد في الخادم، فتتغير مع النشر وليس من هنا."
+  },
+  "storage": {
+    "title": "اشتراك مساحة التخزين",
+    "loadError": "تعذّر تحميل اشتراك مساحة التخزين.",
+    "none": "لم تشترِ هذه المدرسة مساحة تخزين إضافية من قبل.",
+    "plan": "{{size}} · {{price}} {{interval}} · {{status}}",
+    "interval": {
+      "monthly": "شهرياً",
+      "yearly": "سنوياً"
+    },
+    "renews": "يتجدد في {{date}}",
+    "ends": "ملغى: ينتهي في {{date}}",
+    "pending": "مجدول: يتغير إلى {{size}} في {{date}}",
+    "card": "الدفع ببطاقة {{brand}} تنتهي بـ {{last4}}",
+    "billingError": "تعذّرت قراءة Stripe: {{error}}",
+    "incidentsTitle": "خُصم أكثر من المبلغ المؤكد",
+    "incidentRefunded": "{{date}}: خُصم {{charged}} بدلاً من {{expected}}؛ واستُرد {{refund}} تلقائياً.",
+    "incidentReview": "{{date}}: خُصم {{charged}} بدلاً من {{expected}}؛ وفشل استرداد {{refund}}. استرده أدناه.",
+    "invoicesTitle": "الفواتير",
+    "noInvoices": "لا توجد فواتير.",
+    "columns": {
+      "date": "التاريخ",
+      "reason": "السبب",
+      "paid": "المدفوع",
+      "refunded": "المسترد",
+      "status": "الحالة",
+      "actions": "الإجراءات"
+    },
+    "view": "عرض",
+    "refund": "استرداد",
+    "refundTitle": "استرداد فاتورة مساحة تخزين",
+    "refundHelp": "خُصم بهذه الفاتورة {{paid}}. يمكن استرداد ما يصل إلى {{refundable}} إلى بطاقة المدرسة.",
+    "amountLabel": "المبلغ ({{currency}})",
+    "amountError": "مبلغ أكبر من 0 ولا يتجاوز ما يمكن استرداده.",
+    "reasonLabel": "السبب (يُحفظ في سجل التدقيق)",
+    "refundConfirm": "استرداد {{amount}}",
+    "refunded": "تم استرداد {{amount}}",
+    "refundError": "لم يتم الاسترداد"
   }
 }

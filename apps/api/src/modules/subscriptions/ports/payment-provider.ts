@@ -211,11 +211,87 @@ export interface ChangeSubscriptionPriceInput {
   idempotencyKey: string;
   /** Replaces the subscription's metadata keys given here (the new local `price_id`, say). */
   metadata: Record<string, string>;
+  /**
+   * With `chargeNow`: the amount the buyer confirmed. The invoice is built and checked against it
+   * before anything is charged; a different amount charges nothing (`failure: "amount_changed"`).
+   */
+  expectedAmountMinor?: number;
+  /**
+   * With `chargeNow`: the card to charge, one of the customer's own (`listPaymentMethods`). Only
+   * this card is tried, and the renewal card is left as it is. Null: the subscription's default.
+   */
+  paymentMethodId?: string | null;
 }
 
 export interface ChangeSubscriptionPriceResult {
-  /** False when the provider is holding the change until a payment succeeds: nothing changed yet. */
+  /** False when nothing changed: the payment did not go through, or the amount was not the one confirmed. */
   applied: boolean;
+  /** Why nothing changed, when `applied` is false. */
+  failure?: "declined" | "amount_changed";
+  /** The provider's reason for a decline, for the buyer ("Your card has insufficient funds."). */
+  declineMessage?: string;
+  /**
+   * The invoice this change created (with `chargeNow`), as the provider recorded it: what the card
+   * was actually charged, to check against what the buyer confirmed. Null when none was created.
+   */
+  invoice: { id: string; amountPaidMinor: number; currency: string } | null;
+}
+
+/**
+ * Move a subscription to another price from its next renewal on, with nothing charged or credited
+ * now (Stripe: a subscription schedule whose second phase starts at the current period's end).
+ */
+export interface ScheduleSubscriptionPriceChangeInput {
+  providerSubscriptionId: string;
+  priceId: string;
+  /** Written onto the subscription when the new price starts (the new local `price_id`, say). */
+  metadata: Record<string, string>;
+  idempotencyKey: string;
+}
+
+export interface ScheduleSubscriptionPriceChangeResult {
+  scheduleId: string;
+  /** When the new price starts: the end of the current period. */
+  effectiveAt: Date;
+}
+
+/** A saved card of the customer, as the payer picks it: never the full number. */
+export interface SavedPaymentMethod extends PaymentMethodSummary {
+  id: string;
+  /** The card renewals are charged to. */
+  isDefault: boolean;
+}
+
+/** A card or other payment method, as the buyer would recognise it. */
+export interface PaymentMethodSummary {
+  brand: string;
+  last4: string | null;
+  expMonth: number | null;
+  expYear: number | null;
+}
+
+export interface SubscriptionInvoiceSummary {
+  id: string;
+  number: string | null;
+  status: string | null;
+  created: Date;
+  amountDueMinor: number;
+  amountPaidMinor: number;
+  /** Refunded so far on the payment behind it. */
+  amountRefundedMinor: number;
+  currency: string;
+  /** Why it was raised: `subscription_create`, `subscription_cycle`, `subscription_update`, ... */
+  billingReason: string | null;
+  hostedInvoiceUrl: string | null;
+  invoicePdf: string | null;
+}
+
+export interface SubscriptionBillingSummary {
+  paymentMethod: PaymentMethodSummary | null;
+  /** The next regular bill, or null when the subscription will not renew. */
+  nextBill: { amountMinor: number; currency: string; at: Date } | null;
+  /** Newest first. */
+  invoices: SubscriptionInvoiceSummary[];
 }
 
 /** What `changeSubscriptionPrice` with the same inputs would bill, computed without changing it. */
@@ -332,6 +408,43 @@ export interface PaymentProviderPort {
   changeSubscriptionPrice?(
     input: ChangeSubscriptionPriceInput,
   ): Promise<ChangeSubscriptionPriceResult>;
+  /** Schedule a price change for the next renewal. Implemented wherever `changeSubscriptionPrice` is. */
+  scheduleSubscriptionPriceChange?(
+    input: ScheduleSubscriptionPriceChangeInput,
+  ): Promise<ScheduleSubscriptionPriceChangeResult>;
+  /** Undo a scheduled change: the subscription carries on as it is. Idempotent. */
+  releaseSubscriptionSchedule?(scheduleId: string): Promise<void>;
+  /**
+   * Invoice items waiting for the customer's next invoice (prorations from earlier changes, say).
+   * A preview counts them but an immediate change does not, so a change is refused while any exist.
+   */
+  countPendingInvoiceItems?(customerId: string): Promise<{ count: number; netMinor: number }>;
+  /** Payment method, next bill and invoices of one subscription. */
+  describeSubscriptionBilling?(providerSubscriptionId: string): Promise<SubscriptionBillingSummary>;
+  /**
+   * A hosted page where the customer replaces their card, and nothing else: no plan change and no
+   * cancellation, so the provider and Studafy never disagree about the plan.
+   */
+  createPaymentMethodPortalSession?(input: {
+    customerId: string;
+    returnUrl: string;
+  }): Promise<CreateBillingPortalSessionResult>;
+  /** The customer's saved cards, the subscription's renewal card marked as default. */
+  listPaymentMethods?(input: {
+    customerId: string;
+    providerSubscriptionId: string | null;
+  }): Promise<SavedPaymentMethod[]>;
+  /** A hosted page where the customer saves a new card without paying anything. */
+  createCardSetupSession?(input: {
+    customerId: string;
+    successUrl: string;
+    cancelUrl: string;
+  }): Promise<CreateBillingPortalSessionResult>;
+  /** Make `paymentMethodId` the card the subscription renews on. */
+  setSubscriptionPaymentMethod?(input: {
+    providerSubscriptionId: string;
+    paymentMethodId: string;
+  }): Promise<void>;
   /** The bill `changeSubscriptionPrice` would produce. Implemented wherever it is. */
   previewSubscriptionPriceChange?(
     input: PreviewSubscriptionPriceChangeInput,

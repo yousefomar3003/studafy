@@ -24,6 +24,7 @@ import {
   extractMetadata,
   extractStudentIdHint,
   extractSubscriptionId,
+  extractSubscriptionPriceId,
 } from "./event-mapping";
 import { TERMINAL_STATUSES } from "./state-machine";
 
@@ -139,7 +140,12 @@ export async function resolveTarget(
 
   if (stripeSubscriptionId) {
     const byProviderKey = await findByProviderSubscriptionId(tx, schoolId, stripeSubscriptionId);
-    if (byProviderKey) return byProviderKey;
+    if (byProviderKey) {
+      if (byProviderKey.kind === "storage") {
+        await applyScheduledStorageChange(tx, byProviderKey.id, payload);
+      }
+      return byProviderKey;
+    }
   }
 
   // A storage add-on is a school purchase with no student, so it must be told apart before the
@@ -388,6 +394,35 @@ export async function isRetiredStorageDuplicate(
  * Also parked (null): a completion naming no storage price, and any other event for a school with
  * no storage row.
  */
+/**
+ * Apply a storage change scheduled for the renewal (000224) once Stripe's subscription has moved to
+ * the scheduled price: the row takes the new tier and cap, and the schedule columns are cleared.
+ * Keyed on the price the subscription now carries, so a redelivered or out-of-order event is a no-op
+ * and an event from before the renewal (still on the old price) changes nothing.
+ */
+async function applyScheduledStorageChange(
+  tx: TransactionSql,
+  storageSubscriptionId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const priceId = extractSubscriptionPriceId(payload);
+  if (priceId === null) return;
+  await tx`
+    UPDATE app.storage_subscriptions s
+    SET plan_price_id = s.pending_plan_price_id,
+        cap_bytes = s.pending_cap_bytes,
+        pending_plan_price_id = NULL,
+        pending_cap_bytes = NULL,
+        pending_effective_at = NULL,
+        stripe_schedule_id = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    FROM app.plan_prices pp
+    WHERE s.id = ${storageSubscriptionId}::uuid
+      AND pp.id = s.pending_plan_price_id
+      AND pp.stripe_price_id = ${priceId}
+  `;
+}
+
 async function resolveStorageTarget(
   tx: TransactionSql,
   schoolId: string,
@@ -436,6 +471,7 @@ async function resolveStorageTarget(
       return null;
     }
     await linkProviderSubscription(tx, "storage", existing.id, stripeSubscriptionId);
+    await applyScheduledStorageChange(tx, existing.id, payload);
     return target(existing);
   }
 
@@ -499,6 +535,8 @@ async function resolveStorageTarget(
           cap_bytes = ${tier.capBytes},
           stripe_subscription_id = ${stripeSubscriptionId},
           cancel_at_period_end = false,
+          pending_plan_price_id = NULL, pending_cap_bytes = NULL, pending_effective_at = NULL,
+          stripe_schedule_id = NULL,
           current_period_start = CURRENT_TIMESTAMP,
           current_period_end = CURRENT_TIMESTAMP
             + ${yearly ? "1 year" : "1 month"}::interval,
@@ -517,6 +555,10 @@ async function resolveStorageTarget(
         cap_bytes = ${tier.capBytes},
         stripe_subscription_id = COALESCE(${stripeSubscriptionId}::text, stripe_subscription_id),
         cancel_at_period_end = CASE WHEN ${ended} THEN false ELSE cancel_at_period_end END,
+        pending_plan_price_id = CASE WHEN ${ended} THEN NULL ELSE pending_plan_price_id END,
+        pending_cap_bytes = CASE WHEN ${ended} THEN NULL ELSE pending_cap_bytes END,
+        pending_effective_at = CASE WHEN ${ended} THEN NULL ELSE pending_effective_at END,
+        stripe_schedule_id = CASE WHEN ${ended} THEN NULL ELSE stripe_schedule_id END,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${existing.id}::uuid
   `;

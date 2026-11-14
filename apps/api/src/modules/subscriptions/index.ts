@@ -2,6 +2,7 @@ export { checkoutRoutes } from "./routes/checkout-routes";
 export { schoolCheckoutRoutes } from "./routes/school-checkout-routes";
 export { aiCheckoutRoutes } from "./routes/ai-checkout-routes";
 export { storageAddonRoutes } from "./routes/storage-addon-routes";
+export { platformStorageRoutes } from "./routes/storage-platform-routes";
 export { webhookRoutes } from "./routes/webhook-routes";
 export { planRoutes } from "./routes/plan-routes";
 export { adminSubscriptionRoutes } from "./routes/admin-routes";
