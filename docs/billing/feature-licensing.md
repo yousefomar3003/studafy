@@ -115,7 +115,7 @@ not reopened without the product owner.
 
 ### Payment for licenses (bank transfer or Revolut link)
 
-1. Quote. The school **accepts** it, or **declines** it with an optional reason (migration 000222):
+1. Quote. The school **accepts** it, or **declines** it with an optional reason (migration 000223):
    a declined quote is closed like an expired or withdrawn one, can no longer be accepted, and the
    super admin sees "Declined by the school" and the reason on the school's quotes and prices a new
    one. Overlap credits are claimed by invoices only, so a declined quote leaves them open.
