@@ -1328,4 +1328,96 @@ describe("route permissions", () => {
     });
     expect(bank.status).toBe(400);
   });
+
+  integrationTest(
+    "a Revolut payment link: the super admin sets, replaces and removes it; the school sees it only while unpaid",
+    async () => {
+      const f = await school();
+      const { invoice } = await accepted(f, (await sentQuote(f, newTerm(4))).id);
+      const linkPath = `/api/platform/schools/${f.schoolId}/license-invoices/${invoice.id}/payment-link`;
+      const schoolView = async () =>
+        (await (
+          await asRole(f, ROLES.ORG_ADMIN, "GET", `/api/school/license/invoices/${invoice.id}`)
+        ).json()) as { paymentLink: string | null };
+
+      expect((await schoolView()).paymentLink).toBeNull();
+
+      const link = "https://checkout.revolut.com/pay/0b4f3c1e-77aa-4d1b-9b77-5a1f4c2e9d10";
+      const set = await asOperator("PUT", linkPath, { url: link });
+      expect(set.status).toBe(200);
+      expect(((await set.json()) as { paymentLink: string }).paymentLink).toBe(link);
+      expect((await schoolView()).paymentLink).toBe(link);
+      const list = (await (
+        await asRole(f, ROLES.ORG_ADMIN, "GET", "/api/school/license/invoices")
+      ).json()) as { invoices: { id: string; paymentLink: string | null }[] };
+      expect(list.invoices.find((i) => i.id === invoice.id)!.paymentLink).toBe(link);
+
+      const replaced = await asOperator("PUT", linkPath, { url: "https://revolut.me/studafy" });
+      expect(((await replaced.json()) as { paymentLink: string }).paymentLink).toBe(
+        "https://revolut.me/studafy",
+      );
+
+      for (const bad of [
+        "http://revolut.me/studafy",
+        "https://evil.example/pay",
+        "https://revolut.com.evil.example/pay",
+        "https://user:pass@revolut.me/studafy",
+        "javascript:alert(1)",
+        `https://revolut.me/${"a".repeat(490)}`,
+      ]) {
+        const refused = await asOperator("PUT", linkPath, { url: bad });
+        expect([400, 422]).toContain(refused.status);
+        if (refused.status === 422) {
+          expect(((await refused.json()) as { code: string }).code).toBe(
+            "LICENSE_PAYMENT_LINK_INVALID",
+          );
+        }
+      }
+      expect((await schoolView()).paymentLink).toBe("https://revolut.me/studafy");
+
+      // A school can neither set nor remove it.
+      expect(
+        (await asRole(f, ROLES.ORG_ADMIN, "PUT", linkPath, { url: "https://revolut.me/x" })).status,
+      ).toBe(403);
+      expect((await asRole(f, ROLES.ORG_ADMIN, "DELETE", linkPath)).status).toBe(403);
+
+      const removed = await asOperator("DELETE", linkPath);
+      expect(removed.status).toBe(200);
+      expect(((await removed.json()) as { paymentLink: string | null }).paymentLink).toBeNull();
+      expect((await schoolView()).paymentLink).toBeNull();
+
+      // Paid in full: the link is no longer shown, and can no longer be set.
+      await asOperator("PUT", linkPath, { url: link });
+      await pay(f, invoice.id, invoice.totalMinor);
+      expect((await schoolView()).paymentLink).toBeNull();
+      const onPaid = await asOperator("PUT", linkPath, { url: link });
+      expect(onPaid.status).toBe(409);
+      expect(((await onPaid.json()) as { code: string }).code).toBe("LICENSE_INVOICE_NOT_PAYABLE");
+
+      // A void invoice refuses it too.
+      const other = await school();
+      const { invoice: voided } = await accepted(other, (await sentQuote(other, newTerm(2))).id);
+      await as(other.schoolId, operator, async (tx) => ({
+        result: await voidInvoice(tx, other.schoolId, voided.id, "Sent by mistake", operator),
+      }));
+      const onVoid = await asOperator(
+        "PUT",
+        `/api/platform/schools/${other.schoolId}/license-invoices/${voided.id}/payment-link`,
+        { url: link },
+      );
+      expect(onVoid.status).toBe(409);
+
+      // The write is audited.
+      const audits = await asAdmin(
+        f.schoolId,
+        (tx) =>
+          tx<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM app.audit_logs
+          WHERE target_table = 'license_invoices' AND target_id = ${invoice.id}::uuid
+            AND new_values ? 'payment_link'
+        `,
+      );
+      expect(audits[0]!.n).toBeGreaterThanOrEqual(4);
+    },
+  );
 });

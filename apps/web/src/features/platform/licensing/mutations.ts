@@ -310,6 +310,21 @@ export function useVoidInvoice() {
   );
 }
 
+/** Set or replace (`url`) or remove (`url` null) the invoice's online payment link (Revolut). */
+export function useSetInvoicePaymentLink() {
+  return useLicensingMutation(
+    async (input: { schoolId: string; invoiceId: string; url: string | null }) => {
+      const params = { path: { schoolId: input.schoolId, invoiceId: input.invoiceId } };
+      const path = "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link";
+      const { data } =
+        input.url === null
+          ? await api.DELETE(path, { params })
+          : await api.PUT(path, { params, body: { url: input.url } });
+      return required(data, "Payment link");
+    },
+  );
+}
+
 export function useMatchReceipt() {
   return useLicensingMutation(
     async (input: { schoolId: string; receiptId: string; paymentId: string }) => {

@@ -1,4 +1,5 @@
 import { z } from "@hono/zod-openapi";
+import { LICENSE_PAYMENT_LINK_MAX_LENGTH } from "@studafy/constants";
 
 import {
   INVOICE_STATUSES,
@@ -352,6 +353,15 @@ const invoiceShape = {
   overdueAt: z.string().datetime().nullable(),
   voidedAt: z.string().datetime().nullable(),
   voidReason: z.string().nullable(),
+  paymentLink: z
+    .string()
+    .url()
+    .nullable()
+    .openapi({
+      description:
+        "An online payment link (Revolut) to pay this invoice, while it can still be paid; null when " +
+        "none is set or it is paid or void. A payment made through it is still recorded by Studafy.",
+    }),
   createdAt: z.string().datetime(),
 };
 
@@ -454,6 +464,20 @@ export const acceptQuoteResponseSchema = z
   .openapi("LicenseQuoteAcceptance");
 
 export const voidBodySchema = z.object({ reason }).openapi("LicenseVoidBody");
+
+export const paymentLinkBodySchema = z
+  .object({
+    url: z
+      .string()
+      .min(1)
+      .max(LICENSE_PAYMENT_LINK_MAX_LENGTH)
+      .openapi({
+        description:
+          "An https payment link on an allowed provider host (revolut.com, revolut.me or a " +
+          "subdomain). Anything else: 422 LICENSE_PAYMENT_LINK_INVALID.",
+      }),
+  })
+  .openapi("LicensePaymentLinkBody");
 
 export const activateEarlyBodySchema = z
   .object({ dueDate: isoDate })

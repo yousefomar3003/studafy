@@ -258,6 +258,7 @@
   "LICENSE_INVOICE_NOT_FOUND": "لم يتم العثور على الفاتورة",
   "LICENSE_INVOICE_NOT_PAYABLE": "هذه الفاتورة مدفوعة أو ملغاة",
   "LICENSE_INVOICE_HAS_PAYMENTS": "ألغِ دفعات هذه الفاتورة أولاً",
+  "LICENSE_PAYMENT_LINK_INVALID": "الصق رابط دفع يبدأ بـ https من Revolut (revolut.com أو revolut.me)، بحد أقصى 500 حرف.",
   "LICENSE_PAYMENT_NOT_FOUND": "لم يتم العثور على الدفعة",
   "LICENSE_PAYMENT_EXCEEDS_BALANCE": "المبلغ أكبر من رصيد الفاتورة",
   "LICENSE_PAYMENT_VOIDED": "تم إلغاء هذه الدفعة",
