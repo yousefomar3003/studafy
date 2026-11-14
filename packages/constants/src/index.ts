@@ -62,6 +62,8 @@ export {
   FEATURE_USAGE_UNITS,
   FEATURES,
   isFeatureKey,
+  isLicensableAudience,
+  LICENSABLE_AUDIENCES,
 } from "./features";
 export type { FeatureAudience, FeatureDefinition, FeatureKey, FeatureUsageUnit } from "./features";
 export { PAYMENT_PURPOSES } from "./payment-purposes";

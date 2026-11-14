@@ -868,6 +868,68 @@ describe("quote rules", () => {
   );
 });
 
+describe("students only (LICENSABLE_AUDIENCES)", () => {
+  integrationTest("a new quote with teacher seats or Family+ is refused", async () => {
+    const f = await school();
+    expect(
+      await refusal(sentQuote(f, newTerm(5, { teacher: { planId: tiers.teacher, seats: 2 } }))),
+    ).toBe("LICENSE_AUDIENCE_NOT_OFFERED");
+    expect(await refusal(sentQuote(f, newTerm(5, { includeFamilyPlus: true })))).toBe(
+      "LICENSE_AUDIENCE_NOT_OFFERED",
+    );
+    // A teacher tier with no seats is refused too: it is not on offer.
+    expect(
+      await refusal(sentQuote(f, newTerm(5, { teacher: { planId: tiers.teacher, seats: 0 } }))),
+    ).toBe("LICENSE_AUDIENCE_NOT_OFFERED");
+    // Students alone are priced as before.
+    expect((await sentQuote(f, newTerm(5))).status).toBe("sent");
+  });
+
+  integrationTest(
+    "a license that already holds teacher seats keeps them but gets no more",
+    async () => {
+      const f = await school();
+      const licenseId = await as(f.schoolId, operator, async (tx) => {
+        const license = await createLicense(
+          tx,
+          f.schoolId,
+          {
+            startsAt: new Date(Date.now() - DAY),
+            endsAt: new Date(Date.now() + 200 * DAY),
+            currencyCode: "USD",
+            includeFamilyPlus: false,
+            student: { planId: tiers.student, seats: 10 },
+            teacher: { planId: tiers.teacher, seats: 3 },
+          },
+          operator,
+        );
+        const active = await transitionLicense(tx, f.schoolId, license.id, "active", operator);
+        return { result: active.result.id, versions: active.versions };
+      });
+
+      // More students on it is fine; the teacher seats it holds ride along unchanged.
+      const more = await sentQuote(f, {
+        kind: "seat_increase",
+        licenseId,
+        student: { planId: tiers.student, seats: 20 },
+      });
+      expect(more.status).toBe("sent");
+      expect(
+        await refusal(
+          sentQuote(f, {
+            kind: "seat_increase",
+            licenseId,
+            teacher: { planId: tiers.teacher, seats: 4 },
+          }),
+        ),
+      ).toBe("LICENSE_AUDIENCE_NOT_OFFERED");
+      expect(
+        await refusal(sentQuote(f, { kind: "seat_increase", licenseId, includeFamilyPlus: true })),
+      ).toBe("LICENSE_AUDIENCE_NOT_OFFERED");
+    },
+  );
+});
+
 // ---------------------------------------------------------------------------------------------------
 // Tenant isolation
 // ---------------------------------------------------------------------------------------------------

@@ -340,7 +340,15 @@
       "parents_two": "مقعدا ولي أمر",
       "parents_few": "{{count}} مقاعد ولي أمر",
       "parents_many": "{{count}} مقعد ولي أمر",
-      "parents_other": "{{count}} مقعد ولي أمر"
+      "parents_other": "{{count}} مقعد ولي أمر",
+      "studentAi_zero": "الذكاء الاصطناعي للطلاب: لا مقاعد",
+      "studentAi_one": "الذكاء الاصطناعي للطلاب: مقعد واحد",
+      "studentAi_two": "الذكاء الاصطناعي للطلاب: مقعدان",
+      "studentAi_few": "الذكاء الاصطناعي للطلاب: {{count}} مقاعد",
+      "studentAi_many": "الذكاء الاصطناعي للطلاب: {{count}} مقعدًا",
+      "studentAi_other": "الذكاء الاصطناعي للطلاب: {{count}} مقعد",
+      "studentAiNoSeats": "الذكاء الاصطناعي للطلاب",
+      "studentAiTier": "الباقة {{tier}}"
     },
     "price": "تسعيره",
     "resolve": "إنجاز",

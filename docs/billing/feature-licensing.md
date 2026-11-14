@@ -52,6 +52,27 @@ existing AI subscriber is on the `ai_addon` tier, whose limits are unlimited (se
 These are the product decisions the whole system is built to. Sessions 2–6 implement them; they are
 not reopened without the product owner.
 
+### Students only until other features are built (2026-11-14)
+
+- A license sells seats only to an audience with at least one **built** feature:
+  `LICENSABLE_AUDIENCES` in
+  [`packages/constants/src/features.ts`](../../packages/constants/src/features.ts), derived from
+  `FEATURES` (a feature marked `planned` does not count). Today that is **students only**: the AI
+  tutor and study tools. Teacher seats (AI grading), parent seats and **Family+** are `planned` and
+  are not offered anywhere: not in the school's request form, the super admin calculator, the tier
+  and pricing pages, or a license's facts.
+- The API enforces it where a license is sold: a school's change request and every quote
+  (`refuseUnofferedAudiences`, `422 LICENSE_AUDIENCE_NOT_OFFERED`). A license that already holds
+  seats in another audience keeps them: they still show, can still be assigned, and survive a seat
+  increase or an extension; they are only never added to. The super admin's direct license
+  endpoints are not checked (repair by hand).
+- Nothing is removed from the database. When a teacher or parent feature ships (its `planned` flag
+  removed), that audience comes back on every screen and in the API with no other change.
+- The school asks with **Request AI for students** (number of students, the AI tier, an optional
+  note). The console inbox shows it as "Student AI: N seats · tier X", and **Price it** opens the
+  calculator prefilled (`?schoolId=&studentSeats=&studentTier=`, plus `licenseId` and
+  `kind=seat_increase` when the school has a license in force).
+
 ### Seats
 
 - A license has a **seat count per audience** (students, teachers, parents) and a **tier per

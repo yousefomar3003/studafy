@@ -93,6 +93,23 @@ export const FEATURE_KEYS = Object.keys(FEATURES) as FeatureKey[];
  */
 export const FEATURE_KEY_PATTERN = /^[a-z][a-z0-9_]{1,49}$/;
 
+/**
+ * The audiences a school license may sell seats to: those with at least one feature that is built
+ * (not `planned`). Today only students (the AI tutor and study tools); teachers and parents come
+ * back on their own once one of their features ships, with no other change. Seats a license
+ * already holds in another audience stay readable and assignable; they are only not offered anew.
+ */
+export const LICENSABLE_AUDIENCES: readonly FeatureAudience[] = FEATURE_AUDIENCES.filter(
+  (audience) =>
+    Object.values(FEATURES as Record<string, FeatureDefinition>).some(
+      (feature) => feature.audience === audience && feature.planned !== true,
+    ),
+);
+
+export function isLicensableAudience(audience: FeatureAudience): boolean {
+  return LICENSABLE_AUDIENCES.includes(audience);
+}
+
 export function isFeatureKey(value: string): value is FeatureKey {
   return Object.hasOwn(FEATURES, value);
 }
