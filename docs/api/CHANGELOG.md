@@ -11,6 +11,15 @@ when it required the `version-bump` label.
 
 ## Unreleased
 
+### Added
+
+- `GET /api/platform/health` (`PlatformSystemHealth`) adds `storageDuplicates`
+  (`PlatformStorageDuplicates`). It lists schools charged for a second storage add-on (000219):
+  every one not yet settled and those settled in the last 30 days, open ones first. Each item gives
+  the duplicate and kept Stripe subscription ids, `source` (`checkout`, resolved automatically, or
+  `event`, left for a person), `status` (`pending`, `resolved`, `needs_review`), the refund and
+  anything not refunded, and the last error.
+
 ### Changed
 
 - **(breaking)** `POST /api/subscriptions/storage/change` (`changeStorageAddOnTier`) now charges

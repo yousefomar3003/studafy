@@ -992,7 +992,27 @@
       "status": "الحالة (المحاولات)",
       "received": "وقت الاستلام",
       "used": "المساحة المستخدمة",
-      "orphans": "ملفات متبقية"
+      "orphans": "ملفات متبقية",
+      "duplicateStatus": "الحالة",
+      "duplicateSubscription": "الاشتراك المكرر",
+      "refund": "المبلغ المسترد",
+      "detected": "تاريخ الاكتشاف",
+      "note": "ما يحدث"
+    },
+    "duplicatesHeading": "اشتراكات تخزين مكررة ({{count}} مفتوحة)",
+    "duplicatesHelp": "مدرسة دُفع منها مقابل خطتي تخزين في الوقت نفسه. يُحتفظ بآخر عملية شراء، ويُلغى الاشتراك الأقدم في Stripe ويُسترد تلقائياً الجزء غير المستخدم من مدته.",
+    "duplicatesCaption": "اشتراكات تخزين مكررة",
+    "noDuplicates": "لم يُخصم من أي مدرسة مرتين مقابل التخزين.",
+    "duplicateKept": "المحتفظ به: {{id}}",
+    "duplicateUnrefunded": "تعذّر استرداد {{amount}} تلقائياً: تحقق منه في Stripe",
+    "duplicatePending": "جارٍ الإلغاء والاسترداد (المحاولة {{attempts}})",
+    "duplicateResolved": "أُلغي واستُرد {{when}}",
+    "duplicateReviewEvent": "اشتراك تخزين ثانٍ فعّال دون عملية دفع مكتملة. تحقق منه في Stripe: ألغِ واسترد الاشتراك الذي لا تريده المدرسة.",
+    "duplicateReviewFailed": "تعذّر إلغاؤه أو استرداده تلقائياً. أكمل ذلك في Stripe.",
+    "duplicateStatus": {
+      "pending": "قيد المعالجة",
+      "resolved": "تمت المعالجة",
+      "needs_review": "يحتاج إلى مراجعة"
     }
   },
   "flags": {

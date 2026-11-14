@@ -19,6 +19,7 @@ import {
   scheduleLicenseJobs,
   scheduleSeatReconciliationJob,
   scheduleStorageQuotaReconciliationJob,
+  scheduleStorageDuplicateResolverJob,
   scheduleFinanceReconciliationJob,
 } from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
@@ -233,6 +234,13 @@ void scheduleSeatReconciliationJob(seatReconciliationRedis).then(() =>
 const storageQuotaReconciliationRedis = createRedisConnection(env);
 void scheduleStorageQuotaReconciliationJob(storageQuotaReconciliationRedis).then(() =>
   storageQuotaReconciliationRedis.disconnect(),
+);
+
+// Duplicate storage subscription resolver (000219): idempotently register the 10-minute run that
+// cancels and refunds a storage subscription a newer purchase replaced.
+const storageDuplicateResolverRedis = createRedisConnection(env);
+void scheduleStorageDuplicateResolverJob(storageDuplicateResolverRedis).then(() =>
+  storageDuplicateResolverRedis.disconnect(),
 );
 
 // Finance reconciliation scheduler: idempotently register the daily 02:30 run of apps/api's

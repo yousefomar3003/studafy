@@ -27,7 +27,7 @@
 
 import { SUBSCRIPTION_STATUSES } from "@studafy/constants";
 
-import { resolveSchoolId, resolveTarget } from "./attribution";
+import { isRetiredStorageDuplicate, resolveSchoolId, resolveTarget } from "./attribution";
 import {
   attributeEvent,
   claimEvent,
@@ -36,6 +36,7 @@ import {
   markProcessed,
 } from "./billing-event-store";
 import {
+  extractAddonHint,
   extractCustomerId,
   extractPeriod,
   extractSchoolIdHint,
@@ -273,7 +274,21 @@ async function applyClaimedEvent(
   // app.audit_logs are all RLS-forced and would match zero rows without it.
   await setTenantScope(tx, schoolId, options.requestId);
 
-  const target = await resolveTarget(tx, schoolId, event.type, event.data);
+  // A storage subscription already retired as a duplicate (000219) -- its cancellation, a late copy
+  // of its checkout -- is finished with here: it must never move the school's add-on.
+  if (await isRetiredStorageDuplicate(tx, schoolId, event.data)) {
+    options.logger.info(
+      { event_id: event.id, event_type: event.type, school_id: schoolId },
+      "billing event for a retired duplicate storage subscription; recorded, not applied",
+    );
+    await markProcessed(tx, rowId);
+    return { outcome: "processed", transitioned: false };
+  }
+
+  const target = await resolveTarget(tx, schoolId, event.type, event.data, event.id);
+  if (extractAddonHint(event.data) === "storage") {
+    await warnOfStorageDuplicate(tx, event, schoolId, options.logger);
+  }
   if (target === null) {
     return park(`School ${schoolId} has no subscription this event could be applied to`);
   }
@@ -299,6 +314,41 @@ async function applyClaimedEvent(
   await markProcessed(tx, rowId);
 
   return { outcome: "processed", transitioned: fold.status !== target.status };
+}
+
+/**
+ * A structured warning for every duplicate storage subscription this event found (000219), so the
+ * double charge shows in the logs as well as on the super admin's health page.
+ */
+async function warnOfStorageDuplicate(
+  tx: TransactionSql,
+  event: VerifiedBillingEvent,
+  schoolId: string,
+  logger: BillingLogger,
+): Promise<void> {
+  const found = await tx<
+    { id: string; stripe_subscription_id: string; source: string; status: string }[]
+  >`
+    SELECT id, stripe_subscription_id, source, status
+    FROM app.storage_duplicate_subscriptions
+    WHERE school_id = ${schoolId}::uuid AND detected_by_event_id = ${event.id}
+  `;
+  for (const duplicate of found) {
+    logger.warn(
+      {
+        event_id: event.id,
+        event_type: event.type,
+        school_id: schoolId,
+        storage_duplicate_id: duplicate.id,
+        duplicate_subscription_id: duplicate.stripe_subscription_id,
+        source: duplicate.source,
+        status: duplicate.status,
+      },
+      duplicate.source === "checkout"
+        ? "duplicate storage subscription: the newest purchase is kept, the older one will be canceled and refunded"
+        : "second live storage subscription without a completed checkout: needs review",
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------

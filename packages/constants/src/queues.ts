@@ -114,6 +114,9 @@ export const JOB_NAMES = {
   // deletions, lifecycle expirations, orphaned objects) that event-driven increments cannot see.
   // Carries no payload: the sweep reads every school's usage and the S3 bucket directly.
   RUN_STORAGE_QUOTA_RECONCILIATION: "run-storage-quota-reconciliation",
+  // Every 10 minutes: cancel and refund duplicate storage subscriptions (000219) the webhook
+  // pipeline retired when a school bought storage a second time. Carries no payload.
+  RUN_STORAGE_DUPLICATE_RESOLVER: "run-storage-duplicate-resolver",
   // Daily finance reconciliation. Scheduled job: asks apps/api to reconcile every school's
   // installment_cache against ERPNext (POST /api/finance/reconciliation/run, X-Api-Key) -- the API owns
   // the per-school ERPNext clients, so the worker only triggers it. Carries no payload.
