@@ -13,6 +13,12 @@ when it required the `version-bump` label.
 
 ### Added
 
+- A school can decline a licence quote (migration 000222): `POST
+/api/school/license/quotes/{quoteId}/decline` (`license:manage`) with an optional `reason`
+  (`DeclineLicenseQuoteBody`, at most 1000 characters) answers the `LicenseQuote`. Only a sent quote
+  within its validity can be declined (409 `LICENSE_QUOTE_NOT_EDITABLE` / `LICENSE_QUOTE_EXPIRED`); a
+  declined quote cannot be accepted. `LicenseQuoteStatus` adds `declined`, and `LicenseQuote` adds
+  `declinedAt`, `declinedBy` and `declineReason`. The school's quote list includes declined quotes.
 - Licence payment plans (migration 000221, ADR-021). `LicenseQuoteBody`, `LicenseQuoteReplaceBody`
   and `LicenseQuoteCalculateBody` take optional `paymentPlan` (`LicensePaymentPlan`: `in_full`,
   `monthly`, `custom`; default `in_full`) and, for `custom`, `paymentSchedule`

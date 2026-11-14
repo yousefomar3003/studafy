@@ -594,6 +594,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/platform/schools/{schoolId}/license-payments/upload-url",
   "POST /api/platform/schools/{schoolId}/license-receipts/{receiptId}/match",
   "POST /api/school/license/quotes/{quoteId}/accept",
+  "POST /api/school/license/quotes/{quoteId}/decline",
   "POST /api/school/license/invoices/{invoiceId}/receipts",
   // The license console's catalog (session 4): features and tiers are global, audited in the
   // operator's home school.
