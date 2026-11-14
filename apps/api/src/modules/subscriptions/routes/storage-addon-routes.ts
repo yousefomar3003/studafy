@@ -88,6 +88,11 @@ const StorageOfferSchema = z
         "Whether this school can buy, change or cancel the add-on online. False when its payment " +
         "provider cannot manage subscriptions (Tap) or is not configured.",
     }),
+    testMode: z.boolean().openapi({
+      description:
+        "True when payments run in a Stripe Sandbox (test keys): test cards only, no real money is " +
+        "charged.",
+    }),
     granted: z
       .object({
         capBytes: z.number().int(),

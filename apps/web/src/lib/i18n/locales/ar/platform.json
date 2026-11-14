@@ -1025,7 +1025,12 @@
       "refunded": "تم الاسترداد",
       "needs_review": "بحاجة إلى مراجعة"
     },
-    "incidentNote": "خُصم {{charged}} بدلاً من {{expected}}"
+    "incidentNote": "خُصم {{charged}} بدلاً من {{expected}}",
+    "stripeMode": {
+      "live": "Stripe: مباشر (أموال حقيقية)",
+      "sandbox": "Stripe: تجريبي (بطاقات اختبار، بلا أموال حقيقية)",
+      "not_configured": "Stripe: غير مُعدّ"
+    }
   },
   "flags": {
     "title": "مفاتيح الميزات",

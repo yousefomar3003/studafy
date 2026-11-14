@@ -88,3 +88,6 @@ export {
   tierPercentageFor,
 } from "./sibling-discount";
 export type { SiblingDiscountRule, SiblingDiscountTier, SiblingStanding } from "./sibling-discount";
+
+export { isLiveStripeMode, stripeModeFromKey } from "./stripe-mode";
+export type { StripeMode } from "./stripe-mode";

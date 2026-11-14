@@ -13,6 +13,10 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Stripe Sandbox support (docs/billing/stripe-modes.md): `StorageAddOnOffer.testMode` (true while
+  payments run on Stripe Sandbox keys: test cards only, no real money), `SystemHealth.stripeMode`
+  (`live`, `sandbox` or `not_configured`), and the Stripe webhook's `outcome` gains `ignored` for an
+  event from the other account mode (answered 200, never applied).
 - Storage billing works like an app-store subscription (migration 000224, ADR-022).
   `StorageAddOnChangePreview` adds `timing` (`now`: more storage on the same interval, charged at
   once; `renewal`: less storage or the other interval, applied at the next renewal with nothing
