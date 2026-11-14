@@ -239,6 +239,42 @@ export const systemHealthSchema = z
       complaints: z.number().int(),
       deliveries: z.number().int(),
     }),
+    storageDuplicates: z
+      .object({
+        open: z.number().int().openapi({
+          description: "Duplicate storage subscriptions not yet canceled and refunded.",
+        }),
+        items: z.array(
+          z.object({
+            id: z.string().uuid(),
+            schoolId: z.string().uuid(),
+            schoolName: z.string(),
+            stripeSubscriptionId: z.string().openapi({
+              description: "The subscription the school no longer keeps (canceled and refunded).",
+            }),
+            keptStripeSubscriptionId: z.string().nullable(),
+            source: z.enum(["checkout", "event"]).openapi({
+              description:
+                "checkout: a second completed checkout, resolved automatically. event: a second " +
+                "live subscription with no completed checkout, left for a person.",
+            }),
+            status: z.enum(["pending", "resolved", "needs_review"]),
+            attempts: z.number().int(),
+            refundAmountMinor: z.number().int().nullable(),
+            refundCurrency: z.string().nullable(),
+            stripeRefundId: z.string().nullable(),
+            unrefundedMinor: z.number().int().nullable(),
+            lastError: z.string().nullable(),
+            detectedAt: isoDateTime,
+            resolvedAt: isoDateTime.nullable(),
+          }),
+        ),
+      })
+      .openapi("PlatformStorageDuplicates", {
+        description:
+          "Schools charged for a second storage add-on (000219): every one not yet settled, and " +
+          "those settled in the last 30 days. Open ones first.",
+      }),
     storage: z.object({
       available: z.boolean(),
       lastRunAt: isoDateTime.nullable(),

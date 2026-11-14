@@ -77,6 +77,28 @@ const health = {
   },
   webhooks: { failedEvents: [], recentFailures: [], rejectedSignatures: [] },
   email: { bounces: 4, complaints: 0, deliveries: 120 },
+  storageDuplicates: {
+    open: 1,
+    items: [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        schoolId: SCHOOL_ID,
+        schoolName: "Alpha Academy",
+        stripeSubscriptionId: "sub_duplicate_old",
+        keptStripeSubscriptionId: "sub_duplicate_new",
+        source: "checkout",
+        status: "pending",
+        attempts: 1,
+        refundAmountMinor: 1000,
+        refundCurrency: "USD",
+        stripeRefundId: null,
+        unrefundedMinor: 0,
+        lastError: null,
+        detectedAt: new Date(NOW).toISOString(),
+        resolvedAt: null,
+      },
+    ],
+  },
   storage: {
     available: true,
     lastRunAt: new Date(NOW - HOUR).toISOString(),
@@ -249,6 +271,10 @@ describe("HealthPage", () => {
     expect(screen.getByText("run-storage-quota-reconciliation")).toBeTruthy();
     expect(screen.getAllByText("Alpha Academy").length).toBeGreaterThan(0);
     expect(screen.getByText(/Google Play webhook failures/)).toBeTruthy();
+    expect(screen.getByText("Duplicate storage subscriptions (1 open)")).toBeTruthy();
+    expect(screen.getByText("sub_duplicate_old")).toBeTruthy();
+    expect(screen.getByText("Kept: sub_duplicate_new")).toBeTruthy();
+    expect(screen.getByText("Canceling and refunding (attempt 1)")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
   });
 });

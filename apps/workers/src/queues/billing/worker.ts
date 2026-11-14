@@ -18,6 +18,10 @@ import {
   processBillingEventSchema,
 } from "./schemas";
 import { runSeatReconciliation } from "./seat-reconciliation";
+import {
+  runStorageDuplicateResolver,
+  StripeStorageDuplicateClient,
+} from "./storage-duplicate-resolver";
 import { orphanRemovalEnabled } from "./storage-orphan-sweep";
 import { runStorageQuotaReconciliation } from "./storage-quota-reconciliation";
 import { createStorageQuotaS3 } from "./storage-quota-s3";
@@ -107,6 +111,12 @@ export async function processBillingJob(
     return processSeatReconciliation(database);
   }
 
+  // Duplicate storage subscriptions (000219): cancel and refund the one a newer purchase replaced.
+  // Moves money, so Stripe is required whenever there is anything to resolve.
+  if (job.name === JOB_NAMES.RUN_STORAGE_DUPLICATE_RESOLVER) {
+    return processStorageDuplicates(database);
+  }
+
   // Daily storage-quota reconciliation (ST-16x). Same shape as the dunning and seat sweeps: no
   // payload, its own postgres connection, one system tenant transaction per school. Unlike them it
   // talks to S3 (the bucket that holds the school's objects), so it needs the storage options — and
@@ -169,6 +179,31 @@ async function processLicenseJob(name: string, database: DatabaseSource): Promis
       return await runLicenseReminders(sql, now, workerLogger);
     }
     return await runUsagePeriodStart(sql, now, workerLogger);
+  } finally {
+    await lease.release();
+  }
+}
+
+async function processStorageDuplicates(database: DatabaseSource): Promise<unknown> {
+  const secretKey = process.env.STRIPE_SECRET_KEY;
+  const lease = leaseDatabase(database);
+  const sql = lease.sql;
+  try {
+    if (!secretKey) {
+      const [row] = await sql<{ count: number }[]>`
+        SELECT count(*)::int AS count FROM app.schools WHERE stripe_customer_id IS NOT NULL
+      `;
+      if ((row?.count ?? 0) > 0) {
+        throw new Error("STRIPE_SECRET_KEY is required to resolve duplicate storage subscriptions");
+      }
+      return { processed: false, reason: "stripe not configured" };
+    }
+    return await runStorageDuplicateResolver(
+      sql,
+      new StripeStorageDuplicateClient(secretKey),
+      new Date(),
+      workerLogger,
+    );
   } finally {
     await lease.release();
   }

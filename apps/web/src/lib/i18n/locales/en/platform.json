@@ -936,7 +936,27 @@
       "status": "Status (attempts)",
       "received": "Received",
       "used": "Storage used",
-      "orphans": "Leftover files"
+      "orphans": "Leftover files",
+      "duplicateStatus": "Status",
+      "duplicateSubscription": "Duplicate subscription",
+      "refund": "Refund",
+      "detected": "Found",
+      "note": "What happens"
+    },
+    "duplicatesHeading": "Duplicate storage subscriptions ({{count}} open)",
+    "duplicatesHelp": "A school charged for a second storage plan at the same time. The newest purchase is kept; the older subscription is canceled in Stripe and the unused part of its period refunded automatically.",
+    "duplicatesCaption": "Duplicate storage subscriptions",
+    "noDuplicates": "No school has been charged twice for storage.",
+    "duplicateKept": "Kept: {{id}}",
+    "duplicateUnrefunded": "{{amount}} could not be refunded automatically: check in Stripe",
+    "duplicatePending": "Canceling and refunding (attempt {{attempts}})",
+    "duplicateResolved": "Canceled and refunded {{when}}",
+    "duplicateReviewEvent": "A second live storage subscription with no completed checkout. Check it in Stripe: cancel and refund whichever the school does not want.",
+    "duplicateReviewFailed": "It could not be canceled or refunded automatically. Finish it in Stripe.",
+    "duplicateStatus": {
+      "pending": "Being resolved",
+      "resolved": "Resolved",
+      "needs_review": "Needs review"
     }
   },
   "flags": {
