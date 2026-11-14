@@ -171,6 +171,11 @@ export const platformOperatorListSchema = z
 export const systemHealthSchema = z
   .object({
     generatedAt: isoDateTime,
+    stripeMode: z.enum(["live", "sandbox", "not_configured"]).openapi({
+      description:
+        "The Stripe account mode payments run in: live (real money), sandbox (test cards only) or " +
+        "not_configured.",
+    }),
     windowDays: z.number().int(),
     jobs: z.object({
       available: z.boolean(),

@@ -103,7 +103,11 @@ export interface WebhookRequestContext {
  */
 export interface WebhookOutcome {
   received: true;
-  outcome: "duplicate" | "processed" | "parked";
+  /**
+   * `ignored`: a Stripe event from the other account mode (live vs Sandbox) than the configured key.
+   * Answered 200 so Stripe stops redelivering it; never applied (docs/billing/stripe-modes.md).
+   */
+  outcome: "duplicate" | "processed" | "parked" | "ignored";
 }
 
 /**
@@ -136,6 +140,24 @@ export async function handleBillingWebhook(
   context: WebhookRequestContext,
 ): Promise<WebhookOutcome> {
   const event = await verify(deps, payload, signature, context);
+
+  // A live event must never move state while production runs on Sandbox keys, nor a Sandbox event
+  // while it runs live. The two modes sign with different secrets, so this is the second lock.
+  const expectedLivemode = deps.providerName === "stripe" ? deps.provider.livemode : undefined;
+  if (expectedLivemode !== undefined && event.livemode !== expectedLivemode) {
+    deps.logger.warn(
+      {
+        provider: deps.providerName,
+        provider_event_id: event.id,
+        event_type: event.type,
+        event_livemode: event.livemode,
+        expected_livemode: expectedLivemode,
+        request_id: context.requestId,
+      },
+      "stripe event from the other account mode ignored",
+    );
+    return { received: true, outcome: "ignored" };
+  }
 
   // A one-time fee payment is not a subscription event, whatever its type says: Stripe reports a
   // paid fee Checkout as `checkout.session.completed`, which the state machine would read as a

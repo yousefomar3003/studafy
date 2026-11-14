@@ -371,6 +371,20 @@ export default function StoragePage() {
         description={t("schoolLicense.storage.description")}
       />
 
+      {data?.testMode ? (
+        <div
+          className="license-banner"
+          data-tone="warning"
+          role="note"
+          data-testid="storage-test-mode"
+        >
+          <div>
+            <p className="license-banner__title">{t("schoolLicense.storage.testModeTitle")}</p>
+            <p className="license-banner__body">{t("schoolLicense.storage.testModeBody")}</p>
+          </div>
+        </div>
+      ) : null}
+
       {confirming ? (
         <div className="license-banner" data-tone="neutral" role="status">
           <div>
