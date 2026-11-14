@@ -43,6 +43,8 @@ function invoice(currencyCode = "USD", minorUnit = 2) {
     voidedAt: null,
     voidReason: null,
     paymentLink: null as string | null,
+    paymentPlan: "in_full",
+    instalments: [] as unknown[],
     createdAt: "2026-10-01T08:00:00.000Z",
     bankDetails: {
       bankName: "Gulf Bank",
@@ -131,7 +133,10 @@ const postMock = mock((path: string, _init?: { body?: Record<string, unknown> })
 });
 
 const LINK_PATH = "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link";
+const INSTALMENT_LINK_PATH =
+  "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link";
 const putMock = mock((path: string, init?: { body?: { url: string } }) => {
+  if (path === INSTALMENT_LINK_PATH) return Promise.resolve({ data: current });
   if (path === LINK_PATH) {
     current = { ...current, paymentLink: init!.body!.url };
     return Promise.resolve({ data: current });
@@ -181,7 +186,65 @@ afterEach(() => {
   deleteMock.mockClear();
 });
 
+/** Paid monthly in three: the first paid, the second partly paid (to pay now), the third due. */
+function monthlyInvoice() {
+  const base = invoice();
+  const instalment = (position: number, paidMinor: number, status: string) => ({
+    id: `00000000-0000-4000-8000-00000000000${position}`,
+    position,
+    amountMinor: 40_000,
+    paidMinor,
+    balanceMinor: 40_000 - paidMinor,
+    dueDate: `2026-${String(9 + position).padStart(2, "0")}-01`,
+    status,
+    overdue: false,
+    overdueAt: null,
+    current: position === 2,
+    paymentLink: null as string | null,
+  });
+  return {
+    ...base,
+    totalMinor: 120_000,
+    paidMinor: 60_000,
+    balanceMinor: 60_000,
+    paymentPlan: "monthly",
+    instalments: [
+      instalment(1, 40_000, "paid"),
+      instalment(2, 20_000, "partially_paid"),
+      instalment(3, 0, "due"),
+    ],
+  };
+}
+
 describe("InvoicePage", () => {
+  test("a monthly invoice shows its schedule, with a payment link per unpaid instalment", async () => {
+    current = monthlyInvoice();
+    await renderPage();
+    const card = await screen.findByRole("region", { name: "Payment schedule" });
+    expect(screen.queryByRole("region", { name: "Payment link" })).toBeNull();
+    expect(
+      within(card).getByText("Paid monthly: 3 payments, one each licence month.", { exact: false }),
+    ).toBeTruthy();
+    // The paid instalment has no link field; the other two do.
+    expect(within(card).queryByLabelText("Revolut link for instalment 1")).toBeNull();
+    expect(within(card).getByLabelText("Revolut link for instalment 3")).toBeTruthy();
+
+    const link = "https://checkout.revolut.com/pay/second";
+    fireEvent.change(within(card).getByLabelText("Revolut link for instalment 2"), {
+      target: { value: link },
+    });
+    fireEvent.click(within(card).getAllByRole("button", { name: "Save link" })[0]!);
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    const [path, init] = putMock.mock.calls[0]! as unknown as [
+      string,
+      { params: { path: Record<string, string> }; body: { url: string } },
+    ];
+    expect(path).toBe(INSTALMENT_LINK_PATH);
+    expect(init.params.path.instalmentId).toBe("00000000-0000-4000-8000-000000000002");
+    expect(init.body).toEqual({ url: link });
+    expect(await screen.findByText("Payment link for instalment 2 saved.")).toBeTruthy();
+  });
+
   test("pastes a Revolut payment link, refuses anything else, and removes it", async () => {
     await renderPage();
     const card = await screen.findByRole("region", { name: "Payment link" });

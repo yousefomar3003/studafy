@@ -255,7 +255,30 @@
     "nextOffer_two": "أضف مقعدين للوصول إلى خصم {{percent}}",
     "nextOffer_few": "أضف {{count}} مقاعد للوصول إلى خصم {{percent}}",
     "nextOffer_many": "أضف {{count}} مقعداً للوصول إلى خصم {{percent}}",
-    "nextOffer_other": "أضف {{count}} مقعداً للوصول إلى خصم {{percent}}"
+    "nextOffer_other": "أضف {{count}} مقعداً للوصول إلى خصم {{percent}}",
+    "planHeading": "طريقة دفع المدرسة",
+    "planLabel": "خطة الدفع",
+    "plan": {
+      "in_full": "دفعة واحدة",
+      "monthly": "شهريًا، على أشهر الترخيص",
+      "custom": "جدول مخصص"
+    },
+    "customHeading": "الأقساط",
+    "customAmountLabel": "مبلغ القسط {{position}} ({{currency}})",
+    "customDueLabel": "تاريخ استحقاق القسط {{position}}",
+    "customRemove": "إزالة القسط {{position}}",
+    "customAdd": "إضافة قسط",
+    "customLeft": "المتبقي للجدولة: {{amount}}",
+    "scheduleErrors": {
+      "empty": "أضف قسطًا واحدًا على الأقل.",
+      "incomplete": "أعطِ كل قسط مبلغًا أكبر من صفر وتاريخ استحقاق.",
+      "too_many": "يمكن أن يحتوي الجدول المخصص على 24 قسطًا كحد أقصى.",
+      "invalid_date": "أحد تواريخ الاستحقاق ليس تاريخًا صحيحًا.",
+      "non_positive": "يجب أن يكون كل قسط أكبر من صفر.",
+      "not_ascending": "رتّب تواريخ الاستحقاق من الأقرب إلى الأبعد.",
+      "sum_mismatch": "يجب أن يساوي مجموع الأقساط إجمالي العرض تمامًا.",
+      "in_past": "لا يمكن أن يكون تاريخ الاستحقاق قبل اليوم."
+    }
   },
   "quotes": {
     "title": "عروض الأسعار",
@@ -468,7 +491,7 @@
     "fileLabel": "إرفاق ملف الإيصال (PDF أو JPEG أو PNG، اختياري)",
     "recordConfirm": "تسجيل التحويل",
     "recorded": "سُجّل التحويل.",
-    "recordedActivated": "سُجّل التحويل: دُفعت الفاتورة وأصبح الترخيص فعّالاً.",
+    "recordedActivated": "سُجّل التحويل: أصبح الترخيص فعّالاً الآن.",
     "voidPaymentTitle": "إلغاء الدفعة {{reference}}",
     "voidInvoiceTitle": "إلغاء الفاتورة {{number}}",
     "reasonLabel": "السبب",
@@ -496,6 +519,15 @@
       "saved": "حُفظ رابط الدفع. يمكن للمدرسة الآن الدفع عبر الإنترنت.",
       "removed": "أُزيل رابط الدفع. ترى المدرسة التفاصيل البنكية فقط.",
       "invalid": "الصق رابطًا يبدأ بـ https من Revolut (revolut.com أو revolut.me)، بحد أقصى 500 حرف."
+    },
+    "instalments": {
+      "title": "جدول الدفع",
+      "help": "تُخصم الدفعات التي تسجّلها من أقدم قسط أولاً. يبدأ الترخيص بمجرد دفع القسط الأول.",
+      "linkColumn": "رابط الدفع",
+      "linkLabel": "رابط Revolut للقسط {{position}}",
+      "openLink": "فتح الرابط",
+      "linkSaved": "حُفظ رابط الدفع للقسط {{position}}.",
+      "linkRemoved": "أُزيل رابط الدفع للقسط {{position}}."
     }
   },
   "school": {

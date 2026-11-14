@@ -66,6 +66,7 @@ The platform's core decision set maps to this index as follows:
 10. Channel policy → ADR-0016 (+ SAD_13)
 11. Academic grading → ADR-0017
 12. Paid features and licensing → ADR-0018 (+ ADR-0014, [billing/feature-licensing.md](../billing/feature-licensing.md))
+13. Licence payment plans (at once, monthly, custom) → ADR-0021
 
 ## Review
 

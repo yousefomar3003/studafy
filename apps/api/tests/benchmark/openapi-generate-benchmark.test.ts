@@ -569,6 +569,7 @@ const EXPECTED_PATHS = [
   "/api/platform/licenses/receipts",
   "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}",
   "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
+  "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link",
   "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
   "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payments",
   "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/void",
