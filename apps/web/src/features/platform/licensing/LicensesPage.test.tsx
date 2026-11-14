@@ -26,7 +26,10 @@ const openRequest = {
   studentSeats: 120,
   teacherSeats: null,
   parentSeats: null,
-  includeFamilyPlus: true,
+  includeFamilyPlus: null,
+  studentTier: { id: "t-2", code: "student_pro", displayName: "Student Pro" },
+  teacherTier: null,
+  parentTier: null,
   note: "New grade 7 section",
   requestedBy: "44444444-4444-4444-8444-444444444444",
   resolutionNote: null,
@@ -169,10 +172,11 @@ describe("LicensesPage", () => {
   test("shows an open request with what the school wants and a link to price it", async () => {
     await renderPage();
     const box = await inbox();
-    expect(await box.findByText("120 student seats · Family+ on")).toBeTruthy();
+    expect(await box.findByText("Student AI: 120 seats · tier Student Pro")).toBeTruthy();
     expect(box.getByText("“New grade 7 section”")).toBeTruthy();
     expect(box.getByRole("link", { name: "Price it" }).getAttribute("href")).toBe(
-      `/portal/platform/quotes?schoolId=${SCHOOL_ID}&licenseId=${LICENSE_ID}&kind=seat_increase`,
+      `/portal/platform/quotes?schoolId=${SCHOOL_ID}&licenseId=${LICENSE_ID}&kind=seat_increase` +
+        "&studentSeats=120&studentTier=t-2",
     );
   });
 
@@ -209,7 +213,7 @@ describe("LicensesPage", () => {
   test("switches the inbox between open, resolved and declined requests", async () => {
     await renderPage();
     const box = await inbox();
-    await box.findByText("120 student seats · Family+ on");
+    await box.findByText("Student AI: 120 seats · tier Student Pro");
     const chips = within(box.getByRole("group", { name: "Show requests" }));
     expect(chips.getByRole("button", { name: "Open" }).getAttribute("aria-pressed")).toBe("true");
 

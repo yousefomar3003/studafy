@@ -18,28 +18,31 @@ const PRO = "22222222-2222-4222-8222-222222222222";
 
 let endsInDays = 200;
 let overdue: unknown[] = [];
+let hasLicense = true;
 
 function overview() {
   return {
-    license: {
-      id: "licence-1",
-      status: "active",
-      startsAt: "2026-09-01T00:00:00.000Z",
-      endsAt: new Date(Date.now() + endsInDays * DAY - 3_600_000).toISOString(),
-      includeFamilyPlus: false,
-      currencyCode: "USD",
-      activatedAt: "2026-09-01T00:00:00.000Z",
-      audiences: [
-        {
-          audience: "student",
-          purchased: 50,
-          assigned: 46,
-          tier: { id: PLUS, code: "student_plus", displayName: "Student Plus" },
+    license: !hasLicense
+      ? null
+      : {
+          id: "licence-1",
+          status: "active",
+          startsAt: "2026-09-01T00:00:00.000Z",
+          endsAt: new Date(Date.now() + endsInDays * DAY - 3_600_000).toISOString(),
+          includeFamilyPlus: false,
+          currencyCode: "USD",
+          activatedAt: "2026-09-01T00:00:00.000Z",
+          audiences: [
+            {
+              audience: "student",
+              purchased: 50,
+              assigned: 46,
+              tier: { id: PLUS, code: "student_plus", displayName: "Student Plus" },
+            },
+            { audience: "teacher", purchased: 10, assigned: 2, tier: null },
+            { audience: "parent", purchased: 0, assigned: 0, tier: null },
+          ],
         },
-        { audience: "teacher", purchased: 10, assigned: 2, tier: null },
-        { audience: "parent", purchased: 0, assigned: 0, tier: null },
-      ],
-    },
     usage: [
       { feature: "ai_tutor", unit: "messages", used: 1200 },
       { feature: "study_tools", unit: "generations", used: 35 },
@@ -146,6 +149,7 @@ async function renderPage(role = "PRINCIPAL", at = "/portal/license") {
 
 afterEach(() => {
   cleanup();
+  hasLicense = true;
   endsInDays = 200;
   overdue = [];
   getMock.mockClear();
@@ -158,7 +162,8 @@ describe("LicensePage", () => {
     const facts = (label: string) =>
       screen.getByText(label, { selector: "dt" }).parentElement!.querySelector("dd")!.textContent;
     await screen.findByText("Active");
-    expect(facts("Family+")).toBe("Not included");
+    // Family+ is not built yet: no Family+ fact on a license without it.
+    expect(screen.queryByText("Family+", { selector: "dt" })).toBeNull();
     await waitFor(() => expect(facts("Balance due")).toBe("$600.00"));
 
     const table = within(
@@ -170,8 +175,10 @@ describe("LicensePage", () => {
     const gets = within(await within(students).findByRole("list", { name: "What Students get" }));
     expect(gets.getByText("AI tutor: 300 messages a month")).toBeTruthy();
     expect(gets.getByText("Study tools: Unlimited")).toBeTruthy();
-    // No Family+: no parents row.
+    // No Family+: no parents row. Teacher seats are no longer sold, but this license already holds
+    // ten, so they still show.
     expect(table.queryByText("Parents (Family+)")).toBeNull();
+    expect(table.getByText("Teachers")).toBeTruthy();
 
     const usage = within(screen.getByRole("table", { name: "Usage this month" }));
     expect(
@@ -208,28 +215,26 @@ describe("LicensePage", () => {
     expect(screen.queryByText(/overdue/)).toBeNull();
   });
 
-  test("requests more seats and a different tier", async () => {
+  test("requests AI for more students on a different tier", async () => {
     await renderPage();
-    fireEvent.click(
-      await screen.findByRole("button", { name: "Request more seats or a different tier" }),
-    );
-    const dialog = within(
-      await screen.findByRole("dialog", { name: "Request more seats or a different tier" }),
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "Request AI for students" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Request AI for students" }));
     const send = dialog.getByRole("button", { name: "Send request" }) as HTMLButtonElement;
     expect(send.disabled).toBe(true);
+    // Only students: no teacher or parent seats, no Family+.
+    expect(dialog.queryByText(/Teachers/)).toBeNull();
+    expect(dialog.queryByText(/Family\+/)).toBeNull();
 
-    fireEvent.change(dialog.getByLabelText("Students: seats wanted in total"), {
+    fireEvent.change(dialog.getByLabelText("Number of students"), {
       target: { value: "80" },
     });
-    fireEvent.click(dialog.getByRole("combobox", { name: "Students: tier" }));
+    fireEvent.click(dialog.getByRole("combobox", { name: "AI tier" }));
     fireEvent.click(await screen.findByRole("option", { name: "Student Pro" }));
-    // A note is required.
-    expect(send.disabled).toBe(true);
+    // The note is optional.
+    expect(send.disabled).toBe(false);
     fireEvent.change(dialog.getByLabelText(/Note for Studafy/), {
       target: { value: "Two new classes" },
     });
-    expect(send.disabled).toBe(false);
     fireEvent.click(send);
 
     await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
@@ -246,19 +251,39 @@ describe("LicensePage", () => {
     expect(await screen.findByText("Request sent to Studafy.")).toBeTruthy();
   });
 
+  test("a school with no license requests AI for its students", async () => {
+    hasLicense = false;
+    await renderPage();
+    expect(await screen.findByText(/Your school has no license yet/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Request AI for students" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Request AI for students" }));
+    const send = dialog.getByRole("button", { name: "Send request" }) as HTMLButtonElement;
+    // A first license needs a number of students; a tier alone is not enough.
+    fireEvent.click(dialog.getByRole("combobox", { name: "AI tier" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Student Plus" }));
+    expect(send.disabled).toBe(true);
+    fireEvent.change(dialog.getByLabelText(/Number of students/), { target: { value: "300" } });
+    expect(send.disabled).toBe(false);
+    fireEvent.click(send);
+
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    expect(postMock.mock.calls[0]![1]!.body).toMatchObject({
+      studentSeats: 300,
+      studentPlanId: PLUS,
+      // No note given: the request says what it is for the inbox.
+      note: "Student AI for 300 students, Student Plus.",
+    });
+  });
+
   test("the almost-full banner's link opens the request form", async () => {
     await renderPage("PRINCIPAL", "/portal/license?request=1");
-    expect(
-      await screen.findByRole("dialog", { name: "Request more seats or a different tier" }),
-    ).toBeTruthy();
+    expect(await screen.findByRole("dialog", { name: "Request AI for students" })).toBeTruthy();
   });
 
   test("without license:manage there is no request form", async () => {
     await renderPage("FINANCE", "/portal/license?request=1");
     await screen.findByText("Active");
-    expect(
-      screen.queryByRole("button", { name: "Request more seats or a different tier" }),
-    ).toBeNull();
+    expect(screen.queryByRole("button", { name: "Request AI for students" })).toBeNull();
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

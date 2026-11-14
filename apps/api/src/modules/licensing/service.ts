@@ -1,5 +1,5 @@
 import { LIVE_STATUSES } from "@studafy/billing";
-import { ERROR_CODES, FEATURE_KEYS, FEATURES } from "@studafy/constants";
+import { ERROR_CODES, FEATURE_KEYS, FEATURES, isLicensableAudience } from "@studafy/constants";
 
 import { usagePeriodStart } from "../features/resolve";
 import {
@@ -432,6 +432,49 @@ function diff(
     }
   }
   return { oldValues, newValues };
+}
+
+/** Seats, tiers and Family+ as a license has them or a buyer wants them. */
+export type AudienceTerms = { includeFamilyPlus: boolean } & Record<
+  Audience,
+  { planId: string | null; seats: number }
+>;
+
+/** A license's own terms, as `AudienceTerms`. */
+export function termsOf(license: LicenseRecord): AudienceTerms {
+  return {
+    includeFamilyPlus: license.includeFamilyPlus,
+    student: { planId: license.studentPlanId, seats: license.studentSeats },
+    teacher: { planId: license.teacherPlanId, seats: license.teacherSeats },
+    parent: { planId: license.parentPlanId, seats: license.parentSeats },
+  };
+}
+
+/**
+ * Refuse anything sold to an audience whose features are not built (`LICENSABLE_AUDIENCES`):
+ * seats, a tier, or Family+. `before` is what the license already holds -- keeping or lowering it
+ * stays possible, so a license from before the rule remains editable; adding to it does not.
+ *
+ * Checked where a license is sold: a school's change request and every quote (priceQuote), which
+ * is how the console creates and changes licenses. The super admin's direct license endpoints are
+ * left as they are, for repairing a license by hand.
+ */
+export function refuseUnofferedAudiences(
+  wanted: AudienceTerms,
+  before: AudienceTerms | null,
+  actor: LicenseActor,
+): void {
+  for (const audience of AUDIENCES) {
+    if (isLicensableAudience(audience)) continue;
+    const had = before?.[audience] ?? { planId: null, seats: 0 };
+    const want = wanted[audience];
+    if (want.seats > had.seats || (want.planId !== null && want.planId !== had.planId)) {
+      throw licenseError(422, ERROR_CODES.LICENSE_AUDIENCE_NOT_OFFERED, actor.locale);
+    }
+  }
+  if (!isLicensableAudience("parent") && wanted.includeFamilyPlus && !before?.includeFamilyPlus) {
+    throw licenseError(422, ERROR_CODES.LICENSE_AUDIENCE_NOT_OFFERED, actor.locale);
+  }
 }
 
 export async function createLicense(
@@ -1471,6 +1514,26 @@ export async function createChangeRequest(
   actor: LicenseActor,
 ): Promise<ChangeRequestView> {
   const license = await currentLicense(tx);
+  const held = license ? termsOf(license) : null;
+  // A request asks for totals; one left out (null) keeps what the license holds.
+  const wish = (
+    audience: Audience,
+    seats: number | null | undefined,
+    planId: string | null | undefined,
+  ) => ({
+    seats: seats ?? held?.[audience].seats ?? 0,
+    planId: planId ?? held?.[audience].planId ?? null,
+  });
+  refuseUnofferedAudiences(
+    {
+      includeFamilyPlus: input.includeFamilyPlus ?? held?.includeFamilyPlus ?? false,
+      student: wish("student", input.studentSeats, input.studentPlanId),
+      teacher: wish("teacher", input.teacherSeats, input.teacherPlanId),
+      parent: wish("parent", input.parentSeats, input.parentPlanId),
+    },
+    held,
+    actor,
+  );
   const wanted = {
     student: input.studentPlanId ?? null,
     teacher: input.teacherPlanId ?? null,

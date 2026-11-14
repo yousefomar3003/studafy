@@ -1,4 +1,5 @@
 import { ApiError } from "@studafy/api-client";
+import { isLicensableAudience } from "@studafy/constants";
 import { Button, Card, Input, Select, useToast } from "@studafy/ui";
 import { useState } from "react";
 
@@ -154,7 +155,7 @@ function CurrencySettings({
 
   const audienceOptions = [
     { value: "all" as const, label: t("platformLicensing.pricing.allAudiences") },
-    ...AUDIENCES.map((audience) => ({
+    ...AUDIENCES.filter(isLicensableAudience).map((audience) => ({
       value: audience,
       label: t(`platformLicensing.audience.${audience}`),
     })),

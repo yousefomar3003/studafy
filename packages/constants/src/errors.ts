@@ -484,8 +484,10 @@ export const ERROR_CODES = {
   // that audience (or, for parents, does not include Family+). LICENSE_SEAT_LIMIT_REACHED: every
   // purchased seat of that audience is assigned. LICENSE_SEATS_BELOW_ASSIGNED: a seat count cannot
   // drop below the seats already assigned. LICENSE_SEAT_NOT_ELIGIBLE: the person is not a member of
-  // the school in that audience.
+  // the school in that audience. LICENSE_AUDIENCE_NOT_OFFERED: seats, a tier or Family+ for an
+  // audience whose features are not built yet (LICENSABLE_AUDIENCES), so it is not for sale.
   LICENSE_NOT_FOUND: "LICENSE_NOT_FOUND",
+  LICENSE_AUDIENCE_NOT_OFFERED: "LICENSE_AUDIENCE_NOT_OFFERED",
   LICENSE_NONE: "LICENSE_NONE",
   LICENSE_INVALID_TRANSITION: "LICENSE_INVALID_TRANSITION",
   LICENSE_ALREADY_ACTIVE: "LICENSE_ALREADY_ACTIVE",

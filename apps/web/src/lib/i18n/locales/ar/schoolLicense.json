@@ -486,5 +486,25 @@
       "gb": "{{value}} غيغابايت",
       "tb": "{{value}} تيرابايت"
     }
+  },
+  "aiRequest": {
+    "open": "اطلب الذكاء الاصطناعي للطلاب",
+    "noLicense": "لا يوجد ترخيص لمدرستك بعد. اطلب Studafy AI لطلابك وسترسل لك Studafy عرض سعر.",
+    "title": "اطلب الذكاء الاصطناعي للطلاب",
+    "description": "أخبر Studafy بعدد الطلاب الذين يحصلون على Studafy AI (المعلّم الذكي وأدوات الدراسة) وبالباقة المطلوبة. سيصلك عرض سعر لتقبله، ولا يتغيّر شيء قبل ذلك.",
+    "studentsLabel": "عدد الطلاب",
+    "studentsHelp": "كم طالبًا يحصل على Studafy AI. تختار من يحصل على مقعد بعد بدء الترخيص.",
+    "tierLabel": "باقة الذكاء الاصطناعي",
+    "anyTier": "لست متأكدًا: ستقترح Studafy باقة",
+    "anyTierShort": "باقة تقترحها Studafy",
+    "noteLabel": "ملاحظة لـStudafy (اختيارية)",
+    "submit": "إرسال الطلب",
+    "defaultNote_zero": "الذكاء الاصطناعي للطلاب: لا طلاب، {{tier}}.",
+    "defaultNote_one": "الذكاء الاصطناعي لطالب واحد، {{tier}}.",
+    "defaultNote_two": "الذكاء الاصطناعي لطالبين، {{tier}}.",
+    "defaultNote_few": "الذكاء الاصطناعي لـ{{count}} طلاب، {{tier}}.",
+    "defaultNote_many": "الذكاء الاصطناعي لـ{{count}} طالبًا، {{tier}}.",
+    "defaultNote_other": "الذكاء الاصطناعي لـ{{count}} طالب، {{tier}}.",
+    "defaultNoteTier": "الذكاء الاصطناعي للطلاب على {{tier}}."
   }
 }

@@ -1,4 +1,5 @@
 import { ApiError } from "@studafy/api-client";
+import { isLicensableAudience } from "@studafy/constants";
 import { Button, Card, Checkbox, Input, Modal, useToast } from "@studafy/ui";
 import { useState } from "react";
 
@@ -42,7 +43,12 @@ export default function TiersPage() {
       ) : null}
       {tiers.data && features.data ? (
         <div className="platform-stack">
-          {AUDIENCES.map((audience) => (
+          {/* Only audiences a license sells today, and any that already has tiers. */}
+          {AUDIENCES.filter(
+            (audience) =>
+              isLicensableAudience(audience) ||
+              tiers.data.some((tier) => tier.audience === audience),
+          ).map((audience) => (
             <AudienceTiers
               key={audience}
               audience={audience}

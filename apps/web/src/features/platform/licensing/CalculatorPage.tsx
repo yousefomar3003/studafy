@@ -7,7 +7,7 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { PlatformPageHeader } from "../PlatformNav";
 import { useSchoolDetailQuery, useSchoolsListQuery } from "../queries";
 
-import { AUDIENCES } from "./constants";
+import { AUDIENCES, offersFamilyPlus, shownAudiences } from "./constants";
 import { bpsToPercent, currencyMinorUnit, toMinor, useMoney } from "./format";
 import { useCreateQuote, useQuoteAction } from "./mutations";
 import {
@@ -51,6 +51,8 @@ interface AudienceState {
  *
  * `?schoolId=&licenseId=&kind=` prefill it: the school page's "change seats or tiers" opens a seat
  * increase for a license in force, or a new term re-pricing a draft or awaiting-payment one.
+ * `&studentSeats=&studentTier=` prefill the student seats and tier, as a school's "Request AI for
+ * students" does from the console inbox.
  */
 export default function CalculatorPage() {
   const { t } = useTranslation();
@@ -74,7 +76,10 @@ export default function CalculatorPage() {
   const [familyPlus, setFamilyPlus] = useState(false);
   const [withCredits, setWithCredits] = useState(true);
   const [audiences, setAudiences] = useState<Record<LicenseAudience, AudienceState>>({
-    student: { planId: "", seats: "" },
+    student: {
+      planId: params.get("studentTier") ?? "",
+      seats: /^\d{1,6}$/.test(params.get("studentSeats") ?? "") ? params.get("studentSeats")! : "",
+    },
     teacher: { planId: "", seats: "" },
     parent: { planId: "", seats: "" },
   });
@@ -91,6 +96,12 @@ export default function CalculatorPage() {
       : l.status === "draft" || l.status === "awaiting_payment",
   );
   const license = pickable.find((l) => l.id === licenseId) ?? null;
+  // Only what a license sells today, plus what a picked license in force already holds.
+  const held = changesLicense ? license : null;
+  const offered = useMemo(
+    () => shownAudiences(held).filter((a) => a !== "parent" || familyPlus),
+    [held, familyPlus],
+  );
 
   // A picked license seeds the terms: its currency, tiers, seats and Family+ (and, for a new term,
   // its start).
@@ -101,12 +112,19 @@ export default function CalculatorPage() {
     setFamilyPlus(license.includeFamilyPlus);
     if (!changesLicense) setStartsAt(license.startsAt.slice(0, 10));
     setAudiences(
-      Object.fromEntries(
-        AUDIENCES.map((audience) => {
-          const row = license.audiences.find((a) => a.audience === audience);
-          return [audience, { planId: row?.tier?.id ?? "", seats: String(row?.purchased ?? 0) }];
-        }),
-      ) as Record<LicenseAudience, AudienceState>,
+      (prev) =>
+        Object.fromEntries(
+          AUDIENCES.map((audience) => {
+            const row = license.audiences.find((a) => a.audience === audience);
+            // A seat increase asks for new totals: keep totals the inbox prefilled when they are more.
+            const wanted = Number(prev[audience].seats || "0");
+            const seats = Math.max(row?.purchased ?? 0, changesLicense ? wanted : 0);
+            return [
+              audience,
+              { planId: row?.tier?.id ?? prev[audience].planId, seats: String(seats) },
+            ];
+          }),
+        ) as Record<LicenseAudience, AudienceState>,
     );
   }
 
@@ -132,7 +150,7 @@ export default function CalculatorPage() {
       return null;
     const audienceInput = (audience: LicenseAudience) => {
       const row = audiences[audience];
-      if (audience === "parent" && !familyPlus) return undefined;
+      if (!offered.includes(audience)) return undefined;
       const seats = Number(row.seats || "0");
       if (!Number.isInteger(seats) || seats < 0) return undefined;
       return seats > 0 || row.planId ? { planId: row.planId || null, seats } : undefined;
@@ -145,7 +163,7 @@ export default function CalculatorPage() {
       months: kind === "seat_increase" ? undefined : monthsNumber,
       startsAt:
         kind === "new" && startsAt ? new Date(`${startsAt}T00:00:00Z`).toISOString() : undefined,
-      includeFamilyPlus: familyPlus,
+      includeFamilyPlus: familyPlus && offersFamilyPlus(held),
       student: audienceInput("student"),
       teacher: audienceInput("teacher"),
       parent: audienceInput("parent"),
@@ -163,8 +181,10 @@ export default function CalculatorPage() {
     effectiveCurrency,
     familyPlus,
     kind,
+    held,
     license,
     months,
+    offered,
     schoolId,
     startsAt,
     withCredits,
@@ -273,14 +293,16 @@ export default function CalculatorPage() {
               ) : null}
             </div>
 
-            <Checkbox
-              label={t("platformLicensing.calculator.familyPlusLabel")}
-              checked={familyPlus}
-              onChange={(event) => setFamilyPlus(event.target.checked)}
-            />
+            {offersFamilyPlus(held) ? (
+              <Checkbox
+                label={t("platformLicensing.calculator.familyPlusLabel")}
+                checked={familyPlus}
+                onChange={(event) => setFamilyPlus(event.target.checked)}
+              />
+            ) : null}
 
             <h3>{t("platformLicensing.calculator.seatsHeading")}</h3>
-            {AUDIENCES.filter((a) => a !== "parent" || familyPlus).map((audience) => (
+            {offered.map((audience) => (
               <AudienceRow
                 key={audience}
                 audience={audience}
