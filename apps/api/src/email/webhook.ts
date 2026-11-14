@@ -5,64 +5,77 @@ import { auditAction } from "../middleware/auditEmitter";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
 
-import { ResendEventError, parseResendEvent, verifyResendSignature } from "./resend-events";
+import { EmailEventError, parseResendEvent } from "./resend-events";
+import { ResendSignatureError, verifyResendSignature } from "./resend-signature";
 
 import type { Database } from "../db";
 import type { Logger } from "../logger";
-import type { ParsedEmailEvent } from "./email-events";
+import type { ParsedEmailEvent } from "./resend-events";
 import type { AppEnv } from "../middleware/requestId";
 import type { JSONValue, TransactionSql } from "postgres";
 
 /**
  * Resend email-event webhook ingestion (deliverability R-08).
  *
- * Resend posts bounce, complaint, and delivery events here. This endpoint is the feedback half of
- * the email channel: it records each event once in `app.email_events`, feeds hard-bounce and
- * complaint addresses into the global `app.email_suppressions` list (which the workers' dispatcher
- * consults before every send), and advances the matching `app.email_deliveries` rows to their
- * terminal feedback state.
+ * Resend posts delivered, bounced, and complained events here. This endpoint is the feedback half
+ * of the email channel: it records each event once in `app.email_events`, feeds permanent-bounce
+ * and complaint addresses into the global `app.email_suppressions` list (which the workers'
+ * dispatcher consults before every send), and advances the matching `app.email_deliveries` rows to
+ * their terminal feedback state.
  *
- * It is public by design — there is no session — and authenticates by Resend's Svix signature over
- * the raw body before anything is parsed, so an unsigned or stale event never gets as far as
- * touching the database. At-least-once delivery is absorbed by the unique (message_id, event_type)
- * constraint on `app.email_events`: a redelivery inserts nothing, is answered 200, and changes no
- * state.
+ * It is public by design — there is no session — and authenticates the way Resend signs: an
+ * HMAC-SHA256 over the svix id, timestamp, and raw body, keyed by RESEND_WEBHOOK_SECRET, inside a
+ * five-minute replay window. That check runs before the body is parsed, so an unsigned request
+ * never gets as far as touching the database. At-least-once delivery is absorbed by the unique
+ * (message_id, event_type) constraint on `app.email_events`: a redelivery inserts nothing, is
+ * answered 200, and changes no state.
  */
-
-const webhookAcceptedSchema = z.object({ ok: z.literal(true) }).openapi("EmailWebhookAccepted");
 
 const resendEventSchema = z
   .object({
     type: z.string().openapi({
-      description:
-        "Resend event type; email.bounced, email.complained and email.delivered are acted on.",
+      description: "Resend event type, e.g. email.delivered, email.bounced, email.complained.",
     }),
     created_at: z.string().optional(),
     data: z
       .object({
-        email_id: z.string().openapi({ description: "Resend's id for the sent email." }),
-        to: z.array(z.string()).optional(),
+        // Optional here so contact.* / domain.* events (no email) are acknowledged and ignored,
+        // not answered 400 and retried; parseResendEvent requires it for the types acted on.
+        email_id: z
+          .string()
+          .optional()
+          .openapi({ description: "The Resend id of the email the event is about." }),
+        to: z.union([z.array(z.string()), z.string()]).optional(),
+        bounce: z
+          .object({
+            type: z.string().optional().openapi({
+              description: "Permanent, Transient, or Undetermined. Only Permanent suppresses.",
+            }),
+          })
+          .passthrough()
+          .optional(),
       })
       .passthrough(),
   })
   .passthrough()
   .openapi("ResendEmailEvent");
 
-const resendWebhookRoute = createRoute({
+const webhookAcceptedSchema = z.object({ ok: z.literal(true) }).openapi("EmailWebhookAccepted");
+
+const webhookRoute = createRoute({
   method: "post",
   path: "/email/webhooks/resend",
   tags: ["Email"],
   operationId: "ingestResendEmailEvent",
   summary: "Ingest an email event from Resend",
   description:
-    "Receives bounce, complaint and delivery events from Resend, the email provider the workers " +
-    "send through. Authenticates by Resend's Svix " +
-    "signature (svix-id, svix-timestamp, svix-signature headers) with RESEND_WEBHOOK_SECRET; " +
-    "nothing else is trusted.\n\n" +
-    "Each (message_id, event_type) is recorded once in " +
-    "app.email_events, hard bounces and complaints added to the global suppression list, and the " +
-    "matching deliveries advanced to bounced or complained. Other event types answer 200 and are " +
-    "ignored.",
+    "Receives delivered, bounced, and complained events from Resend. Authenticates by the Svix " +
+    "signature headers (svix-id, svix-timestamp, svix-signature): an HMAC-SHA256 over the raw body " +
+    "keyed by the endpoint's signing secret, within a five-minute window; nothing else is trusted.\n\n" +
+    "Each (email_id, event_type) is recorded in app.email_events exactly once — at-least-once " +
+    "delivery is absorbed by the unique constraint and a redelivery answers 200 without re-processing. " +
+    "Permanent bounces and complaints suppress the affected addresses in the global suppression list, " +
+    "so the email dispatcher never mails them again. Other event types are acknowledged and ignored.",
   security: [],
   request: {
     body: {
@@ -77,13 +90,22 @@ const resendWebhookRoute = createRoute({
         schema: webhookAcceptedSchema,
       },
     },
-    // 400: malformed event. 401: signature missing, invalid or stale. 500: RESEND_WEBHOOK_SECRET
-    // unconfigured, or ingestion failed.
+    // 400: malformed event document. 401: signature missing, invalid, or outside the replay window.
+    // 500: RESEND_WEBHOOK_SECRET unconfigured, or ingestion failed.
     [400, 401, 500],
   ),
 });
 
-export function emailEventWebhookRoutes(db: Database, logger: Logger): OpenAPIHono<AppEnv> {
+export interface EmailEventWebhookOptions {
+  /** Clock for the replay window, in Unix seconds. Injected by tests. */
+  nowSeconds?: () => number;
+}
+
+export function emailEventWebhookRoutes(
+  db: Database,
+  logger: Logger,
+  options: EmailEventWebhookOptions = {},
+): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   // Audit declaration for the CI coverage gate (tests/audit-coverage.test.ts). No app.audit_logs row
@@ -96,42 +118,49 @@ export function emailEventWebhookRoutes(db: Database, logger: Logger): OpenAPIHo
   routes.use("/email/webhooks/resend", async (c, next) => {
     const secret = process.env.RESEND_WEBHOOK_SECRET;
     if (!secret) {
+      // The message reaches the log, never the client: errorHandlerMiddleware withholds detail on
+      // every 5xx. An operator needs to know which variable is missing; a caller must not learn
+      // that verification is off.
       throw new HTTPException(500, { message: "RESEND_WEBHOOK_SECRET is not configured" });
     }
 
-    // Authenticate over the exact bytes Resend signed, before the validator parses them.
+    // Signature verification runs ahead of the request validator: authenticate, then parse.
+    // c.req.text() caches, so the validator's later c.req.json() reads the same bytes.
     const rawBody = await c.req.text();
-    const verified = verifyResendSignature(
-      rawBody,
-      {
-        id: c.req.header("svix-id"),
-        timestamp: c.req.header("svix-timestamp"),
-        signature: c.req.header("svix-signature"),
-      },
-      secret,
-    );
-    if (!verified) {
-      logger.warn({ svix_id: c.req.header("svix-id") }, "Resend signature verification failed");
+    const headers = {
+      id: c.req.header("svix-id"),
+      timestamp: c.req.header("svix-timestamp"),
+      signature: c.req.header("svix-signature"),
+    };
+
+    try {
+      verifyResendSignature(secret, headers, rawBody, options.nowSeconds?.());
+    } catch (err) {
+      if (!(err instanceof ResendSignatureError)) throw err;
+      logger.warn({ err, svix_id: headers.id }, "Resend webhook signature verification failed");
+      // Same message for every authentication failure, so a caller cannot probe the checks.
       throw new HTTPException(401, { message: "Invalid webhook signature" });
     }
+
     await next();
   });
 
-  routes.openapi(resendWebhookRoute, async (c) => {
+  routes.openapi(webhookRoute, async (c) => {
+    const document = c.req.valid("json");
     const log = c.get("log");
+
     let event: ParsedEmailEvent | null;
     try {
-      event = parseResendEvent(c.req.valid("json"));
+      event = parseResendEvent(document);
     } catch (err) {
-      if (err instanceof ResendEventError) {
-        throw new HTTPException(400, { message: err.message });
-      }
+      if (err instanceof EmailEventError) throw new HTTPException(400, { message: err.message });
       throw err;
     }
+
     if (event === null) {
-      log.info({ type: c.req.valid("json").type }, "Resend event type knowingly ignored");
+      log.info({ type: document.type }, "Resend event type knowingly ignored");
     } else {
-      await recordEmailEvent(db, event, log);
+      await ingestEvent(db, event, log);
     }
     return c.json({ ok: true } as const, 200);
   });
@@ -139,15 +168,7 @@ export function emailEventWebhookRoutes(db: Database, logger: Logger): OpenAPIHo
   return routes;
 }
 
-/**
- * Record one provider email event and apply it: the ledger row, the suppression of
- * hard-bounced or complaining addresses, and the deliveries' terminal state, in one transaction.
- */
-async function recordEmailEvent(
-  db: Database,
-  event: ParsedEmailEvent,
-  logger: Logger,
-): Promise<void> {
+async function ingestEvent(db: Database, event: ParsedEmailEvent, logger: Logger): Promise<void> {
   try {
     await db.begin(async (tx) => {
       // The unique (message_id, event_type) constraint is the dedup arbiter: a redelivered event
@@ -183,7 +204,7 @@ async function recordEmailEvent(
   } catch (err) {
     logger.error({ err, message_id: event.messageId }, "Email event ingestion failed");
     // Detail is withheld from the client by the 5xx arm of errorHandlerMiddleware; the cause is in
-    // the line above, correlated by request_id.
+    // the line above, correlated by request_id. A 5xx makes Resend retry.
     throw new HTTPException(500, { message: "Email event ingestion failed" });
   }
 }

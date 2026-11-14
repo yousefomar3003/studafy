@@ -78,13 +78,12 @@ The same files set the AI provider: `AI_LLM_PROVIDER=openai-compatible` against 
 
 | Variable                  | prod value                                                                        |
 | ------------------------- | --------------------------------------------------------------------------------- |
+| `VITE_API_BASE_URL`       | `https://api.studafy.com`                                                         |
+| `VITE_REALTIME_BASE_URL`  | the realtime WebSocket URL, once realtime is turned on (`infra/fly/README.md`)    |
 | `VITE_TURNSTILE_SITE_KEY` | the Turnstile widget's **Site Key** (public)                                      |
 | `VITE_SENTRY_DSN`         | Sentry project `studafy-web` → Client Keys (DSN); public, it can only send events |
 | `SENTRY_ORG`              | `studafy-limited`                                                                 |
 | `SENTRY_PROJECT`          | `studafy-web`                                                                     |
-
-`VITE_API_BASE_URL` (`https://api.studafy.com`) and the realtime URL are build arguments in
-`infra/fly/web.toml`, not variables.
 
 One Environment **secret** belongs with them: `SENTRY_AUTH_TOKEN`, a Sentry organization token
 (Settings → Developer Settings → Organization Tokens) that lets the web build upload source maps, so

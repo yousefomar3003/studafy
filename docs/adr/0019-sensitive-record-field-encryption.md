@@ -93,10 +93,22 @@ The API (reveal, DSR export) needs to decrypt. Retention deletes only rows and n
    Keys keep KMS request charges negligible next to the $1/month for the key. Only the API task
    role holds `kms:GenerateDataKey`/`kms:Decrypt` (`infra/terraform/modules/compute`), and
    CloudTrail records every use of the key. `STORAGE_SENSITIVE_KMS_KEY_ID` is required on staging
-   and production when they run on AWS S3. Local development (rustfs) has no KMS, so there the
-   class falls back to the bucket default. The same holds for a deployed tier on an S3-compatible
-   provider (`S3_ENDPOINT` set, e.g. Cloudflare R2): SSE-KMS is AWS-only, so the key is refused
-   there and sensitive documents rely on the provider's at-rest encryption (AES-256 on R2).
+   and production **when they run on AWS S3**. Local development (rustfs) has no KMS, so there the
+   class falls back to the bucket default.
+
+   **Amended 2026-11-08 (move to Fly.io Tigris).** Tigris is S3-compatible but has no KMS: it
+   accepts the SSE-KMS headers and silently stores the object under its own encryption at rest
+   (verified against the `studafy-app-files` bucket). The project owner chose to accept provider
+   encryption at rest for sensitive document files rather than encrypt them in the API (which
+   would force sensitive downloads through the API instead of pre-signed URLs). On any
+   S3-compatible endpoint (`S3_ENDPOINT` set), `STORAGE_SENSITIVE_KMS_KEY_ID` is therefore not
+   required and is **refused** at startup, so no configuration can claim a protection the object
+   does not have. What is lost: the second, separately granted key and the per-use CloudTrail
+   record. What remains: a private bucket, one-minute pre-signed URLs gated on
+   `studentRecord:readSensitive`, audited downloads, and Tigris encryption at rest. Application-
+   level file encryption stays the upgrade path if a school or regulator requires a separate key.
+   The same holds for Cloudflare R2, which production uses since the move to fly.io: SSE-KMS is
+   refused there too and sensitive documents rely on R2's AES-256 encryption at rest.
 
 ## Alternatives considered
 

@@ -14,6 +14,8 @@
  * @see db/migrations/000030_add_auth_anomaly_event_types.sql
  */
 
+import { sanitizeSensitivePath } from "../../lib/security/sensitive-path";
+
 import type { SecurityEventSink } from "../../lib/security/securityEventSink";
 import type { Logger } from "../../logger";
 
@@ -46,11 +48,14 @@ export function emitRateLimitBlock(
   eventSink: SecurityEventSink | null | undefined,
   event: RateLimitBlockEvent,
 ): void {
+  // Callers pass c.req.path, and auth-class routes include token-bearing paths such as
+  // /api/auth/invitations/{token}/activate.
+  const path = sanitizeSensitivePath(event.path);
   log?.error(
     {
       event: "auth_rate_limit_block",
       route_class: event.routeClass,
-      path: event.path,
+      path,
       client_ip: event.clientIp,
       request_id: event.requestId,
     },
@@ -59,7 +64,7 @@ export function emitRateLimitBlock(
 
   eventSink?.record({
     eventType: "auth_rate_limit_block",
-    path: event.path,
+    path,
     method: "POST",
     clientIp: event.clientIp,
     userAgent: event.userAgent,
