@@ -42,6 +42,15 @@ export {
 export { runStorageQuotaReconciliation } from "./storage-quota-reconciliation";
 export type { StorageQuotaReconciliationResult } from "./storage-quota-reconciliation";
 export { createStorageQuotaS3 } from "./storage-quota-s3";
+export {
+  scheduleStorageDuplicateResolverJob,
+  STORAGE_DUPLICATE_RESOLVER_CRON_PATTERN,
+} from "./storage-duplicate-scheduler";
+export {
+  runStorageDuplicateResolver,
+  StripeStorageDuplicateClient,
+} from "./storage-duplicate-resolver";
+export type { StorageDuplicateResult, StorageDuplicateStripe } from "./storage-duplicate-resolver";
 export type { StorageQuotaS3Client } from "./storage-quota-s3";
 export {
   scheduleCostReportJobs,

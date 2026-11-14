@@ -21,6 +21,7 @@ import { isStorageAddonPlanCode, STORAGE_ADDON_TIERS } from "@studafy/constants"
 import {
   extractAddonHint,
   extractLocalPriceIdHint,
+  extractMetadata,
   extractStudentIdHint,
   extractSubscriptionId,
 } from "./event-mapping";
@@ -131,6 +132,8 @@ export async function resolveTarget(
   schoolId: string,
   eventType: string,
   payload: Record<string, unknown>,
+  /** The provider's event id, recorded on a duplicate storage subscription this event finds. */
+  providerEventId: string | null = null,
 ): Promise<AttributionTarget | null> {
   const stripeSubscriptionId = extractSubscriptionId(payload);
 
@@ -143,7 +146,14 @@ export async function resolveTarget(
   // fall-through to the school's own subscription below -- which would otherwise activate, renew or
   // cancel the school plan on the strength of a storage payment.
   if (extractAddonHint(payload) === "storage") {
-    return resolveStorageTarget(tx, schoolId, eventType, payload, stripeSubscriptionId);
+    return resolveStorageTarget(
+      tx,
+      schoolId,
+      eventType,
+      payload,
+      stripeSubscriptionId,
+      providerEventId,
+    );
   }
 
   const studentId = extractStudentIdHint(payload);
@@ -332,6 +342,32 @@ interface StorageRow {
 }
 
 /**
+ * Whether this event is about a storage subscription Studafy has already retired as a duplicate
+ * (000219): one replaced by a newer purchase and canceled (or about to be) by the billing worker.
+ * Its later events -- the cancellation Studafy itself caused, a late redelivery of its checkout --
+ * are recorded and finished with, and never touch the school's add-on.
+ *
+ * A duplicate only seen through other events (source 'event', needs_review) is not retired: its own
+ * checkout completion may still arrive and make it the purchase the school keeps.
+ */
+export async function isRetiredStorageDuplicate(
+  tx: TransactionSql,
+  schoolId: string,
+  payload: Record<string, unknown>,
+): Promise<boolean> {
+  const stripeSubscriptionId = extractSubscriptionId(payload);
+  if (!stripeSubscriptionId) return false;
+  const rows = await tx<{ id: string }[]>`
+    SELECT id FROM app.storage_duplicate_subscriptions
+    WHERE school_id = ${schoolId}::uuid
+      AND stripe_subscription_id = ${stripeSubscriptionId}
+      AND (source = 'checkout' OR status <> 'needs_review')
+    LIMIT 1
+  `;
+  return rows.length > 0;
+}
+
+/**
  * The school's storage add-on row this event moves, creating or re-arming it when the event is the
  * completed checkout that bought it.
  *
@@ -340,9 +376,17 @@ interface StorageRow {
  * a tier change is made by the API when the provider has accepted it, which keeps an out-of-order
  * delivery from undoing it.
  *
- * Parked (null) rather than guessed: a completion naming no storage price, any other event for a
- * school with no storage row, and a second purchase while one is still live (two provider
- * subscriptions for one add-on is a double charge a person has to sort out, not something to fold).
+ * Only events about the row's own provider subscription move it. Any other event naming a different
+ * storage subscription is parked (null) rather than folded in: a renewal of a second subscription
+ * must not rewrite this one's period, and its cancellation must not end the school's storage.
+ *
+ * A second completed purchase while one is live is a double charge, and the school pays only for
+ * the newest: the row moves to the new purchase's tier and subscription, and the one it replaces is
+ * recorded in app.storage_duplicate_subscriptions (000219) for the billing worker to cancel and
+ * refund. Which purchase is newest is the order their completions arrive in.
+ *
+ * Also parked (null): a completion naming no storage price, and any other event for a school with
+ * no storage row.
  */
 async function resolveStorageTarget(
   tx: TransactionSql,
@@ -350,6 +394,7 @@ async function resolveStorageTarget(
   eventType: string,
   payload: Record<string, unknown>,
   stripeSubscriptionId: string | null,
+  providerEventId: string | null,
 ): Promise<AttributionTarget | null> {
   const [existing] = await tx<StorageRow[]>`
     SELECT id, status::text AS status, stripe_subscription_id
@@ -366,8 +411,30 @@ async function resolveStorageTarget(
     status: row.status,
   });
 
+  const otherSubscription =
+    existing !== undefined &&
+    existing.stripe_subscription_id !== null &&
+    stripeSubscriptionId !== null &&
+    existing.stripe_subscription_id !== stripeSubscriptionId;
+  const ended = existing !== undefined && TERMINAL_STATUSES.has(existing.status);
+
   if (eventType !== "checkout.session.completed") {
     if (!existing) return null;
+    if (otherSubscription) {
+      // A second storage subscription seen without its checkout (yet). Flag it for a person while
+      // the school's own add-on is live; never cancel it from here, it may be the one to keep.
+      if (!ended && eventType !== "customer.subscription.deleted") {
+        await recordStorageDuplicate(tx, {
+          schoolId,
+          storageSubscriptionId: existing.id,
+          duplicate: stripeSubscriptionId,
+          kept: existing.stripe_subscription_id,
+          source: "event",
+          providerEventId,
+        });
+      }
+      return null;
+    }
     await linkProviderSubscription(tx, "storage", existing.id, stripeSubscriptionId);
     return target(existing);
   }
@@ -404,14 +471,42 @@ async function resolveStorageTarget(
     return raced ? target(raced) : null;
   }
 
-  const sameSubscription =
-    existing.stripe_subscription_id === null ||
-    stripeSubscriptionId === null ||
-    existing.stripe_subscription_id === stripeSubscriptionId;
-  const ended = TERMINAL_STATUSES.has(existing.status);
+  // This purchase completed: whatever its earlier events flagged for review is now explained.
+  if (stripeSubscriptionId !== null) {
+    await tx`
+      DELETE FROM app.storage_duplicate_subscriptions
+      WHERE school_id = ${schoolId}::uuid
+        AND stripe_subscription_id = ${stripeSubscriptionId}
+        AND source = 'event' AND status = 'needs_review'
+    `;
+  }
 
-  // Still live under another provider subscription: a second purchase. Park it for a person.
-  if (!sameSubscription && !ended) return null;
+  if (otherSubscription && !ended) {
+    // A second purchase while the first is live: the newest is kept, the one it replaces retired.
+    await recordStorageDuplicate(tx, {
+      schoolId,
+      storageSubscriptionId: existing.id,
+      duplicate: existing.stripe_subscription_id!,
+      kept: stripeSubscriptionId,
+      source: "checkout",
+      providerEventId,
+    });
+    const yearly = extractMetadata(payload).billing_interval === "yearly";
+    // The new subscription's real period arrives on its next event, attributed to the row by its id.
+    await tx`
+      UPDATE app.storage_subscriptions
+      SET plan_price_id = ${tier.priceId}::uuid,
+          cap_bytes = ${tier.capBytes},
+          stripe_subscription_id = ${stripeSubscriptionId},
+          cancel_at_period_end = false,
+          current_period_start = CURRENT_TIMESTAMP,
+          current_period_end = CURRENT_TIMESTAMP
+            + ${yearly ? "1 year" : "1 month"}::interval,
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id = ${existing.id}::uuid
+    `;
+    return target(existing);
+  }
 
   // Bought again after the last one ended (the fold restarts its lifecycle on this completion), or a
   // redelivery of the completion that bought this one: the row takes this purchase's tier and
@@ -426,6 +521,46 @@ async function resolveStorageTarget(
     WHERE id = ${existing.id}::uuid
   `;
   return target(existing);
+}
+
+/**
+ * Record a storage subscription the school must not keep paying for. Idempotent on the provider
+ * subscription id: a redelivery finds it recorded. A completed second checkout ('checkout') is
+ * queued for the billing worker at once; one only seen through other events ('event') waits for a
+ * person (see 000219).
+ */
+async function recordStorageDuplicate(
+  tx: TransactionSql,
+  input: {
+    schoolId: string;
+    storageSubscriptionId: string;
+    duplicate: string;
+    kept: string | null;
+    source: "checkout" | "event";
+    providerEventId: string | null;
+  },
+): Promise<void> {
+  const status = input.source === "checkout" ? "pending" : "needs_review";
+  await tx`
+    INSERT INTO app.storage_duplicate_subscriptions (
+      school_id, storage_subscription_id, stripe_subscription_id, kept_stripe_subscription_id,
+      source, status, detected_by_event_id, last_error
+    ) VALUES (
+      ${input.schoolId}::uuid,
+      ${input.storageSubscriptionId}::uuid,
+      ${input.duplicate},
+      ${input.kept},
+      ${input.source},
+      ${status},
+      ${input.providerEventId},
+      ${
+        input.source === "event"
+          ? "A second live storage subscription with no completed checkout: check it in Stripe"
+          : null
+      }
+    )
+    ON CONFLICT (stripe_subscription_id) DO NOTHING
+  `;
 }
 
 /** The storage tier an `app.plan_prices` id sells, or null when it is not a storage plan's price. */
