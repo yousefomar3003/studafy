@@ -477,12 +477,14 @@ async function resolveStorageTarget(
 
   const tier = await storageTierOf(tx, extractLocalPriceIdHint(payload));
   if (tier === null) return null;
+  // Which Stripe mode (live or Sandbox) bought it: every Stripe object carries `livemode` (000225).
+  const livemode = typeof payload.livemode === "boolean" ? payload.livemode : null;
 
   if (!existing) {
     const inserted = await tx<{ id: string }[]>`
       INSERT INTO app.storage_subscriptions (
         school_id, plan_price_id, cap_bytes, status, current_period_start, current_period_end,
-        stripe_subscription_id
+        stripe_subscription_id, stripe_livemode
       ) VALUES (
         ${schoolId}::uuid,
         ${tier.priceId}::uuid,
@@ -490,7 +492,8 @@ async function resolveStorageTarget(
         'trialing'::app.subscription_status,
         CURRENT_TIMESTAMP,
         CURRENT_TIMESTAMP + ${`${STORAGE_PLACEHOLDER_PERIOD_DAYS} days`}::interval,
-        ${stripeSubscriptionId}
+        ${stripeSubscriptionId},
+        ${livemode}
       )
       ON CONFLICT (school_id) DO NOTHING
       RETURNING id
@@ -534,6 +537,7 @@ async function resolveStorageTarget(
       SET plan_price_id = ${tier.priceId}::uuid,
           cap_bytes = ${tier.capBytes},
           stripe_subscription_id = ${stripeSubscriptionId},
+          stripe_livemode = ${livemode},
           cancel_at_period_end = false,
           pending_plan_price_id = NULL, pending_cap_bytes = NULL, pending_effective_at = NULL,
           stripe_schedule_id = NULL,
@@ -554,6 +558,7 @@ async function resolveStorageTarget(
     SET plan_price_id = ${tier.priceId}::uuid,
         cap_bytes = ${tier.capBytes},
         stripe_subscription_id = COALESCE(${stripeSubscriptionId}::text, stripe_subscription_id),
+        stripe_livemode = COALESCE(${livemode}::boolean, stripe_livemode),
         cancel_at_period_end = CASE WHEN ${ended} THEN false ELSE cancel_at_period_end END,
         pending_plan_price_id = CASE WHEN ${ended} THEN NULL ELSE pending_plan_price_id END,
         pending_cap_bytes = CASE WHEN ${ended} THEN NULL ELSE pending_cap_bytes END,

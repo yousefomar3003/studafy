@@ -192,6 +192,11 @@ export interface PlatformOpsRoutesDeps {
   database: Database;
   redis: RedisClient | null;
   flags: FlagsService | null;
+  /**
+   * The configured Stripe key's account mode: true live, false Sandbox, undefined when Stripe is not
+   * configured (or its key's mode is unknown). Shown on the health page (docs/billing/stripe-modes.md).
+   */
+  stripeLivemode?: boolean;
 }
 
 function actorFrom(c: Context<AppEnv>): Actor {
@@ -307,7 +312,11 @@ export function platformOpsRoutes(deps: PlatformOpsRoutesDeps): OpenAPIHono<AppE
     c.json({ operators: await listPlatformOperators(database) }, 200),
   );
 
-  routes.openapi(healthRoute, async (c) => c.json(await getSystemHealth(database, redis), 200));
+  const stripeMode =
+    deps.stripeLivemode === undefined ? "not_configured" : deps.stripeLivemode ? "live" : "sandbox";
+  routes.openapi(healthRoute, async (c) =>
+    c.json({ ...(await getSystemHealth(database, redis)), stripeMode } as const, 200),
+  );
 
   routes.openapi(flagsRoute, async (c) =>
     c.json({ flags: await listFlagsAcrossSchools(database, flags) }, 200),

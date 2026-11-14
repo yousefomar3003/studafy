@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { stripeModeFromKey } from "@studafy/billing";
 import { ERROR_CODES } from "@studafy/constants";
 import Stripe from "stripe";
 
@@ -130,6 +131,9 @@ export class StripeAdapter implements PaymentProviderPort {
   private readonly stripe: Stripe;
   private readonly webhookSecret: string;
 
+  /** Live account (true) or Sandbox (false), from the key's prefix; undefined for a placeholder key. */
+  readonly livemode: boolean | undefined;
+
   constructor(options: StripeAdapterOptions) {
     this.stripe =
       options.client ??
@@ -137,15 +141,54 @@ export class StripeAdapter implements PaymentProviderPort {
         apiVersion: "2026-07-29.dahlia",
       });
     this.webhookSecret = options.webhookSecret;
+    const mode = stripeModeFromKey(options.secretKey);
+    this.livemode = mode === null ? undefined : mode === "live";
   }
 
   async createCustomer(input: CreateCustomerInput): Promise<CreateCustomerResult> {
-    const customer = await this.stripe.customers.create({
-      name: input.name,
-      email: input.email,
-      metadata: input.metadata,
-    });
+    const customer = await this.stripe.customers.create(
+      {
+        name: input.name,
+        email: input.email,
+        metadata: input.metadata,
+      },
+      input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
+    );
     return { providerCustomerId: customer.id };
+  }
+
+  async retrieveCustomer(customerId: string): Promise<{ livemode: boolean } | null> {
+    try {
+      const customer = await this.stripe.customers.retrieve(customerId);
+      if (customer.deleted) return null;
+      return { livemode: customer.livemode };
+    } catch (error) {
+      if (isMissing(error)) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * The oldest live (not deleted) customer this account holds for the school. Search can miss a
+   * customer made in the last minute; the create's idempotency key covers that window.
+   */
+  async findCustomerBySchoolId(schoolId: string): Promise<string | null> {
+    const found = await this.stripe.customers.search({
+      query: `metadata['school_id']:'${searchValue(schoolId)}'`,
+      limit: 100,
+    });
+    const oldest = [...found.data].sort((a, b) => a.created - b.created)[0];
+    return oldest?.id ?? null;
+  }
+
+  async retrieveSubscriptionMode(subscriptionId: string): Promise<{ livemode: boolean } | null> {
+    try {
+      const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+      return { livemode: subscription.livemode };
+    } catch (error) {
+      if (isMissing(error)) return null;
+      throw error;
+    }
   }
 
   async createCheckoutSession(

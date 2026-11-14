@@ -22,6 +22,7 @@ const P1TY = "44444444-4444-4444-8444-444444444444";
 
 let current: Record<string, unknown> | null = null;
 let availableOnline = true;
+let testMode = false;
 let granted: { capBytes: number; endsAt: string } | null = null;
 /** Each preview's amount due now; the next change answers PRICE_CHANGED when `changeRefusals` > 0. */
 let previewAmounts: number[] = [];
@@ -112,6 +113,7 @@ function offer() {
     current,
     currency: "USD",
     availableOnline,
+    testMode,
     granted,
     tiers: [
       {
@@ -247,6 +249,7 @@ afterEach(() => {
   cleanup();
   current = null;
   availableOnline = true;
+  testMode = false;
   granted = null;
   previewAmounts = [];
   changeRefusals = 0;
@@ -258,6 +261,19 @@ afterEach(() => {
 });
 
 describe("StoragePage", () => {
+  test("says plainly when payments are in Stripe Sandbox, and only then", async () => {
+    testMode = true;
+    await renderPage();
+    expect(await screen.findByText("Test mode: no real money")).toBeTruthy();
+    expect(screen.getByText(/Use test card 4242 4242 4242 4242/)).toBeTruthy();
+    cleanup();
+
+    testMode = false;
+    await renderPage();
+    await screen.findByText("8.2 GB of 10 GB used");
+    expect(screen.queryByText("Test mode: no real money")).toBeNull();
+  });
+
   test("shows usage against the included storage and both tiers at their prices", async () => {
     await renderPage();
 

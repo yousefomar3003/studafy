@@ -85,6 +85,11 @@ export interface StorageOffer {
   /** Whether this school can buy, change or cancel online (its provider is Stripe and configured). */
   availableOnline: boolean;
   /**
+   * True when payments run in a Stripe Sandbox (test keys): test cards only, no real money
+   * (docs/billing/stripe-modes.md).
+   */
+  testMode: boolean;
+  /**
    * Storage Studafy granted by hand (a cash payment, a pilot) that is in force now, or null
    * (app.manual_grants, 000211).
    */
@@ -241,12 +246,79 @@ async function onlineProvider(
   providers: PaymentProviderRegistry,
   schoolId: string,
 ): Promise<SelectedPaymentProvider | null> {
+  let selected: SelectedPaymentProvider;
   try {
-    const selected = await selectPaymentProviderForSchool(tx, providers, schoolId);
-    return sellsStorageOnline(selected) ? selected : null;
+    selected = await selectPaymentProviderForSchool(tx, providers, schoolId);
   } catch {
     return null;
   }
+  if (!sellsStorageOnline(selected)) return null;
+  await endStorageAddonOfOtherMode(tx, selected, schoolId);
+  return selected;
+}
+
+/**
+ * End, for this Stripe mode, a live add-on whose subscription belongs to the other mode (production
+ * switched between live and Sandbox keys, docs/billing/stripe-modes.md). The key in use cannot see
+ * that subscription, so it must neither block a purchase nor be changed or cancelled through the
+ * wrong key: the row is marked canceled here (its history and the school's files are kept) and the
+ * school is back on its included storage until it buys in this mode. A row whose mode is not yet
+ * recorded is settled by asking Stripe once; a provider failure throws rather than ending anything.
+ */
+async function endStorageAddonOfOtherMode(
+  tx: TransactionSql,
+  selected: SelectedPaymentProvider,
+  schoolId: string,
+): Promise<void> {
+  const livemode = selected.port.livemode;
+  if (livemode === undefined) return;
+
+  const [row] = await tx<
+    {
+      id: string;
+      status: string;
+      stripe_subscription_id: string;
+      stripe_livemode: boolean | null;
+    }[]
+  >`
+    SELECT id, status::text AS status, stripe_subscription_id, stripe_livemode
+    FROM app.storage_subscriptions
+    WHERE school_id = ${schoolId}::uuid AND status::text = ANY(${[...LIVE_STATUSES]})
+      AND stripe_subscription_id IS NOT NULL
+    FOR UPDATE
+  `;
+  if (!row) return;
+
+  let rowLivemode = row.stripe_livemode;
+  if (rowLivemode === null) {
+    if (!selected.port.retrieveSubscriptionMode) return;
+    const seen = await selected.port.retrieveSubscriptionMode(row.stripe_subscription_id);
+    // Not in this account: it was bought in the other mode.
+    rowLivemode = seen ? seen.livemode : !livemode;
+    await tx`
+      UPDATE app.storage_subscriptions SET stripe_livemode = ${rowLivemode}
+      WHERE id = ${row.id}::uuid
+    `;
+  }
+  if (rowLivemode === livemode) return;
+
+  await tx`
+    UPDATE app.storage_subscriptions
+    SET status = 'canceled'::app.subscription_status,
+        cancel_at_period_end = false,
+        pending_plan_price_id = NULL, pending_cap_bytes = NULL, pending_effective_at = NULL,
+        stripe_schedule_id = NULL,
+        grace_period_ends_at = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${row.id}::uuid
+  `;
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "storage_subscriptions",
+    targetId: row.id,
+    oldValues: { status: row.status, stripe_livemode: rowLivemode },
+    newValues: { status: "canceled", reason: "stripe_mode_switched", current_livemode: livemode },
+  });
 }
 
 /**
@@ -284,6 +356,8 @@ export async function getStorageOffer(
         .map(toPrice),
     }));
 
+    // Before the live row is read: a row from the other Stripe mode is ended first.
+    const online = await onlineProvider(tx, providers, context.schoolId);
     const live = await findLiveStorageAddon(tx, context.schoolId);
     const current = live ? await describeStorageAddon(tx, live) : null;
 
@@ -296,7 +370,8 @@ export async function getStorageOffer(
       current,
       tiers,
       currency,
-      availableOnline: (await onlineProvider(tx, providers, context.schoolId)) !== null,
+      availableOnline: online !== null,
+      testMode: online?.port.livemode === false,
       granted: await findStorageGrantInForce(tx),
     };
   });
@@ -328,6 +403,7 @@ export async function requireOnlineStorageProvider(
   // error, as every other checkout does.
   const selected = await selectPaymentProviderForSchool(tx, providers, schoolId);
   if (!sellsStorageOnline(selected)) throw unavailable();
+  await endStorageAddonOfOtherMode(tx, selected, schoolId);
   return selected;
 }
 
@@ -361,11 +437,29 @@ function unsettled(message: string): CodedHttpException {
   return new CodedHttpException(409, ERROR_CODES.STORAGE_ADDON_UNSETTLED, message);
 }
 
-/** The school's provider customer, or null when it has none yet. */
-async function stripeCustomerOf(tx: TransactionSql, schoolId: string): Promise<string | null> {
-  const [row] = await tx<{ stripe_customer_id: string | null }[]>`
-    SELECT stripe_customer_id FROM app.schools WHERE id = ${schoolId}::uuid
+/**
+ * The school's provider customer, or null when it has none yet -- or only one from the other Stripe
+ * mode (live vs Sandbox), which this key cannot see (000225).
+ */
+async function stripeCustomerOf(
+  tx: TransactionSql,
+  schoolId: string,
+  selected: SelectedPaymentProvider,
+): Promise<string | null> {
+  const [row] = await tx<
+    { stripe_customer_id: string | null; stripe_customer_livemode: boolean | null }[]
+  >`
+    SELECT stripe_customer_id, stripe_customer_livemode FROM app.schools WHERE id = ${schoolId}::uuid
   `;
+  const livemode = selected.port.livemode;
+  if (
+    livemode !== undefined &&
+    row?.stripe_customer_livemode !== null &&
+    row?.stripe_customer_livemode !== undefined &&
+    row.stripe_customer_livemode !== livemode
+  ) {
+    return null;
+  }
   return row?.stripe_customer_id ?? null;
 }
 
@@ -410,7 +504,7 @@ async function prepareChange(
   // A Stripe subscription is billed in one currency for its whole life.
   if (currentPrice && currentPrice.currency !== next.currency) throw unavailable();
 
-  const customerId = await stripeCustomerOf(tx, schoolId);
+  const customerId = await stripeCustomerOf(tx, schoolId, selected);
   if (customerId) {
     const pending = await selected.port.countPendingInvoiceItems!(customerId);
     if (pending.count > 0) {
@@ -698,7 +792,7 @@ export async function changeStorageTier(
 
     let chosen: SavedPaymentMethod | null = null;
     if (paymentMethodId) {
-      const customerId = await stripeCustomerOf(tx, schoolId);
+      const customerId = await stripeCustomerOf(tx, schoolId, selected);
       const cards =
         customerId && selected.port.listPaymentMethods
           ? await selected.port.listPaymentMethods({
@@ -941,7 +1035,7 @@ export async function createStoragePaymentMethodSession(
   return withTenantTx(database, params.tenantContext, async (tx) => {
     const selected = await requireOnlineStorageProvider(tx, providers, params.schoolId);
     const live = await findLiveStorageAddon(tx, params.schoolId);
-    const customerId = await stripeCustomerOf(tx, params.schoolId);
+    const customerId = await stripeCustomerOf(tx, params.schoolId, selected);
     if (!live || !customerId) throw notActive();
     if (!selected.port.createPaymentMethodPortalSession) throw unavailable();
     return selected.port.createPaymentMethodPortalSession({
@@ -959,7 +1053,7 @@ export async function listStorageCards(
 ): Promise<SavedPaymentMethod[]> {
   return withTenantTx(database, params.tenantContext, async (tx) => {
     const selected = await requireOnlineStorageProvider(tx, providers, params.schoolId);
-    const customerId = await stripeCustomerOf(tx, params.schoolId);
+    const customerId = await stripeCustomerOf(tx, params.schoolId, selected);
     if (!customerId || !selected.port.listPaymentMethods) return [];
     const live = await findLiveStorageAddon(tx, params.schoolId);
     return selected.port.listPaymentMethods({
@@ -980,7 +1074,7 @@ export async function createStorageCardSetupSession(
 ): Promise<{ url: string }> {
   return withTenantTx(database, params.tenantContext, async (tx) => {
     const selected = await requireOnlineStorageProvider(tx, providers, params.schoolId);
-    const customerId = await stripeCustomerOf(tx, params.schoolId);
+    const customerId = await stripeCustomerOf(tx, params.schoolId, selected);
     if (!customerId) throw notActive();
     if (!selected.port.createCardSetupSession) throw unavailable();
     return selected.port.createCardSetupSession({
