@@ -1,7 +1,8 @@
 import { ERROR_CODES } from "@studafy/constants";
+import { buildSchedule, customScheduleErrors } from "@studafy/license-pricing";
 
 import { auditLicenseChange, licenseError } from "./context";
-import { activateLicenseFor, integerSetting, issueInvoice } from "./invoices";
+import { activateLicenseFor, integerSetting, issueInvoice, utcDate } from "./invoices";
 import { priceQuote } from "./pricing";
 import {
   AUDIENCES,
@@ -16,7 +17,12 @@ import type { LicenseActor } from "./context";
 import type { InvoiceRecord } from "./invoices";
 import type { PricedQuote, QuoteAudienceInput, QuoteKind, QuoteTerms } from "./pricing";
 import type { Audience, Changed } from "./service";
-import type { PricingResult } from "@studafy/license-pricing";
+import type {
+  CustomInstalmentInput,
+  PaymentPlan,
+  PricingResult,
+  ScheduledInstalment,
+} from "@studafy/license-pricing";
 import type { JSONValue, TransactionSql } from "postgres";
 
 /**
@@ -55,6 +61,15 @@ export interface QuoteView {
   pricedAt: string;
   validUntil: string;
   notes: string | null;
+  /** How the invoice is to be paid (000221). */
+  paymentPlan: PaymentPlan;
+  /** The super admin's instalments, for a custom plan; null otherwise. */
+  paymentSchedule: CustomInstalmentInput[] | null;
+  /**
+   * The instalments the invoice would have if the quote were accepted today (the real ones are on the
+   * invoice once it is).
+   */
+  schedulePreview: ScheduledInstalment[];
   createdBy: string;
   sentAt: string | null;
   acceptedAt: string | null;
@@ -94,6 +109,8 @@ interface QuoteRow {
   priced_at: Date;
   valid_until: Date;
   notes: string | null;
+  payment_plan: PaymentPlan;
+  payment_schedule: CustomInstalmentInput[] | null;
   created_by: string;
   sent_at: Date | null;
   accepted_at: Date | null;
@@ -113,15 +130,57 @@ const QUOTE_COLUMNS = (tx: TransactionSql) => tx`
   q.adjustment_minor::text AS adjustment_minor, q.adjustment_reason,
   q.list_total_minor::text AS list_total_minor, q.discount_total_minor::text AS discount_total_minor,
   q.credit_total_minor::text AS credit_total_minor, q.total_minor::text AS total_minor, q.breakdown,
-  q.priced_at, q.valid_until, q.notes, q.created_by::text AS created_by, q.sent_at, q.accepted_at,
+  q.priced_at, q.valid_until, q.notes, q.payment_plan, q.payment_schedule,
+  q.created_by::text AS created_by, q.sent_at, q.accepted_at,
   q.accepted_by::text AS accepted_by, q.accepted_by_platform, q.closed_at,
   (SELECT i.id::text FROM app.license_invoices AS i
    WHERE i.school_id = q.school_id AND i.quote_id = q.id) AS invoice_id,
   q.created_at
 `;
 
-function toView(row: QuoteRow): QuoteView {
+/** What a quote preview needs from the settings: when an invoice paid at once falls due. */
+interface PreviewContext {
+  today: string;
+  dueDays: number;
+}
+
+async function previewContext(tx: TransactionSql, now: Date = new Date()): Promise<PreviewContext> {
+  return { today: utcDate(now), dueDays: await integerSetting(tx, "license.invoice_due_days", 30) };
+}
+
+/** The instalments an invoice for these terms would have, issued on `issueDate`. */
+export function scheduleFor(
+  terms: {
+    totalMinor: number;
+    months: number;
+    startsAt: string;
+    paymentPlan: PaymentPlan;
+    paymentSchedule: readonly CustomInstalmentInput[] | null;
+  },
+  issueDate: string,
+  dueDays: number,
+): ScheduledInstalment[] {
+  const custom = terms.paymentPlan === "custom" ? (terms.paymentSchedule ?? []) : null;
+  // A custom schedule that no longer adds up (only possible for a stale stored quote) previews as
+  // paid at once rather than failing the read; accepting it is refused.
+  const plan =
+    custom && customScheduleErrors(terms.totalMinor, custom).length > 0
+      ? "in_full"
+      : terms.paymentPlan;
+  return buildSchedule({
+    plan,
+    totalMinor: terms.totalMinor,
+    months: terms.months,
+    startDate: terms.startsAt.slice(0, 10),
+    issueDate,
+    inFullDueDate: utcDate(new Date(Date.parse(issueDate) + dueDays * DAY_MS)),
+    custom,
+  });
+}
+
+function toView(row: QuoteRow, preview: PreviewContext): QuoteView {
   const iso = (d: Date | null) => d?.toISOString() ?? null;
+  const issueDate = row.accepted_at ? utcDate(row.accepted_at) : preview.today;
   return {
     id: row.id,
     schoolId: row.school_id,
@@ -150,6 +209,19 @@ function toView(row: QuoteRow): QuoteView {
     pricedAt: row.priced_at.toISOString(),
     validUntil: row.valid_until.toISOString(),
     notes: row.notes,
+    paymentPlan: row.payment_plan,
+    paymentSchedule: row.payment_schedule,
+    schedulePreview: scheduleFor(
+      {
+        totalMinor: Number(row.total_minor),
+        months: row.months,
+        startsAt: row.starts_at.toISOString(),
+        paymentPlan: row.payment_plan,
+        paymentSchedule: row.payment_schedule,
+      },
+      issueDate,
+      preview.dueDays,
+    ),
     createdBy: row.created_by,
     sentAt: iso(row.sent_at),
     acceptedAt: iso(row.accepted_at),
@@ -173,7 +245,7 @@ export async function readQuote(
     WHERE q.school_id = current_setting('app.school_id')::uuid AND q.id = ${quoteId}::uuid
     ${options.forUpdate ? tx`FOR UPDATE OF q` : tx``}
   `;
-  return row ? toView(row) : null;
+  return row ? toView(row, await previewContext(tx)) : null;
 }
 
 export async function requireQuote(
@@ -206,7 +278,8 @@ export async function listQuotes(
       AND q.status = ANY(${statuses as QuoteStatus[]}::text[])
     ORDER BY q.created_at DESC, q.id
   `;
-  return rows.map(toView);
+  const preview = await previewContext(tx);
+  return rows.map((row) => toView(row, preview));
 }
 
 function quoteSnapshot(quote: QuoteView): Record<string, unknown> {
@@ -226,6 +299,50 @@ function quoteSnapshot(quote: QuoteView): Record<string, unknown> {
     total_minor: quote.totalMinor,
     valid_until: quote.validUntil,
     notes: quote.notes,
+    payment_plan: quote.paymentPlan,
+    payment_schedule: quote.paymentSchedule,
+  };
+}
+
+export interface QuotePaymentTerms {
+  /** Paid at once when omitted on create; unchanged when omitted on replace. */
+  paymentPlan?: PaymentPlan;
+  /** Required for, and only for, a custom plan. */
+  paymentSchedule?: CustomInstalmentInput[] | null;
+}
+
+/**
+ * The plan and schedule to store for a quote priced at `totalMinor`. A custom schedule must add up to
+ * the total exactly, be in date order, have no date before today and at most MAX_CUSTOM_INSTALMENTS
+ * instalments: LICENSE_PAYMENT_SCHEDULE_INVALID otherwise.
+ */
+function resolvePaymentPlan(
+  requested: QuotePaymentTerms,
+  fallback: { plan: PaymentPlan; schedule: CustomInstalmentInput[] | null },
+  totalMinor: number,
+  actor: LicenseActor,
+  now: Date,
+): { plan: PaymentPlan; schedule: CustomInstalmentInput[] | null } {
+  const plan = requested.paymentPlan ?? fallback.plan;
+  if (plan !== "custom") {
+    if (requested.paymentSchedule) {
+      throw licenseError(422, ERROR_CODES.LICENSE_PAYMENT_SCHEDULE_INVALID, actor.locale);
+    }
+    return { plan, schedule: null };
+  }
+  const schedule =
+    requested.paymentSchedule ?? (requested.paymentPlan ? null : fallback.schedule) ?? null;
+  const today = utcDate(now);
+  if (
+    !schedule ||
+    customScheduleErrors(totalMinor, schedule).length > 0 ||
+    schedule.some((instalment) => instalment.dueDate < today)
+  ) {
+    throw licenseError(422, ERROR_CODES.LICENSE_PAYMENT_SCHEDULE_INVALID, actor.locale);
+  }
+  return {
+    plan,
+    schedule: schedule.map((i) => ({ amountMinor: i.amountMinor, dueDate: i.dueDate })),
   };
 }
 
@@ -262,19 +379,26 @@ function pricedColumns(priced: PricedQuote) {
 export async function createQuote(
   tx: TransactionSql,
   schoolId: string,
-  terms: QuoteTerms & { notes?: string | null },
+  terms: QuoteTerms & QuotePaymentTerms & { notes?: string | null },
   actor: LicenseActor,
   now: Date = new Date(),
 ): Promise<QuoteView> {
   const priced = await priceQuote(tx, terms, actor, { now });
   const columns = pricedColumns(priced);
+  const payment = resolvePaymentPlan(
+    terms,
+    { plan: "in_full", schedule: null },
+    priced.pricing.totalMinor,
+    actor,
+    now,
+  );
   const [row] = await tx<{ id: string }[]>`
     INSERT INTO app.license_quotes (
       school_id, kind, license_id, currency_id, starts_at, ends_at, months, prorate_days,
       student_plan_id, student_seats, teacher_plan_id, teacher_seats, include_family_plus,
       parent_plan_id, parent_seats, adjustment_minor, adjustment_reason, list_total_minor,
       discount_total_minor, credit_total_minor, total_minor, breakdown, valid_until, notes,
-      created_by
+      payment_plan, payment_schedule, created_by
     ) VALUES (
       ${schoolId}::uuid, ${priced.kind}, ${priced.licenseId}::uuid, ${columns.currency_id}::uuid,
       ${columns.starts_at}, ${columns.ends_at}, ${columns.months}, ${columns.prorate_days},
@@ -284,7 +408,9 @@ export async function createQuote(
       ${columns.adjustment_reason}, ${columns.list_total_minor}, ${columns.discount_total_minor},
       ${columns.credit_total_minor}, ${columns.total_minor},
       ${tx.json(priced.pricing as unknown as JSONValue)}, ${await validUntil(tx, now)},
-      ${terms.notes?.trim() || null}, ${actor.userId}::uuid
+      ${terms.notes?.trim() || null}, ${payment.plan},
+      ${payment.schedule ? tx.json(payment.schedule as unknown as JSONValue) : null},
+      ${actor.userId}::uuid
     )
     RETURNING id::text AS id
   `;
@@ -303,7 +429,7 @@ export async function replaceQuote(
   tx: TransactionSql,
   schoolId: string,
   quoteId: string,
-  terms: Omit<QuoteTerms, "kind" | "licenseId"> & { notes?: string | null },
+  terms: Omit<QuoteTerms, "kind" | "licenseId"> & QuotePaymentTerms & { notes?: string | null },
   actor: LicenseActor,
   now: Date = new Date(),
 ): Promise<QuoteView> {
@@ -318,6 +444,13 @@ export async function replaceQuote(
     { now },
   );
   const c = pricedColumns(priced);
+  const payment = resolvePaymentPlan(
+    terms,
+    { plan: before.paymentPlan, schedule: before.paymentSchedule },
+    priced.pricing.totalMinor,
+    actor,
+    now,
+  );
   await tx`
     UPDATE app.license_quotes SET
       currency_id = ${c.currency_id}::uuid, starts_at = ${c.starts_at}, ends_at = ${c.ends_at},
@@ -332,6 +465,8 @@ export async function replaceQuote(
       breakdown = ${tx.json(priced.pricing as unknown as JSONValue)},
       priced_at = CURRENT_TIMESTAMP,
       notes = ${terms.notes !== undefined ? terms.notes?.trim() || null : before.notes},
+      payment_plan = ${payment.plan},
+      payment_schedule = ${payment.schedule ? tx.json(payment.schedule as unknown as JSONValue) : null},
       updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
     WHERE school_id = current_setting('app.school_id')::uuid AND id = ${quoteId}::uuid
   `;
@@ -471,6 +606,12 @@ export async function acceptQuote(
     line.kind === "overlap_credit" && line.amountMinor < 0 ? [line.reference] : [],
   );
   await assertCreditsOpen(tx, overlapIds, actor);
+  if (
+    quote.paymentPlan === "custom" &&
+    customScheduleErrors(quote.totalMinor, quote.paymentSchedule ?? []).length > 0
+  ) {
+    throw licenseError(422, ERROR_CODES.LICENSE_PAYMENT_SCHEDULE_INVALID, actor.locale);
+  }
 
   const audience = (a: Audience) => quote.audiences.find((x) => x.audience === a)!;
   const audienceInputs = Object.fromEntries(
@@ -524,6 +665,12 @@ export async function acceptQuote(
       currencyId: (await readLicense(tx, licenseId))!.currencyId,
       lines,
       planIds: Object.fromEntries(AUDIENCES.map((a) => [a, audience(a).planId])),
+      schedule: {
+        plan: quote.paymentPlan,
+        months: quote.months,
+        startDate: quote.startsAt.slice(0, 10),
+        custom: quote.paymentSchedule,
+      },
     },
     actor,
     now,

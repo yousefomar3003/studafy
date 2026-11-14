@@ -247,7 +247,30 @@
     "save": "Save as draft quote",
     "pickSchoolFirst": "Pick a school to save a quote.",
     "saved": "Quote saved as a draft.",
-    "saveError": "The quote was not saved."
+    "saveError": "The quote was not saved.",
+    "planHeading": "How the school pays",
+    "planLabel": "Payment plan",
+    "plan": {
+      "in_full": "All at once",
+      "monthly": "Monthly, over the licence months",
+      "custom": "Custom schedule"
+    },
+    "customHeading": "Instalments",
+    "customAmountLabel": "Instalment {{position}} amount ({{currency}})",
+    "customDueLabel": "Instalment {{position}} due on",
+    "customRemove": "Remove instalment {{position}}",
+    "customAdd": "Add an instalment",
+    "customLeft": "Left to schedule: {{amount}}",
+    "scheduleErrors": {
+      "empty": "Add at least one instalment.",
+      "incomplete": "Give every instalment an amount above zero and a due date.",
+      "too_many": "A custom schedule can have at most 24 instalments.",
+      "invalid_date": "One of the due dates isn't a real date.",
+      "non_positive": "Every instalment must be more than zero.",
+      "not_ascending": "Put the due dates in order, earliest first.",
+      "sum_mismatch": "The instalments must add up to the quote's total exactly.",
+      "in_past": "A due date can't be before today."
+    }
   },
   "quotes": {
     "title": "Quotes",
@@ -428,7 +451,7 @@
     "fileLabel": "Attach a receipt file (PDF, JPEG or PNG, optional)",
     "recordConfirm": "Record transfer",
     "recorded": "Transfer recorded.",
-    "recordedActivated": "Transfer recorded: the invoice is paid and the license is active.",
+    "recordedActivated": "Transfer recorded: the license is now active.",
     "voidPaymentTitle": "Void payment {{reference}}",
     "voidInvoiceTitle": "Void invoice {{number}}",
     "reasonLabel": "Reason",
@@ -456,6 +479,15 @@
       "saved": "Payment link saved. The school can now pay online.",
       "removed": "Payment link removed. The school sees only the bank details.",
       "invalid": "Paste an https link from Revolut (revolut.com or revolut.me), up to 500 characters."
+    },
+    "instalments": {
+      "title": "Payment schedule",
+      "help": "Payments you record fill the earliest instalment first. The licence starts once the first one is paid.",
+      "linkColumn": "Payment link",
+      "linkLabel": "Revolut link for instalment {{position}}",
+      "openLink": "Open the link",
+      "linkSaved": "Payment link for instalment {{position}} saved.",
+      "linkRemoved": "Payment link for instalment {{position}} removed."
     }
   },
   "school": {

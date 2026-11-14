@@ -121,16 +121,31 @@ not reopened without the product owner.
    admin added one to the invoice, and **can upload a receipt**.
 4. The super admin records the payment: amount, date, bank reference, receipt. **Partial payments
    are allowed** and the balance is tracked.
-5. The license activates when **fully paid**, OR the super admin **activates it early** with a
-   payment due date.
+5. The license activates when the **first instalment is paid in full** (the whole invoice, for one
+   paid at once), OR the super admin **activates it early** with a payment due date.
 
-Overdue invoices trigger reminders. **Suspension is a manual super admin decision, never
+Overdue instalments trigger reminders. **Suspension is a manual super admin decision, never
 automatic.**
+
+**Payment plans (migration 000221, [ADR-021](../adr/0021-licence-payment-plans.md)).** The super
+admin chooses on the quote how the school pays: **all at once**, **monthly** over the licence months
+(an 8-month licence is 8 payments, due on the start date and the same day each month; the rounding
+remainder goes on the first), or a **custom schedule** of amounts and dates that add up to the total
+exactly (dates in order, none before today, at most 24). The total is the same whichever plan: the
+volume and duration discounts apply as usual. The school sees the schedule on the quote, and on the
+invoice what is due when and what is paid of each instalment. Payments are recorded against the
+invoice and fill the **earliest instalment first** (a voided payment re-applies the rest); the
+invoice's due date is its earliest unpaid instalment's. Each instalment is reminded of when due and
+when overdue, and has **its own Revolut payment link** (console: the invoice → **Payment schedule**;
+API: `PUT|DELETE …/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link`). The
+calculator previews the schedule live (`POST /api/platform/licenses/quote` returns `schedulePreview`
+and `scheduleErrors`).
 
 **Revolut payment link (migration 000220).** Licences are never paid through Stripe or renewed
 automatically. The super admin makes a payment link in Revolut's own dashboard and pastes it on the
 invoice (console: Payments → the invoice → **Payment link**; API:
-`PUT|DELETE /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link`). The school
+`PUT|DELETE /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link`, which since
+000221 sets the link of the instalment to pay now). The school
 then sees **Pay online** beside the bank details while the invoice is issued or partly paid; once it
 is paid or void the link is hidden and can no longer be set. Only https links on the hosts in
 `LICENSE_PAYMENT_LINK_HOSTS` (`@studafy/constants`: `revolut.com`, `revolut.me` and their

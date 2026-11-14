@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { PaymentSchedule } from "../../license/PaymentSchedule";
 import { PlatformPageHeader } from "../PlatformNav";
 import { useSchoolDetailQuery } from "../queries";
 
@@ -93,7 +94,11 @@ export default function InvoicePage() {
       {data ? (
         <div className="platform-stack">
           <InvoiceDocument invoice={data} schoolName={school.data?.name ?? null} />
-          {open ? <PaymentLinkCard invoice={data} schoolId={schoolId} /> : null}
+          {data.instalments.length > 1 ? (
+            <InstalmentsCard invoice={data} schoolId={schoolId} open={open} />
+          ) : open ? (
+            <PaymentLinkCard invoice={data} schoolId={schoolId} />
+          ) : null}
           <PaymentsCard
             invoice={data}
             schoolId={schoolId}
@@ -393,6 +398,164 @@ export function PaymentLinkCard({
         )}
       </Card.Body>
     </Card>
+  );
+}
+
+/**
+ * An invoice paid monthly or on a custom schedule: each instalment's due date, amount, what is paid
+ * of it and its status, and -- while it is unpaid -- its own online payment link (Revolut) for its
+ * amount. Payments recorded below fill the earliest instalment first.
+ */
+export function InstalmentsCard({
+  invoice,
+  schoolId,
+  open,
+}: {
+  invoice: InvoiceDetail;
+  schoolId: string;
+  open: boolean;
+}) {
+  const { t } = useTranslation();
+  const title = t("platformLicensing.invoice.instalments.title");
+  return (
+    <Card as="section" aria-labelledby="invoice-instalments">
+      <Card.Header>
+        <h2 id="invoice-instalments">{title}</h2>
+      </Card.Header>
+      <Card.Body>
+        <p className="platform-muted">
+          {t(`schoolLicense.schedule.plan.${invoice.paymentPlan}`, {
+            count: invoice.instalments.length,
+          })}{" "}
+          {t("platformLicensing.invoice.instalments.help")}
+        </p>
+        <PaymentSchedule
+          rows={invoice.instalments}
+          currencyCode={invoice.currencyCode}
+          minorUnit={invoice.minorUnit}
+          caption={title}
+          actionHeader={t("platformLicensing.invoice.instalments.linkColumn")}
+          action={(row) => {
+            const instalment = invoice.instalments.find((i) => i.position === row.position)!;
+            return open && instalment.status !== "paid" ? (
+              <InstalmentLinkEditor
+                key={`${instalment.id}:${instalment.paymentLink ?? ""}`}
+                schoolId={schoolId}
+                invoiceId={invoice.id}
+                instalment={instalment}
+              />
+            ) : null;
+          }}
+        />
+      </Card.Body>
+    </Card>
+  );
+}
+
+function InstalmentLinkEditor({
+  schoolId,
+  invoiceId,
+  instalment,
+}: {
+  schoolId: string;
+  invoiceId: string;
+  instalment: InvoiceDetail["instalments"][number];
+}) {
+  const { t } = useTranslation();
+  const { show } = useToast();
+  const save = useSetInvoicePaymentLink();
+  const [editing, setEditing] = useState(instalment.paymentLink === null);
+  const [value, setValue] = useState(instalment.paymentLink ?? "");
+  const [touched, setTouched] = useState(false);
+  const trimmed = value.trim();
+  const invalid = trimmed !== "" && !isAllowedLicensePaymentLink(trimmed);
+
+  function submit(url: string | null) {
+    if (save.isPending) return;
+    save.mutate(
+      { schoolId, invoiceId, instalmentId: instalment.id, url },
+      {
+        onSuccess: () => {
+          show({
+            variant: "success",
+            title: t(
+              url === null
+                ? "platformLicensing.invoice.instalments.linkRemoved"
+                : "platformLicensing.invoice.instalments.linkSaved",
+              { position: instalment.position },
+            ),
+          });
+          setTouched(false);
+          setEditing(url === null);
+        },
+        onError: errorToast(show, t),
+      },
+    );
+  }
+
+  if (!editing && instalment.paymentLink) {
+    return (
+      <div className="platform-cell-stack">
+        <a href={instalment.paymentLink} target="_blank" rel="noopener noreferrer">
+          {t("platformLicensing.invoice.instalments.openLink")}
+        </a>
+        <div className="platform-actions">
+          <Button variant="tertiary" onClick={() => setEditing(true)}>
+            {t("platformLicensing.invoice.paymentLink.change")}
+          </Button>
+          <Button variant="tertiary" loading={save.isPending} onClick={() => submit(null)}>
+            {t("platformLicensing.invoice.paymentLink.remove")}
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="platform-cell-stack"
+      onSubmit={(event) => {
+        event.preventDefault();
+        setTouched(true);
+        if (trimmed === "" || invalid) return;
+        submit(trimmed);
+      }}
+    >
+      <Input
+        label={t("platformLicensing.invoice.instalments.linkLabel", {
+          position: instalment.position,
+        })}
+        type="url"
+        inputMode="url"
+        placeholder="https://checkout.revolut.com/pay/…"
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        onBlur={() => setTouched(true)}
+        error={
+          touched && (invalid || trimmed === "")
+            ? t("platformLicensing.invoice.paymentLink.invalid")
+            : undefined
+        }
+      />
+      <div className="platform-actions">
+        <Button type="submit" variant="secondary" loading={save.isPending}>
+          {t("platformLicensing.invoice.paymentLink.save")}
+        </Button>
+        {instalment.paymentLink ? (
+          <Button
+            type="button"
+            variant="tertiary"
+            onClick={() => {
+              setValue(instalment.paymentLink ?? "");
+              setTouched(false);
+              setEditing(false);
+            }}
+          >
+            {t("platform.common.cancel")}
+          </Button>
+        ) : null}
+      </div>
+    </form>
   );
 }
 

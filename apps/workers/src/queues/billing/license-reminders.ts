@@ -3,8 +3,12 @@
  * lifecycle job, per school:
  *
  *   license_expiring_30 / license_expiring_7 -- an active license ends within 30 / 7 days
- *   invoice_due                              -- an unpaid invoice falls due today (UTC)
- *   invoice_overdue                          -- an unpaid invoice was marked overdue
+ *   invoice_due                              -- an unpaid instalment falls due today (UTC)
+ *   invoice_overdue                          -- an unpaid instalment was marked overdue
+ *
+ * Invoice reminders are per instalment (000221): each instalment of a monthly or custom plan is
+ * reminded of once when due and once when overdue; the subject is the instalment, whose id is the
+ * invoice's own for every invoice issued before instalments existed, so nothing is sent twice.
  *   receipt_uploaded                         -- the school uploaded a transfer receipt
  *
  * The first four go to the school's ORG_ADMINs and PRINCIPALs and to every super admin; a receipt
@@ -139,7 +143,8 @@ async function dueReminders(
     });
   }
 
-  const invoices = await tx<
+  // Every unpaid instalment of an open invoice that falls due today or has been marked overdue.
+  const instalments = await tx<
     {
       id: string;
       number: string;
@@ -150,31 +155,34 @@ async function dueReminders(
       minor_unit: number;
     }[]
   >`
-    SELECT i.id::text AS id, i.number, i.due_date::text AS due_date,
-           i.balance_minor::text AS balance_minor, i.overdue_at, c.code AS currency_code,
+    SELECT inst.id::text AS id, i.number, inst.due_date::text AS due_date,
+           inst.balance_minor::text AS balance_minor, inst.overdue_at, c.code AS currency_code,
            c.minor_unit::int AS minor_unit
-    FROM app.license_invoices AS i
+    FROM app.license_invoice_instalments AS inst
+    JOIN app.license_invoices AS i ON i.id = inst.invoice_id AND i.school_id = inst.school_id
     JOIN app.currencies AS c ON c.id = i.currency_id
-    WHERE i.school_id = current_setting('app.school_id')::uuid
+    WHERE inst.school_id = current_setting('app.school_id')::uuid
       AND i.status IN ('issued', 'partially_paid')
-      AND (i.overdue_at IS NOT NULL OR i.due_date = ${today}::date)
+      AND inst.status <> 'paid'
+      AND (inst.overdue_at IS NOT NULL OR inst.due_date = ${today}::date)
+    ORDER BY i.number, inst.position
   `;
-  for (const invoice of invoices) {
+  for (const instalment of instalments) {
     reminders.push({
-      kind: invoice.overdue_at ? "invoice_overdue" : "invoice_due",
-      subjectId: invoice.id,
-      type: invoice.overdue_at
+      kind: instalment.overdue_at ? "invoice_overdue" : "invoice_due",
+      subjectId: instalment.id,
+      type: instalment.overdue_at
         ? NOTIFICATION_TYPES.LICENSE_INVOICE_OVERDUE
         : NOTIFICATION_TYPES.LICENSE_INVOICE_DUE,
       vars: {
         schoolName,
-        invoiceNumber: invoice.number,
+        invoiceNumber: instalment.number,
         balance: formatMoney(
-          Number(invoice.balance_minor),
-          invoice.minor_unit,
-          invoice.currency_code,
+          Number(instalment.balance_minor),
+          instalment.minor_unit,
+          instalment.currency_code,
         ),
-        dueDate: invoice.due_date,
+        dueDate: instalment.due_date,
       },
       toSchool: true,
     });

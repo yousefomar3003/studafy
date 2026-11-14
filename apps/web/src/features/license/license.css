@@ -386,3 +386,8 @@
   font-size: var(--font-size-xl);
   font-weight: var(--font-weight-semibold);
 }
+
+/* A licence payment schedule: the instalment to pay now stands out. */
+.license-schedule tr[data-current="true"] td {
+  font-weight: var(--font-weight-medium);
+}

@@ -77,6 +77,9 @@ const calculation = {
   prorateDays: null,
   includeFamilyPlus: false,
   audiences: [],
+  paymentPlan: "in_full",
+  schedulePreview: [{ position: 1, amountMinor: 0, dueDate: "2026-12-01" }],
+  scheduleErrors: [] as string[],
   breakdown: {
     currencyCode: "USD",
     months: 12,
@@ -291,6 +294,61 @@ describe("CalculatorPage", () => {
     // The school is in the path, not the body.
     expect(init!.body!.schoolId).toBeUndefined();
     expect(await screen.findByText("Quote saved as a draft.")).toBeTruthy();
+  });
+
+  test("a custom payment schedule is priced, checked and saved with the quote", async () => {
+    await renderPage();
+    await chooseStudentSeats("80");
+    const save = (await screen.findByRole("button", {
+      name: "Save as draft quote",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Payment plan" }));
+    fireEvent.click(screen.getByRole("option", { name: "Custom schedule" }));
+    // Until every instalment has an amount and a date, nothing can be saved.
+    expect(
+      await screen.findByText("Give every instalment an amount above zero and a due date."),
+    ).toBeTruthy();
+    expect(save.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Instalment 1 amount (USD)"), {
+      target: { value: "2032" },
+    });
+    fireEvent.change(screen.getByLabelText("Instalment 1 due on"), {
+      target: { value: "2026-12-01" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add an instalment" }));
+    fireEvent.change(screen.getByLabelText("Instalment 2 amount (USD)"), {
+      target: { value: "2032" },
+    });
+    fireEvent.change(screen.getByLabelText("Instalment 2 due on"), {
+      target: { value: "2027-03-01" },
+    });
+
+    await waitFor(() =>
+      expect(pricedBodies().at(-1)).toMatchObject({
+        paymentPlan: "custom",
+        paymentSchedule: [
+          { amountMinor: 203_200, dueDate: "2026-12-01" },
+          { amountMinor: 203_200, dueDate: "2027-03-01" },
+        ],
+      }),
+    );
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(
+        postMock.mock.calls.some(
+          ([path]) => path === "/api/platform/schools/{schoolId}/license-quotes",
+        ),
+      ).toBe(true),
+    );
+    const [, init] = postMock.mock.calls.find(
+      ([path]) => path === "/api/platform/schools/{schoolId}/license-quotes",
+    )!;
+    expect(init!.body).toMatchObject({ paymentPlan: "custom" });
+    expect((init!.body!.paymentSchedule as unknown[]).length).toBe(2);
   });
 
   test("lists the school's quotes with their status and sends a draft", async () => {
