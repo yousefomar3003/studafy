@@ -299,7 +299,7 @@ export const systemHealthSchema = z
       })
       .openapi("PlatformStorageIncidents", {
         description:
-          "Storage changes that charged more than the school confirmed (000222), the excess " +
+          "Storage changes that charged more than the school confirmed (000224), the excess " +
           "refunded automatically or left for a person. Open ones always, refunded ones for 30 days.",
       }),
     storage: z.object({

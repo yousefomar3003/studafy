@@ -262,7 +262,7 @@ async function applyClaimedEvent(
     return { outcome: "processed", transitioned: false };
   }
 
-  // Objects the API settles itself (000222): the invoice of an immediate storage change, paid with
+  // Objects the API settles itself (000224): the invoice of an immediate storage change, paid with
   // the card the school chose, and a checkout that only saves a card. Recorded, never applied --
   // a card-saving checkout would otherwise read as a completed purchase of the school plan.
   if (API_SETTLED_PURPOSES.has(String(extractMetadata(event.data).studafy_purpose ?? ""))) {

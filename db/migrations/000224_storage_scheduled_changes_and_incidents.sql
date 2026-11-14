@@ -41,9 +41,9 @@ CREATE INDEX idx_storage_subscriptions_pending_plan_price_id
   WHERE pending_plan_price_id IS NOT NULL;
 
 COMMENT ON COLUMN app.storage_subscriptions.pending_plan_price_id IS
-  'The tier the add-on moves to at its next renewal (000222); applied by the webhook pipeline when the Stripe subscription moves to that price.';
+  'The tier the add-on moves to at its next renewal (000224); applied by the webhook pipeline when the Stripe subscription moves to that price.';
 COMMENT ON COLUMN app.storage_subscriptions.stripe_schedule_id IS
-  'The Stripe subscription schedule holding the scheduled change (000222); released when it is undone.';
+  'The Stripe subscription schedule holding the scheduled change (000224); released when it is undone.';
 
 CREATE TABLE app.storage_billing_incidents (
   id uuid DEFAULT gen_random_uuid() CONSTRAINT pk_storage_billing_incidents PRIMARY KEY,
@@ -89,7 +89,7 @@ CREATE INDEX idx_storage_billing_incidents_storage
   ON app.storage_billing_incidents (storage_subscription_id);
 
 COMMENT ON TABLE app.storage_billing_incidents IS
-  'A storage change charged more than the school confirmed (000222): the excess refunded at once, or left for a person when the refund failed. Shown on the platform system-health page.';
+  'A storage change charged more than the school confirmed (000224): the excess refunded at once, or left for a person when the refund failed. Shown on the platform system-health page.';
 
 REVOKE ALL PRIVILEGES ON TABLE app.storage_billing_incidents FROM PUBLIC, studafy_app;
 GRANT SELECT, INSERT, UPDATE ON TABLE app.storage_billing_incidents TO studafy_app;

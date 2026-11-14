@@ -83,7 +83,7 @@ safety net, if a second storage subscription still reaches Studafy:
   days, is listed on the platform's system-health page (`/portal/platform/health`), needing review
   first. A structured warning is also logged when one is found, and on every failed attempt.
 
-### Changes, scheduled changes and overcharges (000222, ADR-022)
+### Changes, scheduled changes and overcharges (000224, ADR-022)
 
 Storage billing follows the app stores. More storage on the same interval applies at once, with one
 prorated charge for exactly the amount the school confirmed. Less storage, or the other interval,

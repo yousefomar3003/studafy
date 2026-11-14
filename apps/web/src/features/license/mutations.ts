@@ -74,6 +74,17 @@ export function useAcceptQuote() {
   });
 }
 
+/** Decline a sent quote, with an optional reason the super admin reads. */
+export function useDeclineQuote() {
+  return useLicenseMutation(async (input: { quoteId: string; reason: string | null }) => {
+    const { data } = await api.POST("/api/school/license/quotes/{quoteId}/decline", {
+      params: { path: { quoteId: input.quoteId } },
+      body: { reason: input.reason },
+    });
+    return required(data, "Decline") as Schemas["LicenseQuote"];
+  });
+}
+
 /**
  * A transfer receipt: the file goes to storage through a pre-signed URL (content class
  * `license.receipt`: PDF, JPEG or PNG up to 10 MiB), then its key is attached to the invoice, where

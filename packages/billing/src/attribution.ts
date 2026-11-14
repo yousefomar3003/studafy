@@ -395,7 +395,7 @@ export async function isRetiredStorageDuplicate(
  * no storage row.
  */
 /**
- * Apply a storage change scheduled for the renewal (000222) once Stripe's subscription has moved to
+ * Apply a storage change scheduled for the renewal (000224) once Stripe's subscription has moved to
  * the scheduled price: the row takes the new tier and cap, and the schedule columns are cleared.
  * Keyed on the price the subscription now carries, so a redelivered or out-of-order event is a no-op
  * and an event from before the renewal (still on the old price) changes nothing.

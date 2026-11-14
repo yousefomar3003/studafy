@@ -218,7 +218,8 @@
     "sent": "Waiting for you",
     "accepted": "Accepted",
     "expired": "Expired",
-    "withdrawn": "Withdrawn"
+    "withdrawn": "Withdrawn",
+    "declined": "Declined"
   },
   "quotes": {
     "title": "Quotes",
@@ -235,6 +236,17 @@
   "quote": {
     "title": "Quote: {{kind}}",
     "accept": "Accept quote",
+    "decline": "Decline quote",
+    "declineTitle": "Decline this quote?",
+    "declineBody": "It is closed and can't be accepted afterwards. Studafy sees your reason and can send you a new quote.",
+    "declineReasonLabel": "Why are you declining? (optional)",
+    "declineReasonHelp": "For example: too expensive, fewer students, a different start date.",
+    "declineReasonTooLong": "Keep it under 1,000 characters.",
+    "declineConfirm": "Decline quote",
+    "declined": "Quote declined. Studafy has been told.",
+    "declineError": "The quote wasn't declined",
+    "declinedNote": "You declined this quote.",
+    "declinedWithReason": "You declined this quote: “{{reason}}”",
     "breakdownTitle": "Price breakdown",
     "columns": {
       "item": "Item",

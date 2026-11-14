@@ -28,7 +28,7 @@ charge were computed differently, so the amount confirmed was not the amount cha
 2. **Less storage, or the other interval, applies at the next renewal** — as Apple and Google do.
    Nothing is charged or credited now; the school keeps what it pays for until the renewal; Stripe
    holds the change as a subscription schedule (current price to the period end, then the new price,
-   no proration) and the add-on row records it (`pending_*`, `stripe_schedule_id`, migration 000222).
+   no proration) and the add-on row records it (`pending_*`, `stripe_schedule_id`, migration 000224).
    The webhook pipeline applies it when the subscription's price becomes the scheduled one. The
    school can undo it until then. Because no change creates a credit any more, previews and charges
    can no longer disagree.

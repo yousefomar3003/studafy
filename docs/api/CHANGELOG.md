@@ -13,7 +13,7 @@ when it required the `version-bump` label.
 
 ### Added
 
-- Storage billing works like an app-store subscription (migration 000222, ADR-022).
+- Storage billing works like an app-store subscription (migration 000224, ADR-022).
   `StorageAddOnChangePreview` adds `timing` (`now`: more storage on the same interval, charged at
   once; `renewal`: less storage or the other interval, applied at the next renewal with nothing
   charged) and `effectiveAt`; `chargeNow` is true only when something is charged now.
@@ -33,6 +33,12 @@ when it required the `version-bump` label.
   (`PlatformStorageRefund`; 422 `STORAGE_ADDON_REFUND_INVALID`). `GET /api/platform/health` adds
   `storageIncidents` (`PlatformStorageIncidents`): storage changes that charged more than confirmed,
   refunded automatically or left for review.
+- A school can decline a licence quote (migration 000223): `POST
+/api/school/license/quotes/{quoteId}/decline` (`license:manage`) with an optional `reason`
+  (`DeclineLicenseQuoteBody`, at most 1000 characters) answers the `LicenseQuote`. Only a sent quote
+  within its validity can be declined (409 `LICENSE_QUOTE_NOT_EDITABLE` / `LICENSE_QUOTE_EXPIRED`); a
+  declined quote cannot be accepted. `LicenseQuoteStatus` adds `declined`, and `LicenseQuote` adds
+  `declinedAt`, `declinedBy` and `declineReason`. The school's quote list includes declined quotes.
 - Licence payment plans (migration 000221, ADR-021). `LicenseQuoteBody`, `LicenseQuoteReplaceBody`
   and `LicenseQuoteCalculateBody` take optional `paymentPlan` (`LicensePaymentPlan`: `in_full`,
   `monthly`, `custom`; default `in_full`) and, for `custom`, `paymentSchedule`

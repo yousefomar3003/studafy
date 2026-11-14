@@ -21,6 +21,7 @@ import {
   createLicense,
   createQuote,
   createReceipt,
+  declineQuote,
   matchReceipt,
   readInvoice,
   recordPayment,
@@ -795,6 +796,192 @@ describe("changes to a license in force", () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
+// Declining a quote (000223)
+// ---------------------------------------------------------------------------------------------------
+
+async function declined(f: SchoolFixture, quoteId: string, reason: string | null, now?: Date) {
+  return as(f.schoolId, f.admin, async (tx) => ({
+    result: await declineQuote(tx, f.schoolId, quoteId, f.admin, reason, now),
+  }));
+}
+
+describe("declining a quote", () => {
+  integrationTest(
+    "the school declines a sent quote with a reason; it is closed and cannot be accepted",
+    async () => {
+      const f = await school();
+      const quote = await sentQuote(f, newTerm(120));
+
+      const closed = await declined(f, quote.id, "  Too expensive for 120 students  ");
+      expect(closed).toMatchObject({
+        status: "declined",
+        declineReason: "Too expensive for 120 students",
+        declinedBy: f.admin.userId,
+        invoiceId: null,
+      });
+      expect(closed.declinedAt).not.toBeNull();
+      expect(closed.closedAt).not.toBeNull();
+
+      expect(await refusal(accepted(f, quote.id))).toBe("LICENSE_QUOTE_NOT_EDITABLE");
+      expect(await refusal(accepted(f, quote.id, operator))).toBe("LICENSE_QUOTE_NOT_EDITABLE");
+      expect(await refusal(declined(f, quote.id, null))).toBe("LICENSE_QUOTE_NOT_EDITABLE");
+      // Nothing was created for it.
+      const [counts] = await asAdmin(
+        f.schoolId,
+        (tx) => tx<{ licenses: number; invoices: number }[]>`
+          SELECT (SELECT count(*)::int FROM app.school_licenses WHERE school_id = ${f.schoolId}::uuid) AS licenses,
+                 (SELECT count(*)::int FROM app.license_invoices WHERE school_id = ${f.schoolId}::uuid) AS invoices
+        `,
+      );
+      expect(counts).toEqual({ licenses: 0, invoices: 0 });
+
+      // Audited, and the super admin can price a new quote for the school straight away.
+      const [audit] = await asAdmin(
+        f.schoolId,
+        (tx) => tx<{ new_values: Record<string, unknown> }[]>`
+          SELECT new_values FROM app.audit_logs
+          WHERE target_table = 'license_quotes' AND target_id = ${quote.id}::uuid
+            AND new_values->>'status' = 'declined'
+        `,
+      );
+      expect(audit?.new_values).toMatchObject({
+        status: "declined",
+        decline_reason: "Too expensive for 120 students",
+      });
+      const next = await sentQuote(f, newTerm(100));
+      expect(next.status).toBe("sent");
+    },
+  );
+
+  integrationTest("a blank reason is stored as none", async () => {
+    const f = await school();
+    const quote = await sentQuote(f, newTerm(5));
+    expect((await declined(f, quote.id, "   ")).declineReason).toBeNull();
+  });
+
+  integrationTest("only a sent quote within its validity can be declined", async () => {
+    const f = await school();
+    // A draft and a withdrawn quote are the super admin's: the school does not see them.
+    const draft = await as(f.schoolId, operator, async (tx) => ({
+      result: await createQuote(tx, f.schoolId, newTerm(5), operator),
+    }));
+    expect(await refusal(declined(f, draft.id, null))).toBe("LICENSE_QUOTE_NOT_FOUND");
+    const withdrawn = await sentQuote(f, newTerm(5));
+    await as(f.schoolId, operator, async (tx) => ({
+      result: await withdrawQuote(tx, f.schoolId, withdrawn.id, operator),
+    }));
+    expect(await refusal(declined(f, withdrawn.id, null))).toBe("LICENSE_QUOTE_NOT_FOUND");
+
+    const acceptedQuote = await sentQuote(f, newTerm(5));
+    await accepted(f, acceptedQuote.id);
+    expect(await refusal(declined(f, acceptedQuote.id, null))).toBe("LICENSE_QUOTE_NOT_EDITABLE");
+
+    const past = new Date(Date.now() - 40 * DAY);
+    const expired = await sentQuote(f, newTerm(5, { startsAt: past }), past);
+    expect(await refusal(declined(f, expired.id, null))).toBe("LICENSE_QUOTE_EXPIRED");
+  });
+
+  integrationTest("another school cannot decline it", async () => {
+    const f = await school();
+    const other = await school(0, "Other School");
+    const quote = await sentQuote(f, newTerm(5));
+    const attempt = as(other.schoolId, other.admin, async (tx) => ({
+      result: await declineQuote(tx, other.schoolId, quote.id, other.admin, null),
+    }));
+    expect(await refusal(attempt)).toBe("LICENSE_QUOTE_NOT_FOUND");
+    expect((await sentQuote(f, newTerm(6))).status).toBe("sent");
+    const [row] = await asAdmin(
+      f.schoolId,
+      (tx) => tx<{ status: string }[]>`
+        SELECT status FROM app.license_quotes WHERE id = ${quote.id}::uuid
+      `,
+    );
+    expect(row?.status).toBe("sent");
+  });
+
+  integrationTest("the overlap credits it priced stay open for the next quote", async () => {
+    const f = await school(1);
+    const licenseId = await activeLicense(
+      f,
+      10,
+      new Date(Date.now() - DAY),
+      new Date(Date.now() + 300 * DAY),
+    );
+    await as(
+      f.schoolId,
+      f.admin,
+      (tx) =>
+        assignSeats(
+          tx,
+          f.schoolId,
+          licenseId,
+          { audience: "student", userIds: [f.students[0]!.userId] },
+          f.admin,
+        ) as never,
+    );
+    await asAdmin(f.schoolId, async (tx) => {
+      const [seat] = await tx<{ id: string; user_id: string }[]>`
+        SELECT id::text AS id, user_id::text AS user_id FROM app.license_seats
+        WHERE license_id = ${licenseId}::uuid
+      `;
+      const [sub] = await tx<{ id: string }[]>`
+        INSERT INTO app.ai_subscriptions (school_id, student_id, status, current_period_start, current_period_end)
+        VALUES (${f.schoolId}::uuid, ${f.students[0]!.id}::uuid, 'active', now() - interval '10 days', now() + interval '44 days')
+        RETURNING id::text AS id
+      `;
+      await tx`
+        INSERT INTO app.license_seat_overlaps (
+          school_id, license_id, seat_id, user_id, ai_subscription_id, provider, overlap_starts_at,
+          overlap_ends_at, overlap_days, currency_id, monthly_seat_price_minor,
+          daily_seat_price_minor, credit_minor, renewal_action, renewal_status
+        )
+        SELECT ${f.schoolId}::uuid, ${licenseId}::uuid, ${seat!.id}::uuid, ${seat!.user_id}::uuid,
+               ${sub!.id}::uuid, 'tap', now(), now() + interval '44 days', 44, c.id,
+               3000, 98.630137, 4438, 'cancel_at_period_end', 'done'
+        FROM app.currencies AS c WHERE c.code = 'USD'
+      `;
+    });
+
+    const quote = await sentQuote(f, { kind: "extension", licenseId, months: 1 });
+    expect(quote.creditTotalMinor).toBe(4438);
+    await declined(f, quote.id, "Not now");
+    const next = await sentQuote(f, { kind: "extension", licenseId, months: 1 });
+    expect(next.creditTotalMinor).toBe(4438);
+  });
+
+  integrationTest("the database keeps a decline consistent", async () => {
+    const f = await school();
+    const quote = await sentQuote(f, newTerm(5));
+    // A reason without a decline, or a decline without who and when, is refused.
+    expect(
+      await refusal(
+        asAdmin(
+          f.schoolId,
+          (tx) => tx`
+            UPDATE app.license_quotes SET decline_reason = 'x' WHERE id = ${quote.id}::uuid
+          `,
+        ).catch((err: { constraint_name?: string }) => {
+          throw { code: err.constraint_name };
+        }),
+      ),
+    ).toBe("ck_license_quotes_declined");
+    expect(
+      await refusal(
+        asAdmin(
+          f.schoolId,
+          (tx) => tx`
+            UPDATE app.license_quotes SET status = 'declined', closed_at = now()
+            WHERE id = ${quote.id}::uuid
+          `,
+        ).catch((err: { constraint_name?: string }) => {
+          throw { code: err.constraint_name };
+        }),
+      ),
+    ).toBe("ck_license_quotes_declined");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
 // Quote rules
 // ---------------------------------------------------------------------------------------------------
 
@@ -1151,14 +1338,40 @@ describe("route permissions", () => {
         expect(
           (await asRole(f, role, "POST", `/api/school/license/quotes/${quote.id}/accept`)).status,
         ).toBe(403);
+        expect(
+          (
+            await asRole(f, role, "POST", `/api/school/license/quotes/${quote.id}/decline`, {
+              reason: null,
+            })
+          ).status,
+        ).toBe(403);
       }
+
+      // A principal declines a second quote with a reason; the school still lists it.
+      const other = await sentQuote(f, newTerm(20));
+      const decline = await asRole(
+        f,
+        ROLES.PRINCIPAL,
+        "POST",
+        `/api/school/license/quotes/${other.id}/decline`,
+        { reason: "We only need 10 seats" },
+      );
+      expect(decline.status).toBe(200);
+      expect(await decline.json()).toMatchObject({
+        status: "declined",
+        declineReason: "We only need 10 seats",
+      });
+      const declinedList = (await (
+        await asRole(f, ROLES.ORG_ADMIN, "GET", "/api/school/license/quotes?status=declined")
+      ).json()) as { quotes: { id: string }[] };
+      expect(declinedList.quotes.map((q) => q.id)).toEqual([other.id]);
 
       const listed = (await (
         await asRole(f, ROLES.ORG_ADMIN, "GET", "/api/school/license/quotes")
       ).json()) as {
         quotes: { id: string; status: string }[];
       };
-      expect(listed.quotes.map((q) => q.status)).toEqual(["sent"]);
+      expect(listed.quotes.map((q) => q.status)).toEqual(["declined", "sent"]);
 
       const accept = await asRole(
         f,

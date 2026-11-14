@@ -32,7 +32,14 @@ import type { JSONValue, TransactionSql } from "postgres";
  * its terms, adding seats or extending it -- and issues the invoice, in one transaction.
  */
 
-export const QUOTE_STATUSES = ["draft", "sent", "accepted", "expired", "withdrawn"] as const;
+export const QUOTE_STATUSES = [
+  "draft",
+  "sent",
+  "accepted",
+  "expired",
+  "withdrawn",
+  "declined",
+] as const;
 export type QuoteStatus = (typeof QUOTE_STATUSES)[number];
 
 const DAY_MS = 86_400_000;
@@ -76,6 +83,10 @@ export interface QuoteView {
   acceptedBy: string | null;
   acceptedByPlatform: boolean | null;
   closedAt: string | null;
+  /** When the school declined it (000223), by whom, and its optional reason. */
+  declinedAt: string | null;
+  declinedBy: string | null;
+  declineReason: string | null;
   invoiceId: string | null;
   createdAt: string;
 }
@@ -117,6 +128,9 @@ interface QuoteRow {
   accepted_by: string | null;
   accepted_by_platform: boolean | null;
   closed_at: Date | null;
+  declined_at: Date | null;
+  declined_by: string | null;
+  decline_reason: string | null;
   invoice_id: string | null;
   created_at: Date;
 }
@@ -133,6 +147,7 @@ const QUOTE_COLUMNS = (tx: TransactionSql) => tx`
   q.priced_at, q.valid_until, q.notes, q.payment_plan, q.payment_schedule,
   q.created_by::text AS created_by, q.sent_at, q.accepted_at,
   q.accepted_by::text AS accepted_by, q.accepted_by_platform, q.closed_at,
+  q.declined_at, q.declined_by::text AS declined_by, q.decline_reason,
   (SELECT i.id::text FROM app.license_invoices AS i
    WHERE i.school_id = q.school_id AND i.quote_id = q.id) AS invoice_id,
   q.created_at
@@ -228,6 +243,9 @@ function toView(row: QuoteRow, preview: PreviewContext): QuoteView {
     acceptedBy: row.accepted_by,
     acceptedByPlatform: row.accepted_by_platform,
     closedAt: iso(row.closed_at),
+    declinedAt: iso(row.declined_at),
+    declinedBy: row.declined_by,
+    declineReason: row.decline_reason,
     invoiceId: row.invoice_id,
     createdAt: row.created_at.toISOString(),
   };
@@ -263,7 +281,7 @@ export async function requireQuote(
 }
 
 /** The statuses a school sees. */
-export const SCHOOL_VISIBLE: readonly QuoteStatus[] = ["sent", "accepted", "expired"];
+export const SCHOOL_VISIBLE: readonly QuoteStatus[] = ["sent", "accepted", "expired", "declined"];
 
 /** The school's quotes, newest first. */
 export async function listQuotes(
@@ -533,6 +551,45 @@ export async function withdrawQuote(
     targetId: quoteId,
     oldValues: { status: before.status },
     newValues: { status: "withdrawn" },
+  });
+  return (await readQuote(tx, quoteId))!;
+}
+
+/**
+ * The school declines a sent quote, optionally saying why (000223). It is closed like an expired or
+ * withdrawn quote: it can no longer be accepted and the super admin prices a new one. Overlap credits
+ * are claimed by invoices, not quotes, so nothing is released here. Refused for anything but a sent
+ * quote still within its validity.
+ */
+export async function declineQuote(
+  tx: TransactionSql,
+  schoolId: string,
+  quoteId: string,
+  actor: LicenseActor,
+  reason: string | null,
+  now: Date = new Date(),
+): Promise<QuoteView> {
+  const before = await requireQuote(tx, quoteId, actor, { forUpdate: true, schoolVisible: true });
+  if (before.status !== "sent") {
+    throw licenseError(409, ERROR_CODES.LICENSE_QUOTE_NOT_EDITABLE, actor.locale);
+  }
+  if (new Date(before.validUntil).getTime() < now.getTime()) {
+    throw licenseError(409, ERROR_CODES.LICENSE_QUOTE_EXPIRED, actor.locale);
+  }
+  const trimmed = reason?.trim() || null;
+  await tx`
+    UPDATE app.license_quotes
+    SET status = 'declined', closed_at = ${now}, declined_at = ${now},
+        declined_by = ${actor.userId}::uuid, decline_reason = ${trimmed},
+        updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
+    WHERE school_id = current_setting('app.school_id')::uuid AND id = ${quoteId}::uuid
+  `;
+  await auditLicenseChange(tx, schoolId, actor, {
+    action: "update",
+    targetTable: "license_quotes",
+    targetId: quoteId,
+    oldValues: { status: before.status },
+    newValues: { status: "declined", decline_reason: trimmed },
   });
   return (await readQuote(tx, quoteId))!;
 }

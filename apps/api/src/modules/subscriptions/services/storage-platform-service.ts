@@ -1,7 +1,7 @@
 /**
  * A school's storage add-on as the super admin sees it (platform console): the add-on and any change
  * scheduled for its renewal, its Stripe invoices with what each took and what was refunded, the
- * billing incidents recorded for it (000222), and a refund of one of its invoices.
+ * billing incidents recorded for it (000224), and a refund of one of its invoices.
  *
  * No transaction is held across a Stripe call: the row is read, Stripe is called, and the audit rows
  * are written afterwards. A refund carries an idempotency key from the console's request key, and the

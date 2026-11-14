@@ -597,6 +597,7 @@ const EXPECTED_PATHS = [
   "/api/school/license/quotes",
   "/api/school/license/quotes/{quoteId}",
   "/api/school/license/quotes/{quoteId}/accept",
+  "/api/school/license/quotes/{quoteId}/decline",
   "/api/school/license/receipts/{receiptId}/file",
   // The license console (session 4).
   "/api/platform/features",
