@@ -796,7 +796,7 @@ describe("changes to a license in force", () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
-// Declining a quote (000222)
+// Declining a quote (000223)
 // ---------------------------------------------------------------------------------------------------
 
 async function declined(f: SchoolFixture, quoteId: string, reason: string | null, now?: Date) {

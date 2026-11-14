@@ -83,7 +83,7 @@ export interface QuoteView {
   acceptedBy: string | null;
   acceptedByPlatform: boolean | null;
   closedAt: string | null;
-  /** When the school declined it (000222), by whom, and its optional reason. */
+  /** When the school declined it (000223), by whom, and its optional reason. */
   declinedAt: string | null;
   declinedBy: string | null;
   declineReason: string | null;
@@ -556,7 +556,7 @@ export async function withdrawQuote(
 }
 
 /**
- * The school declines a sent quote, optionally saying why (000222). It is closed like an expired or
+ * The school declines a sent quote, optionally saying why (000223). It is closed like an expired or
  * withdrawn quote: it can no longer be accepted and the super admin prices a new one. Overlap credits
  * are claimed by invoices, not quotes, so nothing is released here. Refused for anything but a sent
  * quote still within its validity.
