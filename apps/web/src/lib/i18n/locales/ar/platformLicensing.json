@@ -60,7 +60,8 @@
     "sent": "مُرسل",
     "accepted": "مقبول",
     "expired": "منتهي الصلاحية",
-    "withdrawn": "مسحوب"
+    "withdrawn": "مسحوب",
+    "declined": "رفضته المدرسة"
   },
   "invoiceStatus": {
     "issued": "صادرة",
@@ -300,7 +301,9 @@
       "accept": "قُبل عرض السعر وصدرت فاتورته.",
       "withdraw": "سُحب عرض السعر."
     },
-    "openInvoice": "فتح الفاتورة"
+    "openInvoice": "فتح الفاتورة",
+    "declineReason": "السبب: «{{reason}}»",
+    "declinedNoReason": "لم يُذكر سبب."
   },
   "licenses": {
     "title": "التراخيص",
