@@ -1,121 +1,156 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
-
-import { normalizeAddresses } from "./email-events";
-
-import type { ParsedEmailEvent } from "./email-events";
-
 /**
- * Resend email-event webhook: signature check and event parsing.
+ * Translation of Resend webhook events into the email-event ledger (deliverability R-08).
  *
- * Resend signs every webhook the Svix way: an HMAC-SHA256, keyed by the endpoint's `whsec_` secret
- * (base64 after the prefix), over `${svix-id}.${svix-timestamp}.${raw body}`, sent base64 as one or
- * more space-separated `v1,<signature>` entries in `svix-signature`. A delivery older or newer than
- * five minutes is refused, so a captured request cannot be replayed later.
+ * Resend posts one JSON document per event:
  *
- * Parsing maps Resend's events onto the email-event ledger (`ParsedEmailEvent`):
- * `email.bounced` is a hard bounce (soft bounces arrive as `email.delivery_delayed`, which is
- * ignored), `email.complained` a spam complaint, `email.delivered` a delivery. The message id is
- * Resend's `data.email_id`, the id the workers' Resend sender recorded on the delivery row.
+ * ```json
+ * {
+ *   "type": "email.bounced",
+ *   "created_at": "2026-11-09T19:44:00.000Z",
+ *   "data": {
+ *     "email_id": "4ef9a417-02e9-4d39-ad75-9611e0fcc33c",
+ *     "to": ["parent@example.com"],
+ *     "bounce": { "type": "Permanent", "subType": "General", "message": "..." }
+ *   }
+ * }
+ * ```
+ *
+ * `data.email_id` is the id the workers' sender recorded as `app.email_deliveries.message_id`.
+ * The endpoint subscribes to email.delivered, email.bounced, email.complained and
+ * email.delivery_delayed; only the first three change state. Anything else is logged and knowingly
+ * ignored rather than answered with an error, so a widened subscription cannot wedge delivery.
+ *
+ * Suppression policy, mirroring what a production sender must do:
+ * - Permanent bounce  -> suppress the bounced address. The address is hard-failed; mailing it again
+ *   degrades the sending domain's reputation.
+ * - Transient / Undetermined bounce -> record the event, do not suppress. There is no evidence the
+ *   address is dead, and suppressing on a guess would block mail the recipient may still want.
+ * - Complaint         -> suppress every recipient. A complaint is a direct report to the mailbox
+ *   provider; keeping an address that complained is how senders lose the right to send at all.
+ *
+ * Addresses are normalized to `lower(trim())` to match the constraint on `app.email_suppressions`
+ * and the recipients the dispatcher records on `app.email_deliveries`.
  */
 
-const TOLERANCE_SECONDS = 5 * 60;
+export type EmailEventType = "bounce" | "complaint" | "delivery";
+export type EmailSuppressionReason = "bounce" | "complaint";
 
-export class ResendEventError extends Error {
+/** Raised when an event document cannot be interpreted structurally. */
+export class EmailEventError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = "ResendEventError";
+    this.name = "EmailEventError";
   }
 }
 
-export interface ResendSignatureHeaders {
-  id: string | undefined;
-  timestamp: string | undefined;
-  signature: string | undefined;
-}
-
-/** Whether the headers carry a valid, current Svix signature over `rawBody` for `secret`. */
-export function verifyResendSignature(
-  rawBody: string,
-  headers: ResendSignatureHeaders,
-  secret: string,
-  nowSeconds: number = Math.floor(Date.now() / 1000),
-): boolean {
-  const { id, timestamp, signature } = headers;
-  if (!id || !timestamp || !signature) return false;
-
-  const sentAt = Number(timestamp);
-  if (!Number.isInteger(sentAt) || Math.abs(nowSeconds - sentAt) > TOLERANCE_SECONDS) return false;
-
-  const key = Buffer.from(secret.startsWith("whsec_") ? secret.slice(6) : secret, "base64");
-  const expected = createHmac("sha256", key).update(`${id}.${timestamp}.${rawBody}`).digest();
-
-  return signature.split(" ").some((entry) => {
-    const [version, value] = entry.split(",", 2);
-    if (version !== "v1" || !value) return false;
-    const candidate = Buffer.from(value, "base64");
-    return candidate.length === expected.length && timingSafeEqual(candidate, expected);
-  });
-}
-
-interface ResendEvent {
+export interface ResendEvent {
   type?: unknown;
+  created_at?: unknown;
   data?: {
     email_id?: unknown;
     to?: unknown;
-    bounce?: { type?: unknown };
+    bounce?: { type?: unknown; [key: string]: unknown };
+    [key: string]: unknown;
   };
+  [key: string]: unknown;
+}
+
+export interface ParsedEmailEvent {
+  /** Ledger value for `app.email_events.event_type`. */
+  eventType: EmailEventType;
+  /** Resend email id, which the dispatcher also records on the delivery row. */
+  messageId: string;
+  /** The raw event document, stored verbatim on `app.email_events.payload`. */
+  payload: Record<string, unknown>;
+  /** Whether the recipients should be added to the suppression list. */
+  suppress: boolean;
+  /** The suppression reason when `suppress` is true, otherwise null. */
+  reason: EmailSuppressionReason | null;
+  /** Normalized addresses to suppress (empty when `suppress` is false). */
+  recipients: string[];
+}
+
+/** The Resend event types this endpoint acts on, mapped to ledger values. */
+const EVENT_TYPE_MAP: Record<string, EmailEventType> = {
+  "email.bounced": "bounce",
+  "email.complained": "complaint",
+  "email.delivered": "delivery",
+};
+
+export function normalizeAddress(address: string): string {
+  return address.trim().toLowerCase();
+}
+
+export function normalizeAddresses(addresses: string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const address of addresses) {
+    const value = normalizeAddress(address);
+    if (value === "" || seen.has(value)) continue;
+    seen.add(value);
+    normalized.push(value);
+  }
+  return normalized;
 }
 
 /**
- * Parse a Resend webhook body into what the webhook must record and do.
+ * Parse a Resend event document into what the webhook must record and do.
  *
- * @returns The parsed event, or `null` for an event type this endpoint knowingly ignores.
- * @throws {ResendEventError} When the body is not usable (no email id, or a bounce/complaint with no
- *   recipient to suppress).
+ * @returns A parsed event, or `null` when the event type is knowingly ignored.
+ * @throws {EmailEventError} When the document is structurally unusable (not an object, missing
+ *   data.email_id, or a bounce/complaint with no recipient to attribute).
  */
-export function parseResendEvent(body: unknown): ParsedEmailEvent | null {
-  if (typeof body !== "object" || body === null || Array.isArray(body)) {
-    throw new ResendEventError("Resend event is not a JSON object");
+export function parseResendEvent(document: unknown): ParsedEmailEvent | null {
+  if (typeof document !== "object" || document === null || Array.isArray(document)) {
+    throw new EmailEventError("Resend event is not a JSON object");
   }
-  const event = body as ResendEvent;
+  const event = document as ResendEvent;
 
-  const eventType =
-    event.type === "email.bounced"
-      ? "bounce"
-      : event.type === "email.complained"
-        ? "complaint"
-        : event.type === "email.delivered"
-          ? "delivery"
-          : null;
-  if (eventType === null) return null;
+  const mapped = typeof event.type === "string" ? EVENT_TYPE_MAP[event.type] : undefined;
+  if (mapped === undefined) return null;
 
   const messageId = event.data?.email_id;
   if (typeof messageId !== "string" || messageId.length === 0) {
-    throw new ResendEventError("Resend event is missing data.email_id");
+    throw new EmailEventError("Resend event is missing data.email_id");
   }
 
   const payload = event as Record<string, unknown>;
-  if (eventType === "delivery") {
-    return { eventType, messageId, payload, suppress: false, reason: null, recipients: [] };
+
+  if (mapped === "delivery") {
+    return { eventType: mapped, messageId, payload, suppress: false, reason: null, recipients: [] };
   }
 
-  const to = Array.isArray(event.data?.to) ? event.data.to : [];
-  const recipients = normalizeAddresses(
-    to.filter((address): address is string => typeof address === "string"),
-  );
-  if (recipients.length === 0) {
-    throw new ResendEventError("Resend event carries no recipient addresses to act on");
+  const recipients = recipientsFrom(event);
+  if (mapped === "complaint") {
+    return {
+      eventType: mapped,
+      messageId,
+      payload,
+      suppress: true,
+      reason: "complaint",
+      recipients,
+    };
   }
 
-  // email.bounced is a permanent bounce; a bounce Resend itself labels transient is recorded but
-  // does not suppress the address.
-  const suppress = eventType === "complaint" || event.data?.bounce?.type !== "Transient";
+  const suppress = event.data?.bounce?.type === "Permanent";
   return {
-    eventType,
+    eventType: mapped,
     messageId,
     payload,
     suppress,
-    reason: suppress ? eventType : null,
+    reason: suppress ? "bounce" : null,
     recipients: suppress ? recipients : [],
   };
+}
+
+function recipientsFrom(event: ResendEvent): string[] {
+  const to = event.data?.to;
+  const raw = typeof to === "string" ? [to] : Array.isArray(to) ? to : [];
+  const addresses = normalizeAddresses(
+    raw.filter((address): address is string => typeof address === "string"),
+  );
+  if (addresses.length === 0) {
+    throw new EmailEventError("Resend event carries no recipient addresses to act on");
+  }
+  return addresses;
 }

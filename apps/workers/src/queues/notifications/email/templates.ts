@@ -3,7 +3,7 @@
  *
  * Every template is a pure function of plain data: given a school name, a link, and the payload
  * fields it needs, it returns a fully-rendered { subject, text, html }. There is no template
- * engine and no I/O — the dispatcher renders inline before handing the message to the SES sender,
+ * engine and no I/O — the dispatcher renders inline before handing the message to the Resend sender,
  * and unit tests exercise each template without a database.
  *
  * All copy is English-only (a localization pass is a separate concern, not this ticket).

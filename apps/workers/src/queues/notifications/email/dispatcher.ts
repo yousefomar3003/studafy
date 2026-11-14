@@ -1,5 +1,5 @@
 /**
- * Email dispatcher — the polling loop that turns outbox events into SES sends.
+ * Email dispatcher — the polling loop that turns outbox events into Resend sends.
  *
  * Mirrors the outbox relay's shape (claim, work, mark, repeat) with its own cursor, and processes
  * each row in its own tenant transaction so the claim, the delivery claim, the send, and the
@@ -7,9 +7,10 @@
  * at-least-once without duplicates:
  *
  * - If the process crashes mid-send, the transaction rolls back and the row stays undispatched —
- *   the email is re-attempted next cycle. Duplicate mail is only possible in the window between
- *   SES accepting the message and the commit, which at-least-once semantics permit.
- * - Transient send failures (throttle, 5xx, network) — and anything else that throws while
+ *   the email is re-attempted next cycle. A crash between Resend accepting the message and the
+ *   commit would otherwise send a duplicate, but every send carries an idempotency key derived from the
+ *   outbox event, so Resend answers the retry with the original send (within its 24h window).
+ * - Transient send failures (429, 5xx, network) — and anything else that throws while
  *   resolving or sending — roll back to a savepoint, so no delivery row is left behind, and the
  *   row is rescheduled: `email_attempts` counts the failure and `email_next_attempt_at` (000200)
  *   pushes the next try out exponentially (30 s doubling to 1 h). The claim skips a row until then,
@@ -17,7 +18,7 @@
  *   EMAIL_MAX_SEND_ATTEMPTS it is dead-lettered: a terminal 'failed' delivery row records the last
  *   error and the event is marked dispatched. Before 000200 a transient failure rolled the whole
  *   transaction back and the row was retried every cycle, forever.
- * - Permanent failures (MessageRejected) commit a terminal 'failed' delivery row and mark the
+ * - Permanent failures (validation, rejected address) commit a terminal 'failed' delivery row and mark the
  *   event dispatched, so a mailer that can never succeed does not spin forever.
  *
  * The dedup claim precedes the send: each recipient is claimed with INSERT ... ON CONFLICT DO
@@ -65,7 +66,7 @@ export interface EmailDispatcherConfig {
    * Defaults to `pollIntervalMs`, i.e. no backoff.
    */
   maxIdleIntervalMs?: number;
-  /** SES send pacing, sends per second. */
+  /** Resend send pacing, sends per second. */
   ratePerSecond: number;
   /** Base URL for the action links embedded in rendered emails. */
   frontendUrl: string;
@@ -172,7 +173,13 @@ async function deliverRow(
   }
 
   try {
-    const { messageId } = await ctx.sender.send({ to: resolved.recipient, ...resolved.content });
+    // Keyed on the outbox event, not the delivery row: a retryable failure rolls this transaction
+    // back, so the next attempt inserts a fresh delivery row but must reuse the same key.
+    const { messageId } = await ctx.sender.send({
+      to: resolved.recipient,
+      ...resolved.content,
+      idempotencyKey: `outbox-event-${row.id}`,
+    });
     await tx`
       UPDATE app.email_deliveries
       SET status = 'sent', message_id = ${messageId}, updated_at = CURRENT_TIMESTAMP

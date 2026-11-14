@@ -315,7 +315,7 @@ const EXPECTED_MUTATING_ROUTES = [
   // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm.
   // auditAction declares the mutation, but no app.audit_logs row is written: the staged object
   // under temp/ IS the audit record, an infra-level event with no database row to pair it with —
-  // the same precedent as the SES email webhook above. The object's lifecycle is itself traceable
+  // the same precedent as the Resend email webhook above. The object's lifecycle is itself traceable
   // via the school-prefixed key, which is the application half of the storage tenant boundary.
   "POST /api/storage/uploads/request-upload",
   "POST /api/storage/uploads/confirm",

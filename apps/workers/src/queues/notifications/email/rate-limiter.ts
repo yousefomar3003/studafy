@@ -1,7 +1,7 @@
 /**
- * In-process token bucket for SES send pacing.
+ * In-process token bucket for Resend send pacing.
  *
- * SES throttles send volume per account per region, and the dispatcher process is the only mailer
+ * Resend rate-limits API requests per team, and the dispatcher process is the only mailer
  * in an environment, so a per-process limiter is sufficient — no shared counter is needed. The
  * bucket starts full, so a burst up to `ratePerSecond` is allowed immediately, then one token is
  * replenished per second on average.
