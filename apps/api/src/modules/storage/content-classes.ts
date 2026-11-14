@@ -125,6 +125,18 @@ const CONTENT_CLASSES: ReadonlyMap<string, ContentClass> = new Map([
     },
   ],
   [
+    // A voice note on a parent<->teacher message (000218). Same flow as `message.attachment`: the
+    // messaging send confirms and promotes it. AAC (.m4a = audio/mp4) mono at ~32 kbps is about
+    // 240 KB a minute; 2 MiB covers the 2-minute cap with room for a higher encoder bitrate.
+    "message.voice",
+    {
+      allowedContentTypes: new Set(["audio/mp4", "audio/aac"]),
+      maxSizeBytes: 2 * MIB,
+      requiredPermission: PERMISSIONS.MESSAGE_SEND,
+      gatewayConfirm: false,
+    },
+  ],
+  [
     // The picture on a question in a questions assignment (000169). Staged through the generic
     // request-upload route, then confirmed and promoted by the question save itself (one
     // transaction with the question set). Mirrors ck_assignment_questions_image_mime_type.

@@ -53,8 +53,46 @@ interface AttachmentThumbnailProps {
   senderName: string;
 }
 
+/** "1:05" for 65 000 ms. */
+function formatVoiceDuration(durationMs: number): string {
+  const totalSeconds = Math.round(durationMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+/**
+ * A reported voice note (000218): the browser's own audio player, so a reviewer can hear it with
+ * keyboard and screen-reader support for free. Same expiry and scan rules as an image.
+ */
+function VoiceNotePlayer({ attachment, senderName }: AttachmentThumbnailProps) {
+  const { t } = useTranslation();
+  const duration = formatVoiceDuration(attachment.duration_ms ?? 0);
+  if (!attachment.download_url) {
+    return (
+      <span className="message-reports__voice">
+        {t("principal.messageReports.detail.voiceUnavailable", { duration })}
+      </span>
+    );
+  }
+  return (
+    <figure className="message-reports__voice">
+      <figcaption>{t("principal.messageReports.detail.voiceCaption", { duration })}</figcaption>
+      <audio
+        controls
+        preload="none"
+        src={attachment.download_url}
+        aria-label={t("principal.messageReports.detail.voiceLabel", { name: senderName, duration })}
+      />
+    </figure>
+  );
+}
+
 function AttachmentThumbnail({ attachment, senderName }: AttachmentThumbnailProps) {
   const { t } = useTranslation();
+  if (attachment.content_type.startsWith("audio/")) {
+    return <VoiceNotePlayer attachment={attachment} senderName={senderName} />;
+  }
   if (!attachment.download_url) {
     return (
       <span className="message-reports__image-unavailable">

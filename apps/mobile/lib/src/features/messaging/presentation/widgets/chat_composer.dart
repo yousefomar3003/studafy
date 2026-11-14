@@ -18,6 +18,9 @@ import '../../domain/messaging.dart';
 /// the trimmed text is non-empty or at least one image is uploaded, and never while one is still
 /// uploading. [onSend] gets the raw text; the field clears itself after. [showAttach] shows the
 /// attach button, which calls [onAttach] — null disables it (the draft is full).
+///
+/// [onRecordVoice], when set, turns the send button into a microphone while there is nothing to
+/// send (no text, no images): tapping it starts a voice note.
 class ChatComposer extends StatefulWidget {
   const ChatComposer({
     required this.onSend,
@@ -26,6 +29,7 @@ class ChatComposer extends StatefulWidget {
     this.showAttach = false,
     this.onRemoveAttachment,
     this.onRetryAttachment,
+    this.onRecordVoice,
     super.key,
   });
 
@@ -35,6 +39,7 @@ class ChatComposer extends StatefulWidget {
   final bool showAttach;
   final ValueChanged<String>? onRemoveAttachment;
   final ValueChanged<String>? onRetryAttachment;
+  final VoidCallback? onRecordVoice;
 
   @override
   State<ChatComposer> createState() => _ChatComposerState();
@@ -163,18 +168,32 @@ class _ChatComposerState extends State<ChatComposer> {
                     const SizedBox(width: AppSpacing.space8),
                     ValueListenableBuilder<TextEditingValue>(
                       valueListenable: _controller,
-                      builder: (context, value, _) => IconButton.filled(
-                        tooltip: 'messaging.chat.send'.tr(),
-                        onPressed: _canSend(value.text) ? _send : null,
-                        style: IconButton.styleFrom(
-                          fixedSize: const Size.square(_sendButtonSize),
-                          backgroundColor: colorScheme.inverseSurface,
-                          foregroundColor: colorScheme.onInverseSurface,
-                          disabledBackgroundColor: colorScheme.surfaceContainerHighest,
-                          disabledForegroundColor: colorScheme.onSurfaceVariant,
-                        ),
-                        icon: const Icon(Icons.arrow_upward),
-                      ),
+                      builder: (context, value, _) =>
+                          widget.onRecordVoice != null &&
+                              value.text.trim().isEmpty &&
+                              widget.attachments.isEmpty
+                          ? IconButton.filled(
+                              tooltip: 'messaging.voice.record'.tr(),
+                              onPressed: widget.onRecordVoice,
+                              style: IconButton.styleFrom(
+                                fixedSize: const Size.square(_sendButtonSize),
+                                backgroundColor: colorScheme.inverseSurface,
+                                foregroundColor: colorScheme.onInverseSurface,
+                              ),
+                              icon: const Icon(Icons.mic_none),
+                            )
+                          : IconButton.filled(
+                              tooltip: 'messaging.chat.send'.tr(),
+                              onPressed: _canSend(value.text) ? _send : null,
+                              style: IconButton.styleFrom(
+                                fixedSize: const Size.square(_sendButtonSize),
+                                backgroundColor: colorScheme.inverseSurface,
+                                foregroundColor: colorScheme.onInverseSurface,
+                                disabledBackgroundColor: colorScheme.surfaceContainerHighest,
+                                disabledForegroundColor: colorScheme.onSurfaceVariant,
+                              ),
+                              icon: const Icon(Icons.arrow_upward),
+                            ),
                     ),
                   ],
                 ),

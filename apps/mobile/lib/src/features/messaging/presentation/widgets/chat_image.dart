@@ -23,7 +23,7 @@ class ChatImage {
 
   /// The images of a confirmed message, in display order.
   static List<ChatImage> ofMessage(ChatMessage message) => [
-    for (final attachment in message.attachments)
+    for (final attachment in message.images)
       ChatImage.network(key: attachment.id, url: attachment.downloadUrl),
   ];
 }

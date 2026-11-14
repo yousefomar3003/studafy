@@ -239,6 +239,50 @@ describeDb("attendance taking", () => {
     expect(events.map((event) => event.payload)).toEqual([{ sessionId, classId: world.classId }]);
   });
 
+  test("the class teacher takes a past day's register and corrects it; another teacher cannot", async () => {
+    const world = await buildWorld();
+    const yesterday = new Date(Date.now() - 86_400_000).toISOString().slice(0, 10);
+
+    const opened = await request(world.teacher, "POST", "/api/attendance/sessions", {
+      class_id: world.classId,
+      session_date: yesterday,
+    });
+    expect(opened.status).toBe(201);
+    const { id: sessionId } = (await opened.json()) as { id: string };
+    const batch = await request(world.teacher, "POST", "/api/attendance/records/batch", {
+      attendance_session_id: sessionId,
+      records: [{ student_id: world.studentId, status: "absent" }],
+    });
+    expect(batch.status).toBe(201);
+    const submit = await request(world.teacher, "PATCH", `/api/attendance/sessions/${sessionId}`, {
+      status: "submitted",
+    });
+    expect(submit.status).toBe(200);
+    const read = await request(
+      world.teacher,
+      "GET",
+      `/api/attendance/sessions/${sessionId}/records`,
+    );
+    const { records } = (await read.json()) as { records: { id: string }[] };
+
+    const outsider = await createUser(database!.sql, world.schoolId);
+    await assignRole(database!.sql, world.schoolId, outsider.id, ROLES.INSTRUCTOR);
+    const other = { schoolId: world.schoolId, userId: outsider.id, roles: [ROLES.INSTRUCTOR] };
+    const refused = await request(other, "PATCH", `/api/attendance/records/${records[0]!.id}`, {
+      status: "present",
+      reason: "Marked by mistake",
+    });
+    expect([403, 404]).toContain(refused.status);
+
+    const corrected = await request(
+      world.teacher,
+      "PATCH",
+      `/api/attendance/records/${records[0]!.id}`,
+      { status: "present", reason: "Marked by mistake" },
+    );
+    expect(corrected.status).toBe(200);
+  });
+
   test("a teacher who does not teach the class cannot open or record its register", async () => {
     const world = await buildWorld();
     const outsider = await createUser(database!.sql, world.schoolId);

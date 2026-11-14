@@ -167,10 +167,13 @@ class MobileAuthClient {
   }
 
   /// Revoke the session. Always succeeds (200) per backend contract.
-  Future<void> logout(String refreshToken) async {
+  ///
+  /// [fcmToken] is this phone's push token: the signed-out account's registration of it is removed
+  /// too, so the phone stops receiving that account's notices (other accounts keep theirs).
+  Future<void> logout(String refreshToken, {String? fcmToken}) async {
     await _dio.post<dynamic>(
       '/api/auth/logout',
-      data: {'refresh_token': refreshToken},
+      data: {'refresh_token': refreshToken, 'fcm_token': ?fcmToken},
     );
   }
 }

@@ -80,6 +80,15 @@ export const updateSchoolSettingsBodySchema = z
           "parent app, without the child's member ID and password.",
         example: true,
       }),
+    allow_voice_notes: z
+      .boolean()
+      .optional()
+      .openapi({
+        description:
+          "When true, parents and teachers can send voice notes in chats. Notes already sent stay " +
+          "playable when it is turned off.",
+        example: true,
+      }),
     attendance_correction_window_hours: attendanceCorrectionWindowHoursSchema.optional().openapi({
       description: "Attendance correction window, in hours.",
     }),
@@ -128,6 +137,12 @@ export const schoolSettingsResponseSchema = z
       description:
         "When true, a linked parent can put their child's own account on their phone from the " +
         "parent app, without the child's member ID and password.",
+      example: true,
+    }),
+    allow_voice_notes: z.boolean().openapi({
+      description:
+        "When true, parents and teachers can send voice notes in chats. Notes already sent stay " +
+        "playable when it is turned off.",
       example: true,
     }),
     attendance_correction_window_hours: attendanceCorrectionWindowHoursSchema.openapi({

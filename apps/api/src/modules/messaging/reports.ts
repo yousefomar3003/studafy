@@ -381,6 +381,8 @@ interface SnapshotAttachmentRow {
   size_bytes: string;
   /** Null when the image is not servable: pending, infected or unscannable (000192). */
   storage_key: string | null;
+  /** A voice note's length (000218); null for an image. */
+  duration_ms: number | null;
 }
 
 export async function getMessageReport(
@@ -402,7 +404,8 @@ export async function getMessageReport(
   `;
   // Storage keys reach a reviewer only through this review-gated SECURITY DEFINER lookup.
   const attachments = await tx<SnapshotAttachmentRow[]>`
-    SELECT report_message_id, attachment_id, mime_type, size_bytes::text AS size_bytes, storage_key
+    SELECT report_message_id, attachment_id, mime_type, size_bytes::text AS size_bytes, storage_key,
+           duration_ms
     FROM app.message_report_attachment_objects(${reportId}::uuid)
   `;
   const byMessage = new Map<string, MessageReportDetail["messages"][number]["attachments"]>();
@@ -414,6 +417,7 @@ export async function getMessageReport(
         storage_key: attachment.storage_key,
         mime_type: attachment.mime_type,
         size_bytes: attachment.size_bytes,
+        duration_ms: attachment.duration_ms,
       }),
     );
     byMessage.set(attachment.report_message_id, list);

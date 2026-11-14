@@ -10,9 +10,11 @@ import '../../../attendance_office/presentation/register_screen.dart';
 import '../../../student/presentation/widgets/status_pill.dart';
 import '../../application/teacher_providers.dart';
 
-/// Opens today's register for one of the teacher's classes — the attendance office's
-/// [RegisterScreen], read-only once submitted (teachers take registers but don't correct them) —
-/// and refreshes the home's session states on the way back.
+/// Opens one of the teacher's classes' registers — the attendance office's [RegisterScreen] —
+/// on today, with a date picker in the app bar for an earlier day. Once a register is submitted
+/// the teacher may correct its records within the school's correction window (the API enforces
+/// both the window and that they teach the class); past it the office or the principal corrects.
+/// Refreshes the home's session states on the way back.
 Future<void> openTeacherRegister(
   BuildContext context,
   WidgetRef ref, {
@@ -25,7 +27,9 @@ Future<void> openTeacherRegister(
         classId: classId,
         classCode: classCode,
         date: dateOnly(DateTime.now()),
-        canCorrect: false,
+        canCorrect: true,
+        allowDateChange: true,
+        windowExpiredMessageKey: 'teacher.attendance.correction.windowExpired',
       ),
     ),
   );

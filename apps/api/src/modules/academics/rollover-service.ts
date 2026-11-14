@@ -164,6 +164,7 @@ async function executeRollover(
       action: "update",
       targetTable: "enrollments",
       targetId: targetYearId,
+      oldValues: { status: "active", academic_year_id: activeYear?.id ?? null },
       newValues: {
         reason: "academic_year_rollover",
         archived_count: enrollmentsArchived,

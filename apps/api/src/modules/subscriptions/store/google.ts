@@ -30,6 +30,12 @@ export interface GoogleNotification {
   kind: StoreEventKind | null;
   purchaseToken: string | null;
   sentAt: Date;
+  /**
+   * Set when the notification is for another app on the same Play account (its RTDN topic points
+   * here by mistake). Such a notification changes nothing; it is still acknowledged, because a
+   * refused push is redelivered by Pub/Sub for up to seven days.
+   */
+  otherPackage?: string;
 }
 
 export interface GooglePlayStore {
@@ -160,7 +166,13 @@ export function createGooglePlayStore(config: GooglePlayConfig): GooglePlayStore
         subscriptionNotification?: { notificationType?: number; purchaseToken?: string };
       };
       if (decoded.packageName !== config.packageName) {
-        throw new StoreVerificationError("Notification is for another package");
+        return {
+          eventId: message.messageId,
+          kind: null,
+          purchaseToken: null,
+          sentAt: new Date(Number(decoded.eventTimeMillis ?? Date.now())),
+          otherPackage: decoded.packageName ?? "(none)",
+        };
       }
       const notification = decoded.subscriptionNotification;
       return {

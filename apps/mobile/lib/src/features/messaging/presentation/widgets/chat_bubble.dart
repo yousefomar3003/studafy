@@ -14,7 +14,8 @@ enum BubbleDelivery {
   blocked,
   quotaExceeded,
   storageUnavailable,
-  invalid;
+  invalid,
+  voiceNotesDisabled;
 
   bool get isFailure => this != sending;
 
@@ -26,6 +27,7 @@ enum BubbleDelivery {
     quotaExceeded => 'messaging.chat.quotaExceeded',
     storageUnavailable => 'messaging.chat.storageUnavailable',
     invalid => 'messaging.chat.invalid',
+    voiceNotesDisabled => 'messaging.voice.disabled',
   };
 }
 
@@ -51,6 +53,7 @@ class ChatBubble extends StatelessWidget {
     this.onOpenImage,
     this.onImageError,
     this.onLongPress,
+    this.voice,
     super.key,
   });
 
@@ -64,6 +67,9 @@ class ChatBubble extends StatelessWidget {
   final ValueChanged<int>? onOpenImage;
   final VoidCallback? onImageError;
   final VoidCallback? onLongPress;
+
+  /// A voice note's player, shown instead of images and text (a voice note is sent on its own).
+  final Widget? voice;
 
   /// The width of the image block.
   static const double imagesWidth = 240;
@@ -97,6 +103,7 @@ class ChatBubble extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              ?voice,
               if (images.isNotEmpty)
                 Padding(
                   padding: EdgeInsets.all(hasText ? 2 : 0),

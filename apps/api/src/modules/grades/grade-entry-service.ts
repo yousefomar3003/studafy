@@ -407,7 +407,18 @@ export async function bulkUpdateGrades(
     action: "update",
     targetTable: "grades",
     targetId: entries.length === 1 ? entries[0]!.id : gradebookId,
-    newValues: { updatedCount: entries.length, gradebookId },
+    oldValues: {
+      gradebookId,
+      scores: entries.map((entry) => ({
+        id: entry.id,
+        score: gradesById.get(entry.id)!.score,
+      })),
+    },
+    newValues: {
+      gradebookId,
+      updatedCount: entries.length,
+      scores: entries.map((entry) => ({ id: entry.id, score: entry.score })),
+    },
   });
 
   return results;

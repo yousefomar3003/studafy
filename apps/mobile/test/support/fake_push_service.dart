@@ -22,13 +22,25 @@ class FakePushService implements PushService {
   int permissionRequests = 0;
 
   final _messageController = StreamController<RemoteMessage>.broadcast();
-  final _tapController = StreamController<String>.broadcast();
+  final _tapController = StreamController<PushTap>.broadcast();
+
+  /// [permissionStatus]'s answer.
+  PushPermission permission = PushPermission.granted;
+
+  /// [currentToken]'s answer.
+  String? token = 'fake-fcm-token';
+
+  /// Access tokens [registerForAccount] was called with.
+  final List<String> registeredAccounts = [];
+
+  /// How many times [openSystemSettings] ran.
+  int settingsOpened = 0;
 
   @override
   Stream<RemoteMessage> get onMessage => _messageController.stream;
 
   @override
-  Stream<String> get onNotificationTap => _tapController.stream;
+  Stream<PushTap> get onNotificationTap => _tapController.stream;
 
   @override
   Future<String?> initialize() async => null;
@@ -46,6 +58,22 @@ class FakePushService implements PushService {
   Future<void> registerIfAuthenticated() async {}
 
   @override
+  Future<String?> currentToken() async => token;
+
+  @override
+  Future<void> registerForAccount(String accessToken) async {
+    registeredAccounts.add(accessToken);
+  }
+
+  @override
+  Future<PushPermission> permissionStatus() async => permission;
+
+  @override
+  Future<void> openSystemSettings() async {
+    settingsOpened++;
+  }
+
+  @override
   void dispose() {
     _messageController.close();
     _tapController.close();
@@ -54,5 +82,6 @@ class FakePushService implements PushService {
   /// Simulates the user tapping a notification whose payload resolved to [route]
   /// (`resolveNotificationTapRoute`) — [StudafyApp] listens on [onNotificationTap] and pushes it
   /// via `GoRouter`, exactly as [FirebasePushService] would after a real tap.
-  void simulateNotificationTap(String route) => _tapController.add(route);
+  void simulateNotificationTap(String route, {String? userId}) =>
+      _tapController.add(PushTap(route, userId: userId));
 }

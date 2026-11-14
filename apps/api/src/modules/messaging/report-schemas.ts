@@ -3,7 +3,11 @@ import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
 import { sanitizedTextSchema } from "../../lib/sanitize";
 
-import { blockStateSchema, MESSAGE_ATTACHMENT_CONTENT_TYPES } from "./schemas";
+import {
+  blockStateSchema,
+  MESSAGE_ATTACHMENT_CONTENT_TYPES,
+  MESSAGE_VOICE_CONTENT_TYPES,
+} from "./schemas";
 
 /** Mirrors ck_message_reports_reason_category (000136). */
 export const MESSAGE_REPORT_REASONS = [
@@ -141,8 +145,11 @@ export const messageReportListSchema = z
 const reportEvidenceAttachmentSchema = z
   .object({
     id: uuidSchema,
-    content_type: z.enum(MESSAGE_ATTACHMENT_CONTENT_TYPES),
+    content_type: z.enum([...MESSAGE_ATTACHMENT_CONTENT_TYPES, ...MESSAGE_VOICE_CONTENT_TYPES]),
     size_bytes: z.number().int().positive(),
+    duration_ms: z.number().int().positive().nullable().openapi({
+      description: "Length of a voice note in milliseconds; null for an image.",
+    }),
     download_url: z.string().nullable().openapi({
       description: "5-minute pre-signed GET URL; null when object storage is not configured.",
     }),

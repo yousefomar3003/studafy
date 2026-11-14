@@ -50,6 +50,8 @@
 	<string>Studafy only opens an audio file you choose to upload to your class as course material.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Take a photo of a worksheet, whiteboard or handout to upload to your class as course material, or to ask the AI study assistant about its text.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Studafy uses the microphone only while you record a voice message in a chat with your child's teacher or a student's parent.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Studafy only opens a photo you choose, to upload to your class as course material or to ask the AI study assistant about its text.</string>
 	<key>UIApplicationSceneManifest</key>

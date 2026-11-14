@@ -142,7 +142,7 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `aiContent:moderate`             | ✅          | ✅        |           |                    |         |            |         |        |       |               |
 | `attendance:record:create`       | ✅          |           |           | ✅                 |         | ✅         |         |        |       |               |
 | `attendance:record:read`         | ✅          | ✅        | ✅        | ✅                 |         | ✅         |         |        |       |               |
-| `attendance:record:correct`      | ✅          |           | ✅        | ✅                 |         |            |         |        |       |               |
+| `attendance:record:correct`      | ✅          |           | ✅        | ✅                 |         | ✅         |         |        |       |               |
 | `attendance:report:read`         | ✅          | ✅        | ✅        | ✅                 |         | ✅         |         |        |       |               |
 | `attendance:report:export`       | ✅          | ✅        | ✅        | ✅                 |         |            |         |        |       |               |
 | `attendance:correction:override` | ✅          |           | ✅        |                    |         |            |         |        |       |               |

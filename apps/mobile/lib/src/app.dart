@@ -10,10 +10,13 @@ import 'core/auth/auth_state.dart';
 import 'core/di/app_providers.dart';
 import 'core/localization/locale_rebuild_scope.dart';
 import 'core/monitoring/monitoring_providers.dart';
+import 'core/auth/saved_account.dart';
 import 'core/push/push_providers.dart';
+import 'core/push/push_service.dart';
 import 'design/theme/app_theme.dart';
 import 'design/widgets/keyboard_dismiss_scope.dart';
 import 'features/launch/presentation/launch_gate.dart';
+import 'features/shell/application/shell_providers.dart';
 import 'core/features/features_providers.dart';
 
 class StudafyApp extends ConsumerStatefulWidget {
@@ -24,7 +27,7 @@ class StudafyApp extends ConsumerStatefulWidget {
 }
 
 class _StudafyAppState extends ConsumerState<StudafyApp> {
-  StreamSubscription<String>? _tapSub;
+  StreamSubscription<PushTap>? _tapSub;
 
   @override
   void didChangeDependencies() {
@@ -52,11 +55,40 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
     if (_tapSub != null) return;
 
     final pushService = ref.read(pushServiceProvider);
-    _tapSub = pushService.onNotificationTap.listen((route) {
-      if (!mounted) return;
-      GoRouter.of(context).push(route);
-    });
+    _tapSub = pushService.onNotificationTap.listen(_openTap);
   }
+
+  /// Opens a tapped notification. On a phone with several signed-in accounts, a notice for one of
+  /// the others first switches to that account (setting the current one aside), then opens it.
+  Future<void> _openTap(PushTap tap) async {
+    if (!mounted) return;
+    final userId = tap.userId;
+    final activeUserId = ref.read(authSessionProvider).userId;
+    if (userId != null && activeUserId != null && userId != activeUserId) {
+      final saved = await ref.read(savedAccountsProvider.notifier).find(userId);
+      if (saved != null) {
+        final profile = ref.read(accountProfileProvider).value;
+        final switched = await ref
+            .read(authNotifierProvider.notifier)
+            .switchTo(
+              userId,
+              current: AccountLabel(
+                displayName: profile?.displayName,
+                schoolName: profile?.school.name,
+                memberIds: profile?.memberIds ?? const [],
+              ),
+            );
+        // The account could no longer be opened: the app is on the login screen now.
+        if (!switched || !mounted) return;
+        // Let the shell rebuild for the newly active account before opening the notice.
+        await Future<void>.delayed(Duration.zero);
+        if (!mounted) return;
+      }
+    }
+    _router.push(tap.route);
+  }
+
+  GoRouter get _router => ref.read(routerProvider);
 
   /// Initialize push if the session is already authenticated when the app mounts (a restored
   /// session). A sign-in during this run is handled by the listener in [build].

@@ -113,6 +113,20 @@ describe("MessageReportDetailPage", () => {
     expect(screen.getByText("Image unavailable")).toBeTruthy();
   });
 
+  test("a reported voice note plays in the browser's audio player, with its length", async () => {
+    const { container } = renderPage(await loadDetailPage());
+    await screen.findByRole("heading", { name: "Harassment" });
+
+    expect(screen.getByText("Voice message · 1:05")).toBeTruthy();
+    const audio = container.querySelector("audio");
+    expect(audio).not.toBeNull();
+    expect(audio!.getAttribute("src")).toBe(
+      "https://storage.example.test/attachment-3.m4a?sig=abc",
+    );
+    expect(audio!.hasAttribute("controls")).toBe(true);
+    expect(audio!.getAttribute("aria-label")).toBe("Voice message from Omar Saleh, 1:05");
+  });
+
   test("Refresh images refetches the report for fresh signed URLs", async () => {
     renderPage(await loadDetailPage());
     await screen.findByRole("heading", { name: "Harassment" });

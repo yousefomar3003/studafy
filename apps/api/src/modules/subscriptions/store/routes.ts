@@ -16,8 +16,10 @@ import { AUTH_CHANNELS } from "../../auth/channels";
 import {
   handleAppleNotification,
   handleGooglePlayNotification,
+  readStoreOffer,
   readStorePurchaseConfirmation,
   registerStorePurchase,
+  storeProductIds,
 } from "./service";
 
 import type { StoreBilling, StorePurchaseConfirmation } from "./service";
@@ -29,10 +31,29 @@ import type { AppEnv } from "../../../middleware/requestId";
 const StoreConfigSchema = z
   .object({
     enabled: z.boolean(),
+    /**
+     * The product to buy for this student. One store account can hold only one subscription to a
+     * product, so a brother or sister already holding the first one is offered the next.
+     */
     productId: z.string().nullable(),
+    /** Every product the add-on is sold under, primary first. */
+    productIds: z.array(z.string()),
     platforms: z.object({ apple: z.boolean(), google: z.boolean() }),
-    /** True when this signed-in user is a student whose school has an active Studafy plan. */
+    /**
+     * True when the add-on can be bought for this student: the signed-in student, or the child a
+     * parent asked about (`studentId`), whose school has an active Studafy plan, with a product left.
+     */
     purchasable: z.boolean(),
+    /** The student the offer is for, and their first name for "AI for <name>". */
+    studentId: z.string().uuid().nullable(),
+    studentFirstName: z.string().nullable(),
+    /** Whether that student's AI add-on is on right now, however it was paid for. */
+    subscribed: z.boolean(),
+    /** Why it cannot be bought, for the app to say so rather than show nothing. */
+    unavailableReason: z
+      .enum(["not_configured", "not_student", "school_plan_inactive", "no_free_product"])
+      .nullable()
+      .openapi({ description: "Null when it can be bought." }),
     /**
      * The ids the app stamps on the purchase when `purchasable`: the student's id (Apple
      * `appAccountToken`, Google `obfuscatedAccountId`) and the school's (Google
@@ -93,7 +114,12 @@ const RegisterPurchaseSchema = z
   .openapi("AiStorePurchaseRequest");
 
 const PurchaseResultSchema = z
-  .object({ active: z.boolean(), expiresAt: z.string().datetime().nullable() })
+  .object({
+    active: z.boolean(),
+    expiresAt: z.string().datetime().nullable(),
+    /** The student the purchase turned AI on for: the one it was bought for. */
+    studentId: z.string().uuid(),
+  })
   .openapi("AiStorePurchaseResult");
 
 const NotificationResultSchema = z.object({ received: z.literal(true), outcome: z.string() });
@@ -106,9 +132,17 @@ const storeConfigRoute = createRoute({
   summary: "In-app purchase setup for the AI add-on",
   description:
     "Whether the AI add-on can be bought in the mobile app, which store product to offer, " +
-    "whether this signed-in user may buy it (a student whose school has an active plan), and the " +
-    "confirmation of their last in-app purchase's withdrawal waiver, if one was recorded.",
+    "whether it can be bought for this student (the signed-in student, or with `studentId` a " +
+    "child linked to the signed-in parent) and why not, and the confirmation of the last in-app " +
+    "purchase's withdrawal waiver, if one was recorded.",
   security: [{ bearerAuth: [] }],
+  request: {
+    query: z.object({
+      studentId: z.string().uuid().optional().openapi({
+        description: "A parent's child to buy for. Omitted: the signed-in student.",
+      }),
+    }),
+  },
   responses: standardResponses(
     { 200: { description: "Store setup", schema: StoreConfigSchema } },
     [401],
@@ -201,42 +235,38 @@ export function aiStoreRoutes(
 
   app.openapi(storeConfigRoute, async (c) => {
     const auth = requireAuth(c);
+    const { studentId } = c.req.valid("query");
     const enabled = store !== null && (store.apple !== null || store.google !== null);
-    let student: { id: string } | null = null;
+    // A school whose own plan is not live is "school_plan_inactive": the add-on works only on top of
+    // that plan, so selling it otherwise would take money for nothing.
+    const offer = await readStoreOffer(database, store, {
+      schoolId: auth.schoolId,
+      userId: auth.userId,
+      studentId,
+    });
+    const purchasable = offer.unavailableReason === null;
     let purchaseConfirmation: StorePurchaseConfirmation | null = null;
-    if (enabled) {
-      ({ student, purchaseConfirmation } = await withTenantTx(
+    if (offer.studentId) {
+      const target = offer.studentId;
+      purchaseConfirmation = await withTenantTx(
         database,
         { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
-        async (tx) => {
-          const [row] = await tx<{ id: string; purchasable: boolean }[]>`
-            SELECT s.id,
-                   -- A student of a school whose own plan is live: the add-on works only on top
-                   -- of that, so selling it otherwise would take money for nothing.
-                   EXISTS (
-                     SELECT 1 FROM app.subscriptions
-                     WHERE school_id = ${auth.schoolId}::uuid
-                       AND status IN ('trialing', 'active', 'past_due', 'grace_period')
-                   ) AS purchasable
-            FROM app.students s
-            WHERE s.user_id = ${auth.userId}::uuid
-            LIMIT 1
-          `;
-          return {
-            student: row?.purchasable ? { id: row.id } : null,
-            purchaseConfirmation: row ? await readStorePurchaseConfirmation(tx, row.id) : null,
-          };
-        },
-      ));
+        (tx) => readStorePurchaseConfirmation(tx, target),
+      );
     }
     return c.json(
       {
         enabled,
-        productId: enabled ? store!.productId : null,
+        productId: purchasable ? offer.productId : null,
+        productIds: enabled ? [...storeProductIds(store!)] : [],
         platforms: { apple: store?.apple != null, google: store?.google != null },
-        purchasable: student !== null,
-        accountToken: student?.id ?? null,
-        profileId: student ? auth.schoolId : null,
+        purchasable,
+        studentId: offer.studentId,
+        studentFirstName: offer.studentFirstName,
+        subscribed: offer.subscribed,
+        unavailableReason: offer.unavailableReason,
+        accountToken: purchasable ? offer.studentId : null,
+        profileId: purchasable ? auth.schoolId : null,
         purchaseConfirmation,
       },
       200,

@@ -363,10 +363,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.bySemanticsLabel('Photo ready to send'), findsNothing);
-      final send = tester.widget<IconButton>(
-        find.widgetWithIcon(IconButton, Icons.arrow_upward),
-      );
-      expect(send.onPressed, isNull);
+      // Nothing left to send: the send button is back to the voice-note microphone.
+      expect(find.widgetWithIcon(IconButton, Icons.arrow_upward), findsNothing);
+      expect(find.byTooltip('Record a voice message'), findsOneWidget);
 
       await _dispose(tester);
     });

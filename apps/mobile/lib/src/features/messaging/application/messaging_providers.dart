@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../core/api/api_exception.dart';
 import '../../../core/auth/auth_providers.dart';
@@ -91,6 +93,7 @@ PendingFailure pendingFailureOf(Object error) {
   return switch ((apiError.status, apiError.code)) {
     (429, _) => PendingFailure.rateLimited,
     (_, 'MESSAGING_BLOCKED') => PendingFailure.blocked,
+    (_, 'MESSAGING_VOICE_NOTES_DISABLED') => PendingFailure.voiceNotesDisabled,
     (_, 'STORAGE_QUOTA_EXCEEDED') || (402, _) => PendingFailure.quotaExceeded,
     (_, 'STORAGE_NOT_CONFIGURED') || (503, _) => PendingFailure.storageUnavailable,
     (400, _) => PendingFailure.invalid,
@@ -253,7 +256,8 @@ class ChatController extends Notifier<ChatState> {
           (p) =>
               p.status == PendingStatus.sending &&
               p.body == message.body &&
-              p.images.length == message.attachments.length,
+              p.images.length == message.images.length &&
+              (p.voiceNote != null) == (message.voiceNote != null),
         );
         if (index >= 0) pending.removeAt(index);
       }
@@ -361,6 +365,46 @@ class ChatController extends Notifier<ChatState> {
     await _deliver(pending);
   }
 
+  /// Sends a recorded voice note. Shown at once as a pending message (playable from the local
+  /// file); uploaded under `message.voice`, then sent. A failure keeps it, retryable — with the
+  /// staged key once the upload has succeeded, so a retry does not upload it again.
+  Future<void> sendVoiceNote(PendingVoiceNote note) async {
+    final pending = PendingMessage(
+      localId: 'local-${_localSeq++}',
+      body: '',
+      createdAt: ref.read(chatClockProvider)(),
+      status: PendingStatus.sending,
+      voiceNote: note,
+    );
+    state = state.copyWith(pending: [...state.pending, pending]);
+    _resetPollInterval();
+    await _deliver(pending);
+  }
+
+  /// Uploads [pending]'s voice note when it has no staged key yet; returns the message with it.
+  Future<PendingMessage> _stageVoiceNote(PendingMessage pending) async {
+    final note = pending.voiceNote;
+    if (note == null || note.storageKey != null) return pending;
+    final size = note.sizeBytes;
+    if (size > maxVoiceNoteBytes) {
+      throw const VoiceNoteTooLargeException();
+    }
+    final ticket = await _client.requestAttachmentUpload(
+      fileName: p.basename(note.localPath),
+      contentType: voiceNoteContentType,
+      sizeBytes: size,
+      contentClass: 'message.voice',
+    );
+    await _client.uploadAttachment(
+      uploadUrl: ticket.uploadUrl,
+      file: File(note.localPath),
+      contentType: voiceNoteContentType,
+    );
+    final staged = pending.copyWith(voiceNote: note.withStorageKey(ticket.storageKey));
+    if (ref.mounted) _replacePending(staged);
+    return staged;
+  }
+
   /// Re-sends a failed pending message.
   Future<void> retry(String localId) async {
     final pending = _pendingById(localId);
@@ -379,12 +423,17 @@ class ChatController extends Notifier<ChatState> {
     );
   }
 
-  Future<void> _deliver(PendingMessage pending) async {
+  Future<void> _deliver(PendingMessage original) async {
+    var pending = original;
     try {
+      pending = await _stageVoiceNote(pending);
+      final voice = pending.voiceNote;
       final sent = await _client.sendMessage(
         conversationId,
         pending.body,
         storageKeys: [for (final image in pending.images) image.storageKey],
+        voiceNoteKey: voice?.storageKey,
+        voiceNoteDuration: voice?.duration,
       );
       if (!ref.mounted) return;
       state = state.copyWith(
@@ -396,7 +445,9 @@ class ChatController extends Notifier<ChatState> {
       );
     } on Object catch (error) {
       if (!ref.mounted) return;
-      final failure = pendingFailureOf(error);
+      final failure = error is VoiceNoteTooLargeException
+          ? PendingFailure.invalid
+          : pendingFailureOf(error);
       _replacePending(pending.copyWith(status: PendingStatus.failed, failure: failure));
       if (failure == PendingFailure.blocked) {
         // A block we did not know about. The other side is the likely one (our own block hides
@@ -438,6 +489,11 @@ class ChatController extends Notifier<ChatState> {
       // Best-effort: the badge simply stays until the next successful read.
     }
   }
+}
+
+/// A recorded voice note over the API's size cap; never uploaded.
+class VoiceNoteTooLargeException implements Exception {
+  const VoiceNoteTooLargeException();
 }
 
 final chatControllerProvider = NotifierProvider.autoDispose

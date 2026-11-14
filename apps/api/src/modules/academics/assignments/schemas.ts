@@ -549,7 +549,7 @@ export const confirmAttachmentBodySchema = z
       .optional()
       .openapi({ description: "Optional integrity checksum computed by the client." }),
   })
-  .openapi("ConfirmAttachmentBody");
+  .openapi("AssignmentConfirmAttachmentBody");
 
 export type ConfirmAttachmentBody = z.infer<typeof confirmAttachmentBodySchema>;
 
