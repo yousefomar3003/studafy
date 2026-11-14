@@ -18,6 +18,7 @@ export type StorageTier = Schemas["StorageAddOnTier"];
 export type StoragePrice = NonNullable<Schemas["StorageAddOnPrice"]>;
 export type StorageCurrent = Schemas["StorageAddOnCurrent"];
 export type StorageInterval = StoragePrice["interval"];
+export type StorageChangePreview = Schemas["StorageAddOnChangePreview"];
 
 export const STORAGE_OFFER_KEY = ["storage-addon-offer"];
 
@@ -26,9 +27,11 @@ function required<T>(data: T | undefined, what: string): T {
   return data;
 }
 
-export function useStorageOfferQuery() {
+/** `poll`: refetch every few seconds, while a payment is being confirmed. */
+export function useStorageOfferQuery(options: { poll?: boolean } = {}) {
   return useQuery({
     queryKey: STORAGE_OFFER_KEY,
+    refetchInterval: options.poll ? 3_000 : false,
     queryFn: async () => {
       const { data } = await api.GET("/api/subscriptions/storage/offer");
       // The generated response type drops the arrays' prototype -- the same @studafy/api-client
@@ -61,11 +64,39 @@ export function useStartStorageCheckout() {
   });
 }
 
+/**
+ * The exact cost of switching to `priceId` (null: nothing to preview), computed by the payment
+ * provider. Never cached: an amount shown is always one just computed. `attempt` forces a new one.
+ */
+export function useStorageChangePreview(priceId: string | null, attempt = 0) {
+  return useQuery({
+    queryKey: ["storage-change-preview", priceId, attempt],
+    enabled: priceId !== null,
+    staleTime: 0,
+    gcTime: 0,
+    retry: false,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const { data } = await api.POST("/api/subscriptions/storage/change/preview", {
+        body: { priceId: priceId! },
+      });
+      return required(data, "Storage change preview") as StorageChangePreview;
+    },
+  });
+}
+
+/** A change for exactly the amount the school confirmed from a preview. */
+export interface StorageChangeInput {
+  priceId: string;
+  prorationDate: string;
+  expectedAmountMinor: number;
+  /** One per confirmation, so a repeated request can never charge twice. */
+  requestKey: string;
+}
+
 export function useChangeStorageTier() {
-  return useStorageMutation(async (priceId: string) => {
-    const { data } = await api.POST("/api/subscriptions/storage/change", {
-      body: { priceId },
-    });
+  return useStorageMutation(async (input: StorageChangeInput) => {
+    const { data } = await api.POST("/api/subscriptions/storage/change", { body: input });
     return required(data, "Storage change") as StorageCurrent;
   });
 }

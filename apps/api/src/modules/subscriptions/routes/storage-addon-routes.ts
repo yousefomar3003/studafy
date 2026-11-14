@@ -11,6 +11,7 @@ import { createStorageCheckoutSession } from "../services/checkout-service";
 import {
   changeStorageTier,
   getStorageOffer,
+  previewStorageTierChange,
   setStorageAddonCancellation,
 } from "../services/storage-addon-service";
 
@@ -94,7 +95,50 @@ const StorageCheckoutResponseSchema = z.object({
   sessionId: z.string(),
 });
 
-const StorageChangeRequestSchema = z.object({ priceId: z.string().uuid() });
+const StorageChangePreviewRequestSchema = z.object({ priceId: z.string().uuid() });
+
+const StorageChangePreviewSchema = z
+  .object({
+    amountDueNowMinor: z
+      .number()
+      .int()
+      .openapi({
+        description:
+          "Charged the moment the change is confirmed, prorated: the new price for the rest of the " +
+          "period less the unused part of the current one. 0 for a move to less storage.",
+      }),
+    nextBillMinor: z.number().int().openapi({
+      description: "The next regular bill; for a move down, the new price less the credit.",
+    }),
+    nextBillAt: z.string().datetime(),
+    currency: z.string(),
+    chargeNow: z.boolean(),
+    price: StorageAddonPriceSchema,
+    capBytes: z.number().int(),
+    prorationDate: z.string().datetime().openapi({
+      description: "Send back with the change, with amountDueNowMinor as expectedAmountMinor.",
+    }),
+  })
+  .openapi("StorageAddOnChangePreview");
+
+const StorageChangeRequestSchema = z.object({
+  priceId: z.string().uuid(),
+  prorationDate: z.string().datetime().openapi({
+    description: "The preview's prorationDate. A preview older than 30 minutes is refused.",
+  }),
+  expectedAmountMinor: z
+    .number()
+    .int()
+    .min(0)
+    .openapi({
+      description:
+        "The preview's amountDueNowMinor, as the school confirmed it. When the change would now cost " +
+        "anything else, nothing is charged: 409 STORAGE_ADDON_PRICE_CHANGED.",
+    }),
+  requestKey: z.string().uuid().openapi({
+    description: "One per confirmation. Repeating a request with the same key never charges twice.",
+  }),
+});
 
 const StorageCancellationSchema = z
   .object({
@@ -129,7 +173,10 @@ const checkoutRoute = createRoute({
   summary: "Buy extra storage for the school",
   description:
     "Starts a hosted checkout for a storage tier price. 409 STORAGE_ADDON_ALREADY_ACTIVE when the " +
-    "school already has one (change its tier instead), 409 STORAGE_ADDON_UNAVAILABLE when the " +
+    "school already has one (change its tier instead), 409 STORAGE_ADDON_PURCHASE_PENDING when a " +
+    "storage payment is already paid or open at the provider (its confirmation still on the way; " +
+    "earlier open checkouts are closed first, so only one can ever be paid), 409 " +
+    "STORAGE_ADDON_UNAVAILABLE when the " +
     "school's payment provider cannot sell it online. license:manage; web only.",
   security: [{ bearerAuth: [] }],
   request: {
@@ -141,6 +188,25 @@ const checkoutRoute = createRoute({
   ),
 });
 
+const previewChangeRoute = createRoute({
+  method: "post",
+  path: `${BASE}/change/preview`,
+  tags: ["Subscriptions"],
+  operationId: "previewStorageAddOnChange",
+  summary: "What changing the school's storage tier will cost",
+  description:
+    "The exact prorated amount charged now and the next bill, from the payment provider's own " +
+    "invoice preview. Nothing is charged or changed. license:manage; web only.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { "application/json": { schema: StorageChangePreviewRequestSchema } } },
+  },
+  responses: standardResponses(
+    { 200: { description: "The cost of the change", schema: StorageChangePreviewSchema } },
+    [400, 401, 403, 404, 409, 502, 503],
+  ),
+});
+
 const changeRoute = createRoute({
   method: "post",
   path: `${BASE}/change`,
@@ -148,7 +214,9 @@ const changeRoute = createRoute({
   operationId: "changeStorageAddOnTier",
   summary: "Change the school's storage tier",
   description:
-    "Moves the live add-on to another tier or interval, prorated. More storage (or another " +
+    "Moves the live add-on to another tier or interval, prorated, for exactly the amount the " +
+    "school confirmed from the preview (409 STORAGE_ADDON_PRICE_CHANGED, nothing charged, when it " +
+    "would now cost anything else). More storage (or another " +
     "interval) is charged now and applied only once paid: 402 STORAGE_ADDON_PAYMENT_FAILED leaves " +
     "everything as it was. Less storage applies now and is credited on the next invoice; no file " +
     "is ever deleted. license:manage; web only.",
@@ -212,6 +280,10 @@ export function storageAddonRoutes(
   app.use("/api/subscriptions/storage/offer", requirePermission(PERMISSIONS.LICENSE_READ));
   app.use("/api/subscriptions/storage/checkout", requirePermission(PERMISSIONS.LICENSE_MANAGE));
   app.use("/api/subscriptions/storage/change", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use(
+    "/api/subscriptions/storage/change/preview",
+    requirePermission(PERMISSIONS.LICENSE_MANAGE),
+  );
   app.use("/api/subscriptions/storage/cancel", requirePermission(PERMISSIONS.LICENSE_MANAGE));
   app.use(
     "/api/subscriptions/storage/cancel/reverse",
@@ -254,12 +326,37 @@ export function storageAddonRoutes(
     return c.json(result, 200);
   });
 
+  app.openapi(previewChangeRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+    const preview = await previewStorageTierChange(database, providers, {
+      schoolId: auth.schoolId,
+      priceId: body.priceId,
+      tenantContext: {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        requestId: c.get("requestId"),
+      },
+    });
+    return c.json(
+      {
+        ...preview,
+        nextBillAt: preview.nextBillAt.toISOString(),
+        prorationDate: preview.prorationDate.toISOString(),
+      },
+      200,
+    );
+  });
+
   app.openapi(changeRoute, async (c) => {
     const auth = requireAuth(c);
     const body = c.req.valid("json");
     const current = await changeStorageTier(database, providers, {
       schoolId: auth.schoolId,
       priceId: body.priceId,
+      prorationDate: new Date(body.prorationDate),
+      expectedAmountMinor: body.expectedAmountMinor,
+      requestKey: body.requestKey,
       tenantContext: {
         schoolId: auth.schoolId,
         userId: auth.userId,

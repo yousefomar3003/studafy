@@ -372,6 +372,12 @@ export const ERROR_CODES = {
   STORAGE_ADDON_UNAVAILABLE: "STORAGE_ADDON_UNAVAILABLE",
   // The provider could not charge the tier change; nothing was changed.
   STORAGE_ADDON_PAYMENT_FAILED: "STORAGE_ADDON_PAYMENT_FAILED",
+  // A storage purchase for the school is already paid or being paid at the provider (its
+  // confirmation may still be on the way): a second checkout would charge twice.
+  STORAGE_ADDON_PURCHASE_PENDING: "STORAGE_ADDON_PURCHASE_PENDING",
+  // The amount the buyer confirmed for a tier change is no longer what it would cost (the preview is
+  // too old, or the subscription changed since): nothing was charged; preview it again.
+  STORAGE_ADDON_PRICE_CHANGED: "STORAGE_ADDON_PRICE_CHANGED",
 
   // Manual grants (db/migrations/000211): storage and tiers Studafy staff grant by hand.
   // No such grant in this school.
