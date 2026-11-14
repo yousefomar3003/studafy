@@ -13,7 +13,7 @@ when it required the `version-bump` label.
 
 ### Added
 
-- A school can decline a licence quote (migration 000222): `POST
+- A school can decline a licence quote (migration 000223): `POST
 /api/school/license/quotes/{quoteId}/decline` (`license:manage`) with an optional `reason`
   (`DeclineLicenseQuoteBody`, at most 1000 characters) answers the `LicenseQuote`. Only a sent quote
   within its validity can be declined (409 `LICENSE_QUOTE_NOT_EDITABLE` / `LICENSE_QUOTE_EXPIRED`); a
