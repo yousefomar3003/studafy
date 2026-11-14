@@ -6,6 +6,7 @@ import Stripe from "stripe";
 import { PaymentProviderError } from "../ports/payment-provider";
 
 import type {
+  AddonPurchasesInFlight,
   ChangeSubscriptionPriceInput,
   ChangeSubscriptionPriceResult,
   CreateCheckoutSessionInput,
@@ -27,6 +28,8 @@ import type {
   SyncProductInput,
   SyncProductResult,
   ParsedWebhookEvent,
+  PreviewSubscriptionPriceChangeInput,
+  PreviewSubscriptionPriceChangeResult,
   LookupProductResult,
   LookupPriceResult,
   CreateBillingPortalSessionInput,
@@ -488,7 +491,110 @@ export class StripeAdapter implements PaymentProviderPort {
   async changeSubscriptionPrice(
     input: ChangeSubscriptionPriceInput,
   ): Promise<ChangeSubscriptionPriceResult> {
-    const subscription = await this.stripe.subscriptions.retrieve(input.providerSubscriptionId);
+    const { item } = await this.subscriptionItem(input.providerSubscriptionId);
+
+    // `proration_date` is the instant the buyer's preview was computed at, so the invoice is the one
+    // they confirmed; the idempotency key makes a repeated request replay this answer instead of
+    // invoicing again.
+    const updated = await this.stripe.subscriptions.update(
+      input.providerSubscriptionId,
+      {
+        items: [{ id: item.id, price: input.priceId }],
+        metadata: input.metadata,
+        proration_date: input.prorationDate,
+        ...(input.chargeNow
+          ? { proration_behavior: "always_invoice", payment_behavior: "pending_if_incomplete" }
+          : { proration_behavior: "create_prorations" }),
+      },
+      { idempotencyKey: input.idempotencyKey },
+    );
+
+    return { applied: updated.pending_update == null };
+  }
+
+  /**
+   * The invoice `changeSubscriptionPrice` would produce, from Stripe's own preview: with
+   * `always_invoice` that is the proration invoice charged at once; with `create_prorations` it is
+   * the next regular invoice, the credit for the unused part of the old price included.
+   */
+  async previewSubscriptionPriceChange(
+    input: PreviewSubscriptionPriceChangeInput,
+  ): Promise<PreviewSubscriptionPriceChangeResult> {
+    const { subscription, item } = await this.subscriptionItem(input.providerSubscriptionId);
+    const customer =
+      typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+
+    const preview = await this.stripe.invoices.createPreview({
+      customer,
+      subscription: input.providerSubscriptionId,
+      subscription_details: {
+        items: [{ id: item.id, price: input.priceId }],
+        proration_date: input.prorationDate,
+        proration_behavior: input.chargeNow ? "always_invoice" : "create_prorations",
+      },
+    });
+
+    return { amountDueMinor: preview.amount_due, currency: preview.currency.toUpperCase() };
+  }
+
+  /**
+   * Live subscriptions (including one still settling its first payment) and open checkouts of one
+   * add-on for the customer, read from Stripe itself: a checkout paid a moment ago has its
+   * subscription here before its webhook reaches Studafy.
+   */
+  async findAddonPurchasesInFlight(input: {
+    customerId: string;
+    addon: string;
+  }): Promise<AddonPurchasesInFlight> {
+    const liveStatuses = new Set([
+      "active",
+      "trialing",
+      "past_due",
+      "unpaid",
+      "incomplete",
+      "paused",
+    ]);
+    const liveSubscriptionIds: string[] = [];
+    for await (const subscription of this.stripe.subscriptions.list({
+      customer: input.customerId,
+      status: "all",
+      limit: 100,
+    })) {
+      if (subscription.metadata?.addon === input.addon && liveStatuses.has(subscription.status)) {
+        liveSubscriptionIds.push(subscription.id);
+      }
+    }
+
+    const openCheckoutSessionIds: string[] = [];
+    for await (const session of this.stripe.checkout.sessions.list({
+      customer: input.customerId,
+      status: "open",
+      limit: 100,
+    })) {
+      if (session.metadata?.addon === input.addon) openCheckoutSessionIds.push(session.id);
+    }
+
+    return { liveSubscriptionIds, openCheckoutSessionIds };
+  }
+
+  async expireCheckoutSession(sessionId: string): Promise<"expired" | "completed"> {
+    try {
+      await this.stripe.checkout.sessions.expire(sessionId);
+      return "expired";
+    } catch (error) {
+      // Only an open session can be expired: read what it became instead.
+      if (!(error instanceof Stripe.errors.StripeInvalidRequestError)) throw error;
+      const session = await this.stripe.checkout.sessions.retrieve(sessionId);
+      if (session.status === "complete") return "completed";
+      if (session.status === "expired") return "expired";
+      throw error;
+    }
+  }
+
+  private async subscriptionItem(
+    providerSubscriptionId: string,
+  ): Promise<{ subscription: Stripe.Subscription; item: Stripe.SubscriptionItem }> {
+    const subscription = await this.stripe.subscriptions.retrieve(providerSubscriptionId);
     const item = subscription.items.data[0];
     if (!item) {
       throw new PaymentProviderError(
@@ -497,16 +603,7 @@ export class StripeAdapter implements PaymentProviderPort {
         "Stripe subscription has no item to change",
       );
     }
-
-    const updated = await this.stripe.subscriptions.update(input.providerSubscriptionId, {
-      items: [{ id: item.id, price: input.priceId }],
-      metadata: input.metadata,
-      ...(input.chargeNow
-        ? { proration_behavior: "always_invoice", payment_behavior: "pending_if_incomplete" }
-        : { proration_behavior: "create_prorations" }),
-    });
-
-    return { applied: updated.pending_update == null };
+    return { subscription, item };
   }
 
   async listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult> {

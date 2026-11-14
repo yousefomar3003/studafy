@@ -1,7 +1,7 @@
 import { ApiError } from "@studafy/api-client";
-import { PERMISSIONS } from "@studafy/constants";
+import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 import { Button, Card, Chip, Modal, useToast } from "@studafy/ui";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { usePermissions } from "../../lib/auth";
@@ -13,6 +13,7 @@ import {
   useChangeStorageTier,
   useSetStorageCancellation,
   useStartStorageCheckout,
+  useStorageChangePreview,
   useStorageOfferQuery,
 } from "./storage";
 
@@ -23,6 +24,9 @@ import type { TFunction } from "i18next";
 import "./license.css";
 
 const GIB = 1024 ** 3;
+
+/** How long the page waits for a payment's confirmation before asking the buyer to come back. */
+const CONFIRMING_FOR_MS = 2 * 60 * 1000;
 
 /** "8.2 GB", "100 GB", "1 TB": whole units where they are whole, one decimal otherwise. */
 export function formatStorage(
@@ -67,6 +71,12 @@ function priceFor(tier: StorageTier, interval: StorageInterval): StoragePrice | 
  * Everyone at the school shares one storage allowance: 10 GB is included, and the add-on raises it to
  * 100 GB or 1 TB, monthly or yearly. Nothing is ever deleted -- canceling, or moving to less storage
  * than the school already uses, only stops new uploads until it is back under its limit.
+ *
+ * Money moves only after a confirmation that names the amount: buying shows the price before the
+ * payment page; switching shows the exact prorated charge the provider computed, and the change is
+ * sent with that amount so nothing else can be charged; stopping renewal says what happens and when.
+ * Every action is guarded against a second click while one is in flight, and while a payment that
+ * just went through is still being confirmed, nothing can be bought again.
  */
 export default function StoragePage() {
   const { t } = useTranslation();
@@ -75,15 +85,48 @@ export default function StoragePage() {
   const { show } = useToast();
   const [searchParams] = useSearchParams();
   const canManage = usePermissions().has(PERMISSIONS.LICENSE_MANAGE);
-  const offer = useStorageOfferQuery();
+  const checkoutStatus = searchParams.get("checkout");
+
+  // A payment that went through (or one the server says is already on its way) is confirmed by the
+  // provider's webhook a little later: until the add-on shows up, poll and sell nothing.
+  const [awaitingPayment, setAwaitingPayment] = useState(checkoutStatus === "success");
+  const [confirmTimedOut, setConfirmTimedOut] = useState(false);
+  const offer = useStorageOfferQuery({ poll: awaitingPayment && !confirmTimedOut });
   const checkout = useStartStorageCheckout();
   const change = useChangeStorageTier();
   const cancellation = useSetStorageCancellation();
   const [interval, setInterval] = useState<StorageInterval | null>(null);
-  const [switchTo, setSwitchTo] = useState<{ tier: StorageTier; price: StoragePrice } | null>(null);
-  const checkoutStatus = searchParams.get("checkout");
+  const [buyTarget, setBuyTarget] = useState<{ tier: StorageTier; price: StoragePrice } | null>(
+    null,
+  );
+  const [switchTo, setSwitchTo] = useState<{
+    tier: StorageTier;
+    price: StoragePrice;
+    requestKey: string;
+  } | null>(null);
+  const [previewAttempt, setPreviewAttempt] = useState(0);
+  const [priceMoved, setPriceMoved] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const preview = useStorageChangePreview(switchTo?.price.id ?? null, previewAttempt);
+  // Set synchronously on the first click, before React re-renders a disabled button: a double click
+  // or a second key press can never start a second payment.
+  const inFlight = useRef(false);
+
+  const hasStorage = offer.data?.current != null;
+  const confirming = awaitingPayment && !hasStorage;
+
+  useEffect(() => {
+    if (!awaitingPayment) return;
+    if (hasStorage) {
+      setAwaitingPayment(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setConfirmTimedOut(true), CONFIRMING_FOR_MS);
+    return () => window.clearTimeout(timer);
+  }, [awaitingPayment, hasStorage]);
 
   const size = (bytes: number) => formatStorage(bytes, t, formatNumber);
+  const date = (iso: string) => formatDate(new Date(iso), { dateStyle: "medium" });
   const priceLabel = (price: StoragePrice) =>
     t(
       price.interval === "yearly"
@@ -101,39 +144,108 @@ export default function StoragePage() {
       });
   }
 
-  function buy(price: StoragePrice) {
-    checkout.mutate(
-      { priceId: price.id, successUrl: returnUrl("success"), cancelUrl: returnUrl("cancelled") },
-      {
-        onSuccess: (result) => window.location.assign(result.url),
-        onError: failed(t("schoolLicense.storage.checkoutError")),
-      },
+  /** Run `action` unless another one is still in flight; `action` calls `done` when it settles. */
+  function once(action: (done: () => void) => void) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    action(() => {
+      inFlight.current = false;
+    });
+  }
+
+  function confirmBuy() {
+    if (!buyTarget) return;
+    const { price } = buyTarget;
+    once((done) =>
+      checkout.mutate(
+        { priceId: price.id, successUrl: returnUrl("success"), cancelUrl: returnUrl("cancelled") },
+        {
+          // Stays "in flight" while the browser leaves for the payment page.
+          onSuccess: (result) => window.location.assign(result.url),
+          onError: (error) => {
+            done();
+            setBuyTarget(null);
+            if (
+              error instanceof ApiError &&
+              error.code === ERROR_CODES.STORAGE_ADDON_PURCHASE_PENDING
+            ) {
+              setConfirmTimedOut(false);
+              setAwaitingPayment(true);
+            }
+            failed(t("schoolLicense.storage.checkoutError"))(error);
+          },
+        },
+      ),
     );
   }
 
+  function openSwitch(tier: StorageTier, price: StoragePrice) {
+    setPriceMoved(false);
+    setPreviewAttempt((n) => n + 1);
+    setSwitchTo({ tier, price, requestKey: crypto.randomUUID() });
+  }
+
+  function closeSwitch() {
+    if (change.isPending) return;
+    setSwitchTo(null);
+    setPriceMoved(false);
+  }
+
   function confirmSwitch() {
-    if (!switchTo) return;
-    change.mutate(switchTo.price.id, {
-      onSuccess: () => {
-        setSwitchTo(null);
-        show({ variant: "success", title: t("schoolLicense.storage.changed") });
-      },
-      onError: (error) => {
-        setSwitchTo(null);
-        failed(t("schoolLicense.storage.changeError"))(error);
-      },
-    });
+    const quoted = preview.data;
+    if (!switchTo || !quoted) return;
+    once((done) =>
+      change.mutate(
+        {
+          priceId: switchTo.price.id,
+          prorationDate: quoted.prorationDate,
+          expectedAmountMinor: quoted.amountDueNowMinor,
+          requestKey: switchTo.requestKey,
+        },
+        {
+          onSuccess: () => {
+            done();
+            setSwitchTo(null);
+            show({ variant: "success", title: t("schoolLicense.storage.changed") });
+          },
+          onError: (error) => {
+            done();
+            if (
+              error instanceof ApiError &&
+              error.code === ERROR_CODES.STORAGE_ADDON_PRICE_CHANGED
+            ) {
+              // Nothing was charged: show the new amount and let the school confirm that one.
+              setPriceMoved(true);
+              setPreviewAttempt((n) => n + 1);
+              setSwitchTo({ ...switchTo, requestKey: crypto.randomUUID() });
+              return;
+            }
+            setSwitchTo(null);
+            failed(t("schoolLicense.storage.changeError"))(error);
+          },
+        },
+      ),
+    );
   }
 
   function setCancel(cancel: boolean) {
-    cancellation.mutate(cancel, {
-      onSuccess: () =>
-        show({
-          variant: "success",
-          title: t(cancel ? "schoolLicense.storage.canceled" : "schoolLicense.storage.resumed"),
-        }),
-      onError: failed(t("schoolLicense.storage.cancelError")),
-    });
+    once((done) =>
+      cancellation.mutate(cancel, {
+        onSuccess: () => {
+          done();
+          setConfirmCancel(false);
+          show({
+            variant: "success",
+            title: t(cancel ? "schoolLicense.storage.canceled" : "schoolLicense.storage.resumed"),
+          });
+        },
+        onError: (error) => {
+          done();
+          setConfirmCancel(false);
+          failed(t("schoolLicense.storage.cancelError"))(error);
+        },
+      }),
+    );
   }
 
   const data: StorageOffer | undefined = offer.data;
@@ -143,7 +255,7 @@ export default function StoragePage() {
     data && data.usage.capBytes > 0
       ? Math.min(100, Math.round((data.usage.usedBytes / data.usage.capBytes) * 100))
       : 0;
-  const busy = checkout.isPending || change.isPending || cancellation.isPending;
+  const busy = checkout.isPending || change.isPending || cancellation.isPending || confirming;
 
   return (
     <>
@@ -152,11 +264,24 @@ export default function StoragePage() {
         description={t("schoolLicense.storage.description")}
       />
 
-      {checkoutStatus === "success" ? (
+      {confirming ? (
+        <div className="license-banner" data-tone="neutral" role="status">
+          <div>
+            <p className="license-banner__title">{t("schoolLicense.storage.confirmingTitle")}</p>
+            <p className="license-banner__body">
+              {t(
+                confirmTimedOut
+                  ? "schoolLicense.storage.confirmingSlowBody"
+                  : "schoolLicense.storage.confirmingBody",
+              )}
+            </p>
+          </div>
+        </div>
+      ) : checkoutStatus === "success" ? (
         <div className="license-banner" data-tone="success" role="status">
           <div>
             <p className="license-banner__title">{t("schoolLicense.storage.successTitle")}</p>
-            <p className="license-banner__body">{t("schoolLicense.storage.successBody")}</p>
+            <p className="license-banner__body">{t("schoolLicense.storage.successReadyBody")}</p>
           </div>
         </div>
       ) : checkoutStatus === "cancelled" ? (
@@ -228,7 +353,9 @@ export default function StoragePage() {
                   variant="secondary"
                   loading={cancellation.isPending}
                   disabled={busy}
-                  onClick={() => setCancel(!current.cancelAtPeriodEnd)}
+                  onClick={() =>
+                    current.cancelAtPeriodEnd ? setCancel(false) : setConfirmCancel(true)
+                  }
                 >
                   {t(
                     current.cancelAtPeriodEnd
@@ -290,10 +417,12 @@ export default function StoragePage() {
                               variant="primary"
                               loading={
                                 (checkout.isPending && checkout.variables?.priceId === price.id) ||
-                                (change.isPending && change.variables === price.id)
+                                (change.isPending && change.variables?.priceId === price.id)
                               }
                               disabled={busy}
-                              onClick={() => (current ? setSwitchTo({ tier, price }) : buy(price))}
+                              onClick={() =>
+                                current ? openSwitch(tier, price) : setBuyTarget({ tier, price })
+                              }
                             >
                               {t(
                                 current
@@ -320,35 +449,151 @@ export default function StoragePage() {
       )}
 
       <Modal
+        open={buyTarget !== null}
+        onClose={() => (checkout.isPending ? undefined : setBuyTarget(null))}
+        title={t("schoolLicense.storage.buyTitle", {
+          size: buyTarget ? size(buyTarget.tier.capBytes) : "",
+        })}
+      >
+        <Modal.Body>
+          {buyTarget ? (
+            <p>
+              {t(
+                buyTarget.price.interval === "yearly"
+                  ? "schoolLicense.storage.buyBodyYearly"
+                  : "schoolLicense.storage.buyBodyMonthly",
+                {
+                  amount: money(buyTarget.price.amountMinor, buyTarget.price.currency),
+                  size: size(buyTarget.tier.capBytes),
+                },
+              )}
+            </p>
+          ) : null}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={checkout.isPending}
+            onClick={() => setBuyTarget(null)}
+          >
+            {t("schoolLicense.common.cancel")}
+          </Button>
+          <Button type="button" variant="primary" loading={checkout.isPending} onClick={confirmBuy}>
+            {t("schoolLicense.storage.buyConfirm")}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
         open={switchTo !== null}
-        onClose={() => setSwitchTo(null)}
+        onClose={closeSwitch}
         title={t("schoolLicense.storage.switchTitle", {
           size: switchTo ? size(switchTo.tier.capBytes) : "",
         })}
       >
         <Modal.Body>
-          <p>
-            {switchTo && current && switchTo.tier.capBytes < current.capBytes
-              ? t("schoolLicense.storage.switchDownBody", {
-                  size: size(switchTo.tier.capBytes),
-                  price: priceLabel(switchTo.price),
-                })
-              : t("schoolLicense.storage.switchUpBody", {
-                  price: switchTo ? priceLabel(switchTo.price) : "",
+          {priceMoved ? <p role="alert">{t("schoolLicense.storage.priceMoved")}</p> : null}
+          {preview.isPending || preview.isFetching ? (
+            <p role="status">{t("schoolLicense.storage.previewLoading")}</p>
+          ) : preview.isError || !preview.data || !switchTo ? (
+            <p role="alert">
+              {apiErrorMessage(preview.error, t("schoolLicense.storage.previewError"))}
+            </p>
+          ) : preview.data.chargeNow ? (
+            <>
+              <p className="storage-charge" data-testid="storage-charge-now">
+                {t("schoolLicense.storage.chargedToday", {
+                  amount: money(preview.data.amountDueNowMinor, preview.data.currency),
                 })}
-          </p>
+              </p>
+              <p className="license-muted">
+                {t("schoolLicense.storage.chargedTodayHelp", {
+                  size: size(switchTo.tier.capBytes),
+                })}
+              </p>
+              <p>
+                {t("schoolLicense.storage.thenFrom", {
+                  price: priceLabel(switchTo.price),
+                  date: date(preview.data.nextBillAt),
+                })}
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="storage-charge" data-testid="storage-charge-now">
+                {t("schoolLicense.storage.nothingToday")}
+              </p>
+              <p>
+                {t("schoolLicense.storage.downNextBill", {
+                  size: size(switchTo.tier.capBytes),
+                  date: date(preview.data.nextBillAt),
+                  amount: money(preview.data.nextBillMinor, preview.data.currency),
+                })}
+              </p>
+              <p className="license-muted">
+                {t("schoolLicense.storage.thenPrice", { price: priceLabel(switchTo.price) })}
+              </p>
+            </>
+          )}
         </Modal.Body>
         <Modal.Footer>
-          <Button type="button" variant="secondary" onClick={() => setSwitchTo(null)}>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={change.isPending}
+            onClick={closeSwitch}
+          >
             {t("schoolLicense.common.cancel")}
           </Button>
           <Button
             type="button"
             variant="primary"
             loading={change.isPending}
+            disabled={!preview.data || preview.isFetching}
             onClick={confirmSwitch}
           >
-            {t("schoolLicense.storage.switchConfirm")}
+            {preview.data && preview.data.chargeNow
+              ? t("schoolLicense.storage.payAndSwitch", {
+                  amount: money(preview.data.amountDueNowMinor, preview.data.currency),
+                })
+              : t("schoolLicense.storage.switchConfirm")}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      <Modal
+        open={confirmCancel}
+        onClose={() => (cancellation.isPending ? undefined : setConfirmCancel(false))}
+        title={t("schoolLicense.storage.cancelTitle")}
+      >
+        <Modal.Body>
+          {current && data ? (
+            <p>
+              {t("schoolLicense.storage.cancelBody", {
+                size: size(current.capBytes),
+                date: date(current.currentPeriodEnd),
+                included: size(data.usage.includedBytes),
+              })}
+            </p>
+          ) : null}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={cancellation.isPending}
+            onClick={() => setConfirmCancel(false)}
+          >
+            {t("schoolLicense.storage.cancelKeep")}
+          </Button>
+          <Button
+            type="button"
+            variant="primary"
+            loading={cancellation.isPending}
+            onClick={() => setCancel(true)}
+          >
+            {t("schoolLicense.storage.cancelConfirm")}
           </Button>
         </Modal.Footer>
       </Modal>

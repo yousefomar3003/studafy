@@ -64,6 +64,7 @@ const PURCHASE_ROUTES: string[] = [
   "/api/subscriptions/ai/refund-requests",
   "/api/subscriptions/storage/checkout",
   "/api/subscriptions/storage/change",
+  "/api/subscriptions/storage/change/preview",
   "/api/subscriptions/storage/cancel",
   "/api/subscriptions/storage/cancel/reverse",
 ];

@@ -476,6 +476,7 @@ const EXPECTED_PATHS = [
   "/api/subscriptions/storage/cancel",
   "/api/subscriptions/storage/cancel/reverse",
   "/api/subscriptions/storage/change",
+  "/api/subscriptions/storage/change/preview",
   "/api/subscriptions/storage/checkout",
   "/api/subscriptions/storage/offer",
   "/api/subscriptions/webhook/apple",
