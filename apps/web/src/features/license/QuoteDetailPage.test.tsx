@@ -35,6 +35,9 @@ function quote(overrides: Record<string, unknown> = {}) {
     createdAt: "2026-10-20T09:00:00.000Z",
     sentAt: "2026-10-20T10:00:00.000Z",
     totalMinor: 406_400,
+    paymentPlan: "in_full",
+    paymentSchedule: null,
+    schedulePreview: [{ position: 1, amountMinor: 406_400, dueDate: "2026-12-01" }],
     breakdown: {
       currencyCode: "USD",
       months: 12,
@@ -144,6 +147,25 @@ describe("QuoteDetailPage", () => {
       screen.getByText("You save $736.00 (15.33%) compared with the list price."),
     ).toBeTruthy();
     expect(screen.getByText("Valid for this academic year")).toBeTruthy();
+  });
+
+  test("a monthly quote shows its payment schedule before it is accepted", async () => {
+    current = quote({
+      paymentPlan: "monthly",
+      schedulePreview: [
+        { position: 1, amountMinor: 203_200, dueDate: "2026-11-01" },
+        { position: 2, amountMinor: 203_200, dueDate: "2026-12-01" },
+      ],
+    });
+    await renderPage();
+    const section = within(await screen.findByRole("region", { name: "Payment schedule" }));
+    expect(section.getByText("Paid monthly: 2 payments, one each licence month.")).toBeTruthy();
+    expect(section.getAllByText("$2,032.00")).toHaveLength(2);
+    expect(
+      section.getByText(
+        "Your seats start working once the first payment is received. The total is the same whichever way you pay.",
+      ),
+    ).toBeTruthy();
   });
 
   test("accepts a sent quote and opens its invoice", async () => {

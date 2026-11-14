@@ -348,7 +348,9 @@
     "openReceipt": "Open {{file}}",
     "paymentsTitle": "Payments on this invoice",
     "payOnline": "Pay online",
-    "payOnlineHelp": "You'll pay securely through Revolut. Your payment is confirmed once Studafy records it."
+    "payOnlineHelp": "You'll pay securely through Revolut. Your payment is confirmed once Studafy records it.",
+    "howToPayInstalment": "Pay {{amount}} for payment {{position}} of {{count}}, due {{date}}. The invoice's full balance is {{balance}}.",
+    "payInstalmentOnline": "Pay payment {{position}} online"
   },
   "tile": {
     "title": "License",
@@ -440,5 +442,31 @@
     "defaultNote_one": "Student AI for {{count}} student, {{tier}}.",
     "defaultNote_other": "Student AI for {{count}} students, {{tier}}.",
     "defaultNoteTier": "Student AI on {{tier}}."
+  },
+  "schedule": {
+    "title": "Payment schedule",
+    "plan": {
+      "in_full": "Paid all at once.",
+      "monthly_one": "Paid monthly: {{count}} payment, one each licence month.",
+      "monthly_other": "Paid monthly: {{count}} payments, one each licence month.",
+      "custom_one": "Paid in {{count}} instalment on the dates below.",
+      "custom_other": "Paid in {{count}} instalments on the dates below."
+    },
+    "columns": {
+      "number": "#",
+      "dueDate": "Due",
+      "amount": "Amount",
+      "paid": "Paid",
+      "status": "Status"
+    },
+    "status": {
+      "due": "Due",
+      "partially_paid": "Partly paid",
+      "paid": "Paid",
+      "overdue": "Overdue"
+    },
+    "current": "· pay now",
+    "previewNote": "Dates are shown as if the quote were accepted today. A due date before the day you accept moves to that day.",
+    "activationNote": "Your seats start working once the first payment is received. The total is the same whichever way you pay."
   }
 }

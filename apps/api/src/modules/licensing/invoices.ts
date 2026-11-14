@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 
 import { ERROR_CODES, isAllowedLicensePaymentLink } from "@studafy/constants";
+import { allocatePayments, buildSchedule } from "@studafy/license-pricing";
 import postgres from "postgres";
 
 import { CodedHttpException } from "../../coded-http-exception";
@@ -14,7 +15,12 @@ import type { LicenseActor } from "./context";
 import type { Audience, Changed } from "./service";
 import type { Database, DatabasePools } from "../../db/client";
 import type { SchoolStatement, SchoolStatementResults } from "../../db/tenant-tx";
-import type { PricingLine } from "@studafy/license-pricing";
+import type {
+  CustomInstalmentInput,
+  InstalmentStatus,
+  PaymentPlan,
+  PricingLine,
+} from "@studafy/license-pricing";
 import type { TransactionSql } from "postgres";
 
 /**
@@ -27,6 +33,12 @@ import type { TransactionSql } from "postgres";
  * or earlier, when the super admin activates it with a due date. A payment is voided with a reason,
  * never deleted, and the balance follows. Nothing here suspends a license: that is the super admin's
  * decision, made in the console.
+ *
+ * Since 000221 an invoice is paid in instalments (docs/adr/0021): one for a quote paid at once, one
+ * per licence month for a monthly plan, or the super admin's custom schedule. Payments still go
+ * against the invoice; its paid total is spread over the instalments earliest first on every payment
+ * and every void, the invoice's due date is the earliest unpaid instalment's, and the license
+ * activates once the first instalment is paid in full. Each instalment has its own payment link.
  */
 
 export const INVOICE_STATUSES = ["issued", "partially_paid", "paid", "void"] as const;
@@ -157,9 +169,12 @@ export interface InvoiceRecord {
   overdueAt: string | null;
   voidedAt: string | null;
   voidReason: string | null;
+  /** How the invoice is paid: at once, monthly, or on a custom schedule (000221). */
+  paymentPlan: PaymentPlan;
   /**
-   * The online payment link (Revolut) the super admin pasted, while the invoice can still be paid;
-   * null when none is set or the invoice is paid or void.
+   * The online payment link (Revolut) of the instalment to pay now, while the invoice can still be
+   * paid; null when it has none or the invoice is paid or void. Each instalment's own link is in
+   * the detail's `instalments`.
    */
   paymentLink: string | null;
   createdAt: string;
@@ -187,6 +202,7 @@ interface InvoiceRow {
   overdue_at: Date | null;
   voided_at: Date | null;
   void_reason: string | null;
+  payment_plan: PaymentPlan;
   payment_link: string | null;
   created_at: Date;
 }
@@ -199,7 +215,11 @@ const INVOICE_COLUMNS = (tx: TransactionSql) => tx`
   i.credit_total_minor::text AS credit_total_minor, i.adjustment_minor::text AS adjustment_minor,
   i.total_minor::text AS total_minor, i.paid_minor::text AS paid_minor,
   i.balance_minor::text AS balance_minor, i.status, i.overdue_at, i.voided_at, i.void_reason,
-  i.payment_link, i.created_at
+  i.payment_plan,
+  (SELECT inst.payment_link FROM app.license_invoice_instalments AS inst
+   WHERE inst.school_id = i.school_id AND inst.invoice_id = i.id AND inst.status <> 'paid'
+   ORDER BY inst.position LIMIT 1) AS payment_link,
+  i.created_at
 `;
 
 function toInvoice(row: InvoiceRow): InvoiceRecord {
@@ -225,6 +245,7 @@ function toInvoice(row: InvoiceRow): InvoiceRecord {
     overdueAt: row.overdue_at?.toISOString() ?? null,
     voidedAt: row.voided_at?.toISOString() ?? null,
     voidReason: row.void_reason,
+    paymentPlan: row.payment_plan,
     paymentLink: isPayable(row.status) ? row.payment_link : null,
     createdAt: row.created_at.toISOString(),
   };
@@ -311,8 +332,82 @@ export interface ReceiptView {
   createdAt: string;
 }
 
+export interface InstalmentView {
+  id: string;
+  position: number;
+  amountMinor: number;
+  paidMinor: number;
+  balanceMinor: number;
+  dueDate: string;
+  status: InstalmentStatus;
+  /** Not fully paid and past its due date (UTC), on an invoice that can still be paid. */
+  overdue: boolean;
+  overdueAt: string | null;
+  /** The instalment to pay now: the earliest not fully paid, on an invoice that can be paid. */
+  current: boolean;
+  /** Its online payment link, while it can be paid; null otherwise. */
+  paymentLink: string | null;
+}
+
+interface InstalmentRow {
+  id: string;
+  position: number;
+  amount_minor: string;
+  paid_minor: string;
+  due_date: string;
+  status: InstalmentStatus;
+  overdue_at: Date | null;
+  payment_link: string | null;
+}
+
+async function instalmentRows(
+  tx: TransactionSql,
+  invoiceId: string,
+  options: { forUpdate?: boolean } = {},
+): Promise<InstalmentRow[]> {
+  return tx<InstalmentRow[]>`
+    SELECT id::text AS id, position, amount_minor::text AS amount_minor,
+           paid_minor::text AS paid_minor, due_date::text AS due_date, status, overdue_at,
+           payment_link
+    FROM app.license_invoice_instalments
+    WHERE school_id = current_setting('app.school_id')::uuid AND invoice_id = ${invoiceId}::uuid
+    ORDER BY position
+    ${options.forUpdate ? tx`FOR UPDATE` : tx``}
+  `;
+}
+
+/** An invoice's instalments in order, as the school and the console show them. */
+export async function invoiceInstalments(
+  tx: TransactionSql,
+  invoice: InvoiceRecord,
+  now: Date = new Date(),
+): Promise<InstalmentView[]> {
+  const payable = isPayable(invoice.status);
+  const today = utcDate(now);
+  const rows = await instalmentRows(tx, invoice.id);
+  const currentId = payable ? rows.find((row) => row.status !== "paid")?.id : undefined;
+  return rows.map((row) => {
+    const open = payable && row.status !== "paid";
+    return {
+      id: row.id,
+      position: row.position,
+      amountMinor: Number(row.amount_minor),
+      paidMinor: Number(row.paid_minor),
+      balanceMinor: Number(row.amount_minor) - Number(row.paid_minor),
+      dueDate: row.due_date,
+      status: row.status,
+      overdue: open && row.due_date < today,
+      overdueAt: row.overdue_at?.toISOString() ?? null,
+      current: row.id === currentId,
+      paymentLink: open ? row.payment_link : null,
+    };
+  });
+}
+
 export interface InvoiceDetail extends InvoiceRecord {
   overdue: boolean;
+  /** What is due when, earliest first. One instalment for an invoice paid at once. */
+  instalments: InstalmentView[];
   lines: InvoiceLineView[];
   payments: PaymentView[];
   receipts: ReceiptView[];
@@ -484,6 +579,7 @@ export async function invoiceDetail(
   return {
     ...invoice,
     overdue: isOverdue(invoice, now),
+    instalments: await invoiceInstalments(tx, invoice, now),
     lines: await invoiceLines(tx, invoice.id),
     payments: await listPayments(tx, invoice.id),
     receipts: await invoiceReceipts(tx, invoice.id),
@@ -838,7 +934,19 @@ function invoiceSnapshot(invoice: InvoiceRecord): Record<string, unknown> {
     total_minor: invoice.totalMinor,
     paid_minor: invoice.paidMinor,
     status: invoice.status,
+    payment_plan: invoice.paymentPlan,
   };
+}
+
+/** How an issued invoice is to be paid: the quote's plan and what it needs to build the schedule. */
+export interface InvoiceSchedule {
+  plan: PaymentPlan;
+  /** The licence months a monthly plan spreads over. */
+  months: number;
+  /** YYYY-MM-DD the licence (or what the quote adds) starts: the first monthly due date. */
+  startDate: string;
+  /** The super admin's instalments, for a custom plan. */
+  custom?: readonly CustomInstalmentInput[] | null;
 }
 
 export interface IssueInvoiceInput {
@@ -849,12 +957,18 @@ export interface IssueInvoiceInput {
   lines: readonly PricingLine[];
   /** Plan id per audience, for the seat lines. */
   planIds: Partial<Record<Audience, string | null>>;
+  /** How it is paid; paid at once when omitted. */
+  schedule?: InvoiceSchedule;
 }
 
 /**
  * Issue an invoice for priced lines. The number is the next of the issue year; the payment reference
  * is random and unique (a collision, about one in a trillion, is retried under a savepoint). An
  * invoice with nothing to pay -- credits covered it -- is issued already paid.
+ *
+ * Its instalments are written with it (buildSchedule): one due after the configured days when paid
+ * at once, otherwise the quote's monthly or custom schedule, no instalment due before today. The
+ * invoice's due date is the first instalment's.
  */
 export async function issueInvoice(
   tx: TransactionSql,
@@ -876,6 +990,18 @@ export async function issueInvoice(
   const total = subtotal - credits + adjustment;
   const status: InvoiceStatus = total === 0 ? "paid" : "issued";
 
+  const plan = input.schedule?.plan ?? "in_full";
+  const instalments = buildSchedule({
+    plan,
+    totalMinor: total,
+    months: input.schedule?.months ?? 1,
+    startDate: input.schedule?.startDate ?? issueDate,
+    issueDate,
+    inFullDueDate: dueDate,
+    custom: input.schedule?.custom ?? null,
+  });
+  const firstDue = instalments[0]!.dueDate;
+
   const [numbered] = await tx<{ number: string }[]>`
     SELECT app.next_license_invoice_number(${issueDate}::date) AS number
   `;
@@ -889,12 +1015,12 @@ export async function issueInvoice(
           INSERT INTO app.license_invoices (
             school_id, license_id, quote_id, number, payment_reference, currency_id, issue_date,
             due_date, subtotal_minor, credit_total_minor, adjustment_minor, total_minor, status,
-            issued_by
+            payment_plan, issued_by
           ) VALUES (
             ${schoolId}::uuid, ${input.licenseId}::uuid, ${input.quoteId}::uuid, ${number},
             ${newPaymentReference()}, ${input.currencyId}::uuid, ${issueDate}::date,
-            ${dueDate}::date, ${subtotal}, ${credits}, ${adjustment}, ${total}, ${status},
-            ${actor.userId}::uuid
+            ${firstDue}::date, ${subtotal}, ${credits}, ${adjustment}, ${total}, ${status},
+            ${plan}, ${actor.userId}::uuid
           )
           RETURNING id::text AS id
         `,
@@ -955,12 +1081,30 @@ export async function issueInvoice(
     await tx`INSERT INTO app.license_invoice_lines ${tx(lineRows)}`;
   }
 
+  await tx`
+    INSERT INTO app.license_invoice_instalments ${tx(
+      instalments.map((instalment) => ({
+        school_id: schoolId,
+        invoice_id: invoiceId,
+        position: instalment.position,
+        amount_minor: instalment.amountMinor,
+        paid_minor: 0,
+        due_date: instalment.dueDate,
+        status: instalment.amountMinor === 0 ? "paid" : "due",
+      })),
+    )}
+  `;
+
   const invoice = (await readInvoice(tx, invoiceId))!;
   await auditLicenseChange(tx, schoolId, actor, {
     action: "insert",
     targetTable: "license_invoices",
     targetId: invoice.id,
-    newValues: { ...invoiceSnapshot(invoice), lines: lineRows.length },
+    newValues: {
+      ...invoiceSnapshot(invoice),
+      lines: lineRows.length,
+      instalments: instalments.map((i) => ({ amount_minor: i.amountMinor, due_date: i.dueDate })),
+    },
   });
   return invoice;
 }
@@ -975,12 +1119,43 @@ async function setInvoicePaid(
   before: InvoiceRecord,
   paidMinor: number,
   actor: LicenseActor,
+  now: Date = new Date(),
 ): Promise<InvoiceRecord> {
   const status: InvoiceStatus =
     paidMinor === 0 ? "issued" : paidMinor >= before.totalMinor ? "paid" : "partially_paid";
+
+  // Spread the new paid total over the instalments, earliest first. The invoice now falls due on its
+  // earliest unpaid instalment (its last once everything is paid), and is no longer overdue when that
+  // date has not passed.
+  const rows = await instalmentRows(tx, before.id, { forUpdate: true });
+  const allocated = allocatePayments(
+    rows.map((row) => ({ position: row.position, amountMinor: Number(row.amount_minor) })),
+    paidMinor,
+  );
+  const changes: { id: string; from: [number, string]; to: [number, string] }[] = [];
+  for (const [index, row] of rows.entries()) {
+    const next = allocated[index]!;
+    if (Number(row.paid_minor) === next.paidMinor && row.status === next.status) continue;
+    await tx`
+      UPDATE app.license_invoice_instalments
+      SET paid_minor = ${next.paidMinor}, status = ${next.status},
+          updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
+      WHERE school_id = current_setting('app.school_id')::uuid AND id = ${row.id}::uuid
+    `;
+    changes.push({
+      id: row.id,
+      from: [Number(row.paid_minor), row.status],
+      to: [next.paidMinor, next.status],
+    });
+  }
+  const unpaidIndex = allocated.findIndex((instalment) => instalment.status !== "paid");
+  const dueDate = rows[unpaidIndex === -1 ? rows.length - 1 : unpaidIndex]!.due_date;
+  const clearsOverdue = dueDate >= utcDate(now);
+
   await tx`
     UPDATE app.license_invoices
-    SET paid_minor = ${paidMinor}, status = ${status},
+    SET paid_minor = ${paidMinor}, status = ${status}, due_date = ${dueDate}::date,
+        overdue_at = ${clearsOverdue ? null : tx`overdue_at`},
         updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
     WHERE school_id = current_setting('app.school_id')::uuid AND id = ${before.id}::uuid
   `;
@@ -988,10 +1163,21 @@ async function setInvoicePaid(
     action: "update",
     targetTable: "license_invoices",
     targetId: before.id,
-    oldValues: { paid_minor: before.paidMinor, status: before.status },
-    newValues: { paid_minor: paidMinor, status },
+    oldValues: { paid_minor: before.paidMinor, status: before.status, due_date: before.dueDate },
+    newValues: {
+      paid_minor: paidMinor,
+      status,
+      due_date: dueDate,
+      instalments: changes.map((c) => ({ id: c.id, paid_minor: c.to[0], status: c.to[1] })),
+    },
   });
   return (await readInvoice(tx, before.id))!;
+}
+
+/** Whether the invoice's first instalment is paid in full: what puts its license in force. */
+async function firstInstalmentPaid(tx: TransactionSql, invoiceId: string): Promise<boolean> {
+  const [first] = await instalmentRows(tx, invoiceId);
+  return first?.status === "paid";
 }
 
 /**
@@ -1036,7 +1222,10 @@ export interface RecordPaymentInput {
   receiptStorageKey?: string | null;
 }
 
-/** Record a bank transfer. When it completes the invoice, the license activates. */
+/**
+ * Record a bank transfer. It is spread over the instalments earliest first; once the first instalment
+ * is paid in full (the whole invoice, for one paid at once) the license activates.
+ */
 export async function recordPayment(
   tx: TransactionSql,
   schoolId: string,
@@ -1086,9 +1275,10 @@ export async function recordPayment(
     invoice,
     invoice.paidMinor + input.amountMinor,
     actor,
+    now,
   );
   const activation =
-    after.status === "paid"
+    after.status === "paid" || (await firstInstalmentPaid(tx, after.id))
       ? await activateLicenseFor(tx, schoolId, after, actor, now)
       : { activated: false, versions: new Map<string, number>(), pending: [] };
 
@@ -1171,8 +1361,10 @@ export async function voidPayment(
 }
 
 /**
- * Set, replace (`link` a URL) or clear (`link` null) the invoice's online payment link. Only while
- * the invoice can be paid; the link must be an https link to an allowed provider host.
+ * Set, replace (`link` a URL) or clear (`link` null) the online payment link of one instalment --
+ * the one to pay now when `instalmentId` is omitted (the invoice-level route, kept from 000220).
+ * Only while the invoice can be paid and the instalment is not paid; the link must be an https link
+ * to an allowed provider host.
  */
 export async function setInvoicePaymentLink(
   tx: TransactionSql,
@@ -1180,27 +1372,36 @@ export async function setInvoicePaymentLink(
   invoiceId: string,
   link: string | null,
   actor: LicenseActor,
+  instalmentId?: string,
 ): Promise<InvoiceRecord> {
   const invoice = await requireInvoice(tx, invoiceId, actor, { forUpdate: true });
   if (!isPayable(invoice.status)) {
     throw licenseError(409, ERROR_CODES.LICENSE_INVOICE_NOT_PAYABLE, actor.locale);
   }
+  const rows = await instalmentRows(tx, invoiceId, { forUpdate: true });
+  const target = instalmentId
+    ? rows.find((row) => row.id === instalmentId)
+    : rows.find((row) => row.status !== "paid");
+  if (!target) throw licenseError(404, ERROR_CODES.LICENSE_INSTALMENT_NOT_FOUND, actor.locale);
+  if (target.status === "paid") {
+    throw licenseError(409, ERROR_CODES.LICENSE_INVOICE_NOT_PAYABLE, actor.locale);
+  }
   if (link !== null && !isAllowedLicensePaymentLink(link)) {
     throw licenseError(422, ERROR_CODES.LICENSE_PAYMENT_LINK_INVALID, actor.locale);
   }
-  if (invoice.paymentLink === link) return invoice;
+  if (target.payment_link === link) return invoice;
 
   await tx`
-    UPDATE app.license_invoices
+    UPDATE app.license_invoice_instalments
     SET payment_link = ${link}, updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
-    WHERE school_id = current_setting('app.school_id')::uuid AND id = ${invoiceId}::uuid
+    WHERE school_id = current_setting('app.school_id')::uuid AND id = ${target.id}::uuid
   `;
   await auditLicenseChange(tx, schoolId, actor, {
     action: "update",
-    targetTable: "license_invoices",
-    targetId: invoiceId,
-    oldValues: { payment_link: invoice.paymentLink },
-    newValues: { payment_link: link },
+    targetTable: "license_invoice_instalments",
+    targetId: target.id,
+    oldValues: { payment_link: target.payment_link },
+    newValues: { payment_link: link, invoice_id: invoiceId, position: target.position },
   });
   return (await readInvoice(tx, invoiceId))!;
 }
@@ -1238,7 +1439,9 @@ export async function voidInvoice(
 
 /**
  * Activate the invoice's license before it is paid, with the date payment is now due. The invoice
- * stays open; its due date moves (and an overdue mark is cleared when the new date is not past).
+ * stays open; the instalment to pay now falls due on that date instead, and so does the invoice (an
+ * overdue mark is cleared when the new date is not past). The date may not pass the next
+ * instalment's.
  */
 export async function activateEarly(
   tx: TransactionSql,
@@ -1255,7 +1458,23 @@ export async function activateEarly(
   if (dueDate < invoice.issueDate)
     throw licenseError(422, ERROR_CODES.VALIDATION_FAILED, actor.locale);
 
+  const rows = await instalmentRows(tx, invoiceId, { forUpdate: true });
+  const currentIndex = rows.findIndex((row) => row.status !== "paid");
+  const current = rows[currentIndex]!;
+  const previous = currentIndex > 0 ? rows[currentIndex - 1] : undefined;
+  const following = rows[currentIndex + 1];
+  if ((following && dueDate > following.due_date) || (previous && dueDate < previous.due_date)) {
+    throw licenseError(422, ERROR_CODES.LICENSE_PAYMENT_SCHEDULE_INVALID, actor.locale);
+  }
+
   const clearsOverdue = dueDate >= utcDate(now);
+  await tx`
+    UPDATE app.license_invoice_instalments
+    SET due_date = ${dueDate}::date,
+        overdue_at = ${clearsOverdue ? null : tx`overdue_at`},
+        updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
+    WHERE school_id = current_setting('app.school_id')::uuid AND id = ${current.id}::uuid
+  `;
   await tx`
     UPDATE app.license_invoices
     SET due_date = ${dueDate}::date,
@@ -1268,7 +1487,11 @@ export async function activateEarly(
     targetTable: "license_invoices",
     targetId: invoiceId,
     oldValues: { due_date: invoice.dueDate, overdue_at: invoice.overdueAt },
-    newValues: { due_date: dueDate, overdue_at: clearsOverdue ? null : invoice.overdueAt },
+    newValues: {
+      due_date: dueDate,
+      overdue_at: clearsOverdue ? null : invoice.overdueAt,
+      instalment_id: current.id,
+    },
   });
 
   const license = await readLicense(tx, invoice.licenseId);
