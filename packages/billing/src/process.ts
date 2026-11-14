@@ -38,6 +38,7 @@ import {
 import {
   extractAddonHint,
   extractCustomerId,
+  extractMetadata,
   extractPeriod,
   extractSchoolIdHint,
   extractSubscriptionItemId,
@@ -49,6 +50,9 @@ import type { BillingEventSource } from "./billing-event-store";
 import type { SubscriptionKind } from "./state-machine";
 import type { SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
+
+/** `metadata.studafy_purpose` of provider objects the API settles itself (see `processEvent`). */
+const API_SETTLED_PURPOSES: ReadonlySet<string> = new Set(["storage_change", "storage_card_setup"]);
 
 // ---------------------------------------------------------------------------
 // Grace window policy (ST-134)
@@ -254,6 +258,14 @@ async function applyClaimedEvent(
     if (event.provider === "stripe") {
       await applyCustomerSideEffects(tx, event.type, event.data);
     }
+    await markProcessed(tx, rowId);
+    return { outcome: "processed", transitioned: false };
+  }
+
+  // Objects the API settles itself (000222): the invoice of an immediate storage change, paid with
+  // the card the school chose, and a checkout that only saves a card. Recorded, never applied --
+  // a card-saving checkout would otherwise read as a completed purchase of the school plan.
+  if (API_SETTLED_PURPOSES.has(String(extractMetadata(event.data).studafy_purpose ?? ""))) {
     await markProcessed(tx, rowId);
     return { outcome: "processed", transitioned: false };
   }

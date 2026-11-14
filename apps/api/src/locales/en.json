@@ -154,6 +154,7 @@
   "STORAGE_ADDON_UNSETTLED": "Your storage plan has a payment due or an amount from an earlier change that isn't settled yet. Nothing was charged. Try again after your next bill, or contact Studafy.",
   "STORAGE_ADDON_NO_PENDING_CHANGE": "There is no scheduled storage change to undo.",
   "STORAGE_ADDON_REFUND_INVALID": "This invoice can't be refunded for that amount.",
+  "STORAGE_ADDON_CARD_INVALID": "That card isn't one of your school's saved cards. Choose another card or add a new one.",
   "EXAM_NOT_FOUND": "Exam not found",
   "EXAM_INVALID_STATE": "Exam is not in a valid state for this operation",
   "MATERIAL_NOT_FOUND": "Material not found",

@@ -22,7 +22,12 @@ when it required the `version-bump` label.
   `STORAGE_ADDON_UNSETTLED` while a payment is due or an earlier change left an amount pending. New
   `POST /api/subscriptions/storage/change/undo` (409 `STORAGE_ADDON_NO_PENDING_CHANGE`),
   `GET /api/subscriptions/storage/billing` (`StorageAddOnBilling`: card, next bill, invoices) and
-  `POST /api/subscriptions/storage/payment-method` (a card-only Stripe Billing Portal page). Platform:
+  `POST /api/subscriptions/storage/payment-method` (a card-only Stripe Billing Portal page),
+  `GET /api/subscriptions/storage/cards` (`StorageAddOnCard[]`: brand, last 4, expiry, `isDefault`)
+  and `POST /api/subscriptions/storage/cards/setup` (save a new card, nothing charged). The change
+  body takes optional `paymentMethodId` (the card to charge; only that card is tried; 422
+  `STORAGE_ADDON_CARD_INVALID` when it is not the school's) and `useForRenewals` (default false).
+  Platform:
   `GET /api/platform/schools/{schoolId}/storage-subscription` (`PlatformStorageSubscription`) and
   `POST /api/platform/schools/{schoolId}/storage-subscription/invoices/{invoiceId}/refund`
   (`PlatformStorageRefund`; 422 `STORAGE_ADDON_REFUND_INVALID`). `GET /api/platform/health` adds

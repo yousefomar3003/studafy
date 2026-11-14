@@ -420,3 +420,20 @@
 .storage-history {
   overflow-x: auto;
 }
+
+/* "Pay with": the saved cards for a storage change. */
+.storage-pay-with {
+  display: grid;
+  gap: var(--space-8);
+  margin: var(--space-12) 0 0;
+  padding: var(--space-12);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+}
+
+.storage-pay-with__card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8);
+}

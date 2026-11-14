@@ -476,6 +476,16 @@
         "other": "—"
       },
       "receipt": "View receipt"
+    },
+    "payWith": {
+      "title": "Pay with",
+      "loadError": "Your saved cards couldn't be loaded. Try again in a moment.",
+      "none": "No saved card yet. Add one to pay.",
+      "renewalCard": "Renewal card",
+      "addCard": "Use a new card",
+      "alsoRenewals": "Also use this card for renewals",
+      "added": "Your new card is saved. Choose it below.",
+      "addError": "The card page couldn't be opened"
     }
   },
   "aiRequest": {

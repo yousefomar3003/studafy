@@ -21,6 +21,7 @@ export type StorageInterval = StoragePrice["interval"];
 export type StorageChangePreview = Schemas["StorageAddOnChangePreview"];
 export type StorageBilling = NonNullable<Schemas["StorageAddOnBilling"]>;
 export type StorageInvoice = Schemas["StorageAddOnInvoice"];
+export type StorageCard = Schemas["StorageAddOnCard"];
 
 export const STORAGE_OFFER_KEY = ["storage-addon-offer"];
 
@@ -95,6 +96,10 @@ export interface StorageChangeInput {
   expectedAmountMinor: number;
   /** One per confirmation, so a repeated request can never charge twice. */
   requestKey: string;
+  /** The saved card to pay with; only this card is charged. */
+  paymentMethodId?: string | null;
+  /** Also make it the card renewals are charged to. */
+  useForRenewals?: boolean;
 }
 
 export function useChangeStorageTier() {
@@ -154,6 +159,30 @@ export function useStoragePaymentMethodSession() {
         body: { returnUrl },
       });
       return required(data, "Payment method page");
+    },
+  });
+}
+
+/** The school's saved cards to pay a storage change with, the renewal card first. */
+export function useStorageCardsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: ["storage-addon-cards"],
+    enabled,
+    staleTime: 0,
+    retry: false,
+    queryFn: async () => {
+      const { data } = await api.GET("/api/subscriptions/storage/cards");
+      return (data?.cards ?? []) as StorageCard[];
+    },
+  });
+}
+
+/** A hosted page to save a new card (nothing is charged); the caller sends the browser to `url`. */
+export function useStorageCardSetup() {
+  return useMutation({
+    mutationFn: async (input: { successUrl: string; cancelUrl: string }) => {
+      const { data } = await api.POST("/api/subscriptions/storage/cards/setup", { body: input });
+      return required(data, "Card setup page");
     },
   });
 }

@@ -387,6 +387,8 @@ export const ERROR_CODES = {
   STORAGE_ADDON_NO_PENDING_CHANGE: "STORAGE_ADDON_NO_PENDING_CHANGE",
   // The invoice is not one of this school's storage invoices, or has nothing left to refund.
   STORAGE_ADDON_REFUND_INVALID: "STORAGE_ADDON_REFUND_INVALID",
+  // The card chosen to pay is not one of the school's saved cards.
+  STORAGE_ADDON_CARD_INVALID: "STORAGE_ADDON_CARD_INVALID",
 
   // Manual grants (db/migrations/000211): storage and tiers Studafy staff grant by hand.
   // No such grant in this school.

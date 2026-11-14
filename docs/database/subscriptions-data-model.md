@@ -94,6 +94,12 @@ when an event shows the subscription on the scheduled price; undoing or cancelli
 schedule and clears the columns. A change is refused while one is scheduled, while a payment is due,
 or while the Stripe customer has pending invoice items.
 
+An immediate change is paid with the card the school chose: the API builds and finalizes the
+proration invoice itself (`auto_advance: false`, `metadata.studafy_purpose = storage_change`), checks
+its amount and pays it with that card only; a decline voids it and restores the old price. The
+webhook pipeline records but never applies objects marked `storage_change` or
+`storage_card_setup`.
+
 After an immediate change the API reads back the invoice Stripe created. Anything it took beyond the
 confirmed amount is refunded at once and recorded in `app.storage_billing_incidents` (`refunded`, or
 `needs_review` when the refund failed), shown on the platform system-health page and on the school's

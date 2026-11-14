@@ -211,11 +211,25 @@ export interface ChangeSubscriptionPriceInput {
   idempotencyKey: string;
   /** Replaces the subscription's metadata keys given here (the new local `price_id`, say). */
   metadata: Record<string, string>;
+  /**
+   * With `chargeNow`: the amount the buyer confirmed. The invoice is built and checked against it
+   * before anything is charged; a different amount charges nothing (`failure: "amount_changed"`).
+   */
+  expectedAmountMinor?: number;
+  /**
+   * With `chargeNow`: the card to charge, one of the customer's own (`listPaymentMethods`). Only
+   * this card is tried, and the renewal card is left as it is. Null: the subscription's default.
+   */
+  paymentMethodId?: string | null;
 }
 
 export interface ChangeSubscriptionPriceResult {
-  /** False when the provider is holding the change until a payment succeeds: nothing changed yet. */
+  /** False when nothing changed: the payment did not go through, or the amount was not the one confirmed. */
   applied: boolean;
+  /** Why nothing changed, when `applied` is false. */
+  failure?: "declined" | "amount_changed";
+  /** The provider's reason for a decline, for the buyer ("Your card has insufficient funds."). */
+  declineMessage?: string;
   /**
    * The invoice this change created (with `chargeNow`), as the provider recorded it: what the card
    * was actually charged, to check against what the buyer confirmed. Null when none was created.
@@ -239,6 +253,13 @@ export interface ScheduleSubscriptionPriceChangeResult {
   scheduleId: string;
   /** When the new price starts: the end of the current period. */
   effectiveAt: Date;
+}
+
+/** A saved card of the customer, as the payer picks it: never the full number. */
+export interface SavedPaymentMethod extends PaymentMethodSummary {
+  id: string;
+  /** The card renewals are charged to. */
+  isDefault: boolean;
 }
 
 /** A card or other payment method, as the buyer would recognise it. */
@@ -408,6 +429,22 @@ export interface PaymentProviderPort {
     customerId: string;
     returnUrl: string;
   }): Promise<CreateBillingPortalSessionResult>;
+  /** The customer's saved cards, the subscription's renewal card marked as default. */
+  listPaymentMethods?(input: {
+    customerId: string;
+    providerSubscriptionId: string | null;
+  }): Promise<SavedPaymentMethod[]>;
+  /** A hosted page where the customer saves a new card without paying anything. */
+  createCardSetupSession?(input: {
+    customerId: string;
+    successUrl: string;
+    cancelUrl: string;
+  }): Promise<CreateBillingPortalSessionResult>;
+  /** Make `paymentMethodId` the card the subscription renews on. */
+  setSubscriptionPaymentMethod?(input: {
+    providerSubscriptionId: string;
+    paymentMethodId: string;
+  }): Promise<void>;
   /** The bill `changeSubscriptionPrice` would produce. Implemented wherever it is. */
   previewSubscriptionPriceChange?(
     input: PreviewSubscriptionPriceChangeInput,

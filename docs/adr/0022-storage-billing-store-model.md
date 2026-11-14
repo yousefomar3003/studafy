@@ -39,12 +39,24 @@ charge were computed differently, so the amount confirmed was not the amount cha
    back. Anything taken beyond the confirmed amount is refunded at once (idempotency key from the
    invoice and the confirmation) and recorded in `app.storage_billing_incidents`; a refund that fails
    is recorded as `needs_review`. Both show on the platform system-health page.
-5. **Manage subscription** on the school's storage page: plan, renewal or end date, next bill, card,
+5. **The payer chooses the card for every payment they make**, like a store's payment sheet; only
+   automatic renewals charge the renewal card on their own. The change dialog lists the school's
+   saved cards (brand, last four, expiry; the renewal card chosen by default) and **Use a new card**
+   (Stripe Checkout in setup mode: the card is saved, nothing is charged, and the page returns to the
+   same change). The immediate change swaps the price with `create_prorations`, builds an invoice of
+   exactly those prorations, finalizes it with `auto_advance: false` (so Stripe makes no attempt of
+   its own on the default card), checks its amount against the confirmed one, and pays it with the
+   chosen card only. A declined card, or any other amount, voids the invoice and puts the old price
+   back: nothing changes, and the school can pick another card. Choosing a card never changes the
+   renewal card; **Also use this card for renewals** (unticked by default) does. The card must be one
+   of the school's own (422 `STORAGE_ADDON_CARD_INVALID`). Webhooks leave that invoice, and the
+   card-saving checkout, alone (`metadata.studafy_purpose`).
+6. **Manage subscription** on the school's storage page: plan, renewal or end date, next bill, card,
    **Update card** (Stripe's Billing Portal, limited by a configuration Studafy creates to replacing the
    card and reading invoices — no plan changes or cancellation there, so Stripe and Studafy never
    disagree), **Cancel subscription** / **Resume subscription** (one plain confirmation; cancelling
    drops a scheduled change) and **Billing history** with receipts.
-6. **Super admin**: the school's platform page shows the add-on, any scheduled change, its Stripe
+7. **Super admin**: the school's platform page shows the add-on, any scheduled change, its Stripe
    invoices (paid and refunded), its incidents, and a **Refund** action (full or partial, reason
    required, audited, idempotent, never more than is left on the invoice).
 
@@ -54,6 +66,8 @@ charge were computed differently, so the amount confirmed was not the amount cha
 - A school with a leftover pending credit from before this change cannot change tier until its next
   renewal consumes it (or the super admin settles it in Stripe); the message says so and nothing is
   charged.
+- A card that needs the bank's confirmation (3-D Secure) cannot be charged off-session for a change;
+  it is declined with nothing changed, and the school can choose another card.
 - Stripe's Billing Portal configuration is created by the API the first time a school opens
   **Update card**; nothing has to be configured in the Stripe dashboard.
 

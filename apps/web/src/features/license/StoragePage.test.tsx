@@ -28,6 +28,33 @@ let previewAmounts: number[] = [];
 let changeRefusals = 0;
 /** When the previewed change takes effect: at once with a charge, or at the next renewal. */
 let previewTiming: "now" | "renewal" = "now";
+/** The next change answers "card declined" while this is above 0. */
+let declines = 0;
+
+const CARDS = [
+  { id: "pm_renewal", brand: "visa", last4: "4242", expMonth: 3, expYear: 2029, isDefault: true },
+  {
+    id: "pm_other",
+    brand: "mastercard",
+    last4: "4444",
+    expMonth: 8,
+    expYear: 2028,
+    isDefault: false,
+  },
+];
+
+function declined() {
+  return new ApiError({
+    status: 402,
+    title: "Payment Required",
+    code: "STORAGE_ADDON_PAYMENT_FAILED",
+    detail: "The payment for this change didn't go through, so nothing was changed.",
+    instance: null,
+    type: null,
+    request_id: null,
+    problem: null,
+  });
+}
 
 const BILLING = {
   paymentMethod: { brand: "visa", last4: "4242", expMonth: 3, expYear: 2029 },
@@ -115,6 +142,8 @@ const getMock = mock((path: string) => {
       return Promise.resolve({ data: { license: null, usage: [], openChangeRequests: [] } });
     case "/api/school/license/invoices":
       return Promise.resolve({ data: { invoices: [] } });
+    case "/api/subscriptions/storage/cards":
+      return Promise.resolve({ data: { cards: CARDS } });
     case "/api/subscriptions/storage/billing":
       return Promise.resolve({ data: current ? BILLING : null });
     default:
@@ -151,6 +180,10 @@ const postMock = mock((path: string, init?: { body?: Record<string, unknown> }) 
         changeRefusals -= 1;
         return Promise.reject(priceChanged());
       }
+      if (declines > 0) {
+        declines -= 1;
+        return Promise.reject(declined());
+      }
       return Promise.resolve({
         data: {
           ...current,
@@ -167,6 +200,8 @@ const postMock = mock((path: string, init?: { body?: Record<string, unknown> }) 
       });
     case "/api/subscriptions/storage/change/undo":
       return Promise.resolve({ data: { ...current, pendingChange: null } });
+    case "/api/subscriptions/storage/cards/setup":
+      return Promise.resolve({ data: { url: "https://checkout.example/setup" } });
     case "/api/subscriptions/storage/payment-method":
       return Promise.resolve({ data: { url: "https://billing.example/portal" } });
     case "/api/subscriptions/storage/cancel":
@@ -216,6 +251,7 @@ afterEach(() => {
   previewAmounts = [];
   changeRefusals = 0;
   previewTiming = "now";
+  declines = 0;
   getMock.mockClear();
   postMock.mockClear();
   assign.mockClear();
@@ -278,8 +314,82 @@ describe("StoragePage", () => {
       priceId: P1TM,
       prorationDate: "2026-11-14T10:00:00.000Z",
       expectedAmountMinor: 3871,
+      paymentMethodId: "pm_renewal",
+      useForRenewals: false,
     });
     expect(typeof init.body.requestKey).toBe("string");
+  });
+
+  test("the school picks the card to pay with; renewals stay on their card unless ticked", async () => {
+    withStorage();
+    await renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch to 1 TB" }));
+    const dialog = await screen.findByRole("dialog", { name: "Switch to 1 TB?" });
+    const renewal = (await within(dialog).findByLabelText(
+      /Visa ending in 4242 \(expires 03\/2029\)/,
+    )) as HTMLInputElement;
+    await waitFor(() => expect(renewal.checked).toBe(true));
+    expect(within(dialog).queryByLabelText("Also use this card for renewals")).toBeNull();
+
+    fireEvent.click(
+      within(dialog).getByLabelText(/Mastercard ending in 4444 \(expires 08\/2028\)/),
+    );
+    const also = within(dialog).getByLabelText(
+      "Also use this card for renewals",
+    ) as HTMLInputElement;
+    expect(also.checked).toBe(false);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pay $38.71 and switch" }));
+    await waitFor(() => expect(posts("/api/subscriptions/storage/change")).toHaveLength(1));
+    const [, init] = posts("/api/subscriptions/storage/change")[0]! as [
+      string,
+      { body: Record<string, unknown> },
+    ];
+    expect(init.body).toMatchObject({ paymentMethodId: "pm_other", useForRenewals: false });
+  });
+
+  test("a declined card keeps the dialog open to try another card, with a new key", async () => {
+    withStorage();
+    declines = 1;
+    await renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch to 1 TB" }));
+    const dialog = await screen.findByRole("dialog", { name: "Switch to 1 TB?" });
+    await within(dialog).findByLabelText(/Visa ending in 4242 \(expires 03\/2029\)/);
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Pay $38.71 and switch" }));
+
+    expect(await within(dialog).findByTestId("storage-pay-error")).toBeTruthy();
+    fireEvent.click(
+      within(dialog).getByLabelText(/Mastercard ending in 4444 \(expires 08\/2028\)/),
+    );
+    fireEvent.click(within(dialog).getByLabelText("Also use this card for renewals"));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pay $38.71 and switch" }));
+
+    await waitFor(() => expect(posts("/api/subscriptions/storage/change")).toHaveLength(2));
+    const [first, second] = posts("/api/subscriptions/storage/change").map(
+      (call) => (call as [string, { body: Record<string, unknown> }])[1].body,
+    );
+    expect(first!.paymentMethodId).toBe("pm_renewal");
+    expect(second).toMatchObject({ paymentMethodId: "pm_other", useForRenewals: true });
+    expect(second!.requestKey).not.toBe(first!.requestKey);
+  });
+
+  test("using a new card goes to the card page and comes back to this change", async () => {
+    withStorage();
+    await renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch to 1 TB" }));
+    const dialog = await screen.findByRole("dialog", { name: "Switch to 1 TB?" });
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Use a new card" }));
+
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://checkout.example/setup"));
+    const [, init] = posts("/api/subscriptions/storage/cards/setup")[0]! as [
+      string,
+      { body: { successUrl: string; cancelUrl: string } },
+    ];
+    expect(init.body.successUrl).toContain(`switch=${P1TM}`);
+    expect(init.body.successUrl).toContain("card=added");
   });
 
   test("when the amount moved, nothing is charged and the new amount is shown to confirm", async () => {
@@ -332,7 +442,7 @@ describe("StoragePage", () => {
     await renderPage();
 
     expect(await screen.findByRole("heading", { name: "Manage subscription" })).toBeTruthy();
-    expect(await screen.findByText("Visa ending in 4242 (expires 03/2029)")).toBeTruthy();
+    expect(await screen.findByText(/Visa ending in 4242 \(expires 03\/2029\)/)).toBeTruthy();
     expect(screen.getByTestId("storage-next-bill").textContent).toContain("$10.00 on");
     const history = screen.getByRole("table", { name: "Billing history" });
     expect(within(history).getByText("First payment")).toBeTruthy();

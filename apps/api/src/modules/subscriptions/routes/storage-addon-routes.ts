@@ -10,7 +10,9 @@ import { AUTH_CHANNELS } from "../../auth/channels";
 import { createStorageCheckoutSession } from "../services/checkout-service";
 import {
   changeStorageTier,
+  createStorageCardSetupSession,
   createStoragePaymentMethodSession,
+  listStorageCards,
   getStorageBilling,
   getStorageOffer,
   previewStorageTierChange,
@@ -160,6 +162,21 @@ const StorageChangeRequestSchema = z.object({
   requestKey: z.string().uuid().openapi({
     description: "One per confirmation. Repeating a request with the same key never charges twice.",
   }),
+  paymentMethodId: z
+    .string()
+    .min(1)
+    .max(255)
+    .nullable()
+    .optional()
+    .openapi({
+      description:
+        "The saved card (GET /cards) to pay an immediate change with; only this card is charged. " +
+        "Absent or null: the card renewals are charged to. 422 STORAGE_ADDON_CARD_INVALID when it is " +
+        "not one of the school's cards.",
+    }),
+  useForRenewals: z.boolean().optional().openapi({
+    description: "Also make that card the one renewals are charged to. Default false.",
+  }),
 });
 
 const StorageCancellationSchema = z
@@ -205,6 +222,22 @@ const StorageBillingSchema = z
   .openapi("StorageAddOnBilling");
 
 const PaymentMethodSessionRequestSchema = z.object({ returnUrl: z.string().url() });
+
+const SavedCardSchema = z
+  .object({
+    id: z.string(),
+    brand: z.string(),
+    last4: z.string().nullable(),
+    expMonth: z.number().int().nullable(),
+    expYear: z.number().int().nullable(),
+    isDefault: z.boolean().openapi({ description: "The card renewals are charged to." }),
+  })
+  .openapi("StorageAddOnCard");
+
+const CardSetupRequestSchema = z.object({
+  successUrl: z.string().url(),
+  cancelUrl: z.string().url(),
+});
 
 const BASE = "/api/subscriptions/storage";
 
@@ -371,6 +404,38 @@ const paymentMethodRoute = createRoute({
   ),
 });
 
+const cardsRoute = createRoute({
+  method: "get",
+  path: `${BASE}/cards`,
+  tags: ["Subscriptions"],
+  operationId: "listStorageAddOnCards",
+  summary: "The school's saved cards to pay a storage change with",
+  description:
+    "Brand, last four digits and expiry only; the renewal card first. license:manage; web only.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "Saved cards", schema: z.object({ cards: z.array(SavedCardSchema) }) } },
+    [401, 403, 409, 502, 503],
+  ),
+});
+
+const cardSetupRoute = createRoute({
+  method: "post",
+  path: `${BASE}/cards/setup`,
+  tags: ["Subscriptions"],
+  operationId: "createStorageAddOnCardSetup",
+  summary: "Save a new card to pay with",
+  description:
+    "A hosted page where the school saves a card; nothing is charged and the renewal card does " +
+    "not change. license:manage; web only.",
+  security: [{ bearerAuth: [] }],
+  request: { body: { content: { "application/json": { schema: CardSetupRequestSchema } } } },
+  responses: standardResponses(
+    { 200: { description: "The page to open", schema: z.object({ url: z.string() }) } },
+    [400, 401, 403, 409, 502, 503],
+  ),
+});
+
 export function serializeCurrent(current: StorageAddonCurrent) {
   return {
     ...current,
@@ -403,6 +468,8 @@ export function storageAddonRoutes(
   );
   app.use("/api/subscriptions/storage/change/undo", requirePermission(PERMISSIONS.LICENSE_MANAGE));
   app.use("/api/subscriptions/storage/billing", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use("/api/subscriptions/storage/cards", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use("/api/subscriptions/storage/cards/setup", requirePermission(PERMISSIONS.LICENSE_MANAGE));
   app.use(
     "/api/subscriptions/storage/payment-method",
     requirePermission(PERMISSIONS.LICENSE_MANAGE),
@@ -481,6 +548,8 @@ export function storageAddonRoutes(
       prorationDate: new Date(body.prorationDate),
       expectedAmountMinor: body.expectedAmountMinor,
       requestKey: body.requestKey,
+      paymentMethodId: body.paymentMethodId ?? null,
+      useForRenewals: body.useForRenewals ?? false,
       tenantContext: {
         schoolId: auth.schoolId,
         userId: auth.userId,
@@ -514,6 +583,35 @@ export function storageAddonRoutes(
       },
     });
     return c.json(billing ? serializeBilling(billing) : null, 200);
+  });
+
+  app.openapi(cardsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const cards = await listStorageCards(database, providers, {
+      schoolId: auth.schoolId,
+      tenantContext: {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        requestId: c.get("requestId"),
+      },
+    });
+    return c.json({ cards }, 200);
+  });
+
+  app.openapi(cardSetupRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+    const session = await createStorageCardSetupSession(database, providers, {
+      schoolId: auth.schoolId,
+      successUrl: body.successUrl,
+      cancelUrl: body.cancelUrl,
+      tenantContext: {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        requestId: c.get("requestId"),
+      },
+    });
+    return c.json({ url: session.url }, 200);
   });
 
   app.openapi(paymentMethodRoute, async (c) => {

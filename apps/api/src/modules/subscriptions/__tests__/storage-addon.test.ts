@@ -164,6 +164,11 @@ interface FakeStripe {
   refundFails: boolean;
   billing: SubscriptionBillingSummary;
   portalSessions: { customerId: string; returnUrl: string }[];
+  /** Saved cards of the customer; the first is the renewal card. */
+  cards: { id: string; brand: string; last4: string }[];
+  /** Cards whose charge is declined. */
+  decliningCards: Set<string>;
+  renewalCardChanges: { providerSubscriptionId: string; paymentMethodId: string }[];
 }
 
 /** When a scheduled change takes effect in the fake: the end of the current period. */
@@ -207,6 +212,12 @@ function fakeStripe(): FakeStripe {
       ],
     },
     portalSessions: [],
+    cards: [
+      { id: "pm_renewal", brand: "visa", last4: "4242" },
+      { id: "pm_other", brand: "mastercard", last4: "4444" },
+    ],
+    decliningCards: new Set(),
+    renewalCardChanges: [],
     port: undefined as unknown as PaymentProviderPort,
   };
   fake.port = {
@@ -231,6 +242,14 @@ function fakeStripe(): FakeStripe {
       fake.changes.push(input);
       // Long enough for a concurrent request to reach the row lock while this one holds it.
       await new Promise((resolve) => setTimeout(resolve, 50));
+      if (input.paymentMethodId && fake.decliningCards.has(input.paymentMethodId)) {
+        return {
+          applied: false,
+          failure: "declined",
+          declineMessage: "Your card has insufficient funds.",
+          invoice: null,
+        };
+      }
       return {
         applied: fake.applyChanges,
         invoice: fake.applyChanges
@@ -254,6 +273,22 @@ function fakeStripe(): FakeStripe {
       return Promise.resolve();
     },
     countPendingInvoiceItems: () => Promise.resolve({ ...fake.pendingItems }),
+    listPaymentMethods: () =>
+      Promise.resolve(
+        fake.cards.map((card, index) => ({
+          ...card,
+          expMonth: 12,
+          expYear: 2030,
+          isDefault: index === 0,
+        })),
+      ),
+    setSubscriptionPaymentMethod: (input: {
+      providerSubscriptionId: string;
+      paymentMethodId: string;
+    }) => {
+      fake.renewalCardChanges.push(input);
+      return Promise.resolve();
+    },
     describeSubscriptionBilling: () => Promise.resolve(fake.billing),
     createPaymentMethodPortalSession: (input: { customerId: string; returnUrl: string }) => {
       fake.portalSessions.push(input);
@@ -666,7 +701,13 @@ describe("changing and canceling", () => {
     f: BillingFixture,
     stripe: FakeStripe,
     priceId: string,
-    confirmed: { prorationDate: Date; expectedAmountMinor: number; requestKey?: string },
+    confirmed: {
+      prorationDate: Date;
+      expectedAmountMinor: number;
+      requestKey?: string;
+      paymentMethodId?: string | null;
+      useForRenewals?: boolean;
+    },
   ) {
     return changeStorageTier(f.db.sql, registry(stripe), {
       schoolId: f.schoolId,
@@ -674,6 +715,8 @@ describe("changing and canceling", () => {
       prorationDate: confirmed.prorationDate,
       expectedAmountMinor: confirmed.expectedAmountMinor,
       requestKey: confirmed.requestKey ?? "6f1d1c2e-1111-4a4a-8b8b-000000000001",
+      paymentMethodId: confirmed.paymentMethodId,
+      useForRenewals: confirmed.useForRenewals,
       tenantContext: { schoolId: f.schoolId },
     });
   }
@@ -810,6 +853,147 @@ describe("changing and canceling", () => {
     expect(await storageRow(f)).toMatchObject({ plan_price_id: prices.gb100Monthly });
     expect(await capOf(f)).toBe(100 * GIB);
   });
+
+  integrationTest(
+    "the card the school chose is the only one charged, and the renewal card stays",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought(f, "sub_storage_card");
+      const stripe = fakeStripe();
+      const shown = await preview(f, stripe, prices.tb1Monthly);
+
+      await change(f, stripe, prices.tb1Monthly, {
+        prorationDate: shown.prorationDate,
+        expectedAmountMinor: shown.amountDueNowMinor,
+        paymentMethodId: "pm_other",
+      });
+
+      expect(stripe.changes).toHaveLength(1);
+      expect(stripe.changes[0]).toMatchObject({
+        paymentMethodId: "pm_other",
+        expectedAmountMinor: shown.amountDueNowMinor,
+      });
+      expect(stripe.renewalCardChanges).toEqual([]);
+      expect(await capOf(f)).toBe(1024 * GIB);
+    },
+  );
+
+  integrationTest("the chosen card becomes the renewal card only when asked", async () => {
+    const f = await createBillingFixture(database!);
+    await bought(f, "sub_storage_card_renewal");
+    const stripe = fakeStripe();
+    const shown = await preview(f, stripe, prices.tb1Monthly);
+
+    await change(f, stripe, prices.tb1Monthly, {
+      prorationDate: shown.prorationDate,
+      expectedAmountMinor: shown.amountDueNowMinor,
+      paymentMethodId: "pm_other",
+      useForRenewals: true,
+    });
+
+    expect(stripe.renewalCardChanges).toEqual([
+      { providerSubscriptionId: "sub_storage_card_renewal", paymentMethodId: "pm_other" },
+    ]);
+  });
+
+  integrationTest(
+    "a declined chosen card changes nothing, and another card can be tried",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought(f, "sub_storage_card_declined");
+      const stripe = fakeStripe();
+      stripe.decliningCards.add("pm_other");
+      const shown = await preview(f, stripe, prices.tb1Monthly);
+
+      await expectCode(
+        change(f, stripe, prices.tb1Monthly, {
+          prorationDate: shown.prorationDate,
+          expectedAmountMinor: shown.amountDueNowMinor,
+          paymentMethodId: "pm_other",
+          useForRenewals: true,
+          requestKey: "6f1d1c2e-1111-4a4a-8b8b-0000000000e1",
+        }),
+        402,
+        ERROR_CODES.STORAGE_ADDON_PAYMENT_FAILED,
+      );
+      expect(await storageRow(f)).toMatchObject({ plan_price_id: prices.gb100Monthly });
+      expect(await capOf(f)).toBe(100 * GIB);
+      expect(stripe.renewalCardChanges).toEqual([]);
+
+      await change(f, stripe, prices.tb1Monthly, {
+        prorationDate: shown.prorationDate,
+        expectedAmountMinor: shown.amountDueNowMinor,
+        paymentMethodId: "pm_renewal",
+        requestKey: "6f1d1c2e-1111-4a4a-8b8b-0000000000e2",
+      });
+      expect(await capOf(f)).toBe(1024 * GIB);
+    },
+  );
+
+  integrationTest(
+    "a card that is not the school's own is refused before anything is charged",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought(f, "sub_storage_card_foreign");
+      const stripe = fakeStripe();
+      const shown = await preview(f, stripe, prices.tb1Monthly);
+
+      await expectCode(
+        change(f, stripe, prices.tb1Monthly, {
+          prorationDate: shown.prorationDate,
+          expectedAmountMinor: shown.amountDueNowMinor,
+          paymentMethodId: "pm_someone_else",
+        }),
+        422,
+        ERROR_CODES.STORAGE_ADDON_CARD_INVALID,
+      );
+      expect(stripe.changes).toHaveLength(0);
+    },
+  );
+
+  integrationTest(
+    "webhooks leave alone the invoice the API pays and the checkout that only saves a card",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought(f, "sub_storage_settled");
+
+      const failed = await deliver(f, {
+        id: "evt_change_invoice_failed",
+        type: "invoice.payment_failed",
+        created: 1_700_000_400,
+        data: {
+          object: "invoice",
+          id: "in_change_declined",
+          customer: f.stripeCustomerId,
+          metadata: { studafy_purpose: "storage_change" },
+          parent: {
+            subscription_details: {
+              subscription: "sub_storage_settled",
+              metadata: { school_id: f.schoolId, addon: "storage" },
+            },
+          },
+        },
+      });
+      expect(failed).toEqual({ received: true, outcome: "processed" });
+      expect((await storageRow(f))?.status).toBe("active");
+
+      const saved = await deliver(f, {
+        id: "evt_card_setup",
+        type: "checkout.session.completed",
+        created: 1_700_000_500,
+        data: {
+          object: "checkout.session",
+          id: "cs_setup",
+          mode: "setup",
+          customer: f.stripeCustomerId,
+          metadata: { studafy_purpose: "storage_card_setup" },
+        },
+      });
+      expect(saved).toEqual({ received: true, outcome: "processed" });
+      // Without the exception this completion would have activated the school's own plan.
+      expect(await readSubscriptionStatus(f, f.subscriptionId)).toBe("trialing");
+    },
+  );
 
   integrationTest(
     "anything charged beyond the confirmed amount is refunded at once and recorded",

@@ -477,6 +477,8 @@ const EXPECTED_PATHS = [
   "/api/subscriptions/storage/cancel/reverse",
   "/api/subscriptions/storage/change",
   "/api/subscriptions/storage/change/preview",
+  "/api/subscriptions/storage/cards",
+  "/api/subscriptions/storage/cards/setup",
   "/api/platform/schools/{schoolId}/storage-subscription",
   "/api/platform/schools/{schoolId}/storage-subscription/invoices/{invoiceId}/refund",
   "/api/subscriptions/storage/billing",

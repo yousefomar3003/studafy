@@ -31,7 +31,11 @@ import { selectPaymentProviderForSchool } from "../payment-provider-routing";
 import type { Database } from "../../../db";
 import type { TenantContext } from "../../../db/tenant-tx";
 import type { PaymentProviderRegistry, SelectedPaymentProvider } from "../payment-provider-routing";
-import type { PaymentMethodSummary, SubscriptionInvoiceSummary } from "../ports/payment-provider";
+import type {
+  PaymentMethodSummary,
+  SavedPaymentMethod,
+  SubscriptionInvoiceSummary,
+} from "../ports/payment-provider";
 import type { StorageAddonPlanCode, SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
@@ -512,6 +516,13 @@ export interface ChangeStorageTierParams {
   expectedAmountMinor: number;
   /** One per confirmation: a repeat of the same request never charges twice. */
   requestKey: string;
+  /**
+   * The saved card to pay an immediate change with (`listStorageCards`); null or absent: the card
+   * renewals are charged to. Only this card is charged.
+   */
+  paymentMethodId?: string | null;
+  /** Also make that card the one renewals are charged to. Off unless the school asks for it. */
+  useForRenewals?: boolean;
   tenantContext: TenantContext;
 }
 
@@ -621,8 +632,16 @@ export async function changeStorageTier(
   providers: PaymentProviderRegistry,
   params: ChangeStorageTierParams,
 ): Promise<StorageAddonCurrent> {
-  const { schoolId, priceId, prorationDate, expectedAmountMinor, requestKey, tenantContext } =
-    params;
+  const {
+    schoolId,
+    priceId,
+    prorationDate,
+    expectedAmountMinor,
+    requestKey,
+    paymentMethodId = null,
+    useForRenewals = false,
+    tenantContext,
+  } = params;
 
   const age = Date.now() - prorationDate.getTime();
   if (age > STORAGE_CHANGE_PREVIEW_TTL_MS || age < -60_000) throw priceChanged();
@@ -677,6 +696,26 @@ export async function changeStorageTier(
     });
     if (preview.amountDueMinor !== expectedAmountMinor) throw priceChanged();
 
+    let chosen: SavedPaymentMethod | null = null;
+    if (paymentMethodId) {
+      const customerId = await stripeCustomerOf(tx, schoolId);
+      const cards =
+        customerId && selected.port.listPaymentMethods
+          ? await selected.port.listPaymentMethods({
+              customerId,
+              providerSubscriptionId: live.stripe_subscription_id,
+            })
+          : [];
+      chosen = cards.find((card) => card.id === paymentMethodId) ?? null;
+      if (!chosen) {
+        throw new CodedHttpException(
+          422,
+          ERROR_CODES.STORAGE_ADDON_CARD_INVALID,
+          "The card is not one of the school's saved cards",
+        );
+      }
+    }
+
     const result = await selected.port.changeSubscriptionPrice!({
       providerSubscriptionId: live.stripe_subscription_id,
       priceId: next.stripe_price_id,
@@ -684,14 +723,43 @@ export async function changeStorageTier(
       prorationDate: prorationSeconds,
       idempotencyKey: `storage-change:${live.id}:${requestKey}`,
       metadata,
+      expectedAmountMinor,
+      paymentMethodId,
     });
 
     if (!result.applied) {
+      if (result.failure === "amount_changed") throw priceChanged();
       throw new CodedHttpException(
         402,
         ERROR_CODES.STORAGE_ADDON_PAYMENT_FAILED,
-        "The payment for the storage change did not go through; nothing was changed",
+        result.declineMessage
+          ? `The card was declined: ${result.declineMessage}; nothing was changed`
+          : "The payment for the storage change did not go through; nothing was changed",
       );
+    }
+
+    if (
+      useForRenewals &&
+      chosen &&
+      !chosen.isDefault &&
+      selected.port.setSubscriptionPaymentMethod
+    ) {
+      // The change is paid and stands; a renewal card that could not be set is only logged.
+      await selected.port
+        .setSubscriptionPaymentMethod({
+          providerSubscriptionId: live.stripe_subscription_id,
+          paymentMethodId: chosen.id,
+        })
+        .catch((caught: unknown) =>
+          console.warn(
+            JSON.stringify({
+              level: "warn",
+              msg: "storage change paid, but the renewal card could not be changed",
+              schoolId,
+              error: caught instanceof Error ? caught.message : String(caught),
+            }),
+          ),
+        );
     }
 
     const currentCap = Number(live.cap_bytes);
@@ -710,6 +778,8 @@ export async function changeStorageTier(
       newValues: {
         plan_price_id: next.id,
         cap_bytes: capBytes,
+        paid_with: chosen ? `${chosen.brand} ${chosen.last4 ?? ""}`.trim() : "renewal card",
+        renewal_card_changed: Boolean(useForRenewals && chosen && !chosen.isDefault),
         confirmed_minor: expectedAmountMinor,
         charged_minor: result.invoice?.amountPaidMinor ?? null,
         stripe_invoice_id: result.invoice?.id ?? null,
@@ -877,6 +947,46 @@ export async function createStoragePaymentMethodSession(
     return selected.port.createPaymentMethodPortalSession({
       customerId,
       returnUrl: params.returnUrl,
+    });
+  });
+}
+
+/** The school's saved cards for paying a storage change, the renewal card first. */
+export async function listStorageCards(
+  database: Database,
+  providers: PaymentProviderRegistry,
+  params: { schoolId: string; tenantContext: TenantContext },
+): Promise<SavedPaymentMethod[]> {
+  return withTenantTx(database, params.tenantContext, async (tx) => {
+    const selected = await requireOnlineStorageProvider(tx, providers, params.schoolId);
+    const customerId = await stripeCustomerOf(tx, params.schoolId);
+    if (!customerId || !selected.port.listPaymentMethods) return [];
+    const live = await findLiveStorageAddon(tx, params.schoolId);
+    return selected.port.listPaymentMethods({
+      customerId,
+      providerSubscriptionId: live?.stripe_subscription_id ?? null,
+    });
+  });
+}
+
+/**
+ * A hosted page where the school saves a new card without paying anything; it then appears among
+ * the cards to pay with. The renewal card does not change.
+ */
+export async function createStorageCardSetupSession(
+  database: Database,
+  providers: PaymentProviderRegistry,
+  params: { schoolId: string; successUrl: string; cancelUrl: string; tenantContext: TenantContext },
+): Promise<{ url: string }> {
+  return withTenantTx(database, params.tenantContext, async (tx) => {
+    const selected = await requireOnlineStorageProvider(tx, providers, params.schoolId);
+    const customerId = await stripeCustomerOf(tx, params.schoolId);
+    if (!customerId) throw notActive();
+    if (!selected.port.createCardSetupSession) throw unavailable();
+    return selected.port.createCardSetupSession({
+      customerId,
+      successUrl: params.successUrl,
+      cancelUrl: params.cancelUrl,
     });
   });
 }
