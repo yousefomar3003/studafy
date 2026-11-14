@@ -46,10 +46,10 @@ ALTER TABLE app.license_quotes
   );
 
 COMMENT ON COLUMN app.license_quotes.declined_at IS
-  'When the school declined this quote (status declined, 000222).';
+  'When the school declined this quote (status declined, 000223).';
 COMMENT ON COLUMN app.license_quotes.declined_by IS
-  'The school user who declined this quote (000222).';
+  'The school user who declined this quote (000223).';
 COMMENT ON COLUMN app.license_quotes.decline_reason IS
-  'The school''s optional reason for declining, shown to the super admin (000222).';
+  'The school''s optional reason for declining, shown to the super admin (000223).';
 
 RESET ROLE;
