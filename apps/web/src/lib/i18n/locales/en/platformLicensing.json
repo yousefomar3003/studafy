@@ -316,7 +316,11 @@
       "parents_other": "{{count}} parent seats",
       "tier": "{{tier}} for {{audience}}",
       "familyPlusOn": "Family+ on",
-      "familyPlusOff": "Family+ off"
+      "familyPlusOff": "Family+ off",
+      "studentAi_one": "Student AI: {{count}} seat",
+      "studentAi_other": "Student AI: {{count}} seats",
+      "studentAiNoSeats": "Student AI",
+      "studentAiTier": "tier {{tier}}"
     },
     "price": "Price it",
     "resolve": "Resolve",
