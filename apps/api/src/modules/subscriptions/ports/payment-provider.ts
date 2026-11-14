@@ -23,6 +23,11 @@ export interface CreateCustomerInput {
   name: string;
   email: string;
   metadata: Record<string, string>;
+  /**
+   * Stable for one school (and mode): a create retried after its transaction rolled back returns the
+   * customer the first attempt made instead of a second one. Ignored by a provider without keys.
+   */
+  idempotencyKey?: string;
 }
 
 export interface CreateCustomerResult {
@@ -371,7 +376,24 @@ export interface RefundResult {
 }
 
 export interface PaymentProviderPort {
+  /**
+   * Stripe only: whether the configured key opens the live account (true) or a Sandbox (false), read
+   * from the key's prefix. Undefined when unknown (a test double, or Tap): no mode decision is made.
+   */
+  readonly livemode?: boolean;
   createCustomer(input: CreateCustomerInput): Promise<CreateCustomerResult>;
+  /**
+   * The customer as the configured key sees it: its mode, or null when this account has no such
+   * customer (it belongs to the other mode, or was deleted). Throws on a provider failure.
+   */
+  retrieveCustomer?(customerId: string): Promise<{ livemode: boolean } | null>;
+  /** The customer this account already holds for a school (`metadata.school_id`), or null. */
+  findCustomerBySchoolId?(schoolId: string): Promise<string | null>;
+  /**
+   * The subscription as the configured key sees it: its mode, or null when this account has no such
+   * subscription. Throws on a provider failure.
+   */
+  retrieveSubscriptionMode?(subscriptionId: string): Promise<{ livemode: boolean } | null>;
   createCheckoutSession(input: CreateCheckoutSessionInput): Promise<CreateCheckoutSessionResult>;
   /** A one-time hosted payment (fees). See `CreatePaymentSessionInput`. */
   createPaymentSession(input: CreatePaymentSessionInput): Promise<CreatePaymentSessionResult>;

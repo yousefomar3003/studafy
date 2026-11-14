@@ -347,6 +347,11 @@ export default function HealthPage() {
               days: data.windowDays,
             })}
           </p>
+          <p data-testid="health-stripe-mode">
+            <span className="platform-pill" data-status={data.stripeMode}>
+              {t(`platform.health.stripeMode.${data.stripeMode}`)}
+            </span>
+          </p>
 
           <section aria-labelledby="health-jobs">
             <h2 id="health-jobs">{t("platform.health.jobsHeading")}</h2>

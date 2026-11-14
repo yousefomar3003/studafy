@@ -39,6 +39,7 @@ const banners = [
 
 const health = {
   generatedAt: new Date(NOW).toISOString(),
+  stripeMode: "sandbox",
   windowDays: 7,
   jobs: {
     available: true,
@@ -298,6 +299,7 @@ describe("HealthPage", () => {
     expect(screen.getByText("in_overcharged")).toBeTruthy();
     expect(screen.getByText("Canceling and refunding (attempt 1)")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
+    expect(screen.getByText("Stripe: Sandbox (test cards, no real money)")).toBeTruthy();
   });
 });
 

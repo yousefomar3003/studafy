@@ -969,7 +969,12 @@
       "refunded": "Refunded",
       "needs_review": "Needs review"
     },
-    "incidentNote": "Charged {{charged}} instead of {{expected}}"
+    "incidentNote": "Charged {{charged}} instead of {{expected}}",
+    "stripeMode": {
+      "live": "Stripe: Live (real money)",
+      "sandbox": "Stripe: Sandbox (test cards, no real money)",
+      "not_configured": "Stripe: not configured"
+    }
   },
   "flags": {
     "title": "Feature switches",

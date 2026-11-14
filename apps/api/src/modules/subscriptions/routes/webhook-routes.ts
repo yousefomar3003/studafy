@@ -30,7 +30,7 @@ import type { Context } from "hono";
  */
 const WebhookResponseSchema = z.object({
   received: z.literal(true),
-  outcome: z.enum(["duplicate", "processed", "parked"]),
+  outcome: z.enum(["duplicate", "processed", "parked", "ignored"]),
 });
 
 const stripeWebhookRoute = createRoute({

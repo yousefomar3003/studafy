@@ -498,7 +498,9 @@
       "alsoRenewals": "Also use this card for renewals",
       "added": "Your new card is saved. Choose it below.",
       "addError": "The card page couldn't be opened"
-    }
+    },
+    "testModeTitle": "Test mode: no real money",
+    "testModeBody": "Payments use Stripe Sandbox. Use test card 4242 4242 4242 4242, any future date, any CVC. No real money is charged."
   },
   "aiRequest": {
     "open": "Request AI for students",

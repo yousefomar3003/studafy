@@ -1394,7 +1394,15 @@ export function createApp({
     app.route("/", platformUserSupportRoutes({ database, denylist: jtiDenylist, logger }));
     // Console operations: Studafy-wide banners, the staff activity log, system health and the
     // cross-school flag view; plus GET /api/platform-banners, which every signed-in client reads.
-    app.route("/", platformOpsRoutes({ database, redis: redis ?? null, flags }));
+    app.route(
+      "/",
+      platformOpsRoutes({
+        database,
+        redis: redis ?? null,
+        flags,
+        stripeLivemode: stripeProvider?.livemode,
+      }),
+    );
     // The console's school sign-up review queue; approval creates and provisions the school.
     app.route(
       "/",

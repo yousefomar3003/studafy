@@ -421,9 +421,11 @@ async function applyCustomerSideEffects(
   const schoolId = extractSchoolIdHint(payload);
   if (!customerId || !schoolId) return;
 
+  const livemode = typeof payload.livemode === "boolean" ? payload.livemode : null;
   await tx`
     UPDATE app.schools
-    SET stripe_customer_id = ${customerId}, updated_at = CURRENT_TIMESTAMP
+    SET stripe_customer_id = ${customerId}, stripe_customer_livemode = ${livemode},
+        updated_at = CURRENT_TIMESTAMP
     WHERE id = ${schoolId}::uuid AND stripe_customer_id IS NULL
   `;
 }
