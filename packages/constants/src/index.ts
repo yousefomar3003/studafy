@@ -83,4 +83,9 @@ export {
   STORAGE_ADDON_TIERS,
   isStorageAddonPlanCode,
 } from "./storage-addon";
+export {
+  isAllowedLicensePaymentLink,
+  LICENSE_PAYMENT_LINK_HOSTS,
+  LICENSE_PAYMENT_LINK_MAX_LENGTH,
+} from "./payment-links";
 export type { StorageAddonPlanCode } from "./storage-addon";

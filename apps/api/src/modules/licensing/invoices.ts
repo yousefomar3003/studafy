@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, isAllowedLicensePaymentLink } from "@studafy/constants";
 import postgres from "postgres";
 
 import { CodedHttpException } from "../../coded-http-exception";
@@ -157,6 +157,11 @@ export interface InvoiceRecord {
   overdueAt: string | null;
   voidedAt: string | null;
   voidReason: string | null;
+  /**
+   * The online payment link (Revolut) the super admin pasted, while the invoice can still be paid;
+   * null when none is set or the invoice is paid or void.
+   */
+  paymentLink: string | null;
   createdAt: string;
 }
 
@@ -182,6 +187,7 @@ interface InvoiceRow {
   overdue_at: Date | null;
   voided_at: Date | null;
   void_reason: string | null;
+  payment_link: string | null;
   created_at: Date;
 }
 
@@ -193,7 +199,7 @@ const INVOICE_COLUMNS = (tx: TransactionSql) => tx`
   i.credit_total_minor::text AS credit_total_minor, i.adjustment_minor::text AS adjustment_minor,
   i.total_minor::text AS total_minor, i.paid_minor::text AS paid_minor,
   i.balance_minor::text AS balance_minor, i.status, i.overdue_at, i.voided_at, i.void_reason,
-  i.created_at
+  i.payment_link, i.created_at
 `;
 
 function toInvoice(row: InvoiceRow): InvoiceRecord {
@@ -219,8 +225,14 @@ function toInvoice(row: InvoiceRow): InvoiceRecord {
     overdueAt: row.overdue_at?.toISOString() ?? null,
     voidedAt: row.voided_at?.toISOString() ?? null,
     voidReason: row.void_reason,
+    paymentLink: isPayable(row.status) ? row.payment_link : null,
     createdAt: row.created_at.toISOString(),
   };
+}
+
+/** Issued or partly paid: money can still be paid against it. */
+function isPayable(status: InvoiceStatus): boolean {
+  return status === "issued" || status === "partially_paid";
 }
 
 export async function readInvoice(
@@ -1156,6 +1168,41 @@ export async function voidPayment(
   );
   const view = (await listPayments(tx, invoice.id)).find((p) => p.id === paymentId)!;
   return { payment: view, invoice: after };
+}
+
+/**
+ * Set, replace (`link` a URL) or clear (`link` null) the invoice's online payment link. Only while
+ * the invoice can be paid; the link must be an https link to an allowed provider host.
+ */
+export async function setInvoicePaymentLink(
+  tx: TransactionSql,
+  schoolId: string,
+  invoiceId: string,
+  link: string | null,
+  actor: LicenseActor,
+): Promise<InvoiceRecord> {
+  const invoice = await requireInvoice(tx, invoiceId, actor, { forUpdate: true });
+  if (!isPayable(invoice.status)) {
+    throw licenseError(409, ERROR_CODES.LICENSE_INVOICE_NOT_PAYABLE, actor.locale);
+  }
+  if (link !== null && !isAllowedLicensePaymentLink(link)) {
+    throw licenseError(422, ERROR_CODES.LICENSE_PAYMENT_LINK_INVALID, actor.locale);
+  }
+  if (invoice.paymentLink === link) return invoice;
+
+  await tx`
+    UPDATE app.license_invoices
+    SET payment_link = ${link}, updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
+    WHERE school_id = current_setting('app.school_id')::uuid AND id = ${invoiceId}::uuid
+  `;
+  await auditLicenseChange(tx, schoolId, actor, {
+    action: "update",
+    targetTable: "license_invoices",
+    targetId: invoiceId,
+    oldValues: { payment_link: invoice.paymentLink },
+    newValues: { payment_link: link },
+  });
+  return (await readInvoice(tx, invoiceId))!;
 }
 
 /** Void an invoice nobody has paid. Its overlap credits become available to the next quote. */

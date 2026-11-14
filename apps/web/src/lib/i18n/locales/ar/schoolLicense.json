@@ -429,7 +429,9 @@
     },
     "open": "فتح",
     "openReceipt": "فتح {{file}}",
-    "paymentsTitle": "الدفعات على هذه الفاتورة"
+    "paymentsTitle": "الدفعات على هذه الفاتورة",
+    "payOnline": "ادفع عبر الإنترنت",
+    "payOnlineHelp": "ستدفع بأمان عبر Revolut. يُؤكَّد دفعك بعد أن تسجّله Studafy."
   },
   "tile": {
     "title": "الترخيص",

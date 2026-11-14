@@ -445,7 +445,18 @@
     "dueDateError": "Not before the issue date.",
     "activateConfirm": "Activate",
     "activated": "License activated.",
-    "dueDateMoved": "Due date updated."
+    "dueDateMoved": "Due date updated.",
+    "paymentLink": {
+      "title": "Payment link",
+      "help": "Paste a payment link you made in Revolut for this invoice. The school sees a \"Pay online\" button next to the bank details while the invoice is unpaid. When the money arrives in Revolut, record it here with \"Record a transfer\".",
+      "label": "Revolut payment link",
+      "save": "Save link",
+      "change": "Change",
+      "remove": "Remove",
+      "saved": "Payment link saved. The school can now pay online.",
+      "removed": "Payment link removed. The school sees only the bank details.",
+      "invalid": "Paste an https link from Revolut (revolut.com or revolut.me), up to 500 characters."
+    }
   },
   "school": {
     "title": "License",

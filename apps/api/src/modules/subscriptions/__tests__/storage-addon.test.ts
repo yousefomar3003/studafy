@@ -791,3 +791,157 @@ describe("changing and canceling", () => {
     },
   );
 });
+
+describe("a second storage subscription", () => {
+  async function duplicates(f: BillingFixture) {
+    const rows = await asAdmin(
+      f,
+      (tx) => tx<
+        {
+          stripe_subscription_id: string;
+          kept_stripe_subscription_id: string | null;
+          source: string;
+          status: string;
+        }[]
+      >`
+        SELECT stripe_subscription_id, kept_stripe_subscription_id, source, status
+        FROM app.storage_duplicate_subscriptions WHERE school_id = ${f.schoolId}::uuid
+        ORDER BY created_at
+      `,
+    );
+    return [...rows];
+  }
+
+  async function period(f: BillingFixture) {
+    const [row] = await asAdmin(
+      f,
+      (tx) => tx<{ current_period_end: Date }[]>`
+        SELECT current_period_end FROM app.storage_subscriptions
+        WHERE school_id = ${f.schoolId}::uuid
+      `,
+    );
+    return row!.current_period_end.getTime();
+  }
+
+  function storageRenewed(
+    f: BillingFixture,
+    id: string,
+    created: number,
+    subscription: string,
+  ): StubEventInput {
+    return {
+      id,
+      type: "customer.subscription.updated",
+      created,
+      data: {
+        id: subscription,
+        customer: f.stripeCustomerId,
+        status: "active",
+        metadata: { school_id: f.schoolId, addon: "storage" },
+        items: {
+          data: [{ current_period_start: created, current_period_end: created + 31 * 86_400 }],
+        },
+      },
+    };
+  }
+
+  integrationTest(
+    "its cancellation never ends the school's storage, and its renewal never moves the period",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await deliver(
+        f,
+        storagePurchased(f, "evt_dup_a1", 1_700_000_100, "sub_dup_a", prices.gb100Monthly),
+      );
+      const before = await period(f);
+
+      expect(
+        await deliver(f, storageRenewed(f, "evt_dup_r1", 1_700_100_000, "sub_dup_stray")),
+      ).toEqual({ received: true, outcome: "parked" });
+      expect(
+        await deliver(f, storageDeleted(f, "evt_dup_d1", 1_700_100_100, "sub_dup_stray")),
+      ).toEqual({ received: true, outcome: "parked" });
+
+      expect(await storageRow(f)).toMatchObject({
+        status: "active",
+        stripe_subscription_id: "sub_dup_a",
+      });
+      expect(await period(f)).toBe(before);
+      expect(await capOf(f)).toBe(100 * GIB);
+      // Seen without a checkout: flagged for a person, never canceled automatically.
+      expect(await duplicates(f)).toEqual([
+        {
+          stripe_subscription_id: "sub_dup_stray",
+          kept_stripe_subscription_id: "sub_dup_a",
+          source: "event",
+          status: "needs_review",
+        },
+      ]);
+    },
+  );
+
+  integrationTest(
+    "a second completed purchase is kept and the one it replaces retired, exactly once",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await deliver(
+        f,
+        storagePurchased(f, "evt_dup_b1", 1_700_000_100, "sub_dup_old", prices.gb100Monthly),
+      );
+
+      // The new subscription's own event can arrive before its checkout: it is only flagged.
+      await deliver(f, storageRenewed(f, "evt_dup_b2", 1_700_000_150, "sub_dup_new"));
+      expect((await duplicates(f))[0]).toMatchObject({ source: "event", status: "needs_review" });
+
+      const bought = storagePurchased(
+        f,
+        "evt_dup_b3",
+        1_700_000_200,
+        "sub_dup_new",
+        prices.tb1Monthly,
+      );
+      expect(await deliver(f, bought)).toEqual({ received: true, outcome: "processed" });
+      // A redelivery of the same completion (a new event id) changes nothing more.
+      await deliver(f, { ...bought, id: "evt_dup_b3_again" });
+
+      expect(await storageRow(f)).toMatchObject({
+        status: "active",
+        plan_price_id: prices.tb1Monthly,
+        cap_bytes: String(STORAGE_ADDON_TIERS.storage_1tb.capBytes),
+        stripe_subscription_id: "sub_dup_new",
+      });
+      expect(await capOf(f)).toBe(1024 * GIB);
+      expect(await duplicates(f)).toEqual([
+        {
+          stripe_subscription_id: "sub_dup_old",
+          kept_stripe_subscription_id: "sub_dup_new",
+          source: "checkout",
+          status: "pending",
+        },
+      ]);
+
+      // A late copy of the old purchase, and the cancellation the worker causes, are finished with
+      // and never move the add-on back or end it.
+      expect(
+        await deliver(
+          f,
+          storagePurchased(f, "evt_dup_b4", 1_700_000_300, "sub_dup_old", prices.gb100Monthly),
+        ),
+      ).toEqual({ received: true, outcome: "processed" });
+      expect(
+        await deliver(f, storageDeleted(f, "evt_dup_b5", 1_700_000_400, "sub_dup_old")),
+      ).toEqual({ received: true, outcome: "processed" });
+
+      expect(await storageRow(f)).toMatchObject({
+        status: "active",
+        plan_price_id: prices.tb1Monthly,
+        stripe_subscription_id: "sub_dup_new",
+      });
+      expect(await duplicates(f)).toHaveLength(1);
+
+      // Later events of the kept subscription move the add-on as usual.
+      await deliver(f, storageDeleted(f, "evt_dup_b6", 1_700_000_500, "sub_dup_new"));
+      expect((await storageRow(f))?.status).toBe("canceled");
+    },
+  );
+});

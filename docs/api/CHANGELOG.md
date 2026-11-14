@@ -11,6 +11,15 @@ when it required the `version-bump` label.
 
 ## Unreleased
 
+### Added
+
+- `GET /api/platform/health` (`PlatformSystemHealth`) adds `storageDuplicates`
+  (`PlatformStorageDuplicates`). It lists schools charged for a second storage add-on (000219):
+  every one not yet settled and those settled in the last 30 days, open ones first. Each item gives
+  the duplicate and kept Stripe subscription ids, `source` (`checkout`, resolved automatically, or
+  `event`, left for a person), `status` (`pending`, `resolved`, `needs_review`), the refund and
+  anything not refunded, and the last error.
+
 ### Changed
 
 - **(breaking)** `POST /api/subscriptions/storage/change` (`changeStorageAddOnTier`) now charges
@@ -33,6 +42,16 @@ when it required the `version-bump` label.
   first parents' count, as before.
 
 ### Added
+
+- Licence invoices can carry an online payment link (Revolut). `LicenseInvoice` (and the list and
+  detail shapes built on it) adds `paymentLink`: the link while the invoice is issued or partly paid,
+  `null` otherwise. The super admin sets or replaces it with
+  `PUT /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link`
+  (`platformSetLicenseInvoicePaymentLink`, body `LicensePaymentLinkBody` `{ url }`) and removes it
+  with `DELETE` on the same path (`platformClearLicenseInvoicePaymentLink`); both answer the
+  `LicenseInvoice`. A link must be https on `revolut.com`, `revolut.me` or a subdomain, at most 500
+  characters (422 `LICENSE_PAYMENT_LINK_INVALID`); a paid or void invoice answers 409
+  `LICENSE_INVOICE_NOT_PAYABLE`. Payments made through the link are still recorded by hand.
 
 - `POST /api/subscriptions/storage/change/preview` (`previewStorageAddOnChange`,
   `StorageAddOnChangePreview`): the exact prorated amount charged now and the next bill, from
