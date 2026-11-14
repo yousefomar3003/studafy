@@ -16,6 +16,7 @@ import { createStorageCheckoutSession } from "../services/checkout-service";
 import {
   changeStorageTier,
   getStorageOffer,
+  previewStorageTierChange,
   setStorageAddonCancellation,
 } from "../services/storage-addon-service";
 import { handleBillingWebhook } from "../webhooks/webhook-processor";
@@ -37,6 +38,7 @@ import type {
   ChangeSubscriptionPriceInput,
   CreateCheckoutSessionInput,
   PaymentProviderPort,
+  PreviewSubscriptionPriceChangeInput,
 } from "../ports/payment-provider";
 import type { TransactionSql } from "postgres";
 
@@ -129,17 +131,33 @@ interface FakeStripe {
   port: PaymentProviderPort;
   checkouts: CreateCheckoutSessionInput[];
   changes: ChangeSubscriptionPriceInput[];
+  previews: PreviewSubscriptionPriceChangeInput[];
   cancellations: string[];
   /** What the next price change answers: applied, or held for a payment. */
   applyChanges: boolean;
+  /** What every preview bills, in minor units. */
+  previewAmount: number;
+  /** Storage subscriptions Stripe holds for the customer that Studafy may not know of. */
+  liveSubscriptionIds: string[];
+  /** Storage checkouts still open at Stripe. */
+  openCheckoutSessionIds: string[];
+  /** Open checkouts that turn out to have been paid when they are expired. */
+  paidWhileExpiring: Set<string>;
+  expired: string[];
 }
 
 function fakeStripe(): FakeStripe {
   const fake: FakeStripe = {
     checkouts: [],
     changes: [],
+    previews: [],
     cancellations: [],
     applyChanges: true,
+    previewAmount: 3_900,
+    liveSubscriptionIds: [],
+    openCheckoutSessionIds: [],
+    paidWhileExpiring: new Set(),
+    expired: [],
     port: undefined as unknown as PaymentProviderPort,
   };
   fake.port = {
@@ -147,9 +165,24 @@ function fakeStripe(): FakeStripe {
       fake.checkouts.push(input);
       return Promise.resolve({ url: "https://checkout.example/storage", sessionId: "cs_storage" });
     },
-    changeSubscriptionPrice: (input: ChangeSubscriptionPriceInput) => {
+    findAddonPurchasesInFlight: () =>
+      Promise.resolve({
+        liveSubscriptionIds: [...fake.liveSubscriptionIds],
+        openCheckoutSessionIds: [...fake.openCheckoutSessionIds],
+      }),
+    expireCheckoutSession: (sessionId: string) => {
+      fake.expired.push(sessionId);
+      return Promise.resolve(fake.paidWhileExpiring.has(sessionId) ? "completed" : "expired");
+    },
+    previewSubscriptionPriceChange: (input: PreviewSubscriptionPriceChangeInput) => {
+      fake.previews.push(input);
+      return Promise.resolve({ amountDueMinor: fake.previewAmount, currency: "USD" });
+    },
+    changeSubscriptionPrice: async (input: ChangeSubscriptionPriceInput) => {
       fake.changes.push(input);
-      return Promise.resolve({ applied: fake.applyChanges });
+      // Long enough for a concurrent request to reach the row lock while this one holds it.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      return { applied: fake.applyChanges };
     },
     scheduleCancellation: (input: { providerSubscriptionId: string }) => {
       fake.cancellations.push(`cancel:${input.providerSubscriptionId}`);
@@ -428,6 +461,78 @@ describe("buying storage", () => {
   });
 });
 
+describe("never paying twice for storage", () => {
+  integrationTest(
+    "a checkout is refused while Stripe already holds a storage subscription Studafy has not heard of",
+    async () => {
+      const f = await createBillingFixture(database!);
+      const stripe = fakeStripe();
+      // The first checkout was paid; its webhook is still on the way, so there is no row yet.
+      stripe.liveSubscriptionIds = ["sub_paid_a_moment_ago"];
+
+      await expectCode(
+        checkout(f, stripe, prices.tb1Monthly),
+        409,
+        ERROR_CODES.STORAGE_ADDON_PURCHASE_PENDING,
+      );
+      expect(stripe.checkouts).toHaveLength(0);
+      expect(await storageRow(f)).toBeUndefined();
+    },
+  );
+
+  integrationTest("earlier open checkouts are closed before a new one is made", async () => {
+    const f = await createBillingFixture(database!);
+    const stripe = fakeStripe();
+    stripe.openCheckoutSessionIds = ["cs_first_tab", "cs_second_tab"];
+
+    await checkout(f, stripe, prices.tb1Monthly);
+
+    expect(stripe.expired).toEqual(["cs_first_tab", "cs_second_tab"]);
+    expect(stripe.checkouts).toHaveLength(1);
+  });
+
+  integrationTest(
+    "an open checkout paid while it was being closed refuses the new one",
+    async () => {
+      const f = await createBillingFixture(database!);
+      const stripe = fakeStripe();
+      stripe.openCheckoutSessionIds = ["cs_paying_now"];
+      stripe.paidWhileExpiring.add("cs_paying_now");
+
+      await expectCode(
+        checkout(f, stripe, prices.gb100Monthly),
+        409,
+        ERROR_CODES.STORAGE_ADDON_PURCHASE_PENDING,
+      );
+      expect(stripe.checkouts).toHaveLength(0);
+    },
+  );
+
+  integrationTest(
+    "a double click makes checkouts one after the other, never side by side",
+    async () => {
+      const f = await createBillingFixture(database!);
+      const stripe = fakeStripe();
+      // Each new checkout is open at Stripe for the next request to find.
+      const create = stripe.port.createCheckoutSession.bind(stripe.port);
+      stripe.port.createCheckoutSession = async (input) => {
+        const result = await create(input);
+        stripe.openCheckoutSessionIds.push(`cs_${stripe.checkouts.length}`);
+        return result;
+      };
+
+      await Promise.all([
+        checkout(f, stripe, prices.gb100Monthly),
+        checkout(f, stripe, prices.gb100Monthly),
+      ]);
+
+      expect(stripe.checkouts).toHaveLength(2);
+      // The second request ran after the first and closed its checkout: only one can be paid.
+      expect(stripe.expired).toEqual(["cs_1"]);
+    },
+  );
+});
+
 describe("changing and canceling", () => {
   async function bought(f: BillingFixture, subscription: string): Promise<void> {
     await deliver(
@@ -436,27 +541,142 @@ describe("changing and canceling", () => {
     );
   }
 
-  integrationTest("moving up charges now and raises the cap once paid", async () => {
+  function preview(f: BillingFixture, stripe: FakeStripe, priceId: string) {
+    return previewStorageTierChange(f.db.sql, registry(stripe), {
+      schoolId: f.schoolId,
+      priceId,
+      tenantContext: { schoolId: f.schoolId },
+    });
+  }
+
+  function change(
+    f: BillingFixture,
+    stripe: FakeStripe,
+    priceId: string,
+    confirmed: { prorationDate: Date; expectedAmountMinor: number; requestKey?: string },
+  ) {
+    return changeStorageTier(f.db.sql, registry(stripe), {
+      schoolId: f.schoolId,
+      priceId,
+      prorationDate: confirmed.prorationDate,
+      expectedAmountMinor: confirmed.expectedAmountMinor,
+      requestKey: confirmed.requestKey ?? "6f1d1c2e-1111-4a4a-8b8b-000000000001",
+      tenantContext: { schoolId: f.schoolId },
+    });
+  }
+
+  integrationTest("the preview shows what moving up costs now, and charges nothing", async () => {
+    const f = await createBillingFixture(database!);
+    await bought(f, "sub_storage_preview");
+    const stripe = fakeStripe();
+    stripe.previewAmount = 3_871;
+
+    const shown = await preview(f, stripe, prices.tb1Monthly);
+
+    expect(shown).toMatchObject({
+      amountDueNowMinor: 3_871,
+      nextBillMinor: 4_900,
+      currency: "USD",
+      chargeNow: true,
+      capBytes: 1024 * GIB,
+    });
+    expect(stripe.previews).toEqual([
+      {
+        providerSubscriptionId: "sub_storage_preview",
+        priceId: "price_storage_1tb_monthly",
+        chargeNow: true,
+        prorationDate: shown.prorationDate.getTime() / 1000,
+      },
+    ]);
+    expect(stripe.changes).toHaveLength(0);
+    expect(await capOf(f)).toBe(100 * GIB);
+  });
+
+  integrationTest("moving up charges exactly the confirmed amount and raises the cap", async () => {
     const f = await createBillingFixture(database!);
     await bought(f, "sub_storage_up");
     const stripe = fakeStripe();
+    const shown = await preview(f, stripe, prices.tb1Monthly);
 
-    const current = await changeStorageTier(f.db.sql, registry(stripe), {
-      schoolId: f.schoolId,
-      priceId: prices.tb1Monthly,
-      tenantContext: { schoolId: f.schoolId },
+    const current = await change(f, stripe, prices.tb1Monthly, {
+      prorationDate: shown.prorationDate,
+      expectedAmountMinor: shown.amountDueNowMinor,
+      requestKey: "6f1d1c2e-1111-4a4a-8b8b-0000000000aa",
     });
 
-    expect(stripe.changes).toEqual([
-      {
-        providerSubscriptionId: "sub_storage_up",
-        priceId: "price_storage_1tb_monthly",
-        chargeNow: true,
-        metadata: { price_id: prices.tb1Monthly, billing_interval: "monthly" },
-      },
-    ]);
+    expect(stripe.changes).toHaveLength(1);
+    expect(stripe.changes[0]).toMatchObject({
+      providerSubscriptionId: "sub_storage_up",
+      priceId: "price_storage_1tb_monthly",
+      chargeNow: true,
+      prorationDate: shown.prorationDate.getTime() / 1000,
+      metadata: { price_id: prices.tb1Monthly, billing_interval: "monthly" },
+    });
+    expect(stripe.changes[0]!.idempotencyKey).toEndWith(":6f1d1c2e-1111-4a4a-8b8b-0000000000aa");
     expect(current).toMatchObject({ planCode: "storage_1tb", capBytes: 1024 * GIB });
     expect(await capOf(f)).toBe(1024 * GIB);
+  });
+
+  integrationTest("a price that moved since the preview charges nothing", async () => {
+    const f = await createBillingFixture(database!);
+    await bought(f, "sub_storage_moved");
+    const stripe = fakeStripe();
+    const shown = await preview(f, stripe, prices.tb1Monthly);
+    stripe.previewAmount = shown.amountDueNowMinor + 1;
+
+    await expectCode(
+      change(f, stripe, prices.tb1Monthly, {
+        prorationDate: shown.prorationDate,
+        expectedAmountMinor: shown.amountDueNowMinor,
+      }),
+      409,
+      ERROR_CODES.STORAGE_ADDON_PRICE_CHANGED,
+    );
+    expect(stripe.changes).toHaveLength(0);
+    expect(await capOf(f)).toBe(100 * GIB);
+  });
+
+  integrationTest(
+    "a preview older than half an hour is refused before anything is asked",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought(f, "sub_storage_stale");
+      const stripe = fakeStripe();
+
+      await expectCode(
+        change(f, stripe, prices.tb1Monthly, {
+          prorationDate: new Date(Date.now() - 31 * 60 * 1000),
+          expectedAmountMinor: stripe.previewAmount,
+        }),
+        409,
+        ERROR_CODES.STORAGE_ADDON_PRICE_CHANGED,
+      );
+      expect(stripe.previews).toHaveLength(0);
+      expect(stripe.changes).toHaveLength(0);
+    },
+  );
+
+  integrationTest("a double click on confirm charges once", async () => {
+    const f = await createBillingFixture(database!);
+    await bought(f, "sub_storage_double");
+    const stripe = fakeStripe();
+    const shown = await preview(f, stripe, prices.tb1Monthly);
+    const confirmed = {
+      prorationDate: shown.prorationDate,
+      expectedAmountMinor: shown.amountDueNowMinor,
+    };
+
+    const results = await Promise.allSettled([
+      change(f, stripe, prices.tb1Monthly, confirmed),
+      change(f, stripe, prices.tb1Monthly, confirmed),
+    ]);
+
+    expect(stripe.changes).toHaveLength(1);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    const refused = results.find((result) => result.status === "rejected");
+    expect((refused as PromiseRejectedResult).reason).toMatchObject({
+      code: ERROR_CODES.STORAGE_ADDON_ALREADY_ACTIVE,
+    });
   });
 
   integrationTest("a declined payment changes nothing", async () => {
@@ -464,12 +684,12 @@ describe("changing and canceling", () => {
     await bought(f, "sub_storage_declined");
     const stripe = fakeStripe();
     stripe.applyChanges = false;
+    const shown = await preview(f, stripe, prices.tb1Monthly);
 
     await expectCode(
-      changeStorageTier(f.db.sql, registry(stripe), {
-        schoolId: f.schoolId,
-        priceId: prices.tb1Monthly,
-        tenantContext: { schoolId: f.schoolId },
+      change(f, stripe, prices.tb1Monthly, {
+        prorationDate: shown.prorationDate,
+        expectedAmountMinor: shown.amountDueNowMinor,
       }),
       402,
       ERROR_CODES.STORAGE_ADDON_PAYMENT_FAILED,
@@ -482,14 +702,41 @@ describe("changing and canceling", () => {
     const f = await createBillingFixture(database!);
     await bought(f, "sub_storage_yearly");
     const stripe = fakeStripe();
+    const shown = await preview(f, stripe, prices.gb100Yearly);
+    expect(shown.chargeNow).toBe(true);
 
-    await changeStorageTier(f.db.sql, registry(stripe), {
-      schoolId: f.schoolId,
-      priceId: prices.gb100Yearly,
-      tenantContext: { schoolId: f.schoolId },
+    await change(f, stripe, prices.gb100Yearly, {
+      prorationDate: shown.prorationDate,
+      expectedAmountMinor: shown.amountDueNowMinor,
     });
 
     expect(stripe.changes[0]).toMatchObject({ chargeNow: true });
+    expect(await capOf(f)).toBe(100 * GIB);
+  });
+
+  integrationTest("moving down charges nothing now and shows the next bill", async () => {
+    const f = await createBillingFixture(database!);
+    await deliver(
+      f,
+      storagePurchased(
+        f,
+        "evt_sub_storage_down",
+        1_700_000_100,
+        "sub_storage_down",
+        prices.tb1Monthly,
+      ),
+    );
+    const stripe = fakeStripe();
+    stripe.previewAmount = 120;
+
+    const shown = await preview(f, stripe, prices.gb100Monthly);
+    expect(shown).toMatchObject({ amountDueNowMinor: 0, nextBillMinor: 120, chargeNow: false });
+
+    await change(f, stripe, prices.gb100Monthly, {
+      prorationDate: shown.prorationDate,
+      expectedAmountMinor: 0,
+    });
+    expect(stripe.changes[0]).toMatchObject({ chargeNow: false });
     expect(await capOf(f)).toBe(100 * GIB);
   });
 
@@ -498,10 +745,14 @@ describe("changing and canceling", () => {
     const stripe = fakeStripe();
 
     await expectCode(
-      changeStorageTier(f.db.sql, registry(stripe), {
-        schoolId: f.schoolId,
-        priceId: prices.tb1Monthly,
-        tenantContext: { schoolId: f.schoolId },
+      preview(f, stripe, prices.tb1Monthly),
+      409,
+      ERROR_CODES.STORAGE_ADDON_NOT_ACTIVE,
+    );
+    await expectCode(
+      change(f, stripe, prices.tb1Monthly, {
+        prorationDate: new Date(),
+        expectedAmountMinor: 0,
       }),
       409,
       ERROR_CODES.STORAGE_ADDON_NOT_ACTIVE,

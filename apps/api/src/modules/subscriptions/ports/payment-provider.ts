@@ -199,6 +199,16 @@ export interface ChangeSubscriptionPriceInput {
   /** The provider's price id (Stripe `price_...`). */
   priceId: string;
   chargeNow: boolean;
+  /**
+   * The instant the proration is computed at, in Unix seconds: the one the buyer was shown in
+   * `previewSubscriptionPriceChange`, so what is charged is exactly what they confirmed.
+   */
+  prorationDate: number;
+  /**
+   * Stable for one confirmed change: a retried or repeated request with the same key is answered
+   * from the provider's first result and never charged a second time.
+   */
+  idempotencyKey: string;
   /** Replaces the subscription's metadata keys given here (the new local `price_id`, say). */
   metadata: Record<string, string>;
 }
@@ -206,6 +216,36 @@ export interface ChangeSubscriptionPriceInput {
 export interface ChangeSubscriptionPriceResult {
   /** False when the provider is holding the change until a payment succeeds: nothing changed yet. */
   applied: boolean;
+}
+
+/** What `changeSubscriptionPrice` with the same inputs would bill, computed without changing it. */
+export interface PreviewSubscriptionPriceChangeInput {
+  providerSubscriptionId: string;
+  priceId: string;
+  chargeNow: boolean;
+  /** Unix seconds; send the same value to `changeSubscriptionPrice`. */
+  prorationDate: number;
+}
+
+export interface PreviewSubscriptionPriceChangeResult {
+  /**
+   * With `chargeNow`, the amount charged at once (the new price for the rest of the period, less
+   * the unused part of the old one, less any customer credit). Without it, the total of the next
+   * regular invoice, credits included.
+   */
+  amountDueMinor: number;
+  /** ISO 4217, upper case. */
+  currency: string;
+}
+
+/**
+ * Purchases of one add-on the provider knows about that Studafy may not have heard of yet (its
+ * webhook still on the way): subscriptions that are live or still settling their first payment,
+ * and hosted checkouts still open for payment.
+ */
+export interface AddonPurchasesInFlight {
+  liveSubscriptionIds: string[];
+  openCheckoutSessionIds: string[];
 }
 
 export interface ListInvoicesInput {
@@ -292,6 +332,23 @@ export interface PaymentProviderPort {
   changeSubscriptionPrice?(
     input: ChangeSubscriptionPriceInput,
   ): Promise<ChangeSubscriptionPriceResult>;
+  /** The bill `changeSubscriptionPrice` would produce. Implemented wherever it is. */
+  previewSubscriptionPriceChange?(
+    input: PreviewSubscriptionPriceChangeInput,
+  ): Promise<PreviewSubscriptionPriceChangeResult>;
+  /**
+   * The customer's purchases of the add-on named by `metadata.addon` that are live or still open
+   * for payment at the provider, whatever Studafy has recorded so far.
+   */
+  findAddonPurchasesInFlight?(input: {
+    customerId: string;
+    addon: string;
+  }): Promise<AddonPurchasesInFlight>;
+  /**
+   * Close a hosted checkout so it can no longer be paid. `"completed"` when it was paid before it
+   * could be closed; `"expired"` when it is closed (or already was).
+   */
+  expireCheckoutSession?(sessionId: string): Promise<"expired" | "completed">;
   /** List invoices billed to a customer, newest first. */
   listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult>;
   /**

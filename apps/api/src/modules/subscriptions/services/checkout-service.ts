@@ -448,6 +448,46 @@ export async function createAiCheckoutSession(
   });
 }
 
+function storagePurchasePending(): CodedHttpException {
+  return new CodedHttpException(
+    409,
+    ERROR_CODES.STORAGE_ADDON_PURCHASE_PENDING,
+    "A storage purchase for this school is already paid or being confirmed",
+  );
+}
+
+/**
+ * Refuse while the provider already has a live storage subscription for the customer, and close
+ * every storage checkout still open so only the one about to be made can be paid. A checkout paid
+ * while it was being closed counts as a live purchase.
+ */
+async function closeEarlierStorageCheckouts(
+  selected: SelectedPaymentProvider,
+  customerId: string,
+): Promise<void> {
+  const { findAddonPurchasesInFlight, expireCheckoutSession } = selected.port;
+  if (!findAddonPurchasesInFlight || !expireCheckoutSession) {
+    // Selling storage online requires both (requireOnlineStorageProvider admits Stripe only).
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.STORAGE_ADDON_UNAVAILABLE,
+      "The storage add-on cannot be bought online for this school",
+    );
+  }
+
+  const inFlight = await findAddonPurchasesInFlight.call(selected.port, {
+    customerId,
+    addon: "storage",
+  });
+  if (inFlight.liveSubscriptionIds.length > 0) throw storagePurchasePending();
+
+  for (const sessionId of inFlight.openCheckoutSessionIds) {
+    if ((await expireCheckoutSession.call(selected.port, sessionId)) === "completed") {
+      throw storagePurchasePending();
+    }
+  }
+}
+
 export interface StorageCheckoutParams {
   schoolId: string;
   priceId: string;
@@ -463,6 +503,11 @@ export interface StorageCheckoutParams {
  * purchase would fall through to the school's own subscription. One add-on per school -- a school
  * that has one changes its tier (storage-addon-service.ts) rather than buying a second, which would
  * bill it twice.
+ *
+ * Studafy's own row appears only when the provider's webhook arrives, which can be a minute after
+ * the payment. So a second purchase is also refused while the provider itself holds a live storage
+ * subscription for the school, and every earlier checkout still open is closed before a new one is
+ * made: at most one payable storage checkout exists for a school at any moment.
  */
 export async function createStorageCheckoutSession(
   database: Database,
@@ -472,6 +517,10 @@ export async function createStorageCheckoutSession(
   const { schoolId, priceId, successUrl, cancelUrl, tenantContext } = params;
 
   return withTenantTx(database, tenantContext, async (tx) => {
+    // One storage checkout at a time per school: a double click, a second tab or a retry waits here
+    // for the first to finish, then sees what it did.
+    await tx`SELECT pg_advisory_xact_lock(hashtextextended(${`storage-checkout:${schoolId}`}, 0))`;
+
     const school = await findSchool(tx, schoolId);
     const selected = await requireOnlineStorageProvider(tx, providers, schoolId);
 
@@ -495,6 +544,8 @@ export async function createStorageCheckoutSession(
 
     const line = checkoutLine(selected, price);
     const customerId = await ensureProviderCustomer(tx, selected, school);
+
+    await closeEarlierStorageCheckouts(selected, customerId);
 
     const session = await selected.port.createCheckoutSession({
       customerId,
