@@ -520,6 +520,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/platform/tiers/{planId}",
   // Manual grants (000211): platform:manage, web channel (modules/platform/grants-routes.ts).
   "POST /api/platform/schools/{schoolId}/grants",
+  "POST /api/platform/schools/{schoolId}/storage-subscription/invoices/{invoiceId}/refund",
   "POST /api/platform/schools/{schoolId}/grants/{grantId}/revoke",
   // School-defined student and parent records (modules/records/routes.ts): the template editor
   // (recordTemplate:manage), filling records in and documents (studentRecord:update), and the

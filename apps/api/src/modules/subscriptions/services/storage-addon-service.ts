@@ -31,6 +31,7 @@ import { selectPaymentProviderForSchool } from "../payment-provider-routing";
 import type { Database } from "../../../db";
 import type { TenantContext } from "../../../db/tenant-tx";
 import type { PaymentProviderRegistry, SelectedPaymentProvider } from "../payment-provider-routing";
+import type { PaymentMethodSummary, SubscriptionInvoiceSummary } from "../ports/payment-provider";
 import type { StorageAddonPlanCode, SubscriptionStatus } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
@@ -51,6 +52,14 @@ export interface StorageAddonTier {
   prices: StorageAddonPrice[];
 }
 
+export interface StoragePendingChange {
+  planCode: StorageAddonPlanCode | null;
+  capBytes: number;
+  price: StorageAddonPrice | null;
+  /** When it takes effect: the add-on's next renewal. */
+  effectiveAt: Date;
+}
+
 export interface StorageAddonCurrent {
   planCode: StorageAddonPlanCode | null;
   capBytes: number;
@@ -58,6 +67,8 @@ export interface StorageAddonCurrent {
   price: StorageAddonPrice | null;
   currentPeriodEnd: Date;
   cancelAtPeriodEnd: boolean;
+  /** A move to less storage or to the other interval, waiting for the next renewal. */
+  pendingChange: StoragePendingChange | null;
 }
 
 export interface StorageOffer {
@@ -93,6 +104,57 @@ interface StorageRow {
   current_period_end: Date;
   cancel_at_period_end: boolean;
   stripe_subscription_id: string | null;
+  pending_plan_price_id: string | null;
+  pending_cap_bytes: string | null;
+  pending_effective_at: Date | null;
+  stripe_schedule_id: string | null;
+}
+
+/** A plan price by id, active or not (the add-on's own price may have been retired since). */
+async function readPrice(
+  tx: TransactionSql,
+  priceId: string | null,
+): Promise<PriceRow | undefined> {
+  if (!priceId) return undefined;
+  const [row] = await tx<PriceRow[]>`
+    SELECT pp.id, p.code AS plan_code, pp.amount_minor::text AS amount_minor,
+           cur.code AS currency, pp.billing_interval::text AS billing_interval,
+           pp.stripe_price_id
+    FROM app.plan_prices pp
+    JOIN app.plans p ON p.id = pp.plan_id
+    JOIN app.currencies cur ON cur.id = pp.currency_id
+    WHERE pp.id = ${priceId}::uuid
+  `;
+  return row;
+}
+
+/** The add-on row as the school sees it, with its price and any change scheduled for renewal. */
+export async function describeStorageAddon(
+  tx: TransactionSql,
+  live: StorageRow,
+): Promise<StorageAddonCurrent> {
+  const price = await readPrice(tx, live.plan_price_id);
+  const pendingPrice = await readPrice(tx, live.pending_plan_price_id);
+  return {
+    planCode: price && isStorageAddonPlanCode(price.plan_code) ? price.plan_code : null,
+    capBytes: Number(live.cap_bytes),
+    status: live.status,
+    price: price ? toPrice(price) : null,
+    currentPeriodEnd: live.current_period_end,
+    cancelAtPeriodEnd: live.cancel_at_period_end,
+    pendingChange:
+      live.pending_plan_price_id && live.pending_effective_at
+        ? {
+            planCode:
+              pendingPrice && isStorageAddonPlanCode(pendingPrice.plan_code)
+                ? pendingPrice.plan_code
+                : null,
+            capBytes: Number(live.pending_cap_bytes),
+            price: pendingPrice ? toPrice(pendingPrice) : null,
+            effectiveAt: live.pending_effective_at,
+          }
+        : null,
+  };
 }
 
 function toPrice(row: PriceRow): StorageAddonPrice {
@@ -123,6 +185,12 @@ export async function findStoragePrice(
   return row;
 }
 
+const STORAGE_COLUMNS = (tx: TransactionSql) => tx`
+  id, plan_price_id, cap_bytes::text AS cap_bytes, status::text AS status, current_period_end,
+  cancel_at_period_end, stripe_subscription_id, pending_plan_price_id,
+  pending_cap_bytes::text AS pending_cap_bytes, pending_effective_at, stripe_schedule_id
+`;
+
 /** The school's live storage add-on row, locked when `forUpdate`. */
 export async function findLiveStorageAddon(
   tx: TransactionSql,
@@ -131,15 +199,13 @@ export async function findLiveStorageAddon(
 ): Promise<StorageRow | undefined> {
   const rows = forUpdate
     ? await tx<StorageRow[]>`
-        SELECT id, plan_price_id, cap_bytes::text AS cap_bytes, status::text AS status,
-               current_period_end, cancel_at_period_end, stripe_subscription_id
+        SELECT ${STORAGE_COLUMNS(tx)}
         FROM app.storage_subscriptions
         WHERE school_id = ${schoolId}::uuid AND status::text = ANY(${[...LIVE_STATUSES]})
         FOR UPDATE
       `
     : await tx<StorageRow[]>`
-        SELECT id, plan_price_id, cap_bytes::text AS cap_bytes, status::text AS status,
-               current_period_end, cancel_at_period_end, stripe_subscription_id
+        SELECT ${STORAGE_COLUMNS(tx)}
         FROM app.storage_subscriptions
         WHERE school_id = ${schoolId}::uuid AND status::text = ANY(${[...LIVE_STATUSES]})
       `;
@@ -157,7 +223,10 @@ function sellsStorageOnline(selected: SelectedPaymentProvider): boolean {
     port.changeSubscriptionPrice !== undefined &&
     port.previewSubscriptionPriceChange !== undefined &&
     port.findAddonPurchasesInFlight !== undefined &&
-    port.expireCheckoutSession !== undefined
+    port.expireCheckoutSession !== undefined &&
+    port.scheduleSubscriptionPriceChange !== undefined &&
+    port.releaseSubscriptionSchedule !== undefined &&
+    port.countPendingInvoiceItems !== undefined
   );
 }
 
@@ -212,28 +281,7 @@ export async function getStorageOffer(
     }));
 
     const live = await findLiveStorageAddon(tx, context.schoolId);
-    let current: StorageAddonCurrent | null = null;
-    if (live) {
-      const [price] = live.plan_price_id
-        ? await tx<PriceRow[]>`
-            SELECT pp.id, p.code AS plan_code, pp.amount_minor::text AS amount_minor,
-                   cur.code AS currency, pp.billing_interval::text AS billing_interval,
-                   pp.stripe_price_id
-            FROM app.plan_prices pp
-            JOIN app.plans p ON p.id = pp.plan_id
-            JOIN app.currencies cur ON cur.id = pp.currency_id
-            WHERE pp.id = ${live.plan_price_id}::uuid
-          `
-        : [];
-      current = {
-        planCode: price && isStorageAddonPlanCode(price.plan_code) ? price.plan_code : null,
-        capBytes: Number(live.cap_bytes),
-        status: live.status,
-        price: price ? toPrice(price) : null,
-        currentPeriodEnd: live.current_period_end,
-        cancelAtPeriodEnd: live.cancel_at_period_end,
-      };
-    }
+    const current = live ? await describeStorageAddon(tx, live) : null;
 
     return {
       usage: {
@@ -282,16 +330,46 @@ export async function requireOnlineStorageProvider(
 /** How long a confirmed preview may be used to change tier. */
 export const STORAGE_CHANGE_PREVIEW_TTL_MS = 30 * 60 * 1000;
 
+/**
+ * When a change takes effect, as the app stores do it: more storage on the same billing interval
+ * starts now with one prorated charge; less storage, or the other interval, starts at the next
+ * renewal with nothing charged or credited now.
+ */
+export type StorageChangeTiming = "now" | "renewal";
+
 interface PreparedChange {
   selected: SelectedPaymentProvider;
   live: StorageRow & { stripe_subscription_id: string };
   next: PriceRow & { plan_code: StorageAddonPlanCode; stripe_price_id: string };
   capBytes: number;
-  chargeNow: boolean;
-  intervalChanges: boolean;
+  timing: StorageChangeTiming;
 }
 
-/** Everything a tier change and its preview both check, with the live row locked. */
+function changePending(): CodedHttpException {
+  return new CodedHttpException(
+    409,
+    ERROR_CODES.STORAGE_ADDON_CHANGE_PENDING,
+    "A storage change is already scheduled for the next renewal",
+  );
+}
+
+function unsettled(message: string): CodedHttpException {
+  return new CodedHttpException(409, ERROR_CODES.STORAGE_ADDON_UNSETTLED, message);
+}
+
+/** The school's provider customer, or null when it has none yet. */
+async function stripeCustomerOf(tx: TransactionSql, schoolId: string): Promise<string | null> {
+  const [row] = await tx<{ stripe_customer_id: string | null }[]>`
+    SELECT stripe_customer_id FROM app.schools WHERE id = ${schoolId}::uuid
+  `;
+  return row?.stripe_customer_id ?? null;
+}
+
+/**
+ * Everything a tier change and its preview both check, with the live row locked: one change at a
+ * time, nothing owed, and nothing left over from an earlier change that the provider's preview would
+ * count but an immediate change would not (the cause of a preview of 0 followed by a real charge).
+ */
 async function prepareChange(
   tx: TransactionSql,
   providers: PaymentProviderRegistry,
@@ -302,6 +380,10 @@ async function prepareChange(
 
   const live = await findLiveStorageAddon(tx, schoolId, true);
   if (!live || !live.stripe_subscription_id) throw notActive();
+  if (live.pending_plan_price_id) throw changePending();
+  if (live.status !== "active" && live.status !== "trialing") {
+    throw unsettled("The storage add-on has a payment due");
+  }
 
   const next = await findStoragePrice(tx, priceId);
   if (!next || !isStorageAddonPlanCode(next.plan_code)) {
@@ -313,18 +395,7 @@ async function prepareChange(
   }
   if (!next.stripe_price_id) throw unavailable();
 
-  const [currentPrice] = live.plan_price_id
-    ? await tx<PriceRow[]>`
-        SELECT pp.id, p.code AS plan_code, pp.amount_minor::text AS amount_minor,
-               cur.code AS currency, pp.billing_interval::text AS billing_interval,
-               pp.stripe_price_id
-        FROM app.plan_prices pp
-        JOIN app.plans p ON p.id = pp.plan_id
-        JOIN app.currencies cur ON cur.id = pp.currency_id
-        WHERE pp.id = ${live.plan_price_id}::uuid
-      `
-    : [];
-
+  const currentPrice = await readPrice(tx, live.plan_price_id);
   if (currentPrice?.id === next.id) {
     throw new CodedHttpException(
       409,
@@ -335,35 +406,41 @@ async function prepareChange(
   // A Stripe subscription is billed in one currency for its whole life.
   if (currentPrice && currentPrice.currency !== next.currency) throw unavailable();
 
+  const customerId = await stripeCustomerOf(tx, schoolId);
+  if (customerId) {
+    const pending = await selected.port.countPendingInvoiceItems!(customerId);
+    if (pending.count > 0) {
+      throw unsettled("An amount from an earlier change is waiting for the next invoice");
+    }
+  }
+
   const capBytes = STORAGE_ADDON_TIERS[next.plan_code].capBytes;
-  const intervalChanges =
-    currentPrice !== undefined && currentPrice.billing_interval !== next.billing_interval;
-  const chargeNow = capBytes > Number(live.cap_bytes) || intervalChanges;
+  const sameInterval =
+    currentPrice === undefined || currentPrice.billing_interval === next.billing_interval;
+  const timing: StorageChangeTiming =
+    capBytes > Number(live.cap_bytes) && sameInterval ? "now" : "renewal";
 
   return {
     selected,
     live: { ...live, stripe_subscription_id: live.stripe_subscription_id },
     next: { ...next, plan_code: next.plan_code, stripe_price_id: next.stripe_price_id },
     capBytes,
-    chargeNow,
-    intervalChanges,
+    timing,
   };
 }
 
-function addInterval(from: Date, interval: "monthly" | "yearly"): Date {
-  const date = new Date(from);
-  if (interval === "yearly") date.setUTCFullYear(date.getUTCFullYear() + 1);
-  else date.setUTCMonth(date.getUTCMonth() + 1);
-  return date;
-}
-
 export interface StorageChangePreview {
-  /** Charged the moment the change is confirmed; 0 for a move to less storage. */
+  /** "now": applied and charged at once. "renewal": applied at the next renewal, nothing now. */
+  timing: StorageChangeTiming;
+  /** When the new storage starts: now, or the next renewal. */
+  effectiveAt: Date;
+  /** Charged the moment the change is confirmed; 0 for a change at renewal. */
   amountDueNowMinor: number;
-  /** The next regular bill: the new price, or for a move down, that price less the credit. */
+  /** The next regular bill, at the new price. */
   nextBillMinor: number;
   nextBillAt: Date;
   currency: string;
+  /** Kept for older clients: true when something is charged now. */
   chargeNow: boolean;
   price: StorageAddonPrice;
   capBytes: number;
@@ -372,9 +449,10 @@ export interface StorageChangePreview {
 }
 
 /**
- * What a tier change will cost, from the provider's own preview of the invoice -- nothing is
- * charged or changed. The change itself must quote `prorationDate` and `amountDueNowMinor` back, so
- * the school is charged exactly the amount it was shown.
+ * What a tier change will cost. For a change now, from the provider's own preview of the invoice --
+ * nothing is charged or changed -- and the change must quote `prorationDate` and
+ * `amountDueNowMinor` back, so the school is charged exactly the amount it was shown. A change at
+ * renewal costs nothing now, and the next bill is the new price.
  */
 export async function previewStorageTierChange(
   database: Database,
@@ -386,24 +464,38 @@ export async function previewStorageTierChange(
   return withTenantTx(database, tenantContext, async (tx) => {
     const change = await prepareChange(tx, providers, schoolId, priceId);
     const prorationDate = new Date(Math.floor(Date.now() / 1000) * 1000);
+    const price = toPrice(change.next);
+
+    if (change.timing === "renewal") {
+      return {
+        timing: "renewal",
+        effectiveAt: change.live.current_period_end,
+        amountDueNowMinor: 0,
+        nextBillMinor: price.amountMinor,
+        nextBillAt: change.live.current_period_end,
+        currency: price.currency,
+        chargeNow: false,
+        price,
+        capBytes: change.capBytes,
+        prorationDate,
+      };
+    }
 
     const preview = await change.selected.port.previewSubscriptionPriceChange!({
       providerSubscriptionId: change.live.stripe_subscription_id,
       priceId: change.next.stripe_price_id,
-      chargeNow: change.chargeNow,
+      chargeNow: true,
       prorationDate: prorationDate.getTime() / 1000,
     });
 
-    const price = toPrice(change.next);
     return {
-      amountDueNowMinor: change.chargeNow ? preview.amountDueMinor : 0,
-      nextBillMinor: change.chargeNow ? price.amountMinor : preview.amountDueMinor,
-      // A new interval restarts the billing period at the change (Stripe resets the cycle anchor).
-      nextBillAt: change.intervalChanges
-        ? addInterval(prorationDate, change.next.billing_interval)
-        : change.live.current_period_end,
+      timing: "now",
+      effectiveAt: prorationDate,
+      amountDueNowMinor: preview.amountDueMinor,
+      nextBillMinor: price.amountMinor,
+      nextBillAt: change.live.current_period_end,
       currency: preview.currency,
-      chargeNow: change.chargeNow,
+      chargeNow: preview.amountDueMinor > 0,
       price,
       capBytes: change.capBytes,
       prorationDate,
@@ -432,19 +524,97 @@ function priceChanged(): CodedHttpException {
 }
 
 /**
- * Move the school's live add-on to another tier or interval, prorated by Stripe, for exactly the
- * amount the school confirmed.
+ * Refund at once whatever an immediate change took beyond the amount the school confirmed, and
+ * record it for the super admin. A failed refund is recorded as `needs_review`, never thrown: the
+ * change itself has been paid and applied, and the school must see it.
+ */
+async function settleOvercharge(
+  tx: TransactionSql,
+  selected: SelectedPaymentProvider,
+  params: {
+    schoolId: string;
+    storageSubscriptionId: string;
+    invoice: { id: string; amountPaidMinor: number; currency: string };
+    expectedMinor: number;
+    requestKey: string;
+  },
+): Promise<void> {
+  const { schoolId, storageSubscriptionId, invoice, expectedMinor, requestKey } = params;
+  const excess = invoice.amountPaidMinor - expectedMinor;
+  if (excess <= 0) return;
+
+  let refundId: string | null = null;
+  let error: string | null = null;
+  try {
+    const refund = await selected.port.refund({
+      invoiceId: invoice.id,
+      amountMinor: excess,
+      currency: invoice.currency,
+      idempotencyKey: `storage-overcharge:${invoice.id}:${requestKey}`,
+      metadata: {
+        school_id: schoolId,
+        reason: "storage_change_overcharge",
+        storage_subscription_id: storageSubscriptionId,
+      },
+    });
+    refundId = refund.providerRefundId;
+  } catch (caught) {
+    error = (caught instanceof Error ? caught.message : String(caught)).slice(0, 500);
+  }
+
+  const status = refundId ? "refunded" : "needs_review";
+  await tx`
+    INSERT INTO app.storage_billing_incidents (
+      school_id, storage_subscription_id, kind, stripe_invoice_id, expected_minor, charged_minor,
+      refund_minor, currency, stripe_refund_id, status, last_error, resolved_at
+    ) VALUES (
+      ${schoolId}::uuid, ${storageSubscriptionId}::uuid, 'overcharge', ${invoice.id},
+      ${expectedMinor}, ${invoice.amountPaidMinor}, ${excess}, ${invoice.currency}, ${refundId},
+      ${status}, ${error}, ${refundId ? new Date() : null}
+    )
+    ON CONFLICT (stripe_invoice_id, kind) DO NOTHING
+  `;
+  await emitAuditLog(tx, {
+    action: "insert",
+    targetTable: "storage_billing_incidents",
+    targetId: storageSubscriptionId,
+    newValues: {
+      stripe_invoice_id: invoice.id,
+      expected_minor: expectedMinor,
+      charged_minor: invoice.amountPaidMinor,
+      refund_minor: excess,
+      stripe_refund_id: refundId,
+      status,
+    },
+  });
+  console.warn(
+    JSON.stringify({
+      level: "warn",
+      msg: "storage change charged more than confirmed",
+      schoolId,
+      invoiceId: invoice.id,
+      expectedMinor,
+      chargedMinor: invoice.amountPaidMinor,
+      refunded: refundId !== null,
+    }),
+  );
+}
+
+/**
+ * Change the school's storage tier, the way the app stores do.
  *
- * The preview is recomputed at the confirmed `prorationDate` before anything is charged; if it no
- * longer matches `expectedAmountMinor` (or the preview is too old) the answer is 409
- * STORAGE_ADDON_PRICE_CHANGED and nothing happens. The live row stays locked from that check to the
- * write, so a double click or a second tab waits and then finds the change already made (409
- * STORAGE_ADDON_ALREADY_ACTIVE), and the provider call carries an idempotency key besides.
+ * More storage on the same interval applies now, for exactly the amount the school confirmed: the
+ * preview is recomputed at the confirmed `prorationDate` and must still match `expectedAmountMinor`
+ * (409 STORAGE_ADDON_PRICE_CHANGED, nothing charged, otherwise); the invoice Stripe then creates is
+ * read back, and anything it took beyond the confirmed amount is refunded at once and recorded
+ * (settleOvercharge). A declined card answers 402 and changes nothing.
  *
- * A move to more storage, or to another interval, is invoiced now and applied only when that invoice
- * is paid: a declined card answers 402 and leaves everything as it was. A move to less storage is
- * credited on the next invoice and applies at once -- the school keeps its files even when they no
- * longer fit, and only new uploads wait until it is back under the smaller cap.
+ * Less storage, or the other interval, is scheduled for the next renewal: nothing is charged or
+ * credited now, the school keeps its current storage until then, and the webhook pipeline moves the
+ * row when the new price starts. Undo it with `undoScheduledStorageChange`.
+ *
+ * The live row stays locked from the checks to the write, so a double click or a second tab waits
+ * and then finds the change already made, and every provider call carries an idempotency key.
  */
 export async function changeStorageTier(
   database: Database,
@@ -459,25 +629,61 @@ export async function changeStorageTier(
 
   return withTenantTx(database, tenantContext, async (tx) => {
     const change = await prepareChange(tx, providers, schoolId, priceId);
-    const { selected, live, next, capBytes, chargeNow } = change;
-    const prorationSeconds = Math.floor(prorationDate.getTime() / 1000);
+    const { selected, live, next, capBytes } = change;
+    const metadata = { price_id: next.id, billing_interval: next.billing_interval };
 
+    if (change.timing === "renewal") {
+      if (expectedAmountMinor !== 0) throw priceChanged();
+      const scheduled = await selected.port.scheduleSubscriptionPriceChange!({
+        providerSubscriptionId: live.stripe_subscription_id,
+        priceId: next.stripe_price_id,
+        metadata,
+        idempotencyKey: `storage-schedule:${live.id}:${requestKey}`,
+      });
+
+      await tx`
+        UPDATE app.storage_subscriptions
+        SET pending_plan_price_id = ${next.id}::uuid, pending_cap_bytes = ${capBytes},
+            pending_effective_at = ${scheduled.effectiveAt},
+            stripe_schedule_id = ${scheduled.scheduleId},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${live.id}::uuid
+      `;
+      await emitAuditLog(tx, {
+        action: "update",
+        targetTable: "storage_subscriptions",
+        targetId: live.id,
+        oldValues: { pending_plan_price_id: null },
+        newValues: {
+          pending_plan_price_id: next.id,
+          pending_cap_bytes: capBytes,
+          pending_effective_at: scheduled.effectiveAt.toISOString(),
+          stripe_schedule_id: scheduled.scheduleId,
+        },
+      });
+
+      const [updated] = await tx<StorageRow[]>`
+        SELECT ${STORAGE_COLUMNS(tx)} FROM app.storage_subscriptions WHERE id = ${live.id}::uuid
+      `;
+      return describeStorageAddon(tx, updated!);
+    }
+
+    const prorationSeconds = Math.floor(prorationDate.getTime() / 1000);
     const preview = await selected.port.previewSubscriptionPriceChange!({
       providerSubscriptionId: live.stripe_subscription_id,
       priceId: next.stripe_price_id,
-      chargeNow,
+      chargeNow: true,
       prorationDate: prorationSeconds,
     });
-    const dueNow = chargeNow ? preview.amountDueMinor : 0;
-    if (dueNow !== expectedAmountMinor) throw priceChanged();
+    if (preview.amountDueMinor !== expectedAmountMinor) throw priceChanged();
 
     const result = await selected.port.changeSubscriptionPrice!({
       providerSubscriptionId: live.stripe_subscription_id,
       priceId: next.stripe_price_id,
-      chargeNow,
+      chargeNow: true,
       prorationDate: prorationSeconds,
       idempotencyKey: `storage-change:${live.id}:${requestKey}`,
-      metadata: { price_id: next.id, billing_interval: next.billing_interval },
+      metadata,
     });
 
     if (!result.applied) {
@@ -504,28 +710,89 @@ export async function changeStorageTier(
       newValues: {
         plan_price_id: next.id,
         cap_bytes: capBytes,
-        charged_now_minor: dueNow,
+        confirmed_minor: expectedAmountMinor,
+        charged_minor: result.invoice?.amountPaidMinor ?? null,
+        stripe_invoice_id: result.invoice?.id ?? null,
         currency: preview.currency,
       },
     });
 
-    return {
-      planCode: next.plan_code,
-      capBytes,
-      status: live.status,
-      price: toPrice(next),
-      currentPeriodEnd: change.intervalChanges
-        ? addInterval(prorationDate, next.billing_interval)
-        : live.current_period_end,
-      cancelAtPeriodEnd: live.cancel_at_period_end,
-    };
+    if (result.invoice) {
+      await settleOvercharge(tx, selected, {
+        schoolId,
+        storageSubscriptionId: live.id,
+        invoice: result.invoice,
+        expectedMinor: expectedAmountMinor,
+        requestKey,
+      });
+    }
+
+    const [updated] = await tx<StorageRow[]>`
+      SELECT ${STORAGE_COLUMNS(tx)} FROM app.storage_subscriptions WHERE id = ${live.id}::uuid
+    `;
+    return describeStorageAddon(tx, updated!);
+  });
+}
+
+/** Release the provider's schedule and clear the scheduled change on the row (row locked). */
+async function dropScheduledChange(
+  tx: TransactionSql,
+  selected: SelectedPaymentProvider,
+  live: StorageRow,
+): Promise<void> {
+  if (!live.stripe_schedule_id) return;
+  await selected.port.releaseSubscriptionSchedule!(live.stripe_schedule_id);
+  await tx`
+    UPDATE app.storage_subscriptions
+    SET pending_plan_price_id = NULL, pending_cap_bytes = NULL, pending_effective_at = NULL,
+        stripe_schedule_id = NULL, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${live.id}::uuid
+  `;
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "storage_subscriptions",
+    targetId: live.id,
+    oldValues: {
+      pending_plan_price_id: live.pending_plan_price_id,
+      stripe_schedule_id: live.stripe_schedule_id,
+    },
+    newValues: { pending_plan_price_id: null, stripe_schedule_id: null },
+  });
+}
+
+/** Undo the change scheduled for the next renewal: the add-on carries on as it is. */
+export async function undoScheduledStorageChange(
+  database: Database,
+  providers: PaymentProviderRegistry,
+  params: { schoolId: string; tenantContext: TenantContext },
+): Promise<StorageAddonCurrent> {
+  return withTenantTx(database, params.tenantContext, async (tx) => {
+    const selected = await requireOnlineStorageProvider(tx, providers, params.schoolId);
+    const live = await findLiveStorageAddon(tx, params.schoolId, true);
+    if (!live) throw notActive();
+    if (!live.pending_plan_price_id) {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.STORAGE_ADDON_NO_PENDING_CHANGE,
+        "No storage change is scheduled",
+      );
+    }
+    await dropScheduledChange(tx, selected, live);
+    return describeStorageAddon(tx, {
+      ...live,
+      pending_plan_price_id: null,
+      pending_cap_bytes: null,
+      pending_effective_at: null,
+      stripe_schedule_id: null,
+    });
   });
 }
 
 /**
  * Stop the add-on renewing (`cancel: true`) or undo that (`cancel: false`). It stays live, and its
  * cap with it, until the period ends; Stripe's `customer.subscription.deleted` then ends it through
- * the state machine and the school is back on its included storage, files untouched.
+ * the state machine and the school is back on its included storage, files untouched. Canceling also
+ * drops any change scheduled for the renewal that will no longer happen.
  */
 export async function setStorageAddonCancellation(
   database: Database,
@@ -542,6 +809,8 @@ export async function setStorageAddonCancellation(
 
     if (live.cancel_at_period_end !== cancel) {
       if (cancel) {
+        // A subscription held by a schedule cannot be set to cancel: release it first.
+        await dropScheduledChange(tx, selected, live);
         await selected.port.scheduleCancellation({
           providerSubscriptionId: live.stripe_subscription_id,
         });
@@ -567,5 +836,47 @@ export async function setStorageAddonCancellation(
     }
 
     return { cancelAtPeriodEnd: cancel, currentPeriodEnd: live.current_period_end };
+  });
+}
+
+export interface StorageBillingDetails {
+  paymentMethod: PaymentMethodSummary | null;
+  nextBill: { amountMinor: number; currency: string; at: Date } | null;
+  invoices: SubscriptionInvoiceSummary[];
+}
+
+/** The live add-on's payment method, next bill and invoices, or null when it has none. */
+export async function getStorageBilling(
+  database: Database,
+  providers: PaymentProviderRegistry,
+  params: { schoolId: string; tenantContext: TenantContext },
+): Promise<StorageBillingDetails | null> {
+  return withTenantTx(database, params.tenantContext, async (tx) => {
+    const selected = await requireOnlineStorageProvider(tx, providers, params.schoolId);
+    const [row] = await tx<{ stripe_subscription_id: string | null }[]>`
+      SELECT stripe_subscription_id FROM app.storage_subscriptions
+      WHERE school_id = ${params.schoolId}::uuid
+    `;
+    if (!row?.stripe_subscription_id || !selected.port.describeSubscriptionBilling) return null;
+    return selected.port.describeSubscriptionBilling(row.stripe_subscription_id);
+  });
+}
+
+/** A hosted page where the school replaces the card its storage is paid with, and nothing else. */
+export async function createStoragePaymentMethodSession(
+  database: Database,
+  providers: PaymentProviderRegistry,
+  params: { schoolId: string; returnUrl: string; tenantContext: TenantContext },
+): Promise<{ url: string }> {
+  return withTenantTx(database, params.tenantContext, async (tx) => {
+    const selected = await requireOnlineStorageProvider(tx, providers, params.schoolId);
+    const live = await findLiveStorageAddon(tx, params.schoolId);
+    const customerId = await stripeCustomerOf(tx, params.schoolId);
+    if (!live || !customerId) throw notActive();
+    if (!selected.port.createPaymentMethodPortalSession) throw unavailable();
+    return selected.port.createPaymentMethodPortalSession({
+      customerId,
+      returnUrl: params.returnUrl,
+    });
   });
 }

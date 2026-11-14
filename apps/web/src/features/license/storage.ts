@@ -16,9 +16,11 @@ export type StorageOffer = Schemas["StorageAddOnOffer"];
 export type StorageTier = Schemas["StorageAddOnTier"];
 // Registered once and reused nullable by `current.price`, so the component itself reads as nullable.
 export type StoragePrice = NonNullable<Schemas["StorageAddOnPrice"]>;
-export type StorageCurrent = Schemas["StorageAddOnCurrent"];
+export type StorageCurrent = NonNullable<Schemas["StorageAddOnCurrent"]>;
 export type StorageInterval = StoragePrice["interval"];
 export type StorageChangePreview = Schemas["StorageAddOnChangePreview"];
+export type StorageBilling = NonNullable<Schemas["StorageAddOnBilling"]>;
+export type StorageInvoice = Schemas["StorageAddOnInvoice"];
 
 export const STORAGE_OFFER_KEY = ["storage-addon-offer"];
 
@@ -49,6 +51,7 @@ function useStorageMutation<Input, Output>(mutationFn: (input: Input) => Promise
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: STORAGE_OFFER_KEY }),
         queryClient.invalidateQueries({ queryKey: BILLING_OVERVIEW_QUERY_KEY }),
+        queryClient.invalidateQueries({ queryKey: ["storage-addon-billing"] }),
       ]);
     },
   });
@@ -108,5 +111,49 @@ export function useSetStorageCancellation() {
       ? await api.POST("/api/subscriptions/storage/cancel")
       : await api.POST("/api/subscriptions/storage/cancel/reverse");
     return required(data, "Storage cancellation");
+  });
+}
+
+export const STORAGE_BILLING_KEY = ["storage-addon-billing"];
+
+/** The add-on's card, next bill and invoices, read from the payment provider. */
+export function useStorageBillingQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: STORAGE_BILLING_KEY,
+    enabled,
+    retry: false,
+    queryFn: async () => {
+      const { data } = await api.GET("/api/subscriptions/storage/billing");
+      return (data ?? null) as StorageBilling | null;
+    },
+  });
+}
+
+/** Undo the change scheduled for the next renewal. */
+export function useUndoStorageChange() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await api.POST("/api/subscriptions/storage/change/undo");
+      return required(data, "Undo storage change") as StorageCurrent;
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: STORAGE_OFFER_KEY }),
+        queryClient.invalidateQueries({ queryKey: STORAGE_BILLING_KEY }),
+      ]);
+    },
+  });
+}
+
+/** A hosted page where the school replaces its card; the caller sends the browser to `url`. */
+export function useStoragePaymentMethodSession() {
+  return useMutation({
+    mutationFn: async (returnUrl: string) => {
+      const { data } = await api.POST("/api/subscriptions/storage/payment-method", {
+        body: { returnUrl },
+      });
+      return required(data, "Payment method page");
+    },
   });
 }

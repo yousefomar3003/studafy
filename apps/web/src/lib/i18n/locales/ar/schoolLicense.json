@@ -500,14 +500,65 @@
     "downNextBill": "تنتقل مدرستك إلى {{size}} الآن. فاتورتك القادمة في {{date}} هي {{amount}}، بعد طرح الجزء غير المستخدم من خطتك الحالية. لا تُحذف أي ملفات.",
     "thenPrice": "بعد ذلك {{price}}.",
     "payAndSwitch": "ادفع {{amount}} وبدّل",
-    "cancelTitle": "إيقاف تجديد مساحة التخزين؟",
+    "cancelTitle": "إلغاء اشتراك مساحة التخزين؟",
     "cancelBody": "تبقى لديك {{size}} حتى {{date}}. بعد ذلك تعود مدرستك إلى {{included}} المضمّنة ولا يُخصم أي مبلغ آخر. لا تُحذف أي ملفات، ويمكنك متابعة التجديد في أي وقت قبل ذلك.",
-    "cancelKeep": "متابعة التجديد",
-    "cancelConfirm": "إيقاف التجديد",
+    "cancelKeep": "الإبقاء على الاشتراك",
+    "cancelConfirm": "إلغاء الاشتراك",
     "units": {
       "mb": "{{value}} ميغابايت",
       "gb": "{{value}} غيغابايت",
       "tb": "{{value}} تيرابايت"
+    },
+    "scheduled": "ستتغير مساحة التخزين إلى {{size}} في {{date}}",
+    "changeScheduledNote": "هناك تغيير مجدول لموعد التجديد القادم. ألغِه في الأعلى لاختيار شيء آخر.",
+    "atRenewal": "تحتفظ مدرستك بـ {{current}} حتى {{date}}، ثم تنتقل إلى {{size}} بسعر {{price}}.",
+    "atRenewalHelp": "لا يُخصم أي مبلغ ولا يُضاف أي رصيد الآن. يمكنك إلغاء هذا التغيير في أي وقت قبل ذلك. لا تُحذف أي ملفات.",
+    "scheduleConfirm": "التغيير في {{date}}",
+    "manage": {
+      "title": "إدارة الاشتراك",
+      "plan": "الخطة",
+      "planValue": "{{size}} · {{price}}",
+      "renews": "يتجدد في",
+      "ends": "ينتهي في",
+      "nextBill": "الفاتورة القادمة",
+      "nextBillValue": "{{amount}} في {{date}}",
+      "paymentMethod": "طريقة الدفع",
+      "cardValue": "{{brand}} تنتهي بـ {{last4}} (تنتهي صلاحيتها {{month}}/{{year}})",
+      "methodValue": "{{brand}}",
+      "noMethod": "لا توجد بطاقة مسجلة",
+      "pendingTitle": "التغيير إلى {{size}} في {{date}}",
+      "pendingBody": "تحتفظ مدرستك بـ {{current}} حتى {{date}}، ثم تدفع {{price}}. لم يُخصم أي مبلغ مقابل هذا التغيير.",
+      "undoChange": "الإبقاء على {{size}}",
+      "undone": "ستبقى مساحة التخزين كما هي",
+      "updateCard": "تحديث البطاقة",
+      "cardError": "تعذّر فتح صفحة البطاقة",
+      "cancel": "إلغاء الاشتراك",
+      "resume": "استئناف الاشتراك",
+      "historyTitle": "سجل الفواتير",
+      "historyError": "تعذّر تحميل فواتيرك. حاول مرة أخرى بعد قليل.",
+      "historyEmpty": "لا توجد فواتير بعد.",
+      "columns": {
+        "date": "التاريخ",
+        "for": "مقابل",
+        "amount": "المبلغ",
+        "status": "الحالة",
+        "receipt": "الإيصال"
+      },
+      "reason": {
+        "create": "الدفعة الأولى",
+        "cycle": "تجديد",
+        "update": "تغيير الخطة",
+        "other": "دفعة"
+      },
+      "refunded": "(تم استرداد {{amount}})",
+      "status": {
+        "paid": "مدفوعة",
+        "open": "مستحقة",
+        "void": "ملغاة",
+        "uncollectible": "غير مدفوعة",
+        "other": "—"
+      },
+      "receipt": "عرض الإيصال"
     }
   },
   "aiRequest": {

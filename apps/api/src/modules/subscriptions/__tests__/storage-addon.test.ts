@@ -15,10 +15,17 @@ import { getStorageUsage } from "../../storage/quota-service";
 import { createStorageCheckoutSession } from "../services/checkout-service";
 import {
   changeStorageTier,
+  createStoragePaymentMethodSession,
+  getStorageBilling,
   getStorageOffer,
   previewStorageTierChange,
   setStorageAddonCancellation,
+  undoScheduledStorageChange,
 } from "../services/storage-addon-service";
+import {
+  getPlatformStorageSubscription,
+  refundPlatformStorageInvoice,
+} from "../services/storage-platform-service";
 import { handleBillingWebhook } from "../webhooks/webhook-processor";
 
 import {
@@ -39,6 +46,9 @@ import type {
   CreateCheckoutSessionInput,
   PaymentProviderPort,
   PreviewSubscriptionPriceChangeInput,
+  RefundInput,
+  ScheduleSubscriptionPriceChangeInput,
+  SubscriptionBillingSummary,
 } from "../ports/payment-provider";
 import type { TransactionSql } from "postgres";
 
@@ -144,7 +154,20 @@ interface FakeStripe {
   /** Open checkouts that turn out to have been paid when they are expired. */
   paidWhileExpiring: Set<string>;
   expired: string[];
+  /** What the invoice an immediate change creates takes from the card; null: the preview amount. */
+  chargedAmount: number | null;
+  schedules: ScheduleSubscriptionPriceChangeInput[];
+  released: string[];
+  /** Invoice items waiting for the customer's next invoice. */
+  pendingItems: { count: number; netMinor: number };
+  refunds: RefundInput[];
+  refundFails: boolean;
+  billing: SubscriptionBillingSummary;
+  portalSessions: { customerId: string; returnUrl: string }[];
 }
+
+/** When a scheduled change takes effect in the fake: the end of the current period. */
+const SCHEDULED_AT = new Date("2030-01-01T00:00:00.000Z");
 
 function fakeStripe(): FakeStripe {
   const fake: FakeStripe = {
@@ -158,6 +181,32 @@ function fakeStripe(): FakeStripe {
     openCheckoutSessionIds: [],
     paidWhileExpiring: new Set(),
     expired: [],
+    chargedAmount: null,
+    schedules: [],
+    released: [],
+    pendingItems: { count: 0, netMinor: 0 },
+    refunds: [],
+    refundFails: false,
+    billing: {
+      paymentMethod: { brand: "visa", last4: "4242", expMonth: 12, expYear: 2030 },
+      nextBill: { amountMinor: 1_000, currency: "USD", at: SCHEDULED_AT },
+      invoices: [
+        {
+          id: "in_storage_1",
+          number: "S-0001",
+          status: "paid",
+          created: new Date("2026-11-14T10:46:00.000Z"),
+          amountDueMinor: 3_879,
+          amountPaidMinor: 3_879,
+          amountRefundedMinor: 0,
+          currency: "USD",
+          billingReason: "subscription_update",
+          hostedInvoiceUrl: "https://invoice.example/in_storage_1",
+          invoicePdf: null,
+        },
+      ],
+    },
+    portalSessions: [],
     port: undefined as unknown as PaymentProviderPort,
   };
   fake.port = {
@@ -182,7 +231,41 @@ function fakeStripe(): FakeStripe {
       fake.changes.push(input);
       // Long enough for a concurrent request to reach the row lock while this one holds it.
       await new Promise((resolve) => setTimeout(resolve, 50));
-      return { applied: fake.applyChanges };
+      return {
+        applied: fake.applyChanges,
+        invoice: fake.applyChanges
+          ? {
+              id: `in_${input.providerSubscriptionId}_${fake.changes.length}`,
+              amountPaidMinor: fake.chargedAmount ?? fake.previewAmount,
+              currency: "USD",
+            }
+          : null,
+      };
+    },
+    scheduleSubscriptionPriceChange: (input: ScheduleSubscriptionPriceChangeInput) => {
+      fake.schedules.push(input);
+      return Promise.resolve({
+        scheduleId: `sub_sched_${fake.schedules.length}`,
+        effectiveAt: SCHEDULED_AT,
+      });
+    },
+    releaseSubscriptionSchedule: (scheduleId: string) => {
+      fake.released.push(scheduleId);
+      return Promise.resolve();
+    },
+    countPendingInvoiceItems: () => Promise.resolve({ ...fake.pendingItems }),
+    describeSubscriptionBilling: () => Promise.resolve(fake.billing),
+    createPaymentMethodPortalSession: (input: { customerId: string; returnUrl: string }) => {
+      fake.portalSessions.push(input);
+      return Promise.resolve({ url: "https://billing.example/portal" });
+    },
+    refund: (input: RefundInput) => {
+      fake.refunds.push(input);
+      if (fake.refundFails) return Promise.reject(new Error("card network unavailable"));
+      return Promise.resolve({
+        providerRefundId: `re_${fake.refunds.length}`,
+        status: "succeeded",
+      });
     },
     scheduleCancellation: (input: { providerSubscriptionId: string }) => {
       fake.cancellations.push(`cancel:${input.providerSubscriptionId}`);
@@ -250,6 +333,29 @@ function storageDeleted(
       customer: f.stripeCustomerId,
       status: "canceled",
       metadata: { school_id: f.schoolId, addon: "storage" },
+    },
+  };
+}
+
+/** A `customer.subscription.updated` for a storage subscription now on `stripePriceId`. */
+function storageUpdated(
+  f: BillingFixture,
+  id: string,
+  created: number,
+  subscription: string,
+  stripePriceId: string,
+): StubEventInput {
+  return {
+    id,
+    type: "customer.subscription.updated",
+    created,
+    data: {
+      object: "subscription",
+      id: subscription,
+      customer: f.stripeCustomerId,
+      status: "active",
+      metadata: { school_id: f.schoolId, addon: "storage" },
+      items: { data: [{ id: `si_${subscription}`, price: { id: stripePriceId } }] },
     },
   };
 }
@@ -541,6 +647,13 @@ describe("changing and canceling", () => {
     );
   }
 
+  async function bought1tb(f: BillingFixture, subscription: string): Promise<void> {
+    await deliver(
+      f,
+      storagePurchased(f, `evt_${subscription}`, 1_700_000_100, subscription, prices.tb1Monthly),
+    );
+  }
+
   function preview(f: BillingFixture, stripe: FakeStripe, priceId: string) {
     return previewStorageTierChange(f.db.sql, registry(stripe), {
       schoolId: f.schoolId,
@@ -698,47 +811,354 @@ describe("changing and canceling", () => {
     expect(await capOf(f)).toBe(100 * GIB);
   });
 
-  integrationTest("moving to yearly on the same tier is charged now", async () => {
-    const f = await createBillingFixture(database!);
-    await bought(f, "sub_storage_yearly");
-    const stripe = fakeStripe();
-    const shown = await preview(f, stripe, prices.gb100Yearly);
-    expect(shown.chargeNow).toBe(true);
+  integrationTest(
+    "anything charged beyond the confirmed amount is refunded at once and recorded",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought(f, "sub_storage_over");
+      const stripe = fakeStripe();
+      stripe.previewAmount = 0;
+      const shown = await preview(f, stripe, prices.tb1Monthly);
+      expect(shown.amountDueNowMinor).toBe(0);
+      // Stripe charges the card what the preview called free (the 2026-11-14 report).
+      stripe.chargedAmount = 3_862;
 
-    await change(f, stripe, prices.gb100Yearly, {
+      await change(f, stripe, prices.tb1Monthly, {
+        prorationDate: shown.prorationDate,
+        expectedAmountMinor: 0,
+        requestKey: "6f1d1c2e-1111-4a4a-8b8b-0000000000bb",
+      });
+
+      expect(stripe.refunds).toHaveLength(1);
+      expect(stripe.refunds[0]).toMatchObject({
+        invoiceId: "in_sub_storage_over_1",
+        amountMinor: 3_862,
+        currency: "USD",
+        idempotencyKey:
+          "storage-overcharge:in_sub_storage_over_1:6f1d1c2e-1111-4a4a-8b8b-0000000000bb",
+      });
+      const [incident] = await asAdmin(
+        f,
+        (tx) => tx<{ status: string; refund_minor: string; stripe_refund_id: string | null }[]>`
+          SELECT status, refund_minor::text AS refund_minor, stripe_refund_id
+          FROM app.storage_billing_incidents WHERE school_id = ${f.schoolId}::uuid
+        `,
+      );
+      expect(incident).toEqual({
+        status: "refunded",
+        refund_minor: "3862",
+        stripe_refund_id: "re_1",
+      });
+      expect(await capOf(f)).toBe(1024 * GIB);
+    },
+  );
+
+  integrationTest("a refund that fails is left for a person, never lost", async () => {
+    const f = await createBillingFixture(database!);
+    await bought(f, "sub_storage_over_fail");
+    const stripe = fakeStripe();
+    const shown = await preview(f, stripe, prices.tb1Monthly);
+    stripe.chargedAmount = shown.amountDueNowMinor + 500;
+    stripe.refundFails = true;
+
+    await change(f, stripe, prices.tb1Monthly, {
       prorationDate: shown.prorationDate,
       expectedAmountMinor: shown.amountDueNowMinor,
     });
 
-    expect(stripe.changes[0]).toMatchObject({ chargeNow: true });
+    const [incident] = await asAdmin(
+      f,
+      (tx) => tx<{ status: string; refund_minor: string; last_error: string | null }[]>`
+        SELECT status, refund_minor::text AS refund_minor, last_error
+        FROM app.storage_billing_incidents WHERE school_id = ${f.schoolId}::uuid
+      `,
+    );
+    expect(incident).toEqual({
+      status: "needs_review",
+      refund_minor: "500",
+      last_error: "card network unavailable",
+    });
+  });
+
+  integrationTest("exactly the confirmed amount refunds nothing", async () => {
+    const f = await createBillingFixture(database!);
+    await bought(f, "sub_storage_exact");
+    const stripe = fakeStripe();
+    const shown = await preview(f, stripe, prices.tb1Monthly);
+
+    await change(f, stripe, prices.tb1Monthly, {
+      prorationDate: shown.prorationDate,
+      expectedAmountMinor: shown.amountDueNowMinor,
+    });
+
+    expect(stripe.refunds).toHaveLength(0);
+  });
+
+  integrationTest(
+    "an amount left over from an earlier change blocks a change, before anything is asked",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought(f, "sub_storage_leftover");
+      const stripe = fakeStripe();
+      stripe.pendingItems = { count: 2, netMinor: -3_879 };
+
+      await expectCode(
+        preview(f, stripe, prices.tb1Monthly),
+        409,
+        ERROR_CODES.STORAGE_ADDON_UNSETTLED,
+      );
+      await expectCode(
+        change(f, stripe, prices.tb1Monthly, {
+          prorationDate: new Date(),
+          expectedAmountMinor: 0,
+        }),
+        409,
+        ERROR_CODES.STORAGE_ADDON_UNSETTLED,
+      );
+      expect(stripe.previews).toHaveLength(0);
+      expect(stripe.changes).toHaveLength(0);
+    },
+  );
+
+  integrationTest(
+    "moving down is scheduled for the renewal: nothing charged, the storage kept until then",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought1tb(f, "sub_storage_down");
+      const stripe = fakeStripe();
+
+      const shown = await preview(f, stripe, prices.gb100Monthly);
+      expect(shown).toMatchObject({
+        timing: "renewal",
+        amountDueNowMinor: 0,
+        nextBillMinor: 1_000,
+        chargeNow: false,
+      });
+      expect(stripe.previews).toHaveLength(0);
+
+      const current = await change(f, stripe, prices.gb100Monthly, {
+        prorationDate: shown.prorationDate,
+        expectedAmountMinor: 0,
+        requestKey: "6f1d1c2e-1111-4a4a-8b8b-0000000000cc",
+      });
+
+      expect(stripe.changes).toHaveLength(0);
+      expect(stripe.schedules).toEqual([
+        {
+          providerSubscriptionId: "sub_storage_down",
+          priceId: "price_storage_100gb_monthly",
+          metadata: { price_id: prices.gb100Monthly, billing_interval: "monthly" },
+          idempotencyKey: expect.stringContaining("6f1d1c2e-1111-4a4a-8b8b-0000000000cc"),
+        },
+      ]);
+      expect(current).toMatchObject({
+        planCode: "storage_1tb",
+        capBytes: 1024 * GIB,
+        pendingChange: {
+          planCode: "storage_100gb",
+          capBytes: 100 * GIB,
+          effectiveAt: SCHEDULED_AT,
+        },
+      });
+      expect(await capOf(f)).toBe(1024 * GIB);
+
+      // A second change waits until this one is applied or undone.
+      await expectCode(
+        preview(f, stripe, prices.tb1Monthly),
+        409,
+        ERROR_CODES.STORAGE_ADDON_CHANGE_PENDING,
+      );
+
+      // An event from before the renewal (still the old price) changes nothing.
+      await deliver(
+        f,
+        storageUpdated(
+          f,
+          "evt_down_before",
+          1_700_000_200,
+          "sub_storage_down",
+          "price_storage_1tb_monthly",
+        ),
+      );
+      expect(await capOf(f)).toBe(1024 * GIB);
+
+      // At the renewal Stripe moves the subscription to the new price: the row follows.
+      await deliver(
+        f,
+        storageUpdated(
+          f,
+          "evt_down_renewed",
+          1_700_000_300,
+          "sub_storage_down",
+          "price_storage_100gb_monthly",
+        ),
+      );
+      expect(await storageRow(f)).toMatchObject({
+        plan_price_id: prices.gb100Monthly,
+        cap_bytes: String(100 * GIB),
+      });
+      const [cleared] = await asAdmin(
+        f,
+        (tx) => tx<{ pending_plan_price_id: string | null; stripe_schedule_id: string | null }[]>`
+          SELECT pending_plan_price_id, stripe_schedule_id FROM app.storage_subscriptions
+          WHERE school_id = ${f.schoolId}::uuid
+        `,
+      );
+      expect(cleared).toEqual({ pending_plan_price_id: null, stripe_schedule_id: null });
+      expect(await capOf(f)).toBe(100 * GIB);
+    },
+  );
+
+  integrationTest("moving to yearly is scheduled for the renewal too", async () => {
+    const f = await createBillingFixture(database!);
+    await bought(f, "sub_storage_yearly");
+    const stripe = fakeStripe();
+
+    const shown = await preview(f, stripe, prices.gb100Yearly);
+    expect(shown).toMatchObject({ timing: "renewal", amountDueNowMinor: 0, chargeNow: false });
+
+    await change(f, stripe, prices.gb100Yearly, {
+      prorationDate: shown.prorationDate,
+      expectedAmountMinor: 0,
+    });
+
+    expect(stripe.changes).toHaveLength(0);
+    expect(stripe.schedules[0]).toMatchObject({ priceId: "price_storage_100gb_yearly" });
     expect(await capOf(f)).toBe(100 * GIB);
   });
 
-  integrationTest("moving down charges nothing now and shows the next bill", async () => {
+  integrationTest(
+    "a scheduled change can be undone, and a change at renewal costs nothing",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought1tb(f, "sub_storage_undo");
+      const stripe = fakeStripe();
+      const shown = await preview(f, stripe, prices.gb100Monthly);
+
+      // Confirming a renewal change with any amount but 0 is refused.
+      await expectCode(
+        change(f, stripe, prices.gb100Monthly, {
+          prorationDate: shown.prorationDate,
+          expectedAmountMinor: 100,
+        }),
+        409,
+        ERROR_CODES.STORAGE_ADDON_PRICE_CHANGED,
+      );
+
+      await change(f, stripe, prices.gb100Monthly, {
+        prorationDate: shown.prorationDate,
+        expectedAmountMinor: 0,
+      });
+      const undone = await undoScheduledStorageChange(f.db.sql, registry(stripe), {
+        schoolId: f.schoolId,
+        tenantContext: { schoolId: f.schoolId },
+      });
+
+      expect(stripe.released).toEqual(["sub_sched_1"]);
+      expect(undone.pendingChange).toBeNull();
+      expect(await capOf(f)).toBe(1024 * GIB);
+      await expectCode(
+        undoScheduledStorageChange(f.db.sql, registry(stripe), {
+          schoolId: f.schoolId,
+          tenantContext: { schoolId: f.schoolId },
+        }),
+        409,
+        ERROR_CODES.STORAGE_ADDON_NO_PENDING_CHANGE,
+      );
+    },
+  );
+
+  integrationTest("canceling drops a change scheduled for the renewal first", async () => {
     const f = await createBillingFixture(database!);
-    await deliver(
-      f,
-      storagePurchased(
-        f,
-        "evt_sub_storage_down",
-        1_700_000_100,
-        "sub_storage_down",
-        prices.tb1Monthly,
-      ),
-    );
+    await bought1tb(f, "sub_storage_cancel_pending");
     const stripe = fakeStripe();
-    stripe.previewAmount = 120;
-
     const shown = await preview(f, stripe, prices.gb100Monthly);
-    expect(shown).toMatchObject({ amountDueNowMinor: 0, nextBillMinor: 120, chargeNow: false });
-
     await change(f, stripe, prices.gb100Monthly, {
       prorationDate: shown.prorationDate,
       expectedAmountMinor: 0,
     });
-    expect(stripe.changes[0]).toMatchObject({ chargeNow: false });
-    expect(await capOf(f)).toBe(100 * GIB);
+
+    await setStorageAddonCancellation(f.db.sql, registry(stripe), {
+      schoolId: f.schoolId,
+      cancel: true,
+      tenantContext: { schoolId: f.schoolId },
+    });
+
+    expect(stripe.released).toEqual(["sub_sched_1"]);
+    expect(stripe.cancellations).toEqual(["cancel:sub_storage_cancel_pending"]);
+    expect(await storageRow(f)).toMatchObject({ cancel_at_period_end: true });
   });
+
+  integrationTest(
+    "the school sees its card, next bill and invoices, and can replace the card",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought(f, "sub_storage_billing");
+      const stripe = fakeStripe();
+      const providers = registry(stripe);
+      const params = { schoolId: f.schoolId, tenantContext: { schoolId: f.schoolId } };
+
+      const billing = await getStorageBilling(f.db.sql, providers, params);
+      expect(billing).toEqual(stripe.billing);
+
+      const session = await createStoragePaymentMethodSession(f.db.sql, providers, {
+        ...params,
+        returnUrl: "https://app.example/portal/license/storage",
+      });
+      expect(session.url).toBe("https://billing.example/portal");
+      expect(stripe.portalSessions).toEqual([
+        { customerId: f.stripeCustomerId, returnUrl: "https://app.example/portal/license/storage" },
+      ]);
+    },
+  );
+
+  integrationTest(
+    "the super admin refunds a storage invoice, never more than it took",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await bought(f, "sub_storage_admin_refund");
+      const stripe = fakeStripe();
+      const providers = registry(stripe);
+      const actor = {
+        kind: "platform" as const,
+        userId: f.studentUserId,
+        homeSchoolId: f.schoolId,
+      };
+
+      const view = await getPlatformStorageSubscription(f.db.sql, providers, f.schoolId, actor);
+      expect(view.subscription).toMatchObject({
+        planCode: "storage_100gb",
+        stripeSubscriptionId: "sub_storage_admin_refund",
+      });
+      expect(view.billing?.invoices).toHaveLength(1);
+
+      const refund = (amountMinor: number, invoiceId = "in_storage_1") =>
+        refundPlatformStorageInvoice(f.db.sql, providers, {
+          schoolId: f.schoolId,
+          invoiceId,
+          amountMinor,
+          reason: "Charged twice on 14 November",
+          requestKey: "6f1d1c2e-1111-4a4a-8b8b-0000000000dd",
+          actor,
+        });
+
+      await expectCode(refund(3_880), 422, ERROR_CODES.STORAGE_ADDON_REFUND_INVALID);
+      await expectCode(
+        refund(100, "in_someone_else"),
+        422,
+        ERROR_CODES.STORAGE_ADDON_REFUND_INVALID,
+      );
+      expect(stripe.refunds).toHaveLength(0);
+
+      const result = await refund(3_879);
+      expect(result).toEqual({ refundId: "re_1", status: "succeeded", amountMinor: 3_879 });
+      expect(stripe.refunds[0]).toMatchObject({
+        invoiceId: "in_storage_1",
+        amountMinor: 3_879,
+        idempotencyKey: "storage-admin-refund:in_storage_1:6f1d1c2e-1111-4a4a-8b8b-0000000000dd",
+      });
+    },
+  );
 
   integrationTest("there is nothing to change or cancel without a live add-on", async () => {
     const f = await createBillingFixture(database!);

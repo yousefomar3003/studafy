@@ -13,6 +13,21 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Storage billing works like an app-store subscription (migration 000222, ADR-022).
+  `StorageAddOnChangePreview` adds `timing` (`now`: more storage on the same interval, charged at
+  once; `renewal`: less storage or the other interval, applied at the next renewal with nothing
+  charged) and `effectiveAt`; `chargeNow` is true only when something is charged now.
+  `StorageAddOnCurrent` adds `pendingChange` (the change scheduled for the renewal). A change is
+  refused with 409 `STORAGE_ADDON_CHANGE_PENDING` while one is scheduled and 409
+  `STORAGE_ADDON_UNSETTLED` while a payment is due or an earlier change left an amount pending. New
+  `POST /api/subscriptions/storage/change/undo` (409 `STORAGE_ADDON_NO_PENDING_CHANGE`),
+  `GET /api/subscriptions/storage/billing` (`StorageAddOnBilling`: card, next bill, invoices) and
+  `POST /api/subscriptions/storage/payment-method` (a card-only Stripe Billing Portal page). Platform:
+  `GET /api/platform/schools/{schoolId}/storage-subscription` (`PlatformStorageSubscription`) and
+  `POST /api/platform/schools/{schoolId}/storage-subscription/invoices/{invoiceId}/refund`
+  (`PlatformStorageRefund`; 422 `STORAGE_ADDON_REFUND_INVALID`). `GET /api/platform/health` adds
+  `storageIncidents` (`PlatformStorageIncidents`): storage changes that charged more than confirmed,
+  refunded automatically or left for review.
 - Licence payment plans (migration 000221, ADR-021). `LicenseQuoteBody`, `LicenseQuoteReplaceBody`
   and `LicenseQuoteCalculateBody` take optional `paymentPlan` (`LicensePaymentPlan`: `in_full`,
   `monthly`, `custom`; default `in_full`) and, for `custom`, `paymentSchedule`

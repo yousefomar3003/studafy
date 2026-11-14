@@ -83,6 +83,22 @@ safety net, if a second storage subscription still reaches Studafy:
   days, is listed on the platform's system-health page (`/portal/platform/health`), needing review
   first. A structured warning is also logged when one is found, and on every failed attempt.
 
+### Changes, scheduled changes and overcharges (000222, ADR-022)
+
+Storage billing follows the app stores. More storage on the same interval applies at once, with one
+prorated charge for exactly the amount the school confirmed. Less storage, or the other interval,
+applies at the next renewal: nothing is charged or credited now, Stripe holds the change as a
+subscription schedule, and the row records it in `pending_plan_price_id`, `pending_cap_bytes`,
+`pending_effective_at` and `stripe_schedule_id` (all set or all null). The webhook pipeline applies it
+when an event shows the subscription on the scheduled price; undoing or cancelling releases the
+schedule and clears the columns. A change is refused while one is scheduled, while a payment is due,
+or while the Stripe customer has pending invoice items.
+
+After an immediate change the API reads back the invoice Stripe created. Anything it took beyond the
+confirmed amount is refunded at once and recorded in `app.storage_billing_incidents` (`refunded`, or
+`needs_review` when the refund failed), shown on the platform system-health page and on the school's
+platform page, where the super admin can also refund any storage invoice by hand.
+
 ## Subscription state machine
 
 Both `subscriptions.status` and `ai_subscriptions.status` share one enum, `app.subscription_status`,

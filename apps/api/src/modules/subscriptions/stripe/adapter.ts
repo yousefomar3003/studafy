@@ -30,6 +30,11 @@ import type {
   ParsedWebhookEvent,
   PreviewSubscriptionPriceChangeInput,
   PreviewSubscriptionPriceChangeResult,
+  PaymentMethodSummary,
+  ScheduleSubscriptionPriceChangeInput,
+  ScheduleSubscriptionPriceChangeResult,
+  SubscriptionBillingSummary,
+  SubscriptionInvoiceSummary,
   LookupProductResult,
   LookupPriceResult,
   CreateBillingPortalSessionInput,
@@ -72,6 +77,24 @@ function catalogIdempotencyKey(
 ): string {
   const digest = createHash("sha256").update(JSON.stringify(fields)).digest("hex").slice(0, 32);
   return `studafy-sync-${kind}-${localId}-${digest}`;
+}
+
+/** Marks the Billing Portal configuration Studafy uses for card updates only. */
+const PAYMENT_METHOD_PORTAL_PURPOSE = "payment_method_only";
+
+function paymentMethodSummary(
+  method: string | Stripe.PaymentMethod | null | undefined,
+): PaymentMethodSummary | null {
+  if (!method || typeof method === "string") return null;
+  if (method.card) {
+    return {
+      brand: method.card.brand,
+      last4: method.card.last4,
+      expMonth: method.card.exp_month,
+      expYear: method.card.exp_year,
+    };
+  }
+  return { brand: method.type, last4: null, expMonth: null, expYear: null };
 }
 
 function isMissing(error: unknown): boolean {
@@ -495,13 +518,14 @@ export class StripeAdapter implements PaymentProviderPort {
 
     // `proration_date` is the instant the buyer's preview was computed at, so the invoice is the one
     // they confirmed; the idempotency key makes a repeated request replay this answer instead of
-    // invoicing again.
+    // invoicing again. The invoice it created is read back so the caller can check what was taken.
     const updated = await this.stripe.subscriptions.update(
       input.providerSubscriptionId,
       {
         items: [{ id: item.id, price: input.priceId }],
         metadata: input.metadata,
         proration_date: input.prorationDate,
+        expand: ["latest_invoice"],
         ...(input.chargeNow
           ? { proration_behavior: "always_invoice", payment_behavior: "pending_if_incomplete" }
           : { proration_behavior: "create_prorations" }),
@@ -509,7 +533,229 @@ export class StripeAdapter implements PaymentProviderPort {
       { idempotencyKey: input.idempotencyKey },
     );
 
-    return { applied: updated.pending_update == null };
+    const latest = updated.latest_invoice;
+    const invoice =
+      input.chargeNow &&
+      latest !== null &&
+      typeof latest === "object" &&
+      latest.billing_reason === "subscription_update" &&
+      latest.created >= input.prorationDate - 60
+        ? {
+            id: latest.id ?? "",
+            amountPaidMinor: latest.amount_paid,
+            currency: latest.currency.toUpperCase(),
+          }
+        : null;
+
+    return { applied: updated.pending_update == null, invoice };
+  }
+
+  /**
+   * Hold a price change for the next renewal as a subscription schedule: the current phase runs to
+   * the end of the period at the current price, then a phase at the new price starts with no
+   * proration, and the schedule releases the subscription. Nothing is charged or credited now.
+   * A schedule the subscription already has is reused (the one Studafy made for an earlier change).
+   */
+  async scheduleSubscriptionPriceChange(
+    input: ScheduleSubscriptionPriceChangeInput,
+  ): Promise<ScheduleSubscriptionPriceChangeResult> {
+    const { subscription, item } = await this.subscriptionItem(input.providerSubscriptionId);
+    const existing =
+      typeof subscription.schedule === "string"
+        ? subscription.schedule
+        : (subscription.schedule?.id ?? null);
+
+    const schedule = existing
+      ? await this.stripe.subscriptionSchedules.retrieve(existing)
+      : await this.stripe.subscriptionSchedules.create(
+          { from_subscription: input.providerSubscriptionId },
+          { idempotencyKey: `${input.idempotencyKey}:schedule` },
+        );
+
+    const current = schedule.current_phase ?? schedule.phases[0];
+    const periodEnd = item.current_period_end;
+    if (!current || !periodEnd) {
+      throw new PaymentProviderError(
+        502,
+        ERROR_CODES.STRIPE_API_ERROR,
+        "Stripe subscription has no current period to schedule from",
+      );
+    }
+
+    await this.stripe.subscriptionSchedules.update(
+      schedule.id,
+      {
+        end_behavior: "release",
+        proration_behavior: "none",
+        phases: [
+          {
+            items: [{ price: item.price.id, quantity: item.quantity ?? 1 }],
+            start_date: current.start_date,
+            end_date: periodEnd,
+            proration_behavior: "none",
+          },
+          {
+            items: [{ price: input.priceId, quantity: 1 }],
+            metadata: { ...subscription.metadata, ...input.metadata },
+            proration_behavior: "none",
+          },
+        ],
+      },
+      { idempotencyKey: `${input.idempotencyKey}:phases` },
+    );
+
+    return { scheduleId: schedule.id, effectiveAt: new Date(periodEnd * 1000) };
+  }
+
+  async releaseSubscriptionSchedule(scheduleId: string): Promise<void> {
+    const schedule = await this.stripe.subscriptionSchedules.retrieve(scheduleId);
+    if (schedule.status !== "active" && schedule.status !== "not_started") return;
+    await this.stripe.subscriptionSchedules.release(scheduleId);
+  }
+
+  async countPendingInvoiceItems(customerId: string): Promise<{ count: number; netMinor: number }> {
+    let count = 0;
+    let netMinor = 0;
+    for await (const item of this.stripe.invoiceItems.list({
+      customer: customerId,
+      pending: true,
+      limit: 100,
+    })) {
+      count += 1;
+      netMinor += item.amount;
+    }
+    return { count, netMinor };
+  }
+
+  async describeSubscriptionBilling(
+    providerSubscriptionId: string,
+  ): Promise<SubscriptionBillingSummary> {
+    const subscription = await this.stripe.subscriptions.retrieve(providerSubscriptionId, {
+      expand: ["default_payment_method", "customer.invoice_settings.default_payment_method"],
+    });
+    const customer = subscription.customer;
+    const customerId = typeof customer === "string" ? customer : customer.id;
+    const customerDefault =
+      typeof customer === "object" && !("deleted" in customer && customer.deleted)
+        ? (customer as Stripe.Customer).invoice_settings?.default_payment_method
+        : null;
+    const method = paymentMethodSummary(subscription.default_payment_method ?? customerDefault);
+
+    const renews =
+      ["active", "trialing", "past_due"].includes(subscription.status) &&
+      !subscription.cancel_at_period_end &&
+      subscription.cancel_at === null;
+    let nextBill: SubscriptionBillingSummary["nextBill"] = null;
+    if (renews) {
+      const preview = await this.stripe.invoices.createPreview({
+        customer: customerId,
+        subscription: providerSubscriptionId,
+      });
+      const at =
+        preview.next_payment_attempt ?? subscription.items.data[0]?.current_period_end ?? null;
+      if (at) {
+        nextBill = {
+          amountMinor: preview.amount_due,
+          currency: preview.currency.toUpperCase(),
+          at: new Date(at * 1000),
+        };
+      }
+    }
+
+    const page = await this.stripe.invoices.list({
+      subscription: providerSubscriptionId,
+      limit: 24,
+    });
+    const invoices: SubscriptionInvoiceSummary[] = [];
+    for (const invoice of page.data) {
+      if (invoice.status === "draft") continue;
+      invoices.push({
+        id: invoice.id ?? "",
+        number: invoice.number ?? null,
+        status: invoice.status,
+        created: new Date(invoice.created * 1000),
+        amountDueMinor: invoice.amount_due,
+        amountPaidMinor: invoice.amount_paid,
+        amountRefundedMinor:
+          invoice.amount_paid > 0 && invoice.id ? await this.refundedOn(invoice.id) : 0,
+        currency: invoice.currency.toUpperCase(),
+        billingReason: invoice.billing_reason ?? null,
+        hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+        invoicePdf: invoice.invoice_pdf ?? null,
+      });
+    }
+
+    return { paymentMethod: method, nextBill, invoices };
+  }
+
+  /** What has been refunded so far on the payment behind one invoice. */
+  private async refundedOn(invoiceId: string): Promise<number> {
+    const payments = await this.stripe.invoicePayments.list({
+      invoice: invoiceId,
+      status: "paid",
+      limit: 1,
+      expand: ["data.payment.payment_intent.latest_charge", "data.payment.charge"],
+    });
+    const payment = payments.data[0]?.payment;
+    const intent = payment?.payment_intent;
+    const intentCharge =
+      intent && typeof intent === "object" && intent.latest_charge ? intent.latest_charge : null;
+    const charge =
+      (intentCharge && typeof intentCharge === "object" ? intentCharge : null) ??
+      (payment?.charge && typeof payment.charge === "object" ? payment.charge : null);
+    return charge?.amount_refunded ?? 0;
+  }
+
+  /**
+   * The Billing Portal limited to replacing the card (and reading invoices): no plan changes and no
+   * cancellation in the portal, so Stripe and Studafy never disagree about the plan. The
+   * configuration is found by its metadata, or made once.
+   */
+  async createPaymentMethodPortalSession(input: {
+    customerId: string;
+    returnUrl: string;
+  }): Promise<CreateBillingPortalSessionResult> {
+    const configuration = await this.paymentMethodPortalConfiguration();
+    const session = await this.stripe.billingPortal.sessions.create({
+      customer: input.customerId,
+      return_url: input.returnUrl,
+      configuration,
+      flow_data: {
+        type: "payment_method_update",
+        after_completion: { type: "redirect", redirect: { return_url: input.returnUrl } },
+      },
+    });
+    return { url: session.url };
+  }
+
+  private portalConfigurationId: string | null = null;
+
+  private async paymentMethodPortalConfiguration(): Promise<string> {
+    if (this.portalConfigurationId) return this.portalConfigurationId;
+    for await (const configuration of this.stripe.billingPortal.configurations.list({
+      active: true,
+      limit: 100,
+    })) {
+      if (configuration.metadata?.studafy_purpose === PAYMENT_METHOD_PORTAL_PURPOSE) {
+        this.portalConfigurationId = configuration.id;
+        return configuration.id;
+      }
+    }
+    const created = await this.stripe.billingPortal.configurations.create(
+      {
+        metadata: { studafy_purpose: PAYMENT_METHOD_PORTAL_PURPOSE },
+        features: {
+          payment_method_update: { enabled: true },
+          invoice_history: { enabled: true },
+          customer_update: { enabled: false },
+          subscription_cancel: { enabled: false },
+          subscription_update: { enabled: false },
+        },
+      },
+      { idempotencyKey: `portal-configuration:${PAYMENT_METHOD_PORTAL_PURPOSE}` },
+    );
+    this.portalConfigurationId = created.id;
+    return created.id;
   }
 
   /**

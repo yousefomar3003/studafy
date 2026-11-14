@@ -417,14 +417,65 @@
     "downNextBill": "Your school moves to {{size}} now. Your next bill, on {{date}}, is {{amount}}, with the unused part of your current plan taken off. No files are deleted.",
     "thenPrice": "After that, {{price}}.",
     "payAndSwitch": "Pay {{amount}} and switch",
-    "cancelTitle": "Stop renewing your storage?",
+    "cancelTitle": "Cancel your storage subscription?",
     "cancelBody": "Your {{size}} stays until {{date}}. After that your school goes back to the {{included}} included and isn't charged again. No files are deleted, and you can keep renewing any time before then.",
-    "cancelKeep": "Keep renewing",
-    "cancelConfirm": "Stop renewing",
+    "cancelKeep": "Keep subscription",
+    "cancelConfirm": "Cancel subscription",
     "units": {
       "mb": "{{value}} MB",
       "gb": "{{value}} GB",
       "tb": "{{value}} TB"
+    },
+    "scheduled": "Your storage changes to {{size}} on {{date}}",
+    "changeScheduledNote": "A change is scheduled for your next renewal. Undo it above to choose something else.",
+    "atRenewal": "Your school keeps {{current}} until {{date}}, then moves to {{size}} at {{price}}.",
+    "atRenewalHelp": "Nothing is charged or credited now. You can undo this any time before then. No files are deleted.",
+    "scheduleConfirm": "Change on {{date}}",
+    "manage": {
+      "title": "Manage subscription",
+      "plan": "Plan",
+      "planValue": "{{size}} · {{price}}",
+      "renews": "Renews on",
+      "ends": "Ends on",
+      "nextBill": "Next bill",
+      "nextBillValue": "{{amount}} on {{date}}",
+      "paymentMethod": "Paid with",
+      "cardValue": "{{brand}} ending in {{last4}} (expires {{month}}/{{year}})",
+      "methodValue": "{{brand}}",
+      "noMethod": "No card on file",
+      "pendingTitle": "Changing to {{size}} on {{date}}",
+      "pendingBody": "Your school keeps {{current}} until {{date}}, then pays {{price}}. Nothing was charged for this change.",
+      "undoChange": "Keep {{size}}",
+      "undone": "Your storage stays as it is",
+      "updateCard": "Update card",
+      "cardError": "The card page couldn't be opened",
+      "cancel": "Cancel subscription",
+      "resume": "Resume subscription",
+      "historyTitle": "Billing history",
+      "historyError": "Your bills couldn't be loaded. Try again in a moment.",
+      "historyEmpty": "No bills yet.",
+      "columns": {
+        "date": "Date",
+        "for": "For",
+        "amount": "Amount",
+        "status": "Status",
+        "receipt": "Receipt"
+      },
+      "reason": {
+        "create": "First payment",
+        "cycle": "Renewal",
+        "update": "Plan change",
+        "other": "Payment"
+      },
+      "refunded": "({{amount}} refunded)",
+      "status": {
+        "paid": "Paid",
+        "open": "Due",
+        "void": "Cancelled",
+        "uncollectible": "Unpaid",
+        "other": "—"
+      },
+      "receipt": "View receipt"
     }
   },
   "aiRequest": {

@@ -19,6 +19,7 @@ type StorageRow = PlatformSystemHealth["storage"]["schools"][number];
 type DeadLetterRow = PlatformSystemHealth["notificationDeadLetters"]["bySchool"][number];
 type WebhookFailureRow = PlatformSystemHealth["webhooks"]["recentFailures"][number];
 type StorageDuplicateRow = PlatformSystemHealth["storageDuplicates"]["items"][number];
+type StorageIncidentRow = PlatformSystemHealth["storageIncidents"]["items"][number];
 
 const KIB = 1024;
 
@@ -224,6 +225,51 @@ export default function HealthPage() {
     },
   ];
 
+  const incidentColumns: DataGridColumn<StorageIncidentRow>[] = [
+    {
+      id: "school",
+      header: t("platform.health.columns.school"),
+      renderCell: (row) => (
+        <Link to={`/portal/platform/schools/${row.schoolId}`}>{row.schoolName}</Link>
+      ),
+    },
+    {
+      id: "status",
+      header: t("platform.health.columns.incidentStatus"),
+      renderCell: (row) => (
+        <span className="platform-pill" data-status={row.status}>
+          {t(`platform.health.incidentStatus.${row.status}`)}
+        </span>
+      ),
+    },
+    {
+      id: "amounts",
+      header: t("platform.health.columns.incidentAmounts"),
+      renderCell: (row) => (
+        <span className="platform-cell-stack">
+          <span>
+            {t("platform.health.incidentNote", {
+              charged: money(row.chargedMinor, row.currency),
+              expected: money(row.expectedMinor, row.currency),
+            })}
+          </span>
+          <code className="platform-muted">{row.stripeInvoiceId}</code>
+          {row.lastError ? <span className="platform-muted">{row.lastError}</span> : null}
+        </span>
+      ),
+    },
+    {
+      id: "refund",
+      header: t("platform.health.columns.incidentRefund"),
+      renderCell: (row) => money(row.refundMinor, row.currency),
+    },
+    {
+      id: "detected",
+      header: t("platform.health.columns.detected"),
+      renderCell: (row) => when(row.detectedAt),
+    },
+  ];
+
   const webhookColumns: DataGridColumn<WebhookFailureRow>[] = [
     {
       id: "event",
@@ -356,6 +402,21 @@ export default function HealthPage() {
               getRowId={(row) => row.id}
               getRowLabel={(row) => row.schoolName}
               empty={t("platform.health.noDuplicates")}
+            />
+          </section>
+
+          <section aria-labelledby="health-storage-incidents">
+            <h2 id="health-storage-incidents">
+              {t("platform.health.incidentsHeading", { count: data.storageIncidents.open })}
+            </h2>
+            <p className="platform-muted">{t("platform.health.incidentsHelp")}</p>
+            <DataGrid
+              caption={t("platform.health.incidentsCaption")}
+              columns={incidentColumns}
+              rows={data.storageIncidents.items}
+              getRowId={(row) => row.id}
+              getRowLabel={(row) => row.schoolName}
+              empty={t("platform.health.noIncidents")}
             />
           </section>
 

@@ -26,6 +26,41 @@ let granted: { capBytes: number; endsAt: string } | null = null;
 /** Each preview's amount due now; the next change answers PRICE_CHANGED when `changeRefusals` > 0. */
 let previewAmounts: number[] = [];
 let changeRefusals = 0;
+/** When the previewed change takes effect: at once with a charge, or at the next renewal. */
+let previewTiming: "now" | "renewal" = "now";
+
+const BILLING = {
+  paymentMethod: { brand: "visa", last4: "4242", expMonth: 3, expYear: 2029 },
+  nextBill: { amountMinor: 1000, currency: "USD", at: "2026-12-12T00:00:00.000Z" },
+  invoices: [
+    {
+      id: "in_1",
+      number: "S-1",
+      status: "paid",
+      created: "2026-11-14T10:46:00.000Z",
+      amountDueMinor: 1000,
+      amountPaidMinor: 1000,
+      amountRefundedMinor: 0,
+      currency: "USD",
+      billingReason: "subscription_create",
+      hostedInvoiceUrl: "https://invoice.example/in_1",
+      invoicePdf: null,
+    },
+    {
+      id: "in_2",
+      number: "S-2",
+      status: "paid",
+      created: "2026-11-14T14:33:00.000Z",
+      amountDueMinor: 3879,
+      amountPaidMinor: 3879,
+      amountRefundedMinor: 3879,
+      currency: "USD",
+      billingReason: "subscription_update",
+      hostedInvoiceUrl: null,
+      invoicePdf: null,
+    },
+  ],
+};
 
 function priceChanged() {
   return new ApiError({
@@ -80,6 +115,8 @@ const getMock = mock((path: string) => {
       return Promise.resolve({ data: { license: null, usage: [], openChangeRequests: [] } });
     case "/api/school/license/invoices":
       return Promise.resolve({ data: { invoices: [] } });
+    case "/api/subscriptions/storage/billing":
+      return Promise.resolve({ data: current ? BILLING : null });
     default:
       throw new Error(`Unhandled GET ${path}`);
   }
@@ -91,11 +128,14 @@ const postMock = mock((path: string, init?: { body?: Record<string, unknown> }) 
     case "/api/subscriptions/storage/change/preview":
       return Promise.resolve({
         data: {
-          amountDueNowMinor: previewAmounts.shift() ?? 3871,
+          timing: previewTiming,
+          effectiveAt:
+            previewTiming === "now" ? "2026-11-14T10:00:00.000Z" : "2026-12-12T00:00:00.000Z",
+          amountDueNowMinor: previewTiming === "now" ? (previewAmounts.shift() ?? 3871) : 0,
           nextBillMinor: 4900,
           nextBillAt: "2026-12-12T00:00:00.000Z",
           currency: "USD",
-          chargeNow: true,
+          chargeNow: previewTiming === "now",
           price: {
             id: init!.body!.priceId,
             amountMinor: 4900,
@@ -111,7 +151,24 @@ const postMock = mock((path: string, init?: { body?: Record<string, unknown> }) 
         changeRefusals -= 1;
         return Promise.reject(priceChanged());
       }
-      return Promise.resolve({ data: { ...current, priceId: init!.body!.priceId } });
+      return Promise.resolve({
+        data: {
+          ...current,
+          pendingChange:
+            previewTiming === "renewal"
+              ? {
+                  planCode: "storage_100gb",
+                  capBytes: 100 * GIB,
+                  price: null,
+                  effectiveAt: "2026-12-12T00:00:00.000Z",
+                }
+              : null,
+        },
+      });
+    case "/api/subscriptions/storage/change/undo":
+      return Promise.resolve({ data: { ...current, pendingChange: null } });
+    case "/api/subscriptions/storage/payment-method":
+      return Promise.resolve({ data: { url: "https://billing.example/portal" } });
     case "/api/subscriptions/storage/cancel":
       return Promise.resolve({
         data: { cancelAtPeriodEnd: true, currentPeriodEnd: "2026-12-12T00:00:00.000Z" },
@@ -147,6 +204,7 @@ function withStorage() {
     price: { id: P100M, amountMinor: 1000, currency: "USD", interval: "monthly" },
     currentPeriodEnd: "2026-12-12T00:00:00.000Z",
     cancelAtPeriodEnd: false,
+    pendingChange: null,
   };
 }
 
@@ -157,6 +215,7 @@ afterEach(() => {
   granted = null;
   previewAmounts = [];
   changeRefusals = 0;
+  previewTiming = "now";
   getMock.mockClear();
   postMock.mockClear();
   assign.mockClear();
@@ -252,18 +311,90 @@ describe("StoragePage", () => {
     expect(second[1].body.requestKey).not.toBe(first[1].body.requestKey);
   });
 
-  test("stopping renewal says what happens and waits for a confirmation", async () => {
+  test("canceling says what happens and waits for one plain confirmation", async () => {
     withStorage();
     await renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Stop renewing" }));
-    const dialog = await screen.findByRole("dialog", { name: "Stop renewing your storage?" });
+    fireEvent.click(await screen.findByRole("button", { name: "Cancel subscription" }));
+    const dialog = await screen.findByRole("dialog", {
+      name: "Cancel your storage subscription?",
+    });
     expect(dialog.textContent).toContain("Your 100 GB stays until");
     expect(dialog.textContent).toContain("No files are deleted");
     expect(posts("/api/subscriptions/storage/cancel")).toHaveLength(0);
 
-    fireEvent.click(within(dialog).getByRole("button", { name: "Stop renewing" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel subscription" }));
     await waitFor(() => expect(posts("/api/subscriptions/storage/cancel")).toHaveLength(1));
+  });
+
+  test("manage subscription shows the plan, next bill, card and every bill", async () => {
+    withStorage();
+    await renderPage();
+
+    expect(await screen.findByRole("heading", { name: "Manage subscription" })).toBeTruthy();
+    expect(await screen.findByText("Visa ending in 4242 (expires 03/2029)")).toBeTruthy();
+    expect(screen.getByTestId("storage-next-bill").textContent).toContain("$10.00 on");
+    const history = screen.getByRole("table", { name: "Billing history" });
+    expect(within(history).getByText("First payment")).toBeTruthy();
+    expect(within(history).getByText("Plan change")).toBeTruthy();
+    expect(within(history).getByText("($38.79 refunded)")).toBeTruthy();
+    expect(within(history).getByRole("link", { name: "View receipt" }).getAttribute("href")).toBe(
+      "https://invoice.example/in_1",
+    );
+  });
+
+  test("update card opens the payment provider's card page once", async () => {
+    withStorage();
+    await renderPage();
+
+    const update = await screen.findByRole("button", { name: "Update card" });
+    fireEvent.click(update);
+    fireEvent.click(update);
+
+    await waitFor(() => expect(assign).toHaveBeenCalledWith("https://billing.example/portal"));
+    expect(posts("/api/subscriptions/storage/payment-method")).toHaveLength(1);
+  });
+
+  test("moving down is scheduled for the renewal, charges nothing and can be undone", async () => {
+    withStorage();
+    current!.planCode = "storage_1tb";
+    current!.capBytes = 1024 * GIB;
+    current!.price = { id: P1TM, amountMinor: 4900, currency: "USD", interval: "monthly" };
+    previewTiming = "renewal";
+    await renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch to 100 GB" }));
+    const dialog = await screen.findByRole("dialog", { name: "Switch to 100 GB?" });
+    expect(await within(dialog).findByText("Nothing is charged today.")).toBeTruthy();
+    expect(dialog.textContent).toContain("Your school keeps 1 TB until");
+    const confirm = within(dialog).getByRole("button", { name: /^Change on / });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+
+    await waitFor(() => expect(posts("/api/subscriptions/storage/change")).toHaveLength(1));
+    const [, init] = posts("/api/subscriptions/storage/change")[0]! as [
+      string,
+      { body: Record<string, unknown> },
+    ];
+    expect(init.body.expectedAmountMinor).toBe(0);
+  });
+
+  test("a scheduled change shows when it happens, blocks other changes, and can be undone", async () => {
+    withStorage();
+    current!.pendingChange = {
+      planCode: "storage_100gb",
+      capBytes: 100 * GIB,
+      price: { id: P100Y, amountMinor: 10000, currency: "USD", interval: "yearly" },
+      effectiveAt: "2026-12-12T00:00:00.000Z",
+    };
+    await renderPage();
+
+    expect(await screen.findByText(/Changing to 100 GB on/)).toBeTruthy();
+    const switchTo = screen.getByRole("button", { name: "Switch to 1 TB" }) as HTMLButtonElement;
+    expect(switchTo.disabled).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Keep 100 GB" }));
+    await waitFor(() => expect(posts("/api/subscriptions/storage/change/undo")).toHaveLength(1));
   });
 
   test("back from a paid checkout, nothing can be bought until the payment is confirmed", async () => {

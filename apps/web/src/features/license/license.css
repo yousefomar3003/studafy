@@ -391,3 +391,32 @@
 .license-schedule tr[data-current="true"] td {
   font-weight: var(--font-weight-medium);
 }
+
+/* Manage subscription: the plan, renewal, card and bills. */
+.storage-manage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--space-12) var(--space-16);
+  margin: 0 0 var(--space-12);
+}
+
+.storage-manage dt {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted, inherit);
+}
+
+.storage-manage dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.storage-manage__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-block: var(--space-12);
+}
+
+.storage-history {
+  overflow-x: auto;
+}

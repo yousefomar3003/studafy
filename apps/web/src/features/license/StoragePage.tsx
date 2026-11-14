@@ -15,35 +15,20 @@ import {
   useStartStorageCheckout,
   useStorageChangePreview,
   useStorageOfferQuery,
+  useStoragePaymentMethodSession,
+  useUndoStorageChange,
 } from "./storage";
+import { formatStorage } from "./storage-format";
+import { StorageManageCard } from "./StorageManageCard";
 
 import type { StorageInterval, StorageOffer, StoragePrice, StorageTier } from "./storage";
-import type { Formatters } from "../../lib/i18n";
-import type { TFunction } from "i18next";
 
 import "./license.css";
-
-const GIB = 1024 ** 3;
 
 /** How long the page waits for a payment's confirmation before asking the buyer to come back. */
 const CONFIRMING_FOR_MS = 2 * 60 * 1000;
 
-/** "8.2 GB", "100 GB", "1 TB": whole units where they are whole, one decimal otherwise. */
-export function formatStorage(
-  bytes: number,
-  t: TFunction,
-  formatNumber: Formatters["formatNumber"],
-): string {
-  const unit = (value: number) =>
-    formatNumber(value, { maximumFractionDigits: Number.isInteger(value) ? 0 : 1 });
-  if (bytes >= 1024 * GIB)
-    return t("schoolLicense.storage.units.tb", { value: unit(bytes / (1024 * GIB)) });
-  if (bytes >= GIB)
-    return t("schoolLicense.storage.units.gb", {
-      value: unit(Math.round((bytes / GIB) * 10) / 10),
-    });
-  return t("schoolLicense.storage.units.mb", { value: unit(Math.round(bytes / 1024 ** 2)) });
-}
+export { formatStorage };
 
 function apiErrorMessage(error: unknown, fallback: string): string {
   if (!(error instanceof ApiError)) return fallback;
@@ -95,6 +80,8 @@ export default function StoragePage() {
   const checkout = useStartStorageCheckout();
   const change = useChangeStorageTier();
   const cancellation = useSetStorageCancellation();
+  const undo = useUndoStorageChange();
+  const cardSession = useStoragePaymentMethodSession();
   const [interval, setInterval] = useState<StorageInterval | null>(null);
   const [buyTarget, setBuyTarget] = useState<{ tier: StorageTier; price: StoragePrice } | null>(
     null,
@@ -203,10 +190,18 @@ export default function StoragePage() {
           requestKey: switchTo.requestKey,
         },
         {
-          onSuccess: () => {
+          onSuccess: (updated) => {
             done();
             setSwitchTo(null);
-            show({ variant: "success", title: t("schoolLicense.storage.changed") });
+            show({
+              variant: "success",
+              title: updated.pendingChange
+                ? t("schoolLicense.storage.scheduled", {
+                    size: size(updated.pendingChange.capBytes),
+                    date: date(updated.pendingChange.effectiveAt),
+                  })
+                : t("schoolLicense.storage.changed"),
+            });
           },
           onError: (error) => {
             done();
@@ -248,6 +243,34 @@ export default function StoragePage() {
     );
   }
 
+  function undoChange() {
+    once((done) =>
+      undo.mutate(undefined, {
+        onSuccess: () => {
+          done();
+          show({ variant: "success", title: t("schoolLicense.storage.manage.undone") });
+        },
+        onError: (error) => {
+          done();
+          failed(t("schoolLicense.storage.changeError"))(error);
+        },
+      }),
+    );
+  }
+
+  function updateCard() {
+    once((done) =>
+      cardSession.mutate(window.location.href.split("?")[0]!, {
+        // Stays "in flight" while the browser leaves for the payment provider's page.
+        onSuccess: (result) => window.location.assign(result.url),
+        onError: (error) => {
+          done();
+          failed(t("schoolLicense.storage.manage.cardError"))(error);
+        },
+      }),
+    );
+  }
+
   const data: StorageOffer | undefined = offer.data;
   const current = data?.current ?? null;
   const shownInterval: StorageInterval = interval ?? current?.price?.interval ?? "monthly";
@@ -255,7 +278,14 @@ export default function StoragePage() {
     data && data.usage.capBytes > 0
       ? Math.min(100, Math.round((data.usage.usedBytes / data.usage.capBytes) * 100))
       : 0;
-  const busy = checkout.isPending || change.isPending || cancellation.isPending || confirming;
+  const busy =
+    checkout.isPending ||
+    change.isPending ||
+    cancellation.isPending ||
+    undo.isPending ||
+    cardSession.isPending ||
+    confirming;
+  const changeScheduled = current?.pendingChange != null;
 
   return (
     <>
@@ -347,27 +377,28 @@ export default function StoragePage() {
                   })}
                 </p>
               ) : null}
-              {current && canManage && data.availableOnline ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  loading={cancellation.isPending}
-                  disabled={busy}
-                  onClick={() =>
-                    current.cancelAtPeriodEnd ? setCancel(false) : setConfirmCancel(true)
-                  }
-                >
-                  {t(
-                    current.cancelAtPeriodEnd
-                      ? "schoolLicense.storage.keepRenewing"
-                      : "schoolLicense.storage.cancelRenewal",
-                  )}
-                </Button>
-              ) : null}
             </Card.Body>
           </Card>
 
+          {current && canManage && data.availableOnline ? (
+            <StorageManageCard
+              current={current}
+              includedBytes={data.usage.includedBytes}
+              busy={busy}
+              cancelling={cancellation.isPending}
+              undoing={undo.isPending}
+              openingCard={cardSession.isPending}
+              onCancel={() => setConfirmCancel(true)}
+              onResume={() => setCancel(false)}
+              onUndoChange={undoChange}
+              onUpdateCard={updateCard}
+            />
+          ) : null}
+
           <h2 className="storage-heading">{t("schoolLicense.storage.tiersTitle")}</h2>
+          {changeScheduled ? (
+            <p className="license-muted">{t("schoolLicense.storage.changeScheduledNote")}</p>
+          ) : null}
 
           {!data.availableOnline ? (
             <p className="license-muted">{t("schoolLicense.storage.notOnline")}</p>
@@ -419,7 +450,7 @@ export default function StoragePage() {
                                 (checkout.isPending && checkout.variables?.priceId === price.id) ||
                                 (change.isPending && change.variables?.priceId === price.id)
                               }
-                              disabled={busy}
+                              disabled={busy || changeScheduled}
                               onClick={() =>
                                 current ? openSwitch(tier, price) : setBuyTarget({ tier, price })
                               }
@@ -500,12 +531,14 @@ export default function StoragePage() {
             <p role="alert">
               {apiErrorMessage(preview.error, t("schoolLicense.storage.previewError"))}
             </p>
-          ) : preview.data.chargeNow ? (
+          ) : preview.data.timing === "now" ? (
             <>
               <p className="storage-charge" data-testid="storage-charge-now">
-                {t("schoolLicense.storage.chargedToday", {
-                  amount: money(preview.data.amountDueNowMinor, preview.data.currency),
-                })}
+                {preview.data.amountDueNowMinor > 0
+                  ? t("schoolLicense.storage.chargedToday", {
+                      amount: money(preview.data.amountDueNowMinor, preview.data.currency),
+                    })
+                  : t("schoolLicense.storage.nothingToday")}
               </p>
               <p className="license-muted">
                 {t("schoolLicense.storage.chargedTodayHelp", {
@@ -525,15 +558,14 @@ export default function StoragePage() {
                 {t("schoolLicense.storage.nothingToday")}
               </p>
               <p>
-                {t("schoolLicense.storage.downNextBill", {
+                {t("schoolLicense.storage.atRenewal", {
+                  current: current ? size(current.capBytes) : "",
                   size: size(switchTo.tier.capBytes),
-                  date: date(preview.data.nextBillAt),
-                  amount: money(preview.data.nextBillMinor, preview.data.currency),
+                  date: date(preview.data.effectiveAt),
+                  price: priceLabel(switchTo.price),
                 })}
               </p>
-              <p className="license-muted">
-                {t("schoolLicense.storage.thenPrice", { price: priceLabel(switchTo.price) })}
-              </p>
+              <p className="license-muted">{t("schoolLicense.storage.atRenewalHelp")}</p>
             </>
           )}
         </Modal.Body>
@@ -553,11 +585,15 @@ export default function StoragePage() {
             disabled={!preview.data || preview.isFetching}
             onClick={confirmSwitch}
           >
-            {preview.data && preview.data.chargeNow
-              ? t("schoolLicense.storage.payAndSwitch", {
-                  amount: money(preview.data.amountDueNowMinor, preview.data.currency),
+            {preview.data?.timing === "renewal"
+              ? t("schoolLicense.storage.scheduleConfirm", {
+                  date: date(preview.data.effectiveAt),
                 })
-              : t("schoolLicense.storage.switchConfirm")}
+              : preview.data && preview.data.amountDueNowMinor > 0
+                ? t("schoolLicense.storage.payAndSwitch", {
+                    amount: money(preview.data.amountDueNowMinor, preview.data.currency),
+                  })
+                : t("schoolLicense.storage.switchConfirm")}
           </Button>
         </Modal.Footer>
       </Modal>
