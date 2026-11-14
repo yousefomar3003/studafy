@@ -1,4 +1,5 @@
 import { ApiError } from "@studafy/api-client";
+import { isAllowedLicensePaymentLink } from "@studafy/constants";
 import { Button, Card, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -13,6 +14,7 @@ import {
   useActivateEarly,
   useMatchReceipt,
   useRecordPayment,
+  useSetInvoicePaymentLink,
   useVoidInvoice,
   useVoidPayment,
 } from "./mutations";
@@ -91,6 +93,7 @@ export default function InvoicePage() {
       {data ? (
         <div className="platform-stack">
           <InvoiceDocument invoice={data} schoolName={school.data?.name ?? null} />
+          {open ? <PaymentLinkCard invoice={data} schoolId={schoolId} /> : null}
           <PaymentsCard
             invoice={data}
             schoolId={schoolId}
@@ -276,6 +279,120 @@ function InvoiceDocument({
         </Card.Body>
       </Card>
     </div>
+  );
+}
+
+/**
+ * The invoice's online payment link (Revolut): paste one made in Revolut, change it or remove it.
+ * The school sees it as "Pay online" beside the bank details while the invoice is unpaid; the
+ * payment is still recorded here by hand once it arrives.
+ */
+export function PaymentLinkCard({
+  invoice,
+  schoolId,
+}: {
+  invoice: InvoiceDetail;
+  schoolId: string;
+}) {
+  const { t } = useTranslation();
+  const { show } = useToast();
+  const save = useSetInvoicePaymentLink();
+  const [editing, setEditing] = useState(invoice.paymentLink === null);
+  const [value, setValue] = useState(invoice.paymentLink ?? "");
+  const [touched, setTouched] = useState(false);
+  const trimmed = value.trim();
+  const invalid = trimmed !== "" && !isAllowedLicensePaymentLink(trimmed);
+
+  function submit(url: string | null) {
+    if (save.isPending) return;
+    save.mutate(
+      { schoolId, invoiceId: invoice.id, url },
+      {
+        onSuccess: () => {
+          show({
+            variant: "success",
+            title: t(
+              url === null
+                ? "platformLicensing.invoice.paymentLink.removed"
+                : "platformLicensing.invoice.paymentLink.saved",
+            ),
+          });
+          setValue(url ?? "");
+          setTouched(false);
+          setEditing(url === null);
+        },
+        onError: errorToast(show, t),
+      },
+    );
+  }
+
+  return (
+    <Card as="section" aria-labelledby="invoice-payment-link">
+      <Card.Header>
+        <h2 id="invoice-payment-link">{t("platformLicensing.invoice.paymentLink.title")}</h2>
+      </Card.Header>
+      <Card.Body>
+        <p className="platform-muted">{t("platformLicensing.invoice.paymentLink.help")}</p>
+        {!editing && invoice.paymentLink ? (
+          <div className="platform-cell-stack">
+            <a href={invoice.paymentLink} target="_blank" rel="noopener noreferrer">
+              {invoice.paymentLink}
+            </a>
+            <div className="platform-actions">
+              <Button variant="secondary" onClick={() => setEditing(true)}>
+                {t("platformLicensing.invoice.paymentLink.change")}
+              </Button>
+              <Button variant="tertiary" loading={save.isPending} onClick={() => submit(null)}>
+                {t("platformLicensing.invoice.paymentLink.remove")}
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <form
+            className="platform-cell-stack"
+            onSubmit={(event) => {
+              event.preventDefault();
+              setTouched(true);
+              if (trimmed === "" || invalid) return;
+              submit(trimmed);
+            }}
+          >
+            <Input
+              label={t("platformLicensing.invoice.paymentLink.label")}
+              type="url"
+              inputMode="url"
+              placeholder="https://checkout.revolut.com/pay/…"
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              onBlur={() => setTouched(true)}
+              error={
+                touched && (invalid || trimmed === "")
+                  ? t("platformLicensing.invoice.paymentLink.invalid")
+                  : undefined
+              }
+            />
+            <div className="platform-actions">
+              <Button type="submit" variant="primary" loading={save.isPending}>
+                {t("platformLicensing.invoice.paymentLink.save")}
+              </Button>
+              {invoice.paymentLink ? (
+                <Button
+                  type="button"
+                  variant="tertiary"
+                  onClick={() => {
+                    setValue(invoice.paymentLink ?? "");
+                    setTouched(false);
+                    setEditing(false);
+                  }}
+                >
+                  {t("platform.common.cancel")}
+                </Button>
+              ) : null}
+            </div>
+          </form>
+        )}
+      </Card.Body>
+    </Card>
   );
 }
 

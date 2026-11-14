@@ -34,6 +34,16 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Licence invoices can carry an online payment link (Revolut). `LicenseInvoice` (and the list and
+  detail shapes built on it) adds `paymentLink`: the link while the invoice is issued or partly paid,
+  `null` otherwise. The super admin sets or replaces it with
+  `PUT /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link`
+  (`platformSetLicenseInvoicePaymentLink`, body `LicensePaymentLinkBody` `{ url }`) and removes it
+  with `DELETE` on the same path (`platformClearLicenseInvoicePaymentLink`); both answer the
+  `LicenseInvoice`. A link must be https on `revolut.com`, `revolut.me` or a subdomain, at most 500
+  characters (422 `LICENSE_PAYMENT_LINK_INVALID`); a paid or void invoice answers 409
+  `LICENSE_INVOICE_NOT_PAYABLE`. Payments made through the link are still recorded by hand.
+
 - `POST /api/subscriptions/storage/change/preview` (`previewStorageAddOnChange`,
   `StorageAddOnChangePreview`): the exact prorated amount charged now and the next bill, from
   Stripe's invoice preview. Nothing is charged or changed.

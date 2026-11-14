@@ -113,11 +113,12 @@ not reopened without the product owner.
 4. When the personal subscription ends, the person continues on the school seat **with no gap**,
    and the school pays **full price** for that seat from then on.
 
-### Payment for licenses (bank transfer)
+### Payment for licenses (bank transfer or Revolut link)
 
 1. Quote.
 2. Invoice, with the platform's bank details and a **unique payment reference**.
-3. The school transfers and **can upload a receipt**.
+3. The school pays by bank transfer, or online through a **Revolut payment link** when the super
+   admin added one to the invoice, and **can upload a receipt**.
 4. The super admin records the payment: amount, date, bank reference, receipt. **Partial payments
    are allowed** and the balance is tracked.
 5. The license activates when **fully paid**, OR the super admin **activates it early** with a
@@ -125,6 +126,18 @@ not reopened without the product owner.
 
 Overdue invoices trigger reminders. **Suspension is a manual super admin decision, never
 automatic.**
+
+**Revolut payment link (migration 000220).** Licences are never paid through Stripe or renewed
+automatically. The super admin makes a payment link in Revolut's own dashboard and pastes it on the
+invoice (console: Payments → the invoice → **Payment link**; API:
+`PUT|DELETE /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link`). The school
+then sees **Pay online** beside the bank details while the invoice is issued or partly paid; once it
+is paid or void the link is hidden and can no longer be set. Only https links on the hosts in
+`LICENSE_PAYMENT_LINK_HOSTS` (`@studafy/constants`: `revolut.com`, `revolut.me` and their
+subdomains), at most 500 characters, are accepted — by the API, re-checked by the school's page, and
+floored by a database CHECK. Studafy does not talk to Revolut: when the money arrives, the super admin
+records it with **Record a transfer**, exactly as for a bank transfer. The due and overdue reminder
+emails still describe the bank transfer only.
 
 ### Pricing
 

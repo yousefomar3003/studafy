@@ -18,6 +18,7 @@ export {
   matchReceipt,
   readInvoice,
   recordPayment,
+  setInvoicePaymentLink,
   voidInvoice,
   voidPayment,
   writeBankDetails,
