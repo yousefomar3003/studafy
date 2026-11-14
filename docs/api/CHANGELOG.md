@@ -11,6 +11,18 @@ when it required the `version-bump` label.
 
 ## Unreleased
 
+### Changed
+
+- **(breaking)** `POST /api/subscriptions/storage/change` (`changeStorageAddOnTier`) now charges
+  only an amount the school confirmed. The body requires `prorationDate` and `expectedAmountMinor`
+  (the `prorationDate` and `amountDueNowMinor` of a preview) and `requestKey` (a UUID per
+  confirmation; repeating it never charges twice). When the change would now cost anything else, or
+  the preview is older than 30 minutes, it answers 409 `STORAGE_ADDON_PRICE_CHANGED` and nothing is
+  charged. Only the web portal calls it, and it ships with this change.
+- `POST /api/subscriptions/storage/checkout` answers 409 `STORAGE_ADDON_PURCHASE_PENDING` while a
+  storage payment for the school is already paid or being confirmed at Stripe, and closes every
+  earlier open storage checkout before it makes a new one, so only one can ever be paid.
+
 ### Fixed
 
 - Student import columns kept as parent records reach the parent they belong to:
@@ -21,6 +33,10 @@ when it required the `version-bump` label.
   first parents' count, as before.
 
 ### Added
+
+- `POST /api/subscriptions/storage/change/preview` (`previewStorageAddOnChange`,
+  `StorageAddOnChangePreview`): the exact prorated amount charged now and the next bill, from
+  Stripe's invoice preview. Nothing is charged or changed.
 
 - Platform console school administration (super admin only, web only):
   `PATCH /api/platform/schools/{schoolId}/profile` (`UpdatePlatformSchoolProfile`, with a required

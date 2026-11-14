@@ -1,3 +1,4 @@
+import { ApiError } from "@studafy/api-client";
 import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterEach, describe, expect, mock, test } from "bun:test";
@@ -8,8 +9,9 @@ import type { ComponentType } from "react";
 
 /**
  * Extra storage (`/portal/license/storage`): the school's usage against its cap, the two tiers with
- * monthly and yearly prices, buying (to the hosted checkout), switching tier behind a confirmation,
- * and stopping renewal -- the actions only for license:manage.
+ * monthly and yearly prices, buying (to the hosted checkout) after a confirmation naming the price,
+ * switching tier for the exact previewed amount, and stopping renewal behind a confirmation -- the
+ * actions only for license:manage, and none of them able to run twice from a double click.
  */
 
 const GIB = 1024 ** 3;
@@ -21,6 +23,22 @@ const P1TY = "44444444-4444-4444-8444-444444444444";
 let current: Record<string, unknown> | null = null;
 let availableOnline = true;
 let granted: { capBytes: number; endsAt: string } | null = null;
+/** Each preview's amount due now; the next change answers PRICE_CHANGED when `changeRefusals` > 0. */
+let previewAmounts: number[] = [];
+let changeRefusals = 0;
+
+function priceChanged() {
+  return new ApiError({
+    status: 409,
+    title: "Conflict",
+    code: "STORAGE_ADDON_PRICE_CHANGED",
+    detail: "The price of this change has changed since you saw it.",
+    instance: null,
+    type: null,
+    request_id: null,
+    problem: null,
+  });
+}
 
 function offer() {
   return {
@@ -70,7 +88,29 @@ const postMock = mock((path: string, init?: { body?: Record<string, unknown> }) 
   switch (path) {
     case "/api/subscriptions/storage/checkout":
       return Promise.resolve({ data: { url: "https://checkout.example/s", sessionId: "cs_1" } });
+    case "/api/subscriptions/storage/change/preview":
+      return Promise.resolve({
+        data: {
+          amountDueNowMinor: previewAmounts.shift() ?? 3871,
+          nextBillMinor: 4900,
+          nextBillAt: "2026-12-12T00:00:00.000Z",
+          currency: "USD",
+          chargeNow: true,
+          price: {
+            id: init!.body!.priceId,
+            amountMinor: 4900,
+            currency: "USD",
+            interval: "monthly",
+          },
+          capBytes: 1024 * GIB,
+          prorationDate: "2026-11-14T10:00:00.000Z",
+        },
+      });
     case "/api/subscriptions/storage/change":
+      if (changeRefusals > 0) {
+        changeRefusals -= 1;
+        return Promise.reject(priceChanged());
+      }
       return Promise.resolve({ data: { ...current, priceId: init!.body!.priceId } });
     case "/api/subscriptions/storage/cancel":
       return Promise.resolve({
@@ -90,12 +130,24 @@ Object.defineProperty(window, "location", {
 
 const loadPage = async (): Promise<ComponentType> => (await import("./StoragePage")).default;
 
-async function renderPage(role = "PRINCIPAL") {
+async function renderPage(role = "PRINCIPAL", at = "/portal/license/storage") {
   const Page = await loadPage();
-  return renderAs(role, <Page />, {
-    path: "/portal/license/storage",
-    at: "/portal/license/storage",
-  });
+  return renderAs(role, <Page />, { path: "/portal/license/storage", at });
+}
+
+function posts(path: string) {
+  return postMock.mock.calls.filter(([called]) => called === path);
+}
+
+function withStorage() {
+  current = {
+    planCode: "storage_100gb",
+    capBytes: 100 * GIB,
+    status: "active",
+    price: { id: P100M, amountMinor: 1000, currency: "USD", interval: "monthly" },
+    currentPeriodEnd: "2026-12-12T00:00:00.000Z",
+    cancelAtPeriodEnd: false,
+  };
 }
 
 afterEach(() => {
@@ -103,6 +155,8 @@ afterEach(() => {
   current = null;
   availableOnline = true;
   granted = null;
+  previewAmounts = [];
+  changeRefusals = 0;
   getMock.mockClear();
   postMock.mockClear();
   assign.mockClear();
@@ -122,40 +176,102 @@ describe("StoragePage", () => {
     expect(screen.getByText("$490.00 per year")).toBeTruthy();
   });
 
-  test("upgrading sends the browser to the hosted checkout for that price", async () => {
+  test("upgrading names the price first, then sends the browser to the checkout once", async () => {
     await renderPage();
 
     fireEvent.click(await screen.findByRole("button", { name: "Upgrade to 1 TB" }));
+    const dialog = await screen.findByRole("dialog", { name: "Upgrade to 1 TB?" });
+    expect(dialog.textContent).toContain("You'll pay $49.00 today");
+    expect(dialog.textContent).toContain("then $49.00 every month");
+    expect(posts("/api/subscriptions/storage/checkout")).toHaveLength(0);
+
+    const pay = within(dialog).getByRole("button", { name: "Continue to payment" });
+    fireEvent.click(pay);
+    fireEvent.click(pay);
 
     await waitFor(() => expect(assign).toHaveBeenCalledWith("https://checkout.example/s"));
-    const [, init] = postMock.mock.calls[0]! as [string, { body: Record<string, unknown> }];
+    const checkouts = posts("/api/subscriptions/storage/checkout");
+    expect(checkouts).toHaveLength(1);
+    const [, init] = checkouts[0]! as [string, { body: Record<string, unknown> }];
     expect(init.body.priceId).toBe(P1TM);
   });
 
-  test("a school with storage switches tier after confirming, and can stop renewing", async () => {
-    current = {
-      planCode: "storage_100gb",
-      capBytes: 100 * GIB,
-      status: "active",
-      price: { id: P100M, amountMinor: 1000, currency: "USD", interval: "monthly" },
-      currentPeriodEnd: "2026-12-12T00:00:00.000Z",
-      cancelAtPeriodEnd: false,
-    };
+  test("switching shows the exact amount due today and charges only that, once", async () => {
+    withStorage();
     await renderPage();
 
     expect(await screen.findByText("Your current plan")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Switch to 1 TB" }));
     const dialog = await screen.findByRole("dialog", { name: "Switch to 1 TB?" });
-    expect(dialog.textContent).toContain("charged now");
-    fireEvent.click(within(dialog).getByRole("button", { name: "Switch" }));
-    await waitFor(() =>
-      expect(postMock).toHaveBeenCalledWith("/api/subscriptions/storage/change", {
-        body: { priceId: P1TM },
-      }),
-    );
+    expect(await within(dialog).findByText("Charged today: $38.71")).toBeTruthy();
+    expect(dialog.textContent).toContain("Then $49.00 per month");
 
-    fireEvent.click(screen.getByRole("button", { name: "Stop renewing" }));
-    await waitFor(() => expect(postMock).toHaveBeenCalledWith("/api/subscriptions/storage/cancel"));
+    const pay = within(dialog).getByRole("button", { name: "Pay $38.71 and switch" });
+    fireEvent.click(pay);
+    fireEvent.click(pay);
+
+    await waitFor(() => expect(posts("/api/subscriptions/storage/change")).toHaveLength(1));
+    const [, init] = posts("/api/subscriptions/storage/change")[0]! as [
+      string,
+      { body: Record<string, unknown> },
+    ];
+    expect(init.body).toMatchObject({
+      priceId: P1TM,
+      prorationDate: "2026-11-14T10:00:00.000Z",
+      expectedAmountMinor: 3871,
+    });
+    expect(typeof init.body.requestKey).toBe("string");
+  });
+
+  test("when the amount moved, nothing is charged and the new amount is shown to confirm", async () => {
+    withStorage();
+    previewAmounts = [3871, 3902];
+    changeRefusals = 1;
+    await renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Switch to 1 TB" }));
+    const dialog = await screen.findByRole("dialog", { name: "Switch to 1 TB?" });
+    fireEvent.click(await within(dialog).findByRole("button", { name: "Pay $38.71 and switch" }));
+
+    expect(
+      await within(dialog).findByText(/The amount changed since you opened this/),
+    ).toBeTruthy();
+    expect(await within(dialog).findByText("Charged today: $39.02")).toBeTruthy();
+    const first = posts("/api/subscriptions/storage/change")[0]! as [
+      string,
+      { body: Record<string, unknown> },
+    ];
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Pay $39.02 and switch" }));
+    await waitFor(() => expect(posts("/api/subscriptions/storage/change")).toHaveLength(2));
+    const second = posts("/api/subscriptions/storage/change")[1]! as [
+      string,
+      { body: Record<string, unknown> },
+    ];
+    expect(second[1].body.expectedAmountMinor).toBe(3902);
+    expect(second[1].body.requestKey).not.toBe(first[1].body.requestKey);
+  });
+
+  test("stopping renewal says what happens and waits for a confirmation", async () => {
+    withStorage();
+    await renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Stop renewing" }));
+    const dialog = await screen.findByRole("dialog", { name: "Stop renewing your storage?" });
+    expect(dialog.textContent).toContain("Your 100 GB stays until");
+    expect(dialog.textContent).toContain("No files are deleted");
+    expect(posts("/api/subscriptions/storage/cancel")).toHaveLength(0);
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Stop renewing" }));
+    await waitFor(() => expect(posts("/api/subscriptions/storage/cancel")).toHaveLength(1));
+  });
+
+  test("back from a paid checkout, nothing can be bought until the payment is confirmed", async () => {
+    await renderPage("PRINCIPAL", "/portal/license/storage?checkout=success");
+
+    expect(await screen.findByText("We're confirming your payment…")).toBeTruthy();
+    const upgrade = screen.getByRole("button", { name: "Upgrade to 1 TB" }) as HTMLButtonElement;
+    expect(upgrade.disabled).toBe(true);
   });
 
   test("without license:manage the tiers show no buy buttons", async () => {
