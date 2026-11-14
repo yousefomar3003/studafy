@@ -25,6 +25,12 @@ when it required the `version-bump` label.
   `paymentLink`). New `PUT|DELETE
 /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link`
   (404 `LICENSE_INSTALMENT_NOT_FOUND`).
+- `GET /api/platform/health` (`PlatformSystemHealth`) adds `storageDuplicates`
+  (`PlatformStorageDuplicates`). It lists schools charged for a second storage add-on (000219):
+  every one not yet settled and those settled in the last 30 days, open ones first. Each item gives
+  the duplicate and kept Stripe subscription ids, `source` (`checkout`, resolved automatically, or
+  `event`, left for a person), `status` (`pending`, `resolved`, `needs_review`), the refund and
+  anything not refunded, and the last error.
 
 ### Changed
 
