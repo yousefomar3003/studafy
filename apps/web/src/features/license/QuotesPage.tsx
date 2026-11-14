@@ -17,6 +17,7 @@ const QUOTE_TONE: Record<Quote["status"], "success" | "warning" | "neutral"> = {
   accepted: "success",
   expired: "neutral",
   withdrawn: "neutral",
+  declined: "neutral",
 };
 
 export function QuoteStatusPill({ status }: { status: Quote["status"] }) {

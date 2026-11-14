@@ -910,6 +910,7 @@ const QUOTE_ACTIONS: Record<Quote["status"], readonly QuoteAction[]> = {
   accepted: [],
   expired: [],
   withdrawn: [],
+  declined: [],
 };
 
 /** The school's quotes with their statuses and the moves each allows. */
@@ -977,9 +978,20 @@ export function SchoolQuotes({ schoolId }: { schoolId: string }) {
                     </td>
                     <td>{formatDate(new Date(quote.validUntil), { dateStyle: "medium" })}</td>
                     <td>
-                      <span className="platform-pill" data-status={quote.status}>
-                        {t(`platformLicensing.quoteStatus.${quote.status}`)}
-                      </span>
+                      <div className="platform-cell-stack">
+                        <span className="platform-pill" data-status={quote.status}>
+                          {t(`platformLicensing.quoteStatus.${quote.status}`)}
+                        </span>
+                        {quote.status === "declined" ? (
+                          <span className="platform-muted" data-testid="quote-decline-reason">
+                            {quote.declineReason
+                              ? t("platformLicensing.quotes.declineReason", {
+                                  reason: quote.declineReason,
+                                })
+                              : t("platformLicensing.quotes.declinedNoReason")}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td>
                       <div className="platform-actions">

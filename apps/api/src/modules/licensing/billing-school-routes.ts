@@ -12,6 +12,7 @@ import { confirmUpload, getContentClass, recordStorageUpload } from "../storage"
 import { requireStorage } from "./billing-platform-routes";
 import {
   acceptQuoteResponseSchema,
+  declineQuoteBodySchema,
   fileUrlSchema,
   invoiceDetailSchema,
   invoiceListQuerySchema,
@@ -34,7 +35,7 @@ import {
   readReceipt,
   requireInvoiceDetail,
 } from "./invoices";
-import { acceptQuote, listQuotes, requireQuote, SCHOOL_VISIBLE } from "./quotes";
+import { acceptQuote, declineQuote, listQuotes, requireQuote, SCHOOL_VISIBLE } from "./quotes";
 import { readInSchool, runLicenseChange } from "./service";
 
 import type { LicenseActor } from "./context";
@@ -45,7 +46,7 @@ import type { Context } from "hono";
 
 /**
  * The school's side of license billing (docs/billing/feature-licensing.md, session 3): its quotes
- * (sent, accepted, expired -- never drafts), accepting one, its invoices with the bank details and
+ * (sent, accepted, expired, declined -- never drafts), accepting or declining one, its invoices with the bank details and
  * payment reference, uploading a transfer receipt, and its payment history. `license:read` to read,
  * `license:manage` to accept or upload; ORG_ADMIN and PRINCIPAL hold both.
  */
@@ -96,6 +97,27 @@ const acceptQuoteRoute = createRoute({
   responses: standardResponses(
     { 200: { description: "The quote and its invoice", schema: acceptQuoteResponseSchema } },
     [401, 403, 404, 409, 422],
+  ),
+});
+
+const declineQuoteRoute = createRoute({
+  method: "post",
+  path: "/api/school/license/quotes/{quoteId}/decline",
+  operationId: "declineSchoolLicenseQuote",
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "Decline a quote",
+  description:
+    "Closes a sent quote the school does not want, with an optional reason the super admin sees. " +
+    "It can no longer be accepted; ask Studafy for a new quote instead. 409 " +
+    "LICENSE_QUOTE_NOT_EDITABLE unless it is sent; 409 LICENSE_QUOTE_EXPIRED past `validUntil`.",
+  request: {
+    params: schoolQuoteParamsSchema,
+    body: { content: { "application/json": { schema: declineQuoteBodySchema } } },
+  },
+  responses: standardResponses(
+    { 200: { description: "The declined quote", schema: quoteSchema } },
+    [400, 401, 403, 404, 409],
   ),
 });
 
@@ -213,6 +235,10 @@ export function schoolLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<App
   routes.use("/api/school/license/receipts/*", writesOnly);
   routes.use("/api/school/license/quotes/:quoteId/accept", auditAction("update", "license_quotes"));
   routes.use(
+    "/api/school/license/quotes/:quoteId/decline",
+    auditAction("update", "license_quotes"),
+  );
+  routes.use(
     "/api/school/license/invoices/:invoiceId/receipts",
     auditAction("insert", "license_payment_receipts"),
   );
@@ -243,6 +269,18 @@ export function schoolLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<App
       acceptQuote(tx, actor.schoolId, quoteId, actor),
     );
     return c.json({ ...result, renewalStops: renewals }, 200);
+  });
+
+  routes.openapi(declineQuoteRoute, async (c) => {
+    const actor = schoolActor(c);
+    const { quoteId } = c.req.valid("param");
+    const { reason } = c.req.valid("json");
+    const { result } = await runLicenseChange(deps, actor.schoolId, actor, async (tx) => ({
+      result: await declineQuote(tx, actor.schoolId, quoteId, actor, reason ?? null),
+      versions: new Map(),
+      pending: [],
+    }));
+    return c.json(result, 200);
   });
 
   routes.openapi(listInvoicesRoute, async (c) => {

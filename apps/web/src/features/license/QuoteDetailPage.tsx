@@ -1,6 +1,6 @@
 import { ApiError } from "@studafy/api-client";
 import { PERMISSIONS } from "@studafy/constants";
-import { Button, Modal, Table, useToast } from "@studafy/ui";
+import { Button, Input, Modal, Table, useToast } from "@studafy/ui";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -9,7 +9,7 @@ import { useFormatters, useTranslation } from "../../lib/i18n";
 import { bpsToPercent, useMoney } from "../platform/licensing/format";
 
 import { LicenseHeader } from "./LicenseHeader";
-import { useAcceptQuote } from "./mutations";
+import { useAcceptQuote, useDeclineQuote } from "./mutations";
 import { PaymentSchedule } from "./PaymentSchedule";
 import { useQuoteQuery } from "./queries";
 import { QuoteStatusPill } from "./QuotesPage";
@@ -25,7 +25,8 @@ type SeatLine = Extract<PriceLine, { kind: "seats" }>;
  * One quote (`/portal/license/quotes/:quoteId`): the full breakdown Studafy priced -- list price per
  * audience, volume and duration discounts, credits for people who already paid personally, any
  * adjustment, the total and what the school saves. `license:manage` accepts a sent quote that has
- * not expired; that applies it to the license and issues the invoice, which opens next.
+ * not expired; that applies it to the license and issues the invoice, which opens next. It can also
+ * decline it instead, with an optional reason Studafy reads before pricing a new one.
  */
 export default function QuoteDetailPage() {
   const { t } = useTranslation();
@@ -34,6 +35,7 @@ export default function QuoteDetailPage() {
   const quote = useQuoteQuery(quoteId);
   const canManage = usePermissions().has(PERMISSIONS.LICENSE_MANAGE);
   const [confirming, setConfirming] = useState(false);
+  const [declining, setDeclining] = useState(false);
   const data = quote.data;
   const acceptable =
     data !== undefined && data.status === "sent" && Date.parse(data.validUntil) > Date.now();
@@ -48,9 +50,14 @@ export default function QuoteDetailPage() {
         }
         actions={
           canManage && acceptable ? (
-            <Button variant="primary" onClick={() => setConfirming(true)}>
-              {t("schoolLicense.quote.accept")}
-            </Button>
+            <>
+              <Button variant="secondary" onClick={() => setDeclining(true)}>
+                {t("schoolLicense.quote.decline")}
+              </Button>
+              <Button variant="primary" onClick={() => setConfirming(true)}>
+                {t("schoolLicense.quote.accept")}
+              </Button>
+            </>
           ) : null
         }
       />
@@ -80,6 +87,13 @@ export default function QuoteDetailPage() {
             </div>
           </dl>
           {data.notes ? <p className="license-note">{data.notes}</p> : null}
+          {data.status === "declined" ? (
+            <p className="license-note" data-testid="quote-declined">
+              {data.declineReason
+                ? t("schoolLicense.quote.declinedWithReason", { reason: data.declineReason })
+                : t("schoolLicense.quote.declinedNote")}
+            </p>
+          ) : null}
           <QuoteBreakdown quote={data} />
           <QuoteSchedule quote={data} />
         </>
@@ -87,6 +101,7 @@ export default function QuoteDetailPage() {
       {data && confirming ? (
         <AcceptModal quote={data} onClose={() => setConfirming(false)} />
       ) : null}
+      {data && declining ? <DeclineModal quote={data} onClose={() => setDeclining(false)} /> : null}
     </>
   );
 }
@@ -285,6 +300,67 @@ function AcceptModal({ quote, onClose }: { quote: Quote; onClose: () => void }) 
         </Button>
         <Button type="button" variant="primary" loading={accept.isPending} onClick={submit}>
           {t("schoolLicense.quote.acceptConfirm")}
+        </Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
+
+function DeclineModal({ quote, onClose }: { quote: Quote; onClose: () => void }) {
+  const { t } = useTranslation();
+  const { show } = useToast();
+  const decline = useDeclineQuote();
+  const [reason, setReason] = useState("");
+  const tooLong = reason.trim().length > 1000;
+
+  function submit() {
+    if (decline.isPending || tooLong) return;
+    decline.mutate(
+      { quoteId: quote.id, reason: reason.trim() || null },
+      {
+        onSuccess: () => {
+          show({ variant: "success", title: t("schoolLicense.quote.declined") });
+          onClose();
+        },
+        onError: (error) =>
+          show({
+            variant: "error",
+            title: t("schoolLicense.quote.declineError"),
+            description: error instanceof ApiError ? (error.detail ?? error.title) : undefined,
+          }),
+      },
+    );
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={t("schoolLicense.quote.declineTitle")}
+      description={t("schoolLicense.quote.declineBody")}
+    >
+      <Modal.Body>
+        <Input
+          label={t("schoolLicense.quote.declineReasonLabel")}
+          helperText={t("schoolLicense.quote.declineReasonHelp")}
+          value={reason}
+          maxLength={1000}
+          error={tooLong ? t("schoolLicense.quote.declineReasonTooLong") : undefined}
+          onChange={(event) => setReason(event.target.value)}
+        />
+      </Modal.Body>
+      <Modal.Footer>
+        <Button type="button" variant="tertiary" onClick={onClose}>
+          {t("schoolLicense.common.cancel")}
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          loading={decline.isPending}
+          disabled={tooLong}
+          onClick={submit}
+        >
+          {t("schoolLicense.quote.declineConfirm")}
         </Button>
       </Modal.Footer>
     </Modal>
