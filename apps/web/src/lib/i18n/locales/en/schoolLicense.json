@@ -346,7 +346,9 @@
     },
     "open": "Open",
     "openReceipt": "Open {{file}}",
-    "paymentsTitle": "Payments on this invoice"
+    "paymentsTitle": "Payments on this invoice",
+    "payOnline": "Pay online",
+    "payOnlineHelp": "You'll pay securely through Revolut. Your payment is confirmed once Studafy records it."
   },
   "tile": {
     "title": "License",

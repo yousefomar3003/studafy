@@ -1,9 +1,10 @@
 import { ApiError } from "@studafy/api-client";
-import { PERMISSIONS } from "@studafy/constants";
+import { isAllowedLicensePaymentLink, PERMISSIONS } from "@studafy/constants";
 import { Button, Input, Table, useToast } from "@studafy/ui";
 import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { LinkButton } from "../../components/LinkButton";
 import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { useMoney } from "../platform/licensing/format";
@@ -22,8 +23,9 @@ const RECEIPT_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 const RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
- * One license invoice (`/portal/license/invoices/:invoiceId`): its lines, due date and balance; the
- * bank details and the payment reference to write on the transfer (with a copy button); the receipts
+ * One license invoice (`/portal/license/invoices/:invoiceId`): its lines, due date and balance; a
+ * "Pay online" button when Studafy added a payment link (Revolut); the bank details and the payment
+ * reference to write on the transfer (with a copy button); the receipts
  * the school uploaded and whether Studafy has matched each to a payment; and the payments recorded.
  * `license:manage` uploads a transfer receipt.
  */
@@ -147,6 +149,11 @@ function HowToPay({ invoice }: { invoice: InvoiceDetail }) {
   const { show } = useToast();
   const money = useMoney();
   const bank = invoice.bankDetails;
+  // Re-checked here as well as by the API: only an https link to an allowed host is ever a button.
+  const payLink =
+    invoice.paymentLink && isAllowedLicensePaymentLink(invoice.paymentLink)
+      ? invoice.paymentLink
+      : null;
 
   async function copy() {
     try {
@@ -165,6 +172,14 @@ function HowToPay({ invoice }: { invoice: InvoiceDetail }) {
           amount: money(invoice.balanceMinor, invoice.currencyCode, invoice.minorUnit),
         })}
       </p>
+      {payLink ? (
+        <div className="license-pay-online license-no-print">
+          <LinkButton href={payLink} target="_blank" rel="noopener noreferrer" variant="primary">
+            {t("schoolLicense.invoice.payOnline")}
+          </LinkButton>
+          <p className="license-muted">{t("schoolLicense.invoice.payOnlineHelp")}</p>
+        </div>
+      ) : null}
       <dl className="license-pay">
         <dt>{t("schoolLicense.invoice.reference")}</dt>
         <dd>

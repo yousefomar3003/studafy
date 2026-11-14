@@ -503,6 +503,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/withdraw",
   "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/void",
   "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
+  "PUT /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
+  "DELETE /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
   "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payments",
   "POST /api/platform/schools/{schoolId}/license-payments/{paymentId}/void",
   "POST /api/platform/schools/{schoolId}/license-payments/upload-url",
