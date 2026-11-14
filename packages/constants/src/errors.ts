@@ -378,6 +378,17 @@ export const ERROR_CODES = {
   // The amount the buyer confirmed for a tier change is no longer what it would cost (the preview is
   // too old, or the subscription changed since): nothing was charged; preview it again.
   STORAGE_ADDON_PRICE_CHANGED: "STORAGE_ADDON_PRICE_CHANGED",
+  // A change to the add-on is already scheduled for the next renewal: undo it before another.
+  STORAGE_ADDON_CHANGE_PENDING: "STORAGE_ADDON_CHANGE_PENDING",
+  // The add-on has a payment due or an unsettled amount from an earlier change: no change until it
+  // is settled, so what is shown and what is charged can never differ.
+  STORAGE_ADDON_UNSETTLED: "STORAGE_ADDON_UNSETTLED",
+  // No scheduled change to undo.
+  STORAGE_ADDON_NO_PENDING_CHANGE: "STORAGE_ADDON_NO_PENDING_CHANGE",
+  // The invoice is not one of this school's storage invoices, or has nothing left to refund.
+  STORAGE_ADDON_REFUND_INVALID: "STORAGE_ADDON_REFUND_INVALID",
+  // The card chosen to pay is not one of the school's saved cards.
+  STORAGE_ADDON_CARD_INVALID: "STORAGE_ADDON_CARD_INVALID",
 
   // Manual grants (db/migrations/000211): storage and tiers Studafy staff grant by hand.
   // No such grant in this school.

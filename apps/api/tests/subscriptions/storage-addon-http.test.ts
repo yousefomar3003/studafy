@@ -35,11 +35,15 @@ const stripe = {
     checkouts.push(input.metadata);
     return Promise.resolve({ url: "https://checkout.example/storage", sessionId: "cs_http" });
   },
-  changeSubscriptionPrice: () => Promise.resolve({ applied: true }),
+  changeSubscriptionPrice: () => Promise.resolve({ applied: true, invoice: null }),
   previewSubscriptionPriceChange: () => Promise.resolve({ amountDueMinor: 3_900, currency: "USD" }),
   findAddonPurchasesInFlight: () =>
     Promise.resolve({ liveSubscriptionIds: [], openCheckoutSessionIds: [] }),
   expireCheckoutSession: () => Promise.resolve("expired"),
+  scheduleSubscriptionPriceChange: () =>
+    Promise.resolve({ scheduleId: "sub_sched_http", effectiveAt: new Date("2030-01-01") }),
+  releaseSubscriptionSchedule: () => Promise.resolve(),
+  countPendingInvoiceItems: () => Promise.resolve({ count: 0, netMinor: 0 }),
 } as unknown as PaymentProviderPort;
 
 beforeAll(async () => {

@@ -81,7 +81,7 @@ async function addAiPrice(f: BillingFixture): Promise<string> {
       FROM app.plans p, app.currencies c
       WHERE p.code = 'ai_addon' AND c.code = 'USD'
       ON CONFLICT (plan_id, currency_id, billing_interval)
-        DO UPDATE SET is_active = true, amount_minor = 499
+        DO UPDATE SET is_active = true, amount_minor = 499, stripe_price_id = EXCLUDED.stripe_price_id
       RETURNING id
     `;
     return row!.id;

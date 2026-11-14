@@ -77,6 +77,25 @@ const health = {
   },
   webhooks: { failedEvents: [], recentFailures: [], rejectedSignatures: [] },
   email: { bounces: 4, complaints: 0, deliveries: 120 },
+  storageIncidents: {
+    open: 1,
+    items: [
+      {
+        id: "a1b2c3d4-0000-4000-8000-000000000001",
+        schoolId: "a1b2c3d4-0000-4000-8000-0000000000aa",
+        schoolName: "Overcharged School",
+        stripeInvoiceId: "in_overcharged",
+        expectedMinor: 0,
+        chargedMinor: 3862,
+        refundMinor: 3862,
+        currency: "USD",
+        stripeRefundId: null,
+        status: "needs_review",
+        lastError: "card network unavailable",
+        detectedAt: "2026-11-14T17:41:00.000Z",
+      },
+    ],
+  },
   storageDuplicates: {
     open: 1,
     items: [
@@ -274,6 +293,9 @@ describe("HealthPage", () => {
     expect(screen.getByText("Duplicate storage subscriptions (1 open)")).toBeTruthy();
     expect(screen.getByText("sub_duplicate_old")).toBeTruthy();
     expect(screen.getByText("Kept: sub_duplicate_new")).toBeTruthy();
+    expect(screen.getByText("Storage charged more than confirmed (1 need review)")).toBeTruthy();
+    expect(screen.getByText("Charged $38.62 instead of $0.00")).toBeTruthy();
+    expect(screen.getByText("in_overcharged")).toBeTruthy();
     expect(screen.getByText("Canceling and refunding (attempt 1)")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
   });

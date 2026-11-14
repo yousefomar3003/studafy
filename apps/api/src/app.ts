@@ -175,6 +175,7 @@ import {
   schoolCheckoutRoutes,
   aiCheckoutRoutes,
   storageAddonRoutes,
+  platformStorageRoutes,
   webhookRoutes,
   planRoutes,
   adminSubscriptionRoutes,
@@ -1351,6 +1352,8 @@ export function createApp({
     app.route("/", aiCheckoutRoutes(database, paymentProviders));
     // The school's paid storage add-on (000205), sold to principals and admins.
     app.route("/", storageAddonRoutes(database, paymentProviders));
+    // The same add-on in the platform console: its invoices, incidents and refunds.
+    app.route("/", platformStorageRoutes(database, paymentProviders));
     // The same add-on bought in the mobile app through Apple / Google, and their notifications.
     app.route("/", aiStoreRoutes(database, storeBilling, logger));
     // The event sink is threaded in so a rejected webhook signature rides the same ST-082 alerting
