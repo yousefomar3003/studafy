@@ -250,3 +250,18 @@
   align-items: center;
   gap: var(--space-8);
 }
+
+/* A reported voice note (000218): caption above the browser's own audio controls. */
+.message-reports__voice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin: 0;
+  min-width: min(100%, 280px);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.message-reports__voice audio {
+  width: 100%;
+}

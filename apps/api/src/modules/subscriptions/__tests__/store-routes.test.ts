@@ -155,8 +155,13 @@ describe("store setup", () => {
     expect(await res.json()).toEqual({
       enabled: false,
       productId: null,
+      productIds: [],
       platforms: { apple: false, google: false },
       purchasable: false,
+      studentId: null,
+      studentFirstName: null,
+      subscribed: false,
+      unavailableReason: "not_configured",
       accountToken: null,
       profileId: null,
       purchaseConfirmation: null,
@@ -184,6 +189,29 @@ describe("Google Play notifications", () => {
 
     expect(res.status).toBe(400);
     expect(await codeOf(res)).toBe(ERROR_CODES.STORE_WEBHOOK_INVALID);
+  });
+
+  test("another app's notification is acknowledged and changes nothing", async () => {
+    // A 4xx would make Pub/Sub redeliver it for days; neither the database nor Google is reached.
+    const otherApp: StoreBilling = {
+      ...store,
+      google: {
+        ...store.google!,
+        parseNotification: () => ({
+          eventId: "msg-1",
+          kind: null,
+          purchaseToken: null,
+          sentAt: new Date(0),
+          otherPackage: "com.other.app",
+        }),
+      },
+    };
+    const res = await post(
+      appFor(null, otherApp),
+      "/api/subscriptions/webhook/google?token=rtdn-token-0123456789",
+    );
+
+    expect(res.status).toBe(200);
   });
 });
 

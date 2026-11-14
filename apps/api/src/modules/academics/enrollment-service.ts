@@ -164,7 +164,8 @@ export async function enrollStudent(
       action: "update",
       targetTable: "enrollments",
       targetId: classId,
-      newValues: { student_id: studentId, action: "re_enroll" },
+      oldValues: { student_id: studentId, status: existing.status },
+      newValues: { student_id: studentId, action: "re_enroll", status: "active" },
     });
 
     return row!;
@@ -259,6 +260,8 @@ export async function transferStudent(
     action: "update",
     targetTable: "enrollments",
     targetId: fromClassId,
+    // The enrolment before the move; the withdraw and enrol above each audit their own half.
+    oldValues: { student_id: studentId, class_id: fromClassId, status: source.status },
     newValues: {
       student_id: studentId,
       action: "transfer",

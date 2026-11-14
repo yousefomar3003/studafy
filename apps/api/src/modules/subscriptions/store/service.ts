@@ -5,7 +5,7 @@ import { DOMAIN_EVENTS, ERROR_CODES, LEGAL_DOCUMENT_VERSIONS } from "@studafy/co
 import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { withSystemTx, withTenantTx } from "../../../db/tenant-tx";
+import { setTenantScope, withSystemTx, withTenantTx } from "../../../db/tenant-tx";
 import { emit } from "../../../lib/events";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { getLocalizedMessage } from "../../../middleware/locale";
@@ -41,6 +41,13 @@ import type { TransactionSql } from "postgres";
 export interface StoreBilling {
   /** The AI add-on's product id, the same in App Store Connect and the Play Console. */
   productId: string;
+  /**
+   * Every product id the AI add-on is sold under, in the order the app offers them; the first is
+   * {@link productId}. One App Store / Google Play account can hold only one subscription to a
+   * product, so a parent buying for a second child on the same phone needs a second product (on
+   * the App Store, in its own subscription group). Absent means just {@link productId}.
+   */
+  productIds?: readonly string[];
   apple: AppleStore | null;
   google: GooglePlayStore | null;
   /** Shared secret in the Pub/Sub push endpoint's URL (`?token=`), authenticating Google's pushes. */
@@ -50,6 +57,82 @@ export interface StoreBilling {
 export interface StorePurchaseResult {
   active: boolean;
   expiresAt: string | null;
+  /** The student the purchase turned AI on for: the one the app stamped on it when it was bought. */
+  studentId: string;
+}
+
+/** Every product id the add-on is sold under, primary first. */
+export function storeProductIds(store: StoreBilling): readonly string[] {
+  return store.productIds?.length ? store.productIds : [store.productId];
+}
+
+/**
+ * Who the caller is to a student, in one school: the student themselves, a parent linked to them,
+ * or a brother or sister (another student sharing a linked parent). Through the link rows only --
+ * never by name, email, phone or id number. Null when the student is not in this school.
+ *
+ * Read in a system transaction scoped to the school (`setTenantScope`), with the school also
+ * pinned in the query: a student cannot read a sibling's row under their own role scope, and this
+ * is exactly the question of whether they are related.
+ */
+export interface StudentRelation {
+  studentId: string;
+  firstName: string;
+  isSelf: boolean;
+  isGuardian: boolean;
+  isSibling: boolean;
+}
+
+export async function readStudentRelation(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  studentId: string,
+): Promise<StudentRelation | null> {
+  const [row] = await tx<
+    {
+      id: string;
+      first_name: string;
+      is_self: boolean;
+      is_guardian: boolean;
+      is_sibling: boolean;
+    }[]
+  >`
+    SELECT s.id,
+           s.first_name,
+           (s.user_id IS NOT DISTINCT FROM ${userId}::uuid) AS is_self,
+           EXISTS (
+             SELECT 1 FROM app.parent_child_links l
+             WHERE l.school_id = s.school_id
+               AND l.student_id = s.id
+               AND l.parent_user_id = ${userId}::uuid
+           ) AS is_guardian,
+           EXISTS (
+             SELECT 1
+             FROM app.parent_child_links theirs
+             JOIN app.parent_child_links mine
+               ON mine.school_id = theirs.school_id
+              AND mine.parent_user_id = theirs.parent_user_id
+             JOIN app.students me
+               ON me.id = mine.student_id
+              AND me.school_id = mine.school_id
+              AND me.user_id = ${userId}::uuid
+             WHERE theirs.school_id = s.school_id
+               AND theirs.student_id = s.id
+           ) AS is_sibling
+    FROM app.students s
+    WHERE s.id = ${studentId}::uuid
+      AND s.school_id = ${schoolId}::uuid
+  `;
+  return row
+    ? {
+        studentId: row.id,
+        firstName: row.first_name,
+        isSelf: row.is_self,
+        isGuardian: row.is_guardian,
+        isSibling: row.is_sibling,
+      }
+    : null;
 }
 
 /**
@@ -142,12 +225,14 @@ async function verify(
 }
 
 /**
- * Record a purchase the signed-in student's app completed, and turn their AI add-on on.
+ * Record a purchase the app completed, and turn on the AI add-on of the student it was bought for.
  *
- * The purchase must be for the configured product, still active, stamped by the app with this
- * student's id (so a receipt cannot be replayed onto another account), and not already registered
- * to a different student. Re-registering the same purchase -- a retry, or "restore purchases" --
- * is idempotent.
+ * The purchase must be for one of the configured products, still active, and stamped by the app
+ * with a student's id when it was bought. It is credited to that student only, so a receipt can
+ * never be moved onto another account; the caller must be that student, a parent linked to them
+ * (buying for their child), or a brother or sister whose account is open on the phone the store
+ * redelivered it to. A purchase already registered to a different student is refused.
+ * Re-registering the same purchase -- a retry, or "restore purchases" -- is idempotent.
  */
 export async function registerStorePurchase(
   database: Database | DatabasePools,
@@ -169,22 +254,25 @@ export async function registerStorePurchase(
   },
 ): Promise<StorePurchaseResult> {
   const { locale } = params;
-  const [student] = await withTenantTx(
-    database,
-    { schoolId: params.schoolId, userId: params.userId, requestId: params.requestId },
-    (tx) => tx<{ id: string }[]>`
-      SELECT id FROM app.students WHERE user_id = ${params.userId}::uuid LIMIT 1
-    `,
-  );
-  if (!student) throw storeError(403, ERROR_CODES.STORE_PURCHASE_ACCOUNT_MISMATCH, locale);
-
   const subscription = await verify(store, params.platform, params.verificationData, locale);
-  if (subscription.productId !== store.productId) {
+  if (!storeProductIds(store).includes(subscription.productId)) {
     throw storeError(400, ERROR_CODES.STORE_PURCHASE_INVALID, locale);
   }
-  if (subscription.studentId !== student.id.toLowerCase()) {
+  // Credited to the student the app stamped on the purchase when it was bought, and nobody else.
+  // The caller only has to be someone who could have bought it or is holding it on this phone: that
+  // student, a linked parent who bought it for them, or a brother or sister signed in on the same
+  // phone -- one store account redelivers every purchase it made to whichever account is open.
+  const stamped = subscription.studentId;
+  const relation = stamped
+    ? await withSystemTx(database, async (tx) => {
+        await setTenantScope(tx, params.schoolId, params.requestId);
+        return readStudentRelation(tx, params.schoolId, params.userId, stamped);
+      })
+    : null;
+  if (!relation || !(relation.isSelf || relation.isGuardian || relation.isSibling)) {
     throw storeError(403, ERROR_CODES.STORE_PURCHASE_ACCOUNT_MISMATCH, locale);
   }
+  const student = { id: relation.studentId };
   if (subscription.state === "expired" || subscription.state === "revoked") {
     throw storeError(409, ERROR_CODES.STORE_PURCHASE_NOT_ACTIVE, locale);
   }
@@ -210,13 +298,15 @@ export async function registerStorePurchase(
     params.requestId,
   );
 
+  // Only whoever bought it gave the waiver: the student, or the parent buying for them. A brother
+  // or sister's app passing the purchase on records none.
   await recordWithdrawalWaiver(database, logger, {
     schoolId: params.schoolId,
     userId: params.userId,
     requestId: params.requestId,
     studentId: student.id,
     subscription,
-    waiver: params.withdrawalWaiver ?? null,
+    waiver: relation.isSelf || relation.isGuardian ? (params.withdrawalWaiver ?? null) : null,
   });
 
   if (subscription.platform === "google") {
@@ -229,7 +319,11 @@ export async function registerStorePurchase(
     }
   }
 
-  return { active: true, expiresAt: subscription.periodEnd?.toISOString() ?? null };
+  return {
+    active: true,
+    expiresAt: subscription.periodEnd?.toISOString() ?? null,
+    studentId: student.id,
+  };
 }
 
 /**
@@ -375,6 +469,137 @@ export async function readStorePurchaseConfirmation(
   };
 }
 
+/** Why the add-on cannot be bought for a student in the app, for the app to say so. */
+export type StoreOfferUnavailableReason =
+  /** No store is set up on the server. */
+  | "not_configured"
+  /** The caller is not a student, nor a parent asking about a child linked to them. */
+  | "not_student"
+  /** The school's own plan is not live; the add-on only works on top of it. */
+  | "school_plan_inactive"
+  /** Every product is already held by a brother or sister, so a store account has none left. */
+  | "no_free_product";
+
+export interface StoreOffer {
+  /** The student the offer is for. */
+  studentId: string | null;
+  /** Their first name, for "AI for <name>". */
+  studentFirstName: string | null;
+  /** Whether their AI add-on is on right now (by any route: store, website or school). */
+  subscribed: boolean;
+  /** The product to offer them: the one they already hold, else the first a sibling does not. */
+  productId: string | null;
+  unavailableReason: StoreOfferUnavailableReason | null;
+}
+
+const LIVE_AI_STATUSES = ["trialing", "active", "past_due", "grace_period"];
+
+/**
+ * What to offer in the app for buying the AI add-on for one student: the caller themselves, or --
+ * for a parent -- a child linked to them.
+ *
+ * Which product: a store account (one Apple ID, one Google account) can hold one subscription to a
+ * product, and the phone a family shares has one store account. So each child gets the first
+ * product none of their brothers and sisters (students sharing a linked parent) holds, and a child
+ * who already holds one keeps it. Siblings are found through the link rows only.
+ */
+export async function readStoreOffer(
+  database: Database | DatabasePools,
+  store: StoreBilling | null,
+  params: { schoolId: string; userId: string; studentId?: string | null },
+): Promise<StoreOffer> {
+  const none = (reason: StoreOfferUnavailableReason): StoreOffer => ({
+    studentId: null,
+    studentFirstName: null,
+    subscribed: false,
+    productId: null,
+    unavailableReason: reason,
+  });
+  if (!store || (store.apple === null && store.google === null)) return none("not_configured");
+
+  return withSystemTx(database, async (tx) => {
+    await setTenantScope(tx, params.schoolId);
+    let targetId = params.studentId ?? null;
+    if (!targetId) {
+      const [own] = await tx<{ id: string }[]>`
+        SELECT id FROM app.students
+        WHERE user_id = ${params.userId}::uuid AND school_id = ${params.schoolId}::uuid
+        LIMIT 1
+      `;
+      targetId = own?.id ?? null;
+    }
+    if (!targetId) return none("not_student");
+    const relation = await readStudentRelation(tx, params.schoolId, params.userId, targetId);
+    // A student asks only about themselves, a parent only about a child linked to them.
+    if (!relation || !(relation.isSelf || relation.isGuardian)) return none("not_student");
+
+    const [state] = await tx<{ plan_live: boolean; subscribed: boolean }[]>`
+      SELECT
+        EXISTS (
+          SELECT 1 FROM app.subscriptions
+          WHERE school_id = ${params.schoolId}::uuid
+            AND status IN ('trialing', 'active', 'past_due', 'grace_period')
+        ) AS plan_live,
+        EXISTS (
+          SELECT 1 FROM app.ai_subscriptions
+          WHERE school_id = ${params.schoolId}::uuid
+            AND student_id = ${relation.studentId}::uuid
+            AND status::text IN ${tx(LIVE_AI_STATUSES)}
+            AND current_period_end > CURRENT_TIMESTAMP
+        ) AS subscribed
+    `;
+
+    // The store product each student in the family last bought, for students whose add-on is on.
+    const held = await tx<{ student_id: string; product_id: string }[]>`
+      WITH family AS (
+        SELECT DISTINCT theirs.student_id
+        FROM app.parent_child_links mine
+        JOIN app.parent_child_links theirs
+          ON theirs.school_id = mine.school_id
+         AND theirs.parent_user_id = mine.parent_user_id
+        WHERE mine.school_id = ${params.schoolId}::uuid
+          AND mine.student_id = ${relation.studentId}::uuid
+        UNION
+        SELECT ${relation.studentId}::uuid
+      )
+      SELECT DISTINCT ON (e.payload -> 'metadata' ->> 'student_id')
+             e.payload -> 'metadata' ->> 'student_id' AS student_id,
+             e.payload ->> 'product_id' AS product_id
+      FROM app.billing_events e
+      JOIN app.ai_subscriptions a
+        ON a.school_id = ${params.schoolId}::uuid
+       AND a.student_id::text = e.payload -> 'metadata' ->> 'student_id'
+       AND a.status::text IN ${tx(LIVE_AI_STATUSES)}
+       AND a.current_period_end > CURRENT_TIMESTAMP
+      WHERE e.provider IN ('apple', 'google')
+        AND e.status = 'processed'
+        AND e.payload ->> 'product_id' IS NOT NULL
+        AND e.payload -> 'metadata' ->> 'school_id' = ${params.schoolId}
+        AND (e.payload -> 'metadata' ->> 'student_id')::uuid IN (SELECT student_id FROM family)
+      ORDER BY e.payload -> 'metadata' ->> 'student_id', e.effective_at DESC
+    `;
+    const own = held.find((row) => row.student_id === relation.studentId)?.product_id ?? null;
+    const taken = new Set(
+      held.filter((row) => row.student_id !== relation.studentId).map((row) => row.product_id),
+    );
+    const productIds = storeProductIds(store);
+    const productId =
+      own && productIds.includes(own) ? own : (productIds.find((id) => !taken.has(id)) ?? null);
+
+    return {
+      studentId: relation.studentId,
+      studentFirstName: relation.firstName,
+      subscribed: state!.subscribed,
+      productId,
+      unavailableReason: !state!.plan_live
+        ? "school_plan_inactive"
+        : productId === null
+          ? "no_free_product"
+          : null,
+    };
+  });
+}
+
 async function applyNotification(
   database: Database | DatabasePools,
   logger: Logger,
@@ -460,6 +685,14 @@ export async function handleGooglePlayNotification(
       throw storeError(400, ERROR_CODES.STORE_WEBHOOK_INVALID, "en");
     }
     throw error;
+  }
+  if (notification.otherPackage) {
+    // Another app's RTDN topic points at this endpoint: Play Console needs fixing, not the payload.
+    logger.warn(
+      { package: notification.otherPackage, eventId: notification.eventId },
+      "google play notification for another package ignored",
+    );
+    return "ignored";
   }
   if (!notification.kind || !notification.purchaseToken) return "ignored";
 

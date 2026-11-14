@@ -403,6 +403,9 @@
       "imageAlt": "صورة أرسلها {{name}}",
       "openImage": "فتح الصورة التي أرسلها {{name}} بالحجم الكامل في علامة تبويب جديدة",
       "imageUnavailable": "الصورة غير متاحة",
+      "voiceCaption": "رسالة صوتية · {{duration}}",
+      "voiceLabel": "رسالة صوتية من {{name}}، {{duration}}",
+      "voiceUnavailable": "رسالة صوتية · {{duration}} — غير متاحة",
       "toast": {
         "in_review": "بدأت المراجعة",
         "actioned": "تم تأكيد اتخاذ إجراء بشأن البلاغ",

@@ -14,7 +14,6 @@ import '../../account/application/account_settings_providers.dart';
 import '../../account/presentation/notification_preferences_screen.dart';
 import '../../account/presentation/own_staff_record_screen.dart';
 import '../../account/presentation/signed_in_devices_screen.dart';
-import '../../ai/store/ai_store_controller.dart';
 import '../../custom_lists/application/custom_lists_providers.dart';
 import '../../custom_lists/presentation/custom_lists_screen.dart';
 import '../../student/application/student_context_providers.dart';
@@ -150,7 +149,6 @@ class ProfileTabScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    if (isStudent) const _RestorePurchasesTile(),
                     // A member of staff reads what the school keeps about them (non-sensitive fields).
                     if (holdsStaffRole(roles)) ...[
                       const Divider(height: 1, indent: 68),
@@ -594,45 +592,6 @@ class _DeleteAccountTile extends StatelessWidget {
           builder: (_) => const DeleteAccountScreen(),
         ),
       ),
-    );
-  }
-}
-
-/// The student's "Restore purchases": asks the store to redeliver a previous AI add-on purchase.
-/// Shown only while the add-on is on offer to this student on this device (the same condition as
-/// the AI tab's offer card, which carries the same action) — otherwise there is nothing to restore.
-class _RestorePurchasesTile extends ConsumerWidget {
-  const _RestorePurchasesTile();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    ref.listen(aiStoreProvider, (previous, next) {
-      final message = switch (next.value) {
-        AiStoreActivated() => 'account.restore.done',
-        AiStoreOffering(:final messageKey?) => messageKey,
-        _ => null,
-      };
-      if (message == null || previous?.value == next.value) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message.tr())));
-    });
-    final offer = ref.watch(aiStoreProvider).value;
-    if (offer is! AiStoreOffering) return const SizedBox.shrink();
-
-    return Column(
-      children: [
-        const Divider(height: 1, indent: 68),
-        _SettingsRow(
-          key: const Key('profileRestorePurchases'),
-          icon: Icons.restore,
-          titleKey: 'aiStore.restore.action',
-          trailing: Icons.chevron_right,
-          onTap: offer.busy == AiStoreBusy.none
-              ? () => ref.read(aiStoreProvider.notifier).restore()
-              : () {},
-        ),
-      ],
     );
   }
 }

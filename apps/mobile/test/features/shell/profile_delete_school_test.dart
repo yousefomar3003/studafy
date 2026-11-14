@@ -12,11 +12,13 @@ import 'package:studafy_mobile/src/core/auth/auth_session.dart';
 import 'package:studafy_mobile/src/core/auth/auth_state.dart';
 import 'package:studafy_mobile/src/core/auth/oauth_client.dart';
 import 'package:studafy_mobile/src/core/auth/school_closed_notice.dart';
+import 'package:studafy_mobile/src/core/push/push_providers.dart';
 import 'package:studafy_mobile/src/features/shell/application/school_closure_providers.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/delete_school_screen.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/pill_navigation_bar.dart';
 
 import '../../support/fake_access_token.dart';
+import '../../support/fake_push_service.dart';
 import '../../support/fake_secure_token_store.dart';
 import '../../support/pump_app_shell.dart';
 import '../../support/pump_studafy_app.dart';
@@ -207,6 +209,8 @@ Future<ProviderContainer> _pumpAdminOnDeleteSchool(
         ),
       ),
       closeSchoolProvider.overrideWithValue(close),
+      // Signing out reads this phone's push token; the real service needs Firebase.
+      pushServiceProvider.overrideWithValue(FakePushService()),
     ],
   );
   await _openProfile(tester);

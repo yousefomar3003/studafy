@@ -15,7 +15,7 @@ import '../../../core/api/generated/models/assignment_attachment.dart';
 import '../../../core/api/generated/models/assignment_attachment_download_state.dart';
 import '../../../core/api/generated/models/assignment_kind.dart';
 import '../../../core/api/generated/models/assignment_status.dart';
-import '../../../core/api/generated/models/confirm_attachment_body.dart';
+import '../../../core/api/generated/models/assignment_confirm_attachment_body.dart';
 import '../../../core/api/generated/models/confirm_upload_body.dart';
 import '../../../core/api/generated/models/create_assignment_body.dart';
 import '../../../core/api/generated/models/create_assignment_body_kind.dart';
@@ -718,7 +718,10 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
         );
         await api.confirmAssignmentAttachment(
           assignmentId: assignment.id,
-          body: ConfirmAttachmentBody(storageKey: upload.storageKey),
+          body: AssignmentConfirmAttachmentBody(
+            storageKey: upload.storageKey,
+            contentType: file.contentType,
+          ),
         );
       }
       if (!mounted) return;
