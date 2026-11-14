@@ -17,3 +17,21 @@ export {
   volumeBracketFor,
 } from "./calculate";
 export { BPS_SCALE, DAYS_PER_YEAR, MONTHS_PER_YEAR, applyBps, divideHalfUp } from "./money";
+export {
+  MAX_CUSTOM_INSTALMENTS,
+  PAYMENT_PLANS,
+  addMonthsUtc,
+  allocatePayments,
+  buildSchedule,
+  customScheduleErrors,
+  splitEvenly,
+} from "./schedule";
+export type {
+  AllocatedInstalment,
+  CustomInstalmentInput,
+  CustomScheduleError,
+  InstalmentStatus,
+  PaymentPlan,
+  ScheduleInput,
+  ScheduledInstalment,
+} from "./schedule";

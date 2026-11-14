@@ -105,6 +105,9 @@ approved_flexible_columns(table_name, column_name) AS (
     -- 000165: the license pricing calculator's full result, kept so the school sees exactly the offer
     -- it was sent. What is owed is relational (license_invoice_lines).
     ('license_quotes', 'breakdown'),
+    -- 000221: a custom payment plan's proposed instalments, as offered on the quote. What is owed is
+    -- relational (license_invoice_instalments).
+    ('license_quotes', 'payment_schedule'),
     ('billing_events', 'payload'),
     ('fee_schedule_cache', 'erpnext_payload'),
     ('fee_structure_cache', 'erpnext_payload'),

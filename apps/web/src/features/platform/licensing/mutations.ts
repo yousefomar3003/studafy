@@ -310,16 +310,39 @@ export function useVoidInvoice() {
   );
 }
 
-/** Set or replace (`url`) or remove (`url` null) the invoice's online payment link (Revolut). */
+/**
+ * Set or replace (`url`) or remove (`url` null) an online payment link (Revolut): one instalment's
+ * when `instalmentId` is given, otherwise the one of the instalment to pay now.
+ */
 export function useSetInvoicePaymentLink() {
   return useLicensingMutation(
-    async (input: { schoolId: string; invoiceId: string; url: string | null }) => {
+    async (input: {
+      schoolId: string;
+      invoiceId: string;
+      instalmentId?: string;
+      url: string | null;
+    }) => {
+      const body = input.url === null ? undefined : { url: input.url };
+      if (input.instalmentId) {
+        const params = {
+          path: {
+            schoolId: input.schoolId,
+            invoiceId: input.invoiceId,
+            instalmentId: input.instalmentId,
+          },
+        };
+        const path =
+          "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link";
+        const { data } = body
+          ? await api.PUT(path, { params, body })
+          : await api.DELETE(path, { params });
+        return required(data, "Payment link");
+      }
       const params = { path: { schoolId: input.schoolId, invoiceId: input.invoiceId } };
       const path = "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link";
-      const { data } =
-        input.url === null
-          ? await api.DELETE(path, { params })
-          : await api.PUT(path, { params, body: { url: input.url } });
+      const { data } = body
+        ? await api.PUT(path, { params, body })
+        : await api.DELETE(path, { params });
       return required(data, "Payment link");
     },
   );

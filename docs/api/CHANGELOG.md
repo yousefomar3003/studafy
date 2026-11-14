@@ -13,6 +13,18 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Licence payment plans (migration 000221, ADR-021). `LicenseQuoteBody`, `LicenseQuoteReplaceBody`
+  and `LicenseQuoteCalculateBody` take optional `paymentPlan` (`LicensePaymentPlan`: `in_full`,
+  `monthly`, `custom`; default `in_full`) and, for `custom`, `paymentSchedule`
+  (`LicenseCustomInstalment[]`: `amountMinor`, `dueDate`; adding up to the total, dates in order and
+  not in the past, at most 24; otherwise 422 `LICENSE_PAYMENT_SCHEDULE_INVALID`). `LicenseQuote` adds
+  `paymentPlan`, `paymentSchedule` and `schedulePreview` (`LicenseScheduledInstalment[]`, as if
+  accepted today); `LicenseQuoteCalculation` adds `paymentPlan`, `schedulePreview` and
+  `scheduleErrors`. `LicenseInvoice` adds `paymentPlan`; `LicenseInvoiceDetail` adds `instalments`
+  (`LicenseInvoiceInstalment`: amount, paid, balance, due date, status, overdue, `current`, its own
+  `paymentLink`). New `PUT|DELETE
+/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link`
+  (404 `LICENSE_INSTALMENT_NOT_FOUND`).
 - `GET /api/platform/health` (`PlatformSystemHealth`) adds `storageDuplicates`
   (`PlatformStorageDuplicates`). It lists schools charged for a second storage add-on (000219):
   every one not yet settled and those settled in the last 30 days, open ones first. Each item gives
@@ -22,6 +34,10 @@ when it required the `version-bump` label.
 
 ### Changed
 
+- `LicenseInvoice.paymentLink` is now the link of the instalment to pay now, and the invoice-level
+  `PUT|DELETE …/license-invoices/{invoiceId}/payment-link` sets that instalment's link (one
+  instalment for an invoice paid at once, so nothing changes for those). A licence now activates once
+  its first instalment is paid in full; an invoice's `dueDate` is its earliest unpaid instalment's.
 - **(breaking)** `POST /api/subscriptions/storage/change` (`changeStorageAddOnTier`) now charges
   only an amount the school confirmed. The body requires `prorationDate` and `expectedAmountMinor`
   (the `prorationDate` and `amountDueNowMinor` of a preview) and `requestKey` (a UUID per

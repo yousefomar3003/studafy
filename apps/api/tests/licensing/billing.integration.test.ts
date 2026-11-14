@@ -1407,13 +1407,14 @@ describe("route permissions", () => {
       );
       expect(onVoid.status).toBe(409);
 
-      // The write is audited.
+      // The write is audited, on the instalment it changed (000221: one, for an invoice paid at once).
       const audits = await asAdmin(
         f.schoolId,
         (tx) =>
           tx<{ n: number }[]>`
           SELECT count(*)::int AS n FROM app.audit_logs
-          WHERE target_table = 'license_invoices' AND target_id = ${invoice.id}::uuid
+          WHERE target_table = 'license_invoice_instalments'
+            AND new_values ->> 'invoice_id' = ${invoice.id}
             AND new_values ? 'payment_link'
         `,
       );

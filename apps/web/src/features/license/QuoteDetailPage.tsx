@@ -10,6 +10,7 @@ import { bpsToPercent, useMoney } from "../platform/licensing/format";
 
 import { LicenseHeader } from "./LicenseHeader";
 import { useAcceptQuote } from "./mutations";
+import { PaymentSchedule } from "./PaymentSchedule";
 import { useQuoteQuery } from "./queries";
 import { QuoteStatusPill } from "./QuotesPage";
 
@@ -80,12 +81,43 @@ export default function QuoteDetailPage() {
           </dl>
           {data.notes ? <p className="license-note">{data.notes}</p> : null}
           <QuoteBreakdown quote={data} />
+          <QuoteSchedule quote={data} />
         </>
       ) : null}
       {data && confirming ? (
         <AcceptModal quote={data} onClose={() => setConfirming(false)} />
       ) : null}
     </>
+  );
+}
+
+/** How the quote is to be paid, and when: the invoice's instalments if it were accepted today. */
+function QuoteSchedule({ quote }: { quote: Quote }) {
+  const { t } = useTranslation();
+  const title = t("schoolLicense.schedule.title");
+  return (
+    <section className="license-section" aria-labelledby="quote-schedule">
+      <h2 id="quote-schedule">{title}</h2>
+      <p>
+        {t(`schoolLicense.schedule.plan.${quote.paymentPlan}`, {
+          count: quote.schedulePreview.length,
+        })}
+      </p>
+      {quote.schedulePreview.length > 1 ? (
+        <>
+          <PaymentSchedule
+            rows={quote.schedulePreview}
+            currencyCode={quote.currencyCode}
+            minorUnit={quote.minorUnit}
+            caption={title}
+          />
+          {quote.status === "sent" ? (
+            <p className="license-muted">{t("schoolLicense.schedule.previewNote")}</p>
+          ) : null}
+        </>
+      ) : null}
+      <p className="license-muted">{t("schoolLicense.schedule.activationNote")}</p>
+    </section>
   );
 }
 

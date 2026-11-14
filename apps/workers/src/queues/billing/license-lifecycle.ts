@@ -7,7 +7,8 @@
  *     stops at `ends_at` in the resolver, so this records the status and refreshes caches;
  *  2. sent quotes past their valid-until date become `expired`;
  *  3. unpaid invoices past their due date are marked overdue (`overdue_at`); their status still says
- *     how much is paid.
+ *     how much is paid. Each instalment not paid by its due date is marked overdue the same way
+ *     (000221); an invoice's due date is its earliest unpaid instalment's.
  *
  * Nothing here suspends a license: that is the super admin's decision, never automatic.
  *
@@ -105,9 +106,37 @@ export async function expireQuotes(tx: TransactionSql, now: Date): Promise<numbe
   return expired.length;
 }
 
-/** Mark unpaid invoices past their due date (UTC) overdue, once. */
+/** Mark unpaid invoices, and their unpaid instalments, past their due date (UTC) overdue, once. */
 export async function markInvoicesOverdue(tx: TransactionSql, now: Date): Promise<number> {
   const today = now.toISOString().slice(0, 10);
+  const instalments = await tx<{ id: string; invoice_id: string; due_date: string }[]>`
+    UPDATE app.license_invoice_instalments AS inst
+    SET overdue_at = ${now}, updated_at = GREATEST(CURRENT_TIMESTAMP, inst.updated_at)
+    FROM app.license_invoices AS i
+    WHERE inst.school_id = current_setting('app.school_id')::uuid
+      AND i.school_id = inst.school_id AND i.id = inst.invoice_id
+      AND i.status IN ('issued', 'partially_paid')
+      AND inst.status <> 'paid'
+      AND inst.due_date < ${today}::date
+      AND inst.overdue_at IS NULL
+    RETURNING inst.id::text AS id, inst.invoice_id::text AS invoice_id,
+              inst.due_date::text AS due_date
+  `;
+  await emitAuditLogs(
+    tx,
+    instalments.map((instalment) => ({
+      action: "update" as const,
+      targetTable: "license_invoice_instalments",
+      targetId: instalment.id,
+      oldValues: { overdue_at: null },
+      newValues: {
+        overdue_at: now.toISOString(),
+        due_date: instalment.due_date,
+        invoice_id: instalment.invoice_id,
+      },
+    })),
+  );
+
   const marked = await tx<{ id: string; due_date: string }[]>`
     UPDATE app.license_invoices
     SET overdue_at = ${now}, updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)

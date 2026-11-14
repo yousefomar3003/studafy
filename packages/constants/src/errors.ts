@@ -525,6 +525,12 @@ export const ERROR_CODES = {
   // The payment link pasted on an invoice is not an https link to an allowed provider host
   // (LICENSE_PAYMENT_LINK_HOSTS), or is too long.
   LICENSE_PAYMENT_LINK_INVALID: "LICENSE_PAYMENT_LINK_INVALID",
+  // A licence quote's payment schedule is not one that can be paid: a custom schedule whose amounts
+  // don't add up to the total, with dates out of order or in the past, too many instalments, or a
+  // due date moved past the next instalment's.
+  LICENSE_PAYMENT_SCHEDULE_INVALID: "LICENSE_PAYMENT_SCHEDULE_INVALID",
+  // No such instalment on this licence invoice.
+  LICENSE_INSTALMENT_NOT_FOUND: "LICENSE_INSTALMENT_NOT_FOUND",
   LICENSE_PAYMENT_NOT_FOUND: "LICENSE_PAYMENT_NOT_FOUND",
   LICENSE_PAYMENT_EXCEEDS_BALANCE: "LICENSE_PAYMENT_EXCEEDS_BALANCE",
   LICENSE_PAYMENT_VOIDED: "LICENSE_PAYMENT_VOIDED",
