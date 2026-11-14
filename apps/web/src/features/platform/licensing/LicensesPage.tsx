@@ -193,6 +193,21 @@ export function SeatMeter({ assigned, purchased }: { assigned: number; purchased
 
 type RequestStatus = ChangeRequest["status"];
 
+/**
+ * The calculator, prefilled from a request: the school, its license in force (as a seat increase)
+ * when it has one, and the student seats and tier asked for.
+ */
+export function priceLink(request: ChangeRequest): string {
+  const params = new URLSearchParams({ schoolId: request.schoolId });
+  if (request.licenseId) {
+    params.set("licenseId", request.licenseId);
+    params.set("kind", "seat_increase");
+  }
+  if (request.studentSeats !== null) params.set("studentSeats", String(request.studentSeats));
+  if (request.studentTier) params.set("studentTier", request.studentTier.id);
+  return `/portal/platform/quotes?${params.toString()}`;
+}
+
 /** Seat change requests from schools: price one, or close it with a note. */
 export function ChangeRequestInbox() {
   const { t } = useTranslation();
@@ -206,8 +221,19 @@ export function ChangeRequestInbox() {
 
   const wanted = (request: ChangeRequest) =>
     [
-      request.studentSeats !== null
-        ? t("platformLicensing.inbox.wants.students", { count: request.studentSeats })
+      request.studentSeats !== null || request.studentTier
+        ? [
+            request.studentSeats !== null
+              ? t("platformLicensing.inbox.wants.studentAi", { count: request.studentSeats })
+              : t("platformLicensing.inbox.wants.studentAiNoSeats"),
+            request.studentTier
+              ? t("platformLicensing.inbox.wants.studentAiTier", {
+                  tier: request.studentTier.displayName,
+                })
+              : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
         : null,
       request.teacherSeats !== null
         ? t("platformLicensing.inbox.wants.teachers", { count: request.teacherSeats })
@@ -215,7 +241,7 @@ export function ChangeRequestInbox() {
       request.parentSeats !== null
         ? t("platformLicensing.inbox.wants.parents", { count: request.parentSeats })
         : null,
-      ...(["student", "teacher", "parent"] as const).map((audience) => {
+      ...(["teacher", "parent"] as const).map((audience) => {
         const tier = request[`${audience}Tier`];
         return tier
           ? t("platformLicensing.inbox.wants.tier", {
@@ -282,15 +308,7 @@ export function ChangeRequestInbox() {
                 </div>
                 {request.status === "open" ? (
                   <div className="platform-actions">
-                    <Link
-                      to={`/portal/platform/quotes?schoolId=${request.schoolId}${
-                        request.licenseId
-                          ? `&licenseId=${request.licenseId}&kind=seat_increase`
-                          : ""
-                      }`}
-                    >
-                      {t("platformLicensing.inbox.price")}
-                    </Link>
+                    <Link to={priceLink(request)}>{t("platformLicensing.inbox.price")}</Link>
                     <Button
                       variant="secondary"
                       onClick={() => setClosing({ request, to: "resolved" })}

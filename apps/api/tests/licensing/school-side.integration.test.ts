@@ -343,6 +343,29 @@ describe("change requests", () => {
         expect([body.note, refused.status]).toEqual([body.note, 422]);
       }
 
+      // Only student AI is sold: teacher or parent seats, their tiers and Family+ are refused, so a
+      // hidden option cannot be sent by hand.
+      for (const body of [
+        { teacherSeats: 5, note: "Teacher seats" },
+        { teacherPlanId: teacherTier, note: "Teacher tier" },
+        { parentSeats: 5, note: "Parent seats" },
+        { includeFamilyPlus: true, note: "Family+" },
+      ]) {
+        const refused = await request(f.as(), "POST", "/api/school/license/change-requests", body);
+        expect([body.note, refused.status]).toEqual([body.note, 422]);
+        expect(((await refused.json()) as { code: string }).code).toBe(
+          "LICENSE_AUDIENCE_NOT_OFFERED",
+        );
+      }
+      // Asking for no teacher seats, or Family+ off, is no new sale.
+      const none = await request(f.as(), "POST", "/api/school/license/change-requests", {
+        studentSeats: 45,
+        teacherSeats: 0,
+        includeFamilyPlus: false,
+        note: "Students only",
+      });
+      expect(none.status).toBe(201);
+
       // The database refuses a tier of the wrong audience whoever writes it.
       const direct = db.sql.begin(async (tx) => {
         await tx.unsafe("SET LOCAL ROLE studafy_admin");

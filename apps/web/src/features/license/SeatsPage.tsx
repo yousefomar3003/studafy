@@ -13,9 +13,9 @@ import { useGradeLevels, useSectionClasses, useSections } from "../principal/sec
 import { LicenseHeader } from "./LicenseHeader";
 import { useAssignSeats, useUnassignSeats } from "./mutations";
 import {
-  AUDIENCES,
   PEOPLE_PAGE_SIZE,
   seatsLeft,
+  shownAudiences,
   usePeopleQuery,
   useSchoolLicenseQuery,
 } from "./queries";
@@ -51,7 +51,7 @@ export default function SeatsPage() {
   const license = overview.data?.license ?? null;
   const [params, setParams] = useSearchParams();
 
-  const audiences = AUDIENCES.filter((a) => a !== "parent" || license?.includeFamilyPlus);
+  const audiences = shownAudiences(license);
   const requested = params.get("audience") as LicenseAudience | null;
   const audience: LicenseAudience =
     requested && audiences.includes(requested) ? requested : "student";

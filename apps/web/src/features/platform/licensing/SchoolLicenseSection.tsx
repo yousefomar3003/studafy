@@ -8,7 +8,7 @@ import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { useSchoolMembersQuery } from "../queries";
 
 import { SchoolQuotes } from "./CalculatorPage";
-import { AUDIENCES } from "./constants";
+import { AUDIENCES, offersFamilyPlus } from "./constants";
 import { useMoney } from "./format";
 import { ActivateEarlyModal } from "./InvoicePage";
 import { LicenseStatusPill, SeatMeter } from "./LicensesPage";
@@ -188,12 +188,16 @@ function LicenseSummary({
           </table>
         </div>
         <dl className="platform-dl">
-          <dt>{t("platformLicensing.school.familyPlus")}</dt>
-          <dd>
-            {license.includeFamilyPlus
-              ? t("platform.common.yes")
-              : t("platformLicensing.common.no")}
-          </dd>
+          {offersFamilyPlus(license) ? (
+            <>
+              <dt>{t("platformLicensing.school.familyPlus")}</dt>
+              <dd>
+                {license.includeFamilyPlus
+                  ? t("platform.common.yes")
+                  : t("platformLicensing.common.no")}
+              </dd>
+            </>
+          ) : null}
           <dt>{t("platformLicensing.school.currency")}</dt>
           <dd>{license.currencyCode}</dd>
           <dt>{t("platformLicensing.school.balance")}</dt>

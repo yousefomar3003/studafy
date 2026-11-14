@@ -347,4 +347,29 @@ describe("CalculatorPage", () => {
       student: { planId: STUDENT_TIER, seats: 150 },
     });
   });
+  test("prices a school's AI request from the inbox: students only, prefilled", async () => {
+    await renderPage(`?schoolId=${SCHOOL_ID}&studentSeats=120&studentTier=${STUDENT_TIER}`);
+
+    expect(((await screen.findByLabelText("Students seats")) as HTMLInputElement).value).toBe(
+      "120",
+    );
+    // Teacher seats and Family+ are not sold yet: no row and no checkbox for them.
+    expect(screen.queryByLabelText("Teachers seats")).toBeNull();
+    expect(screen.queryByLabelText("Parents (Family+) seats")).toBeNull();
+    expect(screen.queryByLabelText(/Include Family\+/)).toBeNull();
+
+    await waitFor(() =>
+      expect(
+        pricedBodies().some(
+          (body) =>
+            (body.student as { seats: number } | undefined)?.seats === 120 &&
+            (body.student as { planId: string }).planId === STUDENT_TIER,
+        ),
+      ).toBe(true),
+    );
+    const body = pricedBodies().at(-1)!;
+    expect(body.teacher).toBeUndefined();
+    expect(body.parent).toBeUndefined();
+    expect(body.includeFamilyPlus).toBe(false);
+  });
 });

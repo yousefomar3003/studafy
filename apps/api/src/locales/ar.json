@@ -241,6 +241,7 @@
   "LICENSE_ALREADY_ACTIVE": "لدى المدرسة ترخيص نشط بالفعل",
   "LICENSE_NOT_EDITABLE": "هذا التعديل غير مسموح به في الحالة الحالية للترخيص",
   "LICENSE_TIER_INVALID": "تحتاج كل فئة لها مقاعد إلى باقة مخصصة لتلك الفئة",
+  "LICENSE_AUDIENCE_NOT_OFFERED": "تشمل التراخيص الطلاب فقط حاليًا: مقاعد المعلمين وأولياء الأمور وFamily+ غير متاحة بعد",
   "LICENSE_AUDIENCE_NOT_LICENSED": "لا يتضمن الترخيص مقاعد لهذه الفئة",
   "LICENSE_SEAT_LIMIT_REACHED": "جميع المقاعد المشتراة لهذه الفئة موزعة بالفعل",
   "LICENSE_SEATS_BELOW_ASSIGNED": "لا يمكن أن يقل عدد المقاعد عن المقاعد الموزعة حالياً",

@@ -241,6 +241,7 @@
   "LICENSE_ALREADY_ACTIVE": "The school already has an active license",
   "LICENSE_NOT_EDITABLE": "This change is not allowed while the license is in its current status",
   "LICENSE_TIER_INVALID": "Each audience with seats needs a tier of that audience",
+  "LICENSE_AUDIENCE_NOT_OFFERED": "Licenses cover students only for now: teacher and parent seats and Family+ are not available yet",
   "LICENSE_AUDIENCE_NOT_LICENSED": "The license has no seats for this audience",
   "LICENSE_SEAT_LIMIT_REACHED": "Every purchased seat for this audience is already assigned",
   "LICENSE_SEATS_BELOW_ASSIGNED": "The seat count cannot be lower than the seats already assigned",

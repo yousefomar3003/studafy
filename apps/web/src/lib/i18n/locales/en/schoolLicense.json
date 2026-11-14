@@ -403,5 +403,21 @@
       "gb": "{{value}} GB",
       "tb": "{{value}} TB"
     }
+  },
+  "aiRequest": {
+    "open": "Request AI for students",
+    "noLicense": "Your school has no license yet. Request Studafy AI for your students and Studafy will send you a quote.",
+    "title": "Request AI for students",
+    "description": "Tell Studafy how many students should get Studafy AI (the AI tutor and study tools) and which tier. You'll get a quote to accept; nothing changes before that.",
+    "studentsLabel": "Number of students",
+    "studentsHelp": "How many students should get Studafy AI. You choose who gets a seat after the license starts.",
+    "tierLabel": "AI tier",
+    "anyTier": "Not sure: Studafy will suggest one",
+    "anyTierShort": "a tier Studafy suggests",
+    "noteLabel": "Note for Studafy (optional)",
+    "submit": "Send request",
+    "defaultNote_one": "Student AI for {{count}} student, {{tier}}.",
+    "defaultNote_other": "Student AI for {{count}} students, {{tier}}.",
+    "defaultNoteTier": "Student AI on {{tier}}."
   }
 }
