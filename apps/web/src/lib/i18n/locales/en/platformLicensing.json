@@ -60,7 +60,8 @@
     "sent": "Sent",
     "accepted": "Accepted",
     "expired": "Expired",
-    "withdrawn": "Withdrawn"
+    "withdrawn": "Withdrawn",
+    "declined": "Declined by the school"
   },
   "invoiceStatus": {
     "issued": "Issued",
@@ -292,7 +293,9 @@
       "accept": "Quote accepted and invoiced.",
       "withdraw": "Quote withdrawn."
     },
-    "openInvoice": "Open invoice"
+    "openInvoice": "Open invoice",
+    "declineReason": "Reason: “{{reason}}”",
+    "declinedNoReason": "No reason given."
   },
   "licenses": {
     "title": "Licenses",

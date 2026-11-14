@@ -129,6 +129,8 @@ const calculation = {
   },
 };
 
+let extraQuotes: Record<string, unknown>[] = [];
+
 const getMock = mock((path: string) => {
   if (path === "/api/platform/tiers") return Promise.resolve({ data: { tiers } });
   if (path === "/api/platform/schools/{schoolId}") {
@@ -138,7 +140,7 @@ const getMock = mock((path: string) => {
     return Promise.resolve({ data: { licenses } });
   }
   if (path === "/api/platform/schools/{schoolId}/license-quotes") {
-    return Promise.resolve({ data: { quotes: [quote] } });
+    return Promise.resolve({ data: { quotes: [quote, ...extraQuotes] } });
   }
   if (path === "/api/platform/schools") {
     return Promise.resolve({ data: { schools: [], total: 0 } });
@@ -367,6 +369,39 @@ describe("CalculatorPage", () => {
       ).toBe(true),
     );
     expect(await screen.findByText("Quote sent to the school.")).toBeTruthy();
+  });
+
+  test("a quote the school declined shows it, with the school's reason, and no actions", async () => {
+    extraQuotes = [
+      {
+        ...quote,
+        id: "q-declined",
+        status: "declined",
+        totalMinor: 99_900,
+        declinedAt: "2026-11-14T10:00:00.000Z",
+        declineReason: "We only need 10 seats",
+      },
+      {
+        ...quote,
+        id: "q-declined-silent",
+        status: "declined",
+        totalMinor: 88_800,
+        declinedAt: "2026-11-14T11:00:00.000Z",
+        declineReason: null,
+      },
+    ];
+    try {
+      await renderPage();
+      const quotes = await screen.findByRole("region", { name: "Quotes" });
+      const row = (await within(quotes).findByText("$999.00")).closest("tr")!;
+      expect(within(row).getByText("Declined by the school")).toBeTruthy();
+      expect(within(row).getByText("Reason: “We only need 10 seats”")).toBeTruthy();
+      expect(within(row).queryByRole("button")).toBeNull();
+      const silent = within(quotes).getByText("$888.00").closest("tr")!;
+      expect(within(silent).getByText("No reason given.")).toBeTruthy();
+    } finally {
+      extraQuotes = [];
+    }
   });
 
   test("re-prices a draft license in place, starting from its terms", async () => {

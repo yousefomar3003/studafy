@@ -387,10 +387,23 @@ export const quoteSchema = z
     acceptedBy: uuid.nullable(),
     acceptedByPlatform: z.boolean().nullable(),
     closedAt: z.string().datetime().nullable(),
+    declinedAt: z.string().datetime().nullable(),
+    declinedBy: uuid.nullable(),
+    declineReason: z.string().nullable().openapi({
+      description: "The school's optional reason, when it declined the quote.",
+    }),
     invoiceId: uuid.nullable(),
     createdAt: z.string().datetime(),
   })
   .openapi("LicenseQuote");
+
+export const declineQuoteBodySchema = z
+  .object({
+    reason: z.string().trim().max(1000).nullable().optional().openapi({
+      description: "Why the school declines, for the super admin. Optional.",
+    }),
+  })
+  .openapi("DeclineLicenseQuoteBody");
 
 export const quoteListSchema = z
   .object({ quotes: z.array(quoteSchema) })

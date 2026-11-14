@@ -293,7 +293,8 @@
     "sent": "بانتظارك",
     "accepted": "مقبول",
     "expired": "منتهي الصلاحية",
-    "withdrawn": "مسحوب"
+    "withdrawn": "مسحوب",
+    "declined": "مرفوض"
   },
   "quotes": {
     "title": "عروض الأسعار",
@@ -310,6 +311,17 @@
   "quote": {
     "title": "عرض سعر: {{kind}}",
     "accept": "قبول العرض",
+    "decline": "رفض عرض السعر",
+    "declineTitle": "هل تريد رفض عرض السعر هذا؟",
+    "declineBody": "سيُغلق العرض ولا يمكن قبوله بعد ذلك. سترى Studafy سببك ويمكنها إرسال عرض سعر جديد إليك.",
+    "declineReasonLabel": "لماذا ترفض العرض؟ (اختياري)",
+    "declineReasonHelp": "مثلاً: السعر مرتفع، عدد طلاب أقل، تاريخ بدء مختلف.",
+    "declineReasonTooLong": "يجب ألا يتجاوز 1000 حرف.",
+    "declineConfirm": "رفض عرض السعر",
+    "declined": "تم رفض عرض السعر وإبلاغ Studafy.",
+    "declineError": "لم يتم رفض عرض السعر",
+    "declinedNote": "لقد رفضت عرض السعر هذا.",
+    "declinedWithReason": "لقد رفضت عرض السعر هذا: «{{reason}}»",
     "breakdownTitle": "تفاصيل السعر",
     "columns": {
       "item": "البند",
