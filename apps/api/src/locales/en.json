@@ -258,6 +258,7 @@
   "LICENSE_INVOICE_NOT_FOUND": "Invoice not found",
   "LICENSE_INVOICE_NOT_PAYABLE": "This invoice is paid or void",
   "LICENSE_INVOICE_HAS_PAYMENTS": "Void this invoice's payments first",
+  "LICENSE_PAYMENT_LINK_INVALID": "Paste an https payment link from Revolut (revolut.com or revolut.me), up to 500 characters.",
   "LICENSE_PAYMENT_NOT_FOUND": "Payment not found",
   "LICENSE_PAYMENT_EXCEEDS_BALANCE": "The amount is more than the invoice's balance",
   "LICENSE_PAYMENT_VOIDED": "This payment has been voided",

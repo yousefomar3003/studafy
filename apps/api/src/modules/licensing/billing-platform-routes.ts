@@ -48,6 +48,7 @@ import {
   recordPaymentBodySchema,
   uploadUrlBodySchema,
   uploadUrlSchema,
+  paymentLinkBodySchema,
   voidBodySchema,
   voidPaymentResultSchema,
 } from "./billing-schemas";
@@ -63,6 +64,7 @@ import {
   readReceipt,
   recordPayment,
   requireInvoiceDetail,
+  setInvoicePaymentLink,
   voidInvoice,
   voidPayment,
   writeBankDetails,
@@ -389,6 +391,43 @@ const voidInvoiceRoute = createRoute({
   ),
 });
 
+const putPaymentLinkRoute = createRoute({
+  method: "put",
+  path: "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
+  operationId: "platformSetLicenseInvoicePaymentLink",
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "Set or replace the invoice's online payment link",
+  description:
+    'A payment link made in Revolut, shown to the school as "Pay online" beside the bank ' +
+    "details while the invoice is unpaid. Studafy does not contact Revolut: record the payment as " +
+    "usual once it arrives. 422 LICENSE_PAYMENT_LINK_INVALID for anything but an https link on an " +
+    "allowed host; 409 LICENSE_INVOICE_NOT_PAYABLE when the invoice is paid or void.",
+  request: {
+    params: platformInvoiceParamsSchema,
+    body: { required: true, content: { "application/json": { schema: paymentLinkBodySchema } } },
+  },
+  responses: standardResponses(
+    { 200: { description: "The invoice", schema: invoiceSchema } },
+    [400, 401, 403, 404, 409, 422],
+  ),
+});
+
+const deletePaymentLinkRoute = createRoute({
+  method: "delete",
+  path: "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
+  operationId: "platformClearLicenseInvoicePaymentLink",
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "Remove the invoice's online payment link",
+  description: "The school then sees only the bank details. 409 when the invoice is paid or void.",
+  request: { params: platformInvoiceParamsSchema },
+  responses: standardResponses(
+    { 200: { description: "The invoice", schema: invoiceSchema } },
+    [401, 403, 404, 409],
+  ),
+});
+
 const activateEarlyRoute = createRoute({
   method: "post",
   path: "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
@@ -684,6 +723,10 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
     auditAction("update", "license_invoices"),
   );
   routes.use(
+    "/api/platform/schools/:schoolId/license-invoices/:invoiceId/payment-link",
+    auditAction("update", "license_invoices"),
+  );
+  routes.use(
     "/api/platform/schools/:schoolId/license-invoices/:invoiceId/payments",
     auditAction("insert", "license_payments"),
   );
@@ -861,6 +904,29 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
     const actor = platformActor(c);
     const { result } = await change(deps, schoolId, actor, async (tx) => ({
       result: await voidInvoice(tx, schoolId, invoiceId, reason, actor),
+      versions: new Map(),
+      pending: [],
+    }));
+    return c.json(result, 200);
+  });
+
+  routes.openapi(putPaymentLinkRoute, async (c) => {
+    const { schoolId, invoiceId } = c.req.valid("param");
+    const { url } = c.req.valid("json");
+    const actor = platformActor(c);
+    const { result } = await change(deps, schoolId, actor, async (tx) => ({
+      result: await setInvoicePaymentLink(tx, schoolId, invoiceId, url.trim(), actor),
+      versions: new Map(),
+      pending: [],
+    }));
+    return c.json(result, 200);
+  });
+
+  routes.openapi(deletePaymentLinkRoute, async (c) => {
+    const { schoolId, invoiceId } = c.req.valid("param");
+    const actor = platformActor(c);
+    const { result } = await change(deps, schoolId, actor, async (tx) => ({
+      result: await setInvoicePaymentLink(tx, schoolId, invoiceId, null, actor),
       versions: new Map(),
       pending: [],
     }));

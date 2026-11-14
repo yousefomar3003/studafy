@@ -252,6 +252,18 @@
 
 /* --- Invoices --- */
 
+.license-pay-online {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-8) var(--space-16);
+  margin-block: var(--space-12) var(--space-16);
+}
+
+.license-pay-online p {
+  margin: 0;
+}
+
 .license-pay {
   display: grid;
   grid-template-columns: max-content 1fr;

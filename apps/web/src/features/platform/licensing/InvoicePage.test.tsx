@@ -42,6 +42,7 @@ function invoice(currencyCode = "USD", minorUnit = 2) {
     overdueAt: null,
     voidedAt: null,
     voidReason: null,
+    paymentLink: null as string | null,
     createdAt: "2026-10-01T08:00:00.000Z",
     bankDetails: {
       bankName: "Gulf Bank",
@@ -129,7 +130,25 @@ const postMock = mock((path: string, _init?: { body?: Record<string, unknown> })
   throw new Error(`Unhandled POST ${path}`);
 });
 
-mock.module("../../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }));
+const LINK_PATH = "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link";
+const putMock = mock((path: string, init?: { body?: { url: string } }) => {
+  if (path === LINK_PATH) {
+    current = { ...current, paymentLink: init!.body!.url };
+    return Promise.resolve({ data: current });
+  }
+  throw new Error(`Unhandled PUT ${path}`);
+});
+const deleteMock = mock((path: string) => {
+  if (path === LINK_PATH) {
+    current = { ...current, paymentLink: null };
+    return Promise.resolve({ data: current });
+  }
+  throw new Error(`Unhandled DELETE ${path}`);
+});
+
+mock.module("../../../lib/api", () => ({
+  api: { GET: getMock, POST: postMock, PUT: putMock, DELETE: deleteMock },
+}));
 
 const loadPage = async (): Promise<ComponentType> => (await import("./InvoicePage")).default;
 
@@ -158,9 +177,51 @@ afterEach(() => {
   current = invoice();
   getMock.mockClear();
   postMock.mockClear();
+  putMock.mockClear();
+  deleteMock.mockClear();
 });
 
 describe("InvoicePage", () => {
+  test("pastes a Revolut payment link, refuses anything else, and removes it", async () => {
+    await renderPage();
+    const card = await screen.findByRole("region", { name: "Payment link" });
+    const field = within(card).getByLabelText("Revolut payment link");
+
+    fireEvent.change(field, { target: { value: "https://evil.example/pay" } });
+    fireEvent.click(within(card).getByRole("button", { name: "Save link" }));
+    expect(
+      await within(card).findByText(
+        "Paste an https link from Revolut (revolut.com or revolut.me), up to 500 characters.",
+      ),
+    ).toBeTruthy();
+    expect(putMock).not.toHaveBeenCalled();
+
+    const link = "https://checkout.revolut.com/pay/abc";
+    fireEvent.change(field, { target: { value: `  ${link} ` } });
+    fireEvent.click(within(card).getByRole("button", { name: "Save link" }));
+    await waitFor(() => expect(putMock).toHaveBeenCalledTimes(1));
+    expect(putMock.mock.calls[0]![1]!.body).toEqual({ url: link });
+    expect(
+      await screen.findByText("Payment link saved. The school can now pay online."),
+    ).toBeTruthy();
+    expect((await within(card).findByRole("link", { name: link })).getAttribute("rel")).toBe(
+      "noopener noreferrer",
+    );
+
+    fireEvent.click(within(card).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(1));
+    expect(
+      await screen.findByText("Payment link removed. The school sees only the bank details."),
+    ).toBeTruthy();
+  });
+
+  test("has no payment link field once the invoice is paid", async () => {
+    current = { ...invoice(), status: "paid", paidMinor: 100_000, balanceMinor: 0 };
+    await renderPage();
+    await screen.findByRole("article", { name: "LIC-2026-000042" });
+    expect(screen.queryByRole("region", { name: "Payment link" })).toBeNull();
+  });
+
   test("shows the lines, the balance and how to pay", async () => {
     await renderPage();
     const document = await screen.findByRole("article", { name: "LIC-2026-000042" });
