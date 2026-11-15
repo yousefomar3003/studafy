@@ -1,3 +1,7 @@
+import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve } from "node:path";
+
 import { describe, expect, test } from "bun:test";
 
 import { loadMigrationConfig, redact } from "../src/config";
@@ -50,5 +54,30 @@ describe("migration configuration", () => {
         DATABASE_SSL_MODE: "verify-full",
       }),
     ).toThrow("requires DATABASE_CA_CERT");
+  });
+});
+
+describe("migrations directory default (QA-004)", () => {
+  test("resolves to the repository's db/migrations regardless of the working directory", () => {
+    const expected = resolve(import.meta.dir, "../../../db/migrations");
+    const original = process.cwd();
+    try {
+      for (const dir of [original, resolve(import.meta.dir, ".."), tmpdir()]) {
+        process.chdir(dir);
+        const config = loadMigrationConfig({ DATABASE_URL: "postgres://u:p@localhost:5432/db" });
+        expect(`${dir} -> ${config.migrationsDir}`).toBe(`${dir} -> ${expected}`);
+      }
+    } finally {
+      process.chdir(original);
+    }
+    expect(existsSync(expected)).toBe(true);
+  });
+
+  test("MIGRATIONS_DIR still wins", () => {
+    const config = loadMigrationConfig({
+      DATABASE_URL: "postgres://u:p@localhost:5432/db",
+      MIGRATIONS_DIR: "/app/db/migrations",
+    });
+    expect(config.migrationsDir).toBe("/app/db/migrations");
   });
 });

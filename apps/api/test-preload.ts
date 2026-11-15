@@ -9,3 +9,6 @@
  * is in place before any test file, or any of its imports, can construct a schema.
  */
 import "@hono/zod-openapi";
+
+// Never let a run without TEST_DATABASE_URL look like full coverage (QA-004).
+import "../../scripts/test-db-gate";

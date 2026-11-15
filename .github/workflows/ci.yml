@@ -16,6 +16,9 @@ jobs:
     env:
       POSTGRES_PASSWORD: studafy_ci_only
       TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+      # This job exists to run the database-backed tests: abort rather than skip them if the URL
+      # above ever goes missing (scripts/test-db-gate.ts, QA-004).
+      REQUIRE_DB_TESTS: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start disposable PostgreSQL
@@ -41,6 +44,9 @@ jobs:
     env:
       POSTGRES_PASSWORD: studafy_ci_only
       TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+      # This job exists to run the database-backed tests: abort rather than skip them if the URL
+      # above ever goes missing (scripts/test-db-gate.ts, QA-004).
+      REQUIRE_DB_TESTS: "1"
       # compose.yml test profile already starts Redis for this job; without the URL exported, every
       # Redis-gated suite silently skips. ST-116's cache-invalidation SLA test is one of them.
       REDIS_URL: redis://127.0.0.1:6390
@@ -135,6 +141,9 @@ jobs:
       # Disposable, ephemeral-container-only password (matches compose.yml test profile's required variable).
       POSTGRES_PASSWORD: studafy_ci_only
       TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+      # This job exists to run the database-backed tests: abort rather than skip them if the URL
+      # above ever goes missing (scripts/test-db-gate.ts, QA-004).
+      REQUIRE_DB_TESTS: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start PostgreSQL 16 (pgvector + pg_stat_statements preloaded)
@@ -352,12 +361,10 @@ jobs:
       # then the coverage-upload step below it) and report a confusing second failure on top of
       # the real one.
       #
-      # Report-only for now (see "Report analyze findings" below): this job is *new* in the branch
-      # that added it, and the branch touches only CI YAML/scripts -- so every finding it reports
-      # is a pre-existing issue in apps/mobile, not a regression this change introduced. `dart
-      # analyze` has no --baseline-commit equivalent to scope it to the diff the way the sast job
-      # scopes Semgrep, so gating on it here would block unrelated PRs on a pre-existing backlog.
-      # Tracked for its own cleanup pass; flip this back to a hard gate (exit 1) once that lands.
+      # A hard gate since QA-004: this used to be report-only while apps/mobile carried a backlog
+      # of pre-existing findings, and with the client regenerated above that backlog is now zero
+      # (`flutter analyze`: "No issues found!"). continue-on-error stays only so the test and
+      # coverage steps below still run; "Fail on analyze findings" turns the job red afterwards.
       - name: flutter analyze
         id: analyze
         continue-on-error: true
@@ -384,13 +391,11 @@ jobs:
             apps/mobile/coverage/lcov.info
             apps/mobile/coverage/coverage-report.md
           if-no-files-found: error
-      # Report-only, not a gate -- see the "flutter analyze" step's comment for why (new job,
-      # CI-only branch, pre-existing findings, no diff-scoping available). Surfaces the result
-      # without redding the job.
-      - name: Report analyze findings
+      - name: Fail on analyze findings
         if: steps.analyze.outcome == 'failure'
         run: |
-          echo '::warning::flutter analyze reported issues -- see the "flutter analyze" step above. Report-only for now (pre-existing apps/mobile backlog); not gating this job.'
+          echo '::error::flutter analyze reported issues -- see the "flutter analyze" step above.'
+          exit 1
       - name: Fail on any failing test
         if: steps.test.outcome == 'failure'
         run: |
