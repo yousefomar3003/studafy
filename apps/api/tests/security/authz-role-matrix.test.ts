@@ -1163,6 +1163,13 @@ const GUARD_CASES: GuardCase[] = [
     source: "finance/expenses/routes.ts",
   },
   {
+    method: "POST",
+    path: "/api/finance/expenses/{expenseId}/attachments",
+    permission: "billing:update",
+    source: "finance/expenses/routes.ts",
+  },
+
+  {
     method: "GET",
     path: "/api/finance/reports/ar-aging",
     permission: "report:viewFinancial",

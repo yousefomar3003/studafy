@@ -220,6 +220,12 @@ export function expenseRoutes(
   routes.use("/api/finance/expenses", requirePermission(PERMISSIONS.BILLING_UPDATE));
   routes.use("/api/finance/expenses/:expenseId", requirePermission(PERMISSIONS.BILLING_UPDATE));
   routes.use("/api/finance/expenses/summary", requirePermission(PERMISSIONS.BILLING_READ));
+  // Its own mount (QA-011): Hono's `:expenseId` matches one segment, so the guard above never ran
+  // for /attachments, and any signed-in school member could replace a receipt.
+  routes.use(
+    "/api/finance/expenses/:expenseId/attachments",
+    requirePermission(PERMISSIONS.BILLING_UPDATE),
+  );
 
   routes.openapi(listRoute, async (c) => {
     const auth = requireAuth(c);
