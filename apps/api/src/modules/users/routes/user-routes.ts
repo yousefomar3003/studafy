@@ -451,6 +451,21 @@ export function userRoutes(
       updateUserService(tx, auth.schoolId, userId, body),
     );
 
+    // Switching an account off through PATCH must end it as /deactivate does (QA-010): this path
+    // used to change the status and revoke nothing, so the user kept refreshing indefinitely.
+    if (body.status === "suspended" || body.status === "archived") {
+      await adminRevokeUserSessions({
+        database,
+        denylist,
+        tenant: { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+        targetUserId: userId,
+        reason: REVOCATION_REASONS.ADMIN_REVOKE_ALL_DEVICES,
+        log: c.get("log"),
+        userAgent: c.req.header("User-Agent") ?? null,
+        clientIp: clientIpFrom(c),
+      });
+    }
+
     return c.json(row, 200);
   });
 
