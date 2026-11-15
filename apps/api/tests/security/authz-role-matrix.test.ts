@@ -148,6 +148,8 @@ const ALL_ROLES: Role[] = [
   ROLES.PARENT,
   ROLES.GUEST,
   ROLES.SUPPORT_AGENT,
+  // Seeded in beforeAll since ST-249 but never probed until QA-002.
+  ROLES.ATTENDANCE_OFFICER,
 ];
 
 function userIdFor(role: Role): string {
@@ -184,8 +186,18 @@ function resolvePath(pathTemplate: string): string {
   );
 }
 
-async function requestAs(role: Role, method: string, pathTemplate: string): Promise<Response> {
-  const token = await tokenFor(role);
+async function requestAs(
+  role: Role | Role[],
+  method: string,
+  pathTemplate: string,
+): Promise<Response> {
+  const roles = Array.isArray(role) ? role : [role];
+  const token = await mintTestToken(keyStore, {
+    schoolId: tenant.schoolId,
+    userId: userIdFor(roles[0]!),
+    roles,
+    channel: "web",
+  });
   const init: RequestInit & { headers: Record<string, string> } = {
     method,
     headers: { Authorization: `Bearer ${token}` },
@@ -1338,6 +1350,34 @@ describe("authz role matrix — Tier B: every requirePermission() mount point", 
       async () => {
         if (allowedRoleAlsoRestrictedBy) return;
         const res = await requestAs(allowedRole, method, path);
+        expect(res.status).not.toBe(403);
+      },
+    );
+  }
+});
+
+describe("authz role matrix — Tier B, multi-role tokens (QA-002)", () => {
+  // Roles are additive (authz.ts hasPermission): a token's permissions are the union of its roles'.
+  // Two roles that both lack a permission must still be denied together, and adding one role that
+  // holds it must be enough. This is the shape of a teacher who is also a parent.
+  for (const guard of GUARD_CASES) {
+    const { method, path, permission, source, allowedRoleAlsoRestrictedBy } = guard;
+    const lacking = ALL_ROLES.filter((role) => !ROLE_PERMISSIONS[role].includes(permission));
+    if (lacking.length < 2) continue;
+    const pair: Role[] = [lacking[0]!, lacking[1]!];
+    const allowedRole = guard.allowedRole ?? ROLES.ORG_ADMIN;
+
+    integrationTest(`${method} ${path} denies ${pair.join("+")} (${source})`, async () => {
+      const res = await requestAs(pair, method, path);
+      expect([401, 403]).toContain(res.status);
+    });
+
+    integrationTest(
+      `${method} ${path} does not deny ${pair[0]}+${allowedRole} (${source})` +
+        (allowedRoleAlsoRestrictedBy ? ` [skipped: ${allowedRoleAlsoRestrictedBy}]` : ""),
+      async () => {
+        if (allowedRoleAlsoRestrictedBy) return;
+        const res = await requestAs([pair[0]!, allowedRole], method, path);
         expect(res.status).not.toBe(403);
       },
     );
