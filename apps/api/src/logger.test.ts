@@ -328,3 +328,55 @@ describe("observer", () => {
     expect(lines).toHaveLength(1);
   });
 });
+
+describe("PII never reaches the log line (QA-020)", () => {
+  function capture(): { logger: Logger; lines: string[] } {
+    const lines: string[] = [];
+    return { logger: createLogger({ destination: (line) => lines.push(line) }), lines };
+  }
+
+  test("personal fields are redacted by key", () => {
+    const { logger, lines } = capture();
+    logger.info(
+      {
+        email: "kid@school.example",
+        display_name: "Omar Saleh",
+        phone: "+966 50 123 4567",
+        user_id: "u-1",
+      },
+      "invited",
+    );
+    const line = lines[0]!;
+    expect(line).not.toContain("kid@school.example");
+    expect(line).not.toContain("Omar Saleh");
+    expect(line).not.toContain("123 4567");
+    expect(line).toContain('"user_id":"u-1"');
+  });
+
+  test("an error message quoting the offending row is scrubbed", () => {
+    const { logger, lines } = capture();
+    logger.error(
+      {
+        err: new Error(
+          "duplicate key value violates unique constraint: Key (email)=(kid@school.example)",
+        ),
+      },
+      "insert failed",
+    );
+    expect(lines[0]).not.toContain("kid@school.example");
+    expect(lines[0]).toContain("duplicate key value");
+  });
+
+  test("operational keys a debugger needs are left alone", () => {
+    const { logger, lines } = capture();
+    logger.info({ session_id: "s-1", route: "/api/x", status: 200, school_id: "sch-1" }, "ok");
+    for (const fragment of [
+      '"session_id":"s-1"',
+      '"route":"/api/x"',
+      '"status":200',
+      '"school_id":"sch-1"',
+    ]) {
+      expect(lines[0]).toContain(fragment);
+    }
+  });
+});
