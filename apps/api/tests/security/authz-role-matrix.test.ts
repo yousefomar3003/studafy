@@ -454,6 +454,19 @@ const GUARD_CASES: GuardCase[] = [
   },
   // Class AI materials setting (000196). Teachers and leadership hold material:manageAi; GUEST does
   // not. The service additionally narrows a teacher to the classes they teach.
+  // School-plan checkouts (QA-013).
+  {
+    method: "POST",
+    path: "/api/subscriptions/checkout",
+    permission: "organization:manageBilling",
+    source: "subscriptions/routes/checkout-routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/subscriptions/school/checkout",
+    permission: "organization:manageBilling",
+    source: "subscriptions/routes/school-checkout-routes.ts",
+  },
   // Learning materials (QA-008).
   ...(
     [

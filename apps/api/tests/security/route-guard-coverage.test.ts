@@ -233,7 +233,6 @@ const GUARD_EXEMPT: Record<string, string> = {
 
 /** Findings: operations that should make a permission decision and don't. Value = the QA task. */
 const KNOWN_UNGUARDED: Record<string, string> = {
-  // QA-013: the school-plan checkouts only check the web channel.
   // QA-086: RLS-scoped academic and attendance reads with no explicit permission gate (no other
   //         minors' PII today; defence in depth).
   "GET /api/academics/classes": "QA-086",
@@ -261,8 +260,6 @@ const KNOWN_UNGUARDED: Record<string, string> = {
   "GET /api/academics/years/{yearId}/terms": "QA-086",
   "GET /api/attendance/sessions": "QA-086",
   "GET /api/attendance/sessions/{sessionId}": "QA-086",
-  "POST /api/subscriptions/checkout": "QA-013",
-  "POST /api/subscriptions/school/checkout": "QA-013",
 };
 
 // ---------------------------------------------------------------------------

@@ -88,8 +88,14 @@ export function checkoutRoutes(
   // own in-app purchase — so, like every other purchase route, it is refused to mobile sessions
   // outright (ST-304; see apps/mobile/docs/store_payment_routing.md).
   app.use("/api/subscriptions/checkout", requireChannel(AUTH_CHANNELS.WEB));
-  // Portal-session, specifically: managing the payment method on file is an admin action, unlike
-  // starting a checkout, which any authenticated web staff session may do today.
+  // A school-plan checkout binds the school's payment-provider customer and its subscription, so it
+  // is a billing administrator's action (QA-013). It used to check only the web channel, which
+  // every student and parent web session also passes.
+  app.use(
+    "/api/subscriptions/checkout",
+    requirePermission(PERMISSIONS.ORGANIZATION_MANAGE_BILLING),
+  );
+  // Portal-session: managing the payment method on file is the same administrator's action.
   app.use("/api/subscriptions/portal", requireChannel(AUTH_CHANNELS.WEB));
   app.use("/api/subscriptions/portal", requirePermission(PERMISSIONS.ORGANIZATION_MANAGE_BILLING));
 
