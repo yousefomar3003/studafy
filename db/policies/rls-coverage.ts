@@ -455,6 +455,30 @@ violations AS (
         ''
       ) = 'provider=NULLIFcurrent_setting''app.oauth_login_provider'',true,''''ANDsubject=NULLIFcurrent_setting''app.oauth_login_subject'',true,'''''
     )
+    -- The email feedback seam (QA-014, migration 000226) resolves a Resend message id to the
+    -- schools holding deliveries for it, before any tenant is known. Same shape as the carve-outs
+    -- here: SELECT-only, studafy_admin only, no WITH CHECK, scoped to one transaction-local GUC.
+    AND NOT (
+      tenant.schema_name = 'app'
+      AND tenant.table_name = 'email_deliveries'
+      AND policy_catalog.polname = 'email_delivery_message_lookup'
+      AND policy_catalog.polcmd = 'r'
+      AND policy_catalog.polroles = ARRAY[(
+        SELECT role_catalog.oid
+        FROM pg_catalog.pg_roles AS role_catalog
+        WHERE role_catalog.rolname = 'studafy_admin'
+      )]
+      AND policy_catalog.polwithcheck IS NULL
+      AND pg_catalog.translate(
+        pg_catalog.replace(
+          pg_catalog.pg_get_expr(policy_catalog.polqual, policy_catalog.polrelid),
+          '::text',
+          ''
+        ),
+        E' \n\t\r()',
+        ''
+      ) = 'message_id=NULLIFcurrent_setting''app.email_delivery_message'',true,'''''
+    )
     -- The public account-deletion request seam (ST-302, migration 000115) resolves an email address
     -- to its accounts across schools before any tenant is known. Same shape as the two carve-outs
     -- above: SELECT-only, studafy_admin only, no WITH CHECK, scoped to one transaction-local GUC.

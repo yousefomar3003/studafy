@@ -6,15 +6,6 @@
 # line when QA-014 fixes it. Format: "file > suite > test", optional trailing "# flaky".
 # Generated 2026-11-16 from the full API suite (4558 pass / 21 fail under studafy_runtime).
 
-# Email (Resend) webhook: transitionDeliveries reads app.email_deliveries with no role or tenant
-# (apps/api/src/email/webhook.ts:173-238, "relies on the application connection having RLS bypass").
-tests/email/webhook.db.test.ts > bounce handling > records a permanent bounce, suppresses every bounced recipient (normalized), and transitions the deliveries
-tests/email/webhook.db.test.ts > bounce handling > records a transient bounce without suppressing the address
-tests/email/webhook.db.test.ts > complaint handling > suppresses complained addresses and transitions the delivery to complained
-tests/email/webhook.db.test.ts > delivery handling > records a delivery event without suppressing or transitioning
-tests/email/webhook.db.test.ts > deduplication > absorbs a redelivery without re-recording or re-processing
-tests/email/webhook.db.test.ts > delivery transitions > transitions only landed 'sent' rows and never walks a terminal row backwards
-tests/email/webhook.db.test.ts > delivery transitions > transitions deliveries in every school holding the message
 
 # ERPNext webhook: dedup, cache projection and outbox inserts run as the login role after
 # set_config('app.school_id') without switching role (apps/api/src/erpnext/webhook.ts:229-268).
