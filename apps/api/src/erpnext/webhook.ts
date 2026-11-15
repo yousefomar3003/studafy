@@ -264,9 +264,10 @@ export function erpNextWebhookRoutes(
     }
 
     try {
-      await db.begin(async (tx) => {
-        await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
-
+      // withTenantTx, not a bare BEGIN + set_config (QA-014): the bare version armed the tenant but
+      // never switched role, so the dedup, audit and outbox inserts below ran as the database login
+      // and worked only because that login bypasses RLS.
+      await withTenantTx(db, { schoolId, requestId: c.get("requestId") }, async (tx) => {
         const dedupResult = await tx`
           INSERT INTO app.erpnext_webhook_dedup (school_id, event_id, doc_type, action)
           VALUES (${schoolId}, ${body.event_id}, ${body.doctype}, ${body.action})

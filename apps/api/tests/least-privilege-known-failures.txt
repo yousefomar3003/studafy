@@ -7,15 +7,6 @@
 # Generated 2026-11-16 from the full API suite (4558 pass / 21 fail under studafy_runtime).
 
 
-# ERPNext webhook: dedup, cache projection and outbox inserts run as the login role after
-# set_config('app.school_id') without switching role (apps/api/src/erpnext/webhook.ts:229-268).
-tests/erpnext/webhook.db.test.ts > outbox payload encoding > stores the outbox payload as a jsonb object, writes the dedup row, and audits the insert
-tests/erpnext/webhook.db.test.ts > deduplication > absorbs an ERPNext redelivery without re-enqueuing or re-auditing
-tests/erpnext/webhook.db.test.ts > tenant routing > lands each school's event in its own outbox
-tests/erpnext/webhook.db.test.ts > invoice cache projection > resolves the student and currency and converts amounts with the currency's own exponent
-tests/erpnext/webhook.db.test.ts > invoice cache projection > answers 200 and leaves no cache row when the student cannot be resolved
-tests/erpnext/webhook.db.test.ts > invoice cache projection > answers 200 and leaves no cache row for an unknown currency
-tests/erpnext/webhook.db.test.ts > fee schedule cache projection > resolves the year and term by code and converts the total to minor units
 
 
 # The Tier A crash sweep (every route x role); re-check after each QA-014 slice.
