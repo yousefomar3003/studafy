@@ -16,6 +16,7 @@ import 'package:studafy_mobile/src/core/api/generated/models/update_assignment_b
 import 'package:studafy_mobile/src/core/api/generated/models/update_material_body.dart';
 import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
+import 'package:studafy_mobile/src/features/student/presentation/widgets/material_week_sections.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/teacher_content_screen.dart';
 
 import '../../../support/ensure_date_formatting.dart';
@@ -29,6 +30,8 @@ material_api.Material _materialFixture({
   String title = 'Notes',
   String? description,
   String ingestStatus = 'ready',
+  int? week,
+  int? day,
 }) => material_api.Material.fromJson({
   'id': id,
   'school_id': 'school-1',
@@ -46,6 +49,8 @@ material_api.Material _materialFixture({
   'ingest_status': ingestStatus,
   'ingest_error': null,
   'ingested_at': _t0,
+  'week_number': week,
+  'day_of_week': day,
   'created_at': _t0,
   'updated_at': _t0,
 });
@@ -111,6 +116,8 @@ class _ContentAcademicsClient extends FakeAcademicsClient {
   Future<MaterialList> listMaterials({
     String? classId,
     IngestStatus? ingestStatus,
+    int? weekNumber,
+    int? dayOfWeek,
     int? limit = 20,
     int? offset = 0,
   }) async {
@@ -131,6 +138,8 @@ class _ContentAcademicsClient extends FakeAcademicsClient {
                 ...m.toJson(),
                 'title': body.title,
                 'description': body.description,
+                'week_number': body.weekNumber,
+                'day_of_week': body.dayOfWeek,
               })
             : m,
     ];
@@ -170,6 +179,7 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 
 void main() {
   setUpAll(ensureDateFormattingInitialized);
+  setUp(resetMaterialWeekSectionsSession);
 
   testWidgets(
     'edits an assignment with the form prefilled and refreshes the list',
@@ -352,6 +362,157 @@ void main() {
 
     expect(academics.updateCalls, isEmpty);
     expect(find.text('Enter a title.'), findsOneWidget);
+  });
+
+  group('week and day', () {
+    Future<_ContentAcademicsClient> pumpMaterials(
+      WidgetTester tester,
+      List<material_api.Material> materials,
+    ) async {
+      final academics = _ContentAcademicsClient(materials);
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: _ContentAssignmentsClient([]),
+          academics: academics,
+        ),
+      );
+      await tester.tap(find.text('Materials'));
+      await tester.pumpAndSettle();
+      return academics;
+    }
+
+    Future<void> choose(WidgetTester tester, Key field, String option) async {
+      await _tapVisible(tester, find.byKey(field));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(option).last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('lists materials in week sections, unscheduled last', (
+      tester,
+    ) async {
+      await pumpMaterials(tester, [
+        _materialFixture(id: 'm-1', title: 'Fractions', week: 2, day: 3),
+        _materialFixture(id: 'm-2', title: 'Old handout'),
+      ]);
+
+      expect(find.text('Week 2'), findsOneWidget);
+      expect(find.text('Unscheduled'), findsOneWidget);
+      // No current week without the term: the first section is open.
+      expect(find.text('Fractions'), findsOneWidget);
+      expect(find.text('Wednesday'), findsOneWidget);
+      expect(find.text('Old handout'), findsNothing);
+
+      await tester.tap(find.text('Unscheduled'));
+      await tester.pumpAndSettle();
+      expect(find.text('Old handout'), findsOneWidget);
+    });
+
+    testWidgets('the upload form will not upload without a week and a day', (
+      tester,
+    ) async {
+      await pumpMaterials(tester, []);
+      await tester.tap(find.text('Upload material'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('material-week-field')), findsOneWidget);
+      await _tapVisible(
+        tester,
+        find.widgetWithText(FilledButton, 'Upload material'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Choose the week this material is for.'),
+        findsOneWidget,
+      );
+      expect(find.text('Choose the day this material is for.'), findsOneWidget);
+      // The upload form has no way to leave a material unscheduled.
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('material-week-field')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Unscheduled'), findsNothing);
+    });
+
+    testWidgets('the edit form moves a material to another week', (
+      tester,
+    ) async {
+      final academics = await pumpMaterials(tester, [
+        _materialFixture(id: 'm-1', title: 'Fractions', week: 2, day: 3),
+      ]);
+      await tester.tap(find.byTooltip('Edit material'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Week 2'), findsOneWidget);
+      expect(find.text('Wednesday'), findsOneWidget);
+      await choose(tester, const ValueKey('material-week-field'), 'Week 5');
+      await choose(tester, const ValueKey('material-day-field-5'), 'Sunday');
+      await _tapVisible(tester, find.text('Save changes'));
+      await tester.pumpAndSettle();
+
+      final (_, body) = academics.updateCalls.single;
+      expect(body.weekNumber, 5);
+      expect(body.dayOfWeek, 7);
+      expect(find.text('Week 5'), findsOneWidget);
+    });
+
+    testWidgets('the edit form can make a material unscheduled', (
+      tester,
+    ) async {
+      final academics = await pumpMaterials(tester, [
+        _materialFixture(id: 'm-1', title: 'Fractions', week: 2, day: 3),
+      ]);
+      await tester.tap(find.byTooltip('Edit material'));
+      await tester.pumpAndSettle();
+
+      await choose(
+        tester,
+        const ValueKey('material-week-field'),
+        'Unscheduled',
+      );
+      expect(find.text('Day'), findsNothing);
+      await _tapVisible(tester, find.text('Save changes'));
+      await tester.pumpAndSettle();
+
+      final (_, body) = academics.updateCalls.single;
+      expect(body.weekNumber, isNull);
+      expect(body.dayOfWeek, isNull);
+      expect(find.text('Unscheduled'), findsOneWidget);
+    });
+
+    testWidgets(
+      'an unscheduled material saves as it is, and needs a day once placed',
+      (tester) async {
+        final academics = await pumpMaterials(tester, [
+          _materialFixture(id: 'm-1', title: 'Old handout'),
+        ]);
+        await tester.tap(find.byTooltip('Edit material'));
+        await tester.pumpAndSettle();
+
+        await choose(tester, const ValueKey('material-week-field'), 'Week 3');
+        await _tapVisible(tester, find.text('Save changes'));
+        await tester.pumpAndSettle();
+        expect(academics.updateCalls, isEmpty);
+        expect(
+          find.text('Choose the day this material is for.'),
+          findsOneWidget,
+        );
+
+        await choose(
+          tester,
+          const ValueKey('material-week-field'),
+          'Unscheduled',
+        );
+        await _tapVisible(tester, find.text('Save changes'));
+        await tester.pumpAndSettle();
+        final (_, body) = academics.updateCalls.single;
+        expect(body.weekNumber, isNull);
+        expect(body.dayOfWeek, isNull);
+      },
+    );
   });
 
   group('AI materials setting', () {
