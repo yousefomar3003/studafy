@@ -80,7 +80,7 @@ export async function listStudents(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor);
-        return tx` AND (s.created_at, s.id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (s.created_at, s.id) < (COALESCE((SELECT k.created_at FROM app.students k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 

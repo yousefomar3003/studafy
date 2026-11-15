@@ -40,6 +40,3 @@ tests/security/authz-role-matrix.test.ts > authz role matrix — Tier A: no rout
 # Manual tier grants (platform/grants): grant and revoke write outside the app's role switch.
 tests/platform/manual-grants-http.test.ts > manual tier grants > a student's paid tier unlocks the feature and adds to a store subscription
 tests/platform/manual-grants-http.test.ts > manual tier grants > revoking the only grant locks the feature at once
-
-# Intermittent without the role too: keyset cursor truncates timestamps (QA-091).
-tests/finance/finance-lists-http.test.ts > invoice list filters and paging > pages past the first page and filters by issue and due date # flaky

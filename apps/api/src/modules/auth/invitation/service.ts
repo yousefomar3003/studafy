@@ -414,7 +414,7 @@ export async function listInvitations(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor!);
-        return tx` AND (created_at, id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (created_at, id) < (COALESCE((SELECT k.created_at FROM app.invitations k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 

@@ -304,7 +304,7 @@ export async function listInvoices(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor!);
-        return tx` AND (ic.last_synced_at, ic.id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (ic.last_synced_at, ic.id) < (COALESCE((SELECT k.last_synced_at FROM app.invoice_cache k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 
@@ -479,7 +479,7 @@ export async function listInvoiceBatches(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor!);
-        return tx` AND (created_at, id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (created_at, id) < (COALESCE((SELECT k.created_at FROM app.invoice_batches k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 
@@ -541,7 +541,7 @@ export async function getInvoiceBatchItems(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor!);
-        return tx` AND (ibi.created_at, ibi.id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (ibi.created_at, ibi.id) < (COALESCE((SELECT k.created_at FROM app.invoice_batch_items k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 
