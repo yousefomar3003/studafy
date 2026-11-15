@@ -72,22 +72,24 @@ export const registerSchoolResponseSchema = z
         .openapi({ description: "Role assigned to the administrator." }),
     }),
     invitation: z.object({
-      token: z.string().openapi({
-        description:
-          "One-time-use activation token. This is the only time the raw token is returned. " +
-          "It must be delivered to the administrator (e.g. via email) to activate their account.",
-      }),
-      expires_at: z.string().datetime().openapi({ description: "Invitation expiry (ISO 8601)." }),
+      expires_at: z
+        .string()
+        .datetime()
+        .openapi({
+          description:
+            "Expiry of the activation invitation emailed to the administrator (ISO 8601). The token " +
+            "itself is never returned by this endpoint.",
+        }),
     }),
     verification: z.object({
-      token: z.string().openapi({
-        description:
-          "One-time-use email verification token. This is the only time the raw token is returned. " +
-          "It is emailed to the school contact address. The school moves to active (trial) only after verification.",
-      }),
-      expires_at: z.string().datetime().openapi({
-        description: "Verification token expiry — 24 hours from registration (ISO 8601).",
-      }),
+      expires_at: z
+        .string()
+        .datetime()
+        .openapi({
+          description:
+            "Expiry of the verification link emailed to the school contact address — 24 hours from " +
+            "registration (ISO 8601). The token itself is never returned by this endpoint.",
+        }),
     }),
   })
   .openapi("RegisterSchoolResponse");
