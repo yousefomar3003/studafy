@@ -28,7 +28,7 @@ import {
 } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
-import { setTenantScope, withSystemTx } from "../../db/tenant-tx";
+import { setTenantScope, withAppTx, withSystemTx } from "../../db/tenant-tx";
 import { buildPermanentKey, buildTempKey, parseStorageKey } from "../../lib/storage/keys";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { findOAuthIdentity } from "../auth/services/returning-user-login-service";
@@ -246,12 +246,15 @@ async function assertReferenceData(
   countryId: string,
   currencyId: string,
 ): Promise<void> {
-  const [row] = await database<{ country_ok: boolean; currency_ok: boolean }[]>`
+  const [row] = await withAppTx(
+    database,
+    (tx) => tx<{ country_ok: boolean; currency_ok: boolean }[]>`
     SELECT
       EXISTS (SELECT 1 FROM app.countries WHERE id = ${countryId}::uuid AND is_active) AS country_ok,
       EXISTS (SELECT 1 FROM app.currencies WHERE id = ${currencyId}::uuid AND is_active)
         AS currency_ok
-  `;
+  `,
+  );
   if (!row?.country_ok || !row.currency_ok) {
     throw new CodedHttpException(
       400,

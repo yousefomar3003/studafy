@@ -1,5 +1,6 @@
 import { DOMAIN_EVENTS } from "@studafy/constants";
 
+import { withAppTx } from "../../../db/tenant-tx";
 import { ErpNextError } from "../../../erpnext/client";
 import { emit } from "../../../lib/events/emitter";
 import { getCurrencyByCode, toMinorUnits } from "../currency";
@@ -338,7 +339,11 @@ export async function runGlobalReconciliation(
   erpnextFactory: TenantErpNextFactory,
   logger?: Logger,
 ): Promise<GlobalReconciliationResult> {
-  const schools = await database<{ id: string }[]>`SELECT id FROM app.schools`;
+  // As studafy_app, not the raw login (QA-014); each school then runs in its own tenant scope.
+  const schools = await withAppTx(
+    database,
+    (tx) => tx<{ id: string }[]>`SELECT id FROM app.schools`,
+  );
 
   let totalDrift = 0;
   let totalHealed = 0;

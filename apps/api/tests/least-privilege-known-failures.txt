@@ -6,12 +6,4 @@
 # line when QA-014 fixes it. Format: "file > suite > test", optional trailing "# flaky".
 # Generated 2026-11-16 from the full API suite (4558 pass / 21 fail under studafy_runtime).
 
-
-
-
-# The Tier A crash sweep (every route x role); re-check after each QA-014 slice.
-tests/security/authz-role-matrix.test.ts > authz role matrix — Tier A: no route ever crashes or leaks, for any role > every operation x every role returns a well-formed response, never a raw 500
-
-# Manual tier grants (platform/grants): grant and revoke write outside the app's role switch.
-tests/platform/manual-grants-http.test.ts > manual tier grants > a student's paid tier unlocks the feature and adds to a store subscription
-tests/platform/manual-grants-http.test.ts > manual tier grants > revoking the only grant locks the feature at once
+# (empty: every QA-014 dependency on RLS bypass found by this job is fixed, 2026-11-16)

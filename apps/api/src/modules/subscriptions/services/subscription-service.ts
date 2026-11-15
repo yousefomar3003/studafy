@@ -1,6 +1,7 @@
 import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { withAppTx } from "../../../db/tenant-tx";
 
 import type { TransactionSql } from "postgres";
 
@@ -83,7 +84,12 @@ export async function requireSchoolSubscription(
 // would leave a second, unguarded way to move a subscription.
 
 export async function getActivePlans(database: import("postgres").Sql): Promise<PlanWithPrices[]> {
-  const plans = await database<
+  // Global catalog tables, read as studafy_app rather than the raw login (QA-014).
+  return withAppTx(database, (tx) => readActivePlans(tx));
+}
+
+async function readActivePlans(tx: import("postgres").TransactionSql): Promise<PlanWithPrices[]> {
+  const plans = await tx<
     {
       id: string;
       code: string;
@@ -100,7 +106,7 @@ export async function getActivePlans(database: import("postgres").Sql): Promise<
   const result: PlanWithPrices[] = [];
 
   for (const plan of plans) {
-    const prices = await database<
+    const prices = await tx<
       {
         id: string;
         currency_code: string;
