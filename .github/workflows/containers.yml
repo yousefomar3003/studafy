@@ -9,6 +9,8 @@ on:
         "db/**",
         "infra/docker/**",
         "bun.lock",
+        ".dockerignore",
+        "scripts/ci/assert-clean-build-context.sh",
         ".github/workflows/containers.yml",
       ]
   push:
@@ -20,6 +22,8 @@ on:
         "db/**",
         "infra/docker/**",
         "bun.lock",
+        ".dockerignore",
+        "scripts/ci/assert-clean-build-context.sh",
         ".github/workflows/containers.yml",
       ]
 
@@ -27,6 +31,16 @@ permissions:
   contents: read
 
 jobs:
+  # QA-021: every Dockerfile runs `COPY . .` from the repo root, so the root .dockerignore is all
+  # that keeps local secret files and Terraform state out of the builder. Proven with sentinel
+  # files in a throwaway context -- no real secret is ever involved.
+  build-context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Secrets and infrastructure state stay out of the build context
+        run: bash scripts/ci/assert-clean-build-context.sh
+
   build-scan:
     runs-on: ubuntu-latest
     strategy:
