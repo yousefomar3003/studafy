@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { ERROR_CODES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
@@ -126,6 +128,27 @@ export async function initiateUpload(
     throw new HTTPException(404, { message: "Class not found" });
   }
 
+  // This teacher's own unconfirmed upload of the same file is an attempt that never finished: the
+  // file PUT or the confirm call failed, and the app shows the teacher an error. It holds no counted
+  // bytes (the meter is credited at confirm), so it is replaced rather than blocking the retry
+  // forever. Any object its PUT did write is left for reconciliation and the orphan sweep.
+  const abandoned = await tx<{ id: string; storage_key: string }[]>`
+    DELETE FROM app.materials
+    WHERE school_id = ${schoolId} AND class_id = ${params.class_id}
+      AND original_file_name = ${params.original_file_name}
+      AND uploaded_by_user_id = ${userId}
+      AND ingest_status = 'uploaded'
+    RETURNING id, storage_key
+  `;
+  for (const row of abandoned) {
+    await emitAuditLog(tx, {
+      action: "delete",
+      targetTable: "materials",
+      targetId: row.id,
+      oldValues: { storage_key: row.storage_key, ingest_status: "uploaded" },
+    });
+  }
+
   const [existingMaterial] = await tx<{ id: string }[]>`
     SELECT id FROM app.materials
     WHERE school_id = ${schoolId} AND class_id = ${params.class_id}
@@ -140,11 +163,15 @@ export async function initiateUpload(
     );
   }
 
+  // The key must be unique per upload (uq_materials_storage_key). The file name alone is not: two
+  // uploads of "notes.pdf" anywhere in the school collide, and every non-Latin character becomes
+  // "_", so all Arabic-named PDFs reduce to the same "_.pdf". The random prefix keeps the key
+  // unique while the slug keeps it readable.
   const fileSlug = params.original_file_name
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_{2,}/g, "_")
     .slice(0, 80);
-  const storageKey = `permanent/${schoolId}/materials/${fileSlug}`;
+  const storageKey = `permanent/${schoolId}/materials/${randomUUID()}-${fileSlug}`;
 
   const [row] = await tx<MaterialRow[]>`
     INSERT INTO app.materials (
