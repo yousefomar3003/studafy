@@ -92,7 +92,8 @@ const RASTER_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/bmp"]);
 // ---------------------------------------------------------------------------
 
 /**
- * The derived-image keys. The material's own key is `permanent/<schoolId>/materials/<slug>`, so the
+ * The derived-image keys. The material's own key is `permanent/<schoolId>/<objectId>/<slug>` (a
+ * per-upload object id since QA-009; older rows used the literal segment `materials`), so the
  * derived images use the material id as the object id — a uuid is a safe key segment and is unique
  * where the original's filename slug is not. This stays inside the canonical
  * `<category>/<schoolId>/<objectId>/<filename>` scheme, and the daily storage reconciliation counts

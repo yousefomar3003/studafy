@@ -362,25 +362,17 @@ describeDb("deleting a file frees its storage", () => {
       body,
     );
     expect(started.status).toBe(201);
-    const { storage_key: key } = (await started.json()) as { storage_key: string };
-    storage.objects.set(key, { contentType: "application/pdf", sizeBytes: 5_000 });
-    const listed = await request(
-      tenant,
-      teacher(tenant),
-      "GET",
-      `/api/academics/materials?class_id=${tenant.cls.id}&limit=100`,
-    );
-    expect(listed.status).toBe(200);
-    const { materials } = (await listed.json()) as {
-      materials: { id: string; storage_key: string }[];
+    // The initiate response names the material (QA-009); its storage_key is the temp/ staging key.
+    const { storage_key: key, material_id: materialId } = (await started.json()) as {
+      storage_key: string;
+      material_id: string;
     };
-    const pending = materials.find((m) => m.storage_key === key);
-    expect(pending).toBeDefined();
+    storage.objects.set(key, { contentType: "application/pdf", sizeBytes: 5_000 });
     const confirmed = await request(
       tenant,
       teacher(tenant),
       "POST",
-      `/api/academics/materials/${pending!.id}/confirm`,
+      `/api/academics/materials/${materialId}/confirm`,
       { storage_key: key },
     );
     expect(confirmed.status).toBe(200);
@@ -402,13 +394,11 @@ describeDb("deleting a file frees its storage", () => {
       },
     );
     expect(started.status).toBe(201);
-    const { storage_key: key } = (await started.json()) as { storage_key: string };
+    const { storage_key: key, material_id: materialId } = (await started.json()) as {
+      storage_key: string;
+      material_id: string;
+    };
     storage.objects.set(key, { contentType: "application/pdf", sizeBytes: 5_000 });
-    const [material] = await asAdmin(
-      tenant.schoolId,
-      (tx) => tx<{ id: string }[]>`SELECT id FROM app.materials WHERE storage_key = ${key}`,
-    );
-    const materialId = material!.id;
     const confirmed = await request(
       tenant,
       teacher(tenant),
@@ -417,6 +407,10 @@ describeDb("deleting a file frees its storage", () => {
       { storage_key: key },
     );
     expect(confirmed.status).toBe(200);
+    // Confirm copied the object to the material's own permanent key (QA-009); that is what a
+    // delete must free.
+    const permanentKey = ((await confirmed.json()) as { storage_key: string }).storage_key;
+    expect(storage.objects.has(permanentKey)).toBe(true);
 
     // What the derivation worker writes for a rendered material.
     const thumbnail = `permanent/${tenant.schoolId}/${materialId}/thumbnail.jpg`;
@@ -439,6 +433,7 @@ describeDb("deleting a file frees its storage", () => {
       `/api/academics/materials/${materialId}`,
     );
     expect(res.status).toBe(204);
+    expect(storage.objects.has(permanentKey)).toBe(false);
     expect(storage.objects.has(key)).toBe(false);
     expect(storage.objects.has(thumbnail)).toBe(false);
     expect(storage.objects.has(preview)).toBe(false);

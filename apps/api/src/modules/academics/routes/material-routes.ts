@@ -10,11 +10,19 @@ import { requirePermission } from "../../../middleware/authz";
 import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
+import { getContentClass } from "../../storage/content-classes";
 import { freeStoredObjects } from "../../storage/free-objects";
-import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quota-service";
+import { assertStorageUploadQuota } from "../../storage/quota-service";
+import { inspectStagedUpload } from "../../storage/service";
 import {
-  confirmUpload,
+  copyStagedUploads,
+  discardStagedUploads,
+  reserveStorage,
+} from "../../storage/staged-promotion";
+import {
+  beginConfirmUpload,
   deleteMaterial,
+  finishConfirmUpload,
   getMaterial,
   initiateUpload,
   listMaterials,
@@ -324,9 +332,8 @@ export function materialRoutes(
       throw new HTTPException(503, { message: "Storage not configured" });
     }
 
-    // Claim-based quota check before the material row is created or a PUT is signed. Materials
-    // upload straight into permanent/, so there is no temp/ stage to refuse at -- this gate plus
-    // the daily reconciliation is the enforcement boundary for this flow.
+    // Claim-based quota pre-check before the row is created or a PUT is signed; confirm charges the
+    // real stored size (QA-009), so this only spares an obviously over-quota upload its round trip.
     const result = await withTenantTx(database, tenantFrom(c), async (tx) => {
       await assertStorageUploadQuota(tx, body.size_bytes);
       return initiateUpload(tx, auth.schoolId, auth.userId, body);
@@ -336,6 +343,7 @@ export function materialRoutes(
 
     return c.json(
       {
+        material_id: result.material.id,
         upload_url: presigned.url,
         storage_key: result.storage_key,
         expires_at: presigned.expiresAt.toISOString(),
@@ -349,20 +357,39 @@ export function materialRoutes(
     const { materialId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
-      const confirmed = await confirmUpload(
-        tx,
-        auth.schoolId,
-        materialId,
-        body.storage_key,
-        body.checksum_sha256,
-      );
-      // The material's size is the client's claim from initiate; the object is already in
-      // permanent/ by now. The meter is credited so enforcement stays fresh, and reconciliation
-      // corrects any gap between the claim and the stored bytes.
-      await recordStorageUpload(tx, confirmed.size_bytes);
-      return confirmed;
-    });
+    if (!storage) {
+      throw new HTTPException(503, { message: "Storage not configured" });
+    }
+
+    // The staged pipeline (modules/storage/staged-promotion.ts), as every other upload uses
+    // (QA-009): authorize, inspect the *stored* object with no transaction open, charge quota for
+    // its real size, copy it to the material's own permanent key, record it, drop the temp copy.
+    // The client only ever held a PUT URL for temp/, so nothing it writes later reaches what is
+    // served.
+    const existing = await withTenantTx(database, tenantFrom(c), (tx) =>
+      beginConfirmUpload(tx, auth.schoolId, materialId, body.storage_key),
+    );
+    const inspected = await inspectStagedUpload(
+      storage,
+      auth.schoolId,
+      getContentClass("material.file"),
+      { storageKey: body.storage_key, checksumSha256: body.checksum_sha256 },
+    );
+    await withTenantTx(database, tenantFrom(c), (tx) => reserveStorage(tx, inspected.sizeBytes));
+    const copy = {
+      tempKey: body.storage_key,
+      permanentKey: existing.storage_key,
+      sizeBytes: inspected.sizeBytes,
+    };
+    await copyStagedUploads(storage, tenantTxRunner(database, tenantFrom(c)), [copy]);
+    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
+      finishConfirmUpload(tx, auth.schoolId, existing, {
+        sizeBytes: inspected.sizeBytes,
+        contentType: inspected.contentType,
+        checksumSha256: inspected.checksumSha256 ?? null,
+      }),
+    );
+    await discardStagedUploads(storage, [copy]);
 
     // Hand the confirmed material to the file-scan worker. The status flip above is the claim: the
     // worker only touches materials still in 'scanning', so a retry (or a duplicate enqueue) can

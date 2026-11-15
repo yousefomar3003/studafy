@@ -118,7 +118,8 @@ function isNotFound(error: unknown): boolean {
 
 /**
  * The key the infected object is copied to. The material key scheme is
- * `permanent/<schoolId>/materials/<slug>`, so the quarantine copy is the same key under
+ * `permanent/<schoolId>/<objectId>/<slug>` (QA-009; older rows `permanent/<schoolId>/materials/<slug>`),
+ * so the quarantine copy is the same key under
  * `quarantine/`. Returns null for a key that is not under `permanent/` — the worker treats that
  * as a data-integrity error and fails closed rather than guessing a destination.
  */
