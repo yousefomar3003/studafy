@@ -454,6 +454,23 @@ const GUARD_CASES: GuardCase[] = [
   },
   // Class AI materials setting (000196). Teachers and leadership hold material:manageAi; GUEST does
   // not. The service additionally narrows a teacher to the classes they teach.
+  // Learning materials (QA-008).
+  ...(
+    [
+      ["GET", "/api/academics/materials", "material:read"],
+      ["GET", "/api/academics/materials/{materialId}", "material:read"],
+      ["POST", "/api/academics/materials/upload", "material:create"],
+      ["POST", "/api/academics/materials/{materialId}/confirm", "material:create"],
+      ["PATCH", "/api/academics/materials/{materialId}", "material:update"],
+      ["DELETE", "/api/academics/materials/{materialId}", "material:delete"],
+      ["PATCH", "/api/academics/materials/{materialId}/ai-visible", "material:manageAi"],
+    ] as const
+  ).map(([method, path, permission]) => ({
+    method,
+    path,
+    permission: permission as Permission,
+    source: "academics/routes/material-routes.ts",
+  })),
   {
     method: "PUT",
     path: "/api/academics/classes/{classId}/ai-materials",

@@ -112,6 +112,26 @@ export async function getMaterial(
   return row;
 }
 
+/**
+ * Refuse a material write unless the caller leads the school or teaches the material's class
+ * (QA-008). The route's permission gate already proved the caller is staff who may write materials
+ * at all; this decides *which* class. The RLS read scope is not enough on its own: it admits a
+ * student enrolled in the class and a parent of one, and a teacher who is also a parent in the
+ * class, none of whom may change its materials.
+ */
+async function assertCanManageMaterialClass(tx: TransactionSql, classId: string): Promise<void> {
+  const [row] = await tx<{ allowed: boolean }[]>`
+    SELECT (app.current_user_is_school_admin() OR app.teaches_class(${classId}::uuid)) AS allowed
+  `;
+  if (!row?.allowed) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.MATERIAL_CLASS_FORBIDDEN,
+      "Only this class's teachers or school leadership can change its learning materials.",
+    );
+  }
+}
+
 export async function initiateUpload(
   tx: TransactionSql,
   schoolId: string,
@@ -125,6 +145,7 @@ export async function initiateUpload(
   if (!cls) {
     throw new HTTPException(404, { message: "Class not found" });
   }
+  await assertCanManageMaterialClass(tx, params.class_id);
 
   const [existingMaterial] = await tx<{ id: string }[]>`
     SELECT id FROM app.materials
@@ -191,6 +212,7 @@ export async function confirmUpload(
   if (!existing) {
     throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
   }
+  await assertCanManageMaterialClass(tx, existing.class_id);
 
   if (existing.storage_key !== storageKey) {
     throw new CodedHttpException(
@@ -249,6 +271,7 @@ export async function updateMaterial(
   if (!existing) {
     throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
   }
+  await assertCanManageMaterialClass(tx, existing.class_id);
 
   const [row] = await tx<MaterialRow[]>`
     UPDATE app.materials
@@ -288,6 +311,7 @@ export async function deleteMaterial(
   if (!existing) {
     throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
   }
+  await assertCanManageMaterialClass(tx, existing.class_id);
 
   const [removed] = await tx<
     { storage_key: string; thumbnail_key: string | null; preview_key: string | null }[]
@@ -335,6 +359,7 @@ export async function toggleAiVisible(
   if (!existing) {
     throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
   }
+  await assertCanManageMaterialClass(tx, existing.class_id);
 
   if (existing.ai_visible === aiVisible) {
     return existing;

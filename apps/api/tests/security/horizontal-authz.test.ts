@@ -257,7 +257,6 @@ CASES.push(
     path: () => `/api/academics/materials/${ids.materialX}`,
     body: () => ({ title: "defaced by teacher B" }),
     expect: "deny",
-    finding: "QA-008",
     why: "does not teach class X; RLS still admits it because the same user is S1's guardian",
   },
   {
@@ -275,7 +274,6 @@ CASES.push(
     path: () => `/api/academics/materials/${ids.materialX}`,
     body: () => ({ title: "defaced by a student" }),
     expect: "deny",
-    finding: "QA-008",
     why: "students read materials; only the class's teachers may change them",
   },
   {
@@ -285,7 +283,6 @@ CASES.push(
     path: () => `/api/academics/materials/${ids.materialX}/ai-visible`,
     body: () => ({ ai_visible: true }),
     expect: "deny",
-    finding: "QA-008",
     why: "material:manageAi is a teacher/admin decision",
   },
   {
@@ -295,8 +292,53 @@ CASES.push(
     path: () => `/api/academics/materials/${ids.materialX}`,
     body: () => ({ title: "defaced via the parent link" }),
     expect: "deny",
-    finding: "QA-008",
     why: "a parent link must not grant teacher-level writes",
+  },
+);
+
+// Material controls and further denials (QA-008): the class's own teacher and school leadership
+// keep full write access; nobody else in the class does.
+CASES.push(
+  {
+    name: "teacher A (teaches class X) can edit class X's material",
+    actor: inA((s) => s.actors.teacherA),
+    method: "PATCH",
+    path: () => `/api/academics/materials/${ids.materialX}`,
+    body: () => ({ title: "Teacher A's worksheet, revised" }),
+    expect: "allow",
+    why: "control: lead teacher of the class",
+  },
+  {
+    name: "ORG_ADMIN can edit class X's material",
+    actor: inA((s) => s.actors.orgAdmin),
+    method: "PATCH",
+    path: () => `/api/academics/materials/${ids.materialX}`,
+    body: () => ({ title: "Teacher A's worksheet, revised by admin" }),
+    expect: "allow",
+    why: "control: school leadership",
+  },
+  {
+    name: "S1 cannot delete class X's material",
+    actor: inA((s) => s.actors.s1),
+    method: "DELETE",
+    path: () => `/api/academics/materials/${ids.materialY}`,
+    expect: "deny",
+    why: "students never delete materials",
+  },
+  {
+    name: "S1 cannot start a material upload into class X",
+    actor: inA((s) => s.actors.s1),
+    method: "POST",
+    path: () => "/api/academics/materials/upload",
+    body: () => ({
+      class_id: a.classX,
+      title: "Planted by a student",
+      file_name: "planted.pdf",
+      mime_type: "application/pdf",
+      size_bytes: 1024,
+    }),
+    expect: "deny",
+    why: "material:create is a teacher permission",
   },
 );
 

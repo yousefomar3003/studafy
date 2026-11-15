@@ -1,11 +1,13 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
-import { INGESTION_JOB_OPTIONS, JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
+import { INGESTION_JOB_OPTIONS, JOB_NAMES, PERMISSIONS, QUEUE_NAMES } from "@studafy/constants";
 import { Queue } from "bullmq";
 import { HTTPException } from "hono/http-exception";
 
 import { tenantTxRunner, withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { freeStoredObjects } from "../../storage/free-objects";
@@ -248,6 +250,41 @@ export function materialRoutes(
     : null;
 
   // Audit declarations
+  // Permission gates (QA-008). These routes used to have none -- they were exempted as "authorized
+  // by signed upload URL and row ownership", but no ownership check existed, so any student or
+  // parent able to read a class could rename, delete or AI-expose its materials. Reads need
+  // material:read; each write needs its own permission, and the service then requires the caller
+  // to lead the school or teach the material's class. Hono matches `:materialId` against "upload",
+  // so the per-method guards keep each mount to the methods its own routes serve.
+  routes.use(
+    "/api/academics/materials",
+    onlyMethods(["GET"], requirePermission(PERMISSIONS.MATERIAL_READ)),
+  );
+  routes.use(
+    "/api/academics/materials/upload",
+    onlyMethods(["POST"], requirePermission(PERMISSIONS.MATERIAL_CREATE)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId",
+    onlyMethods(["GET"], requirePermission(PERMISSIONS.MATERIAL_READ)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId",
+    onlyMethods(["PATCH"], requirePermission(PERMISSIONS.MATERIAL_UPDATE)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId",
+    onlyMethods(["DELETE"], requirePermission(PERMISSIONS.MATERIAL_DELETE)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId/confirm",
+    onlyMethods(["POST"], requirePermission(PERMISSIONS.MATERIAL_CREATE)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId/ai-visible",
+    onlyMethods(["PATCH"], requirePermission(PERMISSIONS.MATERIAL_MANAGE_AI)),
+  );
+
   routes.use("/api/academics/materials/upload", auditAction("insert", "materials"));
   routes.use("/api/academics/materials/:materialId", auditAction("update", "materials"));
   routes.use("/api/academics/materials/:materialId/confirm", auditAction("update", "materials"));

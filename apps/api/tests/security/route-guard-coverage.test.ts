@@ -233,7 +233,6 @@ const GUARD_EXEMPT: Record<string, string> = {
 
 /** Findings: operations that should make a permission decision and don't. Value = the QA task. */
 const KNOWN_UNGUARDED: Record<string, string> = {
-  // QA-008: material writes have no permission or ownership check; reads should require MATERIAL_READ.
   // QA-011: Hono's :expenseId matches one segment, so the expense guard never runs for /attachments.
   // QA-013: the school-plan checkouts only check the web channel.
   // QA-086: RLS-scoped academic and attendance reads with no explicit permission gate (no other
@@ -246,13 +245,6 @@ const KNOWN_UNGUARDED: Record<string, string> = {
   "GET /api/academics/exams": "QA-086",
   "GET /api/academics/exams/{examId}": "QA-086",
   "GET /api/academics/grade-levels": "QA-086",
-  "GET /api/academics/materials": "QA-008",
-  "POST /api/academics/materials/upload": "QA-008",
-  "DELETE /api/academics/materials/{materialId}": "QA-008",
-  "GET /api/academics/materials/{materialId}": "QA-008",
-  "PATCH /api/academics/materials/{materialId}": "QA-008",
-  "PATCH /api/academics/materials/{materialId}/ai-visible": "QA-008",
-  "POST /api/academics/materials/{materialId}/confirm": "QA-008",
   "GET /api/academics/rooms": "QA-086",
   "GET /api/academics/sections": "QA-086",
   "GET /api/academics/sections/{sectionId}": "QA-086",
