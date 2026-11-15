@@ -628,8 +628,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Academic years, terms, class enrolments and exams are NOT exempt: RLS fences them to the
   // school but not to a role, so without TIMETABLE_MANAGE any signed-in student or parent could
   // roll the year over (archiving every enrolment) or delete an exam.
-  // Learning materials (ST-106) — storage-triggered upload flow, authorized by
-  // signed upload URL and row ownership, not by the permission guard.
+  // Learning materials (ST-106). These were exempted as "authorized by signed upload URL and row
+  // ownership", but no ownership check exists: a student or parent in the class can write them.
+  // That is finding QA-008; tests/security/route-guard-coverage.test.ts tracks it per route.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",
   "PATCH /api/academics/materials/{materialId}",

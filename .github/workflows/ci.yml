@@ -19,6 +19,9 @@ jobs:
       # This job exists to run the database-backed tests: abort rather than skip them if the URL
       # above ever goes missing (scripts/test-db-gate.ts, QA-004).
       REQUIRE_DB_TESTS: "1"
+      # tests/security/route-guard-coverage.test.ts mounts the Redis-backed routes (AI, entitlements)
+      # so it can see their guards; compose already starts test-redis for this job (QA-001).
+      TEST_REDIS_URL: redis://127.0.0.1:6390
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Start disposable PostgreSQL
