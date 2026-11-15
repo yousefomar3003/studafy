@@ -285,6 +285,7 @@ void main() {
     await tester.tap(find.text('Create assignment'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), 'Essay');
+    await tester.enterText(find.byKey(const Key('assignmentPoints')), '20');
     await _tapVisible(tester, find.text('Published'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Draft').last);
@@ -299,6 +300,115 @@ void main() {
       CreateAssignmentBodyStatus.draft,
     );
     expect(find.text('Essay'), findsOneWidget);
+  });
+
+  group('assignment points', () {
+    Future<_ContentAssignmentsClient> openCreate(WidgetTester tester) async {
+      // Tall enough that the whole form is built, so the submit button and the points error are
+      // on screen together.
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final assignments = _ContentAssignmentsClient([]);
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: assignments,
+          academics: _ContentAcademicsClient([]),
+        ),
+      );
+      await tester.tap(find.text('Create assignment'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'Essay');
+      return assignments;
+    }
+
+    final points = find.byKey(const Key('assignmentPoints'));
+
+    String pointsText(WidgetTester tester) =>
+        tester.widget<TextFormField>(points).controller!.text;
+
+    testWidgets('a new assignment starts with no total, only a hint', (
+      tester,
+    ) async {
+      await openCreate(tester);
+
+      expect(pointsText(tester), isEmpty);
+      expect(find.text('Out of how many points?'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, '100'), findsNothing);
+    });
+
+    testWidgets('refuses to save until the teacher enters a total', (
+      tester,
+    ) async {
+      final assignments = await openCreate(tester);
+
+      await _tapVisible(tester, find.text('Publish assignment'));
+      await tester.pumpAndSettle();
+
+      expect(assignments.createCalls, isEmpty);
+      expect(
+        find.text('Enter how many points this assignment is out of.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('applies the API limits on the total', (tester) async {
+      final assignments = await openCreate(tester);
+
+      for (final (input, message) in [
+        ('0', 'Enter valid points.'),
+        ('abc', 'Enter valid points.'),
+        ('10001', "Points can't be more than 10,000."),
+        ('12.345', 'Use at most two decimal places.'),
+      ]) {
+        await tester.enterText(points, input);
+        await _tapVisible(tester, find.text('Publish assignment'));
+        await tester.pumpAndSettle();
+        expect(find.text(message), findsOneWidget, reason: input);
+      }
+      expect(assignments.createCalls, isEmpty);
+    });
+
+    testWidgets('sends the total the teacher typed, Arabic digits included', (
+      tester,
+    ) async {
+      final assignments = await openCreate(tester);
+
+      await tester.enterText(points, '٢٥٫٥');
+      await _tapVisible(tester, find.text('Publish assignment'));
+      await tester.pumpAndSettle();
+
+      expect(assignments.createCalls, hasLength(1));
+      expect(assignments.createCalls.single.maxScore, 25.5);
+    });
+
+    testWidgets('editing keeps the saved total', (tester) async {
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: _ContentAssignmentsClient([
+            assignmentFixture(id: 'a-1', classId: 'class-1', maxScore: 25),
+          ]),
+          academics: _ContentAcademicsClient([]),
+        ),
+      );
+
+      await tester.tap(find.byTooltip('Edit assignment'));
+      await tester.pumpAndSettle();
+
+      expect(pointsText(tester), '25');
+    });
+
+    testWidgets('a questions assignment asks for no total', (tester) async {
+      await openCreate(tester);
+
+      await tester.tap(find.text('Questions'));
+      await tester.pumpAndSettle();
+
+      expect(points, findsNothing);
+      expect(find.text('Out of how many points?'), findsNothing);
+    });
   });
 
   testWidgets('edits a material title and description', (tester) async {

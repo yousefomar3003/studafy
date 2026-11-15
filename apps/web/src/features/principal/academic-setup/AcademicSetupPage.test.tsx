@@ -564,6 +564,38 @@ describe("AcademicSetupPage", () => {
     expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
   });
 
+  test("a new assessment starts with no maximum, and saving waits until one is entered", async () => {
+    await renderAt("/subjects");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit Mathematics" }));
+    const category = await screen.findByRole("group", { name: "Category: Exams" });
+    // The existing assessments keep their saved maximum.
+    const existing = within(category).getByRole("group", { name: "Assessment: Exam 1" });
+    expect(
+      (within(existing).getByRole("spinbutton", { name: "Max marks" }) as HTMLInputElement).value,
+    ).toBe("100");
+
+    fireEvent.click(within(category).getByRole("button", { name: "Add assessment" }));
+    const added = await within(category).findByRole("group", { name: "Assessment: Assessment 3" });
+    const max = within(added).getByRole("spinbutton", { name: "Max marks" }) as HTMLInputElement;
+    expect(max.value).toBe("");
+    expect(max.required).toBe(true);
+
+    fireEvent.change(within(added).getByRole("textbox", { name: "Assessment name" }), {
+      target: { value: "Quiz" },
+    });
+    // The live check names the missing maximum, and the published year cannot save around it.
+    expect(await screen.findByText('"Quiz" needs maximum marks above 0.')).toBeTruthy();
+    const save = screen.getByRole("button", { name: "Save" }) as HTMLButtonElement;
+    expect(save.disabled).toBe(true);
+
+    fireEvent.change(max, { target: { value: "20" } });
+    await waitFor(() =>
+      expect(screen.queryByText('"Quiz" needs maximum marks above 0.')).toBeNull(),
+    );
+    expect(putMock).not.toHaveBeenCalled();
+  });
+
   test("drags a subject's weight on a slider, with an exact box beside it", async () => {
     await renderAt("/subjects");
 

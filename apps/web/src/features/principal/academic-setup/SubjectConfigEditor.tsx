@@ -824,6 +824,7 @@ function AssessmentRows({
                     label={t("academicGrading.editor.assessmentMax")}
                     type="number"
                     min={0}
+                    required
                     value={assessment.maxMarks}
                     onChange={(event) => onChange(assessment.key, { maxMarks: event.target.value })}
                   />
