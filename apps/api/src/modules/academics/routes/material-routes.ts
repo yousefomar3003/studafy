@@ -48,7 +48,8 @@ const listMaterialsRoute = createRoute({
   operationId: "listMaterials",
   summary: "List materials",
   description:
-    "Paginated list of materials for the authenticated school, ordered by creation date descending.",
+    "Paginated list of materials for the authenticated school, ordered by creation date " +
+    "descending. Filter by class, ingest status, and the week and day of the term.",
   security: [{ bearerAuth: [] }],
   request: { query: materialQuerySchema },
   responses: standardResponses(
@@ -145,7 +146,10 @@ const updateMaterialRoute = createRoute({
   tags: ["Academics"],
   operationId: "updateMaterial",
   summary: "Update a material",
-  description: "Partially updates material metadata (title, description).",
+  description:
+    "Partially updates material metadata (title, description, and the week and day of the term " +
+    "it is listed under). week_number and day_of_week are sent together: both numbers move it, " +
+    "both null make it unscheduled, both omitted leave it where it is.",
   security: [{ bearerAuth: [] }],
   request: {
     params: materialIdParamSchema,
