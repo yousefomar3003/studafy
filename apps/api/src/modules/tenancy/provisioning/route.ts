@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { PERMISSIONS } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
@@ -133,14 +134,16 @@ export function provisioningRoutes(db: Database, _logger: Logger): OpenAPIHono<A
     requireOwnSchool(c, schoolId);
 
     // Read school info for provisioning params.
-    const schools = await db<
-      { slug: string; name: string; country_id: string; default_currency_id: string }[]
-    >`
-      SELECT slug, name, country_id, default_currency_id
-      FROM app.schools
-      WHERE id = ${schoolId}::uuid
-      LIMIT 1
-    `;
+    const schools = await withTenantTx(
+      db,
+      { schoolId, userId: auth.userId },
+      (tx) => tx<{ slug: string; name: string; country_id: string; default_currency_id: string }[]>`
+        SELECT slug, name, country_id, default_currency_id
+        FROM app.schools
+        WHERE id = ${schoolId}::uuid
+        LIMIT 1
+      `,
+    );
 
     if (schools.length === 0) {
       throw new CodedHttpException(404, "RESOURCE_NOT_FOUND" as never, "School not found.");

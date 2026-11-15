@@ -18,14 +18,6 @@ export const RAW_POOL_QUERY_ALLOWLIST_COUNTS = {
   "apps/api/src/modules/subscriptions/services/subscription-service.ts": 2,
   // Global: country/currency lookups.
   "apps/api/src/modules/tenancy/lookups/service.ts": 2,
-  // Global: the school's provisioning status.
-  "apps/api/src/modules/tenancy/provisioning/route.ts": 1,
-  // Tenant (F-17): app.subscriptions and app.erpnext_site_configs read and written unscoped.
-  "apps/api/src/modules/tenancy/provisioning/service.ts": 5,
-  // Global: slug/email uniqueness pre-check.
-  "apps/api/src/modules/tenancy/registration/service.ts": 1,
-  // Tenant (F-17): the school's first admin read from app.users unscoped; the rest is app.schools.
-  "apps/api/src/modules/tenancy/verification/service.ts": 4,
 };
 
 export const RAW_POOL_QUERY_ALLOWLIST = Object.keys(RAW_POOL_QUERY_ALLOWLIST_COUNTS);

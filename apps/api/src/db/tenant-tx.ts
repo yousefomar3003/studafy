@@ -57,6 +57,28 @@ export async function withTenantTx<T>(
 }
 
 /**
+ * A transaction as `studafy_app` with no tenant armed, for reads of the genuinely global tables
+ * (app.schools by token or email before the school is known, reference data) (QA-014).
+ *
+ * Querying the raw pool instead runs as the database login itself, which only works while that
+ * login holds table privileges of its own -- Supabase `postgres` does, a least-privilege runtime
+ * login (NOBYPASSRLS, owning nothing) does not. Any tenant-isolated table read in here fails closed
+ * (the policy's `current_setting('app.school_id')` is unset), so this cannot leak across schools.
+ */
+export async function withAppTx<T>(
+  database: Database | DatabasePools,
+  fn: (tx: TransactionSql) => Promise<T>,
+): Promise<T> {
+  const selected = selectDatabase(database, {});
+  let result: T | undefined;
+  await selected.begin(async (tx) => {
+    await tx`SELECT set_config('role', 'studafy_app', true)`;
+    result = await fn(tx);
+  });
+  return result as T;
+}
+
+/**
  * A transaction for work the system does on nobody's behalf, with the tenant not yet known.
  *
  * The API's one caller is the payment-provider webhook processor, and its shape is genuinely

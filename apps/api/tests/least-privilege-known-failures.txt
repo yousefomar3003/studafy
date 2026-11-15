@@ -26,15 +26,8 @@ tests/erpnext/webhook.db.test.ts > invoice cache projection > answers 200 and le
 tests/erpnext/webhook.db.test.ts > invoice cache projection > answers 200 and leaves no cache row for an unknown currency
 tests/erpnext/webhook.db.test.ts > fee schedule cache projection > resolves the year and term by code and converts the total to minor units
 
-# Public school registration: register_school / its surrounding transaction need privileges the
-# runtime login lacks outside withSystemTx (apps/api/src/modules/tenancy/registration/service.ts).
-tests/tenancy/registration-no-token-leak.test.ts > POST /api/schools/register (QA-007) > the response carries no token field at any depth
-tests/tenancy/registration-no-token-leak.test.ts > POST /api/schools/register (QA-007) > the emailed verification and invitation tokens never appear in the response
-tests/tenancy/registration-no-token-leak.test.ts > POST /api/schools/register (QA-007) > without the emailed token the school cannot be verified into active
 
-# Provisioning failure bookkeeping (markFailed, tenancy/provisioning/service.ts:399-410) and the
-# Tier A crash sweep, which reaches the same paths through registration and provisioning routes.
-tests/security/provision-route-authz.test.ts > QA-12: provisioning routes are admin-only and own-school-only > (unnamed)
+# The Tier A crash sweep (every route x role); re-check after each QA-014 slice.
 tests/security/authz-role-matrix.test.ts > authz role matrix — Tier A: no route ever crashes or leaks, for any role > every operation x every role returns a well-formed response, never a raw 500
 
 # Manual tier grants (platform/grants): grant and revoke write outside the app's role switch.

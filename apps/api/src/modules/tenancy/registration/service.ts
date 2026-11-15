@@ -11,6 +11,7 @@ import { verifyCaptcha } from "./captcha";
 
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
+import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -98,11 +99,16 @@ export async function registerSchool(
   const expiresAt = new Date(now + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
   const verificationExpiresAt = new Date(now + VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
-  // ── 3. Pre-check uniqueness (advisory — DB constraints are the true guard) ──
-  await checkDuplicates(database, params.slug, normalizedEmail);
-
-  // ── 4. Transaction ─────────────────────────────────────────────────────
+  // ── 3. Transaction ─────────────────────────────────────────────────────
   return database.begin(async (tx) => {
+    // Everything runs as studafy_app (QA-014). The duplicate pre-check used to query app.schools
+    // straight off the pool and register_school ran before the role switch, so both worked only
+    // because the production login itself holds those privileges.
+    await tx`SELECT set_config('role', 'studafy_app', true)`;
+
+    // Pre-check uniqueness (advisory — DB constraints are the true guard).
+    await checkDuplicates(tx, params.slug, normalizedEmail);
+
     // Phase A: Create the school via SECURITY DEFINER function (global table, no RLS).
     const schools = await tx<{ register_school: string }[]>`
       SELECT app.register_school(
@@ -121,12 +127,8 @@ export async function registerSchool(
 
     const schoolId = schools[0].register_school;
 
-    // Phase B: Switch to the runtime role and set tenant context for remaining inserts.
-    await tx`
-      SELECT
-        set_config('role', 'studafy_app', true),
-        set_config('app.school_id', ${schoolId}, true)
-    `;
+    // Phase B: Set tenant context for the remaining inserts.
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
 
     // ── 4a. Create default school settings ────────────────────────────────
     await tx`
@@ -326,11 +328,11 @@ export async function registerSchool(
  * field-specific error message instead of a raw database error.
  */
 async function checkDuplicates(
-  database: Database,
+  tx: TransactionSql,
   slug: string,
   normalizedEmail: string,
 ): Promise<void> {
-  const existing = await database<{ slug: string; normalized_email: string }[]>`
+  const existing = await tx<{ slug: string; normalized_email: string }[]>`
     SELECT slug, normalized_email
     FROM app.schools
     WHERE slug = ${slug} OR normalized_email = ${normalizedEmail}
