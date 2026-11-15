@@ -260,7 +260,7 @@ export async function createTerm(
   academicYearId: string,
   overrides?: { code?: string; sequenceNumber?: number },
 ): Promise<TermRecord> {
-  const code = overrides?.code ?? `TERM-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+  const code = overrides?.code ?? `TERM-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
@@ -296,7 +296,7 @@ export async function createSubject(
   schoolId: string,
   overrides?: { code?: string; name?: string },
 ): Promise<SubjectRecord> {
-  const code = overrides?.code ?? `SUB-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+  const code = overrides?.code ?? `SUB-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
@@ -325,7 +325,7 @@ export async function createCourse(
   subjectId: string,
   overrides?: { code?: string; name?: string; creditHours?: number },
 ): Promise<CourseRecord> {
-  const code = overrides?.code ?? `CRS-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+  const code = overrides?.code ?? `CRS-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
@@ -359,7 +359,7 @@ export async function createRoom(
   schoolId: string,
   overrides?: { code?: string; capacity?: number },
 ): Promise<RoomRecord> {
-  const code = overrides?.code ?? `RM-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+  const code = overrides?.code ?? `RM-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
@@ -392,7 +392,7 @@ export async function createClass(
     code?: string;
   },
 ): Promise<ClassRecord> {
-  const code = overrides.code ?? `CLS-${crypto.randomUUID().slice(0, 4).toUpperCase()}`;
+  const code = overrides.code ?? `CLS-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
   return asAdmin(sql, async (tx) => {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
