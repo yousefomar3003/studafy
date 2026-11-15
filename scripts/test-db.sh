@@ -4,6 +4,9 @@
 #   scripts/test-db.sh            # security, auth, integration, full API, db package, workers
 #   scripts/test-db.sh --quick    # security, db package, workers only
 #   scripts/test-db.sh --keep     # leave the containers running afterwards
+#   scripts/test-db.sh --least-privilege
+#                                 # API suites again with the app logged in as studafy_runtime
+#                                 # (NOSUPERUSER, NOBYPASSRLS, owns nothing; db/test-roles/), QA-003
 #
 # Works from any directory, ignores the root .env (whose discrete DATABASE_* values would clash
 # with DATABASE_URL), and sets REQUIRE_DB_TESTS=1 so no suite can silently skip its database tests.
@@ -13,10 +16,12 @@ set -uo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 QUICK=0
 KEEP=0
+LEAST=0
 for arg in "$@"; do
   case "$arg" in
     --quick) QUICK=1 ;;
     --keep) KEEP=1 ;;
+    --least-privilege) LEAST=1 ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -71,6 +76,19 @@ run "db: migrate + RLS coverage" packages/db env DATABASE_URL="$TEST_DATABASE_UR
   bash -c 'bun --no-env-file src/cli.ts migrate && bun --no-env-file src/cli.ts rls-coverage'
 run "db: package tests" packages/db bun test --max-concurrency=2 --timeout=10000
 run "workers" apps/workers env DATABASE_URL="$TEST_DATABASE_URL" bun test
+
+if [ "$LEAST" -eq 1 ]; then
+  # The roles studafy_runtime is granted exist once any migration has run (cluster-wide).
+  run "least-privilege: create studafy_runtime" . bash -c \
+    'docker compose exec -T test-postgres psql -U studafy_test -d postgres -v ON_ERROR_STOP=1 -f - < db/test-roles/runtime-role.sql'
+  export TEST_APP_DB_ROLE="studafy_runtime:studafy_runtime_test_only"
+  JUNIT="$(mktemp -t studafy-least-privilege.XXXXXX).xml"
+  # Known failures are QA-014's work list; judge the run against it, as CI does.
+  (cd "$REPO/apps/api" && bun test --timeout 120000 --reporter=junit --reporter-outfile="$JUNIT") || true
+  run "least-privilege: api suite vs known list" . bun scripts/ci/least-privilege-check.ts \
+    apps/api/tests/least-privilege-known-failures.txt "$JUNIT"
+  unset TEST_APP_DB_ROLE
+fi
 
 if [ "$KEEP" -eq 0 ]; then
   docker compose rm -sfv test-postgres test-redis >/dev/null 2>&1

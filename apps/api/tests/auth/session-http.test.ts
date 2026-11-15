@@ -7,6 +7,7 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { KeyStore } from "../../src/modules/auth";
 import {
+  appDatabaseFor,
   assignRole,
   createFullTenant,
   createRefreshSession,
@@ -70,7 +71,7 @@ beforeAll(async () => {
     isReady: () => true,
     tracker: createInflightTracker(),
     logger,
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,

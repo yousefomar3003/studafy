@@ -2,6 +2,8 @@ export {
   createTestDatabase,
   migrateDatabase,
   integrationEnabled,
+  appDatabaseFor,
+  assertLeastPrivilege,
   type TestDatabase,
 } from "./database";
 

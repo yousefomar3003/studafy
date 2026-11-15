@@ -5,6 +5,8 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { AUTH_CHANNELS, KeyStore, signAccessToken } from "../../src/modules/auth";
 
+import { appDatabaseFor, assertLeastPrivilege } from "./database";
+
 import type { Database } from "../../src/db";
 import type { StorageService } from "../../src/lib/storage";
 import type { UploadScanEnqueuer } from "../../src/lib/storage/upload-scan";
@@ -90,7 +92,7 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     tracker: createInflightTracker(),
     logger,
     redis: options.redis ?? null,
-    database: options.database,
+    database: options.database ? appDatabaseFor(options.database) : null,
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
@@ -100,7 +102,11 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     uploadScanEnqueuer: options.uploadScanEnqueuer ?? null,
   });
 
-  return { app, keyStore, ready: keyStore.init() };
+  const ready = Promise.all([
+    keyStore.init(),
+    options.database ? assertLeastPrivilege(appDatabaseFor(options.database)) : undefined,
+  ]).then(() => undefined);
+  return { app, keyStore, ready };
 }
 
 // ---------------------------------------------------------------------------

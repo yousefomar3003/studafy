@@ -10,6 +10,7 @@ import { KeyStore } from "../../src/modules/auth";
 import { AUTH_CHANNELS } from "../../src/modules/auth/channels";
 import { guardianSessionRoutes } from "../../src/modules/auth/routes/guardian-session-routes";
 import {
+  appDatabaseFor,
   assignRole,
   createSchool,
   createStudent,
@@ -141,7 +142,7 @@ beforeAll(async () => {
         ? (line: string) => process.stderr.write(line)
         : () => undefined,
     }),
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,

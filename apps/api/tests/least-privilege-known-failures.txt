@@ -1,0 +1,45 @@
+# QA-014 work list: tests that fail only when the app logs in as studafy_runtime (NOSUPERUSER,
+# NOBYPASSRLS, owns nothing; db/test-roles/runtime-role.sql). Each is a code path that works today
+# only because the production login can bypass RLS or holds table privileges outside the app's
+# own role switches. Checked by scripts/ci/least-privilege-check.ts in the least-privilege-db CI
+# job: a new failure fails the job, and so does a listed test that starts passing -- delete its
+# line when QA-014 fixes it. Format: "file > suite > test", optional trailing "# flaky".
+# Generated 2026-11-16 from the full API suite (4558 pass / 21 fail under studafy_runtime).
+
+# Email (Resend) webhook: transitionDeliveries reads app.email_deliveries with no role or tenant
+# (apps/api/src/email/webhook.ts:173-238, "relies on the application connection having RLS bypass").
+tests/email/webhook.db.test.ts > bounce handling > records a permanent bounce, suppresses every bounced recipient (normalized), and transitions the deliveries
+tests/email/webhook.db.test.ts > bounce handling > records a transient bounce without suppressing the address
+tests/email/webhook.db.test.ts > complaint handling > suppresses complained addresses and transitions the delivery to complained
+tests/email/webhook.db.test.ts > delivery handling > records a delivery event without suppressing or transitioning
+tests/email/webhook.db.test.ts > deduplication > absorbs a redelivery without re-recording or re-processing
+tests/email/webhook.db.test.ts > delivery transitions > transitions only landed 'sent' rows and never walks a terminal row backwards
+tests/email/webhook.db.test.ts > delivery transitions > transitions deliveries in every school holding the message
+
+# ERPNext webhook: dedup, cache projection and outbox inserts run as the login role after
+# set_config('app.school_id') without switching role (apps/api/src/erpnext/webhook.ts:229-268).
+tests/erpnext/webhook.db.test.ts > outbox payload encoding > stores the outbox payload as a jsonb object, writes the dedup row, and audits the insert
+tests/erpnext/webhook.db.test.ts > deduplication > absorbs an ERPNext redelivery without re-enqueuing or re-auditing
+tests/erpnext/webhook.db.test.ts > tenant routing > lands each school's event in its own outbox
+tests/erpnext/webhook.db.test.ts > invoice cache projection > resolves the student and currency and converts amounts with the currency's own exponent
+tests/erpnext/webhook.db.test.ts > invoice cache projection > answers 200 and leaves no cache row when the student cannot be resolved
+tests/erpnext/webhook.db.test.ts > invoice cache projection > answers 200 and leaves no cache row for an unknown currency
+tests/erpnext/webhook.db.test.ts > fee schedule cache projection > resolves the year and term by code and converts the total to minor units
+
+# Public school registration: register_school / its surrounding transaction need privileges the
+# runtime login lacks outside withSystemTx (apps/api/src/modules/tenancy/registration/service.ts).
+tests/tenancy/registration-no-token-leak.test.ts > POST /api/schools/register (QA-007) > the response carries no token field at any depth
+tests/tenancy/registration-no-token-leak.test.ts > POST /api/schools/register (QA-007) > the emailed verification and invitation tokens never appear in the response
+tests/tenancy/registration-no-token-leak.test.ts > POST /api/schools/register (QA-007) > without the emailed token the school cannot be verified into active
+
+# Provisioning failure bookkeeping (markFailed, tenancy/provisioning/service.ts:399-410) and the
+# Tier A crash sweep, which reaches the same paths through registration and provisioning routes.
+tests/security/provision-route-authz.test.ts > QA-12: provisioning routes are admin-only and own-school-only > (unnamed)
+tests/security/authz-role-matrix.test.ts > authz role matrix — Tier A: no route ever crashes or leaks, for any role > every operation x every role returns a well-formed response, never a raw 500
+
+# Manual tier grants (platform/grants): grant and revoke write outside the app's role switch.
+tests/platform/manual-grants-http.test.ts > manual tier grants > a student's paid tier unlocks the feature and adds to a store subscription
+tests/platform/manual-grants-http.test.ts > manual tier grants > revoking the only grant locks the feature at once
+
+# Intermittent without the role too: keyset cursor truncates timestamps (QA-091).
+tests/finance/finance-lists-http.test.ts > invoice list filters and paging > pages past the first page and filters by issue and due date # flaky

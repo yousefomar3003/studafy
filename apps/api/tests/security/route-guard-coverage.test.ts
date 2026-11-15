@@ -50,6 +50,7 @@ import { KeyStore } from "../../src/modules/auth";
 import { buildOpenApiDocument } from "../../src/openapi/document";
 import { createRedisClient } from "../../src/redis";
 import {
+  appDatabaseFor,
   createFullTenant,
   createTestDatabase,
   integrationEnabled,
@@ -540,7 +541,7 @@ beforeAll(async () => {
     isReady: () => true,
     tracker: createInflightTracker(),
     logger,
-    database: database.sql,
+    database: appDatabaseFor(database.sql),
     redis,
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,

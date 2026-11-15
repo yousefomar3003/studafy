@@ -11,6 +11,7 @@ import { AUTH_CHANNELS } from "../../src/modules/auth/channels";
 import { SETUP_CODE_TTL_DAYS } from "../../src/modules/auth/services/member-password-service";
 import { createRedisClient } from "../../src/redis";
 import {
+  appDatabaseFor,
   assignRole,
   createSchool,
   createStudent,
@@ -157,7 +158,7 @@ beforeAll(async () => {
         ? (line: string) => process.stderr.write(line)
         : () => undefined,
     }),
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
@@ -563,7 +564,7 @@ describe("member password sign-in", () => {
       isReady: () => true,
       tracker: createInflightTracker(),
       logger,
-      database: sql,
+      database: appDatabaseFor(sql),
       redis,
       keyStore,
       jwtIssuer: TEST_JWT_ISSUER,
@@ -603,7 +604,7 @@ describe("member password sign-in", () => {
         isReady: () => true,
         tracker: createInflightTracker(),
         logger,
-        database: sql,
+        database: appDatabaseFor(sql),
         redis: client,
         keyStore,
         jwtIssuer: TEST_JWT_ISSUER,

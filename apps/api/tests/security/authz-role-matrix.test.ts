@@ -43,6 +43,7 @@ import { createLogger } from "../../src/logger";
 import { apiProblemSchema } from "../../src/middleware";
 import { KeyStore } from "../../src/modules/auth";
 import {
+  appDatabaseFor,
   assignRole,
   createFullTenant,
   createTestDatabase,
@@ -126,7 +127,7 @@ beforeAll(async () => {
     isReady: () => true,
     tracker: createInflightTracker(),
     logger: createLogger({ destination: () => undefined }),
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,

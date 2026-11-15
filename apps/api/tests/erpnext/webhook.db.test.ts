@@ -8,6 +8,7 @@ import { createApp } from "../../src/app";
 import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import {
+  appDatabaseFor,
   createAcademicYear,
   createSchool,
   createStudent,
@@ -128,7 +129,7 @@ beforeAll(async () => {
     tracker: createInflightTracker(),
     logger: createLogger({ destination: () => undefined }),
     redis: null,
-    database: sql,
+    database: appDatabaseFor(sql),
   });
 }, 60_000);
 

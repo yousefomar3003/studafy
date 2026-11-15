@@ -41,6 +41,48 @@ jobs:
         if: always()
         run: docker compose rm -sfv test-postgres test-redis
 
+  # QA-003: the API suite again, with the app logged in as studafy_runtime -- not a superuser, no
+  # BYPASSRLS, owns nothing, reaches data only through the app's own role switches. Production logs
+  # in as Supabase `postgres` (S-01), so code that silently needs RLS bypass passes every other job.
+  # The known QA-014 work list may only shrink: a new failure, or a listed test that now passes,
+  # fails this job (scripts/ci/least-privilege-check.ts).
+  least-privilege-db:
+    name: least-privilege-db
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: studafy_ci_only
+      TEST_DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+      TEST_REDIS_URL: redis://127.0.0.1:6390
+      REQUIRE_DB_TESTS: "1"
+      TEST_APP_DB_ROLE: studafy_runtime:studafy_runtime_test_only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Start disposable PostgreSQL + Redis
+        run: docker compose up -d --wait test-postgres test-redis
+      - uses: ./.github/actions/setup-bun-workspace
+      - name: Build the workspace packages the API imports
+        run: bunx turbo run build --filter=@studafy/api^...
+      # studafy_app / studafy_admin are created by the first migration; roles are cluster-wide.
+      - name: Migrate the shared database, then create the least-privilege login
+        working-directory: packages/db
+        env:
+          DATABASE_URL: postgresql://studafy_test:studafy_ci_only@127.0.0.1:54329/postgres?sslmode=disable
+          DATABASE_SSL_MODE: disable
+        run: |
+          bun --no-env-file src/cli.ts migrate
+          docker compose -f ../../compose.yml exec -T test-postgres \
+            psql -U studafy_test -d postgres -v ON_ERROR_STOP=1 -f - < ../../db/test-roles/runtime-role.sql
+      - name: API suite as studafy_runtime
+        working-directory: apps/api
+        # Failures are judged by the next step against the known list, not by the exit code here.
+        continue-on-error: true
+        run: bun test --timeout 120000 --reporter=junit --reporter-outfile=least-privilege.xml
+      - name: Compare with the QA-014 known-failures list
+        run: bun scripts/ci/least-privilege-check.ts apps/api/tests/least-privilege-known-failures.txt apps/api/least-privilege.xml
+      - name: Stop disposable PostgreSQL + Redis
+        if: always()
+        run: docker compose rm -sfv test-postgres test-redis
+
   api-integration:
     name: api-integration
     runs-on: ubuntu-latest
