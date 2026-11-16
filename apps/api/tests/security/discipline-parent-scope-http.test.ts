@@ -79,7 +79,7 @@ async function incident(
   return created.id;
 }
 
-function as(fixture: TenantFixture, role: "PARENT" | "INSTRUCTOR", roles?: string[]) {
+function as(fixture: TenantFixture, role: "PARENT" | "INSTRUCTOR" | "ORG_ADMIN", roles?: string[]) {
   return {
     schoolId: fixture.schoolId,
     userId: fixture.users[role]!.id,
@@ -118,11 +118,14 @@ describeDb("GET /api/discipline/incidents/{id} for a parent", () => {
     expect((await get(ownOpen)).status).toBe(404);
     expect((await get(othersResolved)).status).toBe(404);
 
-    // Staff are unaffected, including a teacher who is also a parent.
+    // Staff reads follow QA-039: leadership sees every incident, and so does the incident's reporter
+    // (the fixture's instructor filed these). Another staff member who neither teaches the child nor
+    // reported it -- here the parent user, also holding INSTRUCTOR -- does not.
+    expect((await get(othersResolved, as(fixture, "ORG_ADMIN"))).status).toBe(200);
     expect((await get(othersResolved, as(fixture, "INSTRUCTOR"))).status).toBe(200);
     expect(
       (await get(othersResolved, as(fixture, "PARENT", [ROLES.PARENT, ROLES.INSTRUCTOR]))).status,
-    ).toBe(200);
+    ).toBe(404);
 
     // When the school does not show incidents to parents, not even their own child's.
     await setParentVisibility(fixture, false);

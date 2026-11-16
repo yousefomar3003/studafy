@@ -350,7 +350,6 @@ CASES.push(
     method: "GET",
     path: () => `/api/discipline/incidents/${ids.incidentS2}`,
     expect: "deny",
-    finding: "QA-039",
     why: "discipline records of untaught minors are leadership-only",
   },
   {
@@ -359,7 +358,6 @@ CASES.push(
     method: "GET",
     path: () => `/api/discipline/incidents?limit=100`,
     expect: { excludes: "incidentS2" },
-    finding: "QA-039",
     why: "same scope for the list as for a single read",
   },
   {
