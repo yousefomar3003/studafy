@@ -82,17 +82,24 @@ function fakeDatabase(rows: TenantRow[]) {
     },
   });
 
-  return { database, queries };
+  // The route's arithmetic over these rows; the per-school SQL itself is tested against a real
+  // database in tests/ai/metrics-tenant-scope.test.ts (QA-062).
+  const loadRows = async () => rows;
+  return { database, queries, loadRows };
 }
 
-function buildMetricsApp(authCtx: AuthContext, database: Database): OpenAPIHono<AppEnv> {
+function buildMetricsApp(
+  authCtx: AuthContext,
+  database: Database,
+  loadRows?: () => Promise<TenantRow[]>,
+): OpenAPIHono<AppEnv> {
   const app = new OpenAPIHono<AppEnv>();
   app.use("*", async (c, next) => {
     c.set("auth", authCtx);
     c.set("locale", "en");
     await next();
   });
-  app.route("/", aiMetricsRoutes({ database }));
+  app.route("/", aiMetricsRoutes({ database, ...(loadRows ? { loadRows } : {}) }));
   app.onError(errorHandlerMiddleware(silentLogger));
   return app;
 }
@@ -125,8 +132,8 @@ const ROWS: TenantRow[] = [
 
 describe("GET /api/ai/admin/metrics", () => {
   test("returns per-tenant metrics for SUPER_ADMIN", async () => {
-    const { database } = fakeDatabase(ROWS);
-    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database);
+    const { database, loadRows } = fakeDatabase(ROWS);
+    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database, loadRows);
 
     const res = await app.request("/api/ai/admin/metrics");
     const body = (await res.json()) as {
@@ -194,8 +201,8 @@ describe("GET /api/ai/admin/metrics", () => {
   });
 
   test("returns empty state when no tenants have active subscriptions", async () => {
-    const { database } = fakeDatabase([]);
-    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database);
+    const { database, loadRows } = fakeDatabase([]);
+    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database, loadRows);
 
     const res = await app.request("/api/ai/admin/metrics");
     const body = (await res.json()) as {
@@ -216,8 +223,8 @@ describe("GET /api/ai/admin/metrics", () => {
   });
 
   test("rejects non-SUPER_ADMIN with 403", async () => {
-    const { database } = fakeDatabase(ROWS);
-    const app = buildMetricsApp(authWithRoles([ROLES.ORG_ADMIN]), database);
+    const { database, loadRows } = fakeDatabase(ROWS);
+    const app = buildMetricsApp(authWithRoles([ROLES.ORG_ADMIN]), database, loadRows);
 
     const res = await app.request("/api/ai/admin/metrics");
 
@@ -225,8 +232,8 @@ describe("GET /api/ai/admin/metrics", () => {
   });
 
   test("rejects STUDENT role with 403", async () => {
-    const { database } = fakeDatabase(ROWS);
-    const app = buildMetricsApp(authWithRoles([ROLES.STUDENT]), database);
+    const { database, loadRows } = fakeDatabase(ROWS);
+    const app = buildMetricsApp(authWithRoles([ROLES.STUDENT]), database, loadRows);
 
     const res = await app.request("/api/ai/admin/metrics");
 
@@ -246,8 +253,8 @@ describe("GET /api/ai/admin/metrics", () => {
         period_end: new Date("2026-08-31T23:59:59.000Z"),
       },
     ];
-    const { database } = fakeDatabase(singleRow);
-    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database);
+    const { database, loadRows } = fakeDatabase(singleRow);
+    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database, loadRows);
 
     const res = await app.request("/api/ai/admin/metrics");
     const body = (await res.json()) as {
@@ -286,8 +293,8 @@ describe("GET /api/ai/admin/metrics", () => {
         period_end: new Date("2026-08-31T23:59:59.000Z"),
       },
     ];
-    const { database } = fakeDatabase(highUsageRow);
-    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database);
+    const { database, loadRows } = fakeDatabase(highUsageRow);
+    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database, loadRows);
 
     const res = await app.request("/api/ai/admin/metrics");
     const body = (await res.json()) as {
@@ -325,8 +332,8 @@ describe("GET /api/ai/admin/metrics", () => {
         period_end: new Date("2026-08-31T23:59:59.000Z"),
       },
     ];
-    const { database } = fakeDatabase(lowUsageRow);
-    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database);
+    const { database, loadRows } = fakeDatabase(lowUsageRow);
+    const app = buildMetricsApp(authWithRoles([ROLES.SUPER_ADMIN]), database, loadRows);
 
     const res = await app.request("/api/ai/admin/metrics");
     const body = (await res.json()) as {
