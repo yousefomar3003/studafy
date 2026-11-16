@@ -10,7 +10,6 @@
  *   TEST_DATABASE_URL=postgres://... bun test tests/runner-lock-timeout.test.ts
  */
 
- 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import postgres from "postgres";
 
