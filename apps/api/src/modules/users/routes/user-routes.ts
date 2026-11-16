@@ -19,6 +19,7 @@ import {
 } from "../../auth/services/member-password-service";
 import {
   adminRevokeUserSessions,
+  denylistLiveAccessTokens,
   REVOCATION_REASONS,
 } from "../../auth/services/revocation-service";
 import { writeAnswers } from "../../records/record-service";
@@ -480,6 +481,17 @@ export function userRoutes(
         callerRoles: auth.roles,
       }),
     );
+
+    // The target's live access tokens still carry the old roles (QA-026): deny them now. Their
+    // sessions survive, and the next refresh reads the new role.
+    await denylistLiveAccessTokens({
+      database,
+      denylist,
+      tenant: { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+      targetUserId: userId,
+      reason: REVOCATION_REASONS.ROLE_CHANGE,
+      log: c.get("log"),
+    });
 
     return c.json(row, 200);
   });

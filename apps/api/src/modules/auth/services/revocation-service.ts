@@ -63,6 +63,8 @@ export const REVOCATION_REASONS = {
   REVOKE_OTHERS: "revoke_others",
   /** A member changed their own password: every other session ends (QA-024). */
   PASSWORD_CHANGE: "password_change",
+  /** An administrator changed the user's role: live access tokens carry the old one (QA-026). */
+  ROLE_CHANGE: "role_change",
   ADMIN_REVOKE_DEVICE: "admin_revoke_device",
   ADMIN_REVOKE_ALL_DEVICES: "admin_revoke_all_devices",
   ACCOUNT_DELETION: "account_deletion",
@@ -493,4 +495,32 @@ export async function familyOfAccessJti(
     `,
   );
   return rows[0]?.family_id;
+}
+
+/**
+ * Denylist a user's live access tokens without ending their sessions (QA-026). For changes that
+ * make the claims an access token carries stale, such as a role change: the next refresh re-reads
+ * them from the database, so the user stays signed in with what they are now allowed.
+ */
+export async function denylistLiveAccessTokens(params: {
+  database: Database;
+  denylist: JtiDenylist | null;
+  tenant: TenantContext;
+  targetUserId: string;
+  reason: RevocationReason;
+  log?: Logger;
+}): Promise<number> {
+  const live = await withTenantTx(
+    params.database,
+    params.tenant,
+    (tx) => tx<Pick<RevokedRow, "access_jti" | "access_expires_at">[]>`
+      SELECT access_jti, access_expires_at
+      FROM app.admin_user_live_access_jtis(${params.targetUserId})
+    `,
+  );
+  return denylistRevoked(params.denylist, live, {
+    reason: params.reason,
+    subject: { targetUserId: params.targetUserId },
+    log: params.log,
+  });
 }
