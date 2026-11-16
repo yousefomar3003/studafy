@@ -927,7 +927,18 @@ describeDb("academic grading", () => {
         ...period,
         subjects: period.subjects.map((subject) =>
           subject.subject_id === ids.science && period.term_id === ids.term1
-            ? { ...subject, approved_at: expect.any(String) as unknown as string }
+            ? {
+                ...subject,
+                approved_at: expect.any(String) as unknown as string,
+                // Released again by the new approval.
+                categories: subject.categories.map((category) => ({
+                  ...category,
+                  assessments: category.assessments.map((assessment) => ({
+                    ...assessment,
+                    released_at: expect.any(String) as unknown as string,
+                  })),
+                })),
+              }
             : subject,
         ),
       })),

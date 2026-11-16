@@ -202,4 +202,12 @@ export const NOTIFICATION_CATALOG = {
       route: "/classes/{classId}/materials",
     },
   },
+  // Academic marks released (000230): the student and their parents. The route is the mobile app's
+  // released-marks screen for that student (each recipient's row fills in its own student).
+  [NOTIFICATION_TYPES.MARKS_RELEASED]: {
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH],
+    metadataDefaults: {
+      route: "/students/{studentId}/marks",
+    },
+  },
 } as const satisfies NotificationCatalog;

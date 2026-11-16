@@ -13,9 +13,12 @@ import 'widgets/academic_result_widgets.dart';
 /// the annual period for year-long assessments such as the final exam. Under each, one card per
 /// subject with its categories (midterm, final exam, quizzes, …) and every assessment's mark.
 ///
-/// A teacher's marks reach this screen only once school leadership approves that term's mark
-/// sheet; the API returns nothing else. Shared by both audiences like `AcademicResultsScreen`:
-/// the student opens it with no [studentId]; a parent opens it for the selected child.
+/// A teacher's marks reach this screen only once school leadership approves them: the whole term's
+/// mark sheet, or one assessment on its own (say, the first exam before the rest of the term); the
+/// API returns nothing else. A subject released one assessment at a time says more marks are still
+/// to come, and nothing here is ever a term total. Shared by both audiences like
+/// `AcademicResultsScreen`: the student opens it with no [studentId]; a parent opens it for the
+/// selected child.
 class ReleasedMarksScreen extends ConsumerWidget {
   const ReleasedMarksScreen({this.studentId, this.studentName, super.key});
 
@@ -139,7 +142,17 @@ class _SubjectMarksCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(subject.name, style: theme.textTheme.titleMedium),
-            if (approvedAt != null) ...[
+            if (!subject.periodApproved) ...[
+              const SizedBox(height: AppSpacing.space4),
+              Text(
+                'releasedMarks.partial'.tr(),
+                key: ValueKey('released-marks-partial-${subject.id}'),
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ] else if (approvedAt != null) ...[
               const SizedBox(height: AppSpacing.space4),
               Text(
                 'releasedMarks.approvedOn'.tr(

@@ -13,6 +13,8 @@
  *   - attendance.sessionSubmitted -> ATTENDANCE_MARKED to the parents of each student marked absent/late
  *   - material.published         -> MATERIAL_PUBLISHED to the class's active students (not parents:
  *                                   they have no materials screen, and a class gets many materials)
+ *   - marks.released             -> MARKS_RELEASED to the section's students with a released mark in
+ *                                   it and their parents (a mark sheet or one assessment approved)
  *
  * The inbox rows and the event's `notify_dispatched_at` stamp commit in one transaction, so an event
  * notifies exactly once: a crash before COMMIT leaves the event pending and writes nothing. Push is
@@ -38,13 +40,14 @@ import type { Sql, TransactionSql } from "postgres";
 
 /**
  * Must match the event names in idx_outbox_events_school_notify_pending and
- * app.outbox_pending_school_ids('notify') (000228).
+ * app.outbox_pending_school_ids('notify') (000230).
  */
 export const NOTIFY_EVENT_NAMES = [
   "assignment.published",
   "submission.graded",
   "attendance.sessionSubmitted",
   "material.published",
+  "marks.released",
 ] as const;
 
 const STALE_EVENT_MS = 2 * 24 * 60 * 60 * 1000;
@@ -481,6 +484,157 @@ async function materialPublished(
   return drafts;
 }
 
+/** The period's name in a notice: the term's, or the whole year for annual assessments. */
+function periodLabel(locale: TemplateLocale, termName: string | null): string {
+  if (termName) return termName;
+  return locale === "ar" ? "العام الدراسي كاملًا" : "Full year";
+}
+
+/** The localized MARKS_RELEASED line: one assessment, or a whole period of a subject. */
+export function releasedLine(
+  locale: TemplateLocale,
+  release: { subjectName: string; termName: string | null; assessmentName: string | null },
+): string {
+  const { subjectName, termName, assessmentName } = release;
+  if (assessmentName !== null) {
+    return locale === "ar"
+      ? `صدرت درجات ${assessmentName} في ${subjectName}`
+      : `${assessmentName} marks are out for ${subjectName}`;
+  }
+  const period = periodLabel(locale, termName);
+  return locale === "ar"
+    ? `صدرت درجات ${subjectName} – ${period}`
+    : `${subjectName} – ${period} marks are released`;
+}
+
+/**
+ * Leadership approved a mark sheet (assessmentId null) or one assessment on its own (000229).
+ * Tells each of the section's students with a mark in what was released, and their parents. One
+ * event is one notice per person: a sheet approval that also approved pending single assessments
+ * raised a single event. Nothing is sent when the marks are no longer released by the time the event
+ * is read (withdrawn, or the sheet reopened).
+ */
+async function marksReleased(
+  tx: TransactionSql,
+  schoolId: string,
+  payload: Record<string, unknown>,
+): Promise<Draft[]> {
+  const sectionId = String(payload.sectionId ?? "");
+  const subjectId = String(payload.subjectId ?? "");
+  const termId = typeof payload.termId === "string" ? payload.termId : null;
+  const assessmentId = typeof payload.assessmentId === "string" ? payload.assessmentId : null;
+  if (!sectionId || !subjectId) return [];
+
+  const [context] = await tx<
+    {
+      subject_name: string;
+      term_name: string | null;
+      assessment_name: string | null;
+      released: boolean;
+    }[]
+  >`
+    SELECT subject.name AS subject_name, term.name AS term_name,
+           assessment.name AS assessment_name,
+           (
+             EXISTS (
+               SELECT 1 FROM app.mark_sheets AS sheet
+               WHERE sheet.school_id = section.school_id AND sheet.section_id = section.id
+                 AND sheet.subject_id = subject.id
+                 AND sheet.term_id IS NOT DISTINCT FROM ${termId}::uuid
+                 AND sheet.status = 'approved'
+             )
+             OR (
+               ${assessmentId}::uuid IS NOT NULL
+               AND EXISTS (
+                 SELECT 1 FROM app.assessment_mark_releases AS release_row
+                 WHERE release_row.school_id = section.school_id
+                   AND release_row.section_id = section.id
+                   AND release_row.assessment_id = ${assessmentId}::uuid
+                   AND release_row.status = 'approved'
+               )
+             )
+           ) AS released
+    FROM app.sections AS section
+    JOIN app.subjects AS subject
+      ON subject.id = ${subjectId}::uuid AND subject.school_id = section.school_id
+    LEFT JOIN app.terms AS term
+      ON term.id = ${termId}::uuid AND term.school_id = section.school_id
+    LEFT JOIN app.subject_config_assessments AS assessment
+      ON assessment.id = ${assessmentId}::uuid AND assessment.school_id = section.school_id
+    WHERE section.id = ${sectionId}::uuid AND section.school_id = ${schoolId}::uuid
+  `;
+  if (!context?.released) return [];
+  if (assessmentId !== null && context.assessment_name === null) return [];
+
+  const scope =
+    assessmentId === null
+      ? tx`AND assessment.term_id IS NOT DISTINCT FROM ${termId}::uuid`
+      : tx`AND assessment.id = ${assessmentId}::uuid`;
+  const students = await tx<{ student_id: string }[]>`
+    SELECT DISTINCT mark.student_id
+    FROM app.student_marks AS mark
+    JOIN app.subject_config_assessments AS assessment
+      ON assessment.id = mark.assessment_id AND assessment.school_id = mark.school_id
+    JOIN app.subject_configs AS config
+      ON config.id = assessment.subject_config_id AND config.school_id = assessment.school_id
+    JOIN app.student_sections AS placement
+      ON placement.student_id = mark.student_id
+     AND placement.academic_year_id = assessment.academic_year_id
+     AND placement.school_id = mark.school_id
+    WHERE mark.school_id = ${schoolId}::uuid
+      AND placement.section_id = ${sectionId}::uuid
+      AND config.subject_id = ${subjectId}::uuid
+      AND assessment.status = 'active'
+      AND (assessment.section_id IS NULL OR assessment.section_id = ${sectionId}::uuid)
+      ${scope}
+    ORDER BY mark.student_id
+  `;
+  const people = await loadPeople(
+    tx,
+    schoolId,
+    students.map((row) => row.student_id),
+  );
+
+  const type = NOTIFICATION_TYPES.MARKS_RELEASED;
+  const release = {
+    subjectName: context.subject_name,
+    termName: context.term_name,
+    assessmentName: assessmentId === null ? null : context.assessment_name,
+  };
+  const ids: Record<string, string> = { section_id: sectionId, subject_id: subjectId };
+  if (termId) ids.term_id = termId;
+  if (assessmentId) ids.assessment_id = assessmentId;
+  const localized = (locale: TemplateLocale) => ({ released: releasedLine(locale, release) });
+
+  const drafts: Draft[] = [];
+  for (const person of people) {
+    const metadata = {
+      ...ids,
+      route: resolveRoute(type, { studentId: person.studentId }),
+      student_id: person.studentId,
+    };
+    if (person.studentUserId) {
+      drafts.push({
+        userId: person.studentUserId,
+        type,
+        vars: { who: "", subjectName: release.subjectName },
+        localized,
+        metadata,
+      });
+    }
+    for (const parentUserId of person.parentUserIds) {
+      drafts.push({
+        userId: parentUserId,
+        type,
+        vars: { who: `${person.studentName} · `, subjectName: release.subjectName },
+        localized,
+        metadata,
+      });
+    }
+  }
+  return drafts;
+}
+
 interface Audience {
   vars: Record<string, string>;
   localized?: (locale: TemplateLocale) => Record<string, string>;
@@ -526,6 +680,7 @@ const HANDLERS: Record<
   "submission.graded": submissionGraded,
   "attendance.sessionSubmitted": attendanceSubmitted,
   "material.published": materialPublished,
+  "marks.released": marksReleased,
 };
 
 // ---------------------------------------------------------------------------

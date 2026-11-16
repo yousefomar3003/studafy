@@ -14,6 +14,7 @@ import '../domain/mark_sheet.dart';
 import 'assessment_marks_screen.dart';
 import 'report_comments_screen.dart';
 import 'widgets/add_mark_assessment_sheet.dart';
+import 'widgets/assessment_release.dart';
 import 'widgets/mark_sheet_common.dart';
 
 /// One section + subject's mark sheet, one period (a term, or the annual period) at a time.
@@ -23,7 +24,9 @@ import 'widgets/mark_sheet_common.dart';
 /// assessments grouped by category with how many marks are recorded or missing, and every
 /// student's live result preview — a provisional percentage is always labelled as provisional and
 /// never shown as a grade. Opening an assessment pushes [AssessmentMarksScreen] to enter marks;
-/// "Submit for approval" sends the period to the reviewer.
+/// "Submit for approval" sends the whole period to the reviewer. Each assessment also shows where
+/// its marks stand with students and parents, and a complete one can be sent for approval on its
+/// own ("Send for approval") so families see, say, the first exam without waiting for the term.
 class MarkSheetScreen extends ConsumerStatefulWidget {
   const MarkSheetScreen({
     required this.sectionId,
@@ -180,6 +183,12 @@ class _MarkSheetScreenState extends ConsumerState<MarkSheetScreen> {
                       sheet: sheet,
                       assessment: assessment,
                       onOpen: () => _openAssessment(assessment),
+                      onSend: () => sendAssessmentForApproval(
+                        context: context,
+                        ref: ref,
+                        sheetKey: _key,
+                        assessment: assessment,
+                      ),
                     ),
                 ],
                 const SizedBox(height: AppSpacing.space16),
@@ -910,11 +919,15 @@ class _AssessmentTile extends StatelessWidget {
     required this.sheet,
     required this.assessment,
     required this.onOpen,
+    required this.onSend,
   });
 
   final MarkSheet sheet;
   final MarkSheetAssessment assessment;
   final VoidCallback onOpen;
+
+  /// Send this assessment's marks for approval on their own.
+  final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
@@ -983,9 +996,21 @@ class _AssessmentTile extends StatelessWidget {
                   StatusPill(
                     label: 'teacher.marks.sheet.rejected'.tr(),
                     tone: StatusPillTone.danger,
-                  ),
+                  )
+                else
+                  AssessmentReleasePill(assessment: assessment),
               ],
             ),
+            if (sheet.canSendForApproval(assessment))
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  key: ValueKey('release-send-${assessment.id}'),
+                  onPressed: onSend,
+                  icon: const Icon(Icons.send_outlined, size: 18),
+                  label: Text('teacher.marks.release.send'.tr()),
+                ),
+              ),
           ],
         ),
         trailing: assessment.isActive ? const Icon(Icons.chevron_right) : null,

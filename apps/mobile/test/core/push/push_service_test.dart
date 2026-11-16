@@ -60,6 +60,13 @@ void main() {
         }),
         '/classes/k-1/materials',
       );
+      expect(
+        resolveNotificationTapRoute({
+          'notification_type': 'MARKS_RELEASED',
+          'route': '/students/st-1/marks',
+        }),
+        '/students/st-1/marks',
+      );
     });
 
     test('anything the app cannot open lands in the notification inbox', () {

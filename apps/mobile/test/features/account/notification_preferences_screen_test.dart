@@ -93,6 +93,7 @@ void main() {
     expect(notificationCategoryOf('LICENSE_INVOICE_DUE'), NotificationCategory.fees);
     expect(notificationCategoryOf('ENROLLMENT_APPROVED'), NotificationCategory.schoolUpdates);
     expect(notificationCategoryOf('MATERIAL_PUBLISHED'), NotificationCategory.lessons);
+    expect(notificationCategoryOf('MARKS_RELEASED'), NotificationCategory.grades);
   });
 
   testWidgets('one switch turns off every type in the kind, in a single save', (tester) async {

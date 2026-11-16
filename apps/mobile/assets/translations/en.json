@@ -1337,6 +1337,32 @@
         "added": "Assessment added.",
         "proposed": "Sent for approval. It can be marked once approved.",
         "noCategory": "This period has no category that accepts new assessments."
+      },
+      "release": {
+        "title": "Students and parents",
+        "send": "Send for approval",
+        "confirmTitle": "Send {assessment} for approval?",
+        "confirmBody": "These marks go to the reviewer on their own. Once approved, students and parents see them right away; you don't need to finish the rest of the term first. You can't change them while they wait or after approval.",
+        "confirm": "Send",
+        "sent": "Sent for approval.",
+        "releasedNow": "Released to students and parents.",
+        "incompleteError": "Some students still have no mark for this assessment. Enter a mark, or absent / excused, for everyone first.",
+        "alreadySent": "This assessment, or its whole term, has already been sent.",
+        "ready": "Every student has a mark. You can send this assessment for approval now, without waiting for the rest of the term.",
+        "incomplete": "Students still without a mark: {count}. Enter a mark (or absent / excused) for everyone to send this assessment for approval on its own.",
+        "withPeriod": "These marks go to the reviewer with the whole term.",
+        "lockedSubmitted": "Waiting for approval. These marks are read-only until the reviewer approves or returns them.",
+        "lockedApproved": "Released to students and parents. Ask an administrator to withdraw them before changing a mark.",
+        "released": "Students and parents can see these marks.",
+        "releasedOn": "Released to students and parents {date}.",
+        "returned": "Returned by the reviewer: {reason}",
+        "returnedNoReason": "Returned by the reviewer. Correct the marks and send them again.",
+        "saveFirst": "Save your changes before sending.",
+        "status": {
+          "submitted": "Awaiting approval",
+          "released": "Released",
+          "returned": "Returned"
+        }
       }
     },
     "home": {
@@ -2361,10 +2387,10 @@
   "releasedMarks": {
     "title": "Term marks",
     "entry": "Term marks",
-    "entrySubtitle": "Midterm, final exam and other marks your school has approved",
+    "entrySubtitle": "Exam and other marks your school has approved",
     "error": "Couldn't load marks.",
     "unavailable": "Marks aren't available for this account.",
-    "empty": "No approved marks yet. A term's marks appear here once the school approves them.",
+    "empty": "No approved marks yet. Marks appear here once the school approves them.",
     "retry": "Try again",
     "annual": "Full year",
     "approvedOn": "Approved {date}",
@@ -2373,7 +2399,8 @@
       "absent": "Absent",
       "excused": "Excused",
       "notApplicable": "N/A"
-    }
+    },
+    "partial": "More marks for this term are still to come. The term result is not final yet."
   },
   "academicResults": {
     "skillLine": "{skill}: {descriptor}",

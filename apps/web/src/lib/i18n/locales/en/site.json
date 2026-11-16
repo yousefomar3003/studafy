@@ -313,7 +313,8 @@
       "ASSIGNMENT_PUBLISHED": "New assignments",
       "ASSIGNMENT_GRADED": "Marked assignments",
       "ATTENDANCE_MARKED": "Absences and lates",
-      "MATERIAL_PUBLISHED": "New lesson materials"
+      "MATERIAL_PUBLISHED": "New lesson materials",
+      "MARKS_RELEASED": "Released marks"
     },
     "channels": {
       "in_app": "In-app",

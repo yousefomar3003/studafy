@@ -9,20 +9,27 @@ import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import {
   addSectionAssessment,
+  decideAssessmentRelease,
   decideMarkSheet,
   decideProposedAssessment,
   getMarkSheet,
+  listAssessmentReleases,
   listMarkSheets,
   listMyAssignments,
   listProposedAssessments,
   saveMarks,
+  submitAssessmentRelease,
   submitMarkSheet,
 } from "../marks-service";
 import {
   addAssessmentBodySchema,
   addAssessmentResultSchema,
   assessmentIdParamSchema,
+  assessmentReleaseListSchema,
+  assessmentReleaseQuerySchema,
+  assessmentReleaseSchema,
   decideAssessmentBodySchema,
+  decideAssessmentReleaseBodySchema,
   decideSheetBodySchema,
   markSheetListSchema,
   markSheetQuerySchema,
@@ -31,8 +38,10 @@ import {
   myAssignmentsQuerySchema,
   myAssignmentsSchema,
   proposedAssessmentListSchema,
+  releaseIdParamSchema,
   saveMarksBodySchema,
   saveMarksResultSchema,
+  sectionSubjectAssessmentParamSchema,
   sectionSubjectParamSchema,
   sheetIdParamSchema,
   submitSheetBodySchema,
@@ -41,7 +50,7 @@ import {
 
 import type { Database } from "../../../db/client";
 import type { AppEnv } from "../../../middleware/requestId";
-import type { MarkSheetRow } from "../marks-service";
+import type { AssessmentReleaseRow, MarkSheetRow } from "../marks-service";
 import type { Context } from "hono";
 
 const TAGS = ["Marks"];
@@ -87,7 +96,7 @@ const saveMarksRoute = createRoute({
   operationId: "saveMarks",
   summary: "Record, change or clear marks",
   description:
-    "status pending clears a mark. Refused for submitted/approved sheets (MARKS_LOCKED), finalized results, scores outside 0..max, and students who do not take the subject.",
+    "status pending clears a mark. Refused for submitted/approved sheets and for assessments sent for approval on their own or released (MARKS_LOCKED), finalized results, scores outside 0..max, and students who do not take the subject.",
   security,
   request: { params: sectionSubjectParamSchema, body: json(saveMarksBodySchema) },
   responses: standardResponses(
@@ -150,11 +159,58 @@ const decideSheetRoute = createRoute({
   operationId: "decideMarkSheet",
   summary: "Approve, return or reopen a mark sheet",
   description:
-    "Returning or reopening needs a reason. A sheet inside finalized results cannot be reopened.",
+    "Approving releases the period's marks to students and parents and notifies them (MARKS_RELEASED). Returning or reopening needs a reason. A sheet inside finalized results cannot be reopened.",
   security,
   request: { params: sheetIdParamSchema, body: json(decideSheetBodySchema) },
   responses: standardResponses(
     { 200: { description: "Sheet.", schema: markSheetRowSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const submitReleaseRoute = createRoute({
+  method: "post",
+  path: "/api/grading/sections/{sectionId}/subjects/{subjectId}/assessments/{assessmentId}/release",
+  tags: TAGS,
+  operationId: "submitAssessmentRelease",
+  summary: "Send one assessment's marks for approval",
+  description:
+    "Releases a single assessment before the rest of its period: every enrolled student needs a usable mark for it (409 RESULTS_INCOMPLETE). Always waits for leadership approval (also where the grade's sheets need no approval step); once approved the marks are visible to the student and their parents, who are notified (MARKS_RELEASED, in-app and push). Refused while the period's whole sheet is submitted or approved.",
+  security,
+  request: { params: sectionSubjectAssessmentParamSchema },
+  responses: standardResponses(
+    { 200: { description: "Release.", schema: assessmentReleaseSchema } },
+    [400, 401, 403, 404, 409, 500],
+  ),
+});
+
+const listReleasesRoute = createRoute({
+  method: "get",
+  path: "/api/grading/years/{yearId}/assessment-releases",
+  tags: TAGS,
+  operationId: "listAssessmentReleases",
+  summary: "Single assessments sent for approval in a year (the approval queue)",
+  description: "Filter by status=submitted for releases awaiting approval.",
+  security,
+  request: { params: yearIdParamSchema, query: assessmentReleaseQuerySchema },
+  responses: standardResponses(
+    { 200: { description: "Releases.", schema: assessmentReleaseListSchema } },
+    [401, 403, 500],
+  ),
+});
+
+const decideReleaseRoute = createRoute({
+  method: "post",
+  path: "/api/grading/assessment-releases/{releaseId}/decision",
+  tags: TAGS,
+  operationId: "decideAssessmentRelease",
+  summary: "Approve, return or withdraw one assessment's release",
+  description:
+    "Approving releases the marks to the student and their parents and notifies them. Returning or withdrawing (reopen) needs a reason; withdrawing hides the marks from families again. Refused while the period's whole sheet is approved, and inside finalized results.",
+  security,
+  request: { params: releaseIdParamSchema, body: json(decideAssessmentReleaseBodySchema) },
+  responses: standardResponses(
+    { 200: { description: "Release.", schema: assessmentReleaseSchema } },
     [400, 401, 403, 404, 409, 500],
   ),
 });
@@ -203,6 +259,15 @@ function sheetJson(sheet: MarkSheetRow) {
   };
 }
 
+function releaseJson(release: AssessmentReleaseRow) {
+  return {
+    ...release,
+    submitted_at: release.submitted_at.toISOString(),
+    decided_at: release.decided_at?.toISOString() ?? null,
+    updated_at: release.updated_at.toISOString(),
+  };
+}
+
 export function gradingMarksRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
@@ -238,6 +303,20 @@ export function gradingMarksRoutes(database: Database): OpenAPIHono<AppEnv> {
     "/api/grading/mark-sheets/:sheetId/decision",
     requirePermission(PERMISSIONS.APPROVAL_REVIEW),
     auditAction("update", "mark_sheets"),
+  );
+  routes.use(
+    "/api/grading/sections/:sectionId/subjects/:subjectId/assessments/:assessmentId/release",
+    requirePermission(PERMISSIONS.GRADE_UPDATE),
+    auditAction("update", "assessment_mark_releases"),
+  );
+  routes.use(
+    "/api/grading/years/:yearId/assessment-releases",
+    requirePermission(PERMISSIONS.APPROVAL_REVIEW),
+  );
+  routes.use(
+    "/api/grading/assessment-releases/:releaseId/decision",
+    requirePermission(PERMISSIONS.APPROVAL_REVIEW),
+    auditAction("update", "assessment_mark_releases"),
   );
   routes.use(
     "/api/grading/years/:yearId/proposed-assessments",
@@ -325,6 +404,51 @@ export function gradingMarksRoutes(database: Database): OpenAPIHono<AppEnv> {
       decideMarkSheet(tx, tenant.schoolId, tenant.userId, sheetId, action, reason),
     );
     return c.json(sheetJson(sheet), 200);
+  });
+
+  routes.openapi(submitReleaseRoute, async (c) => {
+    const { sectionId, subjectId, assessmentId } = c.req.valid("param");
+    const tenant = tenantFrom(c);
+    const release = await withTenantTx(database, tenant, (tx) =>
+      submitAssessmentRelease(
+        tx,
+        tenant.schoolId,
+        tenant.userId,
+        sectionId,
+        subjectId,
+        assessmentId,
+      ),
+    );
+    return c.json(releaseJson(release), 200);
+  });
+
+  routes.openapi(listReleasesRoute, async (c) => {
+    const { yearId } = c.req.valid("param");
+    const { status } = c.req.valid("query");
+    const tenant = tenantFrom(c);
+    const releases = await withTenantTx(database, tenant, (tx) =>
+      listAssessmentReleases(tx, tenant.schoolId, { yearId, status }),
+    );
+    return c.json(
+      {
+        releases: releases.map((release) => ({
+          ...release,
+          ...releaseJson(release),
+          max_marks: Number(release.max_marks),
+        })),
+      },
+      200,
+    );
+  });
+
+  routes.openapi(decideReleaseRoute, async (c) => {
+    const { releaseId } = c.req.valid("param");
+    const { action, reason } = c.req.valid("json");
+    const tenant = tenantFrom(c);
+    const release = await withTenantTx(database, tenant, (tx) =>
+      decideAssessmentRelease(tx, tenant.schoolId, tenant.userId, releaseId, action, reason),
+    );
+    return c.json(releaseJson(release), 200);
   });
 
   routes.openapi(proposedRoute, async (c) => {

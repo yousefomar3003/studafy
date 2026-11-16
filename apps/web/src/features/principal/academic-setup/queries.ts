@@ -26,6 +26,7 @@ export type SubjectEnrollment = Schemas["SubjectEnrollmentList"]["enrollments"][
 export type MarkSheetSummary = Schemas["MarkSheetList"]["sheets"][number];
 export type ProposedAssessment = Schemas["ProposedAssessmentList"]["assessments"][number];
 export type MarkSheet = Schemas["MarkSheet"];
+export type AssessmentReleaseSummary = Schemas["AssessmentReleaseList"]["releases"][number];
 export type ResultPreview = Schemas["ResultPreview"];
 export type ResultFinalization = Schemas["ResultFinalization"];
 export type ExamTemplate = Schemas["ExamTemplate"];
@@ -59,6 +60,7 @@ export const gradingKeys = {
   enrollments: (sectionId: string) => [...GRADING_KEY, "enrollments", sectionId] as const,
   markSheets: (yearId: string) => [...GRADING_KEY, "mark-sheets", yearId] as const,
   proposed: (yearId: string) => [...GRADING_KEY, "proposed", yearId] as const,
+  assessmentReleases: (yearId: string) => [...GRADING_KEY, "assessment-releases", yearId] as const,
   markSheet: (sectionId: string, subjectId: string) =>
     [...GRADING_KEY, "mark-sheet", sectionId, subjectId] as const,
   preview: (sectionId: string, termId: string | null) =>
@@ -233,6 +235,25 @@ export function useMarkSheets(yearId: string | undefined, status: MarkSheetStatu
         params: { path: { yearId: yearId! }, query: { status } },
       });
       return required<Schemas["MarkSheetList"]>(data, "Mark sheets").sheets;
+    },
+  });
+}
+
+export type AssessmentReleaseStatusFilter = AssessmentReleaseSummary["status"];
+
+/** Single assessments teachers sent for approval before the rest of their period (000229). */
+export function useAssessmentReleases(
+  yearId: string | undefined,
+  status: AssessmentReleaseStatusFilter,
+) {
+  return useQuery({
+    queryKey: [...gradingKeys.assessmentReleases(yearId ?? ""), status],
+    enabled: yearId !== undefined,
+    queryFn: async () => {
+      const { data } = await api.GET("/api/grading/years/{yearId}/assessment-releases", {
+        params: { path: { yearId: yearId! }, query: { status } },
+      });
+      return required<Schemas["AssessmentReleaseList"]>(data, "Assessment releases").releases;
     },
   });
 }

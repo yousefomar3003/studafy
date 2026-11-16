@@ -317,7 +317,8 @@
       "ASSIGNMENT_PUBLISHED": "الواجبات الجديدة",
       "ASSIGNMENT_GRADED": "الواجبات المصححة",
       "ATTENDANCE_MARKED": "الغياب والتأخير",
-      "MATERIAL_PUBLISHED": "المواد التعليمية الجديدة"
+      "MATERIAL_PUBLISHED": "المواد التعليمية الجديدة",
+      "MARKS_RELEASED": "صدور الدرجات"
     },
     "channels": {
       "in_app": "داخل التطبيق",
