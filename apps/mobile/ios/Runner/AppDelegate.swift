@@ -39,6 +39,30 @@ import UserNotifications
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
 
+  // A notification that arrives while the app is open on screen. iOS shows it only if this
+  // delegate answers with presentation options. The firebase_messaging plugin is meant to answer
+  // (setForegroundNotificationPresentationOptions in push_service.dart), but registered through the
+  // implicit engine it did not, so nothing was shown while the app was open, though the same push
+  // appeared on the lock screen. Still hand it on (the plugin's onMessage refreshes the in-app
+  // bell), then always answer with a banner, once, whoever answers first.
+  override func userNotificationCenter(
+    _ center: UNUserNotificationCenter,
+    willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    let show: UNNotificationPresentationOptions = [.banner, .list, .sound, .badge]
+    var answered = false
+    let answer: (UNNotificationPresentationOptions) -> Void = { _ in
+      DispatchQueue.main.async {
+        guard !answered else { return }
+        answered = true
+        completionHandler(show)
+      }
+    }
+    super.userNotificationCenter(center, willPresent: notification, withCompletionHandler: answer)
+    answer(show)
+  }
+
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
   }
