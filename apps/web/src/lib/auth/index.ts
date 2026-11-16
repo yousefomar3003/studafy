@@ -56,7 +56,11 @@ export { decodeAccessTokenRoles } from "./access-token-claims";
 export { resolveRoleHome } from "./role-home";
 
 import { authRefreshClient } from "./api";
-import { createSessionStore } from "./session-store";
+import { createBrowserCrossTab, createSessionStore } from "./session-store";
 
 /** The app-wide session store. `lib/api.ts`'s token seam and the realtime handshake read through it. */
-export const sessionStore = createSessionStore({ refreshClient: authRefreshClient });
+export const sessionStore = createSessionStore({
+  refreshClient: authRefreshClient,
+  // QA-033: tabs rotate the shared refresh cookie one at a time and share the result.
+  crossTab: createBrowserCrossTab(),
+});

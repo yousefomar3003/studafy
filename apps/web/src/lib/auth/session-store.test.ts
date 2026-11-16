@@ -4,6 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { createSessionStore } from "./session-store";
 
 import type {
+  CrossTabCoordinator,
   SessionRefreshClient,
   SessionStatus,
   SessionStore,
@@ -366,5 +367,85 @@ describe("createSessionStore", () => {
     unsubscribe();
     expect(seen).toContain("authenticated");
     expect(seen).toContain("unauthenticated");
+  });
+});
+
+// QA-033: a browser restoring several tabs at once must not log the user out. Every tab shares
+// one refresh cookie, and the API burns the whole family when one refresh token is presented twice,
+// so tabs that rotate concurrently trip reuse detection. Tabs now take a cross-tab lock around a
+// rotation and share the result, so the second tab adopts the first tab's fresh tokens.
+describe("cross-tab refresh (QA-033)", () => {
+  /** The API's rotation rule: each refresh token works once; presenting a spent one burns all. */
+  function fakeServer() {
+    let cookie = 0;
+    let burned = false;
+    let calls = 0;
+    const client = {
+      async refresh() {
+        calls += 1;
+        const presented = cookie; // the browser sends the cookie it holds when the request starts
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        if (burned || presented !== cookie) {
+          burned = true;
+          throw Object.assign(new Error("reuse"), { status: 401 });
+        }
+        cookie += 1;
+        const payload = Buffer.from(JSON.stringify({ sub: "u1", roles: ["ORG_ADMIN"] })).toString(
+          "base64url",
+        );
+        return {
+          accessToken: `h.${payload}.s${cookie}`,
+          expiresAt: Date.now() + 900_000,
+          sessionId: "s1",
+        };
+      },
+      logout: () => Promise.resolve(),
+    };
+    return { client, calls: () => calls, burned: () => burned };
+  }
+
+  /** What every tab of one browser shares: the Web Locks lock and the BroadcastChannel. */
+  function sharedBrowser(): CrossTabCoordinator {
+    let tail: Promise<unknown> = Promise.resolve();
+    let latest: SessionTokens | null = null;
+    return {
+      withLock<T>(fn: () => Promise<T>): Promise<T> {
+        const run = tail.then(fn, fn);
+        tail = run.catch(() => undefined);
+        return run;
+      },
+      publish(tokens) {
+        latest = tokens;
+      },
+      latest: () => latest,
+    };
+  }
+
+  test("five tabs restoring at once all end up signed in, with one rotation", async () => {
+    const server = fakeServer();
+    const browser = sharedBrowser();
+    const tabs = Array.from({ length: 5 }, () =>
+      createSessionStore({ refreshClient: server.client, crossTab: browser }),
+    );
+    const outcomes = await Promise.all(tabs.map((tab) => tab.restore()));
+    expect(outcomes).toEqual(Array(5).fill("authenticated"));
+    expect(server.burned()).toBe(false);
+    expect(server.calls()).toBe(1);
+  });
+
+  test("a later rotation, once the shared token is near expiry, rotates again rather than reusing it", async () => {
+    const server = fakeServer();
+    const browser = sharedBrowser();
+    let clock = Date.now();
+    const tab = createSessionStore({
+      refreshClient: server.client,
+      crossTab: browser,
+      now: () => clock,
+    });
+    await tab.restore();
+    clock += 899_000; // inside the refresh margin of the shared token
+    expect(await tab.restore()).toBe("authenticated");
+    expect(server.calls()).toBe(2);
+    expect(server.burned()).toBe(false);
   });
 });
