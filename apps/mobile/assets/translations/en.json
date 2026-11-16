@@ -432,6 +432,15 @@
     "unknownClass": "Class",
     "error": "Couldn't load materials for this class.",
     "empty": "No materials yet.",
+    "weeks": {
+      "week": "Week {number}",
+      "unscheduled": "Unscheduled",
+      "thisWeek": "This week",
+      "count": {
+        "one": "1 material",
+        "other": "{} materials"
+      }
+    },
     "status": {
       "pendingScan": "Pending scan",
       "scanning": "Scanning",
@@ -1441,6 +1450,10 @@
         "cameraDenied": "Camera access is off. Turn it on in Settings > Studafy > Camera to take a photo.",
         "cameraError": "Could not open the camera.",
         "fileRequired": "Choose a file or take a photo.",
+        "week": "Week",
+        "weekRequired": "Choose the week this material is for.",
+        "day": "Day",
+        "dayRequired": "Choose the day this material is for.",
         "uploading": "Uploading…",
         "save": "Save changes"
       },

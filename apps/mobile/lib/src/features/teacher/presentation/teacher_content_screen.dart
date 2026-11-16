@@ -32,9 +32,11 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../attachments/presentation/attachment_viewer_screen.dart';
 import '../../student/domain/material_ready_state.dart';
 import '../../student/presentation/widgets/material_ready_state_pill.dart';
+import '../../student/presentation/widgets/material_week_sections.dart';
 import 'assignment_submissions_screen.dart';
 import 'question_editor_screen.dart';
 import 'widgets/class_ai_materials_switch.dart';
+import 'widgets/material_placement_fields.dart';
 
 /// Teacher-owned content for one class: create and edit assignments, upload and edit materials.
 ///
@@ -259,6 +261,7 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
             ),
             Expanded(
               child: _MaterialList(
+                classId: widget.classId,
                 future: _materials,
                 onRefresh: _refreshMaterials,
                 onEdit: (material) => _open(
@@ -396,12 +399,16 @@ class _AssignmentList extends StatelessWidget {
   );
 }
 
+/// The class's materials in collapsible week sections with day sub-groups
+/// ([MaterialWeekSections]), the same grouping students see.
 class _MaterialList extends StatelessWidget {
   const _MaterialList({
+    required this.classId,
     required this.future,
     required this.onRefresh,
     required this.onEdit,
   });
+  final String classId;
   final Future<List<material_api.Material>> future;
   final VoidCallback onRefresh;
   final ValueChanged<material_api.Material> onEdit;
@@ -429,61 +436,68 @@ class _MaterialList extends StatelessWidget {
                 icon: Icons.folder_open_outlined,
                 text: 'teacher.content.materials.empty'.tr(),
               )
-            : ListView.separated(
+            : ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(AppSpacing.space16),
-                itemCount: materials.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AppSpacing.space8),
-                itemBuilder: (_, index) {
-                  final material = materials[index];
-                  final description = material.description;
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.space12,
-                        AppSpacing.space8,
-                        AppSpacing.space8,
-                        AppSpacing.space8,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                children: [
+                  MaterialWeekSections(
+                    classId: classId,
+                    materials: materials,
+                    itemBuilder: (context, material) {
+                      final description = material.description;
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.space12,
+                            AppSpacing.space8,
+                            AppSpacing.space8,
+                            AppSpacing.space8,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  material.title,
-                                  style: Theme.of(context).textTheme.titleSmall,
-                                ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      material.title,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    tooltip: 'teacher.content.materials.edit'
+                                        .tr(),
+                                    onPressed: () => onEdit(material),
+                                  ),
+                                ],
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.edit_outlined),
-                                tooltip: 'teacher.content.materials.edit'.tr(),
-                                onPressed: () => onEdit(material),
+                              if (description != null && description.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    bottom: AppSpacing.space4,
+                                  ),
+                                  child: Text(
+                                    description,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
+                                ),
+                              MaterialReadyStatePill(
+                                state: materialReadyStateFromWireName(
+                                  material.ingestStatus.name,
+                                ),
                               ),
                             ],
                           ),
-                          if (description != null && description.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: AppSpacing.space4,
-                              ),
-                              child: Text(
-                                description,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ),
-                          MaterialReadyStatePill(
-                            state: materialReadyStateFromWireName(
-                              material.ingestStatus.name,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
       );
     },
@@ -1029,6 +1043,10 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _description = TextEditingController();
+
+  /// The week and day of the term the material is listed under. Both required to upload.
+  int? _week;
+  int? _day;
   _LocalFile? _file;
   bool _uploading = false;
   double? _progress;
@@ -1073,10 +1091,12 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
   }
 
   Future<void> _upload() async {
-    if (!_formKey.currentState!.validate() || _file == null) {
+    final valid = _formKey.currentState!.validate();
+    if (_file == null) {
       setState(() => _errorKey = 'teacher.content.materialForm.fileRequired');
       return;
     }
+    if (!valid || _week == null || _day == null) return;
     final file = _file!;
     setState(() {
       _uploading = true;
@@ -1094,6 +1114,8 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
           originalFileName: file.name,
           mimeType: file.contentType,
           sizeBytes: file.sizeBytes,
+          weekNumber: _week,
+          dayOfWeek: _day,
         ),
       );
       // The initiate endpoint currently returns only the storage key. The material row is
@@ -1147,6 +1169,15 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
         padding: const EdgeInsets.all(AppSpacing.space16),
         children: [
           _MaterialFields(title: _title, description: _description),
+          const SizedBox(height: AppSpacing.space12),
+          MaterialPlacementFields(
+            classId: widget.classId,
+            week: _week,
+            day: _day,
+            enabled: !_uploading,
+            onWeekChanged: (week) => setState(() => _week = week),
+            onDayChanged: (day) => setState(() => _day = day),
+          ),
           const SizedBox(height: AppSpacing.space12),
           Wrap(
             spacing: AppSpacing.space8,
@@ -1224,8 +1255,9 @@ class _MaterialFields extends StatelessWidget {
   );
 }
 
-/// Edits an uploaded material's metadata. The file itself is immutable -- replacing it means
-/// uploading a new material -- and AI visibility is toggled from the list row.
+/// Edits an uploaded material's metadata, including the week and day it is listed under. The file
+/// itself is immutable -- replacing it means uploading a new material -- and AI visibility is
+/// toggled from the list row.
 class _MaterialEditor extends ConsumerStatefulWidget {
   const _MaterialEditor({required this.material});
   final material_api.Material material;
@@ -1237,6 +1269,10 @@ class _MaterialEditorState extends ConsumerState<_MaterialEditor> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _title;
   late final TextEditingController _description;
+
+  /// [unscheduledMaterialWeek] for a material in no week (one uploaded before weeks existed).
+  late int? _week = widget.material.weekNumber ?? unscheduledMaterialWeek;
+  late int? _day = widget.material.dayOfWeek;
   bool _saving = false;
   String? _errorKey;
 
@@ -1264,8 +1300,9 @@ class _MaterialEditorState extends ConsumerState<_MaterialEditor> {
     });
     try {
       final description = _description.text.trim();
-      // Both fields are always sent: the generated body serialises nulls, and a null description
-      // is exactly how the API clears it.
+      final placed = _week != unscheduledMaterialWeek;
+      // Every field is always sent: the generated body serialises nulls, and a null description
+      // (or a null week and day) is exactly how the API clears it.
       await ref
           .read(apiClientProvider)
           .academics
@@ -1274,6 +1311,8 @@ class _MaterialEditorState extends ConsumerState<_MaterialEditor> {
             body: UpdateMaterialBody(
               title: _title.text.trim(),
               description: description.isEmpty ? null : description,
+              weekNumber: placed ? _week : null,
+              dayOfWeek: placed ? _day : null,
             ),
           );
       if (mounted) Navigator.of(context).pop(true);
@@ -1297,6 +1336,20 @@ class _MaterialEditorState extends ConsumerState<_MaterialEditor> {
         padding: const EdgeInsets.all(AppSpacing.space16),
         children: [
           _MaterialFields(title: _title, description: _description),
+          const SizedBox(height: AppSpacing.space12),
+          MaterialPlacementFields(
+            classId: widget.material.classId,
+            week: _week,
+            day: _day,
+            required: false,
+            allowUnscheduled: true,
+            enabled: !_saving,
+            onWeekChanged: (week) => setState(() {
+              _week = week;
+              if (week == unscheduledMaterialWeek) _day = null;
+            }),
+            onDayChanged: (day) => setState(() => _day = day),
+          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.insert_drive_file_outlined),

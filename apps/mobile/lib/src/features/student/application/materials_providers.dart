@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/api/generated/models/class.dart';
 import '../../../core/api/generated/models/material.dart';
 import '../../../core/api/storage_download_client.dart';
 import '../../../core/auth/auth_providers.dart';
@@ -17,6 +18,12 @@ final materialsForClassProvider = StreamProvider.autoDispose
       return ref.watch(materialsOfflineRepositoryProvider).materialsForClass(classId);
     });
 
+/// A class by id, shared by everything on the materials screens that needs it (its code for the
+/// section header, its term for the week sections) so the class is read once.
+final materialsClassProvider = FutureProvider.autoDispose.family<Class, String>((ref, classId) {
+  return ref.watch(apiClientProvider).academics.getClass(classId: classId);
+});
+
 /// A class's display code by id ("MATH101-A" rather than a UUID). Mirrors
 /// `timetable_day_section.dart`'s private `_classCodeProvider` — public here since more than one
 /// materials widget resolves it (the class-section header today; the viewer screen could add a
@@ -25,7 +32,7 @@ final materialsClassCodeProvider = FutureProvider.autoDispose.family<String, Str
   ref,
   classId,
 ) async {
-  final classValue = await ref.watch(apiClientProvider).academics.getClass(classId: classId);
+  final classValue = await ref.watch(materialsClassProvider(classId).future);
   return classValue.code;
 });
 

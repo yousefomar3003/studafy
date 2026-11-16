@@ -32,6 +32,8 @@ export interface MaterialRow {
   ingest_status: MaterialIngestStatus;
   ingest_error: string | null;
   ingested_at: Date | null;
+  week_number: number | null;
+  day_of_week: number | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -41,6 +43,8 @@ export interface ListMaterialsParams {
   offset: number;
   class_id?: string;
   ingest_status?: string;
+  week_number?: number;
+  day_of_week?: number;
 }
 
 export interface InitiateUploadParams {
@@ -51,11 +55,16 @@ export interface InitiateUploadParams {
   mime_type: string;
   size_bytes: number;
   checksum_sha256?: string;
+  week_number?: number;
+  day_of_week?: number;
 }
 
 export interface UpdateMaterialParams {
   title?: string;
   description?: string | null;
+  // Validated as a pair by updateMaterialBodySchema: both omitted, both numbers, or both null.
+  week_number?: number | null;
+  day_of_week?: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -71,17 +80,23 @@ export async function listMaterials(
   const statusFilter = params.ingest_status
     ? tx` AND m.ingest_status = ${params.ingest_status}::app.material_ingest_status`
     : tx``;
+  const weekFilter =
+    params.week_number !== undefined ? tx` AND m.week_number = ${params.week_number}` : tx``;
+  const dayFilter =
+    params.day_of_week !== undefined ? tx` AND m.day_of_week = ${params.day_of_week}` : tx``;
 
   const [rows, countResult] = await Promise.all([
     tx<MaterialRow[]>`
       SELECT m.id, m.school_id, m.class_id, m.uploaded_by_user_id, m.last_edited_by_user_id,
              m.title, m.description, m.storage_key, m.original_file_name, m.mime_type,
              m.size_bytes::float8 AS size_bytes, m.checksum_sha256, m.ai_visible, m.ingest_status, m.ingest_error,
-             m.ingested_at, m.created_at, m.updated_at
+             m.ingested_at, m.week_number, m.day_of_week, m.created_at, m.updated_at
       FROM app.materials AS m
       WHERE m.school_id = ${schoolId}
         ${classFilter}
         ${statusFilter}
+        ${weekFilter}
+        ${dayFilter}
       ORDER BY m.created_at DESC, m.id
       LIMIT ${params.limit}
       OFFSET ${params.offset}
@@ -92,6 +107,8 @@ export async function listMaterials(
       WHERE m.school_id = ${schoolId}
         ${classFilter}
         ${statusFilter}
+        ${weekFilter}
+        ${dayFilter}
     `,
   ]);
 
@@ -107,7 +124,7 @@ export async function getMaterial(
     SELECT id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
            title, description, storage_key, original_file_name, mime_type,
            size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
-           ingested_at, created_at, updated_at
+           ingested_at, week_number, day_of_week, created_at, updated_at
     FROM app.materials
     WHERE id = ${materialId} AND school_id = ${schoolId}
   `;
@@ -177,7 +194,7 @@ export async function initiateUpload(
     INSERT INTO app.materials (
       school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
       title, description, storage_key, original_file_name, mime_type,
-      size_bytes, checksum_sha256
+      size_bytes, checksum_sha256, week_number, day_of_week
     ) VALUES (
       ${schoolId},
       ${params.class_id},
@@ -189,19 +206,27 @@ export async function initiateUpload(
       ${params.original_file_name},
       ${params.mime_type},
       ${params.size_bytes},
-      ${params.checksum_sha256 ?? null}
+      ${params.checksum_sha256 ?? null},
+      ${params.week_number ?? null},
+      ${params.day_of_week ?? null}
     )
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
               title, description, storage_key, original_file_name, mime_type,
               size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
-              ingested_at, created_at, updated_at
+              ingested_at, week_number, day_of_week, created_at, updated_at
   `;
 
   await emitAuditLog(tx, {
     action: "insert",
     targetTable: "materials",
     targetId: row!.id,
-    newValues: { title: params.title, class_id: params.class_id, storage_key: storageKey },
+    newValues: {
+      title: params.title,
+      class_id: params.class_id,
+      storage_key: storageKey,
+      week_number: params.week_number ?? null,
+      day_of_week: params.day_of_week ?? null,
+    },
   });
 
   return { material: row!, upload_url: "", storage_key: storageKey, expires_at: new Date() };
@@ -251,7 +276,7 @@ export async function confirmUpload(
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
               title, description, storage_key, original_file_name, mime_type,
               size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
-              ingested_at, created_at, updated_at
+              ingested_at, week_number, day_of_week, created_at, updated_at
   `;
 
   await emitAuditLog(tx, {
@@ -277,25 +302,43 @@ export async function updateMaterial(
     throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
   }
 
+  // Omitted keeps the current placement; the schema only lets the pair through together.
+  const placement =
+    params.week_number !== undefined && params.day_of_week !== undefined
+      ? { week_number: params.week_number, day_of_week: params.day_of_week }
+      : { week_number: existing.week_number, day_of_week: existing.day_of_week };
+
   const [row] = await tx<MaterialRow[]>`
     UPDATE app.materials
     SET title = COALESCE(${params.title ?? null}, title),
         description = ${params.description !== undefined ? params.description : existing.description},
+        week_number = ${placement.week_number},
+        day_of_week = ${placement.day_of_week},
         last_edited_by_user_id = ${userId},
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${materialId} AND school_id = ${schoolId}
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
               title, description, storage_key, original_file_name, mime_type,
               size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
-              ingested_at, created_at, updated_at
+              ingested_at, week_number, day_of_week, created_at, updated_at
   `;
 
   await emitAuditLog(tx, {
     action: "update",
     targetTable: "materials",
     targetId: materialId,
-    oldValues: { title: existing.title, description: existing.description },
-    newValues: { title: params.title, description: params.description },
+    oldValues: {
+      title: existing.title,
+      description: existing.description,
+      week_number: existing.week_number,
+      day_of_week: existing.day_of_week,
+    },
+    newValues: {
+      title: params.title,
+      description: params.description,
+      week_number: params.week_number,
+      day_of_week: params.day_of_week,
+    },
   });
 
   return row!;
@@ -402,7 +445,7 @@ export async function toggleAiVisible(
       RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
                 title, description, storage_key, original_file_name, mime_type,
                 size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
-                ingested_at, created_at, updated_at
+                ingested_at, week_number, day_of_week, created_at, updated_at
     `;
     if (!row) throw new HTTPException(404, { message: "Material not found" });
 
@@ -436,7 +479,7 @@ export async function toggleAiVisible(
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
               title, description, storage_key, original_file_name, mime_type,
               size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
-              ingested_at, created_at, updated_at
+              ingested_at, week_number, day_of_week, created_at, updated_at
   `;
   if (!row) throw new HTTPException(404, { message: "Material not found" });
 
