@@ -118,6 +118,17 @@ jobs:
           export MOBILE_BUILD_NUMBER="$(git rev-list --count HEAD)"
           bundle exec fastlane android internal
 
+      # The signed bundle, kept so it can be downloaded (gh run download) and uploaded to Play by
+      # hand, e.g. to another track. Kept even when the Play upload step failed after the build.
+      - name: Keep the signed Android bundle
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-aab
+          path: apps/mobile/build/app/outputs/bundle/*Release/*.aab
+          if-no-files-found: warn
+          retention-days: 14
+
   # --- iOS: TestFlight on every merge to main -------------------------------------------------
   ios-beta:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
