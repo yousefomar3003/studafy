@@ -41,6 +41,7 @@ import {
 } from "../schemas";
 import { loginSlipContext } from "../slip-context";
 import {
+  assertManageableTarget,
   createUser as createUserService,
   deactivateUser,
   getUser,
@@ -399,9 +400,10 @@ export function userRoutes(
     const auth = requireAuth(c);
     const { userId } = c.req.valid("param");
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      getUser(tx, auth.schoolId, userId),
-    );
+    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      await assertManageableTarget(tx, userId, auth.roles);
+      return getUser(tx, auth.schoolId, userId);
+    });
 
     if (!row) {
       throw new HTTPException(404, {
@@ -448,9 +450,10 @@ export function userRoutes(
     const { userId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      updateUserService(tx, auth.schoolId, userId, body),
-    );
+    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      await assertManageableTarget(tx, userId, auth.roles);
+      return updateUserService(tx, auth.schoolId, userId, body);
+    });
 
     // Switching an account off through PATCH must end it as /deactivate does (QA-010): this path
     // used to change the status and revoke nothing, so the user kept refreshing indefinitely.
@@ -499,6 +502,9 @@ export function userRoutes(
   routes.openapi(deactivateUserRoute, async (c) => {
     const auth = requireAuth(c);
     const { userId } = c.req.valid("param");
+    await withTenantTx(database, tenantFrom(c), (tx) =>
+      assertManageableTarget(tx, userId, auth.roles),
+    );
 
     const result = await deactivateUser({
       database,

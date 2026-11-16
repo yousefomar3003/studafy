@@ -122,6 +122,27 @@ function notPlatformStaff(tx: TransactionSql) {
   )`;
 }
 
+/**
+ * QA-060: Studafy's own staff are out of a school administrator's reach. Role changes already
+ * refused them (canChangeRoleOf); reading, editing, deactivating and filing a GDPR request against
+ * a platform-staff account now answer exactly as for a user of another school -- not found --
+ * unless the caller is platform staff too.
+ */
+export async function assertManageableTarget(
+  tx: TransactionSql,
+  targetUserId: string,
+  callerRoles: readonly string[],
+  notFound: () => Error = () => new HTTPException(404, { message: "User not found" }),
+): Promise<void> {
+  if (callerRoles.some((role) => isPlatformRole(role))) return;
+  const [staff] = await tx<{ found: number }[]>`
+    SELECT 1 AS found FROM app.user_roles
+    WHERE user_id = ${targetUserId}::uuid AND role = ANY(${[...PLATFORM_ROLES]}::app.user_role[])
+    LIMIT 1
+  `;
+  if (staff) throw notFound();
+}
+
 export async function listUsers(
   tx: TransactionSql,
   schoolId: string,

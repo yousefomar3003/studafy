@@ -27,6 +27,7 @@ import { requireAuth } from "../../middleware/authContext";
 import { requirePermission } from "../../middleware/authz";
 import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
+import { assertManageableTarget } from "../users/user-service";
 
 import { addDsrJob } from "./dsr-queue";
 import {
@@ -272,6 +273,18 @@ export function privacyRoutes(
     requireStorage(storage);
 
     const row = await withTenantTx(primary, tenantFrom(c), async (tx) => {
+      // QA-060: a platform-staff account is not this school's to erase or export.
+      await assertManageableTarget(
+        tx,
+        body.subject_user_id,
+        auth.roles,
+        () =>
+          new CodedHttpException(
+            404,
+            ERROR_CODES.DSR_SUBJECT_NOT_FOUND,
+            "This user does not belong to your school",
+          ),
+      );
       if (!(await subjectExists(tx, auth.schoolId, body.subject_user_id))) {
         throw new CodedHttpException(
           404,
