@@ -127,6 +127,21 @@ export function hasCredentialFailure(codes: Record<string, number>): boolean {
   return Object.keys(codes).some((code) => CREDENTIAL_ERROR_CODES.has(code));
 }
 
+/**
+ * The longest one FCM call may take. A send that never settles must fail, not hang: the push loop
+ * awaits it, so a hang would stop every later notification (the caller logs the failure).
+ */
+export const SEND_TIMEOUT_MS = 30_000;
+
+/** `promise`, or a rejection once `ms` have passed without it settling. */
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`FCM send timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 /** The `data` payload every FCM message carries. Values must be strings — FCM rejects anything else. */
 export function buildDataPayload(message: PushMessage): Record<string, string> {
   const data: Record<string, string> = {
@@ -161,6 +176,11 @@ export function createFcmSender(env: PushSenderEnv, logger: PushSenderLogger): P
 
   const app = buildFirebaseApp(serviceAccountJson);
   const messaging: Messaging = getMessaging(app);
+  // HTTP/1.1, not firebase-admin's default HTTP/2 session. Under Bun the shared HTTP/2 session
+  // stopped answering once it had sat idle: the first sends after a restart went through, then a
+  // send never settled, the push loop waited on it forever, and every later notification stayed
+  // unsent until the next deploy (seen 2026-11-16). One request per token is plenty at our volume.
+  messaging.enableLegacyHttpTransport();
 
   return {
     async send(message: PushMessage, devices: PushDevice[]): Promise<PushSendResult> {
@@ -168,22 +188,25 @@ export function createFcmSender(env: PushSenderEnv, logger: PushSenderLogger): P
         return { unregisteredDeviceIds: [], sent: 0, dryRun: false };
       }
 
-      const result = await messaging.sendEachForMulticast({
-        tokens: devices.map((device) => device.token),
-        notification: { title: message.title, body: message.body },
-        data: buildDataPayload(message),
-        // Without these a notification can arrive silently: Android delivers normal-priority
-        // messages late on a dozing phone, and iOS plays no sound unless the payload asks for one.
-        android: {
-          priority: "high",
-          notification: { sound: "default", channelId: ANDROID_CHANNEL_ID },
-        },
-        // apns-priority 10 + push-type alert: shown at once, including on the lock screen.
-        apns: {
-          headers: { "apns-priority": "10", "apns-push-type": "alert" },
-          payload: { aps: { sound: "default" } },
-        },
-      });
+      const result = await withTimeout(
+        messaging.sendEachForMulticast({
+          tokens: devices.map((device) => device.token),
+          notification: { title: message.title, body: message.body },
+          data: buildDataPayload(message),
+          // Without these a notification can arrive silently: Android delivers normal-priority
+          // messages late on a dozing phone, and iOS plays no sound unless the payload asks for one.
+          android: {
+            priority: "high",
+            notification: { sound: "default", channelId: ANDROID_CHANNEL_ID },
+          },
+          // apns-priority 10 + push-type alert: shown at once, including on the lock screen.
+          apns: {
+            headers: { "apns-priority": "10", "apns-push-type": "alert" },
+            payload: { aps: { sound: "default" } },
+          },
+        }),
+        SEND_TIMEOUT_MS,
+      );
 
       const unregisteredDeviceIds: string[] = [];
       for (const [index, device] of devices.entries()) {
