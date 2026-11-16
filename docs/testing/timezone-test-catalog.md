@@ -87,23 +87,13 @@ Pacific/Kiritimati) the local wall deadline is exactly `0000 two days later`; on
 `0100` (spring: EU/NY) or `2300` (fall: NY; 0100 Berlin spring; 2300 London fall) — those are the
 honest assertions.
 
-## Notification digest date labels
+## Notification digest date labels (retired)
 
-Parent digest (`apps/workers/src/queues/notifications/email/notification-digest-producer.ts`) labels
-each recipient digest with the recipient's **own local date**:
-
-    (CURRENT_TIMESTAMP AT TIME ZONE COALESCE(user_settings.timezone, school_settings.timezone, 'UTC'))::date::text
-
-Defaults, in order: the recipient's own timezone, then their school's, then UTC. Parent digest
-(`digest-producer.ts`) uses `CURRENT_TIMESTAMP AT TIME ZONE <school timezone>` (school local) and
-meets the same rules. Both land in the recipient's/school's _local_ calendar day, so a date line
-that crosses midnight in a far-ahead zone (Kiritimati, Kathmandu) is assigned the local day, and a
-DST transition does not shift the label's input instant off the intended local day.
-
-**Documented divergence (cite, don't quietly fix):** the _parent_ digest date frame is the parent's
-school-local date; the _recipient_ digest date label is the recipient-local date (which can differ
-for a recipient in a different zone than their school). Tests for the two labels assert both sides,
-so the contract evolves if the divergence is ever reconciled — it is not hidden.
+The daily digest emails (the per-parent attendance/fee digest and the per-recipient notification
+digest) are retired: Studafy sends no notification email. Their producers, and the
+`notification-digest-producer.test.ts` suite that pinned the recipient-local date label, were
+removed. `apps/api/tests/tz-locale/digest-label-date.test.ts` still pins the underlying Postgres
+school-local vs recipient-local date frames, which any future dated summary should reuse.
 
 ## RTL / locale rendering
 
@@ -115,13 +105,12 @@ so the contract evolves if the divergence is ever reconciled — it is not hidde
 
 ## Where these expectations are enforced (must exist; linked from each suite)
 
-| Suite                                                                              | Layer       | Zone                                                                            | What it pins                                                                  |
-| ---------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `apps/api/tests/tz-locale/attendance-correction-deadline.test.ts`                  | api, DB     | NY/Berlin/London spring+fall, Casablanca/Amman/Kathmandu/Kiritimati control     | 48 h absolute deadline; flip at -1s/+0s                                       |
-| `apps/api/tests/tz-locale/digest-label-date.test.ts`                               | api, DB     | per-recipient NY/Berlin/London spring+fall + Kiritimati/Kathmandu + default-UTC | local-date label for digest + parent frame; divergence documented             |
-| `apps/api/tests/tz-locale/scheduled-announcements-dst.test.ts`                     | api         | announcement `scheduled_at` future-clamp across DST                             | absolute instant preserved across DST; future stays scheduled, past publishes |
-| `apps/api/tests/tz-locale/locale-rtl.test.ts`                                      | api, pure   | ar vs en/others                                                                 | reportEnvelope direction; ar render with no unresolved placeholders           |
-| `apps/workers/src/queues/notifications/email/notification-digest-producer.test.ts` | workers, DB | recipient tz fallback chain (user -> school -> UTC)                             | existing suite; catalog extends it with spring/fall cases in each DST zone    |
+| Suite                                                             | Layer     | Zone                                                                            | What it pins                                                                  |
+| ----------------------------------------------------------------- | --------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `apps/api/tests/tz-locale/attendance-correction-deadline.test.ts` | api, DB   | NY/Berlin/London spring+fall, Casablanca/Amman/Kathmandu/Kiritimati control     | 48 h absolute deadline; flip at -1s/+0s                                       |
+| `apps/api/tests/tz-locale/digest-label-date.test.ts`              | api, DB   | per-recipient NY/Berlin/London spring+fall + Kiritimati/Kathmandu + default-UTC | local-date label for digest + parent frame; divergence documented             |
+| `apps/api/tests/tz-locale/scheduled-announcements-dst.test.ts`    | api       | announcement `scheduled_at` future-clamp across DST                             | absolute instant preserved across DST; future stays scheduled, past publishes |
+| `apps/api/tests/tz-locale/locale-rtl.test.ts`                     | api, pure | ar vs en/others                                                                 | reportEnvelope direction; ar render with no unresolved placeholders           |
 
 Cron/scheduler anchors are all `tz: "UTC"` (see `apps/workers` `*-scheduler.ts`), so sweep timing
 never depends on a local wall clock; DST affects only _labels_ and _deadline instants_, both of

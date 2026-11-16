@@ -1,8 +1,7 @@
 /**
- * School enumeration for the email channel.
- *
- * Both the dispatcher and the digest producer walk the school list to scope their work per
- * tenant. app.schools is a global table with no RLS, so the plain connection can read it.
+ * School enumeration. Lives here for history (the email channel needed it first); the per-school
+ * sweeps across apps/workers walk this list to scope their work per tenant. app.schools is a
+ * global table with no RLS, so the plain connection can read it.
  */
 
 import type { Sql } from "postgres";

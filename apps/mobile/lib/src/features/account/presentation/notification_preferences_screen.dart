@@ -73,9 +73,9 @@ class _CategoryChannel {
   bool get enabled => cells.every((cell) => cell.enabled || cell.mandatory);
 }
 
-/// "Notifications" in Profile: whether this phone shows them, a test button, one switch per kind of
-/// notice for the phone and for email, and quiet hours. Everything always lands in the inbox (the
-/// bell), so the switches only decide what interrupts.
+/// "Notifications" in Profile: whether this phone shows them, a test button, one phone switch per
+/// kind of notice, and quiet hours. Everything always lands in the inbox (the bell), so the switches
+/// only decide what interrupts. Studafy sends no notification email, so there is no email choice.
 class NotificationPreferencesScreen extends ConsumerStatefulWidget {
   const NotificationPreferencesScreen({super.key});
 
@@ -280,8 +280,9 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
     );
   }
 
-  /// The visible categories, each with its push and email switch (null when the category has no
-  /// cell on that channel). Types this build doesn't know are left out.
+  /// The visible categories, each with its push switch. Only push cells count: the inbox always
+  /// gets everything, and notifications are never emailed. Types this build doesn't know are left
+  /// out.
   static Map<NotificationCategory, Map<String, _CategoryChannel>> _group(
     List<NotificationPreference> cells, {
     required Set<NotificationCategory> categories,
@@ -292,7 +293,7 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
       final type = cell.notificationType.json;
       final channel = cell.channel.json;
       if (type == null || channel == null) continue;
-      if (cell.channel == NotificationPreferenceChannel.inApp) continue;
+      if (cell.channel != NotificationPreferenceChannel.push) continue;
       if (_isTeachingOnly(type) && !includeTeaching) continue;
       final category = notificationCategoryOf(type);
       if (!categories.contains(category)) continue;
@@ -438,7 +439,7 @@ class _PhoneCard extends ConsumerWidget {
   }
 }
 
-/// One row per kind of notice, with a "Phone" and an "Email" switch.
+/// One row per kind of notice, with a "Phone" switch.
 class _KindsCard extends StatelessWidget {
   const _KindsCard({required this.grouped, required this.saving, required this.onToggle});
 
@@ -446,7 +447,7 @@ class _KindsCard extends StatelessWidget {
   final Set<String> saving;
   final Future<void> Function(NotificationCategory, String, _CategoryChannel, bool) onToggle;
 
-  static const _channels = ['push', 'email'];
+  static const _channels = ['push'];
 
   @override
   Widget build(BuildContext context) {

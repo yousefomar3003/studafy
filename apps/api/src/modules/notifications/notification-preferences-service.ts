@@ -1,9 +1,5 @@
-import {
-  DIGEST_ELIGIBLE_NOTIFICATION_TYPES,
-  MANDATORY_NOTIFICATION_TYPES,
-  NOTIFICATION_TYPES,
-} from "@studafy/constants";
-import { NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
+import { MANDATORY_NOTIFICATION_TYPES, NOTIFICATION_TYPES } from "@studafy/constants";
+import { DELIVERED_NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
 import { HTTPException } from "hono/http-exception";
 
 import { emitAuditLog } from "../../middleware/auditEmitter";
@@ -41,11 +37,13 @@ interface PreferenceRow {
   notification_type: string;
   channel: string;
   enabled: boolean;
-  digest: boolean;
 }
 
 const ALL_TYPES = Object.values(NOTIFICATION_TYPES);
-const ALL_CHANNELS = Object.values(NOTIFICATION_CHANNELS);
+// in_app and push. Studafy sends no notification email, so the email rows app.notification_channel
+// still allows (and the activation trigger still seeds) are never shown, written or read for
+// delivery.
+const ALL_CHANNELS = DELIVERED_NOTIFICATION_CHANNELS;
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -54,8 +52,8 @@ const ALL_CHANNELS = Object.values(NOTIFICATION_CHANNELS);
 /**
  * The authenticated user's full preference matrix, effective right now.
  *
- * Every (type, channel) pair is represented, whether or not a row exists for it — an absent row
- * means enabled: true, digest: false, the same default app.seed_default_notification_preferences
+ * Every (type, delivered channel) pair is represented, whether or not a row exists for it — an
+ * absent row means enabled: true, digest: false, the same default app.seed_default_notification_preferences
  * (000017) writes and apps/workers/.../dispatcher.ts's loadEnabledChannels already treats a missing
  * row as. Materializing the full cross product here rather than returning only the rows that exist
  * means a client never has to know that convention to render a complete toggle list.
@@ -65,9 +63,10 @@ export async function getPreferences(
   userId: string,
 ): Promise<NotificationPreferences> {
   const rows = await tx<PreferenceRow[]>`
-    SELECT notification_type::text, channel::text, enabled, digest
+    SELECT notification_type::text, channel::text, enabled
     FROM app.notification_preferences
     WHERE user_id = ${userId}::uuid
+      AND channel <> 'email'
   `;
   const stored = new Map(rows.map((row) => [`${row.notification_type}:${row.channel}`, row]));
 
@@ -79,11 +78,10 @@ export async function getPreferences(
         notification_type,
         channel,
         enabled: row?.enabled ?? true,
-        digest: row?.digest ?? false,
+        // The daily digest was an email-only feature and is retired with notification email.
+        digest: false,
         mandatory: MANDATORY_NOTIFICATION_TYPES.has(notification_type),
-        digest_eligible:
-          channel === NOTIFICATION_CHANNELS.EMAIL &&
-          DIGEST_ELIGIBLE_NOTIFICATION_TYPES.has(notification_type),
+        digest_eligible: false,
       });
     }
   }
@@ -102,15 +100,16 @@ export async function getPreferences(
 // ---------------------------------------------------------------------------
 
 /**
- * Reject a write the database would reject anyway, with a message that names the rule instead of a
- * raw constraint violation. ck_notification_preferences_mandatory_enabled,
- * ck_notification_preferences_digest_channel and ck_notification_preferences_digest_eligible
- * (migration 000083) enforce the same three rules at the database's arbiter of record — this is
- * defense in depth, not the only guard, so a caller that somehow bypassed this layer would still be
- * stopped, just with a less specific error.
+ * Reject a write with a message that names the rule instead of a raw constraint violation.
+ * ck_notification_preferences_mandatory_enabled (migration 000083) enforces the mandatory rule at
+ * the database's arbiter of record — this is defense in depth for that one.
+ *
+ * Digest was the batched daily email. Studafy sends no notification email, so it can no longer be
+ * turned on for any cell. (The email channel itself never reaches here: the request schema accepts
+ * only in_app and push.)
  */
 export function validateUpdate(update: NotificationPreferenceUpdate): void {
-  const { notification_type, channel, enabled, digest } = update;
+  const { notification_type, enabled, digest } = update;
   // Already validated against notificationTypeSchema/notificationChannelSchema by the OpenAPI
   // request body parser — this cast just recovers the literal type the Set lookups below need.
   const type = notification_type as NotificationType;
@@ -122,16 +121,9 @@ export function validateUpdate(update: NotificationPreferenceUpdate): void {
   }
 
   if (digest === true) {
-    if (channel !== NOTIFICATION_CHANNELS.EMAIL) {
-      throw new HTTPException(422, {
-        message: "digest can only be enabled on the email channel.",
-      });
-    }
-    if (!DIGEST_ELIGIBLE_NOTIFICATION_TYPES.has(type)) {
-      throw new HTTPException(422, {
-        message: `${notification_type} is not eligible for digest delivery.`,
-      });
-    }
+    throw new HTTPException(422, {
+      message: "Digest delivery is not available: notifications are never emailed.",
+    });
   }
 }
 
@@ -143,7 +135,8 @@ async function upsertPreference(
   update: NotificationPreferenceUpdate,
 ): Promise<void> {
   const enabled = update.enabled ?? current.enabled;
-  const digest = update.digest ?? current.digest;
+  // Always false: validateUpdate rejects true, and current.digest is reported false.
+  const digest = false;
 
   await tx`
     INSERT INTO app.notification_preferences (

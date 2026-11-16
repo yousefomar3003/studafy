@@ -184,13 +184,16 @@ describe("data retention sweep", () => {
 
   test("an outbox event waits for every consumer that claims it", () => {
     // The consumers' own claim lists, not copies: a new email or entitlement event is covered.
+    for (const name of [DOMAIN_EVENTS.INVITATION_SENT, DOMAIN_EVENTS.DIGEST_SENT]) {
+      expect(OUTBOX_EMAIL_EVENT_NAMES).toContain(name);
+    }
+    // No email consumer reads these since the parent digest email was retired, so they must not
+    // wait on email_dispatched_at, which nothing will ever set.
     for (const name of [
-      DOMAIN_EVENTS.INVITATION_SENT,
-      DOMAIN_EVENTS.DIGEST_SENT,
       DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED,
       DOMAIN_EVENTS.FEE_INSTALLMENT_OVERDUE,
     ]) {
-      expect(OUTBOX_EMAIL_EVENT_NAMES).toContain(name);
+      expect(OUTBOX_EMAIL_EVENT_NAMES).not.toContain(name);
     }
     expect([...OUTBOX_ENTITLEMENT_EVENT_NAMES].sort()).toEqual(
       [
@@ -547,8 +550,9 @@ describe("data retention sweep", () => {
         await seed("email-sent", DOMAIN_EVENTS.INVITATION_SENT, 15, { relayed: true, email: true }),
         await seed("email-pending", DOMAIN_EVENTS.INVITATION_SENT, 400, { relayed: true }),
         await seed("email-unrelayed", DOMAIN_EVENTS.INVITATION_SENT, 15, { email: true }),
-        await seed("digest-pending", DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED, 15, { relayed: true }),
-        await seed("digest-done", DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED, 15, {
+        // No email consumer since the parent digest email was retired: relayed is finished.
+        await seed("alert-relayed", DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED, 15, { relayed: true }),
+        await seed("alert-relayed-and-emailed", DOMAIN_EVENTS.ATTENDANCE_ALERT_RAISED, 15, {
           relayed: true,
           email: true,
         }),
@@ -576,7 +580,7 @@ describe("data retention sweep", () => {
       const result = await purgeExpiredRetainedData(db!, new FakeStore());
 
       expect(result.failed).toBe(0);
-      expect(result.outboxEvents).toBeGreaterThanOrEqual(DATA_RETENTION_BATCH_SIZE + 1 + 4);
+      expect(result.outboxEvents).toBeGreaterThanOrEqual(DATA_RETENTION_BATCH_SIZE + 1 + 5);
       const left = await asSchool(
         school.schoolId,
         (tx) => tx<{ label: string }[]>`
@@ -589,7 +593,6 @@ describe("data retention sweep", () => {
         "unrelayed-old",
         "email-pending",
         "email-unrelayed",
-        "digest-pending",
         "entitlement-pending",
         "user-entitlement-pending",
       ]);

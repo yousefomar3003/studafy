@@ -184,13 +184,13 @@ test.describe("notifications", () => {
     await page.route("**/api/notification-preferences", (route) =>
       fulfillJson(route, 200, {
         attendance_alert_threshold: null,
-        preferences: ["in_app", "push", "email"].map((channel) => ({
+        preferences: ["in_app", "push"].map((channel) => ({
           notification_type: "ASSIGNMENT_DUE_SOON",
           channel,
           enabled: true,
           digest: false,
           mandatory: false,
-          digest_eligible: channel === "email",
+          digest_eligible: false,
         })),
       }),
     );

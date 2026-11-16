@@ -45,7 +45,6 @@
 
 import { withSystemTenantTx, withSystemTx } from "../../db/tenant-tx";
 import { ENTITLEMENT_EVENT_NAMES, USER_ENTITLEMENT_EVENT_NAME } from "../entitlements/claim";
-import { DIGEST_SOURCE_EVENTS } from "../notifications/email/digest-producer";
 import { EMAIL_EVENT_NAMES } from "../notifications/email/resolve";
 import { loadSchoolIds } from "../notifications/email/schools";
 
@@ -195,8 +194,7 @@ export const DATA_RETENTION_RULES = [
  * name protects it here too:
  *
  *   relayed_at              every event (outbox-relay/claim.ts)
- *   email_dispatched_at     EMAIL_EVENT_NAMES (email/claim.ts) and DIGEST_SOURCE_EVENTS
- *                           (email/digest-producer.ts)
+ *   email_dispatched_at     EMAIL_EVENT_NAMES (email/claim.ts)
  *   entitlement_applied_at  ENTITLEMENT_EVENT_NAMES and USER_ENTITLEMENT_EVENT_NAME
  *                           (entitlements/claim.ts)
  *
@@ -204,9 +202,7 @@ export const DATA_RETENTION_RULES = [
  * and email-dispatched if an email consumer claims it, and entitlement-applied if the entitlement
  * consumer claims it. Nothing else reads an outbox row.
  */
-export const OUTBOX_EMAIL_EVENT_NAMES: readonly string[] = [
-  ...new Set([...EMAIL_EVENT_NAMES, ...DIGEST_SOURCE_EVENTS]),
-];
+export const OUTBOX_EMAIL_EVENT_NAMES: readonly string[] = [...EMAIL_EVENT_NAMES];
 export const OUTBOX_ENTITLEMENT_EVENT_NAMES: readonly string[] = [
   ...ENTITLEMENT_EVENT_NAMES,
   USER_ENTITLEMENT_EVENT_NAME,

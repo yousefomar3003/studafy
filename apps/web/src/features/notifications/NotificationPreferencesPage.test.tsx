@@ -7,7 +7,8 @@ import { MemoryRouter } from "react-router-dom";
 
 import type { ComponentType } from "react";
 
-const CHANNELS = ["in_app", "push", "email"] as const;
+// What the API returns: in_app and push. Studafy sends no notification email.
+const CHANNELS = ["in_app", "push"] as const;
 const TYPES = [
   "ASSIGNMENT_DUE_SOON",
   "GRADE_POSTED",
@@ -26,12 +27,6 @@ const TYPES = [
   "MATERIAL_INGESTED",
   "MATERIAL_INGEST_FAILED",
 ];
-const DIGEST_ELIGIBLE = new Set([
-  "DISCUSSION_REPLY",
-  "STUDY_GROUP_INVITE",
-  "COURSE_PUBLISHED",
-  "ATTENDANCE_ALERT",
-]);
 const MANDATORY = new Set(["ADMIN_ANNOUNCEMENT"]);
 
 const PREFERENCES = TYPES.flatMap((notification_type) =>
@@ -41,7 +36,7 @@ const PREFERENCES = TYPES.flatMap((notification_type) =>
     enabled: true,
     digest: false,
     mandatory: MANDATORY.has(notification_type),
-    digest_eligible: channel === "email" && DIGEST_ELIGIBLE.has(notification_type),
+    digest_eligible: false,
   })),
 );
 
@@ -103,26 +98,15 @@ describe("NotificationPreferencesPage", () => {
     expect(screen.getByText("Mandatory")).toBeTruthy();
   });
 
-  test("a digest-ineligible type's digest checkbox is disabled", async () => {
+  test("offers no email option and no daily digest", async () => {
     renderPage(await loadPage());
 
     await screen.findByText("Grade posted");
-    const digest = screen.getByRole("checkbox", {
-      name: "Grade posted — daily digest",
-    }) as HTMLInputElement;
-
-    expect(digest.disabled).toBe(true);
-  });
-
-  test("a digest-eligible type's digest checkbox is enabled", async () => {
-    renderPage(await loadPage());
-
-    await screen.findByText("Discussion reply");
-    const digest = screen.getByRole("checkbox", {
-      name: "Discussion reply — daily digest",
-    }) as HTMLInputElement;
-
-    expect(digest.disabled).toBe(false);
+    expect(screen.queryByRole("columnheader", { name: "Email" })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /Email/ })).toBeNull();
+    expect(screen.queryByRole("checkbox", { name: /daily digest/ })).toBeNull();
+    expect(screen.getByRole("checkbox", { name: "Grade posted — In-app" })).toBeTruthy();
+    expect(screen.getByRole("checkbox", { name: "Grade posted — Push" })).toBeTruthy();
   });
 
   test("toggling a channel and saving batches the change into one PATCH call", async () => {

@@ -31,14 +31,12 @@ NotificationPreference _cell(
 
 NotificationPreferences _matrix({bool gradesPush = true}) {
   const push = NotificationPreferenceChannel.push;
-  const email = NotificationPreferenceChannel.email;
   const inApp = NotificationPreferenceChannel.inApp;
   return NotificationPreferences(
     attendanceAlertThreshold: 3,
     preferences: [
       _cell(NotificationPreferenceNotificationType.gradePosted, push, enabled: gradesPush),
       _cell(NotificationPreferenceNotificationType.assignmentGraded, push, enabled: gradesPush),
-      _cell(NotificationPreferenceNotificationType.gradePosted, email),
       _cell(NotificationPreferenceNotificationType.gradePosted, inApp),
       _cell(NotificationPreferenceNotificationType.adminAnnouncement, push, mandatory: true),
       _cell(NotificationPreferenceNotificationType.feeInvoiceIssued, push),
@@ -113,6 +111,21 @@ void main() {
     expect(saved.single.every((change) => change.channel == 'push'), isTrue);
     expect(saved.single.every((change) => !change.enabled), isTrue);
     expect(_switch(tester, 'grades/push').value, isFalse);
+  });
+
+  testWidgets('offers no email choice: notifications are never emailed', (tester) async {
+    await pumpAccountScreen(tester, _app(roles: const ['PARENT']));
+
+    expect(find.text('Phone'), findsOneWidget);
+    expect(find.text('Email'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.endsWith('/email'),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('a kind the school requires is locked on', (tester) async {
