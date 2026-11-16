@@ -215,6 +215,60 @@ const AUDIT_LOG_SELECT = `
   l.old_values, l.new_values
 `;
 
+/**
+ * Audited tables whose values FINANCE may read (QA-040): money owed, paid, discounted and billed.
+ * Everything else (grades, discipline, records, people) is not FINANCE's to read, and the audit
+ * trail of a change must not become a second way to read it.
+ */
+export const FINANCE_AUDIT_TABLES: ReadonlySet<string> = new Set([
+  "expense_cache",
+  "fee_structure_cache",
+  "fee_structure_students",
+  "finance_communications",
+  "finance_reconciliation_logs",
+  "finance_report_jobs",
+  "installment_cache",
+  "invoice_batches",
+  "license_change_requests",
+  "license_invoice_instalments",
+  "license_invoices",
+  "license_payment_receipts",
+  "license_payments",
+  "license_price_settings",
+  "license_quotes",
+  "online_fee_payments",
+  "payment_cache",
+  "plan_prices",
+  "refund_requests",
+  "scholarship_awards",
+  "scholarships",
+  "school_tax_settings",
+  "sibling_discount_settings",
+  "storage_billing_incidents",
+  "storage_subscriptions",
+  "subscription_refund_requests",
+  "subscriptions",
+]);
+
+/** Roles that may read the recorded values of every audited table. */
+const AUDIT_VALUE_READERS: ReadonlySet<string> = new Set(["SUPER_ADMIN", "ORG_ADMIN"]);
+
+/** Whether a reader holding `roles` may see the recorded values of a `targetTable` row (QA-040). */
+export function auditValuesVisibleTo(roles: readonly string[], targetTable: string): boolean {
+  if (roles.some((role) => AUDIT_VALUE_READERS.has(role))) return true;
+  return roles.includes("FINANCE") && FINANCE_AUDIT_TABLES.has(targetTable);
+}
+
+/**
+ * The entry as `roles` may see it: unchanged, or with `old_values`/`new_values` withheld. The row
+ * itself -- who did what, when, to which record -- is never hidden; only its contents are.
+ */
+export function scopeAuditEntry(entry: AuditLogEntry, roles: readonly string[]): AuditLogEntry {
+  return auditValuesVisibleTo(roles, entry.target_table)
+    ? entry
+    : { ...entry, old_values: null, new_values: null };
+}
+
 export interface AuditLogPage {
   items: AuditLogEntry[];
   nextCursor: string | null;

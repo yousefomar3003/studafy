@@ -13,6 +13,7 @@ import {
   auditLogCsvHeader,
   auditLogEntryToCsv,
   queryAuditLogExportRows,
+  scopeAuditEntry,
 } from "@studafy/audit-reporting";
 
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -46,9 +47,19 @@ export async function renderAuditExport(
 
   const chunks: Uint8Array[] = [new TextEncoder().encode(auditLogCsvHeader() + CSV_ROW_TERMINATOR)];
   await withSystemTenantTx(deps.primary, { schoolId: deps.context.schoolId }, async (tx) => {
+    // The export shows the requester only the values the explorer would (QA-040), judged by the
+    // roles they hold when the file is generated.
+    const roles = (
+      await tx<{ role: string }[]>`
+        SELECT role::text AS role FROM app.user_roles
+        WHERE school_id = ${deps.context.schoolId}::uuid
+          AND user_id = ${deps.context.requestedByUserId}::uuid
+      `
+    ).map((r) => r.role);
     const encoder = new TextEncoder();
     for await (const entry of queryAuditLogExportRows(tx, deps.context.schoolId, filter)) {
-      chunks.push(encoder.encode(auditLogEntryToCsv(entry) + CSV_ROW_TERMINATOR));
+      const scoped = scopeAuditEntry(entry, roles);
+      chunks.push(encoder.encode(auditLogEntryToCsv(scoped) + CSV_ROW_TERMINATOR));
     }
   });
   return Buffer.concat(chunks);

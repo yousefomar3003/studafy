@@ -402,7 +402,6 @@ CASES.push(
     method: "GET",
     path: () => `/api/audit/logs?limit=100`,
     expect: { excludes: "gradeAuditMarker" },
-    finding: "QA-040",
     why: "FINANCE holds no GRADE_READ",
   },
   {
