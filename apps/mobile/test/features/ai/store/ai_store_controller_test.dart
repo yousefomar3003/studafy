@@ -8,6 +8,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:studafy_mobile/src/core/api/api_exception.dart';
 import 'package:studafy_mobile/src/features/ai/store/ai_store_backend.dart';
 import 'package:studafy_mobile/src/features/ai/store/ai_store_controller.dart';
+import 'package:studafy_mobile/src/features/ai/store/store_gateway.dart';
 
 import 'store_fakes.dart';
 
@@ -139,6 +140,102 @@ void main() {
       expect(gateway.bought.single.accountToken, siblingId);
     });
 
+    group("a family sharing one phone's store account", () {
+      Future<String?> boughtProduct() async {
+        final state = await load();
+        if (state is! AiStoreOffering) return null;
+        final controller = container.read(aiStoreProvider(null).notifier)..acknowledgeWaiver(true);
+        await controller.buy();
+        return gateway.bought.single.productId;
+      }
+
+      test(
+        'buys the next product when the account already holds the first for a sibling',
+        () async {
+          // The server knows of no sibling (e.g. no parent linked, or a different school) and picks
+          // the first product; the phone's account already pays for it for the brother.
+          gateway.held.add(
+            const HeldSubscription(productId: 'studafy_ai_monthly', accountToken: siblingId),
+          );
+
+          expect(await boughtProduct(), 'studafy_ai_monthly_2');
+          expect(gateway.bought.single.accountToken, studentId);
+        },
+      );
+
+      test('a product held without a stamp is skipped too', () async {
+        gateway.held.addAll(const [
+          HeldSubscription(productId: 'studafy_ai_monthly'),
+          HeldSubscription(productId: 'studafy_ai_monthly_2', accountToken: siblingId),
+        ]);
+
+        expect(await boughtProduct(), 'studafy_ai_monthly_3');
+      });
+
+      test("this student's own held product is offered again, never a second one", () async {
+        gateway.held.add(
+          const HeldSubscription(productId: 'studafy_ai_monthly_3', accountToken: studentId),
+        );
+
+        expect(await boughtProduct(), 'studafy_ai_monthly_3');
+      });
+
+      test('the server saying none is left is checked against the store account', () async {
+        // Siblings bought on their own phones: the server counts them, this phone holds nothing.
+        backend.config = storeSetup(
+          purchasable: false,
+          stamped: true,
+          unavailableReason: AiStoreUnavailableReason.noFreeProduct,
+        );
+
+        expect(await boughtProduct(), 'studafy_ai_monthly');
+      });
+
+      test('family full only when the store account holds every product', () async {
+        gateway.held.addAll([
+          for (final id in addOnProducts) HeldSubscription(productId: id, accountToken: siblingId),
+        ]);
+
+        final state = await load();
+        expect((state as AiStoreUnavailable).messageKey, 'aiStore.unavailable.familyFull');
+      });
+
+      test('skips a product the store does not list yet', () async {
+        gateway
+          ..held.add(const HeldSubscription(productId: 'studafy_ai_monthly'))
+          ..listedIds = {'studafy_ai_monthly', 'studafy_ai_monthly_3'};
+
+        expect(await boughtProduct(), 'studafy_ai_monthly_3');
+      });
+
+      test('says not listed when no free product is in the store', () async {
+        gateway
+          ..held.add(const HeldSubscription(productId: 'studafy_ai_monthly'))
+          ..listedIds = {'studafy_ai_monthly'};
+
+        final state = await load();
+        expect((state as AiStoreUnavailable).messageKey, 'aiStore.unavailable.notListed');
+      });
+
+      test("goes by the server's pick when the store account can't be read", () async {
+        gateway.heldFails = true;
+        backend.config = storeSetup(productId: 'studafy_ai_monthly_2');
+
+        expect(await boughtProduct(), 'studafy_ai_monthly_2');
+      });
+
+      test('a purchase of the product picked here carries the waiver', () async {
+        gateway.held.add(
+          const HeldSubscription(productId: 'studafy_ai_monthly', accountToken: siblingId),
+        );
+        await boughtProduct();
+
+        await deliver(_purchase(PurchaseStatus.purchased, productId: 'studafy_ai_monthly_2'));
+
+        expect(backend.waivers.single, isNotNull);
+      });
+    });
+
     test('nothing on a device with no store', () async {
       debugDefaultTargetPlatformOverride = TargetPlatform.linux;
       expect(await load(), isA<AiStoreHidden>());
@@ -152,7 +249,11 @@ void main() {
       container.read(aiStoreProvider(null).notifier).acknowledgeWaiver(true);
       await container.read(aiStoreProvider(null).notifier).buy();
 
-      expect(gateway.bought.single, (accountToken: studentId, profileId: schoolId));
+      expect(gateway.bought.single, (
+        productId: 'studafy_ai_monthly',
+        accountToken: studentId,
+        profileId: schoolId,
+      ));
       expect((current() as AiStoreOffering).busy, AiStoreBusy.purchasing);
     });
 

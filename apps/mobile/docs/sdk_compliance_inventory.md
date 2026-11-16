@@ -71,7 +71,8 @@ Status values:
 | `shared_preferences` | 2.5.5 | Reinstall marker, so tokens a previous install left in the Keychain are dropped | None | Eligible, on-device only |
 | `app_links` | 6.4.1 | OAuth callback deep link | None | Eligible, on-device only |
 | `in_app_purchase` | 3.3.1 | Buying the AI add-on through the App Store / Google Play (StoreKit 2, Play Billing) | The purchase goes to Apple or Google, stamped with the student's Studafy id (an opaque UUID). Receipts go to Studafy's API only | Eligible |
-| `in_app_purchase_android` | 0.5.3 | Play Billing purchase parameters (the obfuscated account and profile ids) | As `in_app_purchase` | Eligible |
+| `in_app_purchase_android` | 0.5.3 | Play Billing purchase parameters (the obfuscated account and profile ids), and the Google account's current subscriptions (`queryPurchases`), so a second child on a shared phone gets a product the account does not hold | As `in_app_purchase` | Eligible |
+| `in_app_purchase_storekit` | 0.4.13+2 | StoreKit 2's `Transaction.all`: which AI add-on subscriptions this Apple ID holds, so a second child on a shared phone gets a product it does not hold | As `in_app_purchase`; read on the device only, nothing sent | Eligible |
 | `url_launcher` | 6.3.2 | Opens the system browser (sign-in, downloads) | None. The browser makes the requests | Eligible |
 | `flutter_web_auth_2` | 5.1.0 | iOS sign-in sheet (`ASWebAuthenticationSession`) | None. The system sheet makes the requests | Eligible |
 | `flutter_svg` | 2.3.0 | Renders bundled SVG assets (sign-in provider logos) | None | Eligible, on-device only |
