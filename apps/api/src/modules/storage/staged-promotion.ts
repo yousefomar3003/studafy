@@ -40,6 +40,8 @@ export interface StagedCopy {
   tempKey: string;
   permanentKey: string;
   sizeBytes: number;
+  /** The ETag seen when the object was inspected: the copy is conditional on it (QA-036). */
+  etag?: string;
 }
 
 /**
@@ -70,7 +72,7 @@ export async function copyStagedUploads(
   let landed = 0;
   try {
     for (const copy of copies) {
-      await copyStagedObject(storage, copy.tempKey, copy.permanentKey);
+      await copyStagedObject(storage, copy.tempKey, copy.permanentKey, copy.etag);
       landed += 1;
     }
   } catch (error) {

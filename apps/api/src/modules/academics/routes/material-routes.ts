@@ -339,7 +339,9 @@ export function materialRoutes(
       return initiateUpload(tx, auth.schoolId, auth.userId, body);
     });
 
-    const presigned = await storage.presign(result.storage_key, "PUT", body.mime_type);
+    const presigned = await storage.presign(result.storage_key, "PUT", body.mime_type, undefined, {
+      contentLength: body.size_bytes,
+    });
 
     return c.json(
       {
@@ -380,6 +382,7 @@ export function materialRoutes(
       tempKey: body.storage_key,
       permanentKey: existing.storage_key,
       sizeBytes: inspected.sizeBytes,
+      etag: inspected.etag,
     };
     await copyStagedUploads(storage, tenantTxRunner(database, tenantFrom(c)), [copy]);
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
