@@ -285,6 +285,9 @@
       "title": "Announcements",
       "empty": "No announcements yet.",
       "error": "Couldn't load announcements."
+    },
+    "newMarks": {
+      "title": "New exam marks"
     }
   },
   "assignments": {
@@ -399,6 +402,10 @@
       "title": "Your latest grades are in",
       "body": "New results have just been published — here's where you stand this term.",
       "dismiss": "Dismiss"
+    },
+    "tabs": {
+      "examMarks": "Exam marks",
+      "coursework": "Coursework"
     }
   },
   "timetable": {
@@ -2385,12 +2392,10 @@
     }
   },
   "releasedMarks": {
-    "title": "Term marks",
-    "entry": "Term marks",
-    "entrySubtitle": "Exam and other marks your school has approved",
+    "title": "Exam marks",
     "error": "Couldn't load marks.",
     "unavailable": "Marks aren't available for this account.",
-    "empty": "No approved marks yet. Marks appear here once the school approves them.",
+    "empty": "Exam marks appear here once your school approves them.",
     "retry": "Try again",
     "annual": "Full year",
     "approvedOn": "Approved {date}",
@@ -2400,7 +2405,14 @@
       "excused": "Excused",
       "notApplicable": "N/A"
     },
-    "partial": "More marks for this term are still to come. The term result is not final yet."
+    "partial": "More marks for this term are still to come. The term result is not final yet.",
+    "emptyTitle": "No exam marks yet",
+    "releasedOn": "Released {date}",
+    "latest": "Latest mark",
+    "subjectInPeriod": "{subject} · {period}",
+    "moreToCome": "More to come",
+    "moreToComeNote": "More marks for this term are still to come.",
+    "seeAll": "See all exam marks"
   },
   "academicResults": {
     "skillLine": "{skill}: {descriptor}",
