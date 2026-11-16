@@ -60,3 +60,21 @@ kill_timeout = "60s"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "2gb"
+
+# Liveness (QA-046): /healthz fails when a poll loop has not cycled for 5 minutes or a BullMQ worker
+# stopped (apps/workers/src/health.ts). Fly shows the check state and alerts on it; it is on an
+# internal port, never published.
+[checks]
+  [checks.workers_alive]
+    type = "http"
+    port = 8081
+    path = "/healthz"
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "60s"
+
+# Prometheus metrics (queue depth, job outcomes, durations) scraped by Fly's managed Prometheus.
+[metrics]
+  port = 9464
+  path = "/metrics"
+

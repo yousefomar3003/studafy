@@ -68,6 +68,8 @@ export interface PollLoopHandle {
    * exited, so shutdown can wait for a cycle that is mid-send before closing its pools (QA-047).
    */
   stop(): Promise<void>;
+  /** When the last cycle finished, successful or not (epoch ms); null before the first (QA-046). */
+  lastCycleAt(): number | null;
   /** Resolves when the loop has exited. */
   readonly done: Promise<void>;
 }
@@ -95,6 +97,8 @@ export function startPollLoop(options: PollLoopOptions): PollLoopHandle {
   const controller = new AbortController();
   const sleep = options.sleep ?? abortableSleep;
 
+  let lastCycleAt: number | null = null;
+
   const run = async (): Promise<void> => {
     while (!controller.signal.aborted) {
       let worked = false;
@@ -103,6 +107,7 @@ export function startPollLoop(options: PollLoopOptions): PollLoopHandle {
       } catch (err) {
         options.onError(err);
       }
+      lastCycleAt = Date.now();
       if (controller.signal.aborted) break;
       if (worked) {
         // More may be waiting (a full batch, or rows that arrived meanwhile): sleeping on a backlog
@@ -120,6 +125,7 @@ export function startPollLoop(options: PollLoopOptions): PollLoopHandle {
       controller.abort();
       return done;
     },
+    lastCycleAt: () => lastCycleAt,
     done,
   };
 }

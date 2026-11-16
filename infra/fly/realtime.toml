@@ -53,3 +53,9 @@ kill_timeout = "30s"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
+
+# Prometheus metrics (RED per route, process) scraped by Fly's managed Prometheus (QA-046). The port
+# is internal; Fly publishes only the http_service port.
+[metrics]
+  port = 9464
+  path = "/metrics"

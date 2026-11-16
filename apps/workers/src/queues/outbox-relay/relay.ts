@@ -53,6 +53,8 @@ export interface RelayContext {
 export interface RelayHandle {
   /** Resolves once the in-flight cycle, if any, has finished. */
   stop(): Promise<void>;
+  /** When the loop last finished a cycle (QA-046 liveness). */
+  lastCycleAt(): number | null;
 }
 
 /**
@@ -140,5 +142,6 @@ export function startRelay(ctx: RelayContext): RelayHandle {
       ctx.logger.info({}, "outbox relay stopping");
       return loop.stop();
     },
+    lastCycleAt: () => loop.lastCycleAt(),
   };
 }

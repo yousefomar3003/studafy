@@ -13,6 +13,8 @@ import type { ConnectionOptions, Job } from "bullmq";
 /** Minimal surface of a BullMQ Worker needed for shutdown — satisfied by the real `Worker` class. */
 export interface StoppableWorker {
   close(force?: boolean): Promise<void>;
+  /** BullMQ's Worker#isRunning; false once the worker has closed (QA-046 liveness). */
+  isRunning?(): boolean;
 }
 
 export type WorkerFactory = (

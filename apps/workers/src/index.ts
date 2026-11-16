@@ -9,6 +9,7 @@ import postgres from "postgres";
 import { createRedisConnection } from "./connection";
 import { closeWorkerPools } from "./db/pool";
 import { databaseUrlFrom, loadEnv } from "./env";
+import { evaluateHealth, startHealthServer, startHeartbeat } from "./health";
 import { workerLogger } from "./log";
 import { startBillingPipelineGauges } from "./metrics/billing-pipeline";
 import { scheduleAnnouncementPublishJob } from "./queues/announcements";
@@ -192,6 +193,39 @@ const pushConsumer = startPushConsumer({
   logger: workerLogger,
 });
 
+// Liveness (QA-046): /healthz for Fly's check and a heartbeat line every minute for the Axiom
+// absence alert. A loop with no completed cycle for 5 minutes, or a BullMQ worker that stopped, is
+// unhealthy. The slowest healthy loop idles at most a few seconds between cycles.
+const startedAt = Date.now();
+const evaluateWorkersHealth = () =>
+  evaluateHealth({
+    loops: [
+      ...(relayHandle
+        ? [{ name: "outbox-relay", lastCycleAt: () => relayHandle!.lastCycleAt() }]
+        : []),
+      { name: "email-dispatcher", lastCycleAt: () => emailDispatcher.lastCycleAt() },
+      { name: "entitlement-invalidator", lastCycleAt: () => entitlementInvalidator.lastCycleAt() },
+      { name: "school-event-notifier", lastCycleAt: () => schoolEventNotifier.lastCycleAt() },
+      { name: "push-consumer", lastCycleAt: () => pushConsumer.lastCycleAt() },
+    ],
+    workers: workers.map((worker, index) => ({
+      name: QUEUE_REGISTRY[index]?.name ?? `worker-${index}`,
+      isRunning: () => worker.isRunning?.() ?? true,
+    })),
+    now: Date.now(),
+    startedAt,
+    staleAfterMs: 5 * 60_000,
+  });
+const healthServer = startHealthServer({
+  port: env.WORKERS_HEALTH_PORT,
+  evaluate: evaluateWorkersHealth,
+});
+const heartbeat = startHeartbeat({
+  intervalMs: 60_000,
+  evaluate: evaluateWorkersHealth,
+  logger: workerLogger,
+});
+
 // Digest scheduler: idempotently register the daily 06:00 parent-digest on the notifications
 // queue. Its own Redis connection so the upsert never contends with worker polling.
 const digestRedis = createRedisConnection(env);
@@ -338,6 +372,8 @@ const shutdown = (signal: string) => {
   shuttingDown = true;
 
   console.log(`Received ${signal}, waiting for active jobs to finish…`);
+  heartbeat.stop();
+  healthServer.stop();
 
   // Loops and jobs drain together, bounded by SHUTDOWN_TIMEOUT_MS (kept under Fly's kill_timeout in
   // infra/fly/workers.toml); nothing below closes until both have (QA-047).

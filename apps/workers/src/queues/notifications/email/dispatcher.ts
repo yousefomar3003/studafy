@@ -89,6 +89,8 @@ export interface EmailDispatcherContext {
 export interface DispatcherHandle {
   /** Resolves once the in-flight cycle, if any, has finished. */
   stop(): Promise<void>;
+  /** When the loop last finished a cycle (QA-046 liveness). */
+  lastCycleAt(): number | null;
 }
 
 /** "deferred": the attempt failed transiently and the row was rescheduled (see the header). */
@@ -383,5 +385,6 @@ export function startEmailDispatcher(ctx: EmailDispatcherContext): DispatcherHan
       ctx.logger.info({}, "email dispatcher stopping");
       return loop.stop();
     },
+    lastCycleAt: () => loop.lastCycleAt(),
   };
 }
