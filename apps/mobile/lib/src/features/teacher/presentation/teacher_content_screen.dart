@@ -586,7 +586,11 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
     final existing = widget.existing;
     _title = TextEditingController(text: existing?.title ?? '');
     _details = TextEditingController(text: existing?.description ?? '');
-    _score = TextEditingController(text: '${existing?.maxScore ?? 100}');
+    // No default total: the teacher decides what the assignment is out of. An edit keeps the
+    // saved total.
+    _score = TextEditingController(
+      text: existing == null ? '' : '${existing.maxScore}',
+    );
     _dueAt =
         existing?.dueAt.toLocal() ??
         DateTime.now().add(const Duration(days: 7));
@@ -658,7 +662,7 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
           description: description,
           dueAt: _dueAt.toUtc(),
           // Replaced by the question total once questions are saved.
-          maxScore: _isQuestions ? 1 : num.parse(_score.text),
+          maxScore: _isQuestions ? 1 : _parsePoints(_score.text)!,
           allowLateSubmission: _lateAllowed,
           status: _isQuestions
               ? CreateAssignmentBodyStatus.draft
@@ -678,7 +682,7 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
         instructions: existing.instructions,
         availableFrom: existing.availableFrom,
         dueAt: _dueAt.toUtc(),
-        maxScore: _isQuestions ? existing.maxScore : num.parse(_score.text),
+        maxScore: _isQuestions ? existing.maxScore : _parsePoints(_score.text)!,
         allowLateSubmission: _lateAllowed,
         status: UpdateAssignmentBodyStatus.fromJson(_status.json!),
       ),
@@ -744,6 +748,45 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// The API's ceiling on an assignment's total (MAX_SCORE_CEILING in the assignments schemas).
+  static const _maxPoints = 10000;
+
+  /// Reads the points field, accepting Arabic-Indic digits and a comma or Arabic decimal
+  /// separator, since the field is typed rather than prefilled. Null when it isn't a number.
+  static num? _parsePoints(String? raw) {
+    final normalized = StringBuffer();
+    for (final rune in (raw ?? '').trim().runes) {
+      if (rune >= 0x0660 && rune <= 0x0669) {
+        normalized.writeCharCode(0x30 + rune - 0x0660);
+      } else if (rune >= 0x06F0 && rune <= 0x06F9) {
+        normalized.writeCharCode(0x30 + rune - 0x06F0);
+      } else if (rune == 0x066B || rune == 0x2C) {
+        normalized.write('.');
+      } else {
+        normalized.writeCharCode(rune);
+      }
+    }
+    return num.tryParse(normalized.toString());
+  }
+
+  /// Mirrors the API's rule for max_score: required, above 0, at most 10,000, two decimals.
+  static String? _pointsErrorKey(String? raw) {
+    if ((raw ?? '').trim().isEmpty) {
+      return 'teacher.content.assignmentForm.pointsRequired';
+    }
+    final points = _parsePoints(raw);
+    if (points == null || !points.isFinite || points <= 0) {
+      return 'teacher.content.assignmentForm.pointsInvalid';
+    }
+    if (points > _maxPoints) {
+      return 'teacher.content.assignmentForm.pointsTooHigh';
+    }
+    if ((points * 100 - (points * 100).round()).abs() > 1e-6) {
+      return 'teacher.content.assignmentForm.pointsDecimals';
+    }
+    return null;
   }
 
   String get _fallbackErrorKey => _editing
@@ -853,19 +896,19 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
             if (!_isQuestions) ...[
               const SizedBox(height: AppSpacing.space12),
               TextFormField(
+                key: const Key('assignmentPoints'),
                 controller: _score,
                 decoration: InputDecoration(
                   labelText: 'teacher.content.assignmentForm.points'.tr(),
+                  hintText: 'teacher.content.assignmentForm.pointsHint'.tr(),
+                  // Keep the hint on screen while the field is empty and unfocused, so the
+                  // teacher sees the question rather than just a blank box.
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
                 ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                validator: (v) {
-                  final points = num.tryParse(v ?? '');
-                  return points == null || points <= 0
-                      ? 'teacher.content.assignmentForm.pointsInvalid'.tr()
-                      : null;
-                },
+                validator: (v) => _pointsErrorKey(v)?.tr(),
               ),
             ],
             if (!(_isQuestions && !_editing)) ...[
