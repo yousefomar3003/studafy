@@ -88,6 +88,14 @@ The Cloudflare R2 API token for `studafy-prod-files`. The api reads it as
 3. Verify: a put/get of an attachment round-trips (or, for a read-only reporter, a list succeeds).
 4. After the configured rotation window, delete the old pair in the console.
 
+### Reconciliation trigger key (`RECONCILIATION_API_KEY`, api)
+
+The `X-Api-Key` for `POST /api/finance/reconciliation/run`, compared in constant time (QA-092). The deploy workflow does not stage it today, so in production the route answers 403 to everyone until the key is added there on purpose.
+
+1. Generate 32+ random bytes in the password manager.
+2. Set `RECONCILIATION_API_KEY` in the `prod` environment, stage it onto `studafy-core-api` in the deploy workflow's secret step, and deploy. Update the caller (the scheduler that triggers the run) in the same window, because the old key stops working at the deploy.
+3. Verify: one triggered run answers 200, and a wrong key still answers 403.
+
 ## Rollback / abort criteria
 
 - Abort if another run of the deploy workflow is in flight (the workflow's concurrency group queues
