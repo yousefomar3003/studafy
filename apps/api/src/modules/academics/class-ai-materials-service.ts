@@ -28,6 +28,8 @@ import { HTTPException } from "hono/http-exception";
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
+import { callerManagesClass } from "./class-access";
+
 import type { ClassAiMaterialsSetting } from "./schemas";
 import type { TransactionSql } from "postgres";
 
@@ -64,10 +66,7 @@ export async function assertCanManageClassAiMaterials(
   tx: TransactionSql,
   classId: string,
 ): Promise<void> {
-  const [row] = await tx<{ allowed: boolean }[]>`
-    SELECT (app.current_user_is_school_admin() OR app.teaches_class(${classId}::uuid)) AS allowed
-  `;
-  if (!row?.allowed) {
+  if (!(await callerManagesClass(tx, classId))) {
     throw new CodedHttpException(
       403,
       ERROR_CODES.CLASS_AI_MATERIALS_FORBIDDEN,

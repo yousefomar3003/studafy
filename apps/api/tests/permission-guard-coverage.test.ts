@@ -320,14 +320,14 @@ const EXPECTED_MUTATING_ROUTES = [
   // EVALUATION_SCORE_CREATE/DELETE.
   "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
   "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
-  // Learning materials (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
-  // catalog data with no cross-user row-level permission.
+  // Learning materials (ST-102). Guarded by requirePermission(): upload and confirm by
+  // MATERIAL_CREATE, edit and retry by MATERIAL_UPDATE, AI visibility by MATERIAL_MANAGE_AI, delete
+  // by MATERIAL_DELETE; the service then narrows a teacher to the classes they teach.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
-  // Retrying a failed material: guarded by requirePermission(MATERIAL_UPDATE).
   "POST /api/academics/materials/{materialId}/retry",
   // Generic object storage gateway (SAD §22). Authorized per content class by requirePermissionIn()
   // in the handler — the required permission arrives in the request body, so the mount-time
@@ -630,13 +630,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Academic years, terms, class enrolments and exams are NOT exempt: RLS fences them to the
   // school but not to a role, so without TIMETABLE_MANAGE any signed-in student or parent could
   // roll the year over (archiving every enrolment) or delete an exam.
-  // Learning materials (ST-106) — storage-triggered upload flow, authorized by
-  // signed upload URL and row ownership, not by the permission guard.
-  "POST /api/academics/materials/upload",
-  "POST /api/academics/materials/{materialId}/confirm",
-  "PATCH /api/academics/materials/{materialId}",
-  "PATCH /api/academics/materials/{materialId}/ai-visible",
-  "DELETE /api/academics/materials/{materialId}",
+  // Learning materials are NOT exempt either: RLS lets everyone who can read a class (its enrolled
+  // students and their parents included) see its materials, and nothing in RLS stops them writing.
   // In-app inbox (ST-142) — personal per-user read state; the caller's own rows only. RLS
   // (`user_id = app.current_user_id()`) is the fence, so the bearer identity is sufficient
   // authorization — same rationale as the session-lifecycle routes above.

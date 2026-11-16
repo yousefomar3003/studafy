@@ -6,6 +6,8 @@ import { HTTPException } from "hono/http-exception";
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
+import { callerManagesClass } from "./class-access";
+
 import type { MaterialIngestStatus } from "./schemas";
 import type { Role } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
@@ -89,6 +91,50 @@ export interface UpdateMaterialParams {
   // Validated as a pair by updateMaterialBodySchema: both omitted, both numbers, or both null.
   week_number?: number | null;
   day_of_week?: number | null;
+}
+
+// ---------------------------------------------------------------------------
+// Authorization
+// ---------------------------------------------------------------------------
+
+/**
+ * Refuse a write to a class's materials unless the caller teaches the class or leads the school.
+ *
+ * Every write route is first gated by its material permission (material:create, material:update,
+ * material:delete or material:manageAi), which students and parents never hold. Reading is wider
+ * than writing, though: RLS lets everyone who can read the class see its materials, and that
+ * includes a teacher whose own child is enrolled there. This check narrows a teacher to the
+ * classes they teach. A teacher of an unrelated class cannot see the material at all and is told
+ * 404 by the lookup before this runs.
+ *
+ * 403 rather than 404: the caller passed the permission gate, so they are staff, and "not your
+ * class" serves them better than "no such material".
+ */
+export async function assertCanWriteClassMaterials(
+  tx: TransactionSql,
+  classId: string,
+): Promise<void> {
+  if (!(await callerManagesClass(tx, classId))) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.MATERIAL_CLASS_FORBIDDEN,
+      "Only this class's teachers or the school admin can change its materials.",
+    );
+  }
+}
+
+/** The material a write acts on: 404 when missing or invisible, 403 when not the caller's class. */
+async function getWritableMaterial(
+  tx: TransactionSql,
+  schoolId: string,
+  materialId: string,
+): Promise<MaterialRow> {
+  const existing = await getMaterial(tx, schoolId, materialId);
+  if (!existing) {
+    throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
+  }
+  await assertCanWriteClassMaterials(tx, existing.class_id);
+  return existing;
 }
 
 // ---------------------------------------------------------------------------
@@ -180,6 +226,9 @@ export async function initiateUpload(
   /** Stored objects of the replaced failed attempts, to free once the transaction commits. */
   freedStorageKeys: string[];
 }> {
+  // Scope first: a teacher of another class cannot see this one, so the lookup below would tell
+  // them 404 for a class that exists.
+  await assertCanWriteClassMaterials(tx, params.class_id);
   const [cls] = await tx<{ id: string }[]>`
     SELECT id FROM app.classes
     WHERE id = ${params.class_id} AND school_id = ${schoolId}
@@ -311,10 +360,7 @@ export async function confirmUpload(
   storageKey: string,
   checksumSha256?: string,
 ): Promise<MaterialRow> {
-  const existing = await getMaterial(tx, schoolId, materialId);
-  if (!existing) {
-    throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
-  }
+  const existing = await getWritableMaterial(tx, schoolId, materialId);
 
   if (existing.storage_key !== storageKey) {
     throw new CodedHttpException(
@@ -371,10 +417,7 @@ export async function getRetryableMaterial(
   schoolId: string,
   materialId: string,
 ): Promise<MaterialRow> {
-  const existing = await getMaterial(tx, schoolId, materialId);
-  if (!existing) {
-    throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
-  }
+  const existing = await getWritableMaterial(tx, schoolId, materialId);
   if (existing.ingest_status !== "failed") {
     throw new CodedHttpException(
       409,
@@ -439,10 +482,7 @@ export async function updateMaterial(
   userId: string,
   params: UpdateMaterialParams,
 ): Promise<MaterialRow> {
-  const existing = await getMaterial(tx, schoolId, materialId);
-  if (!existing) {
-    throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
-  }
+  const existing = await getWritableMaterial(tx, schoolId, materialId);
 
   // Omitted keeps the current placement; the schema only lets the pair through together.
   const placement =
@@ -496,10 +536,7 @@ export async function deleteMaterial(
   schoolId: string,
   materialId: string,
 ): Promise<{ deleted: boolean; storageKeys: string[] }> {
-  const existing = await getMaterial(tx, schoolId, materialId);
-  if (!existing) {
-    throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
-  }
+  const existing = await getWritableMaterial(tx, schoolId, materialId);
 
   const [removed] = await tx<
     { storage_key: string; thumbnail_key: string | null; preview_key: string | null }[]
@@ -543,10 +580,7 @@ export async function toggleAiVisible(
   materialId: string,
   aiVisible: boolean,
 ): Promise<MaterialRow> {
-  const existing = await getMaterial(tx, schoolId, materialId);
-  if (!existing) {
-    throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
-  }
+  const existing = await getWritableMaterial(tx, schoolId, materialId);
 
   if (existing.ai_visible === aiVisible) {
     return existing;

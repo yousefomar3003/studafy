@@ -448,6 +448,45 @@ const GUARD_CASES: GuardCase[] = [
     source: "academics/routes/class-ai-materials-routes.ts",
     allowedRole: ROLES.PRINCIPAL,
   },
+  // Learning materials. Teachers and the school admin hold material:create/update/delete; the
+  // service additionally narrows a teacher to the classes they teach. GUEST holds none of them.
+  {
+    method: "POST",
+    path: "/api/academics/materials/upload",
+    permission: "material:create",
+    source: "academics/routes/material-routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/academics/materials/{materialId}/confirm",
+    permission: "material:create",
+    source: "academics/routes/material-routes.ts",
+  },
+  {
+    method: "PATCH",
+    path: "/api/academics/materials/{materialId}",
+    permission: "material:update",
+    source: "academics/routes/material-routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/academics/materials/{materialId}/retry",
+    permission: "material:update",
+    source: "academics/routes/material-routes.ts",
+  },
+  {
+    method: "PATCH",
+    path: "/api/academics/materials/{materialId}/ai-visible",
+    permission: "material:manageAi",
+    source: "academics/routes/material-routes.ts",
+    allowedRole: ROLES.PRINCIPAL,
+  },
+  {
+    method: "DELETE",
+    path: "/api/academics/materials/{materialId}",
+    permission: "material:delete",
+    source: "academics/routes/material-routes.ts",
+  },
   {
     method: "POST",
     path: "/api/academics/exams",
