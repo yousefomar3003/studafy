@@ -8,6 +8,7 @@ import '../../student/presentation/widgets/status_pill.dart';
 import '../application/mark_entry_editor.dart';
 import '../application/mark_sheet_providers.dart';
 import '../domain/mark_sheet.dart';
+import 'widgets/assessment_release.dart';
 import 'widgets/mark_sheet_common.dart';
 
 /// Mark entry for one assessment: a row per student with a score field (validated against the
@@ -17,6 +18,11 @@ import 'widgets/mark_sheet_common.dart';
 /// Edits are held in a [MarkEntryEditor] and written together with Save; a value outside
 /// `0..max` is flagged inline and keeps Save disabled, so it never reaches the API. When the
 /// period is submitted or approved, or the year is not active, every row is read-only.
+///
+/// A release card on top shows where these marks stand with students and parents, and sends this
+/// one assessment for approval on its own once every student has a mark ("Send for approval") —
+/// without waiting for the rest of the period. While it waits, and once approved, its rows are
+/// read-only too.
 class AssessmentMarksScreen extends ConsumerStatefulWidget {
   const AssessmentMarksScreen({
     required this.sheetKey,
@@ -36,6 +42,7 @@ class _AssessmentMarksScreenState extends ConsumerState<AssessmentMarksScreen> {
   MarkEntryEditor? _editor;
   final Map<MarkCellKey, TextEditingController> _controllers = {};
   bool _saving = false;
+  bool _sendingRelease = false;
 
   @override
   void dispose() {
@@ -138,7 +145,7 @@ class _AssessmentMarksScreenState extends ConsumerState<AssessmentMarksScreen> {
               Expanded(child: _buildRows(sheet, editor.assessment, editor)),
               _SaveBar(
                 editor: editor,
-                editable: sheet.isPeriodEditable(assessment.termId),
+                editable: sheet.isAssessmentEditable(assessment),
                 saving: _saving,
                 onSave: _save,
               ),
@@ -158,6 +165,14 @@ class _AssessmentMarksScreenState extends ConsumerState<AssessmentMarksScreen> {
     return ListView(
       padding: const EdgeInsets.all(AppSpacing.space16),
       children: [
+        if (assessment.isActive)
+          AssessmentReleaseCard(
+            sheet: sheet,
+            assessment: assessment,
+            hasUnsavedChanges: editor.hasChanges,
+            sending: _sendingRelease,
+            onSend: () => _sendRelease(assessment),
+          ),
         if (lockMessage != null)
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.space12),
@@ -243,9 +258,17 @@ class _AssessmentMarksScreenState extends ConsumerState<AssessmentMarksScreen> {
     if (!sheet.canEditMarks) return 'teacher.marks.sheet.yearNotActive'.tr();
     final period = sheet.periodFor(assessment.termId);
     if (period == null || period.status.isOpen) {
-      return assessment.isActive
-          ? null
-          : 'teacher.marks.sheet.proposedHint'.tr();
+      if (!assessment.isActive) return 'teacher.marks.sheet.proposedHint'.tr();
+      return switch (assessment.releaseStatus) {
+        AssessmentReleaseStatus.draft ||
+        AssessmentReleaseStatus.returned => null,
+        AssessmentReleaseStatus.submitted =>
+          'teacher.marks.release.lockedSubmitted'.tr(),
+        AssessmentReleaseStatus.approved =>
+          'teacher.marks.release.lockedApproved'.tr(),
+        AssessmentReleaseStatus.unknown =>
+          'teacher.marks.sheet.lockedUnknown'.tr(),
+      };
     }
     return switch (period.status) {
       MarkSheetPeriodStatus.submitted =>
@@ -254,6 +277,19 @@ class _AssessmentMarksScreenState extends ConsumerState<AssessmentMarksScreen> {
         'teacher.marks.sheet.lockedApproved'.tr(),
       _ => 'teacher.marks.sheet.lockedUnknown'.tr(),
     };
+  }
+
+  Future<void> _sendRelease(MarkSheetAssessment assessment) async {
+    if (_sendingRelease) return;
+    await sendAssessmentForApproval(
+      context: context,
+      ref: ref,
+      sheetKey: widget.sheetKey,
+      assessment: assessment,
+      onBusy: (busy) {
+        if (mounted) setState(() => _sendingRelease = busy);
+      },
+    );
   }
 
   Future<bool> _confirmDiscard() async {

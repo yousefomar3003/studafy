@@ -40,6 +40,30 @@ enum MarkSheetPeriodStatus {
   bool get isLocked => !isOpen;
 }
 
+/// One assessment's own release (`release_status`): its marks sent for approval on their own,
+/// before the rest of the period. Approved means students and parents can see them.
+enum AssessmentReleaseStatus {
+  draft,
+  submitted,
+  approved,
+  returned,
+
+  /// A wire value newer than this build. Treated as locked.
+  unknown;
+
+  static AssessmentReleaseStatus fromWire(Object? value) => switch (value) {
+    'draft' || null => draft,
+    'submitted' => submitted,
+    'approved' => approved,
+    'returned' => returned,
+    _ => unknown,
+  };
+
+  /// Marks can still change: never sent, or sent back by the reviewer (saving a mark of a returned
+  /// assessment moves it back to draft server-side).
+  bool get isOpen => this == draft || this == returned;
+}
+
 /// How a recorded mark counts. `pending` is not a stored state — it is only sent to clear a mark.
 enum MarkStatus {
   graded('graded'),
@@ -271,6 +295,13 @@ class MarkSheetAssessment {
     required this.isMandatory,
     required this.status,
     required this.sectionSpecific,
+    this.releaseId,
+    this.releaseStatus = AssessmentReleaseStatus.draft,
+    this.releaseSubmittedAt,
+    this.releaseDecidedAt,
+    this.releaseReturnReason,
+    this.released = false,
+    this.missingCount,
   });
 
   factory MarkSheetAssessment.fromJson(Map<String, Object?> json) =>
@@ -284,6 +315,13 @@ class MarkSheetAssessment {
         isMandatory: json['is_mandatory'] as bool? ?? true,
         status: json['status'] as String? ?? 'active',
         sectionSpecific: json['section_specific'] as bool? ?? false,
+        releaseId: json['release_id'] as String?,
+        releaseStatus: AssessmentReleaseStatus.fromWire(json['release_status']),
+        releaseSubmittedAt: _date(json['release_submitted_at']),
+        releaseDecidedAt: _date(json['release_decided_at']),
+        releaseReturnReason: json['release_return_reason'] as String?,
+        released: json['released'] as bool? ?? false,
+        missingCount: (json['missing_count'] as num?)?.toInt(),
       );
 
   final String id;
@@ -299,6 +337,20 @@ class MarkSheetAssessment {
   /// `active`, `proposed` (a teacher-added assessment awaiting approval) or `rejected`.
   final String status;
   final bool sectionSpecific;
+
+  /// This assessment's own release; `draft` when it was never sent on its own.
+  final String? releaseId;
+  final AssessmentReleaseStatus releaseStatus;
+  final DateTime? releaseSubmittedAt;
+  final DateTime? releaseDecidedAt;
+  final String? releaseReturnReason;
+
+  /// Visible to students and parents: approved on its own or with its period's sheet.
+  final bool released;
+
+  /// Enrolled students still without a usable mark for it (the server's count); 0 means it can be
+  /// sent for approval on its own. Null from an older API.
+  final int? missingCount;
 
   /// Only active assessments accept marks and count towards the result.
   bool get isActive => status == 'active';
@@ -643,6 +695,11 @@ class MarkSheet {
     return period == null || period.status.isOpen;
   }
 
+  /// Whether [assessment]'s marks can be written right now: its period is open and it is not
+  /// waiting for, or past, its own approval.
+  bool isAssessmentEditable(MarkSheetAssessment assessment) =>
+      isPeriodEditable(assessment.termId) && assessment.releaseStatus.isOpen;
+
   /// Whether [student]'s mark for [assessment] can be written right now.
   bool isCellEditable(
     MarkSheetAssessment assessment,
@@ -650,7 +707,15 @@ class MarkSheet {
   ) =>
       assessment.isActive &&
       !student.isExempt &&
-      isPeriodEditable(assessment.termId);
+      isAssessmentEditable(assessment);
+
+  /// Whether [assessment] can be sent for approval on its own: marks are open for it, it is active,
+  /// and every enrolled student has a usable mark for it.
+  bool canSendForApproval(MarkSheetAssessment assessment) =>
+      assessment.isActive &&
+      isAssessmentEditable(assessment) &&
+      (assessment.missingCount ?? 0) == 0 &&
+      enrolledCount > 0;
 
   /// The mandatory, active assessments of [termId]'s period the engine still reports as missing
   /// for [student] — what blocks submitting that period.

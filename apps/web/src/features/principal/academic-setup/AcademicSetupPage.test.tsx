@@ -82,6 +82,7 @@ const OVERVIEW = {
     missing_teacher_assignments: 0,
     students_with_incomplete_marks: 0,
     mark_sheets_awaiting_approval: 0,
+    assessment_releases_awaiting_approval: 1,
     proposed_assessments: 0,
     certificates_ready: 0,
     certificates_blocked: 0,
@@ -429,6 +430,31 @@ const GET_RESPONSES: Record<string, unknown> = {
   },
   "/api/grading/certificates": { certificates: [] },
   "/api/grading/years/{yearId}/proposed-assessments": { assessments: [] },
+  "/api/grading/years/{yearId}/assessment-releases": {
+    releases: [
+      {
+        id: "release-1",
+        section_id: "sec-10c",
+        subject_id: "sub-math",
+        term_id: "term-1",
+        assessment_id: "asm-first",
+        status: "submitted",
+        submitted_by_user_id: "user-2",
+        submitted_at: "2026-10-20T09:00:00.000Z",
+        decided_by_user_id: null,
+        decided_at: null,
+        return_reason: null,
+        updated_at: "2026-10-20T09:00:00.000Z",
+        section_name: "C",
+        grade_level_name: "Grade 10",
+        subject_name: "Mathematics",
+        term_name: "Term 1",
+        assessment_name: "First exam",
+        max_marks: 50,
+        submitted_by_name: "Omar Aziz",
+      },
+    ],
+  },
   "/api/grading/years/{yearId}/mark-sheets": {
     sheets: [
       {
@@ -794,6 +820,59 @@ describe("AcademicSetupPage", () => {
         body: { action: "return", reason: "Exam 2 marks are missing." },
       }),
     );
+  });
+
+  test("approves a single assessment so its marks reach families before the term", async () => {
+    await renderAt("/approvals");
+
+    expect(await screen.findByRole("heading", { name: "Single assessments" })).toBeTruthy();
+    expect(screen.getByText("Out of 50")).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Approve and release First exam · Mathematics, Grade 10 – C",
+      }),
+    );
+    await waitFor(() =>
+      expect(postMock).toHaveBeenCalledWith(
+        "/api/grading/assessment-releases/{releaseId}/decision",
+        {
+          params: { path: { releaseId: "release-1" } },
+          body: { action: "approve", reason: null },
+        },
+      ),
+    );
+  });
+
+  test("returns a single assessment to its teacher with a reason", async () => {
+    await renderAt("/approvals");
+
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Return First exam · Mathematics, Grade 10 – C to the teacher",
+      }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Return First exam · Mathematics, Grade 10 – C?",
+    });
+    fireEvent.change(within(dialog).getByRole("textbox", { name: /Reason/ }), {
+      target: { value: "Question 3 was marked out of 5, not 10." },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Return" }));
+    await waitFor(() =>
+      expect(postMock).toHaveBeenCalledWith(
+        "/api/grading/assessment-releases/{releaseId}/decision",
+        {
+          params: { path: { releaseId: "release-1" } },
+          body: { action: "return", reason: "Question 3 was marked out of 5, not 10." },
+        },
+      ),
+    );
+  });
+
+  test("has no accessibility violations on the approvals screen", async () => {
+    const { container } = await renderAt("/approvals");
+    await screen.findByText("First exam · Mathematics, Grade 10 – C");
+    await expectNoA11yViolations(container);
   });
 
   test("has no accessibility violations on the sections screen", async () => {

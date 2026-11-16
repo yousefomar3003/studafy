@@ -1819,6 +1819,13 @@ export async function createSectionOverride(
               AND student_id = ANY (${studentIds}::uuid[])
           `,
         );
+        // The section's single-assessment releases (000229) follow their marks onto the copies.
+        await tx`
+          UPDATE app.assessment_mark_releases SET assessment_id = ${to}::uuid,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE school_id = ${schoolId}::uuid AND section_id = ${sectionId}::uuid
+            AND assessment_id = ${from}::uuid
+        `;
       }
     } catch (error) {
       if (isPgError(error, "23514")) {

@@ -13,6 +13,18 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Releasing marks one assessment at a time (migration 000229): `submitAssessmentRelease`
+  (`POST .../sections/{sectionId}/subjects/{subjectId}/assessments/{assessmentId}/release`,
+  `grade:update`) sends one complete assessment for approval (409
+  `RESULTS_INCOMPLETE` while a student's mark is missing, 409 `CONFLICT_STATE_MISMATCH` when it or
+  its period's sheet is already sent); `GET /api/grading/years/{yearId}/assessment-releases`
+  (`listAssessmentReleases`) and `POST /api/grading/assessment-releases/{releaseId}/decision`
+  (`decideAssessmentRelease`: approve, return or reopen/withdraw with a reason), both
+  `approval:review`. `MarkSheetAssessment` adds `release_id`, `release_status`,
+  `release_submitted_at`, `release_decided_at`, `release_return_reason`, `released` and
+  `missing_count`; `ReleasedMarkSubject` adds `period_approved` and `ReleasedAssessment` adds
+  `released_at` (`approved_at` stays the whole period's approval, null while only single
+  assessments are released); `GradingOverview.counts` adds `assessment_releases_awaiting_approval`.
 - `POST /api/academics/materials/{materialId}/retry` (`retryMaterial`, needs `material:update`):
   sends a `failed` material back to `scanning` (its `ingest_error` cleared) and enqueues the malware
   scan, as confirm does. 409 `CONFLICT_STATE_MISMATCH` for any other state, 409

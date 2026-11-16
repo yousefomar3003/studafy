@@ -189,6 +189,71 @@ void main() {
       expect(find.text('Submitted for approval.'), findsOneWidget);
     });
 
+    testWidgets('a complete assessment is sent for approval on its own', (
+      tester,
+    ) async {
+      final client = FakeMarkSheetClient(markSheetFixture())
+        ..sheetAfterRelease = markSheetFixture(
+          releases: {
+            'a-quiz1': {
+              'release_id': 'rel-1',
+              'release_status': 'submitted',
+              'release_submitted_at': t0,
+            },
+          },
+        );
+      await _pump(tester, client);
+
+      // Quiz 1 has every student's mark; the Midterm still misses Omar's.
+      expect(
+        find.byKey(const ValueKey('release-send-a-quiz1')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('release-send-a-mid')), findsNothing);
+
+      await tester.tap(find.byKey(const ValueKey('release-send-a-quiz1')));
+      await tester.pumpAndSettle();
+      expect(find.text('Send Quiz 1 for approval?'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('release-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(client.releaseCalls, ['a-quiz1']);
+      expect(find.text('Sent for approval.'), findsOneWidget);
+      // The whole term was not submitted.
+      expect(client.submitCalls, isEmpty);
+      expect(find.text('Awaiting approval'), findsOneWidget);
+      expect(find.byKey(const ValueKey('release-send-a-quiz1')), findsNothing);
+    });
+
+    testWidgets('released and returned assessments show where they stand', (
+      tester,
+    ) async {
+      await _pump(
+        tester,
+        FakeMarkSheetClient(
+          markSheetFixture(
+            releases: {
+              'a-quiz1': {
+                'release_status': 'approved',
+                'released': true,
+                'release_decided_at': t0,
+              },
+              'a-mid': {
+                'release_status': 'returned',
+                'release_return_reason': 'Recheck Q3',
+                'release_decided_at': t0,
+              },
+            },
+          ),
+        ),
+      );
+
+      expect(find.text('Released'), findsOneWidget);
+      expect(find.text('Returned'), findsOneWidget);
+      // The whole-term action is still there.
+      expect(find.text('Submit for approval'), findsOneWidget);
+    });
+
     testWidgets('renders right-to-left in Arabic', (tester) async {
       await _pump(
         tester,
@@ -300,6 +365,129 @@ void main() {
         find.byKey(const ValueKey('mark-field-st-omar-1')),
       );
       expect(field.controller!.text, '15');
+    });
+
+    testWidgets('a complete assessment offers "Send for approval"', (
+      tester,
+    ) async {
+      final client = FakeMarkSheetClient(markSheetFixture());
+      await _pump(
+        tester,
+        client,
+        home: const AssessmentMarksScreen(
+          sheetKey: _key,
+          assessmentId: 'a-quiz1',
+        ),
+      );
+
+      final send = find.byKey(const ValueKey('assessment-release-send'));
+      expect(tester.widget<OutlinedButton>(send).onPressed, isNotNull);
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('release-confirm')));
+      await tester.pumpAndSettle();
+      expect(client.releaseCalls, ['a-quiz1']);
+      expect(find.text('Sent for approval.'), findsOneWidget);
+    });
+
+    testWidgets('unsaved edits must be saved before sending', (tester) async {
+      await _pump(
+        tester,
+        FakeMarkSheetClient(markSheetFixture()),
+        home: const AssessmentMarksScreen(
+          sheetKey: _key,
+          assessmentId: 'a-quiz1',
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('mark-field-st-omar-1')),
+        '16',
+      );
+      await tester.pumpAndSettle();
+      final send = find.byKey(const ValueKey('assessment-release-send'));
+      expect(tester.widget<OutlinedButton>(send).onPressed, isNull);
+      expect(find.text('Save your changes before sending.'), findsOneWidget);
+    });
+
+    testWidgets('an incomplete assessment cannot be sent yet', (tester) async {
+      await _pump(
+        tester,
+        FakeMarkSheetClient(markSheetFixture()),
+        home: const AssessmentMarksScreen(
+          sheetKey: _key,
+          assessmentId: 'a-mid',
+        ),
+      );
+
+      final send = find.byKey(const ValueKey('assessment-release-send'));
+      expect(tester.widget<OutlinedButton>(send).onPressed, isNull);
+      expect(
+        find.textContaining('Students still without a mark: 1'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a released assessment is read-only', (tester) async {
+      await _pump(
+        tester,
+        FakeMarkSheetClient(
+          markSheetFixture(
+            releases: {
+              'a-quiz1': {
+                'release_status': 'approved',
+                'released': true,
+                'release_decided_at': t0,
+              },
+            },
+          ),
+        ),
+        home: const AssessmentMarksScreen(
+          sheetKey: _key,
+          assessmentId: 'a-quiz1',
+        ),
+      );
+
+      expect(
+        find.text(
+          'Released to students and parents. Ask an administrator to withdraw them before changing a mark.',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('assessment-release-send')),
+        findsNothing,
+      );
+      expect(find.byKey(const ValueKey('mark-save')), findsNothing);
+      final field = tester.widget<TextField>(
+        find.byKey(const ValueKey('mark-field-st-omar-1')),
+      );
+      expect(field.enabled, isFalse);
+    });
+
+    testWidgets('a server refusal for missing marks is explained', (
+      tester,
+    ) async {
+      final client = FakeMarkSheetClient(markSheetFixture())
+        ..releaseError = problem(409, 'RESULTS_INCOMPLETE');
+      await _pump(
+        tester,
+        client,
+        home: const AssessmentMarksScreen(
+          sheetKey: _key,
+          assessmentId: 'a-quiz1',
+        ),
+      );
+
+      await tester.tap(find.byKey(const ValueKey('assessment-release-send')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('release-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Some students still have no mark'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('absent is chosen from the status menu', (tester) async {

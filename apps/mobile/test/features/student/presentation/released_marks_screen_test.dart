@@ -201,6 +201,55 @@ void main() {
     },
   );
 
+  testWidgets(
+    'a single released exam shows its own mark and says the term is not final',
+    (tester) async {
+      final client = _FakeMarksClient(
+        periods: [
+          _period('t1', 'Semester 1', [
+            {
+              ..._subject('Mathematics', [
+                _category('Exams', 'exam', [
+                  _assessment('First exam', 50, [_graded(44)]),
+                ]),
+              ]),
+              // Only the first exam is out: the term's sheet is not approved.
+              'approved_at': null,
+              'period_approved': false,
+            },
+            _subject('Science', [
+              _category('Midterm', 'midterm', [
+                _assessment('Midterm S1', 50, [_graded(40)]),
+              ]),
+            ]),
+          ]),
+        ],
+      );
+      await _pump(tester, client);
+
+      expect(find.text('First exam'), findsOneWidget);
+      expect(find.text('44 / 50'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('released-marks-partial-sub-Mathematics')),
+        findsOneWidget,
+      );
+      expect(
+        find.text(
+          'More marks for this term are still to come. The term result is not final yet.',
+        ),
+        findsOneWidget,
+      );
+      // Science's whole term is approved: its date, and no "still to come" note.
+      expect(find.textContaining('Approved'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('released-marks-partial-sub-Science')),
+        findsNothing,
+      );
+      // No total or percentage anywhere.
+      expect(find.textContaining('%'), findsNothing);
+    },
+  );
+
   testWidgets('a failed load offers a retry', (tester) async {
     final client = _FakeMarksClient(fail: true);
     await _pump(tester, client);
