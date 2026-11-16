@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { PERMISSIONS } from "@studafy/constants";
 import { z } from "zod";
 
+import { returnUrlSchema } from "../../../lib/security/return-url";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
@@ -19,12 +20,12 @@ import type { PaymentProviderRegistry } from "../payment-provider-routing";
 
 const CheckoutRequestSchema = z.object({
   priceId: z.string().uuid(),
-  successUrl: z.string().url(),
-  cancelUrl: z.string().url(),
+  successUrl: returnUrlSchema,
+  cancelUrl: returnUrlSchema,
 });
 
 const PortalRequestSchema = z.object({
-  returnUrl: z.string().url(),
+  returnUrl: returnUrlSchema,
 });
 
 const CheckoutResponseSchema = z.object({
