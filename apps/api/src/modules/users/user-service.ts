@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../db/tenant-tx";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../lib/keyset-cursor";
+import { likeContains } from "../../lib/sql/like";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { MEMBER_PASSWORD_ROLES } from "../auth/services/member-password-service";
 import { adminRevokeUserSessions, REVOCATION_REASONS } from "../auth/services/revocation-service";
@@ -129,9 +130,9 @@ export async function listUsers(
   const statusFilter = params.status ? tx` AND u.status = ${params.status}::app.user_status` : tx``;
 
   const searchFilter = params.search
-    ? tx` AND (u.display_name ILIKE ${`%${params.search}%`} OR u.email ILIKE ${`%${params.search}%`}
+    ? tx` AND (u.display_name ILIKE ${likeContains(params.search)} OR u.email ILIKE ${likeContains(params.search)}
              OR EXISTS (SELECT 1 FROM app.member_codes mc
-                        WHERE mc.user_id = u.id AND mc.code ILIKE ${`%${params.search}%`}))`
+                        WHERE mc.user_id = u.id AND mc.code ILIKE ${likeContains(params.search)}))`
     : tx``;
 
   const createdFromFilter = params.created_from

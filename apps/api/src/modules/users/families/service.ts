@@ -2,6 +2,7 @@ import { ERROR_CODES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { likeContains } from "../../../lib/sql/like";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
 import type { TransactionSql } from "postgres";
@@ -95,7 +96,9 @@ export async function listFamilies(
             AND link.parent_user_id = ${userId}::uuid
         )
       )`;
-  const search = options.search ? tx`AND family.display_name ILIKE ${`%${options.search}%`}` : tx``;
+  const search = options.search
+    ? tx`AND family.display_name ILIKE ${likeContains(options.search)}`
+    : tx``;
 
   const rows = await tx<FamilyRow[]>`
     SELECT family.id, family.school_id, family.display_name,

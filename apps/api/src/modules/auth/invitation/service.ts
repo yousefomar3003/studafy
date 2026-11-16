@@ -5,6 +5,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { emit } from "../../../lib/events/emitter";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../../lib/keyset-cursor";
+import { likeContains } from "../../../lib/sql/like";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
 import type { InvitationStatus } from "./schemas";
@@ -409,7 +410,7 @@ export async function listInvitations(
 
   const roleFilter = params.role ? tx` AND role = ${params.role}::app.user_role` : tx``;
 
-  const searchFilter = params.search ? tx` AND email ILIKE ${`%${params.search}%`}` : tx``;
+  const searchFilter = params.search ? tx` AND email ILIKE ${likeContains(params.search)}` : tx``;
 
   const cursorFilter = params.cursor
     ? (() => {

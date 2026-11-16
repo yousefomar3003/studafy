@@ -16,6 +16,7 @@ import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../../lib/keyset-cursor";
+import { likeContains } from "../../../lib/sql/like";
 import { formatMinorUnits } from "../currency";
 
 import type { InvoiceBatchItemStatus, InvoiceBatchStatus, InvoiceStatus } from "./schemas";
@@ -288,9 +289,9 @@ export async function listInvoices(
     : tx``;
   const searchFilter = params.search
     ? tx` AND (
-        s.first_name ILIKE ${`%${params.search}%`}
-        OR s.last_name ILIKE ${`%${params.search}%`}
-        OR s.admission_number ILIKE ${`%${params.search}%`}
+        s.first_name ILIKE ${likeContains(params.search)}
+        OR s.last_name ILIKE ${likeContains(params.search)}
+        OR s.admission_number ILIKE ${likeContains(params.search)}
       )`
     : tx``;
   // Inclusive on both ends. An invoice with no due date never matches a due-date bound.

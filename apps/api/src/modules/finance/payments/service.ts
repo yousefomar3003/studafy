@@ -38,6 +38,7 @@ import { ERROR_CODES } from "@studafy/constants";
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { schoolToday } from "../../../lib/school-today";
+import { likeContains } from "../../../lib/sql/like";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
 import { erpNextDefinitelyDidNotWrite, translateErpNextError } from "../erpnext-errors";
@@ -216,7 +217,7 @@ export async function listPayments(
   schoolId: string,
   params: ListPaymentsParams,
 ): Promise<{ rows: PaymentRow[]; total: number; totals: PaymentTotal[] }> {
-  const like = params.search ? `%${params.search}%` : null;
+  const like = params.search ? likeContains(params.search) : null;
   const student = params.student_id ? tx` AND pc.student_id = ${params.student_id}::uuid` : tx``;
   const invoice = params.invoice_id ? tx` AND pc.erpnext_invoice_id = ${params.invoice_id}` : tx``;
   const mode = params.payment_mode ? tx` AND pc.payment_mode = ${params.payment_mode}` : tx``;
