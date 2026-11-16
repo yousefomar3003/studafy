@@ -28,6 +28,7 @@ import '../../../core/api/generated/models/update_assignment_body_status.dart';
 import '../../../core/api/generated/models/update_material_body.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/files/picked_file.dart';
+import '../../../core/localization/localized_number.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../attachments/presentation/attachment_viewer_screen.dart';
 import '../../student/domain/material_ready_state.dart';
@@ -894,21 +895,7 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
 
   /// Reads the points field, accepting Arabic-Indic digits and a comma or Arabic decimal
   /// separator, since the field is typed rather than prefilled. Null when it isn't a number.
-  static num? _parsePoints(String? raw) {
-    final normalized = StringBuffer();
-    for (final rune in (raw ?? '').trim().runes) {
-      if (rune >= 0x0660 && rune <= 0x0669) {
-        normalized.writeCharCode(0x30 + rune - 0x0660);
-      } else if (rune >= 0x06F0 && rune <= 0x06F9) {
-        normalized.writeCharCode(0x30 + rune - 0x06F0);
-      } else if (rune == 0x066B || rune == 0x2C) {
-        normalized.write('.');
-      } else {
-        normalized.writeCharCode(rune);
-      }
-    }
-    return num.tryParse(normalized.toString());
-  }
+  static num? _parsePoints(String? raw) => parseLocalizedNumber(raw);
 
   /// Mirrors the API's rule for max_score: required, above 0, at most 10,000, two decimals.
   static String? _pointsErrorKey(String? raw) {

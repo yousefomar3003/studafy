@@ -13,6 +13,7 @@ import '../../../../support/wrap_with_localization.dart';
 /// Records createAssessment; nothing else is reached from the sheet.
 class _FakeGradeEntryClient implements GradeEntryClient {
   final List<(String, double)> created = [];
+  final List<double> weights = [];
 
   @override
   Future<List<GradeSubmission>> createAssessment(
@@ -22,6 +23,7 @@ class _FakeGradeEntryClient implements GradeEntryClient {
     double weight = 1,
   }) async {
     created.add((label, maxScore));
+    weights.add(weight);
     return const [];
   }
 
@@ -74,4 +76,42 @@ void main() {
     await tester.pumpAndSettle();
     expect(client.created, [('Quiz 1', 20.0)]);
   });
+
+  testWidgets(
+    'accepts a score and weight typed on an Arabic keyboard (Arabic-Indic digits, ٫ and ,)',
+    (tester) async {
+      final client = await _pump(tester);
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'اختبار ١');
+      await tester.enterText(find.byType(TextFormField).at(1), '٢٠٫٥');
+      await tester.enterText(find.byType(TextFormField).at(2), '١,٥');
+      await tester.pump();
+
+      // Nothing was filtered out of the fields.
+      expect(find.text('٢٠٫٥'), findsOneWidget);
+      expect(find.text('١,٥'), findsOneWidget);
+
+      await tester.tap(find.text('Add assessment'));
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a number above 0.'), findsNothing);
+      expect(client.created, [('اختبار ١', 20.5)]);
+      expect(client.weights, [1.5]);
+    },
+  );
+
+  testWidgets(
+    'Eastern Arabic-Indic digits work too, and letters are still kept out',
+    (tester) async {
+      final client = await _pump(tester);
+
+      await tester.enterText(find.byType(TextFormField).at(0), 'Quiz 2');
+      await tester.enterText(find.byType(TextFormField).at(1), '۱۵abc');
+      await tester.pump();
+      expect(find.text('۱۵'), findsOneWidget);
+
+      await tester.tap(find.text('Add assessment'));
+      await tester.pumpAndSettle();
+      expect(client.created, [('Quiz 2', 15.0)]);
+    },
+  );
 }
