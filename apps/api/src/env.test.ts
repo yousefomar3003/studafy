@@ -6,8 +6,11 @@ import { EnvValidationError, loadEnv } from "./env";
 import { LOG_LEVEL_NAMES } from "./logger";
 
 // A deployed tier needs a real records keyring (ADR-019) and a real realtime ticket key (QA-14).
+const TEST_JWT_PEM = "-----BEGIN PRIVATE KEY-----\nMIIEvQ\n-----END PRIVATE KEY-----";
+
 const DEPLOYED_SECRETS = {
   WS_JWT_SECRET: "w".repeat(32),
+  JWT_PRIVATE_KEY_PEM: TEST_JWT_PEM,
   RECORDS_ENCRYPTION_KEYS: JSON.stringify({ "prod-1": Buffer.alloc(32, 3).toString("base64") }),
   RECORDS_ENCRYPTION_CURRENT_KEY_ID: "prod-1",
 };
@@ -569,5 +572,44 @@ describe("in-app purchase configuration", () => {
       }
     };
     expect(issues()).toContain("APPLE_IAP_APP_APPLE_ID");
+  });
+});
+
+// QA-023: in-memory keys differ per machine and per restart, so a deployed API must load one.
+describe("JWT signing key (QA-023)", () => {
+  const deployed = {
+    CORS_ALLOWED_ORIGINS: "https://app.studafy.com",
+    TURNSTILE_SECRET_KEY: "s",
+    ...DEPLOYED_SECRETS,
+  };
+
+  test("a deployed tier refuses to boot without JWT_PRIVATE_KEY_PEM", () => {
+    for (const APP_ENV of ["staging", "production"]) {
+      expect(() => loadEnv({ ...deployed, APP_ENV, JWT_PRIVATE_KEY_PEM: undefined })).toThrow(
+        /JWT_PRIVATE_KEY_PEM is required/,
+      );
+      expect(() => loadEnv({ ...deployed, APP_ENV, JWT_PRIVATE_KEY_PEM: "" })).toThrow(
+        /JWT_PRIVATE_KEY_PEM is required/,
+      );
+    }
+  });
+
+  test("a value that is not a PKCS#8 PEM is refused", () => {
+    expect(() =>
+      loadEnv({ ...deployed, APP_ENV: "production", JWT_PRIVATE_KEY_PEM: "not-a-key" }),
+    ).toThrow(EnvValidationError);
+  });
+
+  test("escaped newlines from a secret store are restored", () => {
+    const env = loadEnv({
+      ...deployed,
+      APP_ENV: "production",
+      JWT_PRIVATE_KEY_PEM: TEST_JWT_PEM.replaceAll("\n", "\\n"),
+    });
+    expect(env.JWT_PRIVATE_KEY_PEM).toBe(TEST_JWT_PEM);
+  });
+
+  test("development keeps generating a key in memory", () => {
+    expect(loadEnv({ APP_ENV: "development" }).JWT_PRIVATE_KEY_PEM).toBeUndefined();
   });
 });

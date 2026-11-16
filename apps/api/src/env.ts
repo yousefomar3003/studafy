@@ -57,6 +57,24 @@ function emptyAsUnset(value: unknown): unknown {
   return value === "" ? undefined : value;
 }
 
+/**
+ * A PEM held in a secret store. Empty means unset, and a single-line value with literal `\n`
+ * escapes (how most secret UIs and `fly secrets set` carry one) gets its newlines back.
+ */
+function pemFromSecret(value: unknown): unknown {
+  const present = emptyAsUnset(value);
+  return typeof present === "string"
+    ? present.replaceAll("\\n", "\n").replaceAll("\r\n", "\n").trim()
+    : present;
+}
+
+const pkcs8Pem = z
+  .string()
+  .regex(
+    /^-----BEGIN PRIVATE KEY-----\n[\s\S]+\n-----END PRIVATE KEY-----$/,
+    "must be an unencrypted PKCS#8 PEM (-----BEGIN PRIVATE KEY-----)",
+  );
+
 export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -164,6 +182,12 @@ export const envSchema = z
       .int()
       .positive()
       .default(7 * 24 * 60 * 60 * 1000),
+    // The access-token signing key (QA-023), RSA PKCS#8 PEM. Required on a deployed tier (below):
+    // without it each machine generates its own key, so a token signed on one is a 401 on another
+    // and every restart logs everyone out. The NEXT key is published and verified but never signs;
+    // see docs/runbooks/security/rotation-jwt-jwks.md. Unset in development: a key is generated.
+    JWT_PRIVATE_KEY_PEM: z.preprocess(pemFromSecret, pkcs8Pem.optional()),
+    JWT_NEXT_PRIVATE_KEY_PEM: z.preprocess(pemFromSecret, pkcs8Pem.optional()),
     // Google OAuth (OIDC). All optional — the feature activates only when the client id and secret
     // are set, and then the redirect URI must be too (refinement below). Deployed tiers always render
     // the redirect URI (derived from the tier's API origin) and inject the client id/secret from the
@@ -429,6 +453,14 @@ export const envSchema = z
         code: "custom",
         path: ["TURNSTILE_SECRET_KEY"],
         message: `TURNSTILE_SECRET_KEY is required when APP_ENV is ${env.APP_ENV}`,
+      });
+    }
+
+    if (env.APP_ENV !== "development" && !env.JWT_PRIVATE_KEY_PEM) {
+      context.addIssue({
+        code: "custom",
+        path: ["JWT_PRIVATE_KEY_PEM"],
+        message: `JWT_PRIVATE_KEY_PEM is required when APP_ENV is ${env.APP_ENV}`,
       });
     }
 

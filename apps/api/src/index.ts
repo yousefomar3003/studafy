@@ -220,7 +220,16 @@ const flags = createFlagsService({
 const keyStore = new KeyStore(env.JWT_KEY_ROTATION_INTERVAL_MS, (kid) => {
   logger.info({ kid }, "jwt key rotated");
 });
-await keyStore.init();
+// A deployed tier loads its key from the secret (env.ts refuses to boot without it), so every machine
+// and every restart accepts the same tokens (QA-023). Development generates one in memory.
+await keyStore.init({
+  privateKeyPem: env.JWT_PRIVATE_KEY_PEM,
+  nextPrivateKeyPem: env.JWT_NEXT_PRIVATE_KEY_PEM,
+});
+logger.info(
+  { kid: keyStore.signingKey().kid, source: env.JWT_PRIVATE_KEY_PEM ? "secret" : "generated" },
+  "jwt signing key ready",
+);
 
 // The readiness probe: /readyz's question, composed here rather than in createApp so the app stays
 // dependency-free. The draining flag is synchronous (state.ready flips in the shutdown handler) and

@@ -62,6 +62,8 @@ export interface TestAppOptions {
   storage?: StorageService | null;
   /** Records the malware scans uploads enqueue (F-14). Defaults to none: uploads stay unserved. */
   uploadScanEnqueuer?: UploadScanEnqueuer | null;
+  /** Load the signing key from this PKCS#8 PEM, as a deployed API does (QA-023). Default: random. */
+  jwtPrivateKeyPem?: string;
 }
 
 /** A test app plus the key store whose keys its tokens must be signed with. */
@@ -103,7 +105,9 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
   });
 
   const ready = Promise.all([
-    keyStore.init(),
+    keyStore.init(
+      options.jwtPrivateKeyPem ? { privateKeyPem: options.jwtPrivateKeyPem } : undefined,
+    ),
     options.database ? assertLeastPrivilege(appDatabaseFor(options.database)) : undefined,
   ]).then(() => undefined);
   return { app, keyStore, ready };
