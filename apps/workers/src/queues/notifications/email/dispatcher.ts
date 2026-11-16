@@ -138,7 +138,12 @@ async function recordDelivery(
 
 async function markDispatched(tx: TransactionSql, row: ClaimedOutboxRow): Promise<void> {
   const now = new Date().toISOString();
-  await tx`UPDATE app.outbox_events SET email_dispatched_at = ${now} WHERE id = ${row.id}`;
+  // The one-time token (invitation, verification, deletion confirmation) is a bearer credential
+  // kept only until its email has gone (QA-032), not for the row's whole retention.
+  await tx`
+    UPDATE app.outbox_events SET email_dispatched_at = ${now}, payload = payload - 'token'
+    WHERE id = ${row.id}
+  `;
 }
 
 function clampError(err: unknown): string {
@@ -246,7 +251,8 @@ async function rescheduleOrDeadLetter(
   await tx`
     UPDATE app.outbox_events
     SET email_attempts = ${attempts}, email_next_attempt_at = NULL,
-        email_dispatched_at = ${new Date().toISOString()}
+        email_dispatched_at = ${new Date().toISOString()},
+        payload = payload - 'token'
     WHERE id = ${row.id}
   `;
   ctx.logger.error(
