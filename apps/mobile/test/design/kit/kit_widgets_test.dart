@@ -299,6 +299,59 @@ void main() {
       });
 
       testWidgets(
+        'AppCollapsibleSectionCard with expanded follows its parent, not its own taps',
+        (tester) async {
+          var expanded = false;
+          final changes = <bool>[];
+          await _pump(
+            tester,
+            StatefulBuilder(
+              builder: (context, setState) => AppCollapsibleSectionCard(
+                title: 'Week 3',
+                icon: Icons.folder_outlined,
+                expanded: expanded,
+                onExpansionChanged: (next) {
+                  changes.add(next);
+                  setState(() => expanded = next);
+                },
+                child: const Text('controlled'),
+              ),
+            ),
+            direction: direction,
+          );
+          expect(find.text('controlled'), findsNothing);
+
+          await tester.tap(find.text('Week 3'));
+          await tester.pumpAndSettle();
+          expect(changes, [true]);
+          expect(find.text('controlled'), findsOneWidget);
+        },
+      );
+
+      testWidgets(
+        'AppCollapsibleSectionCard with expanded stays put until the parent changes it',
+        (tester) async {
+          final changes = <bool>[];
+          await _pump(
+            tester,
+            AppCollapsibleSectionCard(
+              title: 'Week 4',
+              icon: Icons.folder_outlined,
+              expanded: false,
+              onExpansionChanged: changes.add,
+              child: const Text('still hidden'),
+            ),
+            direction: direction,
+          );
+
+          await tester.tap(find.text('Week 4'));
+          await tester.pumpAndSettle();
+          expect(changes, [true]);
+          expect(find.text('still hidden'), findsNothing);
+        },
+      );
+
+      testWidgets(
         'AppHeroCard renders structured content with the icon on the start side',
         (tester) async {
           await _pump(

@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/api/generated/models/material.dart';
+import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../../timetable/presentation/weekly_schedule_view.dart' show weekdayName;
 import '../../application/material_weeks_providers.dart';
@@ -34,9 +35,11 @@ String materialDayLabel(int dayOfWeek, DateTime? date, String locale) {
   return date == null ? name : '$name · ${DateFormat('d MMM', locale).format(date)}';
 }
 
-/// A class's materials as collapsible week sections, each with its day sub-groups, then a final
-/// Unscheduled section (see [groupMaterialsByWeek]). Shared by the student materials library and
-/// the teacher's class content screen; [itemBuilder] draws each material row.
+/// A class's materials as collapsible week section cards ([AppCollapsibleSectionCard]), each with
+/// its day sub-groups, then a final Unscheduled section (see [groupMaterialsByWeek]). Shared by the
+/// student materials library and the teacher's class content screen; [itemBuilder] draws each
+/// material row. Each card's badge takes the class's subject [accent], and its header keeps a count
+/// of the week's materials visible while it is collapsed.
 ///
 /// The current week starts expanded and the rest collapsed ([defaultExpandedSectionKey]). Whatever
 /// the user opens or closes is remembered per class on this device, so returning to the list
@@ -46,12 +49,16 @@ class MaterialWeekSections extends ConsumerStatefulWidget {
     required this.classId,
     required this.materials,
     required this.itemBuilder,
+    this.accent = AppAccent.blue,
     super.key,
   });
 
   final String classId;
   final List<Material> materials;
   final Widget Function(BuildContext context, Material material) itemBuilder;
+
+  /// The class's subject accent ([SubjectVisuals]) for the section badges.
+  final AppAccent accent;
 
   @override
   ConsumerState<MaterialWeekSections> createState() => _MaterialWeekSectionsState();
@@ -137,16 +144,19 @@ class _MaterialWeekSectionsState extends ConsumerState<MaterialWeekSections> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final section in sections)
+        for (final (index, section) in sections.indexed) ...[
+          if (index > 0) const SizedBox(height: AppSpacing.space12),
           _WeekSection(
             key: ValueKey('material-week-section-${section.key}'),
             section: section,
             calendar: calendar,
+            accent: widget.accent,
             isCurrent: section.weekNumber != null && section.weekNumber == currentWeek,
             expanded: _choices[section.key] ?? section.key == defaultKey,
             onToggle: (expanded) => _toggle(section.key, expanded),
             itemBuilder: widget.itemBuilder,
           ),
+        ],
       ],
     );
   }
@@ -156,6 +166,7 @@ class _WeekSection extends StatelessWidget {
   const _WeekSection({
     required this.section,
     required this.calendar,
+    required this.accent,
     required this.isCurrent,
     required this.expanded,
     required this.onToggle,
@@ -165,6 +176,7 @@ class _WeekSection extends StatelessWidget {
 
   final MaterialWeekSection section;
   final MaterialWeekCalendar calendar;
+  final AppAccent accent;
   final bool isCurrent;
   final bool expanded;
   final ValueChanged<bool> onToggle;
@@ -176,54 +188,57 @@ class _WeekSection extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final week = section.weekNumber;
+    // The dates go under the title rather than beside it, so the title stays on one line next to
+    // the count pill.
     final title = week == null
         ? 'materials.weeks.unscheduled'.tr()
-        : materialWeekLabel(week, calendar, locale);
-    final count = 'materials.weeks.count'.plural(section.materialCount);
+        : 'materials.weeks.week'.tr(namedArgs: {'number': '$week'});
+    final range = week == null ? null : calendar.teachingRange(week);
+    final subtitle = [
+      if (range != null) materialWeekRangeLabel(range, locale),
+      if (isCurrent) 'materials.weeks.thisWeek'.tr(),
+    ].join(' · ');
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Semantics(
-          expanded: expanded,
-          child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.space8),
-            title: Text(
-              title,
-              style: textTheme.titleSmall?.copyWith(color: isCurrent ? colorScheme.primary : null),
-            ),
-            subtitle: Text(
-              isCurrent ? '${'materials.weeks.thisWeek'.tr()} · $count' : count,
-              style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-            trailing: AnimatedRotation(
-              turns: expanded ? 0.5 : 0,
-              duration: const Duration(milliseconds: 150),
-              child: const Icon(Icons.expand_more),
-            ),
-            onTap: () => onToggle(!expanded),
-          ),
+    return AppCollapsibleSectionCard(
+      title: title,
+      icon: week == null
+          ? Icons.inventory_2_outlined
+          : isCurrent
+          ? Icons.today_outlined
+          : Icons.date_range_outlined,
+      accent: accent,
+      subtitle: subtitle.isEmpty ? null : subtitle,
+      trailing: Padding(
+        padding: const EdgeInsetsDirectional.only(end: AppSpacing.space4),
+        child: AppStatusPill(
+          label: 'materials.weeks.count'.plural(section.materialCount),
+          tone: isCurrent ? AppTone.brand : AppTone.neutral,
         ),
-        if (expanded) ...[
+      ),
+      expanded: expanded,
+      onExpansionChanged: onToggle,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
           for (final material in section.unscheduled) itemBuilder(context, material),
           for (final day in section.days) ...[
             Padding(
-              padding: const EdgeInsetsDirectional.fromSTEB(
-                AppSpacing.space16,
-                AppSpacing.space8,
-                AppSpacing.space16,
-                AppSpacing.space4,
+              padding: const EdgeInsetsDirectional.only(
+                top: AppSpacing.space8,
+                bottom: AppSpacing.space4,
               ),
               child: Text(
                 materialDayLabel(day.dayOfWeek, day.date, locale),
-                style: textTheme.labelMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+                style: textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             for (final material in day.materials) itemBuilder(context, material),
           ],
         ],
-        const Divider(height: 1),
-      ],
+      ),
     );
   }
 }

@@ -51,6 +51,10 @@ class AppSectionCard extends StatelessWidget {
 
 /// An [AppSectionCard] whose body folds away under its header: tap the header to collapse or
 /// expand it. The header announces its expanded state to screen readers.
+///
+/// Uncontrolled by default: the card keeps its own state, starting from [initiallyExpanded]. Give
+/// it [expanded] to control it instead (e.g. state restored from storage after the first frame);
+/// a tap then only reports the wanted state through [onExpansionChanged].
 class AppCollapsibleSectionCard extends StatefulWidget {
   const AppCollapsibleSectionCard({
     required this.title,
@@ -60,6 +64,7 @@ class AppCollapsibleSectionCard extends StatefulWidget {
     this.subtitle,
     this.trailing,
     this.initiallyExpanded = true,
+    this.expanded,
     this.onExpansionChanged,
     super.key,
   });
@@ -73,6 +78,9 @@ class AppCollapsibleSectionCard extends StatefulWidget {
   /// Shown before the expand chevron (e.g. a count that stays visible while collapsed).
   final Widget? trailing;
   final bool initiallyExpanded;
+
+  /// When non-null, whether the card is expanded; the parent owns the state.
+  final bool? expanded;
   final ValueChanged<bool>? onExpansionChanged;
 
   @override
@@ -81,13 +89,16 @@ class AppCollapsibleSectionCard extends StatefulWidget {
 }
 
 class _AppCollapsibleSectionCardState extends State<AppCollapsibleSectionCard> {
-  late bool _expanded = widget.initiallyExpanded;
+  late bool _ownExpanded = widget.initiallyExpanded;
 
   static const _duration = Duration(milliseconds: 200);
 
+  bool get _expanded => widget.expanded ?? _ownExpanded;
+
   void _toggle() {
-    setState(() => _expanded = !_expanded);
-    widget.onExpansionChanged?.call(_expanded);
+    final next = !_expanded;
+    if (widget.expanded == null) setState(() => _ownExpanded = next);
+    widget.onExpansionChanged?.call(next);
   }
 
   @override
