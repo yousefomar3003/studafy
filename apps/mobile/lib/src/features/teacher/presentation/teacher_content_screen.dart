@@ -32,17 +32,24 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../attachments/presentation/attachment_viewer_screen.dart';
 import '../../student/domain/material_ready_state.dart';
 import '../../student/presentation/widgets/material_ready_state_pill.dart';
+import '../../student/presentation/widgets/material_week_sections.dart';
 import 'assignment_submissions_screen.dart';
 import 'question_editor_screen.dart';
 import 'widgets/class_ai_materials_switch.dart';
+import 'widgets/material_placement_fields.dart';
 
 /// Teacher-owned content for one class: create and edit assignments, upload and edit materials.
 ///
 /// Material rows are re-read while any of them is still in the server-side scan / AI-ingestion
 /// pipeline (not [MaterialReadyStateX.isSettled]), so the transition to Ready is visible without
-/// the teacher leaving and returning. The re-read backs off from [materialPollInitialDelay] to
-/// [materialPollMaxDelay], stops once every material has settled, and pauses while the app is in
-/// the background or another route covers this one.
+/// the teacher leaving and returning. For [materialPollFastWindow] after the screen opens or the
+/// teacher acts (an upload, a retry, pull to refresh) it re-reads every [materialPollInitialDelay]:
+/// that is when the scan and processing usually finish (a cold scanner alone takes about 30 s), and
+/// a longer gap would only show Ready late. After that it backs off to [materialPollMaxDelay]. It
+/// stops once every material has settled, and pauses while the app is in the background or another
+/// route covers this one.
+///
+/// A failed material offers Retry and Delete, so a failed attempt does not stay in the list.
 class TeacherContentScreen extends ConsumerStatefulWidget {
   const TeacherContentScreen({
     required this.classId,
@@ -58,10 +65,14 @@ class TeacherContentScreen extends ConsumerStatefulWidget {
       _TeacherContentScreenState();
 }
 
-/// The first wait before re-reading materials that are still being scanned or ingested.
-const materialPollInitialDelay = Duration(seconds: 8);
+/// The wait between re-reads of materials that are still being scanned or ingested, while the
+/// work is recent (see [materialPollFastWindow]).
+const materialPollInitialDelay = Duration(seconds: 5);
 
-/// The longest wait between two re-reads; the delay doubles up to this while nothing settles.
+/// How long after the teacher's last action the re-reads stay at [materialPollInitialDelay].
+const materialPollFastWindow = Duration(minutes: 2);
+
+/// The longest wait between two re-reads; past the fast window the delay doubles up to this.
 const materialPollMaxDelay = Duration(seconds: 60);
 
 class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
@@ -73,6 +84,9 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
   /// The next scheduled re-read, if any. One-shot: each load decides whether another is needed.
   Timer? _materialRefresh;
   Duration _materialPollDelay = materialPollInitialDelay;
+
+  /// Time spent polling since the teacher's last action, summed from the delays actually waited.
+  Duration _materialPollElapsed = Duration.zero;
 
   /// Whether the last successful load had a material still in the pipeline. Kept across a failed
   /// load, so a transient error backs off rather than stopping the re-reads.
@@ -133,10 +147,13 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
     final delay = _materialPollDelay;
     _materialRefresh = Timer(delay, () {
       _materialRefresh = null;
-      final doubled = delay * 2;
-      _materialPollDelay = doubled > materialPollMaxDelay
-          ? materialPollMaxDelay
-          : doubled;
+      _materialPollElapsed += delay;
+      if (_materialPollElapsed >= materialPollFastWindow) {
+        final doubled = delay * 2;
+        _materialPollDelay = doubled > materialPollMaxDelay
+            ? materialPollMaxDelay
+            : doubled;
+      }
       _refreshMaterials(background: true);
     });
   }
@@ -176,13 +193,87 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
   }
 
   /// Re-reads the materials. A [background] re-read keeps the current backoff; anything the
-  /// teacher did (pull to refresh, an upload or edit) starts it over from the shortest delay.
+  /// teacher did (pull to refresh, an upload, edit or retry) starts it over from the shortest delay.
   void _refreshMaterials({bool background = false}) {
     if (!mounted) return;
-    if (!background) _materialPollDelay = materialPollInitialDelay;
+    if (!background) {
+      _materialPollDelay = materialPollInitialDelay;
+      _materialPollElapsed = Duration.zero;
+    }
     setState(() {
       _materials = _loadMaterials();
     });
+  }
+
+  /// Sends a failed material back through the scan and processing.
+  Future<void> _retryMaterial(material_api.Material material) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(apiClientProvider)
+          .academics
+          .retryMaterial(materialId: material.id);
+      messenger.showSnackBar(
+        SnackBar(content: Text('teacher.content.materials.retried'.tr())),
+      );
+    } on DioException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            (error.apiError?.code == 'MATERIAL_STORAGE_CONFIRM_FAILED'
+                    ? 'teacher.content.materials.retryFileMissing'
+                    : _errorKeyFor(
+                        error,
+                        'teacher.content.materials.retryError',
+                      ))
+                .tr(),
+          ),
+        ),
+      );
+    }
+    _refreshMaterials();
+  }
+
+  /// Deletes a material after the teacher confirms; its file and space are freed server-side.
+  Future<void> _deleteMaterial(material_api.Material material) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('teacher.content.materials.deleteTitle'.tr()),
+        content: Text(
+          'teacher.content.materials.deleteBody'.tr(
+            namedArgs: {'title': material.title},
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text('teacher.content.materials.cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text('teacher.content.materials.delete'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(apiClientProvider)
+          .academics
+          .deleteMaterial(materialId: material.id);
+    } on DioException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            _errorKeyFor(error, 'teacher.content.materials.deleteError').tr(),
+          ),
+        ),
+      );
+    }
+    _refreshMaterials();
   }
 
   @override
@@ -259,12 +350,15 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
             ),
             Expanded(
               child: _MaterialList(
+                classId: widget.classId,
                 future: _materials,
                 onRefresh: _refreshMaterials,
                 onEdit: (material) => _open(
                   _MaterialEditor(material: material),
                   assignments: false,
                 ),
+                onRetry: _retryMaterial,
+                onDelete: _deleteMaterial,
               ),
             ),
           ],
@@ -396,15 +490,23 @@ class _AssignmentList extends StatelessWidget {
   );
 }
 
+/// The class's materials in collapsible week sections with day sub-groups
+/// ([MaterialWeekSections]), the same grouping students see.
 class _MaterialList extends StatelessWidget {
   const _MaterialList({
+    required this.classId,
     required this.future,
     required this.onRefresh,
     required this.onEdit,
+    required this.onRetry,
+    required this.onDelete,
   });
+  final String classId;
   final Future<List<material_api.Material>> future;
   final VoidCallback onRefresh;
   final ValueChanged<material_api.Material> onEdit;
+  final ValueChanged<material_api.Material> onRetry;
+  final ValueChanged<material_api.Material> onDelete;
 
   @override
   Widget build(
@@ -429,61 +531,98 @@ class _MaterialList extends StatelessWidget {
                 icon: Icons.folder_open_outlined,
                 text: 'teacher.content.materials.empty'.tr(),
               )
-            : ListView.separated(
+            : ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(AppSpacing.space16),
-                itemCount: materials.length,
-                separatorBuilder: (_, _) =>
-                    const SizedBox(height: AppSpacing.space8),
-                itemBuilder: (_, index) {
-                  final material = materials[index];
-                  final description = material.description;
-                  return Card(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.space12,
-                        AppSpacing.space8,
-                        AppSpacing.space8,
-                        AppSpacing.space8,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
+                children: [
+                  MaterialWeekSections(
+                    classId: classId,
+                    materials: materials,
+                    itemBuilder: (context, material) {
+                      final description = material.description;
+                      final state = materialReadyStateFromWireName(
+                        material.ingestStatus.name,
+                      );
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.space12,
+                            AppSpacing.space8,
+                            AppSpacing.space8,
+                            AppSpacing.space8,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Expanded(
-                                child: Text(
-                                  material.title,
-                                  style: Theme.of(context).textTheme.titleSmall,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      material.title,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleSmall,
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.edit_outlined),
+                                    tooltip: 'teacher.content.materials.edit'
+                                        .tr(),
+                                    onPressed: () => onEdit(material),
+                                  ),
+                                ],
+                              ),
+                              if (description != null && description.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(
+                                    bottom: AppSpacing.space4,
+                                  ),
+                                  child: Text(
+                                    description,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
+                                  ),
                                 ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.edit_outlined),
-                                tooltip: 'teacher.content.materials.edit'.tr(),
-                                onPressed: () => onEdit(material),
-                              ),
+                              MaterialReadyStatePill(state: state),
+                              // A failed attempt can be run again or removed; a blocked file can
+                              // only be removed. Neither should sit in the list forever.
+                              if (state == MaterialReadyState.failed ||
+                                  state == MaterialReadyState.quarantined)
+                                Wrap(
+                                  spacing: AppSpacing.space8,
+                                  children: [
+                                    if (state == MaterialReadyState.failed)
+                                      TextButton.icon(
+                                        key: ValueKey(
+                                          'material-retry-${material.id}',
+                                        ),
+                                        onPressed: () => onRetry(material),
+                                        icon: const Icon(Icons.refresh),
+                                        label: Text(
+                                          'teacher.content.materials.retry'
+                                              .tr(),
+                                        ),
+                                      ),
+                                    TextButton.icon(
+                                      key: ValueKey(
+                                        'material-delete-${material.id}',
+                                      ),
+                                      onPressed: () => onDelete(material),
+                                      icon: const Icon(Icons.delete_outline),
+                                      label: Text(
+                                        'teacher.content.materials.delete'.tr(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                             ],
                           ),
-                          if (description != null && description.isNotEmpty)
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                bottom: AppSpacing.space4,
-                              ),
-                              child: Text(
-                                description,
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ),
-                          MaterialReadyStatePill(
-                            state: materialReadyStateFromWireName(
-                              material.ingestStatus.name,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ),
       );
     },
@@ -586,7 +725,11 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
     final existing = widget.existing;
     _title = TextEditingController(text: existing?.title ?? '');
     _details = TextEditingController(text: existing?.description ?? '');
-    _score = TextEditingController(text: '${existing?.maxScore ?? 100}');
+    // No default total: the teacher decides what the assignment is out of. An edit keeps the
+    // saved total.
+    _score = TextEditingController(
+      text: existing == null ? '' : '${existing.maxScore}',
+    );
     _dueAt =
         existing?.dueAt.toLocal() ??
         DateTime.now().add(const Duration(days: 7));
@@ -658,7 +801,7 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
           description: description,
           dueAt: _dueAt.toUtc(),
           // Replaced by the question total once questions are saved.
-          maxScore: _isQuestions ? 1 : num.parse(_score.text),
+          maxScore: _isQuestions ? 1 : _parsePoints(_score.text)!,
           allowLateSubmission: _lateAllowed,
           status: _isQuestions
               ? CreateAssignmentBodyStatus.draft
@@ -678,7 +821,7 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
         instructions: existing.instructions,
         availableFrom: existing.availableFrom,
         dueAt: _dueAt.toUtc(),
-        maxScore: _isQuestions ? existing.maxScore : num.parse(_score.text),
+        maxScore: _isQuestions ? existing.maxScore : _parsePoints(_score.text)!,
         allowLateSubmission: _lateAllowed,
         status: UpdateAssignmentBodyStatus.fromJson(_status.json!),
       ),
@@ -744,6 +887,45 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// The API's ceiling on an assignment's total (MAX_SCORE_CEILING in the assignments schemas).
+  static const _maxPoints = 10000;
+
+  /// Reads the points field, accepting Arabic-Indic digits and a comma or Arabic decimal
+  /// separator, since the field is typed rather than prefilled. Null when it isn't a number.
+  static num? _parsePoints(String? raw) {
+    final normalized = StringBuffer();
+    for (final rune in (raw ?? '').trim().runes) {
+      if (rune >= 0x0660 && rune <= 0x0669) {
+        normalized.writeCharCode(0x30 + rune - 0x0660);
+      } else if (rune >= 0x06F0 && rune <= 0x06F9) {
+        normalized.writeCharCode(0x30 + rune - 0x06F0);
+      } else if (rune == 0x066B || rune == 0x2C) {
+        normalized.write('.');
+      } else {
+        normalized.writeCharCode(rune);
+      }
+    }
+    return num.tryParse(normalized.toString());
+  }
+
+  /// Mirrors the API's rule for max_score: required, above 0, at most 10,000, two decimals.
+  static String? _pointsErrorKey(String? raw) {
+    if ((raw ?? '').trim().isEmpty) {
+      return 'teacher.content.assignmentForm.pointsRequired';
+    }
+    final points = _parsePoints(raw);
+    if (points == null || !points.isFinite || points <= 0) {
+      return 'teacher.content.assignmentForm.pointsInvalid';
+    }
+    if (points > _maxPoints) {
+      return 'teacher.content.assignmentForm.pointsTooHigh';
+    }
+    if ((points * 100 - (points * 100).round()).abs() > 1e-6) {
+      return 'teacher.content.assignmentForm.pointsDecimals';
+    }
+    return null;
   }
 
   String get _fallbackErrorKey => _editing
@@ -853,19 +1035,19 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
             if (!_isQuestions) ...[
               const SizedBox(height: AppSpacing.space12),
               TextFormField(
+                key: const Key('assignmentPoints'),
                 controller: _score,
                 decoration: InputDecoration(
                   labelText: 'teacher.content.assignmentForm.points'.tr(),
+                  hintText: 'teacher.content.assignmentForm.pointsHint'.tr(),
+                  // Keep the hint on screen while the field is empty and unfocused, so the
+                  // teacher sees the question rather than just a blank box.
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
                 ),
                 keyboardType: const TextInputType.numberWithOptions(
                   decimal: true,
                 ),
-                validator: (v) {
-                  final points = num.tryParse(v ?? '');
-                  return points == null || points <= 0
-                      ? 'teacher.content.assignmentForm.pointsInvalid'.tr()
-                      : null;
-                },
+                validator: (v) => _pointsErrorKey(v)?.tr(),
               ),
             ],
             if (!(_isQuestions && !_editing)) ...[
@@ -986,6 +1168,10 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _description = TextEditingController();
+
+  /// The week and day of the term the material is listed under. Both required to upload.
+  int? _week;
+  int? _day;
   _LocalFile? _file;
   bool _uploading = false;
   double? _progress;
@@ -1030,10 +1216,12 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
   }
 
   Future<void> _upload() async {
-    if (!_formKey.currentState!.validate() || _file == null) {
+    final valid = _formKey.currentState!.validate();
+    if (_file == null) {
       setState(() => _errorKey = 'teacher.content.materialForm.fileRequired');
       return;
     }
+    if (!valid || _week == null || _day == null) return;
     final file = _file!;
     setState(() {
       _uploading = true;
@@ -1051,6 +1239,8 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
           originalFileName: file.name,
           mimeType: file.contentType,
           sizeBytes: file.sizeBytes,
+          weekNumber: _week,
+          dayOfWeek: _day,
         ),
       );
       // The initiate endpoint currently returns only the storage key. The material row is
@@ -1104,6 +1294,15 @@ class _MaterialComposerState extends ConsumerState<_MaterialComposer> {
         padding: const EdgeInsets.all(AppSpacing.space16),
         children: [
           _MaterialFields(title: _title, description: _description),
+          const SizedBox(height: AppSpacing.space12),
+          MaterialPlacementFields(
+            classId: widget.classId,
+            week: _week,
+            day: _day,
+            enabled: !_uploading,
+            onWeekChanged: (week) => setState(() => _week = week),
+            onDayChanged: (day) => setState(() => _day = day),
+          ),
           const SizedBox(height: AppSpacing.space12),
           Wrap(
             spacing: AppSpacing.space8,
@@ -1181,8 +1380,9 @@ class _MaterialFields extends StatelessWidget {
   );
 }
 
-/// Edits an uploaded material's metadata. The file itself is immutable -- replacing it means
-/// uploading a new material -- and AI visibility is toggled from the list row.
+/// Edits an uploaded material's metadata, including the week and day it is listed under. The file
+/// itself is immutable -- replacing it means uploading a new material -- and AI visibility is
+/// toggled from the list row.
 class _MaterialEditor extends ConsumerStatefulWidget {
   const _MaterialEditor({required this.material});
   final material_api.Material material;
@@ -1194,6 +1394,10 @@ class _MaterialEditorState extends ConsumerState<_MaterialEditor> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _title;
   late final TextEditingController _description;
+
+  /// [unscheduledMaterialWeek] for a material in no week (one uploaded before weeks existed).
+  late int? _week = widget.material.weekNumber ?? unscheduledMaterialWeek;
+  late int? _day = widget.material.dayOfWeek;
   bool _saving = false;
   String? _errorKey;
 
@@ -1221,8 +1425,9 @@ class _MaterialEditorState extends ConsumerState<_MaterialEditor> {
     });
     try {
       final description = _description.text.trim();
-      // Both fields are always sent: the generated body serialises nulls, and a null description
-      // is exactly how the API clears it.
+      final placed = _week != unscheduledMaterialWeek;
+      // Every field is always sent: the generated body serialises nulls, and a null description
+      // (or a null week and day) is exactly how the API clears it.
       await ref
           .read(apiClientProvider)
           .academics
@@ -1231,6 +1436,8 @@ class _MaterialEditorState extends ConsumerState<_MaterialEditor> {
             body: UpdateMaterialBody(
               title: _title.text.trim(),
               description: description.isEmpty ? null : description,
+              weekNumber: placed ? _week : null,
+              dayOfWeek: placed ? _day : null,
             ),
           );
       if (mounted) Navigator.of(context).pop(true);
@@ -1254,6 +1461,20 @@ class _MaterialEditorState extends ConsumerState<_MaterialEditor> {
         padding: const EdgeInsets.all(AppSpacing.space16),
         children: [
           _MaterialFields(title: _title, description: _description),
+          const SizedBox(height: AppSpacing.space12),
+          MaterialPlacementFields(
+            classId: widget.material.classId,
+            week: _week,
+            day: _day,
+            required: false,
+            allowUnscheduled: true,
+            enabled: !_saving,
+            onWeekChanged: (week) => setState(() {
+              _week = week;
+              if (week == unscheduledMaterialWeek) _day = null;
+            }),
+            onDayChanged: (day) => setState(() => _day = day),
+          ),
           ListTile(
             contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.insert_drive_file_outlined),

@@ -205,6 +205,7 @@ import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
 
 import type { Database } from "./db";
+import type { ScannerWarmup } from "./lib/scanner-warmup";
 import type { SecurityEventSink } from "./lib/security/securityEventSink";
 import type { StorageService } from "./lib/storage";
 import type { UploadScanEnqueuer } from "./lib/storage/upload-scan";
@@ -342,6 +343,12 @@ export interface AppOptions {
    */
   uploadScanEnqueuer?: UploadScanEnqueuer | null;
   /**
+   * Wakes the scaled-to-zero malware scanner when a material upload starts, so it boots while the
+   * file uploads (lib/scanner-warmup.ts). Fire-and-forget. Absent (tests, local dev without
+   * CLAMAV_HOST): no warm-up.
+   */
+  scannerWarmup?: ScannerWarmup | null;
+  /**
    * Stripe payment provider for subscription billing.
    *
    * Nullable: when absent, checkout, portal, and webhook routes still register (so the OpenAPI
@@ -420,6 +427,7 @@ export function createApp({
   rateLimitDisabled = false,
   storage = null,
   uploadScanEnqueuer,
+  scannerWarmup = null,
   stripeProvider = null,
   tapProvider = null,
   tapCountries = new Set(),
@@ -1309,7 +1317,7 @@ export function createApp({
   // the same way: when absent, confirm still flips the material to 'scanning' but no scan job is
   // enqueued.
   if (database) {
-    app.route("/", materialRoutes(database, storage, redis ?? null));
+    app.route("/", materialRoutes(database, storage, redis ?? null, { scannerWarmup }));
     // Per-class "use this class's materials with the AI study assistant" setting (000196). Turning
     // it back on enqueues ingestion, so it takes Redis the same optional way.
     app.route("/", classAiMaterialsRoutes(database, redis ?? null));

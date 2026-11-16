@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/generated/models/timetable_slot.dart';
 import '../../../../core/auth/auth_providers.dart';
 import '../../../../core/offline/staleness_banner.dart';
+import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_radius_tokens.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/today_providers.dart';
@@ -39,6 +40,7 @@ class TodayTimetableCard extends ConsumerWidget {
     return TodayCardShell(
       titleKey: 'today.timetable.title',
       icon: Icons.schedule_outlined,
+      accent: AppAccent.blue,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -107,40 +109,41 @@ class _SlotRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final classCode = ref.watch(_classCodeProvider(slot.classId));
+    // Coloured by subject once the class code is known; until then by the class id, which is
+    // just as stable, so the row doesn't flash a different colour on every load.
+    final visual = SubjectVisuals.of(classCode.value, fallbackKey: slot.classId);
+    final period = 'timetable.period'.tr(namedArgs: {'period': '${slot.period}'});
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.space4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 28,
-            child: Text(
-              '${slot.period}',
-              style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w600,
+    return classCode.when(
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
+        child: Row(
+          children: [
+            AppIconBadge(icon: visual.icon, accent: visual.accent),
+            const SizedBox(width: AppSpacing.space12),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: AppRadius.smRadius,
               ),
+              child: const SizedBox(height: 14, width: 80),
             ),
-          ),
-          const SizedBox(width: AppSpacing.space8),
-          Expanded(
-            child: classCode.when(
-              loading: () => DecoratedBox(
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: AppRadius.smRadius,
-                ),
-                child: const SizedBox(height: 14, width: 80),
-              ),
-              error: (error, stackTrace) =>
-                  Text('today.timetable.unknownClass'.tr()),
-              data: (code) => Text(code, style: textTheme.bodyMedium),
-            ),
-          ),
-        ],
+          ],
+        ),
+      ),
+      error: (error, stackTrace) => AppIconListTile(
+        icon: visual.icon,
+        accent: visual.accent,
+        title: 'today.timetable.unknownClass'.tr(),
+        subtitle: period,
+      ),
+      data: (code) => AppIconListTile(
+        icon: visual.icon,
+        accent: visual.accent,
+        title: code,
+        subtitle: period,
       ),
     );
   }

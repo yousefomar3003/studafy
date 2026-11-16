@@ -310,6 +310,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  "POST /api/academics/materials/{materialId}/retry",
   // Class AI materials setting (000196). Audited as an update on classes.
   "PUT /api/academics/classes/{classId}/ai-materials",
   // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm.

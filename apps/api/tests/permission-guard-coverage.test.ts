@@ -327,6 +327,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  // Retrying a failed material: guarded by requirePermission(MATERIAL_UPDATE).
+  "POST /api/academics/materials/{materialId}/retry",
   // Generic object storage gateway (SAD §22). Authorized per content class by requirePermissionIn()
   // in the handler — the required permission arrives in the request body, so the mount-time
   // requirePermission() form cannot see it. Exempted below on that basis.

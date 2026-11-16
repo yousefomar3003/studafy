@@ -6,6 +6,7 @@ import { createLogger } from "../../src/logger";
 import { AUTH_CHANNELS, KeyStore, signAccessToken } from "../../src/modules/auth";
 
 import type { Database } from "../../src/db";
+import type { ScannerWarmup } from "../../src/lib/scanner-warmup";
 import type { StorageService } from "../../src/lib/storage";
 import type { UploadScanEnqueuer } from "../../src/lib/storage/upload-scan";
 import type { AppEnv } from "../../src/middleware/requestId";
@@ -60,6 +61,8 @@ export interface TestAppOptions {
   storage?: StorageService | null;
   /** Records the malware scans uploads enqueue (F-14). Defaults to none: uploads stay unserved. */
   uploadScanEnqueuer?: UploadScanEnqueuer | null;
+  /** Called when a material upload starts (lib/scanner-warmup.ts). Defaults to none. */
+  scannerWarmup?: ScannerWarmup | null;
 }
 
 /** A test app plus the key store whose keys its tokens must be signed with. */
@@ -98,6 +101,7 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     stripeProvider: options.stripeProvider ?? null,
     storage: options.storage ?? null,
     uploadScanEnqueuer: options.uploadScanEnqueuer ?? null,
+    scannerWarmup: options.scannerWarmup ?? null,
   });
 
   return { app, keyStore, ready: keyStore.init() };

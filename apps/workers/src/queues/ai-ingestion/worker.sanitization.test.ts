@@ -16,6 +16,7 @@
  *   TEST_DATABASE_URL=postgres://... bun test src/queues/ai-ingestion/worker.sanitization.test.ts
  */
 
+import { UnrecoverableError } from "bullmq";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import postgres from "postgres";
@@ -271,5 +272,62 @@ describeDb("ai-ingestion and the class AI materials setting", () => {
     expect(await chunkContents(fixture.materialId)).toEqual([]);
     expect((await materialRow(fixture.materialId)).ingest_status).toBe("ready");
     expect(derived).toEqual([fixture.materialId]);
+  });
+});
+
+/**
+ * How a failed ingestion is retried. A parse error is a verdict on the bytes (corrupt, encrypted,
+ * unsupported, no text), so the material is marked `failed` on the first attempt and the job is
+ * not retried: retrying read the same bytes four more times and delayed "failed" by the backoff.
+ * Anything else may be transient and keeps BullMQ's retries.
+ */
+describeDb("ai-ingestion failures", () => {
+  const firstOfFive = (f: MaterialFixture): Job =>
+    ({
+      id: crypto.randomUUID(),
+      name: "ai-ingestion",
+      data: { version: 1, materialId: f.materialId, schoolId: f.schoolId },
+      attemptsMade: 0,
+      opts: { attempts: 5 },
+    }) as unknown as Job;
+
+  async function materialRow(materialId: string) {
+    const [row] = await sql<{ ingest_status: string; ingest_error: string | null }[]>`
+      SELECT ingest_status::text AS ingest_status, ingest_error
+      FROM app.materials WHERE id = ${materialId}::uuid
+    `;
+    return row!;
+  }
+
+  test("a corrupt document fails at once and is not retried", async () => {
+    const fixture = await seedFixture();
+    const config: AiIngestionWorkerConfig = {
+      databaseUrl: databaseUrl!,
+      fetchBytes: async () => new TextEncoder().encode("this is not a docx"),
+    };
+
+    const error = await processIngestJob(firstOfFive(fixture), config).catch((e: unknown) => e);
+
+    expect(error).toBeInstanceOf(UnrecoverableError);
+    expect(await materialRow(fixture.materialId)).toEqual({
+      ingest_status: "failed",
+      ingest_error: "file is not a valid DOCX",
+    });
+  });
+
+  test("a transient error keeps its retries and leaves the material in flight", async () => {
+    const fixture = await seedFixture();
+    const config: AiIngestionWorkerConfig = {
+      databaseUrl: databaseUrl!,
+      fetchBytes: async () => {
+        throw new Error("bucket unavailable");
+      },
+    };
+
+    const error = await processIngestJob(firstOfFive(fixture), config).catch((e: unknown) => e);
+
+    expect(error).not.toBeInstanceOf(UnrecoverableError);
+    expect((error as Error).message).toBe("bucket unavailable");
+    expect((await materialRow(fixture.materialId)).ingest_status).toBe("processing");
   });
 });

@@ -7,8 +7,10 @@ import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/materials_providers.dart';
 import '../material_viewer_screen.dart';
 import 'material_list_tile.dart';
+import 'material_week_sections.dart';
 
-/// One class's materials: the class code as a header, then its materials newest-first (the
+/// One class's materials: the class code as a header, then its materials grouped into collapsible
+/// week sections with day sub-groups ([MaterialWeekSections]), newest-first within a day (the
 /// server's own ordering — `listMaterials`'s `ORDER BY created_at DESC` — carried straight
 /// through), or an empty/error line in place of the list.
 class ClassMaterialsSection extends ConsumerWidget {
@@ -56,8 +58,10 @@ class ClassMaterialsSection extends ConsumerWidget {
                   StalenessBanner(fetchedAt: cached.fetchedAt),
                   const SizedBox(height: AppSpacing.space8),
                 ],
-                for (final material in cached.data)
-                  MaterialListTile(
+                MaterialWeekSections(
+                  classId: classId,
+                  materials: cached.data,
+                  itemBuilder: (context, material) => MaterialListTile(
                     material: material,
                     onTap: () => Navigator.of(context).push(
                       MaterialPageRoute<void>(
@@ -65,6 +69,7 @@ class ClassMaterialsSection extends ConsumerWidget {
                       ),
                     ),
                   ),
+                ),
               ],
             );
           },
