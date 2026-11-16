@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/features/feature_gate.dart';
 import '../../../../core/features/features_providers.dart';
 import '../../../../core/features/my_features.dart';
-import '../../../../design/tokens/app_radius_tokens.dart';
+import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/parent_providers.dart';
 
@@ -63,20 +63,16 @@ class FamilyPlusCoverageCard extends ConsumerWidget {
       FeatureUnavailable() => const <String>[],
     };
 
-    final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.space16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: AppRadius.lgRadius,
-      ),
+    return AppSectionCard(
+      title: 'familyPlus.title'.tr(),
+      icon: Icons.workspace_premium_outlined,
+      accent: AppAccent.indigo,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('familyPlus.title'.tr(), style: textTheme.titleMedium),
-          for (final line in lines) ...[
-            const SizedBox(height: AppSpacing.space8),
+          for (final (index, line) in lines.indexed) ...[
+            if (index > 0) const SizedBox(height: AppSpacing.space8),
             Text(line, style: textTheme.bodyMedium),
           ],
         ],

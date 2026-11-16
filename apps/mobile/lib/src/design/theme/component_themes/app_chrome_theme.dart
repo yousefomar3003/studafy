@@ -131,6 +131,11 @@ abstract final class AppChromeTheme {
         fontWeight: FontWeight.w500,
       ),
       subtitleTextStyle: textTheme.bodyMedium?.copyWith(color: colors.onSurfaceVariant),
+      leadingAndTrailingTextStyle: textTheme.labelMedium?.copyWith(
+        color: colors.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+      ),
+      horizontalTitleGap: AppSpacing.space12,
       shape: const RoundedRectangleBorder(borderRadius: AppRadius.mdRadius),
     );
   }

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/generated/models/announcement.dart';
 import '../../../core/api/generated/models/discipline_incident.dart';
+import '../../../design/kit/kit.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../custom_lists/presentation/linked_custom_lists_section.dart';
 import '../application/teacher_providers.dart';
@@ -32,8 +33,6 @@ class TeacherClassDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Resolve roster names for this class (see classRosterNamesProvider).
     ref.watch(classRosterNamesProvider(classId));
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
     final roster = ref.watch(classRosterProvider(classId));
     final courseName = ref.watch(classCourseNameProvider(classId));
 
@@ -84,10 +83,14 @@ class TeacherClassDetailScreen extends ConsumerWidget {
               sliver: SliverList.list(
                 children: [
                   courseName.maybeWhen(
-                    data: (name) => Text(name, style: textTheme.titleMedium),
+                    data: (name) => _ClassHero(
+                      classId: classId,
+                      courseName: name,
+                      rosterSize: roster.value?.length,
+                    ),
                     orElse: () => const SizedBox.shrink(),
                   ),
-                  const SizedBox(height: AppSpacing.space12),
+                  const SizedBox(height: AppSpacing.space16),
                   // The class's rows in the school's custom lists (a bus group, a homeroom); takes
                   // no space when there are none.
                   LinkedCustomListsSection(
@@ -95,13 +98,13 @@ class TeacherClassDetailScreen extends ConsumerWidget {
                     subjectId: classId,
                   ),
                   const SizedBox(height: AppSpacing.space4),
-                  Text(
-                    'teacher.class.rosterTitle'.tr(),
-                    style: textTheme.titleSmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                  AppSectionHeader(
+                    title: 'teacher.class.rosterTitle'.tr(),
+                    icon: Icons.groups_outlined,
+                    accent: AppAccent.slate,
+                    badgeSize: 32,
                   ),
-                  const SizedBox(height: AppSpacing.space12),
+                  const SizedBox(height: AppSpacing.space8),
                 ],
               ),
             ),
@@ -190,6 +193,35 @@ class TeacherClassDetailScreen extends ConsumerWidget {
   }
 }
 
+/// The class's subject-coloured hero: its subject icon, course name and, once the roster has
+/// loaded, its size. (The class code is already the app bar title.)
+class _ClassHero extends StatelessWidget {
+  const _ClassHero({
+    required this.classId,
+    required this.courseName,
+    required this.rosterSize,
+  });
+
+  final String classId;
+  final String courseName;
+  final int? rosterSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = SubjectVisuals.of(courseName, fallbackKey: classId);
+    return AppHeroCard(
+      accent: visual.accent,
+      icon: visual.icon,
+      title: courseName,
+      subtitle: rosterSize == null
+          ? null
+          : 'teacher.classes.roster'.tr(
+              namedArgs: {'count': '$rosterSize'},
+            ),
+    );
+  }
+}
+
 class _Message extends StatelessWidget {
   const _Message({required this.icon, required this.messageKey});
 
@@ -198,24 +230,14 @@ class _Message extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.space24),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
-          const SizedBox(width: AppSpacing.space8),
-          Expanded(
-            child: Text(
-              messageKey.tr(),
-              style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.only(top: AppSpacing.space8),
+      child: AppEmptyState(
+        icon: icon,
+        message: messageKey.tr(),
+        accent: icon == Icons.error_outline
+            ? AppTone.danger.accent
+            : AppAccent.slate,
       ),
     );
   }

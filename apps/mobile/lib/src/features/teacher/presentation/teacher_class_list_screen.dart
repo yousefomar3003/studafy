@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../design/kit/kit.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/teacher_providers.dart';
 import '../domain/teacher_class.dart';
@@ -47,7 +48,7 @@ class TeacherClassListScreen extends ConsumerWidget {
             physics: const AlwaysScrollableScrollPhysics(),
             itemCount: list.length + 1,
             separatorBuilder: (context, index) =>
-                const SizedBox(height: AppSpacing.space8),
+                const SizedBox(height: AppSpacing.space12),
             itemBuilder: (context, index) => index == 0
                 ? const MarksEntryTile()
                 : _ClassTile(summary: list[index - 1]),
@@ -65,23 +66,27 @@ class _ClassTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        title: Text(summary.code),
-        subtitle: Text(summary.course.name),
-        trailing: Text(
-          'teacher.classes.roster'.tr(
-            namedArgs: {'count': '${summary.activeEnrollmentCount}'},
-          ),
-          style: Theme.of(context).textTheme.bodySmall,
+    final visual = SubjectVisuals.of(
+      summary.course.name,
+      fallbackKey: summary.id,
+    );
+
+    return AppIconListCard(
+      icon: visual.icon,
+      accent: visual.accent,
+      title: summary.code,
+      subtitle: summary.course.name,
+      trailing: AppStatusPill(
+        icon: Icons.groups_outlined,
+        label: 'teacher.classes.roster'.tr(
+          namedArgs: {'count': '${summary.activeEnrollmentCount}'},
         ),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => TeacherClassDetailScreen(
-              classId: summary.id,
-              classCode: summary.code,
-            ),
+      ),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => TeacherClassDetailScreen(
+            classId: summary.id,
+            classCode: summary.code,
           ),
         ),
       ),
@@ -89,28 +94,26 @@ class _ClassTile extends StatelessWidget {
   }
 }
 
-/// Opens the teacher's academic mark sheets ([GradingAssignmentsScreen]).
+/// Opens the teacher's academic mark sheets ([GradingAssignmentsScreen]): a brand-tinted
+/// call-to-action card leading the class list.
 class MarksEntryTile extends StatelessWidget {
   const MarksEntryTile({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      margin: EdgeInsets.zero,
-      color: colorScheme.secondaryContainer,
-      child: ListTile(
-        leading: Icon(
-          Icons.fact_check_outlined,
-          color: colorScheme.onSecondaryContainer,
-        ),
-        title: Text('teacher.marks.open'.tr()),
-        subtitle: Text('teacher.marks.openSubtitle'.tr()),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => const GradingAssignmentsScreen(),
-          ),
+    return AppIconListCard(
+      // Filled, so the badge stands out from the card's own blue tint.
+      leading: const AppIconBadge(
+        icon: Icons.fact_check_outlined,
+        accent: AppAccent.blue,
+        filled: true,
+      ),
+      color: AppAccent.blue.colorsOf(context).container,
+      title: 'teacher.marks.open'.tr(),
+      subtitle: 'teacher.marks.openSubtitle'.tr(),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const GradingAssignmentsScreen(),
         ),
       ),
     );
@@ -132,31 +135,22 @@ class _ScrollableMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(
-        AppSpacing.space32,
+        AppSpacing.space16,
       ).withBottomInset(context),
       children: [
         if (header != null) ...[
           header!,
           const SizedBox(height: AppSpacing.space24),
         ],
-        Column(
-          children: [
-            Icon(icon, size: 32, color: colorScheme.onSurfaceVariant),
-            const SizedBox(height: AppSpacing.space12),
-            Text(
-              messageKey.tr(),
-              textAlign: TextAlign.center,
-              style: textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
+        AppEmptyState(
+          icon: icon,
+          message: messageKey.tr(),
+          accent: icon == Icons.error_outline
+              ? AppTone.danger.accent
+              : AppAccent.blue,
         ),
       ],
     );

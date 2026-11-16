@@ -4,17 +4,24 @@ import 'package:flutter/services.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 
-/// One tab in a [PillNavigationBar]: its icon (already decorated, e.g. with an unread badge) and
-/// its translated label.
+/// One tab in a [PillNavigationBar]: its icon (already decorated, e.g. with an unread badge), the
+/// filled variant shown while selected, and its translated label.
 class PillNavigationDestination {
-  const PillNavigationDestination({required this.icon, required this.label});
+  const PillNavigationDestination({
+    required this.icon,
+    required this.label,
+    this.selectedIcon,
+  });
 
   final Widget icon;
+
+  /// Shown instead of [icon] while the tab is selected; [icon] when null.
+  final Widget? selectedIcon;
   final String label;
 }
 
 /// The shell's floating bottom navigation: a rounded pill that floats above the bottom edge,
-/// with the selected tab drawn as a filled inverse-colour capsule showing its icon and label.
+/// with the selected tab drawn as a brand-coloured capsule showing its filled icon and label.
 ///
 /// Unselected tabs show only their icon so up to five tabs fit on a phone-width screen; their
 /// label is still exposed to screen readers, and shown on the capsule as soon as a tab is selected.
@@ -193,9 +200,7 @@ class _PillNavigationItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final foreground = selected
-        ? colors.onInverseSurface
-        : colors.onSurfaceVariant;
+    final foreground = selected ? colors.onPrimary : colors.onSurfaceVariant;
 
     final item = Semantics(
       key: itemKey,
@@ -217,8 +222,16 @@ class _PillNavigationItem extends StatelessWidget {
               horizontal: selected ? AppSpacing.space16 : AppSpacing.space12,
             ),
             decoration: BoxDecoration(
-              color: selected ? colors.inverseSurface : Colors.transparent,
+              color: selected ? colors.primary : Colors.transparent,
               borderRadius: AppRadius.fullRadius,
+              boxShadow: [
+                if (selected)
+                  BoxShadow(
+                    color: colors.primary.withValues(alpha: 0.32),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
             ),
             child: IconTheme.merge(
               data: IconThemeData(size: 22, color: foreground),
@@ -228,7 +241,9 @@ class _PillNavigationItem extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    destination.icon,
+                    selected
+                        ? (destination.selectedIcon ?? destination.icon)
+                        : destination.icon,
                     if (selected) ...[
                       const SizedBox(width: AppSpacing.space8),
                       Flexible(

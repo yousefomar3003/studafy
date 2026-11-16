@@ -63,6 +63,8 @@ Material _material() => Material(
   ingestStatus: MaterialIngestStatus.ready,
   ingestError: null,
   ingestedAt: null,
+  weekNumber: null,
+  dayOfWeek: null,
   createdAt: DateTime(2026, 1, 1),
   updatedAt: DateTime(2026, 1, 1),
 );

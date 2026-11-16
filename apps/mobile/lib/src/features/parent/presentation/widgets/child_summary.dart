@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/parent_providers.dart';
 import 'child_attendance_card.dart';
@@ -22,6 +23,7 @@ class ChildSummary extends ConsumerWidget {
             attendance: ParentSectionCard(
               titleKey: 'parent.attendance.title',
               icon: Icons.event_available_outlined,
+              accent: AppAccent.emerald,
               child: ParentCardSkeleton(lineCount: 1),
             ),
             grades: ParentSectionCard(
@@ -33,6 +35,7 @@ class ChildSummary extends ConsumerWidget {
           error: (_, _) => const ParentSectionCard(
             titleKey: 'parent.attendance.title',
             icon: Icons.event_available_outlined,
+            accent: AppAccent.emerald,
             child: ParentCardMessage(
               messageKey: 'parent.children.error',
               icon: Icons.error_outline,

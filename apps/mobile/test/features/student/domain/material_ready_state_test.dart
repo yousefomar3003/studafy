@@ -20,24 +20,33 @@ void main() {
     });
 
     test('falls back to processing for an unrecognized future wire value', () {
-      expect(materialReadyStateFromWireName('archived'), MaterialReadyState.processing);
+      expect(
+        materialReadyStateFromWireName('archived'),
+        MaterialReadyState.processing,
+      );
     });
   });
 
   group('MaterialReadyStateX.isOpenable', () {
     test('is true only for ready', () {
       for (final state in MaterialReadyState.values) {
-        expect(state.isOpenable, state == MaterialReadyState.ready, reason: '$state');
+        expect(
+          state.isOpenable,
+          state == MaterialReadyState.ready,
+          reason: '$state',
+        );
       }
     });
   });
 
   group('MaterialReadyStateX.isSettled', () {
-    test('is true only where the pipeline has finished', () {
+    test('is true where the pipeline has finished or waits on the uploader', () {
       const settled = {
         MaterialReadyState.ready,
         MaterialReadyState.failed,
         MaterialReadyState.quarantined,
+        // Only the uploader's confirm moves an upload on; polling would never see it change.
+        MaterialReadyState.pendingScan,
       };
       for (final state in MaterialReadyState.values) {
         expect(state.isSettled, settled.contains(state), reason: '$state');

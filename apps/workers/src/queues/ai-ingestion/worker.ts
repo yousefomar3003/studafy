@@ -1,6 +1,7 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { NOTIFICATION_TYPES } from "@studafy/constants";
 import { sanitizePlainText } from "@studafy/sanitize";
+import { UnrecoverableError } from "bullmq";
 import postgres from "postgres";
 
 import { leaseDatabase } from "../../db/pool";
@@ -96,10 +97,10 @@ type IngestResult =
  *    (or, if the setting went off mid-parse, the re-claim) finishes it as `ready` with no chunks and
  *    deletes any it had, so the class's text never reaches the embedding stage and a queued job
  *    cannot strand the material in `queued`. Turning the setting back on re-stages it;
- *  - a terminal failure (the last attempt) records `failed` + a reason in `ingest_error` and
- *    notifies the uploader. The transaction boundary is what makes this safe: a crash mid-insert
- *    rolls back and the retry re-claims from `processing`; a committed insert and a committed
- *    `ready` never diverge.
+ *  - a terminal failure (the last attempt, or a parse error, which no retry can fix) records
+ *    `failed` + a reason in `ingest_error` and notifies the uploader. The transaction boundary is
+ *    what makes this safe: a crash mid-insert rolls back and the retry re-claims from
+ *    `processing`; a committed insert and a committed `ready` never diverge.
  */
 export async function processIngestJob(
   job: Job,
@@ -296,7 +297,13 @@ export async function processIngestJob(
       chunks: committed ? chunks.length : 0,
     };
   } catch (error) {
-    if (job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
+    // A parse error is a verdict on the file's bytes (corrupt, encrypted, unsupported, no text):
+    // every retry would read the same bytes and fail the same way, only later -- with the default
+    // 5 attempts that is 75 s of backoff plus four more parses before the teacher sees "failed".
+    // So it is recorded as the terminal failure now and the job is not retried. Anything else (the
+    // bucket, the database, the concurrency cap) may be transient and keeps its retries.
+    const deterministic = error instanceof MaterialParseError;
+    if (deterministic || job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
       const reason = failureReason(error);
       await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
         const [state] = await tx<MaterialState[]>`
@@ -320,6 +327,7 @@ export async function processIngestJob(
         }
       });
     }
+    if (deterministic) throw new UnrecoverableError(error.message);
     throw error;
   } finally {
     await lease?.release().catch(() => undefined);

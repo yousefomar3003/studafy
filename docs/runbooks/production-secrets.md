@@ -115,4 +115,5 @@ school tenants that block unverified multitenant apps cannot sign in.
 
 Nothing to supply. The workers reach ClamAV on the `studafy-core-scanner` fly app over its private
 Flycast address (`CLAMAV_HOST = "studafy-core-scanner.flycast"` in `infra/fly/workers.toml`); the
-deploy workflow deploys the scanner first. See `infra/fly/README.md`.
+deploy workflow deploys the scanner first. The API has the same setting in `infra/fly/api.toml`, only
+to wake the scanner when a material upload starts. See `infra/fly/README.md`.

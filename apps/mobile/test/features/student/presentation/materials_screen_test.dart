@@ -137,7 +137,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Scanning'), findsOneWidget);
-    final tile = tester.widget<ListTile>(find.byType(ListTile));
+    final tile = tester.widget<ListTile>(
+      find.descendant(of: find.byType(MaterialListTile), matching: find.byType(ListTile)),
+    );
     expect(tile.enabled, isFalse);
   });
 

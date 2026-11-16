@@ -36,7 +36,8 @@ class CreateAssessmentSheet extends ConsumerStatefulWidget {
 class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
   final _formKey = GlobalKey<FormState>();
   final _labelController = TextEditingController();
-  final _maxScoreController = TextEditingController(text: '100');
+  // Empty, not 100: the teacher decides what the assessment is out of.
+  final _maxScoreController = TextEditingController();
   final _weightController = TextEditingController(text: '1');
 
   bool _submitting = false;
@@ -140,6 +141,9 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
                     decoration: InputDecoration(
                       labelText: 'teacher.grades.createAssessment.maxScoreField'
                           .tr(),
+                      hintText: 'teacher.grades.createAssessment.maxScoreHint'
+                          .tr(),
+                      floatingLabelBehavior: FloatingLabelBehavior.always,
                     ),
                     validator: _positiveNumberValidator,
                   ),
