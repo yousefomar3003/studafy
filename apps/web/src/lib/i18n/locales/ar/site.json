@@ -316,7 +316,8 @@
       "FEE_STATEMENT": "كشوف حساب رسوم العائلة",
       "ASSIGNMENT_PUBLISHED": "الواجبات الجديدة",
       "ASSIGNMENT_GRADED": "الواجبات المصححة",
-      "ATTENDANCE_MARKED": "الغياب والتأخير"
+      "ATTENDANCE_MARKED": "الغياب والتأخير",
+      "MATERIAL_PUBLISHED": "المواد التعليمية الجديدة"
     },
     "channels": {
       "in_app": "داخل التطبيق",

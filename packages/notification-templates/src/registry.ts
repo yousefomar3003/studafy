@@ -194,4 +194,12 @@ export const NOTIFICATION_CATALOG = {
       route: "/parent/alerts",
     },
   },
+  // A class material turned visible (000228): the class's students. The route is the
+  // mobile app's materials list narrowed to that class.
+  [NOTIFICATION_TYPES.MATERIAL_PUBLISHED]: {
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH],
+    metadataDefaults: {
+      route: "/classes/{classId}/materials",
+    },
+  },
 } as const satisfies NotificationCatalog;

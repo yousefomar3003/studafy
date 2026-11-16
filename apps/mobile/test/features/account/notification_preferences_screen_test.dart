@@ -42,6 +42,7 @@ NotificationPreferences _matrix({bool gradesPush = true}) {
       _cell(NotificationPreferenceNotificationType.feeInvoiceIssued, push),
       _cell(NotificationPreferenceNotificationType.materialIngested, push),
       _cell(NotificationPreferenceNotificationType.attendanceAlert, push),
+      _cell(NotificationPreferenceNotificationType.materialPublished, push),
     ],
   );
 }
@@ -91,6 +92,7 @@ void main() {
     expect(notificationCategoryOf('FEE_PAYMENT_REMINDER'), NotificationCategory.fees);
     expect(notificationCategoryOf('LICENSE_INVOICE_DUE'), NotificationCategory.fees);
     expect(notificationCategoryOf('ENROLLMENT_APPROVED'), NotificationCategory.schoolUpdates);
+    expect(notificationCategoryOf('MATERIAL_PUBLISHED'), NotificationCategory.lessons);
   });
 
   testWidgets('one switch turns off every type in the kind, in a single save', (tester) async {
@@ -139,9 +141,13 @@ void main() {
     await pumpAccountScreen(tester, _app(roles: const ['STUDENT']));
     expect(find.text('Fees and billing'), findsNothing);
     expect(find.text('Attendance'), findsOneWidget);
+    // New materials are a student's notice, never hidden as a teacher-only MATERIAL_ type.
+    expect(find.text('Lessons'), findsOneWidget);
+    expect(_switch(tester, 'lessons/push').value, isTrue);
 
     await pumpAccountScreen(tester, _app(roles: const ['PARENT']));
     expect(find.text('Fees and billing'), findsOneWidget);
+    expect(find.text('Lessons'), findsNothing);
   });
 
   testWidgets('allowed: sends a test notification', (tester) async {

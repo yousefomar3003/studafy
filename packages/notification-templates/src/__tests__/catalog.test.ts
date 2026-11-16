@@ -93,6 +93,8 @@ describe("templates — completeness", () => {
                       "assignmentTitle",
                       "result",
                       "status",
+                      "materialTitle",
+                      "placement",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -232,6 +234,11 @@ describe("renderNotification — snapshot tests", () => {
       status: "absent",
       courseName: "Physics",
       date: "2026-11-12",
+    },
+    [NOTIFICATION_TYPES.MATERIAL_PUBLISHED]: {
+      materialTitle: "Newton's laws",
+      courseName: "Physics",
+      placement: " · Week 3, Monday",
     },
   } as const;
 

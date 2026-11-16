@@ -153,6 +153,7 @@ IconData _iconFor(String type) => switch (type) {
   'ANNOUNCEMENT' || 'ADMIN_ANNOUNCEMENT' => Icons.campaign_outlined,
   'ASSIGNMENT_PUBLISHED' || 'ASSIGNMENT_DUE_SOON' => Icons.assignment_outlined,
   'ASSIGNMENT_GRADED' || 'GRADE_POSTED' => Icons.grading_outlined,
+  'MATERIAL_PUBLISHED' => Icons.menu_book_outlined,
   'FEE_INVOICE_ISSUED' ||
   'FEE_PAYMENT_RECEIVED' ||
   'FEE_PAYMENT_REMINDER' ||

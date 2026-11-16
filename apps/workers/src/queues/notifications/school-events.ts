@@ -3,12 +3,16 @@
  *
  * Before this, a teacher publishing an assignment, releasing a mark or submitting a register told
  * nobody. The API already emits those facts into `app.outbox_events` in the same transaction as the
- * change (assignment.published, submission.graded, attendance.sessionSubmitted); this consumer reads
- * them per school and writes one `app.notifications` row per person concerned:
+ * change (assignment.published, submission.graded, attendance.sessionSubmitted), and the database
+ * raises material.published the first time a material becomes visible (trg_materials_published,
+ * 000228); this consumer reads them per school and writes one `app.notifications` row per person
+ * concerned:
  *
  *   - assignment.published       -> ASSIGNMENT_PUBLISHED to the class's active students and their parents
  *   - submission.graded          -> ASSIGNMENT_GRADED to that student and their parents
  *   - attendance.sessionSubmitted -> ATTENDANCE_MARKED to the parents of each student marked absent/late
+ *   - material.published         -> MATERIAL_PUBLISHED to the class's active students (not parents:
+ *                                   they have no materials screen, and a class gets many materials)
  *
  * The inbox rows and the event's `notify_dispatched_at` stamp commit in one transaction, so an event
  * notifies exactly once: a crash before COMMIT leaves the event pending and writes nothing. Push is
@@ -32,11 +36,15 @@ import type { NotificationType } from "@studafy/constants";
 import type { TemplateLocale } from "@studafy/notification-templates";
 import type { Sql, TransactionSql } from "postgres";
 
-/** Must match the event names in idx_outbox_events_school_notify_pending (000216). */
+/**
+ * Must match the event names in idx_outbox_events_school_notify_pending and
+ * app.outbox_pending_school_ids('notify') (000228).
+ */
 export const NOTIFY_EVENT_NAMES = [
   "assignment.published",
   "submission.graded",
   "attendance.sessionSubmitted",
+  "material.published",
 ] as const;
 
 const STALE_EVENT_MS = 2 * 24 * 60 * 60 * 1000;
@@ -387,6 +395,92 @@ async function attendanceSubmitted(
   return drafts;
 }
 
+/** ISO weekday 1..7 (app.materials.day_of_week). */
+const WEEKDAYS: Record<TemplateLocale, readonly string[]> = {
+  en: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+  ar: ["الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد"],
+};
+
+/** " · Week 3, Monday" for a scheduled material, "" for an unscheduled one. */
+export function materialPlacement(
+  locale: TemplateLocale,
+  weekNumber: number | null,
+  dayOfWeek: number | null,
+): string {
+  if (weekNumber === null || dayOfWeek === null) return "";
+  const day = WEEKDAYS[locale][dayOfWeek - 1];
+  if (!day) return "";
+  return locale === "ar" ? ` · الأسبوع ${weekNumber}، ${day}` : ` · Week ${weekNumber}, ${day}`;
+}
+
+async function materialPublished(
+  tx: TransactionSql,
+  schoolId: string,
+  payload: Record<string, unknown>,
+): Promise<Draft[]> {
+  const materialId = String(payload.materialId ?? "");
+  if (!materialId) return [];
+  // Still `ready`: one deleted, or re-staged and failed, since the event was raised is not news.
+  const [material] = await tx<
+    {
+      id: string;
+      title: string;
+      class_id: string;
+      course_id: string;
+      course_name: string;
+      week_number: number | null;
+      day_of_week: number | null;
+    }[]
+  >`
+    SELECT material.id, material.title, material.class_id, class_row.course_id,
+           course.name AS course_name, material.week_number, material.day_of_week
+    FROM app.materials AS material
+    JOIN app.classes AS class_row
+      ON class_row.id = material.class_id AND class_row.school_id = material.school_id
+    JOIN app.courses AS course
+      ON course.id = class_row.course_id AND course.school_id = class_row.school_id
+    WHERE material.id = ${materialId}::uuid
+      AND material.school_id = ${schoolId}::uuid
+      AND material.ingest_status = 'ready'::app.material_ingest_status
+  `;
+  if (!material) return [];
+
+  const enrolled = await tx<{ student_id: string }[]>`
+    SELECT DISTINCT student_id
+    FROM app.enrollments
+    WHERE school_id = ${schoolId}::uuid
+      AND class_id = ${material.class_id}::uuid
+      AND status = 'active'
+  `;
+  const people = await loadPeople(
+    tx,
+    schoolId,
+    enrolled.map((row) => row.student_id),
+  );
+
+  const type = NOTIFICATION_TYPES.MATERIAL_PUBLISHED;
+  const metadata = {
+    route: resolveRoute(type, { classId: material.class_id }),
+    material_id: material.id,
+    class_id: material.class_id,
+    course_id: material.course_id,
+  };
+  const drafts: Draft[] = [];
+  for (const person of people) {
+    if (!person.studentUserId) continue;
+    drafts.push({
+      userId: person.studentUserId,
+      type,
+      vars: { materialTitle: material.title, courseName: material.course_name },
+      localized: (locale) => ({
+        placement: materialPlacement(locale, material.week_number, material.day_of_week),
+      }),
+      metadata: { ...metadata, student_id: person.studentId },
+    });
+  }
+  return drafts;
+}
+
 interface Audience {
   vars: Record<string, string>;
   localized?: (locale: TemplateLocale) => Record<string, string>;
@@ -431,6 +525,7 @@ const HANDLERS: Record<
   "assignment.published": assignmentPublished,
   "submission.graded": submissionGraded,
   "attendance.sessionSubmitted": attendanceSubmitted,
+  "material.published": materialPublished,
 };
 
 // ---------------------------------------------------------------------------
