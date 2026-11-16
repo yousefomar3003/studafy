@@ -402,6 +402,9 @@ export const ERROR_CODES = {
   MATERIAL_NOT_FOUND: "MATERIAL_NOT_FOUND",
   MATERIAL_STORAGE_CONFIRM_FAILED: "MATERIAL_STORAGE_CONFIRM_FAILED",
   MATERIAL_INGEST_IN_PROGRESS: "MATERIAL_INGEST_IN_PROGRESS",
+  // The caller holds the material permission but neither teaches the material's class nor leads
+  // the school, so may not upload to it or change its materials.
+  MATERIAL_CLASS_FORBIDDEN: "MATERIAL_CLASS_FORBIDDEN",
   // The caller holds material:manageAi but neither teaches the class nor leads the school, so may
   // not change whether the class's materials are used with the AI study assistant (000196).
   CLASS_AI_MATERIALS_FORBIDDEN: "CLASS_AI_MATERIALS_FORBIDDEN",

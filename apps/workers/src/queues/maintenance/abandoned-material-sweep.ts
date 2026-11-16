@@ -6,8 +6,10 @@
  *
  *  - an upload that was never confirmed: still `uploaded` a day after it was started, because the
  *    file PUT or the confirm call failed and the app showed the teacher an error. Only an AI-visible
- *    row counts (every new upload is): a confirmed material whose AI use was turned off is also
- *    `uploaded`, with ai_visible off (toggleAiVisible in apps/api), and is a real material.
+ *    row counts (every new upload is). Turning AI off used to move a confirmed material back to
+ *    `uploaded` with ai_visible off (toggleAiVisible in apps/api, fixed; migration 000227 repaired
+ *    the rows whose history shows they were servable), so a row in that shape may still be a real
+ *    material and is never swept.
  *  - a `failed` material the teacher neither retried nor deleted within 14 days of the failure
  *    (updated_at is when it failed).
  *

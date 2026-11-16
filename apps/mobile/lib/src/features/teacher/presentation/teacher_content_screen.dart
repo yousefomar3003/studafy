@@ -28,10 +28,13 @@ import '../../../core/api/generated/models/update_assignment_body_status.dart';
 import '../../../core/api/generated/models/update_material_body.dart';
 import '../../../core/auth/auth_providers.dart';
 import '../../../core/files/picked_file.dart';
+import '../../../core/localization/localized_number.dart';
+import '../../../design/kit/kit.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../attachments/presentation/attachment_viewer_screen.dart';
 import '../../student/domain/material_ready_state.dart';
 import '../../student/presentation/widgets/material_ready_state_pill.dart';
+import '../../student/presentation/widgets/material_type_icon.dart';
 import '../../student/presentation/widgets/material_week_sections.dart';
 import 'assignment_submissions_screen.dart';
 import 'question_editor_screen.dart';
@@ -351,8 +354,13 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
             Expanded(
               child: _MaterialList(
                 classId: widget.classId,
+                classCode: widget.classCode,
                 future: _materials,
                 onRefresh: _refreshMaterials,
+                onUpload: () => _open(
+                  _MaterialComposer(classId: widget.classId),
+                  assignments: false,
+                ),
                 onEdit: (material) => _open(
                   _MaterialEditor(material: material),
                   assignments: false,
@@ -491,19 +499,24 @@ class _AssignmentList extends StatelessWidget {
 }
 
 /// The class's materials in collapsible week sections with day sub-groups
-/// ([MaterialWeekSections]), the same grouping students see.
+/// ([MaterialWeekSections]), the same grouping students see, tinted with the class's subject
+/// accent. An empty class shows an [AppEmptyState] with an upload button.
 class _MaterialList extends StatelessWidget {
   const _MaterialList({
     required this.classId,
+    required this.classCode,
     required this.future,
     required this.onRefresh,
+    required this.onUpload,
     required this.onEdit,
     required this.onRetry,
     required this.onDelete,
   });
   final String classId;
+  final String classCode;
   final Future<List<material_api.Material>> future;
   final VoidCallback onRefresh;
+  final VoidCallback onUpload;
   final ValueChanged<material_api.Material> onEdit;
   final ValueChanged<material_api.Material> onRetry;
   final ValueChanged<material_api.Material> onDelete;
@@ -518,115 +531,132 @@ class _MaterialList extends StatelessWidget {
         return const Center(child: CircularProgressIndicator());
       }
       if (snapshot.hasError) {
-        return _Message(
-          icon: Icons.error_outline,
-          text: 'teacher.content.materials.loadError'.tr(),
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(AppSpacing.space16),
+          children: [
+            AppEmptyState(
+              icon: Icons.error_outline,
+              accent: AppTone.danger.accent,
+              message: 'teacher.content.materials.loadError'.tr(),
+            ),
+          ],
         );
       }
       final materials = snapshot.data!;
+      final visual = SubjectVisuals.of(classCode, fallbackKey: classId);
       return RefreshIndicator(
         onRefresh: () async => onRefresh(),
         child: materials.isEmpty
-            ? _Message(
-                icon: Icons.folder_open_outlined,
-                text: 'teacher.content.materials.empty'.tr(),
+            ? ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(AppSpacing.space16),
+                children: [
+                  AppEmptyState(
+                    icon: Icons.folder_open_outlined,
+                    accent: visual.accent,
+                    title: 'teacher.content.materials.empty'.tr(),
+                    message: 'teacher.content.materials.emptyHint'.tr(),
+                    action: FilledButton.icon(
+                      key: const ValueKey('materials-empty-upload'),
+                      onPressed: onUpload,
+                      icon: const Icon(Icons.upload_file_outlined),
+                      label: Text('teacher.content.materials.upload'.tr()),
+                    ),
+                  ),
+                ],
               )
             : ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(AppSpacing.space16),
+                // Bottom room so the last card can scroll clear of the upload button.
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.space16,
+                  AppSpacing.space8,
+                  AppSpacing.space16,
+                  AppSpacing.space80,
+                ),
                 children: [
                   MaterialWeekSections(
                     classId: classId,
                     materials: materials,
-                    itemBuilder: (context, material) {
-                      final description = material.description;
-                      final state = materialReadyStateFromWireName(
-                        material.ingestStatus.name,
-                      );
-                      return Card(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            AppSpacing.space12,
-                            AppSpacing.space8,
-                            AppSpacing.space8,
-                            AppSpacing.space8,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      material.title,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleSmall,
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit_outlined),
-                                    tooltip: 'teacher.content.materials.edit'
-                                        .tr(),
-                                    onPressed: () => onEdit(material),
-                                  ),
-                                ],
-                              ),
-                              if (description != null && description.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.only(
-                                    bottom: AppSpacing.space4,
-                                  ),
-                                  child: Text(
-                                    description,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                                ),
-                              MaterialReadyStatePill(state: state),
-                              // A failed attempt can be run again or removed; a blocked file can
-                              // only be removed. Neither should sit in the list forever.
-                              if (state == MaterialReadyState.failed ||
-                                  state == MaterialReadyState.quarantined)
-                                Wrap(
-                                  spacing: AppSpacing.space8,
-                                  children: [
-                                    if (state == MaterialReadyState.failed)
-                                      TextButton.icon(
-                                        key: ValueKey(
-                                          'material-retry-${material.id}',
-                                        ),
-                                        onPressed: () => onRetry(material),
-                                        icon: const Icon(Icons.refresh),
-                                        label: Text(
-                                          'teacher.content.materials.retry'
-                                              .tr(),
-                                        ),
-                                      ),
-                                    TextButton.icon(
-                                      key: ValueKey(
-                                        'material-delete-${material.id}',
-                                      ),
-                                      onPressed: () => onDelete(material),
-                                      icon: const Icon(Icons.delete_outline),
-                                      label: Text(
-                                        'teacher.content.materials.delete'.tr(),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                    accent: visual.accent,
+                    itemBuilder: (context, material) => _TeacherMaterialTile(
+                      material: material,
+                      accent: visual.accent,
+                      onEdit: onEdit,
+                      onRetry: onRetry,
+                      onDelete: onDelete,
+                    ),
                   ),
                 ],
               ),
       );
     },
   );
+}
+
+/// A material row on the teacher's list: the file-type badge in the class's [accent], title and
+/// description, an edit button, and under the text its ready-state pill plus, for a failed or
+/// blocked file, the actions that clear it.
+class _TeacherMaterialTile extends StatelessWidget {
+  const _TeacherMaterialTile({
+    required this.material,
+    required this.accent,
+    required this.onEdit,
+    required this.onRetry,
+    required this.onDelete,
+  });
+
+  final material_api.Material material;
+  final AppAccent accent;
+  final ValueChanged<material_api.Material> onEdit;
+  final ValueChanged<material_api.Material> onRetry;
+  final ValueChanged<material_api.Material> onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = materialReadyStateFromWireName(material.ingestStatus.name);
+    return AppIconListTile(
+      icon: materialTypeIconFor(material.mimeType),
+      accent: accent,
+      title: material.title,
+      subtitle: material.description,
+      trailing: IconButton(
+        icon: const Icon(Icons.edit_outlined),
+        tooltip: 'teacher.content.materials.edit'.tr(),
+        onPressed: () => onEdit(material),
+      ),
+      footer: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          MaterialReadyStatePill(state: state),
+          // A failed attempt can be run again or removed; a blocked file can only be removed.
+          // Neither should sit in the list forever.
+          if (state == MaterialReadyState.failed ||
+              state == MaterialReadyState.quarantined)
+            Wrap(
+              spacing: AppSpacing.space8,
+              children: [
+                if (state == MaterialReadyState.failed)
+                  TextButton.icon(
+                    key: ValueKey('material-retry-${material.id}'),
+                    onPressed: () => onRetry(material),
+                    icon: const Icon(Icons.refresh),
+                    label: Text('teacher.content.materials.retry'.tr()),
+                  ),
+                TextButton.icon(
+                  key: ValueKey('material-delete-${material.id}'),
+                  onPressed: () => onDelete(material),
+                  icon: const Icon(Icons.delete_outline),
+                  label: Text('teacher.content.materials.delete'.tr()),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _Message extends StatelessWidget {
@@ -894,21 +924,7 @@ class _AssignmentComposerState extends ConsumerState<_AssignmentComposer> {
 
   /// Reads the points field, accepting Arabic-Indic digits and a comma or Arabic decimal
   /// separator, since the field is typed rather than prefilled. Null when it isn't a number.
-  static num? _parsePoints(String? raw) {
-    final normalized = StringBuffer();
-    for (final rune in (raw ?? '').trim().runes) {
-      if (rune >= 0x0660 && rune <= 0x0669) {
-        normalized.writeCharCode(0x30 + rune - 0x0660);
-      } else if (rune >= 0x06F0 && rune <= 0x06F9) {
-        normalized.writeCharCode(0x30 + rune - 0x06F0);
-      } else if (rune == 0x066B || rune == 0x2C) {
-        normalized.write('.');
-      } else {
-        normalized.writeCharCode(rune);
-      }
-    }
-    return num.tryParse(normalized.toString());
-  }
+  static num? _parsePoints(String? raw) => parseLocalizedNumber(raw);
 
   /// Mirrors the API's rule for max_score: required, above 0, at most 10,000, two decimals.
   static String? _pointsErrorKey(String? raw) {

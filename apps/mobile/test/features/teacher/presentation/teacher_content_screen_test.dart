@@ -552,7 +552,9 @@ void main() {
       tester,
     ) async {
       await pumpMaterials(tester, []);
-      await tester.tap(find.text('Upload material'));
+      // An empty class offers the upload right in its empty state.
+      expect(find.text('No materials yet.'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('materials-empty-upload')));
       await tester.pumpAndSettle();
 
       expect(find.byKey(const ValueKey('material-week-field')), findsOneWidget);

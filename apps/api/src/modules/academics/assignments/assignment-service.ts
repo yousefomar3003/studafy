@@ -3,6 +3,7 @@ import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 import { CodedHttpException } from "../../../coded-http-exception";
 import { emit } from "../../../lib/events/emitter";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
+import { callerManagesClass } from "../class-access";
 
 import type { AssignmentFilterStatus, AssignmentKind, AssignmentStatus } from "./schemas";
 import type { TransactionSql } from "postgres";
@@ -121,11 +122,7 @@ export interface UpdateAssignmentParams {
  * class id is far better served by "not your class" than by "no such class".
  */
 export async function assertCanManageClass(tx: TransactionSql, classId: string): Promise<void> {
-  const [row] = await tx<{ allowed: boolean }[]>`
-    SELECT (app.current_user_is_school_admin() OR app.teaches_class(${classId})) AS allowed
-  `;
-
-  if (!row?.allowed) {
+  if (!(await callerManagesClass(tx, classId))) {
     throw new CodedHttpException(
       403,
       ERROR_CODES.ASSIGNMENT_CLASS_FORBIDDEN,
