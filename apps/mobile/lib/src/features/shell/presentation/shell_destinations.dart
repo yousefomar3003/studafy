@@ -25,12 +25,16 @@ class ShellDestination {
     required this.labelKey,
     required this.icon,
     required this.body,
+    this.selectedIcon,
     this.decorateIcon,
   });
 
   /// Translation key for both the bottom navigation label and the tab's placeholder heading.
   final String labelKey;
   final IconData icon;
+
+  /// The filled variant shown while this tab is selected; [icon] when null.
+  final IconData? selectedIcon;
   final Widget body;
 
   /// Wraps the navigation icon, e.g. with an unread badge. A top-level function tear-off, so
@@ -65,6 +69,7 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
   const profile = ShellDestination(
     labelKey: 'shell.tabs.profile',
     icon: Icons.person_outline,
+    selectedIcon: Icons.person,
     body: ProfileTabScreen(),
   );
 
@@ -74,21 +79,25 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
         ShellDestination(
           labelKey: 'shell.tabs.home',
           icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
           body: TodayScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.lessons',
           icon: Icons.menu_book_outlined,
+          selectedIcon: Icons.menu_book,
           body: MaterialsScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.work',
           icon: Icons.assignment_outlined,
+          selectedIcon: Icons.assignment,
           body: StudentAssignmentsScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.ai',
           icon: Icons.auto_awesome_outlined,
+          selectedIcon: Icons.auto_awesome,
           body: AiHubScreen(),
         ),
         profile,
@@ -98,21 +107,25 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
         ShellDestination(
           labelKey: 'shell.tabs.home',
           icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
           body: TeacherHomeScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.timetable',
           icon: Icons.view_week_outlined,
+          selectedIcon: Icons.view_week,
           body: TeacherTimetableScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.classes',
           icon: Icons.groups_outlined,
+          selectedIcon: Icons.groups,
           body: TeacherClassListScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.messages',
           icon: Icons.chat_bubble_outline,
+          selectedIcon: Icons.chat_bubble,
           body: TeacherMessagesScreen(),
           decorateIcon: unreadMessagesBadge,
         ),
@@ -123,21 +136,25 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
         ShellDestination(
           labelKey: 'shell.tabs.home',
           icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
           body: ParentHomeScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.children',
           icon: Icons.family_restroom_outlined,
+          selectedIcon: Icons.family_restroom,
           body: ChildDetailScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.news',
           icon: Icons.campaign_outlined,
+          selectedIcon: Icons.campaign,
           body: ParentCommunicationScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.messages',
           icon: Icons.chat_bubble_outline,
+          selectedIcon: Icons.chat_bubble,
           body: ParentMessagesScreen(),
           decorateIcon: unreadMessagesBadge,
         ),
@@ -148,11 +165,13 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
         ShellDestination(
           labelKey: 'shell.tabs.registers',
           icon: Icons.fact_check_outlined,
+          selectedIcon: Icons.fact_check,
           body: RegistersScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.notifications',
           icon: Icons.notifications_none_outlined,
+          selectedIcon: Icons.notifications,
           body: NotificationsInboxView(),
         ),
         profile,
@@ -162,6 +181,7 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
         ShellDestination(
           labelKey: 'shell.tabs.home',
           icon: Icons.home_outlined,
+          selectedIcon: Icons.home_rounded,
           body: ViewerHomeScreen(),
         ),
         profile,

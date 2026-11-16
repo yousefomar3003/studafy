@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/material.dart';
 import 'package:studafy_mobile/src/core/offline/cached_value.dart';
+import 'package:studafy_mobile/src/design/kit/kit.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/student/application/materials_providers.dart';
 import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
@@ -108,6 +109,12 @@ void main() {
     expect(find.text('MATH101-A'), findsOneWidget);
     expect(find.text('Photosynthesis Study Guide'), findsOneWidget);
     expect(find.byType(MaterialListTile), findsOneWidget);
+    // The file-type badge takes the class's subject colour (MATH101-A is maths).
+    final badge = tester.widget<AppIconBadge>(
+      find.descendant(of: find.byType(MaterialListTile), matching: find.byType(AppIconBadge)),
+    );
+    expect(badge.accent, SubjectVisuals.of('MATH101-A').accent);
+    expect(badge.icon, Icons.picture_as_pdf);
   });
 
   testWidgets('shows a status pill and disables tapping a not-yet-ready material', (tester) async {
@@ -137,8 +144,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Scanning'), findsOneWidget);
-    final tile = tester.widget<ListTile>(find.byType(ListTile));
-    expect(tile.enabled, isFalse);
+    final tile = tester.widget<AppIconListTile>(
+      find.descendant(of: find.byType(MaterialListTile), matching: find.byType(AppIconListTile)),
+    );
+    expect(tile.onTap, isNull);
   });
 
   testWidgets('an empty class shows the empty-materials line', (tester) async {

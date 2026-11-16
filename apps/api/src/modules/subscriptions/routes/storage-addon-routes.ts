@@ -10,14 +10,20 @@ import { AUTH_CHANNELS } from "../../auth/channels";
 import { createStorageCheckoutSession } from "../services/checkout-service";
 import {
   changeStorageTier,
+  createStorageCardSetupSession,
+  createStoragePaymentMethodSession,
+  listStorageCards,
+  getStorageBilling,
   getStorageOffer,
+  previewStorageTierChange,
   setStorageAddonCancellation,
+  undoScheduledStorageChange,
 } from "../services/storage-addon-service";
 
 import type { Database } from "../../../db";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { PaymentProviderRegistry } from "../payment-provider-routing";
-import type { StorageAddonCurrent } from "../services/storage-addon-service";
+import type { StorageAddonCurrent, StorageBillingDetails } from "../services/storage-addon-service";
 
 const planCodeSchema = z.enum(STORAGE_ADDON_PLAN_CODES as [string, ...string[]]);
 
@@ -41,6 +47,19 @@ const StorageAddonCurrentSchema = z
       description:
         "Set to stop at the end of the period; storage drops back to what is included then.",
     }),
+    pendingChange: z
+      .object({
+        planCode: planCodeSchema.nullable(),
+        capBytes: z.number().int(),
+        price: StorageAddonPriceSchema.nullable(),
+        effectiveAt: z.string().datetime(),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "A move to less storage or to the other billing interval, taking effect at the next " +
+          "renewal (nothing charged or credited now). Undo with POST /change/undo.",
+      }),
   })
   .openapi("StorageAddOnCurrent");
 
@@ -69,6 +88,11 @@ const StorageOfferSchema = z
         "Whether this school can buy, change or cancel the add-on online. False when its payment " +
         "provider cannot manage subscriptions (Tap) or is not configured.",
     }),
+    testMode: z.boolean().openapi({
+      description:
+        "True when payments run in a Stripe Sandbox (test keys): test cards only, no real money is " +
+        "charged.",
+    }),
     granted: z
       .object({
         capBytes: z.number().int(),
@@ -94,7 +118,71 @@ const StorageCheckoutResponseSchema = z.object({
   sessionId: z.string(),
 });
 
-const StorageChangeRequestSchema = z.object({ priceId: z.string().uuid() });
+const StorageChangePreviewRequestSchema = z.object({ priceId: z.string().uuid() });
+
+const StorageChangePreviewSchema = z
+  .object({
+    timing: z.enum(["now", "renewal"]).openapi({
+      description:
+        "now: more storage on the same interval, applied and charged at once. renewal: less " +
+        "storage or the other interval, applied at the next renewal with nothing charged now.",
+    }),
+    effectiveAt: z.string().datetime(),
+    amountDueNowMinor: z
+      .number()
+      .int()
+      .openapi({
+        description:
+          "Charged the moment the change is confirmed, prorated: the new price for the rest of the " +
+          "period less the unused part of the current one. 0 for a change at renewal.",
+      }),
+    nextBillMinor: z.number().int().openapi({
+      description: "The next regular bill, at the new price.",
+    }),
+    nextBillAt: z.string().datetime(),
+    currency: z.string(),
+    chargeNow: z.boolean(),
+    price: StorageAddonPriceSchema,
+    capBytes: z.number().int(),
+    prorationDate: z.string().datetime().openapi({
+      description: "Send back with the change, with amountDueNowMinor as expectedAmountMinor.",
+    }),
+  })
+  .openapi("StorageAddOnChangePreview");
+
+const StorageChangeRequestSchema = z.object({
+  priceId: z.string().uuid(),
+  prorationDate: z.string().datetime().openapi({
+    description: "The preview's prorationDate. A preview older than 30 minutes is refused.",
+  }),
+  expectedAmountMinor: z
+    .number()
+    .int()
+    .min(0)
+    .openapi({
+      description:
+        "The preview's amountDueNowMinor, as the school confirmed it. When the change would now cost " +
+        "anything else, nothing is charged: 409 STORAGE_ADDON_PRICE_CHANGED.",
+    }),
+  requestKey: z.string().uuid().openapi({
+    description: "One per confirmation. Repeating a request with the same key never charges twice.",
+  }),
+  paymentMethodId: z
+    .string()
+    .min(1)
+    .max(255)
+    .nullable()
+    .optional()
+    .openapi({
+      description:
+        "The saved card (GET /cards) to pay an immediate change with; only this card is charged. " +
+        "Absent or null: the card renewals are charged to. 422 STORAGE_ADDON_CARD_INVALID when it is " +
+        "not one of the school's cards.",
+    }),
+  useForRenewals: z.boolean().optional().openapi({
+    description: "Also make that card the one renewals are charged to. Default false.",
+  }),
+});
 
 const StorageCancellationSchema = z
   .object({
@@ -102,6 +190,59 @@ const StorageCancellationSchema = z
     currentPeriodEnd: z.string().datetime(),
   })
   .openapi("StorageAddOnCancellation");
+
+const PaymentMethodSchema = z
+  .object({
+    brand: z.string(),
+    last4: z.string().nullable(),
+    expMonth: z.number().int().nullable(),
+    expYear: z.number().int().nullable(),
+  })
+  .openapi("StorageAddOnPaymentMethod");
+
+export const StorageInvoiceSchema = z
+  .object({
+    id: z.string(),
+    number: z.string().nullable(),
+    status: z.string().nullable(),
+    created: z.string().datetime(),
+    amountDueMinor: z.number().int(),
+    amountPaidMinor: z.number().int(),
+    amountRefundedMinor: z.number().int(),
+    currency: z.string(),
+    billingReason: z.string().nullable(),
+    hostedInvoiceUrl: z.string().nullable(),
+    invoicePdf: z.string().nullable(),
+  })
+  .openapi("StorageAddOnInvoice");
+
+const StorageBillingSchema = z
+  .object({
+    paymentMethod: PaymentMethodSchema.nullable(),
+    nextBill: z
+      .object({ amountMinor: z.number().int(), currency: z.string(), at: z.string().datetime() })
+      .nullable(),
+    invoices: z.array(StorageInvoiceSchema),
+  })
+  .openapi("StorageAddOnBilling");
+
+const PaymentMethodSessionRequestSchema = z.object({ returnUrl: z.string().url() });
+
+const SavedCardSchema = z
+  .object({
+    id: z.string(),
+    brand: z.string(),
+    last4: z.string().nullable(),
+    expMonth: z.number().int().nullable(),
+    expYear: z.number().int().nullable(),
+    isDefault: z.boolean().openapi({ description: "The card renewals are charged to." }),
+  })
+  .openapi("StorageAddOnCard");
+
+const CardSetupRequestSchema = z.object({
+  successUrl: z.string().url(),
+  cancelUrl: z.string().url(),
+});
 
 const BASE = "/api/subscriptions/storage";
 
@@ -129,7 +270,10 @@ const checkoutRoute = createRoute({
   summary: "Buy extra storage for the school",
   description:
     "Starts a hosted checkout for a storage tier price. 409 STORAGE_ADDON_ALREADY_ACTIVE when the " +
-    "school already has one (change its tier instead), 409 STORAGE_ADDON_UNAVAILABLE when the " +
+    "school already has one (change its tier instead), 409 STORAGE_ADDON_PURCHASE_PENDING when a " +
+    "storage payment is already paid or open at the provider (its confirmation still on the way; " +
+    "earlier open checkouts are closed first, so only one can ever be paid), 409 " +
+    "STORAGE_ADDON_UNAVAILABLE when the " +
     "school's payment provider cannot sell it online. license:manage; web only.",
   security: [{ bearerAuth: [] }],
   request: {
@@ -141,6 +285,25 @@ const checkoutRoute = createRoute({
   ),
 });
 
+const previewChangeRoute = createRoute({
+  method: "post",
+  path: `${BASE}/change/preview`,
+  tags: ["Subscriptions"],
+  operationId: "previewStorageAddOnChange",
+  summary: "What changing the school's storage tier will cost",
+  description:
+    "The exact prorated amount charged now and the next bill, from the payment provider's own " +
+    "invoice preview. Nothing is charged or changed. license:manage; web only.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { "application/json": { schema: StorageChangePreviewRequestSchema } } },
+  },
+  responses: standardResponses(
+    { 200: { description: "The cost of the change", schema: StorageChangePreviewSchema } },
+    [400, 401, 403, 404, 409, 502, 503],
+  ),
+});
+
 const changeRoute = createRoute({
   method: "post",
   path: `${BASE}/change`,
@@ -148,7 +311,9 @@ const changeRoute = createRoute({
   operationId: "changeStorageAddOnTier",
   summary: "Change the school's storage tier",
   description:
-    "Moves the live add-on to another tier or interval, prorated. More storage (or another " +
+    "Moves the live add-on to another tier or interval, prorated, for exactly the amount the " +
+    "school confirmed from the preview (409 STORAGE_ADDON_PRICE_CHANGED, nothing charged, when it " +
+    "would now cost anything else). More storage (or another " +
     "interval) is charged now and applied only once paid: 402 STORAGE_ADDON_PAYMENT_FAILED leaves " +
     "everything as it was. Less storage applies now and is credited on the next invoice; no file " +
     "is ever deleted. license:manage; web only.",
@@ -192,8 +357,98 @@ const reverseCancelRoute = createRoute({
   ),
 });
 
-function serializeCurrent(current: StorageAddonCurrent) {
-  return { ...current, currentPeriodEnd: current.currentPeriodEnd.toISOString() };
+const undoChangeRoute = createRoute({
+  method: "post",
+  path: `${BASE}/change/undo`,
+  tags: ["Subscriptions"],
+  operationId: "undoStorageAddOnScheduledChange",
+  summary: "Undo the storage change scheduled for the next renewal",
+  description:
+    "The add-on carries on as it is. 409 STORAGE_ADDON_NO_PENDING_CHANGE when none is scheduled. " +
+    "license:manage; web only.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "The add-on", schema: StorageAddonCurrentSchema } },
+    [401, 403, 409, 502, 503],
+  ),
+});
+
+const billingRoute = createRoute({
+  method: "get",
+  path: `${BASE}/billing`,
+  tags: ["Subscriptions"],
+  operationId: "getStorageAddOnBilling",
+  summary: "The storage add-on's card, next bill and invoices",
+  description:
+    "From the payment provider: the payment method, the next regular bill and the add-on's " +
+    "invoices with receipt links. null when the school has no storage add-on. license:manage; " +
+    "web only.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "Billing details", schema: StorageBillingSchema.nullable() } },
+    [401, 403, 409, 502, 503],
+  ),
+});
+
+const paymentMethodRoute = createRoute({
+  method: "post",
+  path: `${BASE}/payment-method`,
+  tags: ["Subscriptions"],
+  operationId: "createStorageAddOnPaymentMethodSession",
+  summary: "Replace the card the storage add-on is paid with",
+  description:
+    "A hosted page where the school replaces its card, and nothing else: plans are changed and " +
+    "canceled only in Studafy. license:manage; web only.",
+  security: [{ bearerAuth: [] }],
+  request: {
+    body: { content: { "application/json": { schema: PaymentMethodSessionRequestSchema } } },
+  },
+  responses: standardResponses(
+    { 200: { description: "The page to open", schema: z.object({ url: z.string() }) } },
+    [400, 401, 403, 409, 502, 503],
+  ),
+});
+
+const cardsRoute = createRoute({
+  method: "get",
+  path: `${BASE}/cards`,
+  tags: ["Subscriptions"],
+  operationId: "listStorageAddOnCards",
+  summary: "The school's saved cards to pay a storage change with",
+  description:
+    "Brand, last four digits and expiry only; the renewal card first. license:manage; web only.",
+  security: [{ bearerAuth: [] }],
+  responses: standardResponses(
+    { 200: { description: "Saved cards", schema: z.object({ cards: z.array(SavedCardSchema) }) } },
+    [401, 403, 409, 502, 503],
+  ),
+});
+
+const cardSetupRoute = createRoute({
+  method: "post",
+  path: `${BASE}/cards/setup`,
+  tags: ["Subscriptions"],
+  operationId: "createStorageAddOnCardSetup",
+  summary: "Save a new card to pay with",
+  description:
+    "A hosted page where the school saves a card; nothing is charged and the renewal card does " +
+    "not change. license:manage; web only.",
+  security: [{ bearerAuth: [] }],
+  request: { body: { content: { "application/json": { schema: CardSetupRequestSchema } } } },
+  responses: standardResponses(
+    { 200: { description: "The page to open", schema: z.object({ url: z.string() }) } },
+    [400, 401, 403, 409, 502, 503],
+  ),
+});
+
+export function serializeCurrent(current: StorageAddonCurrent) {
+  return {
+    ...current,
+    currentPeriodEnd: current.currentPeriodEnd.toISOString(),
+    pendingChange: current.pendingChange
+      ? { ...current.pendingChange, effectiveAt: current.pendingChange.effectiveAt.toISOString() }
+      : null,
+  };
 }
 
 /**
@@ -212,6 +467,18 @@ export function storageAddonRoutes(
   app.use("/api/subscriptions/storage/offer", requirePermission(PERMISSIONS.LICENSE_READ));
   app.use("/api/subscriptions/storage/checkout", requirePermission(PERMISSIONS.LICENSE_MANAGE));
   app.use("/api/subscriptions/storage/change", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use(
+    "/api/subscriptions/storage/change/preview",
+    requirePermission(PERMISSIONS.LICENSE_MANAGE),
+  );
+  app.use("/api/subscriptions/storage/change/undo", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use("/api/subscriptions/storage/billing", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use("/api/subscriptions/storage/cards", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use("/api/subscriptions/storage/cards/setup", requirePermission(PERMISSIONS.LICENSE_MANAGE));
+  app.use(
+    "/api/subscriptions/storage/payment-method",
+    requirePermission(PERMISSIONS.LICENSE_MANAGE),
+  );
   app.use("/api/subscriptions/storage/cancel", requirePermission(PERMISSIONS.LICENSE_MANAGE));
   app.use(
     "/api/subscriptions/storage/cancel/reverse",
@@ -254,10 +521,10 @@ export function storageAddonRoutes(
     return c.json(result, 200);
   });
 
-  app.openapi(changeRoute, async (c) => {
+  app.openapi(previewChangeRoute, async (c) => {
     const auth = requireAuth(c);
     const body = c.req.valid("json");
-    const current = await changeStorageTier(database, providers, {
+    const preview = await previewStorageTierChange(database, providers, {
       schoolId: auth.schoolId,
       priceId: body.priceId,
       tenantContext: {
@@ -266,7 +533,105 @@ export function storageAddonRoutes(
         requestId: c.get("requestId"),
       },
     });
+    return c.json(
+      {
+        ...preview,
+        effectiveAt: preview.effectiveAt.toISOString(),
+        nextBillAt: preview.nextBillAt.toISOString(),
+        prorationDate: preview.prorationDate.toISOString(),
+      },
+      200,
+    );
+  });
+
+  app.openapi(changeRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+    const current = await changeStorageTier(database, providers, {
+      schoolId: auth.schoolId,
+      priceId: body.priceId,
+      prorationDate: new Date(body.prorationDate),
+      expectedAmountMinor: body.expectedAmountMinor,
+      requestKey: body.requestKey,
+      paymentMethodId: body.paymentMethodId ?? null,
+      useForRenewals: body.useForRenewals ?? false,
+      tenantContext: {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        requestId: c.get("requestId"),
+      },
+    });
     return c.json(serializeCurrent(current), 200);
+  });
+
+  app.openapi(undoChangeRoute, async (c) => {
+    const auth = requireAuth(c);
+    const current = await undoScheduledStorageChange(database, providers, {
+      schoolId: auth.schoolId,
+      tenantContext: {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        requestId: c.get("requestId"),
+      },
+    });
+    return c.json(serializeCurrent(current), 200);
+  });
+
+  app.openapi(billingRoute, async (c) => {
+    const auth = requireAuth(c);
+    const billing = await getStorageBilling(database, providers, {
+      schoolId: auth.schoolId,
+      tenantContext: {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        requestId: c.get("requestId"),
+      },
+    });
+    return c.json(billing ? serializeBilling(billing) : null, 200);
+  });
+
+  app.openapi(cardsRoute, async (c) => {
+    const auth = requireAuth(c);
+    const cards = await listStorageCards(database, providers, {
+      schoolId: auth.schoolId,
+      tenantContext: {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        requestId: c.get("requestId"),
+      },
+    });
+    return c.json({ cards }, 200);
+  });
+
+  app.openapi(cardSetupRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+    const session = await createStorageCardSetupSession(database, providers, {
+      schoolId: auth.schoolId,
+      successUrl: body.successUrl,
+      cancelUrl: body.cancelUrl,
+      tenantContext: {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        requestId: c.get("requestId"),
+      },
+    });
+    return c.json({ url: session.url }, 200);
+  });
+
+  app.openapi(paymentMethodRoute, async (c) => {
+    const auth = requireAuth(c);
+    const body = c.req.valid("json");
+    const session = await createStoragePaymentMethodSession(database, providers, {
+      schoolId: auth.schoolId,
+      returnUrl: body.returnUrl,
+      tenantContext: {
+        schoolId: auth.schoolId,
+        userId: auth.userId,
+        requestId: c.get("requestId"),
+      },
+    });
+    return c.json({ url: session.url }, 200);
   });
 
   for (const [route, cancel] of [
@@ -295,4 +660,17 @@ export function storageAddonRoutes(
   }
 
   return app;
+}
+
+export function serializeBilling(billing: StorageBillingDetails) {
+  return {
+    paymentMethod: billing.paymentMethod,
+    nextBill: billing.nextBill
+      ? { ...billing.nextBill, at: billing.nextBill.at.toISOString() }
+      : null,
+    invoices: billing.invoices.map((invoice) => ({
+      ...invoice,
+      created: invoice.created.toISOString(),
+    })),
+  };
 }

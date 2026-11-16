@@ -36,6 +36,9 @@ const invoice = {
   overdueAt: null,
   voidedAt: null,
   voidReason: null,
+  paymentLink: null as string | null,
+  paymentPlan: "in_full",
+  instalments: [] as unknown[],
   createdAt: "2026-10-01T08:00:00.000Z",
   bankDetails: {
     bankName: "Gulf Bank",
@@ -106,9 +109,10 @@ const UPLOAD = {
   expires_at: "2026-10-27T12:00:00.000Z",
 };
 
+let served = invoice;
+
 const getMock = mock((path: string) => {
-  if (path === "/api/school/license/invoices/{invoiceId}")
-    return Promise.resolve({ data: invoice });
+  if (path === "/api/school/license/invoices/{invoiceId}") return Promise.resolve({ data: served });
   if (path === "/api/school/license") {
     return Promise.resolve({ data: { license: null, usage: [], openChangeRequests: [] } });
   }
@@ -139,6 +143,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  served = invoice;
   globalThis.fetch = originalFetch;
   getMock.mockClear();
   postMock.mockClear();
@@ -181,6 +186,72 @@ describe("InvoiceDetailPage", () => {
     expect(pay.getByText("STF-AB12-CD34")).toBeTruthy();
     expect(pay.getByText("AE070331234567890123456")).toBeTruthy();
     expect(pay.getByText("GULFAEAD")).toBeTruthy();
+  });
+
+  test("an invoice paid monthly shows its schedule and pays the instalment due now", async () => {
+    const instalment = (position: number, paidMinor: number, status: string) => ({
+      id: `00000000-0000-4000-8000-00000000000${position}`,
+      position,
+      amountMinor: 40_000,
+      paidMinor,
+      balanceMinor: 40_000 - paidMinor,
+      dueDate: `2026-${String(9 + position).padStart(2, "0")}-01`,
+      status,
+      overdue: false,
+      overdueAt: null,
+      current: position === 2,
+      paymentLink: position === 2 ? "https://checkout.revolut.com/pay/two" : null,
+    });
+    served = {
+      ...invoice,
+      totalMinor: 120_000,
+      paidMinor: 40_000,
+      balanceMinor: 80_000,
+      paymentPlan: "monthly",
+      paymentLink: "https://checkout.revolut.com/pay/two",
+      instalments: [
+        instalment(1, 40_000, "paid"),
+        instalment(2, 0, "due"),
+        instalment(3, 0, "due"),
+      ],
+    };
+    await renderPage();
+    const schedule = within(await screen.findByRole("region", { name: "Payment schedule" }));
+    expect(schedule.getAllByRole("row")).toHaveLength(4);
+    const pay = within(await screen.findByRole("region", { name: "How to pay" }));
+    expect(pay.getByText(/for payment 2 of 3/)).toBeTruthy();
+    expect(pay.getByRole("link", { name: "Pay payment 2 online" }).getAttribute("href")).toBe(
+      "https://checkout.revolut.com/pay/two",
+    );
+  });
+
+  test("with a payment link, a Pay online button sits beside the bank details", async () => {
+    served = { ...invoice, paymentLink: "https://checkout.revolut.com/pay/abc" };
+    await renderPage();
+    const pay = within(await screen.findByRole("region", { name: "How to pay" }));
+    const button = pay.getByRole("link", { name: "Pay online" });
+    expect(button.getAttribute("href")).toBe("https://checkout.revolut.com/pay/abc");
+    expect(button.getAttribute("target")).toBe("_blank");
+    expect(button.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(
+      pay.getByText(
+        "You'll pay securely through Revolut. Your payment is confirmed once Studafy records it.",
+      ),
+    ).toBeTruthy();
+    // The bank details stay.
+    expect(pay.getByText("AE070331234567890123456")).toBeTruthy();
+  });
+
+  test("without a payment link, or with one that is not Revolut, there is no Pay online", async () => {
+    await renderPage();
+    await screen.findByRole("region", { name: "How to pay" });
+    expect(screen.queryByRole("link", { name: "Pay online" })).toBeNull();
+    cleanup();
+
+    served = { ...invoice, paymentLink: "https://evil.example/pay" };
+    await renderPage();
+    await screen.findByRole("region", { name: "How to pay" });
+    expect(screen.queryByRole("link", { name: "Pay online" })).toBeNull();
   });
 
   test("copies the payment reference", async () => {

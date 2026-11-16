@@ -11,6 +11,12 @@
  *   - Payment webhook processing failures (app.billing_events in failed/dlq, global to
  *     studafy_admin) and rejected webhook signatures (app.security_events) from the last 7 days.
  *   - Email bounces and complaints (app.email_events) from the last 7 days.
+ *   - Duplicate storage subscriptions (app.storage_duplicate_subscriptions, 000219, per school): a
+ *     school charged for a second storage add-on. Every one not yet settled, at any age, and those
+ *     settled in the last 30 days.
+ *   - Storage billing incidents (app.storage_billing_incidents, 000224, per school): a storage change
+ *     that charged more than the school confirmed, with the excess refunded automatically (or left
+ *     for a person when that failed). Open ones at any age, refunded ones from the last 30 days.
  *   - The latest daily storage reconciliation: the per-school orphan report is that job's return
  *     value (apps/workers storage-quota-reconciliation.ts), so it is read from the job, not a table.
  *
@@ -26,6 +32,9 @@ import type { Database } from "../../../db/client";
 import type { RedisClient } from "../../../redis";
 
 const WINDOW_DAYS = 7;
+/** Settled duplicate storage subscriptions stay listed this long; unsettled ones always do. */
+const DUPLICATES_WINDOW_DAYS = 30;
+const DUPLICATE_STATUS_ORDER = { needs_review: 0, pending: 1, resolved: 2 } as const;
 const RECENT_FAILURES = 5;
 /** Completed/failed jobs scanned per scheduled queue to find each scheduler's last run. */
 const SCHEDULER_HISTORY_SCAN = 200;
@@ -76,6 +85,39 @@ export interface StorageSchoolLine {
   failed: boolean;
 }
 
+export interface StorageDuplicateLine {
+  id: string;
+  schoolId: string;
+  schoolName: string;
+  stripeSubscriptionId: string;
+  keptStripeSubscriptionId: string | null;
+  source: "checkout" | "event";
+  status: "pending" | "resolved" | "needs_review";
+  attempts: number;
+  refundAmountMinor: number | null;
+  refundCurrency: string | null;
+  stripeRefundId: string | null;
+  unrefundedMinor: number | null;
+  lastError: string | null;
+  detectedAt: string;
+  resolvedAt: string | null;
+}
+
+export interface StorageIncidentLine {
+  id: string;
+  schoolId: string;
+  schoolName: string;
+  stripeInvoiceId: string;
+  expectedMinor: number;
+  chargedMinor: number;
+  refundMinor: number;
+  currency: string;
+  stripeRefundId: string | null;
+  status: "refunded" | "needs_review";
+  lastError: string | null;
+  detectedAt: string;
+}
+
 export interface SystemHealth {
   generatedAt: string;
   windowDays: number;
@@ -102,6 +144,10 @@ export interface SystemHealth {
     rejectedSignatures: { type: string; count: number }[];
   };
   email: { bounces: number; complaints: number; deliveries: number };
+  /** Open first (needs review, then pending), newest first within each. */
+  storageDuplicates: { open: number; items: StorageDuplicateLine[] };
+  /** Needs review first, newest first within each. */
+  storageIncidents: { open: number; items: StorageIncidentLine[] };
   storage: {
     available: boolean;
     lastRunAt: string | null;
@@ -121,6 +167,7 @@ export async function getSystemHealth(
   now: Date = new Date(),
 ): Promise<SystemHealth> {
   const since = new Date(now.getTime() - WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const duplicatesSince = new Date(now.getTime() - DUPLICATES_WINDOW_DAYS * 24 * 60 * 60 * 1000);
 
   const db = await withSystemTx(database, async (tx) => {
     const schools = await tx<{ id: string; name: string }[]>`
@@ -164,7 +211,67 @@ export async function getSystemHealth(
       WHERE received_at >= ${since}
       GROUP BY event_type
     `;
-    return { schools, deadLetters, failedEvents, recentFailures, signatures, email };
+    const duplicates = await pipelinePerSchool(tx, schools, () => [
+      tx<
+        {
+          id: string;
+          stripe_subscription_id: string;
+          kept_stripe_subscription_id: string | null;
+          source: "checkout" | "event";
+          status: "pending" | "resolved" | "needs_review";
+          attempts: number;
+          refund_amount_minor: string | null;
+          refund_currency: string | null;
+          stripe_refund_id: string | null;
+          unrefunded_minor: string | null;
+          last_error: string | null;
+          created_at: Date;
+          resolved_at: Date | null;
+        }[]
+      >`
+        SELECT id, stripe_subscription_id, kept_stripe_subscription_id, source, status, attempts,
+               refund_amount_minor::text AS refund_amount_minor, refund_currency, stripe_refund_id,
+               unrefunded_minor::text AS unrefunded_minor, last_error, created_at, resolved_at
+        FROM app.storage_duplicate_subscriptions
+        WHERE status <> 'resolved' OR resolved_at >= ${duplicatesSince}
+        ORDER BY created_at DESC
+        LIMIT 50
+      `,
+    ]);
+    const incidents = await pipelinePerSchool(tx, schools, () => [
+      tx<
+        {
+          id: string;
+          stripe_invoice_id: string;
+          expected_minor: string;
+          charged_minor: string;
+          refund_minor: string;
+          currency: string;
+          stripe_refund_id: string | null;
+          status: "refunded" | "needs_review";
+          last_error: string | null;
+          created_at: Date;
+        }[]
+      >`
+        SELECT id, stripe_invoice_id, expected_minor::text AS expected_minor,
+               charged_minor::text AS charged_minor, refund_minor::text AS refund_minor, currency,
+               stripe_refund_id, status, last_error, created_at
+        FROM app.storage_billing_incidents
+        WHERE status <> 'refunded' OR created_at >= ${duplicatesSince}
+        ORDER BY created_at DESC
+        LIMIT 50
+      `,
+    ]);
+    return {
+      schools,
+      deadLetters,
+      failedEvents,
+      recentFailures,
+      signatures,
+      email,
+      duplicates,
+      incidents,
+    };
   });
 
   const schoolNames = new Map(db.schools.map((school) => [school.id, school.name]));
@@ -180,6 +287,54 @@ export async function getSystemHealth(
     })
     .filter((line) => line.count > 0)
     .sort((a, b) => b.count - a.count);
+  const storageDuplicates: StorageDuplicateLine[] = db.schools
+    .flatMap((school, index) =>
+      db.duplicates[index]![0].map((row) => ({
+        id: row.id,
+        schoolId: school.id,
+        schoolName: school.name,
+        stripeSubscriptionId: row.stripe_subscription_id,
+        keptStripeSubscriptionId: row.kept_stripe_subscription_id,
+        source: row.source,
+        status: row.status,
+        attempts: row.attempts,
+        refundAmountMinor:
+          row.refund_amount_minor === null ? null : Number(row.refund_amount_minor),
+        refundCurrency: row.refund_currency,
+        stripeRefundId: row.stripe_refund_id,
+        unrefundedMinor: row.unrefunded_minor === null ? null : Number(row.unrefunded_minor),
+        lastError: preview(row.last_error),
+        detectedAt: row.created_at.toISOString(),
+        resolvedAt: row.resolved_at ? row.resolved_at.toISOString() : null,
+      })),
+    )
+    .sort(
+      (a, b) =>
+        DUPLICATE_STATUS_ORDER[a.status] - DUPLICATE_STATUS_ORDER[b.status] ||
+        b.detectedAt.localeCompare(a.detectedAt),
+    );
+  const storageIncidents: StorageIncidentLine[] = db.schools
+    .flatMap((school, index) =>
+      db.incidents[index]![0].map((row) => ({
+        id: row.id,
+        schoolId: school.id,
+        schoolName: school.name,
+        stripeInvoiceId: row.stripe_invoice_id,
+        expectedMinor: Number(row.expected_minor),
+        chargedMinor: Number(row.charged_minor),
+        refundMinor: Number(row.refund_minor),
+        currency: row.currency,
+        stripeRefundId: row.stripe_refund_id,
+        status: row.status,
+        lastError: preview(row.last_error),
+        detectedAt: row.created_at.toISOString(),
+      })),
+    )
+    .sort(
+      (a, b) =>
+        Number(a.status === "refunded") - Number(b.status === "refunded") ||
+        b.detectedAt.localeCompare(a.detectedAt),
+    );
   const emailCount = (type: string) => db.email.find((row) => row.event_type === type)?.count ?? 0;
 
   const jobs = redis ? await readJobs(redis) : null;
@@ -217,6 +372,14 @@ export async function getSystemHealth(
       bounces: emailCount("bounce"),
       complaints: emailCount("complaint"),
       deliveries: emailCount("delivery"),
+    },
+    storageDuplicates: {
+      open: storageDuplicates.filter((line) => line.status !== "resolved").length,
+      items: storageDuplicates,
+    },
+    storageIncidents: {
+      open: storageIncidents.filter((line) => line.status !== "refunded").length,
+      items: storageIncidents,
     },
     storage: storage ?? { available: false, lastRunAt: null, totals: null, schools: [] },
     notAvailable,

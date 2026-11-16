@@ -1,4 +1,5 @@
 import { ApiError } from "@studafy/api-client";
+import { isLicensableAudience } from "@studafy/constants";
 import { Button, Input, Modal, Select, useToast } from "@studafy/ui";
 import { useState } from "react";
 
@@ -22,9 +23,14 @@ const EMPTY: Record<LicenseAudience, AudienceWish> = {
   parent: { seats: "", planId: "" },
 };
 
+/** The audiences a school can ask for: only those a license sells (today, students). */
+const REQUESTABLE = AUDIENCES.filter(isLicensableAudience);
+
 /**
- * Ask Studafy for more (or fewer) seats, a different tier, or Family+ on or off. It creates a
- * request for the super admin; nothing on the license changes until a quote for it is accepted.
+ * "Request AI for students": how many students should get Studafy AI, the AI tier, and an optional
+ * note. It creates a request for the super admin, who prices it as a quote; nothing on the license
+ * changes until that quote is accepted. Teacher and parent seats and Family+ appear here only once
+ * their features are built (`LICENSABLE_AUDIENCES`).
  */
 export function RequestChangeModal({
   open,
@@ -44,14 +50,18 @@ export function RequestChangeModal({
   const [familyPlus, setFamilyPlus] = useState<FamilyPlusChoice>("same");
   const [note, setNote] = useState("");
 
+  const offersFamilyPlus = isLicensableAudience("parent");
   const hasFamilyPlus = license?.includeFamilyPlus ?? false;
-  const parentsShown = familyPlus === "include" || (hasFamilyPlus && familyPlus !== "remove");
-  const audiences = AUDIENCES.filter((a) => a !== "parent" || parentsShown);
+  const parentsShown =
+    offersFamilyPlus && (familyPlus === "include" || (hasFamilyPlus && familyPlus !== "remove"));
+  const audiences = REQUESTABLE.filter((a) => a !== "parent" || parentsShown);
   const seatsInvalid = (value: string) => value !== "" && !/^\d{1,6}$/.test(value);
   const invalid = audiences.some((a) => seatsInvalid(wishes[a].seats));
   const asksSomething =
     familyPlus !== "same" || audiences.some((a) => wishes[a].seats !== "" || wishes[a].planId);
-  const valid = !invalid && asksSomething && note.trim() !== "";
+  // With no license yet, the request is for a first one: it needs a number of students.
+  const needsStudents = license === null && wishes.student.seats === "";
+  const valid = !invalid && asksSomething && !needsStudents;
 
   function close() {
     setWishes(EMPTY);
@@ -61,19 +71,32 @@ export function RequestChangeModal({
   }
 
   function submit() {
-    if (!valid) return;
+    if (!valid || request.isPending) return;
     const wish = (audience: LicenseAudience) =>
       audiences.includes(audience) ? wishes[audience] : { seats: "", planId: "" };
+    const studentSeats = wish("student").seats === "" ? null : Number(wish("student").seats);
+    const tier = tiers.find((candidate) => candidate.id === wish("student").planId);
     request.mutate(
       {
-        studentSeats: wish("student").seats === "" ? null : Number(wish("student").seats),
+        studentSeats,
         teacherSeats: wish("teacher").seats === "" ? null : Number(wish("teacher").seats),
         parentSeats: wish("parent").seats === "" ? null : Number(wish("parent").seats),
         studentPlanId: wish("student").planId || null,
         teacherPlanId: wish("teacher").planId || null,
         parentPlanId: wish("parent").planId || null,
-        includeFamilyPlus: familyPlus === "same" ? null : familyPlus === "include",
-        note: note.trim(),
+        includeFamilyPlus:
+          !offersFamilyPlus || familyPlus === "same" ? null : familyPlus === "include",
+        // The note is optional for the school; the request always carries one for the inbox.
+        note:
+          note.trim() ||
+          (studentSeats !== null
+            ? t("schoolLicense.aiRequest.defaultNote", {
+                count: studentSeats,
+                tier: tier?.displayName ?? t("schoolLicense.aiRequest.anyTierShort"),
+              })
+            : t("schoolLicense.aiRequest.defaultNoteTier", {
+                tier: tier?.displayName ?? t("schoolLicense.aiRequest.anyTierShort"),
+              })),
       },
       {
         onSuccess: () => {
@@ -94,25 +117,33 @@ export function RequestChangeModal({
     <Modal
       open={open}
       onClose={close}
-      title={t("schoolLicense.request.title")}
-      description={t("schoolLicense.request.description")}
+      title={t("schoolLicense.aiRequest.title")}
+      description={t("schoolLicense.aiRequest.description")}
     >
       <Modal.Body>
         {audiences.map((audience) => {
           const current = license?.audiences.find((a) => a.audience === audience);
           const audienceName = t(`schoolLicense.audience.${audience}`);
+          const isStudents = audience === "student";
           return (
             <fieldset key={audience} className="license-toolbar">
               <legend className="sf-visually-hidden">{audienceName}</legend>
               <Input
-                label={t("schoolLicense.request.seatsLabel", { audience: audienceName })}
+                label={
+                  isStudents
+                    ? t("schoolLicense.aiRequest.studentsLabel")
+                    : t("schoolLicense.request.seatsLabel", { audience: audienceName })
+                }
                 helperText={
-                  current
+                  current && current.purchased > 0
                     ? t("schoolLicense.request.seatsNow", { count: current.purchased })
-                    : undefined
+                    : isStudents
+                      ? t("schoolLicense.aiRequest.studentsHelp")
+                      : undefined
                 }
                 inputMode="numeric"
                 value={wishes[audience].seats}
+                required={isStudents && license === null}
                 error={
                   seatsInvalid(wishes[audience].seats)
                     ? t("schoolLicense.request.seatsError")
@@ -126,7 +157,11 @@ export function RequestChangeModal({
                 }
               />
               <Select
-                label={t("schoolLicense.request.tierLabel", { audience: audienceName })}
+                label={
+                  isStudents
+                    ? t("schoolLicense.aiRequest.tierLabel")
+                    : t("schoolLicense.request.tierLabel", { audience: audienceName })
+                }
                 value={wishes[audience].planId}
                 onChange={(planId) =>
                   setWishes((prev) => ({ ...prev, [audience]: { ...prev[audience], planId } }))
@@ -136,7 +171,7 @@ export function RequestChangeModal({
                     value: "",
                     label: current?.tier
                       ? t("schoolLicense.request.keepTier", { tier: current.tier.displayName })
-                      : t("schoolLicense.request.noTierChange"),
+                      : t("schoolLicense.aiRequest.anyTier"),
                   },
                   ...tiers
                     .filter(
@@ -151,27 +186,28 @@ export function RequestChangeModal({
             </fieldset>
           );
         })}
-        <Select
-          label={t("schoolLicense.request.familyPlusLabel")}
-          value={familyPlus}
-          onChange={setFamilyPlus}
-          options={[
-            {
-              value: "same",
-              label: hasFamilyPlus
-                ? t("schoolLicense.request.familyPlusKeepOn")
-                : t("schoolLicense.request.familyPlusKeepOff"),
-            },
-            hasFamilyPlus
-              ? { value: "remove", label: t("schoolLicense.request.familyPlusRemove") }
-              : { value: "include", label: t("schoolLicense.request.familyPlusAdd") },
-          ]}
-        />
+        {offersFamilyPlus ? (
+          <Select
+            label={t("schoolLicense.request.familyPlusLabel")}
+            value={familyPlus}
+            onChange={setFamilyPlus}
+            options={[
+              {
+                value: "same",
+                label: hasFamilyPlus
+                  ? t("schoolLicense.request.familyPlusKeepOn")
+                  : t("schoolLicense.request.familyPlusKeepOff"),
+              },
+              hasFamilyPlus
+                ? { value: "remove", label: t("schoolLicense.request.familyPlusRemove") }
+                : { value: "include", label: t("schoolLicense.request.familyPlusAdd") },
+            ]}
+          />
+        ) : null}
         <Input
-          label={t("schoolLicense.request.noteLabel")}
+          label={t("schoolLicense.aiRequest.noteLabel")}
           helperText={t("schoolLicense.request.noteHelp")}
           value={note}
-          required
           onChange={(event) => setNote(event.target.value)}
         />
       </Modal.Body>
@@ -182,11 +218,11 @@ export function RequestChangeModal({
         <Button
           type="button"
           variant="primary"
-          disabled={!valid}
+          disabled={!valid || request.isPending}
           loading={request.isPending}
           onClick={submit}
         >
-          {t("schoolLicense.request.submit")}
+          {t("schoolLicense.aiRequest.submit")}
         </Button>
       </Modal.Footer>
     </Modal>

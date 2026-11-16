@@ -60,7 +60,8 @@
     "sent": "Sent",
     "accepted": "Accepted",
     "expired": "Expired",
-    "withdrawn": "Withdrawn"
+    "withdrawn": "Withdrawn",
+    "declined": "Declined by the school"
   },
   "invoiceStatus": {
     "issued": "Issued",
@@ -247,7 +248,30 @@
     "save": "Save as draft quote",
     "pickSchoolFirst": "Pick a school to save a quote.",
     "saved": "Quote saved as a draft.",
-    "saveError": "The quote was not saved."
+    "saveError": "The quote was not saved.",
+    "planHeading": "How the school pays",
+    "planLabel": "Payment plan",
+    "plan": {
+      "in_full": "All at once",
+      "monthly": "Monthly, over the licence months",
+      "custom": "Custom schedule"
+    },
+    "customHeading": "Instalments",
+    "customAmountLabel": "Instalment {{position}} amount ({{currency}})",
+    "customDueLabel": "Instalment {{position}} due on",
+    "customRemove": "Remove instalment {{position}}",
+    "customAdd": "Add an instalment",
+    "customLeft": "Left to schedule: {{amount}}",
+    "scheduleErrors": {
+      "empty": "Add at least one instalment.",
+      "incomplete": "Give every instalment an amount above zero and a due date.",
+      "too_many": "A custom schedule can have at most 24 instalments.",
+      "invalid_date": "One of the due dates isn't a real date.",
+      "non_positive": "Every instalment must be more than zero.",
+      "not_ascending": "Put the due dates in order, earliest first.",
+      "sum_mismatch": "The instalments must add up to the quote's total exactly.",
+      "in_past": "A due date can't be before today."
+    }
   },
   "quotes": {
     "title": "Quotes",
@@ -269,7 +293,9 @@
       "accept": "Quote accepted and invoiced.",
       "withdraw": "Quote withdrawn."
     },
-    "openInvoice": "Open invoice"
+    "openInvoice": "Open invoice",
+    "declineReason": "Reason: “{{reason}}”",
+    "declinedNoReason": "No reason given."
   },
   "licenses": {
     "title": "Licenses",
@@ -316,7 +342,11 @@
       "parents_other": "{{count}} parent seats",
       "tier": "{{tier}} for {{audience}}",
       "familyPlusOn": "Family+ on",
-      "familyPlusOff": "Family+ off"
+      "familyPlusOff": "Family+ off",
+      "studentAi_one": "Student AI: {{count}} seat",
+      "studentAi_other": "Student AI: {{count}} seats",
+      "studentAiNoSeats": "Student AI",
+      "studentAiTier": "tier {{tier}}"
     },
     "price": "Price it",
     "resolve": "Resolve",
@@ -424,7 +454,7 @@
     "fileLabel": "Attach a receipt file (PDF, JPEG or PNG, optional)",
     "recordConfirm": "Record transfer",
     "recorded": "Transfer recorded.",
-    "recordedActivated": "Transfer recorded: the invoice is paid and the license is active.",
+    "recordedActivated": "Transfer recorded: the license is now active.",
     "voidPaymentTitle": "Void payment {{reference}}",
     "voidInvoiceTitle": "Void invoice {{number}}",
     "reasonLabel": "Reason",
@@ -441,7 +471,27 @@
     "dueDateError": "Not before the issue date.",
     "activateConfirm": "Activate",
     "activated": "License activated.",
-    "dueDateMoved": "Due date updated."
+    "dueDateMoved": "Due date updated.",
+    "paymentLink": {
+      "title": "Payment link",
+      "help": "Paste a payment link you made in Revolut for this invoice. The school sees a \"Pay online\" button next to the bank details while the invoice is unpaid. When the money arrives in Revolut, record it here with \"Record a transfer\".",
+      "label": "Revolut payment link",
+      "save": "Save link",
+      "change": "Change",
+      "remove": "Remove",
+      "saved": "Payment link saved. The school can now pay online.",
+      "removed": "Payment link removed. The school sees only the bank details.",
+      "invalid": "Paste an https link from Revolut (revolut.com or revolut.me), up to 500 characters."
+    },
+    "instalments": {
+      "title": "Payment schedule",
+      "help": "Payments you record fill the earliest instalment first. The licence starts once the first one is paid.",
+      "linkColumn": "Payment link",
+      "linkLabel": "Revolut link for instalment {{position}}",
+      "openLink": "Open the link",
+      "linkSaved": "Payment link for instalment {{position}} saved.",
+      "linkRemoved": "Payment link for instalment {{position}} removed."
+    }
   },
   "school": {
     "title": "License",

@@ -18,13 +18,21 @@ export {
   matchReceipt,
   readInvoice,
   recordPayment,
+  setInvoicePaymentLink,
   voidInvoice,
   voidPayment,
   writeBankDetails,
   type InvoiceRecord,
 } from "./invoices";
 export { addMonths, priceQuote, replacePriceSettings, type QuoteTerms } from "./pricing";
-export { acceptQuote, createQuote, readQuote, sendQuote, withdrawQuote } from "./quotes";
+export {
+  acceptQuote,
+  createQuote,
+  declineQuote,
+  readQuote,
+  sendQuote,
+  withdrawQuote,
+} from "./quotes";
 export {
   LICENSE_TRANSITIONS,
   assignSeats,

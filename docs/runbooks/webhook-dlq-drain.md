@@ -154,5 +154,5 @@ same `error_class` within one retry cycle.
   DB-backed counts is future work alongside the first real on-call surface.
 - **Email/ERPNext intake failures have no durable record.** They fail open (5xx to the provider)
   and rely on Resend/ERPNext redelivery; there is no replay handle if the provider gives up. The
-  email path (Resend → `/email/webhooks/resend`) depends on Resend's retry schedule, which this repo
-  does not control.
+  email path in particular (Resend → `/email/webhooks/resend`) depends on Resend's retry schedule,
+  which this repo does not control; a failed message can be replayed from Resend → Webhooks.

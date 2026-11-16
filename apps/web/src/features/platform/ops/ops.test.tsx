@@ -39,6 +39,7 @@ const banners = [
 
 const health = {
   generatedAt: new Date(NOW).toISOString(),
+  stripeMode: "sandbox",
   windowDays: 7,
   jobs: {
     available: true,
@@ -77,6 +78,47 @@ const health = {
   },
   webhooks: { failedEvents: [], recentFailures: [], rejectedSignatures: [] },
   email: { bounces: 4, complaints: 0, deliveries: 120 },
+  storageIncidents: {
+    open: 1,
+    items: [
+      {
+        id: "a1b2c3d4-0000-4000-8000-000000000001",
+        schoolId: "a1b2c3d4-0000-4000-8000-0000000000aa",
+        schoolName: "Overcharged School",
+        stripeInvoiceId: "in_overcharged",
+        expectedMinor: 0,
+        chargedMinor: 3862,
+        refundMinor: 3862,
+        currency: "USD",
+        stripeRefundId: null,
+        status: "needs_review",
+        lastError: "card network unavailable",
+        detectedAt: "2026-11-14T17:41:00.000Z",
+      },
+    ],
+  },
+  storageDuplicates: {
+    open: 1,
+    items: [
+      {
+        id: "11111111-1111-4111-8111-111111111111",
+        schoolId: SCHOOL_ID,
+        schoolName: "Alpha Academy",
+        stripeSubscriptionId: "sub_duplicate_old",
+        keptStripeSubscriptionId: "sub_duplicate_new",
+        source: "checkout",
+        status: "pending",
+        attempts: 1,
+        refundAmountMinor: 1000,
+        refundCurrency: "USD",
+        stripeRefundId: null,
+        unrefundedMinor: 0,
+        lastError: null,
+        detectedAt: new Date(NOW).toISOString(),
+        resolvedAt: null,
+      },
+    ],
+  },
   storage: {
     available: true,
     lastRunAt: new Date(NOW - HOUR).toISOString(),
@@ -249,7 +291,15 @@ describe("HealthPage", () => {
     expect(screen.getByText("run-storage-quota-reconciliation")).toBeTruthy();
     expect(screen.getAllByText("Alpha Academy").length).toBeGreaterThan(0);
     expect(screen.getByText(/Google Play webhook failures/)).toBeTruthy();
+    expect(screen.getByText("Duplicate storage subscriptions (1 open)")).toBeTruthy();
+    expect(screen.getByText("sub_duplicate_old")).toBeTruthy();
+    expect(screen.getByText("Kept: sub_duplicate_new")).toBeTruthy();
+    expect(screen.getByText("Storage charged more than confirmed (1 need review)")).toBeTruthy();
+    expect(screen.getByText("Charged $38.62 instead of $0.00")).toBeTruthy();
+    expect(screen.getByText("in_overcharged")).toBeTruthy();
+    expect(screen.getByText("Canceling and refunding (attempt 1)")).toBeTruthy();
     expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
+    expect(screen.getByText("Stripe: Sandbox (test cards, no real money)")).toBeTruthy();
   });
 });
 

@@ -320,13 +320,15 @@ const EXPECTED_MUTATING_ROUTES = [
   // EVALUATION_SCORE_CREATE/DELETE.
   "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
   "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
-  // Learning materials (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
-  // catalog data with no cross-user row-level permission.
+  // Learning materials (ST-102). Guarded by requirePermission(): upload and confirm by
+  // MATERIAL_CREATE, edit and retry by MATERIAL_UPDATE, AI visibility by MATERIAL_MANAGE_AI, delete
+  // by MATERIAL_DELETE; the service then narrows a teacher to the classes they teach.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  "POST /api/academics/materials/{materialId}/retry",
   // Generic object storage gateway (SAD §22). Authorized per content class by requirePermissionIn()
   // in the handler — the required permission arrives in the request body, so the mount-time
   // requirePermission() form cannot see it. Exempted below on that basis.
@@ -503,11 +505,16 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/withdraw",
   "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/void",
   "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
+  "PUT /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
+  "DELETE /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
+  "PUT /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link",
+  "DELETE /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link",
   "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payments",
   "POST /api/platform/schools/{schoolId}/license-payments/{paymentId}/void",
   "POST /api/platform/schools/{schoolId}/license-payments/upload-url",
   "POST /api/platform/schools/{schoolId}/license-receipts/{receiptId}/match",
   "POST /api/school/license/quotes/{quoteId}/accept",
+  "POST /api/school/license/quotes/{quoteId}/decline",
   "POST /api/school/license/invoices/{invoiceId}/receipts",
   // The license console's catalog (session 4): features and tiers are global, audited in the
   // operator's home school.
@@ -516,6 +523,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "PUT /api/platform/tiers/{planId}",
   // Manual grants (000211): platform:manage, web channel (modules/platform/grants-routes.ts).
   "POST /api/platform/schools/{schoolId}/grants",
+  "POST /api/platform/schools/{schoolId}/storage-subscription/invoices/{invoiceId}/refund",
   "POST /api/platform/schools/{schoolId}/grants/{grantId}/revoke",
   // School-defined student and parent records (modules/records/routes.ts): the template editor
   // (recordTemplate:manage), filling records in and documents (studentRecord:update), and the
@@ -622,13 +630,8 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Academic years, terms, class enrolments and exams are NOT exempt: RLS fences them to the
   // school but not to a role, so without TIMETABLE_MANAGE any signed-in student or parent could
   // roll the year over (archiving every enrolment) or delete an exam.
-  // Learning materials (ST-106) — storage-triggered upload flow, authorized by
-  // signed upload URL and row ownership, not by the permission guard.
-  "POST /api/academics/materials/upload",
-  "POST /api/academics/materials/{materialId}/confirm",
-  "PATCH /api/academics/materials/{materialId}",
-  "PATCH /api/academics/materials/{materialId}/ai-visible",
-  "DELETE /api/academics/materials/{materialId}",
+  // Learning materials are NOT exempt either: RLS lets everyone who can read a class (its enrolled
+  // students and their parents included) see its materials, and nothing in RLS stops them writing.
   // In-app inbox (ST-142) — personal per-user read state; the caller's own rows only. RLS
   // (`user_id = app.current_user_id()`) is the fence, so the bearer identity is sufficient
   // authorization — same rationale as the session-lifecycle routes above.

@@ -12,7 +12,7 @@ import { setTenantScope } from "../../db/tenant-tx";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { licenseError } from "./context";
-import { AUDIENCES, readLicense } from "./service";
+import { AUDIENCES, readLicense, refuseUnofferedAudiences, termsOf } from "./service";
 
 import type { LicenseActor } from "./context";
 import type { Audience, LicenseRecord } from "./service";
@@ -509,6 +509,13 @@ export async function priceQuote(
   if (!includeFamilyPlus && audiences.parent.seats > 0) {
     throw licenseError(422, ERROR_CODES.LICENSE_TIER_INVALID, actor.locale);
   }
+  // Nothing new for an audience whose features are not built. Re-pricing a draft is new terms;
+  // more seats on, or an extension of, a license in force keeps what it already holds.
+  refuseUnofferedAudiences(
+    { includeFamilyPlus, ...audiences },
+    terms.kind === "new" || !license ? null : termsOf(license),
+    actor,
+  );
 
   const planIds = AUDIENCES.map((a) => audiences[a].planId).filter((id): id is string =>
     Boolean(id),

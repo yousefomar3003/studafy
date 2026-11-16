@@ -2,7 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../../design/kit/kit.dart';
 import '../../application/teacher_providers.dart';
 import 'teacher_section_card.dart';
 
@@ -19,6 +19,7 @@ class TeacherGradingQueueCard extends ConsumerWidget {
     return TeacherSectionCard(
       titleKey: 'teacher.home.grading.title',
       icon: Icons.rate_review_outlined,
+      accent: AppAccent.amber,
       trailing: pending.maybeWhen(
         data: (list) => list.isEmpty ? null : _CountBadge(count: list.length),
         orElse: () => null,
@@ -40,8 +41,9 @@ class TeacherGradingQueueCard extends ConsumerWidget {
             'teacher.home.grading.count'.tr(
               namedArgs: {'count': '${list.length}'},
             ),
-            style: textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+            style: textTheme.bodyLarge?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w500,
             ),
           );
         },
@@ -57,24 +59,6 @@ class _CountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.space8,
-        vertical: AppSpacing.space4,
-      ),
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(9999),
-      ),
-      child: Text(
-        '$count',
-        style: textTheme.labelMedium?.copyWith(
-          color: colorScheme.onPrimaryContainer,
-        ),
-      ),
-    );
+    return AppStatusPill(label: '$count', tone: AppTone.warning);
   }
 }

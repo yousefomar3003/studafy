@@ -177,6 +177,16 @@ async function invoice(
       )
       RETURNING id::text AS id
     `;
+    // Every invoice is paid in instalments (000221): one, with the invoice's own id, as the migration
+    // gives every invoice issued before them.
+    await tx`
+      INSERT INTO app.license_invoice_instalments (
+        id, school_id, invoice_id, position, amount_minor, paid_minor, due_date, status, overdue_at
+      ) VALUES (
+        ${row!.id}::uuid, ${schoolId}::uuid, ${row!.id}::uuid, 1, ${total}, ${paid},
+        ${options.dueDate}::date, ${status === "issued" ? "due" : status}, ${options.overdueAt ?? null}
+      )
+    `;
     return row!.id;
   });
 }
@@ -547,5 +557,79 @@ describe("usage period start", () => {
   test("the period is the first of the month in UTC", () => {
     expect(monthStart(new Date("2026-11-30T23:59:59Z"))).toBe("2026-11-01");
     expect(monthStart(new Date("2027-01-01T00:00:00Z"))).toBe("2027-01-01");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+
+describe("instalments (000221)", () => {
+  jobTest("each unpaid instalment goes overdue and is reminded of on its own", async () => {
+    const schoolId = await school("Instalment School");
+    const orgAdmin = await user(schoolId, "ORG_ADMIN");
+    const now = new Date();
+    const lic = await license(schoolId, {
+      startsAt: new Date(now.getTime() - 40 * DAY),
+      endsAt: new Date(now.getTime() + 200 * DAY),
+    });
+    const yesterday = new Date(now.getTime() - DAY).toISOString().slice(0, 10);
+    const later = new Date(now.getTime() + 30 * DAY).toISOString().slice(0, 10);
+    // Two monthly instalments of 1000.00: the first is late, the second not yet due.
+    const id = await invoice(schoolId, lic, { dueDate: yesterday, total: 200_000 });
+    const second = crypto.randomUUID();
+    await admin(schoolId, async (tx) => {
+      await tx`
+        UPDATE app.license_invoice_instalments SET amount_minor = 100_000
+        WHERE school_id = ${schoolId}::uuid AND invoice_id = ${id}::uuid
+      `;
+      await tx`
+        INSERT INTO app.license_invoice_instalments (
+          id, school_id, invoice_id, position, amount_minor, due_date, status
+        ) VALUES (${second}::uuid, ${schoolId}::uuid, ${id}::uuid, 2, 100_000, ${later}::date, 'due')
+      `;
+    });
+
+    await runLicenseLifecycle(db!, now, silentLogger, [schoolId]);
+    const marked = await admin(
+      schoolId,
+      (tx) => tx<{ position: number; overdue: boolean }[]>`
+        SELECT position, overdue_at IS NOT NULL AS overdue FROM app.license_invoice_instalments
+        WHERE school_id = ${schoolId}::uuid AND invoice_id = ${id}::uuid ORDER BY position
+      `,
+    );
+    expect(marked.map((row) => [row.position, row.overdue])).toEqual([
+      [1, true],
+      [2, false],
+    ]);
+
+    const sent = await runLicenseReminders(db!, now, silentLogger, [schoolId]);
+    expect(sent.reminders).toMatchObject({ invoice_due: 0, invoice_overdue: 1 });
+    const [notice] = await notifications(schoolId, orgAdmin);
+    expect(notice).toMatchObject({ type: "LICENSE_INVOICE_OVERDUE" });
+    expect(notice!.body).toContain("Balance: 1000.00 USD");
+    expect((await runLicenseReminders(db!, now, silentLogger, [schoolId])).reminders).toMatchObject(
+      {
+        invoice_overdue: 0,
+      },
+    );
+  });
+
+  jobTest("an invoice whose instalments do not add up cannot be stored", async () => {
+    const schoolId = await school();
+    const now = new Date();
+    const lic = await license(schoolId, {
+      startsAt: new Date(now.getTime() - DAY),
+      endsAt: new Date(now.getTime() + 200 * DAY),
+    });
+    const id = await invoice(schoolId, lic, { dueDate: now.toISOString().slice(0, 10) });
+    const failure = await admin(schoolId, async (tx) => {
+      await tx`
+        UPDATE app.license_invoice_instalments SET amount_minor = 1
+        WHERE school_id = ${schoolId}::uuid AND invoice_id = ${id}::uuid
+      `;
+    }).then(
+      () => null,
+      (error: unknown) => error,
+    );
+    expect(String(failure)).toContain("is not whole");
   });
 });

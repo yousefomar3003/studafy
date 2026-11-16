@@ -18,10 +18,16 @@ What runs when:
 - **api, web**: always on (`min_machines_running = 1`). A cold start would land on a person's
   request, and the web machine is 256 MB (about $2 a month).
 - **workers**: always on; they poll their queues.
-- **scanner**: on demand. The workers' first connection to its Flycast address starts it, and fly's
-  proxy stops it again a few minutes after the last scan. The scan worker waits up to two minutes
-  for clamd to answer before it streams a file (`CLAMD_STARTUP_WAIT_MS`), so a cold start (about
-  30 s) delays a scan, never fails it.
+- **scanner**: on demand. The first connection to its Flycast address starts it, and fly's proxy
+  stops it again a few minutes after the last one. The scan worker waits up to two minutes for clamd
+  to answer before it streams a file (`CLAMD_STARTUP_WAIT_MS`), so a cold start (about 30 s) delays
+  a scan, never fails it. To hide most of that wait, the API knocks on the scanner when a material
+  upload starts: one short connection that sends clamd's `zPING`, unawaited, at most once every 30 s
+  per API machine, errors ignored (`apps/api/src/lib/scanner-warmup.ts`). The machine then boots
+  while the teacher's file uploads. This is set by `CLAMAV_HOST = "studafy-core-scanner.flycast"`
+  and `CLAMAV_PORT = "3310"` in api.toml's `[env]` (plain settings, not secrets; the API needs no
+  new secret). Without `CLAMAV_HOST` the API skips the knock and nothing else changes. The scanner
+  still scales to zero: a knock keeps it up only for fly's usual idle period.
 - **realtime**: scaled to zero while live updates are deferred. Nothing reaches it: the web build
   and the mobile builds leave the socket off (`VITE_REALTIME_ENABLED`, `REALTIME_ENABLED`) and the
   API has no `/ws` route while `REALTIME_FLY_APP` is unset. To turn realtime on, set
@@ -137,6 +143,7 @@ run would overwrite. The workflow checks the required ones up front and names an
 | `GOOGLE_PLAY_SERVICE_ACCOUNT`, `GOOGLE_PLAY_RTDN_TOKEN`                                                                           | ✓   | `GOOGLE_PLAY_SERVICE_ACCOUNT`    |                            |         |
 | `FIREBASE_SERVICE_ACCOUNT`                                                                                                        |     | ✓                                |                            |         |
 | Optional: `GOOGLE_OAUTH_CLIENT_ID`/`_SECRET`, `MICROSOFT_OAUTH_CLIENT_ID`/`_SECRET`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | ✓   | `STRIPE_SECRET_KEY`              |                            |         |
+| Optional: `OTEL_EXPORTER_OTLP_ENDPOINT`, `OTEL_EXPORTER_OTLP_HEADERS` (traces to Axiom, see Observability)                        | ✓   | ✓                                | ✓                          |         |
 
 Build-time values for the web app come from the environment's **variables**: `VITE_TURNSTILE_SITE_KEY`,
 `VITE_SENTRY_DSN`, `SENTRY_ORG`, `SENTRY_PROJECT` (and the `SENTRY_AUTH_TOKEN` secret, for source maps).
@@ -159,6 +166,24 @@ fly ssh console -a studafy-core-api -C "sh -c 'cd /app && bun bootstrap.ts --ema
 
 Open the printed link and sign in with Google or Microsoft as that address. Production's first
 operator was created this way on 2026-11-10.
+
+## Observability
+
+Errors go to Sentry (`SENTRY_DSN`, project `studafy-server` in the `studafy-limited` org). Logs and
+traces go to Axiom, in the organisation's EU Central edge deployment
+(`https://eu-central-1.aws.edge.axiom.co`), replacing CloudWatch and Tempo from the AWS stack.
+
+- **Logs → dataset `studafy-logs`.** The services write pino-format JSON lines to stdout; the
+  `studafy-log-shipper` app (`log-shipper.toml`) reads the organisation's log stream and posts every
+  line to Axiom. It sits outside the deploy workflow; its config and secrets are in that file.
+- **Traces → dataset `studafy-traces`.** api, workers and realtime export OTLP/HTTP when
+  `OTEL_EXPORTER_OTLP_ENDPOINT` is set (`packages/observability/src/tracing.ts`). The OTel exporter
+  reads its auth from `OTEL_EXPORTER_OTLP_HEADERS` itself, so both are `prod` secrets:
+  - `OTEL_EXPORTER_OTLP_ENDPOINT` = `https://eu-central-1.aws.edge.axiom.co`
+  - `OTEL_EXPORTER_OTLP_HEADERS` = `Authorization=Bearer <xaat token, ingest on studafy-traces only>,X-Axiom-Dataset=studafy-traces`
+
+  Leave both unset to turn tracing off. Axiom's EU edge accepts API tokens (`xaat-…`) only, not
+  personal tokens.
 
 ## File storage (R2) CORS
 

@@ -171,6 +171,11 @@ export const platformOperatorListSchema = z
 export const systemHealthSchema = z
   .object({
     generatedAt: isoDateTime,
+    stripeMode: z.enum(["live", "sandbox", "not_configured"]).openapi({
+      description:
+        "The Stripe account mode payments run in: live (real money), sandbox (test cards only) or " +
+        "not_configured.",
+    }),
     windowDays: z.number().int(),
     jobs: z.object({
       available: z.boolean(),
@@ -239,6 +244,69 @@ export const systemHealthSchema = z
       complaints: z.number().int(),
       deliveries: z.number().int(),
     }),
+    storageDuplicates: z
+      .object({
+        open: z.number().int().openapi({
+          description: "Duplicate storage subscriptions not yet canceled and refunded.",
+        }),
+        items: z.array(
+          z.object({
+            id: z.string().uuid(),
+            schoolId: z.string().uuid(),
+            schoolName: z.string(),
+            stripeSubscriptionId: z.string().openapi({
+              description: "The subscription the school no longer keeps (canceled and refunded).",
+            }),
+            keptStripeSubscriptionId: z.string().nullable(),
+            source: z.enum(["checkout", "event"]).openapi({
+              description:
+                "checkout: a second completed checkout, resolved automatically. event: a second " +
+                "live subscription with no completed checkout, left for a person.",
+            }),
+            status: z.enum(["pending", "resolved", "needs_review"]),
+            attempts: z.number().int(),
+            refundAmountMinor: z.number().int().nullable(),
+            refundCurrency: z.string().nullable(),
+            stripeRefundId: z.string().nullable(),
+            unrefundedMinor: z.number().int().nullable(),
+            lastError: z.string().nullable(),
+            detectedAt: isoDateTime,
+            resolvedAt: isoDateTime.nullable(),
+          }),
+        ),
+      })
+      .openapi("PlatformStorageDuplicates", {
+        description:
+          "Schools charged for a second storage add-on (000219): every one not yet settled, and " +
+          "those settled in the last 30 days. Open ones first.",
+      }),
+    storageIncidents: z
+      .object({
+        open: z.number().int().openapi({
+          description: "Overcharges whose refund failed and need a person.",
+        }),
+        items: z.array(
+          z.object({
+            id: z.string().uuid(),
+            schoolId: z.string().uuid(),
+            schoolName: z.string(),
+            stripeInvoiceId: z.string(),
+            expectedMinor: z.number().int(),
+            chargedMinor: z.number().int(),
+            refundMinor: z.number().int(),
+            currency: z.string(),
+            stripeRefundId: z.string().nullable(),
+            status: z.enum(["refunded", "needs_review"]),
+            lastError: z.string().nullable(),
+            detectedAt: isoDateTime,
+          }),
+        ),
+      })
+      .openapi("PlatformStorageIncidents", {
+        description:
+          "Storage changes that charged more than the school confirmed (000224), the excess " +
+          "refunded automatically or left for a person. Open ones always, refunded ones for 30 days.",
+      }),
     storage: z.object({
       available: z.boolean(),
       lastRunAt: isoDateTime.nullable(),

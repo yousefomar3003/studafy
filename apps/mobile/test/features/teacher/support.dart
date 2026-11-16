@@ -166,6 +166,7 @@ Assignment assignmentFixture({
   required String classId,
   String title = 'Worksheet',
   String status = 'published',
+  num maxScore = 100,
 }) => Assignment.fromJson({
   'id': id,
   'school_id': 'school-1',
@@ -178,7 +179,7 @@ Assignment assignmentFixture({
   'available_from': null,
   'assigned_at': _t0,
   'due_at': _t0,
-  'max_score': 100,
+  'max_score': maxScore,
   'allow_late_submission': true,
   'attachments': <Object?>[],
   'kind': 'written',

@@ -372,6 +372,23 @@ export const ERROR_CODES = {
   STORAGE_ADDON_UNAVAILABLE: "STORAGE_ADDON_UNAVAILABLE",
   // The provider could not charge the tier change; nothing was changed.
   STORAGE_ADDON_PAYMENT_FAILED: "STORAGE_ADDON_PAYMENT_FAILED",
+  // A storage purchase for the school is already paid or being paid at the provider (its
+  // confirmation may still be on the way): a second checkout would charge twice.
+  STORAGE_ADDON_PURCHASE_PENDING: "STORAGE_ADDON_PURCHASE_PENDING",
+  // The amount the buyer confirmed for a tier change is no longer what it would cost (the preview is
+  // too old, or the subscription changed since): nothing was charged; preview it again.
+  STORAGE_ADDON_PRICE_CHANGED: "STORAGE_ADDON_PRICE_CHANGED",
+  // A change to the add-on is already scheduled for the next renewal: undo it before another.
+  STORAGE_ADDON_CHANGE_PENDING: "STORAGE_ADDON_CHANGE_PENDING",
+  // The add-on has a payment due or an unsettled amount from an earlier change: no change until it
+  // is settled, so what is shown and what is charged can never differ.
+  STORAGE_ADDON_UNSETTLED: "STORAGE_ADDON_UNSETTLED",
+  // No scheduled change to undo.
+  STORAGE_ADDON_NO_PENDING_CHANGE: "STORAGE_ADDON_NO_PENDING_CHANGE",
+  // The invoice is not one of this school's storage invoices, or has nothing left to refund.
+  STORAGE_ADDON_REFUND_INVALID: "STORAGE_ADDON_REFUND_INVALID",
+  // The card chosen to pay is not one of the school's saved cards.
+  STORAGE_ADDON_CARD_INVALID: "STORAGE_ADDON_CARD_INVALID",
 
   // Manual grants (db/migrations/000211): storage and tiers Studafy staff grant by hand.
   // No such grant in this school.
@@ -385,6 +402,9 @@ export const ERROR_CODES = {
   MATERIAL_NOT_FOUND: "MATERIAL_NOT_FOUND",
   MATERIAL_STORAGE_CONFIRM_FAILED: "MATERIAL_STORAGE_CONFIRM_FAILED",
   MATERIAL_INGEST_IN_PROGRESS: "MATERIAL_INGEST_IN_PROGRESS",
+  // The caller holds the material permission but neither teaches the material's class nor leads
+  // the school, so may not upload to it or change its materials.
+  MATERIAL_CLASS_FORBIDDEN: "MATERIAL_CLASS_FORBIDDEN",
   // The caller holds material:manageAi but neither teaches the class nor leads the school, so may
   // not change whether the class's materials are used with the AI study assistant (000196).
   CLASS_AI_MATERIALS_FORBIDDEN: "CLASS_AI_MATERIALS_FORBIDDEN",
@@ -484,8 +504,10 @@ export const ERROR_CODES = {
   // that audience (or, for parents, does not include Family+). LICENSE_SEAT_LIMIT_REACHED: every
   // purchased seat of that audience is assigned. LICENSE_SEATS_BELOW_ASSIGNED: a seat count cannot
   // drop below the seats already assigned. LICENSE_SEAT_NOT_ELIGIBLE: the person is not a member of
-  // the school in that audience.
+  // the school in that audience. LICENSE_AUDIENCE_NOT_OFFERED: seats, a tier or Family+ for an
+  // audience whose features are not built yet (LICENSABLE_AUDIENCES), so it is not for sale.
   LICENSE_NOT_FOUND: "LICENSE_NOT_FOUND",
+  LICENSE_AUDIENCE_NOT_OFFERED: "LICENSE_AUDIENCE_NOT_OFFERED",
   LICENSE_NONE: "LICENSE_NONE",
   LICENSE_INVALID_TRANSITION: "LICENSE_INVALID_TRANSITION",
   LICENSE_ALREADY_ACTIVE: "LICENSE_ALREADY_ACTIVE",
@@ -514,6 +536,15 @@ export const ERROR_CODES = {
   LICENSE_INVOICE_NOT_FOUND: "LICENSE_INVOICE_NOT_FOUND",
   LICENSE_INVOICE_NOT_PAYABLE: "LICENSE_INVOICE_NOT_PAYABLE",
   LICENSE_INVOICE_HAS_PAYMENTS: "LICENSE_INVOICE_HAS_PAYMENTS",
+  // The payment link pasted on an invoice is not an https link to an allowed provider host
+  // (LICENSE_PAYMENT_LINK_HOSTS), or is too long.
+  LICENSE_PAYMENT_LINK_INVALID: "LICENSE_PAYMENT_LINK_INVALID",
+  // A licence quote's payment schedule is not one that can be paid: a custom schedule whose amounts
+  // don't add up to the total, with dates out of order or in the past, too many instalments, or a
+  // due date moved past the next instalment's.
+  LICENSE_PAYMENT_SCHEDULE_INVALID: "LICENSE_PAYMENT_SCHEDULE_INVALID",
+  // No such instalment on this licence invoice.
+  LICENSE_INSTALMENT_NOT_FOUND: "LICENSE_INSTALMENT_NOT_FOUND",
   LICENSE_PAYMENT_NOT_FOUND: "LICENSE_PAYMENT_NOT_FOUND",
   LICENSE_PAYMENT_EXCEEDS_BALANCE: "LICENSE_PAYMENT_EXCEEDS_BALANCE",
   LICENSE_PAYMENT_VOIDED: "LICENSE_PAYMENT_VOIDED",

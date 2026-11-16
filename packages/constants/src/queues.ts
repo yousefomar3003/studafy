@@ -114,6 +114,9 @@ export const JOB_NAMES = {
   // deletions, lifecycle expirations, orphaned objects) that event-driven increments cannot see.
   // Carries no payload: the sweep reads every school's usage and the S3 bucket directly.
   RUN_STORAGE_QUOTA_RECONCILIATION: "run-storage-quota-reconciliation",
+  // Every 10 minutes: cancel and refund duplicate storage subscriptions (000219) the webhook
+  // pipeline retired when a school bought storage a second time. Carries no payload.
+  RUN_STORAGE_DUPLICATE_RESOLVER: "run-storage-duplicate-resolver",
   // Daily finance reconciliation. Scheduled job: asks apps/api to reconcile every school's
   // installment_cache against ERPNext (POST /api/finance/reconciliation/run, X-Api-Key) -- the API owns
   // the per-school ERPNext clients, so the worker only triggers it. Carries no payload.
@@ -209,6 +212,11 @@ export const JOB_NAMES = {
   // (global) to NULL in batches. app.audit_logs is append-only and keeps its addresses. Carries no
   // payload. Registered on the maintenance queue via Job Scheduler.
   PURGE_EXPIRED_IP_ADDRESSES: "purge-expired-ip-addresses",
+  // Scheduled deletion of materials that will never become available: an upload never confirmed
+  // after 24 hours, and a failed material left for 14 days. Their stored files are removed and the
+  // space released. Carries no payload. Registered on the maintenance queue via Job Scheduler
+  // (apps/workers/src/queues/maintenance/abandoned-material-sweep.ts).
+  PURGE_ABANDONED_MATERIALS: "purge-abandoned-materials",
   // Scheduled deletion of data past its fixed retention period (docs/modules/data-retention.md):
   // security events, sales inquiries, rejected school applications (and their proof file) and
   // in-app notifications after 12 months, data subject request export bundles 30 days after the

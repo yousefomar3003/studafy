@@ -77,6 +77,9 @@ const calculation = {
   prorateDays: null,
   includeFamilyPlus: false,
   audiences: [],
+  paymentPlan: "in_full",
+  schedulePreview: [{ position: 1, amountMinor: 0, dueDate: "2026-12-01" }],
+  scheduleErrors: [] as string[],
   breakdown: {
     currencyCode: "USD",
     months: 12,
@@ -126,6 +129,8 @@ const calculation = {
   },
 };
 
+let extraQuotes: Record<string, unknown>[] = [];
+
 const getMock = mock((path: string) => {
   if (path === "/api/platform/tiers") return Promise.resolve({ data: { tiers } });
   if (path === "/api/platform/schools/{schoolId}") {
@@ -135,7 +140,7 @@ const getMock = mock((path: string) => {
     return Promise.resolve({ data: { licenses } });
   }
   if (path === "/api/platform/schools/{schoolId}/license-quotes") {
-    return Promise.resolve({ data: { quotes: [quote] } });
+    return Promise.resolve({ data: { quotes: [quote, ...extraQuotes] } });
   }
   if (path === "/api/platform/schools") {
     return Promise.resolve({ data: { schools: [], total: 0 } });
@@ -293,6 +298,61 @@ describe("CalculatorPage", () => {
     expect(await screen.findByText("Quote saved as a draft.")).toBeTruthy();
   });
 
+  test("a custom payment schedule is priced, checked and saved with the quote", async () => {
+    await renderPage();
+    await chooseStudentSeats("80");
+    const save = (await screen.findByRole("button", {
+      name: "Save as draft quote",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Payment plan" }));
+    fireEvent.click(screen.getByRole("option", { name: "Custom schedule" }));
+    // Until every instalment has an amount and a date, nothing can be saved.
+    expect(
+      await screen.findByText("Give every instalment an amount above zero and a due date."),
+    ).toBeTruthy();
+    expect(save.disabled).toBe(true);
+
+    fireEvent.change(screen.getByLabelText("Instalment 1 amount (USD)"), {
+      target: { value: "2032" },
+    });
+    fireEvent.change(screen.getByLabelText("Instalment 1 due on"), {
+      target: { value: "2026-12-01" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Add an instalment" }));
+    fireEvent.change(screen.getByLabelText("Instalment 2 amount (USD)"), {
+      target: { value: "2032" },
+    });
+    fireEvent.change(screen.getByLabelText("Instalment 2 due on"), {
+      target: { value: "2027-03-01" },
+    });
+
+    await waitFor(() =>
+      expect(pricedBodies().at(-1)).toMatchObject({
+        paymentPlan: "custom",
+        paymentSchedule: [
+          { amountMinor: 203_200, dueDate: "2026-12-01" },
+          { amountMinor: 203_200, dueDate: "2027-03-01" },
+        ],
+      }),
+    );
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(
+        postMock.mock.calls.some(
+          ([path]) => path === "/api/platform/schools/{schoolId}/license-quotes",
+        ),
+      ).toBe(true),
+    );
+    const [, init] = postMock.mock.calls.find(
+      ([path]) => path === "/api/platform/schools/{schoolId}/license-quotes",
+    )!;
+    expect(init!.body).toMatchObject({ paymentPlan: "custom" });
+    expect((init!.body!.paymentSchedule as unknown[]).length).toBe(2);
+  });
+
   test("lists the school's quotes with their status and sends a draft", async () => {
     await renderPage();
     const quotes = await screen.findByRole("region", { name: "Quotes" });
@@ -309,6 +369,39 @@ describe("CalculatorPage", () => {
       ).toBe(true),
     );
     expect(await screen.findByText("Quote sent to the school.")).toBeTruthy();
+  });
+
+  test("a quote the school declined shows it, with the school's reason, and no actions", async () => {
+    extraQuotes = [
+      {
+        ...quote,
+        id: "q-declined",
+        status: "declined",
+        totalMinor: 99_900,
+        declinedAt: "2026-11-14T10:00:00.000Z",
+        declineReason: "We only need 10 seats",
+      },
+      {
+        ...quote,
+        id: "q-declined-silent",
+        status: "declined",
+        totalMinor: 88_800,
+        declinedAt: "2026-11-14T11:00:00.000Z",
+        declineReason: null,
+      },
+    ];
+    try {
+      await renderPage();
+      const quotes = await screen.findByRole("region", { name: "Quotes" });
+      const row = (await within(quotes).findByText("$999.00")).closest("tr")!;
+      expect(within(row).getByText("Declined by the school")).toBeTruthy();
+      expect(within(row).getByText("Reason: “We only need 10 seats”")).toBeTruthy();
+      expect(within(row).queryByRole("button")).toBeNull();
+      const silent = within(quotes).getByText("$888.00").closest("tr")!;
+      expect(within(silent).getByText("No reason given.")).toBeTruthy();
+    } finally {
+      extraQuotes = [];
+    }
   });
 
   test("re-prices a draft license in place, starting from its terms", async () => {
@@ -346,5 +439,30 @@ describe("CalculatorPage", () => {
       startsAt: "2026-12-01T00:00:00.000Z",
       student: { planId: STUDENT_TIER, seats: 150 },
     });
+  });
+  test("prices a school's AI request from the inbox: students only, prefilled", async () => {
+    await renderPage(`?schoolId=${SCHOOL_ID}&studentSeats=120&studentTier=${STUDENT_TIER}`);
+
+    expect(((await screen.findByLabelText("Students seats")) as HTMLInputElement).value).toBe(
+      "120",
+    );
+    // Teacher seats and Family+ are not sold yet: no row and no checkbox for them.
+    expect(screen.queryByLabelText("Teachers seats")).toBeNull();
+    expect(screen.queryByLabelText("Parents (Family+) seats")).toBeNull();
+    expect(screen.queryByLabelText(/Include Family\+/)).toBeNull();
+
+    await waitFor(() =>
+      expect(
+        pricedBodies().some(
+          (body) =>
+            (body.student as { seats: number } | undefined)?.seats === 120 &&
+            (body.student as { planId: string }).planId === STUDENT_TIER,
+        ),
+      ).toBe(true),
+    );
+    const body = pricedBodies().at(-1)!;
+    expect(body.teacher).toBeUndefined();
+    expect(body.parent).toBeUndefined();
+    expect(body.includeFamilyPlus).toBe(false);
   });
 });

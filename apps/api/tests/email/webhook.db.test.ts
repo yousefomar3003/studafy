@@ -1,9 +1,8 @@
-import { createHmac } from "node:crypto";
-
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 import { createApp } from "../../src/app";
+import { signResendPayload } from "../../src/email/resend-signature";
 import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { createSchool, createTestDatabase, integrationEnabled, migrateDatabase } from "../harness";
@@ -14,7 +13,7 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import type { Sql } from "postgres";
 
 /**
- * Database-backed Resend email-event webhook tests (deliverability R-08).
+ * Database-backed Resend webhook tests (deliverability R-08).
  *
  * The pre-DB suite (src/email/webhook.test.ts) covers everything that returns before the handler
  * touches Postgres. This suite exercises the three mutations the happy path makes — the ledger insert
@@ -24,7 +23,7 @@ import type { Sql } from "postgres";
  * ST-072 revocation suite. Gated on TEST_DATABASE_URL; runs in the `api-integration` job.
  */
 
-const RESEND_SECRET = `whsec_${Buffer.from("resend-webhook-db-key").toString("base64")}`;
+const SECRET = `whsec_${Buffer.from("studafy-webhook-db-test-key-0001").toString("base64")}`;
 
 const integrationTest = test.skipIf(!integrationEnabled);
 
@@ -48,7 +47,7 @@ beforeAll(async () => {
   schoolB = await createSchool(sql);
 
   previousSecret = process.env.RESEND_WEBHOOK_SECRET;
-  process.env.RESEND_WEBHOOK_SECRET = RESEND_SECRET;
+  process.env.RESEND_WEBHOOK_SECRET = SECRET;
 
   app = createApp({
     isReady: () => true,
@@ -83,45 +82,47 @@ async function seedDelivery(params: {
   `;
 }
 
-/** The body Resend posts for a bounce; `bounceType` is Resend's own data.bounce.type. */
-function resendBounce(messageId: string, recipients: string[], bounceType = "Permanent"): string {
-  return JSON.stringify({
+/** The event Resend posts for a bounce. */
+function resendBounce(emailId: string, recipients: string[], bounceType = "Permanent") {
+  return {
     type: "email.bounced",
-    created_at: "2026-07-31T00:00:00.000Z",
-    data: { email_id: messageId, to: recipients, bounce: { type: bounceType } },
-  });
+    created_at: "2026-11-09T19:44:00.000Z",
+    data: {
+      email_id: emailId,
+      to: recipients,
+      bounce: { type: bounceType, subType: "General", message: "mailbox does not exist" },
+    },
+  };
 }
 
-function resendComplaint(messageId: string, recipients: string[]): string {
-  return JSON.stringify({
+function resendComplaint(emailId: string, recipients: string[]) {
+  return {
     type: "email.complained",
-    created_at: "2026-07-31T00:00:00.000Z",
-    data: { email_id: messageId, to: recipients },
-  });
+    created_at: "2026-11-09T19:44:00.000Z",
+    data: { email_id: emailId, to: recipients },
+  };
 }
 
-function resendDelivery(messageId: string, recipients: string[]): string {
-  return JSON.stringify({
+function resendDelivery(emailId: string, recipients: string[]) {
+  return {
     type: "email.delivered",
-    created_at: "2026-07-31T00:00:00.000Z",
-    data: { email_id: messageId, to: recipients },
-  });
+    created_at: "2026-11-09T19:44:00.000Z",
+    data: { email_id: emailId, to: recipients },
+  };
 }
 
-/** POST a body signed the Svix way with RESEND_SECRET, as Resend delivers it. */
-const post = (body: string, svixId = `msg_${crypto.randomUUID()}`) => {
+/** Sign and post an event exactly as Resend would, with a fresh svix-id per attempt. */
+const post = (event: object) => {
+  const body = JSON.stringify(event);
+  const id = `msg_${crypto.randomUUID()}`;
   const timestamp = String(Math.floor(Date.now() / 1000));
-  const key = Buffer.from(RESEND_SECRET.slice(6), "base64");
-  const signature = createHmac("sha256", key)
-    .update(`${svixId}.${timestamp}.${body}`)
-    .digest("base64");
   return app.request("/email/webhooks/resend", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "svix-id": svixId,
+      "svix-id": id,
       "svix-timestamp": timestamp,
-      "svix-signature": `v1,${signature}`,
+      "svix-signature": signResendPayload(SECRET, id, timestamp, body),
     },
     body,
   });
@@ -131,7 +132,7 @@ describe("bounce handling", () => {
   integrationTest(
     "records a permanent bounce, suppresses every bounced recipient (normalized), and transitions the deliveries",
     async () => {
-      const messageId = "amq-bounce-permanent-1";
+      const messageId = "re-bounce-permanent-1";
       // Mixed case and surrounding whitespace prove the suppression list stores the normalized address.
       const bounced = ["Parent1@Example.com ", "second-parent@example.com"];
       for (const recipient of bounced) {
@@ -178,7 +179,7 @@ describe("bounce handling", () => {
   );
 
   integrationTest("records a transient bounce without suppressing the address", async () => {
-    const messageId = "amq-bounce-transient-1";
+    const messageId = "re-bounce-transient-1";
     const recipient = "parent2@example.com";
     await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
 
@@ -207,7 +208,7 @@ describe("complaint handling", () => {
   integrationTest(
     "suppresses complained addresses and transitions the delivery to complained",
     async () => {
-      const messageId = "amq-complaint-1";
+      const messageId = "re-complaint-1";
       const recipient = "parent3@example.com";
       await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
 
@@ -235,7 +236,7 @@ describe("complaint handling", () => {
 
 describe("delivery handling", () => {
   integrationTest("records a delivery event without suppressing or transitioning", async () => {
-    const messageId = "amq-delivery-1";
+    const messageId = "re-delivery-1";
     const recipient = "parent4@example.com";
     await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
 
@@ -257,13 +258,13 @@ describe("delivery handling", () => {
 
 describe("deduplication", () => {
   integrationTest("absorbs a redelivery without re-recording or re-processing", async () => {
-    const messageId = "amq-dedup-1";
+    const messageId = "re-dedup-1";
     const recipient = "parent5@example.com";
     await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
 
-    const body = resendBounce(messageId, [recipient]);
-    const first = await post(body, "msg_dedup_1");
-    const redelivery = await post(body, "msg_dedup_1");
+    const event = resendBounce(messageId, [recipient]);
+    const first = await post(event);
+    const redelivery = await post(event);
 
     expect(first.status).toBe(200);
     expect(redelivery.status).toBe(200);
@@ -289,7 +290,7 @@ describe("delivery transitions", () => {
   integrationTest(
     "transitions only landed 'sent' rows and never walks a terminal row backwards",
     async () => {
-      const messageId = "amq-partial-1";
+      const messageId = "re-partial-1";
       const recipient = "parent6@example.com";
       await seedDelivery({ schoolId: schoolA.id, recipient, messageId, status: "sent" });
       await seedDelivery({
@@ -326,7 +327,7 @@ describe("delivery transitions", () => {
   );
 
   integrationTest("transitions deliveries in every school holding the message", async () => {
-    const messageId = "amq-cross-tenant-1";
+    const messageId = "re-cross-tenant-1";
     const recipient = "cross@example.com";
     await seedDelivery({ schoolId: schoolA.id, recipient, messageId });
     await seedDelivery({ schoolId: schoolB.id, recipient, messageId });

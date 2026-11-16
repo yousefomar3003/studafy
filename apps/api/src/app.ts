@@ -175,6 +175,7 @@ import {
   schoolCheckoutRoutes,
   aiCheckoutRoutes,
   storageAddonRoutes,
+  platformStorageRoutes,
   webhookRoutes,
   planRoutes,
   adminSubscriptionRoutes,
@@ -204,6 +205,7 @@ import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
 
 import type { Database } from "./db";
+import type { ScannerWarmup } from "./lib/scanner-warmup";
 import type { SecurityEventSink } from "./lib/security/securityEventSink";
 import type { StorageService } from "./lib/storage";
 import type { UploadScanEnqueuer } from "./lib/storage/upload-scan";
@@ -341,6 +343,12 @@ export interface AppOptions {
    */
   uploadScanEnqueuer?: UploadScanEnqueuer | null;
   /**
+   * Wakes the scaled-to-zero malware scanner when a material upload starts, so it boots while the
+   * file uploads (lib/scanner-warmup.ts). Fire-and-forget. Absent (tests, local dev without
+   * CLAMAV_HOST): no warm-up.
+   */
+  scannerWarmup?: ScannerWarmup | null;
+  /**
    * Stripe payment provider for subscription billing.
    *
    * Nullable: when absent, checkout, portal, and webhook routes still register (so the OpenAPI
@@ -419,6 +427,7 @@ export function createApp({
   rateLimitDisabled = false,
   storage = null,
   uploadScanEnqueuer,
+  scannerWarmup = null,
   stripeProvider = null,
   tapProvider = null,
   tapCountries = new Set(),
@@ -1308,7 +1317,7 @@ export function createApp({
   // the same way: when absent, confirm still flips the material to 'scanning' but no scan job is
   // enqueued.
   if (database) {
-    app.route("/", materialRoutes(database, storage, redis ?? null));
+    app.route("/", materialRoutes(database, storage, redis ?? null, { scannerWarmup }));
     // Per-class "use this class's materials with the AI study assistant" setting (000196). Turning
     // it back on enqueues ingestion, so it takes Redis the same optional way.
     app.route("/", classAiMaterialsRoutes(database, redis ?? null));
@@ -1351,6 +1360,8 @@ export function createApp({
     app.route("/", aiCheckoutRoutes(database, paymentProviders));
     // The school's paid storage add-on (000205), sold to principals and admins.
     app.route("/", storageAddonRoutes(database, paymentProviders));
+    // The same add-on in the platform console: its invoices, incidents and refunds.
+    app.route("/", platformStorageRoutes(database, paymentProviders));
     // The same add-on bought in the mobile app through Apple / Google, and their notifications.
     app.route("/", aiStoreRoutes(database, storeBilling, logger));
     // The event sink is threaded in so a rejected webhook signature rides the same ST-082 alerting
@@ -1391,7 +1402,15 @@ export function createApp({
     app.route("/", platformUserSupportRoutes({ database, denylist: jtiDenylist, logger }));
     // Console operations: Studafy-wide banners, the staff activity log, system health and the
     // cross-school flag view; plus GET /api/platform-banners, which every signed-in client reads.
-    app.route("/", platformOpsRoutes({ database, redis: redis ?? null, flags }));
+    app.route(
+      "/",
+      platformOpsRoutes({
+        database,
+        redis: redis ?? null,
+        flags,
+        stripeLivemode: stripeProvider?.livemode,
+      }),
+    );
     // The console's school sign-up review queue; approval creates and provisions the school.
     app.route(
       "/",

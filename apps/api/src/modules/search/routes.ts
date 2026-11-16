@@ -8,6 +8,7 @@ import { requireAuth } from "../../middleware/authContext";
 import { hasPermission } from "../../middleware/authz";
 import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
+import { materialVisibilityFor } from "../academics/material-service";
 
 import { globalSearchResultSchema, searchQuerySchema } from "./schemas";
 import { globalSearch, SEARCH_TYPES } from "./service";
@@ -35,7 +36,7 @@ function tenantFrom(c: Context<AppEnv>) {
  *   students        GET /api/students                  student:read
  *   users           GET /api/users                     user:read
  *   invoices        GET /api/finance/invoices          billing:read
- *   materials       GET /api/academics/materials       material:read
+ *   materials       GET /api/academics/materials       material:read (non-staff: `ready` only)
  *   classes, sections, subjects, grade_levels, academic_years, terms, rooms
  *                   GET /api/academics/*               none: any school member (only writes are
  *                                                      gated); RLS narrows classes and subjects
@@ -90,6 +91,8 @@ export function searchAccessFor(roles: readonly Role[]): GlobalSearchAccess {
     sections,
     familiesOwnOnly: !canManageFamilies && !billingRead,
     evaluationsOwnSharedOnly: roles.includes("INSTRUCTOR"),
+    // The same rule as the materials list: only school staff see unfinished or failed materials.
+    materialsReadyOnly: materialVisibilityFor(roles).readyOnly,
   };
 }
 

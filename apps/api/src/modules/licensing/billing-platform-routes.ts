@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
+import { customScheduleErrors } from "@studafy/license-pricing";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { withSystemTx } from "../../db/tenant-tx";
@@ -31,6 +32,7 @@ import {
   pendingReceiptListSchema,
   platformInvoiceListQuerySchema,
   platformInvoiceListSchema,
+  platformInstalmentParamsSchema,
   platformInvoiceParamsSchema,
   platformPaymentParamsSchema,
   platformQuoteParamsSchema,
@@ -48,6 +50,7 @@ import {
   recordPaymentBodySchema,
   uploadUrlBodySchema,
   uploadUrlSchema,
+  paymentLinkBodySchema,
   voidBodySchema,
   voidPaymentResultSchema,
 } from "./billing-schemas";
@@ -55,6 +58,7 @@ import { licenseError } from "./context";
 import {
   activateEarly,
   financeTotals,
+  integerSetting,
   listInvoicesAcrossSchools,
   listPendingReceipts,
   matchReceipt,
@@ -63,6 +67,8 @@ import {
   readReceipt,
   recordPayment,
   requireInvoiceDetail,
+  setInvoicePaymentLink,
+  utcDate,
   voidInvoice,
   voidPayment,
   writeBankDetails,
@@ -74,6 +80,7 @@ import {
   listQuotes,
   replaceQuote,
   requireQuote,
+  scheduleFor,
   sendQuote,
   withdrawQuote,
 } from "./quotes";
@@ -85,6 +92,11 @@ import type { LicensingDeps } from "./service";
 import type { StorageService } from "../../lib/storage";
 import type { SupportedLocale } from "../../middleware/locale";
 import type { AppEnv } from "../../middleware/requestId";
+import type {
+  CustomInstalmentInput,
+  CustomScheduleError,
+  PaymentPlan,
+} from "@studafy/license-pricing";
 import type { Context } from "hono";
 
 /**
@@ -389,6 +401,81 @@ const voidInvoiceRoute = createRoute({
   ),
 });
 
+const putPaymentLinkRoute = createRoute({
+  method: "put",
+  path: "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
+  operationId: "platformSetLicenseInvoicePaymentLink",
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "Set or replace the online payment link of the instalment to pay now",
+  description:
+    'A payment link made in Revolut, shown to the school as "Pay online" beside the bank ' +
+    "details while the invoice is unpaid. Studafy does not contact Revolut: record the payment as " +
+    "usual once it arrives. 422 LICENSE_PAYMENT_LINK_INVALID for anything but an https link on an " +
+    "allowed host; 409 LICENSE_INVOICE_NOT_PAYABLE when the invoice is paid or void.",
+  request: {
+    params: platformInvoiceParamsSchema,
+    body: { required: true, content: { "application/json": { schema: paymentLinkBodySchema } } },
+  },
+  responses: standardResponses(
+    { 200: { description: "The invoice", schema: invoiceSchema } },
+    [400, 401, 403, 404, 409, 422],
+  ),
+});
+
+const deletePaymentLinkRoute = createRoute({
+  method: "delete",
+  path: "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
+  operationId: "platformClearLicenseInvoicePaymentLink",
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "Remove the invoice's online payment link",
+  description: "The school then sees only the bank details. 409 when the invoice is paid or void.",
+  request: { params: platformInvoiceParamsSchema },
+  responses: standardResponses(
+    { 200: { description: "The invoice", schema: invoiceSchema } },
+    [401, 403, 404, 409],
+  ),
+});
+
+const putInstalmentPaymentLinkRoute = createRoute({
+  method: "put",
+  path: "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link",
+  operationId: "platformSetLicenseInstalmentPaymentLink",
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "Set or replace one instalment's online payment link",
+  description:
+    'A Revolut payment link for this instalment\'s amount; the school sees "Pay online" for the ' +
+    "instalment it has to pay now. Record the payment as usual once it arrives. 422 " +
+    "LICENSE_PAYMENT_LINK_INVALID for anything but an https link on an allowed host; 409 " +
+    "LICENSE_INVOICE_NOT_PAYABLE when the invoice is paid or void or the instalment is paid; 404 " +
+    "LICENSE_INSTALMENT_NOT_FOUND.",
+  request: {
+    params: platformInstalmentParamsSchema,
+    body: { required: true, content: { "application/json": { schema: paymentLinkBodySchema } } },
+  },
+  responses: standardResponses(
+    { 200: { description: "The invoice", schema: invoiceSchema } },
+    [400, 401, 403, 404, 409, 422],
+  ),
+});
+
+const deleteInstalmentPaymentLinkRoute = createRoute({
+  method: "delete",
+  path: "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link",
+  operationId: "platformClearLicenseInstalmentPaymentLink",
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "Remove one instalment's online payment link",
+  description: "409 when the invoice is paid or void or the instalment is paid.",
+  request: { params: platformInstalmentParamsSchema },
+  responses: standardResponses(
+    { 200: { description: "The invoice", schema: invoiceSchema } },
+    [401, 403, 404, 409],
+  ),
+});
+
 const activateEarlyRoute = createRoute({
   method: "post",
   path: "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
@@ -514,6 +601,46 @@ const receiptFileRoute = createRoute({
 // ---------------------------------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------------------------------
+
+/**
+ * The instalments the calculator's terms would be invoiced in if accepted today, and what is wrong
+ * with a custom schedule (empty when it can be saved) -- reported, not refused, so the console can
+ * show it while the super admin types.
+ */
+function schedulePreviewFor(
+  priced: PricedQuote,
+  plan: PaymentPlan | undefined,
+  custom: CustomInstalmentInput[] | null,
+  dueDays: number,
+) {
+  const paymentPlan = plan ?? "in_full";
+  const totalMinor = priced.pricing.totalMinor;
+  const today = utcDate(new Date());
+  const scheduleErrors: (CustomScheduleError | "in_past")[] =
+    paymentPlan === "custom" && totalMinor > 0
+      ? [
+          ...customScheduleErrors(totalMinor, custom ?? []),
+          ...((custom ?? []).some((instalment) => instalment.dueDate < today)
+            ? (["in_past"] as const)
+            : []),
+        ]
+      : [];
+  const schedulePreview =
+    scheduleErrors.length > 0
+      ? []
+      : scheduleFor(
+          {
+            totalMinor,
+            months: priced.months,
+            startsAt: priced.startsAt.toISOString(),
+            paymentPlan,
+            paymentSchedule: custom,
+          },
+          today,
+          dueDays,
+        );
+  return { paymentPlan, schedulePreview, scheduleErrors };
+}
 
 function platformActor(c: Context<AppEnv>): LicenseActor {
   const auth = requireAuth(c);
@@ -684,6 +811,14 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
     auditAction("update", "license_invoices"),
   );
   routes.use(
+    "/api/platform/schools/:schoolId/license-invoices/:invoiceId/payment-link",
+    auditAction("update", "license_invoice_instalments"),
+  );
+  routes.use(
+    "/api/platform/schools/:schoolId/license-invoices/:invoiceId/instalments/:instalmentId/payment-link",
+    auditAction("update", "license_invoice_instalments"),
+  );
+  routes.use(
     "/api/platform/schools/:schoolId/license-invoices/:invoiceId/payments",
     auditAction("insert", "license_payments"),
   );
@@ -744,7 +879,16 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
         priceQuote(tx, terms, actor, { withCredits: false }),
       );
     }
-    return c.json(calculationView(priced), 200);
+    const dueDays = await withSystemTx(deps.database, (tx) =>
+      integerSetting(tx, "license.invoice_due_days", 30),
+    );
+    return c.json(
+      {
+        ...calculationView(priced),
+        ...schedulePreviewFor(priced, body.paymentPlan, body.paymentSchedule ?? null, dueDays),
+      },
+      200,
+    );
   });
 
   routes.openapi(listInvoicesRoute, async (c) => {
@@ -861,6 +1005,52 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
     const actor = platformActor(c);
     const { result } = await change(deps, schoolId, actor, async (tx) => ({
       result: await voidInvoice(tx, schoolId, invoiceId, reason, actor),
+      versions: new Map(),
+      pending: [],
+    }));
+    return c.json(result, 200);
+  });
+
+  routes.openapi(putPaymentLinkRoute, async (c) => {
+    const { schoolId, invoiceId } = c.req.valid("param");
+    const { url } = c.req.valid("json");
+    const actor = platformActor(c);
+    const { result } = await change(deps, schoolId, actor, async (tx) => ({
+      result: await setInvoicePaymentLink(tx, schoolId, invoiceId, url.trim(), actor),
+      versions: new Map(),
+      pending: [],
+    }));
+    return c.json(result, 200);
+  });
+
+  routes.openapi(deletePaymentLinkRoute, async (c) => {
+    const { schoolId, invoiceId } = c.req.valid("param");
+    const actor = platformActor(c);
+    const { result } = await change(deps, schoolId, actor, async (tx) => ({
+      result: await setInvoicePaymentLink(tx, schoolId, invoiceId, null, actor),
+      versions: new Map(),
+      pending: [],
+    }));
+    return c.json(result, 200);
+  });
+
+  routes.openapi(putInstalmentPaymentLinkRoute, async (c) => {
+    const { schoolId, invoiceId, instalmentId } = c.req.valid("param");
+    const { url } = c.req.valid("json");
+    const actor = platformActor(c);
+    const { result } = await change(deps, schoolId, actor, async (tx) => ({
+      result: await setInvoicePaymentLink(tx, schoolId, invoiceId, url.trim(), actor, instalmentId),
+      versions: new Map(),
+      pending: [],
+    }));
+    return c.json(result, 200);
+  });
+
+  routes.openapi(deleteInstalmentPaymentLinkRoute, async (c) => {
+    const { schoolId, invoiceId, instalmentId } = c.req.valid("param");
+    const actor = platformActor(c);
+    const { result } = await change(deps, schoolId, actor, async (tx) => ({
+      result: await setInvoicePaymentLink(tx, schoolId, invoiceId, null, actor, instalmentId),
       versions: new Map(),
       pending: [],
     }));

@@ -2,6 +2,7 @@ import { Button, DataGrid } from "@studafy/ui";
 import { Link } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { useMoney } from "../licensing/format";
 import { PlatformPageHeader } from "../PlatformNav";
 
 import { useSystemHealthQuery } from "./queries";
@@ -17,6 +18,8 @@ type ScheduledRow = PlatformSystemHealth["jobs"]["scheduled"][number];
 type StorageRow = PlatformSystemHealth["storage"]["schools"][number];
 type DeadLetterRow = PlatformSystemHealth["notificationDeadLetters"]["bySchool"][number];
 type WebhookFailureRow = PlatformSystemHealth["webhooks"]["recentFailures"][number];
+type StorageDuplicateRow = PlatformSystemHealth["storageDuplicates"]["items"][number];
+type StorageIncidentRow = PlatformSystemHealth["storageIncidents"]["items"][number];
 
 const KIB = 1024;
 
@@ -36,6 +39,7 @@ export default function HealthPage() {
   const { t } = useTranslation();
   const { formatDate, formatNumber } = useFormatters();
   const { data, isPending, isError, isFetching, refetch } = useSystemHealthQuery();
+  const money = useMoney();
 
   const when = (iso: string | null) =>
     iso ? formatDate(new Date(iso), { dateStyle: "medium", timeStyle: "short" }) : "—";
@@ -149,6 +153,123 @@ export default function HealthPage() {
     },
   ];
 
+  const duplicateColumns: DataGridColumn<StorageDuplicateRow>[] = [
+    {
+      id: "school",
+      header: t("platform.health.columns.school"),
+      renderCell: (row) => (
+        <Link to={`/portal/platform/schools/${row.schoolId}`}>{row.schoolName}</Link>
+      ),
+    },
+    {
+      id: "status",
+      header: t("platform.health.columns.duplicateStatus"),
+      renderCell: (row) => (
+        <span className="platform-pill" data-status={row.status}>
+          {t(`platform.health.duplicateStatus.${row.status}`)}
+        </span>
+      ),
+    },
+    {
+      id: "subscription",
+      header: t("platform.health.columns.duplicateSubscription"),
+      renderCell: (row) => (
+        <span className="platform-cell-stack">
+          <code>{row.stripeSubscriptionId}</code>
+          {row.keptStripeSubscriptionId ? (
+            <span className="platform-muted">
+              {t("platform.health.duplicateKept", { id: row.keptStripeSubscriptionId })}
+            </span>
+          ) : null}
+        </span>
+      ),
+    },
+    {
+      id: "refund",
+      header: t("platform.health.columns.refund"),
+      renderCell: (row) => {
+        if (row.refundAmountMinor === null || row.refundCurrency === null) return "—";
+        const refunded = money(row.refundAmountMinor, row.refundCurrency);
+        return row.unrefundedMinor ? (
+          <span className="platform-cell-stack">
+            <span>{refunded}</span>
+            <span className="platform-muted">
+              {t("platform.health.duplicateUnrefunded", {
+                amount: money(row.unrefundedMinor, row.refundCurrency),
+              })}
+            </span>
+          </span>
+        ) : (
+          refunded
+        );
+      },
+    },
+    {
+      id: "detected",
+      header: t("platform.health.columns.detected"),
+      renderCell: (row) => when(row.detectedAt),
+    },
+    {
+      id: "note",
+      header: t("platform.health.columns.note"),
+      renderCell: (row) =>
+        row.status === "needs_review"
+          ? t(
+              row.source === "event"
+                ? "platform.health.duplicateReviewEvent"
+                : "platform.health.duplicateReviewFailed",
+            ) + (row.lastError ? ` (${row.lastError})` : "")
+          : row.status === "pending"
+            ? t("platform.health.duplicatePending", { attempts: row.attempts })
+            : t("platform.health.duplicateResolved", { when: when(row.resolvedAt) }),
+    },
+  ];
+
+  const incidentColumns: DataGridColumn<StorageIncidentRow>[] = [
+    {
+      id: "school",
+      header: t("platform.health.columns.school"),
+      renderCell: (row) => (
+        <Link to={`/portal/platform/schools/${row.schoolId}`}>{row.schoolName}</Link>
+      ),
+    },
+    {
+      id: "status",
+      header: t("platform.health.columns.incidentStatus"),
+      renderCell: (row) => (
+        <span className="platform-pill" data-status={row.status}>
+          {t(`platform.health.incidentStatus.${row.status}`)}
+        </span>
+      ),
+    },
+    {
+      id: "amounts",
+      header: t("platform.health.columns.incidentAmounts"),
+      renderCell: (row) => (
+        <span className="platform-cell-stack">
+          <span>
+            {t("platform.health.incidentNote", {
+              charged: money(row.chargedMinor, row.currency),
+              expected: money(row.expectedMinor, row.currency),
+            })}
+          </span>
+          <code className="platform-muted">{row.stripeInvoiceId}</code>
+          {row.lastError ? <span className="platform-muted">{row.lastError}</span> : null}
+        </span>
+      ),
+    },
+    {
+      id: "refund",
+      header: t("platform.health.columns.incidentRefund"),
+      renderCell: (row) => money(row.refundMinor, row.currency),
+    },
+    {
+      id: "detected",
+      header: t("platform.health.columns.detected"),
+      renderCell: (row) => when(row.detectedAt),
+    },
+  ];
+
   const webhookColumns: DataGridColumn<WebhookFailureRow>[] = [
     {
       id: "event",
@@ -226,6 +347,11 @@ export default function HealthPage() {
               days: data.windowDays,
             })}
           </p>
+          <p data-testid="health-stripe-mode">
+            <span className="platform-pill" data-status={data.stripeMode}>
+              {t(`platform.health.stripeMode.${data.stripeMode}`)}
+            </span>
+          </p>
 
           <section aria-labelledby="health-jobs">
             <h2 id="health-jobs">{t("platform.health.jobsHeading")}</h2>
@@ -266,6 +392,36 @@ export default function HealthPage() {
               getRowId={(row) => row.schoolId}
               getRowLabel={(row) => row.schoolName}
               empty={t("platform.health.none")}
+            />
+          </section>
+
+          <section aria-labelledby="health-storage-duplicates">
+            <h2 id="health-storage-duplicates">
+              {t("platform.health.duplicatesHeading", { count: data.storageDuplicates.open })}
+            </h2>
+            <p className="platform-muted">{t("platform.health.duplicatesHelp")}</p>
+            <DataGrid
+              caption={t("platform.health.duplicatesCaption")}
+              columns={duplicateColumns}
+              rows={data.storageDuplicates.items}
+              getRowId={(row) => row.id}
+              getRowLabel={(row) => row.schoolName}
+              empty={t("platform.health.noDuplicates")}
+            />
+          </section>
+
+          <section aria-labelledby="health-storage-incidents">
+            <h2 id="health-storage-incidents">
+              {t("platform.health.incidentsHeading", { count: data.storageIncidents.open })}
+            </h2>
+            <p className="platform-muted">{t("platform.health.incidentsHelp")}</p>
+            <DataGrid
+              caption={t("platform.health.incidentsCaption")}
+              columns={incidentColumns}
+              rows={data.storageIncidents.items}
+              getRowId={(row) => row.id}
+              getRowLabel={(row) => row.schoolName}
+              empty={t("platform.health.noIncidents")}
             />
           </section>
 

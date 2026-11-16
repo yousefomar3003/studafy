@@ -409,6 +409,11 @@ export interface GlobalSearchAccess {
   familiesOwnOnly: boolean;
   /** GET /api/evaluations for an INSTRUCTOR: only their own evaluations shared with them. */
   evaluationsOwnSharedOnly: boolean;
+  /**
+   * GET /api/academics/materials for a caller who is not school staff (a student): only `ready`
+   * materials, never one still uploading, scanning or processing, or one that failed or was blocked.
+   */
+  materialsReadyOnly: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -636,9 +641,12 @@ interface RawMaterialRow {
   rank: number;
 }
 
-/** app.materials: role_scope_visibility (can_read_class(class_id)); 'english' -- titles are prose. */
+/**
+ * app.materials: role_scope_visibility (can_read_class(class_id)); 'english' -- titles are prose.
+ * A non-staff caller sees only `ready` materials, as on the list endpoint.
+ */
 const materialQuery: SectionQuery<RawMaterialRow> = (
-  { tx, schoolId, terms },
+  { tx, schoolId, terms, access },
   _mode,
   limit,
   offset,
@@ -651,6 +659,8 @@ const materialQuery: SectionQuery<RawMaterialRow> = (
     CROSS JOIN LATERAL (
       SELECT * FROM app.materials x
       WHERE x.id = c.id AND x.school_id = ${schoolId}::uuid AND x.search_tsv @@ q.query
+        AND (NOT ${access.materialsReadyOnly}::boolean
+             OR x.ingest_status = 'ready'::app.material_ingest_status)
       OFFSET 0
     ) m
     ORDER BY rank DESC, m.title, m.id

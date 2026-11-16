@@ -147,3 +147,18 @@
     box-shadow: none;
   }
 }
+
+/* The calculator's custom payment schedule (docs/adr/0021). */
+.licensing-schedule-editor {
+  display: grid;
+  gap: var(--space-12);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.licensing-errors {
+  margin: 0;
+  padding-inline-start: var(--space-24);
+  color: var(--color-danger);
+}

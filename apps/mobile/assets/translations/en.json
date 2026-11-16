@@ -432,6 +432,15 @@
     "unknownClass": "Class",
     "error": "Couldn't load materials for this class.",
     "empty": "No materials yet.",
+    "weeks": {
+      "week": "Week {number}",
+      "unscheduled": "Unscheduled",
+      "thisWeek": "This week",
+      "count": {
+        "one": "1 material",
+        "other": "{} materials"
+      }
+    },
     "status": {
       "pendingScan": "Pending scan",
       "scanning": "Scanning",
@@ -1399,7 +1408,17 @@
         "upload": "Upload material",
         "edit": "Edit material",
         "empty": "No materials yet.",
-        "loadError": "Could not load materials."
+        "emptyHint": "Upload notes, worksheets or slides for this class. Students see each one once it's ready.",
+        "loadError": "Could not load materials.",
+        "retry": "Retry",
+        "retried": "Checking the file again.",
+        "retryError": "Couldn't retry this material. Try again.",
+        "retryFileMissing": "This file is no longer stored. Delete it and upload it again.",
+        "delete": "Delete",
+        "deleteTitle": "Delete this material?",
+        "deleteBody": "\"{title}\" will be removed for everyone in this class, and its storage freed.",
+        "deleteError": "Couldn't delete this material. Try again.",
+        "cancel": "Cancel"
       },
       "aiMaterials": {
         "title": "Use this class's materials with the AI study assistant",
@@ -1419,6 +1438,10 @@
         "details": "Instructions (optional)",
         "points": "Points",
         "pointsInvalid": "Enter valid points.",
+        "pointsHint": "Out of how many points?",
+        "pointsRequired": "Enter how many points this assignment is out of.",
+        "pointsTooHigh": "Points can't be more than 10,000.",
+        "pointsDecimals": "Use at most two decimal places.",
         "dueDate": "Due date",
         "lateAllowed": "Allow late submissions",
         "status": "Status",
@@ -1437,6 +1460,10 @@
         "cameraDenied": "Camera access is off. Turn it on in Settings > Studafy > Camera to take a photo.",
         "cameraError": "Could not open the camera.",
         "fileRequired": "Choose a file or take a photo.",
+        "week": "Week",
+        "weekRequired": "Choose the week this material is for.",
+        "day": "Day",
+        "dayRequired": "Choose the day this material is for.",
         "uploading": "Uploading…",
         "save": "Save changes"
       },
@@ -1506,6 +1533,7 @@
         "labelHint": "e.g. Midterm, Homework 3",
         "labelRequired": "Give the assessment a name.",
         "maxScoreField": "Max score",
+        "maxScoreHint": "Out of how many points?",
         "weightField": "Weight",
         "positiveNumber": "Enter a number above 0.",
         "submit": "Add assessment",

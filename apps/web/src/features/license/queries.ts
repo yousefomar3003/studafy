@@ -1,3 +1,4 @@
+import { isLicensableAudience } from "@studafy/constants";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
 import { api } from "../../lib/api";
@@ -35,6 +36,19 @@ export const SCHOOL_LICENSE_KEY = ["school-license"] as const;
 
 /** Audiences in the order every license screen lists them. */
 export const AUDIENCES: readonly LicenseAudience[] = ["student", "teacher", "parent"];
+
+/**
+ * The audiences a license screen lists: those a license sells today (`LICENSABLE_AUDIENCES`, only
+ * students until teacher and parent features are built), plus any this license already holds seats
+ * in, so a license from before the rule still shows everything it has.
+ */
+export function shownAudiences(license: SchoolLicense | null | undefined): LicenseAudience[] {
+  return AUDIENCES.filter((audience) => {
+    if (isLicensableAudience(audience)) return true;
+    const held = license?.audiences.find((row) => row.audience === audience)?.purchased ?? 0;
+    return held > 0 && (audience !== "parent" || license?.includeFamilyPlus === true);
+  });
+}
 
 /** "Expiring soon" and "almost full", for the banners and the dashboard tile. */
 export const EXPIRING_WITHIN_DAYS = 30;

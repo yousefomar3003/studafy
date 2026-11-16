@@ -1,9 +1,10 @@
 import { ApiError } from "@studafy/api-client";
-import { PERMISSIONS } from "@studafy/constants";
+import { isAllowedLicensePaymentLink, PERMISSIONS } from "@studafy/constants";
 import { Button, Input, Table, useToast } from "@studafy/ui";
 import { useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 
+import { LinkButton } from "../../components/LinkButton";
 import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { useMoney } from "../platform/licensing/format";
@@ -11,6 +12,7 @@ import { useMoney } from "../platform/licensing/format";
 import { InvoiceStatusPill, PaymentsTable } from "./InvoicesPage";
 import { LicenseHeader } from "./LicenseHeader";
 import { receiptFileUrl, useUploadReceipt } from "./mutations";
+import { PaymentSchedule } from "./PaymentSchedule";
 import { useInvoiceQuery } from "./queries";
 
 import type { InvoiceDetail, Receipt } from "./queries";
@@ -22,8 +24,9 @@ const RECEIPT_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 const RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
 
 /**
- * One license invoice (`/portal/license/invoices/:invoiceId`): its lines, due date and balance; the
- * bank details and the payment reference to write on the transfer (with a copy button); the receipts
+ * One license invoice (`/portal/license/invoices/:invoiceId`): its lines, due date and balance; a
+ * "Pay online" button when Studafy added a payment link (Revolut); the bank details and the payment
+ * reference to write on the transfer (with a copy button); the receipts
  * the school uploaded and whether Studafy has matched each to a payment; and the payments recorded.
  * `license:manage` uploads a transfer receipt.
  */
@@ -57,6 +60,7 @@ export default function InvoiceDetailPage() {
         <>
           <InvoiceSummary invoice={data} />
           <InvoiceLines invoice={data} />
+          {data.instalments.length > 1 ? <InvoiceSchedule invoice={data} /> : null}
           {data.status !== "void" && data.status !== "paid" ? <HowToPay invoice={data} /> : null}
           <section className="license-section license-no-print" aria-labelledby="invoice-receipts">
             <h2 id="invoice-receipts">{t("schoolLicense.invoice.receiptsTitle")}</h2>
@@ -142,11 +146,41 @@ function InvoiceLines({ invoice }: { invoice: InvoiceDetail }) {
   );
 }
 
+/** When each instalment is due and what is paid of it, for an invoice paid monthly or in parts. */
+function InvoiceSchedule({ invoice }: { invoice: InvoiceDetail }) {
+  const { t } = useTranslation();
+  const title = t("schoolLicense.schedule.title");
+  return (
+    <section className="license-section" aria-labelledby="invoice-schedule">
+      <h2 id="invoice-schedule">{title}</h2>
+      <p className="license-muted">
+        {t(`schoolLicense.schedule.plan.${invoice.paymentPlan}`, {
+          count: invoice.instalments.length,
+        })}
+      </p>
+      <PaymentSchedule
+        rows={invoice.instalments}
+        currencyCode={invoice.currencyCode}
+        minorUnit={invoice.minorUnit}
+        caption={title}
+      />
+    </section>
+  );
+}
+
 function HowToPay({ invoice }: { invoice: InvoiceDetail }) {
   const { t } = useTranslation();
   const { show } = useToast();
   const money = useMoney();
+  const { formatDate } = useFormatters();
   const bank = invoice.bankDetails;
+  // The instalment to pay now; the invoice's payment link is this instalment's.
+  const current = invoice.instalments.find((instalment) => instalment.current);
+  // Re-checked here as well as by the API: only an https link to an allowed host is ever a button.
+  const payLink =
+    invoice.paymentLink && isAllowedLicensePaymentLink(invoice.paymentLink)
+      ? invoice.paymentLink
+      : null;
 
   async function copy() {
     try {
@@ -161,10 +195,28 @@ function HowToPay({ invoice }: { invoice: InvoiceDetail }) {
     <section className="license-section" aria-labelledby="invoice-pay">
       <h2 id="invoice-pay">{t("schoolLicense.invoice.howToPay")}</h2>
       <p>
-        {t("schoolLicense.invoice.howToPayBody", {
-          amount: money(invoice.balanceMinor, invoice.currencyCode, invoice.minorUnit),
-        })}
+        {current && invoice.instalments.length > 1
+          ? t("schoolLicense.invoice.howToPayInstalment", {
+              amount: money(current.balanceMinor, invoice.currencyCode, invoice.minorUnit),
+              position: current.position,
+              count: invoice.instalments.length,
+              date: formatDate(new Date(`${current.dueDate}T00:00:00Z`), { dateStyle: "medium" }),
+              balance: money(invoice.balanceMinor, invoice.currencyCode, invoice.minorUnit),
+            })
+          : t("schoolLicense.invoice.howToPayBody", {
+              amount: money(invoice.balanceMinor, invoice.currencyCode, invoice.minorUnit),
+            })}
       </p>
+      {payLink ? (
+        <div className="license-pay-online license-no-print">
+          <LinkButton href={payLink} target="_blank" rel="noopener noreferrer" variant="primary">
+            {current && invoice.instalments.length > 1
+              ? t("schoolLicense.invoice.payInstalmentOnline", { position: current.position })
+              : t("schoolLicense.invoice.payOnline")}
+          </LinkButton>
+          <p className="license-muted">{t("schoolLicense.invoice.payOnlineHelp")}</p>
+        </div>
+      ) : null}
       <dl className="license-pay">
         <dt>{t("schoolLicense.invoice.reference")}</dt>
         <dd>

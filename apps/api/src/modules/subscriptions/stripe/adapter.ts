@@ -1,11 +1,13 @@
 import { createHash } from "node:crypto";
 
+import { stripeModeFromKey } from "@studafy/billing";
 import { ERROR_CODES } from "@studafy/constants";
 import Stripe from "stripe";
 
 import { PaymentProviderError } from "../ports/payment-provider";
 
 import type {
+  AddonPurchasesInFlight,
   ChangeSubscriptionPriceInput,
   ChangeSubscriptionPriceResult,
   CreateCheckoutSessionInput,
@@ -27,6 +29,14 @@ import type {
   SyncProductInput,
   SyncProductResult,
   ParsedWebhookEvent,
+  PreviewSubscriptionPriceChangeInput,
+  PreviewSubscriptionPriceChangeResult,
+  PaymentMethodSummary,
+  SavedPaymentMethod,
+  ScheduleSubscriptionPriceChangeInput,
+  ScheduleSubscriptionPriceChangeResult,
+  SubscriptionBillingSummary,
+  SubscriptionInvoiceSummary,
   LookupProductResult,
   LookupPriceResult,
   CreateBillingPortalSessionInput,
@@ -71,6 +81,32 @@ function catalogIdempotencyKey(
   return `studafy-sync-${kind}-${localId}-${digest}`;
 }
 
+/** Marks an invoice the API pays itself for an immediate storage change (webhooks leave it be). */
+export const STORAGE_CHANGE_INVOICE_PURPOSE = "storage_change";
+
+function idOf(value: string | { id: string } | null | undefined): string | null {
+  if (!value) return null;
+  return typeof value === "string" ? value : value.id;
+}
+
+/** Marks the Billing Portal configuration Studafy uses for card updates only. */
+const PAYMENT_METHOD_PORTAL_PURPOSE = "payment_method_only";
+
+function paymentMethodSummary(
+  method: string | Stripe.PaymentMethod | null | undefined,
+): PaymentMethodSummary | null {
+  if (!method || typeof method === "string") return null;
+  if (method.card) {
+    return {
+      brand: method.card.brand,
+      last4: method.card.last4,
+      expMonth: method.card.exp_month,
+      expYear: method.card.exp_year,
+    };
+  }
+  return { brand: method.type, last4: null, expMonth: null, expYear: null };
+}
+
 function isMissing(error: unknown): boolean {
   return (
     error instanceof Stripe.errors.StripeError &&
@@ -95,6 +131,9 @@ export class StripeAdapter implements PaymentProviderPort {
   private readonly stripe: Stripe;
   private readonly webhookSecret: string;
 
+  /** Live account (true) or Sandbox (false), from the key's prefix; undefined for a placeholder key. */
+  readonly livemode: boolean | undefined;
+
   constructor(options: StripeAdapterOptions) {
     this.stripe =
       options.client ??
@@ -102,15 +141,54 @@ export class StripeAdapter implements PaymentProviderPort {
         apiVersion: "2026-07-29.dahlia",
       });
     this.webhookSecret = options.webhookSecret;
+    const mode = stripeModeFromKey(options.secretKey);
+    this.livemode = mode === null ? undefined : mode === "live";
   }
 
   async createCustomer(input: CreateCustomerInput): Promise<CreateCustomerResult> {
-    const customer = await this.stripe.customers.create({
-      name: input.name,
-      email: input.email,
-      metadata: input.metadata,
-    });
+    const customer = await this.stripe.customers.create(
+      {
+        name: input.name,
+        email: input.email,
+        metadata: input.metadata,
+      },
+      input.idempotencyKey ? { idempotencyKey: input.idempotencyKey } : undefined,
+    );
     return { providerCustomerId: customer.id };
+  }
+
+  async retrieveCustomer(customerId: string): Promise<{ livemode: boolean } | null> {
+    try {
+      const customer = await this.stripe.customers.retrieve(customerId);
+      if (customer.deleted) return null;
+      return { livemode: customer.livemode };
+    } catch (error) {
+      if (isMissing(error)) return null;
+      throw error;
+    }
+  }
+
+  /**
+   * The oldest live (not deleted) customer this account holds for the school. Search can miss a
+   * customer made in the last minute; the create's idempotency key covers that window.
+   */
+  async findCustomerBySchoolId(schoolId: string): Promise<string | null> {
+    const found = await this.stripe.customers.search({
+      query: `metadata['school_id']:'${searchValue(schoolId)}'`,
+      limit: 100,
+    });
+    const oldest = [...found.data].sort((a, b) => a.created - b.created)[0];
+    return oldest?.id ?? null;
+  }
+
+  async retrieveSubscriptionMode(subscriptionId: string): Promise<{ livemode: boolean } | null> {
+    try {
+      const subscription = await this.stripe.subscriptions.retrieve(subscriptionId);
+      return { livemode: subscription.livemode };
+    } catch (error) {
+      if (isMissing(error)) return null;
+      throw error;
+    }
   }
 
   async createCheckoutSession(
@@ -480,15 +558,493 @@ export class StripeAdapter implements PaymentProviderPort {
   /**
    * Swap the subscription's one item to another price, prorated.
    *
-   * `chargeNow` invoices the difference immediately with `payment_behavior: "pending_if_incomplete"`:
-   * Stripe then applies the change only once that invoice is paid and otherwise reports it as a
-   * `pending_update`, so a declined card leaves the subscription exactly as it was. Without it the
-   * proration waits for the next regular invoice.
+   * With `chargeNow` the money moves only on the card the buyer chose, and only for the amount they
+   * confirmed; nothing stays changed unless that card pays it:
+   *
+   *  1. the price is swapped with `create_prorations` at the confirmed `proration_date`, which
+   *     invoices nothing and charges nothing by itself;
+   *  2. an invoice of exactly those prorations is created and finalized with `auto_advance: false`,
+   *     so Stripe makes no payment attempt of its own -- in particular not on the default card;
+   *  3. its amount is checked against `expectedAmountMinor`; a different amount is never charged;
+   *  4. it is paid with `paymentMethodId` (or the default when none is given), off-session.
+   *
+   * When 3 or 4 fails, the invoice is voided (its prorations go with it) and the subscription is
+   * put back on its old price with no proration: the customer is exactly where they were. Every
+   * call carries an idempotency key derived from the caller's, so a replay never charges twice.
+   * The invoice is marked `studafy_purpose: storage_change` so the webhook pipeline leaves its
+   * events alone: the outcome is applied here.
+   *
+   * Without `chargeNow` the proration waits for the next regular invoice.
    */
   async changeSubscriptionPrice(
     input: ChangeSubscriptionPriceInput,
   ): Promise<ChangeSubscriptionPriceResult> {
-    const subscription = await this.stripe.subscriptions.retrieve(input.providerSubscriptionId);
+    const { subscription, item } = await this.subscriptionItem(input.providerSubscriptionId);
+    const key = input.idempotencyKey;
+
+    if (!input.chargeNow) {
+      await this.stripe.subscriptions.update(
+        input.providerSubscriptionId,
+        {
+          items: [{ id: item.id, price: input.priceId }],
+          metadata: input.metadata,
+          proration_date: input.prorationDate,
+          proration_behavior: "create_prorations",
+        },
+        { idempotencyKey: key },
+      );
+      return { applied: true, invoice: null };
+    }
+
+    const customer =
+      typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+    const previousPrice = item.price.id;
+    const previousMetadata = { ...subscription.metadata };
+
+    await this.stripe.subscriptions.update(
+      input.providerSubscriptionId,
+      {
+        items: [{ id: item.id, price: input.priceId }],
+        metadata: input.metadata,
+        proration_date: input.prorationDate,
+        proration_behavior: "create_prorations",
+      },
+      { idempotencyKey: `${key}:update` },
+    );
+
+    const draft = await this.stripe.invoices.create(
+      {
+        customer,
+        subscription: input.providerSubscriptionId,
+        pending_invoice_items_behavior: "include",
+        auto_advance: false,
+        collection_method: "charge_automatically",
+        metadata: { studafy_purpose: STORAGE_CHANGE_INVOICE_PURPOSE },
+      },
+      { idempotencyKey: `${key}:invoice` },
+    );
+    const invoiceId = draft.id ?? "";
+    const finalized = await this.stripe.invoices.finalizeInvoice(
+      invoiceId,
+      { auto_advance: false },
+      { idempotencyKey: `${key}:finalize` },
+    );
+
+    const undo = async () => {
+      if (finalized.status === "open") {
+        await this.stripe.invoices.voidInvoice(invoiceId, {}, { idempotencyKey: `${key}:void` });
+      }
+      await this.stripe.subscriptions.update(
+        input.providerSubscriptionId,
+        {
+          items: [{ id: item.id, price: previousPrice }],
+          metadata: previousMetadata,
+          proration_behavior: "none",
+        },
+        { idempotencyKey: `${key}:revert` },
+      );
+    };
+
+    if (
+      input.expectedAmountMinor !== undefined &&
+      finalized.amount_due !== input.expectedAmountMinor
+    ) {
+      await undo();
+      return { applied: false, failure: "amount_changed", invoice: null };
+    }
+
+    let paid = finalized;
+    if (finalized.status === "open" && finalized.amount_due > 0) {
+      try {
+        paid = await this.stripe.invoices.pay(
+          invoiceId,
+          {
+            off_session: true,
+            ...(input.paymentMethodId ? { payment_method: input.paymentMethodId } : {}),
+          },
+          { idempotencyKey: `${key}:pay` },
+        );
+      } catch (error) {
+        if (!(error instanceof Stripe.errors.StripeError)) throw error;
+        // A timeout or a dropped connection says nothing about the payment: read what happened.
+        const after = await this.stripe.invoices.retrieve(invoiceId);
+        if (after.status === "paid") {
+          paid = after;
+        } else {
+          await undo();
+          return {
+            applied: false,
+            failure: "declined",
+            declineMessage: error.message,
+            invoice: null,
+          };
+        }
+      }
+    }
+
+    if (paid.status !== "paid") {
+      await undo();
+      return { applied: false, failure: "declined", invoice: null };
+    }
+
+    return {
+      applied: true,
+      invoice: {
+        id: invoiceId,
+        amountPaidMinor: paid.amount_paid,
+        currency: paid.currency.toUpperCase(),
+      },
+    };
+  }
+
+  async listPaymentMethods(input: {
+    customerId: string;
+    providerSubscriptionId: string | null;
+  }): Promise<SavedPaymentMethod[]> {
+    const customer = await this.stripe.customers.retrieve(input.customerId);
+    const customerDefault =
+      "deleted" in customer && customer.deleted
+        ? null
+        : idOf((customer as Stripe.Customer).invoice_settings?.default_payment_method);
+    let subscriptionDefault: string | null = null;
+    if (input.providerSubscriptionId) {
+      const subscription = await this.stripe.subscriptions.retrieve(input.providerSubscriptionId);
+      subscriptionDefault = idOf(subscription.default_payment_method);
+    }
+    const renewalCard = subscriptionDefault ?? customerDefault;
+
+    const methods: SavedPaymentMethod[] = [];
+    for await (const method of this.stripe.paymentMethods.list({
+      customer: input.customerId,
+      type: "card",
+      limit: 100,
+    })) {
+      const summary = paymentMethodSummary(method);
+      if (summary)
+        methods.push({ ...summary, id: method.id, isDefault: method.id === renewalCard });
+    }
+    // The renewal card first, then newest first as Stripe lists them.
+    return methods.sort((a, b) => Number(b.isDefault) - Number(a.isDefault));
+  }
+
+  /** Checkout in setup mode: the card is saved to the customer, nothing is charged. */
+  async createCardSetupSession(input: {
+    customerId: string;
+    successUrl: string;
+    cancelUrl: string;
+  }): Promise<CreateBillingPortalSessionResult> {
+    const session = await this.stripe.checkout.sessions.create({
+      mode: "setup",
+      customer: input.customerId,
+      payment_method_types: ["card"],
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+      metadata: { studafy_purpose: "storage_card_setup" },
+    });
+    if (!session.url) throw new Error("Stripe Checkout session returned no URL");
+    return { url: session.url };
+  }
+
+  async setSubscriptionPaymentMethod(input: {
+    providerSubscriptionId: string;
+    paymentMethodId: string;
+  }): Promise<void> {
+    await this.stripe.subscriptions.update(input.providerSubscriptionId, {
+      default_payment_method: input.paymentMethodId,
+    });
+  }
+
+  /**
+   * Hold a price change for the next renewal as a subscription schedule: the current phase runs to
+   * the end of the period at the current price, then a phase at the new price starts with no
+   * proration, and the schedule releases the subscription. Nothing is charged or credited now.
+   * A schedule the subscription already has is reused (the one Studafy made for an earlier change).
+   */
+  async scheduleSubscriptionPriceChange(
+    input: ScheduleSubscriptionPriceChangeInput,
+  ): Promise<ScheduleSubscriptionPriceChangeResult> {
+    const { subscription, item } = await this.subscriptionItem(input.providerSubscriptionId);
+    const existing =
+      typeof subscription.schedule === "string"
+        ? subscription.schedule
+        : (subscription.schedule?.id ?? null);
+
+    const schedule = existing
+      ? await this.stripe.subscriptionSchedules.retrieve(existing)
+      : await this.stripe.subscriptionSchedules.create(
+          { from_subscription: input.providerSubscriptionId },
+          { idempotencyKey: `${input.idempotencyKey}:schedule` },
+        );
+
+    const current = schedule.current_phase ?? schedule.phases[0];
+    const periodEnd = item.current_period_end;
+    if (!current || !periodEnd) {
+      throw new PaymentProviderError(
+        502,
+        ERROR_CODES.STRIPE_API_ERROR,
+        "Stripe subscription has no current period to schedule from",
+      );
+    }
+
+    await this.stripe.subscriptionSchedules.update(
+      schedule.id,
+      {
+        end_behavior: "release",
+        proration_behavior: "none",
+        phases: [
+          {
+            items: [{ price: item.price.id, quantity: item.quantity ?? 1 }],
+            start_date: current.start_date,
+            end_date: periodEnd,
+            proration_behavior: "none",
+          },
+          {
+            items: [{ price: input.priceId, quantity: 1 }],
+            metadata: { ...subscription.metadata, ...input.metadata },
+            proration_behavior: "none",
+          },
+        ],
+      },
+      { idempotencyKey: `${input.idempotencyKey}:phases` },
+    );
+
+    return { scheduleId: schedule.id, effectiveAt: new Date(periodEnd * 1000) };
+  }
+
+  async releaseSubscriptionSchedule(scheduleId: string): Promise<void> {
+    const schedule = await this.stripe.subscriptionSchedules.retrieve(scheduleId);
+    if (schedule.status !== "active" && schedule.status !== "not_started") return;
+    await this.stripe.subscriptionSchedules.release(scheduleId);
+  }
+
+  async countPendingInvoiceItems(customerId: string): Promise<{ count: number; netMinor: number }> {
+    let count = 0;
+    let netMinor = 0;
+    for await (const item of this.stripe.invoiceItems.list({
+      customer: customerId,
+      pending: true,
+      limit: 100,
+    })) {
+      count += 1;
+      netMinor += item.amount;
+    }
+    return { count, netMinor };
+  }
+
+  async describeSubscriptionBilling(
+    providerSubscriptionId: string,
+  ): Promise<SubscriptionBillingSummary> {
+    const subscription = await this.stripe.subscriptions.retrieve(providerSubscriptionId, {
+      expand: ["default_payment_method", "customer.invoice_settings.default_payment_method"],
+    });
+    const customer = subscription.customer;
+    const customerId = typeof customer === "string" ? customer : customer.id;
+    const customerDefault =
+      typeof customer === "object" && !("deleted" in customer && customer.deleted)
+        ? (customer as Stripe.Customer).invoice_settings?.default_payment_method
+        : null;
+    const method = paymentMethodSummary(subscription.default_payment_method ?? customerDefault);
+
+    const renews =
+      ["active", "trialing", "past_due"].includes(subscription.status) &&
+      !subscription.cancel_at_period_end &&
+      subscription.cancel_at === null;
+    let nextBill: SubscriptionBillingSummary["nextBill"] = null;
+    if (renews) {
+      const preview = await this.stripe.invoices.createPreview({
+        customer: customerId,
+        subscription: providerSubscriptionId,
+      });
+      const at =
+        preview.next_payment_attempt ?? subscription.items.data[0]?.current_period_end ?? null;
+      if (at) {
+        nextBill = {
+          amountMinor: preview.amount_due,
+          currency: preview.currency.toUpperCase(),
+          at: new Date(at * 1000),
+        };
+      }
+    }
+
+    const page = await this.stripe.invoices.list({
+      subscription: providerSubscriptionId,
+      limit: 24,
+    });
+    const invoices: SubscriptionInvoiceSummary[] = [];
+    for (const invoice of page.data) {
+      if (invoice.status === "draft") continue;
+      invoices.push({
+        id: invoice.id ?? "",
+        number: invoice.number ?? null,
+        status: invoice.status,
+        created: new Date(invoice.created * 1000),
+        amountDueMinor: invoice.amount_due,
+        amountPaidMinor: invoice.amount_paid,
+        amountRefundedMinor:
+          invoice.amount_paid > 0 && invoice.id ? await this.refundedOn(invoice.id) : 0,
+        currency: invoice.currency.toUpperCase(),
+        billingReason: invoice.billing_reason ?? null,
+        hostedInvoiceUrl: invoice.hosted_invoice_url ?? null,
+        invoicePdf: invoice.invoice_pdf ?? null,
+      });
+    }
+
+    return { paymentMethod: method, nextBill, invoices };
+  }
+
+  /** What has been refunded so far on the payment behind one invoice. */
+  private async refundedOn(invoiceId: string): Promise<number> {
+    const payments = await this.stripe.invoicePayments.list({
+      invoice: invoiceId,
+      status: "paid",
+      limit: 1,
+      expand: ["data.payment.payment_intent.latest_charge", "data.payment.charge"],
+    });
+    const payment = payments.data[0]?.payment;
+    const intent = payment?.payment_intent;
+    const intentCharge =
+      intent && typeof intent === "object" && intent.latest_charge ? intent.latest_charge : null;
+    const charge =
+      (intentCharge && typeof intentCharge === "object" ? intentCharge : null) ??
+      (payment?.charge && typeof payment.charge === "object" ? payment.charge : null);
+    return charge?.amount_refunded ?? 0;
+  }
+
+  /**
+   * The Billing Portal limited to replacing the card (and reading invoices): no plan changes and no
+   * cancellation in the portal, so Stripe and Studafy never disagree about the plan. The
+   * configuration is found by its metadata, or made once.
+   */
+  async createPaymentMethodPortalSession(input: {
+    customerId: string;
+    returnUrl: string;
+  }): Promise<CreateBillingPortalSessionResult> {
+    const configuration = await this.paymentMethodPortalConfiguration();
+    const session = await this.stripe.billingPortal.sessions.create({
+      customer: input.customerId,
+      return_url: input.returnUrl,
+      configuration,
+      flow_data: {
+        type: "payment_method_update",
+        after_completion: { type: "redirect", redirect: { return_url: input.returnUrl } },
+      },
+    });
+    return { url: session.url };
+  }
+
+  private portalConfigurationId: string | null = null;
+
+  private async paymentMethodPortalConfiguration(): Promise<string> {
+    if (this.portalConfigurationId) return this.portalConfigurationId;
+    for await (const configuration of this.stripe.billingPortal.configurations.list({
+      active: true,
+      limit: 100,
+    })) {
+      if (configuration.metadata?.studafy_purpose === PAYMENT_METHOD_PORTAL_PURPOSE) {
+        this.portalConfigurationId = configuration.id;
+        return configuration.id;
+      }
+    }
+    const created = await this.stripe.billingPortal.configurations.create(
+      {
+        metadata: { studafy_purpose: PAYMENT_METHOD_PORTAL_PURPOSE },
+        features: {
+          payment_method_update: { enabled: true },
+          invoice_history: { enabled: true },
+          customer_update: { enabled: false },
+          subscription_cancel: { enabled: false },
+          subscription_update: { enabled: false },
+        },
+      },
+      { idempotencyKey: `portal-configuration:${PAYMENT_METHOD_PORTAL_PURPOSE}` },
+    );
+    this.portalConfigurationId = created.id;
+    return created.id;
+  }
+
+  /**
+   * The invoice `changeSubscriptionPrice` would produce, from Stripe's own preview: with
+   * `always_invoice` that is the proration invoice charged at once; with `create_prorations` it is
+   * the next regular invoice, the credit for the unused part of the old price included.
+   */
+  async previewSubscriptionPriceChange(
+    input: PreviewSubscriptionPriceChangeInput,
+  ): Promise<PreviewSubscriptionPriceChangeResult> {
+    const { subscription, item } = await this.subscriptionItem(input.providerSubscriptionId);
+    const customer =
+      typeof subscription.customer === "string" ? subscription.customer : subscription.customer.id;
+
+    const preview = await this.stripe.invoices.createPreview({
+      customer,
+      subscription: input.providerSubscriptionId,
+      subscription_details: {
+        items: [{ id: item.id, price: input.priceId }],
+        proration_date: input.prorationDate,
+        proration_behavior: input.chargeNow ? "always_invoice" : "create_prorations",
+      },
+    });
+
+    return { amountDueMinor: preview.amount_due, currency: preview.currency.toUpperCase() };
+  }
+
+  /**
+   * Live subscriptions (including one still settling its first payment) and open checkouts of one
+   * add-on for the customer, read from Stripe itself: a checkout paid a moment ago has its
+   * subscription here before its webhook reaches Studafy.
+   */
+  async findAddonPurchasesInFlight(input: {
+    customerId: string;
+    addon: string;
+  }): Promise<AddonPurchasesInFlight> {
+    const liveStatuses = new Set([
+      "active",
+      "trialing",
+      "past_due",
+      "unpaid",
+      "incomplete",
+      "paused",
+    ]);
+    const liveSubscriptionIds: string[] = [];
+    for await (const subscription of this.stripe.subscriptions.list({
+      customer: input.customerId,
+      status: "all",
+      limit: 100,
+    })) {
+      if (subscription.metadata?.addon === input.addon && liveStatuses.has(subscription.status)) {
+        liveSubscriptionIds.push(subscription.id);
+      }
+    }
+
+    const openCheckoutSessionIds: string[] = [];
+    for await (const session of this.stripe.checkout.sessions.list({
+      customer: input.customerId,
+      status: "open",
+      limit: 100,
+    })) {
+      if (session.metadata?.addon === input.addon) openCheckoutSessionIds.push(session.id);
+    }
+
+    return { liveSubscriptionIds, openCheckoutSessionIds };
+  }
+
+  async expireCheckoutSession(sessionId: string): Promise<"expired" | "completed"> {
+    try {
+      await this.stripe.checkout.sessions.expire(sessionId);
+      return "expired";
+    } catch (error) {
+      // Only an open session can be expired: read what it became instead.
+      if (!(error instanceof Stripe.errors.StripeInvalidRequestError)) throw error;
+      const session = await this.stripe.checkout.sessions.retrieve(sessionId);
+      if (session.status === "complete") return "completed";
+      if (session.status === "expired") return "expired";
+      throw error;
+    }
+  }
+
+  private async subscriptionItem(
+    providerSubscriptionId: string,
+  ): Promise<{ subscription: Stripe.Subscription; item: Stripe.SubscriptionItem }> {
+    const subscription = await this.stripe.subscriptions.retrieve(providerSubscriptionId);
     const item = subscription.items.data[0];
     if (!item) {
       throw new PaymentProviderError(
@@ -497,16 +1053,7 @@ export class StripeAdapter implements PaymentProviderPort {
         "Stripe subscription has no item to change",
       );
     }
-
-    const updated = await this.stripe.subscriptions.update(input.providerSubscriptionId, {
-      items: [{ id: item.id, price: input.priceId }],
-      metadata: input.metadata,
-      ...(input.chargeNow
-        ? { proration_behavior: "always_invoice", payment_behavior: "pending_if_incomplete" }
-        : { proration_behavior: "create_prorations" }),
-    });
-
-    return { applied: updated.pending_update == null };
+    return { subscription, item };
   }
 
   async listInvoices(input: ListInvoicesInput): Promise<ListInvoicesResult> {

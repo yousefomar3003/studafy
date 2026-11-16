@@ -936,7 +936,44 @@
       "status": "Status (attempts)",
       "received": "Received",
       "used": "Storage used",
-      "orphans": "Leftover files"
+      "orphans": "Leftover files",
+      "duplicateStatus": "Status",
+      "duplicateSubscription": "Duplicate subscription",
+      "refund": "Refund",
+      "detected": "Found",
+      "note": "What happens",
+      "incidentStatus": "Status",
+      "incidentAmounts": "What happened",
+      "incidentRefund": "Refund"
+    },
+    "duplicatesHeading": "Duplicate storage subscriptions ({{count}} open)",
+    "duplicatesHelp": "A school charged for a second storage plan at the same time. The newest purchase is kept; the older subscription is canceled in Stripe and the unused part of its period refunded automatically.",
+    "duplicatesCaption": "Duplicate storage subscriptions",
+    "noDuplicates": "No school has been charged twice for storage.",
+    "duplicateKept": "Kept: {{id}}",
+    "duplicateUnrefunded": "{{amount}} could not be refunded automatically: check in Stripe",
+    "duplicatePending": "Canceling and refunding (attempt {{attempts}})",
+    "duplicateResolved": "Canceled and refunded {{when}}",
+    "duplicateReviewEvent": "A second live storage subscription with no completed checkout. Check it in Stripe: cancel and refund whichever the school does not want.",
+    "duplicateReviewFailed": "It could not be canceled or refunded automatically. Finish it in Stripe.",
+    "duplicateStatus": {
+      "pending": "Being resolved",
+      "resolved": "Resolved",
+      "needs_review": "Needs review"
+    },
+    "incidentsHeading": "Storage charged more than confirmed ({{count}} need review)",
+    "incidentsHelp": "A storage change charged more than the school confirmed. The difference is refunded automatically; anything that couldn't be refunded needs you to finish it in Stripe.",
+    "incidentsCaption": "Storage overcharges",
+    "noIncidents": "No storage change has charged more than was confirmed.",
+    "incidentStatus": {
+      "refunded": "Refunded",
+      "needs_review": "Needs review"
+    },
+    "incidentNote": "Charged {{charged}} instead of {{expected}}",
+    "stripeMode": {
+      "live": "Stripe: Live (real money)",
+      "sandbox": "Stripe: Sandbox (test cards, no real money)",
+      "not_configured": "Stripe: not configured"
     }
   },
   "flags": {
@@ -952,5 +989,43 @@
     "school": "School",
     "override": "Override",
     "howToChange": "To change a school's switch, open the school's page. The default for every school is a server setting, so it changes with a deployment, not here."
+  },
+  "storage": {
+    "title": "Storage subscription",
+    "loadError": "The storage subscription couldn't be loaded.",
+    "none": "This school has never bought extra storage.",
+    "plan": "{{size}} · {{price}} {{interval}} · {{status}}",
+    "interval": {
+      "monthly": "per month",
+      "yearly": "per year"
+    },
+    "renews": "Renews on {{date}}",
+    "ends": "Cancelled: ends on {{date}}",
+    "pending": "Scheduled: changes to {{size}} on {{date}}",
+    "card": "Paid with {{brand}} ending in {{last4}}",
+    "billingError": "Stripe couldn't be read: {{error}}",
+    "incidentsTitle": "Charged more than confirmed",
+    "incidentRefunded": "{{date}}: charged {{charged}} instead of {{expected}}; {{refund}} refunded automatically.",
+    "incidentReview": "{{date}}: charged {{charged}} instead of {{expected}}; the {{refund}} refund failed. Refund it below.",
+    "invoicesTitle": "Invoices",
+    "noInvoices": "No invoices.",
+    "columns": {
+      "date": "Date",
+      "reason": "Reason",
+      "paid": "Paid",
+      "refunded": "Refunded",
+      "status": "Status",
+      "actions": "Actions"
+    },
+    "view": "View",
+    "refund": "Refund",
+    "refundTitle": "Refund a storage invoice",
+    "refundHelp": "This invoice took {{paid}}. Up to {{refundable}} can still be refunded to the school's card.",
+    "amountLabel": "Amount ({{currency}})",
+    "amountError": "An amount above 0 and no more than what can still be refunded.",
+    "reasonLabel": "Reason (kept in the audit log)",
+    "refundConfirm": "Refund {{amount}}",
+    "refunded": "{{amount}} refunded",
+    "refundError": "The refund wasn't made"
   }
 }

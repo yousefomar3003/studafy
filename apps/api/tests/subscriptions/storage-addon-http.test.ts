@@ -35,7 +35,15 @@ const stripe = {
     checkouts.push(input.metadata);
     return Promise.resolve({ url: "https://checkout.example/storage", sessionId: "cs_http" });
   },
-  changeSubscriptionPrice: () => Promise.resolve({ applied: true }),
+  changeSubscriptionPrice: () => Promise.resolve({ applied: true, invoice: null }),
+  previewSubscriptionPriceChange: () => Promise.resolve({ amountDueMinor: 3_900, currency: "USD" }),
+  findAddonPurchasesInFlight: () =>
+    Promise.resolve({ liveSubscriptionIds: [], openCheckoutSessionIds: [] }),
+  expireCheckoutSession: () => Promise.resolve("expired"),
+  scheduleSubscriptionPriceChange: () =>
+    Promise.resolve({ scheduleId: "sub_sched_http", effectiveAt: new Date("2030-01-01") }),
+  releaseSubscriptionSchedule: () => Promise.resolve(),
+  countPendingInvoiceItems: () => Promise.resolve({ count: 0, netMinor: 0 }),
 } as unknown as PaymentProviderPort;
 
 beforeAll(async () => {
@@ -139,5 +147,31 @@ describeDb("storage add-on routes", () => {
       },
     );
     expect(started.status).toBe(403);
+
+    for (const path of [
+      "/api/subscriptions/storage/change/preview",
+      "/api/subscriptions/storage/change",
+    ]) {
+      const refused = await request(seeded, "INSTRUCTOR", "POST", path, {
+        priceId: crypto.randomUUID(),
+        prorationDate: new Date().toISOString(),
+        expectedAmountMinor: 0,
+        requestKey: crypto.randomUUID(),
+      });
+      expect(refused.status).toBe(403);
+    }
+  });
+
+  test("a tier change without a confirmed amount is refused before anything is charged", async () => {
+    const seeded = await seed("PRINCIPAL");
+
+    const unconfirmed = await request(
+      seeded,
+      "PRINCIPAL",
+      "POST",
+      "/api/subscriptions/storage/change",
+      { priceId: crypto.randomUUID() },
+    );
+    expect(unconfirmed.status).toBe(400);
   });
 });

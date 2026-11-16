@@ -11,6 +11,82 @@ when it required the `version-bump` label.
 
 ## Unreleased
 
+### Added
+
+- `POST /api/academics/materials/{materialId}/retry` (`retryMaterial`, needs `material:update`):
+  sends a `failed` material back to `scanning` (its `ingest_error` cleared) and enqueues the malware
+  scan, as confirm does. 409 `CONFLICT_STATE_MISMATCH` for any other state, 409
+  `MATERIAL_STORAGE_CONFIRM_FAILED` when its file is no longer in storage.
+- Stripe Sandbox support (docs/billing/stripe-modes.md): `StorageAddOnOffer.testMode` (true while
+  payments run on Stripe Sandbox keys: test cards only, no real money), `SystemHealth.stripeMode`
+  (`live`, `sandbox` or `not_configured`), and the Stripe webhook's `outcome` gains `ignored` for an
+  event from the other account mode (answered 200, never applied).
+- Storage billing works like an app-store subscription (migration 000224, ADR-022).
+  `StorageAddOnChangePreview` adds `timing` (`now`: more storage on the same interval, charged at
+  once; `renewal`: less storage or the other interval, applied at the next renewal with nothing
+  charged) and `effectiveAt`; `chargeNow` is true only when something is charged now.
+  `StorageAddOnCurrent` adds `pendingChange` (the change scheduled for the renewal). A change is
+  refused with 409 `STORAGE_ADDON_CHANGE_PENDING` while one is scheduled and 409
+  `STORAGE_ADDON_UNSETTLED` while a payment is due or an earlier change left an amount pending. New
+  `POST /api/subscriptions/storage/change/undo` (409 `STORAGE_ADDON_NO_PENDING_CHANGE`),
+  `GET /api/subscriptions/storage/billing` (`StorageAddOnBilling`: card, next bill, invoices) and
+  `POST /api/subscriptions/storage/payment-method` (a card-only Stripe Billing Portal page),
+  `GET /api/subscriptions/storage/cards` (`StorageAddOnCard[]`: brand, last 4, expiry, `isDefault`)
+  and `POST /api/subscriptions/storage/cards/setup` (save a new card, nothing charged). The change
+  body takes optional `paymentMethodId` (the card to charge; only that card is tried; 422
+  `STORAGE_ADDON_CARD_INVALID` when it is not the school's) and `useForRenewals` (default false).
+  Platform:
+  `GET /api/platform/schools/{schoolId}/storage-subscription` (`PlatformStorageSubscription`) and
+  `POST /api/platform/schools/{schoolId}/storage-subscription/invoices/{invoiceId}/refund`
+  (`PlatformStorageRefund`; 422 `STORAGE_ADDON_REFUND_INVALID`). `GET /api/platform/health` adds
+  `storageIncidents` (`PlatformStorageIncidents`): storage changes that charged more than confirmed,
+  refunded automatically or left for review.
+- A school can decline a licence quote (migration 000223): `POST
+/api/school/license/quotes/{quoteId}/decline` (`license:manage`) with an optional `reason`
+  (`DeclineLicenseQuoteBody`, at most 1000 characters) answers the `LicenseQuote`. Only a sent quote
+  within its validity can be declined (409 `LICENSE_QUOTE_NOT_EDITABLE` / `LICENSE_QUOTE_EXPIRED`); a
+  declined quote cannot be accepted. `LicenseQuoteStatus` adds `declined`, and `LicenseQuote` adds
+  `declinedAt`, `declinedBy` and `declineReason`. The school's quote list includes declined quotes.
+- Licence payment plans (migration 000221, ADR-021). `LicenseQuoteBody`, `LicenseQuoteReplaceBody`
+  and `LicenseQuoteCalculateBody` take optional `paymentPlan` (`LicensePaymentPlan`: `in_full`,
+  `monthly`, `custom`; default `in_full`) and, for `custom`, `paymentSchedule`
+  (`LicenseCustomInstalment[]`: `amountMinor`, `dueDate`; adding up to the total, dates in order and
+  not in the past, at most 24; otherwise 422 `LICENSE_PAYMENT_SCHEDULE_INVALID`). `LicenseQuote` adds
+  `paymentPlan`, `paymentSchedule` and `schedulePreview` (`LicenseScheduledInstalment[]`, as if
+  accepted today); `LicenseQuoteCalculation` adds `paymentPlan`, `schedulePreview` and
+  `scheduleErrors`. `LicenseInvoice` adds `paymentPlan`; `LicenseInvoiceDetail` adds `instalments`
+  (`LicenseInvoiceInstalment`: amount, paid, balance, due date, status, overdue, `current`, its own
+  `paymentLink`). New `PUT|DELETE
+/api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link`
+  (404 `LICENSE_INSTALMENT_NOT_FOUND`).
+- `GET /api/platform/health` (`PlatformSystemHealth`) adds `storageDuplicates`
+  (`PlatformStorageDuplicates`). It lists schools charged for a second storage add-on (000219):
+  every one not yet settled and those settled in the last 30 days, open ones first. Each item gives
+  the duplicate and kept Stripe subscription ids, `source` (`checkout`, resolved automatically, or
+  `event`, left for a person), `status` (`pending`, `resolved`, `needs_review`), the refund and
+  anything not refunded, and the last error.
+
+### Changed
+
+- `GET /api/academics/materials` and `GET /api/academics/materials/{materialId}`: a caller who is
+  not school staff (students, parents, guests) sees only `ready` materials; another state is left
+  out of the list and answers 404 by id. Staff still see every state.
+- `POST /api/academics/materials/upload` also replaces the caller's own `failed` attempt at the same
+  file in the class (as it already did an unconfirmed `uploaded` one) and frees its stored file.
+- `LicenseInvoice.paymentLink` is now the link of the instalment to pay now, and the invoice-level
+  `PUT|DELETE …/license-invoices/{invoiceId}/payment-link` sets that instalment's link (one
+  instalment for an invoice paid at once, so nothing changes for those). A licence now activates once
+  its first instalment is paid in full; an invoice's `dueDate` is its earliest unpaid instalment's.
+- **(breaking)** `POST /api/subscriptions/storage/change` (`changeStorageAddOnTier`) now charges
+  only an amount the school confirmed. The body requires `prorationDate` and `expectedAmountMinor`
+  (the `prorationDate` and `amountDueNowMinor` of a preview) and `requestKey` (a UUID per
+  confirmation; repeating it never charges twice). When the change would now cost anything else, or
+  the preview is older than 30 minutes, it answers 409 `STORAGE_ADDON_PRICE_CHANGED` and nothing is
+  charged. Only the web portal calls it, and it ships with this change.
+- `POST /api/subscriptions/storage/checkout` answers 409 `STORAGE_ADDON_PURCHASE_PENDING` while a
+  storage payment for the school is already paid or being confirmed at Stripe, and closes every
+  earlier open storage checkout before it makes a new one, so only one can ever be paid.
+
 ### Fixed
 
 - Student import columns kept as parent records reach the parent they belong to:
@@ -21,6 +97,20 @@ when it required the `version-bump` label.
   first parents' count, as before.
 
 ### Added
+
+- Licence invoices can carry an online payment link (Revolut). `LicenseInvoice` (and the list and
+  detail shapes built on it) adds `paymentLink`: the link while the invoice is issued or partly paid,
+  `null` otherwise. The super admin sets or replaces it with
+  `PUT /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link`
+  (`platformSetLicenseInvoicePaymentLink`, body `LicensePaymentLinkBody` `{ url }`) and removes it
+  with `DELETE` on the same path (`platformClearLicenseInvoicePaymentLink`); both answer the
+  `LicenseInvoice`. A link must be https on `revolut.com`, `revolut.me` or a subdomain, at most 500
+  characters (422 `LICENSE_PAYMENT_LINK_INVALID`); a paid or void invoice answers 409
+  `LICENSE_INVOICE_NOT_PAYABLE`. Payments made through the link are still recorded by hand.
+
+- `POST /api/subscriptions/storage/change/preview` (`previewStorageAddOnChange`,
+  `StorageAddOnChangePreview`): the exact prorated amount charged now and the next bill, from
+  Stripe's invoice preview. Nothing is charged or changed.
 
 - Platform console school administration (super admin only, web only):
   `PATCH /api/platform/schools/{schoolId}/profile` (`UpdatePlatformSchoolProfile`, with a required
