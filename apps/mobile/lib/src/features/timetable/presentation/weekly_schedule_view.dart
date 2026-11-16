@@ -210,7 +210,11 @@ class _WeeklyScheduleViewState extends ConsumerState<WeeklyScheduleView> {
                     ),
                   ),
                   Text(
-                    'timetable.lessonsPerWeek'.plural(schedule.lessonCount),
+                    // English plural rules put 0 in "other" ("0 lessons a week"); the zero form is
+                    // asked for explicitly so every language keeps its "No lessons" wording.
+                    schedule.lessonCount == 0
+                        ? 'timetable.lessonsPerWeek.zero'.tr()
+                        : 'timetable.lessonsPerWeek'.plural(schedule.lessonCount),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
