@@ -7,29 +7,47 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/grade_providers.dart';
 import '../domain/grade_report.dart';
 import 'academic_results_screen.dart';
-import 'released_marks_screen.dart';
 import 'widgets/grade_term_selector.dart';
 import 'widgets/grade_trend_card.dart';
 import 'widgets/grades_placeholders.dart';
 import 'widgets/grades_publish_banner.dart';
+import 'widgets/released_marks_widgets.dart';
 import 'widgets/subject_grades_card.dart';
 import 'widgets/term_grade_summary_card.dart';
 
-/// The student's published grades for one term: the term picker, a term-average trend
-/// sparkline, the term/cumulative summary, and a card per subject with its category breakdown.
+/// Which tab of [GradesScreen] to open on.
+enum GradesTab {
+  /// Exam marks school leadership has approved ([ReleasedMarksView]).
+  examMarks,
+
+  /// Published coursework grades (assignments and submissions), one term at a time.
+  coursework,
+}
+
+/// The student's grades, in two tabs:
 ///
-/// Reached two ways: pushed with no [courseId] (e.g. from the "New grades" home card), or via
-/// the `GRADE_POSTED` push deep link `/courses/{courseId}/grades`. On the deep-link path it
+/// - **Exam marks** — every mark school leadership has approved (a whole term's mark sheet, or
+///   one exam on its own such as the first monthly exam), by term and subject. The default tab,
+///   so an approved exam is the first thing a student sees here, not hidden behind an icon.
+/// - **Coursework** — the published grades for one term: the term picker, a term-average trend
+///   sparkline, the term/cumulative summary, and a card per subject with its category breakdown.
+///
+/// Reached three ways: pushed with no [courseId] from a home card ("New grades" opens
+/// coursework, "New exam marks" opens exam marks), or via the `GRADE_POSTED` push deep link
+/// `/courses/{courseId}/grades`, which always opens coursework. On the deep-link path it
 /// resets the term selection to the active term and then lets [deepLinkGradeTermProvider]
 /// correct it to whichever term actually holds that course's freshly published grade — so the
 /// student lands on the right term (acceptance criterion) — and highlights that subject.
 class GradesScreen extends ConsumerStatefulWidget {
-  const GradesScreen({this.courseId, super.key});
+  const GradesScreen({this.courseId, this.initialTab = GradesTab.examMarks, super.key});
 
   /// The course a push deep link pointed at, or null for a plain in-app open. Non-null also
   /// means "arrived from the grade-posted notification", which is what shows the publish
   /// banner.
   final String? courseId;
+
+  /// The tab to open on; a [courseId] deep link always opens [GradesTab.coursework].
+  final GradesTab initialTab;
 
   @override
   ConsumerState<GradesScreen> createState() => _GradesScreenState();
@@ -67,69 +85,77 @@ class _GradesScreenState extends ConsumerState<GradesScreen> {
 
     final status = ref.watch(gradeReportProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('grades.title'.tr()),
-        actions: [
-          // Approved term marks (midterm, final exam, …) from the teacher's mark sheets.
-          IconButton(
-            icon: const Icon(Icons.fact_check_outlined),
-            tooltip: 'releasedMarks.entry'.tr(),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const ReleasedMarksScreen(),
-              ),
+    final initialTab = _fromPush ? GradesTab.coursework : widget.initialTab;
+
+    return DefaultTabController(
+      length: GradesTab.values.length,
+      initialIndex: initialTab.index,
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('grades.title'.tr()),
+          actions: [
+            // Official (finalized) results, certificates and report cards — distinct from the
+            // approved marks and published running grades this screen shows.
+            IconButton(
+              icon: const Icon(Icons.workspace_premium_outlined),
+              tooltip: 'academicResults.entry'.tr(),
+              onPressed: () => Navigator.of(
+                context,
+              ).push(MaterialPageRoute<void>(builder: (_) => const AcademicResultsScreen())),
             ),
-          ),
-          // Official (finalized) results, certificates and report cards — distinct from the
-          // published running grades this screen shows.
-          IconButton(
-            icon: const Icon(Icons.workspace_premium_outlined),
-            tooltip: 'academicResults.entry'.tr(),
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const AcademicResultsScreen(),
+          ],
+          bottom: TabBar(
+            tabs: [
+              Tab(key: const ValueKey('grades-tab-exam-marks'), text: 'grades.tabs.examMarks'.tr()),
+              Tab(
+                key: const ValueKey('grades-tab-coursework'),
+                text: 'grades.tabs.coursework'.tr(),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-      body: Column(
-        children: [
-          const GradeTermSelector(),
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async {
-                ref
-                  ..invalidate(academicYearTermsProvider)
-                  ..invalidate(gradeSnapshotProvider);
-              },
-              child: status.when(
-                loading: () => const GradesSkeleton(),
-                error: (error, stackTrace) => const GradesMessage(
-                  messageKey: 'grades.error',
-                  icon: Icons.error_outline,
+        ),
+        body: TabBarView(
+          children: [
+            const ReleasedMarksView(),
+            Column(
+              children: [
+                const GradeTermSelector(),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () async {
+                      ref
+                        ..invalidate(academicYearTermsProvider)
+                        ..invalidate(gradeSnapshotProvider);
+                    },
+                    child: status.when(
+                      loading: () => const GradesSkeleton(),
+                      error: (error, stackTrace) => const GradesMessage(
+                        messageKey: 'grades.error',
+                        icon: Icons.error_outline,
+                      ),
+                      data: (report) => switch (report) {
+                        GradeReportUnavailable() => const GradesMessage(
+                          messageKey: 'grades.unavailable',
+                          icon: Icons.info_outline,
+                        ),
+                        GradeReportReady(value: final cached) => _Report(
+                          report: cached.data,
+                          isStale: cached.isStale,
+                          fetchedAt: cached.fetchedAt,
+                          highlightCourseId: widget.courseId,
+                          highlightKey: _highlightKey,
+                          showBanner: _fromPush && !_bannerDismissed,
+                          onDismissBanner: () => setState(() => _bannerDismissed = true),
+                          onReportBuilt: _scrollToHighlightOnce,
+                        ),
+                      },
+                    ),
+                  ),
                 ),
-                data: (report) => switch (report) {
-                  GradeReportUnavailable() => const GradesMessage(
-                    messageKey: 'grades.unavailable',
-                    icon: Icons.info_outline,
-                  ),
-                  GradeReportReady(value: final cached) => _Report(
-                    report: cached.data,
-                    isStale: cached.isStale,
-                    fetchedAt: cached.fetchedAt,
-                    highlightCourseId: widget.courseId,
-                    highlightKey: _highlightKey,
-                    showBanner: _fromPush && !_bannerDismissed,
-                    onDismissBanner: () => setState(() => _bannerDismissed = true),
-                    onReportBuilt: _scrollToHighlightOnce,
-                  ),
-                },
-              ),
+              ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
