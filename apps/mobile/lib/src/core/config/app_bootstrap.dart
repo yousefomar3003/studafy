@@ -95,6 +95,9 @@ void bootstrapApp(AppEnvironment environment) {
           supportedLocales: AppLocales.supported,
           path: AppLocales.translationsPath,
           fallbackLocale: AppLocales.fallback,
+          // Use each language's own plural rules. The default (true) only knows zero/one/two/other,
+          // so Arabic never reached its "few" (3-10) and "many" (11-99) forms: "4 مادة", not "4 مواد".
+          ignorePluralRules: false,
           child: ProviderScope(
             // No automatic retries on 4xx, short backoff otherwise — see providerRetryPolicy.
             retry: providerRetryPolicy,
