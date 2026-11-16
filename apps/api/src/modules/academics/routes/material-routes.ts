@@ -14,6 +14,7 @@ import { tenantTxRunner, withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
 import { requirePermission } from "../../../middleware/authz";
+import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
 import { freeStoredObjects } from "../../storage/free-objects";
@@ -108,7 +109,8 @@ const initiateMaterialUploadRoute = createRoute({
   summary: "Initiate a material upload",
   description:
     "Creates a material record and returns a pre-signed upload URL. " +
-    "The client uploads the file directly to storage, then calls the confirm endpoint.",
+    "The client uploads the file directly to storage, then calls the confirm endpoint. " +
+    "Requires material:create, and the caller must teach the class or be the school admin.",
   security: [{ bearerAuth: [] }],
   request: {
     body: {
@@ -137,7 +139,8 @@ const confirmMaterialUploadRoute = createRoute({
     "Confirms that the file was uploaded to storage. Transitions the material to " +
     "scanning state and enqueues a malware scan. The scan worker flips a clean, AI-visible " +
     "material to queued and enqueues AI ingestion (which flips it to ready), a clean non-AI " +
-    "material straight to ready, and an infected material to quarantined.",
+    "material straight to ready, and an infected material to quarantined. Requires " +
+    "material:create, and the caller must teach the material's class or be the school admin.",
   security: [{ bearerAuth: [] }],
   request: {
     params: materialIdParamSchema,
@@ -167,7 +170,8 @@ const retryMaterialRoute = createRoute({
     "Sends a failed material back through the pipeline: it returns to scanning (its error " +
     "cleared) and a malware scan is enqueued, exactly as after confirm. Only a `failed` material " +
     "whose file is still in storage can be retried (409 otherwise); a quarantined one never can. " +
-    "Requires material:update.",
+    "Requires material:update, and the caller must teach the material's class or be the school " +
+    "admin.",
   security: [{ bearerAuth: [] }],
   request: { params: materialIdParamSchema },
   responses: standardResponses(
@@ -190,7 +194,8 @@ const updateMaterialRoute = createRoute({
   description:
     "Partially updates material metadata (title, description, and the week and day of the term " +
     "it is listed under). week_number and day_of_week are sent together: both numbers move it, " +
-    "both null make it unscheduled, both omitted leave it where it is.",
+    "both null make it unscheduled, both omitted leave it where it is. Requires material:update, " +
+    "and the caller must teach the material's class or be the school admin.",
   security: [{ bearerAuth: [] }],
   request: {
     params: materialIdParamSchema,
@@ -219,7 +224,8 @@ const deleteMaterialRoute = createRoute({
   description:
     "Deletes a material and its associated AI chunks (cascaded). " +
     "Its stored file, thumbnail and preview are removed and their space freed once the delete " +
-    "has committed.",
+    "has committed. Requires material:delete, and the caller must teach the material's class or " +
+    "be the school admin.",
   security: [{ bearerAuth: [] }],
   request: { params: materialIdParamSchema },
   responses: {
@@ -235,8 +241,11 @@ const toggleAiVisibleRoute = createRoute({
   operationId: "toggleMaterialAiVisible",
   summary: "Toggle AI visibility",
   description:
-    "Sets whether a material is exposed to AI ingestion. Disabling removes all " +
-    "associated chunks and resets ingest status. Enabling queues the material for ingestion.",
+    "Sets whether a material is exposed to AI ingestion. It never changes whether the material " +
+    "can be opened. Disabling removes its AI chunks and keeps it servable: a `ready` material " +
+    "stays `ready`, and one waiting for or in AI ingestion becomes `ready`. Enabling a `ready` " +
+    "material queues it for ingestion again. " +
+    "Requires material:manageAi, and the caller must teach the material's class or lead the school.",
   security: [{ bearerAuth: [] }],
   request: {
     params: materialIdParamSchema,
@@ -298,6 +307,13 @@ export function materialRoutes(
     ? new Queue(QUEUE_NAMES.AI_INGESTION, { connection: redis as never })
     : null;
 
+  // Thumbnail and preview derivation, for a material that turning AI off finished before its
+  // ingestion did (the ingestion worker queues them otherwise). Best-effort: a missing thumbnail
+  // falls back to the file-type icon, and a duplicate job is a no-op in the worker.
+  const derivationQueue = redis
+    ? new Queue(QUEUE_NAMES.DERIVATIONS, { connection: redis as never })
+    : null;
+
   // Hand a material in 'scanning' to the file-scan worker (confirm and retry). The status flip is
   // the claim: the worker only touches materials still in 'scanning', so a retry (or a duplicate
   // enqueue) can never scan the same object twice or notify the uploader twice.
@@ -325,12 +341,38 @@ export function materialRoutes(
   routes.use("/api/academics/materials/:materialId", auditAction("update", "materials"));
   routes.use("/api/academics/materials/:materialId/confirm", auditAction("update", "materials"));
   routes.use("/api/academics/materials/:materialId/retry", auditAction("update", "materials"));
-  // Retrying is staff work: it re-runs the scan and processing of a teacher's upload.
+  routes.use("/api/academics/materials/:materialId/ai-visible", auditAction("update", "materials"));
+
+  // Writes are staff work. Reads stay open to everyone who can read the class (RLS), but writing
+  // needs the material permission -- teachers and the school admin hold create/update/delete,
+  // students and parents hold none -- and the service then narrows a teacher to the classes they
+  // teach (assertCanWriteClassMaterials). Confirm is the second half of an upload, so it takes
+  // material:create. AI visibility takes material:manageAi, the permission the class-wide AI
+  // materials setting uses, so the principal who may switch a whole class off may also switch off
+  // one material.
+  routes.use("/api/academics/materials/upload", requirePermission(PERMISSIONS.MATERIAL_CREATE));
+  routes.use(
+    "/api/academics/materials/:materialId/confirm",
+    requirePermission(PERMISSIONS.MATERIAL_CREATE),
+  );
   routes.use(
     "/api/academics/materials/:materialId/retry",
     requirePermission(PERMISSIONS.MATERIAL_UPDATE),
   );
-  routes.use("/api/academics/materials/:materialId/ai-visible", auditAction("update", "materials"));
+  routes.use(
+    "/api/academics/materials/:materialId/ai-visible",
+    requirePermission(PERMISSIONS.MATERIAL_MANAGE_AI),
+  );
+  // GET on the same path stays open; only PATCH and DELETE are writes. "upload" also matches
+  // :materialId, but as a POST it is neither.
+  routes.use(
+    "/api/academics/materials/:materialId",
+    onlyMethods(["PATCH"], requirePermission(PERMISSIONS.MATERIAL_UPDATE)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId",
+    onlyMethods(["DELETE"], requirePermission(PERMISSIONS.MATERIAL_DELETE)),
+  );
 
   routes.openapi(listMaterialsRoute, async (c) => {
     const auth = requireAuth(c);
@@ -490,9 +532,15 @@ export function materialRoutes(
     const { materialId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
+    const { material: row, derivePreviews } = await withTenantTx(database, tenantFrom(c), (tx) =>
       toggleAiVisible(tx, auth.schoolId, materialId, body.ai_visible),
     );
+
+    if (derivePreviews && derivationQueue) {
+      await derivationQueue
+        .add(JOB_NAMES.DERIVE_MATERIAL_PREVIEWS, { schoolId: auth.schoolId, materialId: row.id })
+        .catch(() => undefined);
+    }
 
     // Enabling re-stages a previously ingested material to 'queued' (the service flips it there).
     // Hand it to the ai-ingestion worker: the claim on 'queued' makes a duplicate enqueue a no-op,

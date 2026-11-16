@@ -100,9 +100,14 @@ void main() {
   testWidgets('labels each week with its dates, the current one expanded', (tester) async {
     await _pump(tester);
 
-    expect(find.text('Week 2 · 6–10 Sep'), findsOneWidget);
-    expect(find.text('Week 3 · 13–17 Sep'), findsOneWidget);
-    expect(find.text('This week · 2 materials'), findsOneWidget);
+    // The dates sit under the week; the current week says so too.
+    expect(find.text('Week 2'), findsOneWidget);
+    expect(find.text('6–10 Sep'), findsOneWidget);
+    expect(find.text('Week 3'), findsOneWidget);
+    expect(find.text('13–17 Sep · This week'), findsOneWidget);
+    // Every week keeps its count visible while collapsed.
+    expect(find.text('2 materials'), findsOneWidget);
+    expect(find.text('1 material'), findsNWidgets(2));
     expect(find.text('Unscheduled'), findsOneWidget);
 
     // Week 3 is open, with its days in the school's order (Sunday first).
@@ -119,7 +124,7 @@ void main() {
     // Unscheduled comes last.
     expect(
       tester.getTopLeft(find.text('Unscheduled')).dy,
-      greaterThan(tester.getTopLeft(find.text('Week 3 · 13–17 Sep')).dy),
+      greaterThan(tester.getTopLeft(find.text('Week 3')).dy),
     );
   });
 
@@ -128,7 +133,7 @@ void main() {
 
     await tester.tap(find.text('Unscheduled'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Week 3 · 13–17 Sep'));
+    await tester.tap(find.text('Week 3'));
     await tester.pumpAndSettle();
 
     expect(find.text('Title legacy'), findsOneWidget);
