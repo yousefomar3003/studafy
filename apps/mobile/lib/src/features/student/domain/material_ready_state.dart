@@ -22,9 +22,9 @@ enum MaterialReadyState {
   /// will mint a download URL for.
   ready,
 
-  /// Scanned clean, but AI ingestion failed. The gateway still requires `ready` to serve a
-  /// download, so a failed material stays unopenable until ingestion is retried (re-toggling AI
-  /// visibility server-side) and completes.
+  /// The scan or AI ingestion gave up on it. The gateway still requires `ready` to serve a
+  /// download, so a failed material stays unopenable until the teacher retries it (or deletes it
+  /// and uploads it again) and the pipeline completes.
   failed,
 
   /// The malware scan found a threat. Never openable.

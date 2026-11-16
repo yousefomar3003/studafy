@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/api_exception.dart';
+import '../../../../core/localization/localized_number.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/grade_entry_providers.dart';
 
@@ -55,8 +55,9 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
     if (_submitting || !(_formKey.currentState?.validate() ?? false)) return;
 
     final label = _labelController.text.trim();
-    final maxScore = double.parse(_maxScoreController.text.trim());
-    final weight = double.tryParse(_weightController.text.trim()) ?? 1;
+    final maxScore = parseLocalizedNumber(_maxScoreController.text)!.toDouble();
+    final weight =
+        parseLocalizedNumber(_weightController.text)?.toDouble() ?? 1;
 
     setState(() {
       _submitting = true;
@@ -135,9 +136,7 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                    ],
+                    inputFormatters: [localizedDecimalInputFormatter],
                     decoration: InputDecoration(
                       labelText: 'teacher.grades.createAssessment.maxScoreField'
                           .tr(),
@@ -155,9 +154,7 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
                     keyboardType: const TextInputType.numberWithOptions(
                       decimal: true,
                     ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
-                    ],
+                    inputFormatters: [localizedDecimalInputFormatter],
                     decoration: InputDecoration(
                       labelText: 'teacher.grades.createAssessment.weightField'
                           .tr(),
@@ -193,8 +190,8 @@ class _CreateAssessmentSheetState extends ConsumerState<CreateAssessmentSheet> {
   }
 
   String? _positiveNumberValidator(String? value) {
-    final parsed = double.tryParse((value ?? '').trim());
-    if (parsed == null || parsed <= 0) {
+    final parsed = parseLocalizedNumber(value);
+    if (parsed == null || !parsed.isFinite || parsed <= 0) {
       return 'teacher.grades.createAssessment.positiveNumber'.tr();
     }
     return null;

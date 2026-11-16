@@ -4,12 +4,17 @@
  * The route contract is covered by the route's openapi layer; what needs a live PostgreSQL is the
  * guarded status transition itself: 'ready' -> 'queued' (clearing the ingest stamp to satisfy the
  * lifecycle CHECK), every other state left alone so nothing mid-flight is derailed, 'failed' never
- * silently re-ingested, disable resetting to 'uploaded' and purging chunks, and the tenant-scope
- * boundary rejecting a foreign school.
+ * silently re-ingested, disable purging chunks while keeping the material servable ('ready' stays
+ * 'ready', 'queued'/'processing' finish as 'ready', the rest keep their state), off-then-on
+ * re-queueing ingestion, migration 000227 repairing the rows the old disable broke, and the
+ * tenant-scope boundary rejecting a foreign school.
  *
  * Set TEST_DATABASE_URL to run these:
  *   TEST_DATABASE_URL=postgres://... bun test src/modules/academics/__tests__/material-toggle.integration.test.ts
  */
+
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 import { ERROR_CODES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
@@ -31,6 +36,7 @@ import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { toggleAiVisible } from "../material-service";
 
+import type { MaterialRow, ToggleAiVisibleResult } from "../material-service";
 import type { TransactionSql } from "postgres";
 
 const describeDb = integrationEnabled ? describe : describe.skip;
@@ -82,7 +88,15 @@ async function toggleAsTenant(
   tenant: TenantFixture,
   materialId: string,
   aiVisible: boolean,
-): Promise<ReturnType<typeof toggleAiVisible>> {
+): Promise<MaterialRow> {
+  return (await toggleWithResult(tenant, materialId, aiVisible)).material;
+}
+
+function toggleWithResult(
+  tenant: TenantFixture,
+  materialId: string,
+  aiVisible: boolean,
+): Promise<ToggleAiVisibleResult> {
   // can_read_class resolves through the lead teacher, so act as the class's teacher (not the
   // role-loop INSTRUCTOR user, who teaches no class) -- same convention as the downloads suite.
   return withTenantTx(
@@ -233,33 +247,90 @@ describeDb("toggleAiVisible — enabling a ready material", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Disable: reset to 'uploaded' and purge chunks
+// Disable: purge chunks, keep the material servable
 // ---------------------------------------------------------------------------
 
+async function seedChunk(tenant: TenantFixture, materialId: string): Promise<void> {
+  await asAdmin(tenant.schoolId, async (tx) => {
+    await tx`
+      INSERT INTO app.material_chunks
+        (school_id, material_id, chunk_index, content, embedding, embedding_model)
+      VALUES
+        (${tenant.schoolId}, ${materialId}, 0, 'chunk',
+         array_fill(0::real, ARRAY[1536])::public.vector, 'test')
+    `;
+  });
+}
+
 describeDb("toggleAiVisible — disabling", () => {
-  test("resets a ready material to uploaded, clears the stamp, and purges chunks", async () => {
+  test("keeps a ready material ready, with its ingest stamp, and purges its chunks", async () => {
     const tenant = await createFullTenant(db.sql);
     const { materialId } = await seedMaterial(tenant, "ready", true);
-
-    await asAdmin(tenant.schoolId, async (tx) => {
-      await tx`
-        INSERT INTO app.material_chunks
-          (school_id, material_id, chunk_index, content, embedding, embedding_model)
-        VALUES
-          (${tenant.schoolId}, ${materialId}, 0, 'chunk',
-           array_fill(0::real, ARRAY[1536])::public.vector, 'test')
-      `;
-    });
+    await seedChunk(tenant, materialId);
     expect(await countChunks(tenant, materialId)).toBe(1);
 
-    const row = await toggleAsTenant(tenant, materialId, false);
+    const result = await toggleWithResult(tenant, materialId, false);
 
-    expect(row.ai_visible).toBe(false);
-    expect(row.ingest_status).toBe("uploaded");
-    expect(row.ingest_error).toBeNull();
-    expect(row.ingested_at).toBeNull();
+    expect(result.derivePreviews).toBe(false);
+    expect(result.material.ai_visible).toBe(false);
+    expect(result.material.ingest_status).toBe("ready");
+    expect(result.material.ingest_error).toBeNull();
+    expect(result.material.ingested_at).toEqual(new Date("2026-01-01T00:00:00Z"));
     expect(await countChunks(tenant, materialId)).toBe(0);
+    const persisted = await readMaterial(tenant, materialId);
+    expect(persisted.ingest_status).toBe("ready");
+    expect(persisted.ingested_at).toEqual(new Date("2026-01-01T00:00:00Z"));
   });
+
+  test("audits the purge with the number of chunks removed", async () => {
+    const tenant = await createFullTenant(db.sql);
+    const { materialId } = await seedMaterial(tenant, "ready", true);
+    await seedChunk(tenant, materialId);
+
+    await toggleAsTenant(tenant, materialId, false);
+
+    const [audit] = await asAdmin(
+      tenant.schoolId,
+      (tx) => tx<{ old_values: Record<string, unknown>; new_values: Record<string, unknown> }[]>`
+        SELECT old_values, new_values FROM app.audit_logs
+        WHERE target_table = 'materials' AND target_id = ${materialId}
+      `,
+    );
+    expect(audit!.old_values).toEqual({ ai_visible: true, ingest_status: "ready" });
+    expect(audit!.new_values).toEqual({
+      ai_visible: false,
+      ingest_status: "ready",
+      chunks_purged: 1,
+    });
+  });
+
+  for (const status of ["queued", "processing"] as const) {
+    test(`finishes a ${status} material as ready (it was scanned clean) and asks for previews`, async () => {
+      const tenant = await createFullTenant(db.sql);
+      const { materialId } = await seedMaterial(tenant, status, true);
+
+      const result = await toggleWithResult(tenant, materialId, false);
+
+      expect(result.derivePreviews).toBe(true);
+      expect(result.material.ai_visible).toBe(false);
+      expect(result.material.ingest_status).toBe("ready");
+      expect(result.material.ingested_at).not.toBeNull();
+      expect((await readMaterial(tenant, materialId)).ingest_status).toBe("ready");
+    });
+  }
+
+  for (const status of ["uploaded", "scanning", "failed", "quarantined"] as const) {
+    test(`leaves a ${status} material in its state`, async () => {
+      const tenant = await createFullTenant(db.sql);
+      const { materialId } = await seedMaterial(tenant, status, true);
+      const before = await readMaterial(tenant, materialId);
+
+      const result = await toggleWithResult(tenant, materialId, false);
+
+      expect(result.derivePreviews).toBe(false);
+      expect(await readMaterial(tenant, materialId)).toEqual({ ...before, ai_visible: false });
+    });
+  }
 
   test("is a no-op when ai_visible is already false", async () => {
     const tenant = await createFullTenant(db.sql);
@@ -269,6 +340,73 @@ describeDb("toggleAiVisible — disabling", () => {
 
     expect(row.ai_visible).toBe(false);
     expect(row.ingest_status).toBe("uploaded");
+  });
+
+  test("off and on again re-queues a ready material for ingestion", async () => {
+    const tenant = await createFullTenant(db.sql);
+    const { materialId } = await seedMaterial(tenant, "ready", true);
+    await seedChunk(tenant, materialId);
+
+    const off = await toggleAsTenant(tenant, materialId, false);
+    expect(off.ingest_status).toBe("ready");
+    const on = await toggleAsTenant(tenant, materialId, true);
+
+    expect(on.ai_visible).toBe(true);
+    expect(on.ingest_status).toBe("queued");
+    expect(on.ingested_at).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 000227: repairing what the old disable broke
+// ---------------------------------------------------------------------------
+
+describeDb("migration 000227", () => {
+  const migration = readFileSync(
+    resolve(import.meta.dir, "../../../../../../db/migrations/000227_repair_ai_off_materials.sql"),
+    "utf8",
+  );
+
+  /** A material the old disable moved to 'uploaded' from `from`, with the audit row it wrote. */
+  async function seedBroken(
+    tenant: TenantFixture,
+    from: string,
+    aiVisibleNow: boolean,
+  ): Promise<string> {
+    const { materialId } = await seedMaterial(tenant, "uploaded", aiVisibleNow);
+    await asAdmin(tenant.schoolId, async (tx) => {
+      await tx`
+        INSERT INTO app.audit_logs (school_id, action, target_table, target_id, old_values, new_values)
+        VALUES (${tenant.schoolId}, 'update', 'materials', ${materialId},
+                ${tx.json({ ai_visible: true, ingest_status: from })},
+                ${tx.json({ ai_visible: false, ingest_status: "uploaded", chunks_purged: 0 })})
+      `;
+    });
+    return materialId;
+  }
+
+  test("makes a material servable again when it was ready, queued or processing at AI-off", async () => {
+    const tenant = await createFullTenant(db.sql);
+    const wasReady = await seedBroken(tenant, "ready", false);
+    const wasProcessing = await seedBroken(tenant, "processing", false);
+    // Turned back on since, which the old code left in 'uploaded' for the sweep to delete.
+    const backOn = await seedBroken(tenant, "queued", true);
+    // Never servable, or never confirmed: left alone.
+    const wasFailed = await seedBroken(tenant, "failed", false);
+    const wasScanning = await seedBroken(tenant, "scanning", false);
+    const neverConfirmed = (await seedMaterial(tenant, "uploaded", false)).materialId;
+
+    await adminClient!.begin((tx) => tx.unsafe(migration));
+
+    for (const id of [wasReady, wasProcessing, backOn]) {
+      const row = await readMaterial(tenant, id);
+      expect(row.ingest_status).toBe("ready");
+      expect(row.ingested_at).not.toBeNull();
+    }
+    expect((await readMaterial(tenant, backOn)).ai_visible).toBe(true);
+    for (const id of [wasFailed, wasScanning, neverConfirmed]) {
+      expect((await readMaterial(tenant, id)).ingest_status).toBe("uploaded");
+    }
   });
 });
 
