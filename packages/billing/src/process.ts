@@ -44,6 +44,7 @@ import {
   extractSubscriptionItemId,
 } from "./event-mapping";
 import { deriveIntent, foldStatus, LIVE_STATUSES, resolveAiCascade } from "./state-machine";
+import { loadRowForUpdate } from "./system-transition";
 
 import type { AttributionTarget } from "./attribution";
 import type { BillingEventSource } from "./billing-event-store";
@@ -173,6 +174,11 @@ export interface ProcessOptions {
   logger: BillingLogger;
   /** Correlates the audit row with the HTTP request that caused it, when there was one. */
   requestId?: string | null;
+  /**
+   * Test seam (QA-035): awaited after the fold is computed and before it is applied, so a test can
+   * force two events to interleave there. Never set in production.
+   */
+  beforeApply?: () => Promise<void>;
 }
 
 export type ProcessOutcome =
@@ -297,7 +303,7 @@ async function applyClaimedEvent(
     return { outcome: "processed", transitioned: false };
   }
 
-  const target = await resolveTarget(tx, schoolId, event.type, event.data, event.id);
+  let target = await resolveTarget(tx, schoolId, event.type, event.data, event.id);
   if (extractAddonHint(event.data) === "storage") {
     await warnOfStorageDuplicate(tx, event, schoolId, options.logger);
   }
@@ -306,6 +312,14 @@ async function applyClaimedEvent(
   }
 
   await attributeEvent(tx, rowId, target.kind, target.id);
+
+  // QA-035: lock the subscription row before folding. Only redeliveries of one event id serialized
+  // before (on the claim); two different events about one subscription each folded what they could
+  // see and the last writer won, even with a stale fold. Holding the row, a concurrent event waits
+  // here until this one commits, then folds a sequence that includes it. The status is re-read
+  // under the lock so `from` (audit) and `transitioned` describe the row as it now is.
+  const locked = await loadRowForUpdate(tx, target.kind, schoolId, target.id);
+  if (locked !== null) target = { ...target, status: locked.status };
 
   const sequence = await loadFoldSequence(tx, target.kind, target.id, rowId);
   const fold = foldStatus(target.kind, sequence);
@@ -322,6 +336,7 @@ async function applyClaimedEvent(
     await saveTapPaymentMethod(tx, target, event.data);
   }
 
+  await options.beforeApply?.();
   await applyTransition(tx, options, target, fold.status, event.data);
   await markProcessed(tx, rowId);
 

@@ -86,7 +86,7 @@ export async function applySystemTransition(
  * the source of the audit's `from` value, which is why it is read (and locked) before the UPDATE
  * rather than reported by `RETURNING`.
  */
-async function loadRowForUpdate(
+export async function loadRowForUpdate(
   tx: TransactionSql,
   kind: SubscriptionKind,
   schoolId: string,
