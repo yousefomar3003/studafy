@@ -52,6 +52,59 @@ file is ever deleted. A school over its cap keeps and reads everything, and only
 refused. The tiers are `app.plans` `storage_100gb` and `storage_1tb`, and their prices are
 `app.plan_prices` rows: USD is seeded, and other currencies are added as more rows.
 
+### One storage subscription per school, never two (000219)
+
+A school pays for one storage add-on at a time. Changing tier moves the same Stripe subscription
+to a new price, prorated (`POST /api/subscriptions/storage/change`). It never starts a second one,
+and the checkout refuses to start a second purchase while Stripe holds a live one (#474). As a
+safety net, if a second storage subscription still reaches Studafy:
+
+- **Only events about the add-on row's own Stripe subscription move it.** An event naming another
+  storage subscription is parked: a second subscription's renewal never rewrites the row's period,
+  and its cancellation never ends the school's storage.
+- **A second completed checkout: the newest purchase is kept.** The row moves to the new purchase's
+  tier and subscription, with a placeholder period until that subscription's next event. The
+  subscription it replaced is recorded in `app.storage_duplicate_subscriptions` as `pending`. The
+  billing worker (`run-storage-duplicate-resolver`, every 10 minutes) then cancels it in Stripe at
+  once. It also refunds the unused share of its period at the old price, capped at what its latest
+  paid invoice took. Every later event of the retired subscription is recorded and finished with,
+  including the cancellation the worker causes and late copies of its checkout. None of them touch
+  the row. Which purchase is newest is the order the checkouts' completions arrive in.
+- **A second live subscription seen without a completed checkout** (`source = 'event'`) is only
+  flagged as `needs_review`. Studafy never cancels it on its own, because a new subscription's own
+  events can arrive before its checkout completion. If that completion does arrive, the flag is
+  dropped and the newest-wins move above runs.
+- **Retries and review.** No transaction is held across a Stripe call. The refund amount is fixed
+  before the refund is requested. The cancel and the refund carry idempotency keys derived from the
+  row, and an earlier refund is found by its `storage_duplicate_id` metadata. A retry therefore
+  never cancels or refunds twice. After 8 failed attempts (about a day) a row becomes
+  `needs_review`.
+- **Where the super admin sees it.** Every row not yet settled, and those settled in the last 30
+  days, is listed on the platform's system-health page (`/portal/platform/health`), needing review
+  first. A structured warning is also logged when one is found, and on every failed attempt.
+
+### Changes, scheduled changes and overcharges (000224, ADR-022)
+
+Storage billing follows the app stores. More storage on the same interval applies at once, with one
+prorated charge for exactly the amount the school confirmed. Less storage, or the other interval,
+applies at the next renewal: nothing is charged or credited now, Stripe holds the change as a
+subscription schedule, and the row records it in `pending_plan_price_id`, `pending_cap_bytes`,
+`pending_effective_at` and `stripe_schedule_id` (all set or all null). The webhook pipeline applies it
+when an event shows the subscription on the scheduled price; undoing or cancelling releases the
+schedule and clears the columns. A change is refused while one is scheduled, while a payment is due,
+or while the Stripe customer has pending invoice items.
+
+An immediate change is paid with the card the school chose: the API builds and finalizes the
+proration invoice itself (`auto_advance: false`, `metadata.studafy_purpose = storage_change`), checks
+its amount and pays it with that card only; a decline voids it and restores the old price. The
+webhook pipeline records but never applies objects marked `storage_change` or
+`storage_card_setup`.
+
+After an immediate change the API reads back the invoice Stripe created. Anything it took beyond the
+confirmed amount is refunded at once and recorded in `app.storage_billing_incidents` (`refunded`, or
+`needs_review` when the refund failed), shown on the platform system-health page and on the school's
+platform page, where the super admin can also refund any storage invoice by hand.
+
 ## Subscription state machine
 
 Both `subscriptions.status` and `ai_subscriptions.status` share one enum, `app.subscription_status`,

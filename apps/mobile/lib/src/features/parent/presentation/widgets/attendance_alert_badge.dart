@@ -1,7 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../../design/kit/kit.dart';
 import '../../domain/attendance_alert.dart';
 
 /// A small pill stating where a child's term attendance stands. Rendered only when the alert is
@@ -16,36 +16,18 @@ class AttendanceAlertBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!alert.isElevated) return const SizedBox.shrink();
 
-    final colorScheme = Theme.of(context).colorScheme;
-    final (background, foreground, labelKey) = switch (alert) {
-      AttendanceAlert.needsAttention => (
-          colorScheme.errorContainer,
-          colorScheme.onErrorContainer,
-          'parent.attendance.badge.alert',
-        ),
+    final (tone, labelKey) = switch (alert) {
+      AttendanceAlert.needsAttention => (AppTone.danger, 'parent.attendance.badge.alert'),
       AttendanceAlert.watch || AttendanceAlert.onTrack => (
-          colorScheme.secondaryContainer,
-          colorScheme.onSecondaryContainer,
+          AppTone.warning,
           'parent.attendance.badge.watch',
         ),
     };
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.space8,
-        vertical: AppSpacing.space4,
-      ),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        labelKey.tr(),
-        style: Theme.of(context)
-            .textTheme
-            .labelSmall
-            ?.copyWith(color: foreground, fontWeight: FontWeight.w600),
-      ),
+    return AppStatusPill(
+      label: labelKey.tr(),
+      tone: tone,
+      icon: Icons.warning_amber_rounded,
     );
   }
 }

@@ -310,12 +310,13 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  "POST /api/academics/materials/{materialId}/retry",
   // Class AI materials setting (000196). Audited as an update on classes.
   "PUT /api/academics/classes/{classId}/ai-materials",
   // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm.
   // auditAction declares the mutation, but no app.audit_logs row is written: the staged object
   // under temp/ IS the audit record, an infra-level event with no database row to pair it with —
-  // the same precedent as the SES email webhook above. The object's lifecycle is itself traceable
+  // the same precedent as the Resend email webhook above. The object's lifecycle is itself traceable
   // via the school-prefixed key, which is the application half of the storage tenant boundary.
   "POST /api/storage/uploads/request-upload",
   "POST /api/storage/uploads/confirm",
@@ -585,11 +586,16 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/platform/schools/{schoolId}/license-quotes/{quoteId}/withdraw",
   "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/void",
   "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/activate-early",
+  "PUT /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
+  "DELETE /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link",
+  "PUT /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link",
+  "DELETE /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link",
   "POST /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payments",
   "POST /api/platform/schools/{schoolId}/license-payments/{paymentId}/void",
   "POST /api/platform/schools/{schoolId}/license-payments/upload-url",
   "POST /api/platform/schools/{schoolId}/license-receipts/{receiptId}/match",
   "POST /api/school/license/quotes/{quoteId}/accept",
+  "POST /api/school/license/quotes/{quoteId}/decline",
   "POST /api/school/license/invoices/{invoiceId}/receipts",
   // The license console's catalog (session 4): features and tiers are global, audited in the
   // operator's home school.
@@ -599,6 +605,7 @@ const EXPECTED_MUTATING_ROUTES = [
   // Manual grants (000211): audited from inside the service transaction (the console's two rows
   // for a super admin acting on another school).
   "POST /api/platform/schools/{schoolId}/grants",
+  "POST /api/platform/schools/{schoolId}/storage-subscription/invoices/{invoiceId}/refund",
   "POST /api/platform/schools/{schoolId}/grants/{grantId}/revoke",
   // School-defined student and parent records (modules/records/routes.ts): the template editor
   // (recordTemplate:manage), filling records in and documents (studentRecord:update), and the

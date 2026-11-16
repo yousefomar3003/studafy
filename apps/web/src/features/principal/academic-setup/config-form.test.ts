@@ -6,6 +6,7 @@ import {
   draftFromTemplate,
   draftToBody,
   emptyDraft,
+  hasIncompleteFields,
   newAssessment,
   newCategory,
   validateDraft,
@@ -164,5 +165,19 @@ describe("config-form", () => {
       annualTotal: 100,
       valid: true,
     });
+  });
+
+  test("a new marked assessment has no maximum until one is entered", () => {
+    const draft = emptyDraft(TERMS);
+    const category = { ...newCategory(), name: "Quizzes" };
+    const quiz = { ...newAssessment(category, "term-1"), name: "Quiz 1" };
+    expect(quiz.maxMarks).toBe("");
+    expect(newAssessment(category, "term-1", "descriptive").maxMarks).toBe("1");
+
+    draft.categories = [category];
+    draft.assessments = [quiz];
+    expect(hasIncompleteFields(draft)).toBe(true);
+    draft.assessments = [{ ...quiz, maxMarks: "20" }];
+    expect(hasIncompleteFields(draft)).toBe(false);
   });
 });

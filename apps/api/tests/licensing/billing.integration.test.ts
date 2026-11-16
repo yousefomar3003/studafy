@@ -21,6 +21,7 @@ import {
   createLicense,
   createQuote,
   createReceipt,
+  declineQuote,
   matchReceipt,
   readInvoice,
   recordPayment,
@@ -795,6 +796,192 @@ describe("changes to a license in force", () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
+// Declining a quote (000223)
+// ---------------------------------------------------------------------------------------------------
+
+async function declined(f: SchoolFixture, quoteId: string, reason: string | null, now?: Date) {
+  return as(f.schoolId, f.admin, async (tx) => ({
+    result: await declineQuote(tx, f.schoolId, quoteId, f.admin, reason, now),
+  }));
+}
+
+describe("declining a quote", () => {
+  integrationTest(
+    "the school declines a sent quote with a reason; it is closed and cannot be accepted",
+    async () => {
+      const f = await school();
+      const quote = await sentQuote(f, newTerm(120));
+
+      const closed = await declined(f, quote.id, "  Too expensive for 120 students  ");
+      expect(closed).toMatchObject({
+        status: "declined",
+        declineReason: "Too expensive for 120 students",
+        declinedBy: f.admin.userId,
+        invoiceId: null,
+      });
+      expect(closed.declinedAt).not.toBeNull();
+      expect(closed.closedAt).not.toBeNull();
+
+      expect(await refusal(accepted(f, quote.id))).toBe("LICENSE_QUOTE_NOT_EDITABLE");
+      expect(await refusal(accepted(f, quote.id, operator))).toBe("LICENSE_QUOTE_NOT_EDITABLE");
+      expect(await refusal(declined(f, quote.id, null))).toBe("LICENSE_QUOTE_NOT_EDITABLE");
+      // Nothing was created for it.
+      const [counts] = await asAdmin(
+        f.schoolId,
+        (tx) => tx<{ licenses: number; invoices: number }[]>`
+          SELECT (SELECT count(*)::int FROM app.school_licenses WHERE school_id = ${f.schoolId}::uuid) AS licenses,
+                 (SELECT count(*)::int FROM app.license_invoices WHERE school_id = ${f.schoolId}::uuid) AS invoices
+        `,
+      );
+      expect(counts).toEqual({ licenses: 0, invoices: 0 });
+
+      // Audited, and the super admin can price a new quote for the school straight away.
+      const [audit] = await asAdmin(
+        f.schoolId,
+        (tx) => tx<{ new_values: Record<string, unknown> }[]>`
+          SELECT new_values FROM app.audit_logs
+          WHERE target_table = 'license_quotes' AND target_id = ${quote.id}::uuid
+            AND new_values->>'status' = 'declined'
+        `,
+      );
+      expect(audit?.new_values).toMatchObject({
+        status: "declined",
+        decline_reason: "Too expensive for 120 students",
+      });
+      const next = await sentQuote(f, newTerm(100));
+      expect(next.status).toBe("sent");
+    },
+  );
+
+  integrationTest("a blank reason is stored as none", async () => {
+    const f = await school();
+    const quote = await sentQuote(f, newTerm(5));
+    expect((await declined(f, quote.id, "   ")).declineReason).toBeNull();
+  });
+
+  integrationTest("only a sent quote within its validity can be declined", async () => {
+    const f = await school();
+    // A draft and a withdrawn quote are the super admin's: the school does not see them.
+    const draft = await as(f.schoolId, operator, async (tx) => ({
+      result: await createQuote(tx, f.schoolId, newTerm(5), operator),
+    }));
+    expect(await refusal(declined(f, draft.id, null))).toBe("LICENSE_QUOTE_NOT_FOUND");
+    const withdrawn = await sentQuote(f, newTerm(5));
+    await as(f.schoolId, operator, async (tx) => ({
+      result: await withdrawQuote(tx, f.schoolId, withdrawn.id, operator),
+    }));
+    expect(await refusal(declined(f, withdrawn.id, null))).toBe("LICENSE_QUOTE_NOT_FOUND");
+
+    const acceptedQuote = await sentQuote(f, newTerm(5));
+    await accepted(f, acceptedQuote.id);
+    expect(await refusal(declined(f, acceptedQuote.id, null))).toBe("LICENSE_QUOTE_NOT_EDITABLE");
+
+    const past = new Date(Date.now() - 40 * DAY);
+    const expired = await sentQuote(f, newTerm(5, { startsAt: past }), past);
+    expect(await refusal(declined(f, expired.id, null))).toBe("LICENSE_QUOTE_EXPIRED");
+  });
+
+  integrationTest("another school cannot decline it", async () => {
+    const f = await school();
+    const other = await school(0, "Other School");
+    const quote = await sentQuote(f, newTerm(5));
+    const attempt = as(other.schoolId, other.admin, async (tx) => ({
+      result: await declineQuote(tx, other.schoolId, quote.id, other.admin, null),
+    }));
+    expect(await refusal(attempt)).toBe("LICENSE_QUOTE_NOT_FOUND");
+    expect((await sentQuote(f, newTerm(6))).status).toBe("sent");
+    const [row] = await asAdmin(
+      f.schoolId,
+      (tx) => tx<{ status: string }[]>`
+        SELECT status FROM app.license_quotes WHERE id = ${quote.id}::uuid
+      `,
+    );
+    expect(row?.status).toBe("sent");
+  });
+
+  integrationTest("the overlap credits it priced stay open for the next quote", async () => {
+    const f = await school(1);
+    const licenseId = await activeLicense(
+      f,
+      10,
+      new Date(Date.now() - DAY),
+      new Date(Date.now() + 300 * DAY),
+    );
+    await as(
+      f.schoolId,
+      f.admin,
+      (tx) =>
+        assignSeats(
+          tx,
+          f.schoolId,
+          licenseId,
+          { audience: "student", userIds: [f.students[0]!.userId] },
+          f.admin,
+        ) as never,
+    );
+    await asAdmin(f.schoolId, async (tx) => {
+      const [seat] = await tx<{ id: string; user_id: string }[]>`
+        SELECT id::text AS id, user_id::text AS user_id FROM app.license_seats
+        WHERE license_id = ${licenseId}::uuid
+      `;
+      const [sub] = await tx<{ id: string }[]>`
+        INSERT INTO app.ai_subscriptions (school_id, student_id, status, current_period_start, current_period_end)
+        VALUES (${f.schoolId}::uuid, ${f.students[0]!.id}::uuid, 'active', now() - interval '10 days', now() + interval '44 days')
+        RETURNING id::text AS id
+      `;
+      await tx`
+        INSERT INTO app.license_seat_overlaps (
+          school_id, license_id, seat_id, user_id, ai_subscription_id, provider, overlap_starts_at,
+          overlap_ends_at, overlap_days, currency_id, monthly_seat_price_minor,
+          daily_seat_price_minor, credit_minor, renewal_action, renewal_status
+        )
+        SELECT ${f.schoolId}::uuid, ${licenseId}::uuid, ${seat!.id}::uuid, ${seat!.user_id}::uuid,
+               ${sub!.id}::uuid, 'tap', now(), now() + interval '44 days', 44, c.id,
+               3000, 98.630137, 4438, 'cancel_at_period_end', 'done'
+        FROM app.currencies AS c WHERE c.code = 'USD'
+      `;
+    });
+
+    const quote = await sentQuote(f, { kind: "extension", licenseId, months: 1 });
+    expect(quote.creditTotalMinor).toBe(4438);
+    await declined(f, quote.id, "Not now");
+    const next = await sentQuote(f, { kind: "extension", licenseId, months: 1 });
+    expect(next.creditTotalMinor).toBe(4438);
+  });
+
+  integrationTest("the database keeps a decline consistent", async () => {
+    const f = await school();
+    const quote = await sentQuote(f, newTerm(5));
+    // A reason without a decline, or a decline without who and when, is refused.
+    expect(
+      await refusal(
+        asAdmin(
+          f.schoolId,
+          (tx) => tx`
+            UPDATE app.license_quotes SET decline_reason = 'x' WHERE id = ${quote.id}::uuid
+          `,
+        ).catch((err: { constraint_name?: string }) => {
+          throw { code: err.constraint_name };
+        }),
+      ),
+    ).toBe("ck_license_quotes_declined");
+    expect(
+      await refusal(
+        asAdmin(
+          f.schoolId,
+          (tx) => tx`
+            UPDATE app.license_quotes SET status = 'declined', closed_at = now()
+            WHERE id = ${quote.id}::uuid
+          `,
+        ).catch((err: { constraint_name?: string }) => {
+          throw { code: err.constraint_name };
+        }),
+      ),
+    ).toBe("ck_license_quotes_declined");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
 // Quote rules
 // ---------------------------------------------------------------------------------------------------
 
@@ -864,6 +1051,68 @@ describe("quote rules", () => {
       const { invoice } = await accepted(f, quote.id);
       expect(invoice.status).toBe("paid");
       expect(await licenseStatus(f.schoolId, invoice.licenseId)).toBe("active");
+    },
+  );
+});
+
+describe("students only (LICENSABLE_AUDIENCES)", () => {
+  integrationTest("a new quote with teacher seats or Family+ is refused", async () => {
+    const f = await school();
+    expect(
+      await refusal(sentQuote(f, newTerm(5, { teacher: { planId: tiers.teacher, seats: 2 } }))),
+    ).toBe("LICENSE_AUDIENCE_NOT_OFFERED");
+    expect(await refusal(sentQuote(f, newTerm(5, { includeFamilyPlus: true })))).toBe(
+      "LICENSE_AUDIENCE_NOT_OFFERED",
+    );
+    // A teacher tier with no seats is refused too: it is not on offer.
+    expect(
+      await refusal(sentQuote(f, newTerm(5, { teacher: { planId: tiers.teacher, seats: 0 } }))),
+    ).toBe("LICENSE_AUDIENCE_NOT_OFFERED");
+    // Students alone are priced as before.
+    expect((await sentQuote(f, newTerm(5))).status).toBe("sent");
+  });
+
+  integrationTest(
+    "a license that already holds teacher seats keeps them but gets no more",
+    async () => {
+      const f = await school();
+      const licenseId = await as(f.schoolId, operator, async (tx) => {
+        const license = await createLicense(
+          tx,
+          f.schoolId,
+          {
+            startsAt: new Date(Date.now() - DAY),
+            endsAt: new Date(Date.now() + 200 * DAY),
+            currencyCode: "USD",
+            includeFamilyPlus: false,
+            student: { planId: tiers.student, seats: 10 },
+            teacher: { planId: tiers.teacher, seats: 3 },
+          },
+          operator,
+        );
+        const active = await transitionLicense(tx, f.schoolId, license.id, "active", operator);
+        return { result: active.result.id, versions: active.versions };
+      });
+
+      // More students on it is fine; the teacher seats it holds ride along unchanged.
+      const more = await sentQuote(f, {
+        kind: "seat_increase",
+        licenseId,
+        student: { planId: tiers.student, seats: 20 },
+      });
+      expect(more.status).toBe("sent");
+      expect(
+        await refusal(
+          sentQuote(f, {
+            kind: "seat_increase",
+            licenseId,
+            teacher: { planId: tiers.teacher, seats: 4 },
+          }),
+        ),
+      ).toBe("LICENSE_AUDIENCE_NOT_OFFERED");
+      expect(
+        await refusal(sentQuote(f, { kind: "seat_increase", licenseId, includeFamilyPlus: true })),
+      ).toBe("LICENSE_AUDIENCE_NOT_OFFERED");
     },
   );
 });
@@ -1089,14 +1338,40 @@ describe("route permissions", () => {
         expect(
           (await asRole(f, role, "POST", `/api/school/license/quotes/${quote.id}/accept`)).status,
         ).toBe(403);
+        expect(
+          (
+            await asRole(f, role, "POST", `/api/school/license/quotes/${quote.id}/decline`, {
+              reason: null,
+            })
+          ).status,
+        ).toBe(403);
       }
+
+      // A principal declines a second quote with a reason; the school still lists it.
+      const other = await sentQuote(f, newTerm(20));
+      const decline = await asRole(
+        f,
+        ROLES.PRINCIPAL,
+        "POST",
+        `/api/school/license/quotes/${other.id}/decline`,
+        { reason: "We only need 10 seats" },
+      );
+      expect(decline.status).toBe(200);
+      expect(await decline.json()).toMatchObject({
+        status: "declined",
+        declineReason: "We only need 10 seats",
+      });
+      const declinedList = (await (
+        await asRole(f, ROLES.ORG_ADMIN, "GET", "/api/school/license/quotes?status=declined")
+      ).json()) as { quotes: { id: string }[] };
+      expect(declinedList.quotes.map((q) => q.id)).toEqual([other.id]);
 
       const listed = (await (
         await asRole(f, ROLES.ORG_ADMIN, "GET", "/api/school/license/quotes")
       ).json()) as {
         quotes: { id: string; status: string }[];
       };
-      expect(listed.quotes.map((q) => q.status)).toEqual(["sent"]);
+      expect(listed.quotes.map((q) => q.status)).toEqual(["declined", "sent"]);
 
       const accept = await asRole(
         f,
@@ -1266,4 +1541,97 @@ describe("route permissions", () => {
     });
     expect(bank.status).toBe(400);
   });
+
+  integrationTest(
+    "a Revolut payment link: the super admin sets, replaces and removes it; the school sees it only while unpaid",
+    async () => {
+      const f = await school();
+      const { invoice } = await accepted(f, (await sentQuote(f, newTerm(4))).id);
+      const linkPath = `/api/platform/schools/${f.schoolId}/license-invoices/${invoice.id}/payment-link`;
+      const schoolView = async () =>
+        (await (
+          await asRole(f, ROLES.ORG_ADMIN, "GET", `/api/school/license/invoices/${invoice.id}`)
+        ).json()) as { paymentLink: string | null };
+
+      expect((await schoolView()).paymentLink).toBeNull();
+
+      const link = "https://checkout.revolut.com/pay/0b4f3c1e-77aa-4d1b-9b77-5a1f4c2e9d10";
+      const set = await asOperator("PUT", linkPath, { url: link });
+      expect(set.status).toBe(200);
+      expect(((await set.json()) as { paymentLink: string }).paymentLink).toBe(link);
+      expect((await schoolView()).paymentLink).toBe(link);
+      const list = (await (
+        await asRole(f, ROLES.ORG_ADMIN, "GET", "/api/school/license/invoices")
+      ).json()) as { invoices: { id: string; paymentLink: string | null }[] };
+      expect(list.invoices.find((i) => i.id === invoice.id)!.paymentLink).toBe(link);
+
+      const replaced = await asOperator("PUT", linkPath, { url: "https://revolut.me/studafy" });
+      expect(((await replaced.json()) as { paymentLink: string }).paymentLink).toBe(
+        "https://revolut.me/studafy",
+      );
+
+      for (const bad of [
+        "http://revolut.me/studafy",
+        "https://evil.example/pay",
+        "https://revolut.com.evil.example/pay",
+        "https://user:pass@revolut.me/studafy",
+        "javascript:alert(1)",
+        `https://revolut.me/${"a".repeat(490)}`,
+      ]) {
+        const refused = await asOperator("PUT", linkPath, { url: bad });
+        expect([400, 422]).toContain(refused.status);
+        if (refused.status === 422) {
+          expect(((await refused.json()) as { code: string }).code).toBe(
+            "LICENSE_PAYMENT_LINK_INVALID",
+          );
+        }
+      }
+      expect((await schoolView()).paymentLink).toBe("https://revolut.me/studafy");
+
+      // A school can neither set nor remove it.
+      expect(
+        (await asRole(f, ROLES.ORG_ADMIN, "PUT", linkPath, { url: "https://revolut.me/x" })).status,
+      ).toBe(403);
+      expect((await asRole(f, ROLES.ORG_ADMIN, "DELETE", linkPath)).status).toBe(403);
+
+      const removed = await asOperator("DELETE", linkPath);
+      expect(removed.status).toBe(200);
+      expect(((await removed.json()) as { paymentLink: string | null }).paymentLink).toBeNull();
+      expect((await schoolView()).paymentLink).toBeNull();
+
+      // Paid in full: the link is no longer shown, and can no longer be set.
+      await asOperator("PUT", linkPath, { url: link });
+      await pay(f, invoice.id, invoice.totalMinor);
+      expect((await schoolView()).paymentLink).toBeNull();
+      const onPaid = await asOperator("PUT", linkPath, { url: link });
+      expect(onPaid.status).toBe(409);
+      expect(((await onPaid.json()) as { code: string }).code).toBe("LICENSE_INVOICE_NOT_PAYABLE");
+
+      // A void invoice refuses it too.
+      const other = await school();
+      const { invoice: voided } = await accepted(other, (await sentQuote(other, newTerm(2))).id);
+      await as(other.schoolId, operator, async (tx) => ({
+        result: await voidInvoice(tx, other.schoolId, voided.id, "Sent by mistake", operator),
+      }));
+      const onVoid = await asOperator(
+        "PUT",
+        `/api/platform/schools/${other.schoolId}/license-invoices/${voided.id}/payment-link`,
+        { url: link },
+      );
+      expect(onVoid.status).toBe(409);
+
+      // The write is audited, on the instalment it changed (000221: one, for an invoice paid at once).
+      const audits = await asAdmin(
+        f.schoolId,
+        (tx) =>
+          tx<{ n: number }[]>`
+          SELECT count(*)::int AS n FROM app.audit_logs
+          WHERE target_table = 'license_invoice_instalments'
+            AND new_values ->> 'invoice_id' = ${invoice.id}
+            AND new_values ? 'payment_link'
+        `,
+      );
+      expect(audits[0]!.n).toBeGreaterThanOrEqual(4);
+    },
+  );
 });

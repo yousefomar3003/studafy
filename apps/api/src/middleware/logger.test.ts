@@ -89,4 +89,45 @@ describe("logger middleware", () => {
       query: { page: "1", limit: "10" },
     });
   });
+
+  test("redacts credential query values (OAuth code/state, RTDN token, password, secret)", async () => {
+    const { app, lines } = buildApp((a) => {
+      a.get("/api/test", (c) => c.json({ ok: true }));
+    });
+
+    await app.request(
+      "/api/test?code=oauth-code&state=oauth-state&token=rtdn-secret&password=hunter2&secret=s3cr3t&page=1",
+    );
+
+    const received = records(lines).filter((record) => record.msg === "request received");
+    expect(received[0]?.query).toEqual({
+      code: "[REDACTED]",
+      state: "[REDACTED]",
+      token: "[REDACTED]",
+      password: "[REDACTED]",
+      secret: "[REDACTED]",
+      page: "1",
+    });
+    for (const value of ["oauth-code", "oauth-state", "rtdn-secret", "hunter2", "s3cr3t"]) {
+      expect(lines.join("")).not.toContain(value);
+    }
+  });
+
+  test("never writes an invitation or school-verification token from the path", async () => {
+    const { app, lines } = buildApp();
+    const invitationToken = "i".repeat(64);
+    const verificationToken = "v".repeat(64);
+
+    await app.request(`/api/auth/invitations/${invitationToken}/activate`);
+    await app.request(`/api/schools/verify-email/${verificationToken}`);
+
+    const received = records(lines).filter((record) => record.msg === "request received");
+    expect(received.map((record) => record.path)).toEqual([
+      "/api/auth/invitations/[REDACTED]/activate",
+      "/api/schools/verify-email/[REDACTED]",
+    ]);
+    const output = lines.join("");
+    expect(output).not.toContain(invitationToken);
+    expect(output).not.toContain(verificationToken);
+  });
 });

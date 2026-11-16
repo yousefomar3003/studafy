@@ -1,4 +1,4 @@
-import { PERMISSIONS } from "@studafy/constants";
+import { isLicensableAudience, PERMISSIONS } from "@studafy/constants";
 import { Button, Table } from "@studafy/ui";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
@@ -10,6 +10,7 @@ import { useMoney } from "../platform/licensing/format";
 import { LicenseHeader, LicenseStatusPill, SeatMeter } from "./LicenseHeader";
 import {
   AUDIENCES,
+  shownAudiences,
   useInvoicesQuery,
   useOfferedTiersQuery,
   useSchoolLicenseQuery,
@@ -49,9 +50,10 @@ export default function LicensePage() {
         title={t("schoolLicense.overview.title")}
         description={t("schoolLicense.overview.description")}
         actions={
-          canManage ? (
+          // With no license yet, the empty state below carries the same action.
+          canManage && license ? (
             <Button variant="secondary" onClick={() => setRequesting(true)}>
-              {t("schoolLicense.overview.requestChange")}
+              {t("schoolLicense.aiRequest.open")}
             </Button>
           ) : null
         }
@@ -59,7 +61,14 @@ export default function LicensePage() {
       {overview.isPending ? <p role="status">{t("schoolLicense.common.loading")}</p> : null}
       {overview.isError ? <p role="alert">{t("schoolLicense.common.loadError")}</p> : null}
       {overview.data && !license ? (
-        <p className="license-muted">{t("schoolLicense.overview.noLicense")}</p>
+        <div className="license-section">
+          <p className="license-muted">{t("schoolLicense.aiRequest.noLicense")}</p>
+          {canManage ? (
+            <Button variant="primary" onClick={() => setRequesting(true)}>
+              {t("schoolLicense.aiRequest.open")}
+            </Button>
+          ) : null}
+        </div>
       ) : null}
       {license ? (
         <>
@@ -105,14 +114,16 @@ function Facts({ license }: { license: SchoolLicense }) {
           })}
         </dd>
       </div>
-      <div>
-        <dt>{t("schoolLicense.overview.familyPlus")}</dt>
-        <dd>
-          {license.includeFamilyPlus
-            ? t("schoolLicense.overview.familyPlusIncluded")
-            : t("schoolLicense.overview.familyPlusNotIncluded")}
-        </dd>
-      </div>
+      {isLicensableAudience("parent") || license.includeFamilyPlus ? (
+        <div>
+          <dt>{t("schoolLicense.overview.familyPlus")}</dt>
+          <dd>
+            {license.includeFamilyPlus
+              ? t("schoolLicense.overview.familyPlusIncluded")
+              : t("schoolLicense.overview.familyPlusNotIncluded")}
+          </dd>
+        </div>
+      ) : null}
       <div>
         <dt>{t("schoolLicense.overview.balance")}</dt>
         <dd>
@@ -148,8 +159,8 @@ export function limitText(
 function AudienceTable({ license, tiers }: { license: SchoolLicense; tiers: OfferedTier[] }) {
   const { t } = useTranslation();
   const { formatNumber } = useFormatters();
-  const rows = AUDIENCES.filter((a) => a !== "parent" || license.includeFamilyPlus).map(
-    (audience) => license.audiences.find((row) => row.audience === audience)!,
+  const rows = shownAudiences(license).map((audience) =>
+    license.audiences.find((row) => row.audience === audience)!,
   );
 
   return (

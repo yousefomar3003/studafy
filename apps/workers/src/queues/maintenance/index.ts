@@ -1,3 +1,17 @@
+export {
+  ABANDONED_MATERIAL_BATCH_SIZE,
+  ABANDONED_UPLOAD_AGE_HOURS,
+  FAILED_MATERIAL_RETENTION_DAYS,
+  purgeAbandonedMaterials,
+} from "./abandoned-material-sweep";
+export type {
+  MaterialObjectStore,
+  PurgeAbandonedMaterialsResult,
+} from "./abandoned-material-sweep";
+export {
+  ABANDONED_MATERIAL_SWEEP_CRON_PATTERN,
+  scheduleAbandonedMaterialSweepJob,
+} from "./abandoned-material-sweep-scheduler";
 export { runAccountDeletionSweep } from "./account-deletion-sweep";
 export type {
   AccountDeletionSweepResult,

@@ -2,12 +2,12 @@
  * Sales-inquiry notifications: emails the Studafy sales inbox about each new "Talk to us" inquiry.
  *
  * Runs inside the email dispatcher's poll cycle rather than as its own job, so it shares the
- * dispatcher's pool, SES sender and rate limiter. `app.sales_inquiries` is global (no school_id;
+ * dispatcher's pool, Resend sender and rate limiter. `app.sales_inquiries` is global (no school_id;
  * studafy_admin only, migration 000125), so it is read under `withSystemTx`, not a tenant tx.
  *
  * One row per transaction, claimed `FOR UPDATE SKIP LOCKED`, mirroring the outbox rows: the send
  * and the `notified_at` stamp commit together, so a crash mid-send re-sends next cycle rather than
- * dropping the notification. Transient SES errors leave the row untouched; any other failure counts
+ * dropping the notification. Transient Resend errors leave the row untouched; any other failure counts
  * an attempt and records the error, and a row stops being retried after MAX_NOTIFY_ATTEMPTS. The
  * inquiry itself is never lost: the console lists it whether or not the email went out.
  */

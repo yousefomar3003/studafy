@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../design/kit/kit.dart';
 import '../../application/parent_providers.dart';
 import '../parent_communication_screen.dart';
 import 'notification_feed_tile.dart';
@@ -20,6 +21,7 @@ class ParentNotificationsCard extends ConsumerWidget {
     return ParentSectionCard(
       titleKey: 'parent.notifications.title',
       icon: Icons.notifications_none_outlined,
+      accent: AppAccent.violet,
       trailing: IconButton(
         icon: const Icon(Icons.arrow_forward),
         tooltip: 'parent.communication.viewAll'.tr(),

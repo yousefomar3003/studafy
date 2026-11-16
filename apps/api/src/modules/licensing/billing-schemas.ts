@@ -1,4 +1,6 @@
 import { z } from "@hono/zod-openapi";
+import { LICENSE_PAYMENT_LINK_MAX_LENGTH } from "@studafy/constants";
+import { MAX_CUSTOM_INSTALMENTS, PAYMENT_PLANS } from "@studafy/license-pricing";
 
 import {
   INVOICE_STATUSES,
@@ -55,6 +57,11 @@ export const platformSchoolOnlyParamsSchema = z.object({ schoolId: pathUuid("sch
 export const platformInvoiceParamsSchema = z.object({
   schoolId: pathUuid("schoolId"),
   invoiceId: pathUuid("invoiceId"),
+});
+export const platformInstalmentParamsSchema = z.object({
+  schoolId: pathUuid("schoolId"),
+  invoiceId: pathUuid("invoiceId"),
+  instalmentId: pathUuid("instalmentId"),
 });
 export const platformPaymentParamsSchema = z.object({
   schoolId: pathUuid("schoolId"),
@@ -245,17 +252,52 @@ const termsShape = {
   adjustment: adjustmentSchema.nullable().optional(),
 };
 
+export const paymentPlanSchema = z.enum(PAYMENT_PLANS).openapi("LicensePaymentPlan", {
+  description:
+    "How the invoice is paid: in_full (one payment), monthly (one instalment per licence month, " +
+    "due on the start date and the same day each following month), or custom (paymentSchedule).",
+});
+
+const scheduledInstalmentSchema = z
+  .object({ position: z.number().int(), amountMinor: minor, dueDate: isoDate })
+  .openapi("LicenseScheduledInstalment");
+
+const customInstalmentSchema = z
+  .object({ amountMinor: z.number().int().min(1), dueDate: isoDate })
+  .openapi("LicenseCustomInstalment");
+
+const paymentTermsShape = {
+  paymentPlan: paymentPlanSchema.optional(),
+  paymentSchedule: z
+    .array(customInstalmentSchema)
+    .min(1)
+    .max(MAX_CUSTOM_INSTALMENTS)
+    .nullable()
+    .optional()
+    .openapi({
+      description:
+        "For a custom plan only: amounts adding up to the quote's total exactly, dates in order and " +
+        "not before today. 422 LICENSE_PAYMENT_SCHEDULE_INVALID otherwise. On a replace, a custom " +
+        "schedule must be sent again whenever the total changes.",
+    }),
+};
+
 export const quoteBodySchema = z
   .object({
     kind: quoteKindSchema,
     licenseId: uuid.nullable().optional(),
     ...termsShape,
+    ...paymentTermsShape,
     notes: z.string().trim().min(1).max(2000).nullable().optional(),
   })
   .openapi("LicenseQuoteBody");
 
 export const quoteReplaceBodySchema = z
-  .object({ ...termsShape, notes: z.string().trim().min(1).max(2000).nullable().optional() })
+  .object({
+    ...termsShape,
+    ...paymentTermsShape,
+    notes: z.string().trim().min(1).max(2000).nullable().optional(),
+  })
   .openapi("LicenseQuoteReplaceBody");
 
 export const calculateBodySchema = z
@@ -265,6 +307,7 @@ export const calculateBodySchema = z
     kind: quoteKindSchema,
     licenseId: uuid.nullable().optional(),
     ...termsShape,
+    ...paymentTermsShape,
   })
   .openapi("LicenseQuoteCalculateBody");
 
@@ -284,6 +327,25 @@ export const calculationSchema = z
     includeFamilyPlus: z.boolean(),
     audiences: z.array(quoteAudienceSchema),
     breakdown: breakdownSchema,
+    paymentPlan: paymentPlanSchema,
+    schedulePreview: z.array(scheduledInstalmentSchema).openapi({
+      description: "The instalments if accepted today; empty while the custom schedule has errors.",
+    }),
+    scheduleErrors: z
+      .array(
+        z.enum([
+          "empty",
+          "too_many",
+          "invalid_date",
+          "non_positive",
+          "not_ascending",
+          "sum_mismatch",
+          "in_past",
+        ]),
+      )
+      .openapi({
+        description: "What is wrong with a custom schedule; empty when it can be saved.",
+      }),
   })
   .openapi("LicenseQuoteCalculation");
 
@@ -312,16 +374,36 @@ export const quoteSchema = z
     pricedAt: z.string().datetime(),
     validUntil: z.string().datetime(),
     notes: z.string().nullable(),
+    paymentPlan: paymentPlanSchema,
+    paymentSchedule: z.array(customInstalmentSchema).nullable(),
+    schedulePreview: z.array(scheduledInstalmentSchema).openapi({
+      description:
+        "The instalments the invoice would have if the quote were accepted today; the invoice " +
+        "carries the real ones.",
+    }),
     createdBy: uuid,
     sentAt: z.string().datetime().nullable(),
     acceptedAt: z.string().datetime().nullable(),
     acceptedBy: uuid.nullable(),
     acceptedByPlatform: z.boolean().nullable(),
     closedAt: z.string().datetime().nullable(),
+    declinedAt: z.string().datetime().nullable(),
+    declinedBy: uuid.nullable(),
+    declineReason: z.string().nullable().openapi({
+      description: "The school's optional reason, when it declined the quote.",
+    }),
     invoiceId: uuid.nullable(),
     createdAt: z.string().datetime(),
   })
   .openapi("LicenseQuote");
+
+export const declineQuoteBodySchema = z
+  .object({
+    reason: z.string().trim().max(1000).nullable().optional().openapi({
+      description: "Why the school declines, for the super admin. Optional.",
+    }),
+  })
+  .openapi("DeclineLicenseQuoteBody");
 
 export const quoteListSchema = z
   .object({ quotes: z.array(quoteSchema) })
@@ -330,6 +412,25 @@ export const quoteListSchema = z
 // ---------------------------------------------------------------------------------------------------
 // Invoices, payments, receipts
 // ---------------------------------------------------------------------------------------------------
+
+export const instalmentSchema = z
+  .object({
+    id: uuid,
+    position: z.number().int(),
+    amountMinor: minor,
+    paidMinor: minor,
+    balanceMinor: minor,
+    dueDate: isoDate,
+    status: z.enum(["due", "partially_paid", "paid"]),
+    overdue: z.boolean(),
+    overdueAt: z.string().datetime().nullable(),
+    current: z.boolean().openapi({
+      description:
+        "The instalment to pay now: the earliest not fully paid, while the invoice is open.",
+    }),
+    paymentLink: z.string().url().nullable(),
+  })
+  .openapi("LicenseInvoiceInstalment");
 
 const invoiceShape = {
   id: uuid,
@@ -352,6 +453,17 @@ const invoiceShape = {
   overdueAt: z.string().datetime().nullable(),
   voidedAt: z.string().datetime().nullable(),
   voidReason: z.string().nullable(),
+  paymentPlan: paymentPlanSchema,
+  paymentLink: z
+    .string()
+    .url()
+    .nullable()
+    .openapi({
+      description:
+        "The online payment link (Revolut) of the instalment to pay now, while the invoice can still " +
+        "be paid; null when it has none or the invoice is paid or void. A payment made through it " +
+        "is still recorded by Studafy. Every instalment's own link is in the detail's instalments.",
+    }),
   createdAt: z.string().datetime(),
 };
 
@@ -438,6 +550,7 @@ export const invoiceDetailSchema = z
   .object({
     ...invoiceShape,
     overdue: z.boolean(),
+    instalments: z.array(instalmentSchema),
     lines: z.array(invoiceLineSchema),
     payments: z.array(paymentSchema),
     receipts: z.array(receiptSchema),
@@ -454,6 +567,20 @@ export const acceptQuoteResponseSchema = z
   .openapi("LicenseQuoteAcceptance");
 
 export const voidBodySchema = z.object({ reason }).openapi("LicenseVoidBody");
+
+export const paymentLinkBodySchema = z
+  .object({
+    url: z
+      .string()
+      .min(1)
+      .max(LICENSE_PAYMENT_LINK_MAX_LENGTH)
+      .openapi({
+        description:
+          "An https payment link on an allowed provider host (revolut.com, revolut.me or a " +
+          "subdomain). Anything else: 422 LICENSE_PAYMENT_LINK_INVALID.",
+      }),
+  })
+  .openapi("LicensePaymentLinkBody");
 
 export const activateEarlyBodySchema = z
   .object({ dueDate: isoDate })

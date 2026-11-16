@@ -448,7 +448,7 @@ describeDb("class AI materials setting — turning it back on", () => {
     });
     expect((await setSetting(world.teacher, world.classId, false)).status).toBe(200);
 
-    const row = await asTenant(world.teacher, (tx) =>
+    const { material: row } = await asTenant(world.teacher, (tx) =>
       toggleAiVisible(tx, world.schoolId, materialId, true),
     );
     expect(row.ai_visible).toBe(true);

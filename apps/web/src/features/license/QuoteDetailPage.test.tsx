@@ -9,7 +9,8 @@ import type { ComponentType } from "react";
 /**
  * A quote on the school's side: the full breakdown (list price, volume and duration discounts,
  * overlap credits, the adjustment, the total) and what the school saves; accepting a sent quote,
- * which opens the invoice it issues; and no Accept on an expired quote or without license:manage.
+ * which opens the invoice it issues; declining it with an optional reason; and no Accept or Decline
+ * on an expired quote or without license:manage.
  */
 
 const QUOTE_ID = "11111111-1111-4111-8111-111111111111";
@@ -35,6 +36,9 @@ function quote(overrides: Record<string, unknown> = {}) {
     createdAt: "2026-10-20T09:00:00.000Z",
     sentAt: "2026-10-20T10:00:00.000Z",
     totalMinor: 406_400,
+    paymentPlan: "in_full",
+    paymentSchedule: null,
+    schedulePreview: [{ position: 1, amountMinor: 406_400, dueDate: "2026-12-01" }],
     breakdown: {
       currencyCode: "USD",
       months: 12,
@@ -104,6 +108,15 @@ const postMock = mock((path: string, _init?: unknown) => {
       },
     });
   }
+  if (path === "/api/school/license/quotes/{quoteId}/decline") {
+    const reason = (_init as { body: { reason: string | null } }).body.reason;
+    current = quote({
+      status: "declined",
+      declineReason: reason,
+      declinedAt: new Date().toISOString(),
+    });
+    return Promise.resolve({ data: current });
+  }
   throw new Error(`Unhandled POST ${path}`);
 });
 mock.module("../../lib/api", () => ({ api: { GET: getMock, POST: postMock } }));
@@ -146,6 +159,25 @@ describe("QuoteDetailPage", () => {
     expect(screen.getByText("Valid for this academic year")).toBeTruthy();
   });
 
+  test("a monthly quote shows its payment schedule before it is accepted", async () => {
+    current = quote({
+      paymentPlan: "monthly",
+      schedulePreview: [
+        { position: 1, amountMinor: 203_200, dueDate: "2026-11-01" },
+        { position: 2, amountMinor: 203_200, dueDate: "2026-12-01" },
+      ],
+    });
+    await renderPage();
+    const section = within(await screen.findByRole("region", { name: "Payment schedule" }));
+    expect(section.getByText("Paid monthly: 2 payments, one each licence month.")).toBeTruthy();
+    expect(section.getAllByText("$2,032.00")).toHaveLength(2);
+    expect(
+      section.getByText(
+        "Your seats start working once the first payment is received. The total is the same whichever way you pay.",
+      ),
+    ).toBeTruthy();
+  });
+
   test("accepts a sent quote and opens its invoice", async () => {
     await renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Accept quote" }));
@@ -180,5 +212,52 @@ describe("QuoteDetailPage", () => {
     await renderPage("FINANCE");
     await screen.findByRole("table", { name: "Price breakdown" });
     expect(screen.queryByRole("button", { name: "Accept quote" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Decline quote" })).toBeNull();
+  });
+
+  test("declines a sent quote with a reason, after one confirmation", async () => {
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Decline quote" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline this quote?" });
+    fireEvent.change(within(dialog).getByLabelText("Why are you declining? (optional)"), {
+      target: { value: "  Too expensive  " },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Decline quote" }));
+
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    const [path, init] = postMock.mock.calls[0]!;
+    expect(path).toBe("/api/school/license/quotes/{quoteId}/decline");
+    expect(init).toMatchObject({
+      params: { path: { quoteId: QUOTE_ID } },
+      body: { reason: "Too expensive" },
+    });
+    expect(await screen.findByText("Quote declined. Studafy has been told.")).toBeTruthy();
+  });
+
+  test("declining without a reason sends none", async () => {
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Decline quote" }));
+    const dialog = await screen.findByRole("dialog", { name: "Decline this quote?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Decline quote" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    expect(postMock.mock.calls[0]![1]).toMatchObject({ body: { reason: null } });
+  });
+
+  test("a declined quote shows its reason and offers neither Accept nor Decline", async () => {
+    current = quote({ status: "declined", declineReason: "We only need 10 seats" });
+    await renderPage();
+    expect(
+      await screen.findByText("You declined this quote: “We only need 10 seats”"),
+    ).toBeTruthy();
+    expect(screen.getByText("Declined")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Accept quote" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Decline quote" })).toBeNull();
+  });
+
+  test("an expired quote cannot be declined", async () => {
+    current = quote({ validUntil: new Date(Date.now() - DAY).toISOString() });
+    await renderPage();
+    await screen.findByRole("table", { name: "Price breakdown" });
+    expect(screen.queryByRole("button", { name: "Decline quote" })).toBeNull();
   });
 });

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/parent_providers.dart';
 import 'parent_section_card.dart';
@@ -22,6 +23,7 @@ class ChildFeesCard extends ConsumerWidget {
     return ParentSectionCard(
       titleKey: 'parent.fees.title',
       icon: Icons.account_balance_wallet_outlined,
+      accent: AppAccent.amber,
       child: ref.watch(familyFinanceProvider).when(
             loading: () => const ParentCardSkeleton(lineCount: 2),
             error: (_, _) => const ParentCardMessage(
@@ -46,12 +48,10 @@ class ChildFeesCard extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   for (final total in due)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: AppSpacing.space4),
-                      child: Text(
-                        'parent.fees.due'.tr(namedArgs: {'amount': total.label}),
-                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                      ),
+                    AppIconListTile(
+                      icon: Icons.receipt_long_outlined,
+                      accent: AppAccent.amber,
+                      title: 'parent.fees.due'.tr(namedArgs: {'amount': total.label}),
                     ),
                   if (view.dataAsOf case final asOf?) ...[
                     const SizedBox(height: AppSpacing.space4),

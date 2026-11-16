@@ -52,6 +52,27 @@ existing AI subscriber is on the `ai_addon` tier, whose limits are unlimited (se
 These are the product decisions the whole system is built to. Sessions 2–6 implement them; they are
 not reopened without the product owner.
 
+### Students only until other features are built (2026-11-14)
+
+- A license sells seats only to an audience with at least one **built** feature:
+  `LICENSABLE_AUDIENCES` in
+  [`packages/constants/src/features.ts`](../../packages/constants/src/features.ts), derived from
+  `FEATURES` (a feature marked `planned` does not count). Today that is **students only**: the AI
+  tutor and study tools. Teacher seats (AI grading), parent seats and **Family+** are `planned` and
+  are not offered anywhere: not in the school's request form, the super admin calculator, the tier
+  and pricing pages, or a license's facts.
+- The API enforces it where a license is sold: a school's change request and every quote
+  (`refuseUnofferedAudiences`, `422 LICENSE_AUDIENCE_NOT_OFFERED`). A license that already holds
+  seats in another audience keeps them: they still show, can still be assigned, and survive a seat
+  increase or an extension; they are only never added to. The super admin's direct license
+  endpoints are not checked (repair by hand).
+- Nothing is removed from the database. When a teacher or parent feature ships (its `planned` flag
+  removed), that audience comes back on every screen and in the API with no other change.
+- The school asks with **Request AI for students** (number of students, the AI tier, an optional
+  note). The console inbox shows it as "Student AI: N seats · tier X", and **Price it** opens the
+  calculator prefilled (`?schoolId=&studentSeats=&studentTier=`, plus `licenseId` and
+  `kind=seat_increase` when the school has a license in force).
+
 ### Seats
 
 - A license has a **seat count per audience** (students, teachers, parents) and a **tier per
@@ -92,18 +113,49 @@ not reopened without the product owner.
 4. When the personal subscription ends, the person continues on the school seat **with no gap**,
    and the school pays **full price** for that seat from then on.
 
-### Payment for licenses (bank transfer)
+### Payment for licenses (bank transfer or Revolut link)
 
-1. Quote.
+1. Quote. The school **accepts** it, or **declines** it with an optional reason (migration 000223):
+   a declined quote is closed like an expired or withdrawn one, can no longer be accepted, and the
+   super admin sees "Declined by the school" and the reason on the school's quotes and prices a new
+   one. Overlap credits are claimed by invoices only, so a declined quote leaves them open.
 2. Invoice, with the platform's bank details and a **unique payment reference**.
-3. The school transfers and **can upload a receipt**.
+3. The school pays by bank transfer, or online through a **Revolut payment link** when the super
+   admin added one to the invoice, and **can upload a receipt**.
 4. The super admin records the payment: amount, date, bank reference, receipt. **Partial payments
    are allowed** and the balance is tracked.
-5. The license activates when **fully paid**, OR the super admin **activates it early** with a
-   payment due date.
+5. The license activates when the **first instalment is paid in full** (the whole invoice, for one
+   paid at once), OR the super admin **activates it early** with a payment due date.
 
-Overdue invoices trigger reminders. **Suspension is a manual super admin decision, never
+Overdue instalments trigger reminders. **Suspension is a manual super admin decision, never
 automatic.**
+
+**Payment plans (migration 000221, [ADR-021](../adr/0021-licence-payment-plans.md)).** The super
+admin chooses on the quote how the school pays: **all at once**, **monthly** over the licence months
+(an 8-month licence is 8 payments, due on the start date and the same day each month; the rounding
+remainder goes on the first), or a **custom schedule** of amounts and dates that add up to the total
+exactly (dates in order, none before today, at most 24). The total is the same whichever plan: the
+volume and duration discounts apply as usual. The school sees the schedule on the quote, and on the
+invoice what is due when and what is paid of each instalment. Payments are recorded against the
+invoice and fill the **earliest instalment first** (a voided payment re-applies the rest); the
+invoice's due date is its earliest unpaid instalment's. Each instalment is reminded of when due and
+when overdue, and has **its own Revolut payment link** (console: the invoice → **Payment schedule**;
+API: `PUT|DELETE …/license-invoices/{invoiceId}/instalments/{instalmentId}/payment-link`). The
+calculator previews the schedule live (`POST /api/platform/licenses/quote` returns `schedulePreview`
+and `scheduleErrors`).
+
+**Revolut payment link (migration 000220).** Licences are never paid through Stripe or renewed
+automatically. The super admin makes a payment link in Revolut's own dashboard and pastes it on the
+invoice (console: Payments → the invoice → **Payment link**; API:
+`PUT|DELETE /api/platform/schools/{schoolId}/license-invoices/{invoiceId}/payment-link`, which since
+000221 sets the link of the instalment to pay now). The school
+then sees **Pay online** beside the bank details while the invoice is issued or partly paid; once it
+is paid or void the link is hidden and can no longer be set. Only https links on the hosts in
+`LICENSE_PAYMENT_LINK_HOSTS` (`@studafy/constants`: `revolut.com`, `revolut.me` and their
+subdomains), at most 500 characters, are accepted — by the API, re-checked by the school's page, and
+floored by a database CHECK. Studafy does not talk to Revolut: when the money arrives, the super admin
+records it with **Record a transfer**, exactly as for a bank transfer. The due and overdue reminder
+emails still describe the bank transfer only.
 
 ### Pricing
 

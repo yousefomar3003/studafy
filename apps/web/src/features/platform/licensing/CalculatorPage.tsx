@@ -4,10 +4,11 @@ import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
+import { PaymentSchedule } from "../../license/PaymentSchedule";
 import { PlatformPageHeader } from "../PlatformNav";
 import { useSchoolDetailQuery, useSchoolsListQuery } from "../queries";
 
-import { AUDIENCES } from "./constants";
+import { AUDIENCES, offersFamilyPlus, shownAudiences } from "./constants";
 import { bpsToPercent, currencyMinorUnit, toMinor, useMoney } from "./format";
 import { useCreateQuote, useQuoteAction } from "./mutations";
 import {
@@ -33,6 +34,15 @@ import type {
 } from "./queries";
 
 type QuoteKind = QuoteCalculateBody["kind"];
+type PaymentPlan = NonNullable<QuoteCalculateBody["paymentPlan"]>;
+
+const PAYMENT_PLANS: readonly PaymentPlan[] = ["in_full", "monthly", "custom"];
+
+interface CustomRow {
+  key: number;
+  amount: string;
+  dueDate: string;
+}
 type SeatLine = Extract<PriceLine, { kind: "seats" }>;
 
 const KINDS: readonly QuoteKind[] = ["new", "seat_increase", "extension"];
@@ -51,6 +61,11 @@ interface AudienceState {
  *
  * `?schoolId=&licenseId=&kind=` prefill it: the school page's "change seats or tiers" opens a seat
  * increase for a license in force, or a new term re-pricing a draft or awaiting-payment one.
+ * `&studentSeats=&studentTier=` prefill the student seats and tier, as a school's "Request AI for
+ * students" does from the console inbox.
+ *
+ * The super admin also picks how the school pays (docs/adr/0021): all at once, monthly over the
+ * licence months, or a custom schedule of amounts and dates; the API previews the instalments live.
  */
 export default function CalculatorPage() {
   const { t } = useTranslation();
@@ -74,13 +89,18 @@ export default function CalculatorPage() {
   const [familyPlus, setFamilyPlus] = useState(false);
   const [withCredits, setWithCredits] = useState(true);
   const [audiences, setAudiences] = useState<Record<LicenseAudience, AudienceState>>({
-    student: { planId: "", seats: "" },
+    student: {
+      planId: params.get("studentTier") ?? "",
+      seats: /^\d{1,6}$/.test(params.get("studentSeats") ?? "") ? params.get("studentSeats")! : "",
+    },
     teacher: { planId: "", seats: "" },
     parent: { planId: "", seats: "" },
   });
   const [adjustment, setAdjustment] = useState("");
   const [adjustmentReason, setAdjustmentReason] = useState("");
   const [notes, setNotes] = useState("");
+  const [plan, setPlan] = useState<PaymentPlan>("in_full");
+  const [customRows, setCustomRows] = useState<CustomRow[]>([{ key: 1, amount: "", dueDate: "" }]);
 
   const changesLicense = kind !== "new";
   // A change prices a license in force; a new term may instead re-price a draft or awaiting-payment
@@ -91,6 +111,12 @@ export default function CalculatorPage() {
       : l.status === "draft" || l.status === "awaiting_payment",
   );
   const license = pickable.find((l) => l.id === licenseId) ?? null;
+  // Only what a license sells today, plus what a picked license in force already holds.
+  const held = changesLicense ? license : null;
+  const offered = useMemo(
+    () => shownAudiences(held).filter((a) => a !== "parent" || familyPlus),
+    [held, familyPlus],
+  );
 
   // A picked license seeds the terms: its currency, tiers, seats and Family+ (and, for a new term,
   // its start).
@@ -101,12 +127,19 @@ export default function CalculatorPage() {
     setFamilyPlus(license.includeFamilyPlus);
     if (!changesLicense) setStartsAt(license.startsAt.slice(0, 10));
     setAudiences(
-      Object.fromEntries(
-        AUDIENCES.map((audience) => {
-          const row = license.audiences.find((a) => a.audience === audience);
-          return [audience, { planId: row?.tier?.id ?? "", seats: String(row?.purchased ?? 0) }];
-        }),
-      ) as Record<LicenseAudience, AudienceState>,
+      (prev) =>
+        Object.fromEntries(
+          AUDIENCES.map((audience) => {
+            const row = license.audiences.find((a) => a.audience === audience);
+            // A seat increase asks for new totals: keep totals the inbox prefilled when they are more.
+            const wanted = Number(prev[audience].seats || "0");
+            const seats = Math.max(row?.purchased ?? 0, changesLicense ? wanted : 0);
+            return [
+              audience,
+              { planId: row?.tier?.id ?? prev[audience].planId, seats: String(seats) },
+            ];
+          }),
+        ) as Record<LicenseAudience, AudienceState>,
     );
   }
 
@@ -123,6 +156,18 @@ export default function CalculatorPage() {
 
   const adjustmentMinor =
     adjustment.trim() === "" ? 0 : signedMinor(adjustment, currencyMinorUnit(effectiveCurrency));
+  // A custom schedule goes to the API only once every row is a positive amount with a date; the
+  // calculation then reports anything else wrong with it (the sum, the order, a past date).
+  const customSchedule = useMemo(() => {
+    const minorUnit = currencyMinorUnit(effectiveCurrency);
+    const parsed = customRows.map((row) => ({
+      amountMinor: toMinor(row.amount, minorUnit),
+      dueDate: row.dueDate,
+    }));
+    return parsed.every((row) => row.amountMinor !== null && row.amountMinor > 0 && row.dueDate)
+      ? parsed.map((row) => ({ amountMinor: row.amountMinor!, dueDate: row.dueDate }))
+      : null;
+  }, [customRows, effectiveCurrency]);
   const body = useMemo<QuoteCalculateBody | null>(() => {
     if (changesLicense && !license) return null;
     if (!effectiveCurrency) return null;
@@ -132,7 +177,7 @@ export default function CalculatorPage() {
       return null;
     const audienceInput = (audience: LicenseAudience) => {
       const row = audiences[audience];
-      if (audience === "parent" && !familyPlus) return undefined;
+      if (!offered.includes(audience)) return undefined;
       const seats = Number(row.seats || "0");
       if (!Number.isInteger(seats) || seats < 0) return undefined;
       return seats > 0 || row.planId ? { planId: row.planId || null, seats } : undefined;
@@ -145,7 +190,7 @@ export default function CalculatorPage() {
       months: kind === "seat_increase" ? undefined : monthsNumber,
       startsAt:
         kind === "new" && startsAt ? new Date(`${startsAt}T00:00:00Z`).toISOString() : undefined,
-      includeFamilyPlus: familyPlus,
+      includeFamilyPlus: familyPlus && offersFamilyPlus(held),
       student: audienceInput("student"),
       teacher: audienceInput("teacher"),
       parent: audienceInput("parent"),
@@ -154,17 +199,23 @@ export default function CalculatorPage() {
         adjustmentMinor !== 0
           ? { amountMinor: adjustmentMinor, reason: adjustmentReason.trim() }
           : null,
+      paymentPlan: plan,
+      paymentSchedule: plan === "custom" ? customSchedule : null,
     };
   }, [
     adjustmentMinor,
     adjustmentReason,
     audiences,
     changesLicense,
+    customSchedule,
+    plan,
     effectiveCurrency,
     familyPlus,
     kind,
+    held,
     license,
     months,
+    offered,
     schoolId,
     startsAt,
     withCredits,
@@ -173,9 +224,12 @@ export default function CalculatorPage() {
   const calculation = useCalculationQuery(settledBody);
   const reasonMissing =
     adjustmentMinor !== 0 && adjustmentMinor !== null && adjustmentReason.trim() === "";
+  const scheduleInvalid =
+    plan === "custom" &&
+    (customSchedule === null || (calculation.data?.scheduleErrors.length ?? 0) > 0);
 
   function save() {
-    if (!schoolId || !body || reasonMissing) return;
+    if (!schoolId || !body || reasonMissing || scheduleInvalid) return;
     createQuote.mutate(
       { schoolId, body: { ...body, notes: notes.trim() || null } },
       {
@@ -273,14 +327,16 @@ export default function CalculatorPage() {
               ) : null}
             </div>
 
-            <Checkbox
-              label={t("platformLicensing.calculator.familyPlusLabel")}
-              checked={familyPlus}
-              onChange={(event) => setFamilyPlus(event.target.checked)}
-            />
+            {offersFamilyPlus(held) ? (
+              <Checkbox
+                label={t("platformLicensing.calculator.familyPlusLabel")}
+                checked={familyPlus}
+                onChange={(event) => setFamilyPlus(event.target.checked)}
+              />
+            ) : null}
 
             <h3>{t("platformLicensing.calculator.seatsHeading")}</h3>
-            {AUDIENCES.filter((a) => a !== "parent" || familyPlus).map((audience) => (
+            {offered.map((audience) => (
               <AudienceRow
                 key={audience}
                 audience={audience}
@@ -326,6 +382,25 @@ export default function CalculatorPage() {
               checked={withCredits}
               onChange={(event) => setWithCredits(event.target.checked)}
             />
+
+            <h3>{t("platformLicensing.calculator.planHeading")}</h3>
+            <Select
+              label={t("platformLicensing.calculator.planLabel")}
+              value={plan}
+              onChange={setPlan}
+              options={PAYMENT_PLANS.map((value) => ({
+                value,
+                label: t(`platformLicensing.calculator.plan.${value}`),
+              }))}
+            />
+            {plan === "custom" ? (
+              <CustomScheduleEditor
+                rows={customRows}
+                currency={effectiveCurrency}
+                totalMinor={calculation.data?.breakdown.totalMinor ?? null}
+                onChange={setCustomRows}
+              />
+            ) : null}
           </Card.Body>
         </Card>
 
@@ -342,6 +417,12 @@ export default function CalculatorPage() {
             }
           />
           {calculation.data ? <NextBrackets calculation={calculation.data} /> : null}
+          {calculation.data ? (
+            <SchedulePreview
+              calculation={calculation.data}
+              customIncomplete={plan === "custom" && customSchedule === null}
+            />
+          ) : null}
           <Card as="section" aria-labelledby="calculator-save">
             <Card.Header>
               <h2 id="calculator-save">{t("platformLicensing.calculator.saveTitle")}</h2>
@@ -356,7 +437,9 @@ export default function CalculatorPage() {
             <Card.Footer>
               <Button
                 variant="primary"
-                disabled={!schoolId || !body || reasonMissing || !calculation.data}
+                disabled={
+                  !schoolId || !body || reasonMissing || scheduleInvalid || !calculation.data
+                }
                 loading={createQuote.isPending}
                 onClick={save}
               >
@@ -374,6 +457,133 @@ export default function CalculatorPage() {
 
       {schoolId ? <SchoolQuotes schoolId={schoolId} /> : null}
     </>
+  );
+}
+
+/**
+ * The custom schedule: one row per instalment (amount and due date), added and removed freely, with
+ * what is still left to schedule against the quote's total.
+ */
+function CustomScheduleEditor({
+  rows,
+  currency,
+  totalMinor,
+  onChange,
+}: {
+  rows: CustomRow[];
+  currency: string;
+  totalMinor: number | null;
+  onChange: (rows: CustomRow[]) => void;
+}) {
+  const { t } = useTranslation();
+  const money = useMoney();
+  const minorUnit = currencyMinorUnit(currency);
+  const scheduled = rows.reduce((sum, row) => sum + (toMinor(row.amount, minorUnit) ?? 0), 0);
+  const update = (key: number, patch: Partial<CustomRow>) =>
+    onChange(rows.map((row) => (row.key === key ? { ...row, ...patch } : row)));
+
+  return (
+    <fieldset className="licensing-schedule-editor">
+      <legend>{t("platformLicensing.calculator.customHeading")}</legend>
+      {rows.map((row, index) => (
+        <div key={row.key} className="licensing-form-grid">
+          <Input
+            label={t("platformLicensing.calculator.customAmountLabel", {
+              position: index + 1,
+              currency,
+            })}
+            inputMode="decimal"
+            value={row.amount}
+            error={
+              row.amount.trim() !== "" && !(toMinor(row.amount, minorUnit)! > 0)
+                ? t("platformLicensing.calculator.amountError")
+                : undefined
+            }
+            onChange={(event) => update(row.key, { amount: event.target.value })}
+          />
+          <Input
+            label={t("platformLicensing.calculator.customDueLabel", { position: index + 1 })}
+            type="date"
+            value={row.dueDate}
+            onChange={(event) => update(row.key, { dueDate: event.target.value })}
+          />
+          {rows.length > 1 ? (
+            <Button
+              type="button"
+              variant="tertiary"
+              onClick={() => onChange(rows.filter((r) => r.key !== row.key))}
+            >
+              {t("platformLicensing.calculator.customRemove", { position: index + 1 })}
+            </Button>
+          ) : null}
+        </div>
+      ))}
+      <div className="platform-actions">
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={rows.length >= 24}
+          onClick={() =>
+            onChange([
+              ...rows,
+              { key: Math.max(...rows.map((r) => r.key)) + 1, amount: "", dueDate: "" },
+            ])
+          }
+        >
+          {t("platformLicensing.calculator.customAdd")}
+        </Button>
+        {totalMinor !== null ? (
+          <span className="platform-muted" role="status">
+            {t("platformLicensing.calculator.customLeft", {
+              amount: money(totalMinor - scheduled, currency),
+            })}
+          </span>
+        ) : null}
+      </div>
+    </fieldset>
+  );
+}
+
+/** The instalments the quote would be invoiced in if accepted today, or what is wrong with them. */
+function SchedulePreview({
+  calculation,
+  customIncomplete,
+}: {
+  calculation: QuoteCalculation;
+  customIncomplete: boolean;
+}) {
+  const { t } = useTranslation();
+  const title = t("schoolLicense.schedule.title");
+  const errors = customIncomplete ? ["incomplete"] : calculation.scheduleErrors;
+  return (
+    <Card as="section" aria-labelledby="calculator-schedule">
+      <Card.Header>
+        <h2 id="calculator-schedule">{title}</h2>
+      </Card.Header>
+      <Card.Body>
+        {errors.length > 0 ? (
+          <ul role="alert" className="licensing-errors">
+            {errors.map((error) => (
+              <li key={error}>{t(`platformLicensing.calculator.scheduleErrors.${error}`)}</li>
+            ))}
+          </ul>
+        ) : (
+          <>
+            <p className="platform-muted">
+              {t(`schoolLicense.schedule.plan.${calculation.paymentPlan}`, {
+                count: calculation.schedulePreview.length,
+              })}
+            </p>
+            <PaymentSchedule
+              rows={calculation.schedulePreview}
+              currencyCode={calculation.currencyCode}
+              caption={title}
+            />
+            <p className="platform-muted">{t("schoolLicense.schedule.previewNote")}</p>
+          </>
+        )}
+      </Card.Body>
+    </Card>
   );
 }
 
@@ -700,6 +910,7 @@ const QUOTE_ACTIONS: Record<Quote["status"], readonly QuoteAction[]> = {
   accepted: [],
   expired: [],
   withdrawn: [],
+  declined: [],
 };
 
 /** The school's quotes with their statuses and the moves each allows. */
@@ -767,9 +978,20 @@ export function SchoolQuotes({ schoolId }: { schoolId: string }) {
                     </td>
                     <td>{formatDate(new Date(quote.validUntil), { dateStyle: "medium" })}</td>
                     <td>
-                      <span className="platform-pill" data-status={quote.status}>
-                        {t(`platformLicensing.quoteStatus.${quote.status}`)}
-                      </span>
+                      <div className="platform-cell-stack">
+                        <span className="platform-pill" data-status={quote.status}>
+                          {t(`platformLicensing.quoteStatus.${quote.status}`)}
+                        </span>
+                        {quote.status === "declined" ? (
+                          <span className="platform-muted" data-testid="quote-decline-reason">
+                            {quote.declineReason
+                              ? t("platformLicensing.quotes.declineReason", {
+                                  reason: quote.declineReason,
+                                })
+                              : t("platformLicensing.quotes.declinedNoReason")}
+                          </span>
+                        ) : null}
+                      </div>
                     </td>
                     <td>
                       <div className="platform-actions">

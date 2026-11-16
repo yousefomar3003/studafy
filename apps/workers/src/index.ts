@@ -19,6 +19,7 @@ import {
   scheduleLicenseJobs,
   scheduleSeatReconciliationJob,
   scheduleStorageQuotaReconciliationJob,
+  scheduleStorageDuplicateResolverJob,
   scheduleFinanceReconciliationJob,
 } from "./queues/billing";
 import { startEntitlementInvalidator } from "./queues/entitlements";
@@ -27,6 +28,7 @@ import {
   scheduleAccountDeletionSweepJob,
   scheduleAiMessageRetentionSweepJob,
   scheduleIpAddressRetentionSweepJob,
+  scheduleAbandonedMaterialSweepJob,
   scheduleDataRetentionSweepJob,
   schedulePartitionMaintenanceJob,
   scheduleRecordRetentionSweepJob,
@@ -235,6 +237,13 @@ void scheduleStorageQuotaReconciliationJob(storageQuotaReconciliationRedis).then
   storageQuotaReconciliationRedis.disconnect(),
 );
 
+// Duplicate storage subscription resolver (000219): idempotently register the 10-minute run that
+// cancels and refunds a storage subscription a newer purchase replaced.
+const storageDuplicateResolverRedis = createRedisConnection(env);
+void scheduleStorageDuplicateResolverJob(storageDuplicateResolverRedis).then(() =>
+  storageDuplicateResolverRedis.disconnect(),
+);
+
 // Finance reconciliation scheduler: idempotently register the daily 02:30 run of apps/api's
 // finance reconciliation (ERPNext vs installment_cache), before the school day and the billing sweeps.
 const financeReconciliationRedis = createRedisConnection(env);
@@ -301,6 +310,13 @@ void scheduleAiMessageRetentionSweepJob(aiMessageRetentionRedis).then(() =>
 const ipAddressRetentionRedis = createRedisConnection(env);
 void scheduleIpAddressRetentionSweepJob(ipAddressRetentionRedis).then(() =>
   ipAddressRetentionRedis.disconnect(),
+);
+
+// Abandoned material sweep scheduler: idempotently register the daily 04:20 deletion of material
+// uploads never confirmed after 24 hours and of failed materials left for 14 days, with their files.
+const abandonedMaterialRedis = createRedisConnection(env);
+void scheduleAbandonedMaterialSweepJob(abandonedMaterialRedis).then(() =>
+  abandonedMaterialRedis.disconnect(),
 );
 
 // Sensitive record retention scheduler (docs/modules/student-records.md "Retention"):

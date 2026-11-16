@@ -9,7 +9,7 @@
  *
  * Same mechanics as sales-inquiries.ts: runs inside the email dispatcher's poll cycle, one row per
  * transaction claimed `FOR UPDATE SKIP LOCKED` so the send and its `*_notified_at` stamp commit
- * together, transient SES errors leave the row for the next cycle, and any other failure counts an
+ * together, transient Resend errors leave the row for the next cycle, and any other failure counts an
  * attempt and stops after MAX_NOTIFY_ATTEMPTS. The application itself is never lost: the console
  * lists it whether or not an email went out.
  */

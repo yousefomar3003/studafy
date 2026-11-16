@@ -349,3 +349,154 @@ describe("StripeAdapter catalog sync", () => {
     await expect(failure).rejects.toMatchObject({ status: 502 });
   });
 });
+
+// ---------------------------------------------------------------------------------------------------
+// An immediate storage change, paid with the card the school chose (ADR-022). The real adapter over
+// an in-memory Stripe that records every call: only the chosen card is charged, never the default
+// first; a wrong amount is never charged; a decline puts everything back.
+// ---------------------------------------------------------------------------------------------------
+
+interface ChangeFake {
+  calls: string[];
+  updates: Record<string, unknown>[];
+  payments: Record<string, unknown>[];
+  amountDue: number;
+  decline: boolean;
+}
+
+function changeFake(): { fake: ChangeFake; client: Stripe } {
+  const fake: ChangeFake = {
+    calls: [],
+    updates: [],
+    payments: [],
+    amountDue: 3_862,
+    decline: false,
+  };
+  const invoice = (status: string, paid = 0) => ({
+    id: "in_change",
+    status,
+    amount_due: fake.amountDue,
+    amount_paid: paid,
+    currency: "usd",
+  });
+  const client = {
+    subscriptions: {
+      retrieve: () =>
+        Promise.resolve({
+          id: "sub_1",
+          customer: "cus_1",
+          metadata: { addon: "storage", price_id: "local_100" },
+          items: { data: [{ id: "si_1", price: { id: "price_100" }, quantity: 1 }] },
+        }),
+      update: (_id: string, params: Record<string, unknown>) => {
+        fake.calls.push("subscriptions.update");
+        fake.updates.push(params);
+        return Promise.resolve({});
+      },
+    },
+    invoices: {
+      create: () => {
+        fake.calls.push("invoices.create");
+        return Promise.resolve(invoice("draft"));
+      },
+      finalizeInvoice: (_id: string, params: Record<string, unknown>) => {
+        fake.calls.push(`invoices.finalize:auto_advance=${String(params.auto_advance)}`);
+        return Promise.resolve(invoice("open"));
+      },
+      pay: (_id: string, params: Record<string, unknown>) => {
+        fake.calls.push("invoices.pay");
+        fake.payments.push(params);
+        if (fake.decline) {
+          return Promise.reject(
+            new Stripe.errors.StripeCardError({
+              type: "card_error",
+              message: "Your card has insufficient funds.",
+            }),
+          );
+        }
+        return Promise.resolve(invoice("paid", fake.amountDue));
+      },
+      retrieve: () => Promise.resolve(invoice("open")),
+      voidInvoice: () => {
+        fake.calls.push("invoices.void");
+        return Promise.resolve(invoice("void"));
+      },
+    },
+  } as unknown as Stripe;
+  return { fake, client };
+}
+
+function changeInput(overrides: Record<string, unknown> = {}) {
+  return {
+    providerSubscriptionId: "sub_1",
+    priceId: "price_1tb",
+    chargeNow: true,
+    prorationDate: 1_790_000_000,
+    idempotencyKey: "storage-change:row:key",
+    metadata: { price_id: "local_1tb", billing_interval: "monthly" },
+    expectedAmountMinor: 3_862,
+    paymentMethodId: "pm_other",
+    ...overrides,
+  };
+}
+
+describe("StripeAdapter immediate storage change", () => {
+  test("charges only the chosen card, for the confirmed amount, with no automatic attempt", async () => {
+    const { fake, client } = changeFake();
+    const adapter = new StripeAdapter({ secretKey: "sk_test_x", webhookSecret: "whsec_x", client });
+
+    const result = await adapter.changeSubscriptionPrice(changeInput());
+
+    expect(result).toEqual({
+      applied: true,
+      invoice: { id: "in_change", amountPaidMinor: 3_862, currency: "USD" },
+    });
+    expect(fake.calls).toEqual([
+      "subscriptions.update",
+      "invoices.create",
+      "invoices.finalize:auto_advance=false",
+      "invoices.pay",
+    ]);
+    expect(fake.payments).toEqual([{ off_session: true, payment_method: "pm_other" }]);
+    expect(fake.updates[0]).toMatchObject({
+      proration_behavior: "create_prorations",
+      proration_date: 1_790_000_000,
+    });
+    // Neither the subscription's nor the customer's renewal card is touched.
+    expect(fake.updates.some((update) => "default_payment_method" in update)).toBe(false);
+  });
+
+  test("a declined card voids the invoice and puts the old price back", async () => {
+    const { fake, client } = changeFake();
+    fake.decline = true;
+    const adapter = new StripeAdapter({ secretKey: "sk_test_x", webhookSecret: "whsec_x", client });
+
+    const result = await adapter.changeSubscriptionPrice(changeInput());
+
+    expect(result).toMatchObject({ applied: false, failure: "declined" });
+    expect(fake.calls).toEqual([
+      "subscriptions.update",
+      "invoices.create",
+      "invoices.finalize:auto_advance=false",
+      "invoices.pay",
+      "invoices.void",
+      "subscriptions.update",
+    ]);
+    expect(fake.updates[1]).toMatchObject({
+      items: [{ id: "si_1", price: "price_100" }],
+      proration_behavior: "none",
+    });
+  });
+
+  test("an invoice for any other amount than the confirmed one is never charged", async () => {
+    const { fake, client } = changeFake();
+    fake.amountDue = 3_879;
+    const adapter = new StripeAdapter({ secretKey: "sk_test_x", webhookSecret: "whsec_x", client });
+
+    const result = await adapter.changeSubscriptionPrice(changeInput());
+
+    expect(result).toMatchObject({ applied: false, failure: "amount_changed" });
+    expect(fake.payments).toEqual([]);
+    expect(fake.calls).toContain("invoices.void");
+  });
+});

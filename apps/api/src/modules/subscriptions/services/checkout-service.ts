@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { LIVE_STATUSES } from "@studafy/billing";
 import { ERROR_CODES } from "@studafy/constants";
 
@@ -47,6 +49,8 @@ interface SchoolBillingRow {
   id: string;
   name: string;
   stripe_customer_id: string | null;
+  /** Mode of `stripe_customer_id`: true live, false Sandbox, null not yet known (000225). */
+  stripe_customer_livemode: boolean | null;
   tap_customer_id: string | null;
   default_currency_id: string;
 }
@@ -64,7 +68,8 @@ interface PlanPriceRow {
 
 async function findSchool(tx: TransactionSql, schoolId: string): Promise<SchoolBillingRow> {
   const [school] = await tx<SchoolBillingRow[]>`
-    SELECT id, name, stripe_customer_id, tap_customer_id, default_currency_id
+    SELECT id, name, stripe_customer_id, stripe_customer_livemode, tap_customer_id,
+           default_currency_id
     FROM app.schools
     WHERE id = ${schoolId}::uuid
     LIMIT 1
@@ -77,43 +82,93 @@ async function findSchool(tx: TransactionSql, schoolId: string): Promise<SchoolB
 }
 
 /**
- * The school's customer at the selected provider, created on first checkout.
+ * The school's customer at the selected provider, created on first checkout -- exactly one per
+ * school, and for Stripe one per account mode (live or Sandbox, docs/billing/stripe-modes.md).
  *
- * Written in the same transaction as the rest of checkout. If that transaction rolls back after the
- * provider call, the provider holds a customer Studafy has no record of and the next checkout makes
- * another; for Stripe the `customer.created` webhook repairs the gap, and for Tap the orphan is
- * harmless because attribution also falls back to `metadata.school_id`.
+ * The id is written in the same transaction as the rest of checkout, so a checkout that fails after
+ * this call rolls the write back. That used to leave an orphan at Stripe and make a new customer on
+ * every retry (seven "studafy test school" customers by 2026-11-14). Now nothing is lost: before
+ * creating one, the customer Stripe already holds for the school (`metadata.school_id`) is reused,
+ * and the create carries an idempotency key per school and mode, so a retry inside Stripe's window
+ * gets the same customer back even while search has not caught up.
+ *
+ * A stored Stripe id is used only when it belongs to the key's mode. One from the other mode (after
+ * switching between live and Sandbox keys) is replaced by this mode's customer; its mode is asked of
+ * Stripe once when not yet recorded.
  */
 async function ensureProviderCustomer(
   tx: TransactionSql,
   selected: SelectedPaymentProvider,
   school: SchoolBillingRow,
 ): Promise<string> {
-  const existing = selected.name === "tap" ? school.tap_customer_id : school.stripe_customer_id;
-  if (existing) return existing;
-
-  const { providerCustomerId } = await selected.port.createCustomer({
-    name: school.name,
-    email: "",
-    metadata: { school_id: school.id },
-  });
-
-  // Two literal statements, not an interpolated column name (see the SQL-safety lint).
   if (selected.name === "tap") {
+    if (school.tap_customer_id) return school.tap_customer_id;
+    const { providerCustomerId } = await selected.port.createCustomer({
+      name: school.name,
+      email: "",
+      metadata: { school_id: school.id },
+    });
     await tx`
       UPDATE app.schools
       SET tap_customer_id = ${providerCustomerId}, updated_at = CURRENT_TIMESTAMP
       WHERE id = ${school.id}::uuid
     `;
-  } else {
-    await tx`
-      UPDATE app.schools
-      SET stripe_customer_id = ${providerCustomerId}, updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${school.id}::uuid
-    `;
+    return providerCustomerId;
   }
 
-  return providerCustomerId;
+  const port = selected.port;
+  const livemode = port.livemode;
+
+  // A test double or a key of unknown mode: the stored customer is used as it is.
+  if (livemode === undefined) {
+    if (school.stripe_customer_id) return school.stripe_customer_id;
+  } else if (school.stripe_customer_id) {
+    if (school.stripe_customer_livemode === livemode) return school.stripe_customer_id;
+    if (school.stripe_customer_livemode === null && port.retrieveCustomer) {
+      const seen = await port.retrieveCustomer(school.stripe_customer_id);
+      if (seen && seen.livemode === livemode) {
+        await storeStripeCustomer(tx, school.id, school.stripe_customer_id, livemode);
+        return school.stripe_customer_id;
+      }
+    }
+    // From the other mode (or gone): this mode's customer takes its place below.
+  }
+
+  const reused = port.findCustomerBySchoolId ? await port.findCustomerBySchoolId(school.id) : null;
+  const customerId =
+    reused ??
+    (
+      await port.createCustomer({
+        name: school.name,
+        email: "",
+        metadata: { school_id: school.id },
+        idempotencyKey: customerIdempotencyKey(school, livemode),
+      })
+    ).providerCustomerId;
+
+  await storeStripeCustomer(tx, school.id, customerId, livemode ?? null);
+  return customerId;
+}
+
+/** One key per school, mode and name: the create's parameters must match for Stripe to replay it. */
+function customerIdempotencyKey(school: SchoolBillingRow, livemode: boolean | undefined): string {
+  const mode = livemode === undefined ? "unknown" : livemode ? "live" : "sandbox";
+  const name = createHash("sha256").update(school.name).digest("hex").slice(0, 16);
+  return `school-customer:${school.id}:${mode}:${name}`;
+}
+
+async function storeStripeCustomer(
+  tx: TransactionSql,
+  schoolId: string,
+  customerId: string,
+  livemode: boolean | null,
+): Promise<void> {
+  await tx`
+    UPDATE app.schools
+    SET stripe_customer_id = ${customerId}, stripe_customer_livemode = ${livemode},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${schoolId}::uuid
+  `;
 }
 
 /**
@@ -448,6 +503,46 @@ export async function createAiCheckoutSession(
   });
 }
 
+function storagePurchasePending(): CodedHttpException {
+  return new CodedHttpException(
+    409,
+    ERROR_CODES.STORAGE_ADDON_PURCHASE_PENDING,
+    "A storage purchase for this school is already paid or being confirmed",
+  );
+}
+
+/**
+ * Refuse while the provider already has a live storage subscription for the customer, and close
+ * every storage checkout still open so only the one about to be made can be paid. A checkout paid
+ * while it was being closed counts as a live purchase.
+ */
+async function closeEarlierStorageCheckouts(
+  selected: SelectedPaymentProvider,
+  customerId: string,
+): Promise<void> {
+  const { findAddonPurchasesInFlight, expireCheckoutSession } = selected.port;
+  if (!findAddonPurchasesInFlight || !expireCheckoutSession) {
+    // Selling storage online requires both (requireOnlineStorageProvider admits Stripe only).
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.STORAGE_ADDON_UNAVAILABLE,
+      "The storage add-on cannot be bought online for this school",
+    );
+  }
+
+  const inFlight = await findAddonPurchasesInFlight.call(selected.port, {
+    customerId,
+    addon: "storage",
+  });
+  if (inFlight.liveSubscriptionIds.length > 0) throw storagePurchasePending();
+
+  for (const sessionId of inFlight.openCheckoutSessionIds) {
+    if ((await expireCheckoutSession.call(selected.port, sessionId)) === "completed") {
+      throw storagePurchasePending();
+    }
+  }
+}
+
 export interface StorageCheckoutParams {
   schoolId: string;
   priceId: string;
@@ -463,6 +558,11 @@ export interface StorageCheckoutParams {
  * purchase would fall through to the school's own subscription. One add-on per school -- a school
  * that has one changes its tier (storage-addon-service.ts) rather than buying a second, which would
  * bill it twice.
+ *
+ * Studafy's own row appears only when the provider's webhook arrives, which can be a minute after
+ * the payment. So a second purchase is also refused while the provider itself holds a live storage
+ * subscription for the school, and every earlier checkout still open is closed before a new one is
+ * made: at most one payable storage checkout exists for a school at any moment.
  */
 export async function createStorageCheckoutSession(
   database: Database,
@@ -472,6 +572,10 @@ export async function createStorageCheckoutSession(
   const { schoolId, priceId, successUrl, cancelUrl, tenantContext } = params;
 
   return withTenantTx(database, tenantContext, async (tx) => {
+    // One storage checkout at a time per school: a double click, a second tab or a retry waits here
+    // for the first to finish, then sees what it did.
+    await tx`SELECT pg_advisory_xact_lock(hashtextextended(${`storage-checkout:${schoolId}`}, 0))`;
+
     const school = await findSchool(tx, schoolId);
     const selected = await requireOnlineStorageProvider(tx, providers, schoolId);
 
@@ -495,6 +599,8 @@ export async function createStorageCheckoutSession(
 
     const line = checkoutLine(selected, price);
     const customerId = await ensureProviderCustomer(tx, selected, school);
+
+    await closeEarlierStorageCheckouts(selected, customerId);
 
     const session = await selected.port.createCheckoutSession({
       customerId,

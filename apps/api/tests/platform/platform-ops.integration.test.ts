@@ -293,6 +293,27 @@ describe("system health", () => {
         VALUES ('m-1', 'bounce', '{}'::jsonb), ('m-2', 'complaint', '{}'::jsonb)
       `;
     });
+    await asAdminIn(alpha, async (tx) => {
+      const [storage] = await tx<{ id: string }[]>`
+        INSERT INTO app.storage_subscriptions (
+          school_id, cap_bytes, status, current_period_start, current_period_end,
+          stripe_subscription_id
+        ) VALUES (
+          ${alpha}, ${1024 ** 4}, 'active', CURRENT_TIMESTAMP,
+          CURRENT_TIMESTAMP + interval '30 days', 'sub_health_new'
+        )
+        RETURNING id
+      `;
+      await tx`
+        INSERT INTO app.storage_duplicate_subscriptions (
+          school_id, storage_subscription_id, stripe_subscription_id, kept_stripe_subscription_id,
+          status, attempts, last_error
+        ) VALUES
+          (${alpha}, ${storage!.id}, 'sub_health_old', 'sub_health_new', 'pending', 1, NULL),
+          (${alpha}, ${storage!.id}, 'sub_health_stray', 'sub_health_new', 'needs_review', 0,
+           'check it in Stripe')
+      `;
+    });
 
     const health = await getSystemHealth(database(), null);
     expect(health.notificationDeadLetters.total).toBe(1);
@@ -301,6 +322,18 @@ describe("system health", () => {
       count: 1,
     });
     expect(health.email).toMatchObject({ bounces: 1, complaints: 1 });
+    // Duplicate storage subscriptions: open ones, needing a person first.
+    expect(health.storageDuplicates.open).toBe(2);
+    expect(health.storageDuplicates.items.map((item) => item.stripeSubscriptionId)).toEqual([
+      "sub_health_stray",
+      "sub_health_old",
+    ]);
+    expect(health.storageDuplicates.items[0]).toMatchObject({
+      schoolId: alpha,
+      schoolName: "Alpha Academy",
+      status: "needs_review",
+      lastError: "check it in Stripe",
+    });
     // No Redis here: the job and storage sections say so instead of failing.
     expect(health.jobs.available).toBe(false);
     expect(health.storage.available).toBe(false);

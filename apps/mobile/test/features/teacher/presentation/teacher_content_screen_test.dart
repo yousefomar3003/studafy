@@ -16,6 +16,7 @@ import 'package:studafy_mobile/src/core/api/generated/models/update_assignment_b
 import 'package:studafy_mobile/src/core/api/generated/models/update_material_body.dart';
 import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
+import 'package:studafy_mobile/src/features/student/presentation/widgets/material_week_sections.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/teacher_content_screen.dart';
 
 import '../../../support/ensure_date_formatting.dart';
@@ -29,6 +30,8 @@ material_api.Material _materialFixture({
   String title = 'Notes',
   String? description,
   String ingestStatus = 'ready',
+  int? week,
+  int? day,
 }) => material_api.Material.fromJson({
   'id': id,
   'school_id': 'school-1',
@@ -46,6 +49,8 @@ material_api.Material _materialFixture({
   'ingest_status': ingestStatus,
   'ingest_error': null,
   'ingested_at': _t0,
+  'week_number': week,
+  'day_of_week': day,
   'created_at': _t0,
   'updated_at': _t0,
 });
@@ -105,12 +110,43 @@ class _ContentAcademicsClient extends FakeAcademicsClient {
 
   List<material_api.Material> materials;
   final List<(String, UpdateMaterialBody)> updateCalls = [];
+  final List<String> retryCalls = [];
+  final List<String> deleteCalls = [];
   int listCalls = 0;
+
+  @override
+  Future<material_api.Material> retryMaterial({
+    required String materialId,
+  }) async {
+    retryCalls.add(materialId);
+    materials = [
+      for (final m in materials)
+        m.id == materialId
+            ? material_api.Material.fromJson({
+                ...m.toJson(),
+                'ingest_status': 'scanning',
+                'ingest_error': null,
+              })
+            : m,
+    ];
+    return materials.firstWhere((m) => m.id == materialId);
+  }
+
+  @override
+  Future<void> deleteMaterial({required String materialId}) async {
+    deleteCalls.add(materialId);
+    materials = [
+      for (final m in materials)
+        if (m.id != materialId) m,
+    ];
+  }
 
   @override
   Future<MaterialList> listMaterials({
     String? classId,
     IngestStatus? ingestStatus,
+    int? weekNumber,
+    int? dayOfWeek,
     int? limit = 20,
     int? offset = 0,
   }) async {
@@ -131,6 +167,8 @@ class _ContentAcademicsClient extends FakeAcademicsClient {
                 ...m.toJson(),
                 'title': body.title,
                 'description': body.description,
+                'week_number': body.weekNumber,
+                'day_of_week': body.dayOfWeek,
               })
             : m,
     ];
@@ -170,6 +208,7 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 
 void main() {
   setUpAll(ensureDateFormattingInitialized);
+  setUp(resetMaterialWeekSectionsSession);
 
   testWidgets(
     'edits an assignment with the form prefilled and refreshes the list',
@@ -285,6 +324,7 @@ void main() {
     await tester.tap(find.text('Create assignment'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextFormField).at(0), 'Essay');
+    await tester.enterText(find.byKey(const Key('assignmentPoints')), '20');
     await _tapVisible(tester, find.text('Published'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Draft').last);
@@ -299,6 +339,115 @@ void main() {
       CreateAssignmentBodyStatus.draft,
     );
     expect(find.text('Essay'), findsOneWidget);
+  });
+
+  group('assignment points', () {
+    Future<_ContentAssignmentsClient> openCreate(WidgetTester tester) async {
+      // Tall enough that the whole form is built, so the submit button and the points error are
+      // on screen together.
+      tester.view.physicalSize = const Size(800, 2400);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+      final assignments = _ContentAssignmentsClient([]);
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: assignments,
+          academics: _ContentAcademicsClient([]),
+        ),
+      );
+      await tester.tap(find.text('Create assignment'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextFormField).at(0), 'Essay');
+      return assignments;
+    }
+
+    final points = find.byKey(const Key('assignmentPoints'));
+
+    String pointsText(WidgetTester tester) =>
+        tester.widget<TextFormField>(points).controller!.text;
+
+    testWidgets('a new assignment starts with no total, only a hint', (
+      tester,
+    ) async {
+      await openCreate(tester);
+
+      expect(pointsText(tester), isEmpty);
+      expect(find.text('Out of how many points?'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, '100'), findsNothing);
+    });
+
+    testWidgets('refuses to save until the teacher enters a total', (
+      tester,
+    ) async {
+      final assignments = await openCreate(tester);
+
+      await _tapVisible(tester, find.text('Publish assignment'));
+      await tester.pumpAndSettle();
+
+      expect(assignments.createCalls, isEmpty);
+      expect(
+        find.text('Enter how many points this assignment is out of.'),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('applies the API limits on the total', (tester) async {
+      final assignments = await openCreate(tester);
+
+      for (final (input, message) in [
+        ('0', 'Enter valid points.'),
+        ('abc', 'Enter valid points.'),
+        ('10001', "Points can't be more than 10,000."),
+        ('12.345', 'Use at most two decimal places.'),
+      ]) {
+        await tester.enterText(points, input);
+        await _tapVisible(tester, find.text('Publish assignment'));
+        await tester.pumpAndSettle();
+        expect(find.text(message), findsOneWidget, reason: input);
+      }
+      expect(assignments.createCalls, isEmpty);
+    });
+
+    testWidgets('sends the total the teacher typed, Arabic digits included', (
+      tester,
+    ) async {
+      final assignments = await openCreate(tester);
+
+      await tester.enterText(points, '٢٥٫٥');
+      await _tapVisible(tester, find.text('Publish assignment'));
+      await tester.pumpAndSettle();
+
+      expect(assignments.createCalls, hasLength(1));
+      expect(assignments.createCalls.single.maxScore, 25.5);
+    });
+
+    testWidgets('editing keeps the saved total', (tester) async {
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: _ContentAssignmentsClient([
+            assignmentFixture(id: 'a-1', classId: 'class-1', maxScore: 25),
+          ]),
+          academics: _ContentAcademicsClient([]),
+        ),
+      );
+
+      await tester.tap(find.byTooltip('Edit assignment'));
+      await tester.pumpAndSettle();
+
+      expect(pointsText(tester), '25');
+    });
+
+    testWidgets('a questions assignment asks for no total', (tester) async {
+      await openCreate(tester);
+
+      await tester.tap(find.text('Questions'));
+      await tester.pumpAndSettle();
+
+      expect(points, findsNothing);
+      expect(find.text('Out of how many points?'), findsNothing);
+    });
   });
 
   testWidgets('edits a material title and description', (tester) async {
@@ -352,6 +501,159 @@ void main() {
 
     expect(academics.updateCalls, isEmpty);
     expect(find.text('Enter a title.'), findsOneWidget);
+  });
+
+  group('week and day', () {
+    Future<_ContentAcademicsClient> pumpMaterials(
+      WidgetTester tester,
+      List<material_api.Material> materials,
+    ) async {
+      final academics = _ContentAcademicsClient(materials);
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: _ContentAssignmentsClient([]),
+          academics: academics,
+        ),
+      );
+      await tester.tap(find.text('Materials'));
+      await tester.pumpAndSettle();
+      return academics;
+    }
+
+    Future<void> choose(WidgetTester tester, Key field, String option) async {
+      await _tapVisible(tester, find.byKey(field));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(option).last);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('lists materials in week sections, unscheduled last', (
+      tester,
+    ) async {
+      await pumpMaterials(tester, [
+        _materialFixture(id: 'm-1', title: 'Fractions', week: 2, day: 3),
+        _materialFixture(id: 'm-2', title: 'Old handout'),
+      ]);
+
+      expect(find.text('Week 2'), findsOneWidget);
+      expect(find.text('Unscheduled'), findsOneWidget);
+      // No current week without the term: the first section is open.
+      expect(find.text('Fractions'), findsOneWidget);
+      expect(find.text('Wednesday'), findsOneWidget);
+      expect(find.text('Old handout'), findsNothing);
+
+      await tester.tap(find.text('Unscheduled'));
+      await tester.pumpAndSettle();
+      expect(find.text('Old handout'), findsOneWidget);
+    });
+
+    testWidgets('the upload form will not upload without a week and a day', (
+      tester,
+    ) async {
+      await pumpMaterials(tester, []);
+      // An empty class offers the upload right in its empty state.
+      expect(find.text('No materials yet.'), findsOneWidget);
+      await tester.tap(find.byKey(const ValueKey('materials-empty-upload')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const ValueKey('material-week-field')), findsOneWidget);
+      await _tapVisible(
+        tester,
+        find.widgetWithText(FilledButton, 'Upload material'),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Choose the week this material is for.'),
+        findsOneWidget,
+      );
+      expect(find.text('Choose the day this material is for.'), findsOneWidget);
+      // The upload form has no way to leave a material unscheduled.
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('material-week-field')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Unscheduled'), findsNothing);
+    });
+
+    testWidgets('the edit form moves a material to another week', (
+      tester,
+    ) async {
+      final academics = await pumpMaterials(tester, [
+        _materialFixture(id: 'm-1', title: 'Fractions', week: 2, day: 3),
+      ]);
+      await tester.tap(find.byTooltip('Edit material'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Week 2'), findsOneWidget);
+      expect(find.text('Wednesday'), findsOneWidget);
+      await choose(tester, const ValueKey('material-week-field'), 'Week 5');
+      await choose(tester, const ValueKey('material-day-field-5'), 'Sunday');
+      await _tapVisible(tester, find.text('Save changes'));
+      await tester.pumpAndSettle();
+
+      final (_, body) = academics.updateCalls.single;
+      expect(body.weekNumber, 5);
+      expect(body.dayOfWeek, 7);
+      expect(find.text('Week 5'), findsOneWidget);
+    });
+
+    testWidgets('the edit form can make a material unscheduled', (
+      tester,
+    ) async {
+      final academics = await pumpMaterials(tester, [
+        _materialFixture(id: 'm-1', title: 'Fractions', week: 2, day: 3),
+      ]);
+      await tester.tap(find.byTooltip('Edit material'));
+      await tester.pumpAndSettle();
+
+      await choose(
+        tester,
+        const ValueKey('material-week-field'),
+        'Unscheduled',
+      );
+      expect(find.text('Day'), findsNothing);
+      await _tapVisible(tester, find.text('Save changes'));
+      await tester.pumpAndSettle();
+
+      final (_, body) = academics.updateCalls.single;
+      expect(body.weekNumber, isNull);
+      expect(body.dayOfWeek, isNull);
+      expect(find.text('Unscheduled'), findsOneWidget);
+    });
+
+    testWidgets(
+      'an unscheduled material saves as it is, and needs a day once placed',
+      (tester) async {
+        final academics = await pumpMaterials(tester, [
+          _materialFixture(id: 'm-1', title: 'Old handout'),
+        ]);
+        await tester.tap(find.byTooltip('Edit material'));
+        await tester.pumpAndSettle();
+
+        await choose(tester, const ValueKey('material-week-field'), 'Week 3');
+        await _tapVisible(tester, find.text('Save changes'));
+        await tester.pumpAndSettle();
+        expect(academics.updateCalls, isEmpty);
+        expect(
+          find.text('Choose the day this material is for.'),
+          findsOneWidget,
+        );
+
+        await choose(
+          tester,
+          const ValueKey('material-week-field'),
+          'Unscheduled',
+        );
+        await _tapVisible(tester, find.text('Save changes'));
+        await tester.pumpAndSettle();
+        final (_, body) = academics.updateCalls.single;
+        expect(body.weekNumber, isNull);
+        expect(body.dayOfWeek, isNull);
+      },
+    );
   });
 
   group('AI materials setting', () {
@@ -497,33 +799,50 @@ void main() {
     });
 
     testWidgets(
-      'backs off while a material is in the pipeline and stops once it settles',
+      're-reads often while the work is recent, then backs off, and stops once it settles',
       (tester) async {
         final academics = await pumpWith(tester, [
           _materialFixture(id: 'm-1', ingestStatus: 'processing'),
         ]);
         expect(academics.listCalls, 1);
 
-        await tester.pump(materialPollInitialDelay);
-        await tester.pump();
-        expect(academics.listCalls, 2);
+        // Every few seconds through the fast window: Ready shows soon after it happens.
+        final fastReads =
+            materialPollFastWindow.inMilliseconds ~/
+            materialPollInitialDelay.inMilliseconds;
+        for (var read = 1; read <= fastReads; read++) {
+          await tester.pump(materialPollInitialDelay);
+          await tester.pump();
+          expect(academics.listCalls, 1 + read);
+        }
 
-        // Doubled: nothing at the original interval, the next read at twice it.
-        await tester.pump(materialPollInitialDelay);
-        expect(academics.listCalls, 2);
+        // Past it: doubled, so nothing at the original interval, the next read at twice it.
         await tester.pump(materialPollInitialDelay);
         await tester.pump();
-        expect(academics.listCalls, 3);
+        expect(academics.listCalls, 1 + fastReads);
+        await tester.pump(materialPollInitialDelay);
+        await tester.pump();
+        expect(academics.listCalls, 2 + fastReads);
 
         academics.materials = [_materialFixture(id: 'm-1')];
         await tester.pump(materialPollInitialDelay * 4);
         await tester.pump();
-        expect(academics.listCalls, 4);
+        expect(academics.listCalls, 3 + fastReads);
 
         await tester.pump(materialPollMaxDelay * 3);
-        expect(academics.listCalls, 4);
+        expect(academics.listCalls, 3 + fastReads);
       },
     );
+
+    testWidgets('never re-reads for an upload that was never confirmed', (
+      tester,
+    ) async {
+      final academics = await pumpWith(tester, [
+        _materialFixture(id: 'm-1', ingestStatus: 'uploaded'),
+      ]);
+      await tester.pump(materialPollMaxDelay * 3);
+      expect(academics.listCalls, 1);
+    });
 
     testWidgets('pauses while another route covers the screen', (tester) async {
       final academics = await pumpWith(tester, [
@@ -549,7 +868,7 @@ void main() {
 
     testWidgets('pauses while the app is in the background', (tester) async {
       final academics = await pumpWith(tester, [
-        _materialFixture(id: 'm-1', ingestStatus: 'uploaded'),
+        _materialFixture(id: 'm-1', ingestStatus: 'queued'),
       ]);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump(materialPollMaxDelay * 3);
@@ -558,6 +877,110 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(academics.listCalls, 2);
+    });
+  });
+
+  group('a failed material', () {
+    Future<_ContentAcademicsClient> pumpWith(
+      WidgetTester tester,
+      List<material_api.Material> materials,
+    ) async {
+      final academics = _ContentAcademicsClient(materials);
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: _ContentAssignmentsClient([]),
+          academics: academics,
+        ),
+      );
+      await tester.tap(find.text('Materials'));
+      await tester.pumpAndSettle();
+      return academics;
+    }
+
+    testWidgets('offers Retry and Delete; a ready one offers neither', (
+      tester,
+    ) async {
+      await pumpWith(tester, [
+        _materialFixture(id: 'm-ok'),
+        _materialFixture(id: 'm-failed', ingestStatus: 'failed'),
+        _materialFixture(id: 'm-blocked', ingestStatus: 'quarantined'),
+      ]);
+
+      expect(
+        find.byKey(const ValueKey('material-retry-m-failed')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('material-delete-m-failed')),
+        findsOneWidget,
+      );
+      // A blocked file was infected: it can be removed, never re-run.
+      expect(
+        find.byKey(const ValueKey('material-retry-m-blocked')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('material-delete-m-blocked')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('material-retry-m-ok')), findsNothing);
+      expect(find.byKey(const ValueKey('material-delete-m-ok')), findsNothing);
+    });
+
+    testWidgets('Retry sends it back to scanning and re-reads the list', (
+      tester,
+    ) async {
+      final academics = await pumpWith(tester, [
+        _materialFixture(id: 'm-failed', ingestStatus: 'failed'),
+      ]);
+      final calls = academics.listCalls;
+
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('material-retry-m-failed')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(academics.retryCalls, ['m-failed']);
+      expect(academics.listCalls, calls + 1);
+      expect(find.text('Checking the file again.'), findsOneWidget);
+      expect(find.text('Scanning'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('material-retry-m-failed')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('Delete asks first, then removes it', (tester) async {
+      final academics = await pumpWith(tester, [
+        _materialFixture(
+          id: 'm-failed',
+          title: 'Algebra',
+          ingestStatus: 'failed',
+        ),
+      ]);
+
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('material-delete-m-failed')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Delete this material?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(academics.deleteCalls, isEmpty);
+
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('material-delete-m-failed')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(academics.deleteCalls, ['m-failed']);
+      expect(find.text('Algebra'), findsNothing);
     });
   });
 }

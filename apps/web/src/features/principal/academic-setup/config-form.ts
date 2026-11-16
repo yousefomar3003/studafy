@@ -323,7 +323,9 @@ export function newAssessment(
     categoryKey: category.key,
     termId: category.scope === "annual" ? null : termId,
     name: "",
-    maxMarks: method === "descriptive" ? "1" : "100",
+    // A descriptive skill stores a placeholder maximum of 1. A marked assessment starts blank: the
+    // school decides what it is out of, and saving is blocked until it does (hasIncompleteFields).
+    maxMarks: method === "descriptive" ? "1" : "",
     weight: "1",
     mandatory: true,
     assessmentDate: "",

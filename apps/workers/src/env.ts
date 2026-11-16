@@ -130,7 +130,9 @@ export const envSchema = z
     FRONTEND_URL: z.string().url().default("http://localhost:5180"),
     // Email dispatcher tunables. See queues/notifications/email/dispatcher.ts for how they bound
     // the polling loop.
-    EMAIL_MAX_RATE_PER_SECOND: z.coerce.number().positive().default(5),
+    // Resend's default API limit is 2 requests/second per team; a 429 is retried, but pacing under
+    // the limit keeps a burst (a digest run) from spending its cycles on rejected requests.
+    EMAIL_MAX_RATE_PER_SECOND: z.coerce.number().positive().default(2),
     EMAIL_POLL_INTERVAL_MS: z.coerce.number().int().min(100).default(1_000),
     EMAIL_BATCH_SIZE: z.coerce.number().int().positive().default(25),
     // ST-133. 500ms rather than the email dispatcher's 1s: this consumer carries the <5s entitlement

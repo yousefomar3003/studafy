@@ -157,6 +157,11 @@ class _AppShellScaffoldState extends ConsumerState<_AppShellScaffold> {
               icon:
                   destination.decorateIcon?.call(Icon(destination.icon)) ??
                   Icon(destination.icon),
+              selectedIcon: switch (destination.selectedIcon) {
+                null => null,
+                final filled =>
+                  destination.decorateIcon?.call(Icon(filled)) ?? Icon(filled),
+              },
               label: destination.labelKey.tr(),
             ),
         ],

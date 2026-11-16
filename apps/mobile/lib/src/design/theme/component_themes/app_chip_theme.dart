@@ -19,6 +19,7 @@ abstract final class AppChipTheme {
       selectedColor: colors.primaryContainer,
       labelStyle: (textTheme.labelSmall ?? const TextStyle()).copyWith(
         color: colors.onPrimaryContainer,
+        fontWeight: AppFontWeight.semibold,
         height: AppLineHeight.sm / AppFontSize.xs,
       ),
       labelPadding: EdgeInsets.zero,

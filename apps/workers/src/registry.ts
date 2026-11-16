@@ -22,7 +22,7 @@ import { processStudentImport } from "./queues/imports/worker";
 import { processMaintenanceJob } from "./queues/maintenance";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
-import { deadLetterListener } from "./queues/notifications/dead-letter";
+import { deadLetterListener, isTerminalFailure } from "./queues/notifications/dead-letter";
 import { processNotificationDelivery } from "./queues/notifications/delivery.worker";
 import {
   DELIVERY_JOB_OPTIONS,
@@ -286,6 +286,27 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         semaphore: ingestionSemaphore(),
         enqueueDerivation,
       });
+    },
+    // The processor itself marks the material failed and alerts the uploader on the last attempt;
+    // this only makes that visible in the logs, which otherwise showed nothing for a failed material.
+    onFailed: (job, error) => {
+      const data = (job?.data ?? {}) as Partial<AiIngestionJobData>;
+      const fields = {
+        event: "material_ingestion_failed",
+        school_id: data.schoolId ?? null,
+        material_id: data.materialId ?? null,
+        job_id: job?.id ?? null,
+        attempts_made: job?.attemptsMade ?? null,
+        err: { type: error.name, message: error.message, stack: error.stack },
+      };
+      if (isTerminalFailure(job)) {
+        workerLogger.error(
+          fields,
+          "material ingestion exhausted its retries; material marked failed",
+        );
+      } else {
+        workerLogger.warn(fields, "material ingestion attempt failed; retrying");
+      }
     },
   },
   {

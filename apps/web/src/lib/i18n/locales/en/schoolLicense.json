@@ -218,7 +218,8 @@
     "sent": "Waiting for you",
     "accepted": "Accepted",
     "expired": "Expired",
-    "withdrawn": "Withdrawn"
+    "withdrawn": "Withdrawn",
+    "declined": "Declined"
   },
   "quotes": {
     "title": "Quotes",
@@ -235,6 +236,17 @@
   "quote": {
     "title": "Quote: {{kind}}",
     "accept": "Accept quote",
+    "decline": "Decline quote",
+    "declineTitle": "Decline this quote?",
+    "declineBody": "It is closed and can't be accepted afterwards. Studafy sees your reason and can send you a new quote.",
+    "declineReasonLabel": "Why are you declining? (optional)",
+    "declineReasonHelp": "For example: too expensive, fewer students, a different start date.",
+    "declineReasonTooLong": "Keep it under 1,000 characters.",
+    "declineConfirm": "Decline quote",
+    "declined": "Quote declined. Studafy has been told.",
+    "declineError": "The quote wasn't declined",
+    "declinedNote": "You declined this quote.",
+    "declinedWithReason": "You declined this quote: “{{reason}}”",
     "breakdownTitle": "Price breakdown",
     "columns": {
       "item": "Item",
@@ -346,7 +358,11 @@
     },
     "open": "Open",
     "openReceipt": "Open {{file}}",
-    "paymentsTitle": "Payments on this invoice"
+    "paymentsTitle": "Payments on this invoice",
+    "payOnline": "Pay online",
+    "payOnlineHelp": "You'll pay securely through Revolut. Your payment is confirmed once Studafy records it.",
+    "howToPayInstalment": "Pay {{amount}} for payment {{position}} of {{count}}, due {{date}}. The invoice's full balance is {{balance}}.",
+    "payInstalmentOnline": "Pay payment {{position}} online"
   },
   "tile": {
     "title": "License",
@@ -382,7 +398,7 @@
     "upgradeTo": "Upgrade to {{size}}",
     "switchTo": "Switch to {{size}}",
     "currentChip": "Your current plan",
-    "confirmPrice": "You'll confirm the price on the payment page before anything is charged.",
+    "confirmPrice": "You'll see the exact amount and confirm it before anything is charged.",
     "nothingDeleted": "Nothing is ever deleted. If you stop renewing or switch to less storage than you use, every file stays and can still be opened; only new uploads wait until you're under your limit.",
     "checkoutError": "The payment page couldn't be opened",
     "changeError": "Your storage wasn't changed",
@@ -391,17 +407,141 @@
     "canceled": "Your storage will stop renewing at the end of this period",
     "resumed": "Your storage will keep renewing",
     "successTitle": "Thank you, your payment went through",
-    "successBody": "Your new storage is ready in a minute or two. Refresh this page to see it.",
     "cancelledTitle": "Payment cancelled",
     "cancelledBody": "Nothing was charged. You can upgrade whenever you're ready.",
     "switchTitle": "Switch to {{size}}?",
-    "switchUpBody": "The difference for the rest of this period is charged now, then {{price}}. The new storage starts as soon as the payment goes through.",
-    "switchDownBody": "Your school moves to {{size}} now, and the unused part of this period comes off your next bill. Then {{price}}. No files are deleted.",
     "switchConfirm": "Switch",
+    "successReadyBody": "Your new storage is ready.",
+    "confirmingTitle": "We're confirming your payment…",
+    "confirmingBody": "This usually takes less than a minute. Buying is paused until it's done, so nothing can be charged twice.",
+    "confirmingSlowBody": "This is taking longer than usual. Refresh this page in a few minutes. If you were charged and your storage still doesn't appear, contact Studafy before buying again.",
+    "buyTitle": "Upgrade to {{size}}?",
+    "buyBodyMonthly": "You'll pay {{amount}} today on the secure payment page, then {{amount}} every month until you stop renewing. Your school gets {{size}} as soon as the payment is confirmed.",
+    "buyBodyYearly": "You'll pay {{amount}} today on the secure payment page, then {{amount}} every year until you stop renewing. Your school gets {{size}} as soon as the payment is confirmed.",
+    "buyConfirm": "Continue to payment",
+    "previewLoading": "Working out the exact amount…",
+    "previewError": "The amount couldn't be worked out, so nothing was charged. Try again in a moment.",
+    "priceMoved": "The amount changed since you opened this, and nothing was charged. Check the new amount below.",
+    "chargedToday": "Charged today: {{amount}}",
+    "chargedTodayHelp": "That's {{size}} for the rest of this billing period, less the unused part of your current plan.",
+    "thenFrom": "Then {{price}}, from {{date}}.",
+    "nothingToday": "Nothing is charged today.",
+    "downNextBill": "Your school moves to {{size}} now. Your next bill, on {{date}}, is {{amount}}, with the unused part of your current plan taken off. No files are deleted.",
+    "thenPrice": "After that, {{price}}.",
+    "payAndSwitch": "Pay {{amount}} and switch",
+    "cancelTitle": "Cancel your storage subscription?",
+    "cancelBody": "Your {{size}} stays until {{date}}. After that your school goes back to the {{included}} included and isn't charged again. No files are deleted, and you can keep renewing any time before then.",
+    "cancelKeep": "Keep subscription",
+    "cancelConfirm": "Cancel subscription",
     "units": {
       "mb": "{{value}} MB",
       "gb": "{{value}} GB",
       "tb": "{{value}} TB"
-    }
+    },
+    "scheduled": "Your storage changes to {{size}} on {{date}}",
+    "changeScheduledNote": "A change is scheduled for your next renewal. Undo it above to choose something else.",
+    "atRenewal": "Your school keeps {{current}} until {{date}}, then moves to {{size}} at {{price}}.",
+    "atRenewalHelp": "Nothing is charged or credited now. You can undo this any time before then. No files are deleted.",
+    "scheduleConfirm": "Change on {{date}}",
+    "manage": {
+      "title": "Manage subscription",
+      "plan": "Plan",
+      "planValue": "{{size}} · {{price}}",
+      "renews": "Renews on",
+      "ends": "Ends on",
+      "nextBill": "Next bill",
+      "nextBillValue": "{{amount}} on {{date}}",
+      "paymentMethod": "Paid with",
+      "cardValue": "{{brand}} ending in {{last4}} (expires {{month}}/{{year}})",
+      "methodValue": "{{brand}}",
+      "noMethod": "No card on file",
+      "pendingTitle": "Changing to {{size}} on {{date}}",
+      "pendingBody": "Your school keeps {{current}} until {{date}}, then pays {{price}}. Nothing was charged for this change.",
+      "undoChange": "Keep {{size}}",
+      "undone": "Your storage stays as it is",
+      "updateCard": "Update card",
+      "cardError": "The card page couldn't be opened",
+      "cancel": "Cancel subscription",
+      "resume": "Resume subscription",
+      "historyTitle": "Billing history",
+      "historyError": "Your bills couldn't be loaded. Try again in a moment.",
+      "historyEmpty": "No bills yet.",
+      "columns": {
+        "date": "Date",
+        "for": "For",
+        "amount": "Amount",
+        "status": "Status",
+        "receipt": "Receipt"
+      },
+      "reason": {
+        "create": "First payment",
+        "cycle": "Renewal",
+        "update": "Plan change",
+        "other": "Payment"
+      },
+      "refunded": "({{amount}} refunded)",
+      "status": {
+        "paid": "Paid",
+        "open": "Due",
+        "void": "Cancelled",
+        "uncollectible": "Unpaid",
+        "other": "—"
+      },
+      "receipt": "View receipt"
+    },
+    "payWith": {
+      "title": "Pay with",
+      "loadError": "Your saved cards couldn't be loaded. Try again in a moment.",
+      "none": "No saved card yet. Add one to pay.",
+      "renewalCard": "Renewal card",
+      "addCard": "Use a new card",
+      "alsoRenewals": "Also use this card for renewals",
+      "added": "Your new card is saved. Choose it below.",
+      "addError": "The card page couldn't be opened"
+    },
+    "testModeTitle": "Test mode: no real money",
+    "testModeBody": "Payments use Stripe Sandbox. Use test card 4242 4242 4242 4242, any future date, any CVC. No real money is charged."
+  },
+  "aiRequest": {
+    "open": "Request AI for students",
+    "noLicense": "Your school has no license yet. Request Studafy AI for your students and Studafy will send you a quote.",
+    "title": "Request AI for students",
+    "description": "Tell Studafy how many students should get Studafy AI (the AI tutor and study tools) and which tier. You'll get a quote to accept; nothing changes before that.",
+    "studentsLabel": "Number of students",
+    "studentsHelp": "How many students should get Studafy AI. You choose who gets a seat after the license starts.",
+    "tierLabel": "AI tier",
+    "anyTier": "Not sure: Studafy will suggest one",
+    "anyTierShort": "a tier Studafy suggests",
+    "noteLabel": "Note for Studafy (optional)",
+    "submit": "Send request",
+    "defaultNote_one": "Student AI for {{count}} student, {{tier}}.",
+    "defaultNote_other": "Student AI for {{count}} students, {{tier}}.",
+    "defaultNoteTier": "Student AI on {{tier}}."
+  },
+  "schedule": {
+    "title": "Payment schedule",
+    "plan": {
+      "in_full": "Paid all at once.",
+      "monthly_one": "Paid monthly: {{count}} payment, one each licence month.",
+      "monthly_other": "Paid monthly: {{count}} payments, one each licence month.",
+      "custom_one": "Paid in {{count}} instalment on the dates below.",
+      "custom_other": "Paid in {{count}} instalments on the dates below."
+    },
+    "columns": {
+      "number": "#",
+      "dueDate": "Due",
+      "amount": "Amount",
+      "paid": "Paid",
+      "status": "Status"
+    },
+    "status": {
+      "due": "Due",
+      "partially_paid": "Partly paid",
+      "paid": "Paid",
+      "overdue": "Overdue"
+    },
+    "current": "· pay now",
+    "previewNote": "Dates are shown as if the quote were accepted today. A due date before the day you accept moves to that day.",
+    "activationNote": "Your seats start working once the first payment is received. The total is the same whichever way you pay."
   }
 }
