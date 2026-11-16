@@ -201,6 +201,9 @@ const createSelfDsrRoute = createRoute({
     { 202: { description: "Request accepted.", schema: dsrResponseSchema } },
     [400, 401, 409, 503, 500],
   ),
+  description:
+    "Export only. A self-service erasure answers 409 SELF_ERASURE_USE_ACCOUNT_DELETION: deleting " +
+    "your own account goes through POST /api/account/deletion (re-authentication, 14-day grace).",
 });
 
 const listSelfDsrRoute = createRoute({
@@ -305,6 +308,17 @@ export function privacyRoutes(
   routes.openapi(createSelfDsrRoute, async (c) => {
     const auth = requireAuth(c);
     const body = c.req.valid("json");
+
+    // QA-042: erasing your own account goes through POST /api/account/deletion, which re-checks a
+    // member's password and holds a 14-day grace period. Filed here it ran at once, on nothing but
+    // a bearer token -- a borrowed or stolen session was enough to erase the account for good.
+    if (body.request_type === "erasure") {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.SELF_ERASURE_USE_ACCOUNT_DELETION,
+        "Delete your own account with POST /api/account/deletion",
+      );
+    }
 
     if (!maintenanceQueue) {
       throw new CodedHttpException(
