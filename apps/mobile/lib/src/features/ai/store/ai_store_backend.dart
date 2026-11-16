@@ -37,7 +37,8 @@ enum AiStoreUnavailableReason {
   /// The school's own Studafy plan is not live; the add-on only works on top of it.
   schoolPlanInactive,
 
-  /// Brothers and sisters already hold every product this phone's store account could buy.
+  /// Brothers and sisters (known to Studafy) already hold every product. Only the server's view:
+  /// the app checks what this phone's store account really holds before saying so.
   noFreeProduct,
 }
 
@@ -52,6 +53,7 @@ class AiStoreSetup {
     required this.purchasable,
     required this.accountToken,
     required this.profileId,
+    this.productIds = const [],
     this.studentId,
     this.studentFirstName,
     this.subscribed = false,
@@ -65,6 +67,10 @@ class AiStoreSetup {
   /// subscription per product, so a brother or sister already holding the first is offered the
   /// next one.
   final String? productId;
+
+  /// Every product the add-on is sold under, primary first. When this phone's store account
+  /// already holds [productId] (for another child), the app buys the first of these it does not.
+  final List<String> productIds;
   final bool apple;
   final bool google;
 
@@ -91,12 +97,13 @@ class AiStoreSetup {
   /// The confirmation of the last in-app purchase's withdrawal waiver, if one was recorded.
   final AiStorePurchaseConfirmation? purchaseConfirmation;
 
-  /// Whether the add-on is offered on [platform] to this user.
-  bool offers(StorePlatform platform) =>
+  /// Whether the add-on is sold on [platform] for this student: the store is set up there, and the
+  /// server gave the id to stamp on the purchase. Which product is decided against the device's
+  /// store account ([productId] is the server's pick).
+  bool sellsOn(StorePlatform platform) =>
       enabled &&
-      purchasable &&
-      productId != null &&
       accountToken != null &&
+      (productId != null || productIds.isNotEmpty) &&
       (platform == StorePlatform.apple ? apple : google);
 }
 
@@ -133,6 +140,7 @@ class ApiAiStoreBackend implements AiStoreBackend {
     return AiStoreSetup(
       enabled: config.enabled,
       productId: config.productId,
+      productIds: config.productIds,
       apple: config.platforms.apple,
       google: config.platforms.google,
       purchasable: config.purchasable,

@@ -22,7 +22,7 @@ import {
   storeProductIds,
 } from "./service";
 
-import type { StoreBilling, StorePurchaseConfirmation } from "./service";
+import type { StoreBilling, StoreOffer, StorePurchaseConfirmation } from "./service";
 import type { Database } from "../../../db";
 import type { Logger } from "../../../logger";
 import type { SupportedLocale } from "../../../middleware/locale";
@@ -55,7 +55,8 @@ const StoreConfigSchema = z
       .nullable()
       .openapi({ description: "Null when it can be bought." }),
     /**
-     * The ids the app stamps on the purchase when `purchasable`: the student's id (Apple
+     * The ids the app stamps on the purchase when `purchasable` (or `no_free_product`, which the app
+     * re-checks against the phone's store account): the student's id (Apple
      * `appAccountToken`, Google `obfuscatedAccountId`) and the school's (Google
      * `obfuscatedProfileId`). The server only accepts a purchase carrying this student's id.
      */
@@ -265,8 +266,7 @@ export function aiStoreRoutes(
         studentFirstName: offer.studentFirstName,
         subscribed: offer.subscribed,
         unavailableReason: offer.unavailableReason,
-        accountToken: purchasable ? offer.studentId : null,
-        profileId: purchasable ? auth.schoolId : null,
+        ...purchaseStamp(offer, auth.schoolId),
         purchaseConfirmation,
       },
       200,
@@ -315,6 +315,26 @@ export function aiStoreRoutes(
   });
 
   return app;
+}
+
+/**
+ * The ids the app stamps on a purchase for this student: when it can be bought, and also when the
+ * server counts no product left for the family. That count only sees brothers and sisters linked
+ * to the same parent in this school, while what matters is what the phone's store account holds:
+ * the app checks that itself and may still find a product free (children at different schools,
+ * or siblings who each bought on their own phone). Apps that predate the check stop at
+ * `no_free_product` and never use the stamp.
+ */
+export function purchaseStamp(
+  offer: Pick<StoreOffer, "studentId" | "unavailableReason">,
+  schoolId: string,
+): { accountToken: string | null; profileId: string | null } {
+  const stampable =
+    offer.studentId !== null &&
+    (offer.unavailableReason === null || offer.unavailableReason === "no_free_product");
+  return stampable
+    ? { accountToken: offer.studentId, profileId: schoolId }
+    : { accountToken: null, profileId: null };
 }
 
 /** Constant-time comparison of the push URL's token, so its value cannot be found by timing. */
