@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/api/generated/models/notification.dart' as api_models;
 import '../../../../core/offline/announcements_offline_repository.dart';
 import '../../../../core/offline/staleness_banner.dart';
+import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/today_providers.dart';
 import 'today_card_shell.dart';
@@ -23,6 +24,7 @@ class TodayAnnouncementsCard extends ConsumerWidget {
     return TodayCardShell(
       titleKey: 'today.announcements.title',
       icon: Icons.campaign_outlined,
+      accent: AppAccent.violet,
       child: announcements.when(
         loading: () => const TodaySkeleton(),
         error: (error, stackTrace) => const TodayStateMessage(
@@ -60,38 +62,14 @@ class _AnnouncementRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
+    // A mandatory notice leads with the red "!" badge instead of the megaphone.
+    final mandatory = isMandatoryAnnouncement(announcement);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.space4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  announcement.title,
-                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (isMandatoryAnnouncement(announcement)) ...[
-                const SizedBox(width: AppSpacing.space8),
-                Icon(Icons.priority_high, size: 16, color: colorScheme.error),
-              ],
-            ],
-          ),
-          Text(
-            announcement.body,
-            style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
+    return AppIconListTile(
+      icon: mandatory ? Icons.priority_high : Icons.campaign_outlined,
+      accent: mandatory ? AppTone.danger.accent : AppAccent.violet,
+      title: announcement.title,
+      subtitle: announcement.body,
     );
   }
 }

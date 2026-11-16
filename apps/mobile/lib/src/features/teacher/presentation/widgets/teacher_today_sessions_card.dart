@@ -2,7 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../../design/kit/kit.dart';
 import '../../application/teacher_providers.dart';
 import '../../domain/teacher_home.dart';
 import 'take_attendance_button.dart';
@@ -20,6 +20,7 @@ class TeacherTodaySessionsCard extends ConsumerWidget {
     return TeacherSectionCard(
       titleKey: 'teacher.home.sessions.title',
       icon: Icons.schedule_outlined,
+      accent: AppAccent.blue,
       child: sessions.when(
         loading: () => const TeacherCardSkeleton(),
         error: (error, stackTrace) => const TeacherCardMessage(
@@ -51,54 +52,33 @@ class _SessionRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
+    final visual = SubjectVisuals.of(
+      session.classCode,
+      fallbackKey: session.classId,
+    );
 
-    return InkWell(
+    return AppIconListTile(
+      icon: visual.icon,
+      accent: visual.accent,
+      title: session.classCode,
+      subtitle: 'teacher.home.sessions.period'.tr(
+        namedArgs: {'period': '${session.period}'},
+      ),
+      // Under the period rather than beside the code: "Attendance in progress" is too wide to
+      // share the line without cutting the class code short.
+      footer: _AttendanceStatus(session: session),
       onTap: () => openTeacherRegister(
         context,
         ref,
         classId: session.classId,
         classCode: session.classCode,
       ),
-      borderRadius: BorderRadius.circular(AppSpacing.space8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(session.classCode, style: textTheme.bodyMedium),
-                  Text(
-                    'teacher.home.sessions.period'.tr(
-                      namedArgs: {'period': '${session.period}'},
-                    ),
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: AppSpacing.space12),
-            _AttendanceStatus(session: session),
-            const SizedBox(width: AppSpacing.space4),
-            Icon(
-              Icons.chevron_right,
-              size: 18,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
 
-/// Where today's attendance for the session stands — not taken yet, in progress or recorded.
+/// Where today's attendance for the session stands — not taken yet (amber), in progress (blue)
+/// or recorded (green).
 class _AttendanceStatus extends StatelessWidget {
   const _AttendanceStatus({required this.session});
 
@@ -106,15 +86,24 @@ class _AttendanceStatus extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final labelKey = switch (session.attendance) {
-      SessionAttendanceState.notStarted =>
+    final (labelKey, tone, icon) = switch (session.attendance) {
+      SessionAttendanceState.notStarted => (
         'teacher.home.sessions.attendanceNotTaken',
-      SessionAttendanceState.inProgress =>
+        AppTone.warning,
+        Icons.schedule,
+      ),
+      SessionAttendanceState.inProgress => (
         'teacher.home.sessions.attendanceInProgress',
-      SessionAttendanceState.recorded =>
+        AppTone.brand,
+        Icons.timelapse,
+      ),
+      SessionAttendanceState.recorded => (
         'teacher.home.sessions.attendanceRecorded',
+        AppTone.success,
+        Icons.check_circle_outline,
+      ),
     };
 
-    return Chip(label: Text(labelKey.tr()));
+    return AppStatusPill(label: labelKey.tr(), tone: tone, icon: icon);
   }
 }

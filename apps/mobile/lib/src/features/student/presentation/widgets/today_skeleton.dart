@@ -26,7 +26,7 @@ class TodaySkeleton extends StatelessWidget {
         for (var i = 0; i < lineCount; i++) ...[
           if (i > 0) const SizedBox(height: AppSpacing.space8),
           FractionallySizedBox(
-            alignment: Alignment.centerLeft,
+            alignment: AlignmentDirectional.centerStart,
             widthFactor: i.isEven ? 0.85 : 0.55,
             child: DecoratedBox(
               decoration: BoxDecoration(color: color, borderRadius: AppRadius.smRadius),
