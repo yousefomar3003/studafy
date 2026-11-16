@@ -90,6 +90,11 @@ export const NOTIFICATION_TYPES = {
   // materials screen to open. Optional, immediate-only and never emailed. Mirrored in
   // app.notification_type by migration 000228.
   MATERIAL_PUBLISHED: "MATERIAL_PUBLISHED",
+  // Academic marks were released to the family: written by the same outbox notify consumer from
+  // marks.released (a whole period's mark sheet, or one assessment, approved by leadership). To the
+  // student and their linked parents. Optional, immediate-only and never emailed. Mirrored in
+  // app.notification_type by migration 000230.
+  MARKS_RELEASED: "MARKS_RELEASED",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

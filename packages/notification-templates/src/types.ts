@@ -176,4 +176,13 @@ export interface NotificationTypeVars {
     courseName: string;
     placement: string;
   };
+  /**
+   * `released` is the localized line: "First exam marks are out for Mathematics" (one assessment)
+   * or "Mathematics – Term 1 marks are released" (a whole period). `who` as in ASSIGNMENT_GRADED.
+   */
+  MARKS_RELEASED: {
+    who: string;
+    subjectName: string;
+    released: string;
+  };
 }

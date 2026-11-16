@@ -1,7 +1,8 @@
-import { ERROR_CODES } from "@studafy/constants";
+import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 import { calculateSubjectResult, summarizeWeights } from "@studafy/grading-engine";
 
 import { CodedHttpException } from "../../coded-http-exception";
+import { emit } from "../../lib/events/emitter";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import {
@@ -52,6 +53,27 @@ export interface MarkSheetRow {
   status: MarkSheetStatus;
   submitted_by_user_id: string | null;
   submitted_at: Date | null;
+  decided_by_user_id: string | null;
+  decided_at: Date | null;
+  return_reason: string | null;
+  updated_at: Date;
+}
+
+/**
+ * One assessment's own release for one section (app.assessment_mark_releases, 000229). No stored
+ * row is a `draft`.
+ */
+export type AssessmentReleaseStatus = "draft" | "submitted" | "approved" | "returned";
+
+export interface AssessmentReleaseRow {
+  id: string;
+  section_id: string;
+  subject_id: string;
+  term_id: string | null;
+  assessment_id: string;
+  status: Exclude<AssessmentReleaseStatus, "draft">;
+  submitted_by_user_id: string;
+  submitted_at: Date;
   decided_by_user_id: string | null;
   decided_at: Date | null;
   return_reason: string | null;
@@ -115,6 +137,16 @@ export interface MarkSheetView {
     due_date: string | null;
     status: string;
     section_specific: boolean;
+    /** This assessment's own release (000229); `draft` with a null id when never sent. */
+    release_id: string | null;
+    release_status: AssessmentReleaseStatus;
+    release_submitted_at: string | null;
+    release_decided_at: string | null;
+    release_return_reason: string | null;
+    /** Visible to students and parents: its own release or its period's sheet is approved. */
+    released: boolean;
+    /** Enrolled students still without a usable mark for it; 0 = it can be sent for approval. */
+    missing_count: number;
   }[];
   mark_sheets: {
     id: string | null;
@@ -188,6 +220,101 @@ function periodsOf(engine: SubjectGradingConfig): (string | null)[] {
 
 const sheetFor = (sheets: MarkSheetRow[], termId: string | null) =>
   sheets.find((sheet) => sheet.term_id === termId);
+
+const RELEASE_COLUMNS = `
+  id, section_id, subject_id, term_id, assessment_id, status, submitted_by_user_id, submitted_at,
+  decided_by_user_id, decided_at, return_reason, updated_at`;
+
+async function loadReleases(
+  tx: TransactionSql,
+  schoolId: string,
+  sectionId: string,
+  subjectId: string,
+): Promise<AssessmentReleaseRow[]> {
+  return tx<AssessmentReleaseRow[]>`
+    SELECT ${tx.unsafe(RELEASE_COLUMNS)} FROM app.assessment_mark_releases
+    WHERE school_id = ${schoolId}::uuid AND section_id = ${sectionId}::uuid
+      AND subject_id = ${subjectId}::uuid
+  `;
+}
+
+/**
+ * The enrolled students whose mark for one assessment is still missing, by the engine's own rule
+ * (the one submitting a whole period uses): no mark at all, or an absence the school does not count
+ * as zero. Releasing a single assessment is stricter than the period in two ways, so a release never
+ * goes out with gaps: the assessment counts as mandatory even when it is optional, and a missing mark
+ * is missing even where the school's policy would count it as zero. Excused / not applicable, a
+ * counted absence and a graded retake all count as recorded.
+ */
+function studentsMissingAssessment(
+  engine: SubjectGradingConfig,
+  assessment: SubjectGradingConfig["assessments"][number],
+  enrolled: readonly RosterStudent[],
+  marks: readonly MarkRow[],
+): RosterStudent[] {
+  const single: SubjectGradingConfig = {
+    ...engine,
+    missingPolicy: "incomplete",
+    assessments: [{ ...assessment, mandatory: true }],
+  };
+  const options = assessment.termId === null ? {} : { termId: assessment.termId };
+  return enrolled.filter(
+    (student) =>
+      calculateSubjectResult(single, toMarkInputs(marks, student.student_id), options)
+        .missingAssessments.length > 0,
+  );
+}
+
+/**
+ * An approved sheet releases its whole period: any of its assessments still waiting on their own
+ * approval is approved with it (silently -- the family gets one notice for the sheet, not one per
+ * assessment), and one marks.released event tells the student and their parents (MARKS_RELEASED).
+ */
+async function releaseSheet(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  sheet: Pick<MarkSheetRow, "id" | "section_id" | "subject_id" | "term_id">,
+): Promise<void> {
+  await approvePendingReleases(tx, schoolId, userId, sheet);
+  await emit(tx, DOMAIN_EVENTS.MARKS_RELEASED, {
+    sectionId: sheet.section_id,
+    subjectId: sheet.subject_id,
+    termId: sheet.term_id,
+    assessmentId: null,
+  });
+}
+
+/**
+ * Leadership approving a whole period's sheet approves the marks of every assessment in it, so any
+ * of that period's assessments still waiting on their own approval is approved with it.
+ */
+async function approvePendingReleases(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  sheet: Pick<MarkSheetRow, "id" | "section_id" | "subject_id" | "term_id">,
+): Promise<void> {
+  const approved = await tx<{ id: string; assessment_id: string }[]>`
+    UPDATE app.assessment_mark_releases SET status = 'approved',
+      decided_by_user_id = ${userId}::uuid, decided_at = CURRENT_TIMESTAMP,
+      updated_at = CURRENT_TIMESTAMP
+    WHERE school_id = ${schoolId}::uuid AND section_id = ${sheet.section_id}::uuid
+      AND subject_id = ${sheet.subject_id}::uuid
+      AND term_id IS NOT DISTINCT FROM ${sheet.term_id}::uuid
+      AND status = 'submitted'
+    RETURNING id, assessment_id
+  `;
+  for (const release of approved) {
+    await emitAuditLog(tx, {
+      action: "update",
+      targetTable: "assessment_mark_releases",
+      targetId: release.id,
+      oldValues: { status: "submitted" },
+      newValues: { status: "approved", with_mark_sheet: sheet.id },
+    });
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Teacher: my section subjects
@@ -323,6 +450,17 @@ async function sheetContext(
   return { section, loaded, engine, roster, source: subject.source, leadership };
 }
 
+function releaseView(release: AssessmentReleaseRow | undefined, sheet: MarkSheetRow | undefined) {
+  return {
+    release_id: release?.id ?? null,
+    release_status: release?.status ?? ("draft" as const),
+    release_submitted_at: release?.submitted_at.toISOString() ?? null,
+    release_decided_at: release?.decided_at?.toISOString() ?? null,
+    release_return_reason: release?.return_reason ?? null,
+    released: release?.status === "approved" || sheet?.status === "approved",
+  };
+}
+
 export function previewOf(
   result: SubjectResult,
 ): NonNullable<MarkSheetView["students"][number]["preview"]> {
@@ -364,6 +502,9 @@ export async function getMarkSheet(
     roster.map((student) => student.student_id),
   );
   const sheets = await loadSheets(tx, schoolId, sectionId, subjectId);
+  const releases = await loadReleases(tx, schoolId, sectionId, subjectId);
+  const enrolled = roster.filter((student) => student.status === "enrolled");
+  const engineAssessments = new Map(engine.assessments.map((a) => [a.id, a]));
 
   return {
     section: {
@@ -428,6 +569,14 @@ export async function getMarkSheet(
       due_date: assessment.due_date,
       status: assessment.status,
       section_specific: assessment.section_id !== null,
+      ...releaseView(
+        releases.find((release) => release.assessment_id === assessment.id),
+        sheetFor(sheets, assessment.term_id),
+      ),
+      missing_count: engineAssessments.has(assessment.id)
+        ? studentsMissingAssessment(engine, engineAssessments.get(assessment.id)!, enrolled, marks)
+            .length
+        : enrolled.length,
     })),
     mark_sheets: periodsOf(engine).map((termId) => {
       const sheet = sheetFor(sheets, termId);
@@ -509,8 +658,9 @@ const BATCH_LIMIT = 500;
  *
  * Every entry is checked against the effective configuration (the assessment must apply to this
  * section and be active), the roster (the student takes the subject and is not exempt), the
- * assessment's maximum, and the period's mark sheet (submitted or approved sheets are locked). A
- * mark inside finalized results is refused by the database trigger. Old and new values go to the
+ * assessment's maximum, the period's mark sheet (submitted or approved sheets are locked) and the
+ * assessment's own release (one sent for approval on its own, or released, is locked too). A mark
+ * inside finalized results is refused by the database trigger. Old and new values go to the
  * audit log.
  */
 export async function saveMarks(
@@ -539,6 +689,9 @@ export async function saveMarks(
   );
   const students = new Map(roster.map((student) => [student.student_id, student]));
   const sheets = await loadSheets(tx, schoolId, sectionId, subjectId);
+  const releases = new Map(
+    (await loadReleases(tx, schoolId, sectionId, subjectId)).map((r) => [r.assessment_id, r]),
+  );
   const descriptive = loaded.config.grading_method === "descriptive";
   const descriptorIds = new Set(loaded.descriptors.map((descriptor) => descriptor.id));
 
@@ -602,6 +755,16 @@ export async function saveMarks(
         409,
         ERROR_CODES.MARKS_LOCKED,
         `${assessment.name}: the mark sheet is ${sheet.status}; ${sheet.status === "approved" ? "an administrator must reopen it" : "wait for the review or ask for it back"}`,
+      );
+    }
+    // An assessment sent for approval on its own is locked the same way until it is returned; once
+    // approved its marks are with the families, and only leadership withdrawing it reopens them.
+    const release = releases.get(assessment.id);
+    if (release && (release.status === "submitted" || release.status === "approved")) {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.MARKS_LOCKED,
+        `${assessment.name}: these marks are ${release.status === "approved" ? "released; an administrator must withdraw them first" : "awaiting approval; wait for the review or ask for them back"}`,
       );
     }
   }
@@ -714,6 +877,25 @@ export async function saveMarks(
           decided_by_user_id = NULL, updated_at = CURRENT_TIMESTAMP
         WHERE id = ${sheet.id}::uuid AND school_id = ${schoolId}::uuid
       `;
+    }
+  }
+
+  // Likewise a teacher editing a returned assessment puts it back to draft (no release row).
+  const touchedAssessments = new Set(entries.map((entry) => entry.assessment_id));
+  for (const assessmentId of touchedAssessments) {
+    const release = releases.get(assessmentId);
+    if (release?.status === "returned") {
+      await tx`
+        DELETE FROM app.assessment_mark_releases
+        WHERE id = ${release.id}::uuid AND school_id = ${schoolId}::uuid
+      `;
+      await emitAuditLog(tx, {
+        action: "delete",
+        targetTable: "assessment_mark_releases",
+        targetId: release.id,
+        oldValues: { status: release.status, return_reason: release.return_reason },
+        newValues: { status: "draft" },
+      });
     }
   }
 
@@ -1009,6 +1191,7 @@ export async function submitMarkSheet(
     oldValues: { status: current?.status ?? "draft" },
     newValues: { status, term_id: termId },
   });
+  if (status === "approved") await releaseSheet(tx, schoolId, userId, sheet);
   return sheet;
 }
 
@@ -1080,7 +1263,265 @@ export async function decideMarkSheet(
     oldValues: { status: sheet.status },
     newValues: { status, action, reason },
   });
+  // Reopening (or returning) the whole sheet leaves assessments approved on their own released: the
+  // families have seen those marks, and they stay locked until leadership withdraws them one by one.
+  if (status === "approved") await releaseSheet(tx, schoolId, userId, updated!);
   return updated!;
+}
+
+// ---------------------------------------------------------------------------
+// Releasing one assessment at a time (000229)
+// ---------------------------------------------------------------------------
+
+/**
+ * Send one assessment's marks for approval before the rest of its period is done. Every enrolled
+ * student needs a usable mark for it ({@link studentsMissingAssessment}). It always waits for
+ * leadership, who approve or return it from the approval queue -- also in a grade program whose
+ * sheets need no approval step. Once approved, the marks are visible to the student and their
+ * parents (app.is_released_student_mark), who are told (MARKS_RELEASED); the period's sheet, its
+ * completeness rule and term results are untouched.
+ */
+export async function submitAssessmentRelease(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  sectionId: string,
+  subjectId: string,
+  assessmentId: string,
+): Promise<AssessmentReleaseRow> {
+  const context = await sheetContext(tx, schoolId, sectionId, subjectId);
+  const { section, engine, roster } = context;
+  assertMarksOpen(await requireYear(tx, schoolId, section.academic_year_id));
+  const assessment = engine.assessments.find((a) => a.id === assessmentId);
+  if (!assessment) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      "This assessment is not an active assessment of the subject for this section",
+    );
+  }
+  const sheet = sheetFor(await loadSheets(tx, schoolId, sectionId, subjectId), assessment.termId);
+  if (sheet && (sheet.status === "submitted" || sheet.status === "approved")) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.CONFLICT_STATE_MISMATCH,
+      `The whole period's mark sheet is already ${sheet.status}; ${assessment.name} goes with it`,
+    );
+  }
+  const [current] = await tx<AssessmentReleaseRow[]>`
+    SELECT ${tx.unsafe(RELEASE_COLUMNS)} FROM app.assessment_mark_releases
+    WHERE school_id = ${schoolId}::uuid AND section_id = ${sectionId}::uuid
+      AND assessment_id = ${assessmentId}::uuid
+    FOR UPDATE
+  `;
+  if (current && (current.status === "submitted" || current.status === "approved")) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.CONFLICT_STATE_MISMATCH,
+      `${assessment.name} is already ${current.status === "approved" ? "released" : "awaiting approval"}`,
+    );
+  }
+
+  const enrolled = roster.filter((student) => student.status === "enrolled");
+  if (enrolled.length === 0) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      "No student takes this subject in this section",
+    );
+  }
+  const marks = await loadMarks(
+    tx,
+    schoolId,
+    [assessmentId],
+    enrolled.map((student) => student.student_id),
+  );
+  const missing = studentsMissingAssessment(engine, assessment, enrolled, marks).map(
+    (student) => `${student.first_name} ${student.last_name}`,
+  );
+  if (missing.length > 0) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.RESULTS_INCOMPLETE,
+      `${assessment.name}: marks are missing for ${missing.slice(0, 10).join(", ")}${missing.length > 10 ? ` and ${missing.length - 10} more` : ""}`,
+    );
+  }
+
+  // Always for leadership to approve, even where the grade program approves sheets on submit: a
+  // teacher never publishes a single assessment directly (the owner's decision).
+  const status = "submitted";
+  const [release] = await tx<AssessmentReleaseRow[]>`
+    INSERT INTO app.assessment_mark_releases (
+      school_id, academic_year_id, section_id, subject_id, term_id, assessment_id, status,
+      submitted_by_user_id, submitted_at, decided_by_user_id, decided_at
+    ) VALUES (
+      ${schoolId}::uuid, ${section.academic_year_id}::uuid, ${sectionId}::uuid, ${subjectId}::uuid,
+      ${assessment.termId}::uuid, ${assessmentId}::uuid, ${status}, ${userId}::uuid,
+      CURRENT_TIMESTAMP, NULL, NULL
+    )
+    ON CONFLICT (school_id, section_id, assessment_id) DO UPDATE SET
+      status = EXCLUDED.status, submitted_by_user_id = EXCLUDED.submitted_by_user_id,
+      submitted_at = EXCLUDED.submitted_at, decided_by_user_id = EXCLUDED.decided_by_user_id,
+      decided_at = EXCLUDED.decided_at, return_reason = NULL, updated_at = CURRENT_TIMESTAMP
+    RETURNING ${tx.unsafe(RELEASE_COLUMNS)}
+  `;
+  await emitAuditLog(tx, {
+    action: current ? "update" : "insert",
+    targetTable: "assessment_mark_releases",
+    targetId: release!.id,
+    oldValues: { status: current?.status ?? "draft" },
+    newValues: {
+      status,
+      section_id: sectionId,
+      subject_id: subjectId,
+      assessment_id: assessmentId,
+    },
+  });
+  return release!;
+}
+
+/**
+ * Leadership's decision on one assessment's release: approve or return a submitted one, or reopen
+ * (withdraw) an approved or submitted one, which hides its marks from the families again and hands
+ * them back to the teacher. Returning and reopening need a reason. A release cannot be withdrawn
+ * while the whole period's sheet is approved (the marks are released with the sheet; reopen that
+ * first), nor once the marks are in finalized results.
+ */
+export async function decideAssessmentRelease(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  releaseId: string,
+  action: "approve" | "return" | "reopen",
+  reason: string | null,
+): Promise<AssessmentReleaseRow> {
+  if (!(await isSchoolLeadership(tx))) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.AUTHZ_FORBIDDEN,
+      "Only school leadership can review released marks",
+    );
+  }
+  const [release] = await tx<(AssessmentReleaseRow & { academic_year_id: string })[]>`
+    SELECT ${tx.unsafe(RELEASE_COLUMNS)}, academic_year_id FROM app.assessment_mark_releases
+    WHERE id = ${releaseId}::uuid AND school_id = ${schoolId}::uuid
+    FOR UPDATE
+  `;
+  if (!release) {
+    throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "Release not found");
+  }
+  assertMarksOpen(await requireYear(tx, schoolId, release.academic_year_id));
+
+  const allowed =
+    (action === "approve" && release.status === "submitted") ||
+    (action === "return" && release.status === "submitted") ||
+    (action === "reopen" && (release.status === "approved" || release.status === "submitted"));
+  if (!allowed) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.CONFLICT_STATE_MISMATCH,
+      `Cannot ${action} a ${release.status} release`,
+    );
+  }
+  if ((action === "return" || action === "reopen") && !reason) {
+    throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Give the teacher a reason");
+  }
+  if (action === "reopen") {
+    const sheet = sheetFor(
+      await loadSheets(tx, schoolId, release.section_id, release.subject_id),
+      release.term_id,
+    );
+    if (sheet?.status === "approved") {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.CONFLICT_STATE_MISMATCH,
+        "The whole period's mark sheet is approved, so these marks are released with it; reopen the mark sheet first",
+      );
+    }
+    const [finalized] = await tx<{ id: string }[]>`
+      SELECT id FROM app.result_finalizations
+      WHERE school_id = ${schoolId}::uuid AND section_id = ${release.section_id}::uuid
+        AND status = 'finalized' AND (term_id IS NULL OR term_id IS NOT DISTINCT FROM ${release.term_id}::uuid)
+    `;
+    if (finalized) {
+      throw new CodedHttpException(
+        409,
+        ERROR_CODES.RESULTS_ALREADY_FINALIZED,
+        "These marks are part of finalized results; use the correction workflow",
+      );
+    }
+  }
+  const status = action === "approve" ? "approved" : "returned";
+  const [updated] = await tx<AssessmentReleaseRow[]>`
+    UPDATE app.assessment_mark_releases SET status = ${status},
+      decided_by_user_id = ${userId}::uuid, decided_at = CURRENT_TIMESTAMP,
+      return_reason = ${action === "approve" ? null : reason}, updated_at = CURRENT_TIMESTAMP
+    WHERE id = ${releaseId}::uuid AND school_id = ${schoolId}::uuid
+    RETURNING ${tx.unsafe(RELEASE_COLUMNS)}
+  `;
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "assessment_mark_releases",
+    targetId: releaseId,
+    oldValues: { status: release.status },
+    newValues: { status, action, reason },
+  });
+  if (status === "approved") {
+    await emit(tx, DOMAIN_EVENTS.MARKS_RELEASED, {
+      sectionId: release.section_id,
+      subjectId: release.subject_id,
+      termId: release.term_id,
+      assessmentId: release.assessment_id,
+    });
+  }
+  return updated!;
+}
+
+export interface AssessmentReleaseListRow extends AssessmentReleaseRow {
+  section_name: string;
+  grade_level_name: string;
+  subject_name: string;
+  term_name: string | null;
+  assessment_name: string;
+  max_marks: string;
+  submitted_by_name: string | null;
+}
+
+/** The year's single-assessment releases (leadership's queue), oldest submission first. */
+export async function listAssessmentReleases(
+  tx: TransactionSql,
+  schoolId: string,
+  filter: { yearId: string; status?: Exclude<AssessmentReleaseStatus, "draft"> },
+): Promise<AssessmentReleaseListRow[]> {
+  const statusFilter = filter.status ? tx`AND release_row.status = ${filter.status}` : tx``;
+  return tx<AssessmentReleaseListRow[]>`
+    SELECT release_row.id, release_row.section_id, release_row.subject_id, release_row.term_id,
+           release_row.assessment_id, release_row.status, release_row.submitted_by_user_id,
+           release_row.submitted_at, release_row.decided_by_user_id, release_row.decided_at,
+           release_row.return_reason, release_row.updated_at,
+           section.name AS section_name, grade.name AS grade_level_name,
+           subject.name AS subject_name, term.name AS term_name,
+           assessment.name AS assessment_name, assessment.max_marks,
+           users.display_name AS submitted_by_name
+    FROM app.assessment_mark_releases AS release_row
+    JOIN app.sections AS section
+      ON section.id = release_row.section_id AND section.school_id = release_row.school_id
+    JOIN app.grade_levels AS grade
+      ON grade.id = section.grade_level_id AND grade.school_id = section.school_id
+    JOIN app.subjects AS subject
+      ON subject.id = release_row.subject_id AND subject.school_id = release_row.school_id
+    JOIN app.subject_config_assessments AS assessment
+      ON assessment.id = release_row.assessment_id AND assessment.school_id = release_row.school_id
+    LEFT JOIN app.terms AS term
+      ON term.id = release_row.term_id AND term.school_id = release_row.school_id
+    LEFT JOIN app.users AS users
+      ON users.id = release_row.submitted_by_user_id AND users.school_id = release_row.school_id
+    WHERE release_row.school_id = ${schoolId}::uuid
+      AND release_row.academic_year_id = ${filter.yearId}::uuid
+      ${statusFilter}
+    ORDER BY release_row.submitted_at, grade.sort_order, section.name, subject.name,
+             assessment.sort_order, assessment.name
+  `;
 }
 
 export async function listMarkSheets(
@@ -1133,6 +1574,8 @@ export interface ReleasedAssessment {
   name: string;
   max_marks: number;
   assessment_date: string | null;
+  /** When this assessment's marks reached the family: its own approval or its period sheet's. */
+  released_at: string;
   attempts: ReleasedMarkAttempt[];
 }
 
@@ -1147,7 +1590,13 @@ export interface ReleasedSubject {
   subject_id: string;
   subject_code: string;
   subject_name: string;
+  /** When the whole period's mark sheet was approved; null while only single assessments are out. */
   approved_at: string | null;
+  /**
+   * False while only some assessments of the period are released one at a time: the rest of the
+   * period's marks are still to come, so nothing here is a term result.
+   */
+  period_approved: boolean;
   categories: ReleasedCategory[];
 }
 
@@ -1161,11 +1610,13 @@ export interface ReleasedPeriod {
 }
 
 /**
- * A student's marks from approved mark sheets, newest year first, its terms in order and the
- * annual period last. A mark shows once leadership approves the sheet of its period (section,
- * subject and term), and disappears again if the sheet is reopened -- the same rule RLS enforces
- * for a student or parent (000173 `app.is_released_student_mark`), applied here for every caller so
- * leadership sees exactly what the family sees. Remarks stay staff-only.
+ * A student's released marks, newest year first, its terms in order and the annual period last. A
+ * mark shows once leadership approves the sheet of its period (section, subject and term) or the
+ * release of its own assessment for the student's section (000229), and disappears again if what
+ * released it is reopened -- the same rule RLS enforces for a student or parent
+ * (`app.is_released_student_mark`), applied here for every caller so leadership sees exactly what
+ * the family sees. Remarks stay staff-only. No total or average is computed here: term results
+ * reach families only through finalized results.
  */
 export async function listReleasedStudentMarks(
   tx: TransactionSql,
@@ -1182,6 +1633,8 @@ export async function listReleasedStudentMarks(
       subject_code: string;
       subject_name: string;
       approved_at: Date | null;
+      period_approved: boolean;
+      released_at: Date;
       category_id: string;
       category_name: string;
       category_kind: string;
@@ -1196,9 +1649,10 @@ export async function listReleasedStudentMarks(
     }[]
   >`
     SELECT year.id AS academic_year_id, year.name AS academic_year_name,
-           sheet.term_id, term.name AS term_name,
+           assessment.term_id, term.name AS term_name,
            subject.id AS subject_id, subject.code AS subject_code, subject.name AS subject_name,
-           sheet.decided_at AS approved_at,
+           sheet.decided_at AS approved_at, sheet.id IS NOT NULL AS period_approved,
+           LEAST(sheet.decided_at, release_row.decided_at) AS released_at,
            category.id AS category_id, category.name AS category_name, category.kind AS category_kind,
            assessment.id AS assessment_id, assessment.name AS assessment_name, assessment.max_marks,
            assessment.assessment_date::text AS assessment_date,
@@ -1216,21 +1670,27 @@ export async function listReleasedStudentMarks(
       ON placement.student_id = mark.student_id
      AND placement.academic_year_id = assessment.academic_year_id
      AND placement.school_id = mark.school_id
-    JOIN app.mark_sheets AS sheet
+    LEFT JOIN app.mark_sheets AS sheet
       ON sheet.school_id = mark.school_id
      AND sheet.academic_year_id = assessment.academic_year_id
      AND sheet.section_id = placement.section_id
      AND sheet.subject_id = config.subject_id
      AND sheet.term_id IS NOT DISTINCT FROM assessment.term_id
+     AND sheet.status = 'approved'
+    LEFT JOIN app.assessment_mark_releases AS release_row
+      ON release_row.school_id = mark.school_id
+     AND release_row.section_id = placement.section_id
+     AND release_row.assessment_id = assessment.id
+     AND release_row.status = 'approved'
     JOIN app.academic_years AS year
       ON year.id = assessment.academic_year_id AND year.school_id = mark.school_id
     JOIN app.subjects AS subject ON subject.id = config.subject_id AND subject.school_id = mark.school_id
-    LEFT JOIN app.terms AS term ON term.id = sheet.term_id AND term.school_id = mark.school_id
+    LEFT JOIN app.terms AS term ON term.id = assessment.term_id AND term.school_id = mark.school_id
     WHERE mark.school_id = ${schoolId}::uuid
       AND mark.student_id = ${studentId}::uuid
       AND assessment.status = 'active'
       AND (assessment.section_id IS NULL OR assessment.section_id = placement.section_id)
-      AND sheet.status = 'approved'
+      AND (sheet.id IS NOT NULL OR release_row.id IS NOT NULL)
     ORDER BY year.starts_on DESC, term.sequence_number NULLS LAST, subject.name,
              category.sort_order, category.name, assessment.sort_order, assessment.name, mark.attempt
   `;
@@ -1262,6 +1722,7 @@ export async function listReleasedStudentMarks(
         subject_code: row.subject_code,
         subject_name: row.subject_name,
         approved_at: row.approved_at?.toISOString() ?? null,
+        period_approved: row.period_approved,
         categories: [],
       };
       subjectByKey.set(subjectKey, subject);
@@ -1286,6 +1747,7 @@ export async function listReleasedStudentMarks(
         name: row.assessment_name,
         max_marks: Number(row.max_marks),
         assessment_date: row.assessment_date,
+        released_at: row.released_at.toISOString(),
         attempts: [],
       };
       assessmentByKey.set(row.assessment_id, assessment);

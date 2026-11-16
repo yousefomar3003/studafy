@@ -5,30 +5,46 @@ import { useTranslation } from "../../../lib/i18n";
 
 import { DateTime, Num, ReasonModal } from "./components";
 import { problemMessage } from "./errors";
-import { useDecideAssessment, useDecideMarkSheet } from "./mutations";
-import { useMarkSheets, useProposedAssessments } from "./queries";
+import { useDecideAssessment, useDecideAssessmentRelease, useDecideMarkSheet } from "./mutations";
+import { useAssessmentReleases, useMarkSheets, useProposedAssessments } from "./queries";
 
 import type { SetupContext } from "./context";
-import type { MarkSheetStatusFilter, MarkSheetSummary } from "./queries";
+import type {
+  AssessmentReleaseStatusFilter,
+  AssessmentReleaseSummary,
+  MarkSheetStatusFilter,
+  MarkSheetSummary,
+} from "./queries";
 
 const SHEET_FILTERS: readonly MarkSheetStatusFilter[] = ["submitted", "approved", "returned"];
+const RELEASE_FILTERS: readonly AssessmentReleaseStatusFilter[] = [
+  "submitted",
+  "approved",
+  "returned",
+];
+
+type ReasonTarget =
+  | { kind: "sheet"; sheet: MarkSheetSummary; action: "return" | "reopen" }
+  | { kind: "release"; release: AssessmentReleaseSummary; action: "return" | "reopen" };
 
 /**
  * The year's approval queue: mark sheets teachers submitted (approve, or return with a reason;
- * approved sheets can be reopened), and assessments teachers proposed for their sections.
+ * approved sheets can be reopened), single assessments teachers sent on their own before the rest
+ * of the period (approved, their marks reach students and parents; returned or withdrawn with a
+ * reason), and assessments teachers proposed for their sections.
  */
 export function ApprovalsTab({ ctx }: { ctx: SetupContext }) {
   const { t } = useTranslation();
   const { show } = useToast();
   const [filter, setFilter] = useState<MarkSheetStatusFilter>("submitted");
   const sheets = useMarkSheets(ctx.year.id, filter);
+  const [releaseFilter, setReleaseFilter] = useState<AssessmentReleaseStatusFilter>("submitted");
+  const releases = useAssessmentReleases(ctx.year.id, releaseFilter);
   const proposed = useProposedAssessments(ctx.year.id);
   const decideSheet = useDecideMarkSheet();
+  const decideRelease = useDecideAssessmentRelease();
   const decideAssessment = useDecideAssessment();
-  const [reasonFor, setReasonFor] = useState<{
-    sheet: MarkSheetSummary;
-    action: "return" | "reopen";
-  } | null>(null);
+  const [reasonFor, setReasonFor] = useState<ReasonTarget | null>(null);
 
   const sheetName = (sheet: MarkSheetSummary) =>
     t("academicGrading.approvals.sheetName", {
@@ -36,6 +52,39 @@ export function ApprovalsTab({ ctx }: { ctx: SetupContext }) {
       grade: sheet.grade_level_name,
       section: sheet.section_name,
     });
+
+  const releaseName = (release: AssessmentReleaseSummary) =>
+    t("academicGrading.approvals.releaseName", {
+      assessment: release.assessment_name,
+      subject: release.subject_name,
+      grade: release.grade_level_name,
+      section: release.section_name,
+    });
+
+  function decideOnRelease(
+    release: AssessmentReleaseSummary,
+    action: "approve" | "return" | "reopen",
+    reason?: string,
+  ) {
+    decideRelease.mutate(
+      { releaseId: release.id, action, reason },
+      {
+        onSuccess: () => {
+          show({
+            variant: "success",
+            title: t(`academicGrading.approvals.releaseDone.${action}`),
+          });
+          setReasonFor(null);
+        },
+        onError: (error) =>
+          show({
+            variant: "error",
+            title: t("academicGrading.approvals.failed"),
+            description: problemMessage(error, t),
+          }),
+      },
+    );
+  }
 
   function decide(
     sheet: MarkSheetSummary,
@@ -134,7 +183,7 @@ export function ApprovalsTab({ ctx }: { ctx: SetupContext }) {
                             type="button"
                             variant="secondary"
                             aria-label={t("academicGrading.approvals.returnLabel", { name })}
-                            onClick={() => setReasonFor({ sheet, action: "return" })}
+                            onClick={() => setReasonFor({ kind: "sheet", sheet, action: "return" })}
                           >
                             {t("academicGrading.approvals.return")}
                           </Button>
@@ -145,9 +194,124 @@ export function ApprovalsTab({ ctx }: { ctx: SetupContext }) {
                           type="button"
                           variant="secondary"
                           aria-label={t("academicGrading.approvals.reopenLabel", { name })}
-                          onClick={() => setReasonFor({ sheet, action: "reopen" })}
+                          onClick={() => setReasonFor({ kind: "sheet", sheet, action: "reopen" })}
                         >
                           {t("academicGrading.approvals.reopen")}
+                        </Button>
+                      ) : null}
+                    </div>
+                  </Table.Cell>
+                </Table.Row>
+              );
+            })}
+          </Table.Body>
+        </Table>
+      </section>
+
+      <section className="ag-block" aria-labelledby="ag-releases-heading">
+        <h2 id="ag-releases-heading">{t("academicGrading.approvals.releasesHeading")}</h2>
+        <p className="ag-muted">{t("academicGrading.approvals.releasesHelp")}</p>
+        <div className="principal-school__filters">
+          <Select<AssessmentReleaseStatusFilter>
+            label={t("academicGrading.approvals.filter")}
+            options={RELEASE_FILTERS.map((value) => ({
+              value,
+              label: t(`academicGrading.approvals.releaseStatus.${value}`),
+            }))}
+            value={releaseFilter}
+            onChange={setReleaseFilter}
+          />
+        </div>
+        <Table caption={t("academicGrading.approvals.releasesCaption")} hideCaption>
+          <Table.Header>
+            <Table.Row>
+              <Table.HeaderCell>
+                {t("academicGrading.approvals.columns.assessment")}
+              </Table.HeaderCell>
+              <Table.HeaderCell>{t("academicGrading.approvals.columns.period")}</Table.HeaderCell>
+              <Table.HeaderCell>
+                {t("academicGrading.approvals.columns.submittedBy")}
+              </Table.HeaderCell>
+              <Table.HeaderCell>
+                {t("academicGrading.approvals.columns.submittedAt")}
+              </Table.HeaderCell>
+              <Table.HeaderCell>{t("academicGrading.approvals.columns.actions")}</Table.HeaderCell>
+            </Table.Row>
+          </Table.Header>
+          <Table.Body
+            columnCount={5}
+            loading={releases.isPending}
+            empty={
+              releases.isError
+                ? problemMessage(releases.error, t)
+                : t(`academicGrading.approvals.releasesEmpty.${releaseFilter}`)
+            }
+          >
+            {(releases.data ?? []).map((release) => {
+              const name = releaseName(release);
+              return (
+                <Table.Row key={release.id}>
+                  <Table.Cell>
+                    {name}
+                    <div className="ag-muted">
+                      {t("academicGrading.approvals.releaseMaxMarks", {
+                        max: release.max_marks,
+                      })}
+                    </div>
+                    {release.return_reason ? (
+                      <div className="ag-muted">
+                        {t("academicGrading.approvals.returnReason", {
+                          reason: release.return_reason,
+                        })}
+                      </div>
+                    ) : null}
+                  </Table.Cell>
+                  <Table.Cell>
+                    {release.term_name ?? t("academicGrading.results.annual")}
+                  </Table.Cell>
+                  <Table.Cell>{release.submitted_by_name ?? "—"}</Table.Cell>
+                  <Table.Cell>
+                    <DateTime value={release.submitted_at} />
+                  </Table.Cell>
+                  <Table.Cell>
+                    <div className="sections-page__row-actions">
+                      {release.status === "submitted" ? (
+                        <>
+                          <Button
+                            type="button"
+                            aria-label={t("academicGrading.approvals.releaseApproveLabel", {
+                              name,
+                            })}
+                            loading={
+                              decideRelease.isPending &&
+                              decideRelease.variables?.releaseId === release.id
+                            }
+                            onClick={() => decideOnRelease(release, "approve")}
+                          >
+                            {t("academicGrading.approvals.releaseApprove")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            aria-label={t("academicGrading.approvals.returnLabel", { name })}
+                            onClick={() =>
+                              setReasonFor({ kind: "release", release, action: "return" })
+                            }
+                          >
+                            {t("academicGrading.approvals.return")}
+                          </Button>
+                        </>
+                      ) : null}
+                      {release.status === "approved" ? (
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          aria-label={t("academicGrading.approvals.withdrawLabel", { name })}
+                          onClick={() =>
+                            setReasonFor({ kind: "release", release, action: "reopen" })
+                          }
+                        >
+                          {t("academicGrading.approvals.withdraw")}
                         </Button>
                       ) : null}
                     </div>
@@ -240,7 +404,7 @@ export function ApprovalsTab({ ctx }: { ctx: SetupContext }) {
         </Table>
       </section>
 
-      {reasonFor ? (
+      {reasonFor?.kind === "sheet" ? (
         <ReasonModal
           key={`${reasonFor.sheet.id}-${reasonFor.action}`}
           open
@@ -252,6 +416,31 @@ export function ApprovalsTab({ ctx }: { ctx: SetupContext }) {
           submitting={decideSheet.isPending}
           onCancel={() => setReasonFor(null)}
           onConfirm={(reason) => decide(reasonFor.sheet, reasonFor.action, reason)}
+        />
+      ) : null}
+      {reasonFor?.kind === "release" ? (
+        <ReasonModal
+          key={`${reasonFor.release.id}-${reasonFor.action}`}
+          open
+          title={t(
+            reasonFor.action === "return"
+              ? "academicGrading.approvals.returnTitle"
+              : "academicGrading.approvals.withdrawTitle",
+            { name: releaseName(reasonFor.release) },
+          )}
+          description={t(
+            reasonFor.action === "return"
+              ? "academicGrading.approvals.releaseReturnDescription"
+              : "academicGrading.approvals.withdrawDescription",
+          )}
+          confirmLabel={t(
+            reasonFor.action === "return"
+              ? "academicGrading.approvals.return"
+              : "academicGrading.approvals.withdraw",
+          )}
+          submitting={decideRelease.isPending}
+          onCancel={() => setReasonFor(null)}
+          onConfirm={(reason) => decideOnRelease(reasonFor.release, reasonFor.action, reason)}
         />
       ) : null}
     </>

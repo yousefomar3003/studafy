@@ -101,6 +101,22 @@ class MarkSheetClient {
     return MarkSheetPeriodStatus.fromWire(response.data?['status']);
   }
 
+  /// `POST .../assessments/{assessmentId}/release` — send one assessment's marks for approval on
+  /// their own, before the rest of the period. Returns the release's status (`submitted`, or
+  /// `approved` when the grade needs no approval step). `RESULTS_INCOMPLETE` while a student's mark
+  /// is missing; `CONFLICT_STATE_MISMATCH` when it, or its whole period, is already sent.
+  Future<AssessmentReleaseStatus> submitAssessmentRelease(
+    String sectionId,
+    String subjectId, {
+    required String assessmentId,
+  }) async {
+    final response = await _dio.post<Map<String, Object?>>(
+      '/api/grading/sections/$sectionId/subjects/$subjectId/assessments/'
+      '$assessmentId/release',
+    );
+    return AssessmentReleaseStatus.fromWire(response.data?['status']);
+  }
+
   static String _sheetPath(String sectionId, String subjectId) =>
       '/api/grading/sections/$sectionId/subjects/$subjectId/marks';
 }

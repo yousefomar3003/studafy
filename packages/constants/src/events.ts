@@ -63,6 +63,13 @@ export const DOMAIN_EVENTS = {
   CERTIFICATE_ISSUED: "certificate.issued",
   CERTIFICATE_REVOKED: "certificate.revoked",
 
+  // Academic marks reached the family (000229/000230): leadership approved a whole period's mark
+  // sheet (assessmentId null) or one assessment released on its own. Emitted by the grading marks
+  // service in the approval's transaction; the workers' notify consumer tells the section's students
+  // with a released mark and their parents (MARKS_RELEASED). A sheet approval that also approves
+  // pending single releases raises this once, for the sheet.
+  MARKS_RELEASED: "marks.released",
+
   EXAM_SCHEDULED: "exam.scheduled",
   EXAM_UPDATED: "exam.updated",
   EXAM_CANCELLED: "exam.cancelled",

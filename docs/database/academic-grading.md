@@ -87,6 +87,36 @@ INSERT` on result rows; a trigger allows a finalization to change only from `fin
   enrolled student to have a usable mark on every mandatory assessment of the period. `submitted`
   and `approved` sheets lock their marks; leadership approves, returns (with reason) or reopens. A
   grade program with `mark_approval_required = false` approves on submit.
+- One assessment at a time (000229, `app.assessment_mark_releases`): a teacher can send a single
+  assessment (say the first exam) for the same approval as soon as every enrolled student has a
+  recorded, usable mark for it (no mark, or an absence the school does not count as zero, is
+  missing; optional assessments and `missing_mark_policy = zero` do not excuse a gap here). Its
+  marks lock while it waits and once approved; once approved they are released to the student and
+  linked parents exactly like an approved sheet's (`app.is_released_student_mark`: the period's
+  sheet is approved **or** the assessment's own release is). A single assessment **always** waits
+  for leadership, also in a grade program whose sheets need no approval step (that setting only
+  approves whole sheets on submit). Changing a mark of a returned assessment puts it back to draft
+  (the row is deleted, audit-logged). Nothing else moves: the period's sheet still needs every mark
+  before it can be submitted, finalization still needs approved sheets, and no term figure is ever shown to
+  families before finalization. Rules between the two:
+  - Sending a single assessment is refused while its period's sheet is submitted or approved.
+  - Approving the period's sheet also approves any of its assessments still waiting on their own.
+  - Returning or reopening the sheet does **not** un-release assessments approved on their own:
+    families have seen those marks, and they stay released and locked until leadership withdraws
+    that assessment (decision `reopen`, with a reason), which hides them again and hands them back
+    to the teacher. Withdrawing is refused while the sheet is approved (reopen the sheet first) and
+    inside finalized results (correction workflow).
+  - A student who joins the section after an assessment was released cannot be given a mark for it
+    until leadership withdraws it (the same as an approved sheet, which must be reopened).
+- Families are told (000230): each approval -- a whole sheet (on approval, or on submit where the
+  program needs no approval step) or one assessment -- raises one `marks.released` outbox event in
+  the approval's transaction. The workers' notify consumer turns it into one MARKS_RELEASED inbox
+  notice for each of the section's students with a mark in what was released and each of their
+  linked parents ("First exam marks are out for Mathematics" / "Mathematics – Term 1 marks are
+  released"), deep-linking to `/students/{studentId}/marks`; the push consumer sends it to their
+  phones under their push preference and quiet hours. Never emailed. A sheet approval that also
+  approves pending single assessments raises one event, not one per assessment; an event whose
+  marks were withdrawn before it was read sends nothing.
 - Teachers may add assessments for their section when the subject allows it; with
   `teacher_assessments_require_approval` they stay `proposed` (not counted) until approved.
 
@@ -158,7 +188,7 @@ shows `needs_reissue` until reissued.
 | `academicConfig:read`         | ORG_ADMIN, PRINCIPAL, INSTRUCTOR | reading configuration, my assignments          |
 | `academicConfig:manage`       | ORG_ADMIN, PRINCIPAL             | all configuration writes, proposed assessments |
 | `grade:read` / `grade:update` | (existing)                       | mark sheet read / mark entry, submit           |
-| `approval:review`             | ORG_ADMIN, PRINCIPAL             | mark sheet approval queue                      |
+| `approval:review`             | ORG_ADMIN, PRINCIPAL             | mark sheet and single-assessment approval      |
 | `result:finalize`             | ORG_ADMIN, PRINCIPAL             | preview, finalize, corrections                 |
 | `academicCertificate:issue`   | ORG_ADMIN, PRINCIPAL             | issue, reissue, revoke, list certificates      |
 

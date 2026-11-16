@@ -235,6 +235,7 @@
       "missing_teacher_assignments": "مواد بلا معلم",
       "students_with_incomplete_marks": "طلاب درجاتهم غير مكتملة",
       "mark_sheets_awaiting_approval": "كشوف درجات بانتظار الاعتماد",
+      "assessment_releases_awaiting_approval": "تقييمات منفردة بانتظار الاعتماد",
       "proposed_assessments": "تقييمات مقترحة",
       "certificates_ready": "شهادات جاهزة",
       "certificates_blocked": "شهادات محجوبة",
@@ -658,7 +659,34 @@
       "rejectAssessment": "رُفض التقييم"
     },
     "sheetsCaption": "قائمة كشوف الدرجات",
-    "proposedCaption": "تقييمات بانتظار الاعتماد"
+    "proposedCaption": "تقييمات بانتظار الاعتماد",
+    "releasesHeading": "تقييمات منفردة",
+    "releasesHelp": "تقييمات أرسلها المعلم وحدها قبل بقية الفصل. بعد اعتمادها يرى الطلاب وأولياء الأمور درجاتها فورًا، ويبقى كشف درجات الفصل بحاجة إلى جميع الدرجات قبل إرساله.",
+    "releasesCaption": "تقييمات منفردة بانتظار الاعتماد",
+    "releaseName": "{{assessment}} · {{subject}}، {{grade}} – {{section}}",
+    "releaseMaxMarks": "من {{max}}",
+    "releaseApprove": "اعتماد ونشر",
+    "releaseApproveLabel": "اعتماد ونشر {{name}}",
+    "releaseReturnDescription": "يرى المعلم السبب ويمكنه تصحيح الدرجات وإرسالها مرة أخرى. لا يراها الطلاب وأولياء الأمور في هذه الأثناء.",
+    "withdraw": "سحب",
+    "withdrawLabel": "سحب {{name}}",
+    "withdrawTitle": "سحب {{name}}؟",
+    "withdrawDescription": "يتوقف الطلاب وأولياء الأمور عن رؤية هذه الدرجات، ويمكن للمعلم تعديلها وإرسالها مرة أخرى. غير ممكن ما دام كشف درجات الفصل كاملًا معتمدًا: أعد فتحه أولًا.",
+    "releaseStatus": {
+      "submitted": "بانتظار الاعتماد",
+      "approved": "منشورة",
+      "returned": "مُعادة أو مسحوبة"
+    },
+    "releasesEmpty": {
+      "submitted": "لا توجد تقييمات منفردة بانتظار الاعتماد.",
+      "approved": "لم تُنشر أي تقييمات منفردة بعد.",
+      "returned": "لا توجد تقييمات مُعادة أو مسحوبة."
+    },
+    "releaseDone": {
+      "approve": "نُشرت للطلاب وأولياء الأمور",
+      "return": "أُعيدت إلى المعلم",
+      "reopen": "سُحبت"
+    }
   },
   "results": {
     "period": "الفترة",
