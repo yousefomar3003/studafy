@@ -74,6 +74,7 @@ async function oauthUser(role = ROLES.INSTRUCTOR) {
     `,
   );
   const app = createApp({
+    idTokenLoginEnabled: true,
     isReady: () => true,
     tracker: createInflightTracker(),
     logger: createLogger({ destination: () => undefined }),

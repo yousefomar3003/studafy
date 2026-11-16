@@ -133,7 +133,7 @@ export function registerOpenApiComponents(app: OpenAPIHono<AppEnv>): void {
     scheme: "bearer",
     bearerFormat: "JWT",
     description:
-      "RS256 JWT access token, issued by POST /api/auth/login/oauth (or the mobile/mock OAuth " +
+      "RS256 JWT access token, issued by the OAuth sign-in flows (web callback, or the mobile/mock " +
       "exchange routes) and verified on every /api/* request by jwtAuthMiddleware — see the " +
       "Authentication guide.",
   });

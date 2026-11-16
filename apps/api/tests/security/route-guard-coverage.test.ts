@@ -599,7 +599,7 @@ describeDb("route guard coverage (QA-001)", () => {
 
   test("enumerates the whole live API", async () => {
     // The live document, not openapi.json: a fresh checkout has no generated file.
-    expect(operations.length).toBeGreaterThanOrEqual(690);
+    expect(operations.length).toBeGreaterThanOrEqual(689);
     const keys = new Set(operations.map((op) => `${op.method} ${op.path}`));
     expect(keys.size).toBe(operations.length);
 

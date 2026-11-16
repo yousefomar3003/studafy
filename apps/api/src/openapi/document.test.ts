@@ -447,7 +447,6 @@ describe("structure", () => {
         "/api/auth/invitations/{token}/oauth/mock/mobile-start",
         "/api/auth/invitations/{token}/oauth/mock/mobile-exchange",
         "/api/auth/login/member",
-        "/api/auth/login/oauth",
         "/api/auth/login/qa",
         "/api/auth/login/review",
         "/api/auth/logout",

@@ -327,6 +327,13 @@ export interface AppOptions {
   /** Skips the rate limiter. Local development only (env.RATE_LIMIT_DISABLED, refused elsewhere). */
   rateLimitDisabled?: boolean;
   /**
+   * Mount the bare ID-token login, POST /api/auth/login/oauth (QA-025). Off by default and never set
+   * by index.ts: it trades any Studafy-audience ID token for a session, with a client-chosen nonce
+   * and no server-issued state, and no client uses it (web and mobile sign in through the callback
+   * and mobile-exchange flows). Only the tests of the shared returning-user login policy turn it on.
+   */
+  idTokenLoginEnabled?: boolean;
+  /**
    * S3-compatible object storage for assignment attachments (ST-103).
    *
    * Nullable and defaulted to null, like `redis`: dev, test, and the OpenAPI generator all run
@@ -418,6 +425,7 @@ export function createApp({
   reviewLoginPassword,
   qaLoginPassword,
   rateLimitDisabled = false,
+  idTokenLoginEnabled = false,
   storage = null,
   uploadScanEnqueuer,
   stripeProvider = null,
@@ -896,7 +904,8 @@ export function createApp({
   // Returning-user OAuth login (ST-079). Authenticates an active user via a verified Microsoft
   // OIDC id_token, matches against oauth_identities, enforces tenant suspension policy, and
   // issues session tokens. Public like the OAuth callbacks — the id_token is the credential.
-  if (database && keyStore) {
+  // Test-only since QA-025 (see idTokenLoginEnabled): a deployed API does not mount it.
+  if (database && keyStore && idTokenLoginEnabled) {
     app.route(
       "/",
       returningUserLoginRoutes(
