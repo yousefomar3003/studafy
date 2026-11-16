@@ -610,6 +610,8 @@ jobs:
           PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: echo "filter=$(bash .github/scripts/resolve-affected-filter.sh)" >> "$GITHUB_OUTPUT"
       - run: bun run format:check
+      # The production deploy's gate and release scripts (QA-005), against fake gh/flyctl/curl.
+      - run: bun test scripts/deploy
       # `--continue=dependencies-successful` surfaces every independent package's failures in one
       # run instead of stopping at the first, so a PR sees all its annotations at once. Piped
       # through annotate-diagnostics.mjs to turn tsc/ESLint output into inline PR annotations --
