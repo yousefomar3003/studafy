@@ -2225,8 +2225,7 @@
       "saveFailed": "Couldn't save that change. Try again.",
       "mandatory": "Required by your school",
       "channels": {
-        "push": "Phone",
-        "email": "Email"
+        "push": "Phone"
       },
       "phone": {
         "title": "Notifications on this phone",
@@ -2239,11 +2238,12 @@
         "openSettings": "Open Settings to turn them on",
         "sendTest": "Send a test notification",
         "testSent": "Sent. It should arrive on this phone in a few seconds.",
-        "testFailed": "Couldn't send the test. Wait a moment and try again."
+        "testFailed": "Couldn't send the test. Wait a moment and try again.",
+        "notRegistered": "This phone couldn't sign up for notifications, so nothing can reach it. Reason: {reason}"
       },
       "kinds": {
         "title": "What to notify me about",
-        "intro": "Everything always appears under the bell. These switches decide what also reaches your phone or your email.",
+        "intro": "Everything always appears under the bell. These switches decide what also reaches your phone.",
         "assignments": {
           "title": "Homework",
           "subtitle": "New homework and due-date reminders"

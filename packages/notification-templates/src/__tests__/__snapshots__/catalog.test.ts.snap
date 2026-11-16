@@ -182,6 +182,12 @@ exports[`renderNotification — snapshot tests en ATTENDANCE_MARKED / push rende
 
 exports[`renderNotification — snapshot tests en ATTENDANCE_MARKED / email renders correctly 1`] = `"Amina Tazi was marked absent in Physics on 2026-11-12."`;
 
+exports[`renderNotification — snapshot tests en MATERIAL_PUBLISHED / in_app renders correctly 1`] = `"New material: Newton's laws"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_PUBLISHED / push renders correctly 1`] = `"Physics · Week 3, Monday"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_PUBLISHED / email renders correctly 1`] = `"Your teacher shared a new material, Newton's laws, in Physics · Week 3, Monday."`;
+
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / in_app renders correctly 1`] = `"موعد تسليم Homework 5 هو 2026-08-15"`;
 
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / push renders correctly 1`] = `"Algebra II — Homework 5 مستحق في 2026-08-15"`;
@@ -364,10 +370,8 @@ exports[`renderNotification — snapshot tests ar ATTENDANCE_MARKED / push rende
 
 exports[`renderNotification — snapshot tests ar ATTENDANCE_MARKED / email renders correctly 1`] = `"تم تسجيل absent لـ Amina Tazi في Physics بتاريخ 2026-11-12."`;
 
-exports[`renderNotification — snapshot tests en MATERIAL_PUBLISHED / in_app renders correctly 1`] = `"New material: Newton's laws"`;
-
-exports[`renderNotification — snapshot tests en MATERIAL_PUBLISHED / push renders correctly 1`] = `"Physics · Week 3, Monday"`;
-
 exports[`renderNotification — snapshot tests ar MATERIAL_PUBLISHED / in_app renders correctly 1`] = `"مادة تعليمية جديدة: Newton's laws"`;
 
 exports[`renderNotification — snapshot tests ar MATERIAL_PUBLISHED / push renders correctly 1`] = `"Physics · Week 3, Monday"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_PUBLISHED / email renders correctly 1`] = `"شارك معلمك مادة تعليمية جديدة بعنوان Newton's laws في Physics · Week 3, Monday."`;

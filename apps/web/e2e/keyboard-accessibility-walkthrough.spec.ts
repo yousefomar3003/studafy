@@ -188,13 +188,13 @@ test("journey 2 — read a notification, then change a channel preference, keybo
     if (route.request().method() === "PATCH") return fulfillJson(route, 200, {});
     return fulfillJson(route, 200, {
       attendance_alert_threshold: null,
-      preferences: ["in_app", "push", "email"].map((channel) => ({
+      preferences: ["in_app", "push"].map((channel) => ({
         notification_type: "ASSIGNMENT_DUE_SOON",
         channel,
         enabled: true,
         digest: false,
         mandatory: false,
-        digest_eligible: channel === "email",
+        digest_eligible: false,
       })),
     });
   });

@@ -2,7 +2,7 @@ import { AR_TEMPLATES } from "./ar";
 import { EN_TEMPLATES } from "./en";
 
 import type { NotificationChannel } from "../types";
-import type { ChannelTemplates, LocaleTemplateSet } from "./types";
+import type { LocaleTemplateSet } from "./types";
 import type { NotificationType } from "@studafy/constants";
 
 /**
@@ -37,12 +37,7 @@ export function renderNotification(
   vars: Record<string, string>,
 ): string {
   const localeSet = LOCALE_MAP[locale];
-  // A never-emailed type has no email template (UnemailedNotificationType); asking for one is a
-  // caller bug, not something to paper over with another channel's text.
-  const template = (localeSet[type] as Partial<ChannelTemplates>)[channel];
-  if (template === undefined) {
-    throw new Error(`${type} has no ${channel} template`);
-  }
+  const template = localeSet[type][channel];
   return template.replace(/\{(\w+)\}/g, (_, key: string) => {
     if (key in vars) {
       return String(vars[key]);

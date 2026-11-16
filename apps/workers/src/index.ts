@@ -36,8 +36,7 @@ import {
 } from "./queues/maintenance";
 import {
   createEmailSender,
-  scheduleDigestJob,
-  scheduleNotificationDigestJob,
+  removeRetiredDigestSchedulers,
   startEmailDispatcher,
   TokenBucket,
 } from "./queues/notifications/email";
@@ -193,18 +192,18 @@ const pushConsumer = startPushConsumer({
   logger: workerLogger,
 });
 
-// Digest scheduler: idempotently register the daily 06:00 parent-digest on the notifications
-// queue. Its own Redis connection so the upsert never contends with worker polling.
+// Studafy sends no notification email, so the daily digest emails are retired. Their BullMQ Job
+// Schedulers outlive the code that registered them, so every boot removes them (a no-op once gone).
+// See email/retired-digests.ts.
 const digestRedis = createRedisConnection(env);
-void scheduleDigestJob(digestRedis).then(() => digestRedis.disconnect());
-
-// Notification digest scheduler: idempotently register the daily 06:30 per-recipient digest
-// (ST-143's preferences.digest flag) on the notifications queue, its own hour after the parent
-// digest above so the two never contend for the same outbox-insert window.
-const notificationDigestRedis = createRedisConnection(env);
-void scheduleNotificationDigestJob(notificationDigestRedis).then(() =>
-  notificationDigestRedis.disconnect(),
-);
+void removeRetiredDigestSchedulers(digestRedis)
+  .catch((err: unknown) =>
+    workerLogger.warn(
+      { err },
+      "could not remove the retired digest schedulers; retrying next boot",
+    ),
+  )
+  .finally(() => digestRedis.disconnect());
 
 // Dunning scheduler: idempotently register the daily 04:00 grace-period sweep on the billing queue.
 const dunningRedis = createRedisConnection(env);

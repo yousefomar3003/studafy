@@ -4,20 +4,20 @@
  * The dispatcher decides *what* each recipient should be told; this carries one already-decided
  * message to one recipient on one channel.
  *
- * ## Two channels, two honest answers
+ * ## Push only
  *
- * `push` is real here. It resolves the recipient's live devices, sends through FCM with the
+ * `push` is the only channel this job delivers. It resolves the recipient's live devices, sends through FCM with the
  * deep-link route in the payload, prunes tokens FCM reports unregistered, and advances the dispatch
  * log to `delivered` — but only when FCM accepted at least one message. Marking `delivered` when
  * nothing was handed to FCM would make the audit trail assert something false, which is the exact
  * question app.notification_dispatch_logs exists to answer.
  *
- * `email` still has no provider in this file: transactional email runs through the Resend dispatcher
- * in email/, not through this delivery job, so a grade-posted email that lands here is recorded as
- * `no provider configured` at `warn` and left at `enqueued`. A status of `enqueued` that never
- * advances is a visible gap; a `delivered` that never happened is a lie. Same for a push recipient
- * with no live device: the row stays `enqueued`, the gap is visible, and the metrics and log line
- * say why.
+ * Studafy sends no notification email, and the dispatcher no longer enqueues email jobs (its
+ * channels come from NOTIFICATION_CATALOG, which is in_app/push only). An email job still sitting in
+ * Redis from before that change is dropped here, unsent: it is logged at `warn` and its dispatch log
+ * is left at `enqueued`. A status of `enqueued` that never advances is a visible gap; a `delivered`
+ * that never happened is a lie. Same for a push recipient with no live device: the row stays
+ * `enqueued`, the gap is visible, and the metrics and log line say why.
  *
  * ## What the per-user device cap is for
  *
@@ -32,7 +32,7 @@
  * The delivery job sits after the dispatcher's reserve-confirm boundary (the reservation is already
  * confirmed by the time this job exists), so its own crash window is at-least-once: a process death
  * between FCM accepting the message and the `delivered` update sends a duplicate push on retry.
- * That is the same trade the email channel already documents, and the one the reserve-confirm
+ * That is the same trade the Resend email dispatcher documents, and the one the reserve-confirm
  * design exists to keep bounded to this single window.
  */
 
@@ -70,7 +70,7 @@ export interface DeliveryDependencies {
 export interface DeliveryResult {
   processed: true;
   channel: string;
-  /** How many live routes the recipient has — devices for push, an address for email. */
+  /** How many live push devices the recipient has. Always 0 for a dropped non-push job. */
   routesResolved: number;
   /** True when the channel handed the message to a provider. False never means "not attempted". */
   sent: boolean;
@@ -94,27 +94,6 @@ interface PushRouteRow {
  * header for why the overflow is measured, not revoked.
  */
 export const MAX_DEVICES_PER_USER = 5;
-
-/**
- * How many live routes this recipient has on this channel.
- *
- * Used for the email branch only, whose provider lives elsewhere. The push branch reads tokens
- * directly via `loadPushRoutes` because it needs the rows, not a count.
- */
-async function countRoutes(
-  tx: TransactionSql,
-  schoolId: string,
-  recipientId: string,
-): Promise<number> {
-  const [row] = await tx<RouteRow[]>`
-    SELECT count(*)::int AS route_count
-    FROM app.users
-    WHERE id = ${recipientId}::uuid
-      AND school_id = ${schoolId}::uuid
-      AND email IS NOT NULL
-  `;
-  return row?.route_count ?? 0;
-}
 
 /**
  * The recipient's live push routes: the `MAX_DEVICES_PER_USER` most recently seen, plus how many
@@ -327,24 +306,20 @@ export async function processNotificationDelivery(
       return await deliverPush(sql, deps, data);
     }
 
-    const routesResolved = await withSystemTenantTx(sql, { schoolId }, async (tx) =>
-      countRoutes(tx, schoolId, recipientId),
-    );
-
+    // Never sent: Studafy delivers no notification by email (see the header).
     deps.log.warn(
       {
-        event: "notification_delivery_no_provider",
+        event: "notification_delivery_channel_retired",
         school_id: schoolId,
         dispatch_log_id: dispatchLogId,
         recipient_id: recipientId,
         channel,
         notification_type: data.notificationType,
-        routes_resolved: routesResolved,
       },
-      `no provider configured for channel ${channel}; notification was rendered but not sent`,
+      `channel ${channel} is not delivered; notification dropped`,
     );
 
-    return { processed: true, channel, routesResolved, sent: false, pruned: 0 };
+    return { processed: true, channel, routesResolved: 0, sent: false, pruned: 0 };
   } finally {
     await database.release();
   }

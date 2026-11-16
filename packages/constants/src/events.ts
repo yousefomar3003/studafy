@@ -82,20 +82,12 @@ export const DOMAIN_EVENTS = {
   // student it marks absent or late (ATTENDANCE_MARKED).
   ATTENDANCE_SESSION_SUBMITTED: "attendance.sessionSubmitted",
 
-  // Parent digest (deliverability R-08). Raised by the workers digest producer, once per parent
-  // per run, aggregating the parent-facing outbox events (attendance.alertRaised,
-  // fee.installmentOverdue) that accumulated since the previous run. The email dispatcher sends
-  // it through the same channel as every other transactional email, so the delivery ledger, dedup,
-  // and SES correlation all apply unchanged.
+  // Retired digest emails. DIGEST_SENT was the per-parent attendance/fee digest and
+  // NOTIFICATION_DIGEST_SENT the per-recipient notification digest. Studafy sends no notification
+  // email, so nothing raises either any more; the names stay because outbox rows written before
+  // that carry them, and the email dispatcher drops such a row unsent (RETIRED_EMAIL_EVENT_NAMES in
+  // apps/workers/src/queues/notifications/email/resolve.ts).
   DIGEST_SENT: "digest.sent",
-
-  // Daily notification digest. Raised by the workers notification-digest producer, once per
-  // recipient per run, aggregating whichever in-app notifications of a digest-eligible type
-  // (see DIGEST_ELIGIBLE_NOTIFICATION_TYPES) that user has opted to receive by email as a daily
-  // digest rather than immediately (app.notification_preferences.digest). Deliberately distinct
-  // from DIGEST_SENT above: that event is the parent-specific attendance/fee digest and predates
-  // the preferences digest flag; this one is the general, preference-driven digest ST-143 added
-  // the flag for.
   NOTIFICATION_DIGEST_SENT: "notification.digestSent",
 
   // Finance reconciliation (ST-122). Raised by the daily reconciliation job when an installment

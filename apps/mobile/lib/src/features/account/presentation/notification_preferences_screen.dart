@@ -32,27 +32,22 @@ enum NotificationCategory {
 
 /// Which [NotificationCategory] a server notification type (its JSON name) belongs to.
 NotificationCategory notificationCategoryOf(String type) => switch (type) {
-  'ASSIGNMENT_DUE_SOON' ||
-  'ASSIGNMENT_PUBLISHED' => NotificationCategory.assignments,
+  'ASSIGNMENT_DUE_SOON' || 'ASSIGNMENT_PUBLISHED' => NotificationCategory.assignments,
   'MATERIAL_PUBLISHED' => NotificationCategory.lessons,
-  'GRADE_POSTED' ||
-  'ASSIGNMENT_GRADED' ||
-  'CERTIFICATE_ISSUED' => NotificationCategory.grades,
+  'GRADE_POSTED' || 'ASSIGNMENT_GRADED' || 'CERTIFICATE_ISSUED' => NotificationCategory.grades,
   'ATTENDANCE_ALERT' || 'ATTENDANCE_MARKED' => NotificationCategory.attendance,
   'DIRECT_MESSAGE' ||
   'DISCUSSION_REPLY' ||
   'SUPPORT_MESSAGE' ||
   'STUDY_GROUP_INVITE' => NotificationCategory.messages,
   'ANNOUNCEMENT' || 'ADMIN_ANNOUNCEMENT' => NotificationCategory.announcements,
-  _ when type.startsWith('FEE_') || type.startsWith('LICENSE_') =>
-    NotificationCategory.fees,
+  _ when type.startsWith('FEE_') || type.startsWith('LICENSE_') => NotificationCategory.fees,
   _ => NotificationCategory.schoolUpdates,
 };
 
 /// Notification types only a teacher who uploads materials receives (about their own uploads).
 /// MATERIAL_PUBLISHED is the students' notice that a new material is up, so it is not one.
-bool _isTeachingOnly(String type) =>
-    type.startsWith('MATERIAL_') && type != 'MATERIAL_PUBLISHED';
+bool _isTeachingOnly(String type) => type.startsWith('MATERIAL_') && type != 'MATERIAL_PUBLISHED';
 
 /// Which categories a person with these role claims is offered. Fees are for parents and the
 /// people who run the school's money; attendance is for families, students and the office; new
@@ -64,12 +59,10 @@ Set<NotificationCategory> visibleCategories(Iterable<String> roleClaims) {
     NotificationCategory.assignments,
     NotificationCategory.grades,
     if (any(['STUDENT'])) NotificationCategory.lessons,
-    if (any(['PARENT', 'STUDENT', 'ATTENDANCE_OFFICER']))
-      NotificationCategory.attendance,
+    if (any(['PARENT', 'STUDENT', 'ATTENDANCE_OFFICER'])) NotificationCategory.attendance,
     NotificationCategory.messages,
     NotificationCategory.announcements,
-    if (any(['PARENT', 'FINANCE', 'PRINCIPAL', 'ORG_ADMIN']))
-      NotificationCategory.fees,
+    if (any(['PARENT', 'FINANCE', 'PRINCIPAL', 'ORG_ADMIN'])) NotificationCategory.fees,
     NotificationCategory.schoolUpdates,
   };
 }
@@ -85,9 +78,9 @@ class _CategoryChannel {
   bool get enabled => cells.every((cell) => cell.enabled || cell.mandatory);
 }
 
-/// "Notifications" in Profile: whether this phone shows them, a test button, one switch per kind of
-/// notice for the phone and for email, and quiet hours. Everything always lands in the inbox (the
-/// bell), so the switches only decide what interrupts.
+/// "Notifications" in Profile: whether this phone shows them, a test button, one phone switch per
+/// kind of notice, and quiet hours. Everything always lands in the inbox (the bell), so the switches
+/// only decide what interrupts. Studafy sends no notification email, so there is no email choice.
 class NotificationPreferencesScreen extends ConsumerStatefulWidget {
   const NotificationPreferencesScreen({super.key});
 
@@ -96,8 +89,7 @@ class NotificationPreferencesScreen extends ConsumerStatefulWidget {
       _NotificationPreferencesScreenState();
 }
 
-class _NotificationPreferencesScreenState
-    extends ConsumerState<NotificationPreferencesScreen>
+class _NotificationPreferencesScreenState extends ConsumerState<NotificationPreferencesScreen>
     with WidgetsBindingObserver {
   /// The latest matrix the server returned from a save; wins over the initial load.
   NotificationPreferences? _saved;
@@ -125,11 +117,13 @@ class _NotificationPreferencesScreenState
     }
   }
 
-  void _snack(String key) {
+  void _snack(String key) => _snackText(key.tr());
+
+  void _snackText(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(key.tr())));
+      ..showSnackBar(SnackBar(content: Text(text)));
   }
 
   Future<void> _toggle(
@@ -144,11 +138,7 @@ class _NotificationPreferencesScreenState
       final updated = await ref.read(updateNotificationPreferencesProvider)([
         for (final cell in switchState.cells)
           if (!cell.mandatory)
-            (
-              type: cell.notificationType.json!,
-              channel: cell.channel.json!,
-              enabled: enabled,
-            ),
+            (type: cell.notificationType.json!, channel: cell.channel.json!, enabled: enabled),
       ]);
       if (mounted) setState(() => _saved = updated);
     } on Object {
@@ -177,6 +167,9 @@ class _NotificationPreferencesScreenState
       await ref.read(pushServiceProvider).registerIfAuthenticated();
       await ref.read(sendTestNotificationProvider)();
       _snack('account.notifications.phone.testSent');
+    } on PushRegistrationException catch (e) {
+      // The test would be queued but could never reach this phone: say why instead of "Sent".
+      _snackText('account.notifications.phone.notRegistered'.tr(namedArgs: {'reason': e.reason}));
     } on Object {
       _snack('account.notifications.phone.testFailed');
     } finally {
@@ -196,10 +189,7 @@ class _NotificationPreferencesScreenState
     }
   }
 
-  Future<void> _pickTime(
-    NotificationQuietHours current, {
-    required bool start,
-  }) async {
+  Future<void> _pickTime(NotificationQuietHours current, {required bool start}) async {
     final value = start ? current.start : current.end;
     final picked = await showTimePicker(
       context: context,
@@ -209,10 +199,7 @@ class _NotificationPreferencesScreenState
     final text = _format(picked);
     final other = start ? current.end : current.start;
     if (other == text) return;
-    await _setQuietHours(
-      start ? text : current.start,
-      start ? current.end : text,
-    );
+    await _setQuietHours(start ? text : current.start, start ? current.end : text);
   }
 
   static TimeOfDay? _parse(String? value) {
@@ -233,15 +220,12 @@ class _NotificationPreferencesScreenState
     return Scaffold(
       appBar: AppBar(title: Text('account.notifications.title'.tr())),
       body: ListView(
-        padding: const EdgeInsets.all(
-          AppSpacing.space16,
-        ).withBottomInset(context),
+        padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
         children: [
           _PhoneCard(
             sendingTest: _sendingTest,
             onTurnOn: _turnOnPhone,
-            onOpenSettings: () =>
-                ref.read(pushServiceProvider).openSystemSettings(),
+            onOpenSettings: () => ref.read(pushServiceProvider).openSystemSettings(),
             onSendTest: _sendTest,
           ),
           const SizedBox(height: AppSpacing.space24),
@@ -249,9 +233,9 @@ class _NotificationPreferencesScreenState
           const SizedBox(height: AppSpacing.space4),
           Text(
             'account.notifications.kinds.intro'.tr(),
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.space12),
           loaded.when(
@@ -261,8 +245,7 @@ class _NotificationPreferencesScreenState
             ),
             error: (_, _) => _RetryCard(
               messageKey: 'account.notifications.loadError',
-              onRetry: () =>
-                  ref.invalidate(accountNotificationPreferencesProvider),
+              onRetry: () => ref.invalidate(accountNotificationPreferencesProvider),
             ),
             data: (initial) => _KindsCard(
               grouped: _group(
@@ -290,9 +273,8 @@ class _NotificationPreferencesScreenState
                   return _QuietHoursCard(
                     current: current,
                     saving: _saving.contains('quiet'),
-                    onEnable: (on) => on
-                        ? _setQuietHours('22:00', '07:00')
-                        : _setQuietHours(null, null),
+                    onEnable: (on) =>
+                        on ? _setQuietHours('22:00', '07:00') : _setQuietHours(null, null),
                     onPickStart: () => _pickTime(current, start: true),
                     onPickEnd: () => _pickTime(current, start: false),
                   );
@@ -303,27 +285,24 @@ class _NotificationPreferencesScreenState
     );
   }
 
-  /// The visible categories, each with its push and email switch (null when the category has no
-  /// cell on that channel). Types this build doesn't know are left out.
+  /// The visible categories, each with its push switch. Only push cells count: the inbox always
+  /// gets everything, and notifications are never emailed. Types this build doesn't know are left
+  /// out.
   static Map<NotificationCategory, Map<String, _CategoryChannel>> _group(
     List<NotificationPreference> cells, {
     required Set<NotificationCategory> categories,
     required bool includeTeaching,
   }) {
-    final byCategory =
-        <NotificationCategory, Map<String, List<NotificationPreference>>>{};
+    final byCategory = <NotificationCategory, Map<String, List<NotificationPreference>>>{};
     for (final cell in cells) {
       final type = cell.notificationType.json;
       final channel = cell.channel.json;
       if (type == null || channel == null) continue;
-      if (cell.channel == NotificationPreferenceChannel.inApp) continue;
+      if (cell.channel != NotificationPreferenceChannel.push) continue;
       if (_isTeachingOnly(type) && !includeTeaching) continue;
       final category = notificationCategoryOf(type);
       if (!categories.contains(category)) continue;
-      byCategory
-          .putIfAbsent(category, () => {})
-          .putIfAbsent(channel, () => [])
-          .add(cell);
+      byCategory.putIfAbsent(category, () => {}).putIfAbsent(channel, () => []).add(cell);
     }
     return {
       for (final category in NotificationCategory.values)
@@ -342,8 +321,7 @@ class _SectionTitle extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) =>
-      Text(text, style: Theme.of(context).textTheme.titleMedium);
+  Widget build(BuildContext context) => Text(text, style: Theme.of(context).textTheme.titleMedium);
 }
 
 class _RetryCard extends StatelessWidget {
@@ -393,11 +371,7 @@ class _PhoneCard extends ConsumerWidget {
         theme.colorScheme.primary,
         'on',
       ),
-      PushPermission.denied => (
-        Icons.notifications_off_outlined,
-        theme.colorScheme.error,
-        'off',
-      ),
+      PushPermission.denied => (Icons.notifications_off_outlined, theme.colorScheme.error, 'off'),
       PushPermission.notDetermined => (
         Icons.notifications_none_outlined,
         theme.colorScheme.onSurfaceVariant,
@@ -408,11 +382,7 @@ class _PhoneCard extends ConsumerWidget {
         theme.colorScheme.onSurfaceVariant,
         'unavailable',
       ),
-      null => (
-        Icons.notifications_none_outlined,
-        theme.colorScheme.onSurfaceVariant,
-        'checking',
-      ),
+      null => (Icons.notifications_none_outlined, theme.colorScheme.onSurfaceVariant, 'checking'),
     };
 
     return Card(
@@ -474,32 +444,20 @@ class _PhoneCard extends ConsumerWidget {
   }
 }
 
-/// One row per kind of notice, with a "Phone" and an "Email" switch.
+/// One row per kind of notice, with a "Phone" switch.
 class _KindsCard extends StatelessWidget {
-  const _KindsCard({
-    required this.grouped,
-    required this.saving,
-    required this.onToggle,
-  });
+  const _KindsCard({required this.grouped, required this.saving, required this.onToggle});
 
   final Map<NotificationCategory, Map<String, _CategoryChannel>> grouped;
   final Set<String> saving;
-  final Future<void> Function(
-    NotificationCategory,
-    String,
-    _CategoryChannel,
-    bool,
-  )
-  onToggle;
+  final Future<void> Function(NotificationCategory, String, _CategoryChannel, bool) onToggle;
 
-  static const _channels = ['push', 'email'];
+  static const _channels = ['push'];
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = theme.textTheme.labelSmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-    );
+    final muted = theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant);
 
     return Card(
       margin: EdgeInsets.zero,
@@ -546,15 +504,13 @@ class _KindsCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'account.notifications.kinds.${category.name}.title'
-                              .tr(),
+                          'account.notifications.kinds.${category.name}.title'.tr(),
                           style: theme.textTheme.bodyLarge,
                         ),
                         Text(
                           channels.values.every((c) => c.locked)
                               ? 'account.notifications.mandatory'.tr()
-                              : 'account.notifications.kinds.${category.name}.subtitle'
-                                    .tr(),
+                              : 'account.notifications.kinds.${category.name}.subtitle'.tr(),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
@@ -567,20 +523,12 @@ class _KindsCard extends StatelessWidget {
                       width: 64,
                       child: switch (channels[channel]) {
                         final switchState? => Switch(
-                          key: Key(
-                            'notificationPref-${category.name}/$channel',
-                          ),
+                          key: Key('notificationPref-${category.name}/$channel'),
                           value: switchState.enabled,
                           onChanged:
-                              switchState.locked ||
-                                  saving.contains('${category.name}/$channel')
+                              switchState.locked || saving.contains('${category.name}/$channel')
                               ? null
-                              : (on) => onToggle(
-                                  category,
-                                  channel,
-                                  switchState,
-                                  on,
-                                ),
+                              : (on) => onToggle(category, channel, switchState, on),
                         ),
                         null => const SizedBox.shrink(),
                       },
@@ -629,23 +577,15 @@ class _QuietHoursCard extends StatelessWidget {
             ListTile(
               key: const Key('notificationQuietFrom'),
               title: Text('account.notifications.quiet.from'.tr()),
-              trailing: Text(
-                current.start!,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              trailing: Text(current.start!, style: Theme.of(context).textTheme.titleMedium),
               onTap: saving ? null : onPickStart,
             ),
             ListTile(
               key: const Key('notificationQuietUntil'),
               title: Text('account.notifications.quiet.until'.tr()),
-              trailing: Text(
-                current.end!,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+              trailing: Text(current.end!, style: Theme.of(context).textTheme.titleMedium),
               subtitle: Text(
-                'account.notifications.quiet.timezone'.tr(
-                  namedArgs: {'zone': current.timezone},
-                ),
+                'account.notifications.quiet.timezone'.tr(namedArgs: {'zone': current.timezone}),
               ),
               onTap: saving ? null : onPickEnd,
             ),

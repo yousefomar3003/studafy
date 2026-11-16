@@ -317,8 +317,7 @@
     },
     "channels": {
       "in_app": "In-app",
-      "push": "Push",
-      "email": "Email"
+      "push": "Push"
     },
     "inbox": {
       "title": "Notifications",
@@ -335,7 +334,7 @@
     },
     "preferences": {
       "title": "Notification settings",
-      "description": "Choose which channels deliver each type of notification, and when to batch them into a daily digest.",
+      "description": "Choose which channels deliver each type of notification. Notifications are never sent by email.",
       "backToInbox": "Back to inbox",
       "loadError": "Unable to load notification preferences. Try reloading the page.",
       "channelsLabel": "Channel preferences",
@@ -343,10 +342,8 @@
       "channelsDescription": "A locked type is mandatory and always delivered on every channel.",
       "tableCaption": "Notification channel preferences",
       "typeColumn": "Notification type",
-      "digestColumn": "Daily digest",
       "mandatory": "Mandatory",
       "cellLabel": "{{type}} — {{channel}}",
-      "digestCellLabel": "{{type}} — daily digest",
       "saveChannels": "Save channel preferences",
       "thresholdLabel": "Attendance alert threshold",
       "attendanceHeading": "Attendance alerts",

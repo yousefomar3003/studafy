@@ -11,7 +11,7 @@
  */
 
 import { NOTIFICATION_TYPES } from "@studafy/constants";
-import { NOTIFICATION_CATALOG, NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
+import { DELIVERED_NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 
@@ -78,23 +78,16 @@ function findCell<T extends { notification_type: string; channel: string }>(
 // ---------------------------------------------------------------------------
 
 describeDb("getPreferences", () => {
-  test("returns the full seeded matrix, defaulting to enabled and non-digest", async () => {
+  test("returns every type on in_app and push, defaulting to enabled and non-digest", async () => {
     const school = await createSchool(db.sql);
     const user = await createUserFactory(db.sql, school.id);
 
     const result = await asUser(school.id, user.id, (tx) => getPreferences(tx, user.id));
 
-    // One cell per channel each type is delivered on: a never-emailed type has no email cell.
     const types = Object.values(NOTIFICATION_TYPES);
-    const cells = types.reduce((sum, type) => sum + NOTIFICATION_CATALOG[type].channels.length, 0);
-    expect(result.preferences).toHaveLength(cells);
-    expect(
-      result.preferences.some(
-        (p) =>
-          p.notification_type === NOTIFICATION_TYPES.MATERIAL_PUBLISHED &&
-          p.channel === NOTIFICATION_CHANNELS.EMAIL,
-      ),
-    ).toBe(false);
+    expect(result.preferences).toHaveLength(types.length * DELIVERED_NOTIFICATION_CHANNELS.length);
+    // Studafy sends no notification email: the seeded email rows are never offered.
+    expect(result.preferences.some((p) => (p.channel as string) === "email")).toBe(false);
     expect(result.preferences.every((p) => p.enabled)).toBe(true);
     expect(result.preferences.every((p) => !p.digest)).toBe(true);
     expect(result.attendance_alert_threshold).toBeNull();
@@ -112,22 +105,13 @@ describeDb("getPreferences", () => {
     expect(mandatoryTypes).toEqual(new Set([NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT]));
   });
 
-  test("digest_eligible is true only for eligible types on the email channel", async () => {
+  test("no cell is digest-eligible: the digest was an email-only feature", async () => {
     const school = await createSchool(db.sql);
     const user = await createUserFactory(db.sql, school.id);
 
     const { preferences } = await asUser(school.id, user.id, (tx) => getPreferences(tx, user.id));
 
-    const eligible = preferences.filter((p) => p.digest_eligible);
-    expect(eligible.every((p) => p.channel === NOTIFICATION_CHANNELS.EMAIL)).toBe(true);
-    expect(new Set(eligible.map((p) => p.notification_type))).toEqual(
-      new Set([
-        NOTIFICATION_TYPES.DISCUSSION_REPLY,
-        NOTIFICATION_TYPES.STUDY_GROUP_INVITE,
-        NOTIFICATION_TYPES.COURSE_PUBLISHED,
-        NOTIFICATION_TYPES.ATTENDANCE_ALERT,
-      ]),
-    );
+    expect(preferences.some((p) => p.digest_eligible || p.digest)).toBe(false);
   });
 
   test("does not expose another user's preferences", async () => {
@@ -138,13 +122,13 @@ describeDb("getPreferences", () => {
     await asUser(school.id, owner.id, (tx) =>
       updatePreferences(tx, school.id, owner.id, {
         preferences: [
-          { notification_type: NOTIFICATION_TYPES.GRADE_POSTED, channel: "email", enabled: false },
+          { notification_type: NOTIFICATION_TYPES.GRADE_POSTED, channel: "push", enabled: false },
         ],
       }),
     );
 
     const { preferences } = await asUser(school.id, other.id, (tx) => getPreferences(tx, other.id));
-    expect(findCell(preferences, NOTIFICATION_TYPES.GRADE_POSTED, "email").enabled).toBe(true);
+    expect(findCell(preferences, NOTIFICATION_TYPES.GRADE_POSTED, "push").enabled).toBe(true);
   });
 });
 
@@ -160,17 +144,17 @@ describeDb("updatePreferences — channel toggles", () => {
     const result = await asUser(school.id, user.id, (tx) =>
       updatePreferences(tx, school.id, user.id, {
         preferences: [
-          { notification_type: NOTIFICATION_TYPES.GRADE_POSTED, channel: "email", enabled: false },
+          { notification_type: NOTIFICATION_TYPES.GRADE_POSTED, channel: "push", enabled: false },
         ],
       }),
     );
 
-    expect(findCell(result.preferences, NOTIFICATION_TYPES.GRADE_POSTED, "email").enabled).toBe(
+    expect(findCell(result.preferences, NOTIFICATION_TYPES.GRADE_POSTED, "push").enabled).toBe(
       false,
     );
-    expect(findCell(result.preferences, NOTIFICATION_TYPES.GRADE_POSTED, "push").enabled).toBe(
-      true,
-    );
+    expect(
+      findCell(result.preferences, NOTIFICATION_TYPES.ASSIGNMENT_DUE_SOON, "push").enabled,
+    ).toBe(true);
     expect(findCell(result.preferences, NOTIFICATION_TYPES.GRADE_POSTED, "in_app").enabled).toBe(
       true,
     );
@@ -234,7 +218,7 @@ describe("validateUpdate — mandatory types", () => {
     expect(() =>
       validateUpdate({
         notification_type: NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT,
-        channel: "email",
+        channel: "push",
         enabled: true,
       }),
     ).not.toThrow();
@@ -244,7 +228,7 @@ describe("validateUpdate — mandatory types", () => {
     expect(() =>
       validateUpdate({
         notification_type: NOTIFICATION_TYPES.GRADE_POSTED,
-        channel: "email",
+        channel: "push",
         enabled: false,
       }),
     ).not.toThrow();
@@ -252,32 +236,28 @@ describe("validateUpdate — mandatory types", () => {
 });
 
 describe("validateUpdate — digest mode", () => {
-  test("rejects digest on a non-email channel", () => {
+  // The digest was the batched daily email. Studafy sends no notification email, so it cannot be
+  // turned on for any type on any channel.
+  for (const notification_type of [
+    NOTIFICATION_TYPES.DISCUSSION_REPLY,
+    NOTIFICATION_TYPES.GRADE_POSTED,
+  ]) {
+    for (const channel of DELIVERED_NOTIFICATION_CHANNELS) {
+      test(`rejects digest on ${notification_type} / ${channel}`, () => {
+        expect(() => validateUpdate({ notification_type, channel, digest: true })).toThrow(
+          expect.objectContaining({ status: 422 }),
+        );
+      });
+    }
+  }
+
+  test("accepts digest: false, which old clients may still send", () => {
     expect(() =>
       validateUpdate({
         notification_type: NOTIFICATION_TYPES.DISCUSSION_REPLY,
         channel: "push",
-        digest: true,
-      }),
-    ).toThrow(expect.objectContaining({ status: 422 }));
-  });
-
-  test("rejects digest on a type that is not digest-eligible", () => {
-    expect(() =>
-      validateUpdate({
-        notification_type: NOTIFICATION_TYPES.GRADE_POSTED,
-        channel: "email",
-        digest: true,
-      }),
-    ).toThrow(expect.objectContaining({ status: 422 }));
-  });
-
-  test("allows digest on an eligible type's email channel", () => {
-    expect(() =>
-      validateUpdate({
-        notification_type: NOTIFICATION_TYPES.DISCUSSION_REPLY,
-        channel: "email",
-        digest: true,
+        enabled: true,
+        digest: false,
       }),
     ).not.toThrow();
   });
@@ -303,38 +283,15 @@ describeDb("updatePreferences — mandatory types", () => {
         preferences: [
           {
             notification_type: NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT,
-            channel: "email",
+            channel: "push",
             enabled: true,
           },
         ],
       }),
     );
     expect(
-      findCell(result.preferences, NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT, "email").enabled,
+      findCell(result.preferences, NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT, "push").enabled,
     ).toBe(true);
-  });
-});
-
-describeDb("updatePreferences — digest mode", () => {
-  test("enables digest on an eligible type's email channel", async () => {
-    const school = await createSchool(db.sql);
-    const user = await createUserFactory(db.sql, school.id);
-
-    const result = await asUser(school.id, user.id, (tx) =>
-      updatePreferences(tx, school.id, user.id, {
-        preferences: [
-          {
-            notification_type: NOTIFICATION_TYPES.DISCUSSION_REPLY,
-            channel: "email",
-            digest: true,
-          },
-        ],
-      }),
-    );
-
-    expect(findCell(result.preferences, NOTIFICATION_TYPES.DISCUSSION_REPLY, "email").digest).toBe(
-      true,
-    );
   });
 });
 

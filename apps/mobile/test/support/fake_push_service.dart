@@ -54,8 +54,14 @@ class FakePushService implements PushService {
     return null;
   }
 
+  /// When set, [registerIfAuthenticated] fails with it: a phone that could not be registered.
+  PushRegistrationException? registrationError;
+
   @override
-  Future<void> registerIfAuthenticated() async {}
+  Future<void> registerIfAuthenticated() async {
+    final error = registrationError;
+    if (error != null) throw error;
+  }
 
   @override
   Future<String?> currentToken() async => token;
