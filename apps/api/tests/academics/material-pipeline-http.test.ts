@@ -1,8 +1,9 @@
 /**
  * The material pipeline as teachers, students and parents see it, over HTTP.
  *
- *  - Students and parents see only `ready` materials, in the list and by id. A material still being
- *    uploaded, scanned or processed, or one that failed or was blocked, is the teacher's business.
+ *  - Students and parents see only `ready` materials, in the list, by id and in global search. A
+ *    material still being uploaded, scanned or processed, or one that failed or was blocked, is the
+ *    teacher's business.
  *  - A teacher retries a failed material (POST /retry): it goes back to scanning, audited.
  *  - Re-uploading a file whose earlier attempt failed replaces that attempt and frees its file.
  *  - Starting an upload wakes the scaled-to-zero scanner, without ever affecting the request.
@@ -254,6 +255,26 @@ describeDb("who sees which materials", () => {
       const asTeacher = await request(t.tenant, t.teacher, "GET", path);
       expect({ status, code: asTeacher.status }).toEqual({ status, code: 200 });
     }
+  });
+});
+
+describeDb("global search over materials", () => {
+  async function searchStatuses(t: Tenant, as: Actor): Promise<string[]> {
+    const res = await request(t.tenant, as, "GET", "/api/search?q=Notes&types=materials&limit=20");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      results: { materials: { ingest_status: string }[] };
+      totals: { materials: number };
+    };
+    expect(body.totals.materials).toBe(body.results.materials.length);
+    return body.results.materials.map((m) => m.ingest_status).sort();
+  }
+
+  test("finds every state for the teacher and only ready for the student", async () => {
+    const t = await newTenant();
+
+    expect(await searchStatuses(t, t.teacher)).toEqual([...ALL_STATUSES].sort());
+    expect(await searchStatuses(t, t.student)).toEqual(["ready"]);
   });
 });
 
