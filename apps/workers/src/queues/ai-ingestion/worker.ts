@@ -1,7 +1,7 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { NOTIFICATION_TYPES } from "@studafy/constants";
 import { sanitizePlainText } from "@studafy/sanitize";
-import { UnrecoverableError } from "bullmq";
+import { DelayedError, UnrecoverableError } from "bullmq";
 import postgres from "postgres";
 
 import { leaseDatabase } from "../../db/pool";
@@ -79,6 +79,9 @@ type IngestResult =
   | { processed: true; materialId: string; ingested: boolean; chunks: number }
   | { processed: false; reason: string };
 
+/** How long a job waits when its school is at the ingestion cap, before jitter (QA-064). */
+const CONTENDED_RETRY_MS = 10_000;
+
 /**
  * Process one `ai-ingestion` job: claim the material, extract and chunk its text, and store the
  * chunks on `app.material_chunks`.
@@ -105,6 +108,7 @@ type IngestResult =
 export async function processIngestJob(
   job: Job,
   config: AiIngestionWorkerConfig,
+  token?: string,
 ): Promise<IngestResult> {
   const parsed = aiIngestionJobDataSchema.safeParse(job.data);
   if (!parsed.success) return { processed: false, reason: "invalid job data" };
@@ -126,7 +130,19 @@ export async function processIngestJob(
     // makes BullMQ retry with the job's backoff; on the terminal attempt the failure path records
     // it as a scheduling failure (see failureReason).
     lease = await semaphore.acquire(data.schoolId);
-    if (!lease) throw new TenantConcurrencyExceededError(data.schoolId);
+    if (!lease) {
+      // QA-064: the school is at its cap. Wait our turn rather than burn an attempt: moved back to
+      // the delayed set, the job keeps every retry for real failures. Jittered so a burst of
+      // contended jobs does not come back in lockstep.
+      if (token) {
+        await job.moveToDelayed(
+          Date.now() + CONTENDED_RETRY_MS + Math.random() * CONTENDED_RETRY_MS,
+          token,
+        );
+        throw new DelayedError();
+      }
+      throw new TenantConcurrencyExceededError(data.schoolId);
+    }
 
     let heldBack = false;
     const claim = await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
@@ -297,6 +313,8 @@ export async function processIngestJob(
       chunks: committed ? chunks.length : 0,
     };
   } catch (error) {
+    // A delayed job (QA-064) has not failed: nothing to record.
+    if (error instanceof DelayedError) throw error;
     // A file over an ingestion limit (QA-043) is over it on every attempt: fail it now rather than
     // spend each retry re-reading it (a parse timeout would cost minutes per attempt).
     const tooLarge = error instanceof DocumentTooLargeError;

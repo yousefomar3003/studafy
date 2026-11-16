@@ -56,7 +56,8 @@ import type { PushSender } from "./queues/notifications/push";
 import type { QueueName } from "@studafy/constants";
 import type { Job } from "bullmq";
 
-export type Processor = (job: Job) => Promise<unknown>;
+/** `token` is BullMQ's lock token for the job, needed to move it back to the delayed set. */
+export type Processor = (job: Job, token?: string) => Promise<unknown>;
 
 export interface QueueDefinition {
   name: QueueName;
@@ -268,24 +269,28 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     // Ingests a material: claim the row, extract + chunk its text, store app.material_chunks. The
     // `missing job data` guard keeps the registry unit test (and any stray producer) from opening a
     // database connection for an empty payload.
-    processor: async (job: Job) => {
+    processor: async (job: Job, token?: string) => {
       const data = job.data as Partial<AiIngestionJobData>;
       if (!data.materialId || !data.schoolId) {
         return { processed: false, reason: "missing job data" };
       }
-      return processIngestJob(job, {
-        databaseUrl,
-        sql: db(),
-        databaseCaCert: workerEnv.DATABASE_CA_CERT,
-        s3Region: workerEnv.S3_REGION,
-        s3Endpoint: workerEnv.S3_ENDPOINT,
-        bucket: workerEnv.S3_APP_FILES_BUCKET,
-        ocrLowConfidenceThreshold: workerEnv.OCR_LOW_CONFIDENCE_THRESHOLD,
-        ocrWorkerPath: workerEnv.OCR_WORKER_PATH,
-        ocrLangPath: workerEnv.OCR_LANG_PATH,
-        semaphore: ingestionSemaphore(),
-        enqueueDerivation,
-      });
+      return processIngestJob(
+        job,
+        {
+          databaseUrl,
+          sql: db(),
+          databaseCaCert: workerEnv.DATABASE_CA_CERT,
+          s3Region: workerEnv.S3_REGION,
+          s3Endpoint: workerEnv.S3_ENDPOINT,
+          bucket: workerEnv.S3_APP_FILES_BUCKET,
+          ocrLowConfidenceThreshold: workerEnv.OCR_LOW_CONFIDENCE_THRESHOLD,
+          ocrWorkerPath: workerEnv.OCR_WORKER_PATH,
+          ocrLangPath: workerEnv.OCR_LANG_PATH,
+          semaphore: ingestionSemaphore(),
+          enqueueDerivation,
+        },
+        token,
+      );
     },
   },
   {

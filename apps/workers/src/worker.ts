@@ -28,6 +28,8 @@ export type WorkerFactory = (
  * does, so a copy from a second bundled bullmq still counts).
  */
 function willRetry(job: Job, error: unknown): boolean {
+  // A job moved back to the delayed set (DelayedError, QA-064) has not failed at all.
+  if (error instanceof Error && error.name === "DelayedError") return true;
   const unrecoverable = error instanceof Error && error.name === "UnrecoverableError";
   return !unrecoverable && job.attemptsMade + 1 < (job.opts.attempts ?? 1);
 }
@@ -47,10 +49,11 @@ export function runMonitoredJob(
   definition: QueueDefinition,
   job: Job,
   reportError: (error: unknown, context: CaptureContext) => void = captureError,
+  token?: string,
 ): Promise<unknown> {
   return withErrorMonitoringScope(async () => {
     try {
-      return await definition.processor(job);
+      return await definition.processor(job, token);
     } catch (error) {
       if (!willRetry(job, error)) {
         const data = job.data as { schoolId?: unknown; school_id?: unknown } | undefined;
@@ -89,11 +92,11 @@ export const createBullmqWorker: WorkerFactory = (definition, connection) => {
     // rather than every processor file importing `withConsumerSpan` itself. `job.data` is read
     // generically (`traceContext` is not part of any per-queue job-data type) because this wrapper
     // is queue-agnostic by construction.
-    (job: Job) => {
+    (job: Job, token?: string) => {
       const carrier = (job.data as { traceContext?: TraceContextCarrier } | undefined)
         ?.traceContext;
       return withConsumerSpan(definition.name, job.name, carrier, () =>
-        runMonitoredJob(definition, job),
+        runMonitoredJob(definition, job, captureError, token),
       );
     },
     {
