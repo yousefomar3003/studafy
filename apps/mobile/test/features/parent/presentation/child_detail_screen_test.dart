@@ -15,9 +15,12 @@ import 'package:studafy_mobile/src/features/parent/domain/child_timetable.dart';
 import 'package:studafy_mobile/src/features/parent/domain/family_finance.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/child_detail_screen.dart';
 import 'package:studafy_mobile/src/features/parent/presentation/widgets/child_detail_placeholders.dart';
+import 'package:studafy_mobile/src/features/student/application/released_marks_providers.dart';
+import 'package:studafy_mobile/src/features/student/presentation/released_marks_screen.dart';
 import 'package:studafy_mobile/src/features/student/presentation/widgets/subject_grades_card.dart';
 
 import '../../../support/ensure_date_formatting.dart';
+import '../../../support/fake_released_marks_client.dart';
 import '../../../support/wrap_with_localization.dart';
 import '../support.dart';
 
@@ -39,12 +42,15 @@ ProviderScope _scope({
   required Map<String, ChildComparisonBreakdown> breakdowns,
   FamilyFinanceView? finance,
   ChildTimetable? timetable,
+  FakeReleasedMarksClient? marks,
 }) {
   return ProviderScope(
     overrides: [
       // An in-memory store so `persistedSelectedChildIdProvider` (and the switcher's persist on
       // tap) has somewhere real to read and write, same as the parent home switcher test.
       offlineDatabaseProvider.overrideWithValue(OfflineDatabase(NativeDatabase.memory())),
+      // The Grades tab leads with the child's approved exam marks, from their own endpoint.
+      releasedMarksClientProvider.overrideWithValue(marks ?? FakeReleasedMarksClient()),
       childComparisonProvider.overrideWith(
         (ref) => comparisonReport([
           for (final id in childIds) childItem(id: id, name: id == 'child-1' ? 'Amir' : 'Lina'),
@@ -118,6 +124,80 @@ void main() {
     expect(find.text('Term summary'), findsOneWidget);
     expect(find.text('88%'), findsOneWidget);
     expect(find.byType(SubjectGradesCard), findsNWidgets(2));
+  });
+
+  testWidgets(
+      "grades tab: the selected child's approved exam marks lead the tab, and open in full",
+      (tester) async {
+    _tallScreen(tester);
+    final marks = FakeReleasedMarksClient(periodsByStudent: {
+      'child-1': singleReleasedExamPeriods(releasedAt: DateTime.utc(2026, 11, 16)),
+      'child-2': singleReleasedExamPeriods(
+        releasedAt: DateTime.utc(2026, 11, 15),
+        subject: 'Science',
+        score: 12,
+      ),
+    });
+    await tester.pumpWidget(wrapWithLocalization(_scope(
+      childIds: const ['child-1', 'child-2'],
+      breakdowns: {
+        'child-1': childBreakdown(id: 'child-1', gradeRows: const []),
+        'child-2': childBreakdown(id: 'child-2', gradeRows: const []),
+      },
+      marks: marks,
+    )));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const ValueKey('released-marks-summary-child-1')), findsOneWidget);
+    expect(find.text('Exam marks'), findsOneWidget);
+    expect(find.text('First month'), findsOneWidget);
+    expect(find.text('Mathematics · First term'), findsOneWidget);
+    expect(find.text('17.5 / 20'), findsOneWidget);
+    expect(find.text('More marks for this term are still to come.'), findsOneWidget);
+    // Above the coursework summary.
+    expect(
+      tester.getTopLeft(find.text('First month')).dy,
+      lessThan(tester.getTopLeft(find.text('Term summary')).dy),
+    );
+
+    await tester.tap(find.text('See all exam marks'));
+    await tester.pumpAndSettle();
+    final screen = tester.widget<ReleasedMarksScreen>(find.byType(ReleasedMarksScreen));
+    expect([screen.studentId, screen.studentName], ['child-1', 'Amir']);
+    expect(find.text('Amir'), findsWidgets);
+    expect(marks.requestedStudents.toSet(), {'child-1'});
+  });
+
+  testWidgets('grades tab: exam marks still show when the coursework breakdown fails',
+      (tester) async {
+    _tallScreen(tester);
+    final marks = FakeReleasedMarksClient(
+      periods: singleReleasedExamPeriods(releasedAt: DateTime.utc(2026, 11, 16)),
+    );
+    await tester.pumpWidget(wrapWithLocalization(ProviderScope(
+      // A failed load stays failed (no retry backoff), so the tab shows its error state.
+      retry: (_, _) => null,
+      overrides: [
+        offlineDatabaseProvider.overrideWithValue(OfflineDatabase(NativeDatabase.memory())),
+        releasedMarksClientProvider.overrideWithValue(marks),
+        childComparisonProvider.overrideWith(
+          (ref) => comparisonReport([childItem(id: 'child-1', name: 'Amir')]),
+        ),
+        childBreakdownProvider.overrideWith(
+          (ref, studentId) async => throw Exception('offline'),
+        ),
+        familyFinanceProvider.overrideWith((ref) async => null),
+        childTimetableProvider.overrideWith(
+          (ref, studentId) async => childTimetableFixture(studentId: studentId),
+        ),
+      ],
+      child: _app(),
+    )));
+    await tester.pumpAndSettle();
+
+    expect(find.text('17.5 / 20'), findsOneWidget);
+    expect(find.text("Couldn't load this term's detail."), findsOneWidget);
+    expect(find.byType(SubjectGradesCard), findsNothing);
   });
 
   testWidgets('grades tab: no published grades shows the empty state', (tester) async {
