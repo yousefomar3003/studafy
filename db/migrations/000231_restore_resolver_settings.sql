@@ -7,6 +7,8 @@
 -- transaction -- a system transaction in particular -- would keep matching other schools' rows
 -- through that policy. Same bodies as before; each now saves the previous values first and restores
 -- them after RETURN QUERY (which appends the rows and carries on), as 000200/000216/000221/000226 do.
+-- A caller with no school armed gets the nil UUID back, as before: tenant policies then match
+-- nothing rather than fail on an empty value.
 --
 -- Forward-only: CREATE OR REPLACE with unchanged signatures and grants.
 
@@ -84,7 +86,11 @@ BEGIN
     LIMIT 1
   ) AS candidate ON true;
   -- QA-018: leave the caller's transaction as it was.
-  PERFORM pg_catalog.set_config('app.school_id', COALESCE(previous_school_id, ''), true);
+  PERFORM pg_catalog.set_config(
+    'app.school_id',
+    COALESCE(NULLIF(previous_school_id, ''), '00000000-0000-0000-0000-000000000000'),
+    true
+  );
   PERFORM pg_catalog.set_config('app.invitation_token_hash', COALESCE(previous_invitation_token_hash, ''), true);
 END
 $function$;
@@ -140,7 +146,11 @@ BEGIN
     LIMIT 1
   ) AS candidate ON true;
   -- QA-018: leave the caller's transaction as it was.
-  PERFORM pg_catalog.set_config('app.school_id', COALESCE(previous_school_id, ''), true);
+  PERFORM pg_catalog.set_config(
+    'app.school_id',
+    COALESCE(NULLIF(previous_school_id, ''), '00000000-0000-0000-0000-000000000000'),
+    true
+  );
   PERFORM pg_catalog.set_config('app.oauth_login_provider', COALESCE(previous_oauth_login_provider, ''), true);
   PERFORM pg_catalog.set_config('app.oauth_login_subject', COALESCE(previous_oauth_login_subject, ''), true);
 END
@@ -184,7 +194,11 @@ BEGIN
     AND account.status <> 'archived'::app.user_status
   ORDER BY school.name, account.id;
   -- QA-018: leave the caller's transaction as it was.
-  PERFORM pg_catalog.set_config('app.school_id', COALESCE(previous_school_id, ''), true);
+  PERFORM pg_catalog.set_config(
+    'app.school_id',
+    COALESCE(NULLIF(previous_school_id, ''), '00000000-0000-0000-0000-000000000000'),
+    true
+  );
   PERFORM pg_catalog.set_config('app.deletion_request_email', COALESCE(previous_deletion_request_email, ''), true);
 END
 $function$;
@@ -234,7 +248,11 @@ BEGIN
   PERFORM pg_catalog.set_config('app.school_id', '00000000-0000-0000-0000-000000000000', true);
   RETURN QUERY SELECT hit_found, hit_user, hit_school;
   -- QA-018: leave the caller's transaction as it was.
-  PERFORM pg_catalog.set_config('app.school_id', COALESCE(previous_school_id, ''), true);
+  PERFORM pg_catalog.set_config(
+    'app.school_id',
+    COALESCE(NULLIF(previous_school_id, ''), '00000000-0000-0000-0000-000000000000'),
+    true
+  );
 END
 $function$;
 
