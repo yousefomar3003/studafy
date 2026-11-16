@@ -63,6 +63,36 @@ iOS (set up 2026-10-26):
   Debug/Profile) and `RunnerRelease.entitlements` (production, for Release), plus the
   `remote-notification` background mode in `Info.plist`.
 
+## iPhones stop getting notifications
+
+Symptom: Android phones get notifications, iPhones get none (it happened twice before 2026-11-16).
+Cause: Apple refuses the APNs credential Firebase holds -- the key was revoked in Apple Developer,
+a yearly APNs **certificate** (.p12) was uploaded instead of the key and expired, or the key's Key ID
+or Team ID is wrong. FCM then fails every iPhone token with `messaging/third-party-auth-error`. The
+workers log it as **`notification_push_credential_rejected`** (error level, with the counts per
+code); other per-token failures log as `notification_push_tokens_failed`.
+
+Fix (about five minutes, no deploy):
+
+1. Apple Developer -> Certificates, Identifiers & Profiles -> **Keys**. If "Studafy Push" is listed
+   and not revoked, and you still have its `.p8`, reuse it. Otherwise **+** -> name "Studafy Push"
+   -> tick **Apple Push Notifications service (APNs)** -> Configure: environment **Sandbox &
+   Production**, key restriction **Team Scoped (All Topics)** -> Continue -> Register ->
+   **Download** the `.p8` (it can be downloaded once only; keep it in the password manager). Note
+   the **Key ID**. The **Team ID** is under Membership details (top right of the account page).
+2. Firebase console -> project `studafy` -> gear -> **Project settings** -> **Cloud Messaging** ->
+   Apple app configuration -> the app `com.studafy.studafyMobile`.
+   - Delete any **APNs certificates** listed there (they expire every year).
+   - Under **APNs Authentication Key**, delete the old key, then **Upload** the `.p8` with its Key
+     ID and Team ID. If the page shows separate development and production slots, upload the same
+     key to both.
+3. Test: send something that notifies (an announcement to yourself) and check the iPhone; the
+   worker log shows `notification_push_delivered` and no `notification_push_credential_rejected`.
+
+Do not revoke the old key in Apple Developer until the new one works in Firebase, and do not create
+APNs keys for anything else: a team may hold only two, and revoking the one Firebase uses is what
+breaks iPhone notifications.
+
 ## Dry run, on purpose only
 
 A production-mode worker refuses to boot without `FIREBASE_SERVICE_ACCOUNT` unless
