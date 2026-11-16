@@ -23,6 +23,7 @@
  * could survive a rolled-back ingestion.
  */
 
+import { schoolToday } from "../../../lib/school-today";
 import { getCurrencyByCode, toMinorUnits } from "../currency";
 import { upsertMapping } from "../id-mappings/service";
 import { erpNextStatusFromDocstatus } from "../payments/projection";
@@ -163,8 +164,7 @@ export async function projectInvoiceEntry(
       ? erpNextStatusFromDocstatus(doc.docstatus)
       : doc.status?.trim() || "submitted";
 
-  const issuedDate =
-    doc.posting_date ?? doc.transaction_date ?? new Date().toISOString().slice(0, 10);
+  const issuedDate = doc.posting_date ?? doc.transaction_date ?? (await schoolToday(tx));
   const dueDate = doc.due_date?.trim() ? doc.due_date : null;
 
   const studentId = await resolveStudentId(tx, schoolId, doc);

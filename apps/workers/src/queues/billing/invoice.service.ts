@@ -16,6 +16,12 @@ import { scholarshipDiscountMinor, type ApprovedScholarship } from "./scholarshi
 import type { GenerateBatchInvoicesJobData, GenerateInvoiceJobData } from "./schemas";
 import type { JSONValue, Sql, TransactionSql } from "postgres";
 
+/** The armed school's local date (app.school_today, migration 000228; QA-044). */
+async function schoolToday(tx: TransactionSql): Promise<string> {
+  const [row] = await tx<{ today: string }[]>`SELECT app.school_today()::text AS today`;
+  return row!.today;
+}
+
 const NAMESPACE_DETERMINISTIC = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
 /**
@@ -167,7 +173,7 @@ async function projectToCache(
   const outstandingAmount = Number(doc.outstanding_amount ?? doc.grand_total ?? doc.total ?? 0);
   const totalMinor = toMinorUnits(totalAmount, currency.minorUnit);
   const outstandingMinor = toMinorUnits(outstandingAmount, currency.minorUnit);
-  const issuedDate = doc.posting_date ?? new Date().toISOString().slice(0, 10);
+  const issuedDate = doc.posting_date ?? (await schoolToday(tx));
   const dueDate = doc.due_date ?? null;
 
   await tx`
@@ -391,7 +397,8 @@ export async function generateInvoice(
     customer: customerId,
     currency: currencyCode,
     items,
-    posting_date: new Date().toISOString().slice(0, 10),
+    // The school's own date (QA-044): an invoice raised at 01:00 in Riyadh is that day's.
+    posting_date: await schoolToday(tx),
     custom_school_id: schoolId,
     [INVOICE_IDEMPOTENCY_FIELD]: idempotencyKey,
   };

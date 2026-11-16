@@ -347,9 +347,9 @@ export async function familyBalance(
     SELECT c.code AS currency, c.minor_unit,
            coalesce(sum(ic.outstanding_amount_minor), 0)::text AS outstanding,
            coalesce(sum(ic.outstanding_amount_minor)
-             FILTER (WHERE ic.due_date < CURRENT_DATE), 0)::text AS overdue,
+             FILTER (WHERE ic.due_date < app.school_today()), 0)::text AS overdue,
            (count(*) FILTER (
-             WHERE ic.due_date < CURRENT_DATE AND ic.outstanding_amount_minor > 0))::int
+             WHERE ic.due_date < app.school_today() AND ic.outstanding_amount_minor > 0))::int
              AS overdue_count
     FROM app.invoice_cache AS ic
     JOIN app.currencies AS c ON c.id = ic.currency_id
@@ -427,7 +427,7 @@ export async function reminderTriage(
             WHERE ic.school_id = family.school_id
               AND lower(ic.erpnext_status) NOT IN ('draft', 'cancelled')
               AND ic.outstanding_amount_minor > 0
-              AND ic.due_date < CURRENT_DATE
+              AND ic.due_date < app.school_today()
               AND ic.student_id IN (
                 SELECT link.student_id FROM app.parent_child_links AS link
                 WHERE link.school_id = family.school_id AND link.family_id = family.id

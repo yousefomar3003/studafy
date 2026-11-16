@@ -76,7 +76,7 @@ async function flagOverdueInstallments(
     SET status = 'overdue',
         updated_at = CURRENT_TIMESTAMP
     WHERE school_id = ${schoolId}::uuid
-      AND due_date < CURRENT_DATE
+      AND due_date < app.school_today()
       AND status IN ('pending', 'partially_paid')
     RETURNING id, student_id, erpnext_fee_schedule_id, due_date, outstanding_amount_minor
   `;

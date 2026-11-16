@@ -106,9 +106,11 @@ export async function expireQuotes(tx: TransactionSql, now: Date): Promise<numbe
   return expired.length;
 }
 
-/** Mark unpaid invoices, and their unpaid instalments, past their due date (UTC) overdue, once. */
+/**
+ * Mark unpaid invoices, and their unpaid instalments, past their due date overdue, once. "Past"
+ * is judged by the school's own date (app.school_today, QA-044), not UTC's.
+ */
 export async function markInvoicesOverdue(tx: TransactionSql, now: Date): Promise<number> {
-  const today = now.toISOString().slice(0, 10);
   const instalments = await tx<{ id: string; invoice_id: string; due_date: string }[]>`
     UPDATE app.license_invoice_instalments AS inst
     SET overdue_at = ${now}, updated_at = GREATEST(CURRENT_TIMESTAMP, inst.updated_at)
@@ -117,7 +119,7 @@ export async function markInvoicesOverdue(tx: TransactionSql, now: Date): Promis
       AND i.school_id = inst.school_id AND i.id = inst.invoice_id
       AND i.status IN ('issued', 'partially_paid')
       AND inst.status <> 'paid'
-      AND inst.due_date < ${today}::date
+      AND inst.due_date < app.school_today(${now})
       AND inst.overdue_at IS NULL
     RETURNING inst.id::text AS id, inst.invoice_id::text AS invoice_id,
               inst.due_date::text AS due_date
@@ -142,7 +144,7 @@ export async function markInvoicesOverdue(tx: TransactionSql, now: Date): Promis
     SET overdue_at = ${now}, updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
     WHERE school_id = current_setting('app.school_id')::uuid
       AND status IN ('issued', 'partially_paid')
-      AND due_date < ${today}::date
+      AND due_date < app.school_today(${now})
       AND overdue_at IS NULL
     RETURNING id::text AS id, due_date::text AS due_date
   `;
