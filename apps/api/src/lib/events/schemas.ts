@@ -269,6 +269,9 @@ export const eventPayloadSchemas = {
     gradebookId: uid,
     studentId: uid,
     approvedByUserId: uid,
+    // QA-031: who the realtime gateway tells (the student's account, linked guardians). Optional
+    // so events already in the outbox still parse; they then reach no one.
+    recipientUserIds: z.array(uid).optional(),
   }),
 
   // ── Finance reconciliation (ST-122) ────────────────────────────────
