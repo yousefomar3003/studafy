@@ -24,6 +24,8 @@ Widget wrapWithLocalization(
     path: AppLocales.translationsPath,
     fallbackLocale: AppLocales.fallback,
     startLocale: startLocale,
+    // Same as the app (app_bootstrap.dart): each language's own plural rules.
+    ignorePluralRules: false,
     assetLoader: const FileTranslationsLoader(),
     child: child,
   );
