@@ -18,15 +18,17 @@ class NotificationTarget {
 
 final _assignmentRoute = RegExp(r'^/courses/[^/{}]+/assignments/[^/{}]+$');
 final _gradesRoute = RegExp(r'^/courses/[^/{}]+/grades$');
+final _classMaterialsRoute = RegExp(r'^/classes/[^/{}]+/materials$');
 
-/// Whether [route] is a deep link this app can open on its own: a filled-in assignment or grades
-/// path, or the parent alert center. Server templates for other types point at web-only pages, or
+/// Whether [route] is a deep link this app can open on its own: a filled-in assignment, grades or
+/// class materials path, or the parent alert center. Server templates for other types point at web-only pages, or
 /// still hold `{placeholders}`, so anything else is not followed.
 bool isOpenableNotificationRoute(String? route) {
   if (route == null || route.isEmpty) return false;
   return route == RoutePaths.parentAlerts ||
       _assignmentRoute.hasMatch(route) ||
-      _gradesRoute.hasMatch(route);
+      _gradesRoute.hasMatch(route) ||
+      _classMaterialsRoute.hasMatch(route);
 }
 
 /// The inbox's tap target for a notification of [type] (the API's `notification_type`) with
@@ -73,6 +75,11 @@ NotificationTarget notificationTargetFor({
       }
       if (role == ShellRole.parent) {
         return const NotificationTarget.tab('shell.tabs.children');
+      }
+    case 'MATERIAL_PUBLISHED':
+      if (role == ShellRole.student) {
+        if (openable != null) return NotificationTarget.route(openable);
+        return const NotificationTarget.tab('shell.tabs.lessons');
       }
   }
   if (openable != null && role != ShellRole.viewer) {

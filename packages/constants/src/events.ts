@@ -50,6 +50,12 @@ export const DOMAIN_EVENTS = {
   // ClamAV returned an infected verdict. The reporter's in-app notification is the row next to it;
   // consumers (e.g. an email alert for school admins) follow this event.
   MATERIAL_QUARANTINED: "material.quarantined",
+  // The first time a material becomes `ready` -- the moment students can see and open it. Raised by
+  // app.materials' trg_materials_published (000228) in the same transaction as that status change,
+  // whichever path made it (the scan worker, AI ingestion, or AI being turned off mid-ingestion),
+  // and never again for the same material (app.materials.published_at). The workers' notify
+  // consumer tells the class's students (MATERIAL_PUBLISHED).
+  MATERIAL_PUBLISHED: "material.published",
 
   STUDY_GROUP_CREATED: "studyGroup.created",
   STUDY_GROUP_JOINED: "studyGroup.joined",
@@ -76,20 +82,12 @@ export const DOMAIN_EVENTS = {
   // student it marks absent or late (ATTENDANCE_MARKED).
   ATTENDANCE_SESSION_SUBMITTED: "attendance.sessionSubmitted",
 
-  // Parent digest (deliverability R-08). Raised by the workers digest producer, once per parent
-  // per run, aggregating the parent-facing outbox events (attendance.alertRaised,
-  // fee.installmentOverdue) that accumulated since the previous run. The email dispatcher sends
-  // it through the same channel as every other transactional email, so the delivery ledger, dedup,
-  // and SES correlation all apply unchanged.
+  // Retired digest emails. DIGEST_SENT was the per-parent attendance/fee digest and
+  // NOTIFICATION_DIGEST_SENT the per-recipient notification digest. Studafy sends no notification
+  // email, so nothing raises either any more; the names stay because outbox rows written before
+  // that carry them, and the email dispatcher drops such a row unsent (RETIRED_EMAIL_EVENT_NAMES in
+  // apps/workers/src/queues/notifications/email/resolve.ts).
   DIGEST_SENT: "digest.sent",
-
-  // Daily notification digest. Raised by the workers notification-digest producer, once per
-  // recipient per run, aggregating whichever in-app notifications of a digest-eligible type
-  // (see DIGEST_ELIGIBLE_NOTIFICATION_TYPES) that user has opted to receive by email as a daily
-  // digest rather than immediately (app.notification_preferences.digest). Deliberately distinct
-  // from DIGEST_SENT above: that event is the parent-specific attendance/fee digest and predates
-  // the preferences digest flag; this one is the general, preference-driven digest ST-143 added
-  // the flag for.
   NOTIFICATION_DIGEST_SENT: "notification.digestSent",
 
   // Finance reconciliation (ST-122). Raised by the daily reconciliation job when an installment

@@ -18,7 +18,7 @@ import {
 } from "@studafy/notification-templates";
 
 import type { NotificationType } from "@studafy/constants";
-import type { NotificationChannel, TemplateLocale } from "@studafy/notification-templates";
+import type { DeliveredNotificationChannel, TemplateLocale } from "@studafy/notification-templates";
 
 /** The locale used when neither the recipient nor their school has expressed a renderable one. */
 export const FALLBACK_LOCALE: TemplateLocale = "en";
@@ -51,12 +51,13 @@ export function resolveLocale(
  *
  * The title comes from the in_app template and the body from the channel's own, which is what the
  * catalog's shape supports: templates are one string per channel, and app.notifications needs two.
- * Using in_app for the title keeps a push and an email about the same event carrying the same
- * headline, and in_app is the shortest of the three, which is the right property for a title.
+ * Using in_app for the title keeps the inbox row and the push about the same event carrying the same
+ * headline, and in_app is the shortest template, which is the right property for a title. The
+ * channel is a delivered one only: Studafy sends no notification email.
  */
 export function render(
   type: NotificationType,
-  channel: NotificationChannel,
+  channel: DeliveredNotificationChannel,
   locale: TemplateLocale,
   vars: Record<string, string>,
 ): RenderedNotification {

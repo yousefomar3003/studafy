@@ -176,4 +176,10 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "{courseName} · {date}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{studentName} was marked {status} in {courseName} on {date}.",
   },
+  [NOTIFICATION_TYPES.MATERIAL_PUBLISHED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "New material: {materialTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{courseName}{placement}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Your teacher shared a new material, {materialTitle}, in {courseName}{placement}.",
+  },
 } as const satisfies LocaleTemplateSet;

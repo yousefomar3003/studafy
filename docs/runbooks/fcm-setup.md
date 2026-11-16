@@ -93,6 +93,34 @@ Do not revoke the old key in Apple Developer until the new one works in Firebase
 APNs keys for anything else: a team may hold only two, and revoking the one Firebase uses is what
 breaks iPhone notifications.
 
+## An Android phone gets no notifications
+
+Work down this list; each step rules out one layer.
+
+1. **On the phone:** Account -> Notifications -> "Notifications on this phone".
+   - "Off" / "Not turned on yet": the Android 13+ notification permission is missing. Turn it on
+     there (or in Settings -> Apps -> studafy -> Notifications).
+   - "Not available": Firebase did not start on this build. Sentry / Crashlytics has an event with
+     reason `Firebase.initializeApp failed` or `push permission status unavailable`.
+   - "On": tap **Send a test notification**. If the phone could not register, the message says why
+     (`no push token: ...` is Firebase refusing to issue a token, `the server did not accept this
+phone: HTTP ...` is the API). The same failure is in Sentry / Crashlytics with reason
+     `FCM token unavailable` or `push token registration failed`.
+2. **adb** (USB debugging on, phone plugged in):
+   `adb logcat | grep -iE '\[push\]|FirebaseMessaging|Firebase-Installations|FIS_|FirebaseApp'`,
+   then open the app signed in. `FIS_AUTH_ERROR` / `AUTHENTICATION_FAILED` mean the Android API key in
+   `google-services.json` cannot reach the Firebase Installations / FCM Registration APIs (Google
+   Cloud console -> APIs & Services -> Credentials -> the Android key's API and app restrictions;
+   an app restriction must include the Play **app signing** SHA-1, not only the upload key's).
+   `adb shell dumpsys notification | grep -A3 studafy` shows whether the `studafy_push` channel
+   exists and its importance.
+3. **Workers:** a send to an Android token from the wrong Firebase project fails with
+   `messaging/mismatched-credential` or `messaging/sender-id-mismatch` and is logged as
+   `notification_push_credential_rejected` — the `GOOGLE_SERVICES_JSON` secret then holds another
+   project's file; download it again from project `studafy`. `sent:` counting the phone with no
+   such log line means FCM accepted the message, so the problem is on the phone (step 1-2:
+   permission, channel muted, battery restrictions).
+
 ## Dry run, on purpose only
 
 A production-mode worker refuses to boot without `FIREBASE_SERVICE_ACCOUNT` unless

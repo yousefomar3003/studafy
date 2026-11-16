@@ -58,6 +58,10 @@ abstract final class RoutePaths {
   static const announcements = '/announcements';
   static const courseDetail = '/courses/:courseId';
   static const assignmentDetail = '/courses/:courseId/assignments/:assignmentId';
+
+  /// One class's materials (a `MATERIAL_PUBLISHED` notice): the student's materials library
+  /// narrowed to that class.
+  static const classMaterials = '/classes/:classId/materials';
   static const discussionDetail =
       '/courses/:courseId/discussions/:discussionId';
   static const groupDetail = '/groups/:groupId';

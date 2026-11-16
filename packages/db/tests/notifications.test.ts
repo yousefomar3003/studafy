@@ -64,6 +64,8 @@ const NOTIFICATION_TYPES = [
   "ASSIGNMENT_PUBLISHED",
   "ASSIGNMENT_GRADED",
   "ATTENDANCE_MARKED",
+  // A class material became visible to its students. Appended by 000228; sorts last.
+  "MATERIAL_PUBLISHED",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;

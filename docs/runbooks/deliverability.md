@@ -1,7 +1,15 @@
 # Email deliverability (R-08)
 
-Transactional email (invitations, password resets, notifications, digests) is sent through
-[Resend](https://resend.com) from `no-reply@send.studafy.com`. DNS for `studafy.com` is hosted on
+Transactional email (invitations, school email verification, account deletion, purchase
+confirmations, billing notices, sales and school-application mail) is sent through
+[Resend](https://resend.com) from `no-reply@send.studafy.com`.
+
+**Studafy sends no notification email.** Notifications go to the in-app inbox and to phone push
+only. The notification dispatcher has no email channel (the catalog in
+`packages/notification-templates` is typed in_app/push), the preferences API neither offers nor
+accepts `email`, and the daily digest emails are retired: their BullMQ schedulers are removed on
+every worker boot and any `digest.sent` / `notification.digestSent` outbox row is marked dispatched
+without being sent (`apps/workers/src/queues/notifications/email/retired-digests.ts`). DNS for `studafy.com` is hosted on
 Vercel (`ns1/ns2.vercel-dns.com`); every record below is managed in Vercel → Domains → studafy.com →
 DNS Records, not in Terraform.
 

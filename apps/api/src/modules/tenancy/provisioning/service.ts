@@ -240,7 +240,8 @@ async function provisionLocal(
       "CERTIFICATE_ISSUED",
       "SUPPORT_MESSAGE",
     ] as const;
-    const channels = ["in_app", "email"] as const;
+    // No email: Studafy sends no notification email (notifications are in-app and push only).
+    const channels = ["in_app", "push"] as const;
 
     for (const nt of notificationTypes) {
       for (const ch of channels) {

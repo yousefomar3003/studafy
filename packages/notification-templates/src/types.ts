@@ -9,8 +9,25 @@ export const NOTIFICATION_CHANNELS = {
 export type NotificationChannel =
   (typeof NOTIFICATION_CHANNELS)[keyof typeof NOTIFICATION_CHANNELS];
 
+/**
+ * The channels a notification is actually delivered on, and the only ones a user is offered a
+ * preference for: the in-app inbox and phone push.
+ *
+ * Studafy sends no notification email (product decision, 2026-11). `email` stays in
+ * NOTIFICATION_CHANNELS only because it mirrors the app.notification_channel enum and the rows
+ * already stored under it; its templates in templates/ are still used as the long-form body of
+ * some in-app notices. Nothing may deliver a notification on it, which is why the catalog's
+ * `channels` is typed with this, not NotificationChannel.
+ */
+export const DELIVERED_NOTIFICATION_CHANNELS = [
+  NOTIFICATION_CHANNELS.IN_APP,
+  NOTIFICATION_CHANNELS.PUSH,
+] as const;
+
+export type DeliveredNotificationChannel = (typeof DELIVERED_NOTIFICATION_CHANNELS)[number];
+
 export interface CatalogEntry {
-  channels: NotificationChannel[];
+  channels: DeliveredNotificationChannel[];
   metadataDefaults: Record<string, string>;
 }
 
@@ -152,5 +169,11 @@ export interface NotificationTypeVars {
     status: string;
     courseName: string;
     date: string;
+  };
+  /** `placement` is "" for an unscheduled material, else the localized " · Week 3, Monday". */
+  MATERIAL_PUBLISHED: {
+    materialTitle: string;
+    courseName: string;
+    placement: string;
   };
 }

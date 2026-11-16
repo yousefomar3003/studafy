@@ -7,6 +7,7 @@ import {
   failuresByCode,
   hasCredentialFailure,
   isUnregisteredToken,
+  withTimeout,
 } from "./sender";
 
 import type { PushDevice } from "./sender";
@@ -57,6 +58,24 @@ describe("buildDataPayload", () => {
     const payload = buildDataPayload({ ...base, route: "" });
     expect(payload.route).toBeUndefined();
     expect(payload).toEqual({ notification_type: "GRADE_POSTED", dispatch_log_id: "log-1" });
+  });
+});
+
+describe("withTimeout", () => {
+  test("passes a settled send through", async () => {
+    expect(await withTimeout(Promise.resolve(3), 50)).toBe(3);
+  });
+
+  test("fails a send that never settles instead of hanging", async () => {
+    const never = new Promise<number>(() => undefined);
+    let error: unknown;
+    try {
+      await withTimeout(never, 20);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("timed out");
   });
 });
 
