@@ -61,6 +61,8 @@ export const REVOCATION_REASONS = {
   REVOKE_DEVICE: "revoke_device",
   REVOKE_ALL_DEVICES: "revoke_all_devices",
   REVOKE_OTHERS: "revoke_others",
+  /** A member changed their own password: every other session ends (QA-024). */
+  PASSWORD_CHANGE: "password_change",
   ADMIN_REVOKE_DEVICE: "admin_revoke_device",
   ADMIN_REVOKE_ALL_DEVICES: "admin_revoke_all_devices",
   ACCOUNT_DELETION: "account_deletion",
@@ -468,4 +470,27 @@ export async function revokeAllSchoolSessionsInTx(
   `;
 
   return { users: Number(row?.users ?? 0), revokedTokens: Number(row?.revoked ?? 0) };
+}
+
+/**
+ * The token family whose live access token carries `jti`: the session a request is authenticated
+ * with. Undefined when that session no longer exists (or never had a recorded jti).
+ */
+export async function familyOfAccessJti(
+  database: Database,
+  tenant: TenantContext & { userId: string },
+  jti: string,
+): Promise<string | undefined> {
+  const rows = await withTenantTx(
+    database,
+    tenant,
+    (tx) => tx<{ family_id: string }[]>`
+      SELECT family_id FROM app.refresh_tokens
+      WHERE access_jti = ${jti}::uuid
+        AND user_id = ${tenant.userId}::uuid
+        AND school_id = current_setting('app.school_id')::uuid
+      LIMIT 1
+    `,
+  );
+  return rows[0]?.family_id;
 }

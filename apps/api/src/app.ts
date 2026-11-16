@@ -969,6 +969,7 @@ export function createApp({
         },
         rateLimitDisabled ? null : (redis ?? null),
         eventSink,
+        jtiDenylist,
       ),
     );
     // "Add <child> to this phone" (000217): a parent puts a linked child's own account on the phone.

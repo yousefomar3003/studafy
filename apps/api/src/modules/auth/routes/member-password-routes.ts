@@ -43,6 +43,11 @@ import {
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
 } from "../services/member-password-service";
+import {
+  familyOfAccessJti,
+  REVOCATION_REASONS,
+  revokeAndDenylist,
+} from "../services/revocation-service";
 
 import { loginResponseSchema } from "./returning-user-login-routes";
 
@@ -64,6 +69,7 @@ import type { Database } from "../../../db";
 import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { RedisClient } from "../../../redis";
+import type { JtiDenylist } from "../denylist";
 import type { PasswordPolicyViolation } from "../services/member-password-service";
 import type { SessionTokenConfig } from "../services/session-service";
 import type { Context } from "hono";
@@ -231,6 +237,7 @@ export function memberPasswordRoutes(
   config: SessionTokenConfig,
   redis: RedisClient | null = null,
   eventSink: SecurityEventSink | null = null,
+  denylist: JtiDenylist | null = null,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
@@ -306,8 +313,29 @@ export function memberPasswordRoutes(
     );
 
     switch (result.outcome) {
-      case "CHANGED":
+      case "CHANGED": {
+        // Every other session ends (QA-024): a password someone else learned stops working on the
+        // devices they signed in with. The session that made the change is kept; if it cannot be
+        // identified, everything is revoked and the member signs in again.
+        const tenant = {
+          schoolId: auth.schoolId,
+          userId: auth.userId,
+          requestId: c.get("requestId"),
+        };
+        const current = await familyOfAccessJti(db, tenant, auth.jti);
+        await revokeAndDenylist({
+          database: db,
+          denylist,
+          tenant,
+          targetUserId: auth.userId,
+          scope: { kind: "user", exceptFamilyId: current },
+          reason: REVOCATION_REASONS.PASSWORD_CHANGE,
+          log: c.get("log"),
+          userAgent: c.req.header("User-Agent") ?? null,
+          clientIp: clientIpFrom(c),
+        });
         return c.json({ changed: true as const }, 200);
+      }
       case "WRONG_PASSWORD":
         throw new CodedHttpException(
           403,

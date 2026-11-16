@@ -598,6 +598,12 @@ export async function changeMemberPassword(
       if (violation) return { outcome: "PASSWORD_REJECTED", reason: violation };
     }
     await storePassword(tx, tenant.userId, newPassword);
+    // A changed password is how a member takes their account back (QA-024): no device keeps a way
+    // around the lockout. The route revokes the other sessions once this has committed.
+    await tx`
+      DELETE FROM app.member_trusted_devices
+      WHERE school_id = current_setting('app.school_id')::uuid AND user_id = ${tenant.userId}::uuid
+    `;
     await emitAuditLog(tx, {
       action: "update",
       targetTable: "member_credentials",
