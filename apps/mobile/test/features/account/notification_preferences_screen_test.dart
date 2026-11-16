@@ -155,6 +155,26 @@ void main() {
     expect(find.textContaining('Sent.'), findsOneWidget);
   });
 
+  testWidgets('a phone that could not register says why instead of claiming the test was sent', (
+    tester,
+  ) async {
+    var tests = 0;
+    final push = FakePushService()
+      ..registrationError = const PushRegistrationException('no push token: FIS_AUTH_ERROR');
+    await pumpAccountScreen(
+      tester,
+      _app(roles: const ['STUDENT'], onTest: () => tests++, push: push),
+    );
+
+    await tester.tap(find.byKey(const Key('notificationSendTest')));
+    await tester.pumpAndSettle();
+
+    expect(tests, 0);
+    expect(find.textContaining('Sent.'), findsNothing);
+    expect(find.textContaining("This phone couldn't sign up for notifications"), findsOneWidget);
+    expect(find.textContaining('FIS_AUTH_ERROR'), findsOneWidget);
+  });
+
   testWidgets('turned off in the phone: offers Settings', (tester) async {
     final push = FakePushService();
     await pumpAccountScreen(

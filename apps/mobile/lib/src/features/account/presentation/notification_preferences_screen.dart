@@ -112,11 +112,13 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
     }
   }
 
-  void _snack(String key) {
+  void _snack(String key) => _snackText(key.tr());
+
+  void _snackText(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(key.tr())));
+      ..showSnackBar(SnackBar(content: Text(text)));
   }
 
   Future<void> _toggle(
@@ -160,6 +162,9 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
       await ref.read(pushServiceProvider).registerIfAuthenticated();
       await ref.read(sendTestNotificationProvider)();
       _snack('account.notifications.phone.testSent');
+    } on PushRegistrationException catch (e) {
+      // The test would be queued but could never reach this phone: say why instead of "Sent".
+      _snackText('account.notifications.phone.notRegistered'.tr(namedArgs: {'reason': e.reason}));
     } on Object {
       _snack('account.notifications.phone.testFailed');
     } finally {
