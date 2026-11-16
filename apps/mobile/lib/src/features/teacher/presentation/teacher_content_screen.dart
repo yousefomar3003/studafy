@@ -42,9 +42,14 @@ import 'widgets/material_placement_fields.dart';
 ///
 /// Material rows are re-read while any of them is still in the server-side scan / AI-ingestion
 /// pipeline (not [MaterialReadyStateX.isSettled]), so the transition to Ready is visible without
-/// the teacher leaving and returning. The re-read backs off from [materialPollInitialDelay] to
-/// [materialPollMaxDelay], stops once every material has settled, and pauses while the app is in
-/// the background or another route covers this one.
+/// the teacher leaving and returning. For [materialPollFastWindow] after the screen opens or the
+/// teacher acts (an upload, a retry, pull to refresh) it re-reads every [materialPollInitialDelay]:
+/// that is when the scan and processing usually finish (a cold scanner alone takes about 30 s), and
+/// a longer gap would only show Ready late. After that it backs off to [materialPollMaxDelay]. It
+/// stops once every material has settled, and pauses while the app is in the background or another
+/// route covers this one.
+///
+/// A failed material offers Retry and Delete, so a failed attempt does not stay in the list.
 class TeacherContentScreen extends ConsumerStatefulWidget {
   const TeacherContentScreen({
     required this.classId,
@@ -60,10 +65,14 @@ class TeacherContentScreen extends ConsumerStatefulWidget {
       _TeacherContentScreenState();
 }
 
-/// The first wait before re-reading materials that are still being scanned or ingested.
-const materialPollInitialDelay = Duration(seconds: 8);
+/// The wait between re-reads of materials that are still being scanned or ingested, while the
+/// work is recent (see [materialPollFastWindow]).
+const materialPollInitialDelay = Duration(seconds: 5);
 
-/// The longest wait between two re-reads; the delay doubles up to this while nothing settles.
+/// How long after the teacher's last action the re-reads stay at [materialPollInitialDelay].
+const materialPollFastWindow = Duration(minutes: 2);
+
+/// The longest wait between two re-reads; past the fast window the delay doubles up to this.
 const materialPollMaxDelay = Duration(seconds: 60);
 
 class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
@@ -75,6 +84,9 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
   /// The next scheduled re-read, if any. One-shot: each load decides whether another is needed.
   Timer? _materialRefresh;
   Duration _materialPollDelay = materialPollInitialDelay;
+
+  /// Time spent polling since the teacher's last action, summed from the delays actually waited.
+  Duration _materialPollElapsed = Duration.zero;
 
   /// Whether the last successful load had a material still in the pipeline. Kept across a failed
   /// load, so a transient error backs off rather than stopping the re-reads.
@@ -135,10 +147,13 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
     final delay = _materialPollDelay;
     _materialRefresh = Timer(delay, () {
       _materialRefresh = null;
-      final doubled = delay * 2;
-      _materialPollDelay = doubled > materialPollMaxDelay
-          ? materialPollMaxDelay
-          : doubled;
+      _materialPollElapsed += delay;
+      if (_materialPollElapsed >= materialPollFastWindow) {
+        final doubled = delay * 2;
+        _materialPollDelay = doubled > materialPollMaxDelay
+            ? materialPollMaxDelay
+            : doubled;
+      }
       _refreshMaterials(background: true);
     });
   }
@@ -178,13 +193,87 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
   }
 
   /// Re-reads the materials. A [background] re-read keeps the current backoff; anything the
-  /// teacher did (pull to refresh, an upload or edit) starts it over from the shortest delay.
+  /// teacher did (pull to refresh, an upload, edit or retry) starts it over from the shortest delay.
   void _refreshMaterials({bool background = false}) {
     if (!mounted) return;
-    if (!background) _materialPollDelay = materialPollInitialDelay;
+    if (!background) {
+      _materialPollDelay = materialPollInitialDelay;
+      _materialPollElapsed = Duration.zero;
+    }
     setState(() {
       _materials = _loadMaterials();
     });
+  }
+
+  /// Sends a failed material back through the scan and processing.
+  Future<void> _retryMaterial(material_api.Material material) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(apiClientProvider)
+          .academics
+          .retryMaterial(materialId: material.id);
+      messenger.showSnackBar(
+        SnackBar(content: Text('teacher.content.materials.retried'.tr())),
+      );
+    } on DioException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            (error.apiError?.code == 'MATERIAL_STORAGE_CONFIRM_FAILED'
+                    ? 'teacher.content.materials.retryFileMissing'
+                    : _errorKeyFor(
+                        error,
+                        'teacher.content.materials.retryError',
+                      ))
+                .tr(),
+          ),
+        ),
+      );
+    }
+    _refreshMaterials();
+  }
+
+  /// Deletes a material after the teacher confirms; its file and space are freed server-side.
+  Future<void> _deleteMaterial(material_api.Material material) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text('teacher.content.materials.deleteTitle'.tr()),
+        content: Text(
+          'teacher.content.materials.deleteBody'.tr(
+            namedArgs: {'title': material.title},
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text('teacher.content.materials.cancel'.tr()),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text('teacher.content.materials.delete'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(apiClientProvider)
+          .academics
+          .deleteMaterial(materialId: material.id);
+    } on DioException catch (error) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            _errorKeyFor(error, 'teacher.content.materials.deleteError').tr(),
+          ),
+        ),
+      );
+    }
+    _refreshMaterials();
   }
 
   @override
@@ -268,6 +357,8 @@ class _TeacherContentScreenState extends ConsumerState<TeacherContentScreen>
                   _MaterialEditor(material: material),
                   assignments: false,
                 ),
+                onRetry: _retryMaterial,
+                onDelete: _deleteMaterial,
               ),
             ),
           ],
@@ -407,11 +498,15 @@ class _MaterialList extends StatelessWidget {
     required this.future,
     required this.onRefresh,
     required this.onEdit,
+    required this.onRetry,
+    required this.onDelete,
   });
   final String classId;
   final Future<List<material_api.Material>> future;
   final VoidCallback onRefresh;
   final ValueChanged<material_api.Material> onEdit;
+  final ValueChanged<material_api.Material> onRetry;
+  final ValueChanged<material_api.Material> onDelete;
 
   @override
   Widget build(
@@ -445,6 +540,9 @@ class _MaterialList extends StatelessWidget {
                     materials: materials,
                     itemBuilder: (context, material) {
                       final description = material.description;
+                      final state = materialReadyStateFromWireName(
+                        material.ingestStatus.name,
+                      );
                       return Card(
                         child: Padding(
                           padding: const EdgeInsets.fromLTRB(
@@ -486,11 +584,38 @@ class _MaterialList extends StatelessWidget {
                                     ).textTheme.bodySmall,
                                   ),
                                 ),
-                              MaterialReadyStatePill(
-                                state: materialReadyStateFromWireName(
-                                  material.ingestStatus.name,
+                              MaterialReadyStatePill(state: state),
+                              // A failed attempt can be run again or removed; a blocked file can
+                              // only be removed. Neither should sit in the list forever.
+                              if (state == MaterialReadyState.failed ||
+                                  state == MaterialReadyState.quarantined)
+                                Wrap(
+                                  spacing: AppSpacing.space8,
+                                  children: [
+                                    if (state == MaterialReadyState.failed)
+                                      TextButton.icon(
+                                        key: ValueKey(
+                                          'material-retry-${material.id}',
+                                        ),
+                                        onPressed: () => onRetry(material),
+                                        icon: const Icon(Icons.refresh),
+                                        label: Text(
+                                          'teacher.content.materials.retry'
+                                              .tr(),
+                                        ),
+                                      ),
+                                    TextButton.icon(
+                                      key: ValueKey(
+                                        'material-delete-${material.id}',
+                                      ),
+                                      onPressed: () => onDelete(material),
+                                      icon: const Icon(Icons.delete_outline),
+                                      label: Text(
+                                        'teacher.content.materials.delete'.tr(),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
                             ],
                           ),
                         ),

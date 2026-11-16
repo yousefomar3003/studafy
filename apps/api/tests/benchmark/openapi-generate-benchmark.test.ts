@@ -130,6 +130,7 @@ const EXPECTED_PATHS = [
   "/api/academics/materials/{materialId}",
   "/api/academics/materials/{materialId}/ai-visible",
   "/api/academics/materials/{materialId}/confirm",
+  "/api/academics/materials/{materialId}/retry",
   "/api/academics/rooms",
   "/api/academics/sections",
   "/api/academics/sections/{sectionId}",

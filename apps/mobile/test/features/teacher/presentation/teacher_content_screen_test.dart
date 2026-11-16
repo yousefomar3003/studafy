@@ -110,7 +110,36 @@ class _ContentAcademicsClient extends FakeAcademicsClient {
 
   List<material_api.Material> materials;
   final List<(String, UpdateMaterialBody)> updateCalls = [];
+  final List<String> retryCalls = [];
+  final List<String> deleteCalls = [];
   int listCalls = 0;
+
+  @override
+  Future<material_api.Material> retryMaterial({
+    required String materialId,
+  }) async {
+    retryCalls.add(materialId);
+    materials = [
+      for (final m in materials)
+        m.id == materialId
+            ? material_api.Material.fromJson({
+                ...m.toJson(),
+                'ingest_status': 'scanning',
+                'ingest_error': null,
+              })
+            : m,
+    ];
+    return materials.firstWhere((m) => m.id == materialId);
+  }
+
+  @override
+  Future<void> deleteMaterial({required String materialId}) async {
+    deleteCalls.add(materialId);
+    materials = [
+      for (final m in materials)
+        if (m.id != materialId) m,
+    ];
+  }
 
   @override
   Future<MaterialList> listMaterials({
@@ -768,33 +797,50 @@ void main() {
     });
 
     testWidgets(
-      'backs off while a material is in the pipeline and stops once it settles',
+      're-reads often while the work is recent, then backs off, and stops once it settles',
       (tester) async {
         final academics = await pumpWith(tester, [
           _materialFixture(id: 'm-1', ingestStatus: 'processing'),
         ]);
         expect(academics.listCalls, 1);
 
-        await tester.pump(materialPollInitialDelay);
-        await tester.pump();
-        expect(academics.listCalls, 2);
+        // Every few seconds through the fast window: Ready shows soon after it happens.
+        final fastReads =
+            materialPollFastWindow.inMilliseconds ~/
+            materialPollInitialDelay.inMilliseconds;
+        for (var read = 1; read <= fastReads; read++) {
+          await tester.pump(materialPollInitialDelay);
+          await tester.pump();
+          expect(academics.listCalls, 1 + read);
+        }
 
-        // Doubled: nothing at the original interval, the next read at twice it.
-        await tester.pump(materialPollInitialDelay);
-        expect(academics.listCalls, 2);
+        // Past it: doubled, so nothing at the original interval, the next read at twice it.
         await tester.pump(materialPollInitialDelay);
         await tester.pump();
-        expect(academics.listCalls, 3);
+        expect(academics.listCalls, 1 + fastReads);
+        await tester.pump(materialPollInitialDelay);
+        await tester.pump();
+        expect(academics.listCalls, 2 + fastReads);
 
         academics.materials = [_materialFixture(id: 'm-1')];
         await tester.pump(materialPollInitialDelay * 4);
         await tester.pump();
-        expect(academics.listCalls, 4);
+        expect(academics.listCalls, 3 + fastReads);
 
         await tester.pump(materialPollMaxDelay * 3);
-        expect(academics.listCalls, 4);
+        expect(academics.listCalls, 3 + fastReads);
       },
     );
+
+    testWidgets('never re-reads for an upload that was never confirmed', (
+      tester,
+    ) async {
+      final academics = await pumpWith(tester, [
+        _materialFixture(id: 'm-1', ingestStatus: 'uploaded'),
+      ]);
+      await tester.pump(materialPollMaxDelay * 3);
+      expect(academics.listCalls, 1);
+    });
 
     testWidgets('pauses while another route covers the screen', (tester) async {
       final academics = await pumpWith(tester, [
@@ -820,7 +866,7 @@ void main() {
 
     testWidgets('pauses while the app is in the background', (tester) async {
       final academics = await pumpWith(tester, [
-        _materialFixture(id: 'm-1', ingestStatus: 'uploaded'),
+        _materialFixture(id: 'm-1', ingestStatus: 'queued'),
       ]);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
       await tester.pump(materialPollMaxDelay * 3);
@@ -829,6 +875,110 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
       await tester.pumpAndSettle();
       expect(academics.listCalls, 2);
+    });
+  });
+
+  group('a failed material', () {
+    Future<_ContentAcademicsClient> pumpWith(
+      WidgetTester tester,
+      List<material_api.Material> materials,
+    ) async {
+      final academics = _ContentAcademicsClient(materials);
+      await _pump(
+        tester,
+        FakeStudafyApiClient(
+          assignments: _ContentAssignmentsClient([]),
+          academics: academics,
+        ),
+      );
+      await tester.tap(find.text('Materials'));
+      await tester.pumpAndSettle();
+      return academics;
+    }
+
+    testWidgets('offers Retry and Delete; a ready one offers neither', (
+      tester,
+    ) async {
+      await pumpWith(tester, [
+        _materialFixture(id: 'm-ok'),
+        _materialFixture(id: 'm-failed', ingestStatus: 'failed'),
+        _materialFixture(id: 'm-blocked', ingestStatus: 'quarantined'),
+      ]);
+
+      expect(
+        find.byKey(const ValueKey('material-retry-m-failed')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const ValueKey('material-delete-m-failed')),
+        findsOneWidget,
+      );
+      // A blocked file was infected: it can be removed, never re-run.
+      expect(
+        find.byKey(const ValueKey('material-retry-m-blocked')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const ValueKey('material-delete-m-blocked')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('material-retry-m-ok')), findsNothing);
+      expect(find.byKey(const ValueKey('material-delete-m-ok')), findsNothing);
+    });
+
+    testWidgets('Retry sends it back to scanning and re-reads the list', (
+      tester,
+    ) async {
+      final academics = await pumpWith(tester, [
+        _materialFixture(id: 'm-failed', ingestStatus: 'failed'),
+      ]);
+      final calls = academics.listCalls;
+
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('material-retry-m-failed')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(academics.retryCalls, ['m-failed']);
+      expect(academics.listCalls, calls + 1);
+      expect(find.text('Checking the file again.'), findsOneWidget);
+      expect(find.text('Scanning'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('material-retry-m-failed')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('Delete asks first, then removes it', (tester) async {
+      final academics = await pumpWith(tester, [
+        _materialFixture(
+          id: 'm-failed',
+          title: 'Algebra',
+          ingestStatus: 'failed',
+        ),
+      ]);
+
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('material-delete-m-failed')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Delete this material?'), findsOneWidget);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(academics.deleteCalls, isEmpty);
+
+      await _tapVisible(
+        tester,
+        find.byKey(const ValueKey('material-delete-m-failed')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, 'Delete'));
+      await tester.pumpAndSettle();
+
+      expect(academics.deleteCalls, ['m-failed']);
+      expect(find.text('Algebra'), findsNothing);
     });
   });
 }

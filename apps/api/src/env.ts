@@ -228,6 +228,12 @@ export const envSchema = z
     // Lifetime of a pre-signed URL. Bounded to the 15–60 minute window ST-103 specifies: short
     // enough that a leaked URL expires before it is useful, long enough to survive a slow upload.
     S3_PRESIGN_TTL_SECONDS: z.coerce.number().int().min(900).max(3600).default(900),
+    // The workers' clamd (CLAMAV_HOST/CLAMAV_PORT in apps/workers/src/env.ts). The API never scans;
+    // it only knocks on clamd when a material upload starts, so that on fly.io, where the scanner
+    // scales to zero, the machine boots while the file is still uploading (lib/scanner-warmup.ts).
+    // Unset: no warm-up, and nothing else changes.
+    CLAMAV_HOST: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
     // fly.io only: the app running apps/realtime, which this API hands `/ws` handshakes to
     // (app.ts realtimeFlyApp). Unset everywhere else.
     REALTIME_FLY_APP: z.preprocess(

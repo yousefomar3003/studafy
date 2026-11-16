@@ -1408,7 +1408,16 @@
         "upload": "Upload material",
         "edit": "Edit material",
         "empty": "No materials yet.",
-        "loadError": "Could not load materials."
+        "loadError": "Could not load materials.",
+        "retry": "Retry",
+        "retried": "Checking the file again.",
+        "retryError": "Couldn't retry this material. Try again.",
+        "retryFileMissing": "This file is no longer stored. Delete it and upload it again.",
+        "delete": "Delete",
+        "deleteTitle": "Delete this material?",
+        "deleteBody": "\"{title}\" will be removed for everyone in this class, and its storage freed.",
+        "deleteError": "Couldn't delete this material. Try again.",
+        "cancel": "Cancel"
       },
       "aiMaterials": {
         "title": "Use this class's materials with the AI study assistant",
