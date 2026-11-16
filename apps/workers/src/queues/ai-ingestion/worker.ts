@@ -1,13 +1,14 @@
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { NOTIFICATION_TYPES } from "@studafy/constants";
 import { sanitizePlainText } from "@studafy/sanitize";
+import { UnrecoverableError } from "bullmq";
 import postgres from "postgres";
 
 import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
 import { createEmbeddingStage, createMockEmbeddingProvider } from "./embedding";
-import { MaterialParseError } from "./errors";
+import { DocumentTooLargeError, MaterialParseError } from "./errors";
 import { buildIngestChunks } from "./ingest";
 import { aiIngestionJobDataSchema } from "./job";
 import { lowConfidencePages, TesseractOcrEngine } from "./ocr";
@@ -296,7 +297,10 @@ export async function processIngestJob(
       chunks: committed ? chunks.length : 0,
     };
   } catch (error) {
-    if (job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
+    // A file over an ingestion limit (QA-043) is over it on every attempt: fail it now rather than
+    // spend each retry re-reading it (a parse timeout would cost minutes per attempt).
+    const tooLarge = error instanceof DocumentTooLargeError;
+    if (tooLarge || job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
       const reason = failureReason(error);
       await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
         const [state] = await tx<MaterialState[]>`
@@ -320,6 +324,7 @@ export async function processIngestJob(
         }
       });
     }
+    if (tooLarge) throw new UnrecoverableError((error as Error).message);
     throw error;
   } finally {
     await lease?.release().catch(() => undefined);
