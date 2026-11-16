@@ -13,6 +13,10 @@ when it required the `version-bump` label.
 
 ### Added
 
+- `POST /api/academics/materials/{materialId}/retry` (`retryMaterial`, needs `material:update`):
+  sends a `failed` material back to `scanning` (its `ingest_error` cleared) and enqueues the malware
+  scan, as confirm does. 409 `CONFLICT_STATE_MISMATCH` for any other state, 409
+  `MATERIAL_STORAGE_CONFIRM_FAILED` when its file is no longer in storage.
 - Stripe Sandbox support (docs/billing/stripe-modes.md): `StorageAddOnOffer.testMode` (true while
   payments run on Stripe Sandbox keys: test cards only, no real money), `SystemHealth.stripeMode`
   (`live`, `sandbox` or `not_configured`), and the Stripe webhook's `outcome` gains `ignored` for an
@@ -64,6 +68,11 @@ when it required the `version-bump` label.
 
 ### Changed
 
+- `GET /api/academics/materials` and `GET /api/academics/materials/{materialId}`: a caller who is
+  not school staff (students, parents, guests) sees only `ready` materials; another state is left
+  out of the list and answers 404 by id. Staff still see every state.
+- `POST /api/academics/materials/upload` also replaces the caller's own `failed` attempt at the same
+  file in the class (as it already did an unconfirmed `uploaded` one) and frees its stored file.
 - `LicenseInvoice.paymentLink` is now the link of the instalment to pay now, and the invoice-level
   `PUT|DELETE …/license-invoices/{invoiceId}/payment-link` sets that instalment's link (one
   instalment for an invoice paid at once, so nothing changes for those). A licence now activates once

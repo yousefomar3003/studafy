@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, ROLES, SCHOOL_STAFF_ROLES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import type { MaterialIngestStatus } from "./schemas";
+import type { Role } from "@studafy/constants";
 import type { TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -47,6 +48,29 @@ export interface ListMaterialsParams {
   day_of_week?: number;
 }
 
+/** What a caller may see of the material pipeline. */
+export interface MaterialVisibility {
+  /**
+   * Only `ready` materials. Students and parents get just the files they can open: a material still
+   * being uploaded, scanned or processed, or one that failed or was blocked, is the teacher's
+   * business, not theirs.
+   */
+  readyOnly: boolean;
+}
+
+/**
+ * Whether these roles see a material in every pipeline state. School staff (who upload, retry and
+ * manage materials) and platform operators do; everyone else (students, parents, guests) sees only
+ * `ready` materials. Row scope (role_scope_visibility) still decides which classes' materials each
+ * role sees at all.
+ */
+export function materialVisibilityFor(roles: readonly Role[]): MaterialVisibility {
+  const staff = roles.some(
+    (role) => role === ROLES.SUPER_ADMIN || SCHOOL_STAFF_ROLES.includes(role),
+  );
+  return { readyOnly: !staff };
+}
+
 export interface InitiateUploadParams {
   class_id: string;
   title: string;
@@ -75,8 +99,10 @@ export async function listMaterials(
   tx: TransactionSql,
   schoolId: string,
   params: ListMaterialsParams,
+  visibility: MaterialVisibility = { readyOnly: false },
 ): Promise<{ rows: MaterialRow[]; total: number }> {
   const classFilter = params.class_id ? tx` AND m.class_id = ${params.class_id}` : tx``;
+  // Both filters apply together: a ready-only caller asking for another status gets nothing.
   const statusFilter = params.ingest_status
     ? tx` AND m.ingest_status = ${params.ingest_status}::app.material_ingest_status`
     : tx``;
@@ -84,6 +110,9 @@ export async function listMaterials(
     params.week_number !== undefined ? tx` AND m.week_number = ${params.week_number}` : tx``;
   const dayFilter =
     params.day_of_week !== undefined ? tx` AND m.day_of_week = ${params.day_of_week}` : tx``;
+  const visibilityFilter = visibility.readyOnly
+    ? tx` AND m.ingest_status = 'ready'::app.material_ingest_status`
+    : tx``;
 
   const [rows, countResult] = await Promise.all([
     tx<MaterialRow[]>`
@@ -97,6 +126,7 @@ export async function listMaterials(
         ${statusFilter}
         ${weekFilter}
         ${dayFilter}
+        ${visibilityFilter}
       ORDER BY m.created_at DESC, m.id
       LIMIT ${params.limit}
       OFFSET ${params.offset}
@@ -109,6 +139,7 @@ export async function listMaterials(
         ${statusFilter}
         ${weekFilter}
         ${dayFilter}
+        ${visibilityFilter}
     `,
   ]);
 
@@ -119,7 +150,11 @@ export async function getMaterial(
   tx: TransactionSql,
   schoolId: string,
   materialId: string,
+  visibility: MaterialVisibility = { readyOnly: false },
 ): Promise<MaterialRow | undefined> {
+  const visibilityFilter = visibility.readyOnly
+    ? tx` AND ingest_status = 'ready'::app.material_ingest_status`
+    : tx``;
   const [row] = await tx<MaterialRow[]>`
     SELECT id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
            title, description, storage_key, original_file_name, mime_type,
@@ -127,6 +162,7 @@ export async function getMaterial(
            ingested_at, week_number, day_of_week, created_at, updated_at
     FROM app.materials
     WHERE id = ${materialId} AND school_id = ${schoolId}
+      ${visibilityFilter}
   `;
   return row;
 }
@@ -136,7 +172,14 @@ export async function initiateUpload(
   schoolId: string,
   userId: string,
   params: InitiateUploadParams,
-): Promise<{ material: MaterialRow; upload_url: string; storage_key: string; expires_at: Date }> {
+): Promise<{
+  material: MaterialRow;
+  upload_url: string;
+  storage_key: string;
+  expires_at: Date;
+  /** Stored objects of the replaced failed attempts, to free once the transaction commits. */
+  freedStorageKeys: string[];
+}> {
   const [cls] = await tx<{ id: string }[]>`
     SELECT id FROM app.classes
     WHERE id = ${params.class_id} AND school_id = ${schoolId}
@@ -145,25 +188,48 @@ export async function initiateUpload(
     throw new HTTPException(404, { message: "Class not found" });
   }
 
-  // This teacher's own unconfirmed upload of the same file is an attempt that never finished: the
-  // file PUT or the confirm call failed, and the app shows the teacher an error. It holds no counted
-  // bytes (the meter is credited at confirm), so it is replaced rather than blocking the retry
-  // forever. Any object its PUT did write is left for reconciliation and the orphan sweep.
-  const abandoned = await tx<{ id: string; storage_key: string }[]>`
+  // This teacher's own earlier attempt at the same file is replaced rather than left in the list:
+  //
+  //  - 'uploaded' with ai_visible: an attempt that never finished (the file PUT or the confirm call
+  //    failed, and the app showed the teacher an error). It holds no counted bytes (the meter is
+  //    credited at confirm). Any object its PUT did write is left for reconciliation and the
+  //    abandoned-material sweep, which removes it once the daily recount has counted it. A row in
+  //    'uploaded' with ai_visible off is a confirmed material whose AI use was turned off
+  //    (toggleAiVisible), not an abandoned attempt, so it is kept.
+  //  - 'failed': the scan or the processing gave up on it. Its file was confirmed (and counted), so
+  //    the caller frees it once this transaction commits (freedStorageKeys).
+  const replaced = await tx<
+    {
+      id: string;
+      ingest_status: "uploaded" | "failed";
+      storage_key: string;
+      thumbnail_key: string | null;
+      preview_key: string | null;
+    }[]
+  >`
     DELETE FROM app.materials
     WHERE school_id = ${schoolId} AND class_id = ${params.class_id}
       AND original_file_name = ${params.original_file_name}
       AND uploaded_by_user_id = ${userId}
-      AND ingest_status = 'uploaded'
-    RETURNING id, storage_key
+      AND (
+        (ingest_status = 'uploaded' AND ai_visible)
+        OR ingest_status = 'failed'
+      )
+    RETURNING id, ingest_status::text AS ingest_status, storage_key, thumbnail_key, preview_key
   `;
-  for (const row of abandoned) {
+  const freedStorageKeys: string[] = [];
+  for (const row of replaced) {
     await emitAuditLog(tx, {
       action: "delete",
       targetTable: "materials",
       targetId: row.id,
-      oldValues: { storage_key: row.storage_key, ingest_status: "uploaded" },
+      oldValues: { storage_key: row.storage_key, ingest_status: row.ingest_status },
     });
+    if (row.ingest_status === "failed") {
+      for (const key of [row.storage_key, row.thumbnail_key, row.preview_key]) {
+        if (key !== null) freedStorageKeys.push(key);
+      }
+    }
   }
 
   const [existingMaterial] = await tx<{ id: string }[]>`
@@ -229,7 +295,13 @@ export async function initiateUpload(
     },
   });
 
-  return { material: row!, upload_url: "", storage_key: storageKey, expires_at: new Date() };
+  return {
+    material: row!,
+    upload_url: "",
+    storage_key: storageKey,
+    expires_at: new Date(),
+    freedStorageKeys,
+  };
 }
 
 export async function confirmUpload(
@@ -288,6 +360,76 @@ export async function confirmUpload(
   });
 
   return row!;
+}
+
+/**
+ * The material a retry would re-run, or a refusal: only a `failed` material can be retried. A
+ * quarantined one was infected and must never be re-run; one still in the pipeline needs no retry.
+ */
+export async function getRetryableMaterial(
+  tx: TransactionSql,
+  schoolId: string,
+  materialId: string,
+): Promise<MaterialRow> {
+  const existing = await getMaterial(tx, schoolId, materialId);
+  if (!existing) {
+    throw new CodedHttpException(404, ERROR_CODES.MATERIAL_NOT_FOUND, "Material not found.");
+  }
+  if (existing.ingest_status !== "failed") {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.CONFLICT_STATE_MISMATCH,
+      `Only a failed material can be retried; this one is ${existing.ingest_status}.`,
+    );
+  }
+  return existing;
+}
+
+/**
+ * Send a failed material back through the pipeline: 'failed' -> 'scanning', the same state confirm
+ * leaves it in, so the caller enqueues the same scan job. Guarded by the status, so two retries at
+ * once flip it only once; the loser is refused.
+ */
+export async function retryFailedMaterial(
+  tx: TransactionSql,
+  schoolId: string,
+  materialId: string,
+): Promise<MaterialRow> {
+  const [row] = await tx<(MaterialRow & { previous_error: string | null })[]>`
+    UPDATE app.materials AS m
+    SET ingest_status = 'scanning'::app.material_ingest_status,
+        ingest_error = NULL,
+        updated_at = CURRENT_TIMESTAMP
+    FROM (
+      SELECT id, ingest_error FROM app.materials
+      WHERE id = ${materialId} AND school_id = ${schoolId}
+    ) AS before
+    WHERE m.id = before.id AND m.school_id = ${schoolId}
+      AND m.ingest_status = 'failed'::app.material_ingest_status
+    RETURNING m.id, m.school_id, m.class_id, m.uploaded_by_user_id, m.last_edited_by_user_id,
+              m.title, m.description, m.storage_key, m.original_file_name, m.mime_type,
+              m.size_bytes::float8 AS size_bytes, m.checksum_sha256, m.ai_visible, m.ingest_status,
+              m.ingest_error, m.ingested_at, m.week_number, m.day_of_week, m.created_at,
+              m.updated_at, before.ingest_error AS previous_error
+  `;
+  if (!row) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.CONFLICT_STATE_MISMATCH,
+      "Only a failed material can be retried.",
+    );
+  }
+
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: "materials",
+    targetId: materialId,
+    oldValues: { ingest_status: "failed", ingest_error: row.previous_error },
+    newValues: { ingest_status: "scanning", retried: true },
+  });
+
+  const { previous_error: _previous, ...material } = row;
+  return material;
 }
 
 export async function updateMaterial(
