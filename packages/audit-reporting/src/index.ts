@@ -13,6 +13,7 @@
  * transaction handle.
  */
 
+import { csvCell } from "@studafy/sanitize";
 import { z } from "zod";
 
 import type { TransactionSql } from "postgres";
@@ -374,12 +375,6 @@ export const AUDIT_LOG_CSV_HEADER = [
   "old_values",
   "new_values",
 ] as const;
-
-function csvCell(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  const text = typeof value === "string" ? value : String(value);
-  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
-}
 
 /** One CSV data line (no trailing CRLF) for an audit entry. */
 export function auditLogEntryToCsv(row: AuditLogEntry): string {

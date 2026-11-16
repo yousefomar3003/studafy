@@ -9,6 +9,7 @@
  */
 
 import { ERROR_CODES, SCHOOL_STAFF_ROLES } from "@studafy/constants";
+import { csvCell } from "@studafy/sanitize";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
@@ -714,15 +715,6 @@ const KIND_LABELS = {
   ar: { student: "طالب", parent: "ولي أمر", staff: "موظف", class: "صف" },
 } as const;
 
-/**
- * One CSV cell. Text that a spreadsheet would read as a formula (=, +, -, @, tab, carriage return)
- * is prefixed with an apostrophe, so an exported list cannot run anything when opened.
- */
-function csvCell(value: string, numeric = false): string {
-  const safe = !numeric && /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return /[",\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-}
-
 export async function exportCsv(
   tx: TransactionSql,
   actor: CustomListActor,
@@ -793,10 +785,9 @@ export async function exportCsv(
               column,
               rowCells.find((cell) => cell.column_id === column.id),
             ),
-            column.field_type === "number",
           ),
         ),
-        csvCell(row.created_at.toISOString().slice(0, 10), true),
+        csvCell(row.created_at.toISOString().slice(0, 10)),
       ].join(","),
     );
   }

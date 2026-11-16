@@ -241,6 +241,7 @@
       "name": "@studafy/audit-reporting",
       "version": "0.0.0",
       "dependencies": {
+        "@studafy/sanitize": "workspace:*",
         "postgres": "3.4.9",
         "zod": "4.6.7",
       },
@@ -310,6 +311,7 @@
       "name": "@studafy/finance-reporting",
       "version": "0.0.0",
       "dependencies": {
+        "@studafy/sanitize": "workspace:*",
         "zod": "4.6.7",
       },
       "devDependencies": {
