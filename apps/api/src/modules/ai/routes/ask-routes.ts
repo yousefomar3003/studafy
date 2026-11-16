@@ -24,6 +24,7 @@ import {
 import { AI_FEATURE_ROUTE, aiTokenBudget, getAiQuota } from "../gate/token-budget";
 import { LlmProviderError } from "../llm/provider";
 import { AI_MODEL_TIERS, resolveAiModel } from "../llm/routing";
+import { effectiveAgeLevel } from "../moderation/age-level";
 import { recordBlockedContent } from "../moderation/enforce";
 import { moderateInput, moderateOutput, type AgeLevel } from "../moderation/moderate";
 import { hybridSearch } from "../retrieval/search";
@@ -194,12 +195,12 @@ const askBodySchema = z.object({
   level: z
     .enum(AI_EXPLAIN_LEVELS)
     .optional()
-    .default("high")
     .openapi({
       description:
-        "The student's age-appropriate level for content moderation. Determines how strict the " +
-        "content filter is: 'elementary' is strictest, 'high' is most permissive. Defaults to 'high'.",
-      example: "middle",
+        "A request for stricter content moderation. The level applied is the server's, from the " +
+        "student's age ('elementary' under 11, 'middle' 11-13, 'high' 14+; 'middle' when no date " +
+        "of birth is on record); this can only make it stricter, never more permissive.",
+      example: "elementary",
     }),
 });
 
@@ -395,10 +396,21 @@ export function aiAskRoutes(deps: {
 
     const routed = resolveAiModel("ask", modelOverrides);
 
+    // QA-029: the moderation level is the server's, from the student's age; the request can only
+    // make it stricter. The self gate guarantees the caller is this student.
+    const dateOfBirth = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      const [student] = await tx<{ date_of_birth: string | null }[]>`
+        SELECT date_of_birth::text AS date_of_birth FROM app.students
+        WHERE id = ${studentId}::uuid AND school_id = current_setting('app.school_id')::uuid
+      `;
+      return student?.date_of_birth ?? null;
+    });
+    const level = effectiveAgeLevel(dateOfBirth, body.level as AgeLevel | undefined);
+
     // Input moderation: check the student's question against the age-appropriate content policy
     // before any expensive work (retrieval, conversation resolution). Blocks with a problem+json
     // response — no LLM call, no message persisted.
-    const inputModeration = moderateInput(body.question, body.level as AgeLevel);
+    const inputModeration = moderateInput(body.question, level);
     if (inputModeration.blocked) {
       await recordBlockedContent(
         database,
@@ -458,7 +470,7 @@ export function aiAskRoutes(deps: {
     const answerGenerally = !grounding.grounded && allowGeneralKnowledge;
     const sources = answerGenerally ? [] : toGroundedSources(preflight.search.hits);
     const prompt = answerGenerally
-      ? assembleGeneralPrompt(body.question, body.level, { history: preflight.history })
+      ? assembleGeneralPrompt(body.question, level, { history: preflight.history })
       : assembleGroundedPrompt(body.question, sources, undefined, {
           history: preflight.history,
           allowGeneralKnowledge,
@@ -529,7 +541,7 @@ export function aiAskRoutes(deps: {
           // policy. If blocked, the message is not persisted, the quota is released, and a
           // moderation_blocked event is sent. The student may have seen partial deltas — the client
           // should clear any rendered content upon receiving this event.
-          const outputModeration = moderateOutput(text, body.level as AgeLevel);
+          const outputModeration = moderateOutput(text, level);
           if (outputModeration.blocked) {
             await recordBlockedContent(
               database,
