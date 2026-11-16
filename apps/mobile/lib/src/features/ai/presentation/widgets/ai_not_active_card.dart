@@ -16,13 +16,6 @@ import '../../../../design/tokens/app_spacing_tokens.dart';
 class AiNotActiveCard extends StatelessWidget {
   const AiNotActiveCard({super.key});
 
-  static const _included = [
-    (Icons.chat_bubble_outline, 'ask'),
-    (Icons.quiz_outlined, 'practice'),
-    (Icons.summarize_outlined, 'summaries'),
-    (Icons.assignment_outlined, 'exam'),
-  ];
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -78,27 +71,49 @@ class AiNotActiveCard extends StatelessWidget {
               AppSpacing.space20,
               AppSpacing.space20,
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'ai.notActive.includedTitle'.tr(),
-                  style: textTheme.labelLarge?.copyWith(color: colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: AppSpacing.space12),
-                for (final (icon, key) in _included) ...[
-                  _IncludedFeature(
-                    icon: icon,
-                    title: 'ai.notActive.features.$key.title'.tr(),
-                    body: 'ai.notActive.features.$key.body'.tr(),
-                  ),
-                  if (key != _included.last.$2) const SizedBox(height: AppSpacing.space12),
-                ],
-              ],
-            ),
+            child: const AiIncludedFeatures(),
           ),
         ],
       ),
+    );
+  }
+}
+
+/// "What's included": the add-on's four tools, each locked. Under the not-active hero here, and in
+/// the parent app's purchase sheet for a child (`AiStoreOfferCard`), so whoever is about to buy sees
+/// what they get.
+class AiIncludedFeatures extends StatelessWidget {
+  const AiIncludedFeatures({super.key});
+
+  static const _included = [
+    (Icons.chat_bubble_outline, 'ask'),
+    (Icons.quiz_outlined, 'practice'),
+    (Icons.summarize_outlined, 'summaries'),
+    (Icons.assignment_outlined, 'exam'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'ai.notActive.includedTitle'.tr(),
+          style: textTheme.labelLarge?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: AppSpacing.space12),
+        for (final (icon, key) in _included) ...[
+          _IncludedFeature(
+            icon: icon,
+            title: 'ai.notActive.features.$key.title'.tr(),
+            body: 'ai.notActive.features.$key.body'.tr(),
+          ),
+          if (key != _included.last.$2) const SizedBox(height: AppSpacing.space12),
+        ],
+      ],
     );
   }
 }

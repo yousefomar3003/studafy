@@ -5,6 +5,8 @@
  * convention -- see attendance-alert.test.ts).
  */
 
+import { randomUUID } from "node:crypto";
+
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import postgres from "postgres";
@@ -293,6 +295,163 @@ describeDb("school event notices", () => {
       notifications: 0,
     });
     expect(await inbox(f.schoolId)).toHaveLength(0);
+  });
+});
+
+/** A material uploaded by the class's teacher, still being scanned. */
+async function createMaterial(
+  f: Fixture,
+  title: string,
+  placement: { week: number; day: number } | null = null,
+): Promise<string> {
+  return asAdmin(f.schoolId, async (tx) => {
+    const fileName = `${randomUUID()}.pdf`;
+    const [row] = await tx<{ id: string }[]>`
+      INSERT INTO app.materials
+        (school_id, class_id, uploaded_by_user_id, last_edited_by_user_id, title, storage_key,
+         original_file_name, mime_type, size_bytes, ingest_status, week_number, day_of_week)
+      VALUES (${f.schoolId}::uuid, ${f.classId}::uuid, ${f.teacherUserId}::uuid,
+              ${f.teacherUserId}::uuid, ${title}, ${`permanent/${f.schoolId}/materials/${fileName}`},
+              ${fileName}, 'application/pdf', 1024, 'scanning',
+              ${placement?.week ?? null}, ${placement?.day ?? null})
+      RETURNING id
+    `;
+    return row!.id;
+  });
+}
+
+/** Move a material along its pipeline the way the workers and the API do. */
+async function setMaterialStatus(
+  f: Fixture,
+  materialId: string,
+  status: "queued" | "processing" | "ready" | "failed" | "quarantined",
+) {
+  const ingestedAt = status === "ready" ? new Date() : null;
+  const error = status === "failed" || status === "quarantined" ? "test" : null;
+  await asAdmin(
+    f.schoolId,
+    (tx) => tx`
+    UPDATE app.materials
+    SET ingest_status = ${status}::app.material_ingest_status,
+        ingest_error = ${error},
+        ingested_at = ${ingestedAt},
+        updated_at = CURRENT_TIMESTAMP
+    WHERE school_id = ${f.schoolId}::uuid AND id = ${materialId}::uuid
+  `,
+  );
+}
+
+async function materialEvents(f: Fixture): Promise<{ payload: Record<string, string> }[]> {
+  const rows = await asAdmin(
+    f.schoolId,
+    (tx) => tx<{ payload: Record<string, string> }[]>`
+    SELECT payload FROM app.outbox_events
+    WHERE school_id = ${f.schoolId}::uuid AND event_name = 'material.published'
+    ORDER BY id
+  `,
+  );
+  return [...rows];
+}
+
+describeDb("material published notices", () => {
+  test("a material turning ready tells the class's student once, and not the parent", async () => {
+    const f = await seed();
+    const materialId = await createMaterial(f, "Newton's laws");
+    await setMaterialStatus(f, materialId, "ready");
+
+    expect(await materialEvents(f)).toEqual([{ payload: { materialId, classId: f.classId } }]);
+    expect(await notifySchoolEvents(sql, f.schoolId, 50)).toEqual({
+      events: 1,
+      notifications: 1,
+    });
+
+    const rows = await inbox(f.schoolId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: f.studentUserId,
+      notification_type: "MATERIAL_PUBLISHED",
+      title: "New material: Newton's laws",
+      body: "Physics",
+      metadata: {
+        route: `/classes/${f.classId}/materials`,
+        material_id: materialId,
+        class_id: f.classId,
+        course_id: f.courseId,
+        student_id: f.studentId,
+      },
+    });
+
+    expect(await notifySchoolEvents(sql, f.schoolId, 50)).toEqual({ events: 0, notifications: 0 });
+    expect(await inbox(f.schoolId)).toHaveLength(1);
+  });
+
+  test("coming back to ready after AI re-staging raises nothing new", async () => {
+    const f = await seed();
+    const materialId = await createMaterial(f, "Vectors");
+    await setMaterialStatus(f, materialId, "queued");
+    await setMaterialStatus(f, materialId, "processing");
+    await setMaterialStatus(f, materialId, "ready");
+    // Turning AI on re-stages a ready material; ingestion brings it back.
+    await setMaterialStatus(f, materialId, "queued");
+    await setMaterialStatus(f, materialId, "processing");
+    await setMaterialStatus(f, materialId, "ready");
+
+    expect(await materialEvents(f)).toHaveLength(1);
+    expect(await notifySchoolEvents(sql, f.schoolId, 50)).toEqual({
+      events: 1,
+      notifications: 1,
+    });
+  });
+
+  test("a failed or quarantined material raises nothing; a retried one publishes when ready", async () => {
+    const f = await seed();
+    const infected = await createMaterial(f, "Infected");
+    await setMaterialStatus(f, infected, "quarantined");
+    const broken = await createMaterial(f, "Broken");
+    await setMaterialStatus(f, broken, "queued");
+    await setMaterialStatus(f, broken, "processing");
+    await setMaterialStatus(f, broken, "failed");
+    expect(await materialEvents(f)).toHaveLength(0);
+
+    // The teacher retries: back through the scan, and this time it becomes visible.
+    await setMaterialStatus(f, broken, "ready");
+    expect(await materialEvents(f)).toEqual([
+      { payload: { materialId: broken, classId: f.classId } },
+    ]);
+  });
+
+  test("names the week and day, in the student's language", async () => {
+    const f = await seed();
+    await asAdmin(
+      f.schoolId,
+      (tx) => tx`
+      INSERT INTO app.user_notification_settings (school_id, user_id, locale)
+      VALUES (${f.schoolId}::uuid, ${f.studentUserId}::uuid, 'ar')
+    `,
+    );
+    const materialId = await createMaterial(f, "Optics", { week: 3, day: 1 });
+    await setMaterialStatus(f, materialId, "ready");
+
+    await notifySchoolEvents(sql, f.schoolId, 50);
+    const [row] = await inbox(f.schoolId);
+    expect(row!.title).toBe("مادة تعليمية جديدة: Optics");
+    expect(row!.body).toBe("Physics · الأسبوع 3، الاثنين");
+  });
+
+  test("a material deleted before the notice goes out tells nobody", async () => {
+    const f = await seed();
+    const materialId = await createMaterial(f, "Withdrawn");
+    await setMaterialStatus(f, materialId, "ready");
+    await asAdmin(
+      f.schoolId,
+      (tx) =>
+        tx`DELETE FROM app.materials WHERE school_id = ${f.schoolId}::uuid AND id = ${materialId}::uuid`,
+    );
+
+    expect(await notifySchoolEvents(sql, f.schoolId, 50)).toEqual({
+      events: 1,
+      notifications: 0,
+    });
   });
 });
 

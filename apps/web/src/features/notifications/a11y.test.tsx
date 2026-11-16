@@ -25,7 +25,7 @@ const NOTIFICATION = {
   updated_at: "2026-08-10T09:00:00.000Z",
 };
 
-const CHANNELS = ["in_app", "push", "email"] as const;
+const CHANNELS = ["in_app", "push"] as const;
 const PREFERENCES = ["ASSIGNMENT_DUE_SOON", "ADMIN_ANNOUNCEMENT", "DISCUSSION_REPLY"].flatMap(
   (notification_type) =>
     CHANNELS.map((channel) => ({
@@ -34,7 +34,7 @@ const PREFERENCES = ["ASSIGNMENT_DUE_SOON", "ADMIN_ANNOUNCEMENT", "DISCUSSION_RE
       enabled: true,
       digest: false,
       mandatory: notification_type === "ADMIN_ANNOUNCEMENT",
-      digest_eligible: channel === "email" && notification_type === "DISCUSSION_REPLY",
+      digest_eligible: false,
     })),
 );
 

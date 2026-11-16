@@ -18,6 +18,7 @@ import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/parent/presentation/parent_communication_screen.dart';
 import '../../features/student/presentation/assignment_detail_screen.dart';
 import '../../features/student/presentation/grades_screen.dart';
+import '../../features/student/presentation/materials_screen.dart';
 import '../../features/student/presentation/attendance_screen.dart';
 import '../../features/student/presentation/exams_screen.dart';
 import '../auth/auth_guard.dart';
@@ -160,6 +161,11 @@ GoRouter createAppRouter({required AppConfig appConfig, Listenable? refreshListe
         path: '/courses/:courseId/assignments/:assignmentId',
         builder: (context, state) =>
             AssignmentDetailScreen(assignmentId: state.pathParameters['assignmentId']!),
+      ),
+      GoRoute(
+        path: RoutePaths.classMaterials,
+        builder: (context, state) =>
+            MaterialsScreen(focusClassId: state.pathParameters['classId']),
       ),
       GoRoute(
         path: '/courses/:courseId/discussions/:discussionId',

@@ -278,7 +278,14 @@ describeDb("processMaterialScan", () => {
       expect(row!.ingested_at).not.toBeNull();
       expect(s3.objects.has(f.storageKey)).toBe(true);
       expect(await scanNotifications(f)).toHaveLength(0);
-      expect(await scanOutboxEvents(f)).toHaveLength(0);
+      // Ready means visible to the class: trg_materials_published (000228) raises the one event that
+      // tells its students.
+      expect([...(await scanOutboxEvents(f))]).toEqual([
+        {
+          event_name: "material.published",
+          payload: { materialId: f.materialId, classId: f.classId },
+        },
+      ]);
     } finally {
       await clamd.close();
     }

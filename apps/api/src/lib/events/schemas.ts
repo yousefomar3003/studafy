@@ -159,6 +159,12 @@ export const eventPayloadSchemas = {
     schoolId: uid,
     virus: z.string(),
   }),
+  // Written by trg_materials_published (000228), not by emit(): the database raises it the first
+  // time a material turns `ready`, whichever service or worker made the change.
+  [DOMAIN_EVENTS.MATERIAL_PUBLISHED]: z.object({
+    materialId: uid,
+    classId: uid,
+  }),
 
   // ── Study Group ───────────────────────────────────────────────────────
   [DOMAIN_EVENTS.STUDY_GROUP_CREATED]: z.object({ groupId: uid }),

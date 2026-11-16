@@ -171,4 +171,10 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "تم تسجيل {status} لـ {studentName} في {courseName} بتاريخ {date}.",
   },
+  [NOTIFICATION_TYPES.MATERIAL_PUBLISHED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "مادة تعليمية جديدة: {materialTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{courseName}{placement}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "شارك معلمك مادة تعليمية جديدة بعنوان {materialTitle} في {courseName}{placement}.",
+  },
 } as const satisfies LocaleTemplateSet;

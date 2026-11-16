@@ -63,6 +63,64 @@ iOS (set up 2026-10-26):
   Debug/Profile) and `RunnerRelease.entitlements` (production, for Release), plus the
   `remote-notification` background mode in `Info.plist`.
 
+## iPhones stop getting notifications
+
+Symptom: Android phones get notifications, iPhones get none (it happened twice before 2026-11-16).
+Cause: Apple refuses the APNs credential Firebase holds -- the key was revoked in Apple Developer,
+a yearly APNs **certificate** (.p12) was uploaded instead of the key and expired, or the key's Key ID
+or Team ID is wrong. FCM then fails every iPhone token with `messaging/third-party-auth-error`. The
+workers log it as **`notification_push_credential_rejected`** (error level, with the counts per
+code); other per-token failures log as `notification_push_tokens_failed`.
+
+Fix (about five minutes, no deploy):
+
+1. Apple Developer -> Certificates, Identifiers & Profiles -> **Keys**. If "Studafy Push" is listed
+   and not revoked, and you still have its `.p8`, reuse it. Otherwise **+** -> name "Studafy Push"
+   -> tick **Apple Push Notifications service (APNs)** -> Configure: environment **Sandbox &
+   Production**, key restriction **Team Scoped (All Topics)** -> Continue -> Register ->
+   **Download** the `.p8` (it can be downloaded once only; keep it in the password manager). Note
+   the **Key ID**. The **Team ID** is under Membership details (top right of the account page).
+2. Firebase console -> project `studafy` -> gear -> **Project settings** -> **Cloud Messaging** ->
+   Apple app configuration -> the app `com.studafy.studafyMobile`.
+   - Delete any **APNs certificates** listed there (they expire every year).
+   - Under **APNs Authentication Key**, delete the old key, then **Upload** the `.p8` with its Key
+     ID and Team ID. If the page shows separate development and production slots, upload the same
+     key to both.
+3. Test: send something that notifies (an announcement to yourself) and check the iPhone; the
+   worker log shows `notification_push_delivered` and no `notification_push_credential_rejected`.
+
+Do not revoke the old key in Apple Developer until the new one works in Firebase, and do not create
+APNs keys for anything else: a team may hold only two, and revoking the one Firebase uses is what
+breaks iPhone notifications.
+
+## An Android phone gets no notifications
+
+Work down this list; each step rules out one layer.
+
+1. **On the phone:** Account -> Notifications -> "Notifications on this phone".
+   - "Off" / "Not turned on yet": the Android 13+ notification permission is missing. Turn it on
+     there (or in Settings -> Apps -> studafy -> Notifications).
+   - "Not available": Firebase did not start on this build. Sentry / Crashlytics has an event with
+     reason `Firebase.initializeApp failed` or `push permission status unavailable`.
+   - "On": tap **Send a test notification**. If the phone could not register, the message says why
+     (`no push token: ...` is Firebase refusing to issue a token, `the server did not accept this
+phone: HTTP ...` is the API). The same failure is in Sentry / Crashlytics with reason
+     `FCM token unavailable` or `push token registration failed`.
+2. **adb** (USB debugging on, phone plugged in):
+   `adb logcat | grep -iE '\[push\]|FirebaseMessaging|Firebase-Installations|FIS_|FirebaseApp'`,
+   then open the app signed in. `FIS_AUTH_ERROR` / `AUTHENTICATION_FAILED` mean the Android API key in
+   `google-services.json` cannot reach the Firebase Installations / FCM Registration APIs (Google
+   Cloud console -> APIs & Services -> Credentials -> the Android key's API and app restrictions;
+   an app restriction must include the Play **app signing** SHA-1, not only the upload key's).
+   `adb shell dumpsys notification | grep -A3 studafy` shows whether the `studafy_push` channel
+   exists and its importance.
+3. **Workers:** a send to an Android token from the wrong Firebase project fails with
+   `messaging/mismatched-credential` or `messaging/sender-id-mismatch` and is logged as
+   `notification_push_credential_rejected` — the `GOOGLE_SERVICES_JSON` secret then holds another
+   project's file; download it again from project `studafy`. `sent:` counting the phone with no
+   such log line means FCM accepted the message, so the problem is on the phone (step 1-2:
+   permission, channel muted, battery restrictions).
+
 ## Dry run, on purpose only
 
 A production-mode worker refuses to boot without `FIREBASE_SERVICE_ACCOUNT` unless

@@ -13,6 +13,7 @@ void main() {
         );
         expect(isOpenableNotificationRoute('/courses/c-1/grades'), isTrue);
         expect(isOpenableNotificationRoute('/parent/alerts'), isTrue);
+        expect(isOpenableNotificationRoute('/classes/k-1/materials'), isTrue);
       },
     );
 
@@ -22,6 +23,10 @@ void main() {
         isFalse,
       );
       expect(isOpenableNotificationRoute('/messages/c-1'), isFalse);
+      expect(
+        isOpenableNotificationRoute('/classes/{classId}/materials'),
+        isFalse,
+      );
       expect(isOpenableNotificationRoute('/'), isFalse);
       expect(isOpenableNotificationRoute(''), isFalse);
       expect(isOpenableNotificationRoute(null), isFalse);
@@ -45,6 +50,24 @@ void main() {
         role: ShellRole.student,
       );
       expect(target.tabLabelKey, 'shell.tabs.work');
+    });
+
+    test("a student opens the new material's class materials", () {
+      final target = notificationTargetFor(
+        type: 'MATERIAL_PUBLISHED',
+        metadata: {'route': '/classes/k-1/materials'},
+        role: ShellRole.student,
+      );
+      expect(target.route, '/classes/k-1/materials');
+    });
+
+    test('a new material without a usable link lands on the Lessons tab', () {
+      final target = notificationTargetFor(
+        type: 'MATERIAL_PUBLISHED',
+        metadata: const {},
+        role: ShellRole.student,
+      );
+      expect(target.tabLabelKey, 'shell.tabs.lessons');
     });
 
     test("a parent's school-work notices open the Children tab", () {

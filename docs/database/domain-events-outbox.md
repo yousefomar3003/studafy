@@ -98,7 +98,7 @@ runs is not a demonstrated need.
 - Retention. The data retention sweep (`apps/workers/src/queues/maintenance/data-retention-sweep.ts`,
   [data-retention.md](../modules/data-retention.md)) deletes a row 14 days after it was written once
   every consumer has finished with it: `relayed_at` is set, `email_dispatched_at` is set if the
-  email dispatcher or digest producer claims its event name, and `entitlement_applied_at` is set if
+  email dispatcher claims its event name, and `entitlement_applied_at` is set if
   the entitlement invalidator does. A row any consumer has not finished is never deleted.
   `idx_outbox_events_school_created` (000201) serves the sweep.
 - No `updated_at` or `aggregate_id`/`occurred_at` columns beyond the ticket's own field list

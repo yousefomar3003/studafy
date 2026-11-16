@@ -15,7 +15,7 @@ import { describe, expect, test } from "bun:test";
 import { errorHandlerMiddleware } from "../../../middleware/errorHandler";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { AUTH_CHANNELS } from "../../auth/channels";
-import { aiStoreRoutes } from "../store/routes";
+import { aiStoreRoutes, purchaseStamp } from "../store/routes";
 import { StoreVerificationError } from "../store/types";
 
 import type { Database } from "../../../db";
@@ -165,6 +165,39 @@ describe("store setup", () => {
       accountToken: null,
       profileId: null,
       purchaseConfirmation: null,
+    });
+  });
+});
+
+describe("the ids stamped on a purchase", () => {
+  const studentId = "00000000-0000-4000-8000-000000000003";
+  const schoolId = "00000000-0000-4000-8000-000000000002";
+
+  test("are given when the add-on can be bought", () => {
+    expect(purchaseStamp({ studentId, unavailableReason: null }, schoolId)).toEqual({
+      accountToken: studentId,
+      profileId: schoolId,
+    });
+  });
+
+  test("are still given when the family seems to hold every product", () => {
+    // The phone's own store account decides: it may have a product free.
+    expect(purchaseStamp({ studentId, unavailableReason: "no_free_product" }, schoolId)).toEqual({
+      accountToken: studentId,
+      profileId: schoolId,
+    });
+  });
+
+  test("are withheld when it cannot be bought at all", () => {
+    for (const reason of ["school_plan_inactive", "not_student", "not_configured"] as const) {
+      expect(purchaseStamp({ studentId, unavailableReason: reason }, schoolId)).toEqual({
+        accountToken: null,
+        profileId: null,
+      });
+    }
+    expect(purchaseStamp({ studentId: null, unavailableReason: "not_student" }, schoolId)).toEqual({
+      accountToken: null,
+      profileId: null,
     });
   });
 });

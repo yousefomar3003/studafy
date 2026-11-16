@@ -36,9 +36,17 @@ for two children on the same phone therefore needs a second product for the seco
 store answers "you're already subscribed" with the first child's purchase.
 
 - The add-on is sold under `AI_STORE_PRODUCT_ID` plus `AI_STORE_EXTRA_PRODUCT_IDS`
-  (`studafy_ai_monthly_2`, `_3`, `_4`). The config picks, for each child, the product they already
-  hold, else the first one no brother or sister (students sharing a linked parent) holds. With none
-  left it answers `unavailableReason: no_free_product`, and the app says so.
+  (`studafy_ai_monthly_2`, `_3`, `_4`). The config suggests, for each child, the product they
+  already hold, else the first one no brother or sister (students sharing a linked parent in this
+  school) holds; with none left it answers `unavailableReason: no_free_product`, still with the
+  ids to stamp.
+- **The phone's store account decides.** Before opening the purchase sheet the app reads which
+  subscriptions the device's Apple ID / Google account holds (StoreKit 2 `Transaction.all`, Play
+  `queryPurchases(SUBS)`) and buys the first product it does not, skipping any the store does not
+  list. That covers what the server cannot see: children at different schools, siblings with no
+  parent linked in Studafy, or siblings who bought on their own phones. A product the account
+  holds for this same child is offered again (the store redelivers it; nothing is charged twice).
+  Only when the account holds every product does the app say the family is full.
 - A parent buys from the child's page in the parent app (`?studentId=` on the config), and the
   purchase is stamped with the **child's** id.
 - `POST .../purchases` credits a purchase to the student stamped on it, never to the caller. The
@@ -102,7 +110,8 @@ Each store is off while its values are empty; the api refuses to boot with a hal
 2. **Product.** The app → Monetization → Subscriptions → create a subscription group "Studafy AI",
    then an auto-renewable subscription with Product ID `studafy_ai_monthly`, duration 1 month, a
    price, and a localized display name and description (English and Arabic). Add the review
-   screenshot (the purchase screen) and review notes.
+   screenshot (the purchase screen — see [The review screenshot](#the-review-screenshot)) and review
+   notes.
    **For families**, repeat for `studafy_ai_monthly_2`, `_3` and `_4`, each in **its own**
    subscription group ("Studafy AI – 2nd child", ...) at the same price. Products in one group are
    mutually exclusive (an upgrade/downgrade), so they must not share the first group.
@@ -120,6 +129,38 @@ Each store is off while its values are empty; the api refuses to boot with a hal
 The API accepts sandbox purchases on every tier on purpose — App Review buys with a sandbox account
 against the production server. Every billing event records the environment, so a sandbox purchase is
 never counted as revenue (`payload->>'environment'`).
+
+## The review screenshot
+
+App Review wants one screenshot of the purchase screen per subscription; the same image serves all
+four products, since they share the screen. What the app shows, and to whom:
+
+- **A student**, in the **AI** tab: "Unlock the AI Study Assistant", what it includes, then the
+  offer — the store's price "per month", the 14-day withdrawal checkbox and **Subscribe** (disabled
+  until the box is ticked; tick it for the screenshot, but don't tap Subscribe).
+- **A parent**, under **Children** → the child → **Studafy AI for (name)**: a sheet with the same
+  offer and what it includes. Parents have no AI tab.
+- The offer appears only when the server allows a sale: the school's own plan is live, the school
+  does not sell an AI seat (if it does, or the student already holds one, the app says "ask your
+  school" instead — the stores forbid selling in the app what a school provides), and the student
+  does not already have AI.
+- The price is never the app's own: it is what the store returns for the product, in the store
+  account's currency.
+
+**The chicken-and-egg.** Until App Store Connect has the screenshot, the product sits in "Missing
+Metadata", and StoreKit may not return it to a TestFlight build — the offer then reads "can't be
+bought on this phone yet. The store hasn't listed it." In that case take the screenshot in the iOS
+simulator with the local StoreKit configuration, `apps/mobile/ios/Runner/StudafyAI.storekit` (all
+four products, $5.99/month, US storefront), which the **dev** scheme's Run action loads. It applies
+only when the app is launched from Xcode; archives and TestFlight builds never use it. Keep its
+price the same as App Store Connect's, or the screenshot shows the wrong price.
+
+1. `cd apps/mobile && flutter build ios --config-only --debug --flavor dev --simulator
+--dart-define=API_BASE_URL=https://api.studafy.com` (or leave the define out to use a local API
+   with the store values from [Values](#values) in `.env`).
+2. Open `ios/Runner.xcworkspace`, choose the **dev** scheme and an iPhone simulator, and Run.
+3. Sign in as a student who matches the list above, open **AI**, tick the checkbox, and take the
+   screenshot (simulator: File → Save Screen, ⌘S).
 
 ## Google Play (once per app)
 

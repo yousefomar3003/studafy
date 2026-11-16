@@ -42,30 +42,30 @@ describe("resolveLocale", () => {
 
 describe("render", () => {
   test("substitutes the event variables", () => {
-    const { title, body } = render("GRADE_POSTED", "email", "en", GRADE_VARS);
+    const { title, body } = render("GRADE_POSTED", "push", "en", GRADE_VARS);
     expect(title).toBe("Grade posted for Lab Report 3: 85/100");
-    expect(body).toBe("Your grade for Lab Report 3 in Biology 101 has been posted: 85/100.");
+    expect(body).toBe("Grade: 85/100 on Lab Report 3");
   });
 
   test("renders Arabic from the same variables", () => {
-    const { title, body } = render("GRADE_POSTED", "email", "ar", GRADE_VARS);
+    const { title, body } = render("GRADE_POSTED", "push", "ar", GRADE_VARS);
     expect(title).toContain("Lab Report 3");
-    expect(body).toContain("Biology 101");
+    expect(body).toContain("85/100");
     // Arabic script, not a silent fallback to the English template. The substituted variables are
     // Latin in both locales, so the script check is on the template text around them.
     expect(/[؀-ۿ]/.test(body)).toBe(true);
-    expect(body).not.toBe(render("GRADE_POSTED", "email", "en", GRADE_VARS).body);
+    expect(body).not.toBe(render("GRADE_POSTED", "push", "en", GRADE_VARS).body);
   });
 
   test("the title is the in_app template regardless of channel", () => {
-    const email = render("GRADE_POSTED", "email", "en", GRADE_VARS);
+    const inApp = render("GRADE_POSTED", "in_app", "en", GRADE_VARS);
     const push = render("GRADE_POSTED", "push", "en", GRADE_VARS);
-    expect(email.title).toBe(push.title);
-    expect(email.body).not.toBe(push.body);
+    expect(inApp.title).toBe(push.title);
+    expect(inApp.body).not.toBe(push.body);
   });
 
   test("an unknown variable is left visible rather than blanked", () => {
-    const { body } = render("GRADE_POSTED", "email", "en", { courseName: "Biology 101" });
+    const { body } = render("GRADE_POSTED", "push", "en", { grade: "85/100" });
     expect(body).toContain("{assignmentName}");
   });
 });
