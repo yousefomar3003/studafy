@@ -4,10 +4,11 @@
 # Build from the repo root:
 #   docker build -f infra/docker/web.Dockerfile -t studafy/web .
 
-ARG BUN_VERSION=1.3.14
-ARG NGINX_VERSION=1.27-alpine
+# QA-053: base images are pinned by tag and digest (the multi-arch index), written out in each FROM
+# so Dependabot can propose bumps; change both together.
+# nginx 1.28: the supported stable line (1.27 is superseded).
 
-FROM oven/bun:${BUN_VERSION}-alpine AS build
+FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS build
 WORKDIR /app
 
 # Baked into the bundle at build time (Vite inlines `import.meta.env.VITE_*` at build, not runtime —
@@ -94,7 +95,7 @@ RUN --mount=type=secret,id=sentry_auth_token \
     [ -n "$VITE_SENTRY_ENVIRONMENT" ] || unset VITE_SENTRY_ENVIRONMENT; \
     bunx turbo run build --filter=@studafy/web
 
-FROM nginx:${NGINX_VERSION} AS runtime
+FROM nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236 AS runtime
 
 # The pinned nginx:1.27-alpine tag doesn't get rebuilt every time an Alpine security advisory
 # lands, so `apk upgrade` pulls in whatever patched package versions the 3.x branch it's built

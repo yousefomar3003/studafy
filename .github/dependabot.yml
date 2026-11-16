@@ -13,3 +13,12 @@ updates:
     # release time to be caught and yanked upstream.
     cooldown:
       default-days: 7
+
+  # QA-053: the container base images are pinned by digest; this proposes the digest (and tag)
+  # bumps, with the same one-week cooldown, so pinning does not turn into never patching.
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7

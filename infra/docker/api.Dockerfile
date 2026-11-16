@@ -8,9 +8,10 @@
 # produces a single self-contained apps/api/dist/index.js — the runtime stage copies only that
 # file and never installs node_modules, which is what keeps the final image small.
 
-ARG BUN_VERSION=1.3.14
+# QA-053: base images are pinned by tag and digest (the multi-arch index), written out in each FROM
+# so Dependabot can propose bumps; change both together.
 
-FROM oven/bun:${BUN_VERSION}-alpine AS build
+FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS build
 WORKDIR /app
 
 # Full source is copied in one layer (see .dockerignore for what's excluded). A manifest-only
@@ -58,7 +59,7 @@ RUN bunx turbo run build --filter=@studafy/api
 # packages/ocr/scripts/build-assets.ts for the layout.
 RUN bun run --cwd apps/api build:ocr
 
-FROM oven/bun:${BUN_VERSION}-alpine AS runtime
+FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS runtime
 WORKDIR /app
 
 # Fixed uid/gid rather than relying on whatever non-root user (if any) ships in the upstream

@@ -8,8 +8,8 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-NGINX_VERSION="$(sed -n 's/^ARG NGINX_VERSION=\(.*\)$/\1/p' "$REPO/infra/docker/web.Dockerfile" | head -1)"
-IMAGE="${WEB_HEADERS_IMAGE:-nginx:$NGINX_VERSION}"
+# The runtime stage's own base image, exactly as production builds it (tag and digest).
+IMAGE="${WEB_HEADERS_IMAGE:-$(sed -n 's/^FROM \(nginx:[^ ]*\) AS runtime$/\1/p' "$REPO/infra/docker/web.Dockerfile" | head -1)}"
 SITE="$(mktemp -d)"
 NAME="studafy-web-headers-$$"
 trap 'docker rm -f "$NAME" >/dev/null 2>&1 || true; rm -rf "$SITE"' EXIT

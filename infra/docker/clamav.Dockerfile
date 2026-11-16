@@ -24,9 +24,10 @@
 # studafy-clamdcheck.sh (end of this file) is the image's health probe: clamd answers PING only
 # once the signatures are loaded.
 
-ARG CLAMAV_VERSION=1.4
+# QA-053: base images are pinned by tag and digest (the multi-arch index), written out in each FROM
+# so Dependabot can propose bumps; change both together.
 
-FROM clamav/clamav:${CLAMAV_VERSION}
+FROM clamav/clamav:1.4@sha256:4cc4350d3fded380caf1799e76c0d1c93f3fa40af99c0cb2862ec0c9b117718a
 
 ARG CLAMAV_TCP_ADDRS="127.0.0.1"
 

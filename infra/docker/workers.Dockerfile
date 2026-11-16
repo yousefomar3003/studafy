@@ -10,9 +10,10 @@
 # copies only that directory, never node_modules. The OCR stage's assets (the tesseract worker-script
 # bundle, its WASM cores, and the traineddata) are produced into dist/ by `bun run build:ocr`.
 
-ARG BUN_VERSION=1.3.14
+# QA-053: base images are pinned by tag and digest (the multi-arch index), written out in each FROM
+# so Dependabot can propose bumps; change both together.
 
-FROM oven/bun:${BUN_VERSION}-alpine AS build
+FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS build
 WORKDIR /app
 
 # See infra/docker/api.Dockerfile for why this is a single COPY rather than a manifest-first split.
@@ -50,7 +51,7 @@ RUN bunx turbo run build --filter=@studafy/workers
 # would be missing at runtime. See packages/ocr/scripts/build-assets.ts for the layout.
 RUN bun run --cwd apps/workers build:ocr
 
-FROM oven/bun:${BUN_VERSION}-alpine AS runtime
+FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS runtime
 WORKDIR /app
 
 # WORKDIR itself is chowned, not just the dist/ copied into it — see infra/docker/api.Dockerfile
