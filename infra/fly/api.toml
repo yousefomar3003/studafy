@@ -41,6 +41,11 @@ primary_region = "fra"
   S3_REGION = "auto"
   S3_APP_FILES_BUCKET = "studafy-prod-files"
   S3_PRESIGN_TTL_SECONDS = "900"
+  # The scanner's private address (the same one workers.toml gives the scan worker). The API never
+  # scans: when a material upload starts it opens one short connection here so fly's proxy boots the
+  # scaled-to-zero scanner while the file uploads (apps/api/src/lib/scanner-warmup.ts).
+  CLAMAV_HOST = "studafy-core-scanner.flycast"
+  CLAMAV_PORT = "3310"
   AI_LLM_ENABLED = "true"
   AI_LLM_PROVIDER = "openai-compatible"
   AI_LLM_BASE_URL = "https://api.together.xyz/v1"
