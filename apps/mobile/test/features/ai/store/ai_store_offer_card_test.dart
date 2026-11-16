@@ -150,6 +150,19 @@ void main() {
     expect(find.text('Studafy AI for Sara'), findsOneWidget);
   });
 
+  testWidgets('a parent sees what the add-on includes; the student tab shows it above instead', (
+    tester,
+  ) async {
+    backend.config = storeSetup(forStudent: siblingId);
+    await pump(tester, const AiStoreOfferCard(studentId: siblingId));
+    expect(find.text("What's included"), findsOneWidget);
+    expect(find.text('Exam mode'), findsOneWidget);
+
+    backend.config = storeSetup();
+    await pump(tester, const AiStoreOfferCard());
+    expect(find.text("What's included"), findsNothing);
+  });
+
   testWidgets('the waiver is in Arabic for an Arabic reader', (tester) async {
     await pump(tester, const AiStoreOfferCard(), locale: const Locale('ar'));
 
