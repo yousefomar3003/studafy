@@ -36,9 +36,17 @@ for two children on the same phone therefore needs a second product for the seco
 store answers "you're already subscribed" with the first child's purchase.
 
 - The add-on is sold under `AI_STORE_PRODUCT_ID` plus `AI_STORE_EXTRA_PRODUCT_IDS`
-  (`studafy_ai_monthly_2`, `_3`, `_4`). The config picks, for each child, the product they already
-  hold, else the first one no brother or sister (students sharing a linked parent) holds. With none
-  left it answers `unavailableReason: no_free_product`, and the app says so.
+  (`studafy_ai_monthly_2`, `_3`, `_4`). The config suggests, for each child, the product they
+  already hold, else the first one no brother or sister (students sharing a linked parent in this
+  school) holds; with none left it answers `unavailableReason: no_free_product`, still with the
+  ids to stamp.
+- **The phone's store account decides.** Before opening the purchase sheet the app reads which
+  subscriptions the device's Apple ID / Google account holds (StoreKit 2 `Transaction.all`, Play
+  `queryPurchases(SUBS)`) and buys the first product it does not, skipping any the store does not
+  list. That covers what the server cannot see: children at different schools, siblings with no
+  parent linked in Studafy, or siblings who bought on their own phones. A product the account
+  holds for this same child is offered again (the store redelivers it; nothing is charged twice).
+  Only when the account holds every product does the app say the family is full.
 - A parent buys from the child's page in the parent app (`?studentId=` on the config), and the
   purchase is stamped with the **child's** id.
 - `POST .../purchases` credits a purchase to the student stamped on it, never to the caller. The
