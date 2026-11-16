@@ -25,22 +25,22 @@ import type { Sql } from "postgres";
 
 describe("buildIdempotencyKey", () => {
   test("carries event type, event id, recipient and channel", () => {
-    expect(buildIdempotencyKey("grades.published", "sub-1", "user-1", "email")).toBe(
-      "grades.published:sub-1:user-1:email",
+    expect(buildIdempotencyKey("grades.published", "sub-1", "user-1", "push")).toBe(
+      "grades.published:sub-1:user-1:push",
     );
   });
 
   test("the channel is part of the key", () => {
-    // Without it, a recipient's email reservation would swallow their push reservation and one of
+    // Without it, a recipient's inbox reservation would swallow their push reservation and one of
     // the two would never be sent — the trap 000056 documents for parent_user_id.
-    const email = buildIdempotencyKey("grades.published", "sub-1", "user-1", "email");
+    const inApp = buildIdempotencyKey("grades.published", "sub-1", "user-1", "in_app");
     const push = buildIdempotencyKey("grades.published", "sub-1", "user-1", "push");
-    expect(email).not.toBe(push);
+    expect(inApp).not.toBe(push);
   });
 
   test("two recipients of one event get different keys", () => {
-    const student = buildIdempotencyKey("grades.published", "sub-1", "user-1", "email");
-    const parent = buildIdempotencyKey("grades.published", "sub-1", "user-2", "email");
+    const student = buildIdempotencyKey("grades.published", "sub-1", "user-1", "push");
+    const parent = buildIdempotencyKey("grades.published", "sub-1", "user-2", "push");
     expect(student).not.toBe(parent);
   });
 });
@@ -405,11 +405,11 @@ describeDb("processNotificationDispatch — fan-out", () => {
     expect(row!.body).toContain("Lab Report 3");
     expect(row!.body).toContain("85/100");
 
-    // The email template is the long one, and it is where the resolved course name shows up. That
-    // it does proves the resolver joined gradebook → class → course rather than the event payload.
-    const email = enqueued.find((job) => job.channel === "email");
-    expect(email?.body).toContain("Biology 101");
-    expect(email?.body).toContain("85/100");
+    // The push deep link carries the resolved course id. That it does proves the resolver joined
+    // gradebook → class → course rather than the event payload, which names no course.
+    const push = enqueued.find((job) => job.channel === "push");
+    expect(push?.body).toContain("85/100");
+    expect(push?.route).toMatch(/^\/courses\/[0-9a-f-]{36}\/grades$/);
   });
 
   test("renders Arabic when the recipient's locale says so", async () => {
@@ -495,7 +495,7 @@ describeDb("processNotificationDispatch — idempotency", () => {
     const firstEnqueueCount = enqueued.length;
     expect(firstEnqueueCount).toBeGreaterThan(0);
 
-    // Simulate a worker that reserved and then died: unconfirm the push/email rows and age them.
+    // Simulate a worker that reserved and then died: unconfirm the push rows and age them.
     await asAdmin(fixture.schoolId, async (tx) => {
       await tx`
         UPDATE app.notification_idempotency_keys
@@ -528,8 +528,9 @@ describeDb("processNotificationDispatch — idempotency", () => {
     `;
     const keys = rows.map((row) => row.idempotency_key);
     expect(new Set(keys).size).toBe(keys.length);
-    // Two recipients across three channels.
-    expect(keys).toHaveLength(6);
+    // Two recipients across two channels (in_app, push). Never email.
+    expect(keys).toHaveLength(4);
+    expect(keys.some((key) => key.endsWith(":email"))).toBe(false);
     for (const key of keys) {
       expect(key.startsWith(`grades.published:${fixture.submissionId}:`)).toBe(true);
     }
@@ -545,7 +546,7 @@ describeDb("processNotificationDispatch — preferences and quiet hours", () => 
         SET enabled = false
         WHERE user_id = ${fixture.studentUserId}::uuid
           AND notification_type = 'GRADE_POSTED'
-          AND channel = 'email'
+          AND channel = 'push'
       `;
     });
     const { enqueueDelivery, enqueued } = collectingEnqueuer();
@@ -556,7 +557,7 @@ describeDb("processNotificationDispatch — preferences and quiet hours", () => 
     });
 
     expect(result.suppressedPreference).toBe(1);
-    expect(enqueued.map((job) => job.channel)).toEqual(["push"]);
+    expect(enqueued).toEqual([]);
 
     const statuses = await dispatchLogStatuses(fixture.schoolId);
     expect(statuses.suppressed_preference).toBe(1);
@@ -565,7 +566,7 @@ describeDb("processNotificationDispatch — preferences and quiet hours", () => 
     // notify, and a consumed key would silently prevent that forever.
     const [reserved] = await sql<{ count: number }[]>`
       SELECT count(*)::int AS count FROM app.notification_idempotency_keys
-      WHERE school_id = ${fixture.schoolId}::uuid AND channel = 'email'
+      WHERE school_id = ${fixture.schoolId}::uuid AND channel = 'push'
     `;
     expect(reserved!.count).toBe(0);
   });
@@ -592,13 +593,13 @@ describeDb("processNotificationDispatch — preferences and quiet hours", () => 
       enqueueDelivery,
     });
 
-    expect(result.suppressedQuietHours).toBe(3);
+    expect(result.suppressedQuietHours).toBe(2);
     expect(result.dispatched).toBe(0);
     expect(enqueued).toEqual([]);
     expect(await notificationRecipients(fixture.schoolId)).toEqual([]);
 
     const statuses = await dispatchLogStatuses(fixture.schoolId);
-    expect(statuses.suppressed_quiet_hours).toBe(3);
+    expect(statuses.suppressed_quiet_hours).toBe(2);
   });
 
   test("a recipient outside quiet hours is unaffected", async () => {
@@ -650,12 +651,12 @@ describeDb("processNotificationDispatch — preferences and quiet hours", () => 
 
     // The window was built from Auckland's clock and is read back against Auckland's clock, so it
     // matches — which is the point. Reading it against UTC would not.
-    expect(result.suppressedQuietHours).toBe(3);
+    expect(result.suppressedQuietHours).toBe(2);
   });
 });
 
 describeDb("processNotificationDispatch — delivery hand-off", () => {
-  test("in_app writes an inbox row; push and email are enqueued", async () => {
+  test("in_app writes an inbox row; push is enqueued; nothing goes to email", async () => {
     const fixture = await seedFixture({ parentCount: 0 });
     const { enqueueDelivery, enqueued } = collectingEnqueuer();
 
@@ -664,7 +665,7 @@ describeDb("processNotificationDispatch — delivery hand-off", () => {
       enqueueDelivery,
     });
 
-    expect(enqueued.map((job) => job.channel).sort()).toEqual(["email", "push"]);
+    expect(enqueued.map((job) => job.channel)).toEqual(["push"]);
     for (const job of enqueued) {
       expect(job.schoolId).toBe(fixture.schoolId);
       expect(job.recipientId).toBe(fixture.studentUserId);
@@ -674,7 +675,7 @@ describeDb("processNotificationDispatch — delivery hand-off", () => {
 
     const statuses = await dispatchLogStatuses(fixture.schoolId);
     expect(statuses.delivered).toBe(1);
-    expect(statuses.enqueued).toBe(2);
+    expect(statuses.enqueued).toBe(1);
   });
 
   test("a failing enqueue leaves the reservation unconfirmed and fails the job", async () => {
@@ -694,7 +695,7 @@ describeDb("processNotificationDispatch — delivery hand-off", () => {
       SELECT count(*)::int AS count FROM app.notification_idempotency_keys
       WHERE school_id = ${fixture.schoolId}::uuid AND dispatched_at IS NULL
     `;
-    expect(unconfirmed!.count).toBe(2);
+    expect(unconfirmed!.count).toBe(1);
   });
 });
 

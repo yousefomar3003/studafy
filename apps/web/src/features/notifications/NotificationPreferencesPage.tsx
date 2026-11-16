@@ -1,6 +1,9 @@
 import { ApiError } from "@studafy/api-client";
 import { NOTIFICATION_TYPES } from "@studafy/constants";
-import { NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
+import {
+  DELIVERED_NOTIFICATION_CHANNELS,
+  NOTIFICATION_CHANNELS,
+} from "@studafy/notification-templates";
 import { Button, Card, Chip, Input, Table, useToast } from "@studafy/ui";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -17,11 +20,12 @@ import type { NotificationPreference } from "./queries";
 import type { FormEvent } from "react";
 
 const ORDERED_TYPES = Object.values(NOTIFICATION_TYPES);
-const ORDERED_CHANNELS = Object.values(NOTIFICATION_CHANNELS);
+// In-app and push only: Studafy sends no notification email, so there is no email column (and no
+// daily digest, which was email-only).
+const ORDERED_CHANNELS = DELIVERED_NOTIFICATION_CHANNELS;
 
 interface PendingPatch {
   enabled?: boolean;
-  digest?: boolean;
 }
 
 function cellKey(type: string, channel: string): string {
@@ -82,10 +86,6 @@ export default function NotificationPreferencesPage() {
 
   function effectiveEnabled(pref: NotificationPreference): boolean {
     return pending.get(cellKey(pref.notification_type, pref.channel))?.enabled ?? pref.enabled;
-  }
-
-  function effectiveDigest(pref: NotificationPreference): boolean {
-    return pending.get(cellKey(pref.notification_type, pref.channel))?.digest ?? pref.digest;
   }
 
   function setPatch(type: string, channel: string, patch: PendingPatch) {
@@ -184,16 +184,12 @@ export default function NotificationPreferencesPage() {
                           {notificationChannelLabel(channel, t)}
                         </Table.HeaderCell>
                       ))}
-                      <Table.HeaderCell>
-                        {t("site.notifications.preferences.digestColumn")}
-                      </Table.HeaderCell>
                     </Table.Row>
                   </Table.Header>
-                  <Table.Body columnCount={ORDERED_CHANNELS.length + 2}>
+                  <Table.Body columnCount={ORDERED_CHANNELS.length + 1}>
                     {ORDERED_TYPES.map((type) => {
-                      const emailCell = cells.get(cellKey(type, NOTIFICATION_CHANNELS.EMAIL));
-                      const mandatory = emailCell?.mandatory ?? false;
-                      const digestEligible = emailCell?.digest_eligible ?? false;
+                      const inAppCell = cells.get(cellKey(type, NOTIFICATION_CHANNELS.IN_APP));
+                      const mandatory = inAppCell?.mandatory ?? false;
                       const typeLabel = notificationTypeLabel(type, t);
 
                       return (
@@ -230,24 +226,6 @@ export default function NotificationPreferencesPage() {
                               </Table.Cell>
                             );
                           })}
-                          <Table.Cell>
-                            {emailCell ? (
-                              <input
-                                type="checkbox"
-                                className="notifications-prefs__checkbox"
-                                checked={effectiveDigest(emailCell)}
-                                disabled={!digestEligible}
-                                aria-label={t("site.notifications.preferences.digestCellLabel", {
-                                  type: typeLabel,
-                                })}
-                                onChange={(event) =>
-                                  setPatch(type, NOTIFICATION_CHANNELS.EMAIL, {
-                                    digest: event.target.checked,
-                                  })
-                                }
-                              />
-                            ) : null}
-                          </Table.Cell>
                         </Table.Row>
                       );
                     })}

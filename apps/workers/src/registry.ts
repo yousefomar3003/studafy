@@ -28,7 +28,10 @@ import {
   DELIVERY_JOB_OPTIONS,
   processNotificationDispatch,
 } from "./queues/notifications/dispatcher.worker";
-import { processDigest, processNotificationDigest } from "./queues/notifications/email";
+import {
+  RETIRED_DIGEST_JOB_NAMES,
+  skipRetiredDigestJob,
+} from "./queues/notifications/email/retired-digests";
 import { createFcmSender } from "./queues/notifications/push";
 import { processReportJob } from "./queues/reports";
 import { createReportS3 } from "./queues/reports/report-s3";
@@ -377,12 +380,10 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         return publishDueAnnouncements(db(), new Date(), workerLogger);
       }
 
-      if (job.name === JOB_NAMES.SEND_DIGESTS) {
-        return processDigest(db());
-      }
-
-      if (job.name === JOB_NAMES.SEND_NOTIFICATION_DIGESTS) {
-        return processNotificationDigest(db());
+      // The daily digest emails are retired: Studafy sends no notification email. A digest job
+      // still queued, or fired by a scheduler not yet removed, is acknowledged and does nothing.
+      if (RETIRED_DIGEST_JOB_NAMES.has(job.name)) {
+        return skipRetiredDigestJob();
       }
 
       const data = job.data as { bulkInviteId?: string; schoolId?: string };

@@ -1,6 +1,6 @@
 import { z } from "@hono/zod-openapi";
 import { NOTIFICATION_TYPES } from "@studafy/constants";
-import { NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
+import { DELIVERED_NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
 import { uuidSchema, dateTimeSchema } from "@studafy/shared-schemas";
 
 // ---------------------------------------------------------------------------
@@ -99,11 +99,13 @@ export const notificationIdParamSchema = z
 // Preferences (ST-143)
 // ---------------------------------------------------------------------------
 
-const notificationChannelValues = Object.values(NOTIFICATION_CHANNELS) as [string, ...string[]];
+// in_app and push only. app.notification_channel also has `email`, but Studafy sends no
+// notification email, so it is neither offered in the matrix nor accepted on write.
+const notificationChannelValues = [...DELIVERED_NOTIFICATION_CHANNELS] as [string, ...string[]];
 
-export const notificationChannelSchema = z
-  .enum(notificationChannelValues)
-  .openapi({ description: "Delivery channel, mirroring app.notification_channel." });
+export const notificationChannelSchema = z.enum(notificationChannelValues).openapi({
+  description: "Delivery channel: the in-app inbox or phone push. Notifications are never emailed.",
+});
 
 /** One (type, channel) cell of the authenticated user's preference matrix, as currently in effect. */
 export const notificationPreferenceSchema = z
@@ -115,8 +117,7 @@ export const notificationPreferenceSchema = z
     }),
     digest: z.boolean().openapi({
       description:
-        "When true, batched into the daily digest instead of sent immediately. Only settable on " +
-        "the email channel for digest-eligible types — see digest_eligible.",
+        "Retired with the email digest; always false. Kept so existing clients keep parsing.",
     }),
     mandatory: z.boolean().openapi({
       description:
@@ -124,7 +125,8 @@ export const notificationPreferenceSchema = z
         "caller.",
     }),
     digest_eligible: z.boolean().openapi({
-      description: "Whether digest may be set to true for this (type, channel) pair.",
+      description:
+        "Always false: no channel offers a digest. Kept so existing clients keep parsing.",
     }),
   })
   .openapi("NotificationPreference");
@@ -135,7 +137,7 @@ export const notificationPreferencesResponseSchema = z
   .object({
     preferences: z.array(notificationPreferenceSchema).openapi({
       description:
-        "Every notification type crossed with every channel, seeded on activation and reflecting " +
+        "Every notification type crossed with each delivered channel (in_app, push), reflecting " +
         "any changes the user has since made.",
     }),
     attendance_alert_threshold: z
@@ -157,7 +159,9 @@ const notificationPreferenceUpdateSchema = z
     notification_type: notificationTypeSchema,
     channel: notificationChannelSchema,
     enabled: z.boolean().optional(),
-    digest: z.boolean().optional(),
+    digest: z.boolean().optional().openapi({
+      description: "Retired with the email digest. Only false is accepted; true fails with 422.",
+    }),
   })
   .refine((value) => value.enabled !== undefined || value.digest !== undefined, {
     message: "At least one of enabled or digest must be provided.",

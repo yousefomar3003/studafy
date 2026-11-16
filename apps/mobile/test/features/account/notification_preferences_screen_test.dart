@@ -31,28 +31,14 @@ NotificationPreference _cell(
 
 NotificationPreferences _matrix({bool gradesPush = true}) {
   const push = NotificationPreferenceChannel.push;
-  const email = NotificationPreferenceChannel.email;
   const inApp = NotificationPreferenceChannel.inApp;
   return NotificationPreferences(
     attendanceAlertThreshold: 3,
     preferences: [
-      _cell(
-        NotificationPreferenceNotificationType.gradePosted,
-        push,
-        enabled: gradesPush,
-      ),
-      _cell(
-        NotificationPreferenceNotificationType.assignmentGraded,
-        push,
-        enabled: gradesPush,
-      ),
-      _cell(NotificationPreferenceNotificationType.gradePosted, email),
+      _cell(NotificationPreferenceNotificationType.gradePosted, push, enabled: gradesPush),
+      _cell(NotificationPreferenceNotificationType.assignmentGraded, push, enabled: gradesPush),
       _cell(NotificationPreferenceNotificationType.gradePosted, inApp),
-      _cell(
-        NotificationPreferenceNotificationType.adminAnnouncement,
-        push,
-        mandatory: true,
-      ),
+      _cell(NotificationPreferenceNotificationType.adminAnnouncement, push, mandatory: true),
       _cell(NotificationPreferenceNotificationType.feeInvoiceIssued, push),
       _cell(NotificationPreferenceNotificationType.materialIngested, push),
       _cell(NotificationPreferenceNotificationType.attendanceAlert, push),
@@ -74,31 +60,19 @@ Widget _app({
       sessionRolesProvider.overrideWithValue(roles),
       pushServiceProvider.overrideWithValue(pushService),
       pushPermissionProvider.overrideWith((ref) async => permission),
-      accountNotificationPreferencesProvider.overrideWith(
-        (ref) async => _matrix(),
-      ),
+      accountNotificationPreferencesProvider.overrideWith((ref) async => _matrix()),
       updateNotificationPreferencesProvider.overrideWithValue((changes) async {
         saved?.add(changes);
         return _matrix(gradesPush: false);
       }),
       notificationQuietHoursProvider.overrideWith(
-        (ref) async => const NotificationQuietHours(
-          start: null,
-          end: null,
-          timezone: 'Asia/Amman',
-        ),
+        (ref) async => const NotificationQuietHours(start: null, end: null, timezone: 'Asia/Amman'),
       ),
       updateQuietHoursProvider.overrideWithValue((start, end) async {
         quietSaves?.add((start, end));
-        return NotificationQuietHours(
-          start: start,
-          end: end,
-          timezone: 'Asia/Amman',
-        );
+        return NotificationQuietHours(start: start, end: end, timezone: 'Asia/Amman');
       }),
-      sendTestNotificationProvider.overrideWithValue(
-        () async => onTest?.call(),
-      ),
+      sendTestNotificationProvider.overrideWithValue(() async => onTest?.call()),
     ],
     child: accountScreenApp(const NotificationPreferencesScreen()),
   );
@@ -110,44 +84,18 @@ Switch _switch(WidgetTester tester, String key) =>
 void main() {
   test('groups server notification types into the kinds people recognise', () {
     expect(notificationCategoryOf('GRADE_POSTED'), NotificationCategory.grades);
-    expect(
-      notificationCategoryOf('ASSIGNMENT_GRADED'),
-      NotificationCategory.grades,
-    );
-    expect(
-      notificationCategoryOf('ASSIGNMENT_PUBLISHED'),
-      NotificationCategory.assignments,
-    );
-    expect(
-      notificationCategoryOf('DIRECT_MESSAGE'),
-      NotificationCategory.messages,
-    );
-    expect(
-      notificationCategoryOf('ATTENDANCE_MARKED'),
-      NotificationCategory.attendance,
-    );
-    expect(
-      notificationCategoryOf('FEE_PAYMENT_REMINDER'),
-      NotificationCategory.fees,
-    );
-    expect(
-      notificationCategoryOf('LICENSE_INVOICE_DUE'),
-      NotificationCategory.fees,
-    );
-    expect(
-      notificationCategoryOf('ENROLLMENT_APPROVED'),
-      NotificationCategory.schoolUpdates,
-    );
+    expect(notificationCategoryOf('ASSIGNMENT_GRADED'), NotificationCategory.grades);
+    expect(notificationCategoryOf('ASSIGNMENT_PUBLISHED'), NotificationCategory.assignments);
+    expect(notificationCategoryOf('DIRECT_MESSAGE'), NotificationCategory.messages);
+    expect(notificationCategoryOf('ATTENDANCE_MARKED'), NotificationCategory.attendance);
+    expect(notificationCategoryOf('FEE_PAYMENT_REMINDER'), NotificationCategory.fees);
+    expect(notificationCategoryOf('LICENSE_INVOICE_DUE'), NotificationCategory.fees);
+    expect(notificationCategoryOf('ENROLLMENT_APPROVED'), NotificationCategory.schoolUpdates);
   });
 
-  testWidgets('one switch turns off every type in the kind, in a single save', (
-    tester,
-  ) async {
+  testWidgets('one switch turns off every type in the kind, in a single save', (tester) async {
     final saved = <List<PreferenceChange>>[];
-    await pumpAccountScreen(
-      tester,
-      _app(roles: const ['STUDENT'], saved: saved),
-    );
+    await pumpAccountScreen(tester, _app(roles: const ['STUDENT'], saved: saved));
 
     expect(find.text('Marks'), findsOneWidget);
     expect(_switch(tester, 'grades/push').value, isTrue);
@@ -163,6 +111,21 @@ void main() {
     expect(saved.single.every((change) => change.channel == 'push'), isTrue);
     expect(saved.single.every((change) => !change.enabled), isTrue);
     expect(_switch(tester, 'grades/push').value, isFalse);
+  });
+
+  testWidgets('offers no email choice: notifications are never emailed', (tester) async {
+    await pumpAccountScreen(tester, _app(roles: const ['PARENT']));
+
+    expect(find.text('Phone'), findsOneWidget);
+    expect(find.text('Email'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.endsWith('/email'),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('a kind the school requires is locked on', (tester) async {
@@ -183,10 +146,7 @@ void main() {
 
   testWidgets('allowed: sends a test notification', (tester) async {
     var tests = 0;
-    await pumpAccountScreen(
-      tester,
-      _app(roles: const ['STUDENT'], onTest: () => tests++),
-    );
+    await pumpAccountScreen(tester, _app(roles: const ['STUDENT'], onTest: () => tests++));
 
     await tester.tap(find.byKey(const Key('notificationSendTest')));
     await tester.pumpAndSettle();
@@ -199,11 +159,7 @@ void main() {
     final push = FakePushService();
     await pumpAccountScreen(
       tester,
-      _app(
-        roles: const ['STUDENT'],
-        permission: PushPermission.denied,
-        push: push,
-      ),
+      _app(roles: const ['STUDENT'], permission: PushPermission.denied, push: push),
     );
 
     expect(find.byKey(const Key('notificationSendTest')), findsNothing);
@@ -216,11 +172,7 @@ void main() {
     final push = FakePushService(permissionUnanswered: true);
     await pumpAccountScreen(
       tester,
-      _app(
-        roles: const ['STUDENT'],
-        permission: PushPermission.notDetermined,
-        push: push,
-      ),
+      _app(roles: const ['STUDENT'], permission: PushPermission.notDetermined, push: push),
     );
 
     await tester.tap(find.byKey(const Key('notificationTurnOn')));
@@ -228,14 +180,9 @@ void main() {
     expect(push.permissionRequests, 1);
   });
 
-  testWidgets('quiet hours turn on with a default window and turn off', (
-    tester,
-  ) async {
+  testWidgets('quiet hours turn on with a default window and turn off', (tester) async {
     final saves = <(String?, String?)>[];
-    await pumpAccountScreen(
-      tester,
-      _app(roles: const ['STUDENT'], quietSaves: saves),
-    );
+    await pumpAccountScreen(tester, _app(roles: const ['STUDENT'], quietSaves: saves));
 
     await tester.ensureVisible(find.byKey(const Key('notificationQuietHours')));
     await tester.tap(find.byKey(const Key('notificationQuietHours')));

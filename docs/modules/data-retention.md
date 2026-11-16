@@ -79,7 +79,8 @@ periods were chosen to match what is already documented, never shorter:
   than deleting rows and leaving their files behind.
 - **Domain events.** Per school. An event is deleted only once every consumer has finished with it:
   `relayed_at` set (the relay claims every event); `email_dispatched_at` set if the email dispatcher
-  (`EMAIL_EVENT_NAMES`) or the digest producer (`DIGEST_SOURCE_EVENTS`) claims its name;
+  (`EMAIL_EVENT_NAMES`) claims its name (the retired parent digest no longer claims attendance and
+  fee events, so those finish once relayed);
   `entitlement_applied_at` set if the entitlement invalidator (`ENTITLEMENT_EVENT_NAMES`,
   `USER_ENTITLEMENT_EVENT_NAME`) does. The sweep imports those lists from the consumers, so a new
   event a consumer starts claiming is protected without touching the sweep. An event a consumer
