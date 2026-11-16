@@ -24,6 +24,8 @@ line, so it does not land in shell history or the process list.
 """
 
 import argparse
+import hashlib
+import hmac
 import datetime
 import os
 import sys
@@ -115,13 +117,27 @@ WEBHOOK_TEMPLATE = (
 )
 
 
-def install_webhooks(school_id, api_url, secret):
-    """One Frappe Webhook per projected doctype, posting to apps/api signed with the shared secret.
+def site_webhook_secret(master_secret, school_id):
+    """This school's own webhook secret (QA-034), derived exactly as apps/api's siteWebhookSecret.
 
-    Frappe signs each request body (base64 HMAC-SHA256 in X-Frappe-Webhook-Signature), which
-    apps/api verifies with ERPNEXT_WEBHOOK_SECRET. Idempotent: an existing hook is updated in place.
+    The site stores only this value, never the master ERPNEXT_WEBHOOK_SECRET, so a secret read off
+    one school's site cannot sign events for another school.
+    """
+    return hmac.new(
+        master_secret.encode(), f"erpnext-webhook-site:v1:{school_id}".encode(), hashlib.sha256
+    ).hexdigest()
+
+
+def install_webhooks(school_id, api_url, secret):
+    """One Frappe Webhook per projected doctype, posting to apps/api signed with this site's secret.
+
+    Frappe signs each request body (base64 HMAC-SHA256 in X-Frappe-Webhook-Signature) with the
+    per-site secret derived from `secret` (the master); every request names the school in
+    X-Studafy-School, which tells apps/api which per-site secret to verify against (QA-034).
+    Idempotent: an existing hook is updated in place.
     """
     url = api_url.rstrip("/") + "/erpnext/webhooks"
+    site_secret = site_webhook_secret(secret, school_id)
     template = WEBHOOK_TEMPLATE.replace("__SCHOOL_ID__", school_id)
     for doctype in WEBHOOK_EVENTS:
         if not frappe.db.exists("DocType", doctype):
@@ -142,10 +158,16 @@ def install_webhooks(school_id, api_url, secret):
                 "request_structure": "JSON",
                 "webhook_json": template,
                 "enable_security": 1,
-                "webhook_secret": secret,
+                "webhook_secret": site_secret,
             }
         )
-        hook.set("webhook_headers", [{"key": "Content-Type", "value": "application/json"}])
+        hook.set(
+            "webhook_headers",
+            [
+                {"key": "Content-Type", "value": "application/json"},
+                {"key": "X-Studafy-School", "value": school_id},
+            ],
+        )
         hook.save(ignore_permissions=True)
     frappe.db.commit()
     print(f"webhooks installed -> {url}")

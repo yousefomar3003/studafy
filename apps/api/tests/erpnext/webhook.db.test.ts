@@ -57,13 +57,24 @@ let schoolB: { id: string; slug: string };
 
 let previousSecret: string | undefined;
 
-const sign = (body: string): string => createHmac("sha256", SECRET).update(body).digest("hex");
+/** A school's site secret, derived from the master the way provision.py does (QA-034). */
+const siteSecret = (schoolId: string): string =>
+  createHmac("sha256", SECRET).update(`erpnext-webhook-site:v1:${schoolId}`).digest("hex");
 
-const post = (body: object) => {
+const sign = (body: string, schoolId: string): string =>
+  createHmac("sha256", siteSecret(schoolId)).update(body).digest("hex");
+
+/** Posted as the site of the school the payload names, unless `asSite` says otherwise. */
+const post = (body: { data: Record<string, unknown> }, asSite?: string) => {
   const raw = JSON.stringify(body);
+  const site = asSite ?? String(body.data.school_id ?? "");
   return app.request("/erpnext/webhooks", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-erpnext-signature": sign(raw) },
+    headers: {
+      "content-type": "application/json",
+      "x-studafy-school": site,
+      "x-erpnext-signature": sign(raw, site),
+    },
     body: raw,
   });
 };
@@ -239,6 +250,23 @@ describe("tenant routing", () => {
     for (const row of newRows) expect(row.school_id).toBe(row.payload.school_id);
     expect(newRows.map((row) => row.school_id).sort()).toEqual([schoolA.id, schoolB.id].sort());
   });
+});
+
+describe("cross-school forgery (QA-034)", () => {
+  integrationTest(
+    "site A's own valid signature on an event for school B writes nothing anywhere",
+    async () => {
+      const before = await outboxCount();
+      const forged = event(`evt-forged-${crypto.randomUUID()}`, { school_id: schoolB.id });
+      const res = await post(forged, schoolA.id);
+      expect(res.status).toBe(403);
+      expect(await outboxCount()).toBe(before);
+      const [dedup] = await sql<{ n: number }[]>`
+        SELECT count(*)::int AS n FROM app.erpnext_webhook_dedup WHERE event_id = ${forged.event_id}
+      `;
+      expect(dedup!.n).toBe(0);
+    },
+  );
 });
 
 describe("invoice cache projection", () => {
@@ -423,7 +451,7 @@ describe("unmapped events", () => {
     const before = await outboxCount();
     const body = event("evt-unknown-1", {}, "Unknown DocType");
 
-    const res = await post(body);
+    const res = await post(body, schoolA.id);
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true });

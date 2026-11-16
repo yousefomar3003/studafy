@@ -15,7 +15,12 @@ import { projectPaymentEntry } from "../modules/finance/payments/projection";
 import { openApiValidationHook } from "../openapi/hook";
 import { standardResponses } from "../openapi/responses";
 
-import { verifyWebhookSignature, webhookSignatureFrom } from "./signature";
+import {
+  SITE_SCHOOL_HEADER,
+  siteWebhookSecret,
+  verifyWebhookSignature,
+  webhookSignatureFrom,
+} from "./signature";
 
 import type { Database } from "../db";
 import type { Logger } from "../logger";
@@ -195,6 +200,8 @@ const webhookRoute = createRoute({
  * OpenAPI definitions while still serving its traffic, so a plain Hono here would erase this
  * endpoint from the document with no error.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function erpNextWebhookRoutes(
   db: Database,
   logger: Logger,
@@ -237,10 +244,24 @@ export function erpNextWebhookRoutes(
 
     const rawBody = await c.req.text();
     const signature = webhookSignatureFrom((name) => c.req.header(name));
+    const siteSchool = c.req.header(SITE_SCHOOL_HEADER) ?? "";
 
-    if (!verifyWebhookSignature(rawBody, signature, webhookSecret)) {
-      logger.warn({ signature }, "webhook signature verification failed");
+    // QA-034: a site signs with its own secret, derived for the school it names. Without the
+    // header, the shared master secret is accepted only while ERPNEXT_WEBHOOK_ACCEPT_SHARED_SECRET
+    // is "true", a rollout switch for sites not yet re-provisioned (docs/runbooks/erpnext-webhooks.md).
+    const legacy = siteSchool === "" && process.env.ERPNEXT_WEBHOOK_ACCEPT_SHARED_SECRET === "true";
+    const secret = UUID.test(siteSchool)
+      ? siteWebhookSecret(webhookSecret, siteSchool)
+      : legacy
+        ? webhookSecret
+        : null;
+
+    if (secret === null || !verifyWebhookSignature(rawBody, signature, secret)) {
+      logger.warn({ site_school: siteSchool || null }, "webhook signature verification failed");
       throw new HTTPException(401, { message: "Invalid webhook signature" });
+    }
+    if (legacy) {
+      logger.warn({}, "webhook accepted with the shared secret; re-provision this site (QA-034)");
     }
 
     await next();
@@ -257,7 +278,18 @@ export function erpNextWebhookRoutes(
       return c.json({ ok: true } as const, 200);
     }
 
-    const schoolId = String(body.data.school_id ?? body.data.custom_school_id ?? "");
+    // The school comes from the authenticated site header (QA-034). A payload naming another school
+    // is a site writing outside its own tenant: refused before any row is written.
+    const siteSchool = c.req.header(SITE_SCHOOL_HEADER) ?? "";
+    const claimed = String(body.data.school_id ?? body.data.custom_school_id ?? "");
+    if (siteSchool !== "" && claimed !== "" && claimed !== siteSchool) {
+      logger.warn(
+        { event_id: body.event_id, site_school: siteSchool, payload_school: claimed },
+        "webhook payload names a different school than its signing site",
+      );
+      throw new HTTPException(403, { message: "Webhook payload does not belong to this site" });
+    }
+    const schoolId = siteSchool || claimed;
     if (!schoolId) {
       logger.warn({ event_id: body.event_id }, "webhook missing school_id");
       throw new HTTPException(400, { message: "Webhook payload is missing school_id" });
