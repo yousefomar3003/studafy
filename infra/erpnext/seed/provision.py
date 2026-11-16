@@ -184,6 +184,35 @@ def ensure_scholarship_award_doctype():
     print("Scholarship Award doctype created")
 
 
+def ensure_invoice_idempotency_field():
+    """`custom_studafy_idempotency_key` on Sales Invoice (QA-022).
+
+    apps/workers stamps every invoice it creates with its idempotency key and, before any POST,
+    looks the key up here, so an invoice created by an attempt that timed out or crashed is adopted
+    rather than created twice. `unique` makes a racing duplicate fail instead of billing twice;
+    `no_copy` keeps the key off amended and duplicated invoices, which would otherwise collide with
+    it. Idempotent.
+    """
+    from frappe.custom.doctype.custom_field.custom_field import create_custom_field
+
+    if frappe.db.exists("Custom Field", {"dt": "Sales Invoice", "fieldname": "custom_studafy_idempotency_key"}):
+        return
+    create_custom_field(
+        "Sales Invoice",
+        {
+            "fieldname": "custom_studafy_idempotency_key",
+            "label": "Studafy Idempotency Key",
+            "fieldtype": "Data",
+            "unique": 1,
+            "no_copy": 1,
+            "read_only": 1,
+            "insert_after": "customer",
+        },
+    )
+    frappe.db.commit()
+    print("Sales Invoice idempotency field created")
+
+
 DEMO_FAMILIES = (
     # (customer, student name, invoice amount, days ago issued, days until due, amount paid)
     #
@@ -297,6 +326,7 @@ def main(argv=None):
             company = complete_setup(args.company, args.abbr, args.currency, args.country)
             set_integration_key(api_key, api_secret)
             ensure_scholarship_award_doctype()
+            ensure_invoice_idempotency_field()
             install_webhooks(args.school_id, args.api_url, webhook_secret)
             print(f"STUDAFY_COMPANY={company}")
         elif args.step == "fixtures":

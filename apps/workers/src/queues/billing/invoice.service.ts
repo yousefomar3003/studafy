@@ -18,6 +18,13 @@ import type { JSONValue, Sql, TransactionSql } from "postgres";
 
 const NAMESPACE_DETERMINISTIC = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
+/**
+ * The Sales Invoice custom field holding the Studafy idempotency key (QA-022): unique and no_copy
+ * on every school's site (infra/erpnext/seed/provision.py, ensure_invoice_idempotency_field).
+ */
+export const INVOICE_IDEMPOTENCY_FIELD = "custom_studafy_idempotency_key";
+const SALES_INVOICE_PATH = "/api/resource/Sales%20Invoice";
+
 export interface InvoiceCacheRow {
   id: string;
   school_id: string;
@@ -217,6 +224,29 @@ async function projectToCache(
   return cached!;
 }
 
+/**
+ * The Sales Invoice already created for this key, if any. Throws when ERPNext cannot answer: the
+ * caller must not POST without knowing, or an earlier attempt's invoice would be duplicated.
+ */
+async function findInvoiceByKey(
+  client: ErpNextClient,
+  idempotencyKey: string,
+): Promise<ErpNextSalesInvoiceDoc | null> {
+  const filters = encodeURIComponent(
+    JSON.stringify([[INVOICE_IDEMPOTENCY_FIELD, "=", idempotencyKey]]),
+  );
+  const fields = encodeURIComponent(JSON.stringify(["name"]));
+  const list = await client.get<{ data: { name: string }[] }>(
+    `${SALES_INVOICE_PATH}?filters=${filters}&fields=${fields}&limit_page_length=2`,
+  );
+  const [match] = list.data.data;
+  if (!match) return null;
+  const doc = await client.get<{ data: ErpNextSalesInvoiceDoc }>(
+    `${SALES_INVOICE_PATH}/${encodeURIComponent(match.name)}`,
+  );
+  return doc.data.data;
+}
+
 async function approvedScholarships(
   tx: TransactionSql,
   schoolId: string,
@@ -295,6 +325,10 @@ export async function generateInvoice(
 ): Promise<SingleInvoiceResult> {
   const idempotencyKey = params.idempotencyKey;
 
+  // Two jobs for the same key (a duplicate enqueue, a batch resume racing a single retry) are
+  // serialized here; the lock is held until this transaction ends, after the mapping is written.
+  await tx`SELECT pg_advisory_xact_lock(hashtextextended(${`erpnext-invoice:${idempotencyKey}`}, 0))`;
+
   const existing = await tx<{ erpnext_docname: string | null }[]>`
     SELECT erpnext_docname
     FROM app.erpnext_id_mappings
@@ -359,6 +393,7 @@ export async function generateInvoice(
     items,
     posting_date: new Date().toISOString().slice(0, 10),
     custom_school_id: schoolId,
+    [INVOICE_IDEMPOTENCY_FIELD]: idempotencyKey,
   };
 
   // The student's approved scholarships (000149) become the invoice's own discount, so ERPNext's
@@ -389,13 +424,33 @@ export async function generateInvoice(
   }
   applySalesTax(payload, await salesTaxSettings(tx, schoolId));
 
+  // Claim-check against ERPNext itself (QA-022): an earlier attempt may have created the invoice
+  // and then lost the answer (timeout, proxy 502) or its transaction (killed before COMMIT). Adopt
+  // that invoice instead of POSTing a second one. If ERPNext cannot be asked, nothing is sent; the
+  // job fails and its retry asks again.
   let doc: ErpNextSalesInvoiceDoc;
+  let status: SingleInvoiceResult["status"] = "created";
   try {
-    const response = await client.post<{ data: ErpNextSalesInvoiceDoc }>(
-      "/api/resource/Sales%20Invoice",
-      payload,
-    );
-    doc = response.data.data;
+    const earlier = await findInvoiceByKey(client, idempotencyKey);
+    if (earlier) {
+      doc = earlier;
+      status = "already_exists";
+    } else {
+      try {
+        const response = await client.post<{ data: ErpNextSalesInvoiceDoc }>(
+          SALES_INVOICE_PATH,
+          payload,
+        );
+        doc = response.data.data;
+      } catch (error) {
+        // The unique key field refused a duplicate: someone else's attempt got there first.
+        const raced = error instanceof ErpNextError && error.status === 409;
+        const adopted = raced ? await findInvoiceByKey(client, idempotencyKey) : null;
+        if (!adopted) throw error;
+        doc = adopted;
+        status = "already_exists";
+      }
+    }
   } catch (error) {
     if (error instanceof ErpNextError) {
       throw new CodedError(error.status, ERROR_CODES.INVOICE_GENERATION_FAILED, error.message);
@@ -413,7 +468,7 @@ export async function generateInvoice(
     idempotencyKey,
     studentId: params.studentId,
     erpnextDocname: row.erpnext_docname,
-    status: "created",
+    status,
   };
 }
 
