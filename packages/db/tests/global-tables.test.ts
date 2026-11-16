@@ -162,8 +162,10 @@ integrationTest("all six tables are global, admin-owned, and runtime-read-only",
       expect(privileges).toEqual(
         table === "schools"
           ? {
+              // QA-016: no INSERT (registration goes through register_school); SELECT and UPDATE
+              // are table grants bounded to the armed school's own row by RLS.
               app_select: true,
-              app_insert: true,
+              app_insert: false,
               app_update: true,
               app_delete: false,
               public_select: false,
