@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../auth/auth_notifier.dart';
 import '../di/app_providers.dart';
+import '../monitoring/monitoring_providers.dart';
 import 'push_service.dart';
 
 /// Background message handler — must be a top-level function.
@@ -27,6 +28,11 @@ final pushServiceProvider = Provider<PushService>((ref) {
   final service = FirebasePushService(
     apiBaseUrl: networkConfig.apiBaseUrl,
     getToken: () => session.tokenProvider,
+    // Failures to get or register this phone's push token happen in the background on a release
+    // build, where nobody sees a debug log; without this a phone that never registered just never
+    // gets notifications. Read lazily: the reporter is only needed once something fails.
+    onError: (error, stack, reason) =>
+        ref.read(crashReporterProvider).recordError(error, stack, reason: reason),
   );
 
   ref.onDispose(service.dispose);
@@ -98,6 +104,4 @@ class PushSetupNotifier extends Notifier<PushSetup> {
   }
 }
 
-final pushSetupProvider = NotifierProvider<PushSetupNotifier, PushSetup>(
-  PushSetupNotifier.new,
-);
+final pushSetupProvider = NotifierProvider<PushSetupNotifier, PushSetup>(PushSetupNotifier.new);
