@@ -8,11 +8,12 @@
  * someone the caller cannot see is shown as a link with no name, never resolved behind their back.
  */
 
-import { ERROR_CODES, SCHOOL_STAFF_ROLES } from "@studafy/constants";
+import { ERROR_CODES, PERMISSIONS, SCHOOL_STAFF_ROLES } from "@studafy/constants";
 import { csvCell } from "@studafy/sanitize";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { emitAuditLog } from "../../middleware/auditEmitter";
+import { hasPermission } from "../../middleware/authz";
 
 import {
   cellInvalid,
@@ -48,6 +49,7 @@ import type {
   LinkCandidatesQuery,
   UpdateCustomListRowInput,
 } from "./schemas";
+import type { Role } from "@studafy/constants";
 import type { RecordKeyring, RecordValue } from "@studafy/records";
 import type { PendingQuery, Row, TransactionSql } from "postgres";
 
@@ -220,6 +222,17 @@ export async function linkCandidates(
     default: {
       const roles = query.kind === "parent" ? ["PARENT"] : [...SCHOOL_STAFF_ROLES];
       const codeKind = query.kind === "parent" ? "PAR" : "TCH";
+      // Users and member codes are isolated by school only. Without user:read, a parent is offered
+      // only through a child the caller can already read: app.students and app.parent_child_links
+      // carry the caller's role scope under RLS (QA-059).
+      const parentScope =
+        query.kind === "parent" && !hasPermission(actor.roles as Role[], PERMISSIONS.USER_READ)
+          ? tx`AND EXISTS (
+              SELECT 1 FROM app.parent_child_links AS pcl
+              JOIN app.students AS s ON s.id = pcl.student_id AND s.school_id = pcl.school_id
+              WHERE pcl.school_id = u.school_id AND pcl.parent_user_id = u.id
+            )`
+          : tx``;
       candidates = await tx`
         SELECT u.id, u.display_name AS name,
                coalesce(t.employee_number, mc.code) AS detail
@@ -238,6 +251,7 @@ export async function linkCandidates(
             OR mc.code ILIKE ${pattern}
             OR t.employee_number ILIKE ${pattern}
           )
+          ${parentScope}
         ORDER BY lower(u.display_name), u.id
         LIMIT ${MAX_LINK_CANDIDATES}
       `;
