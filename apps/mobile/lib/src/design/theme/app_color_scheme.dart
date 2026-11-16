@@ -39,6 +39,14 @@ abstract final class AppColorScheme {
     onSurface: AppColorTokens.neutral900,
     surfaceContainerHighest: AppColorTokens.neutral50,
     onSurfaceVariant: AppColorTokens.neutral600,
+    // The tonal steps between the two, from the same slate scale, for components that use them
+    // (menus, search fields, tonal fills) instead of collapsing them all onto white.
+    surfaceContainerLowest: AppColorTokens.white,
+    surfaceContainerLow: AppColorTokens.neutral50,
+    surfaceContainer: AppColorTokens.neutral100,
+    surfaceContainerHigh: AppColorTokens.neutral100,
+    surfaceDim: AppColorTokens.neutral100,
+    surfaceBright: AppColorTokens.white,
 
     outline: AppColorTokens.neutral200,
     outlineVariant: AppColorTokens.neutral200,
@@ -79,6 +87,12 @@ abstract final class AppColorScheme {
     onSurface: AppColorTokens.neutral50,
     surfaceContainerHighest: AppColorTokens.neutral900,
     onSurfaceVariant: AppColorTokens.neutral400,
+    surfaceContainerLowest: AppColorTokens.neutral950,
+    surfaceContainerLow: AppColorTokens.neutral900,
+    surfaceContainer: AppColorTokens.neutral900,
+    surfaceContainerHigh: AppColorTokens.neutral800,
+    surfaceDim: AppColorTokens.neutral950,
+    surfaceBright: AppColorTokens.neutral800,
 
     outline: AppColorTokens.neutral700,
     outlineVariant: AppColorTokens.neutral700,
