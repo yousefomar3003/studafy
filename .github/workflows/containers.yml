@@ -11,6 +11,7 @@ on:
         "bun.lock",
         ".dockerignore",
         "scripts/ci/assert-clean-build-context.sh",
+        "scripts/ci/assert-web-headers.sh",
         ".github/workflows/containers.yml",
       ]
   push:
@@ -24,6 +25,7 @@ on:
         "bun.lock",
         ".dockerignore",
         "scripts/ci/assert-clean-build-context.sh",
+        "scripts/ci/assert-web-headers.sh",
         ".github/workflows/containers.yml",
       ]
 
@@ -40,6 +42,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Secrets and infrastructure state stay out of the build context
         run: bash scripts/ci/assert-clean-build-context.sh
+
+  # QA-052: every path the web app serves (SPA routes via /index.html, hashed /assets/) carries the
+  # security headers; nginx drops inherited add_header in any location that sets its own.
+  web-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Security headers on every web path
+        run: bash scripts/ci/assert-web-headers.sh
 
   build-scan:
     runs-on: ubuntu-latest

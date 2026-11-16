@@ -119,6 +119,7 @@ RUN addgroup -g 10001 -S app \
     && chown -R app:app /tmp/client_temp /var/cache/nginx
 
 COPY infra/docker/web/nginx.conf /etc/nginx/conf.d/default.conf
+COPY infra/docker/web/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build --chown=app:app /app/apps/web/dist /usr/share/nginx/html
 
 USER app
