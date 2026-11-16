@@ -2,11 +2,13 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
 import '../../../../core/api/generated/models/child_comparison_item.dart';
+import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import 'parent_section_card.dart';
 
-/// The selected child's latest term grades: term-average percentage, GPA, and — when the trend
-/// carries two comparable term averages — the point change from the previous term.
+/// The selected child's latest term grades: term-average percentage and GPA as stat tiles, and —
+/// when the trend carries two comparable term averages — the point change from the previous term
+/// as a tinted pill.
 class ChildGradesCard extends StatelessWidget {
   const ChildGradesCard({required this.child, super.key});
 
@@ -22,6 +24,7 @@ class ChildGradesCard extends StatelessWidget {
       return const ParentSectionCard(
         titleKey: 'parent.grades.title',
         icon: Icons.school_outlined,
+        accent: AppAccent.blue,
         child: ParentCardMessage(
           messageKey: 'parent.grades.empty',
           icon: Icons.info_outline,
@@ -29,40 +32,51 @@ class ChildGradesCard extends StatelessWidget {
       );
     }
 
-    final textTheme = Theme.of(context).textTheme;
+    final tiles = [
+      if (average != null)
+        AppStatTile(
+          value: '${average.round()}%',
+          label: 'parent.grades.termAverage'.tr(),
+          icon: Icons.percent,
+          accent: AppAccent.blue,
+        ),
+      if (gpa != null)
+        AppStatTile(
+          value: gpa.toStringAsFixed(2),
+          label: 'parent.grades.gpa'.tr(),
+          icon: Icons.star_outline_rounded,
+          accent: AppAccent.violet,
+        ),
+    ];
 
     return ParentSectionCard(
       titleKey: 'parent.grades.title',
       icon: Icons.school_outlined,
+      accent: AppAccent.blue,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (average != null)
-            _MetricRow(
-              label: 'parent.grades.termAverage'.tr(),
-              value: '${average.round()}%',
-            ),
-          if (gpa != null)
-            _MetricRow(
-              label: 'parent.grades.gpa'.tr(),
-              value: gpa.toStringAsFixed(2),
-            ),
-          if (_trendLabel(context) case final label?) ...[
-            const SizedBox(height: AppSpacing.space8),
-            Text(
-              label,
-              style: textTheme.bodySmall
-                  ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < tiles.length; i++) ...[
+                if (i > 0) const SizedBox(width: AppSpacing.space12),
+                Expanded(child: tiles[i]),
+              ],
+            ],
+          ),
+          if (_trend() case final trend?) ...[
+            const SizedBox(height: AppSpacing.space12),
+            AppStatusPill(label: trend.label, tone: trend.tone, icon: trend.icon),
           ],
         ],
       ),
     );
   }
 
-  /// The previous-term comparison line, or null when the trend has fewer than two terms with a
+  /// The previous-term comparison, or null when the trend has fewer than two terms with a
   /// recorded average.
-  String? _trendLabel(BuildContext context) {
+  ({String label, AppTone tone, IconData icon})? _trend() {
     final averaged = [
       for (final point in child.gradeTrend)
         if (point.termAveragePercentage != null) point.termAveragePercentage!,
@@ -71,36 +85,23 @@ class ChildGradesCard extends StatelessWidget {
 
     final delta = (averaged.last - averaged[averaged.length - 2]).round();
     if (delta > 0) {
-      return 'parent.grades.trendUp'.tr(namedArgs: {'points': delta.toString()});
+      return (
+        label: 'parent.grades.trendUp'.tr(namedArgs: {'points': delta.toString()}),
+        tone: AppTone.success,
+        icon: Icons.trending_up,
+      );
     }
     if (delta < 0) {
-      return 'parent.grades.trendDown'.tr(namedArgs: {'points': (-delta).toString()});
+      return (
+        label: 'parent.grades.trendDown'.tr(namedArgs: {'points': (-delta).toString()}),
+        tone: AppTone.danger,
+        icon: Icons.trending_down,
+      );
     }
-    return 'parent.grades.trendFlat'.tr();
-  }
-}
-
-class _MetricRow extends StatelessWidget {
-  const _MetricRow({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.space4),
-      child: Row(
-        children: [
-          Expanded(child: Text(label, style: textTheme.bodyMedium)),
-          Text(
-            value,
-            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
+    return (
+      label: 'parent.grades.trendFlat'.tr(),
+      tone: AppTone.neutral,
+      icon: Icons.trending_flat,
     );
   }
 }

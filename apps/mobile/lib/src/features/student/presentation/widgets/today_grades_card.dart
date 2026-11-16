@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/generated/models/published_grade.dart';
 import '../../../../core/offline/staleness_banner.dart';
+import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/today_providers.dart';
 import '../../domain/today_section.dart';
@@ -26,6 +27,7 @@ class TodayGradesCard extends ConsumerWidget {
     return TodayCardShell(
       titleKey: 'today.grades.title',
       icon: Icons.grade_outlined,
+      accent: AppAccent.emerald,
       child: section.when(
         loading: () => const TodaySkeleton(),
         error: (error, stackTrace) =>
@@ -100,36 +102,17 @@ class _GradeRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
     final score = grade.score;
+    final visual = SubjectVisuals.of(grade.course.name, fallbackKey: grade.course.id);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.space4),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  grade.course.name,
-                  style: textTheme.bodyMedium,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  grade.label,
-                  style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-          Text(
-            score == null ? '—' : '$score/${grade.maxScore}',
-            style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ],
+    return AppIconListTile(
+      icon: visual.icon,
+      accent: visual.accent,
+      title: grade.course.name,
+      subtitle: grade.label,
+      trailing: AppStatusPill(
+        label: score == null ? '—' : '$score/${grade.maxScore}',
+        tone: score == null ? AppTone.neutral : AppTone.forPercentage(grade.percentage),
       ),
     );
   }

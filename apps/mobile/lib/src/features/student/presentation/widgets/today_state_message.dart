@@ -1,11 +1,15 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 
-import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../../design/kit/kit.dart';
 
 /// A one-line, icon-led message filling a today-screen card's body for any non-loading,
 /// non-content state: empty, unavailable, or errored. The three call sites
 /// ([TodayGradesCard], [TodayTimetableCard], etc.) only vary the icon and translation key.
+///
+/// Drawn as the kit's compact [AppEmptyState]; an error (the `error_outline` icon) takes the
+/// danger tint so it doesn't read as a calm "nothing here", and an all-done check the success
+/// tint ([AppEmptyState.accentForIcon]).
 class TodayStateMessage extends StatelessWidget {
   const TodayStateMessage({required this.messageKey, required this.icon, super.key});
 
@@ -14,20 +18,11 @@ class TodayStateMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Row(
-      children: [
-        Icon(icon, size: 18, color: colorScheme.onSurfaceVariant),
-        const SizedBox(width: AppSpacing.space8),
-        Expanded(
-          child: Text(
-            messageKey.tr(),
-            style: textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-          ),
-        ),
-      ],
+    return AppEmptyState(
+      compact: true,
+      icon: icon,
+      message: messageKey.tr(),
+      accent: AppEmptyState.accentForIcon(icon),
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../design/kit/app_hero_card.dart';
 import '../../../../design/tokens/app_color_tokens.dart';
 import '../../../../design/tokens/app_radius_tokens.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
@@ -65,22 +66,10 @@ class _ChildSwitcherState extends ConsumerState<ChildSwitcher> {
     final canCompare = (children.value?.length ?? 0) >= 2;
 
     // The hero of the parent home: every card below it is scoped to the child picked here, so it
-    // sits on the brand blue (the same in both themes) rather than the plain white card the
-    // summary cards use, under today's date and time.
-    return Container(
-      clipBehavior: Clip.antiAlias,
+    // sits on the kit's brand-blue hero (the same in both themes) rather than the plain white card
+    // the summary cards use, under today's date and time.
+    return AppHeroCard(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.space16),
-      decoration: BoxDecoration(
-        color: AppColorTokens.accent600,
-        borderRadius: AppRadius.xlRadius,
-        boxShadow: [
-          BoxShadow(
-            color: AppColorTokens.accent600.withValues(alpha: 0.25),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
