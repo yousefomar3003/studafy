@@ -54,7 +54,6 @@ import {
   aiExamRoutes,
   aiExplainRoutes,
   aiFlashcardRoutes,
-  aiGatewayRoutes,
   aiModerationRoutes,
   aiQuizRoutes,
   aiReportRoutes,
@@ -1512,19 +1511,10 @@ export function createApp({
         flags,
       }),
     );
-    // LLM gateway (ST-164). Mounted under the same gate so a generation reserves and commits the
-    // caller's AI quota, and only when the gate's dependencies exist — the generate surface must
-    // never run un-metered. The provider may be null (AI_LLM_ENABLED off): the route still
-    // registers and answers 503 AI_LLM_DISABLED at request time.
-    app.route(
-      "/",
-      aiGatewayRoutes({
-        database,
-        provider: aiLlmProvider,
-        flags,
-        modelOverrides: aiLlmModelOverrides,
-      }),
-    );
+    // The raw LLM gateway (ST-164, POST /api/ai/students/{studentId}/generate) is deliberately not
+    // mounted (QA-030): it passed a caller's prompt and system prompt straight to the provider with
+    // no moderation and let the caller choose the model tier. No client used it; every product
+    // feature has its own moderated route. aiGatewayRoutes stays for a future staff-only use.
     // Ask AI streaming (ST-165). Mounted under the same gate so a grounded answer reserves and
     // commits the caller's AI quota, and only when the gate's dependencies exist — the ask surface
     // must never run un-metered. The provider may be null on the same kill-switch terms as the

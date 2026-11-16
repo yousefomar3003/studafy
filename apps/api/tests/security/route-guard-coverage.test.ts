@@ -127,8 +127,6 @@ const GUARD_EXEMPT: Record<string, string> = {
     "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
   "POST /api/ai/students/{studentId}/explain":
     "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
-  "POST /api/ai/students/{studentId}/generate":
-    "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
   "POST /api/ai/students/{studentId}/messages/{messageId}/report":
     "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
   "POST /api/ai/students/{studentId}/quizzes":
@@ -599,7 +597,7 @@ describeDb("route guard coverage (QA-001)", () => {
 
   test("enumerates the whole live API", async () => {
     // The live document, not openapi.json: a fresh checkout has no generated file.
-    expect(operations.length).toBeGreaterThanOrEqual(689);
+    expect(operations.length).toBeGreaterThanOrEqual(688);
     const keys = new Set(operations.map((op) => `${op.method} ${op.path}`));
     expect(keys.size).toBe(operations.length);
 
