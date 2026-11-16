@@ -182,4 +182,9 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "Your teacher shared a new material, {materialTitle}, in {courseName}{placement}.",
   },
+  [NOTIFICATION_TYPES.MARKS_RELEASED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Marks released: {subjectName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{who}{released}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "{released}. Open Studafy to see them.",
+  },
 } as const satisfies LocaleTemplateSet;

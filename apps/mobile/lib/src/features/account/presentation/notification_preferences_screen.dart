@@ -34,7 +34,10 @@ enum NotificationCategory {
 NotificationCategory notificationCategoryOf(String type) => switch (type) {
   'ASSIGNMENT_DUE_SOON' || 'ASSIGNMENT_PUBLISHED' => NotificationCategory.assignments,
   'MATERIAL_PUBLISHED' => NotificationCategory.lessons,
-  'GRADE_POSTED' || 'ASSIGNMENT_GRADED' || 'CERTIFICATE_ISSUED' => NotificationCategory.grades,
+  'GRADE_POSTED' ||
+  'ASSIGNMENT_GRADED' ||
+  'MARKS_RELEASED' ||
+  'CERTIFICATE_ISSUED' => NotificationCategory.grades,
   'ATTENDANCE_ALERT' || 'ATTENDANCE_MARKED' => NotificationCategory.attendance,
   'DIRECT_MESSAGE' ||
   'DISCUSSION_REPLY' ||

@@ -1,5 +1,6 @@
 /// Domain model for a student's approved marks (`GET /api/grading/students/{studentId}/marks`,
-/// OpenAPI tag `Results`): every mark from a mark sheet school leadership has approved, by
+/// OpenAPI tag `Results`): every mark school leadership has released — a whole period's approved
+/// mark sheet, or a single assessment approved on its own before the rest of its period — by
 /// period (each term, then the annual period for year-long assessments such as a final exam),
 /// subject and category (midterm, final exam, quizzes, …).
 ///
@@ -110,6 +111,7 @@ class ReleasedMarkSubject {
     required this.name,
     required this.approvedAt,
     required this.categories,
+    this.periodApproved = true,
   });
 
   factory ReleasedMarkSubject.fromJson(Map<String, Object?> json) =>
@@ -118,6 +120,8 @@ class ReleasedMarkSubject {
         code: json['subject_code'] as String? ?? '',
         name: json['subject_name'] as String? ?? '',
         approvedAt: DateTime.tryParse(json['approved_at'] as String? ?? ''),
+        // An older API only ever released whole approved periods.
+        periodApproved: json['period_approved'] as bool? ?? true,
         categories: [
           for (final row in _list(json['categories']))
             ReleasedMarkCategory.fromJson(row),
@@ -127,7 +131,13 @@ class ReleasedMarkSubject {
   final String id;
   final String code;
   final String name;
+
+  /// When the whole period's mark sheet was approved; null while only single assessments are out.
   final DateTime? approvedAt;
+
+  /// False while assessments are released one at a time (say, the first exam before the rest of
+  /// the term): more marks are still to come and nothing here is a term result.
+  final bool periodApproved;
   final List<ReleasedMarkCategory> categories;
 }
 

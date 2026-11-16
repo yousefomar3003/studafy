@@ -282,6 +282,26 @@ export function useDecideMarkSheet() {
   );
 }
 
+export function useDecideAssessmentRelease() {
+  return useGradingMutation(
+    async ({
+      releaseId,
+      action,
+      reason,
+    }: {
+      releaseId: string;
+      action: "approve" | "return" | "reopen";
+      reason?: string;
+    }) => {
+      const { data } = await api.POST("/api/grading/assessment-releases/{releaseId}/decision", {
+        params: { path: { releaseId } },
+        body: { action, reason: reason ?? null },
+      });
+      return required<Schemas["AssessmentRelease"]>(data, "Assessment release decision");
+    },
+  );
+}
+
 export function useDecideAssessment() {
   return useGradingMutation(
     async ({ assessmentId, action }: { assessmentId: string; action: "approve" | "reject" }) => {

@@ -30,6 +30,7 @@ const COUNT_TILES: readonly CountTile[] = [
   { key: "missing_teacher_assignments", path: "sections", attention: true },
   { key: "students_with_incomplete_marks", path: "results", attention: true },
   { key: "mark_sheets_awaiting_approval", path: "approvals", attention: true },
+  { key: "assessment_releases_awaiting_approval", path: "approvals", attention: true },
   { key: "proposed_assessments", path: "approvals", attention: true },
   { key: "certificates_ready", path: "results", attention: false },
   { key: "certificates_blocked", path: "results", attention: true },

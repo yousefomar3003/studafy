@@ -155,6 +155,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grading/subject-configs/{configId}",
   "DELETE /api/grading/teacher-assignments/{assignmentId}",
   "POST /api/grading/assessments/{assessmentId}/decision",
+  "POST /api/grading/assessment-releases/{releaseId}/decision",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/assessments/{assessmentId}/release",
   "POST /api/grading/certificates/{certificateId}/reissue",
   "POST /api/grading/certificates/{certificateId}/revoke",
   "POST /api/grading/exam-structure/apply",

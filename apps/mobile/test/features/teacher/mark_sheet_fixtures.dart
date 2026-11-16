@@ -16,6 +16,10 @@ const t0 = '2026-09-01T08:00:00.000Z';
 /// * `st-omar` — only Quiz 1 recorded; preview incomplete (provisional 72.5%), missing Midterm
 ///   and Quiz 2.
 /// * `st-sara` — exempt; `preview: null`, as the API sends it.
+///
+/// So Quiz 1 is complete (`missing_count` 0) and can be sent for approval on its own; Midterm and
+/// Quiz 2 each miss Omar's mark. [releases] overrides an assessment's release fields by id
+/// (`release_status`, `released`, `release_return_reason`, …).
 Map<String, Object?> markSheetJson({
   String term1Status = 'draft',
   String? term1ReturnReason,
@@ -23,6 +27,7 @@ Map<String, Object?> markSheetJson({
   bool canEditMarks = true,
   bool canAddAssessments = false,
   String retakePolicy = 'none',
+  Map<String, Map<String, Object?>> releases = const {},
 }) => {
   'section': {
     'id': 'sec-1',
@@ -77,9 +82,18 @@ Map<String, Object?> markSheetJson({
     },
   ],
   'assessments': [
-    _assessment('a-quiz1', 'c-quiz', 't1', 'Quiz 1', 20),
-    _assessment('a-mid', 'c-exam', 't1', 'Midterm', 100),
-    _assessment('a-quiz2', 'c-quiz', 't2', 'Quiz 2', 20),
+    {
+      ..._assessment('a-quiz1', 'c-quiz', 't1', 'Quiz 1', 20, missing: 0),
+      ...?releases['a-quiz1'],
+    },
+    {
+      ..._assessment('a-mid', 'c-exam', 't1', 'Midterm', 100, missing: 1),
+      ...?releases['a-mid'],
+    },
+    {
+      ..._assessment('a-quiz2', 'c-quiz', 't2', 'Quiz 2', 20, missing: 1),
+      ...?releases['a-quiz2'],
+    },
   ],
   'mark_sheets': [
     {
@@ -161,8 +175,9 @@ Map<String, Object?> _assessment(
   String categoryId,
   String? termId,
   String name,
-  num max,
-) => {
+  num max, {
+  required int missing,
+}) => {
   'id': id,
   'category_id': categoryId,
   'term_id': termId,
@@ -174,6 +189,13 @@ Map<String, Object?> _assessment(
   'due_date': null,
   'status': 'active',
   'section_specific': false,
+  'release_id': null,
+  'release_status': 'draft',
+  'release_submitted_at': null,
+  'release_decided_at': null,
+  'release_return_reason': null,
+  'released': false,
+  'missing_count': missing,
 };
 
 Map<String, Object?> _mark(String id, String assessmentId, num score) => {
@@ -192,6 +214,7 @@ MarkSheet markSheetFixture({
   bool canEditMarks = true,
   bool canAddAssessments = false,
   String retakePolicy = 'none',
+  Map<String, Map<String, Object?>> releases = const {},
 }) => MarkSheet.fromJson(
   markSheetJson(
     term1Status: term1Status,
@@ -199,6 +222,7 @@ MarkSheet markSheetFixture({
     canEditMarks: canEditMarks,
     canAddAssessments: canAddAssessments,
     retakePolicy: retakePolicy,
+    releases: releases,
   ),
 );
 
@@ -227,10 +251,15 @@ class FakeMarkSheetClient implements MarkSheetClient {
 
   final List<List<MarkEntryInput>> saveCalls = [];
   final List<String?> submitCalls = [];
+  final List<String> releaseCalls = [];
 
-  /// When set, the next `saveMarks` / `submitPeriod` throws it instead.
+  /// When set, the next `saveMarks` / `submitPeriod` / `submitAssessmentRelease` throws it instead.
   DioException? saveError;
   DioException? submitError;
+  DioException? releaseError;
+
+  /// What `fetchMarkSheet` serves after a successful `submitAssessmentRelease`.
+  MarkSheet? sheetAfterRelease;
 
   /// What `saveMarks` returns; defaults to [sheet] unchanged.
   MarkSheet? sheetAfterSave;
@@ -264,6 +293,18 @@ class FakeMarkSheetClient implements MarkSheetClient {
     submitCalls.add(termId);
     if (submitError != null) throw submitError!;
     return MarkSheetPeriodStatus.submitted;
+  }
+
+  @override
+  Future<AssessmentReleaseStatus> submitAssessmentRelease(
+    String sectionId,
+    String subjectId, {
+    required String assessmentId,
+  }) async {
+    releaseCalls.add(assessmentId);
+    if (releaseError != null) throw releaseError!;
+    sheet = sheetAfterRelease ?? sheet;
+    return AssessmentReleaseStatus.submitted;
   }
 
   @override

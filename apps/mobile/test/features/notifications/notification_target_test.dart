@@ -70,6 +70,39 @@ void main() {
       expect(target.tabLabelKey, 'shell.tabs.lessons');
     });
 
+    test(
+      "released marks open that student's marks, for a student or a parent",
+      () {
+        for (final role in [ShellRole.student, ShellRole.parent]) {
+          final target = notificationTargetFor(
+            type: 'MARKS_RELEASED',
+            metadata: {'route': '/students/st-1/marks'},
+            role: role,
+          );
+          expect(target.route, '/students/st-1/marks', reason: role.name);
+        }
+      },
+    );
+
+    test('released marks without a usable link land on Work or Children', () {
+      expect(
+        notificationTargetFor(
+          type: 'MARKS_RELEASED',
+          metadata: {'route': '/students/{studentId}/marks'},
+          role: ShellRole.student,
+        ).tabLabelKey,
+        'shell.tabs.work',
+      );
+      expect(
+        notificationTargetFor(
+          type: 'MARKS_RELEASED',
+          metadata: const {},
+          role: ShellRole.parent,
+        ).tabLabelKey,
+        'shell.tabs.children',
+      );
+    });
+
     test("a parent's school-work notices open the Children tab", () {
       final target = notificationTargetFor(
         type: 'ASSIGNMENT_PUBLISHED',

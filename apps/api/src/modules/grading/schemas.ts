@@ -41,6 +41,16 @@ export const assignmentIdParamSchema = z
 export const sheetIdParamSchema = z
   .object({ sheetId: pathUuid("sheetId", "Mark sheet UUID.") })
   .openapi("MarkSheetIdParam");
+export const releaseIdParamSchema = z
+  .object({ releaseId: pathUuid("releaseId", "Assessment release UUID.") })
+  .openapi("AssessmentReleaseIdParam");
+export const sectionSubjectAssessmentParamSchema = z
+  .object({
+    sectionId: pathUuid("sectionId", "Section UUID."),
+    subjectId: pathUuid("subjectId", "Subject UUID."),
+    assessmentId: pathUuid("assessmentId", "Assessment UUID."),
+  })
+  .openapi("SectionSubjectAssessmentParam");
 export const assessmentIdParamSchema = z
   .object({ assessmentId: pathUuid("assessmentId", "Assessment UUID.") })
   .openapi("GradingAssessmentIdParam");
@@ -239,6 +249,7 @@ export const gradingOverviewSchema = z
         missing_teacher_assignments: z.number().int(),
         students_with_incomplete_marks: z.number().int(),
         mark_sheets_awaiting_approval: z.number().int(),
+        assessment_releases_awaiting_approval: z.number().int(),
         proposed_assessments: z.number().int(),
         certificates_ready: z.number().int(),
         certificates_blocked: z.number().int(),
@@ -660,6 +671,16 @@ export const myAssignmentsQuerySchema = z
   .openapi("MyGradingAssignmentsQuery");
 
 const sheetStatusSchema = z.enum(["draft", "submitted", "approved", "returned"]);
+const assessmentReleaseStatusSchema = z
+  .enum(["draft", "submitted", "approved", "returned"])
+  .openapi("AssessmentReleaseStatus", {
+    description:
+      "One assessment's own release: draft (never sent), submitted (awaiting leadership), approved (visible to students and parents) or returned (sent back or withdrawn, with a reason).",
+  });
+/** A stored release is never a draft (no row means draft). */
+const storedReleaseStatusSchema = z
+  .enum(["submitted", "approved", "returned"])
+  .openapi("AssessmentReleaseStoredStatus");
 
 export const myAssignmentsSchema = z
   .object({
@@ -776,6 +797,19 @@ export const markSheetSchema = z
           due_date: z.string().nullable(),
           status: z.string(),
           section_specific: z.boolean(),
+          release_id: uuidSchema.nullable(),
+          release_status: assessmentReleaseStatusSchema,
+          release_submitted_at: dateTimeSchema.nullable(),
+          release_decided_at: dateTimeSchema.nullable(),
+          release_return_reason: z.string().nullable(),
+          released: z.boolean().openapi({
+            description:
+              "Visible to students and parents: its own release or its period's mark sheet is approved.",
+          }),
+          missing_count: z.number().int().openapi({
+            description:
+              "Enrolled students still without a usable mark for it; 0 means it can be sent for approval on its own.",
+          }),
         })
         .openapi("MarkSheetAssessment"),
     ),
@@ -910,6 +944,52 @@ export const decideSheetBodySchema = z
     reason: z.string().trim().min(1).max(2000).nullable().default(null),
   })
   .openapi("DecideMarkSheetBody");
+
+export const assessmentReleaseSchema = z
+  .object({
+    id: uuidSchema,
+    section_id: uuidSchema,
+    subject_id: uuidSchema,
+    term_id: uuidSchema.nullable(),
+    assessment_id: uuidSchema,
+    status: storedReleaseStatusSchema,
+    submitted_by_user_id: uuidSchema,
+    submitted_at: dateTimeSchema,
+    decided_by_user_id: uuidSchema.nullable(),
+    decided_at: dateTimeSchema.nullable(),
+    return_reason: z.string().nullable(),
+    updated_at: dateTimeSchema,
+  })
+  .openapi("AssessmentRelease");
+
+export const assessmentReleaseQuerySchema = z
+  .object({ status: storedReleaseStatusSchema.optional() })
+  .openapi("AssessmentReleaseQuery");
+
+export const assessmentReleaseListSchema = z
+  .object({
+    releases: z.array(
+      assessmentReleaseSchema
+        .extend({
+          section_name: z.string(),
+          grade_level_name: z.string(),
+          subject_name: z.string(),
+          term_name: z.string().nullable(),
+          assessment_name: z.string(),
+          max_marks: z.number(),
+          submitted_by_name: z.string().nullable(),
+        })
+        .openapi("AssessmentReleaseListRow"),
+    ),
+  })
+  .openapi("AssessmentReleaseList");
+
+export const decideAssessmentReleaseBodySchema = z
+  .object({
+    action: z.enum(["approve", "return", "reopen"]),
+    reason: z.string().trim().min(1).max(2000).nullable().default(null),
+  })
+  .openapi("DecideAssessmentReleaseBody");
 
 export const decideAssessmentBodySchema = z
   .object({ action: z.enum(["approve", "reject"]) })
@@ -1195,7 +1275,14 @@ export const studentReleasedMarksSchema = z
                 subject_id: uuidSchema,
                 subject_code: z.string(),
                 subject_name: z.string(),
-                approved_at: dateTimeSchema.nullable(),
+                approved_at: dateTimeSchema.nullable().openapi({
+                  description:
+                    "When the whole period's mark sheet was approved; null while only single assessments are released.",
+                }),
+                period_approved: z.boolean().openapi({
+                  description:
+                    "False while assessments are released one at a time: more of the period's marks are still to come.",
+                }),
                 categories: z.array(
                   z
                     .object({
@@ -1209,6 +1296,10 @@ export const studentReleasedMarksSchema = z
                             name: z.string(),
                             max_marks: z.number(),
                             assessment_date: z.string().nullable(),
+                            released_at: dateTimeSchema.openapi({
+                              description:
+                                "When these marks were released: the assessment's own approval or its period sheet's.",
+                            }),
                             attempts: z.array(
                               z
                                 .object({

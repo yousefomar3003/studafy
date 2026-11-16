@@ -235,6 +235,7 @@
       "missing_teacher_assignments": "Subjects without a teacher",
       "students_with_incomplete_marks": "Students with incomplete marks",
       "mark_sheets_awaiting_approval": "Mark sheets awaiting approval",
+      "assessment_releases_awaiting_approval": "Single assessments awaiting approval",
       "proposed_assessments": "Proposed assessments",
       "certificates_ready": "Certificates ready",
       "certificates_blocked": "Certificates blocked",
@@ -630,7 +631,34 @@
       "rejectAssessment": "Assessment rejected"
     },
     "sheetsCaption": "Mark sheet queue",
-    "proposedCaption": "Assessments awaiting approval"
+    "proposedCaption": "Assessments awaiting approval",
+    "releasesHeading": "Single assessments",
+    "releasesHelp": "Assessments a teacher sent on their own, before the rest of the term. Once approved, students and parents see those marks right away; the term's mark sheet still needs every mark before it can be submitted.",
+    "releasesCaption": "Single assessments awaiting approval",
+    "releaseName": "{{assessment}} · {{subject}}, {{grade}} – {{section}}",
+    "releaseMaxMarks": "Out of {{max}}",
+    "releaseApprove": "Approve and release",
+    "releaseApproveLabel": "Approve and release {{name}}",
+    "releaseReturnDescription": "The teacher sees your reason and can correct the marks and send them again. Students and parents don't see them meanwhile.",
+    "withdraw": "Withdraw",
+    "withdrawLabel": "Withdraw {{name}}",
+    "withdrawTitle": "Withdraw {{name}}?",
+    "withdrawDescription": "Students and parents stop seeing these marks, and the teacher can change them and send them again. Not possible while the term's whole mark sheet is approved: reopen that first.",
+    "releaseStatus": {
+      "submitted": "Awaiting approval",
+      "approved": "Released",
+      "returned": "Returned or withdrawn"
+    },
+    "releasesEmpty": {
+      "submitted": "No single assessments are waiting for approval.",
+      "approved": "No single assessments released yet.",
+      "returned": "No returned or withdrawn assessments."
+    },
+    "releaseDone": {
+      "approve": "Released to students and parents",
+      "return": "Returned to the teacher",
+      "reopen": "Withdrawn"
+    }
   },
   "results": {
     "period": "Period",
