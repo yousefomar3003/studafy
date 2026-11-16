@@ -153,4 +153,10 @@ export interface NotificationTypeVars {
     courseName: string;
     date: string;
   };
+  /** `placement` is "" for an unscheduled material, else the localized " · Week 3, Monday". */
+  MATERIAL_PUBLISHED: {
+    materialTitle: string;
+    courseName: string;
+    placement: string;
+  };
 }

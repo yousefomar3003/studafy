@@ -178,8 +178,8 @@ const emailDispatcher = startEmailDispatcher({
   logger: emailLogger,
 });
 
-// School-event notices: assignment.published, submission.graded and attendance.sessionSubmitted
-// outbox rows become inbox notifications for the students and parents concerned. Its own pool, like
+// School-event notices: assignment.published, submission.graded, attendance.sessionSubmitted and
+// material.published outbox rows become inbox notifications for the students and parents concerned. Its own pool, like
 // the other always-on consumers; idle cycles back off to one discovery statement every 5 s.
 const notifyDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
 const schoolEventNotifier = startSchoolEventNotifier({ db: notifyDb, logger: workerLogger });

@@ -15,4 +15,10 @@ export { renderNotification, TEMPLATE_LOCALES, isTemplateLocale } from "./templa
 export type { TemplateLocale } from "./templates/renderer";
 export { AR_TEMPLATES } from "./templates/ar";
 export { EN_TEMPLATES } from "./templates/en";
-export type { IcuTemplate, ChannelTemplates, LocaleTemplateSet } from "./templates/types";
+export type {
+  IcuTemplate,
+  ChannelTemplates,
+  InAppAndPushTemplates,
+  LocaleTemplateSet,
+  UnemailedNotificationType,
+} from "./templates/types";

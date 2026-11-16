@@ -2248,6 +2248,10 @@
           "title": "Homework",
           "subtitle": "New homework and due-date reminders"
         },
+        "lessons": {
+          "title": "Lessons",
+          "subtitle": "New materials your teachers share"
+        },
         "grades": {
           "title": "Marks",
           "subtitle": "Released marks and certificates"

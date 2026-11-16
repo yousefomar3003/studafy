@@ -240,6 +240,7 @@ describe("emit", () => {
           schoolId: uid,
           virus: "Eicar-Test-Signature",
         },
+        [DOMAIN_EVENTS.MATERIAL_PUBLISHED]: { materialId: uid, classId: uid },
         [DOMAIN_EVENTS.STUDY_GROUP_CREATED]: { groupId: uid },
         [DOMAIN_EVENTS.STUDY_GROUP_JOINED]: { groupId: uid },
         [DOMAIN_EVENTS.CERTIFICATE_ISSUED]: { certificateId: uid, studentId: uid },

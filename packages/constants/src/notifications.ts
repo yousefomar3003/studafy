@@ -84,6 +84,12 @@ export const NOTIFICATION_TYPES = {
   ASSIGNMENT_PUBLISHED: "ASSIGNMENT_PUBLISHED",
   ASSIGNMENT_GRADED: "ASSIGNMENT_GRADED",
   ATTENDANCE_MARKED: "ATTENDANCE_MARKED",
+  // A class material became visible to its students: written by the same outbox notify consumer
+  // from material.published, which app.materials' trg_materials_published raises the first time a
+  // material turns `ready` (000228). To the class's active students only -- parents have no
+  // materials screen to open. Optional, immediate-only and never emailed. Mirrored in
+  // app.notification_type by migration 000228.
+  MATERIAL_PUBLISHED: "MATERIAL_PUBLISHED",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

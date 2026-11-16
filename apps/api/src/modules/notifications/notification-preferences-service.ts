@@ -3,7 +3,7 @@ import {
   MANDATORY_NOTIFICATION_TYPES,
   NOTIFICATION_TYPES,
 } from "@studafy/constants";
-import { NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
+import { NOTIFICATION_CATALOG, NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
 import { HTTPException } from "hono/http-exception";
 
 import { emitAuditLog } from "../../middleware/auditEmitter";
@@ -45,7 +45,6 @@ interface PreferenceRow {
 }
 
 const ALL_TYPES = Object.values(NOTIFICATION_TYPES);
-const ALL_CHANNELS = Object.values(NOTIFICATION_CHANNELS);
 
 // ---------------------------------------------------------------------------
 // Reads
@@ -54,7 +53,9 @@ const ALL_CHANNELS = Object.values(NOTIFICATION_CHANNELS);
 /**
  * The authenticated user's full preference matrix, effective right now.
  *
- * Every (type, channel) pair is represented, whether or not a row exists for it — an absent row
+ * Every (type, channel) pair the type is delivered on (its NOTIFICATION_CATALOG channels, so no email
+ * cell for a never-emailed type such as MATERIAL_PUBLISHED) is represented, whether or not a row
+ * exists for it — an absent row
  * means enabled: true, digest: false, the same default app.seed_default_notification_preferences
  * (000017) writes and apps/workers/.../dispatcher.ts's loadEnabledChannels already treats a missing
  * row as. Materializing the full cross product here rather than returning only the rows that exist
@@ -73,7 +74,7 @@ export async function getPreferences(
 
   const preferences: NotificationPreference[] = [];
   for (const notification_type of ALL_TYPES) {
-    for (const channel of ALL_CHANNELS) {
+    for (const channel of NOTIFICATION_CATALOG[notification_type].channels) {
       const row = stored.get(`${notification_type}:${channel}`);
       preferences.push({
         notification_type,

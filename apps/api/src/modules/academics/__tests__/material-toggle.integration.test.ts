@@ -159,6 +159,20 @@ async function readMaterial(
   return row!;
 }
 
+async function publishedEvents(tenant: TenantFixture, materialId: string): Promise<number> {
+  const [row] = await asAdmin(
+    tenant.schoolId,
+    (tx) => tx<{ count: number }[]>`
+      SELECT count(*)::int AS count
+        FROM app.outbox_events
+       WHERE school_id = ${tenant.schoolId}
+         AND event_name = 'material.published'
+         AND payload ->> 'materialId' = ${materialId}
+    `,
+  );
+  return row!.count;
+}
+
 async function countChunks(tenant: TenantFixture, materialId: string): Promise<number> {
   const [row] = await db.sql<{ count: number }[]>`
     SELECT count(*)::int AS count
@@ -316,6 +330,9 @@ describeDb("toggleAiVisible — disabling", () => {
       expect(result.material.ingest_status).toBe("ready");
       expect(result.material.ingested_at).not.toBeNull();
       expect((await readMaterial(tenant, materialId)).ingest_status).toBe("ready");
+      // Now visible to the class: the database raises the one event that tells its students, in the
+      // teacher's own transaction under RLS (trg_materials_published, 000228).
+      expect(await publishedEvents(tenant, materialId)).toBe(1);
     });
   }
 
@@ -354,6 +371,18 @@ describeDb("toggleAiVisible — disabling", () => {
     expect(on.ai_visible).toBe(true);
     expect(on.ingest_status).toBe("queued");
     expect(on.ingested_at).toBeNull();
+  });
+
+  test("a material announced once is not announced again when re-ingestion makes it ready", async () => {
+    const tenant = await createFullTenant(db.sql);
+    const { materialId } = await seedMaterial(tenant, "queued", true);
+
+    await toggleAsTenant(tenant, materialId, false);
+    await toggleAsTenant(tenant, materialId, true);
+    await toggleAsTenant(tenant, materialId, false);
+
+    expect((await readMaterial(tenant, materialId)).ingest_status).toBe("ready");
+    expect(await publishedEvents(tenant, materialId)).toBe(1);
   });
 });
 

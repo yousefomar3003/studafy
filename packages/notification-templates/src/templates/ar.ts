@@ -171,4 +171,9 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "تم تسجيل {status} لـ {studentName} في {courseName} بتاريخ {date}.",
   },
+  // Never emailed (UnemailedNotificationType): in-app and push only.
+  [NOTIFICATION_TYPES.MATERIAL_PUBLISHED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "مادة تعليمية جديدة: {materialTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{courseName}{placement}",
+  },
 } as const satisfies LocaleTemplateSet;

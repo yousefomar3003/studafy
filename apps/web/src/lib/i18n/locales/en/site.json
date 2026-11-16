@@ -312,7 +312,8 @@
       "FEE_STATEMENT": "Family fee statements",
       "ASSIGNMENT_PUBLISHED": "New assignments",
       "ASSIGNMENT_GRADED": "Marked assignments",
-      "ATTENDANCE_MARKED": "Absences and lates"
+      "ATTENDANCE_MARKED": "Absences and lates",
+      "MATERIAL_PUBLISHED": "New lesson materials"
     },
     "channels": {
       "in_app": "In-app",

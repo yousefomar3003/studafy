@@ -10086,7 +10086,8 @@
         "FEE_STATEMENT": "[F̃áɱíĺý ƒéé šţáţéɱéñţš ǝɥʇ ʞɔın]",
         "ASSIGNMENT_PUBLISHED": "[Ñéŵ áššíğñɱéñţš ǝɥʇ ʞɔ]",
         "ASSIGNMENT_GRADED": "[M̃áŕķéđ áššíğñɱéñţš ǝɥʇ ʞɔı]",
-        "ATTENDANCE_MARKED": "[Áƀšéñçéš áñđ ĺáţéš ǝɥʇ ʞɔı]"
+        "ATTENDANCE_MARKED": "[Áƀšéñçéš áñđ ĺáţéš ǝɥʇ ʞɔı]",
+        "MATERIAL_PUBLISHED": "[Ñéŵ ĺéššóñ ɱáţéŕíáĺš ǝɥʇ ʞɔı]"
       },
       "channels": {
         "in_app": "[Íñ-áρρ ǝɥʇ]",

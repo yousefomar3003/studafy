@@ -176,4 +176,9 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "{courseName} · {date}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{studentName} was marked {status} in {courseName} on {date}.",
   },
+  // Never emailed (UnemailedNotificationType): in-app and push only.
+  [NOTIFICATION_TYPES.MATERIAL_PUBLISHED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "New material: {materialTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{courseName}{placement}",
+  },
 } as const satisfies LocaleTemplateSet;

@@ -50,6 +50,12 @@ export const DOMAIN_EVENTS = {
   // ClamAV returned an infected verdict. The reporter's in-app notification is the row next to it;
   // consumers (e.g. an email alert for school admins) follow this event.
   MATERIAL_QUARANTINED: "material.quarantined",
+  // The first time a material becomes `ready` -- the moment students can see and open it. Raised by
+  // app.materials' trg_materials_published (000228) in the same transaction as that status change,
+  // whichever path made it (the scan worker, AI ingestion, or AI being turned off mid-ingestion),
+  // and never again for the same material (app.materials.published_at). The workers' notify
+  // consumer tells the class's students (MATERIAL_PUBLISHED).
+  MATERIAL_PUBLISHED: "material.published",
 
   STUDY_GROUP_CREATED: "studyGroup.created",
   STUDY_GROUP_JOINED: "studyGroup.joined",

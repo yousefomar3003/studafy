@@ -17,6 +17,7 @@ import '../application/account_settings_providers.dart';
 /// so one switch means one thing a person recognises ("Grades"), not a list of internal events.
 enum NotificationCategory {
   assignments(Icons.assignment_outlined),
+  lessons(Icons.menu_book_outlined),
   grades(Icons.grade_outlined),
   attendance(Icons.event_available_outlined),
   messages(Icons.chat_bubble_outline),
@@ -33,6 +34,7 @@ enum NotificationCategory {
 NotificationCategory notificationCategoryOf(String type) => switch (type) {
   'ASSIGNMENT_DUE_SOON' ||
   'ASSIGNMENT_PUBLISHED' => NotificationCategory.assignments,
+  'MATERIAL_PUBLISHED' => NotificationCategory.lessons,
   'GRADE_POSTED' ||
   'ASSIGNMENT_GRADED' ||
   'CERTIFICATE_ISSUED' => NotificationCategory.grades,
@@ -47,17 +49,21 @@ NotificationCategory notificationCategoryOf(String type) => switch (type) {
   _ => NotificationCategory.schoolUpdates,
 };
 
-/// Notification types only a teacher who uploads materials receives.
-bool _isTeachingOnly(String type) => type.startsWith('MATERIAL_');
+/// Notification types only a teacher who uploads materials receives (about their own uploads).
+/// MATERIAL_PUBLISHED is the students' notice that a new material is up, so it is not one.
+bool _isTeachingOnly(String type) =>
+    type.startsWith('MATERIAL_') && type != 'MATERIAL_PUBLISHED';
 
 /// Which categories a person with these role claims is offered. Fees are for parents and the
-/// people who run the school's money; attendance is for families, students and the office.
+/// people who run the school's money; attendance is for families, students and the office; new
+/// lesson materials are for students.
 Set<NotificationCategory> visibleCategories(Iterable<String> roleClaims) {
   final set = roleClaims.toSet();
   bool any(List<String> wanted) => wanted.any(set.contains);
   return {
     NotificationCategory.assignments,
     NotificationCategory.grades,
+    if (any(['STUDENT'])) NotificationCategory.lessons,
     if (any(['PARENT', 'STUDENT', 'ATTENDANCE_OFFICER']))
       NotificationCategory.attendance,
     NotificationCategory.messages,

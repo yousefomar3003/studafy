@@ -18,6 +18,14 @@ const ALL_CHANNELS: NotificationChannel[] = [
 
 const ALL_TYPES = Object.values(NOTIFICATION_TYPES);
 
+/** Mirrors UnemailedNotificationType: no email channel, and no email template. */
+const UNEMAILED_TYPES: ReadonlySet<string> = new Set([NOTIFICATION_TYPES.MATERIAL_PUBLISHED]);
+
+/** The channels a type has templates for. */
+function channelsOf(type: (typeof ALL_TYPES)[number]): NotificationChannel[] {
+  return [...NOTIFICATION_CATALOG[type].channels];
+}
+
 describe("notification catalog", () => {
   test("every NOTIFICATION_TYPE has a catalog entry", () => {
     for (const type of ALL_TYPES) {
@@ -25,12 +33,13 @@ describe("notification catalog", () => {
     }
   });
 
-  test("every catalog entry has all three channels", () => {
+  test("every catalog entry has in-app and push, and email unless the type is never emailed", () => {
     for (const type of ALL_TYPES) {
       const entry = NOTIFICATION_CATALOG[type];
-      for (const channel of ALL_CHANNELS) {
-        expect(entry.channels).toContain(channel);
-      }
+      const expected = UNEMAILED_TYPES.has(type)
+        ? [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH]
+        : ALL_CHANNELS;
+      expect([...entry.channels].sort()).toEqual([...expected].sort());
     }
   });
 });
@@ -45,15 +54,15 @@ describe("templates — completeness", () => {
     describe(name, () => {
       for (const type of ALL_TYPES) {
         describe(type, () => {
-          for (const channel of ALL_CHANNELS) {
+          for (const channel of channelsOf(type)) {
             test(`${channel} template is non-empty`, () => {
-              const tmpl = templates[type][channel];
+              const tmpl = (templates[type] as Record<string, string>)[channel]!;
               expect(tmpl).toBeTruthy();
               expect(tmpl.trim().length).toBeGreaterThan(0);
             });
 
             test(`${channel} template contains only known variables`, () => {
-              const tmpl = templates[type][channel];
+              const tmpl = (templates[type] as Record<string, string>)[channel]!;
               const placeholders = tmpl.match(/\{(\w+)\}/g) ?? [];
               for (const ph of placeholders) {
                 const varName = ph.slice(1, -1);
@@ -94,6 +103,8 @@ describe("templates — completeness", () => {
                       "assignmentTitle",
                       "result",
                       "status",
+                      "materialTitle",
+                      "placement",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -103,6 +114,18 @@ describe("templates — completeness", () => {
       }
     });
   }
+});
+
+describe("renderNotification — never-emailed types", () => {
+  test("asking for an email body of a never-emailed type throws", () => {
+    expect(() =>
+      renderNotification(NOTIFICATION_TYPES.MATERIAL_PUBLISHED, NOTIFICATION_CHANNELS.EMAIL, "en", {
+        materialTitle: "Newton's laws",
+        courseName: "Physics",
+        placement: "",
+      }),
+    ).toThrow("MATERIAL_PUBLISHED has no email template");
+  });
 });
 
 describe("renderNotification — snapshot tests", () => {
@@ -234,6 +257,11 @@ describe("renderNotification — snapshot tests", () => {
       courseName: "Physics",
       date: "2026-11-12",
     },
+    [NOTIFICATION_TYPES.MATERIAL_PUBLISHED]: {
+      materialTitle: "Newton's laws",
+      courseName: "Physics",
+      placement: " · Week 3, Monday",
+    },
   } as const;
 
   const locales = ["en", "ar"] as const;
@@ -241,7 +269,7 @@ describe("renderNotification — snapshot tests", () => {
   for (const locale of locales) {
     describe(locale, () => {
       for (const type of ALL_TYPES) {
-        for (const channel of ALL_CHANNELS) {
+        for (const channel of channelsOf(type)) {
           test(`${type} / ${channel} renders correctly`, () => {
             const result = renderNotification(
               type,

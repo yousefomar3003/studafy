@@ -363,3 +363,11 @@ exports[`renderNotification — snapshot tests ar ATTENDANCE_MARKED / in_app ren
 exports[`renderNotification — snapshot tests ar ATTENDANCE_MARKED / push renders correctly 1`] = `"Physics · 2026-11-12"`;
 
 exports[`renderNotification — snapshot tests ar ATTENDANCE_MARKED / email renders correctly 1`] = `"تم تسجيل absent لـ Amina Tazi في Physics بتاريخ 2026-11-12."`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_PUBLISHED / in_app renders correctly 1`] = `"New material: Newton's laws"`;
+
+exports[`renderNotification — snapshot tests en MATERIAL_PUBLISHED / push renders correctly 1`] = `"Physics · Week 3, Monday"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_PUBLISHED / in_app renders correctly 1`] = `"مادة تعليمية جديدة: Newton's laws"`;
+
+exports[`renderNotification — snapshot tests ar MATERIAL_PUBLISHED / push renders correctly 1`] = `"Physics · Week 3, Monday"`;

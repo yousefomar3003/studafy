@@ -11,7 +11,7 @@
  */
 
 import { NOTIFICATION_TYPES } from "@studafy/constants";
-import { NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
+import { NOTIFICATION_CATALOG, NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 
@@ -84,9 +84,17 @@ describeDb("getPreferences", () => {
 
     const result = await asUser(school.id, user.id, (tx) => getPreferences(tx, user.id));
 
+    // One cell per channel each type is delivered on: a never-emailed type has no email cell.
     const types = Object.values(NOTIFICATION_TYPES);
-    const channels = Object.values(NOTIFICATION_CHANNELS);
-    expect(result.preferences).toHaveLength(types.length * channels.length);
+    const cells = types.reduce((sum, type) => sum + NOTIFICATION_CATALOG[type].channels.length, 0);
+    expect(result.preferences).toHaveLength(cells);
+    expect(
+      result.preferences.some(
+        (p) =>
+          p.notification_type === NOTIFICATION_TYPES.MATERIAL_PUBLISHED &&
+          p.channel === NOTIFICATION_CHANNELS.EMAIL,
+      ),
+    ).toBe(false);
     expect(result.preferences.every((p) => p.enabled)).toBe(true);
     expect(result.preferences.every((p) => !p.digest)).toBe(true);
     expect(result.attendance_alert_threshold).toBeNull();

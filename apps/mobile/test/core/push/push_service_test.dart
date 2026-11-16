@@ -53,6 +53,13 @@ void main() {
         }),
         '/courses/c-1/assignments/a-1',
       );
+      expect(
+        resolveNotificationTapRoute({
+          'notification_type': 'MATERIAL_PUBLISHED',
+          'route': '/classes/k-1/materials',
+        }),
+        '/classes/k-1/materials',
+      );
     });
 
     test('anything the app cannot open lands in the notification inbox', () {
