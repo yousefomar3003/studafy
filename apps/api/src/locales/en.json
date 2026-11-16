@@ -145,6 +145,7 @@
   "STORAGE_CHECKSUM_MISMATCH": "The uploaded file does not match the checksum you provided. Please upload it again.",
   "STORAGE_OBJECT_CHANGED": "The uploaded file changed while it was being confirmed. Please upload it again.",
   "SELF_ERASURE_USE_ACCOUNT_DELETION": "To delete your account, use Delete account. It confirms it is you and gives you 14 days to change your mind.",
+  "IMPORT_FILE_TOO_LARGE": "The file is too large. Upload a CSV of 5 MB or less, or split it into smaller files.",
   "STORAGE_QUOTA_EXCEEDED": "Storage quota exceeded. Free space by deleting files, or upgrade your plan.",
   "STORAGE_ADDON_ALREADY_ACTIVE": "Your school already has extra storage. Change its size instead of buying it again.",
   "STORAGE_ADDON_NOT_ACTIVE": "Your school has no extra storage to change.",

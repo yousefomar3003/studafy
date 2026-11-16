@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, QUEUE_NAMES, PERMISSIONS } from "@studafy/constants";
 import { Queue } from "bullmq";
+import { bodyLimit } from "hono/body-limit";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../../coded-http-exception";
@@ -631,6 +632,9 @@ const CSV_TEMPLATE =
 // Route factory
 // ---------------------------------------------------------------------------
 
+/** QA-067: the largest student CSV upload accepted, in bytes (default 5 MB). */
+const IMPORT_MAX_UPLOAD_BYTES = Number(process.env.IMPORT_MAX_UPLOAD_BYTES) || 5 * 1024 * 1024;
+
 export function importRoutes(
   database: Database,
   redis: RedisClient | null,
@@ -688,6 +692,22 @@ export function importRoutes(
       c,
       next,
     ),
+  );
+
+  // QA-067: refuse an oversized upload as it streams in, before the handler reads it into memory.
+  // 5 MB is far above a 10,000-row student file; IMPORT_MAX_UPLOAD_BYTES overrides it.
+  routes.use(
+    "/api/imports/students/upload",
+    bodyLimit({
+      maxSize: IMPORT_MAX_UPLOAD_BYTES,
+      onError: () => {
+        throw new CodedHttpException(
+          413,
+          ERROR_CODES.IMPORT_FILE_TOO_LARGE,
+          "The CSV file is larger than the upload limit",
+        );
+      },
+    }),
   );
 
   // --- Handlers ---
