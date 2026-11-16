@@ -1,7 +1,8 @@
-import { ERROR_CODES } from "@studafy/constants";
+import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 import { calculateSubjectResult, summarizeWeights } from "@studafy/grading-engine";
 
 import { CodedHttpException } from "../../coded-http-exception";
+import { emit } from "../../lib/events/emitter";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import {
@@ -262,6 +263,26 @@ function studentsMissingAssessment(
       calculateSubjectResult(single, toMarkInputs(marks, student.student_id), options)
         .missingAssessments.length > 0,
   );
+}
+
+/**
+ * An approved sheet releases its whole period: any of its assessments still waiting on their own
+ * approval is approved with it (silently -- the family gets one notice for the sheet, not one per
+ * assessment), and one marks.released event tells the student and their parents (MARKS_RELEASED).
+ */
+async function releaseSheet(
+  tx: TransactionSql,
+  schoolId: string,
+  userId: string,
+  sheet: Pick<MarkSheetRow, "id" | "section_id" | "subject_id" | "term_id">,
+): Promise<void> {
+  await approvePendingReleases(tx, schoolId, userId, sheet);
+  await emit(tx, DOMAIN_EVENTS.MARKS_RELEASED, {
+    sectionId: sheet.section_id,
+    subjectId: sheet.subject_id,
+    termId: sheet.term_id,
+    assessmentId: null,
+  });
 }
 
 /**
@@ -1170,7 +1191,7 @@ export async function submitMarkSheet(
     oldValues: { status: current?.status ?? "draft" },
     newValues: { status, term_id: termId },
   });
-  if (status === "approved") await approvePendingReleases(tx, schoolId, userId, sheet);
+  if (status === "approved") await releaseSheet(tx, schoolId, userId, sheet);
   return sheet;
 }
 
@@ -1244,7 +1265,7 @@ export async function decideMarkSheet(
   });
   // Reopening (or returning) the whole sheet leaves assessments approved on their own released: the
   // families have seen those marks, and they stay locked until leadership withdraws them one by one.
-  if (status === "approved") await approvePendingReleases(tx, schoolId, userId, updated!);
+  if (status === "approved") await releaseSheet(tx, schoolId, userId, updated!);
   return updated!;
 }
 
@@ -1254,10 +1275,10 @@ export async function decideMarkSheet(
 
 /**
  * Send one assessment's marks for approval before the rest of its period is done. Every enrolled
- * student needs a usable mark for it ({@link studentsMissingAssessment}). The approval is the same
- * as the period sheet's: leadership approves or returns it, and a grade program without an
- * approval step approves it straight away, as it does a sheet. Once approved, the marks are visible
- * to the student and their parents (app.is_released_student_mark); the period's sheet, its
+ * student needs a usable mark for it ({@link studentsMissingAssessment}). It always waits for
+ * leadership, who approve or return it from the approval queue -- also in a grade program whose
+ * sheets need no approval step. Once approved, the marks are visible to the student and their
+ * parents (app.is_released_student_mark), who are told (MARKS_RELEASED); the period's sheet, its
  * completeness rule and term results are untouched.
  */
 export async function submitAssessmentRelease(
@@ -1326,16 +1347,9 @@ export async function submitAssessmentRelease(
     );
   }
 
-  const program = await requireProgram(
-    tx,
-    schoolId,
-    section.academic_year_id,
-    section.grade_level_id,
-  );
-  const approveNow = !program.mark_approval_required;
-  const status = approveNow ? "approved" : "submitted";
-  const decidedBy = approveNow ? userId : null;
-  const decidedAt = approveNow ? new Date() : null;
+  // Always for leadership to approve, even where the grade program approves sheets on submit: a
+  // teacher never publishes a single assessment directly (the owner's decision).
+  const status = "submitted";
   const [release] = await tx<AssessmentReleaseRow[]>`
     INSERT INTO app.assessment_mark_releases (
       school_id, academic_year_id, section_id, subject_id, term_id, assessment_id, status,
@@ -1343,7 +1357,7 @@ export async function submitAssessmentRelease(
     ) VALUES (
       ${schoolId}::uuid, ${section.academic_year_id}::uuid, ${sectionId}::uuid, ${subjectId}::uuid,
       ${assessment.termId}::uuid, ${assessmentId}::uuid, ${status}, ${userId}::uuid,
-      CURRENT_TIMESTAMP, ${decidedBy}::uuid, ${decidedAt}
+      CURRENT_TIMESTAMP, NULL, NULL
     )
     ON CONFLICT (school_id, section_id, assessment_id) DO UPDATE SET
       status = EXCLUDED.status, submitted_by_user_id = EXCLUDED.submitted_by_user_id,
@@ -1452,6 +1466,14 @@ export async function decideAssessmentRelease(
     oldValues: { status: release.status },
     newValues: { status, action, reason },
   });
+  if (status === "approved") {
+    await emit(tx, DOMAIN_EVENTS.MARKS_RELEASED, {
+      sectionId: release.section_id,
+      subjectId: release.subject_id,
+      termId: release.term_id,
+      assessmentId: release.assessment_id,
+    });
+  }
   return updated!;
 }
 

@@ -13,9 +13,13 @@ when it required the `version-bump` label.
 
 ### Added
 
+- `MARKS_RELEASED` notification type (migration 000230, in-app + push, never emailed): approving a
+  mark sheet or a single assessment notifies the students with released marks and their parents;
+  the route is `/students/{studentId}/marks`. New domain event `marks.released`.
 - Releasing marks one assessment at a time (migration 000229): `submitAssessmentRelease`
   (`POST .../sections/{sectionId}/subjects/{subjectId}/assessments/{assessmentId}/release`,
-  `grade:update`) sends one complete assessment for approval (409
+  `grade:update`) sends one complete assessment for leadership approval, always `submitted` even
+  where sheets need no approval step (409
   `RESULTS_INCOMPLETE` while a student's mark is missing, 409 `CONFLICT_STATE_MISMATCH` when it or
   its period's sheet is already sent); `GET /api/grading/years/{yearId}/assessment-releases`
   (`listAssessmentReleases`) and `POST /api/grading/assessment-releases/{releaseId}/decision`

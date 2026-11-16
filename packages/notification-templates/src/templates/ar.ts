@@ -177,4 +177,9 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "شارك معلمك مادة تعليمية جديدة بعنوان {materialTitle} في {courseName}{placement}.",
   },
+  [NOTIFICATION_TYPES.MARKS_RELEASED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "صدرت الدرجات: {subjectName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{who}{released}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "{released}. افتح Studafy للاطلاع عليها.",
+  },
 } as const satisfies LocaleTemplateSet;

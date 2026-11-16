@@ -155,6 +155,16 @@ const lines = (periods: Awaited<ReturnType<typeof released>>) =>
     ),
   );
 
+/** The marks.released payloads raised so far (each one becomes the family's MARKS_RELEASED notice). */
+const releaseEvents = async () =>
+  (
+    await db.sql<{ payload: Record<string, string | null> }[]>`
+      SELECT payload FROM app.outbox_events
+      WHERE school_id = ${tenant.schoolId}::uuid AND event_name = 'marks.released'
+      ORDER BY id
+    `
+  ).map((row) => row.payload);
+
 describeDb("releasing marks one assessment at a time", () => {
   test("setup: approval required, one section, two students and a parent, Mathematics", async () => {
     ids.math = (
@@ -377,8 +387,14 @@ describeDb("releasing marks one assessment at a time", () => {
       "draft",
     );
     ids.firstRelease = (await sendForApproval(ids.first!)).id;
+    // Nothing told the family while it was sent, returned or sent again.
+    expect(await releaseEvents()).toEqual([]);
     const approved = await decide(ids.firstRelease, "approve");
     expect(approved.status).toBe("approved");
+    // Approval raises one marks.released for the family's notice, in the same transaction.
+    expect(await releaseEvents()).toEqual([
+      { sectionId: ids.section!, subjectId: ids.math!, termId: null, assessmentId: ids.first! },
+    ]);
   });
 
   test("once approved, the student and their parent see that exam, and only that exam", async () => {
@@ -430,6 +446,10 @@ describeDb("releasing marks one assessment at a time", () => {
       decideMarkSheet(tx, tenant.schoolId, tenant.users.ORG_ADMIN.id, sheetRow.id, "approve", null),
     );
     ids.sheet = sheetRow.id;
+    // One notice for the sheet, not one more for the Second exam it approved along the way.
+    expect((await releaseEvents()).slice(1)).toEqual([
+      { sectionId: ids.section!, subjectId: ids.math!, termId: null, assessmentId: null },
+    ]);
     const second = (await sheet()).assessments.find((a) => a.id === ids.second)!;
     expect([second.release_status, second.released]).toEqual(["approved", true]);
 
@@ -472,18 +492,36 @@ describeDb("releasing marks one assessment at a time", () => {
     expect(await codeOf(save([mark(ids.s1!, ids.second!, 31)]))).toBe(ERROR_CODES.MARKS_LOCKED);
   });
 
-  test("without an approval step a complete assessment is released straight away", async () => {
+  test("without an approval step for sheets, a single assessment still waits for leadership", async () => {
     await admin((tx) =>
       upsertProgram(tx, tenant.schoolId, tenant.academicYear.id, ids.grade!, {
         mark_approval_required: false,
       }),
     );
+    const before = (await releaseEvents()).length;
     const release = await sendForApproval(ids.first!);
-    expect(release.status).toBe("approved");
+    expect(release.status).toBe("submitted");
+    expect(lines(await released(ids.s1User!, ids.s1!))).toEqual(["Second exam: 30"]);
+    expect(await releaseEvents()).toHaveLength(before);
+    // It is in leadership's queue and counted on the overview all the same.
+    const queue = await admin((tx) =>
+      listAssessmentReleases(tx, tenant.schoolId, {
+        yearId: tenant.academicYear.id,
+        status: "submitted",
+      }),
+    );
+    expect(queue.map((r) => r.id)).toEqual([release.id]);
+    const overview = await admin((tx) =>
+      getGradingOverview(tx, tenant.schoolId, tenant.academicYear.id),
+    );
+    expect(overview.counts.assessment_releases_awaiting_approval).toBe(1);
+
+    await decide(release.id, "approve");
     expect(lines(await released(ids.s1User!, ids.s1!))).toEqual([
       "First exam: 40",
       "Second exam: 30",
     ]);
+    expect(await releaseEvents()).toHaveLength(before + 1);
     await admin((tx) =>
       upsertProgram(tx, tenant.schoolId, tenant.academicYear.id, ids.grade!, {
         mark_approval_required: true,

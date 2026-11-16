@@ -171,6 +171,13 @@ export const eventPayloadSchemas = {
   [DOMAIN_EVENTS.STUDY_GROUP_JOINED]: z.object({ groupId: uid }),
 
   // ── Certificate ───────────────────────────────────────────────────────
+  // A mark sheet (assessmentId null) or a single assessment approved for one section (000229).
+  [DOMAIN_EVENTS.MARKS_RELEASED]: z.object({
+    sectionId: uid,
+    subjectId: uid,
+    termId: uid.nullable(),
+    assessmentId: uid.nullable(),
+  }),
   [DOMAIN_EVENTS.CERTIFICATE_ISSUED]: z.object({
     certificateId: uid,
     studentId: uid,

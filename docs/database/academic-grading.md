@@ -93,10 +93,11 @@ INSERT` on result rows; a trigger allows a finalization to change only from `fin
   missing; optional assessments and `missing_mark_policy = zero` do not excuse a gap here). Its
   marks lock while it waits and once approved; once approved they are released to the student and
   linked parents exactly like an approved sheet's (`app.is_released_student_mark`: the period's
-  sheet is approved **or** the assessment's own release is). A grade program without an approval
-  step approves on send. Changing a mark of a returned assessment puts it back to draft (the row
-  is deleted, audit-logged). Nothing else moves: the period's sheet still needs every mark before it
-  can be submitted, finalization still needs approved sheets, and no term figure is ever shown to
+  sheet is approved **or** the assessment's own release is). A single assessment **always** waits
+  for leadership, also in a grade program whose sheets need no approval step (that setting only
+  approves whole sheets on submit). Changing a mark of a returned assessment puts it back to draft
+  (the row is deleted, audit-logged). Nothing else moves: the period's sheet still needs every mark
+  before it can be submitted, finalization still needs approved sheets, and no term figure is ever shown to
   families before finalization. Rules between the two:
   - Sending a single assessment is refused while its period's sheet is submitted or approved.
   - Approving the period's sheet also approves any of its assessments still waiting on their own.
@@ -107,6 +108,15 @@ INSERT` on result rows; a trigger allows a finalization to change only from `fin
     inside finalized results (correction workflow).
   - A student who joins the section after an assessment was released cannot be given a mark for it
     until leadership withdraws it (the same as an approved sheet, which must be reopened).
+- Families are told (000230): each approval -- a whole sheet (on approval, or on submit where the
+  program needs no approval step) or one assessment -- raises one `marks.released` outbox event in
+  the approval's transaction. The workers' notify consumer turns it into one MARKS_RELEASED inbox
+  notice for each of the section's students with a mark in what was released and each of their
+  linked parents ("First exam marks are out for Mathematics" / "Mathematics – Term 1 marks are
+  released"), deep-linking to `/students/{studentId}/marks`; the push consumer sends it to their
+  phones under their push preference and quiet hours. Never emailed. A sheet approval that also
+  approves pending single assessments raises one event, not one per assessment; an event whose
+  marks were withdrawn before it was read sends nothing.
 - Teachers may add assessments for their section when the subject allows it; with
   `teacher_assessments_require_approval` they stay `proposed` (not counted) until approved.
 

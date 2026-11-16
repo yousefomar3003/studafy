@@ -95,6 +95,8 @@ describe("templates — completeness", () => {
                       "status",
                       "materialTitle",
                       "placement",
+                      "subjectName",
+                      "released",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -239,6 +241,11 @@ describe("renderNotification — snapshot tests", () => {
       materialTitle: "Newton's laws",
       courseName: "Physics",
       placement: " · Week 3, Monday",
+    },
+    [NOTIFICATION_TYPES.MARKS_RELEASED]: {
+      who: "Amina Tazi · ",
+      subjectName: "Mathematics",
+      released: "First exam marks are out for Mathematics",
     },
   } as const;
 

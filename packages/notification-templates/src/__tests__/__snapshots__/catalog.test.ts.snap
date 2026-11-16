@@ -188,6 +188,12 @@ exports[`renderNotification — snapshot tests en MATERIAL_PUBLISHED / push rend
 
 exports[`renderNotification — snapshot tests en MATERIAL_PUBLISHED / email renders correctly 1`] = `"Your teacher shared a new material, Newton's laws, in Physics · Week 3, Monday."`;
 
+exports[`renderNotification — snapshot tests en MARKS_RELEASED / in_app renders correctly 1`] = `"Marks released: Mathematics"`;
+
+exports[`renderNotification — snapshot tests en MARKS_RELEASED / push renders correctly 1`] = `"Amina Tazi · First exam marks are out for Mathematics"`;
+
+exports[`renderNotification — snapshot tests en MARKS_RELEASED / email renders correctly 1`] = `"First exam marks are out for Mathematics. Open Studafy to see them."`;
+
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / in_app renders correctly 1`] = `"موعد تسليم Homework 5 هو 2026-08-15"`;
 
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / push renders correctly 1`] = `"Algebra II — Homework 5 مستحق في 2026-08-15"`;
@@ -375,3 +381,9 @@ exports[`renderNotification — snapshot tests ar MATERIAL_PUBLISHED / in_app re
 exports[`renderNotification — snapshot tests ar MATERIAL_PUBLISHED / push renders correctly 1`] = `"Physics · Week 3, Monday"`;
 
 exports[`renderNotification — snapshot tests ar MATERIAL_PUBLISHED / email renders correctly 1`] = `"شارك معلمك مادة تعليمية جديدة بعنوان Newton's laws في Physics · Week 3, Monday."`;
+
+exports[`renderNotification — snapshot tests ar MARKS_RELEASED / in_app renders correctly 1`] = `"صدرت الدرجات: Mathematics"`;
+
+exports[`renderNotification — snapshot tests ar MARKS_RELEASED / push renders correctly 1`] = `"Amina Tazi · First exam marks are out for Mathematics"`;
+
+exports[`renderNotification — snapshot tests ar MARKS_RELEASED / email renders correctly 1`] = `"First exam marks are out for Mathematics. افتح Studafy للاطلاع عليها."`;

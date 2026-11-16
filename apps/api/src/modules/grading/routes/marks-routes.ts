@@ -159,7 +159,7 @@ const decideSheetRoute = createRoute({
   operationId: "decideMarkSheet",
   summary: "Approve, return or reopen a mark sheet",
   description:
-    "Returning or reopening needs a reason. A sheet inside finalized results cannot be reopened.",
+    "Approving releases the period's marks to students and parents and notifies them (MARKS_RELEASED). Returning or reopening needs a reason. A sheet inside finalized results cannot be reopened.",
   security,
   request: { params: sheetIdParamSchema, body: json(decideSheetBodySchema) },
   responses: standardResponses(
@@ -175,7 +175,7 @@ const submitReleaseRoute = createRoute({
   operationId: "submitAssessmentRelease",
   summary: "Send one assessment's marks for approval",
   description:
-    "Releases a single assessment before the rest of its period: every enrolled student needs a usable mark for it (409 RESULTS_INCOMPLETE). Approved by leadership like a mark sheet (straight away when the grade has no approval step); once approved the marks are visible to the student and their parents. Refused while the period's whole sheet is submitted or approved.",
+    "Releases a single assessment before the rest of its period: every enrolled student needs a usable mark for it (409 RESULTS_INCOMPLETE). Always waits for leadership approval (also where the grade's sheets need no approval step); once approved the marks are visible to the student and their parents, who are notified (MARKS_RELEASED, in-app and push). Refused while the period's whole sheet is submitted or approved.",
   security,
   request: { params: sectionSubjectAssessmentParamSchema },
   responses: standardResponses(
@@ -206,7 +206,7 @@ const decideReleaseRoute = createRoute({
   operationId: "decideAssessmentRelease",
   summary: "Approve, return or withdraw one assessment's release",
   description:
-    "Returning or withdrawing (reopen) needs a reason; withdrawing hides the marks from families again. Refused while the period's whole sheet is approved, and inside finalized results.",
+    "Approving releases the marks to the student and their parents and notifies them. Returning or withdrawing (reopen) needs a reason; withdrawing hides the marks from families again. Refused while the period's whole sheet is approved, and inside finalized results.",
   security,
   request: { params: releaseIdParamSchema, body: json(decideAssessmentReleaseBodySchema) },
   responses: standardResponses(
