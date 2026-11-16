@@ -177,13 +177,16 @@ async function ingestEvent(db: Database, event: ParsedEmailEvent, logger: Logger
 
       // The unique (message_id, event_type) constraint is the dedup arbiter: a redelivered event
       // inserts nothing, and this transaction stops before it changes any state.
+      // Insert-only, as the runtime role may record into this global ledger but not read it (QA-017):
+      // the row count instead of RETURNING, and ON CONFLICT without a conflict target (a target
+      // needs SELECT on its columns). The table's one unique key is (message_id, event_type), so a
+      // conflict is still exactly a redelivery.
       const inserted = await tx`
         INSERT INTO app.email_events (message_id, event_type, payload)
         VALUES (${event.messageId}, ${event.eventType}, ${tx.json(event.payload as unknown as JSONValue)}::jsonb)
-        ON CONFLICT (message_id, event_type) DO NOTHING
-        RETURNING id
+        ON CONFLICT DO NOTHING
       `;
-      if (inserted.length === 0) {
+      if (inserted.count === 0) {
         logger.info(
           { message_id: event.messageId, event_type: event.eventType },
           "Email event already recorded; ignoring redelivery",
@@ -196,7 +199,7 @@ async function ingestEvent(db: Database, event: ParsedEmailEvent, logger: Logger
           await tx`
             INSERT INTO app.email_suppressions (address, reason)
             VALUES (${address}, ${event.reason})
-            ON CONFLICT (address) DO NOTHING
+            ON CONFLICT DO NOTHING
           `;
         }
       }
