@@ -4,6 +4,7 @@
  *  - Students and parents see only `ready` materials, in the list, by id and in global search. A
  *    material still being uploaded, scanned or processed, or one that failed or was blocked, is the
  *    teacher's business.
+ *  - Turning a material's AI use off keeps it downloadable; turning it back on re-queues ingestion.
  *  - A teacher retries a failed material (POST /retry): it goes back to scanning, audited.
  *  - Re-uploading a file whose earlier attempt failed replaces that attempt and frees its file.
  *  - Starting an upload wakes the scaled-to-zero scanner, without ever affecting the request.
@@ -278,6 +279,27 @@ describeDb("global search over materials", () => {
   });
 });
 
+describeDb("turning a material's AI use off and on", () => {
+  test("keeps it downloadable for students, and turning AI back on re-queues it", async () => {
+    const t = await newTenant();
+    const id = t.materials.ready;
+    const path = `/api/academics/materials/${id}/ai-visible`;
+    const download = () =>
+      request(t.tenant, t.student, "GET", `/api/storage/downloads/material/${id}`);
+    expect((await download()).status).toBe(200);
+
+    const off = await request(t.tenant, t.teacher, "PATCH", path, { ai_visible: false });
+    expect(off.status).toBe(200);
+    expect(((await off.json()) as { ingest_status: string }).ingest_status).toBe("ready");
+    expect((await download()).status).toBe(200);
+    expect(await listStatuses(t, t.student)).toEqual(["ready"]);
+
+    const on = await request(t.tenant, t.teacher, "PATCH", path, { ai_visible: true });
+    expect(on.status).toBe(200);
+    expect(((await on.json()) as { ingest_status: string }).ingest_status).toBe("queued");
+  });
+});
+
 // ---------------------------------------------------------------------------
 // C. Failed attempts don't linger
 // ---------------------------------------------------------------------------
@@ -398,7 +420,7 @@ describeDb("uploading a file again after a failed attempt", () => {
     expect(await meter(t.tenant.schoolId)).toBe(0);
   });
 
-  test("keeps another teacher's failed attempt and a confirmed material whose AI use is off", async () => {
+  test("keeps another teacher's failed attempt and an old AI-off row in 'uploaded'", async () => {
     const t = await newTenant();
     const fileName = `slides-${crypto.randomUUID().slice(0, 8)}.pdf`;
     const otherTeacher = t.tenant.users.INSTRUCTOR.id;
@@ -408,7 +430,8 @@ describeDb("uploading a file again after a failed attempt", () => {
         fileName,
         key: othersKey,
       });
-      // A confirmed material whose AI use was turned off sits in 'uploaded' with ai_visible off.
+      // Turning AI off used to leave a confirmed material in 'uploaded' with ai_visible off; a row
+      // like that which migration 000227 could not place may still be a real material.
       const aiOff = await insertMaterial(tx, t.tenant, t.teacher.userId, "uploaded", { fileName });
       await tx`UPDATE app.materials SET ai_visible = false WHERE id = ${aiOff}`;
       return [others, aiOff];

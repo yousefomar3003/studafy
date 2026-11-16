@@ -276,6 +276,77 @@ describeDb("ai-ingestion and the class AI materials setting", () => {
 });
 
 /**
+ * Turning AI off on one material (toggleAiVisible in apps/api) while it waits for or is in
+ * ingestion finishes it as `ready` with ai_visible off, in the API's own transaction. The worker
+ * must then leave it alone: no chunks, no downgrade to `failed`, still `ready` and so downloadable.
+ */
+describeDb("ai-ingestion and a material whose AI use was turned off", () => {
+  async function turnAiOffLikeTheApi(f: MaterialFixture): Promise<void> {
+    await sql.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+      await tx`
+        UPDATE app.materials
+        SET ai_visible = false,
+            ingest_status = 'ready'::app.material_ingest_status,
+            ingested_at = CURRENT_TIMESTAMP
+        WHERE id = ${f.materialId}::uuid
+      `;
+    });
+  }
+
+  async function materialRow(materialId: string) {
+    const [row] = await sql<{ ingest_status: string; ai_visible: boolean }[]>`
+      SELECT ingest_status::text AS ingest_status, ai_visible
+      FROM app.materials WHERE id = ${materialId}::uuid
+    `;
+    return row!;
+  }
+
+  test("a job still queued for it is a no-op", async () => {
+    const fixture = await seedFixture();
+    await turnAiOffLikeTheApi(fixture);
+    let fetched = false;
+    const config: AiIngestionWorkerConfig = {
+      databaseUrl: databaseUrl!,
+      fetchBytes: async () => {
+        fetched = true;
+        return new Uint8Array(await buildDocx("Lesson", ["Lesson text."], []));
+      },
+    };
+
+    const result = await processIngestJob(jobFor(fixture), config);
+
+    expect(result).toMatchObject({ processed: true, ingested: false, chunks: 0 });
+    expect(fetched).toBe(false);
+    expect(await materialRow(fixture.materialId)).toEqual({
+      ingest_status: "ready",
+      ai_visible: false,
+    });
+  });
+
+  test("turned off mid-parse: the parsed text is dropped and it stays ready", async () => {
+    const fixture = await seedFixture();
+    const config: AiIngestionWorkerConfig = {
+      databaseUrl: databaseUrl!,
+      fetchBytes: async () => {
+        await turnAiOffLikeTheApi(fixture);
+        return new Uint8Array(await buildDocx("Lesson", ["Lesson text for the class."], []));
+      },
+    };
+
+    const result = await processIngestJob(jobFor(fixture), config);
+
+    expect(result).toMatchObject({ processed: true, ingested: false, chunks: 0 });
+    expect(await chunkContents(fixture.materialId)).toEqual([]);
+    expect(await materialRow(fixture.materialId)).toEqual({
+      ingest_status: "ready",
+      ai_visible: false,
+    });
+  });
+});
+
+/**
  * How a failed ingestion is retried. A parse error is a verdict on the bytes (corrupt, encrypted,
  * unsupported, no text), so the material is marked `failed` on the first attempt and the job is
  * not retried: retrying read the same bytes four more times and delayed "failed" by the backoff.

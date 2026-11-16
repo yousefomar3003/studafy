@@ -241,8 +241,10 @@ const toggleAiVisibleRoute = createRoute({
   operationId: "toggleMaterialAiVisible",
   summary: "Toggle AI visibility",
   description:
-    "Sets whether a material is exposed to AI ingestion. Disabling removes all " +
-    "associated chunks and resets ingest status. Enabling queues the material for ingestion. " +
+    "Sets whether a material is exposed to AI ingestion. It never changes whether the material " +
+    "can be opened. Disabling removes its AI chunks and keeps it servable: a `ready` material " +
+    "stays `ready`, and one waiting for or in AI ingestion becomes `ready`. Enabling a `ready` " +
+    "material queues it for ingestion again. " +
     "Requires material:manageAi, and the caller must teach the material's class or lead the school.",
   security: [{ bearerAuth: [] }],
   request: {
@@ -303,6 +305,13 @@ export function materialRoutes(
   // a fresh upload. Same degraded mode as scanQueue when Redis is unavailable.
   const ingestionQueue = redis
     ? new Queue(QUEUE_NAMES.AI_INGESTION, { connection: redis as never })
+    : null;
+
+  // Thumbnail and preview derivation, for a material that turning AI off finished before its
+  // ingestion did (the ingestion worker queues them otherwise). Best-effort: a missing thumbnail
+  // falls back to the file-type icon, and a duplicate job is a no-op in the worker.
+  const derivationQueue = redis
+    ? new Queue(QUEUE_NAMES.DERIVATIONS, { connection: redis as never })
     : null;
 
   // Hand a material in 'scanning' to the file-scan worker (confirm and retry). The status flip is
@@ -523,9 +532,15 @@ export function materialRoutes(
     const { materialId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
+    const { material: row, derivePreviews } = await withTenantTx(database, tenantFrom(c), (tx) =>
       toggleAiVisible(tx, auth.schoolId, materialId, body.ai_visible),
     );
+
+    if (derivePreviews && derivationQueue) {
+      await derivationQueue
+        .add(JOB_NAMES.DERIVE_MATERIAL_PREVIEWS, { schoolId: auth.schoolId, materialId: row.id })
+        .catch(() => undefined);
+    }
 
     // Enabling re-stages a previously ingested material to 'queued' (the service flips it there).
     // Hand it to the ai-ingestion worker: the claim on 'queued' makes a duplicate enqueue a no-op,

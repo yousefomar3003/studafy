@@ -243,8 +243,9 @@ export async function initiateUpload(
   //    failed, and the app showed the teacher an error). It holds no counted bytes (the meter is
   //    credited at confirm). Any object its PUT did write is left for reconciliation and the
   //    abandoned-material sweep, which removes it once the daily recount has counted it. A row in
-  //    'uploaded' with ai_visible off is a confirmed material whose AI use was turned off
-  //    (toggleAiVisible), not an abandoned attempt, so it is kept.
+  //    'uploaded' with ai_visible off is kept: turning AI off used to move a confirmed material
+  //    back to 'uploaded' (fixed, and repaired by 000227 where its history shows it was servable),
+  //    and a row like that which 000227 could not place may still be a real material.
   //  - 'failed': the scan or the processing gave up on it. Its file was confirmed (and counted), so
   //    the caller frees it once this transaction commits (freedStorageKeys).
   const replaced = await tx<
@@ -561,11 +562,33 @@ export async function deleteMaterial(
   return { deleted: true, storageKeys };
 }
 
+export interface ToggleAiVisibleResult {
+  material: MaterialRow;
+  /**
+   * True when turning AI off finished a material that was waiting for, or in the middle of, AI
+   * ingestion. The ingestion worker would have queued its thumbnail and preview once it was done,
+   * so the caller queues them instead.
+   */
+  derivePreviews: boolean;
+}
+
 /**
  * Toggle ai_visible on a material.
  *
- * Disabling purges all material_chunks (ON DELETE CASCADE handles this at the schema level) and
- * resets ingest_status to 'uploaded' so a future enable triggers re-ingestion.
+ * AI visibility decides only whether the material's text is chunked for the AI study assistant. It
+ * never decides whether the material can be opened: that is `ready`, set once the malware scan is
+ * clean (and, for an AI-visible material, ingestion has finished).
+ *
+ * Disabling deletes the material's chunks (and with them, ON DELETE CASCADE, anything grounded on
+ * them) and leaves the material servable:
+ *  - `ready` stays `ready`, its ingest stamp kept;
+ *  - `queued` or `processing` (clean, waiting for or in AI ingestion) becomes `ready` now, since
+ *    there is nothing left to wait for. The ingestion worker's claim and final re-claim both skip a
+ *    material that is no longer AI-visible or no longer `queued`/`processing`, so an in-flight job
+ *    writes no chunks and never downgrades it;
+ *  - every other state is left alone: `uploaded` still waits for its confirm, `scanning` for the
+ *    scan (whose clean verdict sends a non-AI material straight to `ready`), and `failed` /
+ *    `quarantined` keep their verdict and error.
  *
  * Enabling stages a `ready` material for re-ingestion: it is flipped to 'queued' (the ST-161
  * re-ingest / re-enable staging state) and the route enqueues an ai-ingestion job, which drives it
@@ -579,11 +602,11 @@ export async function toggleAiVisible(
   schoolId: string,
   materialId: string,
   aiVisible: boolean,
-): Promise<MaterialRow> {
+): Promise<ToggleAiVisibleResult> {
   const existing = await getWritableMaterial(tx, schoolId, materialId);
 
   if (existing.ai_visible === aiVisible) {
-    return existing;
+    return { material: existing, derivePreviews: false };
   }
 
   if (aiVisible) {
@@ -633,23 +656,28 @@ export async function toggleAiVisible(
       newValues: { ai_visible: true, ingest_status: row.ingest_status },
     });
 
-    return row;
+    return { material: row, derivePreviews: false };
   }
 
-  // Disabling: reset flags so a future enable starts fresh.
-  // Chunks are purged by ON DELETE CASCADE if the material is deleted, but here we
-  // explicitly delete them so the purge is visible and auditable.
-  const deleted = await tx<{ count: string }[]>`
-    DELETE FROM app.material_chunks
-    WHERE material_id = ${materialId} AND school_id = ${schoolId}
-  `;
-
+  // Disabling. The row is updated first: that takes its lock, so an ingestion job finishing at this
+  // moment either commits its chunks before (and the delete below sees them) or re-claims after
+  // (sees ai_visible off and writes none). Deleting the chunks first could miss a job's commit.
+  //
+  // A clean material waiting for, or in, AI ingestion has nothing left to wait for: it is ready
+  // now. The lifecycle CHECK requires 'ready' with no error and an ingest stamp; a material
+  // already 'ready' keeps the stamp it has.
+  const finishes = existing.ingest_status === "queued" || existing.ingest_status === "processing";
   const [row] = await tx<MaterialRow[]>`
     UPDATE app.materials
     SET ai_visible = false,
-        ingest_status = 'uploaded'::app.material_ingest_status,
-        ingest_error = NULL,
-        ingested_at = NULL,
+        ingest_status = CASE
+          WHEN ingest_status IN ('queued', 'processing') THEN 'ready'::app.material_ingest_status
+          ELSE ingest_status
+        END,
+        ingested_at = CASE
+          WHEN ingest_status IN ('queued', 'processing') THEN CURRENT_TIMESTAMP
+          ELSE ingested_at
+        END,
         updated_at = CURRENT_TIMESTAMP
     WHERE id = ${materialId} AND school_id = ${schoolId}
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
@@ -659,6 +687,12 @@ export async function toggleAiVisible(
   `;
   if (!row) throw new HTTPException(404, { message: "Material not found" });
 
+  // Deleted explicitly (not left to a later cascade) so the purge is visible and auditable.
+  const deleted = await tx`
+    DELETE FROM app.material_chunks
+    WHERE material_id = ${materialId} AND school_id = ${schoolId}
+  `;
+
   await emitAuditLog(tx, {
     action: "update",
     targetTable: "materials",
@@ -666,10 +700,10 @@ export async function toggleAiVisible(
     oldValues: { ai_visible: true, ingest_status: existing.ingest_status },
     newValues: {
       ai_visible: false,
-      ingest_status: "uploaded",
-      chunks_purged: Number(deleted[0]?.count ?? 0),
+      ingest_status: row.ingest_status,
+      chunks_purged: deleted.count,
     },
   });
 
-  return row;
+  return { material: row, derivePreviews: finishes && row.ingest_status === "ready" };
 }
