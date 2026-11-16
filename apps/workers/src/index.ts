@@ -46,7 +46,7 @@ import { startSchoolEventNotifier } from "./queues/notifications/school-events";
 import { startRelay } from "./queues/outbox-relay";
 import { scheduleReportExpiryJob } from "./queues/reports";
 import { QUEUE_REGISTRY } from "./registry";
-import { shutdownWorkers, startWorkers } from "./worker";
+import { drainThenClose, startWorkers } from "./worker";
 
 import type { RelayHandle } from "./queues/outbox-relay/relay";
 
@@ -339,37 +339,44 @@ const shutdown = (signal: string) => {
 
   console.log(`Received ${signal}, waiting for active jobs to finish…`);
 
-  relayHandle?.stop();
-  emailDispatcher.stop();
-  entitlementInvalidator.stop();
-  schoolEventNotifier.stop();
-  pushConsumer.stop();
-
-  void shutdownWorkers(workers, env.SHUTDOWN_TIMEOUT_MS).then(async () => {
-    connection.disconnect();
-    relayRedis.disconnect();
-    entitlementRedis.disconnect();
-    await relayDb.end({ timeout: 5 });
-    await emailDb.end({ timeout: 5 });
-    await entitlementDb.end({ timeout: 5 });
-    await notifyDb.end({ timeout: 5 });
-    await pushDb.end({ timeout: 5 });
-    // The process-wide pools every job processor borrows (db/pool.ts) — after the drain above.
-    await closeWorkerPools();
-    // startQueueGauges() was given queueMetricsConnection as a live IORedis instance rather
-    // than plain connection options, so BullMQ treats it as externally owned and never closes it
-    // itself — queue.close() only stops the per-queue Queue wrapper. Closing it here is what
-    // actually releases the socket.
-    await queueGauges.close();
-    queueMetricsConnection.disconnect();
-    billingPipelineGauges.close();
-    await billingPipelineDb.end({ timeout: 5 });
-    await metricsServer.shutdown();
-    await tracing?.shutdown();
-    // Last, so a failure reported while jobs were draining still goes out before the exit.
-    await errorMonitoring?.shutdown();
-    console.log("Shutdown complete.");
-    process.exit(0);
+  // Loops and jobs drain together, bounded by SHUTDOWN_TIMEOUT_MS (kept under Fly's kill_timeout in
+  // infra/fly/workers.toml); nothing below closes until both have (QA-047).
+  void drainThenClose({
+    loops: [
+      ...(relayHandle ? [relayHandle] : []),
+      emailDispatcher,
+      entitlementInvalidator,
+      schoolEventNotifier,
+      pushConsumer,
+    ],
+    workers,
+    timeoutMs: env.SHUTDOWN_TIMEOUT_MS,
+    close: async () => {
+      connection.disconnect();
+      relayRedis.disconnect();
+      entitlementRedis.disconnect();
+      await relayDb.end({ timeout: 5 });
+      await emailDb.end({ timeout: 5 });
+      await entitlementDb.end({ timeout: 5 });
+      await notifyDb.end({ timeout: 5 });
+      await pushDb.end({ timeout: 5 });
+      // The process-wide pools every job processor borrows (db/pool.ts) — after the drain above.
+      await closeWorkerPools();
+      // startQueueGauges() was given queueMetricsConnection as a live IORedis instance rather
+      // than plain connection options, so BullMQ treats it as externally owned and never closes it
+      // itself — queue.close() only stops the per-queue Queue wrapper. Closing it here is what
+      // actually releases the socket.
+      await queueGauges.close();
+      queueMetricsConnection.disconnect();
+      billingPipelineGauges.close();
+      await billingPipelineDb.end({ timeout: 5 });
+      await metricsServer.shutdown();
+      await tracing?.shutdown();
+      // Last, so a failure reported while jobs were draining still goes out before the exit.
+      await errorMonitoring?.shutdown();
+      console.log("Shutdown complete.");
+      process.exit(0);
+    },
   });
 };
 

@@ -4,10 +4,17 @@
 app = "studafy-core-workers"
 primary_region = "fra"
 
+# Graceful shutdown (QA-047). Fly's default is SIGINT with 5 s before SIGKILL, shorter than the
+# drain the service waits for, so every deploy killed in-flight work. SHUTDOWN_TIMEOUT_MS ([env])
+# stays below kill_timeout so the process exits on its own.
+kill_signal = "SIGTERM"
+kill_timeout = "60s"
+
 [build]
   dockerfile = "../docker/workers.Dockerfile"
 
 [env]
+  SHUTDOWN_TIMEOUT_MS = "45000"
   NODE_ENV = "production"
   SERVICE_NAME = "workers"
   SENTRY_ENVIRONMENT = "production"

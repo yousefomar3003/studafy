@@ -66,7 +66,8 @@ export interface EntitlementInvalidatorContext {
 }
 
 export interface EntitlementInvalidatorHandle {
-  stop: () => void;
+  /** Resolves once the in-flight cycle, if any, has finished. */
+  stop: () => Promise<void>;
 }
 
 /**
@@ -219,7 +220,7 @@ export function startEntitlementInvalidator(
 
   return {
     stop() {
-      loop.stop();
+      return loop.stop();
     },
   };
 }

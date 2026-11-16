@@ -87,7 +87,8 @@ export interface EmailDispatcherContext {
 }
 
 export interface DispatcherHandle {
-  stop(): void;
+  /** Resolves once the in-flight cycle, if any, has finished. */
+  stop(): Promise<void>;
 }
 
 /** "deferred": the attempt failed transiently and the row was rescheduled (see the header). */
@@ -379,8 +380,8 @@ export function startEmailDispatcher(ctx: EmailDispatcherContext): DispatcherHan
 
   return {
     stop: () => {
-      loop.stop();
       ctx.logger.info({}, "email dispatcher stopping");
+      return loop.stop();
     },
   };
 }

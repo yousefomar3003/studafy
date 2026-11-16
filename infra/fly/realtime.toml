@@ -6,6 +6,11 @@
 app = "studafy-core-realtime"
 primary_region = "fra"
 
+# Graceful shutdown (QA-047). Fly's default is SIGINT with 5 s before SIGKILL, shorter than the
+# time the gateway needs to close its sockets cleanly (clients reconnect to the new machine).
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
 [build]
   dockerfile = "../docker/realtime.Dockerfile"
 

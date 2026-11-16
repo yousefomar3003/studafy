@@ -151,3 +151,36 @@ export async function shutdownWorkers(
     clearTimeout(timer);
   }
 }
+
+/** Anything shutdown has to wait for: a poll loop, whose stop() resolves after its current cycle. */
+export interface StoppableLoop {
+  stop(): Promise<void>;
+}
+
+/**
+ * The shutdown sequence (QA-047): stop the poll loops and drain the BullMQ workers in parallel,
+ * both bounded by `timeoutMs`, and only then run `close` (pools, Redis, telemetry). Closing a
+ * database pool under a cycle that is mid-send would fail its bookkeeping write, and the next
+ * process would send again.
+ */
+export async function drainThenClose(options: {
+  loops: StoppableLoop[];
+  workers: StoppableWorker[];
+  timeoutMs: number;
+  close: () => Promise<void>;
+}): Promise<void> {
+  let deadline: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<void>((resolve) => {
+    deadline = setTimeout(resolve, options.timeoutMs);
+  });
+  const loopsStopped = Promise.allSettled(options.loops.map((loop) => loop.stop()));
+  try {
+    await Promise.all([
+      Promise.race([loopsStopped, expired]),
+      shutdownWorkers(options.workers, options.timeoutMs),
+    ]);
+  } finally {
+    clearTimeout(deadline);
+  }
+  await options.close();
+}

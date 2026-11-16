@@ -51,7 +51,8 @@ export interface RelayContext {
 }
 
 export interface RelayHandle {
-  stop(): void;
+  /** Resolves once the in-flight cycle, if any, has finished. */
+  stop(): Promise<void>;
 }
 
 /**
@@ -136,8 +137,8 @@ export function startRelay(ctx: RelayContext): RelayHandle {
 
   return {
     stop: () => {
-      loop.stop();
       ctx.logger.info({}, "outbox relay stopping");
+      return loop.stop();
     },
   };
 }

@@ -63,8 +63,11 @@ export interface PollLoopOptions extends IdleBackoffOptions {
 }
 
 export interface PollLoopHandle {
-  /** Stop after the current cycle; an in-progress idle wait ends at once. */
-  stop(): void;
+  /**
+   * Stop after the current cycle; an in-progress idle wait ends at once. Resolves when the loop has
+   * exited, so shutdown can wait for a cycle that is mid-send before closing its pools (QA-047).
+   */
+  stop(): Promise<void>;
   /** Resolves when the loop has exited. */
   readonly done: Promise<void>;
 }
@@ -113,7 +116,10 @@ export function startPollLoop(options: PollLoopOptions): PollLoopHandle {
 
   const done = run();
   return {
-    stop: () => controller.abort(),
+    stop: () => {
+      controller.abort();
+      return done;
+    },
     done,
   };
 }
