@@ -280,3 +280,60 @@ describe("tenantLifecycleGuard — soft terminal states", () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// QA-038: a locked-out school can still pay, sign out, export its data and delete accounts.
+// CLOSED (non-payment past grace) and SUSPENDED used to block these too, so the admin could not
+// pay to recover and a parent could not obtain their child's data.
+// ---------------------------------------------------------------------------
+
+function anyRouteApp(auth: AuthContext): Hono<AppEnv> {
+  const app = new Hono<AppEnv>();
+  app.use("*", async (c, next) => {
+    c.set("auth", auth);
+    await next();
+  });
+  app.use("/api/*", tenantLifecycleGuard());
+  app.all("/api/*", (c) => c.json({ reached: c.req.path }));
+  return app;
+}
+
+const RECOVERY_REQUESTS: [string, string][] = [
+  ["GET", "/api/subscriptions/current"],
+  ["GET", "/api/subscriptions/plans"],
+  ["POST", "/api/subscriptions/checkout"],
+  ["POST", "/api/subscriptions/school/checkout"],
+  ["POST", "/api/subscriptions/portal"],
+  ["GET", "/api/subscriptions/current/invoices"],
+  ["GET", "/api/privacy/me/dsr"],
+  ["POST", "/api/privacy/me/dsr"],
+  ["POST", "/api/account/deletion-requests"],
+  ["POST", "/api/auth/logout"],
+  ["GET", "/api/me/features"],
+];
+
+describe("tenantLifecycleGuard — recovery paths stay open (QA-038)", () => {
+  for (const status of [SUBSCRIPTION_STATUSES.CLOSED, "suspended" as SubscriptionStatus]) {
+    for (const [method, path] of RECOVERY_REQUESTS) {
+      it(`${status}: ${method} ${path} is reachable`, async () => {
+        const app = anyRouteApp(contextFor([ROLES.ORG_ADMIN], status));
+        const res = await app.request(path, { method });
+        expect(res.status).toBe(200);
+      });
+    }
+
+    it(`${status}: ordinary school features stay blocked`, async () => {
+      const app = anyRouteApp(contextFor([ROLES.ORG_ADMIN], status));
+      expect((await app.request("/api/attendance/sessions", { method: "POST" })).status).toBe(403);
+      expect((await app.request("/api/subscriptions/ai/checkout", { method: "POST" })).status).toBe(
+        403,
+      );
+    });
+  }
+
+  it("a look-alike path is not a recovery path", async () => {
+    const app = anyRouteApp(contextFor([ROLES.ORG_ADMIN], SUBSCRIPTION_STATUSES.CLOSED));
+    expect((await app.request("/api/subscriptions/currentXYZ")).status).toBe(403);
+    expect((await app.request("/api/privacy-other")).status).toBe(403);
+  });
+});
