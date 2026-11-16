@@ -85,7 +85,9 @@ class _GradesContent extends StatelessWidget {
           alignment: AlignmentDirectional.centerEnd,
           child: TextButton(
             onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const GradesScreen()),
+              MaterialPageRoute<void>(
+                builder: (_) => const GradesScreen(initialTab: GradesTab.coursework),
+              ),
             ),
             child: Text('grades.viewAll'.tr()),
           ),
