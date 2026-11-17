@@ -174,8 +174,8 @@ describe("delivery", () => {
     expect(cookie).toBeDefined();
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Strict");
-    // Scoped to the two endpoints that consume it, so it rides on no other request.
-    expect(cookie).toContain("Path=/api/auth");
+    // Path=/ because deployed tiers name it `__Host-session`, which requires it (QA-070).
+    expect(cookie).toContain("Path=/;");
   });
 
   integrationTest("gives a mobile session the token in the body and sets no cookie", async () => {
@@ -265,6 +265,14 @@ describe("failures", () => {
     // The correlation the ticket asks for: the body's request_id is the response header's value.
     expect(problem.request_id).toBe(res.headers.get("x-request-id"));
   });
+
+  integrationTest(
+    "a malformed cookie is a bad credential, not a server error (QA-070)",
+    async () => {
+      const res = await post("/api/auth/refresh", { headers: { cookie: "session=%E0%A4%A" } });
+      expect(res.status).toBe(401);
+    },
+  );
 
   integrationTest("answers 400, not 401, when nothing was presented", async () => {
     const res = await post("/api/auth/refresh", {
