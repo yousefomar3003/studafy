@@ -80,6 +80,17 @@ const calculation = {
   paymentPlan: "in_full",
   schedulePreview: [{ position: 1, amountMinor: 0, dueDate: "2026-12-01" }],
   scheduleErrors: [] as string[],
+  yearTotals: [
+    {
+      year: 1,
+      startDate: "2026-11-01",
+      endDate: "2027-11-01",
+      months: 12,
+      amountMinor: 406_400,
+      payments: 1,
+    },
+  ],
+  termsChanges: [] as string[],
   breakdown: {
     currencyCode: "USD",
     months: 12,
@@ -130,6 +141,31 @@ const calculation = {
 };
 
 let extraQuotes: Record<string, unknown>[] = [];
+let termsChanges: string[] = [];
+const REQUEST_ID = "99999999-9999-4999-8999-999999999999";
+const schoolRequest = {
+  id: REQUEST_ID,
+  schoolId: SCHOOL_ID,
+  schoolName: "Alpha Academy",
+  licenseId: null,
+  status: "open",
+  studentSeats: 80,
+  teacherSeats: null,
+  parentSeats: null,
+  includeFamilyPlus: null,
+  studentTier: null,
+  teacherTier: null,
+  parentTier: null,
+  note: "AI for grade 10",
+  requestedBy: "44444444-4444-4444-8444-444444444444",
+  resolutionNote: null,
+  resolvedAt: null,
+  createdAt: "2026-10-20T09:00:00.000Z",
+  months: 24,
+  startsOn: "2027-01-10",
+  paymentPlan: "yearly",
+  paymentProposal: null,
+};
 
 const getMock = mock((path: string) => {
   if (path === "/api/platform/tiers") return Promise.resolve({ data: { tiers } });
@@ -145,10 +181,15 @@ const getMock = mock((path: string) => {
   if (path === "/api/platform/schools") {
     return Promise.resolve({ data: { schools: [], total: 0 } });
   }
+  if (path === "/api/platform/licenses/change-requests") {
+    return Promise.resolve({ data: { requests: [schoolRequest] } });
+  }
   throw new Error(`Unhandled GET ${path}`);
 });
 const postMock = mock((path: string, _init?: { body?: Record<string, unknown> }) => {
-  if (path === "/api/platform/licenses/quote") return Promise.resolve({ data: calculation });
+  if (path === "/api/platform/licenses/quote") {
+    return Promise.resolve({ data: { ...calculation, termsChanges } });
+  }
   if (path === "/api/platform/schools/{schoolId}/license-quotes") {
     return Promise.resolve({ data: quote });
   }
@@ -193,6 +234,7 @@ async function chooseStudentSeats(seats: string) {
 afterEach(() => {
   cleanup();
   licenses = [];
+  termsChanges = [];
   getMock.mockClear();
   postMock.mockClear();
 });
@@ -464,5 +506,58 @@ describe("CalculatorPage", () => {
     expect(body.teacher).toBeUndefined();
     expect(body.parent).toBeUndefined();
     expect(body.includeFamilyPlus).toBe(false);
+  });
+
+  test("starts from the school's request: its length, start and plan; a change needs a reason", async () => {
+    await renderPage(
+      `?schoolId=${SCHOOL_ID}&requestId=${REQUEST_ID}&studentSeats=80&studentTier=${STUDENT_TIER}`,
+    );
+    const card = within(await screen.findByTestId("school-request"));
+    expect(await card.findByText("24 months")).toBeTruthy();
+    expect(card.getByText("Jan 10, 2027")).toBeTruthy();
+    expect(card.getByText("Yearly, one payment per licence year")).toBeTruthy();
+
+    expect(((await screen.findByLabelText("Months")) as HTMLInputElement).value).toBe("24");
+    expect((screen.getByLabelText("Starts on") as HTMLInputElement).value).toBe("2027-01-10");
+    await waitFor(() =>
+      expect(pricedBodies().at(-1)).toMatchObject({
+        months: 24,
+        paymentPlan: "yearly",
+        changeRequestId: REQUEST_ID,
+      }),
+    );
+    expect(
+      await screen.findByText("These terms follow the school's chosen length and payment plan."),
+    ).toBeTruthy();
+
+    // The super admin shortens it: the API reports the change, and saving needs a reason.
+    termsChanges = ["months"];
+    fireEvent.change(screen.getByLabelText("Months"), { target: { value: "12" } });
+    expect(
+      await screen.findByText(/These terms change the school's choice \(length\)/),
+    ).toBeTruthy();
+    const save = screen.getByRole("button", { name: "Save as draft quote" }) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(true));
+    fireEvent.change(screen.getByLabelText("Why change what the school chose?"), {
+      target: { value: "Twelve months this year" },
+    });
+    await waitFor(() => expect(save.disabled).toBe(false));
+    fireEvent.click(save);
+    await waitFor(() =>
+      expect(
+        postMock.mock.calls.some(
+          ([path]) => path === "/api/platform/schools/{schoolId}/license-quotes",
+        ),
+      ).toBe(true),
+    );
+    const [, init] = postMock.mock.calls.find(
+      ([path]) => path === "/api/platform/schools/{schoolId}/license-quotes",
+    )!;
+    expect(init!.body).toMatchObject({
+      months: 12,
+      paymentPlan: "yearly",
+      changeRequestId: REQUEST_ID,
+      termsChangeReason: "Twelve months this year",
+    });
   });
 });

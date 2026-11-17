@@ -87,6 +87,53 @@ export function LicenseBanners() {
     }
   }
 
+  // AI stops 30 days after an unpaid instalment (000231): say so once it has, and warn from the day
+  // the instalment is late until then.
+  const stop = license?.nextAiStop ?? null;
+  const stopDate = (iso: string) => formatDate(new Date(`${iso}T00:00:00Z`), { dateStyle: "long" });
+  if (license?.status === "suspended" && license.nonpaymentSuspendedAt) {
+    banners.push({
+      key: "ai-stopped",
+      tone: "danger",
+      title: t("schoolLicense.aiStop.stoppedTitle"),
+      body: (
+        <>
+          {stop
+            ? t("schoolLicense.aiStop.stoppedBody", {
+                number: stop.invoiceNumber,
+                due: stopDate(stop.dueDate),
+                amount: money(stop.balanceMinor, stop.currencyCode, stop.minorUnit),
+              })
+            : t("schoolLicense.aiStop.stoppedInvoice")}{" "}
+          {stop ? (
+            <Link to={`/portal/license/invoices/${stop.invoiceId}`}>
+              {t("schoolLicense.banners.overdueLink")}
+            </Link>
+          ) : null}
+        </>
+      ),
+    });
+  } else if (license?.status === "active" && stop && stop.daysLeft > 0 && stop.daysLeft < 30) {
+    banners.push({
+      key: "ai-stop-warning",
+      tone: stop.daysLeft <= 7 ? "danger" : "warning",
+      title: t("schoolLicense.aiStop.warningTitle", { date: stopDate(stop.stopDate) }),
+      body: (
+        <>
+          {t("schoolLicense.aiStop.warningBody", {
+            amount: money(stop.balanceMinor, stop.currencyCode, stop.minorUnit),
+            number: stop.invoiceNumber,
+            due: stopDate(stop.dueDate),
+            count: stop.daysLeft,
+          })}{" "}
+          <Link to={`/portal/license/invoices/${stop.invoiceId}`}>
+            {t("schoolLicense.banners.overdueLink")}
+          </Link>
+        </>
+      ),
+    });
+  }
+
   const overdueInvoices = overdue.data ?? [];
   if (overdueInvoices.length > 0) {
     const first = overdueInvoices[0]!;

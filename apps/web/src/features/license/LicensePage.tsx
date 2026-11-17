@@ -292,6 +292,16 @@ export function requestSummary(request: ChangeRequest, t: TFunction): string {
       ),
     );
   }
+  if (request.months !== null) {
+    parts.push(t("schoolLicense.requests.months", { count: request.months }));
+  }
+  if (request.paymentPlan) {
+    parts.push(
+      t(`schoolLicense.requests.plan.${request.paymentPlan}`, {
+        count: request.paymentProposal?.length ?? 0,
+      }),
+    );
+  }
   return parts.join(" · ");
 }
 

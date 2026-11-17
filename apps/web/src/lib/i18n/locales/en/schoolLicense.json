@@ -100,7 +100,15 @@
     },
     "tier": "{{tier}} for {{audience}}",
     "familyPlusOn": "Family+ on",
-    "familyPlusOff": "Family+ off"
+    "familyPlusOff": "Family+ off",
+    "months_one": "{{count}} month",
+    "months_other": "{{count}} months",
+    "plan": {
+      "monthly": "paid monthly",
+      "yearly": "paid yearly",
+      "custom_one": "paid in {{count}} payment on our dates",
+      "custom_other": "paid in {{count}} payments on our dates"
+    }
   },
   "request": {
     "title": "Request more seats or a different tier",
@@ -272,7 +280,32 @@
     "acceptHelp": "Your license is updated straight away and an invoice is issued with the bank details and payment reference to pay it.",
     "acceptConfirm": "Accept and get the invoice",
     "accepted": "Quote accepted. Invoice {{number}} is ready.",
-    "acceptError": "The quote was not accepted."
+    "acceptError": "The quote was not accepted.",
+    "terms": {
+      "title": "Length and payment plan",
+      "asked": "You asked for",
+      "offered": "Studafy's quote",
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months",
+      "monthsOpen": "Length left to Studafy",
+      "from": "from {{date}}",
+      "plan": {
+        "in_full": "paid all at once",
+        "monthly": "paid monthly",
+        "yearly": "paid yearly",
+        "custom": "paid on your own dates"
+      },
+      "planOpen": "payment plan left to Studafy",
+      "changed": "Studafy changed what you chose: {{changes}}.",
+      "change": {
+        "months": "length",
+        "start": "start date",
+        "plan": "payment plan",
+        "schedule": "payment dates or amounts"
+      },
+      "reason": "Why: {{reason}}",
+      "same": "This quote follows the length and payment plan you chose."
+    }
   },
   "invoiceFilter": {
     "all": "All invoices",
@@ -525,14 +558,17 @@
       "monthly_one": "Paid monthly: {{count}} payment, one each licence month.",
       "monthly_other": "Paid monthly: {{count}} payments, one each licence month.",
       "custom_one": "Paid in {{count}} instalment on the dates below.",
-      "custom_other": "Paid in {{count}} instalments on the dates below."
+      "custom_other": "Paid in {{count}} instalments on the dates below.",
+      "yearly_one": "Paid yearly: {{count}} payment, at the start of each licence year.",
+      "yearly_other": "Paid yearly: {{count}} payments, one at the start of each licence year."
     },
     "columns": {
       "number": "#",
       "dueDate": "Due",
       "amount": "Amount",
       "paid": "Paid",
-      "status": "Status"
+      "status": "Status",
+      "aiStop": "AI stops if unpaid on"
     },
     "status": {
       "due": "Due",
@@ -542,6 +578,82 @@
     },
     "current": "· pay now",
     "previewNote": "Dates are shown as if the quote were accepted today. A due date before the day you accept moves to that day.",
-    "activationNote": "Your seats start working once the first payment is received. The total is the same whichever way you pay."
+    "activationNote": "Your seats start working once the first payment is received. The total is the same whichever way you pay.",
+    "listTitle": "Every payment"
+  },
+  "years": {
+    "title": "Each licence year",
+    "columns": {
+      "year": "Licence year",
+      "period": "Period",
+      "payments": "Payments",
+      "amount": "Total for the year",
+      "share": "Share of the total"
+    },
+    "year": "Year {{year}}",
+    "period_one": "{{from}} – {{to}} ({{count}} month)",
+    "period_other": "{{from}} – {{to}} ({{count}} months)"
+  },
+  "terms": {
+    "lengthTitle": "How long, and how you pay",
+    "lengthLabel": "How long do you want Studafy AI for?",
+    "keepEnd": "Until your licence ends ({{date}})",
+    "addMonths_one": "{{count}} more month after it ends",
+    "addMonths_other": "{{count}} more months after it ends",
+    "months_one": "{{count}} month",
+    "months_other": "{{count}} months",
+    "otherLength": "Another number of months",
+    "otherMonthsLabel": "Months ({{min}}–{{max}})",
+    "monthsError": "Enter a whole number of months from {{min}} to {{max}}.",
+    "startLabel": "Start on (optional)",
+    "startHelp": "Leave empty to start as soon as Studafy puts the licence in force.",
+    "startError": "Choose today or a later date.",
+    "extendHelp": "The months are added after your licence ends on {{date}}.",
+    "keepHelp": "New seats run until your licence ends on {{date}}. Choose a number of months to extend it as well.",
+    "planLabel": "How do you want to pay?",
+    "plan": {
+      "monthly": "Monthly",
+      "yearly": "Yearly",
+      "custom": "Custom: our own dates"
+    },
+    "planHelp": {
+      "monthly": "One payment each month of the licence, starting on its first day.",
+      "yearly": "One payment at the start of each licence year. Each year pays for its own months, so a 13-month licence is a payment for 12 months, then one for 1 month.",
+      "custom": "Choose your payment dates and what share of the total each one is. The dates must fall within the licence and the shares must add up to 100%."
+    },
+    "custom": {
+      "title": "Your payments",
+      "countLabel": "Number of payments (up to {{max}})",
+      "even": "Spread evenly",
+      "dateLabel": "Payment {{position}}: date",
+      "shareLabel": "Payment {{position}}: share of the total (%)",
+      "shareError": "Enter a percentage, for example 25 or 12.5.",
+      "total": "The shares add up to {{percent}}%."
+    },
+    "errors": {
+      "empty": "Add at least one payment.",
+      "too_many": "Use at most 24 payments.",
+      "invalid_date": "Give every payment a date.",
+      "non_positive": "Give every payment a share above 0%.",
+      "not_ascending": "Put the payments in date order.",
+      "share_mismatch": "The shares must add up to exactly 100%.",
+      "before_today": "A payment date can't be in the past.",
+      "after_term": "Every payment must fall before the licence ends."
+    },
+    "preview": {
+      "title": "Your payment plan",
+      "period": "Licence period: {{from}} – {{to}}.",
+      "share": "Share of the total",
+      "note": "Studafy prices your request and sends a quote with the amount of every payment. You accept it before anything is invoiced; if Studafy has to change the length or plan, the quote says why."
+    }
+  },
+  "aiStop": {
+    "rule": "If a payment is still unpaid 30 days after its due date, Studafy AI stops for every seat until it is paid. It starts again as soon as Studafy records the payment.",
+    "stoppedInvoice": "Studafy AI has stopped for your school because a payment on this licence is more than 30 days late. It starts again as soon as Studafy records the payment.",
+    "stoppedTitle": "Studafy AI has stopped",
+    "stoppedBody": "{{amount}} on invoice {{number}}, due {{due}}, is more than 30 days late, so students and teachers have lost the licence's AI features. They come back as soon as Studafy records the payment.",
+    "warningTitle": "Studafy AI stops on {{date}} if this payment is not made",
+    "warningBody_one": "{{amount}} on invoice {{number}} was due {{due}}. {{count}} day left before the AI stops for every seat.",
+    "warningBody_other": "{{amount}} on invoice {{number}} was due {{due}}. {{count}} days left before the AI stops for every seat."
   }
 }

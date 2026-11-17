@@ -9,18 +9,20 @@
 import { DOMAIN_EVENTS } from "@studafy/constants";
 
 import {
+  LICENSE_PAYMENT_TEMPLATES,
   renderAccountDeletionConfirmationEmail,
   renderAccountDeletionVerificationEmail,
   renderAiStorePurchaseConfirmationEmail,
   renderAiSubscriptionPausedEmail,
   renderAiSubscriptionResumedEmail,
   renderInvitationEmail,
+  renderLicensePaymentEmail,
   renderSeatDriftEmail,
   renderSubscriptionDunningEmail,
   renderVerificationEmail,
 } from "./templates";
 
-import type { EmailTemplate, RenderedEmail } from "./templates";
+import type { EmailTemplate, LicensePaymentEmailData, RenderedEmail } from "./templates";
 
 export interface ClaimedOutboxRow {
   id: string;
@@ -49,6 +51,14 @@ const VERIFICATION_ACTION_PATH = "/verify-email#token={token}";
 const ACCOUNT_DELETION_ACTION_PATH = "/legal/delete-account/confirm#token={token}";
 // The public Terms of Service page (apps/web LegalDocumentPage), linked from purchase confirmations.
 const TERMS_PATH = "/terms";
+// The school portal's licence invoice page (apps/web features/license/InvoiceDetailPage).
+const LICENSE_INVOICE_PATH = "/portal/license/invoices/{invoiceId}";
+
+/** The licence billing email payload the licence reminder job writes (000231). */
+type LicensePaymentPayload = Omit<LicensePaymentEmailData, "schoolName" | "invoiceUrl"> & {
+  email: string;
+  invoiceId: string;
+};
 
 interface InvitationPayload {
   email: string;
@@ -238,6 +248,18 @@ export function resolveEmail(
         }),
       };
     }
+    case DOMAIN_EVENTS.LICENSE_PAYMENT_EMAIL: {
+      const payload = row.payload as unknown as LicensePaymentPayload;
+      return {
+        template: LICENSE_PAYMENT_TEMPLATES[payload.kind],
+        recipient: payload.email,
+        content: renderLicensePaymentEmail({
+          ...payload,
+          schoolName: context.schoolName,
+          invoiceUrl: `${context.frontendUrl}${LICENSE_INVOICE_PATH.replace("{invoiceId}", payload.invoiceId)}`,
+        }),
+      };
+    }
     default:
       throw new Error(`no email template for outbox event ${row.event_name}`);
   }
@@ -272,4 +294,5 @@ export const EMAIL_EVENT_NAMES: readonly string[] = [
   DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED,
   DOMAIN_EVENTS.ACCOUNT_DELETED,
   DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED,
+  DOMAIN_EVENTS.LICENSE_PAYMENT_EMAIL,
 ];

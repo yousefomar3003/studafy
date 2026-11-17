@@ -166,6 +166,15 @@ export const DOMAIN_EVENTS = {
   // confirmation on a durable medium the law asks for. A student without one sees it in the app.
   AI_STORE_PURCHASE_CONFIRMED: "aiSubscription.purchaseConfirmed",
 
+  // A billing email about one instalment of a school licence invoice (000231): it is overdue (the
+  // day after its due date), the licence's AI stops in 7 days unless it is paid, or the AI has
+  // stopped for it. Raised by the workers' licence reminder job in the transaction that claims the
+  // reminder (app.license_reminders), once per instalment and kind, for each billing recipient (the
+  // school's admins and principals, and its verified contact email). Billing mail to the school's
+  // paying contacts, like an invoice -- not a notification, so no notification preference applies.
+  // The email dispatcher consumes it like every other transactional email.
+  LICENSE_PAYMENT_EMAIL: "licenseInvoice.paymentEmail",
+
   // ERPNext finance doc-events. Ingested via verified webhooks and written into app.outbox_events
   // by the API, then relayed by the outbox-relay worker like any other domain event.
   ERPNEXT_INVOICE_SUBMITTED: "erpnext.invoiceSubmitted",

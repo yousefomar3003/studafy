@@ -543,6 +543,9 @@ export const ERROR_CODES = {
   // don't add up to the total, with dates out of order or in the past, too many instalments, or a
   // due date moved past the next instalment's.
   LICENSE_PAYMENT_SCHEDULE_INVALID: "LICENSE_PAYMENT_SCHEDULE_INVALID",
+  // A quote answering a school's request changes the length, start or payment plan the school chose
+  // without saying why (000231).
+  LICENSE_TERMS_CHANGE_REASON_REQUIRED: "LICENSE_TERMS_CHANGE_REASON_REQUIRED",
   // No such instalment on this licence invoice.
   LICENSE_INSTALMENT_NOT_FOUND: "LICENSE_INSTALMENT_NOT_FOUND",
   LICENSE_PAYMENT_NOT_FOUND: "LICENSE_PAYMENT_NOT_FOUND",

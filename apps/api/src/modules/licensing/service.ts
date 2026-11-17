@@ -1,5 +1,6 @@
 import { LIVE_STATUSES } from "@studafy/billing";
 import { ERROR_CODES, FEATURE_KEYS, FEATURES, isLicensableAudience } from "@studafy/constants";
+import { addMonthsUtc, proposalErrors } from "@studafy/license-pricing";
 
 import { usagePeriodStart } from "../features/resolve";
 import {
@@ -8,9 +9,11 @@ import {
 } from "../subscriptions/entitlements/cache";
 import { publishUserEntitlementChanges } from "../subscriptions/entitlements/entitlement-change-publisher";
 
+import { nextAiStop } from "./ai-stop";
 import { auditLicenseChange, inSchool, licenseError, rethrowLicenseDbError } from "./context";
 import { applyRenewalStops, recordSeatOverlaps } from "./overlap";
 
+import type { AiStopView } from "./ai-stop";
 import type { LicenseActor } from "./context";
 import type {
   CoveringSeat,
@@ -23,7 +26,8 @@ import type { StorageService } from "../../lib/storage";
 import type { Logger } from "../../logger";
 import type { RedisClient } from "../../redis";
 import type { FeatureKey, FeatureUsageUnit } from "@studafy/constants";
-import type { TransactionSql } from "postgres";
+import type { ProposedInstalment, SchoolPaymentPlan } from "@studafy/license-pricing";
+import type { JSONValue, TransactionSql } from "postgres";
 
 /**
  * School feature licenses and their seats (session 2 of docs/billing/feature-licensing.md).
@@ -96,6 +100,8 @@ export interface LicenseRecord {
   activatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
+  /** When the workers stopped it for an instalment unpaid 30 days after its due date (000231). */
+  nonpaymentSuspendedAt: Date | null;
 }
 
 export interface LicenseRow {
@@ -118,6 +124,7 @@ export interface LicenseRow {
   activated_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  nonpayment_suspended_at: Date | null;
 }
 
 function toRecord(row: LicenseRow): LicenseRecord {
@@ -141,6 +148,7 @@ function toRecord(row: LicenseRow): LicenseRecord {
     activatedAt: row.activated_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    nonpaymentSuspendedAt: row.nonpayment_suspended_at,
   };
 }
 
@@ -163,7 +171,7 @@ const LICENSE_COLUMNS = (tx: TransactionSql) => tx`
   l.teacher_plan_id::text AS teacher_plan_id, l.teacher_seats,
   l.include_family_plus, l.parent_plan_id::text AS parent_plan_id, l.parent_seats,
   l.currency_id::text AS currency_id, c.code AS currency_code, l.notes, l.created_by::text AS created_by,
-  l.activated_at, l.created_at, l.updated_at
+  l.activated_at, l.created_at, l.updated_at, l.nonpayment_suspended_at
 `;
 
 export async function readLicense(
@@ -248,6 +256,10 @@ export interface LicenseView {
   currencyCode: string;
   activatedAt: string | null;
   audiences: AudienceSeats[];
+  /** When the AI was stopped because an instalment went unpaid 30 days past due; null otherwise. */
+  nonpaymentSuspendedAt: string | null;
+  /** The earliest unpaid instalment on the licence and the day its AI stops if it stays unpaid. */
+  nextAiStop: AiStopView | null;
 }
 
 export interface PlatformLicenseView extends LicenseView {
@@ -303,6 +315,11 @@ export async function licenseView(
     currencyCode: license.currencyCode,
     activatedAt: license.activatedAt?.toISOString() ?? null,
     audiences: await audienceSeats(tx, license),
+    nonpaymentSuspendedAt: license.nonpaymentSuspendedAt?.toISOString() ?? null,
+    nextAiStop:
+      license.status === "active" || license.status === "suspended"
+        ? await nextAiStop(tx, license.id)
+        : null,
   };
 }
 
@@ -1411,6 +1428,14 @@ export interface ChangeRequestInput {
   teacherPlanId?: string | null;
   parentPlanId?: string | null;
   note: string;
+  /** The licence length the school wants (000231); null leaves it to Studafy / the licence's term. */
+  months?: number | null;
+  /** When a new licence should start (YYYY-MM-DD); null for as soon as possible. */
+  startsOn?: string | null;
+  /** How the school wants to pay; null leaves it to Studafy. */
+  paymentPlan?: SchoolPaymentPlan | null;
+  /** For a custom plan: the school's payment dates and shares of the total. */
+  paymentProposal?: ProposedInstalment[] | null;
 }
 
 export interface ChangeRequestView {
@@ -1429,6 +1454,10 @@ export interface ChangeRequestView {
   createdAt: string;
   resolvedAt: string | null;
   resolutionNote: string | null;
+  months: number | null;
+  startsOn: string | null;
+  paymentPlan: SchoolPaymentPlan | null;
+  paymentProposal: ProposedInstalment[] | null;
 }
 
 export interface ChangeRequestRow {
@@ -1447,6 +1476,10 @@ export interface ChangeRequestRow {
   created_at: Date;
   resolved_at: Date | null;
   resolution_note: string | null;
+  months: number | null;
+  starts_on: string | null;
+  payment_plan: SchoolPaymentPlan | null;
+  payment_proposal: ProposedInstalment[] | null;
 }
 
 /** The requested tiers' names, in one read for every row. */
@@ -1492,6 +1525,10 @@ function toChangeRequestView(
     createdAt: row.created_at.toISOString(),
     resolvedAt: row.resolved_at?.toISOString() ?? null,
     resolutionNote: row.resolution_note,
+    months: row.months,
+    startsOn: row.starts_on,
+    paymentPlan: row.payment_plan,
+    paymentProposal: row.payment_proposal,
   };
 }
 
@@ -1499,8 +1536,76 @@ const CHANGE_REQUEST_COLUMNS = (tx: TransactionSql) => tx`
   id::text AS id, license_id::text AS license_id, student_seats, teacher_seats, parent_seats,
   include_family_plus, student_plan_id::text AS student_plan_id,
   teacher_plan_id::text AS teacher_plan_id, parent_plan_id::text AS parent_plan_id, note, status,
-  requested_by::text AS requested_by, created_at, resolved_at, resolution_note
+  requested_by::text AS requested_by, created_at, resolved_at, resolution_note, months,
+  starts_on::text AS starts_on, payment_plan, payment_proposal
 `;
+
+/** Licences in force: a request for one is more seats or more months on it. */
+const IN_FORCE: readonly LicenseStatus[] = ["active", "suspended"];
+
+/**
+ * The term the school's request is for, which its custom payments must fall within: more months on a
+ * licence in force start where it ends; otherwise a new licence from `startsOn` (or today). Without
+ * months, a licence in force runs to its own end; a new licence has no term yet (null).
+ */
+export function requestTerm(
+  license: LicenseRecord | null,
+  input: { months?: number | null; startsOn?: string | null },
+  today: string,
+): { startDate: string; termEnd: string } | null {
+  if (license && IN_FORCE.includes(license.status)) {
+    const end = license.endsAt.toISOString().slice(0, 10);
+    return input.months
+      ? { startDate: end, termEnd: addMonthsUtc(end, input.months) }
+      : { startDate: today, termEnd: end };
+  }
+  if (!input.months) return null;
+  const start = input.startsOn ?? today;
+  return { startDate: start, termEnd: addMonthsUtc(start, input.months) };
+}
+
+/**
+ * The school's length and plan, checked: a start date only for a new licence and never in the past;
+ * a custom proposal only for a custom plan, with shares adding up to the whole and dates from today
+ * to the end of the term (LICENSE_PAYMENT_SCHEDULE_INVALID otherwise).
+ */
+function requestedTermsOf(
+  license: LicenseRecord | null,
+  input: ChangeRequestInput,
+  actor: LicenseActor,
+  now: Date,
+): {
+  months: number | null;
+  startsOn: string | null;
+  plan: SchoolPaymentPlan | null;
+  proposal: ProposedInstalment[] | null;
+} {
+  const today = now.toISOString().slice(0, 10);
+  const inForce = license !== null && IN_FORCE.includes(license.status);
+  const months = input.months ?? null;
+  const startsOn = inForce ? null : (input.startsOn ?? null);
+  if (startsOn !== null && startsOn < today) {
+    throw licenseError(422, ERROR_CODES.VALIDATION_FAILED, actor.locale);
+  }
+  const plan = input.paymentPlan ?? null;
+  if (plan !== "custom") {
+    if (input.paymentProposal) {
+      throw licenseError(422, ERROR_CODES.LICENSE_PAYMENT_SCHEDULE_INVALID, actor.locale);
+    }
+    return { months, startsOn, plan, proposal: null };
+  }
+  const term = requestTerm(license, { months, startsOn }, today);
+  const proposal = input.paymentProposal ?? [];
+  if (!term || proposalErrors(proposal, { today, termEnd: term.termEnd }).length > 0) {
+    throw licenseError(422, ERROR_CODES.LICENSE_PAYMENT_SCHEDULE_INVALID, actor.locale);
+  }
+  return {
+    months,
+    startsOn,
+    plan,
+    proposal: proposal.map((p) => ({ dueDate: p.dueDate, shareBps: p.shareBps })),
+  };
+}
 
 /**
  * A school asks the super admin for different seats or tiers; the license itself is unchanged. A
@@ -1512,9 +1617,11 @@ export async function createChangeRequest(
   schoolId: string,
   input: ChangeRequestInput,
   actor: LicenseActor,
+  now: Date = new Date(),
 ): Promise<ChangeRequestView> {
   const license = await currentLicense(tx);
   const held = license ? termsOf(license) : null;
+  const terms = requestedTermsOf(license, input, actor, now);
   // A request asks for totals; one left out (null) keeps what the license holds.
   const wish = (
     audience: Audience,
@@ -1555,12 +1662,15 @@ export async function createChangeRequest(
   const [row] = await tx<ChangeRequestRow[]>`
     INSERT INTO app.license_change_requests (
       school_id, license_id, student_seats, teacher_seats, parent_seats, include_family_plus,
-      student_plan_id, teacher_plan_id, parent_plan_id, note, requested_by
+      student_plan_id, teacher_plan_id, parent_plan_id, note, requested_by, months, starts_on,
+      payment_plan, payment_proposal
     ) VALUES (
       ${schoolId}::uuid, ${license?.id ?? null}::uuid, ${input.studentSeats ?? null},
       ${input.teacherSeats ?? null}, ${input.parentSeats ?? null}, ${input.includeFamilyPlus ?? null},
       ${wanted.student}::uuid, ${wanted.teacher}::uuid, ${wanted.parent}::uuid,
-      ${input.note.trim()}, ${actor.userId}::uuid
+      ${input.note.trim()}, ${actor.userId}::uuid, ${terms.months}, ${terms.startsOn}::date,
+      ${terms.plan},
+      ${terms.proposal ? tx.json(terms.proposal as unknown as JSONValue) : null}
     )
     RETURNING ${CHANGE_REQUEST_COLUMNS(tx)}
   `;
@@ -1578,6 +1688,10 @@ export async function createChangeRequest(
       teacher_plan_id: row!.teacher_plan_id,
       parent_plan_id: row!.parent_plan_id,
       note: row!.note,
+      months: row!.months,
+      starts_on: row!.starts_on,
+      payment_plan: row!.payment_plan,
+      payment_proposal: row!.payment_proposal,
     },
   });
   return (await toChangeRequestViews(tx, [row!]))[0]!;

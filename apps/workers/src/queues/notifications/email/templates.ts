@@ -25,7 +25,10 @@ export type EmailTemplate =
   | "ai-subscription-resumed"
   | "account-deletion-verification"
   | "account-deletion-confirmation"
-  | "ai-store-purchase-confirmation";
+  | "ai-store-purchase-confirmation"
+  | "license-instalment-overdue"
+  | "license-ai-stop-warning"
+  | "license-ai-stopped";
 
 export interface RenderedEmail {
   subject: string;
@@ -478,4 +481,228 @@ export function renderSchoolApplicationRejectedEmail(
     ].join("\n"),
     html: shell("Studafy", bodyHtml),
   };
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Licence instalment billing emails (000231)
+// ---------------------------------------------------------------------------------------------------
+
+export type LicensePaymentEmailKind = "instalment_overdue" | "ai_stop_warning" | "ai_stopped";
+
+export interface LicensePaymentEmailData {
+  kind: LicensePaymentEmailKind;
+  locale: "en" | "ar";
+  schoolName: string;
+  invoiceNumber: string;
+  instalmentPosition: number;
+  instalmentCount: number;
+  /** Already formatted with its currency, e.g. "250.00 USD". */
+  amount: string;
+  /** YYYY-MM-DD. */
+  dueDate: string;
+  /** YYYY-MM-DD: the day the AI stops (or stopped) while the instalment is unpaid. */
+  stopDate: string;
+  licenseStartsOn: string;
+  licenseEndsOn: string;
+  paymentReference: string;
+  /** The instalment's online payment link (Revolut), when the super admin has added one. */
+  paymentLink: string | null;
+  bankDetails: {
+    bankName: string;
+    accountName: string;
+    iban: string;
+    swift: string;
+    currencyCode: string;
+  } | null;
+  /** The invoice page in the school portal. */
+  invoiceUrl: string;
+}
+
+/** The email template recorded in app.email_deliveries for each kind. */
+export const LICENSE_PAYMENT_TEMPLATES: Record<LicensePaymentEmailKind, EmailTemplate> = {
+  instalment_overdue: "license-instalment-overdue",
+  ai_stop_warning: "license-ai-stop-warning",
+  ai_stopped: "license-ai-stopped",
+};
+
+const MONTHS = {
+  en: [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ],
+  ar: [
+    "يناير",
+    "فبراير",
+    "مارس",
+    "أبريل",
+    "مايو",
+    "يونيو",
+    "يوليو",
+    "أغسطس",
+    "سبتمبر",
+    "أكتوبر",
+    "نوفمبر",
+    "ديسمبر",
+  ],
+} as const;
+
+/**
+ * "1 March 2027" / "1 مارس 2027": a calendar date (YYYY-MM-DD). Spelled out here rather than with
+ * Intl, whose Arabic month names and digits differ between ICU builds (so the same email would read
+ * differently on different hosts); Western digits, as the amounts and invoice numbers use.
+ */
+function calendarDate(day: string, locale: "en" | "ar"): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
+  const month = match ? MONTHS[locale][Number(match[2]) - 1] : undefined;
+  if (!match || !month) return day;
+  return `${Number(match[3])} ${month} ${match[1]}`;
+}
+
+const LICENSE_PAYMENT_COPY = {
+  en: {
+    subject: {
+      instalment_overdue: (d: LicensePaymentEmailData) =>
+        `Payment overdue: invoice ${d.invoiceNumber} for ${d.schoolName}'s Studafy licence`,
+      ai_stop_warning: (d: LicensePaymentEmailData, stop: string) =>
+        `Studafy AI stops on ${stop} unless invoice ${d.invoiceNumber} is paid`,
+      ai_stopped: (d: LicensePaymentEmailData) =>
+        `Studafy AI has stopped for ${d.schoolName}: invoice ${d.invoiceNumber} is unpaid`,
+    },
+    lead: {
+      instalment_overdue: (d: LicensePaymentEmailData, due: string) =>
+        `Payment ${d.instalmentPosition} of ${d.instalmentCount} on invoice ${d.invoiceNumber} was due on ${due}, and ${d.amount} is still unpaid.`,
+      ai_stop_warning: (d: LicensePaymentEmailData, due: string) =>
+        `Payment ${d.instalmentPosition} of ${d.instalmentCount} on invoice ${d.invoiceNumber} was due on ${due}, and ${d.amount} is still unpaid.`,
+      ai_stopped: (d: LicensePaymentEmailData, due: string) =>
+        `Payment ${d.instalmentPosition} of ${d.instalmentCount} on invoice ${d.invoiceNumber} was due on ${due}, and ${d.amount} is still unpaid 30 days later.`,
+    },
+    consequence: {
+      instalment_overdue: (stop: string) =>
+        `If it is still unpaid on ${stop}, Studafy AI stops for every seat on the licence until it is paid.`,
+      ai_stop_warning: (stop: string) =>
+        `If it is still unpaid on ${stop}, in a week or less, Studafy AI stops for every seat on the licence until it is paid.`,
+      ai_stopped: (stop: string) =>
+        `Studafy AI stopped on ${stop}: the students and teachers holding the licence's seats have lost its AI features. They come back as soon as Studafy records the payment.`,
+    },
+    licence: (school: string, from: string, to: string) => `Licence: ${school}, ${from} to ${to}.`,
+    howTitle: "How to pay",
+    bank: (b: NonNullable<LicensePaymentEmailData["bankDetails"]>) => [
+      `Bank transfer to ${b.accountName}, ${b.bankName}`,
+      `IBAN: ${b.iban}`,
+      `SWIFT/BIC: ${b.swift}`,
+      `Currency: ${b.currencyCode}`,
+    ],
+    noBank: "Studafy will send you the bank details for the transfer.",
+    reference: (ref: string) =>
+      `Write the payment reference ${ref} on the transfer, then upload the receipt on the invoice page.`,
+    payOnline: "Pay online",
+    payOnlineText: (link: string) => `Or pay online: ${link}`,
+    viewInvoice: "View the invoice",
+    viewInvoiceText: (url: string) => `View the invoice: ${url}`,
+    footer: "You receive this email because you manage your school's Studafy licence.",
+  },
+  ar: {
+    subject: {
+      instalment_overdue: (d: LicensePaymentEmailData) =>
+        `دفعة متأخرة: الفاتورة ${d.invoiceNumber} لترخيص Studafy الخاص بـ ${d.schoolName}`,
+      ai_stop_warning: (d: LicensePaymentEmailData, stop: string) =>
+        `يتوقف Studafy AI في ${stop} ما لم تُسدَّد الفاتورة ${d.invoiceNumber}`,
+      ai_stopped: (d: LicensePaymentEmailData) =>
+        `توقف Studafy AI لدى ${d.schoolName}: الفاتورة ${d.invoiceNumber} غير مسددة`,
+    },
+    lead: {
+      instalment_overdue: (d: LicensePaymentEmailData, due: string) =>
+        `كانت الدفعة ${d.instalmentPosition} من ${d.instalmentCount} في الفاتورة ${d.invoiceNumber} مستحقة في ${due}، وما زال ${d.amount} غير مسدد.`,
+      ai_stop_warning: (d: LicensePaymentEmailData, due: string) =>
+        `كانت الدفعة ${d.instalmentPosition} من ${d.instalmentCount} في الفاتورة ${d.invoiceNumber} مستحقة في ${due}، وما زال ${d.amount} غير مسدد.`,
+      ai_stopped: (d: LicensePaymentEmailData, due: string) =>
+        `كانت الدفعة ${d.instalmentPosition} من ${d.instalmentCount} في الفاتورة ${d.invoiceNumber} مستحقة في ${due}، وما زال ${d.amount} غير مسدد بعد 30 يومًا.`,
+    },
+    consequence: {
+      instalment_overdue: (stop: string) =>
+        `إذا بقيت غير مسددة في ${stop}، يتوقف Studafy AI لكل مقاعد الترخيص حتى تُسدَّد.`,
+      ai_stop_warning: (stop: string) =>
+        `إذا بقيت غير مسددة في ${stop}، أي خلال أسبوع أو أقل، يتوقف Studafy AI لكل مقاعد الترخيص حتى تُسدَّد.`,
+      ai_stopped: (stop: string) =>
+        `توقف Studafy AI في ${stop}: فقد الطلاب والمعلمون الحاملون لمقاعد الترخيص ميزات الذكاء الاصطناعي، وتعود فور تسجيل Studafy للدفعة.`,
+    },
+    licence: (school: string, from: string, to: string) =>
+      `الترخيص: ${school}، من ${from} إلى ${to}.`,
+    howTitle: "طريقة الدفع",
+    bank: (b: NonNullable<LicensePaymentEmailData["bankDetails"]>) => [
+      `تحويل بنكي إلى ${b.accountName}، ${b.bankName}`,
+      `IBAN: ${b.iban}`,
+      `SWIFT/BIC: ${b.swift}`,
+      `العملة: ${b.currencyCode}`,
+    ],
+    noBank: "سترسل لكم Studafy بيانات الحساب البنكي للتحويل.",
+    reference: (ref: string) =>
+      `اكتبوا مرجع الدفع ${ref} على التحويل، ثم ارفعوا الإيصال في صفحة الفاتورة.`,
+    payOnline: "ادفعوا عبر الإنترنت",
+    payOnlineText: (link: string) => `أو ادفعوا عبر الإنترنت: ${link}`,
+    viewInvoice: "عرض الفاتورة",
+    viewInvoiceText: (url: string) => `عرض الفاتورة: ${url}`,
+    footer: "تصلكم هذه الرسالة لأنكم تديرون ترخيص Studafy الخاص بمدرستكم.",
+  },
+} as const;
+
+/**
+ * A billing email about one licence instalment (000231), in the school's language: what is unpaid
+ * and since when, when the AI stops (or that it has), how to pay -- bank transfer with the payment
+ * reference, or the instalment's online link -- and a link to the invoice. Never names a student.
+ */
+export function renderLicensePaymentEmail(data: LicensePaymentEmailData): RenderedEmail {
+  const copy = LICENSE_PAYMENT_COPY[data.locale];
+  const due = calendarDate(data.dueDate, data.locale);
+  const stop = calendarDate(data.stopDate, data.locale);
+  const subject = copy.subject[data.kind](data, stop);
+  const lead = copy.lead[data.kind](data, due);
+  const consequence = copy.consequence[data.kind](stop);
+  const licence = copy.licence(
+    data.schoolName,
+    calendarDate(data.licenseStartsOn, data.locale),
+    calendarDate(data.licenseEndsOn, data.locale),
+  );
+  const bankLines = data.bankDetails ? copy.bank(data.bankDetails) : [copy.noBank];
+  const reference = copy.reference(data.paymentReference);
+
+  const text = [
+    lead,
+    consequence,
+    licence,
+    "",
+    `${copy.howTitle}:`,
+    ...bankLines,
+    reference,
+    ...(data.paymentLink ? [copy.payOnlineText(data.paymentLink)] : []),
+    "",
+    copy.viewInvoiceText(data.invoiceUrl),
+    "",
+    copy.footer,
+  ].join("\n");
+
+  const dir = data.locale === "ar" ? "rtl" : "ltr";
+  const bodyHtml =
+    `<div dir="${dir}" style="text-align:${dir === "rtl" ? "right" : "left"}">` +
+    `<p>${escapeHtml(lead)}</p>` +
+    `<p><strong>${escapeHtml(consequence)}</strong></p>` +
+    `<p>${escapeHtml(licence)}</p>` +
+    `<p style="margin-bottom:4px"><strong>${escapeHtml(copy.howTitle)}</strong></p>` +
+    `<p style="margin-top:0">${bankLines.map(escapeHtml).join("<br>")}</p>` +
+    `<p>${escapeHtml(reference)}</p>` +
+    (data.paymentLink ? button(data.paymentLink, copy.payOnline) : "") +
+    button(data.invoiceUrl, copy.viewInvoice) +
+    `<p style="color:#6b7480;font-size:12px">${escapeHtml(copy.footer)}</p>` +
+    `</div>`;
+  return { subject, text, html: shell(data.schoolName, bodyHtml) };
 }

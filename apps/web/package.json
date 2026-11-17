@@ -26,6 +26,7 @@
     "@studafy/api-client": "workspace:*",
     "@studafy/constants": "workspace:*",
     "@studafy/grading-engine": "workspace:*",
+    "@studafy/license-pricing": "workspace:*",
     "@studafy/notification-templates": "workspace:*",
     "@studafy/shared-schemas": "workspace:*",
     "@studafy/student-import": "workspace:*",

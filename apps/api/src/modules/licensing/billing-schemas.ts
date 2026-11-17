@@ -8,7 +8,7 @@ import {
   PLATFORM_INVOICE_PAGE_MAX,
 } from "./invoices";
 import { QUOTE_STATUSES } from "./quotes";
-import { audienceSchema } from "./schemas";
+import { audienceSchema, proposedInstalmentSchema } from "./schemas";
 import { AUDIENCES } from "./service";
 
 /**
@@ -255,7 +255,9 @@ const termsShape = {
 export const paymentPlanSchema = z.enum(PAYMENT_PLANS).openapi("LicensePaymentPlan", {
   description:
     "How the invoice is paid: in_full (one payment), monthly (one instalment per licence month, " +
-    "due on the start date and the same day each following month), or custom (paymentSchedule).",
+    "due on the start date and the same day each following month), yearly (one instalment per " +
+    "licence year, due on the start date and each anniversary, each year paying for its own " +
+    "months), or custom (paymentSchedule).",
 });
 
 const scheduledInstalmentSchema = z
@@ -265,6 +267,35 @@ const scheduledInstalmentSchema = z
 const customInstalmentSchema = z
   .object({ amountMinor: z.number().int().min(1), dueDate: isoDate })
   .openapi("LicenseCustomInstalment");
+
+export const yearTotalSchema = z
+  .object({
+    year: z.number().int(),
+    startDate: isoDate,
+    endDate: isoDate.openapi({ description: "The day after the licence year's last day." }),
+    months: z.number().int(),
+    amountMinor: minor,
+    payments: z.number().int(),
+  })
+  .openapi("LicenseYearTotal", {
+    description:
+      "What is paid in one licence year: the instalments falling due in it (one due before the " +
+      "licence starts counts in year 1).",
+  });
+
+const termsChangeSchema = z
+  .enum(["months", "start", "plan", "schedule"])
+  .openapi("LicenseTermsChange");
+
+const requestedTermsSchema = z
+  .object({
+    months: z.number().int().nullable(),
+    startsOn: isoDate.nullable(),
+    // Nullable, so inline (see the note at the top).
+    paymentPlan: z.enum(PAYMENT_PLANS).nullable(),
+    paymentProposal: z.array(proposedInstalmentSchema).nullable(),
+  })
+  .openapi("LicenseRequestedTerms");
 
 const paymentTermsShape = {
   paymentPlan: paymentPlanSchema.optional(),
@@ -280,12 +311,32 @@ const paymentTermsShape = {
         "not before today. 422 LICENSE_PAYMENT_SCHEDULE_INVALID otherwise. On a replace, a custom " +
         "schedule must be sent again whenever the total changes.",
     }),
+  termsChangeReason: z
+    .string()
+    .trim()
+    .max(1000)
+    .nullable()
+    .optional()
+    .openapi({
+      description:
+        "Why the quote's length, start date or payment plan differs from the school's request. " +
+        "Required when it does (422 LICENSE_TERMS_CHANGE_REASON_REQUIRED); ignored when it does not.",
+    }),
 };
 
 export const quoteBodySchema = z
   .object({
     kind: quoteKindSchema,
     licenseId: uuid.nullable().optional(),
+    changeRequestId: uuid
+      .nullable()
+      .optional()
+      .openapi({
+        description:
+          "The school's open request this quote answers: what it asked for is shown on the quote, " +
+          "its payment plan is the default, and accepting the quote resolves it. 404 when it is not " +
+          "an open request of this school.",
+      }),
     ...termsShape,
     ...paymentTermsShape,
     notes: z.string().trim().min(1).max(2000).nullable().optional(),
@@ -306,6 +357,8 @@ export const calculateBodySchema = z
     schoolId: uuid.optional(),
     kind: quoteKindSchema,
     licenseId: uuid.nullable().optional(),
+    /** With `schoolId`: report where these terms depart from that request (`termsChanges`). */
+    changeRequestId: uuid.nullable().optional(),
     ...termsShape,
     ...paymentTermsShape,
   })
@@ -346,6 +399,12 @@ export const calculationSchema = z
       .openapi({
         description: "What is wrong with a custom schedule; empty when it can be saved.",
       }),
+    yearTotals: z.array(yearTotalSchema),
+    termsChanges: z.array(termsChangeSchema).openapi({
+      description:
+        "With `changeRequestId`: where these terms depart from the school's request (each needs " +
+        "`termsChangeReason` when saved). Empty otherwise.",
+    }),
   })
   .openapi("LicenseQuoteCalculation");
 
@@ -381,6 +440,11 @@ export const quoteSchema = z
         "The instalments the invoice would have if the quote were accepted today; the invoice " +
         "carries the real ones.",
     }),
+    yearTotals: z.array(yearTotalSchema),
+    changeRequestId: uuid.nullable(),
+    requestedTerms: requestedTermsSchema.nullable(),
+    termsChanges: z.array(termsChangeSchema),
+    termsChangeReason: z.string().nullable(),
     createdBy: uuid,
     sentAt: z.string().datetime().nullable(),
     acceptedAt: z.string().datetime().nullable(),
@@ -429,6 +493,11 @@ export const instalmentSchema = z
         "The instalment to pay now: the earliest not fully paid, while the invoice is open.",
     }),
     paymentLink: z.string().url().nullable(),
+    aiStopDate: isoDate.openapi({
+      description:
+        "The day (UTC) the licence's AI stops if this instalment is still unpaid: 30 days after " +
+        "its due date. Paying it (or the super admin recording the transfer) resumes the AI.",
+    }),
   })
   .openapi("LicenseInvoiceInstalment");
 
@@ -551,6 +620,15 @@ export const invoiceDetailSchema = z
     ...invoiceShape,
     overdue: z.boolean(),
     instalments: z.array(instalmentSchema),
+    yearTotals: z.array(yearTotalSchema).openapi({
+      description:
+        "What is paid in each licence year, from the instalments; empty for an invoice with no quote.",
+    }),
+    aiStopped: z.boolean().openapi({
+      description:
+        "The invoice's licence is suspended because an instalment was unpaid 30 days after its due " +
+        "date: its AI seats work again once that is paid.",
+    }),
     lines: z.array(invoiceLineSchema),
     payments: z.array(paymentSchema),
     receipts: z.array(receiptSchema),
@@ -611,6 +689,11 @@ export const paymentResultSchema = z
     payment: paymentSchema,
     invoice: invoiceSchema,
     licenseActivated: z.boolean(),
+    licenseResumed: z.boolean().openapi({
+      description:
+        "The payment settled every instalment that was 30 days past due, so the licence's AI, " +
+        "stopped for non-payment, is active again.",
+    }),
     renewalStops: z.array(renewalStopSchema),
   })
   .openapi("LicensePaymentResult");

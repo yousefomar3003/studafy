@@ -284,28 +284,32 @@ describe("license lifecycle", () => {
     expect(again).toMatchObject({ licensesExpired: 0, entitlementBumps: 0 });
   });
 
-  jobTest("leaves a running license alone and never suspends for an unpaid invoice", async () => {
-    const schoolId = await school();
-    const now = new Date();
-    const running = await license(schoolId, {
-      startsAt: new Date(now.getTime() - DAY),
-      endsAt: new Date(now.getTime() + 100 * DAY),
-    });
-    await invoice(schoolId, running, {
-      dueDate: new Date(now.getTime() - 40 * DAY).toISOString().slice(0, 10),
-    });
+  jobTest(
+    "leaves a running license alone and keeps its AI while an unpaid invoice is under 30 days late",
+    async () => {
+      const schoolId = await school();
+      const now = new Date();
+      const running = await license(schoolId, {
+        startsAt: new Date(now.getTime() - DAY),
+        endsAt: new Date(now.getTime() + 100 * DAY),
+      });
+      // 29 days late: overdue, but the AI only stops on day 30 (000231; see the cutoff tests below).
+      await invoice(schoolId, running, {
+        dueDate: new Date(now.getTime() - 29 * DAY).toISOString().slice(0, 10),
+      });
 
-    await runLicenseLifecycle(db!, now, silentLogger, [schoolId]);
-    expect(
-      await scalar(
-        schoolId,
-        (tx) =>
-          tx<
-            { v: string }[]
-          >`SELECT status AS v FROM app.school_licenses WHERE id = ${running}::uuid`,
-      ),
-    ).toBe("active");
-  });
+      await runLicenseLifecycle(db!, now, silentLogger, [schoolId]);
+      expect(
+        await scalar(
+          schoolId,
+          (tx) =>
+            tx<
+              { v: string }[]
+            >`SELECT status AS v FROM app.school_licenses WHERE id = ${running}::uuid`,
+        ),
+      ).toBe("active");
+    },
+  );
 
   jobTest("expires sent quotes past their valid-until date, not drafts", async () => {
     const schoolId = await school();
@@ -631,5 +635,337 @@ describe("instalments (000221)", () => {
       (error: unknown) => error,
     );
     expect(String(failure)).toContain("is not whole");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// AI stops 30 days after an unpaid instalment (000231)
+// ---------------------------------------------------------------------------------------------------
+
+describe("AI stops 30 days after an unpaid instalment (000231)", () => {
+  /** An open invoice on `lic` in instalments of `amount` due on each of `dueDates`. */
+  async function instalments(
+    schoolId: string,
+    lic: string,
+    dueDates: string[],
+    amount = 100_000,
+  ): Promise<{ invoiceId: string; ids: string[] }> {
+    const invoiceId = await invoice(schoolId, lic, {
+      dueDate: dueDates[0]!,
+      total: amount * dueDates.length,
+    });
+    const ids = [invoiceId];
+    await admin(schoolId, async (tx) => {
+      await tx`
+        UPDATE app.license_invoice_instalments SET amount_minor = ${amount}
+        WHERE school_id = ${schoolId}::uuid AND invoice_id = ${invoiceId}::uuid
+      `;
+      for (const [index, dueDate] of dueDates.slice(1).entries()) {
+        const id = crypto.randomUUID();
+        ids.push(id);
+        await tx`
+          INSERT INTO app.license_invoice_instalments (
+            id, school_id, invoice_id, position, amount_minor, due_date, status
+          ) VALUES (${id}::uuid, ${schoolId}::uuid, ${invoiceId}::uuid, ${index + 2}, ${amount},
+                    ${dueDate}::date, 'due')
+        `;
+      }
+    });
+    return { invoiceId, ids };
+  }
+
+  /** Pay the first `count` instalments of `amount` in full, as the API's allocation would. */
+  async function payFirst(schoolId: string, invoiceId: string, count: number, amount = 100_000) {
+    await admin(schoolId, async (tx) => {
+      const [row] = await tx<{ total: string }[]>`
+        SELECT total_minor::text AS total FROM app.license_invoices
+        WHERE school_id = ${schoolId}::uuid AND id = ${invoiceId}::uuid
+      `;
+      const total = row!.total;
+      const paid = count * amount;
+      await tx`
+        UPDATE app.license_invoice_instalments
+        SET paid_minor = amount_minor, status = 'paid'
+        WHERE school_id = ${schoolId}::uuid AND invoice_id = ${invoiceId}::uuid
+          AND position <= ${count}
+      `;
+      await tx`
+        UPDATE app.license_invoices
+        SET paid_minor = ${paid},
+            status = ${paid >= Number(total) ? "paid" : "partially_paid"}
+        WHERE school_id = ${schoolId}::uuid AND id = ${invoiceId}::uuid
+      `;
+    });
+  }
+
+  async function state(schoolId: string, lic: string) {
+    return admin(
+      schoolId,
+      async (tx) =>
+        (
+          await tx<{ status: string; stopped: boolean }[]>`
+            SELECT status, nonpayment_suspended_at IS NOT NULL AS stopped
+            FROM app.school_licenses WHERE school_id = ${schoolId}::uuid AND id = ${lic}::uuid
+          `
+        )[0]!,
+    );
+  }
+
+  const day = (iso: string) => new Date(`${iso}T00:00:00Z`);
+  const at = (iso: string, time: string) => new Date(`${iso}T${time}Z`);
+
+  async function activeSchool() {
+    const schoolId = await school("Cutoff School");
+    const orgAdmin = await user(schoolId, "ORG_ADMIN");
+    const lic = await license(schoolId, {
+      startsAt: day("2026-01-01"),
+      endsAt: day("2030-01-01"),
+    });
+    const holder = await student(schoolId);
+    await seat(schoolId, lic, holder);
+    return { schoolId, orgAdmin, lic };
+  }
+
+  jobTest("day 29 keeps the AI; day 30 stops it (UTC dates, whatever the hour)", async () => {
+    const { schoolId, lic } = await activeSchool();
+    await instalments(schoolId, lic, ["2026-03-01"]);
+
+    // Due 1 March: 30 March is day 29 -- late in the UTC day still counts as day 29.
+    const day29 = await runLicenseLifecycle(db!, at("2026-03-30", "23:59:59"), silentLogger, [
+      schoolId,
+    ]);
+    expect(day29.licensesStopped).toBe(0);
+    expect(await state(schoolId, lic)).toEqual({ status: "active", stopped: false });
+
+    // 31 March is day 30: stopped from the first minute of the UTC day.
+    const day30 = await runLicenseLifecycle(db!, at("2026-03-31", "00:00:01"), silentLogger, [
+      schoolId,
+    ]);
+    expect(day30).toMatchObject({ licensesStopped: 1, failedSchools: 0 });
+    expect(day30.entitlementBumps).toBeGreaterThanOrEqual(1);
+    expect(await state(schoolId, lic)).toEqual({ status: "suspended", stopped: true });
+
+    // Idempotent: nothing more to stop, nothing to resume.
+    const again = await runLicenseLifecycle(db!, at("2026-03-31", "01:00:00"), silentLogger, [
+      schoolId,
+    ]);
+    expect(again).toMatchObject({ licensesStopped: 0, licensesResumed: 0 });
+
+    const audit = await admin(
+      schoolId,
+      (tx) => tx<{ v: string }[]>`
+        SELECT new_values ->> 'reason' AS v FROM app.audit_logs
+        WHERE school_id = ${schoolId}::uuid AND target_table = 'school_licenses'
+          AND target_id = ${lic}::uuid AND new_values ->> 'status' = 'suspended'
+      `,
+    );
+    expect(audit.map((row) => row.v)).toEqual(["non_payment"]);
+  });
+
+  jobTest("paying resumes it; a later instalment going unpaid stops it again", async () => {
+    const { schoolId, lic } = await activeSchool();
+    const { invoiceId } = await instalments(schoolId, lic, [
+      "2026-03-01",
+      "2026-04-01",
+      "2026-05-01",
+    ]);
+    await runLicenseLifecycle(db!, day("2026-03-31"), silentLogger, [schoolId]);
+    expect((await state(schoolId, lic)).stopped).toBe(true);
+
+    // The first instalment paid: nothing is 30 days late on 2 April (the second is 1 day late).
+    await payFirst(schoolId, invoiceId, 1);
+    const resumed = await runLicenseLifecycle(db!, day("2026-04-02"), silentLogger, [schoolId]);
+    expect(resumed.licensesResumed).toBe(1);
+    expect(await state(schoolId, lic)).toEqual({ status: "active", stopped: false });
+
+    // The second instalment, due 1 April, reaches day 30 on 1 May: stopped again.
+    const second = await runLicenseLifecycle(db!, day("2026-05-01"), silentLogger, [schoolId]);
+    expect(second.licensesStopped).toBe(1);
+    expect(await state(schoolId, lic)).toEqual({ status: "suspended", stopped: true });
+
+    await payFirst(schoolId, invoiceId, 2);
+    expect(
+      (await runLicenseLifecycle(db!, day("2026-05-02"), silentLogger, [schoolId])).licensesResumed,
+    ).toBe(1);
+  });
+
+  jobTest("only the instalment past day 30 counts while another is merely overdue", async () => {
+    const { schoolId, lic } = await activeSchool();
+    const { invoiceId } = await instalments(schoolId, lic, ["2026-03-01", "2026-03-20"]);
+    await payFirst(schoolId, invoiceId, 1);
+    // 31 March: the first is paid, the second is 11 days late -- the AI keeps working.
+    const run = await runLicenseLifecycle(db!, day("2026-03-31"), silentLogger, [schoolId]);
+    expect(run.licensesStopped).toBe(0);
+    expect(await state(schoolId, lic)).toEqual({ status: "active", stopped: false });
+  });
+
+  jobTest("a licence the super admin suspended by hand is never resumed by the job", async () => {
+    const { schoolId, lic } = await activeSchool();
+    await admin(
+      schoolId,
+      (tx) => tx`UPDATE app.school_licenses SET status = 'suspended' WHERE id = ${lic}::uuid`,
+    );
+    const run = await runLicenseLifecycle(db!, day("2026-03-31"), silentLogger, [schoolId]);
+    expect(run).toMatchObject({ licensesStopped: 0, licensesResumed: 0 });
+    expect(await state(schoolId, lic)).toEqual({ status: "suspended", stopped: false });
+  });
+
+  jobTest("leaving suspended clears the non-payment mark", async () => {
+    const { schoolId, lic } = await activeSchool();
+    await instalments(schoolId, lic, ["2026-03-01"]);
+    await runLicenseLifecycle(db!, day("2026-03-31"), silentLogger, [schoolId]);
+    await admin(
+      schoolId,
+      (tx) => tx`UPDATE app.school_licenses SET status = 'cancelled' WHERE id = ${lic}::uuid`,
+    );
+    expect(await state(schoolId, lic)).toEqual({ status: "cancelled", stopped: false });
+  });
+
+  jobTest("the school is warned a week before the cutoff, then told once it stops", async () => {
+    const { schoolId, orgAdmin, lic } = await activeSchool();
+    await instalments(schoolId, lic, ["2026-03-01"]);
+
+    // 23 March: the cutoff (31 March) is 8 days away -- too early to warn.
+    await runLicenseLifecycle(db!, day("2026-03-23"), silentLogger, [schoolId]);
+    let sent = await runLicenseReminders(db!, day("2026-03-23"), silentLogger, [schoolId]);
+    expect(sent.reminders).toMatchObject({ ai_stop_warning: 0, ai_stopped: 0 });
+
+    // 24 March: 7 days left.
+    sent = await runLicenseReminders(db!, day("2026-03-24"), silentLogger, [schoolId]);
+    expect(sent.reminders).toMatchObject({ ai_stop_warning: 1, ai_stopped: 0 });
+    // Once only.
+    sent = await runLicenseReminders(db!, day("2026-03-25"), silentLogger, [schoolId]);
+    expect(sent.reminders.ai_stop_warning).toBe(0);
+
+    await runLicenseLifecycle(db!, day("2026-03-31"), silentLogger, [schoolId]);
+    sent = await runLicenseReminders(db!, day("2026-03-31"), silentLogger, [schoolId]);
+    expect(sent.reminders).toMatchObject({ ai_stopped: 1 });
+    expect(
+      (await runLicenseReminders(db!, day("2026-04-01"), silentLogger, [schoolId])).reminders,
+    ).toMatchObject({ ai_stopped: 0, ai_stop_warning: 0 });
+
+    const notices = (await notifications(schoolId, orgAdmin)).filter((n) =>
+      n.type.startsWith("LICENSE_AI_"),
+    );
+    expect(notices.map((n) => [n.type, n.kind])).toEqual([
+      ["LICENSE_AI_STOP_WARNING", "ai_stop_warning"],
+      ["LICENSE_AI_STOPPED", "ai_stopped"],
+    ]);
+    expect(notices[0]!.body).toContain("2026-03-31");
+    expect(notices[0]!.body).toContain("in 7 days");
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------
+// Overdue-payment emails (000231)
+// ---------------------------------------------------------------------------------------------------
+
+describe("licence payment emails (000231)", () => {
+  async function queued(schoolId: string) {
+    return admin(
+      schoolId,
+      (tx) => tx<
+        { email: string; kind: string; locale: string; payload: Record<string, unknown> }[]
+      >`
+        SELECT payload ->> 'email' AS email, payload ->> 'kind' AS kind,
+               payload ->> 'locale' AS locale, payload
+        FROM app.outbox_events
+        WHERE school_id = ${schoolId}::uuid AND event_name = 'licenseInvoice.paymentEmail'
+        ORDER BY id
+      `,
+    );
+  }
+
+  async function emailOf(schoolId: string, userId: string): Promise<string> {
+    return scalar(
+      schoolId,
+      (tx) =>
+        tx<{ v: string }[]>`SELECT normalized_email AS v FROM app.users WHERE id = ${userId}::uuid`,
+    );
+  }
+
+  jobTest(
+    "an overdue instalment is emailed once to the admins, principals and the school's verified address",
+    async () => {
+      const schoolId = await school("Email School");
+      const orgAdmin = await user(schoolId, "ORG_ADMIN");
+      const principal = await user(schoolId, "PRINCIPAL");
+      await user(schoolId, "INSTRUCTOR");
+      const schoolEmail = await admin(null, async (tx) => {
+        const [row] = await tx<{ email: string }[]>`
+          UPDATE app.schools SET email_verified_at = now() WHERE id = ${schoolId}::uuid
+          RETURNING normalized_email AS email
+        `;
+        return row!.email;
+      });
+      await admin(
+        schoolId,
+        (tx) => tx`
+          INSERT INTO app.school_settings (school_id, locale) VALUES (${schoolId}::uuid, 'ar')
+          ON CONFLICT (school_id) DO UPDATE SET locale = 'ar'
+        `,
+      );
+      const now = new Date();
+      const lic = await license(schoolId, {
+        startsAt: new Date(now.getTime() - 40 * DAY),
+        endsAt: new Date(now.getTime() + 300 * DAY),
+      });
+      const yesterday = new Date(now.getTime() - DAY).toISOString().slice(0, 10);
+      const invoiceId = await invoice(schoolId, lic, { dueDate: yesterday, total: 25_000 });
+
+      await runLicenseLifecycle(db!, now, silentLogger, [schoolId]);
+      const sent = await runLicenseReminders(db!, now, silentLogger, [schoolId]);
+      expect(sent.emails).toBe(3);
+
+      const rows = await queued(schoolId);
+      expect(rows.map((row) => row.email).sort()).toEqual(
+        [await emailOf(schoolId, orgAdmin), await emailOf(schoolId, principal), schoolEmail].sort(),
+      );
+      expect(rows.every((row) => row.kind === "instalment_overdue" && row.locale === "ar")).toBe(
+        true,
+      );
+      expect(rows[0]!.payload).toMatchObject({
+        invoiceId,
+        instalmentId: invoiceId,
+        instalmentPosition: 1,
+        instalmentCount: 1,
+        amount: "250.00 USD",
+        dueDate: yesterday,
+        stopDate: new Date(Date.parse(`${yesterday}T00:00:00Z`) + 30 * DAY)
+          .toISOString()
+          .slice(0, 10),
+        paymentLink: null,
+      });
+      // No student data in a billing email.
+      expect(JSON.stringify(rows[0]!.payload)).not.toContain("student");
+
+      // Re-runs queue nothing more.
+      expect((await runLicenseReminders(db!, now, silentLogger, [schoolId])).emails).toBe(0);
+      expect(await queued(schoolId)).toHaveLength(3);
+    },
+  );
+
+  jobTest("the 7-day warning and the stop are each emailed once", async () => {
+    const schoolId = await school("Cutoff Email School");
+    await user(schoolId, "ORG_ADMIN");
+    const lic = await license(schoolId, {
+      startsAt: new Date("2026-01-01T00:00:00Z"),
+      endsAt: new Date("2030-01-01T00:00:00Z"),
+    });
+    await invoice(schoolId, lic, { dueDate: "2026-03-01", total: 100_000 });
+
+    const at = (day: string) => new Date(`${day}T00:00:00Z`);
+    await runLicenseLifecycle(db!, at("2026-03-24"), silentLogger, [schoolId]);
+    await runLicenseReminders(db!, at("2026-03-24"), silentLogger, [schoolId]);
+    await runLicenseReminders(db!, at("2026-03-25"), silentLogger, [schoolId]);
+    await runLicenseLifecycle(db!, at("2026-03-31"), silentLogger, [schoolId]);
+    await runLicenseReminders(db!, at("2026-03-31"), silentLogger, [schoolId]);
+    await runLicenseReminders(db!, at("2026-04-01"), silentLogger, [schoolId]);
+
+    expect((await queued(schoolId)).map((row) => row.kind)).toEqual([
+      "instalment_overdue",
+      "ai_stop_warning",
+      "ai_stopped",
+    ]);
   });
 });
