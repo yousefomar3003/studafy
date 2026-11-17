@@ -224,12 +224,22 @@ async function listStatuses(t: Tenant, as: Actor): Promise<string[]> {
 // ---------------------------------------------------------------------------
 
 describeDb("who sees which materials", () => {
-  test("the teacher sees every state; the student and the parent see only ready", async () => {
+  test("the teacher sees every state; the student sees only ready", async () => {
     const t = await newTenant();
 
     expect(await listStatuses(t, t.teacher)).toEqual([...ALL_STATUSES].sort());
     expect(await listStatuses(t, t.student)).toEqual(["ready"]);
-    expect(await listStatuses(t, t.parent)).toEqual(["ready"]);
+  });
+
+  test("a parent cannot list the class's materials (no material:read, QA-008)", async () => {
+    const t = await newTenant();
+    const res = await request(
+      t.tenant,
+      t.parent,
+      "GET",
+      `/api/academics/materials?class_id=${t.tenant.cls.id}&limit=100`,
+    );
+    expect(res.status).toBe(403);
   });
 
   test("a student asking for another state by filter gets nothing", async () => {

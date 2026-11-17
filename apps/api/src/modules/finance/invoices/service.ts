@@ -16,6 +16,7 @@ import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../../lib/keyset-cursor";
+import { likeContains } from "../../../lib/sql/like";
 import { formatMinorUnits } from "../currency";
 
 import type { InvoiceBatchItemStatus, InvoiceBatchStatus, InvoiceStatus } from "./schemas";
@@ -288,9 +289,9 @@ export async function listInvoices(
     : tx``;
   const searchFilter = params.search
     ? tx` AND (
-        s.first_name ILIKE ${`%${params.search}%`}
-        OR s.last_name ILIKE ${`%${params.search}%`}
-        OR s.admission_number ILIKE ${`%${params.search}%`}
+        s.first_name ILIKE ${likeContains(params.search)}
+        OR s.last_name ILIKE ${likeContains(params.search)}
+        OR s.admission_number ILIKE ${likeContains(params.search)}
       )`
     : tx``;
   // Inclusive on both ends. An invoice with no due date never matches a due-date bound.
@@ -304,7 +305,7 @@ export async function listInvoices(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor!);
-        return tx` AND (ic.last_synced_at, ic.id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (ic.last_synced_at, ic.id) < (COALESCE((SELECT k.last_synced_at FROM app.invoice_cache k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 
@@ -479,7 +480,7 @@ export async function listInvoiceBatches(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor!);
-        return tx` AND (created_at, id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (created_at, id) < (COALESCE((SELECT k.created_at FROM app.invoice_batches k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 
@@ -541,7 +542,7 @@ export async function getInvoiceBatchItems(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor!);
-        return tx` AND (ibi.created_at, ibi.id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (ibi.created_at, ibi.id) < (COALESCE((SELECT k.created_at FROM app.invoice_batch_items k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 

@@ -26,6 +26,7 @@ import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { establishedChannel } from "../channels";
 import { deliverTokenPair } from "../delivery";
 import { loginReviewUser } from "../services/review-login-service";
 
@@ -92,7 +93,16 @@ export function reviewLoginRoutes(
   db: Database,
   config: SessionTokenConfig,
   reviewPassword: string | undefined,
+  /**
+   * The review accounts the shared password may open (QA-085), from
+   * env.REVIEW_LOGIN_ALLOWED_EMAILS. Absent or empty: every review identity, as before.
+   */
+  allowedEmails?: readonly string[],
 ): OpenAPIHono<AppEnv> {
+  const allowed =
+    allowedEmails && allowedEmails.length > 0
+      ? new Set(allowedEmails.map((email) => email.trim().toLowerCase()))
+      : null;
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.use(REVIEW_LOGIN_PATH, auditAction("login", "refresh_tokens"));
@@ -102,9 +112,18 @@ export function reviewLoginRoutes(
       throw new HTTPException(404, { message: "Review login is not configured" });
     }
 
-    const { email, password, channel } = c.req.valid("json");
+    const { email, password } = c.req.valid("json");
+    const channel = establishedChannel(c.req.header("origin"), c.req.valid("json").channel);
     const clientIp = clientIpFrom(c);
     const userAgent = c.req.header("user-agent") ?? null;
+
+    if (allowed && !allowed.has(email.trim().toLowerCase())) {
+      throw new CodedHttpException(
+        401,
+        ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+        "Invalid email or password.",
+      );
+    }
 
     const result = await loginReviewUser(db, config, {
       email,
@@ -120,6 +139,11 @@ export function reviewLoginRoutes(
 
     switch (result.outcome) {
       case "LOGIN_SUCCESS":
+        // A shared password into a real production tenant: every use is worth a look (QA-085).
+        c.get("log")?.warn(
+          { alert: "review_login_used", session_id: result.tokens.sessionId },
+          "review login used",
+        );
         return c.json(deliverTokenPair(c, result.tokens), 200);
 
       case "INVALID_CREDENTIALS":

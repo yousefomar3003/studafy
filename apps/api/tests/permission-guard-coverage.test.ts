@@ -639,6 +639,7 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // roll the year over (archiving every enrolment) or delete an exam.
   // Learning materials are NOT exempt either: RLS lets everyone who can read a class (its enrolled
   // students and their parents included) see its materials, and nothing in RLS stops them writing.
+  // They carry per-method material:* guards and a teaches-the-class check since QA-008.
   // In-app inbox (ST-142) — personal per-user read state; the caller's own rows only. RLS
   // (`user_id = app.current_user_id()`) is the fence, so the bearer identity is sufficient
   // authorization — same rationale as the session-lifecycle routes above.

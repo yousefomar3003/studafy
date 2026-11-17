@@ -141,6 +141,28 @@ async function validateTimetableSlot(
  * When period is provided, validates that a matching approved timetable slot exists.
  * When period is null (daily attendance mode), timetable validation is skipped.
  */
+/**
+ * Whether the caller may open or change a session for this class: a school admin, the class's
+ * teacher, or the attendance officer (QA-087). The same rule `recordAttendanceBatch` applies.
+ * Readability alone is not enough: a teacher who is also a parent can read their child's class.
+ */
+async function assertCanManageClassSessions(tx: TransactionSql, classId: string): Promise<void> {
+  const [auth] = await tx<{ allowed: boolean }[]>`
+    SELECT (
+      app.current_user_is_school_admin()
+      OR app.teaches_class(${classId}::uuid)
+      OR app.current_user_is_attendance_officer()
+    ) AS allowed
+  `;
+  if (!auth?.allowed) {
+    throw new CodedHttpException(
+      403,
+      ERROR_CODES.ATTENDANCE_RECORD_FORBIDDEN,
+      "You are not assigned to this class",
+    );
+  }
+}
+
 export async function openAttendanceSession(
   tx: TransactionSql,
   schoolId: string,
@@ -148,6 +170,18 @@ export async function openAttendanceSession(
   params: OpenSessionParams,
 ): Promise<{ session: AttendanceSessionRow; created: boolean }> {
   const period = params.period ?? null;
+
+  // Validate class exists within this school (and is readable: RLS hides other classes, which read
+  // as not found), then that the caller may run its register (QA-087) -- before an existing session
+  // is handed back.
+  const [classRow] = await tx<{ id: string }[]>`
+    SELECT id FROM app.classes
+    WHERE id = ${params.class_id} AND school_id = ${schoolId}
+  `;
+  if (!classRow) {
+    throw new HTTPException(404, { message: "Class not found" });
+  }
+  await assertCanManageClassSessions(tx, params.class_id);
 
   // Idempotent: return existing if one already covers this class/date/period.
   const existing = await findExistingSession(
@@ -177,15 +211,6 @@ export async function openAttendanceSession(
         "No approved timetable slot found for this class, date, and period",
       );
     }
-  }
-
-  // Validate class exists within this school.
-  const [classRow] = await tx<{ id: string }[]>`
-    SELECT id FROM app.classes
-    WHERE id = ${params.class_id} AND school_id = ${schoolId}
-  `;
-  if (!classRow) {
-    throw new HTTPException(404, { message: "Class not found" });
   }
 
   const [row] = await tx<Record<string, unknown>[]>`
@@ -299,6 +324,7 @@ export async function updateAttendanceSessionStatus(
       "Attendance session not found",
     );
   }
+  await assertCanManageClassSessions(tx, existing.class_id as string);
 
   const allowed = VALID_TRANSITIONS[existing.status];
   if (!allowed || !allowed.has(params.status)) {

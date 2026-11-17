@@ -7,6 +7,7 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { KeyStore, REVIEW_LOGIN_PROVIDER } from "../../src/modules/auth";
 import {
+  appDatabaseFor,
   assignRole,
   createSchool,
   createTestDatabase,
@@ -35,12 +36,19 @@ let app: OpenAPIHono<AppEnv>;
 let reviewSchoolId: string;
 let regularSchoolId: string;
 
-function buildApp(reviewLoginPassword: string | undefined): OpenAPIHono<AppEnv> {
+function buildApp(
+  reviewLoginPassword: string | undefined,
+  options: { allowed?: readonly string[]; lines?: Record<string, unknown>[] } = {},
+): OpenAPIHono<AppEnv> {
   return createApp({
     isReady: () => true,
     tracker: createInflightTracker(),
-    logger: createLogger({ destination: () => undefined }),
-    database: sql,
+    logger: createLogger({
+      destination: (line: string) =>
+        options.lines?.push(JSON.parse(line) as Record<string, unknown>),
+    }),
+    reviewLoginAllowedEmails: options.allowed,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
@@ -178,5 +186,26 @@ describe("review email/password login", () => {
       body: JSON.stringify({ email, password: REVIEW_PASSWORD }),
     });
     expect(response.status).toBe(404);
+  });
+});
+
+// QA-085: one shared password signed in as any account in the review tenant, in production, with
+// nobody told. The accounts it reaches can be listed, and every use raises an alert.
+describe("review login allowlist and alert (QA-085)", () => {
+  integrationTest("only listed accounts sign in, and each sign-in raises an alert", async () => {
+    const listed = await reviewAccount(reviewSchoolId, ROLES.ORG_ADMIN);
+    const unlisted = await reviewAccount(reviewSchoolId, ROLES.ORG_ADMIN);
+    const lines: Record<string, unknown>[] = [];
+    const limited = buildApp(REVIEW_PASSWORD, { allowed: [listed], lines });
+    const signIn = (email: string) =>
+      limited.request(LOGIN_PATH, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: REVIEW_PASSWORD, channel: "mobile" }),
+      });
+
+    await expectInvalidCredentials(await signIn(unlisted));
+    expect((await signIn(listed)).status).toBe(200);
+    expect(lines.filter((line) => line.alert === "review_login_used")).toHaveLength(1);
   });
 });

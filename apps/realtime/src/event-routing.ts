@@ -1,6 +1,6 @@
-import { DOMAIN_EVENTS, ROLES } from "@studafy/constants";
+import { DOMAIN_EVENTS } from "@studafy/constants";
 
-import { roleRoomKey, userRoomKey } from "./rooms";
+import { userRoomKey } from "./rooms";
 
 import type { RoomKey } from "./protocol";
 import type { DomainEvent } from "@studafy/constants";
@@ -28,11 +28,21 @@ function payloadUserId(payload: unknown): string | null {
   return typeof userId === "string" && userId.length > 0 ? userId : null;
 }
 
+/** The `recipientUserIds` an outbox payload names: non-empty strings only. */
+function payloadRecipients(payload: unknown): string[] {
+  if (typeof payload !== "object" || payload === null) return [];
+  const ids = (payload as { recipientUserIds?: unknown }).recipientUserIds;
+  return Array.isArray(ids)
+    ? ids.filter((id): id is string => typeof id === "string" && id.length > 0)
+    : [];
+}
+
 export const EVENT_ROUTES: Partial<Record<DomainEvent, EventRoute>> = {
-  [DOMAIN_EVENTS.GRADES_PUBLISHED]: (schoolId) => [
-    roleRoomKey(schoolId, ROLES.STUDENT),
-    roleRoomKey(schoolId, ROLES.PARENT),
-  ],
+  // QA-031: per-recipient. The role-room broadcast told every student and parent in the school
+  // which minors were graded, when, and by whom. The publisher names the recipients (the student's
+  // own account and linked guardians); an event naming none reaches no one.
+  [DOMAIN_EVENTS.GRADES_PUBLISHED]: (schoolId, payload) =>
+    payloadRecipients(payload).map((userId) => userRoomKey(schoolId, userId)),
   // A person's feature grants changed -- a seat assigned or freed, a license activated or ended
   // (docs/billing/feature-licensing.md). Per-recipient, unlike the role broadcasts: only that
   // person's own sockets (their home user room) hear it, and they re-read GET /api/me/features.

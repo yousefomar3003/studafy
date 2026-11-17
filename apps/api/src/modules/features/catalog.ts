@@ -1,6 +1,6 @@
 import { FEATURE_KEYS, isFeatureKey } from "@studafy/constants";
 
-import { withSystemTx } from "../../db/tenant-tx";
+import { withAppTx, withSystemTx } from "../../db/tenant-tx";
 
 import type { Database, DatabasePools } from "../../db/client";
 import type { Logger } from "../../logger";
@@ -59,28 +59,32 @@ function pool(database: Database | DatabasePools): Database {
   return typeof database === "function" ? database : database.primary;
 }
 
-/** Read the catalog. Global tables: readable by studafy_app with no tenant scope. */
+/**
+ * Read the catalog. Global tables, readable by studafy_app with no tenant scope -- read *as*
+ * studafy_app (withAppTx), not off the raw pool, which only worked because the production login
+ * holds table privileges of its own (QA-014).
+ */
 export async function readFeatureCatalog(
   database: Database | DatabasePools,
 ): Promise<FeatureCatalog> {
-  const sql = pool(database);
-
-  const [featureRows, tierRows, limitRows] = await Promise.all([
-    sql<{ key: string; display_name: string; status: FeatureStatus }[]>`
-      SELECT key, display_name, status FROM app.features
-    `,
-    sql<TierRow[]>`
-      SELECT id::text AS id, code, audience, rank::int AS rank, includes_all_features, is_active
-      FROM app.plans
-      WHERE audience IS NOT NULL
-    `,
-    sql<{ plan_id: string; feature_key: string; monthly_limit: number | null }[]>`
-      SELECT pf.plan_id::text AS plan_id, pf.feature_key, pf.monthly_limit
-      FROM app.plan_features AS pf
-      JOIN app.plans AS p ON p.id = pf.plan_id
-      WHERE p.audience IS NOT NULL
-    `,
-  ]);
+  const [featureRows, tierRows, limitRows] = await withAppTx(pool(database), (tx) =>
+    Promise.all([
+      tx<{ key: string; display_name: string; status: FeatureStatus }[]>`
+        SELECT key, display_name, status FROM app.features
+      `,
+      tx<TierRow[]>`
+        SELECT id::text AS id, code, audience, rank::int AS rank, includes_all_features, is_active
+        FROM app.plans
+        WHERE audience IS NOT NULL
+      `,
+      tx<{ plan_id: string; feature_key: string; monthly_limit: number | null }[]>`
+        SELECT pf.plan_id::text AS plan_id, pf.feature_key, pf.monthly_limit
+        FROM app.plan_features AS pf
+        JOIN app.plans AS p ON p.id = pf.plan_id
+        WHERE p.audience IS NOT NULL
+      `,
+    ]),
+  );
 
   const settings: FeatureCatalog["settings"] = {};
   for (const row of featureRows) {

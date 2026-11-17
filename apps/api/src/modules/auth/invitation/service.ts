@@ -5,6 +5,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { emit } from "../../../lib/events/emitter";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../../lib/keyset-cursor";
+import { likeContains } from "../../../lib/sql/like";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
 import type { InvitationStatus } from "./schemas";
@@ -409,12 +410,12 @@ export async function listInvitations(
 
   const roleFilter = params.role ? tx` AND role = ${params.role}::app.user_role` : tx``;
 
-  const searchFilter = params.search ? tx` AND email ILIKE ${`%${params.search}%`}` : tx``;
+  const searchFilter = params.search ? tx` AND email ILIKE ${likeContains(params.search)}` : tx``;
 
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor!);
-        return tx` AND (created_at, id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (created_at, id) < (COALESCE((SELECT k.created_at FROM app.invitations k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 

@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 
 import { withTenantTx } from "../../db/tenant-tx";
 import { decodeKeysetCursor, encodeKeysetCursor } from "../../lib/keyset-cursor";
+import { likeContains } from "../../lib/sql/like";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 import { MEMBER_PASSWORD_ROLES } from "../auth/services/member-password-service";
 import { adminRevokeUserSessions, REVOCATION_REASONS } from "../auth/services/revocation-service";
@@ -121,6 +122,27 @@ function notPlatformStaff(tx: TransactionSql) {
   )`;
 }
 
+/**
+ * QA-060: Studafy's own staff are out of a school administrator's reach. Role changes already
+ * refused them (canChangeRoleOf); reading, editing, deactivating and filing a GDPR request against
+ * a platform-staff account now answer exactly as for a user of another school -- not found --
+ * unless the caller is platform staff too.
+ */
+export async function assertManageableTarget(
+  tx: TransactionSql,
+  targetUserId: string,
+  callerRoles: readonly string[],
+  notFound: () => Error = () => new HTTPException(404, { message: "User not found" }),
+): Promise<void> {
+  if (callerRoles.some((role) => isPlatformRole(role))) return;
+  const [staff] = await tx<{ found: number }[]>`
+    SELECT 1 AS found FROM app.user_roles
+    WHERE user_id = ${targetUserId}::uuid AND role = ANY(${[...PLATFORM_ROLES]}::app.user_role[])
+    LIMIT 1
+  `;
+  if (staff) throw notFound();
+}
+
 export async function listUsers(
   tx: TransactionSql,
   schoolId: string,
@@ -129,9 +151,9 @@ export async function listUsers(
   const statusFilter = params.status ? tx` AND u.status = ${params.status}::app.user_status` : tx``;
 
   const searchFilter = params.search
-    ? tx` AND (u.display_name ILIKE ${`%${params.search}%`} OR u.email ILIKE ${`%${params.search}%`}
+    ? tx` AND (u.display_name ILIKE ${likeContains(params.search)} OR u.email ILIKE ${likeContains(params.search)}
              OR EXISTS (SELECT 1 FROM app.member_codes mc
-                        WHERE mc.user_id = u.id AND mc.code ILIKE ${`%${params.search}%`}))`
+                        WHERE mc.user_id = u.id AND mc.code ILIKE ${likeContains(params.search)}))`
     : tx``;
 
   const createdFromFilter = params.created_from
@@ -152,7 +174,7 @@ export async function listUsers(
   const cursorFilter = params.cursor
     ? (() => {
         const { created_at, id } = decodeKeysetCursor(params.cursor);
-        return tx` AND (u.created_at, u.id) < (${created_at}::timestamptz, ${id}::uuid)`;
+        return tx` AND (u.created_at, u.id) < (COALESCE((SELECT k.created_at FROM app.users k WHERE k.id = ${id}::uuid), ${created_at}::timestamptz), ${id}::uuid)`;
       })()
     : tx``;
 

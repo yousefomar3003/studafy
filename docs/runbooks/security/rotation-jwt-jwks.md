@@ -1,14 +1,8 @@
 # Secret rotation: JWT signing keys (JWKS overlap)
 
-The RSA signing/verification key pairs that sign `apps/api`'s access tokens. This is a distinct
-class from the other three: the key material never leaves process memory, is never a stored secret,
-and rotation is already automatic. A quarterly drill verifies the overlap property that
-makes rotation zero-downtime.
+The RSA key pair that signs `apps/api`'s access tokens. Since QA-023 it is a **stored secret**, `JWT_PRIVATE_KEY_PEM`, which every API machine loads at boot. Before that, each machine generated its own key in memory. A token signed on one machine was then a 401 on another, and every restart logged everyone out.
 
-Source: `apps/api/src/modules/auth/jwt/key-store.ts` (`KeyStore`), wired in
-`apps/api/src/index.ts:138-141`, served at `GET /.well-known/jwks.json`
-(`apps/api/src/modules/auth/jwks/route.ts`). Verification architecture:
-[`docs/security/JWT_verification_architecture.md`](../../security/JWT_verification_architecture.md).
+Source: `apps/api/src/modules/auth/jwt/key-store.ts` (`KeyStore.init`), wired in `apps/api/src/index.ts`, served at `GET /.well-known/jwks.json` (`apps/api/src/modules/auth/jwks/route.ts`). Verification architecture: [`docs/security/JWT_verification_architecture.md`](../../security/JWT_verification_architecture.md).
 
 Boundary: `WS_JWT_SECRET` (HMAC `HS256`), the realtime handshake-ticket key that `apps/api` signs
 with and `apps/realtime/src/auth.ts` verifies, is a **different class**: an application secret held
@@ -20,67 +14,54 @@ until both run the new value, new handshakes fail and clients retry. (Realtime i
 while live updates are deferred, so today no handshakes happen at all.) Open sockets are not affected, since the
 key is checked only at handshake.
 
-## What already rotates itself
+## How the key works
 
-`KeyStore` holds at most two key pairs, `current` (signing + verification) and `previous`
-(verification only). Every `JWT_KEY_ROTATION_INTERVAL_MS` (default 7 days) it generates a fresh
-RSA-2048 pair, demotes `current` to `previous`, and drops the old `previous`. The JWKS endpoint
-serves both, keyed by `kid`, so tokens signed by the outgoing key stay verifiable until they expire
-— that is the JWKS-overlap property, and it is the entire zero-downtime mechanism. Each rotation is
-logged: `logger.info({ kid }, "jwt key rotated")`, the structured-log audit trail for this class.
+- `JWT_PRIVATE_KEY_PEM` (required when `APP_ENV` is `staging` or `production`; `env.ts` refuses to boot without it): an unencrypted RSA PKCS#8 PEM, which signs and verifies tokens. Its `kid` is the public key's RFC 7638 thumbprint, so every machine and every restart advertises the same `kid`.
+- `JWT_NEXT_PRIVATE_KEY_PEM` (optional): the second key of a rotation window. It is published in the JWKS and accepted for verification, but **never signs**.
+- With a PEM set there is no rotation timer: the key changes only when an operator changes the secret. `JWT_KEY_ROTATION_INTERVAL_MS` applies only to development, where a key is generated in memory.
+- Secret stores that flatten newlines are handled: literal `\n` escapes and CRLF are converted back to newlines.
+- At boot the API logs `jwt signing key ready` with the `kid` and `source` (`secret` or `generated`). On a deployed tier, `source` must be `secret`.
 
-No operator action rotates keys. What needs a human, quarterly, is _proving the overlap holds_ and
-noticing if it ever stops holding.
+## First-time setup (NEEDS HUMAN)
+
+Do this before the first deploy that contains QA-023. The API refuses to boot without the secret.
+
+1. Generate the key on a trusted machine. Never paste it into chat, tickets or logs.
+
+   ```bash
+   openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out jwt-current.pem
+   ```
+
+2. Store it in the secret store the deploy workflow stages from (the `prod` GitHub Environment, see [`docs/runbooks/production-secrets.md`](../production-secrets.md)) as `JWT_PRIVATE_KEY_PEM`, and on the app:
+
+   ```bash
+   fly secrets set -a studafy-core-api JWT_PRIVATE_KEY_PEM="$(cat jwt-current.pem)" --stage
+   ```
+
+   Do the same on every staging API app, with a **different** key. Then shred the local file, or move it into the password manager.
+
+3. Deploy. Check that every machine logs the same `kid` with `source: "secret"`, and that `GET /.well-known/jwks.json` returns that one `kid` from every machine.
+
+Expect one forced sign-in at the switch. Tokens signed by the old in-memory keys die with them, which is bounded by `JWT_ACCESS_TTL_SECONDS` (900 s); refresh tokens are unaffected.
+
+## Planned rotation (zero downtime)
+
+Let A be the current key and B the new one. Each step is a normal rolling deploy, and the old and new machines accept each other's tokens at every step.
+
+1. **Publish B.** Set `JWT_NEXT_PRIVATE_KEY_PEM=B`. A still signs; A and B both verify.
+2. **Sign with B.** After step 1 is on every machine, swap the two secrets: `JWT_PRIVATE_KEY_PEM=B`, `JWT_NEXT_PRIVATE_KEY_PEM=A`. B signs; A and B both verify.
+3. **Retire A.** After at least `JWT_ACCESS_TTL_SECONDS` (900 s), unset `JWT_NEXT_PRIVATE_KEY_PEM`.
+
+## Emergency rotation (key exposed)
+
+Set `JWT_PRIVATE_KEY_PEM` to a fresh key and leave `JWT_NEXT_PRIVATE_KEY_PEM` **unset**, so the exposed key stops verifying at once. Every live access token is refused and clients refresh; refresh tokens are stored server-side and keep working. Record the rotation in [`rotation-schedule.md`](rotation-schedule.md).
 
 ## Quarterly drill
 
-**1. Prove the JWKS advertises the last two keys.**
-
-```bash
-curl -fsS https://api.studafy.com/.well-known/jwks.json | jq '.keys[] | {kid, alg, use, kty}'
-```
-
-Expect exactly two keys unless the process started < the rotation interval ago (then one). Both
-`alg=RS256`, `use=sig`, `kty=RSA`, distinct `kid`s.
-
-**2. Rotate on demand and watch the overlap live.**
-
-A restart regenerates both keys (see the gap below), so the clean way to force a live rotation is
-to restart the api's machines:
-
-```bash
-fly apps restart studafy-core-api
-```
-
-Then immediately re-fetch the JWKS and note that both keys' kids changed. A token signed under the
-pre-restart `kid` is _not_ verifiable after the restart (see the gap) — the overlap guarantee is
-within a process lifetime, which is what the 7-day timer preserves.
-
-**3. Verify a token signs and verifies end-to-end.** Sign with the live `current` key and verify
-against the served JWKS with `jose`'s `createLocalJWKSet` — the same assertion
-`apps/api/src/modules/auth/jwt/sign-verify.test.ts:229` makes under test, run against the real
-endpoint.
-
-**4. Audit trail (required recording, not optional):** capture the `jwt key rotated` log lines from
-the api's logs in Axiom (dataset `studafy-logs`, shipped by `infra/fly/log-shipper.toml`) for the
-rotation window. See
-[`rotation-schedule.md`](rotation-schedule.md)'s audit/evidence section for the exact query.
-
-## Honest gaps
-
-- **Key material is in-memory and ephemeral.** No PEM is persisted (`KeyStore.init()` takes an
-  optional `privateKeyPem`; `index.ts` passes none), so a container restart discards `previous`
-  along with `current`. Any access token minted before the restart becomes unverifiable for its
-  remaining TTL on the next restart/rotate. This is bounded (access TTL default 900s,
-  `JWT_ACCESS_TTL_SECONDS`) and automatic (`KeyStore` rotates on init), but it is not the
-  persistent-key scheme some clients assume JWKS implies. If a zero-gap restart guarantee ever
-  becomes an acceptance criterion, the change is: persist key pairs as a secret and load via
-  the optional `init(privateKeyPem)` path. Not done here.
-- **`onRotate` is wired to the logger only** (`index.ts:139`), so a failed/absent log shipment is a
-  silent gap in the audit trail. No separate durable event store holds rotation events (the
-  `app.security_events` table structurally cannot: it is for unauthenticated _request_ rejections —
-  `db/migrations/000028`; `app.audit_logs` requires a tenant and actor). The structured log and
-  its retention in Axiom are the record.
+1. `curl -fsS https://api.studafy.com/.well-known/jwks.json | jq '.keys[] | {kid, alg, use, kty}'`. Expect the current `kid` (plus the next one during a rotation window), with `alg=RS256`, `use=sig` and `kty=RSA`. Repeat a few times and confirm the same set comes back each time (different machines).
+2. `fly apps restart studafy-core-api`, then fetch the JWKS again. The `kid` must **not** change. If it does, a machine is running without the secret.
+3. Sign and verify end to end against the served JWKS, as `apps/api/src/modules/auth/jwt/sign-verify.test.ts` does under test.
+4. Audit trail: record the `jwt signing key ready` log lines (Axiom, dataset `studafy-logs`) for the drill window. See [`rotation-schedule.md`](rotation-schedule.md).
 
 ## Known gaps
 

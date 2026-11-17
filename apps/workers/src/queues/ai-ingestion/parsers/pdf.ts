@@ -1,6 +1,13 @@
 import { extractTextItems, getDocumentProxy, renderPageAsImage } from "unpdf";
 
-import { CorruptDocumentError, EmptyDocumentError, EncryptedDocumentError } from "../errors";
+import {
+  CorruptDocumentError,
+  DocumentTooLargeError,
+  EmptyDocumentError,
+  EncryptedDocumentError,
+} from "../errors";
+
+import { assertPixelsWithinLimit, INGESTION_LIMITS } from "./limits";
 
 import type { OcrEngine, OcrPageResult, OcrReport } from "../ocr";
 import type { ParsedBlock, ParsedDocument } from "../types";
@@ -31,6 +38,7 @@ interface OutlineSection {
 const HEADING_FONT_RATIO = 1.4;
 const MAX_HEADING_CHARS = 120;
 const LINE_Y_TOLERANCE = 2;
+const OCR_RENDER_SCALE = 2;
 
 export interface ParsePdfOptions {
   /**
@@ -64,6 +72,11 @@ export async function parsePdf(
 
   try {
     const pages = proxy.numPages;
+    if (pages > INGESTION_LIMITS.maxPdfPages) {
+      throw new DocumentTooLargeError(
+        `file has ${pages} pages; the limit is ${INGESTION_LIMITS.maxPdfPages}`,
+      );
+    }
     const { items } = await extractTextItems(proxy);
     const lines = linesPerPage(items);
     const bodySize = dominantFontSize(lines);
@@ -71,6 +84,13 @@ export async function parsePdf(
 
     const ocrByPage = new Map<number, OcrPageResult>();
     if (options.ocr) {
+      // Every textless page goes to OCR, the slow path: cap how many, before starting (QA-043).
+      const textless = lines.filter((pageLines) => pageLines.length === 0).length;
+      if (textless > INGESTION_LIMITS.maxOcrPages) {
+        throw new DocumentTooLargeError(
+          `file has ${textless} scanned pages; the limit is ${INGESTION_LIMITS.maxOcrPages}`,
+        );
+      }
       for (const [pageIndex, pageLines] of lines.entries()) {
         if (pageLines.length > 0) continue;
         const pageNumber = pageIndex + 1;
@@ -108,9 +128,13 @@ async function ocrPage(
   proxy: Awaited<ReturnType<typeof getDocumentProxy>>,
   page: number,
 ): Promise<OcrPageResult> {
+  // The canvas size follows the page's MediaBox, which the file controls: check it before
+  // allocating one (QA-043). A 14,400 pt page at scale 2 would be ~830 megapixels.
+  const viewport = (await proxy.getPage(page)).getViewport({ scale: OCR_RENDER_SCALE });
+  assertPixelsWithinLimit(viewport.width, viewport.height, `page ${page}`);
   const rendered = await renderPageAsImage(proxy, page, {
     canvasImport: () => import("@napi-rs/canvas"),
-    scale: 2,
+    scale: OCR_RENDER_SCALE,
   });
   return ocr.recognize(new Uint8Array(rendered), page);
 }

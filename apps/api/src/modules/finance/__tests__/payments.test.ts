@@ -40,8 +40,11 @@ import type { ErpNextPaymentEntry } from "../payments/projection";
 const SCHOOL_ID = "11111111-1111-4111-8111-111111111111";
 const STUDENT_ID = "22222222-2222-4222-8222-222222222222";
 
-function makeParams(overrides: Partial<CreatePaymentParams> = {}): CreatePaymentParams {
+function makeParams(
+  overrides: Partial<CreatePaymentParams> = {},
+): CreatePaymentParams & { posting_date: string } {
   return {
+    posting_date: "2026-03-15",
     student_id: STUDENT_ID,
     invoice_id: "ACC-SINV-2026-00042",
     amount: 12.345,
@@ -180,14 +183,13 @@ describe("Payment Entry payload", () => {
     expect(payload).not.toHaveProperty("is_partial");
   });
 
-  test("defaults posting_date to today but honours an explicit one", () => {
+  // The default (the school's local today, QA-044) is resolved by createPayment; the builder takes
+  // the date it is given.
+  test("posts on the date it is given", () => {
     expect(
       buildPaymentEntryPayload(makeParams({ posting_date: "2026-03-01" }), SCHOOL_ID, "C")
         .posting_date,
     ).toBe("2026-03-01");
-    expect(buildPaymentEntryPayload(makeParams(), SCHOOL_ID, "C").posting_date).toBe(
-      new Date().toISOString().slice(0, 10),
-    );
   });
 });
 

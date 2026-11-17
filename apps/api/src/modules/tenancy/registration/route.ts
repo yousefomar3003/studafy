@@ -25,7 +25,8 @@ const registerSchoolRoute = createRoute({
     "Public self-registration endpoint. Validates the request, verifies the captcha token, " +
     "and atomically creates the school (status=registered), its first ORG_ADMIN user, and an " +
     "activation invitation. Duplicate school email or slug are rejected with clear error codes. " +
-    "The raw invitation token is returned exactly once in this response.",
+    "The verification token is emailed to the school contact address and the activation " +
+    "invitation to the administrator; neither is ever returned in this response.",
   security: [],
   request: {
     body: {
@@ -36,7 +37,7 @@ const registerSchoolRoute = createRoute({
   responses: standardResponses(
     {
       201: {
-        description: "School registered. The invitation token is included in this response only.",
+        description: "School registered. Verification and invitation links are sent by email only.",
         schema: registerSchoolResponseSchema,
       },
     },
@@ -97,12 +98,14 @@ export function registerSchoolRoutes(db: Database, logger: Logger): OpenAPIHono<
           email: result.adminEmail,
           role: "ORG_ADMIN" as const,
         },
+        // The raw tokens are deliberately absent (QA-007). This route is anonymous: returning the
+        // verification token would let the caller verify a school address they do not own, and the
+        // invitation token would let them activate the first ORG_ADMIN as anyone. Both reach their
+        // owners only through the SCHOOL_VERIFICATION_EMAIL_SENT / INVITATION_SENT outbox emails.
         invitation: {
-          token: result.invitationToken,
           expires_at: result.invitationExpiresAt.toISOString(),
         },
         verification: {
-          token: result.verificationToken,
           expires_at: result.verificationExpiresAt.toISOString(),
         },
       },

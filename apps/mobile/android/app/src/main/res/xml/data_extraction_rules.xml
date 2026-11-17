@@ -1,11 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Android 12+ (android:dataExtractionRules). Same exclusion as backup_rules.xml, applied to
+<!-- Android 12+ (android:dataExtractionRules). Same exclusions as backup_rules.xml, applied to
      both cloud backup and device-to-device transfer. -->
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="FlutterSecureStorage.xml" />
+        <exclude domain="file" path="." />
+        <exclude domain="database" path="." />
     </device-transfer>
 </data-extraction-rules>

@@ -19,6 +19,8 @@
  * Steps 1 and 2 both always run, so a wrong password and an unknown email cost the same work.
  */
 
+import { withTenantTx } from "../../../db/tenant-tx";
+
 import { findOAuthIdentity, loginReturningUser } from "./returning-user-login-service";
 import { normalizeReviewEmail, passwordMatches } from "./review-login-service";
 
@@ -46,16 +48,17 @@ async function isQaTenantIdentity(db: Database, subject: string): Promise<boolea
   const identity = await findOAuthIdentity(db, QA_LOGIN_PROVIDER, subject);
   if (!identity) return false;
 
-  // app.schools is a global table without RLS; the tenant scope is not needed to read the flag.
-  let isQaTenant = false;
-  await db.begin(async (tx) => {
-    await tx.unsafe("SET LOCAL ROLE studafy_app");
-    const [school] = await tx<{ is_qa_tenant: boolean }[]>`
-      SELECT is_qa_tenant FROM app.schools WHERE id = ${identity.schoolId}::uuid
-    `;
-    isQaTenant = school?.is_qa_tenant === true;
-  });
-  return isQaTenant;
+  // Read in the identity's own school scope: app.schools is row-level secured (QA-016), and a
+  // tenant transaction sees exactly its own school's row.
+  const [school] = await withTenantTx(
+    db,
+    { schoolId: identity.schoolId },
+    (tx) =>
+      tx<
+        { is_qa_tenant: boolean }[]
+      >`SELECT is_qa_tenant FROM app.schools WHERE id = ${identity.schoolId}::uuid`,
+  );
+  return school?.is_qa_tenant === true;
 }
 
 export async function loginQaUser(

@@ -19,6 +19,7 @@ import { ROLES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
+import { buildPermanentKey, buildTempKey } from "../../src/lib/storage/keys";
 import {
   assignRole,
   authenticatedRequest,
@@ -174,12 +175,18 @@ type Status = "uploaded" | "ready" | "failed";
 interface SeededMaterial {
   id: string;
   storageKey: string;
+  /** The temp/ key the client PUTs to and confirms with (QA-009). */
+  stagingKey: string;
 }
 
 /** A material of the class, uploaded by its teacher, in the given state. */
 async function seedMaterial(w: World, status: Status): Promise<SeededMaterial> {
-  const storageKey = `permanent/${w.tenant.schoolId}/materials/${crypto.randomUUID()}-notes.pdf`;
+  const objectId = crypto.randomUUID();
+  const storageKey = buildPermanentKey(w.tenant.schoolId, objectId, "notes.pdf");
+  const stagingKey = buildTempKey(w.tenant.schoolId, objectId, "notes.pdf");
   storage.objects.set(storageKey, 1000);
+  // An `uploaded` material is waiting for confirm, which promotes the staged object.
+  if (status === "uploaded") storage.objects.set(stagingKey, 1000);
   const [row] = await asAdmin(
     w.tenant.schoolId,
     (tx) => tx<{ id: string }[]>`
@@ -196,7 +203,7 @@ async function seedMaterial(w: World, status: Status): Promise<SeededMaterial> {
       RETURNING id
     `,
   );
-  return { id: row!.id, storageKey };
+  return { id: row!.id, storageKey, stagingKey };
 }
 
 async function materialState(w: World, id: string) {
@@ -259,7 +266,7 @@ const BY_ID_ROUTES: WriteRoute[] = [
     success: 200,
     send: (w, as, m) =>
       call(w, as, "POST", `/api/academics/materials/${m.id}/confirm`, {
-        storage_key: m.storageKey,
+        storage_key: m.stagingKey,
       }),
   },
   {

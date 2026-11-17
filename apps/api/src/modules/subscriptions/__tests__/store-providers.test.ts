@@ -11,6 +11,7 @@ import { X509Certificate } from "node:crypto";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
+import { createStoreBilling } from "../store";
 import { createAppleStore } from "../store/apple";
 import {
   APPLE_INC_ROOT,
@@ -285,5 +286,31 @@ describe("App Store", () => {
 
   test("refuses a notification that is not signed by Apple", async () => {
     expect(store.verifyNotification(unsigned)).rejects.toBeInstanceOf(StoreVerificationError);
+  });
+});
+
+describe("sandbox allowlist wiring (QA-058)", () => {
+  const base = {
+    AI_STORE_PRODUCT_ID: "studafy_ai_monthly",
+    APPLE_IAP_BUNDLE_ID: "com.studafy.app",
+  };
+
+  test("production always restricts sandbox purchases, to the listed accounts", () => {
+    expect(createStoreBilling({ ...base, NODE_ENV: "production" })!.sandboxAllowedUserIds).toEqual(
+      new Set(),
+    );
+    expect(
+      createStoreBilling({
+        ...base,
+        NODE_ENV: "production",
+        STORE_SANDBOX_ALLOWED_USER_IDS: " a , b ",
+      })!.sandboxAllowedUserIds,
+    ).toEqual(new Set(["a", "b"]));
+  });
+
+  test("outside production sandbox purchases are open", () => {
+    expect(
+      createStoreBilling({ ...base, NODE_ENV: "development" })!.sandboxAllowedUserIds,
+    ).toBeNull();
   });
 });

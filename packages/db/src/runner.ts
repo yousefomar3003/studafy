@@ -138,12 +138,18 @@ async function recordMigration<T extends QuerySql>(
 
 async function applyMigration(sql: ReservedSql, migration: Migration): Promise<bigint> {
   const started = process.hrtime.bigint();
+  // QA-049: a migration that cannot get its lock fails fast instead of queueing every query on the
+  // table behind it. The values are validated durations (discovery.ts), so interpolation is safe.
   try {
     if (migration.transactional) {
       // postgres@3's reserved connection has no `.begin()`; drive the transaction manually so the
       // migration and its history row commit atomically on the same session that holds the lock.
       await sql.unsafe("BEGIN");
       try {
+        await sql.unsafe(
+          `SET LOCAL lock_timeout = '${migration.lockTimeout}'; ` +
+            `SET LOCAL statement_timeout = '${migration.statementTimeout}'`,
+        );
         await sql.unsafe(migration.sql);
         const duration = (process.hrtime.bigint() - started) / 1_000_000n;
         await recordMigration(sql, migration, duration);
@@ -153,9 +159,21 @@ async function applyMigration(sql: ReservedSql, migration: Migration): Promise<b
         throw error;
       }
     } else {
-      await sql.unsafe(migration.sql);
-      const duration = (process.hrtime.bigint() - started) / 1_000_000n;
-      await recordMigration(sql, migration, duration);
+      await sql.unsafe(
+        `SET lock_timeout = '${migration.lockTimeout}'; ` +
+          `SET statement_timeout = '${migration.statementTimeout}'`,
+      );
+      try {
+        await sql.unsafe(migration.sql);
+        const duration = (process.hrtime.bigint() - started) / 1_000_000n;
+        await recordMigration(sql, migration, duration);
+      } finally {
+        // A transaction=off migration cannot use SET LOCAL, so the timeouts are session settings
+        // here. This is the runner's own reserved connection, ended when the run finishes; it is
+        // never returned to an application pool, so nothing leaks.
+        // eslint-disable-next-line studafy/no-session-set -- dedicated migration connection (above)
+        await sql.unsafe("RESET lock_timeout; RESET statement_timeout");
+      }
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown PostgreSQL error";

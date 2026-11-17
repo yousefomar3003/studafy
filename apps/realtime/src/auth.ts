@@ -13,10 +13,10 @@ import type { Role } from "@studafy/constants";
  * caller holding a valid session, signed HS256 with `WS_JWT_SECRET`, which both services read from
  * Secrets Manager. The gateway checks it here and never sees the session's access token.
  *
- * Why a shared key rather than the API's JWKS: the API generates its RSA keys in memory, per task
- * (apps/api/src/modules/auth/jwt/key-store.ts), so a JWKS fetched through the load balancer can come
- * from a different task than the one that signed the ticket. An agreed key has no such window and
- * no network dependency at handshake time.
+ * Why a shared key rather than the API's JWKS: the gateway then has no network dependency at
+ * handshake time. (Deployed API machines now share one RSA key, loaded from JWT_PRIVATE_KEY_PEM
+ * since QA-023, so a JWKS would be consistent too; the per-task key that originally motivated
+ * this is gone.)
  *
  * Single use and revocation are not this module's job: it is pure. The handshake in app.ts spends
  * `ticketId` and checks `sessionId` against the API's denylist through src/session-guard.ts.

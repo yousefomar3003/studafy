@@ -9,6 +9,7 @@ import {
   getGradebookByClassId,
   getGradebookById,
 } from "./config/gradebook-config-service";
+import { gradeRecipients } from "./grade-recipients";
 import { refreshStudentTermSummary } from "./published/service";
 
 import type { UpdateGradeEntry } from "./config/schemas";
@@ -808,6 +809,7 @@ export async function decideSubmission(
     gradebookId: published.gradebook_id,
     studentId: published.student_id,
     approvedByUserId: userId,
+    recipientUserIds: await gradeRecipients(tx, published.student_id),
   });
 
   return published;

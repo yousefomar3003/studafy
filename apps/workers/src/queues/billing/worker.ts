@@ -355,7 +355,7 @@ async function processSingleInvoice(
   try {
     return await sql.begin(async (tx) => {
       await tx`SELECT set_config('app.school_id', ${data.schoolId}, true)`.execute();
-      await tx.unsafe("SET LOCAL ROLE studafy_admin");
+      await tx.unsafe("SET LOCAL ROLE studafy_system");
 
       return generateInvoice(
         tx,

@@ -57,6 +57,45 @@ function emptyAsUnset(value: unknown): unknown {
   return value === "" ? undefined : value;
 }
 
+/**
+ * QA-066: whether a Redis URL keeps its traffic encrypted. `rediss://` is TLS. Plain `redis://` is
+ * accepted only for a host on Fly's private network (`*.internal`, `*.flycast`), whose 6PN links are
+ * WireGuard tunnels already. Anything else, including a URL that does not parse, is refused.
+ */
+export function isEncryptedRedisUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "rediss:") return true;
+  if (url.protocol !== "redis:") return false;
+  const host = url.hostname.toLowerCase();
+  return host.endsWith(".internal") || host.endsWith(".flycast");
+}
+
+export const PLAINTEXT_REDIS_MESSAGE =
+  "must use rediss:// (TLS) in production, unless its host is on Fly's private network (.internal or .flycast)";
+
+/**
+ * A PEM held in a secret store. Empty means unset, and a single-line value with literal `\n`
+ * escapes (how most secret UIs and `fly secrets set` carry one) gets its newlines back.
+ */
+function pemFromSecret(value: unknown): unknown {
+  const present = emptyAsUnset(value);
+  return typeof present === "string"
+    ? present.replaceAll("\\n", "\n").replaceAll("\r\n", "\n").trim()
+    : present;
+}
+
+const pkcs8Pem = z
+  .string()
+  .regex(
+    /^-----BEGIN PRIVATE KEY-----\n[\s\S]+\n-----END PRIVATE KEY-----$/,
+    "must be an unencrypted PKCS#8 PEM (-----BEGIN PRIVATE KEY-----)",
+  );
+
 export const envSchema = z
   .object({
     NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
@@ -88,6 +127,10 @@ export const envSchema = z
     // (@studafy/observability's startMetricsServer) must never be reachable through the public
     // path api's own PORT is, since it carries no auth of its own — fly exposes only PORT. 9464 is Prometheus's own registered default port.
     METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+    // QA-072: the address the metrics endpoint binds. Unset means every interface (local runs and
+    // tests). On fly.io it is `fly-local-6pn`, the machine's private-network address, which fly's
+    // metrics scraper uses; the endpoint has no auth of its own, so it listens nowhere else.
+    METRICS_HOST: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Distributed tracing (ST-260): base URL of an OTLP/HTTP receiver — Axiom's EU edge in
     // production (infra/fly/README.md), with its auth in OTEL_EXPORTER_OTLP_HEADERS. Optional and
     // unset by default — dev, test and the OpenAPI generator all run with no receiver reachable, the
@@ -164,6 +207,12 @@ export const envSchema = z
       .int()
       .positive()
       .default(7 * 24 * 60 * 60 * 1000),
+    // The access-token signing key (QA-023), RSA PKCS#8 PEM. Required on a deployed tier (below):
+    // without it each machine generates its own key, so a token signed on one is a 401 on another
+    // and every restart logs everyone out. The NEXT key is published and verified but never signs;
+    // see docs/runbooks/security/rotation-jwt-jwks.md. Unset in development: a key is generated.
+    JWT_PRIVATE_KEY_PEM: z.preprocess(pemFromSecret, pkcs8Pem.optional()),
+    JWT_NEXT_PRIVATE_KEY_PEM: z.preprocess(pemFromSecret, pkcs8Pem.optional()),
     // Google OAuth (OIDC). All optional — the feature activates only when the client id and secret
     // are set, and then the redirect URI must be too (refinement below). Deployed tiers always render
     // the redirect URI (derived from the tier's API origin) and inject the client id/secret from the
@@ -188,6 +237,8 @@ export const envSchema = z
     // 'review' identities of the single school flagged is_review_tenant. Held in the secret manager,
     // never in the repository (docs/runbooks/app-review-access.md).
     REVIEW_LOGIN_PASSWORD: z.string().min(16).optional(),
+    // QA-085: comma-separated review-tenant emails REVIEW_LOGIN_PASSWORD may open; unset, all.
+    REVIEW_LOGIN_ALLOWED_EMAILS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Shared password for the staging QA tenants (QA-02, qa-login-service.ts). Unset means
     // POST /api/auth/login/qa answers 404. Unlike the reviewer password it reaches SUPER_ADMIN, so the
     // refinement below refuses to boot with it set when APP_ENV is production. Held in the secret
@@ -294,6 +345,10 @@ export const envSchema = z
     // push endpoint's URL that authenticates Google's notifications (a secret).
     GOOGLE_PLAY_SERVICE_ACCOUNT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     GOOGLE_PLAY_RTDN_TOKEN: z.preprocess(emptyAsUnset, z.string().min(16).optional()),
+    // QA-058: comma-separated Studafy user ids (the App Review demo accounts) whose sandbox or
+    // test-track purchases production credits. Everyone else's are refused. Unset in production
+    // means nobody's; ignored elsewhere, where sandbox purchases are always accepted.
+    STORE_SANDBOX_ALLOWED_USER_IDS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Cross-encoder re-ranking (ST-163) kill switch. Off by default: an unset or "false" value leaves
     // the retrieval route on the raw RRF ranking with zero re-ranking cost. Validated as an explicit
     // two-value string so a typo ("yes") fails bootstrap instead of silently flipping the feature on.
@@ -435,6 +490,14 @@ export const envSchema = z
         code: "custom",
         path: ["TURNSTILE_SECRET_KEY"],
         message: `TURNSTILE_SECRET_KEY is required when APP_ENV is ${env.APP_ENV}`,
+      });
+    }
+
+    if (env.APP_ENV !== "development" && !env.JWT_PRIVATE_KEY_PEM) {
+      context.addIssue({
+        code: "custom",
+        path: ["JWT_PRIVATE_KEY_PEM"],
+        message: `JWT_PRIVATE_KEY_PEM is required when APP_ENV is ${env.APP_ENV}`,
       });
     }
 
@@ -702,6 +765,22 @@ export const envSchema = z
     }
 
     if (env.NODE_ENV !== "production") return;
+
+    // QA-066: without Redis, token revocation, rate limiting and entitlement checks silently
+    // degrade and the OAuth state store falls back to process memory, so production needs it.
+    if (env.REDIS_URL === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["REDIS_URL"],
+        message: "REDIS_URL is required in production",
+      });
+    } else if (!isEncryptedRedisUrl(env.REDIS_URL)) {
+      context.addIssue({
+        code: "custom",
+        path: ["REDIS_URL"],
+        message: `REDIS_URL ${PLAINTEXT_REDIS_MESSAGE}`,
+      });
+    }
 
     if (appleStore && env.APPLE_IAP_APP_APPLE_ID === undefined) {
       context.addIssue({

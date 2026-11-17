@@ -1,6 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { exportJWK, generateKeyPair, importJWK, importPKCS8, type JWK } from "jose";
+import {
+  calculateJwkThumbprint,
+  exportJWK,
+  generateKeyPair,
+  importJWK,
+  importPKCS8,
+  type JWK,
+} from "jose";
 
 /**
  * A single RSA key pair held in memory for signing or verifying JWTs.
@@ -47,21 +54,29 @@ export class KeyStore {
   ) {}
 
   /**
-   * Initialize the store. If `privateKeyPem` is provided, it is loaded as the initial
-   * signing key. Otherwise a fresh RSA-2048 key pair is generated.
+   * Initialize the store.
    *
-   * After initialization the rotation timer starts — call `destroy()` on shutdown.
+   * With `privateKeyPem` (every deployed tier, QA-023) the signing key comes from the secret, its
+   * kid is the key's RFC 7638 thumbprint, and there is no rotation timer: every instance and every
+   * restart signs and verifies with the same key. `nextPrivateKeyPem` is published in the JWKS and
+   * accepted for verification only; it is the other half of a rotation window
+   * (docs/runbooks/security/rotation-jwt-jwks.md).
+   *
+   * Without a PEM (development and tests) a fresh RSA-2048 key pair is generated and rotated on a
+   * timer. Call `destroy()` on shutdown either way.
    */
-  async init(privateKeyPem?: string): Promise<void> {
-    if (privateKeyPem) {
-      const privateKey = await importPKCS8(privateKeyPem, "RS256");
-      const publicKey = await derivePublicKey(privateKey);
-      this.current = { kid: randomUUID(), publicKey, privateKey, createdAt: new Date() };
+  async init(keys: { privateKeyPem?: string; nextPrivateKeyPem?: string } = {}): Promise<void> {
+    if (keys.privateKeyPem) {
+      this.current = await loadKeyPair(keys.privateKeyPem);
+      const next = keys.nextPrivateKeyPem ? await loadKeyPair(keys.nextPrivateKeyPem) : null;
+      // The verify-only slot. resolve() lists it in the JWKS and maps its kid; signingKey() never
+      // returns it.
+      this.previous = next && next.kid !== this.current.kid ? next : null;
       this.jwksCache = null;
-    } else {
-      await this.rotate();
+      return;
     }
 
+    await this.rotate();
     this.timer = setInterval(() => {
       this.rotate().catch(() => {
         /* rotation failure is non-fatal; next tick retries */
@@ -142,6 +157,15 @@ export class KeyStore {
       this.timer = null;
     }
   }
+}
+
+/** Load a PKCS#8 PEM as a key pair whose kid is its public key's JWK thumbprint. */
+async function loadKeyPair(pem: string): Promise<StoredKeyPair> {
+  // Extractable so the public half can be derived; the private key never leaves the process.
+  const privateKey = await importPKCS8(pem, "RS256", { extractable: true });
+  const publicKey = await derivePublicKey(privateKey);
+  const kid = await calculateJwkThumbprint(await exportJWK(publicKey));
+  return { kid, publicKey, privateKey, createdAt: new Date() };
 }
 
 /** Export a stored key pair as a JWK suitable for a JWKS endpoint. */

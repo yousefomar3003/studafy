@@ -11,6 +11,17 @@ class $CacheEntriesTable extends CacheEntries
   final GeneratedDatabase attachedDatabase;
   final String? _alias;
   $CacheEntriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  @override
+  late final GeneratedColumn<String> ownerId = GeneratedColumn<String>(
+    'owner_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _resourceMeta = const VerificationMeta(
     'resource',
   );
@@ -57,6 +68,7 @@ class $CacheEntriesTable extends CacheEntries
   );
   @override
   List<GeneratedColumn> get $columns => [
+    ownerId,
     resource,
     cacheKey,
     payload,
@@ -74,6 +86,14 @@ class $CacheEntriesTable extends CacheEntries
   }) {
     final context = VerificationContext();
     final data = instance.toColumns(true);
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerIdMeta);
+    }
     if (data.containsKey('resource')) {
       context.handle(
         _resourceMeta,
@@ -110,11 +130,15 @@ class $CacheEntriesTable extends CacheEntries
   }
 
   @override
-  Set<GeneratedColumn> get $primaryKey => {resource, cacheKey};
+  Set<GeneratedColumn> get $primaryKey => {ownerId, resource, cacheKey};
   @override
   CacheEntryRow map(Map<String, dynamic> data, {String? tablePrefix}) {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return CacheEntryRow(
+      ownerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_id'],
+      )!,
       resource: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}resource'],
@@ -141,11 +165,13 @@ class $CacheEntriesTable extends CacheEntries
 }
 
 class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
+  final String ownerId;
   final String resource;
   final String cacheKey;
   final String payload;
   final DateTime fetchedAt;
   const CacheEntryRow({
+    required this.ownerId,
     required this.resource,
     required this.cacheKey,
     required this.payload,
@@ -154,6 +180,7 @@ class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    map['owner_id'] = Variable<String>(ownerId);
     map['resource'] = Variable<String>(resource);
     map['cache_key'] = Variable<String>(cacheKey);
     map['payload'] = Variable<String>(payload);
@@ -163,6 +190,7 @@ class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
 
   CacheEntriesCompanion toCompanion(bool nullToAbsent) {
     return CacheEntriesCompanion(
+      ownerId: Value(ownerId),
       resource: Value(resource),
       cacheKey: Value(cacheKey),
       payload: Value(payload),
@@ -176,6 +204,7 @@ class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return CacheEntryRow(
+      ownerId: serializer.fromJson<String>(json['ownerId']),
       resource: serializer.fromJson<String>(json['resource']),
       cacheKey: serializer.fromJson<String>(json['cacheKey']),
       payload: serializer.fromJson<String>(json['payload']),
@@ -186,6 +215,7 @@ class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
+      'ownerId': serializer.toJson<String>(ownerId),
       'resource': serializer.toJson<String>(resource),
       'cacheKey': serializer.toJson<String>(cacheKey),
       'payload': serializer.toJson<String>(payload),
@@ -194,11 +224,13 @@ class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
   }
 
   CacheEntryRow copyWith({
+    String? ownerId,
     String? resource,
     String? cacheKey,
     String? payload,
     DateTime? fetchedAt,
   }) => CacheEntryRow(
+    ownerId: ownerId ?? this.ownerId,
     resource: resource ?? this.resource,
     cacheKey: cacheKey ?? this.cacheKey,
     payload: payload ?? this.payload,
@@ -206,6 +238,7 @@ class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
   );
   CacheEntryRow copyWithCompanion(CacheEntriesCompanion data) {
     return CacheEntryRow(
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
       resource: data.resource.present ? data.resource.value : this.resource,
       cacheKey: data.cacheKey.present ? data.cacheKey.value : this.cacheKey,
       payload: data.payload.present ? data.payload.value : this.payload,
@@ -216,6 +249,7 @@ class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
   @override
   String toString() {
     return (StringBuffer('CacheEntryRow(')
+          ..write('ownerId: $ownerId, ')
           ..write('resource: $resource, ')
           ..write('cacheKey: $cacheKey, ')
           ..write('payload: $payload, ')
@@ -225,11 +259,13 @@ class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
   }
 
   @override
-  int get hashCode => Object.hash(resource, cacheKey, payload, fetchedAt);
+  int get hashCode =>
+      Object.hash(ownerId, resource, cacheKey, payload, fetchedAt);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is CacheEntryRow &&
+          other.ownerId == this.ownerId &&
           other.resource == this.resource &&
           other.cacheKey == this.cacheKey &&
           other.payload == this.payload &&
@@ -237,12 +273,14 @@ class CacheEntryRow extends DataClass implements Insertable<CacheEntryRow> {
 }
 
 class CacheEntriesCompanion extends UpdateCompanion<CacheEntryRow> {
+  final Value<String> ownerId;
   final Value<String> resource;
   final Value<String> cacheKey;
   final Value<String> payload;
   final Value<DateTime> fetchedAt;
   final Value<int> rowid;
   const CacheEntriesCompanion({
+    this.ownerId = const Value.absent(),
     this.resource = const Value.absent(),
     this.cacheKey = const Value.absent(),
     this.payload = const Value.absent(),
@@ -250,16 +288,19 @@ class CacheEntriesCompanion extends UpdateCompanion<CacheEntryRow> {
     this.rowid = const Value.absent(),
   });
   CacheEntriesCompanion.insert({
+    required String ownerId,
     required String resource,
     required String cacheKey,
     required String payload,
     required DateTime fetchedAt,
     this.rowid = const Value.absent(),
-  }) : resource = Value(resource),
+  }) : ownerId = Value(ownerId),
+       resource = Value(resource),
        cacheKey = Value(cacheKey),
        payload = Value(payload),
        fetchedAt = Value(fetchedAt);
   static Insertable<CacheEntryRow> custom({
+    Expression<String>? ownerId,
     Expression<String>? resource,
     Expression<String>? cacheKey,
     Expression<String>? payload,
@@ -267,6 +308,7 @@ class CacheEntriesCompanion extends UpdateCompanion<CacheEntryRow> {
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
+      if (ownerId != null) 'owner_id': ownerId,
       if (resource != null) 'resource': resource,
       if (cacheKey != null) 'cache_key': cacheKey,
       if (payload != null) 'payload': payload,
@@ -276,6 +318,7 @@ class CacheEntriesCompanion extends UpdateCompanion<CacheEntryRow> {
   }
 
   CacheEntriesCompanion copyWith({
+    Value<String>? ownerId,
     Value<String>? resource,
     Value<String>? cacheKey,
     Value<String>? payload,
@@ -283,6 +326,7 @@ class CacheEntriesCompanion extends UpdateCompanion<CacheEntryRow> {
     Value<int>? rowid,
   }) {
     return CacheEntriesCompanion(
+      ownerId: ownerId ?? this.ownerId,
       resource: resource ?? this.resource,
       cacheKey: cacheKey ?? this.cacheKey,
       payload: payload ?? this.payload,
@@ -294,6 +338,9 @@ class CacheEntriesCompanion extends UpdateCompanion<CacheEntryRow> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
+    if (ownerId.present) {
+      map['owner_id'] = Variable<String>(ownerId.value);
+    }
     if (resource.present) {
       map['resource'] = Variable<String>(resource.value);
     }
@@ -315,6 +362,7 @@ class CacheEntriesCompanion extends UpdateCompanion<CacheEntryRow> {
   @override
   String toString() {
     return (StringBuffer('CacheEntriesCompanion(')
+          ..write('ownerId: $ownerId, ')
           ..write('resource: $resource, ')
           ..write('cacheKey: $cacheKey, ')
           ..write('payload: $payload, ')
@@ -338,6 +386,7 @@ abstract class _$OfflineDatabase extends GeneratedDatabase {
 
 typedef $$CacheEntriesTableCreateCompanionBuilder =
     CacheEntriesCompanion Function({
+      required String ownerId,
       required String resource,
       required String cacheKey,
       required String payload,
@@ -346,6 +395,7 @@ typedef $$CacheEntriesTableCreateCompanionBuilder =
     });
 typedef $$CacheEntriesTableUpdateCompanionBuilder =
     CacheEntriesCompanion Function({
+      Value<String> ownerId,
       Value<String> resource,
       Value<String> cacheKey,
       Value<String> payload,
@@ -362,6 +412,11 @@ class $$CacheEntriesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnFilters<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<String> get resource => $composableBuilder(
     column: $table.resource,
     builder: (column) => ColumnFilters(column),
@@ -392,6 +447,11 @@ class $$CacheEntriesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  ColumnOrderings<String> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get resource => $composableBuilder(
     column: $table.resource,
     builder: (column) => ColumnOrderings(column),
@@ -422,6 +482,9 @@ class $$CacheEntriesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
+  GeneratedColumn<String> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
+
   GeneratedColumn<String> get resource =>
       $composableBuilder(column: $table.resource, builder: (column) => column);
 
@@ -472,12 +535,14 @@ class $$CacheEntriesTableTableManager
               $$CacheEntriesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
+                Value<String> ownerId = const Value.absent(),
                 Value<String> resource = const Value.absent(),
                 Value<String> cacheKey = const Value.absent(),
                 Value<String> payload = const Value.absent(),
                 Value<DateTime> fetchedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => CacheEntriesCompanion(
+                ownerId: ownerId,
                 resource: resource,
                 cacheKey: cacheKey,
                 payload: payload,
@@ -486,12 +551,14 @@ class $$CacheEntriesTableTableManager
               ),
           createCompanionCallback:
               ({
+                required String ownerId,
                 required String resource,
                 required String cacheKey,
                 required String payload,
                 required DateTime fetchedAt,
                 Value<int> rowid = const Value.absent(),
               }) => CacheEntriesCompanion.insert(
+                ownerId: ownerId,
                 resource: resource,
                 cacheKey: cacheKey,
                 payload: payload,

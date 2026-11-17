@@ -4,7 +4,9 @@ import { ERROR_CODES, ROLES, SCHOOL_STAFF_ROLES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 
 import { CodedHttpException } from "../../coded-http-exception";
+import { buildPermanentKey, buildTempKey, parseStorageKey } from "../../lib/storage/keys";
 import { emitAuditLog } from "../../middleware/auditEmitter";
+import { getContentClass } from "../storage/content-classes";
 
 import { callerManagesClass } from "./class-access";
 
@@ -217,6 +219,13 @@ export async function getMaterial(
   return row;
 }
 
+/**
+ * The content class every material upload is held to (QA-009): the same allowlist and size cap the
+ * generic upload flow applies, checked against the claim here and against the stored object on
+ * confirm. HTML, SVG and script types are not on it.
+ */
+const MATERIAL_CONTENT_CLASS = "material.file";
+
 export async function initiateUpload(
   tx: TransactionSql,
   schoolId: string,
@@ -230,6 +239,22 @@ export async function initiateUpload(
   /** Stored objects of the replaced failed attempts, to free once the transaction commits. */
   freedStorageKeys: string[];
 }> {
+  const contentClass = getContentClass(MATERIAL_CONTENT_CLASS);
+  if (!contentClass.allowedContentTypes.has(params.mime_type)) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      `Files of type ${params.mime_type} cannot be uploaded as learning materials.`,
+    );
+  }
+  if (params.size_bytes > contentClass.maxSizeBytes) {
+    throw new CodedHttpException(
+      400,
+      ERROR_CODES.VALIDATION_FAILED,
+      "This file is larger than learning materials allow.",
+    );
+  }
+
   // Scope first: a teacher of another class cannot see this one, so the lookup below would tell
   // them 404 for a class that exists.
   await assertCanWriteClassMaterials(tx, params.class_id);
@@ -308,7 +333,12 @@ export async function initiateUpload(
     .replace(/[^a-zA-Z0-9._-]/g, "_")
     .replace(/_{2,}/g, "_")
     .slice(0, 80);
-  const storageKey = `permanent/${schoolId}/materials/${randomUUID()}-${fileSlug}`;
+  // One object id per upload (QA-009): the key used to be the file name alone, unique school-wide,
+  // so two classes could not both hold "worksheet.pdf". The client writes to the temp/ key; confirm
+  // copies the inspected object to this permanent key, so a PUT after the scan cannot reach it.
+  const objectId = randomUUID();
+  const storageKey = buildPermanentKey(schoolId, objectId, fileSlug);
+  const stagingKey = buildTempKey(schoolId, objectId, fileSlug);
 
   const [row] = await tx<MaterialRow[]>`
     INSERT INTO app.materials (
@@ -349,25 +379,43 @@ export async function initiateUpload(
     },
   });
 
+  // The client PUTs to the temp/ key (QA-009); confirm promotes the inspected object to storageKey.
   return {
     material: row!,
     upload_url: "",
-    storage_key: storageKey,
+    storage_key: stagingKey,
     expires_at: new Date(),
     freedStorageKeys,
   };
 }
 
-export async function confirmUpload(
+/** The temp/ key a material's own permanent key was staged under (same object id and file name). */
+export function stagingKeyFor(schoolId: string, permanentKey: string): string {
+  const parsed = parseStorageKey(permanentKey);
+  if (!parsed || parsed.category !== "permanent" || parsed.schoolId !== schoolId) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.CONFLICT_STATE_MISMATCH,
+      "Material storage key is not a staged upload.",
+    );
+  }
+  return buildTempKey(schoolId, parsed.objectId, parsed.filename);
+}
+
+/**
+ * Confirm, step 1 of 3 (QA-009): authorize and check the material is waiting for its upload. The
+ * caller then inspects the staged object with no transaction open, reserves quota for its real
+ * size, copies it to `existing.storage_key`, and calls finishConfirmUpload.
+ */
+export async function beginConfirmUpload(
   tx: TransactionSql,
   schoolId: string,
   materialId: string,
-  storageKey: string,
-  checksumSha256?: string,
+  stagingKey: string,
 ): Promise<MaterialRow> {
   const existing = await getWritableMaterial(tx, schoolId, materialId);
 
-  if (existing.storage_key !== storageKey) {
+  if (stagingKeyFor(schoolId, existing.storage_key) !== stagingKey) {
     throw new CodedHttpException(
       409,
       ERROR_CODES.CONFLICT_STATE_MISMATCH,
@@ -382,8 +430,24 @@ export async function confirmUpload(
       `Material is already in ${existing.ingest_status} state.`,
     );
   }
+  return existing;
+}
 
-  if (checksumSha256 && existing.checksum_sha256 && checksumSha256 !== existing.checksum_sha256) {
+/**
+ * Confirm, step 3 of 3: record what was actually stored -- the inspected size, type and checksum,
+ * not the client's claim -- and hand the material to the scanner.
+ */
+export async function finishConfirmUpload(
+  tx: TransactionSql,
+  schoolId: string,
+  existing: MaterialRow,
+  stored: { sizeBytes: number; contentType: string; checksumSha256: string | null },
+): Promise<MaterialRow> {
+  if (
+    stored.checksumSha256 &&
+    existing.checksum_sha256 &&
+    stored.checksumSha256 !== existing.checksum_sha256
+  ) {
     throw new CodedHttpException(
       409,
       ERROR_CODES.MATERIAL_STORAGE_CONFIRM_FAILED,
@@ -394,23 +458,33 @@ export async function confirmUpload(
   const [row] = await tx<MaterialRow[]>`
     UPDATE app.materials
     SET ingest_status = 'scanning'::app.material_ingest_status,
+        size_bytes = ${stored.sizeBytes},
+        mime_type = ${stored.contentType},
+        checksum_sha256 = COALESCE(${stored.checksumSha256}, checksum_sha256),
         updated_at = CURRENT_TIMESTAMP
-    WHERE id = ${materialId} AND school_id = ${schoolId}
+    WHERE id = ${existing.id} AND school_id = ${schoolId} AND ingest_status = 'uploaded'
     RETURNING id, school_id, class_id, uploaded_by_user_id, last_edited_by_user_id,
               title, description, storage_key, original_file_name, mime_type,
               size_bytes::float8 AS size_bytes, checksum_sha256, ai_visible, ingest_status, ingest_error,
               ingested_at, week_number, day_of_week, created_at, updated_at
   `;
+  if (!row) {
+    throw new CodedHttpException(
+      409,
+      ERROR_CODES.MATERIAL_INGEST_IN_PROGRESS,
+      "Material was confirmed concurrently.",
+    );
+  }
 
   await emitAuditLog(tx, {
     action: "update",
     targetTable: "materials",
-    targetId: materialId,
-    oldValues: { ingest_status: existing.ingest_status },
-    newValues: { ingest_status: "scanning" },
+    targetId: existing.id,
+    oldValues: { ingest_status: existing.ingest_status, size_bytes: existing.size_bytes },
+    newValues: { ingest_status: "scanning", size_bytes: stored.sizeBytes },
   });
 
-  return row!;
+  return row;
 }
 
 /**

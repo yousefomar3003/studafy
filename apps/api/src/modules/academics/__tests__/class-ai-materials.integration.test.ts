@@ -459,3 +459,43 @@ describeDb("class AI materials setting — turning it back on", () => {
     expect((await materialState(world.schoolId, materialId)).ingest_status).toBe("queued");
   });
 });
+
+// QA-051: each retrieval leg took the top 50 chunks school-wide (material_chunks is tenant-isolated
+// only) and applied the class scope afterwards, so in a large school a student's own material could
+// be crowded out and the answer came back "not covered". And the keyword leg used the English text
+// configuration only, which barely tokenises Arabic.
+describeDb("retrieval scope and language (QA-051)", () => {
+  test("a student's one matching chunk is found under 60 from a class they are not in", async () => {
+    const world = await buildWorld();
+    // 60 matching chunks in another teacher's class, which the student is not enrolled in.
+    await seedIngestedMaterial(world, world.otherClassId, world.otherTeacher, { chunks: 60 });
+    const mine = await seedIngestedMaterial(world, world.classId, world.teacher, { chunks: 1 });
+
+    const result = await asTenant(world.student, (tx) =>
+      hybridSearch(tx, { query: KEYWORD, queryVector: null }),
+    );
+    expect(result.hits.map((hit) => hit.materialId)).toContain(mine);
+  }, 60_000);
+
+  test("an Arabic query finds Arabic material", async () => {
+    const world = await buildWorld();
+    const materialId = await seedIngestedMaterial(world, world.classId, world.teacher, {
+      chunks: 0,
+    });
+    await asAdmin(
+      world.schoolId,
+      (tx) => tx`
+      INSERT INTO app.material_chunks
+        (school_id, material_id, chunk_index, content, embedding, embedding_model)
+      VALUES (${world.schoolId}, ${materialId}, 0,
+              'البناء الضوئي يحول ضوء الشمس إلى طاقة كيميائية في النبات',
+              ${embedding(7)}::public.vector, 'mock-embedding-3-small@1')
+    `,
+    );
+
+    const result = await asTenant(world.student, (tx) =>
+      hybridSearch(tx, { query: "شمس", queryVector: null }),
+    );
+    expect(result.hits.map((hit) => hit.materialId)).toContain(materialId);
+  }, 60_000);
+});

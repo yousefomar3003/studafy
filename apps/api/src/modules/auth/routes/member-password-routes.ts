@@ -7,13 +7,18 @@
  * Sign-in outcomes:
  *   - 200                                   session tokens
  *   - 401 AUTH_INVALID_CREDENTIALS          unknown code, wrong password, expired or used setup code,
- *                                           or an account that does not sign in this way --
- *                                           deliberately indistinguishable
+ *                                           an account that does not sign in this way, or one
+ *                                           locked out -- deliberately indistinguishable (QA-069)
  *   - 403 AUTH_PASSWORD_CHANGE_REQUIRED     signed in with a setup code; resend with new_password
- *   - 403 AUTH_ACCOUNT_LOCKED               too many wrong passwords; try again later
  *   - 403 SCHOOL_SUSPENDED
  *   - 422 AUTH_PASSWORD_REJECTED            new_password breaks the policy
  *   - 429                                   per-IP, per-member-ID or platform-wide sign-in budget spent
+ *
+ * Lockout (QA-069): MAX_FAILED_ATTEMPTS wrong passwords from one address for one member ID lock that
+ * address out of that ID for LOCKOUT_MINUTES (Redis), so a stranger who knows an ID locks out only
+ * themselves. The account itself locks after ACCOUNT_LOCK_FAILED_ATTEMPTS from anywhere. Either
+ * lock answers exactly like a wrong password, after a real-cost verification, so the response
+ * never confirms that an ID exists.
  *
  * A device that has signed in before sends back the `device_token` it was given (000186). Its
  * attempts skip the per-member-ID and platform-wide budgets and the account lockout -- the things a
@@ -26,23 +31,30 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { buildMemberLoginRateLimitKey, MEMBER_LOGIN_BUDGETS } from "../../../config/rateLimits";
 import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
-import { extractClientIp, takeRateLimitToken } from "../../../middleware/rateLimiter";
+import { extractClientIp, takeMemberLoginTokens } from "../../../middleware/rateLimiter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { emitRateLimitBlock } from "../auth-anomaly-events";
+import { establishedChannel } from "../channels";
 import { deliverTokenPair } from "../delivery";
 import {
+  burnVerification,
   changeMemberPassword,
   isTrustedMemberDevice,
   loginMember,
   LOCKOUT_MINUTES,
+  MAX_FAILED_ATTEMPTS,
   PASSWORD_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
 } from "../services/member-password-service";
+import {
+  familyOfAccessJti,
+  REVOCATION_REASONS,
+  revokeAndDenylist,
+} from "../services/revocation-service";
 
 import { loginResponseSchema } from "./returning-user-login-routes";
 
@@ -64,6 +76,7 @@ import type { Database } from "../../../db";
 import type { SecurityEventSink } from "../../../lib/security/securityEventSink";
 import type { AppEnv } from "../../../middleware/requestId";
 import type { RedisClient } from "../../../redis";
+import type { JtiDenylist } from "../denylist";
 import type { PasswordPolicyViolation } from "../services/member-password-service";
 import type { SessionTokenConfig } from "../services/session-service";
 import type { Context } from "hono";
@@ -80,10 +93,11 @@ const POLICY_MESSAGES: Record<PasswordPolicyViolation, string> = {
 };
 
 /**
- * Takes a token from the member ID's bucket and the platform-wide bucket (config/rateLimits.ts
- * MEMBER_LOGIN_BUDGETS), throwing 429 when either is empty. Fails open without Redis, like the
- * per-IP limiter, so the account lockout remains the backstop. Not called for a trusted device,
- * whose own failure count limits it (member-password-service.ts, TRUSTED DEVICES).
+ * Takes a token from the member ID's bucket and its school's bucket (config/rateLimits.ts
+ * MEMBER_LOGIN_BUDGETS), throwing 429 when either is empty. On a Redis error the buckets fall back
+ * to an in-process copy rather than failing open (QA-028); with no Redis configured at all the
+ * account lockout is the backstop. Not called for a trusted device, whose own failure count limits
+ * it (member-password-service.ts, TRUSTED DEVICES).
  */
 async function throttleMemberLogin(
   c: Context<AppEnv>,
@@ -92,38 +106,43 @@ async function throttleMemberLogin(
   username: string,
 ): Promise<void> {
   if (!redis) return;
-  const now = Math.floor(Date.now() / 1000);
-  for (const scope of ["username", "global"] as const) {
-    let result;
-    try {
-      result = await takeRateLimitToken(
-        redis,
-        buildMemberLoginRateLimitKey(scope, username),
-        // eslint-disable-next-line security/detect-object-injection -- `scope` is a literal from the tuple above
-        MEMBER_LOGIN_BUDGETS[scope],
-        now,
-      );
-    } catch (err: unknown) {
-      c.get("log")?.warn({ err }, "member login rate limiter redis error, failing open");
-      return;
-    }
-    if (!result.allowed) {
-      c.header("Retry-After", String(result.retryAfter));
-      emitRateLimitBlock(c.get("log"), eventSink, {
-        routeClass: `member-login-${scope}`,
-        path: c.req.path,
-        clientIp: extractClientIp(c),
-        requestId: c.get("requestId"),
-        userAgent: c.req.header("User-Agent"),
-      });
-      throw new HTTPException(429);
-    }
-  }
+  const result = await takeMemberLoginTokens(
+    redis,
+    username,
+    Math.floor(Date.now() / 1000),
+    (err) =>
+      c
+        .get("log")
+        ?.warn({ err }, "member login rate limiter redis error, using the in-process bucket"),
+  );
+  if (result.allowed) return;
+  c.header("Retry-After", String(result.retryAfter));
+  emitRateLimitBlock(c.get("log"), eventSink, {
+    routeClass: `member-login-${result.scope}`,
+    path: c.req.path,
+    clientIp: extractClientIp(c),
+    requestId: c.get("requestId"),
+    userAgent: c.req.header("User-Agent"),
+  });
+  throw new HTTPException(429);
 }
 
 function rejected(reason: PasswordPolicyViolation): never {
   // eslint-disable-next-line security/detect-object-injection -- `reason` is a closed union from the policy check
   throw new CodedHttpException(422, ERROR_CODES.AUTH_PASSWORD_REJECTED, POLICY_MESSAGES[reason]);
+}
+
+function invalidCredentials(): never {
+  throw new CodedHttpException(
+    401,
+    ERROR_CODES.AUTH_INVALID_CREDENTIALS,
+    "Invalid ID or password.",
+  );
+}
+
+/** One address's wrong passwords for one member ID (QA-069). */
+function memberLockKey(clientIp: string | null, username: string): string {
+  return `rl:member-lock:${clientIp ?? "unknown"}:${username.trim().toUpperCase()}`;
 }
 
 function locked(): never {
@@ -231,6 +250,7 @@ export function memberPasswordRoutes(
   config: SessionTokenConfig,
   redis: RedisClient | null = null,
   eventSink: SecurityEventSink | null = null,
+  denylist: JtiDenylist | null = null,
 ): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
@@ -246,19 +266,44 @@ export function memberPasswordRoutes(
     const clientIp = clientIpFrom(c);
     const userAgent = c.req.header("user-agent") ?? null;
 
+    // A trusted device is judged on its own failure count; everyone else on this address's.
+    const lockKey = !trustedDevice && redis ? memberLockKey(clientIp, body.username) : null;
+    const lockedOut =
+      lockKey !== null &&
+      Number((await redis!.get(lockKey).catch(() => null)) ?? 0) >= MAX_FAILED_ATTEMPTS;
+    if (lockedOut) {
+      await burnVerification(body.password);
+      return invalidCredentials();
+    }
+
     const result = await loginMember(db, config, {
       username: body.username,
       password: body.password,
       newPassword: body.new_password,
       // Only a token that was trusted when the budgets were chosen; loginMember re-checks it.
       deviceToken: trustedDevice ? body.device_token : undefined,
-      channel: body.channel,
+      channel: establishedChannel(c.req.header("origin"), body.channel),
       device: { userAgent, ipAddress: clientIp },
       requestId: c.get("requestId"),
       logger: c.get("log"),
       clientIp,
       userAgent,
     });
+
+    if (lockKey !== null) {
+      if (result.outcome === "INVALID_CREDENTIALS" || result.outcome === "LOCKED") {
+        await redis!
+          .multi()
+          .incr(lockKey)
+          .expire(lockKey, LOCKOUT_MINUTES * 60)
+          .exec()
+          .catch((err: unknown) =>
+            c.get("log")?.warn({ err }, "member sign-in lock counter not updated"),
+          );
+      } else if (result.outcome === "LOGIN_SUCCESS") {
+        await redis!.del(lockKey).catch(() => undefined);
+      }
+    }
 
     switch (result.outcome) {
       case "LOGIN_SUCCESS":
@@ -270,13 +315,8 @@ export function memberPasswordRoutes(
           200,
         );
       case "INVALID_CREDENTIALS":
-        throw new CodedHttpException(
-          401,
-          ERROR_CODES.AUTH_INVALID_CREDENTIALS,
-          "Invalid ID or password.",
-        );
       case "LOCKED":
-        return locked();
+        return invalidCredentials();
       case "PASSWORD_CHANGE_REQUIRED":
         throw new CodedHttpException(
           403,
@@ -306,8 +346,29 @@ export function memberPasswordRoutes(
     );
 
     switch (result.outcome) {
-      case "CHANGED":
+      case "CHANGED": {
+        // Every other session ends (QA-024): a password someone else learned stops working on the
+        // devices they signed in with. The session that made the change is kept; if it cannot be
+        // identified, everything is revoked and the member signs in again.
+        const tenant = {
+          schoolId: auth.schoolId,
+          userId: auth.userId,
+          requestId: c.get("requestId"),
+        };
+        const current = await familyOfAccessJti(db, tenant, auth.jti);
+        await revokeAndDenylist({
+          database: db,
+          denylist,
+          tenant,
+          targetUserId: auth.userId,
+          scope: { kind: "user", exceptFamilyId: current },
+          reason: REVOCATION_REASONS.PASSWORD_CHANGE,
+          log: c.get("log"),
+          userAgent: c.req.header("User-Agent") ?? null,
+          clientIp: clientIpFrom(c),
+        });
         return c.json({ changed: true as const }, 200);
+      }
       case "WRONG_PASSWORD":
         throw new CodedHttpException(
           403,

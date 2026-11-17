@@ -130,7 +130,7 @@ function createMobileExchangeRoute(provider: string) {
     description:
       `Validates the PKCE state, exchanges the authorization code with ${provider}'s token ` +
       "endpoint, verifies the id_token, and issues a session token pair. Returns the same " +
-      "TokenPair shape as /api/auth/login/oauth with channel=mobile.",
+      "TokenPair shape as every other sign-in, with channel=mobile.",
     security: [],
     request: {
       body: {

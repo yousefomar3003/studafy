@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 
+import { enqueueUploadScans } from "../../lib/storage/upload-scan";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
 import { requirePermission } from "../../middleware/authz";
@@ -245,6 +246,12 @@ export function platformGrantRoutes(deps: PlatformGrantRoutesDeps): OpenAPIHono<
       ),
     );
     await invalidate(schoolId, change);
+    // Scanned like every other upload (QA-055); served only once clean.
+    if (receiptStorageKey) {
+      await enqueueUploadScans(c, [
+        { target: "grant_receipt", schoolId, storageKey: receiptStorageKey },
+      ]);
+    }
     return c.json(change.grant, 201);
   });
 

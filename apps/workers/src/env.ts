@@ -10,6 +10,27 @@ function emptyAsUnset(value: unknown): unknown {
 }
 
 /**
+ * Same helper as apps/api/src/env.ts. QA-066: whether a Redis URL keeps its traffic encrypted. `rediss://` is TLS. Plain `redis://` is
+ * accepted only for a host on Fly's private network (`*.internal`, `*.flycast`), whose 6PN links are
+ * WireGuard tunnels already. Anything else, including a URL that does not parse, is refused.
+ */
+export function isEncryptedRedisUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "rediss:") return true;
+  if (url.protocol !== "redis:") return false;
+  const host = url.hostname.toLowerCase();
+  return host.endsWith(".internal") || host.endsWith(".flycast");
+}
+
+export const PLAINTEXT_REDIS_MESSAGE =
+  "must use rediss:// (TLS) in production, unless its host is on Fly's private network (.internal or .flycast)";
+
+/**
  * Environment configuration for the workers process. Parsed and validated once at bootstrap so
  * that an invalid environment fails fast — before any Redis connection is opened — with a named,
  * readable error.
@@ -30,6 +51,12 @@ export const envSchema = z
     // it exists solely for @studafy/observability's Prometheus-format /metrics endpoint (ST-259).
     // 9464 is Prometheus's own registered default port.
     METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+    // QA-072: the address the metrics endpoint binds. Unset means every interface (local runs and
+    // tests). On fly.io it is `fly-local-6pn`, the machine's private-network address, which fly's
+    // metrics scraper uses; the endpoint has no auth of its own, so it listens nowhere else.
+    METRICS_HOST: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    // /healthz (QA-046): poll-loop and BullMQ worker liveness, checked by Fly. Internal only.
+    WORKERS_HEALTH_PORT: z.coerce.number().int().min(1).max(65535).default(8081),
     // Distributed tracing (ST-260): see apps/api/src/env.ts's own OTEL_EXPORTER_OTLP_ENDPOINT for
     // what this is, why it's optional, and why an empty string is also accepted.
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional().or(z.literal("")),
@@ -49,6 +76,10 @@ export const envSchema = z
     // verify-full: TLS with certificate verification on every pool (databaseUrlFrom), for a
     // database reached over the internet. Unset keeps the plain connection a private PgBouncer used.
     DATABASE_SSL_MODE: z.preprocess(emptyAsUnset, z.enum(["verify-full"]).optional()),
+    // Node's own extra-CA bundle (a file path). Read here only so production can require *some* CA
+    // to verify the database against: workers.toml mounts Supabase's root CA and points this at it,
+    // where DATABASE_CA_CERT would carry the PEM inline. Node itself reads it at startup.
+    NODE_EXTRA_CA_CERTS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     READ_DATABASE_URL: z.string().min(1).optional(),
     READ_DATABASE_HOST: z.string().min(1).optional(),
     READ_DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
@@ -56,6 +87,10 @@ export const envSchema = z
     S3_ENDPOINT: z.string().url().optional(),
     S3_REGION: z.string().min(1).optional(),
     S3_APP_FILES_BUCKET: z.string().min(1).optional(),
+    // The R2 keys, under the api's names (QA-071). Set together; s3-credentials.ts hands them to the
+    // S3 SDK, whose credential chain reads AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY.
+    S3_ACCESS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    S3_SECRET_ACCESS_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     SCHOOL_IDS: z.string().min(1).default(""),
     // ERPNext integration — required for billing queue. Both must be set together.
     ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
@@ -119,11 +154,12 @@ export const envSchema = z
     CLAMAV_HOST: z.string().min(1).optional(),
     CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
     CLAMAV_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+    // 100 MiB: the largest upload class (material.file); clamd's StreamMaxLength is 101M (QA-054).
     CLAMAV_MAX_FILE_BYTES: z.coerce
       .number()
       .int()
       .positive()
-      .default(25 * 1024 * 1024),
+      .default(100 * 1024 * 1024),
     // Base URL for the action links embedded in emails: the web app's public origin. Every link
     // must open a web page (email/resolve.ts); the API is on a separate host on Fly, so an
     // `/api/...` path here would land on the web app's 404 page.
@@ -204,6 +240,14 @@ export const envSchema = z
       }
     }
 
+    if ((env.S3_ACCESS_KEY_ID === undefined) !== (env.S3_SECRET_ACCESS_KEY === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["S3_ACCESS_KEY_ID"],
+        message: "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set together",
+      });
+    }
+
     if (
       (env.GOOGLE_PLAY_PACKAGE_NAME === undefined) !==
       (env.GOOGLE_PLAY_SERVICE_ACCOUNT === undefined)
@@ -226,6 +270,37 @@ export const envSchema = z
     }
 
     if (env.NODE_ENV !== "production") return;
+
+    // QA-066: a deployed worker reaches Postgres over the internet (Supabase's pooler), so every
+    // pool must verify the server certificate, as the API's does. databaseUrlFrom() and
+    // readDatabaseUrlFrom() are what every pool is built from; without the discrete settings the
+    // URL is the local-development default, which fails here too.
+    for (const url of [databaseUrlFrom(env), readDatabaseUrlFrom(env)]) {
+      if (sslModeOf(url) !== "verify-full") {
+        context.addIssue({
+          code: "custom",
+          path: ["DATABASE_SSL_MODE"],
+          message:
+            "DATABASE_SSL_MODE must be verify-full in production (with DATABASE_HOST and DATABASE_USER, or sslmode=verify-full in DATABASE_URL)",
+        });
+        break;
+      }
+    }
+    if (env.DATABASE_CA_CERT === undefined && env.NODE_EXTRA_CA_CERTS === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["DATABASE_CA_CERT"],
+        message:
+          "DATABASE_CA_CERT or NODE_EXTRA_CA_CERTS is required in production, to verify the database certificate",
+      });
+    }
+    if (!isEncryptedRedisUrl(env.REDIS_URL)) {
+      context.addIssue({
+        code: "custom",
+        path: ["REDIS_URL"],
+        message: `REDIS_URL ${PLAINTEXT_REDIS_MESSAGE}`,
+      });
+    }
 
     if (env.RECORDS_ENCRYPTION_KEYS === undefined) {
       context.addIssue({
@@ -322,6 +397,15 @@ export function readDatabaseUrlFrom(env: Env): string {
   const username = env.DATABASE_USER ?? "";
   const password = env.DATABASE_PASSWORD ?? "";
   return `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${env.READ_DATABASE_HOST}:${port}/${name}${sslQuery(env)}`;
+}
+
+/** The `sslmode` a connection string asks for, or null when it names none or does not parse. */
+function sslModeOf(connectionString: string): string | null {
+  try {
+    return new URL(connectionString).searchParams.get("sslmode");
+  } catch {
+    return null;
+  }
 }
 
 function sslQuery(env: Env): string {

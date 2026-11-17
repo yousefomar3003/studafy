@@ -159,6 +159,9 @@ describe("validateMicrosoftIdToken", () => {
     const token = await new SignJWT({
       sub: "microsoft-user-456",
       email: "fallback@example.com",
+      // QA-070: the email claim is used only when Microsoft says its domain is verified.
+      xms_edov: true,
+      tid: MOCK_TENANT_ID,
       nonce: "expected-nonce",
     })
       .setProtectedHeader({ alg: "RS256", kid: "test-kid-1" })
@@ -195,6 +198,7 @@ describe("validateMicrosoftIdToken", () => {
     const now = Math.floor(Date.now() / 1000);
     const token = await new SignJWT({
       preferred_username: "user@example.com",
+      tid: MOCK_TENANT_ID,
       nonce: "expected-nonce",
     })
       .setProtectedHeader({ alg: "RS256", kid: "test-kid-1" })
@@ -213,6 +217,7 @@ describe("validateMicrosoftIdToken", () => {
     const now = Math.floor(Date.now() / 1000);
     const token = await new SignJWT({
       sub: "microsoft-user-789",
+      tid: MOCK_TENANT_ID,
       nonce: "expected-nonce",
     })
       .setProtectedHeader({ alg: "RS256", kid: "test-kid-1" })
@@ -240,5 +245,51 @@ describe("validateMicrosoftIdToken", () => {
       mockJwksUri,
     );
     expect(claims.tenantId).toBe(customTenant);
+  });
+
+  // QA-070 ("nOAuth"): `email` is a free-text attribute any tenant admin can set to someone else's
+  // address, and invitations, provider links and applications bind on it.
+  test("rejects an unverified email claim when there is no preferred_username", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({
+      sub: "microsoft-user-999",
+      email: "victim@school.example",
+      tid: MOCK_TENANT_ID,
+      nonce: "expected-nonce",
+    })
+      .setProtectedHeader({ alg: "RS256", kid: "test-kid-1" })
+      .setIssuer(MOCK_ISSUER)
+      .setAudience(MOCK_CLIENT_ID)
+      .setIssuedAt(now)
+      .setExpirationTime(`${now + 3600}s`)
+      .sign(privateKey);
+    await expect(
+      validateMicrosoftIdToken(token, MOCK_CLIENT_ID, "expected-nonce", mockJwksUri),
+    ).rejects.toThrow("missing required claims");
+  });
+
+  test("rejects a token whose tid does not match its issuer's tenant (QA-070)", async () => {
+    const token = await signTestIdToken({ tid: "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" });
+    await expect(
+      validateMicrosoftIdToken(token, MOCK_CLIENT_ID, "expected-nonce", mockJwksUri),
+    ).rejects.toThrow("issuer");
+  });
+
+  test("rejects a token without a tid (QA-070)", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    const token = await new SignJWT({
+      sub: "microsoft-user-123",
+      preferred_username: "user@example.com",
+      nonce: "expected-nonce",
+    })
+      .setProtectedHeader({ alg: "RS256", kid: "test-kid-1" })
+      .setIssuer(MOCK_ISSUER)
+      .setAudience(MOCK_CLIENT_ID)
+      .setIssuedAt(now)
+      .setExpirationTime(`${now + 3600}s`)
+      .sign(privateKey);
+    await expect(
+      validateMicrosoftIdToken(token, MOCK_CLIENT_ID, "expected-nonce", mockJwksUri),
+    ).rejects.toThrow("issuer");
   });
 });

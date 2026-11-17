@@ -362,25 +362,17 @@ describeDb("deleting a file frees its storage", () => {
       body,
     );
     expect(started.status).toBe(201);
-    const { storage_key: key } = (await started.json()) as { storage_key: string };
-    storage.objects.set(key, { contentType: "application/pdf", sizeBytes: 5_000 });
-    const listed = await request(
-      tenant,
-      teacher(tenant),
-      "GET",
-      `/api/academics/materials?class_id=${tenant.cls.id}&limit=100`,
-    );
-    expect(listed.status).toBe(200);
-    const { materials } = (await listed.json()) as {
-      materials: { id: string; storage_key: string }[];
+    // The initiate response names the material (QA-009); its storage_key is the temp/ staging key.
+    const { storage_key: key, material_id: materialId } = (await started.json()) as {
+      storage_key: string;
+      material_id: string;
     };
-    const pending = materials.find((m) => m.storage_key === key);
-    expect(pending).toBeDefined();
+    storage.objects.set(key, { contentType: "application/pdf", sizeBytes: 5_000 });
     const confirmed = await request(
       tenant,
       teacher(tenant),
       "POST",
-      `/api/academics/materials/${pending!.id}/confirm`,
+      `/api/academics/materials/${materialId}/confirm`,
       { storage_key: key },
     );
     expect(confirmed.status).toBe(200);
@@ -402,13 +394,11 @@ describeDb("deleting a file frees its storage", () => {
       },
     );
     expect(started.status).toBe(201);
-    const { storage_key: key } = (await started.json()) as { storage_key: string };
+    const { storage_key: key, material_id: materialId } = (await started.json()) as {
+      storage_key: string;
+      material_id: string;
+    };
     storage.objects.set(key, { contentType: "application/pdf", sizeBytes: 5_000 });
-    const [material] = await asAdmin(
-      tenant.schoolId,
-      (tx) => tx<{ id: string }[]>`SELECT id FROM app.materials WHERE storage_key = ${key}`,
-    );
-    const materialId = material!.id;
     const confirmed = await request(
       tenant,
       teacher(tenant),
@@ -417,6 +407,10 @@ describeDb("deleting a file frees its storage", () => {
       { storage_key: key },
     );
     expect(confirmed.status).toBe(200);
+    // Confirm copied the object to the material's own permanent key (QA-009); that is what a
+    // delete must free.
+    const permanentKey = ((await confirmed.json()) as { storage_key: string }).storage_key;
+    expect(storage.objects.has(permanentKey)).toBe(true);
 
     // What the derivation worker writes for a rendered material.
     const thumbnail = `permanent/${tenant.schoolId}/${materialId}/thumbnail.jpg`;
@@ -439,6 +433,7 @@ describeDb("deleting a file frees its storage", () => {
       `/api/academics/materials/${materialId}`,
     );
     expect(res.status).toBe(204);
+    expect(storage.objects.has(permanentKey)).toBe(false);
     expect(storage.objects.has(key)).toBe(false);
     expect(storage.objects.has(thumbnail)).toBe(false);
     expect(storage.objects.has(preview)).toBe(false);
@@ -608,29 +603,35 @@ describeDb("uploading a material", () => {
     });
   }
 
-  async function materialIdFor(tenant: TenantFixture, key: string): Promise<string | undefined> {
+  async function storageKeyOf(tenant: TenantFixture, id: string): Promise<string | undefined> {
     const rows = await asAdmin(
       tenant.schoolId,
-      (tx) => tx<{ id: string }[]>`SELECT id FROM app.materials WHERE storage_key = ${key}`,
+      (tx) => tx<{ storage_key: string }[]>`SELECT storage_key FROM app.materials WHERE id = ${id}`,
     );
-    return rows[0]?.id;
+    return rows[0]?.storage_key;
   }
 
+  /** Uploads and confirms a material; returns its permanent storage key. */
   async function uploadAndConfirm(tenant: TenantFixture, fileName: string): Promise<string> {
     const started = await startUpload(tenant, tenant.cls.id, fileName);
     expect(started.status).toBe(201);
-    const { storage_key: key } = (await started.json()) as { storage_key: string };
-    storage.objects.set(key, { contentType: "application/pdf", sizeBytes: 2_000 });
-    const id = await materialIdFor(tenant, key);
+    // The PUT goes to the temp/ staging key; confirm promotes it to the permanent key (QA-009).
+    const { storage_key: stagingKey, material_id: id } = (await started.json()) as {
+      storage_key: string;
+      material_id: string;
+    };
+    storage.objects.set(stagingKey, { contentType: "application/pdf", sizeBytes: 2_000 });
     const confirmed = await request(
       tenant,
       teacher(tenant),
       "POST",
       `/api/academics/materials/${id}/confirm`,
-      { storage_key: key },
+      { storage_key: stagingKey },
     );
     expect(confirmed.status).toBe(200);
-    return key;
+    const key = await storageKeyOf(tenant, id);
+    expect(key).toBeDefined();
+    return key!;
   }
 
   test("two files with the same name each get their own key", async () => {
@@ -647,7 +648,8 @@ describeDb("uploading a material", () => {
     );
     const second = await uploadAndConfirm(tenant, "notes.pdf");
     expect(second).not.toBe(first);
-    expect(second.endsWith("-notes.pdf")).toBe(true);
+    // One object id per upload, the file name after it (QA-009).
+    expect(second.endsWith("/notes.pdf")).toBe(true);
   });
 
   test("Arabic file names that reduce to the same slug do not collide", async () => {
@@ -662,11 +664,12 @@ describeDb("uploading a material", () => {
     // First attempt: the row is created, but the PUT fails and confirm is never called.
     const failed = await startUpload(tenant, tenant.cls.id, "chapter 3.pdf");
     expect(failed.status).toBe(201);
-    const { storage_key: abandonedKey } = (await failed.json()) as { storage_key: string };
+    const { material_id: abandonedId } = (await failed.json()) as { material_id: string };
+    const abandonedKey = await storageKeyOf(tenant, abandonedId);
 
     const retry = await uploadAndConfirm(tenant, "chapter 3.pdf");
     expect(retry).not.toBe(abandonedKey);
-    expect(await materialIdFor(tenant, abandonedKey)).toBeUndefined();
+    expect(await storageKeyOf(tenant, abandonedId)).toBeUndefined();
   });
 
   test("a confirmed upload still in scanning keeps blocking a duplicate", async () => {

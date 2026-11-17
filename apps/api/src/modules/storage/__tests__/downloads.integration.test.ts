@@ -205,10 +205,14 @@ async function seedReceipt(
     const [row] = await tx<{ id: string }[]>`
       INSERT INTO app.expense_cache (
         school_id, document_type, category, vendor, currency_id,
-        amount_minor, erpnext_docname, erpnext_status, attachment_storage_key, last_synced_at
+        amount_minor, erpnext_docname, erpnext_status, attachment_storage_key, last_synced_at,
+        attachment_scan_status
       ) VALUES (
         ${tenant.schoolId}, 'purchase_invoice', 'supplies', 'Acme', ${currency!.id},
-        5000, 'ACC-001', 'Submitted', ${storageKey}, CURRENT_TIMESTAMP
+        5000, 'ACC-001', 'Submitted', ${storageKey}, CURRENT_TIMESTAMP,
+        -- A receipt the scan found clean: a key written with the default status starts 'scanning'
+        -- and is not served (QA-055).
+        'clean'
       )
       RETURNING id
     `;

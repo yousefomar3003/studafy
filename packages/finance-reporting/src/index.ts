@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 
+import { csvCell } from "@studafy/sanitize";
 import { z } from "zod";
 
 export const financeReportTypeSchema = z.enum([
@@ -107,12 +108,6 @@ export function formattedCurrencyRows(
     }
     return formatted;
   });
-}
-
-function csvCell(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  const text = typeof value === "string" ? value : JSON.stringify(value);
-  return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 }
 
 export function reportToCsv(report: ErpNextReportResult): Uint8Array {

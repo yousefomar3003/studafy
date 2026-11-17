@@ -592,9 +592,15 @@ integrationTest(
       ORDER BY c.relname
     `;
       expect(globals).toHaveLength(6);
+      // app.schools is row-level secured since QA-016 (a tenant sees and updates only its own row);
+      // the other global tables stay unsecured reference data.
       expect(
         globals.every(
-          (table) => !table.rls_enabled && !table.rls_forced && table.school_columns === "0",
+          (table) =>
+            table.school_columns === "0" &&
+            (table.name === "schools"
+              ? table.rls_enabled && table.rls_forced
+              : !table.rls_enabled && !table.rls_forced),
         ),
       ).toBe(true);
 
@@ -607,6 +613,8 @@ integrationTest(
            JOIN pg_namespace n ON n.oid = c.relnamespace
            WHERE n.nspname = 'app'
              AND c.relname = ANY(${GLOBAL_TABLES as unknown as string[]})
+             -- app.schools carries its own-row policies since QA-016 (asserted in its own test).
+             AND c.relname <> 'schools'
          )) AS policies,
         (SELECT count(*)::text
          FROM pg_index i

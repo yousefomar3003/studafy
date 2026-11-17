@@ -1,7 +1,10 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { PERMISSIONS } from "@studafy/constants";
 import { z } from "zod";
 
+import { returnUrlSchema } from "../../../lib/security/return-url";
 import { requireAuth } from "../../../middleware/authContext";
+import { requirePermission } from "../../../middleware/authz";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { standardResponses } from "../../../openapi/responses";
 import { AUTH_CHANNELS } from "../../auth/channels";
@@ -13,8 +16,8 @@ import type { PaymentProviderRegistry } from "../payment-provider-routing";
 
 const SchoolCheckoutRequestSchema = z.object({
   planId: z.string().uuid(),
-  successUrl: z.string().url(),
-  cancelUrl: z.string().url(),
+  successUrl: returnUrlSchema,
+  cancelUrl: returnUrlSchema,
 });
 
 const SchoolCheckoutResponseSchema = z.object({
@@ -53,6 +56,11 @@ export function schoolCheckoutRoutes(
   const app = new OpenAPIHono<AppEnv>();
 
   app.use("/api/subscriptions/school/checkout", requireChannel(AUTH_CHANNELS.WEB));
+  // Billing administrators only (QA-013): see checkout-routes.ts.
+  app.use(
+    "/api/subscriptions/school/checkout",
+    requirePermission(PERMISSIONS.ORGANIZATION_MANAGE_BILLING),
+  );
 
   app.openapi(schoolCheckoutRoute, async (c) => {
     const auth = requireAuth(c);

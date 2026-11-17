@@ -2,8 +2,10 @@ import { HTTPException } from "hono/http-exception";
 
 import {
   IP_SCOPED_ROUTE_CLASSES,
+  MEMBER_LOGIN_BUDGETS,
   RATE_LIMIT_BUDGETS,
   RATE_LIMIT_EXEMPT_PATHS,
+  buildMemberLoginRateLimitKey,
   buildRateLimitKey,
   resolveRouteClass,
 } from "../config/rateLimits";
@@ -79,8 +81,9 @@ export interface RateLimiterOptions {
 export function extractClientIp(c: { req: { header(name: string): string | undefined } }): string {
   const trustedHeader = getSecurityConfig().clientIpHeader;
   if (trustedHeader) {
-    const value = c.req.header(trustedHeader)?.trim();
-    if (value) return value;
+    // The only source when configured (QA-086): falling back to X-Forwarded-For let a caller that
+    // bypassed the edge pick its own bucket. Such requests share the "unknown" bucket instead.
+    return c.req.header(trustedHeader)?.trim() || "unknown";
   }
   const xff = c.req.header("x-forwarded-for");
   if (xff) {
@@ -109,9 +112,59 @@ function buildIdentity(
   auth: { schoolId: string; userId: string } | undefined,
   clientIp: string,
 ): string {
+  // A signed-in caller on an `auth` route (sessions, devices, invitations) is one person, not one
+  // campus: keyed by IP, a school behind one NAT address shared ten device registrations a minute
+  // between all its users (QA-028). The sign-in classes keep the IP: their callers have no token.
+  if (routeClass === "auth" && auth) return `user:${auth.schoolId}:${auth.userId}`;
   if (IP_SCOPED_ROUTE_CLASSES.has(routeClass)) return clientIp;
   if (auth) return `${auth.schoolId}:${auth.userId}`;
   return clientIp;
+}
+
+// ---------------------------------------------------------------------------
+// In-process fallback bucket (QA-028)
+// ---------------------------------------------------------------------------
+
+/**
+ * Sign-in limits must not vanish when Redis does: an outage would otherwise be the moment to spray
+ * passwords. While Redis errors, the IP-scoped classes and the member-login buckets take tokens
+ * from this per-instance map instead. It is per instance, so the effective limit is the budget
+ * times the number of API machines, and it is bounded so an outage under load cannot grow it
+ * without limit (the least recently touched key is dropped first).
+ */
+const FALLBACK_MAX_KEYS = 20_000;
+const fallbackBuckets = new Map<string, { tokens: number; at: number }>();
+
+export function takeFallbackToken(
+  key: string,
+  budget: RateLimitBudget,
+  nowSeconds: number,
+): TokenBucketResult {
+  const previous = fallbackBuckets.get(key);
+  const tokens = previous
+    ? Math.min(budget.maxTokens, previous.tokens + (nowSeconds - previous.at) * budget.refillRate)
+    : budget.maxTokens;
+  fallbackBuckets.delete(key);
+  if (fallbackBuckets.size >= FALLBACK_MAX_KEYS) {
+    const oldest = fallbackBuckets.keys().next().value;
+    if (oldest !== undefined) fallbackBuckets.delete(oldest);
+  }
+  if (tokens < 1) {
+    fallbackBuckets.set(key, { tokens, at: nowSeconds });
+    return {
+      remaining: 0,
+      allowed: false,
+      retryAfter:
+        budget.refillRate > 0 ? Math.ceil((1 - tokens) / budget.refillRate) : budget.windowSeconds,
+    };
+  }
+  fallbackBuckets.set(key, { tokens: tokens - 1, at: nowSeconds });
+  return { remaining: Math.floor(tokens - 1), allowed: true, retryAfter: 0 };
+}
+
+/** Test-only: forget every fallback bucket. */
+export function resetFallbackBuckets(): void {
+  fallbackBuckets.clear();
 }
 
 // ---------------------------------------------------------------------------
@@ -276,13 +329,15 @@ export function rateLimiterMiddleware({
     try {
       ({ remaining, allowed, retryAfter } = await takeRateLimitToken(redis, key, budget, now));
     } catch (err: unknown) {
-      // Redis failure — fail open. Log and proceed.
-      const log = c.get("log");
-      if (log) {
-        log.warn({ err }, "rate limiter redis error, failing open");
+      // Redis failure. Sign-in classes fall back to the in-process bucket (QA-028); everything
+      // else fails open, since a 429 there would be an outage of its own for no security gain.
+      if (!IP_SCOPED_ROUTE_CLASSES.has(routeClass)) {
+        c.get("log")?.warn({ err }, "rate limiter redis error, failing open");
+        await next();
+        return;
       }
-      await next();
-      return;
+      c.get("log")?.warn({ err }, "rate limiter redis error, using the in-process bucket");
+      ({ remaining, allowed, retryAfter } = takeFallbackToken(key, budget, now));
     }
 
     c.header("X-RateLimit-Limit", String(budget.maxTokens));
@@ -309,4 +364,42 @@ export function rateLimiterMiddleware({
 
     await next();
   };
+}
+
+// ---------------------------------------------------------------------------
+// Member sign-in buckets
+// ---------------------------------------------------------------------------
+
+export interface MemberLoginThrottleResult {
+  allowed: boolean;
+  /** The bucket that refused, when one did. */
+  scope: keyof typeof MEMBER_LOGIN_BUDGETS | null;
+  retryAfter: number;
+}
+
+/**
+ * Takes a token from the member ID's bucket and its school's bucket (config/rateLimits.ts
+ * MEMBER_LOGIN_BUDGETS). On a Redis error both come from the in-process fallback instead of
+ * failing open (QA-028).
+ */
+export async function takeMemberLoginTokens(
+  redis: RedisClient,
+  username: string,
+  nowSeconds: number,
+  onRedisError?: (err: unknown) => void,
+): Promise<MemberLoginThrottleResult> {
+  for (const scope of ["username", "school"] as const) {
+    const key = buildMemberLoginRateLimitKey(scope, username);
+    // eslint-disable-next-line security/detect-object-injection -- `scope` is a literal from the tuple above
+    const budget = MEMBER_LOGIN_BUDGETS[scope];
+    let result: TokenBucketResult;
+    try {
+      result = await takeRateLimitToken(redis, key, budget, nowSeconds);
+    } catch (err: unknown) {
+      onRedisError?.(err);
+      result = takeFallbackToken(key, budget, nowSeconds);
+    }
+    if (!result.allowed) return { allowed: false, scope, retryAfter: result.retryAfter };
+  }
+  return { allowed: true, scope: null, retryAfter: 0 };
 }

@@ -546,6 +546,24 @@ describeDb("records key rotation", () => {
     );
     const result = await resealRecordValues(sql!, rotated);
     expect(result.failed).toBe(0);
+
+    // QA-090: every re-seal batch is audited per school -- how many values moved to which key,
+    // never a value.
+    const audits = await withAdmin(
+      s.schoolId,
+      (tx) => tx<{ target_table: string; new_values: Record<string, unknown> }[]>`
+      SELECT target_table, new_values FROM app.audit_logs
+      WHERE school_id = ${s.schoolId}::uuid AND target_table = 'record_answers'
+        AND new_values ? 'resealed_to_key_id'
+    `,
+    );
+    expect([...audits]).toEqual([
+      {
+        target_table: "record_answers",
+        new_values: { resealed: 1, resealed_to_key_id: "rotated-2" },
+      },
+    ]);
+
     const [row] = await withAdmin(
       s.schoolId,
       (tx) => tx<{ value_ciphertext: Uint8Array; value_key_id: string; value_mask: string }[]>`

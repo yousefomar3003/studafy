@@ -162,7 +162,7 @@ function familyPage(
       SELECT members.family_id,
              sum(ic.outstanding_amount_minor::numeric / power(10, c.minor_unit)) AS outstanding_major,
              sum(ic.outstanding_amount_minor::numeric / power(10, c.minor_unit))
-               FILTER (WHERE ic.due_date < CURRENT_DATE) AS overdue_major
+               FILTER (WHERE ic.due_date < app.school_today()) AS overdue_major
       FROM members
       JOIN app.invoice_cache AS ic
         ON ic.student_id = members.student_id AND ic.school_id = ${schoolId}::uuid
@@ -193,7 +193,7 @@ export async function overdueFamilyIds(tx: TransactionSql, schoolId: string): Pr
     WHERE link.school_id = ${schoolId}::uuid
       AND ${tx.unsafe(LIVE_INVOICE)}
       AND ic.outstanding_amount_minor > 0
-      AND ic.due_date < CURRENT_DATE
+      AND ic.due_date < app.school_today()
     ORDER BY link.family_id
   `;
   return rows.map((row) => row.family_id);
@@ -285,9 +285,9 @@ async function hydrateFamilies(
              sum(ic.total_amount_minor)::text AS billed,
              sum(ic.outstanding_amount_minor)::text AS outstanding,
              coalesce(sum(ic.outstanding_amount_minor)
-               FILTER (WHERE ic.due_date < CURRENT_DATE), 0)::text AS overdue,
+               FILTER (WHERE ic.due_date < app.school_today()), 0)::text AS overdue,
              (count(*) FILTER (
-               WHERE ic.due_date < CURRENT_DATE AND ic.outstanding_amount_minor > 0))::int
+               WHERE ic.due_date < app.school_today() AND ic.outstanding_amount_minor > 0))::int
                AS overdue_count
       FROM members
       JOIN app.invoice_cache AS ic

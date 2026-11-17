@@ -164,10 +164,10 @@ once will lose its session. Clients must serialize refreshes.
 `app.refresh_tokens.channel` is fixed when the session is established and copied unchanged onto every
 child.
 
-| Channel         | Refresh token delivered as                                                 | Rationale                                                                                              |
-| --------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `web`           | `Set-Cookie: session=…; HttpOnly; Secure; SameSite=Strict; Path=/api/auth` | A browser can be scripted by an XSS payload, so the token must be somewhere JavaScript cannot read it. |
-| `mobile`, `api` | `refresh_token` in the response body                                       | No DOM, no `document.cookie` — a native client needs to read the token to put it in the OS keychain.   |
+| Channel         | Refresh token delivered as                                                | Rationale                                                                                              |
+| --------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `web`           | `Set-Cookie: __Host-session=…; HttpOnly; Secure; SameSite=Strict; Path=/` | A browser can be scripted by an XSS payload, so the token must be somewhere JavaScript cannot read it. |
+| `mobile`, `api` | `refresh_token` in the response body                                      | No DOM, no `document.cookie` — a native client needs to read the token to put it in the OS keychain.   |
 
 Three details that are load-bearing rather than incidental:
 
@@ -179,8 +179,10 @@ Three details that are load-bearing rather than incidental:
 - **The cookie is read in preference to the body.** If both are present, the cookie is what the
   browser attached automatically and the body is attacker-supplied.
 
-`Path=/api/auth` scopes the cookie to the only two endpoints that consume it, so it rides on no other
-request. `Secure` is off only in development and test, where there is no TLS to attach it to;
+Deployed tiers name the cookie `__Host-session` (QA-070): the browser accepts a `__Host-` cookie
+only if it is `Secure`, has `Path=/` and no `Domain`, so a sibling `*.studafy.com` origin cannot set
+one over it (login CSRF). That prefix requires `Path=/`; until QA-070 it was `session` with
+`Path=/api/auth`, and the API still reads that name until those cookies expire. `Secure` is off only in development and test, where there is no TLS to attach it to;
 `getSecurityConfig()` treats `NODE_ENV=test` as its own arm, so a deployed tier cannot lose it
 through an `APP_ENV` misconfiguration.
 

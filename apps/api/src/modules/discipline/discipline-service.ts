@@ -137,6 +137,19 @@ export async function getParentDisciplineVisibility(
   return row?.visible ?? false;
 }
 
+/**
+ * Who may see an incident (QA-039): school leadership and the student's own teachers
+ * (`app.is_privileged_over_student`: ORG_ADMIN, PRINCIPAL, or a teacher of a class the student is
+ * enrolled in), and whoever reported it. DISCIPLINE_INCIDENT_READ alone -- every INSTRUCTOR holds
+ * it -- no longer opens every incident in the school.
+ */
+function incidentScope(tx: TransactionSql, alias: string) {
+  return tx`(
+    app.is_privileged_over_student(${tx(alias)}.student_id)
+    OR ${tx(alias)}.reporter_user_id = app.scope_user_id()
+  )`;
+}
+
 export async function listIncidents(
   tx: TransactionSql,
   schoolId: string,
@@ -158,6 +171,7 @@ export async function listIncidents(
       SELECT ${tx.unsafe(INCIDENT_COLUMNS)}
       FROM app.discipline_incidents i
       WHERE i.school_id = ${schoolId}::uuid
+        AND ${incidentScope(tx, "i")}
         ${studentFilter}
         ${classFilter}
         ${statusFilter}
@@ -170,6 +184,7 @@ export async function listIncidents(
       SELECT count(*)::int AS count
       FROM app.discipline_incidents i
       WHERE i.school_id = ${schoolId}::uuid
+        AND ${incidentScope(tx, "i")}
         ${studentFilter}
         ${classFilter}
         ${statusFilter}
@@ -190,8 +205,9 @@ export async function getIncident(
 ): Promise<IncidentRow | undefined> {
   const [row] = await tx<Record<string, unknown>[]>`
     SELECT ${tx.unsafe(INCIDENT_COLUMNS)}
-    FROM app.discipline_incidents
-    WHERE id = ${incidentId}::uuid AND school_id = ${schoolId}::uuid
+    FROM app.discipline_incidents AS i
+    WHERE i.id = ${incidentId}::uuid AND i.school_id = ${schoolId}::uuid
+      AND ${incidentScope(tx, "i")}
   `;
   return row ? parseIncidentRow(row) : undefined;
 }
@@ -202,6 +218,23 @@ export async function createIncident(
   userId: string,
   params: CreateIncidentBody,
 ): Promise<IncidentRow> {
+  // The class an incident names must be one the student is in (QA-039).
+  if (params.class_id) {
+    const [enrolled] = await tx<{ found: number }[]>`
+      SELECT 1 AS found FROM app.enrollments
+      WHERE school_id = ${schoolId}::uuid
+        AND student_id = ${params.student_id}::uuid
+        AND class_id = ${params.class_id}::uuid
+      LIMIT 1
+    `;
+    if (!enrolled) {
+      throw new CodedHttpException(
+        400,
+        ERROR_CODES.VALIDATION_FAILED,
+        "The student is not enrolled in that class",
+      );
+    }
+  }
   const [row] = await tx<Record<string, unknown>[]>`
     INSERT INTO app.discipline_incidents
       (school_id, student_id, class_id, reporter_user_id,
@@ -364,6 +397,14 @@ export async function listActions(
   incidentId: string,
   params: ListActionsParams,
 ): Promise<{ rows: ActionRow[]; total: number }> {
+  // An incident the caller may not see has no visible actions either (QA-039).
+  if (!(await getIncident(tx, schoolId, incidentId))) {
+    throw new CodedHttpException(
+      404,
+      ERROR_CODES.DISCIPLINE_INCIDENT_NOT_FOUND,
+      "Discipline incident not found",
+    );
+  }
   const [rows, countResult] = await Promise.all([
     tx<Record<string, unknown>[]>`
       SELECT ${tx.unsafe(ACTION_COLUMNS)}

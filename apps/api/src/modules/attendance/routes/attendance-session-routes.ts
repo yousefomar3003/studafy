@@ -93,6 +93,9 @@ const openSessionRoute = createRoute({
 });
 
 const listSessionsRoute = createRoute({
+  // QA-086: an explicit gate, not RLS alone: roles that read this keep it, a GUEST or PARENT session
+  // does not reach the query.
+  middleware: [requirePermission(PERMISSIONS.ATTENDANCE_RECORD_READ)] as const,
   method: "get",
   path: "/api/attendance/sessions",
   tags: ["Attendance"],

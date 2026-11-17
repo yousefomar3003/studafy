@@ -80,7 +80,13 @@ export function loadMigrationConfig(
   );
   const common = {
     ssl: sslOptions(mode, env.DATABASE_CA_CERT),
-    migrationsDir: resolve(env.MIGRATIONS_DIR ?? resolve(process.cwd(), "db/migrations")),
+    // Default relative to this module, not the caller's cwd: running the CLI from packages/db (or any
+    // other directory) used to resolve "<cwd>/db/migrations" and fail with ENOENT (QA-004). Both
+    // src/ and dist/ sit two levels below the repo root, so this finds db/migrations from either;
+    // the migrations image still sets MIGRATIONS_DIR explicitly.
+    migrationsDir: resolve(
+      env.MIGRATIONS_DIR ?? resolve(import.meta.dir, "../../../db/migrations"),
+    ),
   };
 
   if (urlValue) {

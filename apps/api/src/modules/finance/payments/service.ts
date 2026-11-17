@@ -37,6 +37,8 @@ import { ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
+import { schoolToday } from "../../../lib/school-today";
+import { likeContains } from "../../../lib/sql/like";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
 import { erpNextDefinitelyDidNotWrite, translateErpNextError } from "../erpnext-errors";
@@ -215,7 +217,7 @@ export async function listPayments(
   schoolId: string,
   params: ListPaymentsParams,
 ): Promise<{ rows: PaymentRow[]; total: number; totals: PaymentTotal[] }> {
-  const like = params.search ? `%${params.search}%` : null;
+  const like = params.search ? likeContains(params.search) : null;
   const student = params.student_id ? tx` AND pc.student_id = ${params.student_id}::uuid` : tx``;
   const invoice = params.invoice_id ? tx` AND pc.erpnext_invoice_id = ${params.invoice_id}` : tx``;
   const mode = params.payment_mode ? tx` AND pc.payment_mode = ${params.payment_mode}` : tx``;
@@ -428,12 +430,13 @@ async function resolveDepositAccount(
 
 /** Exported for tests: the document shape is part of this endpoint's contract with ERPNext. */
 export function buildPaymentEntryPayload(
-  params: CreatePaymentParams,
+  // The caller resolves the date: the request's, or the school's local today (QA-044).
+  params: CreatePaymentParams & { posting_date: string },
   schoolId: string,
   party: string | undefined,
   depositAccount?: string,
 ): Record<string, unknown> {
-  const postingDate = params.posting_date ?? new Date().toISOString().slice(0, 10);
+  const postingDate = params.posting_date;
 
   return {
     doctype: "Payment Entry",
@@ -510,6 +513,8 @@ export async function createPayment(
         party: string | undefined;
         depositAccount: string | undefined;
         currency: { id: string; code: string; minorUnit: number };
+        /** The school's local date, the posting date when the request names none (QA-044). */
+        today: string;
       };
 
   const prepared = await withTenantTx<Prepared>(database, context, async (tx) => {
@@ -553,7 +558,14 @@ export async function createPayment(
         `Unknown or inactive currency: ${params.currency}`,
       );
     }
-    return { kind: "forward", erpnext, party, depositAccount, currency };
+    return {
+      kind: "forward",
+      erpnext,
+      party,
+      depositAccount,
+      currency,
+      today: await schoolToday(tx),
+    };
   });
 
   if (prepared.kind === "replay") {
@@ -561,13 +573,15 @@ export async function createPayment(
   }
 
   const { erpnext, party, depositAccount, currency } = prepared;
+  // Defaulted once, in the school's timezone, so ERPNext and the projection agree (QA-044).
+  const posting = { ...params, posting_date: params.posting_date ?? prepared.today };
 
   // --- Phase 2: forward to ERPNext --------------------------------------------------------------
   let doc: ErpNextPaymentEntry;
   try {
     const response = await erpnext.post<{ data: ErpNextPaymentEntry }>(
       PAYMENT_ENTRY_RESOURCE,
-      buildPaymentEntryPayload(params, schoolId, party, depositAccount),
+      buildPaymentEntryPayload(posting, schoolId, party, depositAccount),
       { acceptLanguage },
     );
     doc = response.data.data;
@@ -606,7 +620,7 @@ export async function createPayment(
 
   // --- Phase 3: fill in the reservation, project the cache row, audit ---------------------------
   const amountMinor = toMinorUnits(params.amount, currency.minorUnit);
-  const postingDate = params.posting_date ?? new Date().toISOString().slice(0, 10);
+  const postingDate = posting.posting_date;
 
   const row = await withTenantTx(database, context, async (tx) => {
     await tx`

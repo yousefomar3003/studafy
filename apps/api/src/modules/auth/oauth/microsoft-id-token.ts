@@ -9,8 +9,8 @@
  * Key differences from Google:
  *   - Issuer is tenant-specific: https://login.microsoftonline.com/{tenant}/v2.0
  *   - Uses prefix matching instead of strict equality to safely accept all Entra ID tenants
- *   - No email_verified check — Entra ID doesn't reliably include this claim; presence of the
- *     email/preferred_username claim implies verification under tenant admin policy
+ *   - No email_verified check — Entra ID doesn't reliably include this claim. preferred_username
+ *     (on a tenant-verified domain) is used; `email` only with `xms_edov` (QA-070)
  *   - preferred_username (UPN) is the primary identifier, with email as fallback
  *
  * The jwksUri parameter is injectable for testing — production uses the Microsoft discovery
@@ -36,6 +36,8 @@ export interface MicrosoftIdTokenClaims {
 interface MicrosoftIdTokenPayload extends JWTPayload {
   preferred_username?: string;
   email?: string;
+  /** "Email domain owner verified": the optional claim Entra sets when `email` can be trusted. */
+  xms_edov?: boolean | string;
   nonce?: string;
   name?: string;
   tid?: string;
@@ -90,8 +92,14 @@ export async function validateMicrosoftIdToken(
 
   const payload = result.payload as MicrosoftIdTokenPayload;
 
-  // Issuer prefix match — accepts any tenant while rejecting non-Microsoft issuers.
-  if (!isMicrosoftIssuer(payload.iss)) {
+  // Issuer prefix match — accepts any tenant while rejecting non-Microsoft issuers — and the
+  // issuer's tenant must be the token's own `tid` (QA-070), so a token from one tenant cannot pass
+  // under another's issuer.
+  if (
+    !isMicrosoftIssuer(payload.iss) ||
+    !payload.tid ||
+    extractTenantId(payload.iss ?? "") !== payload.tid
+  ) {
     throw new CodedHttpException(
       401,
       ERROR_CODES.AUTH_TOKEN_INVALID,
@@ -103,9 +111,13 @@ export async function validateMicrosoftIdToken(
     throw new CodedHttpException(400, ERROR_CODES.OAUTH_STATE_INVALID, "Token nonce mismatch");
   }
 
-  // Microsoft uses preferred_username (UPN) as the primary email-like identifier.
-  // Normalize to lowercase to prevent duplicate identities from case differences.
-  const rawEmail = payload.preferred_username ?? payload.email;
+  // Microsoft uses preferred_username (UPN) as the primary email-like identifier: a work account's
+  // UPN must sit on a domain its tenant has verified. `email` is a free-text attribute any tenant
+  // admin can set to someone else's address ("nOAuth"), and invitations, provider links and school
+  // applications bind on this value, so it is used only when Entra marks its domain verified
+  // (`xms_edov`) (QA-070). Normalize to lowercase to prevent duplicates from case differences.
+  const emailDomainVerified = payload.xms_edov === true || payload.xms_edov === "1";
+  const rawEmail = payload.preferred_username ?? (emailDomainVerified ? payload.email : undefined);
   if (!payload.sub || !rawEmail) {
     throw new CodedHttpException(
       401,

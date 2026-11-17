@@ -356,6 +356,12 @@ export const ERROR_CODES = {
   // Object storage — pre-signed URL generation and tenant-prefix enforcement.
   STORAGE_KEY_FORBIDDEN: "STORAGE_KEY_FORBIDDEN",
   STORAGE_OBJECT_NOT_FOUND: "STORAGE_OBJECT_NOT_FOUND",
+  // The staged object changed between confirm's inspection and its copy (QA-036): upload again.
+  STORAGE_OBJECT_CHANGED: "STORAGE_OBJECT_CHANGED",
+  // Self-service erasure goes through account deletion (grace period, re-authentication), QA-042.
+  SELF_ERASURE_USE_ACCOUNT_DELETION: "SELF_ERASURE_USE_ACCOUNT_DELETION",
+  // The student CSV upload is over its size limit (QA-067).
+  IMPORT_FILE_TOO_LARGE: "IMPORT_FILE_TOO_LARGE",
   STORAGE_NOT_CONFIGURED: "STORAGE_NOT_CONFIGURED",
   // The object's server-computed SHA-256 did not match the checksum the client supplied at confirm.
   STORAGE_CHECKSUM_MISMATCH: "STORAGE_CHECKSUM_MISMATCH",

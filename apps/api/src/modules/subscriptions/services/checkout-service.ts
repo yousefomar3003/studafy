@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
 
 import { LIVE_STATUSES } from "@studafy/billing";
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, STORAGE_ADDON_PLAN_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { selectPaymentProviderForSchool } from "../payment-provider-routing";
 
+import { AI_ADDON_PLAN_CODE } from "./ai-offer-service";
 import {
   findLiveStorageAddon,
   findStoragePrice,
@@ -206,16 +207,33 @@ function renewalMetadata(price: PlanPriceRow): { price_id: string; billing_inter
   return { price_id: price.id, billing_interval: price.billing_interval };
 }
 
+/**
+ * Which products a checkout may sell (QA-012). A price id arrives from the caller, so the lookup
+ * must also prove it belongs to the right plan family: otherwise the AI add-on could be bought at a
+ * storage tier's or another plan's cheaper price, and a school plan activated with an add-on price
+ * -- the webhook later activates whatever the session was for, whatever was paid.
+ */
+type PlanFamily = "ai_addon" | "storage_addon" | "school_plan";
+
 async function findActivePriceById(
   tx: TransactionSql,
   priceId: string,
+  family: PlanFamily,
 ): Promise<PlanPriceRow | undefined> {
+  const storageCodes = [...STORAGE_ADDON_PLAN_CODES];
+  const familyFilter =
+    family === "ai_addon"
+      ? tx`p.code = ${AI_ADDON_PLAN_CODE}`
+      : family === "storage_addon"
+        ? tx`p.code = ANY(${storageCodes}::text[])`
+        : tx`p.code <> ${AI_ADDON_PLAN_CODE} AND NOT (p.code = ANY(${storageCodes}::text[]))`;
   const [price] = await tx<PlanPriceRow[]>`
     SELECT pp.id, pp.plan_id, pp.stripe_price_id, pp.amount_minor::text AS amount_minor,
            cur.code AS currency, pp.billing_interval::text AS billing_interval
     FROM app.plan_prices pp
+    JOIN app.plans p ON p.id = pp.plan_id AND p.is_active = true
     JOIN app.currencies cur ON cur.id = pp.currency_id
-    WHERE pp.id = ${priceId}::uuid AND pp.is_active = true
+    WHERE pp.id = ${priceId}::uuid AND pp.is_active = true AND ${familyFilter}
     LIMIT 1
   `;
   return price;
@@ -236,7 +254,7 @@ export async function createSchoolCheckoutSession(
     const school = await findSchool(tx, schoolId);
     const selected = await selectPaymentProviderForSchool(tx, providers, schoolId);
 
-    const price = await findActivePriceById(tx, priceId);
+    const price = await findActivePriceById(tx, priceId, "school_plan");
     if (!price) {
       throw new CodedHttpException(
         400,
@@ -475,7 +493,7 @@ export async function createAiCheckoutSession(
 
     const selected = await selectPaymentProviderForSchool(tx, providers, schoolId);
 
-    const price = await findActivePriceById(tx, priceId);
+    const price = await findActivePriceById(tx, priceId, "ai_addon");
     if (!price) {
       throw new CodedHttpException(
         400,
@@ -580,7 +598,9 @@ export async function createStorageCheckoutSession(
     const selected = await requireOnlineStorageProvider(tx, providers, schoolId);
 
     const storagePrice = await findStoragePrice(tx, priceId);
-    const price = storagePrice ? await findActivePriceById(tx, storagePrice.id) : undefined;
+    const price = storagePrice
+      ? await findActivePriceById(tx, storagePrice.id, "storage_addon")
+      : undefined;
     if (!price) {
       throw new CodedHttpException(
         400,

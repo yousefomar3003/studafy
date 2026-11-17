@@ -518,6 +518,7 @@ export async function saveQuestions<T>(
     tempKey,
     permanentKey,
     sizeBytes: upload.sizeBytes,
+    etag: upload.etag,
   }));
 
   await runTx(async (tx) => {

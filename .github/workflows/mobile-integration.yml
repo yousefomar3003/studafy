@@ -97,7 +97,7 @@ jobs:
           done
           echo "::error::realtime gateway did not become ready within 30s"; cat realtime-server.log; exit 1
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: 3.44.8
           channel: stable
@@ -136,7 +136,7 @@ jobs:
       # this one — see attendance_offline_replay_test.dart's own pre-flight check for that failure
       # mode.
       - name: Run the integration_test suite on a real Android emulator
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 34
           arch: x86_64
@@ -250,7 +250,7 @@ jobs:
             echo "::error::cloudflared did not produce a public URL within 30s"; cat realtime-tunnel.log; exit 1
           fi
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: 3.44.8
           channel: stable
@@ -275,10 +275,10 @@ jobs:
           printf '%s' "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
       - id: auth
-        uses: google-github-actions/auth@v2
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2.1.13
         with:
           credentials_json: ${{ secrets.FIREBASE_TEST_LAB_SA_KEY }}
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2.2.1
         with:
           project_id: ${{ secrets.FIREBASE_TEST_LAB_PROJECT_ID }}
 

@@ -6,6 +6,7 @@ import '../../parent/application/parent_providers.dart';
 import '../../shell/application/shell_providers.dart';
 import '../../shell/domain/shell_role.dart';
 import 'widgets/released_marks_widgets.dart';
+import '../../../design/widgets/protected_screen.dart';
 
 /// A student's approved exam marks on their own page ([ReleasedMarksView]): each term on its own
 /// (first semester, second semester, …), then the annual period for year-long assessments such
@@ -35,7 +36,7 @@ class ReleasedMarksScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final name = studentName ?? _linkedChildName(ref);
 
-    return Scaffold(
+    final screen = Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,6 +49,8 @@ class ReleasedMarksScreen extends ConsumerWidget {
       ),
       body: ReleasedMarksView(studentId: studentId),
     );
+    // Grades and transcripts: no screenshots, hidden in the app switcher (QA-084).
+    return ProtectedScreen(child: screen);
   }
 
   String? _linkedChildName(WidgetRef ref) {

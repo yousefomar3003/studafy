@@ -1,3 +1,4 @@
+import 'package:drift/native.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show Override;
@@ -11,6 +12,7 @@ import 'package:studafy_mobile/src/core/config/app_environment.dart';
 import 'package:studafy_mobile/src/core/di/app_providers.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/core/monitoring/monitoring_providers.dart';
+import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
 import 'package:studafy_mobile/src/core/push/push_providers.dart';
 import 'package:studafy_mobile/src/core/update/update_providers.dart';
 import 'package:studafy_mobile/src/core/update/update_status.dart';
@@ -70,14 +72,10 @@ Future<void> pumpStudafyApp(
       child: wrapWithLocalization(
         ProviderScope(
           overrides: [
-            appConfigProvider.overrideWithValue(
-              AppConfig.fromEnvironment(AppEnvironment.dev),
-            ),
+            appConfigProvider.overrideWithValue(AppConfig.fromEnvironment(AppEnvironment.dev)),
             authSessionProvider.overrideWithValue(session ?? fakeAuthSession()),
             // Saved accounts (account switching) read the Keychain, which has no plugin here.
-            secureTokenStoreProvider.overrideWithValue(
-              secureStore ?? FakeSecureTokenStore(),
-            ),
+            secureTokenStoreProvider.overrideWithValue(secureStore ?? FakeSecureTokenStore()),
             crashReporterProvider.overrideWithValue(FakeCrashReporter()),
             // StudafyApp reads this in didChangeDependencies (_subscribeToPushTaps) regardless of
             // auth status — see fake_push_service.dart for why a real PushService can't exist here.
@@ -87,6 +85,9 @@ Future<void> pumpStudafyApp(
             // so [updateStatus] (default `upToDate`) is the honest default. Pass `updateStatus:`
             // to exercise the blocking path — see forced_update_boot_test.dart.
             updateStatusProvider.overrideWith((ref) async => updateStatus),
+            // StudafyApp opens the offline cache at mount (QA-080: a launch with no session wipes
+            // it); the on-disk file needs path_provider, which has no plugin here.
+            offlineDatabaseExecutorProvider.overrideWith((ref) => NativeDatabase.memory()),
             ...extraOverrides,
           ],
           child: const StudafyApp(),

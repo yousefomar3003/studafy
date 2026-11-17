@@ -12,7 +12,7 @@ inputs:
 runs:
   using: composite
   steps:
-    - uses: oven-sh/setup-bun@v2
+    - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version: ${{ inputs.bun-version }}
 
@@ -26,7 +26,7 @@ runs:
     # which is both slow and the reason a single flaky tarball fetch could fail the build. The cache
     # is content-addressed and `--frozen-lockfile` pins the resolved tree, so there is nothing a
     # stale cache entry can silently change; clearing it bought no safety it does not already have.
-    - uses: actions/cache@v4
+    - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: ~/.bun/install/cache
         key: bun-install-${{ runner.os }}-${{ hashFiles('bun.lock') }}

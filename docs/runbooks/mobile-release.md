@@ -65,9 +65,26 @@ schedule, which is the only staged-rollout control App Store Connect exposes.
 
 ## Secrets
 
-Repository secrets, consumed by `mobile-release.yml` and passed through to the lanes. None is ever
+Secrets consumed by `mobile-release.yml` and passed through to the lanes. None is ever
 committed; the workflow writes the file-shaped ones (`fastlane/play-store-key.json`,
 `android/key.properties`, the keystore) at run time and `.gitignore` blocks all of them.
+
+### Where they live (QA-006)
+
+Every job in `mobile-release.yml` runs in the `mobile-release` environment. A repository secret is
+readable by any workflow pushed to any branch, so a malicious or careless workflow on a feature
+branch could print the upload keystore or the match password. An environment secret is readable
+only by jobs that target the environment, and the environment can refuse branches. One-time setup
+by a repository admin (GitHub → Settings → Environments):
+
+1. Create the environment `mobile-release`.
+2. Under **Deployment branches and tags**, choose **Selected branches and tags** and allow `main`
+   and the tag pattern `mobile-v*`.
+3. Move every secret listed below from the repository's secrets to this environment's secrets,
+   then delete the repository copies.
+4. Run `mobile-release` once from `main` (workflow_dispatch) to confirm the lanes still find them.
+
+Until step 3 is done the jobs keep reading the repository secrets, so nothing breaks in between.
 
 ### Android
 
@@ -87,6 +104,12 @@ committed; the workflow writes the file-shaped ones (`fastlane/play-store-key.js
 | `APPLE_ID` / `APPLE_DEVELOPER_TEAM_ID`                     | Apple account email and the 10-character Developer Program team id.                                 |
 | `MATCH_GIT_URL`                                            | SSH/HTTPS URL of the private git repo holding the encrypted signing material.                       |
 | `MATCH_PASSWORD`                                           | Passphrase `match` uses to decrypt that repo.                                                       |
+
+### Both platforms
+
+| Secret              | What it is                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SENTRY_AUTH_TOKEN` | The `studafy-limited` Sentry organization token (Settings → Developer Settings → Organization Tokens), shared with the web build's source-map upload. Store builds are obfuscated (QA-084); the Fastfile uploads their Dart symbols (`build/debug-info`) to Sentry project `flutter` with it. A `mobile-v*` release fails without it; TestFlight / internal builds only warn. Rotating it affects the web and mobile builds together. |
 
 ### Variables
 

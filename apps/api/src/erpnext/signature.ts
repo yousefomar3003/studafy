@@ -43,3 +43,21 @@ export function verifyWebhookSignature(
 
   return given.length === expected.length && timingSafeEqual(given, expected);
 }
+
+/**
+ * The header each school's ERPNext site names its school in (QA-034). It selects which per-site
+ * secret the signature must verify against, so it is authenticated by that signature.
+ */
+export const SITE_SCHOOL_HEADER = "x-studafy-school";
+
+/**
+ * A school's own webhook secret, derived from the master ERPNEXT_WEBHOOK_SECRET (QA-034). Each site
+ * is provisioned with only its derived secret (infra/erpnext/seed/provision.py computes the same
+ * value), so a secret read off one school's site cannot sign another school's events, and nothing
+ * new is stored: the master stays the only secret the API holds.
+ */
+export function siteWebhookSecret(masterSecret: string, schoolId: string): string {
+  return createHmac("sha256", masterSecret)
+    .update(`erpnext-webhook-site:v1:${schoolId}`)
+    .digest("hex");
+}

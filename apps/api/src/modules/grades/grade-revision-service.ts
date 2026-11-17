@@ -5,6 +5,7 @@ import { emit } from "../../lib/events/emitter";
 import { emitAuditLog } from "../../middleware/auditEmitter";
 
 import { assertUserIsSchoolAdmin, assertUserTeachesGradebook } from "./grade-entry-service";
+import { gradeRecipients } from "./grade-recipients";
 import { refreshStudentTermSummary } from "./published/service";
 
 import type { TransactionSql } from "postgres";
@@ -457,6 +458,7 @@ export async function decideRevision(
     gradebookId: submission.gradebook_id,
     studentId: submission.student_id,
     approvedByUserId: userId,
+    recipientUserIds: await gradeRecipients(tx, submission.student_id),
   });
 
   return approved!;

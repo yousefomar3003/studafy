@@ -3,7 +3,7 @@
  * lifecycle job, per school:
  *
  *   license_expiring_30 / license_expiring_7 -- an active license ends within 30 / 7 days
- *   invoice_due                              -- an unpaid instalment falls due today (UTC)
+ *   invoice_due                              -- an unpaid instalment falls due today (the school's date)
  *   invoice_overdue                          -- an unpaid instalment was marked overdue
  *
  * Invoice reminders are per instalment (000221): each instalment of a monthly or custom plan is
@@ -134,7 +134,6 @@ async function dueReminders(
 ): Promise<Reminder[]> {
   const reminders: Reminder[] = [];
   const in30 = new Date(now.getTime() + 30 * DAY_MS);
-  const today = now.toISOString().slice(0, 10);
 
   const licenses = await tx<{ id: string; ends_at: Date }[]>`
     SELECT id::text AS id, ends_at FROM app.school_licenses
@@ -177,7 +176,7 @@ async function dueReminders(
     WHERE inst.school_id = current_setting('app.school_id')::uuid
       AND i.status IN ('issued', 'partially_paid')
       AND inst.status <> 'paid'
-      AND (inst.overdue_at IS NOT NULL OR inst.due_date = ${today}::date)
+      AND (inst.overdue_at IS NOT NULL OR inst.due_date = app.school_today(${now}))
     ORDER BY i.number, inst.position
   `;
   for (const instalment of instalments) {
@@ -200,6 +199,10 @@ async function dueReminders(
       toSchool: true,
     });
   }
+
+  // The AI cutoff is a UTC date (licenseAiStopDate; the workers stop the licence on it in UTC), so it
+  // is compared with today's UTC date, not the school-local date the due reminders above use.
+  const today = now.toISOString().slice(0, 10);
 
   // The AI cutoff of every unpaid instalment on a licence in force: warned of once it is a week or
   // less away; told once the licence is stopped for it (the earliest such instalment per licence, so

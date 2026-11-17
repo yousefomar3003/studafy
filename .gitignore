@@ -6,6 +6,10 @@ storybook-static/
 playwright-report/
 test-results/
 coverage/
+# Graphify's local build cache (file stats, mtimes, hashes, per-file ASTs): rebuilt by
+# `graphify update .` on each machine. Its hash entries tripped gitleaks' generic-api-key rule
+# (QA-075); the graph itself (graphify-out/graph.json, reports) stays tracked.
+graphify-out/cache/
 # Lighthouse CI local runs — regenerated on demand; CI uploads them as artifacts
 .lighthouseci/
 

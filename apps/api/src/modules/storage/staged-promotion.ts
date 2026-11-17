@@ -40,6 +40,8 @@ export interface StagedCopy {
   tempKey: string;
   permanentKey: string;
   sizeBytes: number;
+  /** The ETag seen when the object was inspected: the copy is conditional on it (QA-036). */
+  etag?: string;
 }
 
 /**
@@ -47,6 +49,14 @@ export interface StagedCopy {
  * Call inside the check transaction, after the caller's own authorization.
  */
 export async function reserveStorage(tx: TransactionSql, sizeBytes: number): Promise<StorageUsage> {
+  // QA-037: check and charge as one step. Without this, concurrent confirms near the cap each read
+  // the same meter, each passed, and together went over. The lock is per school and released at
+  // the end of this short transaction, so only one school's own reservations queue behind it.
+  await tx`
+    SELECT pg_advisory_xact_lock(
+      hashtextextended('storage-quota:' || current_setting('app.school_id'), 0)
+    )
+  `;
   const usage = await assertStorageUploadQuota(tx, sizeBytes);
   const bytesUsed = sizeBytes > 0 ? await recordStorageUpload(tx, sizeBytes) : usage.bytesUsed;
   return {
@@ -70,7 +80,7 @@ export async function copyStagedUploads(
   let landed = 0;
   try {
     for (const copy of copies) {
-      await copyStagedObject(storage, copy.tempKey, copy.permanentKey);
+      await copyStagedObject(storage, copy.tempKey, copy.permanentKey, copy.etag);
       landed += 1;
     }
   } catch (error) {

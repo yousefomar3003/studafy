@@ -5,10 +5,12 @@ import { addRecentSearch, clearRecentSearches, loadRecentSearches } from "./rece
 
 beforeEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 afterEach(() => {
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 describe("recent-searches", () => {
@@ -57,5 +59,25 @@ describe("recent-searches", () => {
     window.localStorage.setItem("studafy.global-search.recent.v1", "not json");
 
     expect(loadRecentSearches()).toEqual([]);
+  });
+});
+
+// QA-089: admins search for students by name and email; on a shared school computer those terms
+// stayed in localStorage for the next person. They now live for the tab only and go on sign-out.
+describe("recent-searches storage (QA-089)", () => {
+  beforeEach(() => {
+    window.sessionStorage.clear();
+  });
+
+  test("terms are kept for this tab only, never in localStorage", () => {
+    addRecentSearch("layla haddad");
+    expect(window.localStorage.length).toBe(0);
+    expect(loadRecentSearches()).toEqual(["layla haddad"]);
+  });
+
+  test("terms left in localStorage by an older version are removed", () => {
+    window.localStorage.setItem("studafy.global-search.recent.v1", JSON.stringify(["old term"]));
+    loadRecentSearches();
+    expect(window.localStorage.getItem("studafy.global-search.recent.v1")).toBeNull();
   });
 });

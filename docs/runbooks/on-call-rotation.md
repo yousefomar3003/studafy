@@ -10,8 +10,8 @@ This file is the human contract behind the `critical` / `warning` split.
 alarms, Alertmanager routing to SNS email/SMS and Telegram, and the alert catalog that went with
 them) ran on AWS and was retired with it. Production on fly.io reports errors to Sentry (org
 `studafy-limited`) and ships logs to Axiom (dataset `studafy-logs`, `infra/fly/log-shipper.toml`);
-no alert rules, routes or paging integration for either are defined in this repository, and there
-is no alert catalog yet.
+no alert rules, routes or paging integration for either are configured yet. The alert catalog,
+with the signals the code now provides, is [alerts.md](alerts.md) (QA-046).
 
 Until the team adopts an on-call provider, the rotation below is followed by people, not enforced
 by a tool. This document is the **specification** that provider will be configured to; when the two

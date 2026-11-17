@@ -61,7 +61,8 @@ export const createSelfDsrBodySchema = z
   .object({
     request_type: dsrRequestTypeSchema.openapi({
       description:
-        "'export' (GDPR Art. 15) or 'erasure' (GDPR Art. 17), filed by the caller about their own account.",
+        "'export' (GDPR Art. 15), filed by the caller about their own account. 'erasure' is refused " +
+        "here (409 SELF_ERASURE_USE_ACCOUNT_DELETION): use POST /api/account/deletion.",
     }),
   })
   .openapi("CreateSelfDataSubjectRequestBody");

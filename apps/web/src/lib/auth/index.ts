@@ -55,8 +55,17 @@ export {
 export { decodeAccessTokenRoles } from "./access-token-claims";
 export { resolveRoleHome } from "./role-home";
 
+import { clearRecentSearches } from "../../features/search/recent-searches";
+
 import { authRefreshClient } from "./api";
-import { createSessionStore } from "./session-store";
+import { createBrowserCrossTab, createSessionStore } from "./session-store";
 
 /** The app-wide session store. `lib/api.ts`'s token seam and the realtime handshake read through it. */
-export const sessionStore = createSessionStore({ refreshClient: authRefreshClient });
+export const sessionStore = createSessionStore({
+  refreshClient: authRefreshClient,
+  // QA-033: tabs rotate the shared refresh cookie one at a time and share the result.
+  crossTab: createBrowserCrossTab(),
+  // QA-089: staff search for students by name; the next person at a shared computer must not
+  // find those terms.
+  onSignedOut: clearRecentSearches,
+});

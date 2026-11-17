@@ -17,11 +17,19 @@ import { requirePermission } from "../../../middleware/authz";
 import { onlyMethods } from "../../../middleware/only-methods";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { requestIdHeaders, standardResponses } from "../../../openapi/responses";
+import { getContentClass } from "../../storage/content-classes";
 import { freeStoredObjects } from "../../storage/free-objects";
-import { assertStorageUploadQuota, recordStorageUpload } from "../../storage/quota-service";
+import { assertStorageUploadQuota } from "../../storage/quota-service";
+import { inspectStagedUpload } from "../../storage/service";
 import {
-  confirmUpload,
+  copyStagedUploads,
+  discardStagedUploads,
+  reserveStorage,
+} from "../../storage/staged-promotion";
+import {
+  beginConfirmUpload,
   deleteMaterial,
+  finishConfirmUpload,
   getMaterial,
   getRetryableMaterial,
   initiateUpload,
@@ -337,6 +345,41 @@ export function materialRoutes(
   }
 
   // Audit declarations
+  // Permission gates (QA-008). These routes used to have none -- they were exempted as "authorized
+  // by signed upload URL and row ownership", but no ownership check existed, so any student or
+  // parent able to read a class could rename, delete or AI-expose its materials. Reads need
+  // material:read; each write needs its own permission, and the service then requires the caller
+  // to lead the school or teach the material's class. Hono matches `:materialId` against "upload",
+  // so the per-method guards keep each mount to the methods its own routes serve.
+  routes.use(
+    "/api/academics/materials",
+    onlyMethods(["GET"], requirePermission(PERMISSIONS.MATERIAL_READ)),
+  );
+  routes.use(
+    "/api/academics/materials/upload",
+    onlyMethods(["POST"], requirePermission(PERMISSIONS.MATERIAL_CREATE)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId",
+    onlyMethods(["GET"], requirePermission(PERMISSIONS.MATERIAL_READ)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId",
+    onlyMethods(["PATCH"], requirePermission(PERMISSIONS.MATERIAL_UPDATE)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId",
+    onlyMethods(["DELETE"], requirePermission(PERMISSIONS.MATERIAL_DELETE)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId/confirm",
+    onlyMethods(["POST"], requirePermission(PERMISSIONS.MATERIAL_CREATE)),
+  );
+  routes.use(
+    "/api/academics/materials/:materialId/ai-visible",
+    onlyMethods(["PATCH"], requirePermission(PERMISSIONS.MATERIAL_MANAGE_AI)),
+  );
+
   routes.use("/api/academics/materials/upload", auditAction("insert", "materials"));
   routes.use("/api/academics/materials/:materialId", auditAction("update", "materials"));
   routes.use("/api/academics/materials/:materialId/confirm", auditAction("update", "materials"));
@@ -412,9 +455,8 @@ export function materialRoutes(
     // confirm. Unawaited and error-proof (lib/scanner-warmup.ts): it never delays this request.
     options.scannerWarmup?.();
 
-    // Claim-based quota check before the material row is created or a PUT is signed. Materials
-    // upload straight into permanent/, so there is no temp/ stage to refuse at -- this gate plus
-    // the daily reconciliation is the enforcement boundary for this flow.
+    // Claim-based quota pre-check before the row is created or a PUT is signed; confirm charges the
+    // real stored size (QA-009), so this only spares an obviously over-quota upload its round trip.
     const result = await withTenantTx(database, tenantFrom(c), async (tx) => {
       await assertStorageUploadQuota(tx, body.size_bytes);
       return initiateUpload(tx, auth.schoolId, auth.userId, body);
@@ -429,10 +471,13 @@ export function materialRoutes(
       result.freedStorageKeys,
     );
 
-    const presigned = await storage.presign(result.storage_key, "PUT", body.mime_type);
+    const presigned = await storage.presign(result.storage_key, "PUT", body.mime_type, undefined, {
+      contentLength: body.size_bytes,
+    });
 
     return c.json(
       {
+        material_id: result.material.id,
         upload_url: presigned.url,
         storage_key: result.storage_key,
         expires_at: presigned.expiresAt.toISOString(),
@@ -446,20 +491,40 @@ export function materialRoutes(
     const { materialId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
-      const confirmed = await confirmUpload(
-        tx,
-        auth.schoolId,
-        materialId,
-        body.storage_key,
-        body.checksum_sha256,
-      );
-      // The material's size is the client's claim from initiate; the object is already in
-      // permanent/ by now. The meter is credited so enforcement stays fresh, and reconciliation
-      // corrects any gap between the claim and the stored bytes.
-      await recordStorageUpload(tx, confirmed.size_bytes);
-      return confirmed;
-    });
+    if (!storage) {
+      throw new HTTPException(503, { message: "Storage not configured" });
+    }
+
+    // The staged pipeline (modules/storage/staged-promotion.ts), as every other upload uses
+    // (QA-009): authorize, inspect the *stored* object with no transaction open, charge quota for
+    // its real size, copy it to the material's own permanent key, record it, drop the temp copy.
+    // The client only ever held a PUT URL for temp/, so nothing it writes later reaches what is
+    // served.
+    const existing = await withTenantTx(database, tenantFrom(c), (tx) =>
+      beginConfirmUpload(tx, auth.schoolId, materialId, body.storage_key),
+    );
+    const inspected = await inspectStagedUpload(
+      storage,
+      auth.schoolId,
+      getContentClass("material.file"),
+      { storageKey: body.storage_key, checksumSha256: body.checksum_sha256 },
+    );
+    await withTenantTx(database, tenantFrom(c), (tx) => reserveStorage(tx, inspected.sizeBytes));
+    const copy = {
+      tempKey: body.storage_key,
+      permanentKey: existing.storage_key,
+      sizeBytes: inspected.sizeBytes,
+      etag: inspected.etag,
+    };
+    await copyStagedUploads(storage, tenantTxRunner(database, tenantFrom(c)), [copy]);
+    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
+      finishConfirmUpload(tx, auth.schoolId, existing, {
+        sizeBytes: inspected.sizeBytes,
+        contentType: inspected.contentType,
+        checksumSha256: inspected.checksumSha256 ?? null,
+      }),
+    );
+    await discardStagedUploads(storage, [copy]);
 
     await enqueueScan(auth.schoolId, row);
 

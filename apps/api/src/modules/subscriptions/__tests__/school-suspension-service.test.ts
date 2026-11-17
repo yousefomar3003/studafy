@@ -42,7 +42,9 @@ afterAll(async () => {
 afterEach(async () => {
   if (!db) return;
   await db.sql.begin(async (tx) => {
-    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    // The audit log refuses TRUNCATE from every role (QA-015); a disposable test database may
+    // skip triggers for its own cleanup, as the superuser it connects as.
+    await tx.unsafe("SET LOCAL session_replication_role = replica");
     await tx.unsafe("TRUNCATE app.outbox_events, app.audit_logs");
   });
 });

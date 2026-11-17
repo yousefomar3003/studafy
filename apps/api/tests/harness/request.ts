@@ -5,6 +5,8 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { AUTH_CHANNELS, KeyStore, signAccessToken } from "../../src/modules/auth";
 
+import { appDatabaseFor, assertLeastPrivilege } from "./database";
+
 import type { Database } from "../../src/db";
 import type { ScannerWarmup } from "../../src/lib/scanner-warmup";
 import type { StorageService } from "../../src/lib/storage";
@@ -61,6 +63,8 @@ export interface TestAppOptions {
   storage?: StorageService | null;
   /** Records the malware scans uploads enqueue (F-14). Defaults to none: uploads stay unserved. */
   uploadScanEnqueuer?: UploadScanEnqueuer | null;
+  /** Load the signing key from this PKCS#8 PEM, as a deployed API does (QA-023). Default: random. */
+  jwtPrivateKeyPem?: string;
   /** Called when a material upload starts (lib/scanner-warmup.ts). Defaults to none. */
   scannerWarmup?: ScannerWarmup | null;
 }
@@ -93,7 +97,7 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     tracker: createInflightTracker(),
     logger,
     redis: options.redis ?? null,
-    database: options.database,
+    database: options.database ? appDatabaseFor(options.database) : null,
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
@@ -104,7 +108,13 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     scannerWarmup: options.scannerWarmup ?? null,
   });
 
-  return { app, keyStore, ready: keyStore.init() };
+  const ready = Promise.all([
+    keyStore.init(
+      options.jwtPrivateKeyPem ? { privateKeyPem: options.jwtPrivateKeyPem } : undefined,
+    ),
+    options.database ? assertLeastPrivilege(appDatabaseFor(options.database)) : undefined,
+  ]).then(() => undefined);
+  return { app, keyStore, ready };
 }
 
 // ---------------------------------------------------------------------------
