@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 
 import {
+  licencesToPutInForce,
   recordPaymentShares,
   resolvePendingShares,
   restoreCreditsOfVoidedInvoice,
@@ -1365,8 +1366,9 @@ export async function recordPayment(
     result: {
       payment,
       invoice: after,
-      licenseActivated: activation.activated,
-      licenseResumed: resumed.resumed,
+      // Put in force here, or already by the settle above (the shared rule found it due first).
+      licenseActivated: activation.activated || credits.activated.includes(after.licenseId),
+      licenseResumed: resumed.resumed || credits.resumed.includes(after.licenseId),
     },
     versions: new Map([...credits.versions, ...activation.versions, ...resumed.versions]),
     pending: [...credits.pending, ...activation.pending, ...resumed.pending],
@@ -1375,34 +1377,43 @@ export async function recordPayment(
 
 /**
  * Settle the school's revenue share (000237: forfeit, credit on open later invoices, payout due),
- * then put in force a licence whose invoice a credit left with its first instalment paid, and resume
- * one stopped for non-payment that a credit settled.
+ * then put in force what is now due to be (@studafy/billing `licencesToPutInForce`, the rule the
+ * workers' hourly job uses too): a licence whose invoice a credit left with its first instalment
+ * paid is activated, and one stopped for non-payment that a credit settled is resumed -- here with
+ * the API's full activation (entitlements, personal-subscription overlaps and renewal stops).
  */
 export async function settleShares(
   tx: TransactionSql,
   schoolId: string,
   actor: LicenseActor,
   now: Date = new Date(),
-): Promise<Omit<Changed<unknown>, "result">> {
-  const changes = await settleRevenueShare(tx, shareContext(tx, schoolId, actor, now));
+): Promise<Omit<Changed<unknown>, "result"> & { activated: string[]; resumed: string[] }> {
+  await settleRevenueShare(tx, shareContext(tx, schoolId, actor, now));
   const versions = new Map<string, number>();
   const pending: Changed<unknown>["pending"] = [];
-  const credited = [
-    ...new Set(changes.flatMap((change) => (change.invoiceId ? [change.invoiceId] : []))),
-  ];
-  for (const invoiceId of credited) {
+  const activated: string[] = [];
+  const resumedIds: string[] = [];
+  const due = await licencesToPutInForce(tx, now);
+  for (const { invoiceId, licenseId } of due.activate) {
     const invoice = (await readInvoice(tx, invoiceId))!;
-    const activation =
-      invoice.status === "paid" || (await firstInstalmentPaid(tx, invoice.id))
-        ? await activateLicenseFor(tx, schoolId, invoice, actor, now)
-        : { versions: new Map<string, number>(), pending: [] };
-    const resumed = await resumeIfSettled(tx, schoolId, invoice.licenseId, actor, now);
-    for (const [userId, version] of [...activation.versions, ...resumed.versions]) {
-      versions.set(userId, version);
+    const activation = await activateLicenseFor(tx, schoolId, invoice, actor, now);
+    for (const [userId, version] of activation.versions) versions.set(userId, version);
+    pending.push(...activation.pending);
+    if (activation.activated) {
+      activated.push(licenseId);
+      break; // one active licence at a time
     }
-    pending.push(...activation.pending, ...resumed.pending);
   }
-  return { versions, pending };
+  for (const licenseId of due.resume) {
+    const resumed = await resumeIfSettled(tx, schoolId, licenseId, actor, now);
+    for (const [userId, version] of resumed.versions) versions.set(userId, version);
+    pending.push(...resumed.pending);
+    if (resumed.resumed) {
+      resumedIds.push(licenseId);
+      break;
+    }
+  }
+  return { versions, pending, activated, resumed: resumedIds };
 }
 
 /**

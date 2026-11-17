@@ -21,14 +21,26 @@
  *     measurement day has come are taken and locked, pending shares are worked out again, and the
  *     school's shares are settled -- forfeited for an instalment unpaid past its cutoff (after step
  *     4 has stopped the licence), credited on open later invoices, or due for payout once the licence
- *     has ended.
+ *     has ended. A credit that leaves a licence due to be in force is applied the way the API's
+ *     payment path applies it (@studafy/billing `licencesToPutInForce`, the shared rule): a licence
+ *     it settled for non-payment is resumed (step 5's rule), and a new licence whose first instalment
+ *     a credit paid is activated -- unless a seat holder still pays personally, whose overlap credit
+ *     and renewal stop need the payment providers: that one is left to the API, whose next settle
+ *     for the school (a payment, an invoice, the console's recompute) finds it by the same rule. The
+ *     step is run again on a serialization failure or deadlock (a payment recorded at the same time).
  *
  * Each school runs in its own system tenant transaction (one failing school does not strand the
  * rest), every change writes an audit row with no actor, and every step is idempotent: a re-run finds
  * nothing left to change.
  */
 
-import { runRevenueShareTick } from "@studafy/billing";
+import {
+  activateLicence,
+  licencesToPutInForce,
+  personalSubscriptionsOnLicence,
+  runRevenueShareTick,
+  withTransactionRetry,
+} from "@studafy/billing";
 
 import { emitAuditLogs } from "../../db/audit";
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -54,6 +66,10 @@ export interface LicenseLifecycleResult {
   sharesSettled: number;
   /** Schools whose revenue share pass failed (the lifecycle steps for them still committed). */
   failedRevenueShareSchools: number;
+  /** Licences a revenue share credit put in force (activated). */
+  licensesActivatedByCredit: number;
+  /** Licences a credit left due to activate that wait for the API (a seat holder pays personally). */
+  licensesAwaitingApiActivation: number;
 }
 
 /** Expire the school's licenses that have ended; bump their seat holders. */
@@ -321,6 +337,50 @@ export async function resumePaidLicenses(
   return { resumed: resumed.length, bumped };
 }
 
+/** Step 6 for one school, in one transaction: the revenue share tick, then what its credits settled. */
+export async function revenueShareStep(
+  tx: TransactionSql,
+  schoolId: string,
+  now: Date,
+): Promise<{
+  snapshotsLocked: number;
+  sharesResolved: number;
+  settled: number;
+  activated: number;
+  resumed: number;
+  bumped: number;
+  awaitingApi: string[];
+}> {
+  const audit = (entries: Parameters<typeof emitAuditLogs>[1]) => emitAuditLogs(tx, entries);
+  const tick = await runRevenueShareTick(tx, { schoolId, now, audit });
+  const due = await licencesToPutInForce(tx, now, { creditedOnly: true });
+  let activated = 0;
+  let bumped = 0;
+  const awaitingApi: string[] = [];
+  for (const { licenseId } of due.activate) {
+    if (activated > 0) break; // one active licence at a time
+    if (await personalSubscriptionsOnLicence(tx, licenseId, now)) {
+      awaitingApi.push(licenseId);
+      continue;
+    }
+    const holders = await activateLicence(tx, licenseId, audit);
+    if (!holders) continue;
+    activated += 1;
+    bumped += (await publishUserEntitlementChanges(tx, schoolId, holders)).size;
+  }
+  const resumed =
+    due.resume.length > 0 ? await resumePaidLicenses(tx, schoolId, now) : { resumed: 0, bumped: 0 };
+  return {
+    snapshotsLocked: tick.snapshotsLocked,
+    sharesResolved: tick.sharesResolved,
+    settled: tick.changes.length,
+    activated,
+    resumed: resumed.resumed,
+    bumped: bumped + resumed.bumped,
+    awaitingApi,
+  };
+}
+
 export async function runLicenseLifecycle(
   sql: Sql,
   now: Date,
@@ -341,6 +401,8 @@ export async function runLicenseLifecycle(
     sharesResolved: 0,
     sharesSettled: 0,
     failedRevenueShareSchools: 0,
+    licensesActivatedByCredit: 0,
+    licensesAwaitingApiActivation: 0,
   };
 
   for (const schoolId of schools) {
@@ -362,16 +424,22 @@ export async function runLicenseLifecycle(
       log.warn({ err, school_id: schoolId }, "license lifecycle failed for school");
     }
     try {
-      await withSystemTenantTx(sql, { schoolId }, async (tx) => {
-        const tick = await runRevenueShareTick(tx, {
-          schoolId,
-          now,
-          audit: (entries) => emitAuditLogs(tx, entries),
-        });
-        result.conversionsLocked += tick.snapshotsLocked;
-        result.sharesResolved += tick.sharesResolved;
-        result.sharesSettled += tick.changes.length;
-      });
+      const step = await withTransactionRetry(() =>
+        withSystemTenantTx(sql, { schoolId }, (tx) => revenueShareStep(tx, schoolId, now)),
+      );
+      result.conversionsLocked += step.snapshotsLocked;
+      result.sharesResolved += step.sharesResolved;
+      result.sharesSettled += step.settled;
+      result.licensesActivatedByCredit += step.activated;
+      result.licensesResumed += step.resumed;
+      result.entitlementBumps += step.bumped;
+      result.licensesAwaitingApiActivation += step.awaitingApi.length;
+      if (step.awaitingApi.length > 0) {
+        log.warn(
+          { school_id: schoolId, license_ids: step.awaitingApi },
+          "revenue share credit paid a licence's first instalment; a seat holder pays personally, so the API activates it",
+        );
+      }
     } catch (err) {
       result.failedRevenueShareSchools += 1;
       log.warn({ err, school_id: schoolId }, "revenue share pass failed for school");
