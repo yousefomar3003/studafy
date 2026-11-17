@@ -23,4 +23,18 @@ useDefault = true
     # PR, along with the same wording in the findings report doc) -- a self-inflicted repeat of the
     # exact false positive this file exists to allowlist, not a new secret.
     "1e31f23e37387acc43bd39fa4e0b922635be19de",
+    # QA-075: audited on 2026-11-17 (`gitleaks git . --redact`, 1176 commits). Every remaining hit
+    # was a fixture or a placeholder in prose; none is a credential:
+    "08aa6c75f17ef187086611f4f3469d148f854e63", # stripe-adapter.test.ts: the fake Stripe test key again
+    "f167749b513bbd947f32ccfd24ef0cbf6f151169", # member_sign_in_test.dart: four fake setup codes
+    "e2e0a7b6baf898b39dc82cdc28df7a0e54e5d069", # QA plan docs quoting that fake Stripe key by name
+    "7756e3f20625d439703a5b5fd0f290d8cd07c713", # env.ts PEM-header regex; JWT runbook's `KEY=B` steps
+    "e0937389647c924e5cb52383d3b7c5261ccaa16a", # secret-compare.test.ts: "reconciliation-test-key-…"
+  ]
+  # QA-075: graphify's build cache (file sizes, mtimes, content hashes, per-file ASTs) was tracked
+  # until QA-075 and its hashes match generic-api-key 49 times in commit 51baae3d alone. The cache is
+  # gitignored now, so this path only covers the commits from before that; it holds no source text
+  # a real secret could hide in that the scan of the source file itself would not also catch.
+  paths = [
+    '''^graphify-out/cache/''',
   ]
