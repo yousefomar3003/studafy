@@ -34,7 +34,7 @@ useDefault = true
 [[allowlists]]
   description = "QA-075: exact fixture and placeholder values"
   regexes = [
-    '''^sk_test_placeholder$''',                       # stripe-adapter.test.ts; QA docs quote it
+    '''^sk_test_[p]laceholder$''',                    # stripe-adapter.test.ts; QA docs quote it
     '''^mismatch-key-1$''',                            # idempotency.test.ts
     '''^reconciliation-test-key-0123456789$''',        # secret-compare.test.ts (QA-092)
     '''^(?:abcdef0123456789){4}$''',                   # invitation/service.test.ts repeated hex
