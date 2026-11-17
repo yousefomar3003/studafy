@@ -382,6 +382,9 @@ const EXPECTED_PATHS = [
   "/api/school/license/student-ai/opt-ins/{optInId}/release",
   "/api/parent/student-ai",
   "/api/parent/student-ai/opt-ins",
+  // Student AI content bonus (phase 4): license:read / platform:read (web channel).
+  "/api/school/license/upload-consistency",
+  "/api/platform/schools/{schoolId}/ai-programme/upload-consistency",
   "/api/platform/schools/{schoolId}/license-requests",
   "/api/platform/schools/{schoolId}/license-requests/{requestId}/resolve",
   "/api/platform/schools/{schoolId}/licenses",

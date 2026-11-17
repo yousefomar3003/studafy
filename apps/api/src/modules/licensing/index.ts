@@ -85,3 +85,19 @@ export {
   type RenewalProviders,
 } from "./overlap";
 export { inSchool, type LicenseActor } from "./context";
+// Student AI content bonus (phase 4): upload consistency per class, teacher and school.
+export { uploadConsistencyRoutes } from "./upload-consistency-routes";
+export {
+  contentBonusTiersFor,
+  currentUploadPeriod,
+  studentAiClassIds,
+  uploadConsistency,
+  uploadConsistencyBonus,
+  uploadConsistencyView,
+  type UploadConsistencyBonusView,
+  type UploadConsistencyClassView,
+  type UploadConsistencyReport,
+  type UploadConsistencyTeacherView,
+  type UploadConsistencyView,
+  type UploadPeriod,
+} from "./upload-consistency";

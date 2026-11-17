@@ -375,6 +375,21 @@ const GUARD_CASES: GuardCase[] = [
     permission: "auditLog:export",
     source: "audit/routes.ts",
   },
+  // Student AI content bonus (phase 4): the school reads its own upload consistency on
+  // license:read (ORG_ADMIN, PRINCIPAL); the super admin reads any school's on platform:read.
+  {
+    method: "GET",
+    path: "/api/school/license/upload-consistency",
+    permission: "license:read",
+    source: "licensing/upload-consistency-routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/platform/schools/{schoolId}/ai-programme/upload-consistency",
+    permission: "platform:read",
+    source: "licensing/upload-consistency-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
   // Academic years, terms, class enrolments and exams: RLS fences them to the school, not to a
   // role, so this gate is the only thing between a signed-in student and a year rollover.
   {

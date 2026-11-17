@@ -68,6 +68,17 @@ when it required the `version-bump` label.
   The AI-stop date on `LicenseInvoiceInstalment.aiStopDate` and `LicenseAiStop` now follows the
   licence's own grace period (default 30 days).
 
+- Upload consistency for the Student AI content bonus (migration 000236 adds an index only;
+  docs/billing/ai-upload-consistency.md). Read-only: `getSchoolUploadConsistency`
+  (`GET /api/school/license/upload-consistency`, `license:read`, the caller's own school) and
+  `platformGetSchoolUploadConsistency`
+  (`GET /api/platform/schools/{schoolId}/ai-programme/upload-consistency`, `platform:read`, web
+  channel). Optional `from` and `to` (YYYY-MM-DD, together, at most 400 days apart; default: the
+  current licence's start to today). Response `UploadConsistency`: school days, the school's
+  `consistencyBps`, `UploadConsistencyClass[]` and `UploadConsistencyTeacher[]`, `basis`
+  (`UploadPeriodBasis`) and `bonus` (`UploadConsistencyBonus`: the content-bonus tier on the
+  licence's values, the next tier and `targetBps`; no amounts).
+
 - The school chooses its licence length and payment plan; AI stops 30 days after an unpaid
   instalment (migration 000233, ADR-021 amendment). `CreateLicenseChangeRequestBody` takes optional
   `months` (1-36), `startsOn`, `paymentPlan` (`monthly`, `yearly`, `custom`) and, for custom,

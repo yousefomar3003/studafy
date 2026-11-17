@@ -101,3 +101,19 @@ export {
   monthsBetween,
 } from "./ai-optin";
 export type { AiOptInPeriod, AiOptInSource, AiOptInStatus, LicenseCommitment } from "./ai-optin";
+export {
+  computeUploadConsistency,
+  contentBonusStanding,
+  daysInRange,
+  nextDay,
+  schoolDaysBetween,
+} from "./upload-consistency";
+export type {
+  ContentBonusStanding,
+  DayRange,
+  UploadConsistencyClassInput,
+  UploadConsistencyClassResult,
+  UploadConsistencyInput,
+  UploadConsistencyResult,
+  UploadConsistencyTeacherResult,
+} from "./upload-consistency";
