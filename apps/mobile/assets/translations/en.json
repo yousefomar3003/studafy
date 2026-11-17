@@ -276,8 +276,6 @@
       "viewAll": "View all"
     },
     "grades": {
-      "title": "New grades",
-      "empty": "No grades published yet this term.",
       "unavailable": "Grades aren't available yet.",
       "error": "Couldn't load grades."
     },
@@ -285,9 +283,6 @@
       "title": "Announcements",
       "empty": "No announcements yet.",
       "error": "Couldn't load announcements."
-    },
-    "newMarks": {
-      "title": "New exam marks"
     }
   },
   "assignments": {
@@ -403,9 +398,18 @@
       "body": "New results have just been published — here's where you stand this term.",
       "dismiss": "Dismiss"
     },
-    "tabs": {
-      "examMarks": "Exam marks",
-      "coursework": "Coursework"
+    "kind": {
+      "exam": "Exam",
+      "assignment": "Assignment"
+    },
+    "sections": {
+      "exams": "Exams",
+      "assignments": "Assignments",
+      "assignmentGrades": "Assignment grades"
+    },
+    "recent": {
+      "title": "Recent grades",
+      "empty": "No exam marks or assignment grades yet."
     }
   },
   "timetable": {
@@ -1871,7 +1875,8 @@
         "gpa": "GPA",
         "credits": "Credits",
         "trend": "Average trend",
-        "empty": "No grades published this term yet."
+        "empty": "No grades published this term yet.",
+        "examsHint": "Every mark the school has approved, by term and subject."
       },
       "attendance": {
         "title": "Attendance this term",
@@ -2411,7 +2416,6 @@
     "latest": "Latest mark",
     "subjectInPeriod": "{subject} · {period}",
     "moreToCome": "More to come",
-    "moreToComeNote": "More marks for this term are still to come.",
     "seeAll": "See all exam marks"
   },
   "academicResults": {
