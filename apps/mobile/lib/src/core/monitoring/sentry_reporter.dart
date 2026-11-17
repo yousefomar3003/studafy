@@ -29,7 +29,7 @@ class SentryCrashReporter implements CrashReporter {
       // identity this app ever attaches is the id set explicitly via [identifyUser].
       options.sendDefaultPii = false;
       options.attachStacktrace = true;
-      options.beforeSend = (event, hint) async => _scrubEvent(event);
+      options.beforeSend = (event, hint) async => scrubEvent(event);
       options.beforeBreadcrumb =
           (breadcrumb, hint) => breadcrumb == null ? null : _scrubBreadcrumb(breadcrumb);
     });
@@ -78,11 +78,45 @@ class SentryCrashReporter implements CrashReporter {
 
   // Sentry 9+ events and breadcrumbs are mutable (copyWith is gone): scrub them in place before
   // they leave the device.
-  SentryEvent _scrubEvent(SentryEvent event) {
+  @visibleForTesting
+  //
+  // QA-088: free text is scrubbed as well as `extra`. Exception values carry the failing URL (Dio
+  // puts it in the message, invitation token included), and the message, request and tags can
+  // carry emails and tokens.
+  @visibleForTesting
+  SentryEvent scrubEvent(SentryEvent event) {
     final user = event.user;
     // ignore: deprecated_member_use -- `extra` is still sent; scrubbing it is the point.
     event.extra = _scrubber.scrubMap(event.extra);
     event.user = user == null ? null : SentryUser(id: user.id);
+
+    for (final exception in event.exceptions ?? const <SentryException>[]) {
+      final value = exception.value;
+      if (value != null) exception.value = _scrubber.scrubText(value);
+    }
+    final message = event.message;
+    if (message != null) {
+      message.formatted = _scrubber.scrubText(message.formatted);
+      final template = message.template;
+      if (template != null) message.template = _scrubber.scrubText(template);
+      message.params = message.params
+          ?.map((param) => param is String ? _scrubber.scrubText(param) : param)
+          .toList();
+    }
+    final request = event.request;
+    if (request != null) {
+      final url = request.url;
+      if (url != null) request.url = _scrubber.scrubText(url);
+      final query = request.queryString;
+      if (query != null) request.queryString = _scrubber.scrubText(query);
+      request.headers = _scrubber
+          .scrubMap(request.headers)!
+          .map((key, value) => MapEntry(key, value! as String));
+    }
+    final tags = event.tags;
+    if (tags != null) {
+      event.tags = tags.map((key, value) => MapEntry(key, _scrubber.scrubText(value)));
+    }
     return event;
   }
 
