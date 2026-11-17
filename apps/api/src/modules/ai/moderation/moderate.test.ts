@@ -211,6 +211,33 @@ describe("moderateInput — educational content allowed", () => {
     const result = moderateInput("What is 2 + 2?", "elementary");
     expect(result.blocked).toBe(false);
   });
+
+  test.each([
+    "What is 1+1234567?",
+    "Round 0.770179334 to two decimal places",
+    "Is 1234567890 divisible by 9?",
+    "The year 1999 had 365 days; how many hours is that?",
+    "ما ناتج ١٢ + ٣٠؟",
+  ])("maths with numbers is not mistaken for personal details: %s", (question) => {
+    expect(moderateInput(question, "high").blocked).toBe(false);
+  });
+});
+
+describe("moderateInput — local personal details blocked", () => {
+  test.each([
+    "my number is +962 77 017 9334",
+    "call me on 00962770179334",
+    "my phone is 0770179334",
+    "رقمي 079 123 4567",
+    "رقمي ٠٧٧٠١٧٩٣٣٤",
+    "my Saudi number is 0551234567",
+    "my national number is 9861012345",
+    "رقمي الوطني ٢٠٠٠١٢٣٤٥٦",
+  ])("%s", (question) => {
+    const result = moderateInput(question, "high");
+    expect(result.blocked).toBe(true);
+    expect(result.category).toBe("pii_sharing");
+  });
 });
 
 // ── Age-level threshold tests ─────────────────────────────────────────────────────────────────
