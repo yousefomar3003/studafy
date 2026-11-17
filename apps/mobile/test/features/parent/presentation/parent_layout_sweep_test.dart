@@ -98,6 +98,30 @@ ProviderScope _scope(Widget home, {int childCount = 3}) {
       notificationPreferencesProvider.overrideWith(
         (ref) async => notificationPreferencesFixture(attendanceAlertThreshold: 3),
       ),
+      // Long names and a long exam title, to catch a row that overflows.
+      parentRecentGradesProvider.overrideWith(
+        (ref) async => [
+          recentGrade(
+            kind: 'exam',
+            id: 'a-1',
+            studentId: 'child-1',
+            firstName: _longNames['child-1']!,
+            name: 'Second monthly examination of the first semester (written and oral parts)',
+            subject: 'Islamic education and Arabic language studies',
+            termName: 'First semester',
+          ),
+          recentGrade(
+            kind: 'assignment',
+            id: 'g-1',
+            studentId: 'child-2',
+            firstName: _longNames['child-2']!,
+            name: 'Research project on renewable energy sources in the region',
+            subject: 'Physics',
+            score: 18.75,
+            maxScore: 100,
+          ),
+        ],
+      ),
       parentNotificationsProvider.overrideWith(
         (ref) async => [
           notificationFixture(

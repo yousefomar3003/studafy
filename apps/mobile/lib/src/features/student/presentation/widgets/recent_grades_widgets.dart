@@ -114,19 +114,57 @@ class RecentGradeTile extends StatelessWidget {
         footer: chip,
         onTap: onTap,
       ),
-      RecentAssignmentGrade(:final grade) => AppIconListTile(
-        icon: kind.icon,
-        accent: kind.accent,
-        title: grade.label,
+      RecentAssignmentGrade(:final grade) => AssignmentGradeTile(
+        label: grade.label,
         subtitle: grade.course.name,
-        trailing: AppStatusPill(
-          label: grade.score == null ? '—' : '${grade.score}/${grade.maxScore}',
-          tone: grade.score == null ? AppTone.neutral : AppTone.forPercentage(grade.percentage),
-        ),
-        footer: chip,
+        score: grade.score,
+        maxScore: grade.maxScore,
+        percentage: grade.percentage,
         onTap: onTap,
       ),
     };
+  }
+}
+
+/// A published assignment grade as a "Recent grades" row: the assignment kind's badge, [label]
+/// over [subtitle], "18/20" as a pill tinted by [percentage], and the "Assignment" chip.
+class AssignmentGradeTile extends StatelessWidget {
+  const AssignmentGradeTile({
+    required this.label,
+    required this.subtitle,
+    required this.score,
+    required this.maxScore,
+    this.percentage,
+    this.onTap,
+    super.key,
+  });
+
+  final String label;
+  final String subtitle;
+  final num? score;
+  final num maxScore;
+
+  /// For the pill's tint; worked out from [score] and [maxScore] when not given.
+  final num? percentage;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const kind = GradeKind.assignment;
+    final score = this.score;
+    final percent = percentage ?? (score == null || maxScore <= 0 ? null : score / maxScore * 100);
+    return AppIconListTile(
+      icon: kind.icon,
+      accent: kind.accent,
+      title: label,
+      subtitle: subtitle,
+      trailing: AppStatusPill(
+        label: score == null ? '—' : '$score/$maxScore',
+        tone: score == null ? AppTone.neutral : AppTone.forPercentage(percent),
+      ),
+      footer: const GradeKindChip(kind: kind),
+      onTap: onTap,
+    );
   }
 }
 

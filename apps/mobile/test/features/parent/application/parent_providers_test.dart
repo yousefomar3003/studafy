@@ -55,6 +55,30 @@ void main() {
     });
   });
 
+  group('parentRecentGradesProvider', () {
+    test('asks for the newest few across the family, once, and hands back the rows', () async {
+      final api = FakeStudafyApiClient(
+        childComparisonReports: FakeChildComparisonReportsClient(
+          comparisonReport(const []),
+          recentGrades: [
+            recentGrade(
+              kind: 'exam',
+              id: 'a-1',
+              studentId: 'child-1',
+              firstName: 'Amir',
+              name: 'First month',
+            ),
+          ],
+        ),
+      );
+
+      final items = await container(api).read(parentRecentGradesProvider.future);
+
+      expect(api.childComparisonReports.lastRecentGradesLimit, parentRecentGradesLimit);
+      expect(items.map((item) => item.name), ['First month']);
+    });
+  });
+
   group('selectedChildProvider', () {
     test('defaults to the first linked child when nothing has been picked', () async {
       final c = container(apiWith(['child-1', 'child-2']));
