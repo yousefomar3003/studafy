@@ -87,12 +87,27 @@ android {
         release {
             // The real upload key when fastlane has provisioned key.properties (CI release lane);
             // the debug keystore otherwise, so `flutter run --release` and CI test builds still work.
+            // A release *bundle* (the AAB that goes to Play) refuses to build without the upload
+            // key: see the task-graph check below (QA-084).
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")
             }
         }
+    }
+}
+
+// QA-084: a release app bundle is only ever built to upload to Play, so a debug-signed one is
+// always a mistake (a manual `flutter build appbundle` without key.properties used to produce one
+// silently). Release APKs (`flutter run --release`, the size-budget splits) keep the debug fallback.
+gradle.taskGraph.whenReady {
+    val releaseBundle = allTasks.any { it.name.startsWith("bundle") && it.name.endsWith("Release") }
+    if (releaseBundle && !keystorePropertiesFile.exists()) {
+        throw GradleException(
+            "Release app bundle needs the upload key: ${keystorePropertiesFile.path} is missing. " +
+                "Run the fastlane `android signing` lane (docs/runbooks/mobile-release.md).",
+        )
     }
 }
 
@@ -109,8 +124,8 @@ flutter {
 dependencies {
     // Backports the java.time APIs flutter_local_notifications needs (compileOptions above).
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
-    // local_auth's biometric prompt needs an AppCompat LaunchTheme (res/values*/styles.xml), or it
-    // crashes on Android 8 and below.
+    // The LaunchTheme styles (res/values*/styles.xml) inherit Theme.AppCompat. (It was added for
+    // local_auth's biometric prompt; the app no longer uses local_auth.)
     implementation("androidx.appcompat:appcompat:1.7.0")
     // ST-247: instrumentation-runner deps for the androidTest APK integration_test builds. Pinned
     // to the same androidx.test major line Flutter's own integration_test package targets.

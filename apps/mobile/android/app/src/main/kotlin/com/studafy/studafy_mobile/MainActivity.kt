@@ -4,6 +4,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.view.WindowManager
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -33,6 +34,23 @@ class MainActivity : FlutterFragmentActivity() {
                 } catch (error: Exception) {
                     result.success(false)
                 }
+            }
+        // QA-084: grade and transcript screens (Dart `ProtectedScreen`) turn on FLAG_SECURE while
+        // shown, so screenshots and recordings come out black and the recent-apps thumbnail is
+        // blank.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "studafy/screen_protection")
+            .setMethodCallHandler { call, result ->
+                val secure = call.arguments as? Boolean
+                if (call.method != "setSecure" || secure == null) {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                if (secure) {
+                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+                result.success(null)
             }
     }
 }

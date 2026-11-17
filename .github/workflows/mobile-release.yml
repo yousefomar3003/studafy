@@ -108,6 +108,8 @@ jobs:
       - name: fastlane android internal
         working-directory: apps/mobile
         env:
+          # QA-084: uploads the obfuscated build's Dart symbols to Sentry (Fastfile upload_dart_symbols!).
+          SENTRY_AUTH_TOKEN: ${{ secrets.MOBILE_SENTRY_AUTH_TOKEN }}
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
           ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
           ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
@@ -176,6 +178,8 @@ jobs:
       - name: fastlane ios beta
         working-directory: apps/mobile
         env:
+          # QA-084: uploads the obfuscated build's Dart symbols to Sentry (Fastfile upload_dart_symbols!).
+          SENTRY_AUTH_TOKEN: ${{ secrets.MOBILE_SENTRY_AUTH_TOKEN }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
           APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
@@ -252,6 +256,8 @@ jobs:
       - name: fastlane android release (10% rollout)
         working-directory: apps/mobile
         env:
+          # QA-084: uploads the obfuscated build's Dart symbols to Sentry (Fastfile upload_dart_symbols!).
+          SENTRY_AUTH_TOKEN: ${{ secrets.MOBILE_SENTRY_AUTH_TOKEN }}
           MOBILE_RELEASE_TAG: ${{ github.ref_name }}
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
           ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
@@ -322,6 +328,8 @@ jobs:
       - name: fastlane ios release (submit for review, phased release)
         working-directory: apps/mobile
         env:
+          # QA-084: uploads the obfuscated build's Dart symbols to Sentry (Fastfile upload_dart_symbols!).
+          SENTRY_AUTH_TOKEN: ${{ secrets.MOBILE_SENTRY_AUTH_TOKEN }}
           MOBILE_RELEASE_TAG: ${{ github.ref_name }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}

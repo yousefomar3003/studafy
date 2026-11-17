@@ -105,6 +105,12 @@ Until step 3 is done the jobs keep reading the repository secrets, so nothing br
 | `MATCH_GIT_URL`                                            | SSH/HTTPS URL of the private git repo holding the encrypted signing material.                       |
 | `MATCH_PASSWORD`                                           | Passphrase `match` uses to decrypt that repo.                                                       |
 
+### Both platforms
+
+| Secret                     | What it is                                                                                                                                                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MOBILE_SENTRY_AUTH_TOKEN` | A Sentry auth token for `studafy-limited` with `project:write` (an organization token works). Store builds are obfuscated (QA-084); the Fastfile uploads their Dart symbols (`build/debug-info`) to Sentry project `flutter` with it. A `mobile-v*` release fails without it; TestFlight / internal builds only warn. |
+
 ### Variables
 
 | Variable            | What it is                                                                                                                                                                                                                                                                                                          |

@@ -8,6 +8,7 @@ import '../application/released_marks_providers.dart';
 import '../application/student_context_providers.dart';
 import '../domain/released_marks.dart';
 import 'widgets/academic_result_widgets.dart';
+import '../../../design/widgets/protected_screen.dart';
 
 /// A student's approved marks: each term on its own (first semester, second semester, …), then
 /// the annual period for year-long assessments such as the final exam. Under each, one card per
@@ -29,7 +30,7 @@ class ReleasedMarksScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final id = studentId ?? ref.watch(currentStudentIdProvider);
 
-    return Scaffold(
+    final screen = Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -50,6 +51,8 @@ class ReleasedMarksScreen extends ConsumerWidget {
                   ))
           : _MarksBody(studentId: id),
     );
+    // Grades and transcripts: no screenshots, hidden in the app switcher (QA-084).
+    return ProtectedScreen(child: screen);
   }
 }
 

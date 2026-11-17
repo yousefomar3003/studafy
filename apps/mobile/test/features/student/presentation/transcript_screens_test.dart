@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/localization/app_locales.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
+import 'package:studafy_mobile/src/design/widgets/protected_screen.dart';
 import 'package:studafy_mobile/src/features/student/application/transcript_providers.dart';
 import 'package:studafy_mobile/src/features/student/data/transcript_client.dart';
 import 'package:studafy_mobile/src/features/student/domain/transcript.dart';
@@ -180,6 +181,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(TranscriptDetailScreen), findsOneWidget);
+    // QA-084: no screenshots, hidden in the app switcher.
+    expect(
+      find.ancestor(
+        of: find.text('Al Noor School'),
+        matching: find.byType(ProtectedScreen),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Al Noor School'), findsOneWidget);
     expect(find.text('Lina Haddad'), findsOneWidget);
     expect(find.text('2024–2025'), findsOneWidget);

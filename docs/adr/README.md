@@ -49,6 +49,7 @@ code no longer matches must be superseded before the code, not after.
 | [ADR-018](0018-feature-licensing.md)                  | Paid features as code-registered keys, granted through tiers and resolved per person, `requireFeature` | Billing / licensing  |
 | [ADR-019](0019-sensitive-record-field-encryption.md)  | App-level AES-256-GCM for sensitive record values, keyring app secret, stored masks; SSE-KMS documents | Data protection      |
 | [ADR-020](0020-lexical-only-retrieval.md)             | Lexical-only retrieval in production until a real embedding provider is wired (F-06)                   | AI retrieval         |
+| [ADR-023](0023-mobile-no-certificate-pinning.md)      | No TLS certificate pinning in the mobile app (accepted risk, QA-084)                                   | Mobile security      |
 
 ## Platform decision coverage
 
@@ -68,6 +69,7 @@ The platform's core decision set maps to this index as follows:
 12. Paid features and licensing → ADR-0018 (+ ADR-0014, [billing/feature-licensing.md](../billing/feature-licensing.md))
 13. Licence payment plans (at once, monthly, custom) → ADR-0021
 14. Storage billing like an app-store subscription → ADR-0022
+15. Mobile certificate pinning (not adopted) → ADR-0023
 
 ## Review
 

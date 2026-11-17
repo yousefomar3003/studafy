@@ -31,6 +31,7 @@ import '../realtime/realtime_ticket.dart';
 import 'app_config.dart';
 import 'app_environment.dart';
 import 'provider_retry_policy.dart';
+import 'release_logging.dart';
 
 void bootstrapApp(AppEnvironment environment) {
   // Monitoring is set up inside this same guarded zone so both the zone's own error handler and
@@ -41,6 +42,7 @@ void bootstrapApp(AppEnvironment environment) {
 
   runZonedGuarded<Future<void>>(
     () async {
+      silenceDebugPrintInRelease();
       WidgetsFlutterBinding.ensureInitialized();
       await EasyLocalization.ensureInitialized();
 

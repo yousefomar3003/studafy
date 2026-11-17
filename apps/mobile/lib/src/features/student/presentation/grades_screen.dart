@@ -14,6 +14,7 @@ import 'widgets/grades_placeholders.dart';
 import 'widgets/grades_publish_banner.dart';
 import 'widgets/subject_grades_card.dart';
 import 'widgets/term_grade_summary_card.dart';
+import '../../../design/widgets/protected_screen.dart';
 
 /// The student's published grades for one term: the term picker, a term-average trend
 /// sparkline, the term/cumulative summary, and a card per subject with its category breakdown.
@@ -67,7 +68,7 @@ class _GradesScreenState extends ConsumerState<GradesScreen> {
 
     final status = ref.watch(gradeReportProvider);
 
-    return Scaffold(
+    final screen = Scaffold(
       appBar: AppBar(
         title: Text('grades.title'.tr()),
         actions: [
@@ -132,6 +133,8 @@ class _GradesScreenState extends ConsumerState<GradesScreen> {
         ],
       ),
     );
+    // Grades and transcripts: no screenshots, hidden in the app switcher (QA-084).
+    return ProtectedScreen(child: screen);
   }
 
   void _scrollToHighlightOnce() {

@@ -184,6 +184,39 @@ def extra_dart_defines
   end
 end
 
+# QA-084: store builds are obfuscated (`--obfuscate`), so class and method names in the shipped
+# binary don't describe the app to anyone who unpacks it. The symbols needed to read stack traces
+# go to [dir] instead of into the binary, and [upload_dart_symbols!] sends them to Sentry.
+DEBUG_INFO_DIR = File.join(MOBILE_DIR, "build/debug-info")
+
+def obfuscation_flags(dir = DEBUG_INFO_DIR)
+  ["--obfuscate", "--split-debug-info=#{dir}"]
+end
+
+# Uploads the split debug info of the build just made to Sentry project `flutter`, so obfuscated
+# crash reports are symbolicated. Needs SENTRY_AUTH_TOKEN (CI: the MOBILE_SENTRY_AUTH_TOKEN secret,
+# a token with project:write on studafy-limited). A store release (MOBILE_RELEASE_TAG set) fails
+# without it, since its crashes would be unreadable; a TestFlight / internal build only warns.
+def upload_dart_symbols!
+  token = ENV["SENTRY_AUTH_TOKEN"].to_s.strip
+  if token.empty?
+    message = "SENTRY_AUTH_TOKEN is not set: Dart symbols in #{DEBUG_INFO_DIR} were not uploaded, " \
+      "so this build's crash reports will be obfuscated."
+    UI.user_error!(message) unless ENV["MOBILE_RELEASE_TAG"].to_s.strip.empty?
+    UI.important(message)
+    return
+  end
+  Dir.chdir(MOBILE_DIR) do
+    sh(
+      "bunx", "@sentry/cli@2.39.1", "debug-files", "upload",
+      "--org", ENV.fetch("SENTRY_ORG", "studafy-limited"),
+      "--project", ENV.fetch("SENTRY_PROJECT", "flutter"),
+      "--wait",
+      DEBUG_INFO_DIR,
+    )
+  end
+end
+
 def build_ios_ipa
   install_google_service_info
   # CocoaPods (ios/Podfile), not Swift Package Manager: resolving FlutterFire's packages through
@@ -197,9 +230,11 @@ def build_ios_ipa
     "--build-name=#{pubspec_version_name}",
     "--build-number=#{resolved_build_number}",
     "--export-options-plist=#{ios_export_options_plist}",
+    *obfuscation_flags,
     *sentry_dart_defines,
     *extra_dart_defines,
   )
+  upload_dart_symbols!
   ipa = Dir.glob(File.join(MOBILE_DIR, "build/ios/ipa/*.ipa")).first ||
     UI.user_error!("flutter build ipa produced no .ipa under build/ios/ipa/")
   enforce_size_budget!([ipa], "iOS release")
@@ -213,9 +248,11 @@ def build_android_aab
     "--flavor", FLAVOR, "-t", ENTRYPOINT,
     "--build-name=#{pubspec_version_name}",
     "--build-number=#{resolved_build_number}",
+    *obfuscation_flags,
     *sentry_dart_defines,
     *extra_dart_defines,
   )
+  upload_dart_symbols!
   path = File.join(MOBILE_DIR, "build/app/outputs/bundle/#{FLAVOR}Release/app-#{FLAVOR}-release.aab")
   File.exist?(path) ? path : UI.user_error!("no app bundle at #{path}")
 end
@@ -229,6 +266,9 @@ def enforce_android_size_budget!
     "--flavor", FLAVOR, "-t", ENTRYPOINT,
     "--build-name=#{pubspec_version_name}",
     "--build-number=#{resolved_build_number}",
+    # Measured as shipped (obfuscation shrinks the binary); these APKs are never uploaded, so
+    # their symbols stay apart from the uploaded build's.
+    *obfuscation_flags(File.join(MOBILE_DIR, "build/debug-info-size-gate")),
   )
   # Flutter's own output (`app-<abi>-<flavor>-release.apk`); Gradle's raw copies live under
   # apk/<flavor>/release/, never apk/<flavor>Release/.
