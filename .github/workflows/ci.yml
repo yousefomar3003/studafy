@@ -618,6 +618,8 @@ jobs:
       - run: bun test scripts/deploy scripts/ci
       - name: Every action is pinned to a commit SHA (QA-006)
         run: bash scripts/ci/check-pinned-actions.sh
+      - name: Every .trivyignore waiver is inside its review date (QA-073)
+        run: bash scripts/ci/check-trivyignore-expiry.sh
       # `--continue=dependencies-successful` surfaces every independent package's failures in one
       # run instead of stopping at the first, so a PR sees all its annotations at once. Piped
       # through annotate-diagnostics.mjs to turn tsc/ESLint output into inline PR annotations --

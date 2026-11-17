@@ -13,6 +13,7 @@ on:
         "scripts/ci/assert-clean-build-context.sh",
         "scripts/ci/assert-web-headers.sh",
         ".github/workflows/containers.yml",
+        ".trivyignore",
       ]
   push:
     branches: [dev]
@@ -27,6 +28,7 @@ on:
         "scripts/ci/assert-clean-build-context.sh",
         "scripts/ci/assert-web-headers.sh",
         ".github/workflows/containers.yml",
+        ".trivyignore",
       ]
 
 permissions:
@@ -57,8 +59,9 @@ jobs:
     strategy:
       matrix:
         include:
-          # trivy_exit_code gates whether a CRITICAL image finding fails the job. The app-owned
-          # images (built from slim bases we control) stay strict at "1". erpnext rides the large,
+          # trivy_exit_code gates whether a HIGH or CRITICAL image finding fails the job (QA-073:
+          # HIGH too, the same bar the deploy workflow's pre-release scan holds the exact release
+          # digests to). The app-owned images (built from slim bases we control) stay strict at "1". erpnext rides the large,
           # unmodified third-party frappe/erpnext base (see infra/docker/erpnext.Dockerfile) whose
           # CVEs the team does not patch directly and whose vuln set churns with trivy's DB, so its
           # scan is report-only ("0") -- findings still surface in the logs/SBOM but don't block.
@@ -149,7 +152,7 @@ jobs:
         with:
           version: v0.72.0
           image-ref: studafy/${{ matrix.service }}:ci
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: ${{ matrix.trivy_exit_code }}
           trivyignores: .trivyignore
