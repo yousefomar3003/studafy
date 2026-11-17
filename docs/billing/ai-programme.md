@@ -302,3 +302,54 @@ Integrated on 2026-11-18 (feat/ai-revshare-settings): `countOptedInStudents` rea
   the school (logged, `licensesAwaitingApiActivation`).
 - **Concurrent payments**: recording or voiding a payment, and the hourly revenue share step, run
   again on a serialization failure or deadlock (`withTransactionRetry`, up to 3 tries).
+
+## Dashboards (phase 6)
+
+One read of a school's standing, `aiProgrammeDashboard` (`apps/api/src/modules/licensing/ai-dashboard.ts`),
+serves every role; the pure figures are `@studafy/license-pricing` `ai-dashboard.ts`
+(`conversionStanding`, `optInsToReach`, `contentBonusAimBps`, `studentAiMarginOf`, `paidPartOf`,
+`studafyNetOf`). Values come from the core resolver `resolveAiProgrammeValues` on the licence's stamp.
+The school's read runs as the system role armed for the caller's own school (aggregates over opt-ins
+and tuition lines, which the runtime role's row policies show to leadership only); it carries no
+student, parent or teacher names.
+
+| Who (permission)                                         | Where                                                                                                                                      | What                                                                                                                                                                                                                                                                      |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Super admin (`platform:read`, writes `platform:manage`)  | `/portal/platform/ai-programme/schools` (`GET /api/platform/ai-revenue-share/schools`)                                                     | Every school in the programme: opted in / enrolled, conversion in force (locked, re-measured or today's), uploads, share rate, the year's collected / pending / owed / credited / paid out / forfeited, Studafy's net in total and per seat. Sortable, filterable.        |
+| Super admin                                              | `/portal/platform/ai-programme/schools/:schoolId` (`GET .../schools/{id}/ai-revenue-share/summary`, the ledger, licence and upload routes) | The same figures; conversion measurements with re-measure (reason) before the lock; the ledger by status with each share's working; recompute; payouts and recording one; upload consistency per teacher and class; links to the school's licence and programme settings. |
+| Finance, school admin, principal (`aiRevenueShare:read`) | `/portal/finance/student-ai` (`GET /api/school/ai-revenue-share/summary` and `/api/school/ai-revenue-share`)                               | Owed and paid to Studafy (the licence's invoices); the share per period, collected -> conversion % + bonus % = total % -> amount, and where it went (credited on which invoice, paid out, forfeited); payouts; the year's earnings.                                       |
+| School admin, principal (`license:read`)                 | `/portal/license/student-ai/results`, and a Student AI tile on both dashboards                                                             | Enrolled vs opted in, conversion and the tier it earns, "Add N more seats -> unlock X%" (and the large-school floor when it pays more, saying which is closer), the year's earnings, upload consistency per teacher and per class with those below the target marked.     |
+| Parents                                                  | the app's Student AI line only (phase 3)                                                                                                   | Never the licence price, the share or the conversion: no route they hold returns them.                                                                                                                                                                                    |
+
+**What "earnings" counts** (the school's, for the academic year covering today):
+
+- Revenue share earned: the year's share entries (their period starts in the year) that are final:
+  owed, credited, payout due or paid out. Pending shares are shown apart; forfeited ones never count.
+- Margin on the Student AI line: per line, (the parent's monthly price, fixed on the line) - (the
+  licence's price per seat per month, from the values it was signed with) x months. Knowable only
+  from lines Studafy billed: for a line on the fee schedule, the months on ERPNext invoices, as far
+  as the parent paid that invoice (pro rata for a part-paid one, from the invoice cache). A line the
+  school bills itself (auto-billing off) is **estimated**: its months charged, as if paid in full.
+- Total = share earned + margin collected + margin estimated; the page says when part is estimated.
+- Studafy's net (console only): the year's Student AI part of what Studafy collected - the share
+  (earned and pending), per licence student seat (half up). The worked example: $14,000 - $1,820 =
+  $12,180, $34.80 a seat; on an 8-month year $11,200 - $1,456 = $9,744, $27.84 a seat.
+
+**"Add N more seats -> unlock X%".** N = ceil(next tier's threshold x enrolled / 10,000) - opted in
+(conversion rounds down, as the engine's). The next tier is the first above the current conversion
+that pays more than the share now (tiers the large-school floor already beats are skipped). The
+floor is offered when it pays more and the licence is below its seats: seats needed = its minimum minus the licence's seats.
+
+**Teachers below target.** The target is the next content-bonus tier that pays something above the
+school's upload consistency, or the top tier's threshold once the school is in it (60% / 80% with the
+defaults).
+
+**Payments before the licence entered the programme.** The programme gate is tested when a payment
+is recorded, so a payment made before the licence's first opt-in window earned nothing. Opening the
+first window now records those payments' shares (`recordEarlierPaymentShares` in `@studafy/billing`):
+the licence's non-voided payments with no ledger entry, on invoices whose term starts in the current
+licence period, each split over its instalments by replaying the invoice's payments in order -- as
+`recordPayment` would have, pending or final, and forfeited when the money came after the
+instalment's cutoff. New entries only; nothing is rewritten, and it is idempotent. It runs after the
+window's transaction commits, as the system role (the ledger is never the school's to write); a
+failure is logged at error level, and the console's recompute records whatever is missing.
