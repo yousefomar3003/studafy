@@ -81,8 +81,9 @@ export interface RateLimiterOptions {
 export function extractClientIp(c: { req: { header(name: string): string | undefined } }): string {
   const trustedHeader = getSecurityConfig().clientIpHeader;
   if (trustedHeader) {
-    const value = c.req.header(trustedHeader)?.trim();
-    if (value) return value;
+    // The only source when configured (QA-086): falling back to X-Forwarded-For let a caller that
+    // bypassed the edge pick its own bucket. Such requests share the "unknown" bucket instead.
+    return c.req.header(trustedHeader)?.trim() || "unknown";
   }
   const xff = c.req.header("x-forwarded-for");
   if (xff) {

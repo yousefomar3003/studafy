@@ -5,7 +5,7 @@ import { HTTPException } from "hono/http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
-import { requirePermission, requirePermissionIn } from "../../../middleware/authz";
+import { requirePermission } from "../../../middleware/authz";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import {
@@ -94,6 +94,8 @@ const getIncidentRoute = createRoute({
 });
 
 const createIncidentRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.DISCIPLINE_INCIDENT_CREATE)] as const,
   method: "post",
   path: "/api/discipline/incidents",
   tags: ["Discipline"],
@@ -119,6 +121,8 @@ const createIncidentRoute = createRoute({
 });
 
 const updateIncidentRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.DISCIPLINE_INCIDENT_UPDATE)] as const,
   method: "patch",
   path: "/api/discipline/incidents/{incidentId}",
   tags: ["Discipline"],
@@ -145,6 +149,8 @@ const updateIncidentRoute = createRoute({
 });
 
 const resolveIncidentRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.DISCIPLINE_INCIDENT_RESOLVE)] as const,
   method: "post",
   path: "/api/discipline/incidents/{incidentId}/resolve",
   tags: ["Discipline"],
@@ -191,6 +197,8 @@ const listActionsRoute = createRoute({
 });
 
 const createActionRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.DISCIPLINE_ACTION_CREATE)] as const,
   method: "post",
   path: "/api/discipline/incidents/{incidentId}/actions",
   tags: ["Discipline"],
@@ -217,6 +225,8 @@ const createActionRoute = createRoute({
 });
 
 const updateActionRoute = createRoute({
+  // QA-086: checked before the body is validated, so an unauthorised caller gets 403, not 400.
+  middleware: [requirePermission(PERMISSIONS.DISCIPLINE_ACTION_UPDATE)] as const,
   method: "patch",
   path: "/api/discipline/incidents/{incidentId}/actions/{actionId}",
   tags: ["Discipline"],
@@ -357,7 +367,6 @@ export function disciplineRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(createIncidentRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.DISCIPLINE_INCIDENT_CREATE);
     const body = c.req.valid("json");
 
     const row = await withTenantTx(database, tenantFrom(c), (tx) =>
@@ -369,7 +378,6 @@ export function disciplineRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(updateIncidentRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.DISCIPLINE_INCIDENT_UPDATE);
     const { incidentId } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -382,7 +390,6 @@ export function disciplineRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(resolveIncidentRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.DISCIPLINE_INCIDENT_RESOLVE);
     const { incidentId } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -406,7 +413,6 @@ export function disciplineRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(createActionRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.DISCIPLINE_ACTION_CREATE);
     const { incidentId } = c.req.valid("param");
     const body = c.req.valid("json");
 
@@ -419,7 +425,6 @@ export function disciplineRoutes(database: Database): OpenAPIHono<AppEnv> {
 
   routes.openapi(updateActionRoute, async (c) => {
     const auth = requireAuth(c);
-    requirePermissionIn(c, PERMISSIONS.DISCIPLINE_ACTION_UPDATE);
     const { incidentId, actionId } = c.req.valid("param");
     const body = c.req.valid("json");
 

@@ -195,23 +195,23 @@ CASES.push(
   },
 );
 
-// Class-scoped: enrollment lists only ever show the caller's own (or their children's) rows.
+// Class-scoped: enrollment lists are for staff holding enrollment:read (QA-086).
 CASES.push(
   {
     name: "S1 listing class Y's enrollments does not see S2",
     actor: inA((s) => s.actors.s1),
     method: "GET",
     path: () => `/api/academics/classes/${a.classY}/enrollments`,
-    expect: { excludes: "s2" },
-    why: "RLS: students see only their own enrollment",
+    expect: "deny",
+    why: "QA-086: enrollment lists need enrollment:read, which students do not hold",
   },
   {
     name: "P1 listing class Y's enrollments does not see S2",
     actor: inA((s) => s.actors.parentP1),
     method: "GET",
     path: () => `/api/academics/classes/${a.classY}/enrollments`,
-    expect: { excludes: "s2" },
-    why: "RLS: parents see only their children's enrollments",
+    expect: "deny",
+    why: "QA-086: enrollment lists need enrollment:read, which parents do not hold",
   },
   {
     name: "another school's ORG_ADMIN cannot read class X",

@@ -124,6 +124,9 @@ const deleteGradeLevelRoute = createRoute({
 // ---------------------------------------------------------------------------
 
 const listSectionsRoute = createRoute({
+  // QA-086: an explicit gate, not RLS alone: roles that read this keep it, a GUEST or PARENT session
+  // does not reach the query.
+  middleware: [requirePermission(PERMISSIONS.COURSE_READ)] as const,
   method: "get",
   path: "/api/academics/sections",
   tags: ["Academics"],

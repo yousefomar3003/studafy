@@ -233,16 +233,13 @@ const GUARD_EXEMPT: Record<string, string> = {
 const KNOWN_UNGUARDED: Record<string, string> = {
   // QA-086: RLS-scoped academic and attendance reads with no explicit permission gate (no other
   //         minors' PII today; defence in depth).
-  "GET /api/academics/classes": "QA-086",
   "GET /api/academics/classes/{classId}": "QA-086",
   "GET /api/academics/classes/{classId}/ai-materials": "QA-086",
-  "GET /api/academics/classes/{classId}/enrollments": "QA-086",
   "GET /api/academics/courses/{courseId}": "QA-086",
   "GET /api/academics/exams": "QA-086",
   "GET /api/academics/exams/{examId}": "QA-086",
   "GET /api/academics/grade-levels": "QA-086",
   "GET /api/academics/rooms": "QA-086",
-  "GET /api/academics/sections": "QA-086",
   "GET /api/academics/sections/{sectionId}": "QA-086",
   "GET /api/academics/slots/{slotId}": "QA-086",
   "GET /api/academics/subjects": "QA-086",
@@ -252,11 +249,9 @@ const KNOWN_UNGUARDED: Record<string, string> = {
   "GET /api/academics/timetable-settings": "QA-086",
   "GET /api/academics/timetable-versions": "QA-086",
   "GET /api/academics/timetable-versions/{versionId}": "QA-086",
-  "GET /api/academics/timetable-versions/{versionId}/slots": "QA-086",
   "GET /api/academics/years": "QA-086",
   "GET /api/academics/years/{yearId}": "QA-086",
   "GET /api/academics/years/{yearId}/terms": "QA-086",
-  "GET /api/attendance/sessions": "QA-086",
   "GET /api/attendance/sessions/{sessionId}": "QA-086",
 };
 
