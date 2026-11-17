@@ -103,6 +103,20 @@ const GUARD_EXEMPT: Record<string, string> = {
     "own rows: acts only on the caller's own records, keyed by the token's user id (RLS-enforced)",
   "PUT /api/ai/consent":
     "own rows: acts only on the caller's own records, keyed by the token's user id (RLS-enforced)",
+  "GET /api/ai/students/{studentId}/assignment-sources":
+    "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
+  "POST /api/ai/students/{studentId}/assignment-sources/{assignmentId}":
+    "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
+  "GET /api/ai/students/{studentId}/sources":
+    "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
+  "POST /api/ai/students/{studentId}/sources/upload":
+    "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
+  "GET /api/ai/students/{studentId}/sources/{sourceId}":
+    "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
+  "DELETE /api/ai/students/{studentId}/sources/{sourceId}":
+    "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
+  "POST /api/ai/students/{studentId}/sources/{sourceId}/confirm":
+    "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
   "POST /api/ai/students/{studentId}/ask":
     "self gate: aiStudentSelfGate (app.ts) admits only the student whose id is in the path; staff and parents get 403",
   "POST /api/ai/students/{studentId}/concepts":

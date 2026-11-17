@@ -603,29 +603,35 @@ describeDb("uploading a material", () => {
     });
   }
 
-  async function materialIdFor(tenant: TenantFixture, key: string): Promise<string | undefined> {
+  async function storageKeyOf(tenant: TenantFixture, id: string): Promise<string | undefined> {
     const rows = await asAdmin(
       tenant.schoolId,
-      (tx) => tx<{ id: string }[]>`SELECT id FROM app.materials WHERE storage_key = ${key}`,
+      (tx) => tx<{ storage_key: string }[]>`SELECT storage_key FROM app.materials WHERE id = ${id}`,
     );
-    return rows[0]?.id;
+    return rows[0]?.storage_key;
   }
 
+  /** Uploads and confirms a material; returns its permanent storage key. */
   async function uploadAndConfirm(tenant: TenantFixture, fileName: string): Promise<string> {
     const started = await startUpload(tenant, tenant.cls.id, fileName);
     expect(started.status).toBe(201);
-    const { storage_key: key } = (await started.json()) as { storage_key: string };
-    storage.objects.set(key, { contentType: "application/pdf", sizeBytes: 2_000 });
-    const id = await materialIdFor(tenant, key);
+    // The PUT goes to the temp/ staging key; confirm promotes it to the permanent key (QA-009).
+    const { storage_key: stagingKey, material_id: id } = (await started.json()) as {
+      storage_key: string;
+      material_id: string;
+    };
+    storage.objects.set(stagingKey, { contentType: "application/pdf", sizeBytes: 2_000 });
     const confirmed = await request(
       tenant,
       teacher(tenant),
       "POST",
       `/api/academics/materials/${id}/confirm`,
-      { storage_key: key },
+      { storage_key: stagingKey },
     );
     expect(confirmed.status).toBe(200);
-    return key;
+    const key = await storageKeyOf(tenant, id);
+    expect(key).toBeDefined();
+    return key!;
   }
 
   test("two files with the same name each get their own key", async () => {
@@ -642,7 +648,8 @@ describeDb("uploading a material", () => {
     );
     const second = await uploadAndConfirm(tenant, "notes.pdf");
     expect(second).not.toBe(first);
-    expect(second.endsWith("-notes.pdf")).toBe(true);
+    // One object id per upload, the file name after it (QA-009).
+    expect(second.endsWith("/notes.pdf")).toBe(true);
   });
 
   test("Arabic file names that reduce to the same slug do not collide", async () => {
@@ -657,11 +664,12 @@ describeDb("uploading a material", () => {
     // First attempt: the row is created, but the PUT fails and confirm is never called.
     const failed = await startUpload(tenant, tenant.cls.id, "chapter 3.pdf");
     expect(failed.status).toBe(201);
-    const { storage_key: abandonedKey } = (await failed.json()) as { storage_key: string };
+    const { material_id: abandonedId } = (await failed.json()) as { material_id: string };
+    const abandonedKey = await storageKeyOf(tenant, abandonedId);
 
     const retry = await uploadAndConfirm(tenant, "chapter 3.pdf");
     expect(retry).not.toBe(abandonedKey);
-    expect(await materialIdFor(tenant, abandonedKey)).toBeUndefined();
+    expect(await storageKeyOf(tenant, abandonedId)).toBeUndefined();
   });
 
   test("a confirmed upload still in scanning keeps blocking a duplicate", async () => {
