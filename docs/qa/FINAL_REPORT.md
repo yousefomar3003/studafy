@@ -51,8 +51,8 @@ These will break the deploy, or a feature, if skipped:
 4. **QA-015: database role.** Migration 000232 creates `studafy_system` and grants it to every
    login that may switch to `studafy_admin`, so it works on first boot. Watch the migration log
    for errors.
-5. **QA-084: mobile release.** Create the `MOBILE_SENTRY_AUTH_TOKEN` repository secret before the next
-   `mobile-v*` tag, or that release fails.
+5. **QA-084: mobile release.** Resolved: the mobile release reuses the existing repository
+   `SENTRY_AUTH_TOKEN` (the organization token the web build uses), so no new secret is needed.
 6. **QA-058: App Review.** Set `STORE_SANDBOX_ALLOWED_USER_IDS` to the reviewers' demo account before
    the next submission, or their sandbox purchases are refused in production.
 

@@ -194,8 +194,8 @@ def obfuscation_flags(dir = DEBUG_INFO_DIR)
 end
 
 # Uploads the split debug info of the build just made to Sentry project `flutter`, so obfuscated
-# crash reports are symbolicated. Needs SENTRY_AUTH_TOKEN (CI: the MOBILE_SENTRY_AUTH_TOKEN secret,
-# a token with project:write on studafy-limited). A store release (MOBILE_RELEASE_TAG set) fails
+# crash reports are symbolicated. Needs SENTRY_AUTH_TOKEN (CI: the repository's SENTRY_AUTH_TOKEN secret,
+# the studafy-limited organization token the web build also uses). A store release (MOBILE_RELEASE_TAG set) fails
 # without it, since its crashes would be unreadable; a TestFlight / internal build only warns.
 def upload_dart_symbols!
   token = ENV["SENTRY_AUTH_TOKEN"].to_s.strip

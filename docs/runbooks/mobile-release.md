@@ -107,9 +107,9 @@ Until step 3 is done the jobs keep reading the repository secrets, so nothing br
 
 ### Both platforms
 
-| Secret                     | What it is                                                                                                                                                                                                                                                                                                            |
-| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MOBILE_SENTRY_AUTH_TOKEN` | A Sentry auth token for `studafy-limited` with `project:write` (an organization token works). Store builds are obfuscated (QA-084); the Fastfile uploads their Dart symbols (`build/debug-info`) to Sentry project `flutter` with it. A `mobile-v*` release fails without it; TestFlight / internal builds only warn. |
+| Secret              | What it is                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SENTRY_AUTH_TOKEN` | The `studafy-limited` Sentry organization token (Settings → Developer Settings → Organization Tokens), shared with the web build's source-map upload. Store builds are obfuscated (QA-084); the Fastfile uploads their Dart symbols (`build/debug-info`) to Sentry project `flutter` with it. A `mobile-v*` release fails without it; TestFlight / internal builds only warn. Rotating it affects the web and mobile builds together. |
 
 ### Variables
 
