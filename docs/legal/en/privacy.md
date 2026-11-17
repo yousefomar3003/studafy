@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-11-11
+Last updated: 2026-11-17
 
 This policy explains how personal data is handled in Studafy, the school management system made by Studafy Limited: the web app at app.studafy.com, the Studafy mobile apps, our website, and when people contact us. It is for everyone who uses Studafy: school leaders and staff, teachers, parents and guardians, and students.
 
@@ -105,9 +105,11 @@ Only the two people in a conversation can read it in the app; school leaders can
 
 **Responsible:** your school for content about school matters; Studafy for delivering it.
 
-Studafy sends in-app notifications, mobile push notifications and emails, for example about marks, attendance alerts, announcements, fee notices and account changes. **These can contain personal data,** such as a student's name, an assignment title and mark, a fee amount and due date, or, in the in-app notice of a new message, the sender's name and the first 140 characters of the message. Push notifications go through Google Firebase Cloud Messaging and emails through Resend (section 8). We keep a copy of each notification and a record of each email's delivery.
+Studafy sends notifications in the app and as mobile push notifications, for example about marks, attendance alerts, announcements, fee notices and new messages. **We do not send these notifications by email.** **They can contain personal data,** such as a student's name, an assignment title and mark, a fee amount and due date, or, in the notice of a new message, the sender's name and the first 140 characters of the message. Push notifications go through Google Firebase Cloud Messaging (section 8). We keep a copy of each notification.
 
-You can turn push notifications off in your device's settings, and adjust some notification preferences in the app.
+We send emails only for account and service matters, never as notifications: invitations to join Studafy, email address verification, account-deletion confirmations, purchase confirmations, and billing messages to school administrators, such as overdue-payment notices. Emails go through Resend (section 8), and we keep a record of each email's delivery.
+
+You can turn push notifications off in your device's settings, and choose which kinds of notification reach your phone in the app.
 
 ### 3.5 Fees and finance
 
