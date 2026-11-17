@@ -135,11 +135,27 @@ void main() {
   );
 
   testWidgets(
-    'not covered, the school sells Family+: ask the school, nothing to buy',
+    'not covered and no seat, though the school sells Family+: not active, sells nothing here',
     (tester) async {
       await _pump(
         tester,
         _familyPlus(reason: 'not_included', schoolOffers: true),
+      );
+
+      expect(
+        find.text("Family+ isn't active for your account at this school."),
+        findsOneWidget,
+      );
+      expect(find.byType(ButtonStyleButton), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'a parent seat whose tier lacks Family+: ask the school, nothing to buy',
+    (tester) async {
+      await _pump(
+        tester,
+        _familyPlus(reason: 'not_included', schoolSeat: true),
       );
 
       expect(

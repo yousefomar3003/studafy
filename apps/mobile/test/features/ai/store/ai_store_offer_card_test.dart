@@ -7,6 +7,7 @@ import 'package:studafy_mobile/src/features/ai/store/ai_store_backend.dart';
 import 'package:studafy_mobile/src/features/ai/store/ai_store_controller.dart';
 import 'package:studafy_mobile/src/features/ai/store/ai_store_offer_card.dart';
 import 'package:studafy_mobile/src/features/ai/store/ai_store_purchase_confirmation_note.dart';
+import 'package:studafy_mobile/src/features/ai/store/child_ai_store_button.dart';
 
 import '../../../support/wrap_with_localization.dart';
 import 'store_fakes.dart';
@@ -208,6 +209,50 @@ void main() {
       await pump(tester, const AiStorePurchaseConfirmationNote());
 
       expect(find.byKey(const ValueKey('aiStore.confirmation')), findsNothing);
+    });
+  });
+
+  group('a student the school provides for (owner, 2026-11-18)', () {
+    AiStoreSetup covered({bool subscribed = false}) => storeSetup(
+      purchasable: false,
+      subscribed: subscribed,
+      unavailableReason: AiStoreUnavailableReason.coveredBySchool,
+      schoolName: 'Alpha Academy',
+    );
+
+    testWidgets('"Provided by" the school: no offer, no Subscribe, never the store', (
+      tester,
+    ) async {
+      backend.config = covered();
+      await pump(tester, const AiStoreOfferCard());
+
+      expect(find.byKey(const ValueKey('aiStore.providedBySchool')), findsOneWidget);
+      expect(find.text('Provided by Alpha Academy.'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Subscribe'), findsNothing);
+      expect(find.byKey(const ValueKey('aiStore.restore')), findsNothing);
+      expect(find.textContaining('JOD'), findsNothing);
+      expect(gateway.bought, isEmpty);
+    });
+
+    testWidgets("a parent's covered child: provided by the school, even if subscribed before", (
+      tester,
+    ) async {
+      backend.config = covered(subscribed: true);
+      await pump(tester, const AiStoreOfferCard(studentId: studentId));
+
+      expect(find.text('Studafy AI for Sara is provided by Alpha Academy.'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, 'Subscribe'), findsNothing);
+    });
+
+    testWidgets("the child's page offers no purchase for a covered child", (tester) async {
+      backend.config = covered();
+      await pump(tester, const ChildAiStoreButton(studentId: studentId, childName: 'Sara Tazi'));
+      expect(find.byKey(const ValueKey('childAiStore')), findsNothing);
+
+      // A child without a seat -- even at a school with a licence: the family may buy it here.
+      backend.config = storeSetup();
+      await pump(tester, const ChildAiStoreButton(studentId: siblingId, childName: 'Omar Tazi'));
+      expect(find.byKey(const ValueKey('childAiStore')), findsOneWidget);
     });
   });
 }

@@ -167,10 +167,15 @@ export interface ResolvedAiProgramme {
   overridden: AiProgrammeOverrideField[];
 }
 
-/** The defaults approved on 2026-11-17, in USD: the first global version (migration 000234). */
+/**
+ * The defaults approved on 2026-11-17, in USD: the first global version (migration 000234). Prices
+ * as the owner set them on 2026-11-18: the in-app purchase is $5.99 a month (reference only; the
+ * stores set the real price), the school-offer price is $4 a month (the school tells parents; the
+ * app never shows it), and the school licence stays $4 a seat a month.
+ */
 export const DEFAULT_AI_PROGRAMME_SETTINGS: AiProgrammeSettings = {
   prices: [
-    { currencyCode: "USD", iapPriceMinor: 600, licensePriceMinor: 400, parentPriceMinor: 600 },
+    { currencyCode: "USD", iapPriceMinor: 599, licensePriceMinor: 400, parentPriceMinor: 400 },
   ],
   minSeats: 30,
   maxShareBps: 1500,

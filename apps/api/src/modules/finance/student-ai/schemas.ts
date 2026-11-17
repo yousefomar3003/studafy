@@ -6,13 +6,36 @@ const monthSchema = z
   .regex(/^\d{4}-\d{2}$/)
   .openapi({ example: "2026-09" });
 
+const lineStatusSchema = z.enum(["active", "released", "transferred"]);
+
 /**
- * The Student AI line on a child's fees: monthly price x months = total, paid with tuition. What a
- * parent sees; it never carries the school's licence price or the revenue share.
+ * The Student AI line in the family view (`GET /api/finance/families/{familyId}`), which parents
+ * read: the year, the months it runs and its status. Never an amount, a price or a currency -- the
+ * school tells parents the price (owner, 2026-11-18). Never the licence price or the share either.
  */
-const studentAiLineFields = {
+const familyLineFields = {
   academic_year_id: uuidSchema,
   academic_year_name: z.string(),
+  start_month: monthSchema.openapi({ description: "The first month it runs." }),
+  end_month: monthSchema.openapi({ description: "The academic year's last month." }),
+  late_start: z.boolean().openapi({
+    description: "True when the student joined after the year's first month.",
+  }),
+  stopped_from: monthSchema.nullable().openapi({
+    description: "The first month it no longer runs, after the seat was released or transferred.",
+  }),
+  status: lineStatusSchema,
+};
+
+export const familyStudentAiLineSchema = z.object(familyLineFields).openapi("FamilyStudentAiLine");
+
+/**
+ * The Student AI line on a child's fees, as school finance sees it: monthly price x months = total,
+ * billed with tuition. The price is the parent-facing (school-offer) price the school tells parents;
+ * never the school's licence price or the revenue share.
+ */
+const studentAiLineFields = {
+  ...familyLineFields,
   currency: z.string().openapi({ description: "The school's currency (ISO 4217)." }),
   currency_minor_unit: z.number().int(),
   monthly_price: z.string().openapi({ description: "Decimal string in the currency's precision." }),
@@ -27,15 +50,6 @@ const studentAiLineFields = {
     }),
   total: z.string(),
   total_minor: z.number().int(),
-  start_month: monthSchema,
-  end_month: monthSchema.openapi({ description: "The academic year's last month." }),
-  late_start: z.boolean().openapi({
-    description: "True when the student joined after the year's first month.",
-  }),
-  stopped_from: monthSchema.nullable().openapi({
-    description: "The first month no longer charged after the seat was released or transferred.",
-  }),
-  status: z.enum(["active", "released", "transferred"]),
   billing: z.enum(["auto", "outside"]).openapi({
     description:
       "auto: Studafy adds it to the fee schedule; outside: the school bills it itself. Either " +
@@ -46,10 +60,6 @@ const studentAiLineFields = {
   planned: z.string(),
   planned_minor: z.number().int().openapi({ description: "Still to be invoiced." }),
 };
-
-export const familyStudentAiLineSchema = z
-  .object(studentAiLineFields)
-  .openapi("FamilyStudentAiLine");
 
 export const studentAiFinanceLineSchema = z
   .object({

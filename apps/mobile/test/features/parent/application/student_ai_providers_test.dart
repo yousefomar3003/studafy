@@ -72,16 +72,22 @@ void main() {
     expect(client.fetchedFor, hasLength(2));
   });
 
-  test('null window, pricing and opt-in parse (closed and confirmed offers)', () {
+  test('null window, period and opt-in parse (closed and confirmed offers)', () {
     final offers = offersOf([
       closedOfferJson(id: 'child-1', name: 'Amir'),
-      optedInOfferJson(id: 'child-2', name: 'Lina', source: 'school_on_behalf', seatId: null),
+      optedInOfferJson(
+        id: 'child-2',
+        name: 'Lina',
+        source: 'school_on_behalf',
+        waitingForSchool: true,
+      ),
     ]);
+    expect(offers.schoolName, 'Alpha Academy');
 
     final closed = offers.offers.first;
     expect(closed.state, StudentAiOfferState.closed);
     expect(closed.window, isNull);
-    expect(closed.pricing, isNull);
+    expect(closed.period, isNull);
     expect(closed.canOptIn, isFalse);
 
     final optedIn = offers.offers.last;

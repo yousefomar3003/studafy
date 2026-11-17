@@ -398,10 +398,6 @@ function eligibleIn(tx: TransactionSql, windowId: string, academicYearId: string
   `;
 }
 
-function money(amountMinor: number, minorUnit: number, currencyCode: string): string {
-  return `${(amountMinor / 10 ** minorUnit).toFixed(minorUnit)} ${currencyCode}`;
-}
-
 async function schoolLocale(tx: TransactionSql): Promise<TemplateLocale> {
   const [settings] = await tx<{ locale: string | null }[]>`
     SELECT locale FROM app.school_settings WHERE school_id = current_setting('app.school_id')::uuid
@@ -982,11 +978,10 @@ async function notifyConfirmed(
   `;
   const locale = await schoolLocale(tx);
   const type = NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED;
+  // Parent-facing: never the price or the total (the school tells parents the price).
   const vars = {
     childName: optIn.studentName,
     schoolName: school?.name ?? "",
-    months: String(optIn.months),
-    total: money(optIn.totalMinor, optIn.minorUnit, optIn.currencyCode),
     startMonth: optIn.startMonth.slice(0, 7),
   };
   for (const parent of parents) {
@@ -1101,15 +1096,15 @@ async function afterOptIns(
 export interface ParentOptInInput {
   studentId: string;
   acceptTerms: boolean;
+  /** The terms the parent read; refused (409 AI_OPTIN_TERMS_CHANGED) unless the current ones. */
   termsVersion: string;
-  /** The total the parent was shown; refused when the price is no longer that. */
-  expectedTotalMinor: number;
 }
 
 /**
  * A parent opts their own child in. They must be linked to the child, the window must be open and
- * include the child, the terms accepted (the current version) and the total the same they were
- * shown. Recorded with who, when and the terms version; it cannot be undone.
+ * include the child, and the current terms accepted. The parent is never shown a price (the school
+ * tells them), so none is echoed back; the price in force is snapshotted on the opt-in for billing.
+ * Recorded with who, when and the terms version; it cannot be undone.
  */
 export async function parentOptIn(
   tx: TransactionSql,
@@ -1118,8 +1113,11 @@ export async function parentOptIn(
   actor: LicenseActor,
   now: Date = new Date(),
 ): Promise<Changed<AiOptInView>> {
-  if (!input.acceptTerms || input.termsVersion !== AI_OPTIN_TERMS_VERSION) {
+  if (!input.acceptTerms) {
     throw licenseError(422, ERROR_CODES.AI_OPTIN_TERMS_REQUIRED, actor.locale);
+  }
+  if (input.termsVersion !== AI_OPTIN_TERMS_VERSION) {
+    throw licenseError(409, ERROR_CODES.AI_OPTIN_TERMS_CHANGED, actor.locale);
   }
   const [linked] = await tx<{ ok: boolean }[]>`
     SELECT true AS ok FROM app.parent_child_links
@@ -1131,11 +1129,6 @@ export async function parentOptIn(
   const state = (await eligibility(tx, ctx.window, [input.studentId])).get(input.studentId);
   if (state?.optedIn) throw licenseError(409, ERROR_CODES.AI_OPTIN_ALREADY_OPTED_IN, actor.locale);
   if (!state?.eligible) throw licenseError(422, ERROR_CODES.AI_OPTIN_NOT_ELIGIBLE, actor.locale);
-  if (
-    aiOptInTotal(ctx.programme.monthlyPriceMinor, ctx.period.months) !== input.expectedTotalMinor
-  ) {
-    throw licenseError(409, ERROR_CODES.AI_OPTIN_PRICE_CHANGED, actor.locale);
-  }
   const optIn = await insertOptIn(
     tx,
     schoolId,
@@ -1520,6 +1513,43 @@ export async function listOptInStudents(
 // The parent's view
 // ---------------------------------------------------------------------------------------------------
 
+/**
+ * A child's opt-in as the parent sees it: who recorded it, when, the months it covers and where it
+ * stands. Never the price, the total or the currency: the school tells parents the price (owner,
+ * 2026-11-18), so no parent-callable read carries it. The price is still snapshotted on the opt-in
+ * row for billing.
+ */
+export interface ParentAiOptInView {
+  id: string;
+  studentId: string;
+  studentName: string;
+  source: AiOptInSource;
+  termsVersion: string;
+  optedInAt: string;
+  startMonth: string;
+  endMonth: string;
+  status: AiOptInStatus;
+  /** Active, but the school's licence has no place for the child yet: Student AI starts once it does. */
+  waitingForSchool: boolean;
+  releasedEffectiveMonth: string | null;
+}
+
+export function toParentOptInView(view: AiOptInView): ParentAiOptInView {
+  return {
+    id: view.id,
+    studentId: view.studentId,
+    studentName: view.studentName,
+    source: view.source,
+    termsVersion: view.termsVersion,
+    optedInAt: view.optedInAt,
+    startMonth: view.startMonth,
+    endMonth: view.endMonth,
+    status: view.status,
+    waitingForSchool: view.status === "active" && view.seatId === null,
+    releasedEffectiveMonth: view.releasedEffectiveMonth,
+  };
+}
+
 export interface ParentAiOffer {
   studentId: string;
   studentName: string;
@@ -1529,16 +1559,16 @@ export interface ParentAiOffer {
    */
   state: "available" | "opted_in" | "closed";
   window: { id: string; opensOn: string; closesOn: string; academicYearName: string } | null;
-  pricing: {
-    currencyCode: string;
-    minorUnit: number;
-    monthlyPriceMinor: number;
-    months: number;
-    totalMinor: number;
-    startMonth: string;
-    endMonth: string;
-  } | null;
-  optIn: AiOptInView | null;
+  /** The months joining today would cover (available only). No price: the school tells parents. */
+  period: { startMonth: string; endMonth: string } | null;
+  optIn: ParentAiOptInView | null;
+}
+
+export interface ParentAiOffers {
+  /** The school offering it (this account's school). */
+  schoolName: string;
+  offers: ParentAiOffer[];
+  termsVersion: string;
 }
 
 /**
@@ -1550,9 +1580,13 @@ export async function parentOffers(
   tx: TransactionSql,
   parentUserId: string,
   now: Date = new Date(),
-): Promise<{ offers: ParentAiOffer[]; termsVersion: string }> {
+): Promise<ParentAiOffers> {
   const today = await schoolToday(tx, now);
   const latest = await latestWindowRow(tx);
+  const [school] = await tx<{ name: string }[]>`
+    SELECT name FROM app.schools WHERE id = current_setting('app.school_id')::uuid
+  `;
+  const schoolName = school?.name ?? "";
   const children = await tx<{ id: string; name: string }[]>`
     SELECT s.id::text AS id,
            COALESCE(NULLIF(btrim(concat_ws(' ', s.first_name, s.last_name)), ''), 'Student') AS name
@@ -1562,7 +1596,8 @@ export async function parentOffers(
       AND pcl.parent_user_id = ${parentUserId}::uuid
     ORDER BY lower(s.first_name), s.id
   `;
-  if (children.length === 0) return { offers: [], termsVersion: AI_OPTIN_TERMS_VERSION };
+  if (children.length === 0)
+    return { schoolName, offers: [], termsVersion: AI_OPTIN_TERMS_VERSION };
 
   const ids = children.map((c) => c.id);
   const optIns = (
@@ -1573,28 +1608,22 @@ export async function parentOffers(
         ${latest ? tx`AND o.academic_year_id = ${latest.academic_year_id}::uuid` : tx``}
       ORDER BY o.status = 'active' DESC, o.opted_in_at DESC
     `
-  ).map(toOptInView);
+  ).map((row) => toParentOptInView(toOptInView(row)));
 
   const open = latest && windowState(latest, today) === "open" ? latest : null;
   const states = latest
     ? await eligibility(tx, latest, ids)
     : new Map<string, { eligible: boolean; optedIn: boolean }>();
-  let pricing: ParentAiOffer["pricing"] = null;
+  // Open to join only when the licence takes opt-ins and the programme prices it for the school
+  // (checked here, never sent: the parent is not shown the price).
+  let period: ParentAiOffer["period"] = null;
   if (open) {
     const license = await readLicense(tx, open.license_id);
     const programme =
       license && OPEN_FOR_OPT_IN.has(license.status) ? await optInProgramme(tx, license) : null;
-    const period = aiOptInPeriod({ startsOn: open.ay_starts_on, endsOn: open.ay_ends_on }, today);
-    if (programme?.monthlyPriceMinor != null && period) {
-      pricing = {
-        currencyCode: programme.currencyCode,
-        minorUnit: programme.minorUnit,
-        monthlyPriceMinor: programme.monthlyPriceMinor,
-        months: period.months,
-        totalMinor: aiOptInTotal(programme.monthlyPriceMinor, period.months),
-        startMonth: period.startMonth,
-        endMonth: period.endMonth,
-      };
+    const months = aiOptInPeriod({ startsOn: open.ay_starts_on, endsOn: open.ay_ends_on }, today);
+    if (programme?.monthlyPriceMinor != null && months) {
+      period = { startMonth: months.startMonth, endMonth: months.endMonth };
     }
   }
 
@@ -1615,7 +1644,7 @@ export async function parentOffers(
         studentName: child.name,
         state: "opted_in",
         window: windowRef,
-        pricing: null,
+        period: null,
         optIn,
       });
       continue;
@@ -1625,11 +1654,11 @@ export async function parentOffers(
     offers.push({
       studentId: child.id,
       studentName: child.name,
-      state: open && pricing ? "available" : "closed",
+      state: open && period ? "available" : "closed",
       window: windowRef,
-      pricing: open ? pricing : null,
+      period: open ? period : null,
       optIn: null,
     });
   }
-  return { offers, termsVersion: AI_OPTIN_TERMS_VERSION };
+  return { schoolName, offers, termsVersion: AI_OPTIN_TERMS_VERSION };
 }

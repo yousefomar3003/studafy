@@ -182,18 +182,13 @@ class FamilyReceipt {
 }
 
 /// A child's "Student AI" line for one academic year, as `GET /api/finance/families/{familyId}`
-/// reports it (`student_ai_lines`): the monthly price times the months charged equals the total,
-/// paid with tuition. Amounts are the decimal strings the API already formatted to the school
-/// currency's precision. Whether the school bills it on the fee schedule or itself is not read:
-/// the parent pays it with tuition either way and sees the same line. It never carries what the
-/// school pays for its licence or any revenue share — those are not on the wire at all.
+/// reports it (`student_ai_lines`): included in the school fees, from [startMonth], stopped from
+/// [stoppedFrom] once the seat was released or transferred. The API sends no price, total or amount
+/// for it -- the school tells parents the price -- and the app shows none. It never carries what the
+/// school pays for its licence or any revenue share either.
 class FamilyStudentAiLine {
   const FamilyStudentAiLine({
     required this.academicYearName,
-    required this.currency,
-    required this.monthlyPrice,
-    required this.months,
-    required this.total,
     required this.startMonth,
     required this.lateStart,
     required this.stoppedFrom,
@@ -201,10 +196,6 @@ class FamilyStudentAiLine {
 
   factory FamilyStudentAiLine.fromJson(Map<String, Object?> json) => FamilyStudentAiLine(
         academicYearName: json['academic_year_name']! as String,
-        currency: json['currency']! as String,
-        monthlyPrice: json['monthly_price']! as String,
-        months: (json['months']! as num).toInt(),
-        total: json['total']! as String,
         startMonth: _month(json['start_month']! as String),
         lateStart: json['late_start'] as bool? ?? false,
         stoppedFrom: json['stopped_from'] == null ? null : _month(json['stopped_from']! as String),
@@ -214,20 +205,13 @@ class FamilyStudentAiLine {
   static DateTime _month(String value) => DateTime.parse('$value-01');
 
   final String academicYearName;
-  final String currency;
-  final String monthlyPrice;
-  final int months;
-  final String total;
 
-  /// The first month charged; shown when the child joined after the year began ([lateStart]).
+  /// The first month it runs; shown when the child joined after the year began ([lateStart]).
   final DateTime startMonth;
   final bool lateStart;
 
-  /// The first month no longer charged, once the seat was released or transferred.
+  /// The first month it no longer runs, once the seat was released or transferred.
   final DateTime? stoppedFrom;
-
-  String get monthlyPriceLabel => moneyLabel(monthlyPrice, currency);
-  String get totalLabel => moneyLabel(total, currency);
 }
 
 /// One linked child's full finance detail, as the family financial view scopes it.

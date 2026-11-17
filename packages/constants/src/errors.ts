@@ -582,8 +582,8 @@ export const ERROR_CODES = {
   // AI_OPTIN_WINDOW_ALREADY_OPEN: close the current window before opening another.
   // AI_OPTIN_NOT_ELIGIBLE: not an enrolled student of the window's grades/sections (or not the
   // caller's child). AI_OPTIN_ALREADY_OPTED_IN: one per student per year. AI_OPTIN_YEAR_OVER: no
-  // months left. AI_OPTIN_TERMS_REQUIRED: the terms were not accepted, or an older version was.
-  // AI_OPTIN_PRICE_CHANGED: the total the parent saw is no longer the price. AI_OPTIN_ENDED: already
+  // months left. AI_OPTIN_TERMS_REQUIRED: the terms were not accepted. AI_OPTIN_TERMS_CHANGED: the
+  // parent accepted an older version of the terms (show the current ones). AI_OPTIN_ENDED: already
   // released or transferred. AI_OPTIN_STUDENT_NOT_LEFT: a seat is transferred or released only for a
   // student who left. LICENSE_SEAT_PROGRAMME_LOCKED: a programme seat cannot be unassigned.
   AI_OPTIN_NO_LICENCE: "AI_OPTIN_NO_LICENCE",
@@ -597,7 +597,7 @@ export const ERROR_CODES = {
   AI_OPTIN_ALREADY_OPTED_IN: "AI_OPTIN_ALREADY_OPTED_IN",
   AI_OPTIN_YEAR_OVER: "AI_OPTIN_YEAR_OVER",
   AI_OPTIN_TERMS_REQUIRED: "AI_OPTIN_TERMS_REQUIRED",
-  AI_OPTIN_PRICE_CHANGED: "AI_OPTIN_PRICE_CHANGED",
+  AI_OPTIN_TERMS_CHANGED: "AI_OPTIN_TERMS_CHANGED",
   AI_OPTIN_NOT_FOUND: "AI_OPTIN_NOT_FOUND",
   AI_OPTIN_ENDED: "AI_OPTIN_ENDED",
   AI_OPTIN_STUDENT_NOT_LEFT: "AI_OPTIN_STUDENT_NOT_LEFT",

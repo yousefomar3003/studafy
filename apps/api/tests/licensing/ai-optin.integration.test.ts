@@ -42,6 +42,8 @@ import {
   migrateDatabase,
 } from "../harness";
 
+import { insertPriceOverride } from "./programme-optins";
+
 import type { LicenseActor, LicensingDeps } from "../../src/modules/licensing";
 import type { OpenWindowInput } from "../../src/modules/licensing/ai-optin";
 import type { PendingRenewalStop } from "../../src/modules/licensing/overlap";
@@ -167,17 +169,29 @@ async function school(seats = 5, options: { license?: boolean } = {}): Promise<F
   const adminUser = await createUser(db.sql, schoolId);
   await assignRole(db.sql, schoolId, adminUser.id, "ORG_ADMIN");
   return asAdmin(schoolId, async (tx) => {
+    // This suite's prices, set explicitly: parents $6 a month, the licence $4 a seat a month (the
+    // global defaults are $4 and $4).
+    const overrideId =
+      options.license === false
+        ? null
+        : await insertPriceOverride(tx, {
+            schoolId,
+            createdBy: operator.userId,
+            createdBySchoolId: hq,
+            parentPriceMinor: 600,
+            licensePriceMinor: 400,
+          });
     const [license] =
       options.license === false
         ? [{ id: "" }]
         : await tx<{ id: string }[]>`
             INSERT INTO app.school_licenses (
               school_id, status, starts_at, ends_at, student_plan_id, student_seats, currency_id,
-              created_by, activated_at, ai_programme_version_id
+              created_by, activated_at, ai_programme_version_id, ai_programme_override_id
             )
             SELECT ${schoolId}::uuid, 'active', '2026-09-01T00:00:00Z', '2027-07-01T00:00:00Z',
                    ${studentTier}::uuid, ${seats}, c.id, ${adminUser.id}::uuid, now(),
-                   ${VERSION}::uuid
+                   ${VERSION}::uuid, ${overrideId}::uuid
             FROM app.currencies AS c WHERE c.code = 'USD'
             RETURNING id::text AS id
           `;
@@ -261,17 +275,18 @@ async function open(f: Fixture, overrides: Partial<OpenWindowInput> = {}, now = 
   }));
 }
 
-function optIn(c: Child, f: Fixture, expectedTotalMinor: number, now = NOW, acceptTerms = true) {
+function optIn(
+  c: Child,
+  f: Fixture,
+  now = NOW,
+  acceptTerms = true,
+  termsVersion = AI_OPTIN_TERMS_VERSION,
+) {
   return as(f.schoolId, c.parent, (tx) =>
     parentOptIn(
       tx,
       f.schoolId,
-      {
-        studentId: c.studentId,
-        acceptTerms,
-        termsVersion: AI_OPTIN_TERMS_VERSION,
-        expectedTotalMinor,
-      },
+      { studentId: c.studentId, acceptTerms, termsVersion },
       c.parent,
       now,
     ),
@@ -373,17 +388,18 @@ describe("windows", () => {
 
 describe("a parent opts in", () => {
   integrationTest(
-    "terms and the price shown are required; late opt-in pays the months left",
+    "the current terms are required; late opt-in pays the months left at the price in force",
     async () => {
       const f = await school(5);
       await open(f);
       const c = await child(f, f.sectionA);
 
-      expect(await refusal(optIn(c, f, 4800, NOW, false))).toBe("AI_OPTIN_TERMS_REQUIRED");
-      // A 10-month total is not what a November opt-in costs.
-      expect(await refusal(optIn(c, f, 6000))).toBe("AI_OPTIN_PRICE_CHANGED");
+      expect(await refusal(optIn(c, f, NOW, false))).toBe("AI_OPTIN_TERMS_REQUIRED");
+      // Terms the parent read before they changed are not the terms in force.
+      expect(await refusal(optIn(c, f, NOW, true, "2026-11-17"))).toBe("AI_OPTIN_TERMS_CHANGED");
 
-      const made = await optIn(c, f, 4800);
+      // No price is echoed back by the parent: the price in force is snapshotted for billing.
+      const made = await optIn(c, f);
       expect(made).toMatchObject({
         source: "parent",
         status: "active",
@@ -401,7 +417,7 @@ describe("a parent opts in", () => {
       const seat = await seatOf(f, made.id);
       expect(seat.unassigned_at).toBeNull();
 
-      expect(await refusal(optIn(c, f, 4800))).toBe("AI_OPTIN_ALREADY_OPTED_IN");
+      expect(await refusal(optIn(c, f))).toBe("AI_OPTIN_ALREADY_OPTED_IN");
 
       // The confirmation, in-app (push sends it), to the child's parent.
       const sent = await asAdmin(
@@ -419,17 +435,17 @@ describe("a parent opts in", () => {
     const f = await school(5);
     await open(f, { opensOn: "2026-08-15", closesOn: "2026-09-30" }, BEFORE_YEAR);
     const c = await child(f, f.sectionA);
-    const made = await optIn(c, f, 6000, BEFORE_YEAR);
+    const made = await optIn(c, f, BEFORE_YEAR);
     expect(made).toMatchObject({ startMonth: "2026-09-01", months: 10, totalMinor: 6000 });
   });
 
   integrationTest("only while a window is open, only for children in it", async () => {
     const f = await school(5);
     const c = await child(f, f.sectionA);
-    expect(await refusal(optIn(c, f, 4800))).toBe("AI_OPTIN_WINDOW_CLOSED");
+    expect(await refusal(optIn(c, f))).toBe("AI_OPTIN_WINDOW_CLOSED");
 
     await open(f, { sectionIds: [f.sectionB] });
-    expect(await refusal(optIn(c, f, 4800))).toBe("AI_OPTIN_NOT_ELIGIBLE");
+    expect(await refusal(optIn(c, f))).toBe("AI_OPTIN_NOT_ELIGIBLE");
 
     // Another family's child: not theirs to opt in.
     const other = await child(f, f.sectionB);
@@ -443,7 +459,6 @@ describe("a parent opts in", () => {
               studentId: other.studentId,
               acceptTerms: true,
               termsVersion: AI_OPTIN_TERMS_VERSION,
-              expectedTotalMinor: 4800,
             },
             c.parent,
             NOW,
@@ -459,7 +474,7 @@ describe("a parent opts in", () => {
       const f = await school(5);
       await open(f);
       const c = await child(f, f.sectionA);
-      const made = await optIn(c, f, 4800);
+      const made = await optIn(c, f);
 
       // The parent's own transaction cannot end it: only leadership may (ai_optins_end_scope).
       expect(
@@ -525,7 +540,7 @@ describe("on a parent's behalf", () => {
     const a = await child(f, f.sectionA);
     const b = await child(f, f.sectionB);
     const already = await child(f, f.sectionA);
-    await optIn(already, f, 4800);
+    await optIn(already, f);
 
     const result = await as(f.schoolId, f.admin, (tx) =>
       recordOnBehalf(
@@ -621,7 +636,7 @@ describe("seats", () => {
         await child(f, f.sectionB),
       ];
       const made = [];
-      for (const kid of kids) made.push(await optIn(kid, f, 4800));
+      for (const kid of kids) made.push(await optIn(kid, f));
       expect(made.map((o) => o.seatId !== null)).toEqual([true, true, false]);
 
       // One automatic request, at the minimum (30 > 3 opt-ins).
@@ -661,7 +676,7 @@ describe("seats", () => {
         return row!.id;
       });
       await open(f);
-      const made = await optIn(c, f, 4800);
+      const made = await optIn(c, f);
       expect(made.seatId).toBe(seatId);
     },
   );
@@ -679,8 +694,8 @@ describe("a student leaves", () => {
       await open(f);
       const leaver = await child(f, f.sectionA);
       const waiting = await child(f, f.sectionA);
-      const held = await optIn(leaver, f, 4800);
-      const queued = await optIn(waiting, f, 4800);
+      const held = await optIn(leaver, f);
+      const queued = await optIn(waiting, f);
       expect(queued.seatId).toBeNull();
 
       const release = () =>
@@ -710,7 +725,7 @@ describe("a student leaves", () => {
       await open(f);
       const leaver = await child(f, f.sectionA);
       const next = await child(f, f.sectionB);
-      const held = await optIn(leaver, f, 4800);
+      const held = await optIn(leaver, f);
       await leave(f, leaver.studentId);
 
       const moved = await as(f.schoolId, f.admin, (tx) =>
@@ -751,8 +766,8 @@ describe("isolation", () => {
     const mine = await child(f, f.sectionA);
     const sibling = await child(f, f.sectionB, mine.parent);
     const theirs = await child(f, f.sectionA);
-    await optIn(mine, f, 4800);
-    await optIn(theirs, f, 4800);
+    await optIn(mine, f);
+    await optIn(theirs, f);
 
     const offers = await asUser(f.schoolId, mine.parent.userId, (tx) =>
       parentOffers(tx, mine.parent.userId, NOW),
@@ -764,11 +779,26 @@ describe("isolation", () => {
       ].sort(),
     );
     const available = offers.offers.find((o) => o.state === "available")!;
-    expect(available.pricing).toMatchObject({
-      monthlyPriceMinor: 600,
-      months: 8,
-      totalMinor: 4800,
-    });
+    // The months joining today covers; never a price (the school tells parents).
+    expect(available.period).toEqual({ startMonth: "2026-11-01", endMonth: "2027-06-01" });
+    expect(Object.keys(available)).not.toContain("pricing");
+    const confirmed = offers.offers.find((o) => o.state === "opted_in")!;
+    expect(confirmed.optIn).toMatchObject({ status: "active", startMonth: "2026-11-01" });
+    expect(Object.keys(confirmed.optIn!).sort()).toEqual(
+      [
+        "endMonth",
+        "id",
+        "optedInAt",
+        "releasedEffectiveMonth",
+        "source",
+        "startMonth",
+        "status",
+        "studentId",
+        "studentName",
+        "termsVersion",
+        "waitingForSchool",
+      ].sort(),
+    );
 
     // RLS: the other family's opt-in is invisible to this parent.
     const visible = await asUser(
@@ -876,7 +906,8 @@ describe("routes", () => {
     const offers = await request(c.parent.userId, [ROLES.PARENT], "GET", "/api/parent/student-ai");
     expect(offers.status).toBe(200);
     const body = (await offers.json()) as {
-      offers: { studentId: string; state: string; pricing: { totalMinor: number } | null }[];
+      schoolName: string;
+      offers: { studentId: string; state: string }[];
       termsVersion: string;
     };
     expect(body.offers).toHaveLength(1);
@@ -891,10 +922,15 @@ describe("routes", () => {
         studentId: c.studentId,
         acceptTerms: true,
         termsVersion: body.termsVersion,
-        expectedTotalMinor: body.offers[0]!.pricing!.totalMinor,
       },
     );
     expect(made.status).toBe(201);
+    // The parent's confirmation carries no price, total or currency.
+    const madeBody = (await made.json()) as Record<string, unknown>;
+    expect(madeBody).toMatchObject({ studentId: c.studentId, status: "active" });
+    for (const key of Object.keys(madeBody)) {
+      expect(key).not.toMatch(/price|total|minor|currency|amount/i);
+    }
 
     const overview = await request(
       f.admin.userId,

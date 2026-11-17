@@ -27,7 +27,8 @@
 -- The in-app purchase price has no override: a store price is the same everywhere. Money is bigint
 -- minor units of the price's currency; percentages are basis points (10000 = 100%).
 --
--- The first global version is the approved defaults, in USD: $6 in-app, $4 licence, $6 parents,
+-- The first global version is the approved defaults, in USD: $5.99 in-app (reference), $4 licence,
+-- $4 parents (the school-offer price: schools tell parents; the app never shows it),
 -- minimum 30 seats, maximum share 15%, conversion 0/4/6/8/10/12% from 0/25/40/55/70/85%, 500+ seats at
 -- least 8%, bonus +0/+1.5/+3% from 0/60/80% upload consistency and only above a 0% conversion share,
 -- measured 30 days after the licence starts, 30 days' grace, month-to-month licences 0% of the tier
@@ -266,7 +267,7 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO app.ai_programme_version_prices (
   version_id, currency_id, iap_price_minor, license_price_minor, parent_price_minor
 )
-SELECT 'a1000000-0000-4000-8000-000000000001'::uuid, c.id, 600, 400, 600
+SELECT 'a1000000-0000-4000-8000-000000000001'::uuid, c.id, 599, 400, 400
 FROM app.currencies AS c
 WHERE c.code = 'USD'
 ON CONFLICT (version_id, currency_id) DO NOTHING;

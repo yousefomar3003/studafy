@@ -208,15 +208,15 @@ exports[`renderNotification — snapshot tests en MARKS_RELEASED / email renders
 
 exports[`renderNotification — snapshot tests en AI_OPTIN_AVAILABLE / in_app renders correctly 1`] = `"Student AI is available for Amina Tazi"`;
 
-exports[`renderNotification — snapshot tests en AI_OPTIN_AVAILABLE / push renders correctly 1`] = `"Amman Academy · 6.00 USD a month, paid with tuition · until 2026-12-15"`;
+exports[`renderNotification — snapshot tests en AI_OPTIN_AVAILABLE / push renders correctly 1`] = `"Offered by Amman Academy for the school year · join by 2026-12-15"`;
 
-exports[`renderNotification — snapshot tests en AI_OPTIN_AVAILABLE / email renders correctly 1`] = `"Amman Academy offers Student AI for Amina Tazi at 6.00 USD a month, paid with tuition. Open Studafy to opt in before 2026-12-15."`;
+exports[`renderNotification — snapshot tests en AI_OPTIN_AVAILABLE / email renders correctly 1`] = `"Amman Academy offers Student AI for Amina Tazi for the school year, as part of your school fees. Your school will tell you the price. Open Studafy to join by 2026-12-15."`;
 
 exports[`renderNotification — snapshot tests en AI_OPTIN_CONFIRMED / in_app renders correctly 1`] = `"Student AI confirmed for Amina Tazi"`;
 
-exports[`renderNotification — snapshot tests en AI_OPTIN_CONFIRMED / push renders correctly 1`] = `"8 months from 2026-11: 48.00 USD, paid with tuition"`;
+exports[`renderNotification — snapshot tests en AI_OPTIN_CONFIRMED / push renders correctly 1`] = `"From 2026-11, included in your school fees"`;
 
-exports[`renderNotification — snapshot tests en AI_OPTIN_CONFIRMED / email renders correctly 1`] = `"Student AI for Amina Tazi at Amman Academy is confirmed for 8 months from 2026-11: 48.00 USD in all, paid with tuition. It is committed for the school year and can't be cancelled mid-year."`;
+exports[`renderNotification — snapshot tests en AI_OPTIN_CONFIRMED / email renders correctly 1`] = `"Student AI for Amina Tazi at Amman Academy is confirmed from 2026-11, as part of your school fees. It is committed for the school year and can't be cancelled mid-year."`;
 
 exports[`renderNotification — snapshot tests en AI_OPTIN_SUMMARY / in_app renders correctly 1`] = `"12 new Student AI opt-ins"`;
 
@@ -432,15 +432,15 @@ exports[`renderNotification — snapshot tests ar MARKS_RELEASED / email renders
 
 exports[`renderNotification — snapshot tests ar AI_OPTIN_AVAILABLE / in_app renders correctly 1`] = `"الذكاء الاصطناعي للطلاب متاح لـ Amina Tazi"`;
 
-exports[`renderNotification — snapshot tests ar AI_OPTIN_AVAILABLE / push renders correctly 1`] = `"Amman Academy · 6.00 USD شهريًا مع الرسوم الدراسية · حتى 2026-12-15"`;
+exports[`renderNotification — snapshot tests ar AI_OPTIN_AVAILABLE / push renders correctly 1`] = `"تقدّمه Amman Academy للعام الدراسي · انضم حتى 2026-12-15"`;
 
-exports[`renderNotification — snapshot tests ar AI_OPTIN_AVAILABLE / email renders correctly 1`] = `"تقدّم Amman Academy الذكاء الاصطناعي للطلاب لـ Amina Tazi مقابل 6.00 USD شهريًا تُدفع مع الرسوم الدراسية. افتح Studafy للاشتراك قبل 2026-12-15."`;
+exports[`renderNotification — snapshot tests ar AI_OPTIN_AVAILABLE / email renders correctly 1`] = `"تقدّم Amman Academy الذكاء الاصطناعي للطلاب لـ Amina Tazi للعام الدراسي ضمن الرسوم المدرسية. ستُخبرك مدرستك بالسعر. افتح Studafy للانضمام حتى 2026-12-15."`;
 
 exports[`renderNotification — snapshot tests ar AI_OPTIN_CONFIRMED / in_app renders correctly 1`] = `"تم تأكيد الذكاء الاصطناعي للطلاب لـ Amina Tazi"`;
 
-exports[`renderNotification — snapshot tests ar AI_OPTIN_CONFIRMED / push renders correctly 1`] = `"8 أشهر بدءًا من 2026-11: 48.00 USD مع الرسوم الدراسية"`;
+exports[`renderNotification — snapshot tests ar AI_OPTIN_CONFIRMED / push renders correctly 1`] = `"بدءًا من 2026-11، ضمن الرسوم المدرسية"`;
 
-exports[`renderNotification — snapshot tests ar AI_OPTIN_CONFIRMED / email renders correctly 1`] = `"تم تأكيد الذكاء الاصطناعي للطلاب لـ Amina Tazi في Amman Academy لمدة 8 أشهر بدءًا من 2026-11: 48.00 USD إجمالًا، تُدفع مع الرسوم الدراسية. الاشتراك ملزم للعام الدراسي ولا يمكن إلغاؤه خلال العام."`;
+exports[`renderNotification — snapshot tests ar AI_OPTIN_CONFIRMED / email renders correctly 1`] = `"تم تأكيد الذكاء الاصطناعي للطلاب لـ Amina Tazi في Amman Academy بدءًا من 2026-11، ضمن الرسوم المدرسية. الاشتراك ملزم للعام الدراسي ولا يمكن إلغاؤه خلال العام."`;
 
 exports[`renderNotification — snapshot tests ar AI_OPTIN_SUMMARY / in_app renders correctly 1`] = `"12 اشتراكات جديدة في الذكاء الاصطناعي للطلاب"`;
 

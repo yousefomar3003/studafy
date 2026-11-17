@@ -605,6 +605,33 @@ export interface StudentAiLine {
   planned_minor: number;
 }
 
+/**
+ * The line as a parent sees it in the family view: the year, the months it runs and where it
+ * stands, never an amount. The school tells parents the price (owner, 2026-11-18); finance's own
+ * list (`listStudentAiLines`) keeps the amounts.
+ */
+export interface FamilyStudentAiLine {
+  academic_year_id: string;
+  academic_year_name: string;
+  start_month: string;
+  end_month: string;
+  late_start: boolean;
+  stopped_from: string | null;
+  status: StudentAiOptInStatus;
+}
+
+export function toFamilyStudentAiLine(line: StudentAiLine): FamilyStudentAiLine {
+  return {
+    academic_year_id: line.academic_year_id,
+    academic_year_name: line.academic_year_name,
+    start_month: line.start_month,
+    end_month: line.end_month,
+    late_start: line.late_start,
+    stopped_from: line.stopped_from,
+    status: line.status,
+  };
+}
+
 interface LineRow {
   student_id: string;
   academic_year_id: string;

@@ -27,27 +27,12 @@ import '../../domain/student_ai_offer.dart';
   return (labelKey: 'studentAiOptIn.status.closed', tone: AppTone.neutral);
 }
 
-/// `$6/month × 8 months = $48`: the price parents see, exactly as the API priced it.
-String studentAiPriceLine(
-  BuildContext context, {
-  required int monthlyPriceMinor,
-  required int months,
-  required int totalMinor,
-  required int minorUnit,
-  required String currencyCode,
-}) {
-  final locale = context.locale.toString();
-  String money(int minor) =>
-      formatStudentAiMoney(minor, minorUnit: minorUnit, currencyCode: currencyCode, locale: locale);
-  return 'studentAiOptIn.offer.priceLine'.plural(
-    months,
-    namedArgs: {'monthly': money(monthlyPriceMinor), 'total': money(totalMinor)},
-  );
-}
-
-/// Student AI for one child: the offer with its price, terms and confirmation while the school's
-/// window is open; what was confirmed once it is (no cancel: it is committed for the school year);
-/// or that opt-in is closed at the school for now.
+/// Student AI for one child: the school's offer -- what it includes, the commitment and the
+/// confirmation -- while the school's window is open; what was confirmed once it is (no cancel: it
+/// is committed for the school year); or that joining is closed at the school for now.
+///
+/// Never a price, a total or a way to pay: Student AI is part of the school fees and the school
+/// tells parents the price (store rules; `test/store_compliance/payment_routing_test.dart`).
 class StudentAiOfferCard extends ConsumerWidget {
   const StudentAiOfferCard({required this.offer, required this.termsVersion, super.key});
 
@@ -58,17 +43,17 @@ class StudentAiOfferCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = studentAiStatusOf(offer);
     final optIn = offer.optIn;
-    final pricing = offer.pricing;
+    final period = offer.period;
 
     final Widget body;
     if (optIn != null) {
       body = _OptedInBody(optIn: optIn);
-    } else if (offer.canOptIn && pricing != null) {
+    } else if (offer.canOptIn && period != null) {
       body = _AvailableBody(
-        // A new price is a new offer: the parent ticks the box again for it.
-        key: ValueKey('${offer.studentId}/${pricing.totalMinor}/$termsVersion'),
+        // New terms are a new offer: the parent ticks the box again for them.
+        key: ValueKey('${offer.studentId}/$termsVersion'),
         offer: offer,
-        pricing: pricing,
+        period: period,
         termsVersion: termsVersion,
       );
     } else {
@@ -89,13 +74,13 @@ class StudentAiOfferCard extends ConsumerWidget {
 class _AvailableBody extends ConsumerStatefulWidget {
   const _AvailableBody({
     required this.offer,
-    required this.pricing,
+    required this.period,
     required this.termsVersion,
     super.key,
   });
 
   final StudentAiOffer offer;
-  final StudentAiPricing pricing;
+  final StudentAiPeriod period;
   final String termsVersion;
 
   @override
@@ -115,26 +100,22 @@ class _AvailableBodyState extends ConsumerState<_AvailableBody> {
     try {
       await ref
           .read(studentAiClientProvider)
-          .optIn(
-            studentId: widget.offer.studentId,
-            termsVersion: widget.termsVersion,
-            expectedTotalMinor: widget.pricing.totalMinor,
-          );
+          .optIn(studentId: widget.offer.studentId, termsVersion: widget.termsVersion);
       say('studentAiOptIn.offer.confirmed'.tr(namedArgs: {'child': child}));
       ref.invalidate(studentAiOffersProvider);
     } on DioException catch (error) {
       final code = error.apiError?.code;
       final messageKey = switch (code) {
-        'AI_OPTIN_PRICE_CHANGED' => 'studentAiOptIn.offer.errors.priceChanged',
         'AI_OPTIN_WINDOW_CLOSED' => 'studentAiOptIn.offer.errors.windowClosed',
         'AI_OPTIN_ALREADY_OPTED_IN' => 'studentAiOptIn.offer.errors.alreadyOptedIn',
         'AI_OPTIN_NOT_ELIGIBLE' => 'studentAiOptIn.offer.errors.notEligible',
+        'AI_OPTIN_TERMS_CHANGED' ||
         'AI_OPTIN_TERMS_REQUIRED' => 'studentAiOptIn.offer.errors.termsChanged',
         _ => 'studentAiOptIn.offer.errors.generic',
       };
       say(messageKey.tr(namedArgs: {'child': child}));
       if (code != null && code.startsWith('AI_OPTIN_')) {
-        // The offer moved on (new price or terms, closed, or already confirmed): show it as it is
+        // The offer moved on (new terms, closed, or already confirmed): show it as it is
         // now, and make the parent tick the box again for whatever they confirm next.
         if (mounted) setState(() => _accepted = false);
         ref.invalidate(studentAiOffersProvider);
@@ -146,42 +127,44 @@ class _AvailableBodyState extends ConsumerState<_AvailableBody> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final textTheme = theme.textTheme;
+    final textTheme = Theme.of(context).textTheme;
     final locale = context.locale.toString();
-    final pricing = widget.pricing;
+    final period = widget.period;
     final window = widget.offer.window;
     final child = widget.offer.studentName;
     final month = DateFormat.yMMMM(locale);
-    final total = formatStudentAiMoney(
-      pricing.totalMinor,
-      minorUnit: pricing.minorUnit,
-      currencyCode: pricing.currencyCode,
-      locale: locale,
+
+    Widget bullets(List<String> lines) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final line in lines)
+          Padding(
+            padding: const EdgeInsets.only(bottom: AppSpacing.space4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('•  '),
+                Expanded(child: Text(line, style: textTheme.bodyMedium)),
+              ],
+            ),
+          ),
+      ],
     );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          studentAiPriceLine(
-            context,
-            monthlyPriceMinor: pricing.monthlyPriceMinor,
-            months: pricing.months,
-            totalMinor: pricing.totalMinor,
-            minorUnit: pricing.minorUnit,
-            currencyCode: pricing.currencyCode,
-          ),
-          key: const Key('studentAiPriceLine'),
-          style: textTheme.titleMedium,
+          'studentAiOptIn.offer.offeredBy'.tr(),
+          key: const Key('studentAiOfferedBy'),
+          style: textTheme.titleSmall,
         ),
         const SizedBox(height: AppSpacing.space4),
-        Text('studentAiOptIn.offer.paidWithTuition'.tr(), style: textTheme.bodyMedium),
         Text(
           'studentAiOptIn.offer.period'.tr(
             namedArgs: {
-              'start': month.format(pricing.startMonth),
-              'end': month.format(pricing.endMonth),
+              'start': month.format(period.startMonth),
+              'end': month.format(period.endMonth),
             },
           ),
           style: textTheme.bodySmall,
@@ -194,23 +177,22 @@ class _AvailableBodyState extends ConsumerState<_AvailableBody> {
             style: textTheme.bodySmall,
           ),
         const SizedBox(height: AppSpacing.space12),
+        Text('studentAiOptIn.offer.includesTitle'.tr(), style: textTheme.titleSmall),
+        const SizedBox(height: AppSpacing.space4),
+        bullets([
+          'studentAiOptIn.offer.includesHelper'.tr(namedArgs: {'child': child}),
+          'studentAiOptIn.offer.includesClasses'.tr(namedArgs: {'child': child}),
+          'studentAiOptIn.offer.includesYear'.tr(),
+        ]),
+        const SizedBox(height: AppSpacing.space8),
         Text('studentAiOptIn.offer.termsTitle'.tr(), style: textTheme.titleSmall),
         const SizedBox(height: AppSpacing.space4),
-        for (final key in const [
-          'studentAiOptIn.offer.termsCommitted',
-          'studentAiOptIn.offer.termsTuition',
-          'studentAiOptIn.offer.termsFinal',
-        ])
-          Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.space4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('•  '),
-                Expanded(child: Text(key.tr(), style: textTheme.bodyMedium)),
-              ],
-            ),
-          ),
+        bullets([
+          'studentAiOptIn.offer.termsCommitted'.tr(),
+          'studentAiOptIn.offer.termsFees'.tr(),
+          'studentAiOptIn.offer.termsFromSchool'.tr(),
+          'studentAiOptIn.offer.termsFinal'.tr(),
+        ]),
         CheckboxListTile(
           key: const Key('studentAiAccept'),
           contentPadding: EdgeInsets.zero,
@@ -218,7 +200,7 @@ class _AvailableBodyState extends ConsumerState<_AvailableBody> {
           value: _accepted,
           onChanged: _submitting ? null : (value) => setState(() => _accepted = value ?? false),
           title: Text(
-            'studentAiOptIn.offer.accept'.tr(namedArgs: {'child': child, 'total': total}),
+            'studentAiOptIn.offer.accept'.tr(namedArgs: {'child': child}),
             style: textTheme.bodyMedium,
           ),
         ),
@@ -287,24 +269,14 @@ class _OptedInBody extends StatelessWidget {
         ),
         const SizedBox(height: AppSpacing.space4),
         Text(
-          studentAiPriceLine(
-            context,
-            monthlyPriceMinor: optIn.monthlyPriceMinor,
-            months: optIn.months,
-            totalMinor: optIn.totalMinor,
-            minorUnit: optIn.minorUnit,
-            currencyCode: optIn.currencyCode,
-          ),
-          key: const Key('studentAiPriceLine'),
-          style: textTheme.bodyLarge,
-        ),
-        Text(
           [
-            'studentAiOptIn.optedIn.period'.plural(
-              optIn.months,
-              namedArgs: {'start': month.format(optIn.startMonth)},
+            'studentAiOptIn.offer.period'.tr(
+              namedArgs: {
+                'start': month.format(optIn.startMonth),
+                'end': month.format(optIn.endMonth),
+              },
             ),
-            'studentAiOptIn.offer.paidWithTuition'.tr(),
+            'studentAiOptIn.optedIn.inFees'.tr(),
           ].join(' · '),
           style: textTheme.bodyMedium,
         ),

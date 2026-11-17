@@ -18,6 +18,21 @@ final aiStoreBackendProvider = Provider<AiStoreBackend>(
   (ref) => ApiAiStoreBackend(ref.watch(apiClientProvider).subscriptions),
 );
 
+/// Whether the school provides the AI add-on for a parent's child [studentId] (a school seat), so
+/// the child's page offers no purchase at all. False while unknown, on a device without a store,
+/// or when it cannot be loaded: the offer sheet asks the server again and says so itself.
+final aiStoreCoveredBySchoolProvider = FutureProvider.autoDispose.family<bool, String>((
+  ref,
+  studentId,
+) async {
+  if (currentStorePlatform() == null) return false;
+  try {
+    return (await ref.watch(aiStoreBackendProvider).setup(studentId: studentId)).coveredBySchool;
+  } on Object {
+    return false;
+  }
+});
+
 final withdrawalWaiverStoreProvider = Provider<WithdrawalWaiverStore>(
   (ref) => SharedPreferencesWithdrawalWaiverStore(),
 );
@@ -51,6 +66,15 @@ class AiStoreUnavailable extends AiStoreState {
   const AiStoreUnavailable(this.messageKey, {this.name});
 
   final String messageKey;
+  final String? name;
+}
+
+/// The school provides it (the student holds a school seat): "Provided by (school)", and never a
+/// purchase or a store sheet. [name] is the student's first name for a parent's child.
+class AiStoreProvidedBySchool extends AiStoreState {
+  const AiStoreProvidedBySchool({this.schoolName, this.name});
+
+  final String? schoolName;
   final String? name;
 }
 
@@ -170,10 +194,16 @@ class AiStoreController extends AsyncNotifier<AiStoreState> {
     _setup = setup;
     final name = setup.studentFirstName;
 
+    // A student holding a school seat is never sold it (checked before anything touches the store).
+    if (setup.coveredBySchool) {
+      return AiStoreProvidedBySchool(schoolName: setup.schoolName, name: name);
+    }
     if (setup.subscribed) return AiStoreSubscribed(name: name);
     switch (setup.unavailableReason) {
       case AiStoreUnavailableReason.notStudent:
         return const AiStoreHidden();
+      case AiStoreUnavailableReason.coveredBySchool:
+        return AiStoreProvidedBySchool(schoolName: setup.schoolName, name: name);
       case AiStoreUnavailableReason.notConfigured:
         return AiStoreUnavailable('aiStore.unavailable.notConfigured', name: name);
       case AiStoreUnavailableReason.schoolPlanInactive:

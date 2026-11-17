@@ -119,8 +119,9 @@ const familyStudentSectionSchema = z
     totals: z.array(currencyTotalSchema),
     student_ai_lines: z.array(familyStudentAiLineSchema).openapi({
       description:
-        "The child's Student AI line per academic year (newest first): monthly price x months = " +
-        "total, paid with tuition. Empty when the child has not opted in.",
+        "The child's Student AI line per academic year (newest first): the months it runs and its " +
+        "status, part of the school fees. No amount: the school tells parents the price. Empty " +
+        "when the child has not opted in.",
     }),
   })
   .openapi("FamilyStudentSection");

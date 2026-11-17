@@ -125,8 +125,9 @@ describe("AiProgrammePage", () => {
       reason: "Bigger minimum",
       basedOnVersionId: V2,
     });
+    // The defaults (owner, 2026-11-18): in-app $5.99, licence $4, school-offer price $4.
     expect(body.prices).toEqual([
-      { currencyCode: "USD", iapPriceMinor: 600, licensePriceMinor: 400, parentPriceMinor: 600 },
+      { currencyCode: "USD", iapPriceMinor: 599, licensePriceMinor: 400, parentPriceMinor: 400 },
     ]);
   });
 
@@ -141,9 +142,10 @@ describe("AiProgrammePage", () => {
   test("parents may pay the licence price or less: a warning, never a block", async () => {
     await renderPage();
     const card = await globalCard();
-    expect(card.queryByTestId("margin-warning")).toBeNull();
-    fireEvent.change(card.getByLabelText("Price parents see"), { target: { value: "4.00" } });
+    // The defaults: parents $4 = the licence $4, so the school keeps no margin.
     expect(card.getByTestId("margin-warning").textContent).toContain("keeps no margin");
+    fireEvent.change(card.getByLabelText("Price parents see"), { target: { value: "6.00" } });
+    expect(card.queryByTestId("margin-warning")).toBeNull();
     fireEvent.change(card.getByLabelText("Price parents see"), { target: { value: "3.00" } });
     expect(card.getByTestId("margin-warning").textContent).toContain("less than the school");
     fireEvent.change(card.getByLabelText("Reason for this change"), {

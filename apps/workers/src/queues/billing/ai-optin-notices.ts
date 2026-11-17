@@ -69,11 +69,12 @@ async function notify(
   `;
 }
 
-function money(amountMinor: number, minorUnit: number, currencyCode: string): string {
-  return `${(amountMinor / 10 ** minorUnit).toFixed(minorUnit)} ${currencyCode}`;
-}
-
-/** The armed school's open window today (school-local), with the price parents see, or null. */
+/**
+ * The armed school's open window today (school-local), or null. `price_minor` is only a gate: a
+ * window whose licence has no school-offer price in its currency takes no opt-ins, so parents are not
+ * told about it. The price itself is never put in a parent's notice -- the school tells parents the
+ * price (owner, 2026-11-18).
+ */
 async function openWindow(tx: TransactionSql, now: Date) {
   const [row] = await tx<
     {
@@ -81,8 +82,6 @@ async function openWindow(tx: TransactionSql, now: Date) {
       academic_year_id: string;
       closes_on: string;
       price_minor: string | null;
-      currency_code: string;
-      minor_unit: number;
     }[]
   >`
     WITH today AS (
@@ -102,11 +101,9 @@ async function openWindow(tx: TransactionSql, now: Date) {
                 AND o.price_currency_id = l.currency_id AND o.parent_price_minor IS NOT NULL),
              (SELECT p.parent_price_minor FROM app.ai_programme_version_prices AS p
               WHERE p.version_id = l.ai_programme_version_id AND p.currency_id = l.currency_id)
-           )::text AS price_minor,
-           c.code AS currency_code, c.minor_unit::int AS minor_unit
+           )::text AS price_minor
     FROM app.ai_optin_windows AS w
     JOIN app.school_licenses AS l ON l.id = w.license_id AND l.school_id = w.school_id
-    JOIN app.currencies AS c ON c.id = l.currency_id
     CROSS JOIN today
     WHERE w.school_id = current_setting('app.school_id')::uuid
       AND w.closed_at IS NULL
@@ -166,7 +163,6 @@ async function availabilityNotices(
     ORDER BY s.id
   `;
 
-  const price = money(Number(window.price_minor), window.minor_unit, window.currency_code);
   let notifications = 0;
   let told = 0;
   for (const child of children) {
@@ -184,7 +180,7 @@ async function availabilityNotices(
         parent,
         NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE,
         locale,
-        { childName: child.name, schoolName, price, closesOn: window.closes_on },
+        { childName: child.name, schoolName, closesOn: window.closes_on },
         { route: "/parent/student-ai", student_id: child.student_id, window_id: window.id },
       );
       notifications += 1;

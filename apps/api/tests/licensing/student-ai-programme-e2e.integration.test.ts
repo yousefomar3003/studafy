@@ -15,7 +15,7 @@
 
 import { REVENUE_SHARE_MEASURES, lockDueConversionSnapshots } from "@studafy/billing";
 import { ROLES } from "@studafy/constants";
-import { academicYearMonths, monthCount } from "@studafy/license-pricing";
+import { academicYearMonths, monthCount, monthsBetween } from "@studafy/license-pricing";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -42,6 +42,8 @@ import {
   integrationEnabled,
   migrateDatabase,
 } from "../harness";
+
+import { insertPriceOverride } from "./programme-optins";
 
 import type { LicenseActor, LicensingDeps, QuoteTerms } from "../../src/modules/licensing";
 import type { TestApp, TestDatabase } from "../harness";
@@ -209,6 +211,18 @@ describe("the Student AI programme, end to end", () => {
         return { yearId: year!.id, classId: klass!.id, familyId: family!.id };
       });
 
+      // The school's prices, set explicitly: parents $6, the licence $4 a seat a month (the global
+      // defaults are $4 and $4). Before the quote, so the licence is signed with them.
+      await asAdmin(schoolId, (tx) =>
+        insertPriceOverride(tx, {
+          schoolId,
+          createdBy: operator.userId,
+          createdBySchoolId: operator.homeSchoolId,
+          parentPriceMinor: 600,
+          licensePriceMinor: 400,
+        }),
+      );
+
       // ---- The licence: 30 seats (the minimum) x $4 x 10 months, monthly, from the year's start. ----
       const quote = await as(schoolId, operator, async (tx) => {
         const created = await createQuote(
@@ -267,10 +281,13 @@ describe("the Student AI programme, end to end", () => {
       const offers = (await (
         await request(parentUser.id, [ROLES.PARENT], "GET", "/api/parent/student-ai")
       ).json()) as {
-        offers: { studentId: string; pricing: { totalMinor: number; months: number } }[];
+        offers: { studentId: string; period: { startMonth: string; endMonth: string } }[];
         termsVersion: string;
       };
       const offer = offers.offers.find((o) => o.studentId === kids[0]!.id)!;
+      // The parent is told the months, never the price (the school tells them).
+      expect(JSON.stringify(offers)).not.toMatch(/price|total|minor|currency|amount/i);
+      const monthsLeft = monthsBetween(offer.period.startMonth, offer.period.endMonth);
       const parentMade = await request(
         parentUser.id,
         [ROLES.PARENT],
@@ -280,7 +297,6 @@ describe("the Student AI programme, end to end", () => {
           studentId: kids[0]!.id,
           acceptTerms: true,
           termsVersion: offers.termsVersion,
-          expectedTotalMinor: offer.pricing.totalMinor,
         },
       );
       expect(parentMade.status).toBe(201);
@@ -332,8 +348,8 @@ describe("the Student AI programme, end to end", () => {
       expect(late.map((l) => l.student_id).sort()).toEqual([kids[0]!.id, kids[1]!.id].sort());
       for (const line of late) {
         // Opted in this month: the months left in the year, $6 each.
-        expect(line).toMatchObject({ months: offer.pricing.months, monthly_price_minor: 600 });
-        expect(line.total_minor).toBe(600 * offer.pricing.months);
+        expect(line).toMatchObject({ months: monthsLeft, monthly_price_minor: 600 });
+        expect(line.total_minor).toBe(600 * monthsLeft);
       }
 
       // ---- As if taken on the year's first day: move the opt-ins, seats and students back. ----
@@ -476,7 +492,8 @@ describe("the Student AI programme, end to end", () => {
       );
       expect(credited).toMatchObject({ status: "credited", creditInvoiceId: next.invoice.id });
 
-      // The parent sees only the Student AI line: never the licence price or the share.
+      // The parent sees only the Student AI line: never the licence price, the share, or the price
+      // and total parents are charged (the school tells them).
       const family = await request(
         parentUser.id,
         [ROLES.PARENT],
@@ -488,6 +505,13 @@ describe("the Student AI programme, end to end", () => {
       expect(text).toContain("student_ai_lines");
       expect(text).not.toContain("share");
       expect(text).not.toContain("licen");
+      const section = (
+        JSON.parse(text) as { students: { student_ai_lines: Record<string, unknown>[] }[] }
+      ).students.flatMap((s) => s.student_ai_lines);
+      expect(section).toHaveLength(1);
+      for (const key of Object.keys(section[0]!)) {
+        expect(key).not.toMatch(/price|total|minor|currency|amount|invoiced|planned/i);
+      }
     },
     120_000,
   );

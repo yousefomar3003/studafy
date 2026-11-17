@@ -204,6 +204,10 @@ describe("global versions", () => {
     expect(current.id).toBe(INITIAL_AI_PROGRAMME_VERSION_ID);
     expect(current.versionNumber).toBe(1);
     expect(current.settings).toEqual(DEFAULT_AI_PROGRAMME_SETTINGS as typeof current.settings);
+    // The owner's prices (2026-11-18): in-app $5.99 (reference), school-offer $4, licence $4.
+    expect(current.settings.prices).toEqual([
+      { currencyCode: "USD", iapPriceMinor: 599, licensePriceMinor: 400, parentPriceMinor: 400 },
+    ]);
     expect(current.createdBy).toEqual({ userId: null, name: null });
   });
 

@@ -19,22 +19,13 @@ class StudentAiClient {
     return StudentAiOffers.fromJson(response.data!);
   }
 
-  /// Opts [studentId] in. [termsVersion] is the one the offers came with and [expectedTotalMinor]
-  /// the total the parent was shown: the API refuses with 409 `AI_OPTIN_PRICE_CHANGED` when the
-  /// price moved since. Committed for the school year: there is no undo.
-  Future<StudentAiOptIn> optIn({
-    required String studentId,
-    required String termsVersion,
-    required int expectedTotalMinor,
-  }) async {
+  /// Joins [studentId] to Student AI. [termsVersion] is the one the offers came with: the API
+  /// refuses with 409 `AI_OPTIN_TERMS_CHANGED` when the terms changed since. No price is sent or
+  /// shown: the school tells parents the price. Committed for the school year: there is no undo.
+  Future<StudentAiOptIn> optIn({required String studentId, required String termsVersion}) async {
     final response = await _dio.post<Map<String, Object?>>(
       '/api/parent/student-ai/opt-ins',
-      data: {
-        'studentId': studentId,
-        'acceptTerms': true,
-        'termsVersion': termsVersion,
-        'expectedTotalMinor': expectedTotalMinor,
-      },
+      data: {'studentId': studentId, 'acceptTerms': true, 'termsVersion': termsVersion},
     );
     return StudentAiOptIn.fromJson(response.data!);
   }

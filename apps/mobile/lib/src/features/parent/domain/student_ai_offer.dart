@@ -1,27 +1,38 @@
-import 'dart:math' as math;
-
-import 'package:intl/intl.dart';
-
 /// Student AI for one school's children, as the parent sees it (`GET /api/parent/student-ai`).
 ///
+/// The school offers Student AI as part of its fees and tells parents the price itself: the API
+/// sends no price, total or amount for the parent, and the app shows none (store rules: a digital
+/// service sold outside in-app purchase is never priced in the app).
+///
 /// Hand-parsed rather than the generated `ParentAiOffers`: the generated model types an offer's
-/// `window`, `pricing` and `optIn` (and an opt-in's `parent`) as non-null, but the API sends null
-/// for each of them in ordinary states (no window yet, already opted in, recorded by the school),
-/// so the generated `fromJson` would throw on a closed offer.
+/// `window`, `period` and `optIn` as non-null, but the API sends null for each of them in ordinary
+/// states (no window yet, already opted in), so the generated `fromJson` would throw on a closed
+/// offer.
 class StudentAiOffers {
-  const StudentAiOffers({required this.offers, required this.termsVersion});
+  const StudentAiOffers({
+    required this.offers,
+    required this.termsVersion,
+    this.schoolName,
+  });
 
-  factory StudentAiOffers.fromJson(Map<String, Object?> json) => StudentAiOffers(
-    offers: [
-      for (final entry in (json['offers'] as List<Object?>?) ?? const [])
-        StudentAiOffer.fromJson(Map<String, Object?>.from(entry! as Map)),
-    ],
-    termsVersion: json['termsVersion']! as String,
-  );
+  factory StudentAiOffers.fromJson(Map<String, Object?> json) {
+    final school = (json['schoolName'] as String?)?.trim();
+    return StudentAiOffers(
+      offers: [
+        for (final entry in (json['offers'] as List<Object?>?) ?? const [])
+          StudentAiOffer.fromJson(Map<String, Object?>.from(entry! as Map)),
+      ],
+      termsVersion: json['termsVersion']! as String,
+      schoolName: school == null || school.isEmpty ? null : school,
+    );
+  }
 
   /// One per child the school offered Student AI to. Children it never offered it to are not
   /// listed, so an empty list means there is nothing to show.
   final List<StudentAiOffer> offers;
+
+  /// The school offering it (this account's school); null when the API didn't name it.
+  final String? schoolName;
 
   /// The terms the parent accepts by opting in; sent back with the opt-in.
   final String termsVersion;
@@ -43,15 +54,15 @@ enum StudentAiOfferState {
   };
 }
 
-/// Student AI for one child: open to opt in ([pricing] and [window] set), already opted in
-/// ([optIn] set), or closed at the school for now.
+/// Student AI for one child: open to join ([period] and [window] set), already joined ([optIn]
+/// set), or closed at the school for now.
 class StudentAiOffer {
   const StudentAiOffer({
     required this.studentId,
     required this.studentName,
     required this.state,
     required this.window,
-    required this.pricing,
+    required this.period,
     required this.optIn,
   });
 
@@ -60,7 +71,7 @@ class StudentAiOffer {
     studentName: json['studentName']! as String,
     state: StudentAiOfferState.fromJson(json['state']),
     window: _objectOrNull(json['window'], StudentAiWindow.fromJson),
-    pricing: _objectOrNull(json['pricing'], StudentAiPricing.fromJson),
+    period: _objectOrNull(json['period'], StudentAiPeriod.fromJson),
     optIn: _objectOrNull(json['optIn'], StudentAiOptIn.fromJson),
   );
 
@@ -68,11 +79,11 @@ class StudentAiOffer {
   final String studentName;
   final StudentAiOfferState state;
   final StudentAiWindow? window;
-  final StudentAiPricing? pricing;
+  final StudentAiPeriod? period;
   final StudentAiOptIn? optIn;
 
-  /// Can be opted in now: the window is open for this child and the API priced it.
-  bool get canOptIn => state == StudentAiOfferState.available && pricing != null;
+  /// Can be joined now: the window is open for this child and the API says which months it covers.
+  bool get canOptIn => state == StudentAiOfferState.available && period != null;
 }
 
 /// The school's opt-in window for the child.
@@ -97,35 +108,16 @@ class StudentAiWindow {
   final String academicYearName;
 }
 
-/// What opting in today costs: [monthlyPriceMinor] × [months] = [totalMinor], from [startMonth]
-/// to [endMonth]. The months follow the school's academic year (a late opt-in covers only the
-/// months left, starting this month); the app shows them as the API sends them.
-class StudentAiPricing {
-  const StudentAiPricing({
-    required this.currencyCode,
-    required this.minorUnit,
-    required this.monthlyPriceMinor,
-    required this.months,
-    required this.totalMinor,
-    required this.startMonth,
-    required this.endMonth,
-  });
+/// The months joining today covers, from [startMonth] to [endMonth]: they follow the school's
+/// academic year (joining late covers only the months left, starting this month).
+class StudentAiPeriod {
+  const StudentAiPeriod({required this.startMonth, required this.endMonth});
 
-  factory StudentAiPricing.fromJson(Map<String, Object?> json) => StudentAiPricing(
-    currencyCode: json['currencyCode']! as String,
-    minorUnit: (json['minorUnit']! as num).toInt(),
-    monthlyPriceMinor: (json['monthlyPriceMinor']! as num).toInt(),
-    months: (json['months']! as num).toInt(),
-    totalMinor: (json['totalMinor']! as num).toInt(),
+  factory StudentAiPeriod.fromJson(Map<String, Object?> json) => StudentAiPeriod(
     startMonth: DateTime.parse(json['startMonth']! as String),
     endMonth: DateTime.parse(json['endMonth']! as String),
   );
 
-  final String currencyCode;
-  final int minorUnit;
-  final int monthlyPriceMinor;
-  final int months;
-  final int totalMinor;
   final DateTime startMonth;
   final DateTime endMonth;
 }
@@ -158,8 +150,8 @@ enum StudentAiOptInStatus {
   };
 }
 
-/// A child's Student AI opt-in: committed for [months] months from [startMonth], [totalMinor] in
-/// all, paid with tuition. [seatId] is null until the school's licence has a seat for the child.
+/// A child's Student AI: joined from [startMonth] to [endMonth], committed for the school year and
+/// part of the school fees. [waitingForSchool] until the school's licence has a place for the child.
 class StudentAiOptIn {
   const StudentAiOptIn({
     required this.id,
@@ -169,13 +161,8 @@ class StudentAiOptIn {
     required this.optedInAt,
     required this.startMonth,
     required this.endMonth,
-    required this.months,
-    required this.currencyCode,
-    required this.minorUnit,
-    required this.monthlyPriceMinor,
-    required this.totalMinor,
-    required this.seatId,
     required this.status,
+    required this.waitingForSchool,
     required this.releasedEffectiveMonth,
   });
 
@@ -189,13 +176,8 @@ class StudentAiOptIn {
       optedInAt: DateTime.parse(json['optedInAt']! as String),
       startMonth: DateTime.parse(json['startMonth']! as String),
       endMonth: DateTime.parse(json['endMonth']! as String),
-      months: (json['months']! as num).toInt(),
-      currencyCode: json['currencyCode']! as String,
-      minorUnit: (json['minorUnit']! as num).toInt(),
-      monthlyPriceMinor: (json['monthlyPriceMinor']! as num).toInt(),
-      totalMinor: (json['totalMinor']! as num).toInt(),
-      seatId: json['seatId'] as String?,
       status: StudentAiOptInStatus.fromJson(json['status']),
+      waitingForSchool: json['waitingForSchool'] as bool? ?? false,
       releasedEffectiveMonth: released == null ? null : DateTime.parse(released),
     );
   }
@@ -207,38 +189,16 @@ class StudentAiOptIn {
   final DateTime optedInAt;
   final DateTime startMonth;
   final DateTime endMonth;
-  final int months;
-  final String currencyCode;
-  final int minorUnit;
-  final int monthlyPriceMinor;
-  final int totalMinor;
-  final String? seatId;
   final StudentAiOptInStatus status;
+  final bool waitingForSchool;
 
-  /// For a released seat: the month it is no longer charged from.
+  /// Once stopped: the first month it no longer runs.
   final DateTime? releasedEffectiveMonth;
 
   bool get isActive => status == StudentAiOptInStatus.active;
 
-  /// Opted in, but the school's licence has no seat for the child yet.
-  bool get waitingForSeat => isActive && seatId == null;
-}
-
-/// [minor] units of [currencyCode] as a price for [locale], e.g. `$6` or `$5.50`: whole amounts
-/// drop the fraction, others keep the currency's [minorUnit] digits.
-String formatStudentAiMoney(
-  int minor, {
-  required int minorUnit,
-  required String currencyCode,
-  required String locale,
-}) {
-  final scale = math.pow(10, minorUnit).toInt();
-  final whole = minor % scale == 0;
-  return NumberFormat.simpleCurrency(
-    locale: locale,
-    name: currencyCode,
-    decimalDigits: whole ? 0 : minorUnit,
-  ).format(minor / scale);
+  /// Joined, but the school's licence has no place for the child yet.
+  bool get waitingForSeat => isActive && waitingForSchool;
 }
 
 T? _objectOrNull<T>(Object? raw, T Function(Map<String, Object?>) parse) =>

@@ -1171,11 +1171,13 @@ describe("the measures", () => {
       // Upload consistency waits until the days are over; a finished period with no class that has
       // Student AI measures 0. The commitment is the licence's own.
       const adapters = await asAdmin(f.schoolId, async (tx) => ({
+        // Ends tomorrow (UTC): still ongoing in the school's own timezone, which may already be a
+        // day ahead of UTC late in the evening.
         ongoing: await REVENUE_SHARE_MEASURES.uploadConsistencyForPeriod(tx, {
           schoolId: f.schoolId,
           licenseId,
           from: today,
-          to: today,
+          to: ISO(addDays(new Date(), 1)),
         }),
         finished: await REVENUE_SHARE_MEASURES.uploadConsistencyForPeriod(tx, {
           schoolId: f.schoolId,

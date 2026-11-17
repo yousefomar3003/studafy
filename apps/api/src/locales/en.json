@@ -293,7 +293,7 @@
   "AI_OPTIN_ALREADY_OPTED_IN": "This student already has Student AI for this academic year.",
   "AI_OPTIN_YEAR_OVER": "This academic year has ended, so there are no months left to opt in for.",
   "AI_OPTIN_TERMS_REQUIRED": "Read and accept the terms before confirming.",
-  "AI_OPTIN_PRICE_CHANGED": "The price has changed since you opened this page. Check the new price and confirm again.",
+  "AI_OPTIN_TERMS_CHANGED": "The terms have changed since you opened this page. Read the current terms and confirm again.",
   "AI_OPTIN_NOT_FOUND": "That Student AI opt-in wasn't found.",
   "AI_OPTIN_ENDED": "This opt-in has already been released or transferred.",
   "AI_OPTIN_STUDENT_NOT_LEFT": "A Student AI seat can only be transferred or released when the student has left the school. Change the student's status first.",

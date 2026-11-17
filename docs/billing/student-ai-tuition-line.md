@@ -89,10 +89,12 @@ again each new year, so a new year never carries a line over.
 
 ## Who sees what
 
-- **Parents (app, Finance tab):** per opted-in child and academic year,
-  "6.00 USD/month x 10 months = 60.00 USD, paid with tuition", the start month for a late opt-in and
-  "stopped from <month>" after a release (en + ar). Never the licence cost or the revenue share,
-  which are not on the wire. Row-level security limits the tables to the child's family and school
+- **Parents (app, Finance tab):** per opted-in child and academic year, "Student AI -- included in
+  your school fees", the start month for a late opt-in and "stopped from <month>" after a release
+  (en + ar). **No amount** (owner, 2026-11-18: the school tells parents the price): the family
+  view's `student_ai_lines` carry only the year, start/end month, late start, stop month and status
+  -- no price, total, currency, invoiced or planned amount. The school's own fee invoices keep their
+  totals. Never the licence cost or the revenue share either, which are not on the wire. Row-level security limits the tables to the child's family and school
   leadership; the API scopes the family view to the parent's own family.
 - **Students:** do not see fees in the app.
 - **Finance (web):** every line with what is invoiced and what is still planned, the switch and the

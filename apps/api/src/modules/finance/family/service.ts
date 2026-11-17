@@ -23,7 +23,7 @@
 
 import { formatMinorUnits } from "../currency";
 import { receiptUrlFor } from "../receipts/url";
-import { studentAiLinesFor } from "../student-ai/service";
+import { studentAiLinesFor, toFamilyStudentAiLine } from "../student-ai/service";
 
 import type {
   FamilyFinancialViewResponse,
@@ -392,9 +392,8 @@ export async function aggregateFamilyFinancialView(
       installments: studentInstallments.map(toInstallmentSummary),
       payments: studentPayments.map(toPaymentSummary),
       totals: [...studentTotals].map(([currency, entry]) => toCurrencyTotal(currency, entry)),
-      student_ai_lines: (studentAiLines.get(studentId) ?? []).map(
-        ({ student_id: _student, ...line }) => line,
-      ),
+      // Parents read this view: the line without any amount (the school tells them the price).
+      student_ai_lines: (studentAiLines.get(studentId) ?? []).map(toFamilyStudentAiLine),
     });
   }
 

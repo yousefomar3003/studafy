@@ -220,7 +220,7 @@ async function notices(w: World, userId: string, type: string) {
 }
 
 describe("Student AI available", () => {
-  jobTest("tells each eligible child's parent once, with the price parents see", async () => {
+  jobTest("tells each eligible child's parent once, never with a price", async () => {
     const w = await world();
     const a = await child(w, w.sectionA);
     const windowId = await openWindow(w);
@@ -233,7 +233,9 @@ describe("Student AI available", () => {
     const sent = await notices(w, a.parentId, "AI_OPTIN_AVAILABLE");
     expect(sent).toHaveLength(1);
     expect(sent[0]!.body).toBe("Student AI is available for Amina Tazi");
-    expect(sent[0]!.title).toContain("6.00 USD");
+    expect(sent[0]!.title).toContain("Offered by");
+    // The school tells parents the price: no amount or currency in the notice.
+    expect(`${sent[0]!.title} ${sent[0]!.body}`).not.toMatch(/\d+\.\d+|USD|\$/);
     expect(sent[0]!.metadata).toMatchObject({
       route: "/parent/student-ai",
       student_id: a.studentId,

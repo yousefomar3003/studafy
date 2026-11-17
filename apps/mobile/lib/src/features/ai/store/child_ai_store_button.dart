@@ -1,7 +1,9 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../design/tokens/app_spacing_tokens.dart';
+import 'ai_store_controller.dart';
 import 'ai_store_offer_card.dart';
 import 'store_gateway.dart';
 
@@ -11,15 +13,21 @@ import 'store_gateway.dart';
 ///
 /// One App Store / Google Play account holds one subscription per product, so the server offers a
 /// second child the next product; the sheet says plainly when it cannot be bought for this child.
-class ChildAiStoreButton extends StatelessWidget {
+///
+/// A child holding a school seat is never sold it: the button is not shown once the server says
+/// the school provides it (and the sheet, if opened before that is known, says "Provided by …").
+class ChildAiStoreButton extends ConsumerWidget {
   const ChildAiStoreButton({required this.studentId, required this.childName, super.key});
 
   final String studentId;
   final String childName;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     if (currentStorePlatform() == null) return const SizedBox.shrink();
+    if (ref.watch(aiStoreCoveredBySchoolProvider(studentId)).value ?? false) {
+      return const SizedBox.shrink();
+    }
     return TextButton.icon(
       key: const ValueKey('childAiStore'),
       icon: const Icon(Icons.auto_awesome_outlined, size: 18),

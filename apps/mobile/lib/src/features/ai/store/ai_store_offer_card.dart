@@ -53,10 +53,28 @@ class AiStoreOfferCard extends ConsumerWidget {
             ? 'aiStore.activated'.tr()
             : 'aiStore.activatedFor'.tr(namedArgs: {'name': name}),
       ),
+      // The school provides it: no purchase, no store sheet, and nothing about other ways to pay.
+      AiStoreProvidedBySchool(:final schoolName, :final name) => _Note(
+        key: const ValueKey('aiStore.providedBySchool'),
+        icon: Icons.school_outlined,
+        // The student's own screen: "Provided by (school)"; a parent's child: with the child's name.
+        text:
+            (studentId == null || name == null
+                    ? 'aiStore.providedBy'
+                    : 'aiStore.providedByFor')
+                .tr(
+                  namedArgs: {
+                    'school': schoolName ?? 'aiStore.yourSchool'.tr(),
+                    'name': name ?? '',
+                  },
+                ),
+      ),
       AiStoreUnavailable(:final messageKey, :final name) => _Note(
         key: const ValueKey('aiStore.unavailable'),
         icon: Icons.info_outline,
-        text: messageKey.tr(namedArgs: {'name': name ?? 'aiStore.thisStudent'.tr()}),
+        text: messageKey.tr(
+          namedArgs: {'name': name ?? 'aiStore.thisStudent'.tr()},
+        ),
       ),
       AiStoreHidden() || null => const SizedBox.shrink(),
     };
@@ -84,7 +102,9 @@ class _Note extends StatelessWidget {
         children: [
           Icon(icon, color: colorScheme.primary, size: 20),
           const SizedBox(width: AppSpacing.space12),
-          Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
+          Expanded(
+            child: Text(text, style: Theme.of(context).textTheme.bodyMedium),
+          ),
         ],
       ),
     );
@@ -97,7 +117,10 @@ class _Offer extends ConsumerWidget {
   final AiStoreOffering offer;
   final String? studentId;
 
-  Future<void> _confirmRestore(BuildContext context, AiStoreController controller) async {
+  Future<void> _confirmRestore(
+    BuildContext context,
+    AiStoreController controller,
+  ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -159,15 +182,22 @@ class _Offer extends ConsumerWidget {
           CheckboxListTile(
             key: const ValueKey('aiStore.waiver'),
             value: offer.waiverAcknowledged,
-            onChanged: busy ? null : (value) => controller.acknowledgeWaiver(value ?? false),
+            onChanged: busy
+                ? null
+                : (value) => controller.acknowledgeWaiver(value ?? false),
             controlAffinity: ListTileControlAffinity.leading,
             contentPadding: EdgeInsets.zero,
             dense: true,
-            title: Text('aiStore.waiver.label'.tr(), style: textTheme.bodyMedium),
+            title: Text(
+              'aiStore.waiver.label'.tr(),
+              style: textTheme.bodyMedium,
+            ),
           ),
           const SizedBox(height: AppSpacing.space8),
           FilledButton(
-            onPressed: busy || !offer.waiverAcknowledged ? null : controller.buy,
+            onPressed: busy || !offer.waiverAcknowledged
+                ? null
+                : controller.buy,
             child: offer.busy == AiStoreBusy.purchasing
                 ? const SizedBox.square(
                     dimension: 20,
@@ -186,7 +216,10 @@ class _Offer extends ConsumerWidget {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 ),
                 const SizedBox(width: AppSpacing.space8),
-                Text('aiStore.restore.inProgress'.tr(), style: textTheme.bodySmall),
+                Text(
+                  'aiStore.restore.inProgress'.tr(),
+                  style: textTheme.bodySmall,
+                ),
               ],
             ),
           ],
@@ -196,7 +229,9 @@ class _Offer extends ConsumerWidget {
               key.tr(namedArgs: {'name': name ?? 'aiStore.thisStudent'.tr()}),
               key: const ValueKey('aiStore.message'),
               style: textTheme.bodySmall?.copyWith(
-                color: offer.messageIsError ? colorScheme.error : colorScheme.onSurfaceVariant,
+                color: offer.messageIsError
+                    ? colorScheme.error
+                    : colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
@@ -204,7 +239,9 @@ class _Offer extends ConsumerWidget {
           const SizedBox(height: AppSpacing.space12),
           Text(
             (apple ? 'aiStore.renewal.apple' : 'aiStore.renewal.google').tr(),
-            style: textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
           Wrap(
@@ -218,20 +255,26 @@ class _Offer extends ConsumerWidget {
                 child: Text('aiStore.links.privacy'.tr()),
               ),
               TextButton(
-                onPressed: () =>
-                    launchUrl(ref.read(termsUrlProvider), mode: LaunchMode.externalApplication),
+                onPressed: () => launchUrl(
+                  ref.read(termsUrlProvider),
+                  mode: LaunchMode.externalApplication,
+                ),
                 child: Text('aiStore.links.termsOfService'.tr()),
               ),
               if (apple)
                 TextButton(
-                  onPressed: () =>
-                      launchUrl(appleStandardEulaUrl, mode: LaunchMode.externalApplication),
+                  onPressed: () => launchUrl(
+                    appleStandardEulaUrl,
+                    mode: LaunchMode.externalApplication,
+                  ),
                   child: Text('aiStore.links.terms'.tr()),
                 ),
               // Small, last, and behind a confirmation: required by the stores, rarely needed.
               TextButton(
                 key: const ValueKey('aiStore.restore'),
-                onPressed: busy ? null : () => _confirmRestore(context, controller),
+                onPressed: busy
+                    ? null
+                    : () => _confirmRestore(context, controller),
                 child: Text('aiStore.restore.action'.tr()),
               ),
             ],

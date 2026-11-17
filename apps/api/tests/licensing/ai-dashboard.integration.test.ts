@@ -34,6 +34,7 @@ import {
   assignRole,
   authenticatedRequest,
   createSchool,
+  createStudent,
   createTestApp,
   createTestDatabase,
   createUser,
@@ -41,7 +42,7 @@ import {
   migrateDatabase,
 } from "../harness";
 
-import { insertOptInWindow } from "./programme-optins";
+import { insertOptInWindow, insertPriceOverride } from "./programme-optins";
 
 import type { LicenseActor, LicensingDeps, QuoteTerms } from "../../src/modules/licensing";
 import type {
@@ -171,11 +172,33 @@ interface SchoolFixture {
   yearStart: string;
 }
 
-async function school(name: string, measures: Partial<Measured> = {}): Promise<SchoolFixture> {
+/**
+ * The spec's prices, set explicitly for the school (parents $6, the licence $4 a seat a month): the
+ * global defaults are now parents $4 and the licence $4 (owner, 2026-11-18). `null` keeps the
+ * global defaults.
+ */
+const SPEC_PRICES = { parentPriceMinor: 600, licensePriceMinor: 400 };
+
+async function school(
+  name: string,
+  measures: Partial<Measured> = {},
+  prices: { parentPriceMinor: number; licensePriceMinor: number } | null = SPEC_PRICES,
+): Promise<SchoolFixture> {
   const schoolId = (await createSchool(db.sql, { name })).id;
   const admin = await createUser(db.sql, schoolId);
   await assignRole(db.sql, schoolId, admin.id, ROLES.ORG_ADMIN);
   measured.set(schoolId, { enrolled: 500, optedIn: 350, upload: 8500, ...measures });
+  if (prices) {
+    // Before any quote, so the licence is signed with these prices.
+    await asAdmin(schoolId, (tx) =>
+      insertPriceOverride(tx, {
+        schoolId,
+        createdBy: operator.userId,
+        createdBySchoolId: hq,
+        ...prices,
+      }),
+    );
+  }
   const year = await asAdmin(schoolId, async (tx) => {
     const [row] = await tx<{ id: string; starts_on: string }[]>`
       INSERT INTO app.academic_years (school_id, code, name, starts_on, ends_on, status)
@@ -265,17 +288,25 @@ function recompute(f: SchoolFixture, now: Date) {
 }
 
 /**
- * `count` opted-in students' Student AI tuition lines for the year: $6 x `months`, each on one
- * ERPNext invoice (billed through Studafy) whose paid part is `paidShare` -- or, for `outside`
- * billing, the school bills it itself and nothing is invoiced.
+ * `count` opted-in students' Student AI tuition lines for the year: `priceMinor` (default $6, the
+ * spec's parent price) x `months`, each on one ERPNext invoice (billed through Studafy) whose paid
+ * part is `paidShare` -- or, for `outside` billing, the school bills it itself and nothing is
+ * invoiced.
  */
 async function tuitionLines(
   f: SchoolFixture,
   licenseId: string,
-  input: { count: number; months: number; billing?: "auto" | "outside"; paidShare?: number },
+  input: {
+    count: number;
+    months: number;
+    billing?: "auto" | "outside";
+    paidShare?: number;
+    priceMinor?: number;
+  },
 ) {
   const billing = input.billing ?? "auto";
   const paidShare = input.paidShare ?? 1;
+  const price = input.priceMinor ?? 600;
   await asAdmin(f.schoolId, async (tx) => {
     const tag = crypto.randomUUID().slice(0, 8);
     await tx`
@@ -296,10 +327,10 @@ async function tuitionLines(
         school_id, student_id, academic_year_id, license_id, currency_id, monthly_price_minor,
         start_month, end_month, months, total_minor, billing
       )
-      SELECT s.school_id, s.id, ${f.academicYearId}::uuid, ${licenseId}::uuid, c.id, 600,
+      SELECT s.school_id, s.id, ${f.academicYearId}::uuid, ${licenseId}::uuid, c.id, ${price},
              date_trunc('month', ${f.yearStart}::date)::date,
              (date_trunc('month', ${f.yearStart}::date) + (${input.months - 1} * interval '1 month'))::date,
-             ${input.months}, 600 * ${input.months}, ${billing}
+             ${input.months}, ${price * input.months}, ${billing}
       FROM app.students AS s
       JOIN app.users AS u ON u.id = s.user_id AND u.school_id = s.school_id
       CROSS JOIN app.currencies AS c
@@ -307,7 +338,7 @@ async function tuitionLines(
     `;
     if (billing === "outside") return;
     // One ERPNext invoice per student: tuition $500 + the Student AI line, paid as asked.
-    const total = 50_000 + 600 * input.months;
+    const total = 50_000 + price * input.months;
     await tx`
       INSERT INTO app.student_ai_fee_portions (
         school_id, item_id, student_id, due_date, first_month, month_count, amount_minor, status,
@@ -370,16 +401,19 @@ async function consoleDashboard(f: SchoolFixture) {
   return (await response.json()) as PlatformAiProgrammeDashboard;
 }
 
-/** A licence paid in full on its first day, its conversion locked and its share worked out. */
-async function workedExample(name: string, months: number) {
-  const f = await school(name);
+/**
+ * A licence paid in full on its first day, its conversion locked and its share worked out. The
+ * spec's prices (parents $6, licence $4) unless `defaults`: the global defaults (both $4).
+ */
+async function workedExample(name: string, months: number, defaults = false) {
+  const f = await school(name, {}, defaults ? null : SPEC_PRICES);
   const lic = await licence(f, 350, months);
   // $4 x 350 seats x `months`, paid in full on the licence's first day.
   await pay(f, lic.invoiceId, 400 * 350 * months, lic.start);
   const measureDay = addDays(lic.start, 30);
   await lock(f, new Date(measureDay.getTime() + 3_600_000));
   await recompute(f, new Date(measureDay.getTime() + 2 * 3_600_000));
-  await tuitionLines(f, lic.licenseId, { count: 350, months });
+  await tuitionLines(f, lic.licenseId, { count: 350, months, priceMinor: defaults ? 400 : 600 });
   return { f, lic };
 }
 
@@ -504,6 +538,35 @@ describe("the spec's worked example, on the dashboards", () => {
   );
 });
 
+describe("the global defaults: parents $4, the licence $4", () => {
+  integrationTest(
+    "the school keeps no margin; the share is still worked out on what Studafy collects",
+    async () => {
+      const { f } = await workedExample("Default Prices School", 10, true);
+      const view = await schoolDashboard(f);
+      expect(view.values).toMatchObject({ licensePriceMinor: 400, parentPriceMinor: 400 });
+      // 13% of the $14,000 Studafy collected, whatever the parents are charged.
+      expect(view.earnings.share).toMatchObject({
+        collectedMinor: 1_400_000,
+        earnedMinor: 182_000,
+        owedMinor: 182_000,
+      });
+      expect(view.earnings.margin).toMatchObject({
+        basis: "collected",
+        perStudentMonthMinor: 0,
+        lines: 350,
+        billedMinor: 0,
+        collectedMinor: 0,
+        expectedMinor: 0,
+      });
+      expect(view.earnings.totalMinor).toBe(182_000);
+      const platform = await consoleDashboard(f);
+      expect(platform.studafyNet).toEqual({ netMinor: 1_218_000, perSeatMinor: 3480, seats: 350 });
+    },
+    120_000,
+  );
+});
+
 // ---------------------------------------------------------------------------------------------------
 // The margin's basis
 // ---------------------------------------------------------------------------------------------------
@@ -620,45 +683,168 @@ describe("who reads the dashboards", () => {
   );
 
   integrationTest(
-    "a parent's Student AI read carries the line only: no licence price, share or conversion",
+    "no parent route carries a price, a total, an amount, the licence price, the share or the conversion",
     async () => {
+      // The school sells at the spec's prices (parents $6, licence $4): the school tells parents
+      // the price; the app is never sent it (owner, 2026-11-18).
       const f = await school("Parent School");
       await licence(f, 350, 10);
       const parent = await newUser(f.schoolId, ROLES.PARENT);
-      const response = await get("/api/parent/student-ai", f.schoolId, parent.id, ROLES.PARENT);
-      expect(response.status).toBe(200);
-      const keys = new Set<string>();
-      const walk = (value: unknown) => {
-        if (Array.isArray(value)) value.forEach(walk);
+      // Two enrolled children of one family: one the parent opts in, one left available.
+      const kids = [
+        await createStudent(db.sql, f.schoolId, { firstName: "Amina", lastName: "Tazi" }),
+        await createStudent(db.sql, f.schoolId, { firstName: "Omar", lastName: "Tazi" }),
+      ];
+      const familyId = await asAdmin(f.schoolId, async (tx) => {
+        const [family] = await tx<{ id: string }[]>`
+          INSERT INTO app.families (school_id, display_name, primary_parent_user_id)
+          VALUES (${f.schoolId}::uuid, 'Tazi family', ${parent.id}::uuid)
+          RETURNING id::text AS id
+        `;
+        for (const kid of kids) {
+          await tx`
+            INSERT INTO app.parent_child_links
+              (school_id, parent_user_id, student_id, relationship, family_id)
+            VALUES (${f.schoolId}::uuid, ${parent.id}::uuid, ${kid.id}::uuid, 'mother',
+                    ${family!.id}::uuid)
+          `;
+        }
+        return family!.id;
+      });
+
+      const asParent = (method: string, path: string, body?: unknown) =>
+        authenticatedRequest(
+          api,
+          method,
+          path,
+          { schoolId: f.schoolId, userId: parent.id, roles: [ROLES.PARENT] },
+          body === undefined
+            ? undefined
+            : { body: JSON.stringify(body), headers: { "content-type": "application/json" } },
+        );
+      const asLeader = (method: string, path: string, body?: unknown) =>
+        authenticatedRequest(
+          api,
+          method,
+          path,
+          { schoolId: f.schoolId, userId: f.admin.userId, roles: [ROLES.ORG_ADMIN] },
+          body === undefined
+            ? undefined
+            : { body: JSON.stringify(body), headers: { "content-type": "application/json" } },
+        );
+
+      // The school opens a window today (its own local day).
+      const overview = await asLeader("GET", "/api/school/license/student-ai");
+      expect(overview.status).toBe(200);
+      const { today } = (await overview.json()) as { today: string };
+      const opened = await asLeader("POST", "/api/school/license/student-ai/windows", {
+        academicYearId: f.academicYearId,
+        opensOn: today,
+        closesOn: today,
+        acknowledgeMinimumSeats: true,
+      });
+      expect(opened.status).toBe(201);
+
+      // Every key of a parent-facing body: no money, and nothing of the licence or the share.
+      const PRICE_KEY = /price|total|minor|amount|currency|invoiced|planned|cost|fee/i;
+      const PROGRAMME_KEY = /licen[cs]e|share|revenue|conversion|bonus|margin|seat|studafy/i;
+      const keysOf = (value: unknown, keys = new Set<string>()): Set<string> => {
+        if (Array.isArray(value)) value.forEach((inner) => keysOf(inner, keys));
         else if (value && typeof value === "object") {
           for (const [key, inner] of Object.entries(value)) {
             keys.add(key);
-            walk(inner);
+            keysOf(inner, keys);
           }
         }
+        return keys;
       };
-      walk(await response.json());
-      for (const key of keys) {
-        expect(key).not.toMatch(/licen[cs]ePrice|share|revenue|conversion|bonus|margin|seat/i);
-      }
-      // Every read that carries the licence price, the share or the conversion is refused.
+      const expectClean = (where: string, body: unknown) => {
+        for (const key of keysOf(body)) {
+          expect({ where, key, price: PRICE_KEY.test(key) }).toEqual({ where, key, price: false });
+          expect({ where, key, programme: PROGRAMME_KEY.test(key) }).toEqual({
+            where,
+            key,
+            programme: false,
+          });
+        }
+        // No formatted money in any string either ("$6", "6.00 USD", "60.00").
+        expect(JSON.stringify(body)).not.toMatch(/\$\d|\d+\.\d{2}\b|\bUSD\b/);
+      };
+
+      // GET /api/parent/student-ai: one child available, then (below) one opted in.
+      const before = await asParent("GET", "/api/parent/student-ai");
+      expect(before.status).toBe(200);
+      const offers = (await before.json()) as {
+        schoolName: string;
+        termsVersion: string;
+        offers: { studentId: string; state: string; period: unknown }[];
+      };
+      expect(offers.schoolName).toBe("Parent School");
+      expect(offers.offers.map((o) => o.state)).toEqual(["available", "available"]);
+      expect(offers.offers[0]!.period).not.toBeNull();
+      expectClean("GET /api/parent/student-ai (available)", offers);
+
+      // POST /api/parent/student-ai/opt-ins: only the terms, never a price; none comes back.
+      const made = await asParent("POST", "/api/parent/student-ai/opt-ins", {
+        studentId: kids[0]!.id,
+        acceptTerms: true,
+        termsVersion: offers.termsVersion,
+      });
+      expect(made.status).toBe(201);
+      expectClean("POST /api/parent/student-ai/opt-ins", await made.json());
+      // ...while the opt-in still records the price in force, for billing.
+      const [recorded] = await asAdmin(
+        f.schoolId,
+        (tx) => tx<{ monthly_price_minor: string }[]>`
+          SELECT monthly_price_minor::text FROM app.ai_optins WHERE student_id = ${kids[0]!.id}::uuid
+        `,
+      );
+      expect(Number(recorded!.monthly_price_minor)).toBe(600);
+
+      const after = await asParent("GET", "/api/parent/student-ai");
+      expect(after.status).toBe(200);
+      const afterBody = (await after.json()) as { offers: { state: string }[] };
+      expect(afterBody.offers.map((o) => o.state).sort()).toEqual(["available", "opted_in"]);
+      expectClean("GET /api/parent/student-ai (opted in)", afterBody);
+
+      // The family view's Student AI line (the school's own fee invoices keep their amounts).
+      const family = await asParent("GET", `/api/finance/families/${familyId}`);
+      expect(family.status).toBe(200);
+      const lines = (
+        (await family.json()) as { students: { student_ai_lines: unknown[] }[] }
+      ).students.flatMap((section) => section.student_ai_lines);
+      expect(lines).toHaveLength(1);
+      expectClean("GET /api/finance/families/{familyId} student_ai_lines", lines);
+
+      // The parent's Student AI notifications (in-app and push text).
+      const notifications = await asParent("GET", "/api/notifications");
+      expect(notifications.status).toBe(200);
+      const text = JSON.stringify(await notifications.json());
+      expect(text).toContain("Student AI confirmed");
+      expect(text).not.toMatch(/\$\d|\d+\.\d{2}\b|\bUSD\b/);
+
+      // Every read that carries a price, the licence price, the share or the conversion is
+      // refused to a parent.
       for (const path of [
         "/api/school/ai-revenue-share",
         "/api/school/ai-revenue-share/summary",
         "/api/school/license/student-ai",
+        "/api/school/license/student-ai/students",
         "/api/school/license/upload-consistency",
         "/api/school/license",
         "/api/school/license/invoices",
         "/api/finance/student-ai/lines",
+        "/api/finance/student-ai/settings",
         `/api/platform/schools/${f.schoolId}/ai-revenue-share/summary`,
+        `/api/platform/schools/${f.schoolId}/ai-programme`,
       ]) {
-        expect({
+        expect({ path, status: (await asParent("GET", path)).status }).toEqual({
           path,
-          status: (await get(path, f.schoolId, parent.id, ROLES.PARENT)).status,
-        }).toEqual({ path, status: 403 });
+          status: 403,
+        });
       }
     },
-    60_000,
+    120_000,
   );
 });
 

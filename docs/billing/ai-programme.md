@@ -10,9 +10,9 @@ console page `/portal/platform/ai-programme`.
 
 | Setting                                                                            | Field                                         | Default                                                       | Unit                                       |
 | ---------------------------------------------------------------------------------- | --------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------ |
-| In-app purchase price (display and calculations only; the stores set the real one) | `iapPriceMinor`                               | 600 USD                                                       | minor units / student / month              |
+| In-app purchase price (display and calculations only; the stores set the real one) | `iapPriceMinor`                               | 599 USD                                                       | minor units / student / month              |
 | School licence price                                                               | `licensePriceMinor`                           | 400 USD                                                       | minor units / seat / month                 |
-| Price parents see                                                                  | `parentPriceMinor`                            | 600 USD                                                       | minor units / month                        |
+| School-offer price (the school tells parents; never shown in the app)              | `parentPriceMinor`                            | 400 USD                                                       | minor units / month                        |
 | Minimum seats                                                                      | `minSeats`                                    | 30                                                            | seats                                      |
 | Maximum revenue share                                                              | `maxShareBps`                                 | 1500                                                          | basis points                               |
 | Conversion tiers (from -> share)                                                   | `conversionTiers`                             | 0->0, 2500->400, 4000->600, 5500->800, 7000->1000, 8500->1200 | bps                                        |
@@ -23,6 +23,24 @@ console page `/portal/platform/ai-programme`.
 | Grace before Student AI stops                                                      | `nonpaymentGraceDays`                         | 30                                                            | days after an unpaid instalment's due date |
 | Month-to-month licences earn                                                       | `monthToMonthShareBps`                        | 0                                                             | bps of the tier values (5000 = half)       |
 | How the share is given                                                             | `payoutMode`                                  | `invoice_credit`                                              | `invoice_credit` or `payout`               |
+
+**Owner's prices (2026-11-18).** Student AI bought in the app is $5.99 a month (the in-app purchase;
+the App Store / Google Play price is the real one, this value is the reference). When the school
+offers it, the price is the school-offer price Studafy sets -- $4 a month by default -- and **the
+school tells parents that price, not Studafy**: no parent-facing API route, notification or app
+screen carries it (or a total, or an amount). Schools, finance and the super admin see it on the web
+so they can tell parents. With the defaults (parents $4, licence $4) the school keeps no margin and
+earns only the revenue share, which is still calculated on what Studafy collects.
+
+**Choice (2026-11-18).** A family may take Student AI through the school's offer or buy it in the
+app at the store's price. A student **without** a school seat is always offered the in-app purchase,
+even at a school with a licence or the programme. A student **with** a school seat (a licence in
+force, or a programme opt-in holding a seat -- including one waiting for its licence to start) is
+never sold it: `GET /api/subscriptions/ai/store/config` answers `covered_by_school` and the app shows
+"Provided by <school>". A store purchase that races a seat assignment is not refused (the store has
+taken the money): it is recorded and handled as a seat given to someone who already pays (an
+overlap row; Google Play renewal cancelled; an App Store purchaser told to turn renewal off,
+`LICENSE_SEAT_APPLE_RENEWAL`). The in-app purchase offer never mentions the school option.
 
 Prices are per currency in a global version; a school is priced in its own currency
 (`schools.default_currency_id`). The parent price may be any amount, including the licence price or
@@ -95,11 +113,19 @@ app `/parent/student-ai`.
    when the licence has fewer seats, an automatic seat request is opened for Studafy to price. One
    window open at a time; a window past its last day closes when the next opens.
 2. **Parents are told** (`AI_OPTIN_AVAILABLE`, in-app and push, once per child and window, hourly
-   job) and see, per eligible child, "Student AI for <child>": the price parents see per month ×
-   the months left in the school's academic year = total, paid with tuition, committed for the year.
-3. **A parent opts in** (`studentAi:optIn`, PARENT only; never ORG_ADMIN): linked to the child,
-   window open and including the child, terms accepted (`AI_OPTIN_TERMS_VERSION`), and the total
-   they were shown (else `AI_OPTIN_PRICE_CHANGED`). Recorded with who, when and the terms version.
+   job; no price) and see, per eligible child, "Student AI for <child> -- offered by your school":
+   what it includes, the months it covers (the months left in the school's academic year), and the
+   terms: committed for the school year, can't be cancelled mid-year, part of the school fees, and
+   "your school will tell you the price". **No price, total or amount** is sent to a parent
+   (`GET /api/parent/student-ai` carries status, child, school, window dates, months and terms
+   version only) or shown in the app (store rules: a digital service sold outside in-app purchase
+   is never priced in the app).
+3. **A parent joins** (`studentAi:optIn`, PARENT only; never ORG_ADMIN): linked to the child,
+   window open and including the child, terms accepted (`acceptTerms`, else 422
+   `AI_OPTIN_TERMS_REQUIRED`) in their current version (`termsVersion` = `AI_OPTIN_TERMS_VERSION`,
+   else 409 `AI_OPTIN_TERMS_CHANGED`). No price is echoed by the app; the server snapshots the
+   price in force on the opt-in for billing and returns the opt-in without it. Recorded with who,
+   when and the terms version.
    It cannot be undone. Parents with children at several schools have an account per school (the
    account switcher), so each school's offer is its own.
 4. **Or the school records it on the parent's behalf** (single, bulk, or a CSV column of school

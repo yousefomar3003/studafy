@@ -28,8 +28,9 @@ const codes = (issues: { field: string; code: string }[]) =>
 describe("defaults", () => {
   test("the approved defaults are valid and in USD minor units / basis points", () => {
     expect(validateAiProgrammeSettings(G)).toEqual([]);
+    // The owner's prices (2026-11-18): in-app $5.99 (reference), school-offer $4, licence $4.
     expect(G.prices).toEqual([
-      { currencyCode: "USD", iapPriceMinor: 600, licensePriceMinor: 400, parentPriceMinor: 600 },
+      { currencyCode: "USD", iapPriceMinor: 599, licensePriceMinor: 400, parentPriceMinor: 400 },
     ]);
     expect(G.maxShareBps).toBe(1500);
     expect(G.conversionTiers.map((t) => [t.fromBps, t.shareBps])).toEqual([
@@ -52,8 +53,8 @@ describe("resolveAiProgramme", () => {
   test("no override: the global values for the currency", () => {
     const r = resolveAiProgramme(G, null, "USD");
     expect(r.licensePriceMinor).toBe(400);
-    expect(r.parentPriceMinor).toBe(600);
-    expect(r.iapPriceMinor).toBe(600);
+    expect(r.parentPriceMinor).toBe(400);
+    expect(r.iapPriceMinor).toBe(599);
     expect(r.overridden).toEqual([]);
     expect(r.nonpaymentGraceDays).toBe(30);
   });
@@ -97,7 +98,7 @@ describe("resolveAiProgramme", () => {
     const o = override({ priceCurrencyCode: "USD", licensePriceMinor: 350, parentPriceMinor: 500 });
     const usd = resolveAiProgramme(G, o, "USD");
     expect([usd.licensePriceMinor, usd.parentPriceMinor]).toEqual([350, 500]);
-    expect(usd.iapPriceMinor).toBe(600);
+    expect(usd.iapPriceMinor).toBe(599);
     expect(usd.overridden).toEqual(["licensePriceMinor", "parentPriceMinor"]);
 
     const eur = resolveAiProgramme(G, o, "EUR");
@@ -227,7 +228,13 @@ describe("validateAiProgrammeSettings", () => {
     };
     expect(validateAiProgrammeSettings(equal)).toEqual([]);
     expect(validateAiProgrammeSettings(below)).toEqual([]);
-    expect(schoolMarginOf(resolveAiProgramme(G, null, "USD"))).toBe("positive");
+    const above = {
+      ...G,
+      prices: [{ ...G.prices[0]!, licensePriceMinor: 400, parentPriceMinor: 600 }],
+    };
+    expect(schoolMarginOf(resolveAiProgramme(above, null, "USD"))).toBe("positive");
+    // The defaults: parents $4 = the licence $4, so the school keeps no margin.
+    expect(schoolMarginOf(resolveAiProgramme(G, null, "USD"))).toBe("none");
     expect(schoolMarginOf(resolveAiProgramme(equal, null, "USD"))).toBe("none");
     expect(schoolMarginOf(resolveAiProgramme(below, null, "USD"))).toBe("below_cost");
     expect(schoolMarginOf(resolveAiProgramme(G, null, "EUR"))).toBeNull();

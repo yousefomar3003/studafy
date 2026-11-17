@@ -28,7 +28,8 @@ when it required the `version-bump` label.
   fields reference the licence's own `LicenseCommitment` enum (the separate
   `AiRevenueShareCommitment` schema is gone; same values). Upload consistency
   (`UploadConsistency`) measures the classes of students holding a Student AI programme opt-in with
-  a seat (000235). The family view's `student_ai_lines` are priced from the parent's opt-in.
+  a seat (000235). The family view's `student_ai_lines` follow the parent's opt-in (months and
+  status; no amount).
 
 - Student AI opt-in and programme seats (migration 000235; docs/billing/ai-programme.md, phase 2).
   School (`license:read` / `license:manage`): `getSchoolStudentAi` (`GET /api/school/license/student-ai`,
@@ -39,12 +40,16 @@ when it required the `version-bump` label.
   `RecordAiOptInsBody` -> `RecordAiOptInsResult`), `transferStudentAiOptIn` and
   `releaseStudentAiOptIn` (`POST .../opt-ins/{optInId}/transfer|release`). Parent (new permission
   `studentAi:optIn`, PARENT only): `getParentStudentAi` (`GET /api/parent/student-ai`,
-  `ParentAiOffers`) and `optInParentStudentAi` (`POST /api/parent/student-ai/opt-ins`,
-  `ParentAiOptInBody`, 201 `AiOptIn`). New error codes `AI_OPTIN_NO_LICENCE`,
+  `ParentAiOffers`: `schoolName`, per child the state, window, `period` (`ParentAiOfferPeriod`:
+  start/end month) and `optIn` (`ParentAiOptIn`) -- never a price, total or amount, which the school
+  tells parents) and `optInParentStudentAi` (`POST /api/parent/student-ai/opt-ins`,
+  `ParentAiOptInBody`: `studentId`, `acceptTerms`, `termsVersion` -- no price echoed; 201
+  `ParentAiOptIn`, no price). New error codes `AI_OPTIN_NO_LICENCE`,
   `AI_OPTIN_PRICE_MISSING`, `AI_OPTIN_WINDOW_INVALID`, `AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED`,
   `AI_OPTIN_WINDOW_CLOSED`, `AI_OPTIN_WINDOW_ALREADY_OPEN`, `AI_OPTIN_WINDOW_NOT_FOUND`,
   `AI_OPTIN_NOT_ELIGIBLE`, `AI_OPTIN_ALREADY_OPTED_IN`, `AI_OPTIN_YEAR_OVER`,
-  `AI_OPTIN_TERMS_REQUIRED`, `AI_OPTIN_PRICE_CHANGED`, `AI_OPTIN_NOT_FOUND`, `AI_OPTIN_ENDED`,
+  `AI_OPTIN_TERMS_REQUIRED`, `AI_OPTIN_TERMS_CHANGED` (409: the parent accepted an older terms
+  version), `AI_OPTIN_NOT_FOUND`, `AI_OPTIN_ENDED`,
   `AI_OPTIN_STUDENT_NOT_LEFT` and `LICENSE_SEAT_PROGRAMME_LOCKED` (the school's and the console's
   `DELETE .../seats/{seatId}` now answer 409 for a seat a Student AI opt-in holds). `LicenseSeat` adds
   `programme`; `SchoolLicense`, `LicenseQuote` add `commitment` (`LicenseCommitment`: `full_year` |
@@ -54,9 +59,10 @@ when it required the `version-bump` label.
 
 - The Student AI line on tuition (migration 000238; docs/billing/student-ai-tuition-line.md).
   `FamilyStudentSection` (`GET /api/finance/families/{familyId}`) adds `student_ai_lines`
-  (`FamilyStudentAiLine[]`: monthly price x months = total in the school's currency, start month,
-  `late_start`, `stopped_from`, `billing` auto | outside, invoiced and planned amounts; never the
-  licence price or a revenue share). Finance: `getStudentAiBillingSettings` and
+  (`FamilyStudentAiLine[]`, which parents read: academic year, start and end month, `late_start`,
+  `stopped_from`, `status` -- no price, total, currency or amount, since the school tells parents
+  the price; never the licence price or a revenue share). Finance (`StudentAiFinanceLine` keeps the
+  monthly price x months = total, invoiced and planned amounts): `getStudentAiBillingSettings` and
   `updateStudentAiBillingSettings` (`GET`/`PUT /api/finance/student-ai/settings`,
   `StudentAiBillingSettings`, body `UpdateStudentAiBillingSettingsBody`, response
   `StudentAiSettingsResult`), `listStudentAiLines` (`GET /api/finance/student-ai/lines`,
@@ -203,6 +209,15 @@ when it required the `version-bump` label.
   anything not refunded, and the last error.
 
 ### Changed
+
+- `getAiStoreConfig` (`GET /api/subscriptions/ai/store/config`, `AiStoreConfig`): new
+  `unavailableReason` value `covered_by_school` and a nullable `schoolName`. A student holding a
+  school seat (a licence in force, or a Student AI programme opt-in with a seat, including one whose
+  licence has not started) is never sold the add-on in the app (owner, 2026-11-18); a student
+  without one is, even at a school with a licence. `registerAiStorePurchase` still accepts a
+  genuine completed purchase for a seated student (the store has taken the money) and then stops its
+  renewal through the seat-overlap path (Google Play cancelled; App Store purchaser notified).
+  `MyFeature.schoolOffers` is now informational only: a person without a seat may buy in the app.
 
 - `AiRevenueShareRecomputeResult` adds `recorded`: the console's recompute now also records the
   revenue share of payments made on a licence this period before it entered the programme (as

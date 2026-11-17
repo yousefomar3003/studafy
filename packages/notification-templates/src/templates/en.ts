@@ -204,15 +204,15 @@ export const EN_TEMPLATES = {
   [NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "Student AI is available for {childName}",
     [NOTIFICATION_CHANNELS.PUSH]:
-      "{schoolName} · {price} a month, paid with tuition · until {closesOn}",
+      "Offered by {schoolName} for the school year · join by {closesOn}",
     [NOTIFICATION_CHANNELS.EMAIL]:
-      "{schoolName} offers Student AI for {childName} at {price} a month, paid with tuition. Open Studafy to opt in before {closesOn}.",
+      "{schoolName} offers Student AI for {childName} for the school year, as part of your school fees. Your school will tell you the price. Open Studafy to join by {closesOn}.",
   },
   [NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "Student AI confirmed for {childName}",
-    [NOTIFICATION_CHANNELS.PUSH]: "{months} months from {startMonth}: {total}, paid with tuition",
+    [NOTIFICATION_CHANNELS.PUSH]: "From {startMonth}, included in your school fees",
     [NOTIFICATION_CHANNELS.EMAIL]:
-      "Student AI for {childName} at {schoolName} is confirmed for {months} months from {startMonth}: {total} in all, paid with tuition. It is committed for the school year and can't be cancelled mid-year.",
+      "Student AI for {childName} at {schoolName} is confirmed from {startMonth}, as part of your school fees. It is committed for the school year and can't be cancelled mid-year.",
   },
   [NOTIFICATION_TYPES.AI_OPTIN_SUMMARY]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "{newCount} new Student AI opt-ins",

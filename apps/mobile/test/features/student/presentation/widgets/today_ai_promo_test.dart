@@ -56,8 +56,15 @@ void main() {
     expect(find.text('Studafy AI'), findsNothing);
   });
 
-  testWidgets('hidden where the school would provide it: never sold in the app', (tester) async {
+  testWidgets('offered where the school sells seats but the student holds none', (tester) async {
+    // Owner, 2026-11-18: the family chooses the school or the app.
     await _pump(tester, [featureJson(reason: 'not_included', schoolOffers: true)]);
+
+    expect(find.text('Studafy AI'), findsOneWidget);
+  });
+
+  testWidgets('hidden from a seat holder: never sold in the app', (tester) async {
+    await _pump(tester, [featureJson(reason: 'not_included', schoolSeat: true)]);
 
     expect(find.text('Studafy AI'), findsNothing);
   });

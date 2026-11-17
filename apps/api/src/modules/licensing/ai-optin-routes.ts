@@ -17,6 +17,7 @@ import {
   recordOnBehalf,
   releaseOptIn,
   schoolAiOptInOverview,
+  toParentOptInView,
   transferOptIn,
 } from "./ai-optin";
 import {
@@ -28,6 +29,7 @@ import {
   optInStudentsQuerySchema,
   parentOffersSchema,
   parentOptInBodySchema,
+  parentOptInSchema,
   recordOnBehalfBodySchema,
   recordResultSchema,
   releaseBodySchema,
@@ -205,9 +207,10 @@ const parentOffersRoute = createRoute({
   operationId: "getParentStudentAi",
   summary: "Student AI for my children at this school",
   description:
-    "Per linked child: the offer while the school's window is open for them (monthly price × the " +
-    "months left in the school's academic year = total, paid with tuition), their opt-in once they " +
-    "have one, or that the window is closed. Children the school never offered it to are left out.",
+    "Per linked child: the offer while the school's window is open for them (the months left in " +
+    "the school's academic year, part of the school fees), their opt-in once they have one, or " +
+    "that the window is closed. Children the school never offered it to are left out. Never a " +
+    "price, a total or an amount: the school tells parents the price.",
   security: [{ bearerAuth: [] }],
   responses: standardResponses(
     { 200: { description: "The offers", schema: parentOffersSchema } },
@@ -222,9 +225,11 @@ const parentOptInRoute = createRoute({
   operationId: "optInParentStudentAi",
   summary: "Opt my child in to Student AI",
   description:
-    "Committed for the rest of the school year, paid with tuition, and it can't be cancelled " +
-    "mid-year: the parent must accept the terms (`acceptTerms`, current `termsVersion`; 422 " +
-    "AI_OPTIN_TERMS_REQUIRED) and confirm the total they were shown (409 AI_OPTIN_PRICE_CHANGED). " +
+    "Committed for the rest of the school year, part of the school fees, and it can't be " +
+    "cancelled mid-year: the parent must accept the terms (`acceptTerms`; 422 " +
+    "AI_OPTIN_TERMS_REQUIRED) in their current version (`termsVersion`; 409 " +
+    "AI_OPTIN_TERMS_CHANGED). The price in force is recorded on the opt-in for billing and never " +
+    "returned. " +
     "422 AI_OPTIN_NOT_ELIGIBLE for a child not theirs or not in the window; 409 " +
     "AI_OPTIN_WINDOW_CLOSED / AI_OPTIN_ALREADY_OPTED_IN.",
   security: [{ bearerAuth: [] }],
@@ -232,7 +237,7 @@ const parentOptInRoute = createRoute({
     body: { required: true, content: { "application/json": { schema: parentOptInBodySchema } } },
   },
   responses: standardResponses(
-    { 201: { description: "The opt-in", schema: aiOptInSchema } },
+    { 201: { description: "The opt-in", schema: parentOptInSchema } },
     [400, 401, 403, 409, 422],
   ),
 });
@@ -392,7 +397,7 @@ export function aiOptInRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> {
       parentOptIn(tx, actor.schoolId, body, actor),
     );
     await resyncLines(c, actor, [result.studentId], "ai_optin_parent");
-    return c.json(result, 201);
+    return c.json(toParentOptInView(result), 201);
   });
 
   return routes;

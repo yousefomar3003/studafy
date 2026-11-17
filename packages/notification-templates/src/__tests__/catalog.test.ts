@@ -19,6 +19,22 @@ const ALL_CHANNELS: NotificationChannel[] = [
 const ALL_TYPES = Object.values(NOTIFICATION_TYPES);
 
 describe("notification catalog", () => {
+  test("a parent's Student AI notices never name a price or a total (the school tells parents)", () => {
+    const parentTypes = [
+      NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE,
+      NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED,
+    ];
+    for (const templates of [EN_TEMPLATES, AR_TEMPLATES]) {
+      for (const type of parentTypes) {
+        for (const channel of ALL_CHANNELS) {
+          const text = templates[type][channel];
+          expect(text).not.toMatch(/\{(price|total|months|amount|monthly\w*)\}/i);
+          expect(text).not.toMatch(/[$€£]|\bUSD\b|\bJOD\b|\bSAR\b|د\.ا|ر\.س|\d/);
+        }
+      }
+    }
+  });
+
   test("every NOTIFICATION_TYPE has a catalog entry", () => {
     for (const type of ALL_TYPES) {
       expect(NOTIFICATION_CATALOG).toHaveProperty(type);
@@ -275,14 +291,11 @@ describe("renderNotification — snapshot tests", () => {
     [NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE]: {
       childName: "Amina Tazi",
       schoolName: "Amman Academy",
-      price: "6.00 USD",
       closesOn: "2026-12-15",
     },
     [NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED]: {
       childName: "Amina Tazi",
       schoolName: "Amman Academy",
-      months: "8",
-      total: "48.00 USD",
       startMonth: "2026-11",
     },
     [NOTIFICATION_TYPES.AI_OPTIN_SUMMARY]: {

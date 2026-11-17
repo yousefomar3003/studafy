@@ -286,6 +286,8 @@ async function sync(s: Scenario) {
 }
 
 interface LineView {
+  academic_year_id: string;
+  academic_year_name: string;
   monthly_price: string;
   monthly_price_minor: number;
   months: number;
@@ -302,6 +304,18 @@ interface LineView {
   planned: string;
 }
 
+/** The parent's line in the family view: never an amount (the school tells parents the price). */
+type ParentLineView = Pick<
+  LineView,
+  | "academic_year_id"
+  | "academic_year_name"
+  | "start_month"
+  | "end_month"
+  | "late_start"
+  | "stopped_from"
+  | "status"
+>;
+
 async function parentLines(s: Scenario, parent: Actor = s.parent) {
   const response = await authenticatedRequest(
     harness!,
@@ -312,17 +326,44 @@ async function parentLines(s: Scenario, parent: Actor = s.parent) {
   return {
     status: response.status,
     body: (await response.json()) as {
-      students: { student_id: string; student_ai_lines: LineView[] }[];
+      students: { student_id: string; student_ai_lines: ParentLineView[] }[];
     },
   };
 }
 
+/**
+ * The student's line as school finance lists it (with its amounts), after checking the parent's
+ * family view shows the same line with no amount, price, total or currency.
+ */
 async function lineOf(s: Scenario, student: StudentRecord = s.student): Promise<LineView> {
+  const list = await authenticatedRequest(
+    harness!,
+    "GET",
+    "/api/finance/student-ai/lines",
+    s.finance,
+  );
+  expect(list.status).toBe(200);
+  const lines = (
+    (await list.json()) as { lines: (LineView & { student_id: string })[] }
+  ).lines.filter((entry) => entry.student_id === student.id);
+  expect(lines).toHaveLength(1);
+  const line = lines[0]!;
+
   const { status, body } = await parentLines(s);
   expect(status).toBe(200);
   const section = body.students.find((entry) => entry.student_id === student.id)!;
-  expect(section.student_ai_lines).toHaveLength(1);
-  return section.student_ai_lines[0]!;
+  expect(section.student_ai_lines).toEqual([
+    {
+      academic_year_id: line.academic_year_id,
+      academic_year_name: line.academic_year_name,
+      start_month: line.start_month,
+      end_month: line.end_month,
+      late_start: line.late_start,
+      stopped_from: line.stopped_from,
+      status: line.status,
+    },
+  ]);
+  return line;
 }
 
 const TEN_MONTHS = { startsOn: "2026-09-01", endsOn: "2027-06-30" };
@@ -354,7 +395,7 @@ describeDb("the Student AI line on tuition", () => {
       invoiced: "0.00",
       planned: "60.00",
     });
-    // Parents never see the licence price or the revenue share.
+    // Finance's line never carries the licence price or the revenue share either.
     expect(JSON.stringify(line)).not.toContain("license");
     expect(JSON.stringify(line)).not.toContain("share");
 

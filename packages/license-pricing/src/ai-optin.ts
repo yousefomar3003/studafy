@@ -13,7 +13,7 @@ import { academicYearMonths, monthIndex, monthStart } from "./academic-months";
  */
 
 /** The terms a parent agrees to; recorded on every opt-in. Bump when the wording changes. */
-export const AI_OPTIN_TERMS_VERSION = "2026-11-17";
+export const AI_OPTIN_TERMS_VERSION = "2026-11-18";
 
 export const AI_OPTIN_SOURCES = ["parent", "school_on_behalf", "transfer"] as const;
 export type AiOptInSource = (typeof AI_OPTIN_SOURCES)[number];

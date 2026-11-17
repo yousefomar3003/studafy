@@ -609,6 +609,9 @@
     "activated": "تم تفعيل Studafy AI.",
     "activatedFor": "تم تفعيل Studafy AI لـ {name}.",
     "thisStudent": "هذا الطالب",
+    "providedBy": "مقدَّم من {school}.",
+    "providedByFor": "Studafy AI لـ {name} مقدَّم من {school}.",
+    "yourSchool": "مدرستك",
     "childButton": "Studafy AI لـ {name}",
     "unavailable": {
       "loadFailed": "تعذّر التحميل الآن. اسحب للأسفل للمحاولة مرة أخرى.",
@@ -1991,17 +1994,9 @@
         },
         "studentAi": {
           "title": "الذكاء الاصطناعي للطالب",
-          "line": "{price} شهريًا × {months} = {total}، تُدفع مع الرسوم الدراسية",
-          "months": {
-            "zero": "{} شهر",
-            "one": "شهر واحد",
-            "two": "شهران",
-            "few": "{} أشهر",
-            "many": "{} شهرًا",
-            "other": "{} شهر"
-          },
+          "line": "Student AI — ضمن الرسوم المدرسية",
           "from": "ابتداءً من {month}",
-          "stoppedFrom": "توقفت ابتداءً من {month}"
+          "stoppedFrom": "توقف ابتداءً من {month}"
         },
         "invoices": {
           "title": "الفواتير",
@@ -2675,74 +2670,63 @@
   "studentAiOptIn": {
     "title": "Student AI",
     "home": {
-      "intro": "تقدّم مدرستك Student AI طوال العام الدراسي، ويُدفع مع الرسوم الدراسية.",
+      "intro": "تقدّم مدرستك Student AI طوال العام الدراسي، ضمن الرسوم المدرسية.",
       "open": "عرض Student AI"
     },
     "status": {
       "available": "متاح",
       "confirmed": "مؤكَّد",
-      "waitingSeat": "بانتظار مقعد",
+      "waitingSeat": "بانتظار المدرسة",
       "ended": "انتهى",
       "closed": "مغلق"
     },
     "screen": {
-      "intro": "Student AI مساعد دراسي تقدّمه مدرستك طوال العام الدراسي. يُدفع مع الرسوم الدراسية، وتحصّله المدرسة.",
+      "intro": "Student AI مساعد دراسي تقدّمه مدرستك طوال العام الدراسي. وهو ضمن الرسوم المدرسية، وستُخبرك مدرستك بالسعر.",
       "empty": "لا تقدّم هذه المدرسة Student AI لأبنائك.",
       "loadError": "تعذّر تحميل Student AI.",
       "retry": "حاول مرة أخرى"
     },
     "offer": {
       "title": "Student AI لـ{child}",
-      "priceLine": {
-        "zero": "{monthly} شهريًا × 0 شهر = {total}",
-        "one": "{monthly} شهريًا × شهر واحد = {total}",
-        "two": "{monthly} شهريًا × شهران = {total}",
-        "few": "{monthly} شهريًا × {} أشهر = {total}",
-        "many": "{monthly} شهريًا × {} شهرًا = {total}",
-        "other": "{monthly} شهريًا × {} شهر = {total}"
-      },
-      "paidWithTuition": "يُدفع مع الرسوم الدراسية",
+      "offeredBy": "تقدّمه مدرستك",
       "period": "من {start} إلى {end}",
-      "closesOn": "سجّل قبل {date}",
+      "closesOn": "انضم قبل {date}",
+      "includesTitle": "ما يتضمّنه",
+      "includesHelper": "مساعد دراسي لـ{child} في تطبيق Studafy.",
+      "includesClasses": "شروحات وتمارين في مواد {child} الدراسية.",
+      "includesYear": "متاح لبقية العام الدراسي.",
       "termsTitle": "قبل التأكيد",
       "termsCommitted": "الاشتراك ملزِم للعام الدراسي ولا يمكن إلغاؤه في منتصف العام.",
-      "termsTuition": "يُدفع مع الرسوم الدراسية، وتحصّله المدرسة.",
+      "termsFees": "وهو ضمن الرسوم المدرسية.",
+      "termsFromSchool": "ستُخبرك مدرستك بالسعر.",
       "termsFinal": "بعد التأكيد، لا يمكن التراجع عنه من التطبيق.",
-      "accept": "أفهم أن Student AI لـ{child} يكلّف {total}، ويُدفع مع الرسوم الدراسية، ولا يمكن إلغاؤه في منتصف العام.",
-      "confirm": "تأكيد Student AI",
-      "confirmed": "تم تأكيد Student AI لـ{child}.",
+      "accept": "أفهم أن Student AI لـ{child} ملزِم للعام الدراسي، ولا يمكن إلغاؤه في منتصف العام، وهو ضمن رسومي المدرسية.",
+      "confirm": "انضمام",
+      "confirmed": "انضم {child} إلى Student AI.",
       "errors": {
-        "priceChanged": "تغيّر السعر. راجع السعر الجديد ثم أكّد مرة أخرى.",
-        "windowClosed": "أُغلق التسجيل في Student AI في المدرسة للتو.",
+        "windowClosed": "أُغلق الانضمام إلى Student AI في المدرسة للتو.",
         "alreadyOptedIn": "Student AI مؤكَّد بالفعل لـ{child}.",
-        "notEligible": "لا يمكن تسجيل {child} الآن. تواصل مع المدرسة.",
+        "notEligible": "لا يمكن لـ{child} الانضمام الآن. تواصل مع المدرسة.",
         "termsChanged": "تغيّرت الشروط. اقرأها ثم أكّد مرة أخرى.",
-        "generic": "تعذّر تأكيد Student AI. تحقّق من اتصالك وحاول مرة أخرى."
+        "generic": "تعذّر الانضمام إلى Student AI. تحقّق من اتصالك وحاول مرة أخرى."
       }
     },
     "optedIn": {
-      "headline": "تم تأكيد Student AI لـ{child}.",
-      "period": {
-        "zero": "0 شهر بدءًا من {start}",
-        "one": "شهر واحد بدءًا من {start}",
-        "two": "شهران بدءًا من {start}",
-        "few": "{} أشهر بدءًا من {start}",
-        "many": "{} شهرًا بدءًا من {start}",
-        "other": "{} شهر بدءًا من {start}"
-      },
+      "headline": "انضم {child} إلى Student AI.",
+      "inFees": "ضمن الرسوم المدرسية",
       "recordedBySchool": "سجّلته المدرسة نيابةً عنك.",
-      "transferred": "نقلت المدرسة مقعدًا إلى {child}.",
-      "waitingSeat": "بانتظار أن تضيف المدرسة مقعدًا. يبدأ Student AI فور إضافته.",
-      "seatReady": "لدى المدرسة مقعد لـ{child}، لذا Student AI مفعَّل.",
+      "transferred": "نقلت المدرسة مكانًا إلى {child}.",
+      "waitingSeat": "بانتظار أن تضيف المدرسة مكانًا. يبدأ Student AI فور إضافته.",
+      "seatReady": "لدى المدرسة مكان لـ{child}، لذا Student AI مفعَّل.",
       "committed": "ملزِم للعام الدراسي. لأي استفسار، تواصل مع المدرسة."
     },
     "ended": {
       "headline": "انتهى Student AI لـ{child}.",
-      "released": "تم تحرير المقعد، ولا يُحتسب بدءًا من {month}.",
-      "transferred": "نقلت المدرسة المقعد إلى طالب آخر."
+      "released": "أنهته المدرسة. يتوقف ابتداءً من {month}.",
+      "transferred": "نقلت المدرسة المكان إلى طالب آخر."
     },
     "closed": {
-      "body": "التسجيل في Student AI مغلق في {school} حاليًا.",
+      "body": "الانضمام إلى Student AI مغلق في {school} حاليًا.",
       "yourSchool": "مدرستك"
     }
   },

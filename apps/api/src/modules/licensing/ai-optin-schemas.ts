@@ -242,21 +242,41 @@ export const releaseBodySchema = z.object({ note }).openapi("ReleaseAiOptInBody"
 // Parent
 // ---------------------------------------------------------------------------------------------------
 
+// Parent-facing: status, child, school, window dates, the months covered and the terms version.
+// Never a price, a total or a currency amount -- the school tells parents the price (owner,
+// 2026-11-18), and the app never shows it. tests/licensing/ai-dashboard.integration.test.ts walks
+// every parent-callable read and response for price/amount keys.
+
 const parentOfferWindowSchema = z
   .object({ id: uuid, opensOn: date, closesOn: date, academicYearName: z.string() })
   .openapi("ParentAiOfferWindow");
 
-const parentOfferPricingSchema = z
+const parentOfferPeriodSchema = z
   .object({
-    currencyCode: z.string(),
-    minorUnit: z.number().int(),
-    monthlyPriceMinor: minor,
-    months: z.number().int(),
-    totalMinor: minor,
+    startMonth: date.openapi({ description: "First day of the first month joining today covers." }),
+    endMonth: date.openapi({ description: "First day of the academic year's last month." }),
+  })
+  .openapi("ParentAiOfferPeriod");
+
+export const parentOptInSchema = z
+  .object({
+    id: uuid,
+    studentId: uuid,
+    studentName: z.string(),
+    source: aiOptInSourceSchema,
+    termsVersion: z.string(),
+    optedInAt: z.string().datetime(),
     startMonth: date,
     endMonth: date,
+    status: aiOptInStatusSchema,
+    waitingForSchool: z.boolean().openapi({
+      description:
+        "Active, but the school has no place for the child on its licence yet; Student AI starts " +
+        "once it does.",
+    }),
+    releasedEffectiveMonth: date.nullable(),
   })
-  .openapi("ParentAiOfferPricing");
+  .openapi("ParentAiOptIn");
 
 const parentOfferSchema = z
   .object({
@@ -264,13 +284,17 @@ const parentOfferSchema = z
     studentName: z.string(),
     state: z.enum(["available", "opted_in", "closed"]).openapi("ParentAiOfferState"),
     window: parentOfferWindowSchema.nullable(),
-    pricing: parentOfferPricingSchema.nullable(),
-    optIn: aiOptInSchema.nullable(),
+    period: parentOfferPeriodSchema.nullable(),
+    optIn: parentOptInSchema.nullable(),
   })
   .openapi("ParentAiOffer");
 
 export const parentOffersSchema = z
-  .object({ offers: z.array(parentOfferSchema), termsVersion: z.string() })
+  .object({
+    schoolName: z.string(),
+    offers: z.array(parentOfferSchema),
+    termsVersion: z.string(),
+  })
   .openapi("ParentAiOffers");
 
 export const parentOptInBodySchema = z
@@ -279,11 +303,16 @@ export const parentOptInBodySchema = z
     acceptTerms: z.boolean().openapi({
       description:
         "The parent ticked the confirmation: committed for the school year, can't be cancelled " +
-        "mid-year, paid with tuition. Must be true.",
+        "mid-year, part of the school fees, and the school tells them the price. Must be true.",
     }),
-    termsVersion: z.string().min(1).max(40),
-    expectedTotalMinor: minor.openapi({
-      description: "The total the parent was shown; 409 AI_OPTIN_PRICE_CHANGED when it changed.",
-    }),
+    termsVersion: z
+      .string()
+      .min(1)
+      .max(40)
+      .openapi({
+        description:
+          "The terms version the offers came with; 409 AI_OPTIN_TERMS_CHANGED when it is no longer " +
+          "the current one.",
+      }),
   })
   .openapi("ParentAiOptInBody");

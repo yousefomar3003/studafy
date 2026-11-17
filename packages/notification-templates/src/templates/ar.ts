@@ -200,16 +200,15 @@ export const AR_TEMPLATES = {
   },
   [NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "الذكاء الاصطناعي للطلاب متاح لـ {childName}",
-    [NOTIFICATION_CHANNELS.PUSH]:
-      "{schoolName} · {price} شهريًا مع الرسوم الدراسية · حتى {closesOn}",
+    [NOTIFICATION_CHANNELS.PUSH]: "تقدّمه {schoolName} للعام الدراسي · انضم حتى {closesOn}",
     [NOTIFICATION_CHANNELS.EMAIL]:
-      "تقدّم {schoolName} الذكاء الاصطناعي للطلاب لـ {childName} مقابل {price} شهريًا تُدفع مع الرسوم الدراسية. افتح Studafy للاشتراك قبل {closesOn}.",
+      "تقدّم {schoolName} الذكاء الاصطناعي للطلاب لـ {childName} للعام الدراسي ضمن الرسوم المدرسية. ستُخبرك مدرستك بالسعر. افتح Studafy للانضمام حتى {closesOn}.",
   },
   [NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "تم تأكيد الذكاء الاصطناعي للطلاب لـ {childName}",
-    [NOTIFICATION_CHANNELS.PUSH]: "{months} أشهر بدءًا من {startMonth}: {total} مع الرسوم الدراسية",
+    [NOTIFICATION_CHANNELS.PUSH]: "بدءًا من {startMonth}، ضمن الرسوم المدرسية",
     [NOTIFICATION_CHANNELS.EMAIL]:
-      "تم تأكيد الذكاء الاصطناعي للطلاب لـ {childName} في {schoolName} لمدة {months} أشهر بدءًا من {startMonth}: {total} إجمالًا، تُدفع مع الرسوم الدراسية. الاشتراك ملزم للعام الدراسي ولا يمكن إلغاؤه خلال العام.",
+      "تم تأكيد الذكاء الاصطناعي للطلاب لـ {childName} في {schoolName} بدءًا من {startMonth}، ضمن الرسوم المدرسية. الاشتراك ملزم للعام الدراسي ولا يمكن إلغاؤه خلال العام.",
   },
   [NOTIFICATION_TYPES.AI_OPTIN_SUMMARY]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "{newCount} اشتراكات جديدة في الذكاء الاصطناعي للطلاب",

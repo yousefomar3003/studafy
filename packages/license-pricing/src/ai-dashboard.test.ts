@@ -135,6 +135,22 @@ describe("money", () => {
     });
   });
 
+  test("the defaults (parents $4, licence $4): no margin; the share is still on what Studafy collects", () => {
+    expect([defaults.parentPriceMinor, defaults.licensePriceMinor]).toEqual([400, 400]);
+    expect(
+      studentAiMarginOf(defaults.parentPriceMinor!, defaults.licensePriceMinor!, 10) * 350,
+    ).toBe(0);
+    // 350 seats x $4 x 10 months collected: 13% of it, whatever parents are charged.
+    const share = computeRevenueShare(defaults, {
+      conversionBps: 7000,
+      uploadConsistencyBps: 8500,
+      seats: 350,
+      commitment: "full_year",
+      baseMinor: defaults.licensePriceMinor! * 10 * 350,
+    });
+    expect(share).toMatchObject({ totalBps: 1300, amountMinor: 182_000 });
+  });
+
   test("a parent price below the licence price is a negative margin", () => {
     expect(studentAiMarginOf(300, 400, 10)).toBe(-1000);
   });

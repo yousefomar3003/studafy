@@ -136,3 +136,36 @@ export async function transferTestOptIn(
   `;
   return row!.id;
 }
+
+/**
+ * A school's programme override that sets only its prices (per seat per month, in minor units):
+ * for suites that want explicit prices rather than the global defaults (version 1: parents $4,
+ * licence $4). Returns the override id; stamp a licence with it (`ai_programme_override_id`) for
+ * the licence to use these prices. `createdBy` is any user of `createdBySchoolId`.
+ */
+export async function insertPriceOverride(
+  tx: TransactionSql,
+  input: {
+    schoolId: string;
+    createdBy: string;
+    createdBySchoolId: string;
+    parentPriceMinor: number;
+    licensePriceMinor: number;
+    currencyCode?: string;
+  },
+): Promise<string> {
+  const [row] = await tx<{ id: string }[]>`
+    INSERT INTO app.ai_programme_school_overrides (
+      school_id, version_number, price_currency_id, license_price_minor, parent_price_minor,
+      reason, created_by, created_by_school_id
+    )
+    SELECT ${input.schoolId}::uuid,
+           COALESCE((SELECT max(version_number) FROM app.ai_programme_school_overrides
+                     WHERE school_id = ${input.schoolId}::uuid), 0) + 1,
+           c.id, ${input.licensePriceMinor}, ${input.parentPriceMinor}, 'Test prices',
+           ${input.createdBy}::uuid, ${input.createdBySchoolId}::uuid
+    FROM app.currencies AS c WHERE c.code = ${input.currencyCode ?? "USD"}
+    RETURNING id::text AS id
+  `;
+  return row!.id;
+}
