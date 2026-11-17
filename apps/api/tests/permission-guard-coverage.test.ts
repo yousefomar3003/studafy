@@ -352,6 +352,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/scholarship-awards/{awardId}/approve",
   "POST /api/finance/scholarship-awards/{awardId}/reject",
   "POST /api/finance/scholarship-awards/{awardId}/revoke",
+  // The Student AI line on tuition (000238): billing:update.
+  "PUT /api/finance/student-ai/settings",
+  "POST /api/finance/student-ai/sync",
   // Family finance (finance/family-accounts): billing:update, guarded in that module's routes.
   "POST /api/finance/families/{familyId}/payments",
   "POST /api/finance/families/{familyId}/reminders",

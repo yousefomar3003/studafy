@@ -385,6 +385,8 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("record-expense", "action", "/portal/finance/expenses/new", BILLING_UPDATE),
   // Readable by finance; saving is the school admin's, checked by the page.
   entry("tax-settings", "page", "/portal/finance/settings/tax", BILLING_READ),
+  // The Student AI line on tuition (000238): finance reads it; switching needs billing:update.
+  entry("student-ai-billing", "page", "/portal/finance/settings/student-ai", BILLING_READ),
 ];
 
 const BY_ID = new Map(SEARCH_DESTINATIONS.map((destination) => [destination.id, destination]));

@@ -1978,6 +1978,17 @@
           "settled": "All fees settled.",
           "asOf": "As of {date}"
         },
+        "studentAi": {
+          "title": "Student AI",
+          "line": "{price}/month × {months} = {total}, paid with tuition",
+          "months": {
+            "zero": "{} months",
+            "one": "{} month",
+            "other": "{} months"
+          },
+          "from": "From {month}",
+          "stoppedFrom": "Stopped from {month}"
+        },
         "invoices": {
           "title": "Invoices",
           "empty": "No invoices yet.",

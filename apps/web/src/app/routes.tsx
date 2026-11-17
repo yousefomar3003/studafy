@@ -510,6 +510,10 @@ const TaxSettingsPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/settings/TaxSettingsPage"),
 );
+const StudentAiBillingPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/settings/StudentAiBillingPage"),
+);
 const FamiliesListPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/families/FamiliesListPage"),
@@ -1498,6 +1502,17 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_READ}>
                 <TaxSettingsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // The Student AI line on tuition (000238): readable with `billing:read`; the
+            // auto-billing switch and the recalculation need `billing:update`, which the page checks
+            // and the API enforces.
+            path: "finance/settings/student-ai",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <StudentAiBillingPage />
               </RequirePermission>
             ),
           },

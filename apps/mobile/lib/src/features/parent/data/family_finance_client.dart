@@ -11,8 +11,8 @@ import '../domain/family_finance.dart';
 /// [Dio] with the base URL, bearer injection and error mapping `createApiClient` uses, built in
 /// `familyFinanceClientProvider`.
 ///
-/// Parses every array the endpoint returns — invoices, installments, receipts, and the
-/// per-student and household totals. Throws the shared `ApiException` (attached by
+/// Parses every array the endpoint returns — invoices, installments, receipts, the Student AI
+/// lines, and the per-student and household totals. Throws the shared `ApiException` (attached by
 /// `ErrorMappingInterceptor`) on any non-2xx — the endpoint can 429/503 while its ERPNext read
 /// models are cold — and every screen built on this view renders that as its own error state.
 class FamilyFinanceClient {
@@ -52,6 +52,10 @@ class FamilyFinanceClient {
             FamilyReceipt.fromJson(Map<String, Object?>.from(entry! as Map)),
         ],
         totals: _totals(json['totals']),
+        studentAiLines: [
+          for (final entry in (json['student_ai_lines'] as List<Object?>?) ?? const [])
+            FamilyStudentAiLine.fromJson(Map<String, Object?>.from(entry! as Map)),
+        ],
       );
 
   List<MoneyTotal> _totals(Object? raw) => [
