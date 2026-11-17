@@ -10,8 +10,11 @@
  * reminded of once when due and once when overdue; the subject is the instalment, whose id is the
  * invoice's own for every invoice issued before instalments existed, so nothing is sent twice.
  *   receipt_uploaded                         -- the school uploaded a transfer receipt
+ *   ai_stop_warning                          -- an unpaid instalment's AI cutoff (30 days after its
+ *                                               due date, 000231) is 7 days away or less
+ *   ai_stopped                               -- the licence was suspended for that instalment
  *
- * The first four go to the school's ORG_ADMINs and PRINCIPALs and to every super admin; a receipt
+ * All but receipt_uploaded go to the school's ORG_ADMINs and PRINCIPALs and to every super admin; a receipt
  * goes to the super admins only (the school uploaded it). They are in-app notifications, rendered
  * from @studafy/notification-templates in the recipient school's language -- the same delivery as
  * session 2's App Store notice.
@@ -23,7 +26,12 @@
  * the claim and every notice commit together.
  */
 
-import { NOTIFICATION_TYPES } from "@studafy/constants";
+import {
+  LICENSE_AI_STOP_WARNING_DAYS,
+  LICENSE_NONPAYMENT_GRACE_DAYS,
+  NOTIFICATION_TYPES,
+  licenseAiStopDate,
+} from "@studafy/constants";
 import {
   isTemplateLocale,
   NOTIFICATION_CHANNELS,
@@ -44,7 +52,9 @@ export type LicenseReminderKind =
   | "license_expiring_7"
   | "invoice_due"
   | "invoice_overdue"
-  | "receipt_uploaded";
+  | "receipt_uploaded"
+  | "ai_stop_warning"
+  | "ai_stopped";
 
 export interface LicenseRemindersResult {
   schools: number;
@@ -188,6 +198,80 @@ async function dueReminders(
     });
   }
 
+  // The AI cutoff of every unpaid instalment on a licence in force: warned of once it is a week or
+  // less away; told once the licence is stopped for it (the earliest such instalment per licence, so
+  // a later instalment stopping it again is told again).
+  const cutoffs = await tx<
+    {
+      id: string;
+      number: string;
+      due_date: string;
+      balance_minor: string;
+      currency_code: string;
+      minor_unit: number;
+      license_status: string;
+      stopped: boolean;
+      first_late: boolean;
+    }[]
+  >`
+    SELECT inst.id::text AS id, i.number, inst.due_date::text AS due_date,
+           inst.balance_minor::text AS balance_minor, c.code AS currency_code,
+           c.minor_unit::int AS minor_unit, l.status AS license_status,
+           (l.nonpayment_suspended_at IS NOT NULL) AS stopped,
+           inst.id = first_value(inst.id) OVER (
+             PARTITION BY l.id ORDER BY inst.due_date, i.number, inst.position
+           ) AS first_late
+    FROM app.license_invoice_instalments AS inst
+    JOIN app.license_invoices AS i ON i.id = inst.invoice_id AND i.school_id = inst.school_id
+    JOIN app.school_licenses AS l ON l.id = i.license_id AND l.school_id = i.school_id
+    JOIN app.currencies AS c ON c.id = i.currency_id
+    WHERE inst.school_id = current_setting('app.school_id')::uuid
+      AND i.status IN ('issued', 'partially_paid')
+      AND inst.status <> 'paid'
+      AND l.status IN ('active', 'suspended')
+      AND inst.due_date + ${LICENSE_NONPAYMENT_GRACE_DAYS}::int
+          <= ${today}::date + ${LICENSE_AI_STOP_WARNING_DAYS}::int
+    ORDER BY i.number, inst.position
+  `;
+  for (const instalment of cutoffs) {
+    const stopDate = licenseAiStopDate(instalment.due_date);
+    const vars = {
+      schoolName,
+      invoiceNumber: instalment.number,
+      balance: formatMoney(
+        Number(instalment.balance_minor),
+        instalment.minor_unit,
+        instalment.currency_code,
+      ),
+      dueDate: instalment.due_date,
+      stopDate,
+    };
+    if (instalment.stopped && instalment.first_late && stopDate <= today) {
+      reminders.push({
+        kind: "ai_stopped",
+        subjectId: instalment.id,
+        type: NOTIFICATION_TYPES.LICENSE_AI_STOPPED,
+        vars,
+        toSchool: true,
+      });
+    } else if (instalment.license_status === "active" && stopDate > today) {
+      reminders.push({
+        kind: "ai_stop_warning",
+        subjectId: instalment.id,
+        type: NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING,
+        vars: {
+          ...vars,
+          daysLeft: String(
+            Math.round(
+              (Date.parse(`${stopDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / DAY_MS,
+            ),
+          ),
+        },
+        toSchool: true,
+      });
+    }
+  }
+
   const receipts = await tx<{ id: string; number: string }[]>`
     SELECT r.id::text AS id, i.number
     FROM app.license_payment_receipts AS r
@@ -251,6 +335,8 @@ export async function runLicenseReminders(
       invoice_due: 0,
       invoice_overdue: 0,
       receipt_uploaded: 0,
+      ai_stop_warning: 0,
+      ai_stopped: 0,
     },
     notifications: 0,
     failedSchools: 0,

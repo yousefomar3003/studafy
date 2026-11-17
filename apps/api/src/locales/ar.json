@@ -266,6 +266,7 @@
   "LICENSE_INVOICE_HAS_PAYMENTS": "ألغِ دفعات هذه الفاتورة أولاً",
   "LICENSE_PAYMENT_LINK_INVALID": "الصق رابط دفع يبدأ بـ https من Revolut (revolut.com أو revolut.me)، بحد أقصى 500 حرف.",
   "LICENSE_PAYMENT_SCHEDULE_INVALID": "لا يمكن استخدام جدول الدفع هذا. يجب أن يساوي مجموع الأقساط المبلغ الإجمالي، وأن تكون التواريخ مرتبة وغير ماضية.",
+  "LICENSE_TERMS_CHANGE_REASON_REQUIRED": "اذكروا سبب تغيير المدة أو تاريخ البدء أو خطة الدفع التي طلبتها المدرسة في هذا العرض.",
   "LICENSE_INSTALMENT_NOT_FOUND": "هذا القسط غير موجود في هذه الفاتورة.",
   "LICENSE_PAYMENT_NOT_FOUND": "لم يتم العثور على الدفعة",
   "LICENSE_PAYMENT_EXCEEDS_BALANCE": "المبلغ أكبر من رصيد الفاتورة",

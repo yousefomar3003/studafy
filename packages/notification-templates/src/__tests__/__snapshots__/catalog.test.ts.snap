@@ -164,6 +164,18 @@ exports[`renderNotification — snapshot tests en LICENSE_RECEIPT_UPLOADED / pus
 
 exports[`renderNotification — snapshot tests en LICENSE_RECEIPT_UPLOADED / email renders correctly 1`] = `"Amman Academy uploaded a bank transfer receipt for invoice LIC-2026-000042. Record the payment and match the receipt to it in the license console."`;
 
+exports[`renderNotification — snapshot tests en LICENSE_AI_STOP_WARNING / in_app renders correctly 1`] = `"Amman Academy's Studafy AI stops on 2026-12-01, in 7 days, unless invoice LIC-2026-000042 (due 2026-11-01) is paid. Balance: 364.50 USD."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_AI_STOP_WARNING / push renders correctly 1`] = `"Studafy AI stops on 2026-12-01 unless LIC-2026-000042 is paid"`;
+
+exports[`renderNotification — snapshot tests en LICENSE_AI_STOP_WARNING / email renders correctly 1`] = `"A payment of 364.50 USD on invoice LIC-2026-000042 for Amman Academy's Studafy license was due on 2026-11-01. If it is still unpaid on 2026-12-01, in 7 days, the AI features the license covers stop for every seat holder until it is paid. Please pay by bank transfer with the payment reference printed on the invoice, and upload the receipt in Studafy."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_AI_STOPPED / in_app renders correctly 1`] = `"Amman Academy's Studafy AI has stopped: invoice LIC-2026-000042 was due on 2026-11-01 and 364.50 USD is still unpaid. It starts again as soon as the payment is recorded."`;
+
+exports[`renderNotification — snapshot tests en LICENSE_AI_STOPPED / push renders correctly 1`] = `"Studafy AI stopped: LIC-2026-000042 is unpaid"`;
+
+exports[`renderNotification — snapshot tests en LICENSE_AI_STOPPED / email renders correctly 1`] = `"Amman Academy's Studafy AI stopped on 2026-12-01 because invoice LIC-2026-000042, due on 2026-11-01, still has 364.50 USD unpaid. Students and teachers holding the license's seats have lost its AI features until it is paid. Pay by bank transfer with the payment reference printed on the invoice and upload the receipt in Studafy; the AI starts again as soon as Studafy records the payment."`;
+
 exports[`renderNotification — snapshot tests en ASSIGNMENT_PUBLISHED / in_app renders correctly 1`] = `"New assignment: Gravity"`;
 
 exports[`renderNotification — snapshot tests en ASSIGNMENT_PUBLISHED / push renders correctly 1`] = `"Amina Tazi · Physics · due 2026-11-20"`;
@@ -357,6 +369,18 @@ exports[`renderNotification — snapshot tests ar LICENSE_RECEIPT_UPLOADED / in_
 exports[`renderNotification — snapshot tests ar LICENSE_RECEIPT_UPLOADED / push renders correctly 1`] = `"رفعت Amman Academy إيصالاً للفاتورة LIC-2026-000042"`;
 
 exports[`renderNotification — snapshot tests ar LICENSE_RECEIPT_UPLOADED / email renders correctly 1`] = `"رفعت Amman Academy إيصال تحويل بنكي للفاتورة LIC-2026-000042. سجّل الدفعة وطابق الإيصال معها في لوحة التراخيص."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_AI_STOP_WARNING / in_app renders correctly 1`] = `"يتوقف الذكاء الاصطناعي في Studafy لدى Amman Academy في 2026-12-01، بعد 7 أيام، ما لم تُسدَّد الفاتورة LIC-2026-000042 (المستحقة في 2026-11-01). الرصيد: 364.50 USD."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_AI_STOP_WARNING / push renders correctly 1`] = `"يتوقف الذكاء الاصطناعي في Studafy في 2026-12-01 ما لم تُسدَّد LIC-2026-000042"`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_AI_STOP_WARNING / email renders correctly 1`] = `"كانت دفعة بقيمة 364.50 USD من الفاتورة LIC-2026-000042 لترخيص Studafy الخاص بـ Amman Academy مستحقة في 2026-11-01. إذا بقيت غير مسددة في 2026-12-01، أي بعد 7 أيام، تتوقف ميزات الذكاء الاصطناعي التي يشملها الترخيص لكل حاملي المقاعد حتى تُسدَّد. يُرجى الدفع بتحويل بنكي مع ذكر مرجع الدفع المطبوع على الفاتورة، ورفع الإيصال في Studafy."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_AI_STOPPED / in_app renders correctly 1`] = `"توقف الذكاء الاصطناعي في Studafy لدى Amman Academy: كانت الفاتورة LIC-2026-000042 مستحقة في 2026-11-01 وما زال 364.50 USD غير مسدد. يعود العمل به فور تسجيل الدفعة."`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_AI_STOPPED / push renders correctly 1`] = `"توقف الذكاء الاصطناعي في Studafy: الفاتورة LIC-2026-000042 غير مسددة"`;
+
+exports[`renderNotification — snapshot tests ar LICENSE_AI_STOPPED / email renders correctly 1`] = `"توقف الذكاء الاصطناعي في Studafy لدى Amman Academy في 2026-12-01 لأن الفاتورة LIC-2026-000042 المستحقة في 2026-11-01 ما زال فيها 364.50 USD غير مسدد. فقد الطلاب والمعلمون الحاملون لمقاعد الترخيص ميزات الذكاء الاصطناعي حتى تُسدَّد. يُرجى الدفع بتحويل بنكي مع ذكر مرجع الدفع المطبوع على الفاتورة ورفع الإيصال في Studafy، ويعود العمل به فور تسجيل Studafy للدفعة."`;
 
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_PUBLISHED / in_app renders correctly 1`] = `"واجب جديد: Gravity"`;
 

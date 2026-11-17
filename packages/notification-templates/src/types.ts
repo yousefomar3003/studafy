@@ -149,6 +149,21 @@ export interface NotificationTypeVars {
     schoolName: string;
     invoiceNumber: string;
   };
+  LICENSE_AI_STOP_WARNING: {
+    schoolName: string;
+    invoiceNumber: string;
+    balance: string;
+    dueDate: string;
+    stopDate: string;
+    daysLeft: string;
+  };
+  LICENSE_AI_STOPPED: {
+    schoolName: string;
+    invoiceNumber: string;
+    balance: string;
+    dueDate: string;
+    stopDate: string;
+  };
   /** `who` is "" for the student, "<child's name> · " for a parent. */
   ASSIGNMENT_PUBLISHED: {
     who: string;

@@ -13,6 +13,24 @@ when it required the `version-bump` label.
 
 ### Added
 
+- The school chooses its licence length and payment plan; AI stops 30 days after an unpaid
+  instalment (migration 000231, ADR-021 amendment). `CreateLicenseChangeRequestBody` takes optional
+  `months` (1-36), `startsOn`, `paymentPlan` (`monthly`, `yearly`, `custom`) and, for custom,
+  `paymentProposal` (`LicenseProposedInstalment[]`: `dueDate`, `shareBps` adding up to 10000; 422
+  `LICENSE_PAYMENT_SCHEDULE_INVALID` otherwise); `LicenseChangeRequest` echoes them.
+  `LicensePaymentPlan` adds `yearly`. `LicenseQuoteBody` takes `changeRequestId` (404 when not an
+  open request of the school); quote bodies take `termsChangeReason`, required when the quote's
+  length, start or plan departs from the request (422 `LICENSE_TERMS_CHANGE_REASON_REQUIRED`).
+  `LicenseQuote` adds `yearTotals` (`LicenseYearTotal[]`), `changeRequestId`, `requestedTerms`
+  (`LicenseRequestedTerms`), `termsChanges` (`LicenseTermsChange[]`) and `termsChangeReason`;
+  `LicenseQuoteCalculateBody` takes `changeRequestId` and `LicenseQuoteCalculation` adds
+  `yearTotals` and `termsChanges`. Accepting a quote resolves its request.
+  `LicenseInvoiceDetail` adds `yearTotals` and `aiStopped`; `LicenseInvoiceInstalment` adds
+  `aiStopDate`. `SchoolLicense` (and the platform/console licence views) add
+  `nonpaymentSuspendedAt` and `nextAiStop` (`LicenseAiStop`). `LicensePaymentResult` adds
+  `licenseResumed`. New notification types `LICENSE_AI_STOP_WARNING` and `LICENSE_AI_STOPPED`
+  (in-app + push).
+
 - `MARKS_RELEASED` notification type (migration 000230, in-app + push, never emailed): approving a
   mark sheet or a single assessment notifies the students with released marks and their parents;
   the route is `/students/{studentId}/marks`. New domain event `marks.released`.

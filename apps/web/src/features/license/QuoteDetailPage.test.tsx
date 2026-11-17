@@ -39,6 +39,20 @@ function quote(overrides: Record<string, unknown> = {}) {
     paymentPlan: "in_full",
     paymentSchedule: null,
     schedulePreview: [{ position: 1, amountMinor: 406_400, dueDate: "2026-12-01" }],
+    yearTotals: [
+      {
+        year: 1,
+        startDate: "2026-11-01",
+        endDate: "2027-11-01",
+        months: 12,
+        amountMinor: 406_400,
+        payments: 1,
+      },
+    ],
+    changeRequestId: null,
+    requestedTerms: null,
+    termsChanges: [],
+    termsChangeReason: null,
     breakdown: {
       currencyCode: "USD",
       months: 12,
@@ -152,7 +166,7 @@ describe("QuoteDetailPage", () => {
     expect(amountOf("Duration discount (10%)")).toBe("-$456.00");
     expect(amountOf("Credit: Omar Saleh pays personally for 30 more days")).toBe("-$30.00");
     expect(amountOf("Adjustment: Loyal school")).toBe("-$10.00");
-    expect(screen.getByText("$4,064.00")).toBeTruthy();
+    expect(screen.getAllByText("$4,064.00").length).toBeGreaterThan(0);
     expect(
       screen.getByText("You save $736.00 (15.33%) compared with the list price."),
     ).toBeTruthy();
@@ -175,6 +189,83 @@ describe("QuoteDetailPage", () => {
       section.getByText(
         "Your seats start working once the first payment is received. The total is the same whichever way you pay.",
       ),
+    ).toBeTruthy();
+  });
+
+  test("shows each licence year's total and every payment", async () => {
+    current = quote({
+      paymentPlan: "yearly",
+      months: 13,
+      endsAt: "2027-12-01T00:00:00.000Z",
+      schedulePreview: [
+        { position: 1, amountMinor: 375_138, dueDate: "2026-11-01" },
+        { position: 2, amountMinor: 31_262, dueDate: "2027-11-01" },
+      ],
+      yearTotals: [
+        {
+          year: 1,
+          startDate: "2026-11-01",
+          endDate: "2027-11-01",
+          months: 12,
+          amountMinor: 375_138,
+          payments: 1,
+        },
+        {
+          year: 2,
+          startDate: "2027-11-01",
+          endDate: "2027-12-01",
+          months: 1,
+          amountMinor: 31_262,
+          payments: 1,
+        },
+      ],
+    });
+    await renderPage();
+    const section = within(await screen.findByRole("region", { name: "Payment schedule" }));
+    expect(
+      section.getByText("Paid yearly: 2 payments, one at the start of each licence year."),
+    ).toBeTruthy();
+    const years = within(section.getByTestId("year-totals"));
+    expect(years.getByText("Year 1")).toBeTruthy();
+    expect(years.getByText("Year 2")).toBeTruthy();
+    expect(years.getByText(/Oct 31, 2027 \(12 months\)/)).toBeTruthy();
+    expect(years.getByText(/Nov 30, 2027 \(1 month\)/)).toBeTruthy();
+    expect(section.getAllByText("$3,751.38").length).toBeGreaterThanOrEqual(2);
+    expect(section.getAllByText("$312.62").length).toBeGreaterThanOrEqual(2);
+  });
+
+  test("shows what the school asked for and why Studafy changed it", async () => {
+    current = quote({
+      paymentPlan: "yearly",
+      months: 6,
+      changeRequestId: "r-1",
+      requestedTerms: {
+        months: 12,
+        startsOn: "2026-11-01",
+        paymentPlan: "monthly",
+        paymentProposal: null,
+      },
+      termsChanges: ["months", "plan"],
+      termsChangeReason: "Six months is the most we can offer this term",
+    });
+    await renderPage();
+    const terms = within(await screen.findByTestId("quote-terms"));
+    expect(terms.getByText("12 months · from Nov 1, 2026 · paid monthly")).toBeTruthy();
+    expect(terms.getByText("6 months · from Nov 1, 2026 · paid yearly")).toBeTruthy();
+    expect(terms.getByTestId("quote-terms-changed").textContent).toBe(
+      "Studafy changed what you chose: length, payment plan. Why: Six months is the most we can offer this term",
+    );
+  });
+
+  test("a quote that follows the school's choice says so", async () => {
+    current = quote({
+      paymentPlan: "monthly",
+      changeRequestId: "r-1",
+      requestedTerms: { months: 12, startsOn: null, paymentPlan: "monthly", paymentProposal: null },
+    });
+    await renderPage();
+    expect(
+      await screen.findByText("This quote follows the length and payment plan you chose."),
     ).toBeTruthy();
   });
 

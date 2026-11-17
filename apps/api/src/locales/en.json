@@ -266,6 +266,7 @@
   "LICENSE_INVOICE_HAS_PAYMENTS": "Void this invoice's payments first",
   "LICENSE_PAYMENT_LINK_INVALID": "Paste an https payment link from Revolut (revolut.com or revolut.me), up to 500 characters.",
   "LICENSE_PAYMENT_SCHEDULE_INVALID": "This payment schedule can't be used. The instalments must add up to the total, with dates in order and not in the past.",
+  "LICENSE_TERMS_CHANGE_REASON_REQUIRED": "Say why this quote changes the length, start date or payment plan the school asked for.",
   "LICENSE_INSTALMENT_NOT_FOUND": "That instalment isn't on this invoice.",
   "LICENSE_PAYMENT_NOT_FOUND": "Payment not found",
   "LICENSE_PAYMENT_EXCEEDS_BALANCE": "The amount is more than the invoice's balance",

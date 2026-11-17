@@ -8,14 +8,21 @@
  *  2. sent quotes past their valid-until date become `expired`;
  *  3. unpaid invoices past their due date are marked overdue (`overdue_at`); their status still says
  *     how much is paid. Each instalment not paid by its due date is marked overdue the same way
- *     (000221); an invoice's due date is its earliest unpaid instalment's.
- *
- * Nothing here suspends a license: that is the super admin's decision, never automatic.
+ *     (000221); an invoice's due date is its earliest unpaid instalment's;
+ *  4. AI stops 30 days after an unpaid instalment (000231): an active licence with any unpaid
+ *     instalment LICENSE_NONPAYMENT_GRACE_DAYS or more past its due date (UTC dates) is suspended and
+ *     marked `nonpayment_suspended_at`, and its seat holders' entitlements are bumped so the AI stops
+ *     at once. Every instalment counts: a later one going unpaid stops it again;
+ *  5. a licence stopped for non-payment with nothing past the cutoff any more (paid, or its invoice
+ *     voided) is resumed. The API resumes it the moment the payment is recorded; this is the safety
+ *     net. A licence the super admin suspended by hand is never resumed here.
  *
  * Each school runs in its own system tenant transaction (one failing school does not strand the
  * rest), every change writes an audit row with no actor, and every step is idempotent: a re-run finds
  * nothing left to change.
  */
+
+import { LICENSE_NONPAYMENT_GRACE_DAYS } from "@studafy/constants";
 
 import { emitAuditLogs } from "../../db/audit";
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -32,6 +39,8 @@ export interface LicenseLifecycleResult {
   entitlementBumps: number;
   quotesExpired: number;
   invoicesOverdue: number;
+  licensesStopped: number;
+  licensesResumed: number;
   failedSchools: number;
 }
 
@@ -159,6 +168,144 @@ export async function markInvoicesOverdue(tx: TransactionSql, now: Date): Promis
   return marked.length;
 }
 
+/** Bump the entitlements of a licence's current seat holders. */
+async function bumpSeatHolders(
+  tx: TransactionSql,
+  schoolId: string,
+  licenseIds: string[],
+): Promise<number> {
+  if (licenseIds.length === 0) return 0;
+  const holders = await tx<{ user_id: string }[]>`
+    SELECT DISTINCT user_id::text AS user_id
+    FROM app.license_seats
+    WHERE school_id = current_setting('app.school_id')::uuid
+      AND license_id = ANY(${licenseIds}::uuid[])
+      AND unassigned_at IS NULL
+  `;
+  const versions = await publishUserEntitlementChanges(
+    tx,
+    schoolId,
+    holders.map((h) => h.user_id),
+  );
+  return versions.size;
+}
+
+/**
+ * Suspend every active licence with an unpaid instalment LICENSE_NONPAYMENT_GRACE_DAYS or more past
+ * its due date (`today` >= due date + 30, both UTC dates). Idempotent: a suspended licence is not
+ * picked again.
+ */
+export async function stopForNonPayment(
+  tx: TransactionSql,
+  schoolId: string,
+  now: Date,
+): Promise<{ stopped: number; bumped: number }> {
+  const today = now.toISOString().slice(0, 10);
+  const stopped = await tx<{ id: string; due_date: string; instalment_id: string }[]>`
+    UPDATE app.school_licenses AS l
+    SET status = 'suspended', nonpayment_suspended_at = ${now},
+        updated_at = GREATEST(CURRENT_TIMESTAMP, l.updated_at)
+    FROM (
+      SELECT DISTINCT ON (i.license_id) i.license_id, inst.id AS instalment_id, inst.due_date
+      FROM app.license_invoice_instalments AS inst
+      JOIN app.license_invoices AS i ON i.id = inst.invoice_id AND i.school_id = inst.school_id
+      WHERE inst.school_id = current_setting('app.school_id')::uuid
+        AND i.status IN ('issued', 'partially_paid')
+        AND inst.status <> 'paid'
+        AND inst.due_date + ${LICENSE_NONPAYMENT_GRACE_DAYS}::int <= ${today}::date
+      ORDER BY i.license_id, inst.due_date, inst.position
+    ) AS late
+    WHERE l.school_id = current_setting('app.school_id')::uuid
+      AND l.id = late.license_id
+      AND l.status = 'active'
+    RETURNING l.id::text AS id, late.due_date::text AS due_date,
+              late.instalment_id::text AS instalment_id
+  `;
+  if (stopped.length === 0) return { stopped: 0, bumped: 0 };
+  await emitAuditLogs(
+    tx,
+    stopped.map((license) => ({
+      action: "update" as const,
+      targetTable: "school_licenses",
+      targetId: license.id,
+      oldValues: { status: "active" },
+      newValues: {
+        status: "suspended",
+        reason: "non_payment",
+        nonpayment_suspended_at: now.toISOString(),
+        instalment_id: license.instalment_id,
+        instalment_due_date: license.due_date,
+      },
+    })),
+  );
+  const bumped = await bumpSeatHolders(
+    tx,
+    schoolId,
+    stopped.map((l) => l.id),
+  );
+  return { stopped: stopped.length, bumped };
+}
+
+/**
+ * Resume every licence stopped for non-payment that has nothing past the cutoff any more and has not
+ * ended, unless the school has another licence active by now. Idempotent.
+ */
+export async function resumePaidLicenses(
+  tx: TransactionSql,
+  schoolId: string,
+  now: Date,
+): Promise<{ resumed: number; bumped: number }> {
+  const today = now.toISOString().slice(0, 10);
+  // One at a time: a school has at most one active licence.
+  const resumed = await tx<{ id: string }[]>`
+    UPDATE app.school_licenses AS l
+    SET status = 'active', updated_at = GREATEST(CURRENT_TIMESTAMP, l.updated_at)
+    WHERE l.school_id = current_setting('app.school_id')::uuid
+      AND l.id = (
+        SELECT c.id FROM app.school_licenses AS c
+        WHERE c.school_id = current_setting('app.school_id')::uuid
+          AND c.status = 'suspended'
+          AND c.nonpayment_suspended_at IS NOT NULL
+          AND c.ends_at > ${now}
+          AND NOT EXISTS (
+            SELECT 1 FROM app.school_licenses AS other
+            WHERE other.school_id = c.school_id AND other.status = 'active'
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM app.license_invoice_instalments AS inst
+            JOIN app.license_invoices AS i
+              ON i.id = inst.invoice_id AND i.school_id = inst.school_id
+            WHERE inst.school_id = c.school_id
+              AND i.license_id = c.id
+              AND i.status IN ('issued', 'partially_paid')
+              AND inst.status <> 'paid'
+              AND inst.due_date + ${LICENSE_NONPAYMENT_GRACE_DAYS}::int <= ${today}::date
+          )
+        ORDER BY c.starts_at DESC, c.id
+        LIMIT 1
+      )
+    RETURNING l.id::text AS id
+  `;
+  if (resumed.length === 0) return { resumed: 0, bumped: 0 };
+  await emitAuditLogs(
+    tx,
+    resumed.map((license) => ({
+      action: "update" as const,
+      targetTable: "school_licenses",
+      targetId: license.id,
+      oldValues: { status: "suspended", reason: "non_payment" },
+      newValues: { status: "active", nonpayment_suspended_at: null },
+    })),
+  );
+  const bumped = await bumpSeatHolders(
+    tx,
+    schoolId,
+    resumed.map((l) => l.id),
+  );
+  return { resumed: resumed.length, bumped };
+}
+
 export async function runLicenseLifecycle(
   sql: Sql,
   now: Date,
@@ -172,6 +319,8 @@ export async function runLicenseLifecycle(
     entitlementBumps: 0,
     quotesExpired: 0,
     invoicesOverdue: 0,
+    licensesStopped: 0,
+    licensesResumed: 0,
     failedSchools: 0,
   };
 
@@ -183,6 +332,11 @@ export async function runLicenseLifecycle(
         result.entitlementBumps += licenses.bumped;
         result.quotesExpired += await expireQuotes(tx, now);
         result.invoicesOverdue += await markInvoicesOverdue(tx, now);
+        const stopped = await stopForNonPayment(tx, schoolId, now);
+        result.licensesStopped += stopped.stopped;
+        const resumed = await resumePaidLicenses(tx, schoolId, now);
+        result.licensesResumed += resumed.resumed;
+        result.entitlementBumps += stopped.bumped + resumed.bumped;
       });
     } catch (err) {
       result.failedSchools += 1;

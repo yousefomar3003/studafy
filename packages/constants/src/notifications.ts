@@ -76,6 +76,12 @@ export const NOTIFICATION_TYPES = {
   LICENSE_INVOICE_DUE: "LICENSE_INVOICE_DUE",
   LICENSE_INVOICE_OVERDUE: "LICENSE_INVOICE_OVERDUE",
   LICENSE_RECEIPT_UPLOADED: "LICENSE_RECEIPT_UPLOADED",
+  // A licence paid in instalments stops covering its AI seats once an instalment is unpaid
+  // LICENSE_NONPAYMENT_GRACE_DAYS after its due date (000231): a warning 7 days before that cutoff,
+  // and a notice when the AI stops. Same recipients and delivery as the reminders above (in-app and
+  // push, never emailed). Mirrored in app.notification_type by migration 000231.
+  LICENSE_AI_STOP_WARNING: "LICENSE_AI_STOP_WARNING",
+  LICENSE_AI_STOPPED: "LICENSE_AI_STOPPED",
   // Everyday school events, written by the workers' outbox notify consumer
   // (apps/workers/src/queues/notifications/school-events.ts): an assignment published (to the class's
   // students and their parents), a hand-in's mark released (to that student and their parents), and a

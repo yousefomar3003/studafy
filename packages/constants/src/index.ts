@@ -81,7 +81,10 @@ export {
 } from "./storage-addon";
 export {
   isAllowedLicensePaymentLink,
+  LICENSE_AI_STOP_WARNING_DAYS,
+  LICENSE_NONPAYMENT_GRACE_DAYS,
   LICENSE_PAYMENT_LINK_HOSTS,
   LICENSE_PAYMENT_LINK_MAX_LENGTH,
+  licenseAiStopDate,
 } from "./payment-links";
 export type { StorageAddonPlanCode } from "./storage-addon";

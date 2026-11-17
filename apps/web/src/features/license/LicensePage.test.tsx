@@ -19,6 +19,7 @@ const PRO = "22222222-2222-4222-8222-222222222222";
 let endsInDays = 200;
 let overdue: unknown[] = [];
 let hasLicense = true;
+let licenseExtra: Record<string, unknown> = {};
 
 function overview() {
   return {
@@ -42,6 +43,9 @@ function overview() {
             { audience: "teacher", purchased: 10, assigned: 2, tier: null },
             { audience: "parent", purchased: 0, assigned: 0, tier: null },
           ],
+          nonpaymentSuspendedAt: null,
+          nextAiStop: null,
+          ...licenseExtra,
         },
     usage: [
       { feature: "ai_tutor", unit: "messages", used: 1200 },
@@ -65,6 +69,10 @@ function overview() {
         createdAt: "2026-10-20T09:00:00.000Z",
         resolvedAt: null,
         resolutionNote: null,
+        months: 12,
+        startsOn: null,
+        paymentPlan: "yearly",
+        paymentProposal: null,
       },
     ],
   };
@@ -150,6 +158,7 @@ async function renderPage(role = "PRINCIPAL", at = "/portal/license") {
 afterEach(() => {
   cleanup();
   hasLicense = true;
+  licenseExtra = {};
   endsInDays = 200;
   overdue = [];
   getMock.mockClear();
@@ -188,7 +197,9 @@ describe("LicensePage", () => {
     expect(usage.queryByText("family_plus")).toBeNull();
 
     const requests = within(screen.getByRole("region", { name: "Requests waiting for Studafy" }));
-    expect(requests.getByText(/60 student seats · Student Pro for Students/)).toBeTruthy();
+    expect(
+      requests.getByText(/60 student seats · Student Pro for Students · 12 months · paid yearly/),
+    ).toBeTruthy();
   });
 
   test("warns when seats are almost full, the license ends soon and an invoice is overdue", async () => {
@@ -247,6 +258,11 @@ describe("LicensePage", () => {
       parentPlanId: null,
       includeFamilyPlus: null,
       note: "Two new classes",
+      // A licence in force: the new seats run to its end, paid monthly unless the school chooses.
+      months: null,
+      startsOn: null,
+      paymentPlan: "monthly",
+      paymentProposal: null,
     });
     expect(await screen.findByText("Request sent to Studafy.")).toBeTruthy();
   });
@@ -273,6 +289,134 @@ describe("LicensePage", () => {
       // No note given: the request says what it is for the inbox.
       note: "Student AI for 300 students, Student Plus.",
     });
+  });
+
+  test("a new licence: the school chooses 13 months, paid yearly, and sees each year", async () => {
+    hasLicense = false;
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Request AI for students" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Request AI for students" }));
+    fireEvent.change(dialog.getByLabelText(/Number of students/), { target: { value: "100" } });
+    fireEvent.click(dialog.getByRole("combobox", { name: "How long do you want Studafy AI for?" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Another number of months" }));
+    fireEvent.change(dialog.getByLabelText("Months (1–36)"), { target: { value: "13" } });
+    fireEvent.change(dialog.getByLabelText("Start on (optional)"), {
+      target: { value: "2099-09-01" },
+    });
+    fireEvent.click(dialog.getByRole("radio", { name: "Yearly" }));
+
+    const years = within(dialog.getByTestId("year-totals"));
+    expect(years.getByText("Year 1")).toBeTruthy();
+    expect(years.getByText("Year 2")).toBeTruthy();
+    expect(years.getByText(/Aug 31, 2100 \(12 months\)/)).toBeTruthy();
+    expect(years.getByText(/Sep 30, 2100 \(1 month\)/)).toBeTruthy();
+    const payments = within(dialog.getByTestId("terms-payments"));
+    expect(payments.getAllByRole("row")).toHaveLength(3);
+    expect(payments.getByText("Sep 1, 2099")).toBeTruthy();
+    expect(payments.getByText("Sep 1, 2100")).toBeTruthy();
+    expect(payments.getByText("92.31%")).toBeTruthy();
+    expect(payments.getByText("7.69%")).toBeTruthy();
+
+    fireEvent.click(dialog.getByRole("button", { name: "Send request" }));
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    expect(postMock.mock.calls[0]![1]!.body).toMatchObject({
+      studentSeats: 100,
+      months: 13,
+      startsOn: "2099-09-01",
+      paymentPlan: "yearly",
+      paymentProposal: null,
+    });
+  });
+
+  test("a custom plan: the school's own dates and shares, which must add up to 100%", async () => {
+    hasLicense = false;
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Request AI for students" }));
+    const dialog = within(await screen.findByRole("dialog", { name: "Request AI for students" }));
+    fireEvent.change(dialog.getByLabelText(/Number of students/), { target: { value: "40" } });
+    fireEvent.change(dialog.getByLabelText("Start on (optional)"), {
+      target: { value: "2099-01-01" },
+    });
+    fireEvent.click(dialog.getByRole("radio", { name: "Custom: our own dates" }));
+    // 12 months by default; two even payments to start from.
+    expect((dialog.getByLabelText("Payment 1: date") as HTMLInputElement).value).toBe("2099-01-01");
+    expect((dialog.getByLabelText("Payment 2: date") as HTMLInputElement).value).toBe("2099-07-01");
+    expect(
+      (dialog.getByLabelText("Payment 1: share of the total (%)") as HTMLInputElement).value,
+    ).toBe("50");
+    const send = dialog.getByRole("button", { name: "Send request" }) as HTMLButtonElement;
+    expect(send.disabled).toBe(false);
+
+    fireEvent.change(dialog.getByLabelText("Payment 1: share of the total (%)"), {
+      target: { value: "30" },
+    });
+    expect(dialog.getByText("The shares must add up to exactly 100%.")).toBeTruthy();
+    expect(send.disabled).toBe(true);
+    fireEvent.change(dialog.getByLabelText("Payment 2: share of the total (%)"), {
+      target: { value: "70" },
+    });
+    // A date after the licence ends is refused.
+    fireEvent.change(dialog.getByLabelText("Payment 2: date"), { target: { value: "2100-02-01" } });
+    expect(dialog.getByText("Every payment must fall before the licence ends.")).toBeTruthy();
+    fireEvent.change(dialog.getByLabelText("Payment 2: date"), { target: { value: "2099-06-15" } });
+    expect(send.disabled).toBe(false);
+
+    fireEvent.click(send);
+    await waitFor(() => expect(postMock).toHaveBeenCalledTimes(1));
+    expect(postMock.mock.calls[0]![1]!.body).toMatchObject({
+      months: 12,
+      paymentPlan: "custom",
+      paymentProposal: [
+        { dueDate: "2099-01-01", shareBps: 3000 },
+        { dueDate: "2099-06-15", shareBps: 7000 },
+      ],
+    });
+  });
+
+  test("warns before the AI stops for an unpaid instalment", async () => {
+    licenseExtra = {
+      nextAiStop: {
+        invoiceId: "i-1",
+        invoiceNumber: "LIC-2026-000042",
+        position: 2,
+        dueDate: "2026-11-01",
+        stopDate: "2026-12-01",
+        balanceMinor: 60_000,
+        currencyCode: "USD",
+        minorUnit: 2,
+        daysLeft: 5,
+      },
+    };
+    await renderPage();
+    expect(
+      await screen.findByText("Studafy AI stops on December 1, 2026 if this payment is not made"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(
+        /\$600.00 on invoice LIC-2026-000042 was due November 1, 2026\. 5 days left/,
+      ),
+    ).toBeTruthy();
+  });
+
+  test("says when the AI has stopped for non-payment", async () => {
+    licenseExtra = {
+      status: "suspended",
+      nonpaymentSuspendedAt: "2026-12-01T00:05:00.000Z",
+      nextAiStop: {
+        invoiceId: "i-1",
+        invoiceNumber: "LIC-2026-000042",
+        position: 2,
+        dueDate: "2026-11-01",
+        stopDate: "2026-12-01",
+        balanceMinor: 60_000,
+        currencyCode: "USD",
+        minorUnit: 2,
+        daysLeft: -3,
+      },
+    };
+    await renderPage();
+    expect(await screen.findByText("Studafy AI has stopped")).toBeTruthy();
+    expect(screen.queryByText(/if this payment is not made/)).toBeNull();
   });
 
   test("the almost-full banner's link opens the request form", async () => {

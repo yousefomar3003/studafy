@@ -154,6 +154,22 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "رفعت {schoolName} إيصال تحويل بنكي للفاتورة {invoiceNumber}. سجّل الدفعة وطابق الإيصال معها في لوحة التراخيص.",
   },
+  [NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "يتوقف الذكاء الاصطناعي في Studafy لدى {schoolName} في {stopDate}، بعد {daysLeft} أيام، ما لم تُسدَّد الفاتورة {invoiceNumber} (المستحقة في {dueDate}). الرصيد: {balance}.",
+    [NOTIFICATION_CHANNELS.PUSH]:
+      "يتوقف الذكاء الاصطناعي في Studafy في {stopDate} ما لم تُسدَّد {invoiceNumber}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "كانت دفعة بقيمة {balance} من الفاتورة {invoiceNumber} لترخيص Studafy الخاص بـ {schoolName} مستحقة في {dueDate}. إذا بقيت غير مسددة في {stopDate}، أي بعد {daysLeft} أيام، تتوقف ميزات الذكاء الاصطناعي التي يشملها الترخيص لكل حاملي المقاعد حتى تُسدَّد. يُرجى الدفع بتحويل بنكي مع ذكر مرجع الدفع المطبوع على الفاتورة، ورفع الإيصال في Studafy.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_AI_STOPPED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "توقف الذكاء الاصطناعي في Studafy لدى {schoolName}: كانت الفاتورة {invoiceNumber} مستحقة في {dueDate} وما زال {balance} غير مسدد. يعود العمل به فور تسجيل الدفعة.",
+    [NOTIFICATION_CHANNELS.PUSH]:
+      "توقف الذكاء الاصطناعي في Studafy: الفاتورة {invoiceNumber} غير مسددة",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "توقف الذكاء الاصطناعي في Studafy لدى {schoolName} في {stopDate} لأن الفاتورة {invoiceNumber} المستحقة في {dueDate} ما زال فيها {balance} غير مسدد. فقد الطلاب والمعلمون الحاملون لمقاعد الترخيص ميزات الذكاء الاصطناعي حتى تُسدَّد. يُرجى الدفع بتحويل بنكي مع ذكر مرجع الدفع المطبوع على الفاتورة ورفع الإيصال في Studafy، ويعود العمل به فور تسجيل Studafy للدفعة.",
+  },
   [NOTIFICATION_TYPES.ASSIGNMENT_PUBLISHED]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "واجب جديد: {assignmentTitle}",
     [NOTIFICATION_CHANNELS.PUSH]: "{who}{courseName} · موعد التسليم {dueDate}",

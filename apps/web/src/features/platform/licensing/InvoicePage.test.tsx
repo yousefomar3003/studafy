@@ -45,6 +45,8 @@ function invoice(currencyCode = "USD", minorUnit = 2) {
     paymentLink: null as string | null,
     paymentPlan: "in_full",
     instalments: [] as unknown[],
+    yearTotals: [] as unknown[],
+    aiStopped: false,
     createdAt: "2026-10-01T08:00:00.000Z",
     bankDetails: {
       bankName: "Gulf Bank",
