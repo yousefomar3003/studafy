@@ -6,6 +6,7 @@ import { requireAuth } from "../../middleware/authContext";
 import { requirePermission } from "../../middleware/authz";
 import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
+import { resyncStudentAiAfterCommit } from "../finance/student-ai/service";
 
 import {
   closeWindow,
@@ -276,6 +277,23 @@ export function aiOptInRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> {
   routes.use("/api/parent/student-ai/*", requirePermission(PERMISSIONS.STUDENT_AI_OPT_IN));
   routes.use("/api/parent/student-ai/opt-ins", auditAction("insert", "ai_optins"));
 
+  // The Student AI line on tuition (phase 3, 000238) follows the opt-ins: brought up to date for the
+  // students concerned once the opt-in's transaction has committed (its tables are written by the
+  // system role, not the school's).
+  const resyncLines = (
+    c: Context<AppEnv>,
+    actor: LicenseActor & { schoolId: string },
+    studentIds: readonly string[],
+    trigger: string,
+  ) =>
+    resyncStudentAiAfterCommit(
+      deps.database,
+      { schoolId: actor.schoolId, userId: actor.userId, requestId: actor.requestId },
+      studentIds,
+      c.get("log"),
+      trigger,
+    );
+
   routes.openapi(overviewRoute, async (c) => {
     const actor = actorOf(c);
     const overview = await readInSchool(deps, actor.schoolId, actor, (tx) =>
@@ -317,6 +335,12 @@ export function aiOptInRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> {
     const { result } = await runLicenseChange(deps, actor.schoolId, actor, (tx) =>
       recordOnBehalf(tx, actor.schoolId, body, actor),
     );
+    await resyncLines(
+      c,
+      actor,
+      result.recorded.map((optIn) => optIn.studentId),
+      "ai_optin_recorded",
+    );
     return c.json(result, 200);
   });
 
@@ -326,6 +350,13 @@ export function aiOptInRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> {
     const body = c.req.valid("json");
     const { result } = await runLicenseChange(deps, actor.schoolId, actor, (tx) =>
       transferOptIn(tx, actor.schoolId, optInId, body, actor),
+    );
+    // Both students: the leaver's line stops after this month, the receiver's starts the next.
+    await resyncLines(
+      c,
+      actor,
+      [result.from.studentId, result.to.studentId],
+      "ai_optin_transferred",
     );
     return c.json(result, 200);
   });
@@ -337,6 +368,7 @@ export function aiOptInRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> {
     const { result } = await runLicenseChange(deps, actor.schoolId, actor, (tx) =>
       releaseOptIn(tx, actor.schoolId, optInId, body, actor),
     );
+    await resyncLines(c, actor, [result.studentId], "ai_optin_released");
     return c.json(result, 200);
   });
 
@@ -354,6 +386,7 @@ export function aiOptInRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> {
     const { result } = await runLicenseChange(deps, actor.schoolId, actor, (tx) =>
       parentOptIn(tx, actor.schoolId, body, actor),
     );
+    await resyncLines(c, actor, [result.studentId], "ai_optin_parent");
     return c.json(result, 201);
   });
 

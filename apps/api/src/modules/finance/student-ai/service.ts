@@ -3,7 +3,7 @@
  * docs/billing/student-ai-tuition-line.md).
  *
  * For every opted-in student there is one item per academic year: the parent price per month (the
- * licence's signed programme values, resolved in the school's currency) times the months charged.
+ * price on the phase 2 opt-in, what the parent agreed to, in its currency) times the months charged.
  * With auto-billing on, the item is spread over the student's tuition instalments as planned
  * portions (./plan.ts); the billing worker puts a planned portion on the first Sales Invoice it
  * generates for the student due on or after the portion's due date, which freezes it. With
@@ -23,7 +23,6 @@
 
 import { setTenantScope, withSystemTx } from "../../../db/tenant-tx";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
-import { resolveAiProgrammeStamp } from "../../licensing/ai-programme";
 import { formatMinorUnits } from "../currency";
 
 import { listStudentAiOptIns } from "./opt-ins";
@@ -40,7 +39,8 @@ import {
 
 import type { StudentAiOptIn, StudentAiOptInStatus } from "./opt-ins";
 import type { MonthIndex, PortionPlan } from "./plan";
-import type { Database } from "../../../db/client";
+import type { Database, DatabasePools } from "../../../db/client";
+import type { Logger } from "../../../logger";
 import type { PendingQuery, Row, TransactionSql } from "postgres";
 
 export type StudentAiBilling = "auto" | "outside";
@@ -71,7 +71,7 @@ export interface StudentAiBillingSettings {
 
 /** A system transaction armed for the school, with the acting user for the audit trail. */
 export function withStudentAiTx<T>(
-  database: Database,
+  database: Database | DatabasePools,
   actor: { schoolId: string; userId?: string; requestId?: string },
   fn: (tx: TransactionSql) => Promise<T>,
 ): Promise<T> {
@@ -192,39 +192,6 @@ function decidingOptIn(optIns: readonly StudentAiOptIn[]): StudentAiOptIn {
   return [...pool].sort((a, b) => b.startMonth.localeCompare(a.startMonth))[0]!;
 }
 
-async function schoolCurrency(
-  tx: TransactionSql,
-  schoolId: string,
-): Promise<{ id: string; code: string }> {
-  const [row] = await tx<{ id: string; code: string }[]>`
-    SELECT c.id, c.code FROM app.schools AS s JOIN app.currencies AS c ON c.id = s.default_currency_id
-    WHERE s.id = ${schoolId}::uuid
-  `;
-  if (!row) throw new Error(`School ${schoolId} does not exist.`);
-  return row;
-}
-
-/** The parent price per month the licence was signed with, in `currencyCode`; null when unset. */
-async function licenceParentPrice(
-  tx: TransactionSql,
-  schoolId: string,
-  licenceId: string,
-  currencyCode: string,
-): Promise<number | null> {
-  const [licence] = await tx<{ version_id: string; override_id: string | null }[]>`
-    SELECT ai_programme_version_id AS version_id, ai_programme_override_id AS override_id
-    FROM app.school_licenses
-    WHERE school_id = ${schoolId}::uuid AND id = ${licenceId}::uuid
-  `;
-  if (!licence) return null;
-  const { values } = await resolveAiProgrammeStamp(
-    tx,
-    { versionId: licence.version_id, overrideId: licence.override_id },
-    currencyCode,
-  );
-  return values.parentPriceMinor;
-}
-
 async function currentMonth(tx: TransactionSql): Promise<MonthIndex> {
   const [row] = await tx<{ today: string }[]>`SELECT CURRENT_DATE::text AS today`;
   return monthIndex(row!.today);
@@ -276,7 +243,6 @@ export async function syncStudentAiFeeItems(
       : [];
 
   const results: StudentAiSyncItemResult[] = [];
-  let currency: { id: string; code: string } | null = null;
   let thisMonth: MonthIndex | null = null;
 
   const yearIds = new Set([...byYear.keys(), ...items.map((item) => item.academic_year_id)]);
@@ -303,6 +269,9 @@ export async function syncStudentAiFeeItems(
       startMonth: MonthIndex;
       stopMonth: MonthIndex | null;
       status: StudentAiOptInStatus;
+      /** The opt-in's price and currency: what the parent agreed to (null when no opt-in). */
+      priceMinor: number | null;
+      currencyId: string | null;
     } | null = null;
     if (yearOptIns.length > 0 && range) {
       const optIn = decidingOptIn(yearOptIns);
@@ -320,6 +289,8 @@ export async function syncStudentAiFeeItems(
         startMonth: Math.max(monthIndex(optIn.startMonth), range.first),
         stopMonth: stop,
         status: optIn.status,
+        priceMinor: optIn.monthlyPriceMinor,
+        currencyId: optIn.currencyId,
       };
       if (desired.startMonth > range.last && !existing) {
         results.push(skip(yearId, "skipped_no_months"));
@@ -332,6 +303,8 @@ export async function syncStudentAiFeeItems(
         startMonth: monthIndex(existing.start_month),
         stopMonth: Math.max(monthIndex(existing.start_month), lastBilled + 1),
         status: "released",
+        priceMinor: null,
+        currencyId: null,
       };
     }
 
@@ -357,15 +330,13 @@ export async function syncStudentAiFeeItems(
     if (existing) {
       priceMinor = Number(existing.monthly_price_minor);
       currencyId = existing.currency_id;
+    } else if (desired.priceMinor !== null && desired.currencyId !== null) {
+      // The monthly price the parent agreed to on the opt-in (phase 2), in its currency.
+      priceMinor = desired.priceMinor;
+      currencyId = desired.currencyId;
     } else {
-      currency ??= await schoolCurrency(tx, schoolId);
-      const price = await licenceParentPrice(tx, schoolId, desired.licenceId, currency.code);
-      if (price === null) {
-        results.push(skip(yearId, "skipped_no_price"));
-        continue;
-      }
-      priceMinor = price;
-      currencyId = currency.id;
+      results.push(skip(yearId, "skipped_no_price"));
+      continue;
     }
 
     const startMonth = Math.min(desired.startMonth, range.last);
@@ -569,13 +540,37 @@ export async function syncSchoolStudentAiFeeItems(
  * events after commit, the fee-schedule generator).
  */
 export function syncStudentAiFeeItemsInOwnTx(
-  database: Database,
+  database: Database | DatabasePools,
   actor: { schoolId: string; userId?: string; requestId?: string },
   studentIds: readonly string[],
 ): Promise<StudentAiSyncResult[]> {
   return withStudentAiTx(database, actor, (tx) =>
     syncStudentAiFeeItemsFor(tx, actor.schoolId, studentIds),
   );
+}
+
+/**
+ * The re-sync after another transaction committed (phase 2's opt-in, release or transfer; the
+ * fee-schedule generator), best effort: the change itself stands, and a failure is logged at error
+ * level with the school and students, so it is seen -- `POST /api/finance/student-ai/sync` (the
+ * finance page's Recalculate) is the retry, and it is idempotent.
+ */
+export async function resyncStudentAiAfterCommit(
+  database: Database | DatabasePools,
+  actor: { schoolId: string; userId?: string; requestId?: string },
+  studentIds: readonly string[],
+  log: Pick<Logger, "error">,
+  trigger: string,
+): Promise<void> {
+  if (studentIds.length === 0) return;
+  try {
+    await syncStudentAiFeeItemsInOwnTx(database, actor, studentIds);
+  } catch (err) {
+    log.error(
+      { err, school_id: actor.schoolId, student_ids: [...new Set(studentIds)], trigger },
+      "student ai: re-sync of the tuition line failed; POST /api/finance/student-ai/sync retries it",
+    );
+  }
 }
 
 // ---------------------------------------------------------------------------------------------------
