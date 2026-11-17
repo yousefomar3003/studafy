@@ -67,8 +67,11 @@ one; override prices count only in their own currency; the in-app price is globa
 
 ## For later phases
 
-- Read what a licence was signed with: `resolveAiProgrammeStamp(tx, { versionId, overrideId },
-currencyCode)` or `licenseAiProgramme(tx, license)`.
+- Read what a licence was signed with: `resolveAiProgrammeValues(tx, { versionId, overrideId },
+currencyCode)` -- the core resolver (values only; `readProgrammeValues` in @studafy/billing), for
+  school-facing requests and the workers -- or, in platform views only, `resolveAiProgrammeStamp`
+  (which adds the versions and their authors' names, looked up by arming each super admin's home
+  school) and `licenseAiProgramme(tx, license)`.
 - `previewRevenueShare(values, { conversionBps, uploadConsistencyBps, seats, fullYear })` is the
   share formula the console's example uses (tier, floor, bonus rule, cap, month-to-month). Phase 5
   applies it to what Studafy actually collects at that school's licence price.
@@ -106,7 +109,13 @@ app `/parent/student-ai`.
    daily `AI_OPTIN_SUMMARY` of new opt-ins (16:00 UTC run).
 
 **Late opt-in** is allowed while a window is open: priced for the remaining months only, starting
-this month (`aiOptInPeriod`). Months always follow the school's academic year.
+this month (`aiOptInPeriod`). Months always follow the school's academic year, counted by the one
+month rule (`academicYearMonths` in `@studafy/license-pricing`: a calendar month counts when the year
+covers at least half of it), the same months the tuition line and the revenue share's instalment
+periods count.
+
+**Opt-ins are per academic year.** Parents choose again each new year: a new year's window takes new
+opt-ins, and a licence renewal (or a new licence) never carries last year's over.
 
 ## Seats
 
@@ -207,18 +216,30 @@ the same in ten monthly payments of $182; so is an 8-month school at its own pri
 - Before the lock, the super admin can re-measure now, with a reason (`source = super_admin`,
   audited): a provisional figure; the lock still happens on the day.
 - Enrolled = students with status `enrolled` who existed and were admitted by the end of the day.
-- Opted in = **adapter** `countOptedInStudents(tx, schoolId, licenseId, onDate)` in
-  `packages/billing/src/ai-revenue-share/measures.ts`. Until phase 2 is integrated: the licence's
-  student seats held at the end of the day.
+- Opted in = `countOptedInStudents(tx, schoolId, licenseId, onDate)` in
+  `packages/billing/src/ai-revenue-share/measures.ts`: the school's phase 2 opt-ins for the academic
+  year covering the day (or, before any year began, the next one), taken by the end of the day and
+  not ended by then, each student once. Opt-ins are **per academic year**: parents choose again each
+  new year, and a licence renewal does not carry them over; counting the year's opt-ins (not only
+  the licence's) means a renewal measures that year's choices rather than 0.
+- **Only licences in the programme earn a share**: a licence with at least one opt-in window or
+  programme opt-in (`licenceInProgramme`). A licence without either gets no ledger entries and no
+  conversion measurement. A payment recorded before the licence's first window opens earns nothing
+  either (the test is made when the payment is recorded).
 
 ### The ledger (`app.ai_programme_revenue_share_entries`)
 
 Recording a payment (the console's "Record a transfer") writes one entry per instalment it paid:
-collected, the Student AI part (`base`), the period that instalment pays for (monthly: licence month k;
-yearly: licence year k; at once: the term; custom: due date to the day before the next), the licence's
-programme versions, commitment, conversion (locked snapshot), upload consistency over that period
-(**adapter** `uploadConsistencyForPeriod(tx, { schoolId, licenseId, from, to })`, null until phase 4
-is integrated, so the bonus stays pending), bonus, cap, multiplier, total and amount.
+collected, the Student AI part (`base`), the period that instalment pays for (monthly: the term's
+k-th month by the one month rule -- `academicYearMonths`, a calendar month counts when the term covers
+at least half of it, the same months the parent's opt-in and the tuition line count -- the first
+stretched back to the term's start and the last on to its end; yearly: licence year k; at once: the
+term; custom: due date to the day before the next), the licence's programme versions, commitment
+(`school_licenses.commitment`, the one `LICENSE_COMMITMENTS` list), conversion (locked snapshot),
+upload consistency over that period (`uploadConsistencyForPeriod`: phase 4's measure, once the
+period's last day has passed in the school's timezone -- until then the bonus stays pending and the
+hourly job works it out; a finished period with no class to measure is 0%), bonus, cap, multiplier,
+total and amount.
 
 | Status       | Meaning                                                                                                                         |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
@@ -265,7 +286,19 @@ shares are untouched. Decided on what is recorded when the cutoff passes.
 
 ### Integration (phases 2 and 4)
 
-- `countOptedInStudents` and `uploadConsistencyForPeriod` in
-  `packages/billing/src/ai-revenue-share/measures.ts` are the only two places to swap.
-- `licenceCommitment` reads `school_licenses.commitment` through `to_jsonb` so it works before and
-  after phase 2's column; read the column directly once it is there.
+Integrated on 2026-11-18 (feat/ai-revshare-settings): `countOptedInStudents` reads phase 2's
+`app.ai_optins`, `uploadConsistencyForPeriod` reads phase 4's upload consistency (moved into
+`packages/billing/src/ai-revenue-share/upload-consistency.ts` so the workers can measure too), and
+`licenceCommitment` reads `school_licenses.commitment` directly.
+
+- **Activation by a credit** (`packages/billing/src/ai-revenue-share/activation.ts`): one rule,
+  `licencesToPutInForce`, decides which licences are now due to be in force (a draft or
+  awaiting-payment licence with an invoice whose first instalment is paid, or paid in full; a licence
+  stopped for non-payment with nothing past its cutoff; never while another licence is active). The
+  API's settle (`settleShares`) puts them in force with `activateLicenseFor` / `resumeIfSettled`. The
+  hourly job applies the same rule to invoices a credit went on and activates with `activateLicence`
+  (status, audit, entitlements), except when a seat holder still pays personally: the overlap credit
+  and renewal stop need the payment providers, so that licence is left to the API's next settle for
+  the school (logged, `licensesAwaitingApiActivation`).
+- **Concurrent payments**: recording or voiding a payment, and the hourly revenue share step, run
+  again on a serialization failure or deadlock (`withTransactionRetry`, up to 3 tries).

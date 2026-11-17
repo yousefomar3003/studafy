@@ -10,10 +10,10 @@ reconciliation and reads in `.../student-ai/service.ts`; the billing worker's pa
 
 ## The amount
 
-- **Price:** the licence's signed programme values (phase 1, `resolveAiProgrammeStamp`) resolved in
-  the school's currency (`schools.default_currency_id`): `parentPriceMinor`. It is fixed on the line
-  when the line is created, which is what the parent agreed to. No price for that currency: no line
-  (reported as `skipped_no_price`).
+- **Price:** the monthly price and currency on the parent's phase 2 opt-in (what they agreed to: the
+  licence's signed parent price when they opted in). It is fixed on the line when the line is
+  created; a later re-apply of programme values or a change of the school's currency never re-prices
+  it. (`skipped_no_price` remains for a line without an opt-in to price it from.)
 - **Months follow the school's academic year.** A calendar month belongs to the year when the year
   covers at least half of its days: 1 Sep - 30 Jun is 10 months, 1 Sep - 30 Apr is 8, and a year
   from 25 Aug to 10 Jun is Sep - May (9). Nothing assumes 10.
@@ -76,10 +76,16 @@ it can run after any event, any number of times, and changes nothing when nothin
 a system transaction armed for the school (`withStudentAiTx`); `syncStudentAiFeeItemsInOwnTx` opens
 one. Finance can run it for the whole school (`POST /api/finance/student-ai/sync`).
 
-Opt-ins are read only through `listStudentAiOptIns` (`.../student-ai/opt-ins.ts`). Until phase 2's
-opt-in table is wired in, it derives opt-ins from the licence's student seats (assigned month =
-start month; unassigned = released from the next month). **That temporary body must be replaced
-before shipping**: it would bill every seat holder.
+Opt-ins are read only through `listStudentAiOptIns` (`.../student-ai/opt-ins.ts`), from phase 2's
+`app.ai_optins`: the start month, the status, the first month no longer charged (a release's
+`released_effective_month`; for a transfer, the month the receiving student's opt-in starts -- the
+month after the transfer, so the leaver is charged through the transfer month and no month is
+charged twice), and the monthly price and currency the parent agreed to on the opt-in (the line's
+price is fixed from it). Phase 2's opt-in (parent or on a parent's behalf), release and transfer
+(both students) call `resyncStudentAiAfterCommit` once their transaction commits; so does the
+fee-schedule generator. A failed re-sync is logged at error level with the school and student ids
+(`POST /api/finance/student-ai/sync` is the retry). Opt-ins are per academic year: parents choose
+again each new year, so a new year never carries a line over.
 
 ## Who sees what
 

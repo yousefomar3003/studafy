@@ -25,14 +25,18 @@ for a class, averaged across the classes that have Student AI.
   count. An upload on a weekend or holiday counts for nothing. A material that is never published
   (still scanning, or failed) doesn't count either.
 - **Classes that have Student AI:** `studentAiClassIds` in
-  `apps/api/src/modules/licensing/upload-consistency.ts` is the only definition. For now, a class
-  qualifies when at least one of its students did all of the following at some point in the period:
+  `packages/billing/src/ai-revenue-share/upload-consistency.ts` is the only definition (the API's
+  views and the revenue share engine, in the API and the workers' hourly job, all read through it).
+  A class qualifies when at least one of its students did all of the following at some point in the
+  period:
   - was in the class (enrolment active or completed, or withdrawn during or after the period);
-  - held a student seat (assigned before the period ended and not unassigned before it started);
-  - held that seat on a licence that was in force (activated, with dates overlapping the period) and
-    carries Student AI programme values.
-
-  Phase 2's opt-in can narrow this in that one function.
+  - held a Student AI programme opt-in (phase 2, `app.ai_optins`) whose months overlap the period
+    (start month to last month, or to the month before a release takes effect);
+  - held that opt-in's licence seat in the period (assigned before the period ended and not
+    unassigned before it started; an opt-in still waiting for a seat does not count);
+  - on a licence whose dates overlap the period and that was taken up (not a draft, not cancelled).
+    It need not be activated yet: a licence's first payment is what activates it, and that payment's
+    share measures the very period it pays for.
 
 - **Rounding** always goes down, so a bonus tier is never shown before it is reached. A class's value
   is floor(upload days × 10000 / school days) in basis points. A teacher's value, and the school's,
@@ -45,7 +49,7 @@ for a class, averaged across the classes that have Student AI.
 
 - Pure counting, with no database and no clock: `computeUploadConsistency`, `schoolDaysBetween` and
   `contentBonusStanding` in `packages/license-pricing/src/upload-consistency.ts`.
-- Reads, in `apps/api/src/modules/licensing/upload-consistency.ts`. They use the armed school, and
+- Reads, in `apps/api/src/modules/licensing/upload-consistency.ts` (views) and `packages/billing/src/ai-revenue-share/upload-consistency.ts` (the read). They use the armed school, and
   work as studafy_app for a school admin or principal, or as studafy_admin scoped to the school:
   - `uploadConsistency(tx, { from, to })` returns the school's figure, rows per class
     (`schoolDays`, `uploadDays`, `consistencyBps`, teachers) and rows per teacher. It takes any date
@@ -57,9 +61,9 @@ for a class, averaged across the classes that have Student AI.
     content-bonus tier a percentage falls in, using the values the licence was signed with. With no
     licence, they use the school's current values. They also return the next tier, and the lowest
     tier that pays (`targetBps`, the "below target" line for principals). They show the tier only,
-    never an amount. The tiers are read directly rather than through `resolveAiProgrammeStamp`,
-    because that function also looks up the super admins' names in their own school and so doesn't
-    belong in a school's request.
+    never an amount. The tiers come from the core resolver `resolveAiProgrammeValues`, not
+    `resolveAiProgrammeStamp`, which also looks up the super admins' names in their own school and
+    so is for platform views only.
   - `uploadConsistencyView(tx, period | null)` is what the routes return: the report, how the
     period was chosen (`basis`), and the bonus tier.
 - Index `idx_materials_school_class_published` (migration 000236), a partial index on published

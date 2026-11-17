@@ -13,6 +13,12 @@ when it required the `version-bump` label.
 
 ### Added
 
+- The Student AI programme's phases integrated (no new paths). The revenue share's `commitment`
+  fields reference the licence's own `LicenseCommitment` enum (the separate
+  `AiRevenueShareCommitment` schema is gone; same values). Upload consistency
+  (`UploadConsistency`) measures the classes of students holding a Student AI programme opt-in with
+  a seat (000235). The family view's `student_ai_lines` are priced from the parent's opt-in.
+
 - Student AI opt-in and programme seats (migration 000235; docs/billing/ai-programme.md, phase 2).
   School (`license:read` / `license:manage`): `getSchoolStudentAi` (`GET /api/school/license/student-ai`,
   `SchoolAiOptInOverview`), `openStudentAiWindow` (`POST .../student-ai/windows`,
