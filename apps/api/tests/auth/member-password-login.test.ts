@@ -612,10 +612,10 @@ describe("member password sign-in", () => {
       });
       const student = await claimed([ROLES.STUDENT], "Harbor-Kettle-83");
       // Member codes repeat across test files (each has its own database) but Redis is shared, so
-      // start this ID's and the platform's buckets empty.
+      // start this ID's and its school's buckets empty.
       await client.del(
         buildMemberLoginRateLimitKey("username", student.code),
-        buildMemberLoginRateLimitKey("global"),
+        buildMemberLoginRateLimitKey("school", student.code),
       );
       const phone = await deviceTokenOf(
         await post(

@@ -26,11 +26,10 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
 import { CodedHttpException } from "../../../coded-http-exception";
-import { buildMemberLoginRateLimitKey, MEMBER_LOGIN_BUDGETS } from "../../../config/rateLimits";
 import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
-import { extractClientIp, takeRateLimitToken } from "../../../middleware/rateLimiter";
+import { extractClientIp, takeMemberLoginTokens } from "../../../middleware/rateLimiter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { emitRateLimitBlock } from "../auth-anomaly-events";
@@ -86,10 +85,11 @@ const POLICY_MESSAGES: Record<PasswordPolicyViolation, string> = {
 };
 
 /**
- * Takes a token from the member ID's bucket and the platform-wide bucket (config/rateLimits.ts
- * MEMBER_LOGIN_BUDGETS), throwing 429 when either is empty. Fails open without Redis, like the
- * per-IP limiter, so the account lockout remains the backstop. Not called for a trusted device,
- * whose own failure count limits it (member-password-service.ts, TRUSTED DEVICES).
+ * Takes a token from the member ID's bucket and its school's bucket (config/rateLimits.ts
+ * MEMBER_LOGIN_BUDGETS), throwing 429 when either is empty. On a Redis error the buckets fall back
+ * to an in-process copy rather than failing open (QA-028); with no Redis configured at all the
+ * account lockout is the backstop. Not called for a trusted device, whose own failure count limits
+ * it (member-password-service.ts, TRUSTED DEVICES).
  */
 async function throttleMemberLogin(
   c: Context<AppEnv>,
@@ -98,33 +98,25 @@ async function throttleMemberLogin(
   username: string,
 ): Promise<void> {
   if (!redis) return;
-  const now = Math.floor(Date.now() / 1000);
-  for (const scope of ["username", "global"] as const) {
-    let result;
-    try {
-      result = await takeRateLimitToken(
-        redis,
-        buildMemberLoginRateLimitKey(scope, username),
-        // eslint-disable-next-line security/detect-object-injection -- `scope` is a literal from the tuple above
-        MEMBER_LOGIN_BUDGETS[scope],
-        now,
-      );
-    } catch (err: unknown) {
-      c.get("log")?.warn({ err }, "member login rate limiter redis error, failing open");
-      return;
-    }
-    if (!result.allowed) {
-      c.header("Retry-After", String(result.retryAfter));
-      emitRateLimitBlock(c.get("log"), eventSink, {
-        routeClass: `member-login-${scope}`,
-        path: c.req.path,
-        clientIp: extractClientIp(c),
-        requestId: c.get("requestId"),
-        userAgent: c.req.header("User-Agent"),
-      });
-      throw new HTTPException(429);
-    }
-  }
+  const result = await takeMemberLoginTokens(
+    redis,
+    username,
+    Math.floor(Date.now() / 1000),
+    (err) =>
+      c
+        .get("log")
+        ?.warn({ err }, "member login rate limiter redis error, using the in-process bucket"),
+  );
+  if (result.allowed) return;
+  c.header("Retry-After", String(result.retryAfter));
+  emitRateLimitBlock(c.get("log"), eventSink, {
+    routeClass: `member-login-${result.scope}`,
+    path: c.req.path,
+    clientIp: extractClientIp(c),
+    requestId: c.get("requestId"),
+    userAgent: c.req.header("User-Agent"),
+  });
+  throw new HTTPException(429);
 }
 
 function rejected(reason: PasswordPolicyViolation): never {
