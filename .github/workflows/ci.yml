@@ -573,6 +573,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_CONFIG: .gitleaks.toml
+          # QA-075: the action defaults to gitleaks 8.24.3, which predates the `[[allowlists]]`
+          # tables .gitleaks.toml uses (8.25+). Pinned to the version the allowlist was audited with.
+          GITLEAKS_VERSION: "8.30.1"
 
   quality:
     runs-on: ubuntu-latest
