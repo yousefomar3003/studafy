@@ -43,13 +43,17 @@ Nothing else is requested: no location, contacts, Bluetooth or tracking (ATT). `
 
 **iOS string** (`ios/Runner/Info.plist`):
 
-> Take a photo of a worksheet, whiteboard or handout and upload it to your class as course material.
+> Take a photo of a worksheet, whiteboard or handout to upload to your class as course material, or
+> of a page of your notes or textbook to study with the AI study tools.
 
 - **Where it's asked:** Classes → a class → Materials → **Upload material** → **Camera**
-  (`teacher_content_screen.dart`, `_takePhoto`). This is the only `ImagePicker` call site in the app,
-  and it uses `ImageSource.camera`. iOS shows its prompt at that tap, the first time only.
-- **Who sees it:** teachers. Students, parents and the view-only shell have
-  no camera entry point.
+  (`teacher_content_screen.dart`, `_takePhoto`), Ask AI's photo button, and, for a student, any AI
+  study tool's source picker → **My files & photos** → **Take photo** (`ai_source_picker.dart`,
+  through `DeviceAiSourceFilePicker`). iOS shows its prompt at the first such tap only.
+- **Who sees it:** teachers, and students with the AI study tools. Parents and the view-only shell
+  have no camera entry point.
+- **Students' AI source photos** are uploaded, malware-scanned and read (OCR) like a material, and
+  are visible to that student only.
 - **If declined:** iOS won't show the prompt again; `image_picker` throws `camera_access_denied`.
   The screen now shows "Camera access is off. Turn it on in Settings > Studafy > Camera to take a
   photo." **Choose file** still works. (Before this ticket the exception was unhandled and the
@@ -93,7 +97,8 @@ from an auth-status listener in `app.dart`.
 
 ## Photo library and music library (declared, never shown)
 
-> Studafy only opens a photo you choose to upload to your class as course material.
+> Studafy only opens a photo you choose, to upload to your class as course material or to study
+> with the AI study tools.
 
 > Studafy only opens an audio file you choose to upload to your class as course material.
 

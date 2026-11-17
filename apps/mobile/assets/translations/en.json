@@ -1048,6 +1048,69 @@
       "unknown": "Something went wrong. Try again."
     }
   },
+  "aiSources": {
+    "tabs": {
+      "material": "Study materials",
+      "assignment": "My assignments",
+      "personal": "My files & photos"
+    },
+    "chooser": {
+      "title": "Choose a source",
+      "summaryHint": "Pick what you want summarized.",
+      "conceptsHint": "Pick what you want the key concepts of.",
+      "materialsEmpty": "No study materials are ready for the AI tools yet."
+    },
+    "scope": {
+      "label": "Search in",
+      "all": "All my study materials",
+      "allHint": "Every study material from your classes",
+      "sheetTitle": "Where should the AI look?"
+    },
+    "assignments": {
+      "empty": "You have no assignments to study from yet.",
+      "due": "Due {date}",
+      "files": "{count} files",
+      "use": "Use",
+      "aiOff": "AI off"
+    },
+    "files": {
+      "intro": "Add your own notes or a page from a book. Only you can see them.",
+      "uploadFile": "Upload file",
+      "takePhoto": "Take photo",
+      "choosePhoto": "Gallery",
+      "empty": "No files yet. Add a PDF, Word or PowerPoint file, or a photo of your notes.",
+      "usage": "{count} of {max} files · kept for {months} months",
+      "uploading": "Uploading {name}…",
+      "uploaded": "Uploaded. It will be ready in a moment.",
+      "delete": "Delete",
+      "deleteTitle": "Delete this file?",
+      "deleteBody": "Its text is removed too, along with any quiz questions or flashcards made from it.",
+      "cancel": "Cancel",
+      "deleted": "File deleted."
+    },
+    "status": {
+      "uploading": "Uploading",
+      "scanning": "Checking for viruses",
+      "processing": "Reading the text",
+      "ready": "Ready",
+      "failed": "Couldn't read it",
+      "blocked": "Blocked: unsafe file",
+      "noText": "No text found",
+      "retry": "Try again"
+    },
+    "errors": {
+      "unsupported": "Only PDF, Word, PowerPoint, JPEG or PNG files can be used.",
+      "tooLarge": "This file is too large. Use one under 25 MB.",
+      "limit": "You've reached the limit for your own files. Delete one you no longer need.",
+      "aiOff": "Your school has turned off the AI study tools for this class.",
+      "name": "Please rename this file and try again.",
+      "storageFull": "Your school's storage is full. Delete a file or ask your school.",
+      "permission": "Allow camera or photo access in Settings to add a photo.",
+      "network": "No connection. Check your network and try again.",
+      "generic": "Something went wrong. Try again.",
+      "load": "Couldn't load this list."
+    }
+  },
   "teacher": {
     "student": {
       "error": "Couldn't load this student. Pull to try again.",

@@ -3,11 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
+import 'package:studafy_mobile/src/features/ai/application/ai_source_providers.dart';
 import 'package:studafy_mobile/src/features/ai/application/ai_study_providers.dart';
 import 'package:studafy_mobile/src/features/ai/application/ask_ai_providers.dart';
 import 'package:studafy_mobile/src/features/ai/data/ai_explain_client.dart';
+import 'package:studafy_mobile/src/features/ai/data/ai_sources_client.dart';
 import 'package:studafy_mobile/src/features/ai/domain/ai_explain.dart';
+import 'package:studafy_mobile/src/features/ai/domain/ai_source.dart';
 import 'package:studafy_mobile/src/features/ai/presentation/explain_screen.dart';
+import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 
 import '../../../support/wrap_with_localization.dart';
 
@@ -16,13 +20,18 @@ class _FakeExplainClient implements AiExplainClient {
 
   final List<AiExplainPassage> passages;
   final explained = <(String, AiExplainLevel)>[];
+  final searchedIn = <String?>[];
 
   @override
   Future<List<AiExplainPassage>> search({
     required String studentId,
     required String topic,
     int limit = 5,
-  }) async => passages;
+    String? materialId,
+  }) async {
+    searchedIn.add(materialId);
+    return passages;
+  }
 
   @override
   Future<String> explain({
@@ -52,11 +61,35 @@ const _passages = [
   ),
 ];
 
+class _OwnNotesClient implements AiSourcesClient {
+  @override
+  Future<AiPersonalSources> list({required String studentId}) async => AiPersonalSources(
+    sources: [
+      AiPersonalSource(
+        id: 'my-notes',
+        title: 'My plant notes',
+        mimeType: 'image/jpeg',
+        sizeBytes: 9000,
+        status: AiSourceStatus.ready,
+        hasText: true,
+        createdAt: DateTime(2026, 11, 1),
+      ),
+    ],
+    usage: AiSourceUsage.empty,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError();
+}
+
 Widget _screen(AiExplainClient client) {
   return wrapWithLocalization(
     ProviderScope(
       overrides: [
         aiExplainClientProvider.overrideWithValue(client),
+        aiSourcesClientProvider.overrideWithValue(_OwnNotesClient()),
+        aiSourcePollIntervalProvider.overrideWithValue(Duration.zero),
+        currentEnrolledClassIdsProvider.overrideWithValue(const []),
         askAiStudentIdProvider.overrideWithValue('student-1'),
         aiUsageProvider.overrideWith((ref) async => noAiUsage),
       ],
@@ -127,5 +160,35 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Nothing found on that topic'), findsOneWidget);
+  });
+
+  testWidgets('searches only the source the student picks, such as their own notes', (
+    tester,
+  ) async {
+    final client = _FakeExplainClient(_passages);
+    await tester.pumpWidget(_screen(client));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('aiExplainChooseScope')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('My files & photos'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('My plant notes'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('aiExplainScope')), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'photosynthesis');
+    await tester.pump();
+    await tester.tap(find.text('Explain'));
+    await tester.pumpAndSettle();
+    expect(client.searchedIn, ['my-notes']);
+
+    // Clearing the scope searches every study material again.
+    final scopeChip = find.byKey(const Key('aiExplainScope'));
+    await tester.tap(find.descendant(of: scopeChip, matching: find.byType(Icon)).last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Explain'));
+    await tester.pumpAndSettle();
+    expect(client.searchedIn, ['my-notes', null]);
   });
 }

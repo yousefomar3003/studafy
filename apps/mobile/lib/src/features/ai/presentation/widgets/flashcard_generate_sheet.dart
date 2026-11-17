@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/flashcard_providers.dart';
 import '../../domain/flashcard_state.dart';
+import 'ai_source_picker.dart';
 import 'flashcard_material_picker.dart';
 import '../../../../core/features/feature_gate.dart';
 
@@ -56,10 +57,16 @@ class _FlashcardGenerateSheetState extends State<FlashcardGenerateSheet> {
           const SizedBox(height: AppSpacing.space4),
           Text('flashcards.generate.hint'.tr(), style: TextStyle(color: colorScheme.onSurfaceVariant)),
           const SizedBox(height: AppSpacing.space16),
-          FlashcardMaterialPicker(
+          // Study materials, an assignment, or the student's own files and photos -- one selection.
+          AiSourcePicker(
             selected: _selected.keys.toSet(),
-            onToggle: _toggle,
-            maxSelectable: flashcardMaxMaterials,
+            onSelect: (choice) => _toggle(choice.id, choice.title),
+            atLimit: _selected.length >= flashcardMaxMaterials,
+            studyMaterials: FlashcardMaterialPicker(
+              selected: _selected.keys.toSet(),
+              onToggle: _toggle,
+              maxSelectable: flashcardMaxMaterials,
+            ),
           ),
           const SizedBox(height: AppSpacing.space20),
           Text('flashcards.generate.cardCount'.tr(), style: Theme.of(context).textTheme.titleSmall),

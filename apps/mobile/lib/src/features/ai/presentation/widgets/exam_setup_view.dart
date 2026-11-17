@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/exam_controller.dart';
 import '../../domain/exam_state.dart';
+import 'ai_source_picker.dart';
 import 'exam_material_picker.dart';
 import '../../../../core/features/feature_gate.dart';
 
@@ -58,7 +59,17 @@ class _ExamSetupViewState extends State<ExamSetupView> {
         const SizedBox(height: AppSpacing.space4),
         Text('examMode.setup.hint'.tr(), style: TextStyle(color: colorScheme.onSurfaceVariant)),
         const SizedBox(height: AppSpacing.space16),
-        ExamMaterialPicker(selected: _selected, onToggle: _toggle, maxSelectable: examMaxMaterials),
+        // Study materials, an assignment, or the student's own files and photos -- one selection.
+        AiSourcePicker(
+          selected: _selected,
+          onSelect: (choice) => _toggle(choice.id),
+          atLimit: _selected.length >= examMaxMaterials,
+          studyMaterials: ExamMaterialPicker(
+            selected: _selected,
+            onToggle: _toggle,
+            maxSelectable: examMaxMaterials,
+          ),
+        ),
         const SizedBox(height: AppSpacing.space20),
         Text('examMode.setup.questionCount'.tr(), style: Theme.of(context).textTheme.titleSmall),
         Slider(
