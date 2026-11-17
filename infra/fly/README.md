@@ -61,7 +61,10 @@ Supabase's `postgres` is not a superuser, which the first migrations ran into on
   and installs `pg_stat_statements` in its own `extensions` schema, so 000003's three grants for
   `studafy_monitor` cannot run. Production applied 000003 without those three statements and
   recorded it under the file's real checksum; everything else in it ran as written. The app does
-  not use `studafy_monitor`.
+  not use `studafy_monitor`. Migration 000234 (QA-074) re-applies the `REVOKE ALL … FROM PUBLIC`
+  on `pg_stat_statements` wherever the extension lives, and warns rather than fails where Supabase
+  refuses a grant. Check its warnings in the deploy log; if it could not revoke, run the revoke as
+  the view's owner.
 - **Migration 000002 revokes `CONNECT` on the database from `PUBLIC`.** Supabase's own login roles
   (`pgbouncer`, which the pooler's auth query uses, `authenticator`, `supabase_auth_admin`,
   `supabase_storage_admin`, …) connect through exactly that `PUBLIC` grant. After 000002 every one
