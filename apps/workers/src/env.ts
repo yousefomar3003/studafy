@@ -154,11 +154,12 @@ export const envSchema = z
     CLAMAV_HOST: z.string().min(1).optional(),
     CLAMAV_PORT: z.coerce.number().int().min(1).max(65535).default(3310),
     CLAMAV_TIMEOUT_MS: z.coerce.number().int().positive().default(30_000),
+    // 100 MiB: the largest upload class (material.file); clamd's StreamMaxLength is 101M (QA-054).
     CLAMAV_MAX_FILE_BYTES: z.coerce
       .number()
       .int()
       .positive()
-      .default(25 * 1024 * 1024),
+      .default(100 * 1024 * 1024),
     // Base URL for the action links embedded in emails: the web app's public origin. Every link
     // must open a web page (email/resolve.ts); the API is on a separate host on Fly, so an
     // `/api/...` path here would land on the web app's 404 page.
