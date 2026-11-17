@@ -95,6 +95,16 @@ time).
 Each store is off while its values are empty; the api refuses to boot with a half-configured store
 (`apps/api/src/env.ts`). Locally, put the same names in `.env`.
 
+## Sandbox purchases in production (QA-058)
+
+Production credits a sandbox (App Store) or test-track (Google Play) purchase only for the accounts in
+`STORE_SANDBOX_ALLOWED_USER_IDS`, a comma-separated list of Studafy user ids. Anyone else's gets
+`STORE_PURCHASE_INVALID`, so TestFlight users and Play license testers don't get the AI add-on
+free. App Review buys with a sandbox account against the production server, so **before each
+submission**, put the user id of the demo account you give the reviewers in this list
+(`fly secrets set STORE_SANDBOX_ALLOWED_USER_IDS=<id>[,<id>] -a studafy-core-api`). Outside
+production every sandbox purchase is accepted.
+
 ## App Store (once per app)
 
 1. **Agreements.** App Store Connect → Business → accept the **Paid Apps** agreement and add bank and

@@ -312,6 +312,10 @@ export const envSchema = z
     // push endpoint's URL that authenticates Google's notifications (a secret).
     GOOGLE_PLAY_SERVICE_ACCOUNT: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     GOOGLE_PLAY_RTDN_TOKEN: z.preprocess(emptyAsUnset, z.string().min(16).optional()),
+    // QA-058: comma-separated Studafy user ids (the App Review demo accounts) whose sandbox or
+    // test-track purchases production credits. Everyone else's are refused. Unset in production
+    // means nobody's; ignored elsewhere, where sandbox purchases are always accepted.
+    STORE_SANDBOX_ALLOWED_USER_IDS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Cross-encoder re-ranking (ST-163) kill switch. Off by default: an unset or "false" value leaves
     // the retrieval route on the raw RRF ranking with zero re-ranking cost. Validated as an explicit
     // two-value string so a typo ("yes") fails bootstrap instead of silently flipping the feature on.
