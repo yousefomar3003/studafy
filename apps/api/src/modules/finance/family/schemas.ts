@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
+import { familyStudentAiLineSchema } from "../student-ai/schemas";
+
 import type { SupportedLocale } from "../../../middleware/locale";
 
 const dateSchema = z
@@ -115,6 +117,11 @@ const familyStudentSectionSchema = z
     installments: z.array(installmentSummarySchema),
     payments: z.array(paymentSummarySchema),
     totals: z.array(currencyTotalSchema),
+    student_ai_lines: z.array(familyStudentAiLineSchema).openapi({
+      description:
+        "The child's Student AI line per academic year (newest first): monthly price x months = " +
+        "total, paid with tuition. Empty when the child has not opted in.",
+    }),
   })
   .openapi("FamilyStudentSection");
 

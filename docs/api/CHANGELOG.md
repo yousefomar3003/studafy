@@ -13,6 +13,17 @@ when it required the `version-bump` label.
 
 ### Added
 
+- The Student AI line on tuition (migration 000238; docs/billing/student-ai-tuition-line.md).
+  `FamilyStudentSection` (`GET /api/finance/families/{familyId}`) adds `student_ai_lines`
+  (`FamilyStudentAiLine[]`: monthly price x months = total in the school's currency, start month,
+  `late_start`, `stopped_from`, `billing` auto | outside, invoiced and planned amounts; never the
+  licence price or a revenue share). Finance: `getStudentAiBillingSettings` and
+  `updateStudentAiBillingSettings` (`GET`/`PUT /api/finance/student-ai/settings`,
+  `StudentAiBillingSettings`, body `UpdateStudentAiBillingSettingsBody`, response
+  `StudentAiSettingsResult`), `listStudentAiLines` (`GET /api/finance/student-ai/lines`,
+  `StudentAiFinanceLineList`) and `syncStudentAiLines` (`POST /api/finance/student-ai/sync`,
+  `StudentAiSyncSummary`); reads on `billing:read`, changes on `billing:update`.
+
 - The Student AI programme's settings, versioned (migration 000234; docs/billing/ai-programme.md).
   Super admin only (`platform:read` to read, `platform:manage` to save, web channel):
   `platformGetAiProgramme` (`GET /api/platform/ai-programme`), `platformListAiProgrammeVersions` and

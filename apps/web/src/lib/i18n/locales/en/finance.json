@@ -61,7 +61,8 @@
       "reports": "Reports →",
       "expenses": "Expenses →",
       "families": "Families →",
-      "tax": "Sales tax (VAT)"
+      "tax": "Sales tax (VAT)",
+      "studentAi": "Student AI on tuition"
     }
   },
   "overdue": {
@@ -717,5 +718,37 @@
     "savedToast": "Tax settings saved",
     "saveError": "The tax settings could not be saved.",
     "loadError": "Unable to load the tax settings."
+  },
+  "studentAi": {
+    "title": "Student AI on tuition",
+    "intro": "Each student whose family chose Student AI has a Student AI fee: the monthly price times the months left in the school's academic year. Parents see it in the app as paid with tuition.",
+    "billingTitle": "Billing",
+    "autoBilling": "Add Student AI to the fee schedule",
+    "autoOn": "On: the fee is spread over each student's tuition instalments and added to the invoices generated for them.",
+    "autoOff": "Off: Studafy adds nothing to invoices. Bill Student AI with tuition yourself; parents still see the line as paid with tuition.",
+    "notRetroactive": "Changes apply only to what is not yet invoiced. Invoiced amounts never change; turning billing back on starts from this month.",
+    "readOnly": "You can view this page, but changing billing needs the billing:update permission.",
+    "recalculate": "Recalculate lines",
+    "savedToast": "Student AI billing saved",
+    "saveError": "The Student AI billing setting could not be saved.",
+    "recalculatedToast": "Student AI lines recalculated",
+    "recalculateError": "The Student AI lines could not be recalculated.",
+    "syncSummary": "{{created}} added, {{updated}} changed, {{removed}} removed.",
+    "loadError": "Unable to load the Student AI settings.",
+    "linesTitle": "Student AI lines",
+    "linesError": "Unable to load the Student AI lines.",
+    "empty": "No student has Student AI on their fees yet.",
+    "columns": {
+      "student": "Student",
+      "line": "Fee",
+      "period": "Period",
+      "invoiced": "Invoiced",
+      "planned": "Still to invoice"
+    },
+    "line_one": "{{price}}/month × {{count}} month = {{total}}",
+    "line_other": "{{price}}/month × {{count}} months = {{total}}",
+    "period": "{{start}} to {{end}}",
+    "stoppedFrom": "From {{start}}, stopped from {{stop}}",
+    "billedBySchool": "Billed by the school"
   }
 }

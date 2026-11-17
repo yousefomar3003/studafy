@@ -1201,6 +1201,26 @@ const GUARD_CASES: GuardCase[] = [
     permission: "billing:read",
     source: "finance/expenses/routes.ts",
   },
+  // The Student AI line on tuition (000238): reads on billing:read, the switch and the
+  // recalculation on billing:update (the recalculation is the write probe: it is idempotent).
+  {
+    method: "GET",
+    path: "/api/finance/student-ai/settings",
+    permission: "billing:read",
+    source: "finance/student-ai/routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/finance/student-ai/lines",
+    permission: "billing:read",
+    source: "finance/student-ai/routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/finance/student-ai/sync",
+    permission: "billing:update",
+    source: "finance/student-ai/routes.ts",
+  },
   {
     method: "GET",
     path: "/api/finance/reports/ar-aging",

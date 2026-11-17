@@ -274,6 +274,10 @@ describe("structure", () => {
         "/api/finance/invoices/{invoiceId}/cancellation",
         "/api/finance/payments/{paymentId}/reversal",
         "/api/finance/tax-settings",
+        // The Student AI line on tuition (000238): billing:read / billing:update.
+        "/api/finance/student-ai/settings",
+        "/api/finance/student-ai/lines",
+        "/api/finance/student-ai/sync",
         "/api/finance/scholarships",
         "/api/finance/scholarships/{scholarshipId}",
         "/api/finance/scholarship-awards",
@@ -1461,6 +1465,11 @@ describe("security", () => {
         "POST /api/finance/payments/{paymentId}/reversal",
         "GET /api/finance/tax-settings",
         "PUT /api/finance/tax-settings",
+        // The Student AI line on tuition (000238): billing:read / billing:update.
+        "GET /api/finance/student-ai/settings",
+        "PUT /api/finance/student-ai/settings",
+        "GET /api/finance/student-ai/lines",
+        "POST /api/finance/student-ai/sync",
         "GET /api/finance/scholarships",
         "POST /api/finance/scholarships",
         "PATCH /api/finance/scholarships/{scholarshipId}",

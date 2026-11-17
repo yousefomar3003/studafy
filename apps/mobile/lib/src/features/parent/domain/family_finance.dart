@@ -181,6 +181,55 @@ class FamilyReceipt {
   String get amountLabel => moneyLabel(amount, currency);
 }
 
+/// A child's "Student AI" line for one academic year, as `GET /api/finance/families/{familyId}`
+/// reports it (`student_ai_lines`): the monthly price times the months charged equals the total,
+/// paid with tuition. Amounts are the decimal strings the API already formatted to the school
+/// currency's precision. Whether the school bills it on the fee schedule or itself is not read:
+/// the parent pays it with tuition either way and sees the same line. It never carries what the
+/// school pays for its licence or any revenue share — those are not on the wire at all.
+class FamilyStudentAiLine {
+  const FamilyStudentAiLine({
+    required this.academicYearName,
+    required this.currency,
+    required this.monthlyPrice,
+    required this.months,
+    required this.total,
+    required this.startMonth,
+    required this.lateStart,
+    required this.stoppedFrom,
+  });
+
+  factory FamilyStudentAiLine.fromJson(Map<String, Object?> json) => FamilyStudentAiLine(
+        academicYearName: json['academic_year_name']! as String,
+        currency: json['currency']! as String,
+        monthlyPrice: json['monthly_price']! as String,
+        months: (json['months']! as num).toInt(),
+        total: json['total']! as String,
+        startMonth: _month(json['start_month']! as String),
+        lateStart: json['late_start'] as bool? ?? false,
+        stoppedFrom: json['stopped_from'] == null ? null : _month(json['stopped_from']! as String),
+      );
+
+  /// `"2026-09"` → the first day of that month.
+  static DateTime _month(String value) => DateTime.parse('$value-01');
+
+  final String academicYearName;
+  final String currency;
+  final String monthlyPrice;
+  final int months;
+  final String total;
+
+  /// The first month charged; shown when the child joined after the year began ([lateStart]).
+  final DateTime startMonth;
+  final bool lateStart;
+
+  /// The first month no longer charged, once the seat was released or transferred.
+  final DateTime? stoppedFrom;
+
+  String get monthlyPriceLabel => moneyLabel(monthlyPrice, currency);
+  String get totalLabel => moneyLabel(total, currency);
+}
+
 /// One linked child's full finance detail, as the family financial view scopes it.
 class FamilyStudentFinance {
   const FamilyStudentFinance({
@@ -189,6 +238,7 @@ class FamilyStudentFinance {
     required this.installments,
     required this.receipts,
     required this.totals,
+    this.studentAiLines = const [],
   });
 
   final String studentId;
@@ -197,7 +247,11 @@ class FamilyStudentFinance {
   final List<FamilyReceipt> receipts;
   final List<MoneyTotal> totals;
 
-  bool get isEmpty => invoices.isEmpty && installments.isEmpty && receipts.isEmpty;
+  /// The child's Student AI line per academic year, newest first; empty when not opted in.
+  final List<FamilyStudentAiLine> studentAiLines;
+
+  bool get isEmpty =>
+      invoices.isEmpty && installments.isEmpty && receipts.isEmpty && studentAiLines.isEmpty;
 }
 
 /// The parent-facing slice of `GET /api/finance/families/{familyId}`: read-only per

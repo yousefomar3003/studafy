@@ -173,4 +173,54 @@ void main() {
       expect(view.amountsDueFor('child-2'), isEmpty);
     });
   });
+
+  group('FamilyStudentAiLine.fromJson', () {
+    Map<String, Object?> lineJson({String? stoppedFrom, bool lateStart = false}) => {
+          'academic_year_id': '7a1e4a39-87c1-4a76-9a4c-0d36a6a3a2c1',
+          'academic_year_name': '2026/27',
+          'currency': 'USD',
+          'currency_minor_unit': 2,
+          'monthly_price': '6.00',
+          'monthly_price_minor': 600,
+          'months': 10,
+          'total': '60.00',
+          'total_minor': 6000,
+          'start_month': '2026-09',
+          'end_month': '2027-06',
+          'late_start': lateStart,
+          'stopped_from': stoppedFrom,
+          'status': stoppedFrom == null ? 'active' : 'released',
+          'billing': 'outside',
+          'invoiced': '0.00',
+          'invoiced_minor': 0,
+          'planned': '0.00',
+          'planned_minor': 0,
+        };
+
+    test('parses the price, months, total and months as dates', () {
+      final line = FamilyStudentAiLine.fromJson(lineJson(stoppedFrom: '2027-01'));
+
+      expect(line.monthlyPriceLabel, '6.00 USD');
+      expect(line.totalLabel, '60.00 USD');
+      expect(line.months, 10);
+      expect(line.startMonth, DateTime(2026, 9));
+      expect(line.stoppedFrom, DateTime(2027, 1));
+    });
+
+    test('an active line has no stop month; a section with only a line is not empty', () {
+      final line = FamilyStudentAiLine.fromJson(lineJson());
+      expect(line.stoppedFrom, isNull);
+      expect(line.lateStart, isFalse);
+
+      final section = FamilyStudentFinance(
+        studentId: 'child-1',
+        invoices: const [],
+        installments: const [],
+        receipts: const [],
+        totals: const [],
+        studentAiLines: [line],
+      );
+      expect(section.isEmpty, isFalse);
+    });
+  });
 }

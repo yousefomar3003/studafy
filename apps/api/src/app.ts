@@ -126,6 +126,7 @@ import {
   scholarshipRoutes,
   siblingDiscountRoutes,
   taxSettingsRoutes,
+  studentAiFinanceRoutes,
   financeStudentRoutes,
   financeUnlinkedRoutes,
   refundWebhookRoutes,
@@ -698,6 +699,9 @@ export function createApp({
     app.route("/", siblingDiscountRoutes(database));
     // Sales tax (VAT) settings: Studafy's own too, applied by the billing worker at generation.
     app.route("/", taxSettingsRoutes(database));
+    // The Student AI line on tuition (000238): the auto-billing switch and finance's list. Studafy's
+    // own tables; the billing worker puts the portions on the invoices it generates.
+    app.route("/", studentAiFinanceRoutes(database));
     app.route("/", financeStudentRoutes(database));
     // Students with no guardian and parents with no children: the people no family reaches.
     app.route("/", financeUnlinkedRoutes(database));

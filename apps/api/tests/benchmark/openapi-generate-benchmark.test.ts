@@ -298,6 +298,10 @@ const EXPECTED_PATHS = [
   "/api/finance/invoices/{invoiceId}/cancellation",
   "/api/finance/payments/{paymentId}/reversal",
   "/api/finance/tax-settings",
+  // The Student AI line on tuition (000238).
+  "/api/finance/student-ai/settings",
+  "/api/finance/student-ai/lines",
+  "/api/finance/student-ai/sync",
   "/api/finance/students/{studentId}",
   "/api/finance/scholarships",
   "/api/finance/scholarships/{scholarshipId}",
