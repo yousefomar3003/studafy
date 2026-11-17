@@ -14,6 +14,9 @@ kill_timeout = "60s"
   dockerfile = "../docker/workers.Dockerfile"
 
 [env]
+  # QA-072: the Prometheus endpoint (METRICS_PORT, [metrics] below) listens on the private network
+  # address only, where fly's scraper reaches it, not on every interface.
+  METRICS_HOST = "fly-local-6pn"
   SHUTDOWN_TIMEOUT_MS = "45000"
   NODE_ENV = "production"
   SERVICE_NAME = "workers"

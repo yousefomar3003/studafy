@@ -127,6 +127,10 @@ export const envSchema = z
     // (@studafy/observability's startMetricsServer) must never be reachable through the public
     // path api's own PORT is, since it carries no auth of its own — fly exposes only PORT. 9464 is Prometheus's own registered default port.
     METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+    // QA-072: the address the metrics endpoint binds. Unset means every interface (local runs and
+    // tests). On fly.io it is `fly-local-6pn`, the machine's private-network address, which fly's
+    // metrics scraper uses; the endpoint has no auth of its own, so it listens nowhere else.
+    METRICS_HOST: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Distributed tracing (ST-260): base URL of an OTLP/HTTP receiver — Axiom's EU edge in
     // production (infra/fly/README.md), with its auth in OTEL_EXPORTER_OTLP_HEADERS. Optional and
     // unset by default — dev, test and the OpenAPI generator all run with no receiver reachable, the

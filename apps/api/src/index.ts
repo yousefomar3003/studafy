@@ -54,7 +54,11 @@ const errorMonitoring = initErrorMonitoring({
 // createRedMetricsMiddleware(), since an OTel instrument stays bound to whichever meter created
 // it and this call is what registers the real global MeterProvider (see
 // packages/observability/src/redMetrics.ts).
-const metricsServer = startMetricsServer({ serviceName: env.SERVICE_NAME, port: env.METRICS_PORT });
+const metricsServer = startMetricsServer({
+  serviceName: env.SERVICE_NAME,
+  port: env.METRICS_PORT,
+  host: env.METRICS_HOST,
+});
 
 // Distributed tracing (ST-260), same "before anything can call trace.getTracer()" ordering
 // requirement — null when OTEL_EXPORTER_OTLP_ENDPOINT is unset (dev, test, the OpenAPI generator).

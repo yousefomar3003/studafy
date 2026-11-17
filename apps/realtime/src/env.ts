@@ -61,6 +61,10 @@ export const envSchema = z
     // route to it. 9464 is Prometheus's own registered default port. Distinct from this app's own
     // existing GET /metrics (src/health.ts) — the JSON fan-out-counter debug endpoint, unchanged.
     METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+    // QA-072: the address the metrics endpoint binds. Unset means every interface (local runs and
+    // tests). On fly.io it is `fly-local-6pn`, the machine's private-network address, which fly's
+    // metrics scraper uses; the endpoint has no auth of its own, so it listens nowhere else.
+    METRICS_HOST: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Distributed tracing (ST-260): see apps/api/src/env.ts's own OTEL_EXPORTER_OTLP_ENDPOINT for
     // what this is, why it's optional, and why an empty string is also accepted.
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional().or(z.literal("")),

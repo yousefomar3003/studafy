@@ -51,6 +51,10 @@ export const envSchema = z
     // it exists solely for @studafy/observability's Prometheus-format /metrics endpoint (ST-259).
     // 9464 is Prometheus's own registered default port.
     METRICS_PORT: z.coerce.number().int().min(1).max(65535).default(9464),
+    // QA-072: the address the metrics endpoint binds. Unset means every interface (local runs and
+    // tests). On fly.io it is `fly-local-6pn`, the machine's private-network address, which fly's
+    // metrics scraper uses; the endpoint has no auth of its own, so it listens nowhere else.
+    METRICS_HOST: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // /healthz (QA-046): poll-loop and BullMQ worker liveness, checked by Fly. Internal only.
     WORKERS_HEALTH_PORT: z.coerce.number().int().min(1).max(65535).default(8081),
     // Distributed tracing (ST-260): see apps/api/src/env.ts's own OTEL_EXPORTER_OTLP_ENDPOINT for
