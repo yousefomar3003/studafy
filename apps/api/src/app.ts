@@ -151,7 +151,9 @@ import {
   platformLicenseBillingRoutes,
   platformLicenseConsoleRoutes,
   platformAiProgrammeRoutes,
+  platformAiRevenueShareRoutes,
   platformLicenseRoutes,
+  schoolAiRevenueShareRoutes,
   schoolLicenseBillingRoutes,
   schoolLicenseRoutes,
 } from "./modules/licensing";
@@ -1285,6 +1287,10 @@ export function createApp({
     // The Student AI programme's settings (000234): global and per-school versions, and the values a
     // licence was signed with.
     app.route("/", platformAiProgrammeRoutes(licensingDeps));
+    // The Student AI revenue share (000237): the console's ledger, measurements, recompute and
+    // payouts, and the school's own read (aiRevenueShare:read).
+    app.route("/", platformAiRevenueShareRoutes(licensingDeps));
+    app.route("/", schoolAiRevenueShareRoutes(licensingDeps));
   }
 
   // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with

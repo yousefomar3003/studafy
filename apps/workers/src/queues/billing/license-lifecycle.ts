@@ -15,12 +15,20 @@
  *     entitlements are bumped so the AI stops at once. Every instalment counts: a later one going unpaid stops it again;
  *  5. a licence stopped for non-payment with nothing past the cutoff any more (paid, or its invoice
  *     voided) is resumed. The API resumes it the moment the payment is recorded; this is the safety
- *     net. A licence the super admin suspended by hand is never resumed here.
+ *     net. A licence the super admin suspended by hand is never resumed here;
+ *  6. the Student AI revenue share (000237, @studafy/billing runRevenueShareTick), in a transaction
+ *     of its own so a failure there never holds back the steps above: conversion measurements whose
+ *     measurement day has come are taken and locked, pending shares are worked out again, and the
+ *     school's shares are settled -- forfeited for an instalment unpaid past its cutoff (after step
+ *     4 has stopped the licence), credited on open later invoices, or due for payout once the licence
+ *     has ended.
  *
  * Each school runs in its own system tenant transaction (one failing school does not strand the
  * rest), every change writes an audit row with no actor, and every step is idempotent: a re-run finds
  * nothing left to change.
  */
+
+import { runRevenueShareTick } from "@studafy/billing";
 
 import { emitAuditLogs } from "../../db/audit";
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -40,6 +48,12 @@ export interface LicenseLifecycleResult {
   licensesStopped: number;
   licensesResumed: number;
   failedSchools: number;
+  /** Revenue share (000237): measurements locked, pending shares worked out, entries settled. */
+  conversionsLocked: number;
+  sharesResolved: number;
+  sharesSettled: number;
+  /** Schools whose revenue share pass failed (the lifecycle steps for them still committed). */
+  failedRevenueShareSchools: number;
 }
 
 /** Expire the school's licenses that have ended; bump their seat holders. */
@@ -323,6 +337,10 @@ export async function runLicenseLifecycle(
     licensesStopped: 0,
     licensesResumed: 0,
     failedSchools: 0,
+    conversionsLocked: 0,
+    sharesResolved: 0,
+    sharesSettled: 0,
+    failedRevenueShareSchools: 0,
   };
 
   for (const schoolId of schools) {
@@ -342,6 +360,21 @@ export async function runLicenseLifecycle(
     } catch (err) {
       result.failedSchools += 1;
       log.warn({ err, school_id: schoolId }, "license lifecycle failed for school");
+    }
+    try {
+      await withSystemTenantTx(sql, { schoolId }, async (tx) => {
+        const tick = await runRevenueShareTick(tx, {
+          schoolId,
+          now,
+          audit: (entries) => emitAuditLogs(tx, entries),
+        });
+        result.conversionsLocked += tick.snapshotsLocked;
+        result.sharesResolved += tick.sharesResolved;
+        result.sharesSettled += tick.changes.length;
+      });
+    } catch (err) {
+      result.failedRevenueShareSchools += 1;
+      log.warn({ err, school_id: schoolId }, "revenue share pass failed for school");
     }
   }
 

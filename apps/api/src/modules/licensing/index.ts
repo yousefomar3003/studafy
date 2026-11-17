@@ -11,6 +11,7 @@ export { platformLicenseBillingRoutes } from "./billing-platform-routes";
 export { schoolLicenseBillingRoutes } from "./billing-school-routes";
 export { platformLicenseConsoleRoutes } from "./console-routes";
 export { platformAiProgrammeRoutes } from "./ai-programme-routes";
+export { platformAiRevenueShareRoutes, schoolAiRevenueShareRoutes } from "./revenue-share-routes";
 export {
   INITIAL_AI_PROGRAMME_VERSION_ID,
   attachAiProgramme,
@@ -77,3 +78,11 @@ export {
   type RenewalProviders,
 } from "./overlap";
 export { inSchool, type LicenseActor } from "./context";
+export {
+  licenseRevenueShare,
+  recomputeRevenueShare,
+  recordRevenueSharePayout,
+  remeasureConversion,
+  schoolRevenueShare,
+} from "./revenue-share";
+export { useRevenueShareMeasures } from "./revenue-share-context";

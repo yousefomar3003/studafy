@@ -9,7 +9,13 @@ import {
 
 import { attachAiProgramme, currentAiProgrammeStamp } from "./ai-programme";
 import { auditLicenseChange, licenseError } from "./context";
-import { activateLicenseFor, integerSetting, issueInvoice, utcDate } from "./invoices";
+import {
+  activateLicenseFor,
+  firstInstalmentPaid,
+  integerSetting,
+  issueInvoice,
+  utcDate,
+} from "./invoices";
 import { priceQuote } from "./pricing";
 import {
   AUDIENCES,
@@ -959,9 +965,10 @@ export async function acceptQuote(
     actor,
     now,
   );
-  // Fully covered by credits: nothing to pay, so it is in force now.
+  // Fully covered by credits -- or its first instalment covered by the school's revenue share
+  // credit (000237): nothing to pay first, so it is in force now.
   const activation =
-    invoice.status === "paid"
+    invoice.status === "paid" || (await firstInstalmentPaid(tx, invoice.id))
       ? await activateLicenseFor(tx, schoolId, invoice, actor, now)
       : { versions: new Map<string, number>(), pending: [] };
   merge(activation);

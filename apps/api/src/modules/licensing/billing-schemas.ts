@@ -563,7 +563,9 @@ export const platformInvoiceListSchema = z
 const invoiceLineSchema = z
   .object({
     position: z.number().int(),
-    kind: z.enum(["seats", "overlap_credit", "adjustment"]).openapi("LicenseInvoiceLineKind"),
+    kind: z
+      .enum(["seats", "overlap_credit", "adjustment", "ai_share_credit"])
+      .openapi("LicenseInvoiceLineKind"),
     description: z.string(),
     audience: nullableAudience(),
     planId: uuid.nullable(),

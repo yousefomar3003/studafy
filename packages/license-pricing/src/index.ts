@@ -89,3 +89,21 @@ export type {
   RevenueSharePreview,
   RevenueSharePreviewInput,
 } from "./ai-programme";
+export {
+  REVENUE_SHARE_COMMITMENTS,
+  addDaysUtc,
+  computeRevenueShare,
+  instalmentPeriods,
+  measurementDateOf,
+  ratioBps,
+  shareAmountOf,
+  studentPartOf,
+} from "./revenue-share";
+export type {
+  InstalmentPeriod,
+  InstalmentPeriodInput,
+  RevenueShareCommitment,
+  RevenueShareInput,
+  RevenueShareResult,
+  RevenueShareSettings,
+} from "./revenue-share";
