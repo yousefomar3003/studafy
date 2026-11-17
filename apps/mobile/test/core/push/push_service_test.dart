@@ -1,3 +1,6 @@
+import 'package:dio/dio.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/push/push_service.dart';
 
@@ -92,6 +95,84 @@ void main() {
 
     test('a payload with no notification type navigates nowhere', () {
       expect(resolveNotificationTapRoute(const {}), isNull);
+    });
+  });
+
+  group('describePushFailure', () {
+    test(
+      'a wrapped Java exception from a platform channel names the innermost cause',
+      () {
+        // What Firebase.initializeApp() threw on Android release builds 1.0.0 (1706): pigeon puts
+        // the Java exception's toString() in the code and its class name in the message.
+        final error = PlatformException(
+          code:
+              'java.util.concurrent.ExecutionException: java.util.concurrent.ExecutionException: '
+              'java.util.concurrent.ExecutionException: java.lang.NullPointerException: '
+              'FirebaseCrashlytics component is not present.',
+          message: 'ExecutionException',
+          details: 'Cause: ...\nStacktrace: ...',
+        );
+        expect(
+          describePushFailure(error),
+          'PlatformException: NullPointerException: FirebaseCrashlytics component is not present.',
+        );
+      },
+    );
+
+    test(
+      'an ordinary platform error keeps its code and the first line of its message',
+      () {
+        final error = PlatformException(
+          code: 'firebase_messaging',
+          message: 'SERVICE_NOT_AVAILABLE\nmore detail',
+        );
+        expect(
+          describePushFailure(error),
+          'PlatformException(firebase_messaging): SERVICE_NOT_AVAILABLE',
+        );
+      },
+    );
+
+    test('a Firebase error names plugin and code', () {
+      final error = FirebaseException(
+        plugin: 'core',
+        code: 'not-initialized',
+        message: 'Firebase has not been correctly initialized.',
+      );
+      expect(
+        describePushFailure(error),
+        'FirebaseException(core/not-initialized): Firebase has not been correctly initialized.',
+      );
+    });
+
+    test('HTTP failures name only the status', () {
+      final request = RequestOptions(path: '/api/auth/devices');
+      final error = DioException(
+        requestOptions: request,
+        response: Response(
+          requestOptions: request,
+          statusCode: 503,
+          data: 'secret body',
+        ),
+      );
+      expect(describePushFailure(error), 'HTTP 503');
+    });
+
+    test('other errors give their type and first line', () {
+      expect(
+        describePushFailure(StateError('boom\nsecond line')),
+        'StateError: Bad state: boom',
+      );
+    });
+
+    test('never shows a token-like string, and stays short', () {
+      final token = '${'f' * 30}:APA91b${'x' * 140}';
+      final described = describePushFailure(
+        Exception('registration rejected for $token ${'y ' * 80}'),
+      );
+      expect(described, isNot(contains('APA91b')));
+      expect(described.length, lessThanOrEqualTo(120));
+      expect(described, endsWith('…'));
     });
   });
 }
