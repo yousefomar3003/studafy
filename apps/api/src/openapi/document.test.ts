@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { Validator } from "@seriousme/openapi-schema-validator";
@@ -1533,14 +1533,21 @@ describe("the generated artifact", () => {
   // The generated file is gitignored and regenerated in CI. This test writes it if absent (e.g.
   // a fresh checkout) and verifies it matches the current routes.
   test("matches what the routes currently generate", async () => {
-    const file = Bun.file(COMMITTED_SPEC);
-    const exists = await file.exists();
-
-    if (!exists) {
-      await writeFile(COMMITTED_SPEC, `${JSON.stringify(document, null, 2)}\n`);
+    if (!(await Bun.file(COMMITTED_SPEC).exists())) {
+      // Generate it exactly as `bun run openapi:generate` does (banner included): importing the
+      // script runs it. OPENAPI_OUT is cleared so it writes the default path read below.
+      const out = process.env.OPENAPI_OUT;
+      delete process.env.OPENAPI_OUT;
+      try {
+        await import("../../scripts/generate-openapi");
+      } finally {
+        if (out !== undefined) process.env.OPENAPI_OUT = out;
+      }
     }
 
-    const committed = (await file.json()) as Record<string, unknown>;
+    // Read through a fresh handle: a Bun.file that saw the file missing keeps its size of 0, so
+    // reading it after the write above returned "" (Unexpected end of JSON input).
+    const committed = JSON.parse(await readFile(COMMITTED_SPEC, "utf8")) as Record<string, unknown>;
     const { [BANNER_KEY]: banner, ...spec } = committed;
 
     expect(banner, "the generator's do-not-edit banner is missing").toBeString();
