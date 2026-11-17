@@ -78,9 +78,9 @@ Google and Microsoft do not rename the OAuth client when you rotate its secret â
 
 ### S3-compatible access keys (`S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`)
 
-The Cloudflare R2 API token for `studafy-prod-files`. The api reads it as
-`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY`; the workflow hands the workers the same pair as
-`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`.
+The Cloudflare R2 API token for `studafy-prod-files`. The api and the workers both read it as
+`S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` (QA-071; the workers used to be handed it as
+`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`, which is only the S3 SDK's name for it, not AWS).
 
 1. Create a new R2 API token in the Cloudflare dashboard.
 2. Set both halves in the `prod` environment and run the deploy workflow (they must be set together

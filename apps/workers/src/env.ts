@@ -87,6 +87,10 @@ export const envSchema = z
     S3_ENDPOINT: z.string().url().optional(),
     S3_REGION: z.string().min(1).optional(),
     S3_APP_FILES_BUCKET: z.string().min(1).optional(),
+    // The R2 keys, under the api's names (QA-071). Set together; s3-credentials.ts hands them to the
+    // S3 SDK, whose credential chain reads AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY.
+    S3_ACCESS_KEY_ID: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
+    S3_SECRET_ACCESS_KEY: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     SCHOOL_IDS: z.string().min(1).default(""),
     // ERPNext integration — required for billing queue. Both must be set together.
     ERPNEXT_API_URL: z.preprocess(emptyAsUnset, z.string().url().optional()),
@@ -233,6 +237,14 @@ export const envSchema = z
           message: (error as Error).message,
         });
       }
+    }
+
+    if ((env.S3_ACCESS_KEY_ID === undefined) !== (env.S3_SECRET_ACCESS_KEY === undefined)) {
+      context.addIssue({
+        code: "custom",
+        path: ["S3_ACCESS_KEY_ID"],
+        message: "S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set together",
+      });
     }
 
     if (

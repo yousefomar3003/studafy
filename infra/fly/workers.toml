@@ -36,7 +36,8 @@ kill_timeout = "60s"
   NODE_EXTRA_CA_CERTS = "/etc/studafy/supabase-ca.pem"
   S3_REGION = "auto"
   S3_APP_FILES_BUCKET = "studafy-prod-files"
-  # The AWS SDK's own credential chain reads the R2 keys from AWS_ACCESS_KEY_ID/SECRET (secrets).
+  # The R2 keys are the S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY secrets, as on the api; the workers
+  # hand them to the S3 SDK at startup (apps/workers/src/s3-credentials.ts, QA-071).
   AWS_REGION = "auto"
   # clamd runs as its own app, reached over the organisation's private network (scanner.toml).
   CLAMAV_HOST = "studafy-core-scanner.flycast"

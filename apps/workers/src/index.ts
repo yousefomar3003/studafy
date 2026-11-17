@@ -47,12 +47,15 @@ import { startSchoolEventNotifier } from "./queues/notifications/school-events";
 import { startRelay } from "./queues/outbox-relay";
 import { scheduleReportExpiryJob } from "./queues/reports";
 import { QUEUE_REGISTRY } from "./registry";
+import { applyS3CredentialAliases } from "./s3-credentials";
 import { drainThenClose, startWorkers } from "./worker";
 
 import type { RelayHandle } from "./queues/outbox-relay/relay";
 
 // Fail fast: an invalid environment throws EnvValidationError here, before any Redis connection opens.
 const env = loadEnv();
+// Before any S3 client resolves credentials: the R2 keys arrive as S3_*, the SDK reads AWS_*.
+applyS3CredentialAliases();
 
 // Sentry error monitoring — null (and every reporting call a no-op) when SENTRY_DSN is unset. Before
 // startTracing(), for the context-manager ordering apps/api/src/index.ts's own call documents.
