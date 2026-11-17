@@ -122,16 +122,18 @@ async function student(schoolId: string): Promise<{ userId: string; studentId: s
 
 async function license(
   schoolId: string,
-  options: { status?: string; startsAt: Date; endsAt: Date; seats?: number },
+  options: { status?: string; startsAt: Date; endsAt: Date; seats?: number; graceDays?: number },
 ): Promise<string> {
   return admin(schoolId, async (tx) => {
     const [row] = await tx<{ id: string }[]>`
       INSERT INTO app.school_licenses (
         school_id, status, starts_at, ends_at, student_plan_id, student_seats, currency_id,
-        created_by, activated_at
+        created_by, activated_at, ai_programme_version_id, nonpayment_grace_days
       ) VALUES (
         ${schoolId}::uuid, ${options.status ?? "active"}, ${options.startsAt}, ${options.endsAt}, ${tier}::uuid,
-        ${options.seats ?? 5}, ${usd}::uuid, ${hq.superAdmin}::uuid, ${options.startsAt}
+        ${options.seats ?? 5}, ${usd}::uuid, ${hq.superAdmin}::uuid, ${options.startsAt},
+        -- The approved defaults (000234), with the licence's grace period.
+        'a1000000-0000-4000-8000-000000000001'::uuid, ${options.graceDays ?? 30}
       )
       RETURNING id::text AS id
     `;
@@ -760,6 +762,33 @@ describe("AI stops 30 days after an unpaid instalment (000233)", () => {
       `,
     );
     expect(audit.map((row) => row.v)).toEqual(["non_payment"]);
+  });
+
+  jobTest("the licence's own grace period (000234) moves the cutoff", async () => {
+    const schoolId = await school("Grace School");
+    const lic = await license(schoolId, {
+      startsAt: day("2026-01-01"),
+      endsAt: day("2030-01-01"),
+      graceDays: 45,
+    });
+    await instalments(schoolId, lic, ["2026-03-01"]);
+    // Day 30 (31 March) no longer stops it ...
+    const day30 = await runLicenseLifecycle(db!, day("2026-03-31"), silentLogger, [schoolId]);
+    expect(day30.licensesStopped).toBe(0);
+    // ... day 45 (15 April) does.
+    const day45 = await runLicenseLifecycle(db!, day("2026-04-15"), silentLogger, [schoolId]);
+    expect(day45.licensesStopped).toBe(1);
+    expect(await state(schoolId, lic)).toEqual({ status: "suspended", stopped: true });
+    // A longer grace re-applied to the licence (the super admin's choice) lets the job resume it.
+    await admin(
+      schoolId,
+      (tx) => tx`
+      UPDATE app.school_licenses SET nonpayment_grace_days = 60
+      WHERE school_id = ${schoolId}::uuid AND id = ${lic}::uuid
+    `,
+    );
+    const resumed = await runLicenseLifecycle(db!, day("2026-04-16"), silentLogger, [schoolId]);
+    expect(resumed.licensesResumed).toBe(1);
   });
 
   jobTest("paying resumes it; a later instalment going unpaid stops it again", async () => {

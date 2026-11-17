@@ -110,6 +110,11 @@
       "where": "Studafy platform › Pricing",
       "keywords": "seat price, volume discounts, duration discounts, price per seat, pricing rules, rates"
     },
+    "platform-ai-programme": {
+      "title": "Student AI programme",
+      "where": "Studafy platform › Student AI",
+      "keywords": "student ai, revenue share, tuition, conversion tiers, content bonus, ai price, parent price, in-app price, grace period"
+    },
     "build-license-quote": {
       "title": "Build a license quote",
       "where": "Studafy platform › Quotes",

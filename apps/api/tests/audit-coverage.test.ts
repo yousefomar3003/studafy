@@ -587,6 +587,12 @@ const EXPECTED_MUTATING_ROUTES = [
   // in the operator's home school. The calculator and the upload URL write nothing (declared for
   // this gate, as the other upload-url routes are).
   "PUT /api/platform/licenses/price-settings/{currencyCode}",
+  // Student AI programme settings (000234): every save is a new version, audited in the service; the preview writes nothing (declared for this gate, like the calculator).
+  "POST /api/platform/ai-programme/versions",
+  "PUT /api/platform/schools/{schoolId}/ai-programme/override",
+  "POST /api/platform/schools/{schoolId}/ai-programme/override/clear",
+  "POST /api/platform/schools/{schoolId}/ai-programme/preview",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply",
   "PUT /api/platform/licenses/bank-details",
   "POST /api/platform/licenses/quote",
   "POST /api/platform/schools/{schoolId}/license-quotes",

@@ -9,10 +9,16 @@ import {
 } from "../subscriptions/entitlements/cache";
 import { publishUserEntitlementChanges } from "../subscriptions/entitlements/entitlement-change-publisher";
 
+import {
+  currentAiProgrammeStamp,
+  licenseAiProgrammeStamp,
+  programmeColumnsFor,
+} from "./ai-programme";
 import { nextAiStop } from "./ai-stop";
 import { auditLicenseChange, inSchool, licenseError, rethrowLicenseDbError } from "./context";
 import { applyRenewalStops, recordSeatOverlaps } from "./overlap";
 
+import type { AiProgrammeStamp, LicenseAiProgrammeStampView } from "./ai-programme";
 import type { AiStopView } from "./ai-stop";
 import type { LicenseActor } from "./context";
 import type {
@@ -102,6 +108,12 @@ export interface LicenseRecord {
   updatedAt: Date;
   /** When the workers stopped it for an instalment unpaid 30 days after its due date (000233). */
   nonpaymentSuspendedAt: Date | null;
+  /** The Student AI programme versions it was signed with, and when they were attached (000234). */
+  aiProgrammeVersionId: string;
+  aiProgrammeOverrideId: string | null;
+  aiProgrammeAppliedAt: Date;
+  /** Days after an unpaid instalment's due date that its AI stops, from those values (000234). */
+  nonpaymentGraceDays: number;
 }
 
 export interface LicenseRow {
@@ -125,6 +137,10 @@ export interface LicenseRow {
   created_at: Date;
   updated_at: Date;
   nonpayment_suspended_at: Date | null;
+  ai_programme_version_id: string;
+  ai_programme_override_id: string | null;
+  ai_programme_applied_at: Date;
+  nonpayment_grace_days: number;
 }
 
 function toRecord(row: LicenseRow): LicenseRecord {
@@ -149,6 +165,10 @@ function toRecord(row: LicenseRow): LicenseRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     nonpaymentSuspendedAt: row.nonpayment_suspended_at,
+    aiProgrammeVersionId: row.ai_programme_version_id,
+    aiProgrammeOverrideId: row.ai_programme_override_id,
+    aiProgrammeAppliedAt: row.ai_programme_applied_at,
+    nonpaymentGraceDays: row.nonpayment_grace_days,
   };
 }
 
@@ -171,7 +191,10 @@ const LICENSE_COLUMNS = (tx: TransactionSql) => tx`
   l.teacher_plan_id::text AS teacher_plan_id, l.teacher_seats,
   l.include_family_plus, l.parent_plan_id::text AS parent_plan_id, l.parent_seats,
   l.currency_id::text AS currency_id, c.code AS currency_code, l.notes, l.created_by::text AS created_by,
-  l.activated_at, l.created_at, l.updated_at, l.nonpayment_suspended_at
+  l.activated_at, l.created_at, l.updated_at, l.nonpayment_suspended_at,
+  l.ai_programme_version_id::text AS ai_programme_version_id,
+  l.ai_programme_override_id::text AS ai_programme_override_id, l.ai_programme_applied_at,
+  l.nonpayment_grace_days
 `;
 
 export async function readLicense(
@@ -269,6 +292,8 @@ export interface PlatformLicenseView extends LicenseView {
   createdAt: string;
   updatedAt: string;
   allowedTransitions: LicenseStatus[];
+  /** The Student AI programme versions it was signed with, and whether they are current (000234). */
+  aiProgramme: LicenseAiProgrammeStampView;
 }
 
 async function audienceSeats(tx: TransactionSql, license: LicenseRecord): Promise<AudienceSeats[]> {
@@ -335,6 +360,7 @@ export async function platformLicenseView(
     createdAt: license.createdAt.toISOString(),
     updatedAt: license.updatedAt.toISOString(),
     allowedTransitions: [...LICENSE_TRANSITIONS[license.status]],
+    aiProgramme: await licenseAiProgrammeStamp(tx, license),
   };
 }
 
@@ -420,6 +446,9 @@ async function currencyIdFor(
 
 function licenseSnapshot(license: LicenseRecord): Record<string, unknown> {
   return {
+    ai_programme_version_id: license.aiProgrammeVersionId,
+    ai_programme_override_id: license.aiProgrammeOverrideId,
+    nonpayment_grace_days: license.nonpaymentGraceDays,
     status: license.status,
     starts_at: license.startsAt.toISOString(),
     ends_at: license.endsAt.toISOString(),
@@ -494,24 +523,36 @@ export function refuseUnofferedAudiences(
   }
 }
 
+/**
+ * A new licence, as a draft. It is signed with the Student AI programme values `programme` names
+ * (an accepted quote's), or else with the ones in force for the school now (000234).
+ */
 export async function createLicense(
   tx: TransactionSql,
   schoolId: string,
   input: CreateLicenseInput,
   actor: LicenseActor,
+  programme?: AiProgrammeStamp | null,
 ): Promise<LicenseRecord> {
   const currencyId = await currencyIdFor(tx, input.currencyCode, actor);
+  const signed = await programmeColumnsFor(
+    tx,
+    programme ?? (await currentAiProgrammeStamp(tx)),
+    input.currencyCode,
+  );
   const [row] = await tx<{ id: string }[]>`
     INSERT INTO app.school_licenses (
       school_id, status, starts_at, ends_at, student_plan_id, student_seats, teacher_plan_id,
-      teacher_seats, include_family_plus, parent_plan_id, parent_seats, currency_id, notes, created_by
+      teacher_seats, include_family_plus, parent_plan_id, parent_seats, currency_id, notes, created_by,
+      ai_programme_version_id, ai_programme_override_id, nonpayment_grace_days
     ) VALUES (
       ${schoolId}::uuid, 'draft', ${input.startsAt}, ${input.endsAt},
       ${input.student?.planId ?? null}::uuid, ${input.student?.seats ?? 0},
       ${input.teacher?.planId ?? null}::uuid, ${input.teacher?.seats ?? 0},
       ${input.includeFamilyPlus},
       ${input.parent?.planId ?? null}::uuid, ${input.parent?.seats ?? 0},
-      ${currencyId}::uuid, ${input.notes ?? null}, ${actor.userId}::uuid
+      ${currencyId}::uuid, ${input.notes ?? null}, ${actor.userId}::uuid,
+      ${signed.versionId}::uuid, ${signed.overrideId}::uuid, ${signed.nonpaymentGraceDays}
     )
     RETURNING id::text AS id
   `;

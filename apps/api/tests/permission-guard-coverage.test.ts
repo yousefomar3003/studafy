@@ -503,6 +503,12 @@ const EXPECTED_MUTATING_ROUTES = [
   // License billing (session 3): the console's routes on platform:manage (web channel), the
   // school's accept and receipt upload on license:manage, in modules/licensing/billing-*-routes.ts.
   "PUT /api/platform/licenses/price-settings/{currencyCode}",
+  // Student AI programme settings (000234), platform:manage.
+  "POST /api/platform/ai-programme/versions",
+  "PUT /api/platform/schools/{schoolId}/ai-programme/override",
+  "POST /api/platform/schools/{schoolId}/ai-programme/override/clear",
+  "POST /api/platform/schools/{schoolId}/ai-programme/preview",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply",
   "PUT /api/platform/licenses/bank-details",
   "POST /api/platform/licenses/quote",
   "POST /api/platform/schools/{schoolId}/license-quotes",

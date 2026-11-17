@@ -13,6 +13,28 @@ when it required the `version-bump` label.
 
 ### Added
 
+- The Student AI programme's settings, versioned (migration 000234; docs/billing/ai-programme.md).
+  Super admin only (`platform:read` to read, `platform:manage` to save, web channel):
+  `platformGetAiProgramme` (`GET /api/platform/ai-programme`), `platformListAiProgrammeVersions` and
+  `platformSaveAiProgrammeVersion` (`GET`/`POST /api/platform/ai-programme/versions`, body
+  `AiProgrammeVersionBody`: every setting, a `reason` and `basedOnVersionId`),
+  `platformGetSchoolAiProgramme` (`GET /api/platform/schools/{schoolId}/ai-programme`:
+  `SchoolAiProgramme` with the global version, the school's override version and the effective
+  `AiProgrammeValues`), `platformListSchoolAiProgrammeOverrides`
+  (`GET .../ai-programme/overrides`), `platformSaveSchoolAiProgrammeOverride`
+  (`PUT .../ai-programme/override`, `AiProgrammeOverrideBody`: any subset, null inherits),
+  `platformClearSchoolAiProgrammeOverride` (`POST .../ai-programme/override/clear`),
+  `platformPreviewSchoolAiProgramme` (`POST .../ai-programme/preview`: effective values and
+  `AiProgrammeIssue[]`, saves nothing), `platformGetLicenseAiProgramme`
+  (`GET /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme`: what the licence was
+  signed with next to the current values) and `platformReapplyLicenseAiProgramme`
+  (`POST .../ai-programme/reapply`, with a reason). New error codes `AI_PROGRAMME_VALUE_OUT_OF_RANGE`,
+  `AI_PROGRAMME_TIERS_INVALID`, `AI_PROGRAMME_SHARE_ABOVE_MAX`, `AI_PROGRAMME_CURRENCY_INVALID`,
+  `AI_PROGRAMME_REASON_REQUIRED` (422) and `AI_PROGRAMME_VERSION_CONFLICT` (409).
+  `PlatformSchoolLicense` (and `ConsoleLicense`) add `aiProgramme` (`LicenseAiProgrammeStamp`).
+  The AI-stop date on `LicenseInvoiceInstalment.aiStopDate` and `LicenseAiStop` now follows the
+  licence's own grace period (default 30 days).
+
 - The school chooses its licence length and payment plan; AI stops 30 days after an unpaid
   instalment (migration 000233, ADR-021 amendment). `CreateLicenseChangeRequestBody` takes optional
   `months` (1-36), `startsOn`, `paymentPlan` (`monthly`, `yearly`, `custom`) and, for custom,

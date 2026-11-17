@@ -137,6 +137,7 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("platform-features", "page", "/portal/platform/features", PLATFORM),
   entry("platform-tiers", "page", "/portal/platform/tiers", PLATFORM),
   entry("platform-pricing", "page", "/portal/platform/pricing", PLATFORM),
+  entry("platform-ai-programme", "page", "/portal/platform/ai-programme", PLATFORM),
   entry("build-license-quote", "action", "/portal/platform/quotes", PLATFORM),
   entry("platform-licenses", "page", "/portal/platform/licenses", PLATFORM),
   entry("platform-payments", "page", "/portal/platform/payments", PLATFORM),

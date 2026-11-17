@@ -1,6 +1,11 @@
 import { randomInt } from "node:crypto";
 
-import { ERROR_CODES, isAllowedLicensePaymentLink, licenseAiStopDate } from "@studafy/constants";
+import {
+  ERROR_CODES,
+  isAllowedLicensePaymentLink,
+  LICENSE_NONPAYMENT_GRACE_DAYS,
+  licenseAiStopDate,
+} from "@studafy/constants";
 import {
   allocatePayments,
   buildSchedule,
@@ -385,6 +390,15 @@ async function instalmentRows(
   `;
 }
 
+/** The licence's grace period before an unpaid instalment stops its AI (000234). */
+async function licenseGraceDays(tx: TransactionSql, licenseId: string): Promise<number> {
+  const [row] = await tx<{ days: number }[]>`
+    SELECT nonpayment_grace_days AS days FROM app.school_licenses
+    WHERE school_id = current_setting('app.school_id')::uuid AND id = ${licenseId}::uuid
+  `;
+  return row?.days ?? LICENSE_NONPAYMENT_GRACE_DAYS;
+}
+
 /** An invoice's instalments in order, as the school and the console show them. */
 export async function invoiceInstalments(
   tx: TransactionSql,
@@ -394,6 +408,7 @@ export async function invoiceInstalments(
   const payable = isPayable(invoice.status);
   const today = utcDate(now);
   const rows = await instalmentRows(tx, invoice.id);
+  const graceDays = await licenseGraceDays(tx, invoice.licenseId);
   const currentId = payable ? rows.find((row) => row.status !== "paid")?.id : undefined;
   return rows.map((row) => {
     const open = payable && row.status !== "paid";
@@ -409,7 +424,7 @@ export async function invoiceInstalments(
       overdueAt: row.overdue_at?.toISOString() ?? null,
       current: row.id === currentId,
       paymentLink: open ? row.payment_link : null,
-      aiStopDate: licenseAiStopDate(row.due_date),
+      aiStopDate: licenseAiStopDate(row.due_date, graceDays),
     };
   });
 }

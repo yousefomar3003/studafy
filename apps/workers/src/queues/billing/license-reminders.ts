@@ -29,7 +29,6 @@
 import {
   DOMAIN_EVENTS,
   LICENSE_AI_STOP_WARNING_DAYS,
-  LICENSE_NONPAYMENT_GRACE_DAYS,
   NOTIFICATION_TYPES,
   licenseAiStopDate,
 } from "@studafy/constants";
@@ -215,12 +214,14 @@ async function dueReminders(
       license_status: string;
       stopped: boolean;
       first_late: boolean;
+      grace_days: number;
     }[]
   >`
     SELECT inst.id::text AS id, i.number, inst.due_date::text AS due_date,
            inst.balance_minor::text AS balance_minor, c.code AS currency_code,
            c.minor_unit::int AS minor_unit, l.status AS license_status,
            (l.nonpayment_suspended_at IS NOT NULL) AS stopped,
+           l.nonpayment_grace_days AS grace_days,
            inst.id = first_value(inst.id) OVER (
              PARTITION BY l.id ORDER BY inst.due_date, i.number, inst.position
            ) AS first_late
@@ -232,12 +233,12 @@ async function dueReminders(
       AND i.status IN ('issued', 'partially_paid')
       AND inst.status <> 'paid'
       AND l.status IN ('active', 'suspended')
-      AND inst.due_date + ${LICENSE_NONPAYMENT_GRACE_DAYS}::int
+      AND inst.due_date + l.nonpayment_grace_days
           <= ${today}::date + ${LICENSE_AI_STOP_WARNING_DAYS}::int
     ORDER BY i.number, inst.position
   `;
   for (const instalment of cutoffs) {
-    const stopDate = licenseAiStopDate(instalment.due_date);
+    const stopDate = licenseAiStopDate(instalment.due_date, instalment.grace_days);
     const vars = {
       schoolName,
       invoiceNumber: instalment.number,
@@ -387,6 +388,7 @@ async function queuePaymentEmails(
       minor_unit: number;
       starts_on: string;
       ends_on: string;
+      grace_days: number;
     }[]
   >`
     SELECT i.id::text AS invoice_id, i.number, i.payment_reference, inst.position,
@@ -395,7 +397,8 @@ async function queuePaymentEmails(
            inst.due_date::text AS due_date, inst.balance_minor::text AS balance_minor,
            inst.payment_link, c.code AS currency_code, c.minor_unit::int AS minor_unit,
            (l.starts_at AT TIME ZONE 'UTC')::date::text AS starts_on,
-           (l.ends_at AT TIME ZONE 'UTC')::date::text AS ends_on
+           (l.ends_at AT TIME ZONE 'UTC')::date::text AS ends_on,
+           l.nonpayment_grace_days AS grace_days
     FROM app.license_invoice_instalments AS inst
     JOIN app.license_invoices AS i ON i.id = inst.invoice_id AND i.school_id = inst.school_id
     JOIN app.school_licenses AS l ON l.id = i.license_id AND l.school_id = i.school_id
@@ -423,7 +426,7 @@ async function queuePaymentEmails(
         instalment.currency_code,
       ),
       dueDate: instalment.due_date,
-      stopDate: licenseAiStopDate(instalment.due_date),
+      stopDate: licenseAiStopDate(instalment.due_date, instalment.grace_days),
       licenseStartsOn: instalment.starts_on,
       licenseEndsOn: instalment.ends_on,
       paymentReference: instalment.payment_reference,

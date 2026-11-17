@@ -10,6 +10,21 @@ export { schoolLicenseRoutes } from "./school-routes";
 export { platformLicenseBillingRoutes } from "./billing-platform-routes";
 export { schoolLicenseBillingRoutes } from "./billing-school-routes";
 export { platformLicenseConsoleRoutes } from "./console-routes";
+export { platformAiProgrammeRoutes } from "./ai-programme-routes";
+export {
+  INITIAL_AI_PROGRAMME_VERSION_ID,
+  attachAiProgramme,
+  clearSchoolOverride,
+  currentAiProgrammeStamp,
+  currentAiProgrammeVersion,
+  licenseAiProgramme,
+  reapplyAiProgramme,
+  resolveAiProgrammeStamp,
+  saveAiProgrammeVersion,
+  saveSchoolOverride,
+  schoolAiProgramme,
+  type AiProgrammeStamp,
+} from "./ai-programme";
 export {
   activateEarly,
   createReceipt,

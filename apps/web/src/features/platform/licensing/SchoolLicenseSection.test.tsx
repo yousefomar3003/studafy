@@ -53,8 +53,36 @@ function license(status: "active" | "suspended" | "awaiting_payment") {
       },
       { audience: "parent", purchased: 0, assigned: 0, tier: null },
     ],
+    aiProgramme: {
+      versionId: "88888888-8888-4888-8888-888888888888",
+      versionNumber: 1,
+      overrideId: null,
+      overrideVersionNumber: null,
+      appliedAt: "2026-08-20T00:00:00.000Z",
+      nonpaymentGraceDays: 30,
+      current: false,
+    },
   };
 }
+
+const PROGRAMME_VALUES = {
+  currencyCode: "USD",
+  iapPriceMinor: 600,
+  licensePriceMinor: 400,
+  parentPriceMinor: 600,
+  minSeats: 30,
+  maxShareBps: 1500,
+  conversionTiers: [{ fromBps: 0, shareBps: 0 }],
+  largeSchoolMinSeats: 500,
+  largeSchoolShareBps: 800,
+  contentBonusTiers: [{ fromBps: 0, shareBps: 0 }],
+  bonusRequiresConversionShare: true,
+  measurementOffsetDays: 30,
+  nonpaymentGraceDays: 30,
+  monthToMonthShareBps: 0,
+  payoutMode: "invoice_credit",
+  overridden: [],
+};
 
 let current = license("active");
 let invoices: unknown[] = [];
@@ -147,6 +175,19 @@ const getMock = mock((path: string, _init?: unknown) => {
       },
     });
   }
+  if (path === "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme") {
+    return Promise.resolve({
+      data: {
+        licenseId: LICENSE_ID,
+        stamp: current.aiProgramme,
+        signed: PROGRAMME_VALUES,
+        current: { ...PROGRAMME_VALUES, nonpaymentGraceDays: 45 },
+        currentVersionNumber: 2,
+        currentOverrideVersionNumber: null,
+        changes: ["nonpaymentGraceDays"],
+      },
+    });
+  }
   throw new Error(`Unhandled GET ${path}`);
 });
 const postMock = mock((path: string, _init?: { body?: Record<string, unknown> }) => {
@@ -161,6 +202,9 @@ const postMock = mock((path: string, _init?: { body?: Record<string, unknown> })
   }
   if (path === "/api/platform/schools/{schoolId}/licenses/{licenseId}/seats") {
     return Promise.resolve({ data: { assigned: [{}], notAssigned: [], renewalStops: [] } });
+  }
+  if (path === "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply") {
+    return Promise.resolve({ data: {} });
   }
   throw new Error(`Unhandled POST ${path}`);
 });
@@ -204,6 +248,41 @@ afterEach(() => {
 });
 
 describe("SchoolLicenseSection", () => {
+  test("shows the Student AI programme version the licence was signed with and re-applies the current one with a reason", async () => {
+    await renderSection();
+    expect((await screen.findByTestId("programme-version")).textContent).toBe("Version 1");
+    expect(screen.getByTestId("programme-current").textContent).toBe("Newer settings available");
+    expect(screen.getByText("Edit this school's settings").getAttribute("href")).toBe(
+      `/portal/platform/ai-programme?schoolId=${SCHOOL_ID}`,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Apply current settings" }));
+    const dialog = await screen.findByRole("dialog");
+    const changes = await within(dialog).findByTestId("apply-changes");
+    expect(within(changes).getByText("30 days")).toBeTruthy();
+    expect(within(changes).getByText("45 days")).toBeTruthy();
+    const confirm = within(dialog).getByRole("button", { name: "Apply settings" });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(dialog).getByLabelText("Reason for this change"), {
+      target: { value: "Renewal terms agreed" },
+    });
+    fireEvent.click(confirm);
+    await waitFor(() =>
+      expect(
+        bodiesOf("/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply"),
+      ).toEqual([{ reason: "Renewal terms agreed" }]),
+    );
+  });
+
+  test("a licence on the current settings offers no re-apply", async () => {
+    current = {
+      ...license("active"),
+      aiProgramme: { ...license("active").aiProgramme, current: true },
+    };
+    await renderSection();
+    expect((await screen.findByTestId("programme-current")).textContent).toBe("Current settings");
+    expect(screen.queryByRole("button", { name: "Apply current settings" })).toBeNull();
+  });
+
   test("shows tiers, seats used of purchased, Family+ and this month's usage", async () => {
     await renderSection();
     const seats = await screen.findByRole("table", { name: "Tier and seats per audience" });

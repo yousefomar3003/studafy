@@ -553,6 +553,20 @@ export const ERROR_CODES = {
   LICENSE_PAYMENT_VOIDED: "LICENSE_PAYMENT_VOIDED",
   LICENSE_RECEIPT_NOT_FOUND: "LICENSE_RECEIPT_NOT_FOUND",
   LICENSE_RECEIPT_ALREADY_MATCHED: "LICENSE_RECEIPT_ALREADY_MATCHED",
+  // The Student AI programme's settings (000234), the super admin's. AI_PROGRAMME_VALUE_OUT_OF_RANGE:
+  // a price, percentage, seat count or day count outside its bounds. AI_PROGRAMME_TIERS_INVALID: a
+  // tier table must start at 0%, raise its threshold on every row, never lower a share, and have at
+  // most 20 rows. AI_PROGRAMME_SHARE_ABOVE_MAX: a tier share, the large-school floor or a bonus is
+  // above the maximum revenue share. AI_PROGRAMME_CURRENCY_INVALID: no prices, a currency twice or
+  // not in use, or school prices without the school's currency. AI_PROGRAMME_REASON_REQUIRED: every
+  // change says why. AI_PROGRAMME_VERSION_CONFLICT: someone saved a newer version since this one was
+  // opened -- reload and try again.
+  AI_PROGRAMME_VALUE_OUT_OF_RANGE: "AI_PROGRAMME_VALUE_OUT_OF_RANGE",
+  AI_PROGRAMME_TIERS_INVALID: "AI_PROGRAMME_TIERS_INVALID",
+  AI_PROGRAMME_SHARE_ABOVE_MAX: "AI_PROGRAMME_SHARE_ABOVE_MAX",
+  AI_PROGRAMME_CURRENCY_INVALID: "AI_PROGRAMME_CURRENCY_INVALID",
+  AI_PROGRAMME_REASON_REQUIRED: "AI_PROGRAMME_REASON_REQUIRED",
+  AI_PROGRAMME_VERSION_CONFLICT: "AI_PROGRAMME_VERSION_CONFLICT",
 
   // Third-party AI data-sharing consent (ST-305). AI_CONSENT_REQUIRED is the consent gate's refusal:
   // the caller has no live consent for the current disclosure, so nothing was sent to the model

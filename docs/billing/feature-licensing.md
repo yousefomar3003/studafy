@@ -134,6 +134,10 @@ school's billing contacts are emailed when an instalment goes overdue, 7 days be
 when the AI stops (billing email, not a notification). Any
 other suspension is a manual super admin decision.
 
+Since migration 000234 the 30 days is the default of a Student AI programme setting
+(`nonpaymentGraceDays`, globally or per school), and each licence keeps the grace period it was
+signed with in `school_licenses.nonpayment_grace_days`; see [ai-programme.md](./ai-programme.md).
+
 **The school chooses the length and plan (migration 000233, ADR-021 amendment).** The school's
 request carries the months (1-36), an optional start and monthly / yearly / custom (dates and shares
 of the total); the super admin's quote starts from it and needs a reason the school reads to depart

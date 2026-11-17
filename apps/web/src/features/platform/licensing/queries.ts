@@ -306,3 +306,70 @@ export function useSchoolLicensesQuery(schoolId: string | null) {
     enabled: schoolId !== null,
   });
 }
+
+// ---------------------------------------------------------------------------------------------------
+// The Student AI programme's settings (000234)
+// ---------------------------------------------------------------------------------------------------
+
+export type AiProgrammeVersion = Schemas["AiProgrammeVersion"];
+/** Nullable in the document because SchoolAiProgramme.override is; a list row never is. */
+export type AiProgrammeOverrideVersion = NonNullable<Schemas["AiProgrammeOverrideVersion"]>;
+export type SchoolAiProgramme = Schemas["SchoolAiProgramme"];
+export type LicenseAiProgramme = Schemas["LicenseAiProgramme"];
+export type AiProgrammeValues = Schemas["AiProgrammeValues"];
+
+export const AI_PROGRAMME_KEY = [...LICENSING_KEY, "ai-programme"] as const;
+
+export function useAiProgrammeVersionsQuery() {
+  return useQuery({
+    queryKey: [...AI_PROGRAMME_KEY, "versions"] as const,
+    queryFn: async () => {
+      const { data } = await api.GET("/api/platform/ai-programme/versions");
+      if (!data) throw new Error("Programme versions returned no data.");
+      return data.versions as AiProgrammeVersion[];
+    },
+  });
+}
+
+export function useSchoolAiProgrammeQuery(schoolId: string | null) {
+  return useQuery({
+    queryKey: [...AI_PROGRAMME_KEY, "school", schoolId] as const,
+    enabled: Boolean(schoolId),
+    queryFn: async () => {
+      const { data } = await api.GET("/api/platform/schools/{schoolId}/ai-programme", {
+        params: { path: { schoolId: schoolId! } },
+      });
+      if (!data) throw new Error("School programme returned no data.");
+      return data as SchoolAiProgramme;
+    },
+  });
+}
+
+export function useSchoolAiProgrammeOverridesQuery(schoolId: string | null) {
+  return useQuery({
+    queryKey: [...AI_PROGRAMME_KEY, "school", schoolId, "overrides"] as const,
+    enabled: Boolean(schoolId),
+    queryFn: async () => {
+      const { data } = await api.GET("/api/platform/schools/{schoolId}/ai-programme/overrides", {
+        params: { path: { schoolId: schoolId! } },
+      });
+      if (!data) throw new Error("Programme overrides returned no data.");
+      return data.overrides as AiProgrammeOverrideVersion[];
+    },
+  });
+}
+
+export function useLicenseAiProgrammeQuery(schoolId: string, licenseId: string, enabled = true) {
+  return useQuery({
+    queryKey: [...AI_PROGRAMME_KEY, "license", schoolId, licenseId] as const,
+    enabled,
+    queryFn: async () => {
+      const { data } = await api.GET(
+        "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme",
+        { params: { path: { schoolId, licenseId } } },
+      );
+      if (!data) throw new Error("Licence programme returned no data.");
+      return data as LicenseAiProgramme;
+    },
+  });
+}

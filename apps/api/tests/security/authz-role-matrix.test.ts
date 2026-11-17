@@ -951,6 +951,29 @@ const GUARD_CASES: GuardCase[] = [
     source: "platform/user-support-routes.ts",
     allowedRole: ROLES.SUPER_ADMIN,
   },
+  // Student AI programme settings (000234): read on platform:read, every save on platform:manage.
+  // The version save is the probe for the writes: an empty body is refused after the gate (400).
+  {
+    method: "GET",
+    path: "/api/platform/ai-programme",
+    permission: "platform:read",
+    source: "licensing/ai-programme-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  {
+    method: "GET",
+    path: "/api/platform/schools/{schoolId}/ai-programme",
+    permission: "platform:read",
+    source: "licensing/ai-programme-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  {
+    method: "POST",
+    path: "/api/platform/ai-programme/versions",
+    permission: "platform:manage",
+    source: "licensing/ai-programme-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
   // Staff and class records (000181). Literal subject kinds on record-imports: each kind has its
   // own guard, mounted on its own path.
   {

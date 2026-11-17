@@ -283,6 +283,10 @@ const PlatformPricingPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/licensing/PricingSettingsPage"),
 );
+const PlatformAiProgrammePage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/licensing/AiProgrammePage"),
+);
 const PlatformQuotesPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/licensing/CalculatorPage"),
@@ -724,6 +728,7 @@ export const routes: RouteObject[] = [
               ["platform/features", <PlatformFeaturesPage key="features" />],
               ["platform/tiers", <PlatformTiersPage key="tiers" />],
               ["platform/pricing", <PlatformPricingPage key="pricing" />],
+              ["platform/ai-programme", <PlatformAiProgrammePage key="ai-programme" />],
               ["platform/quotes", <PlatformQuotesPage key="quotes" />],
               ["platform/licenses", <PlatformLicensesPage key="licenses" />],
               ["platform/payments", <PlatformPaymentsPage key="payments" />],

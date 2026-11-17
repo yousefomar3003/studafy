@@ -10,9 +10,9 @@
  *     how much is paid. Each instalment not paid by its due date is marked overdue the same way
  *     (000221); an invoice's due date is its earliest unpaid instalment's;
  *  4. AI stops 30 days after an unpaid instalment (000233): an active licence with any unpaid
- *     instalment LICENSE_NONPAYMENT_GRACE_DAYS or more past its due date (UTC dates) is suspended and
- *     marked `nonpayment_suspended_at`, and its seat holders' entitlements are bumped so the AI stops
- *     at once. Every instalment counts: a later one going unpaid stops it again;
+ *     instalment its grace period (the licence's nonpayment_grace_days, 000234) or more past its
+ *     due date (UTC dates) is suspended and marked `nonpayment_suspended_at`, and its seat holders'
+ *     entitlements are bumped so the AI stops at once. Every instalment counts: a later one going unpaid stops it again;
  *  5. a licence stopped for non-payment with nothing past the cutoff any more (paid, or its invoice
  *     voided) is resumed. The API resumes it the moment the payment is recorded; this is the safety
  *     net. A licence the super admin suspended by hand is never resumed here.
@@ -21,8 +21,6 @@
  * rest), every change writes an audit row with no actor, and every step is idempotent: a re-run finds
  * nothing left to change.
  */
-
-import { LICENSE_NONPAYMENT_GRACE_DAYS } from "@studafy/constants";
 
 import { emitAuditLogs } from "../../db/audit";
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -191,8 +189,9 @@ async function bumpSeatHolders(
 }
 
 /**
- * Suspend every active licence with an unpaid instalment LICENSE_NONPAYMENT_GRACE_DAYS or more past
- * its due date (`today` >= due date + 30, both UTC dates). Idempotent: a suspended licence is not
+ * Suspend every active licence with an unpaid instalment its grace period or more past its due date
+ * (`today` >= due date + the licence's nonpayment_grace_days, both UTC dates; 30 by default, a
+ * Student AI programme setting since 000234). Idempotent: a suspended licence is not
  * picked again.
  */
 export async function stopForNonPayment(
@@ -209,10 +208,12 @@ export async function stopForNonPayment(
       SELECT DISTINCT ON (i.license_id) i.license_id, inst.id AS instalment_id, inst.due_date
       FROM app.license_invoice_instalments AS inst
       JOIN app.license_invoices AS i ON i.id = inst.invoice_id AND i.school_id = inst.school_id
+      JOIN app.school_licenses AS grace
+        ON grace.id = i.license_id AND grace.school_id = i.school_id
       WHERE inst.school_id = current_setting('app.school_id')::uuid
         AND i.status IN ('issued', 'partially_paid')
         AND inst.status <> 'paid'
-        AND inst.due_date + ${LICENSE_NONPAYMENT_GRACE_DAYS}::int <= ${today}::date
+        AND inst.due_date + grace.nonpayment_grace_days <= ${today}::date
       ORDER BY i.license_id, inst.due_date, inst.position
     ) AS late
     WHERE l.school_id = current_setting('app.school_id')::uuid
@@ -280,7 +281,7 @@ export async function resumePaidLicenses(
               AND i.license_id = c.id
               AND i.status IN ('issued', 'partially_paid')
               AND inst.status <> 'paid'
-              AND inst.due_date + ${LICENSE_NONPAYMENT_GRACE_DAYS}::int <= ${today}::date
+              AND inst.due_date + c.nonpayment_grace_days <= ${today}::date
           )
         ORDER BY c.starts_at DESC, c.id
         LIMIT 1

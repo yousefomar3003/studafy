@@ -8,6 +8,7 @@ import {
   SHARE_SCALE,
 } from "@studafy/license-pricing";
 
+import { licenseAiProgrammeStampSchema } from "./ai-programme-schemas";
 import { AUDIENCES, LICENSE_STATUSES, MAX_ASSIGN_USER_IDS } from "./service";
 
 /**
@@ -156,6 +157,7 @@ export const platformLicenseSchema = licenseSchema
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
     allowedTransitions: z.array(licenseStatusSchema),
+    aiProgramme: licenseAiProgrammeStampSchema,
   })
   .openapi("PlatformSchoolLicense");
 

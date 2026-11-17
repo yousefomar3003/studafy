@@ -11,6 +11,7 @@ import { SchoolQuotes } from "./CalculatorPage";
 import { AUDIENCES, offersFamilyPlus } from "./constants";
 import { useMoney } from "./format";
 import { ActivateEarlyModal } from "./InvoicePage";
+import { LicenseAiProgrammeCard } from "./LicenseAiProgrammeCard";
 import { LicenseStatusPill, SeatMeter } from "./LicensesPage";
 import { useAssignSeats, useExtendLicense, useLicenseStatus, useUnassignSeat } from "./mutations";
 import { InvoiceStatusPill } from "./PaymentsPage";
@@ -80,6 +81,7 @@ export function SchoolLicenseSection({
             usage={overview.data.usage}
             invoices={invoices.data ?? []}
           />
+          <LicenseAiProgrammeCard schoolId={schoolId} license={license} />
           <SeatsCard schoolId={schoolId} schoolName={schoolName} license={license} />
         </>
       ) : null}
