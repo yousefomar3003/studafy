@@ -54,7 +54,18 @@ export interface SessionTokenConfig {
   accessTtlSeconds: number;
   /** Refresh-token lifetime, applied fresh on every rotation. Threaded from env.JWT_REFRESH_TTL_SECONDS. */
   refreshTtlSeconds: number;
+  /**
+   * How long a session family may live from its first token, however often it rotates (QA-085).
+   * Defaults to {@link REFRESH_ABSOLUTE_LIFETIME_SECONDS}.
+   */
+  refreshAbsoluteLifetimeSeconds?: number;
 }
+
+/**
+ * 90 days: a session signs in again at least this often. Before QA-085 every rotation granted a
+ * fresh refresh lifetime, so a stolen refresh token that kept rotating never had to end.
+ */
+export const REFRESH_ABSOLUTE_LIFETIME_SECONDS = 90 * 24 * 60 * 60;
 
 /** Device metadata captured from the request. Explicit scalars, never a serialized blob. */
 export interface DeviceContext {
@@ -397,6 +408,16 @@ export async function rotateRefreshToken(
 
       if (session.expires_at.getTime() <= Date.now()) return { kind: "expired" };
 
+      // The family's absolute end (QA-085), from its first token's issue time.
+      const [family] = await tx<{ started: Date }[]>`
+        SELECT min(issued_at) AS started FROM app.refresh_tokens
+        WHERE family_id = ${session.family_id}
+      `;
+      const familyEndsAt =
+        family!.started.getTime() +
+        (config.refreshAbsoluteLifetimeSeconds ?? REFRESH_ABSOLUTE_LIFETIME_SECONDS) * 1000;
+      if (familyEndsAt <= Date.now()) return { kind: "expired" };
+
       if (session.roles.length === 0) {
         throw new AuthException(
           ERROR_CODES.AUTH_SESSION_NOT_FOUND,
@@ -410,7 +431,9 @@ export async function rotateRefreshToken(
 
       const minted = mintOpaqueToken(session.school_id, session.user_id);
       const childId = randomUUID();
-      const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
+      const expiresAt = new Date(
+        Math.min(Date.now() + config.refreshTtlSeconds * 1000, familyEndsAt),
+      );
       // Generated up front, like childId above and for the same reason: signing and persistence run
       // concurrently below, so every value both statements need has to exist before either starts.
       // Taking the jti back from the signer would serialize them.

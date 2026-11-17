@@ -317,6 +317,8 @@ export interface AppOptions {
    * env.REVIEW_LOGIN_PASSWORD. Absent keeps POST /api/auth/login/review registered but answering 404.
    */
   reviewLoginPassword?: string;
+  /** The review accounts that password may open (QA-085); absent: all. From env.REVIEW_LOGIN_ALLOWED_EMAILS. */
+  reviewLoginAllowedEmails?: readonly string[];
   /**
    * Shared password for the staging QA tenants' email/password login (QA-02), threaded from
    * env.QA_LOGIN_PASSWORD, which env.ts refuses in production. Absent keeps POST /api/auth/login/qa
@@ -422,6 +424,7 @@ export function createApp({
   aiLlmModelOverrides = {},
   microsoftIdentityVerifier,
   reviewLoginPassword,
+  reviewLoginAllowedEmails,
   qaLoginPassword,
   rateLimitDisabled = false,
   idTokenLoginEnabled = false,
@@ -937,6 +940,7 @@ export function createApp({
           refreshTtlSeconds: jwtRefreshTtlSeconds,
         },
         reviewLoginPassword,
+        reviewLoginAllowedEmails,
       ),
     );
   }

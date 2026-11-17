@@ -257,6 +257,9 @@ const app = createApp({
   jwtRefreshTtlSeconds: env.JWT_REFRESH_TTL_SECONDS,
   realtimeTicketSecret: env.WS_JWT_SECRET,
   reviewLoginPassword: env.REVIEW_LOGIN_PASSWORD,
+  reviewLoginAllowedEmails: env.REVIEW_LOGIN_ALLOWED_EMAILS?.split(",")
+    .map((email) => email.trim())
+    .filter(Boolean),
   qaLoginPassword: env.QA_LOGIN_PASSWORD,
   rateLimitDisabled: env.RATE_LIMIT_DISABLED === "true",
   securityEventSink,

@@ -330,6 +330,7 @@ describe("member password sign-in", () => {
       await lockAccount(parent.code);
       await expectCode(await login(parent.code, setup_code), 401, "AUTH_INVALID_CREDENTIALS");
     },
+    60_000,
   );
 
   integrationTest("unknown IDs and privileged accounts are refused the same way", async () => {
@@ -499,79 +500,99 @@ describe("member password sign-in", () => {
     expect(await response.json()).not.toHaveProperty("default_password");
   });
 
-  integrationTest("a stranger's wrong guesses do not lock the member's own phone out", async () => {
-    const student = await member([ROLES.STUDENT]);
-    const { setup_code } = await issueCode(student.id);
-    const phone = await deviceTokenOf(await login(student.code, setup_code, "Lunar-Otter-58"));
-    expect(phone).toMatch(/^[\w-]{43}$/u);
+  integrationTest(
+    "a stranger's wrong guesses do not lock the member's own phone out",
+    async () => {
+      const student = await member([ROLES.STUDENT]);
+      const { setup_code } = await issueCode(student.id);
+      const phone = await deviceTokenOf(await login(student.code, setup_code, "Lunar-Otter-58"));
+      expect(phone).toMatch(/^[\w-]{43}$/u);
 
-    // Someone who knows the ID locks the account.
-    await lockAccount(student.code);
-    await expectCode(await login(student.code, "Lunar-Otter-58"), 401, "AUTH_INVALID_CREDENTIALS");
-
-    // The member's phone still signs in, keeps its token, and the lock is lifted.
-    const again = await loginFrom(phone!, student.code, "Lunar-Otter-58");
-    expect(await deviceTokenOf(again)).toBeUndefined();
-    expect((await login(student.code, "Lunar-Otter-58")).status).toBe(200);
-  });
-
-  integrationTest("a trusted device that keeps guessing loses its trust", async () => {
-    const parent = await claimed([ROLES.PARENT], "Quiet-Harbor-31");
-    const phone = await deviceTokenOf(await login(parent.code, "Quiet-Harbor-31"));
-
-    // Its wrong passwords count against the device, not the account...
-    for (let attempt = 0; attempt < 5; attempt += 1) {
+      // Someone who knows the ID locks the account.
+      await lockAccount(student.code);
       await expectCode(
-        await loginFrom(phone!, parent.code, "wrong-guess"),
+        await login(student.code, "Lunar-Otter-58"),
         401,
         "AUTH_INVALID_CREDENTIALS",
       );
-    }
-    expect((await login(parent.code, "Quiet-Harbor-31")).status).toBe(200);
 
-    // ...and after five it is an ordinary device again, under the account lockout.
-    await lockAccount(parent.code, phone!);
-    await expectCode(
-      await loginFrom(phone!, parent.code, "Quiet-Harbor-31"),
-      401,
-      "AUTH_INVALID_CREDENTIALS",
-    );
-  });
+      // The member's phone still signs in, keeps its token, and the lock is lifted.
+      const again = await loginFrom(phone!, student.code, "Lunar-Otter-58");
+      expect(await deviceTokenOf(again)).toBeUndefined();
+      expect((await login(student.code, "Lunar-Otter-58")).status).toBe(200);
+    },
+    60_000,
+  );
 
-  integrationTest("a device token opens nothing on its own or on another account", async () => {
-    const first = await claimed([ROLES.STUDENT], "Copper-Lantern-4");
-    const second = await claimed([ROLES.STUDENT], "Velvet-Comet-19");
-    const phone = await deviceTokenOf(await login(first.code, "Copper-Lantern-4"));
+  integrationTest(
+    "a trusted device that keeps guessing loses its trust",
+    async () => {
+      const parent = await claimed([ROLES.PARENT], "Quiet-Harbor-31");
+      const phone = await deviceTokenOf(await login(parent.code, "Quiet-Harbor-31"));
 
-    await expectCode(
-      await loginFrom(phone!, first.code, "wrong-guess"),
-      401,
-      "AUTH_INVALID_CREDENTIALS",
-    );
-    await lockAccount(second.code);
-    // Trusted for the first account only: the second stays locked against it.
-    await expectCode(
-      await loginFrom(phone!, second.code, "Velvet-Comet-19"),
-      401,
-      "AUTH_INVALID_CREDENTIALS",
-    );
-  });
+      // Its wrong passwords count against the device, not the account...
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        await expectCode(
+          await loginFrom(phone!, parent.code, "wrong-guess"),
+          401,
+          "AUTH_INVALID_CREDENTIALS",
+        );
+      }
+      expect((await login(parent.code, "Quiet-Harbor-31")).status).toBe(200);
 
-  integrationTest("an admin reset forgets every trusted device", async () => {
-    const teacher = await claimed([ROLES.INSTRUCTOR], "Maple-Signal-62");
-    const phone = await deviceTokenOf(await login(teacher.code, "Maple-Signal-62"));
-    const { setup_code } = await issueCode(teacher.id);
-    const fresh = await deviceTokenOf(await login(teacher.code, setup_code, "Cedar-Window-73"));
-    expect(fresh).not.toBe(phone);
+      // ...and after five it is an ordinary device again, under the account lockout.
+      await lockAccount(parent.code, phone!);
+      await expectCode(
+        await loginFrom(phone!, parent.code, "Quiet-Harbor-31"),
+        401,
+        "AUTH_INVALID_CREDENTIALS",
+      );
+    },
+    60_000,
+  );
 
-    await lockAccount(teacher.code);
-    await expectCode(
-      await loginFrom(phone!, teacher.code, "Cedar-Window-73"),
-      401,
-      "AUTH_INVALID_CREDENTIALS",
-    );
-    expect((await loginFrom(fresh!, teacher.code, "Cedar-Window-73")).status).toBe(200);
-  });
+  integrationTest(
+    "a device token opens nothing on its own or on another account",
+    async () => {
+      const first = await claimed([ROLES.STUDENT], "Copper-Lantern-4");
+      const second = await claimed([ROLES.STUDENT], "Velvet-Comet-19");
+      const phone = await deviceTokenOf(await login(first.code, "Copper-Lantern-4"));
+
+      await expectCode(
+        await loginFrom(phone!, first.code, "wrong-guess"),
+        401,
+        "AUTH_INVALID_CREDENTIALS",
+      );
+      await lockAccount(second.code);
+      // Trusted for the first account only: the second stays locked against it.
+      await expectCode(
+        await loginFrom(phone!, second.code, "Velvet-Comet-19"),
+        401,
+        "AUTH_INVALID_CREDENTIALS",
+      );
+    },
+    60_000,
+  );
+
+  integrationTest(
+    "an admin reset forgets every trusted device",
+    async () => {
+      const teacher = await claimed([ROLES.INSTRUCTOR], "Maple-Signal-62");
+      const phone = await deviceTokenOf(await login(teacher.code, "Maple-Signal-62"));
+      const { setup_code } = await issueCode(teacher.id);
+      const fresh = await deviceTokenOf(await login(teacher.code, setup_code, "Cedar-Window-73"));
+      expect(fresh).not.toBe(phone);
+
+      await lockAccount(teacher.code);
+      await expectCode(
+        await loginFrom(phone!, teacher.code, "Cedar-Window-73"),
+        401,
+        "AUTH_INVALID_CREDENTIALS",
+      );
+      expect((await loginFrom(fresh!, teacher.code, "Cedar-Window-73")).status).toBe(200);
+    },
+    60_000,
+  );
 
   redisTest("sign-in attempts on one member ID are limited whatever the IP", async () => {
     const logger = createLogger({ destination: () => undefined });
@@ -712,4 +733,38 @@ describe("member sign-in lockout is per address (QA-069)", () => {
       client.disconnect();
     }
   });
+});
+
+// QA-085: the client chose its channel, so a page script could claim `mobile` and receive the
+// refresh token in readable JSON instead of the HttpOnly cookie. A request a browser made (it
+// carries Origin) is now always a web session.
+describe("the session channel is not the browser's to choose (QA-085)", () => {
+  integrationTest(
+    "a browser request claiming mobile is a web session, not a token in JSON",
+    async () => {
+      // Member IDs belong to mobile-only roles, so as a web session it is refused outright -- and
+      // either way no refresh token reaches page script.
+      const teacher = await claimed([ROLES.INSTRUCTOR], "Silver-Brook-48");
+      const res = await post(
+        LOGIN,
+        { username: teacher.code, password: "Silver-Brook-48", channel: "mobile" },
+        undefined,
+        app,
+        { origin: "http://localhost:5180" },
+      );
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { code: string };
+      expect(body.code).toBe("WEB_ACCESS_MOBILE_ONLY");
+      expect(body).not.toHaveProperty("refresh_token");
+
+      // The app, which sends no Origin, still gets its token.
+      const app2 = await post(LOGIN, {
+        username: teacher.code,
+        password: "Silver-Brook-48",
+        channel: "mobile",
+      });
+      expect(app2.status).toBe(200);
+      expect(await app2.json()).toHaveProperty("refresh_token");
+    },
+  );
 });

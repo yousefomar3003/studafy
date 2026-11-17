@@ -539,3 +539,42 @@ describe("logging", () => {
     expect(breach!.family_id).toBe(seed.familyId);
   });
 });
+
+// QA-085: a refresh token slid forever -- every rotation granted a fresh 30 days -- so a stolen
+// session never had to end. A session family now has an absolute lifetime from its first token.
+describe("absolute session lifetime (QA-085)", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  integrationTest("a family older than the cap cannot be refreshed", async () => {
+    const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.STUDENT.id, {
+      channel: "mobile",
+      issuedAt: new Date(Date.now() - 91 * DAY_MS),
+    });
+    const res = await post("/api/auth/refresh", {
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: seed.token }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  integrationTest(
+    "a refresh near the cap is cut to the cap, not granted 30 more days",
+    async () => {
+      const familyStart = new Date(Date.now() - 89 * DAY_MS);
+      const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.STUDENT.id, {
+        channel: "mobile",
+        issuedAt: familyStart,
+      });
+      const res = await post("/api/auth/refresh", {
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refresh_token: seed.token }),
+      });
+      expect(res.status).toBe(200);
+      const [child] = await sql<{ expires_at: Date }[]>`
+      SELECT expires_at FROM app.refresh_tokens
+      WHERE family_id = ${seed.familyId}::uuid AND parent_token_id IS NOT NULL
+    `;
+      expect(child!.expires_at.getTime()).toBeLessThanOrEqual(familyStart.getTime() + 90 * DAY_MS);
+    },
+  );
+});

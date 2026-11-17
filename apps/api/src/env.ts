@@ -212,6 +212,8 @@ export const envSchema = z
     // 'review' identities of the single school flagged is_review_tenant. Held in the secret manager,
     // never in the repository (docs/runbooks/app-review-access.md).
     REVIEW_LOGIN_PASSWORD: z.string().min(16).optional(),
+    // QA-085: comma-separated review-tenant emails REVIEW_LOGIN_PASSWORD may open; unset, all.
+    REVIEW_LOGIN_ALLOWED_EMAILS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     // Shared password for the staging QA tenants (QA-02, qa-login-service.ts). Unset means
     // POST /api/auth/login/qa answers 404. Unlike the reviewer password it reaches SUPER_ADMIN, so the
     // refinement below refuses to boot with it set when APP_ENV is production. Held in the secret

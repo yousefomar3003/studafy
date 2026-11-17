@@ -38,6 +38,7 @@ import { extractClientIp, takeMemberLoginTokens } from "../../../middleware/rate
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
 import { emitRateLimitBlock } from "../auth-anomaly-events";
+import { establishedChannel } from "../channels";
 import { deliverTokenPair } from "../delivery";
 import {
   burnVerification,
@@ -281,7 +282,7 @@ export function memberPasswordRoutes(
       newPassword: body.new_password,
       // Only a token that was trusted when the budgets were chosen; loginMember re-checks it.
       deviceToken: trustedDevice ? body.device_token : undefined,
-      channel: body.channel,
+      channel: establishedChannel(c.req.header("origin"), body.channel),
       device: { userAgent, ipAddress: clientIp },
       requestId: c.get("requestId"),
       logger: c.get("log"),
