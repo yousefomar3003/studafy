@@ -1043,6 +1043,27 @@ const GUARD_CASES: GuardCase[] = [
     source: "licensing/revenue-share-routes.ts",
     allowedRole: ROLES.FINANCE,
   },
+  {
+    method: "GET",
+    path: "/api/school/ai-revenue-share/summary",
+    permission: "aiRevenueShare:read",
+    source: "licensing/revenue-share-routes.ts",
+    allowedRole: ROLES.FINANCE,
+  },
+  {
+    method: "GET",
+    path: "/api/platform/schools/{schoolId}/ai-revenue-share/summary",
+    permission: "platform:read",
+    source: "licensing/revenue-share-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  {
+    method: "GET",
+    path: "/api/platform/ai-revenue-share/schools",
+    permission: "platform:read",
+    source: "licensing/revenue-share-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
   // Staff and class records (000181). Literal subject kinds on record-imports: each kind has its
   // own guard, mounted on its own path.
   {

@@ -142,3 +142,17 @@ export type {
   RevenueShareResult,
   RevenueShareSettings,
 } from "./revenue-share";
+export {
+  contentBonusAimBps,
+  conversionStanding,
+  optInsToReach,
+  paidPartOf,
+  studafyNetOf,
+  studentAiMarginOf,
+} from "./ai-dashboard";
+export type {
+  ConversionStanding,
+  ConversionStandingInput,
+  ConversionTierSettings,
+  StudafyNet,
+} from "./ai-dashboard";

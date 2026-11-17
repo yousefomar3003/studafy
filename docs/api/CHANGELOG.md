@@ -13,6 +13,17 @@ when it required the `version-bump` label.
 
 ### Added
 
+- The Student AI programme's dashboards (phase 6; docs/billing/ai-programme.md "Dashboards").
+  School (`aiRevenueShare:read`: the school admin, the principal and finance):
+  `schoolGetAiProgrammeDashboard` (`GET /api/school/ai-revenue-share/summary`,
+  `AiProgrammeDashboard`: enrolled and opted in today, the conversion in force and its tier, the
+  next tier and the opt-ins it takes, the large-school floor, upload consistency and its target, the
+  share rate, the ledger's totals, the year's earnings -- share earned plus the margin on Student AI
+  tuition lines, collected or estimated -- and the licence's invoices). Console (`platform:read`,
+  web): `platformGetAiProgrammeDashboard` (`GET /api/platform/schools/{schoolId}/ai-revenue-share/summary`,
+  `PlatformAiProgrammeDashboard`, adds `studafyNet`) and `platformListAiProgrammeSchools`
+  (`GET /api/platform/ai-revenue-share/schools`, `AiProgrammeSchoolList`). Read-only.
+
 - The Student AI programme's phases integrated (no new paths). The revenue share's `commitment`
   fields reference the licence's own `LicenseCommitment` enum (the separate
   `AiRevenueShareCommitment` schema is gone; same values). Upload consistency
@@ -192,6 +203,10 @@ when it required the `version-bump` label.
   anything not refunded, and the last error.
 
 ### Changed
+
+- `AiRevenueShareRecomputeResult` adds `recorded`: the console's recompute now also records the
+  revenue share of payments made on a licence this period before it entered the programme (as
+  opening its first opt-in window does).
 
 - `GET /api/academics/materials` and `GET /api/academics/materials/{materialId}`: a caller who is
   not school staff (students, parents, guests) sees only `ready` materials; another state is left

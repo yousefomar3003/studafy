@@ -10,6 +10,17 @@ import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
 import { AUTH_CHANNELS } from "../auth/channels";
 
+import {
+  aiProgrammeDashboard,
+  listAiProgrammeSchools,
+  platformAiProgrammeDashboard,
+  readSchoolAsSystem,
+} from "./ai-dashboard";
+import {
+  aiProgrammeDashboardSchema,
+  aiProgrammeSchoolListSchema,
+  platformAiProgrammeDashboardSchema,
+} from "./ai-dashboard-schemas";
 import { licenseError } from "./context";
 import {
   licenseRevenueShare,
@@ -171,6 +182,62 @@ const schoolRoute = createRoute({
   ),
 });
 
+const DASHBOARD_DESCRIPTION =
+  "Students enrolled and opted in today; the conversion the share uses (locked on the measurement " +
+  "day, a provisional re-measure, or today's counts) and its tier; the next tier that pays more " +
+  "and the opt-ins it takes, and the large-school floor when it pays more; upload consistency to " +
+  "date, its bonus tier and the target; the share a payment would get now; the ledger's totals; " +
+  "the school's earnings for the academic year (the share earned, plus the margin on the Student " +
+  "AI tuition lines: collected from lines Studafy billed, estimated for lines the school bills " +
+  "itself); and the licence's invoices (invoiced, paid, outstanding, credits). Aggregates only.";
+
+const schoolDashboardRoute = createRoute({
+  method: "get",
+  path: "/api/school/ai-revenue-share/summary",
+  operationId: "schoolGetAiProgrammeDashboard",
+  tags: [SCHOOL_TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "The school's Student AI programme dashboard",
+  description: `${DASHBOARD_DESCRIPTION} aiRevenueShare:read (the school admin, the principal and finance).`,
+  responses: standardResponses(
+    { 200: { description: "The dashboard", schema: aiProgrammeDashboardSchema } },
+    [401, 403],
+  ),
+});
+
+const platformDashboardRoute = createRoute({
+  method: "get",
+  path: "/api/platform/schools/{schoolId}/ai-revenue-share/summary",
+  operationId: "platformGetAiProgrammeDashboard",
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "A school's Student AI programme dashboard",
+  description: `${DASHBOARD_DESCRIPTION} Adds what Studafy keeps for the year, in total and per seat.`,
+  request: { params: revenueShareSchoolParamsSchema },
+  responses: standardResponses(
+    { 200: { description: "The dashboard", schema: platformAiProgrammeDashboardSchema } },
+    [401, 403, 404],
+  ),
+});
+
+const overviewRoute = createRoute({
+  method: "get",
+  path: "/api/platform/ai-revenue-share/schools",
+  operationId: "platformListAiProgrammeSchools",
+  tags: [TAG],
+  security: [{ bearerAuth: [] }],
+  summary: "Every school in the Student AI programme",
+  description:
+    "One row per school with an opt-in window, opt-ins or a revenue share ledger: enrolled and " +
+    "opted in, conversion (in force and today's), upload consistency, the share rate, the year's " +
+    "share (collected, pending, owed, credited, payout due, paid out, forfeited) and what Studafy " +
+    "keeps, in total and per seat.",
+  responses: standardResponses(
+    { 200: { description: "The schools", schema: aiProgrammeSchoolListSchema } },
+    [401, 403],
+  ),
+});
+
 function platformActor(c: Context<AppEnv>): LicenseActor {
   const auth = requireAuth(c);
   return {
@@ -189,6 +256,7 @@ export function platformAiRevenueShareRoutes(deps: LicensingDeps): OpenAPIHono<A
     c.req.method === "GET" ? next() : manage(c, next);
 
   const paths = [
+    "/api/platform/ai-revenue-share/schools",
     "/api/platform/schools/:schoolId/ai-revenue-share",
     "/api/platform/schools/:schoolId/ai-revenue-share/*",
     "/api/platform/schools/:schoolId/licenses/:licenseId/ai-revenue-share",
@@ -225,6 +293,21 @@ export function platformAiRevenueShareRoutes(deps: LicensingDeps): OpenAPIHono<A
     const actor = platformActor(c);
     await requireSchool(schoolId, actor);
     const view = await readInSchool(deps, schoolId, actor, (tx) => schoolRevenueShare(tx, query));
+    return c.json(view, 200);
+  });
+
+  routes.openapi(overviewRoute, async (c) => {
+    const schools = await listAiProgrammeSchools(deps.database);
+    return c.json({ schools }, 200);
+  });
+
+  routes.openapi(platformDashboardRoute, async (c) => {
+    const { schoolId } = c.req.valid("param");
+    const actor = platformActor(c);
+    await requireSchool(schoolId, actor);
+    const view = await readInSchool(deps, schoolId, actor, (tx) =>
+      platformAiProgrammeDashboard(tx),
+    );
     return c.json(view, 200);
   });
 
@@ -282,20 +365,36 @@ export function platformAiRevenueShareRoutes(deps: LicensingDeps): OpenAPIHono<A
 export function schoolAiRevenueShareRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
   routes.use("/api/school/ai-revenue-share", requirePermission(PERMISSIONS.AI_REVENUE_SHARE_READ));
+  routes.use(
+    "/api/school/ai-revenue-share/summary",
+    requirePermission(PERMISSIONS.AI_REVENUE_SHARE_READ),
+  );
 
-  routes.openapi(schoolRoute, async (c) => {
-    const query = c.req.valid("query");
+  const schoolActor = (c: Context<AppEnv>): LicenseActor => {
     const auth = requireAuth(c);
-    const actor: LicenseActor = {
+    return {
       kind: "school",
       userId: auth.userId,
       homeSchoolId: auth.schoolId,
       requestId: c.get("requestId"),
       locale: (c.get("locale") ?? "en") as SupportedLocale,
     };
-    const view = await readInSchool(deps, auth.schoolId, actor, (tx) =>
+  };
+
+  routes.openapi(schoolRoute, async (c) => {
+    const query = c.req.valid("query");
+    const actor = schoolActor(c);
+    const view = await readInSchool(deps, actor.homeSchoolId, actor, (tx) =>
       schoolRevenueShare(tx, query),
     );
+    return c.json(view, 200);
+  });
+
+  // Aggregates over opt-ins and tuition lines, which the runtime role shows leadership only: read as
+  // the system armed for the caller's own school (tenant isolation still binds every statement).
+  routes.openapi(schoolDashboardRoute, async (c) => {
+    const actor = schoolActor(c);
+    const view = await readSchoolAsSystem(deps.database, actor, (tx) => aiProgrammeDashboard(tx));
     return c.json(view, 200);
   });
 

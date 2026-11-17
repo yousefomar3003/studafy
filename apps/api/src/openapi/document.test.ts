@@ -198,6 +198,11 @@ describe("structure", () => {
         "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share",
         "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share/measure",
         "/api/school/ai-revenue-share",
+        // The programme's dashboards (phase 6): the school's own summary (aiRevenueShare:read), a
+        // school's summary and every school's row for the console (platform:read).
+        "/api/school/ai-revenue-share/summary",
+        "/api/platform/schools/{schoolId}/ai-revenue-share/summary",
+        "/api/platform/ai-revenue-share/schools",
         "/api/platform/licenses/bank-details",
         "/api/platform/licenses/quote",
         "/api/platform/licenses/invoices",
@@ -1036,6 +1041,9 @@ describe("security", () => {
         "GET /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share",
         "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share/measure",
         "GET /api/school/ai-revenue-share",
+        "GET /api/school/ai-revenue-share/summary",
+        "GET /api/platform/schools/{schoolId}/ai-revenue-share/summary",
+        "GET /api/platform/ai-revenue-share/schools",
         "GET /api/platform/licenses/bank-details",
         "PUT /api/platform/licenses/bank-details",
         "POST /api/platform/licenses/quote",
