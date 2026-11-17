@@ -2,11 +2,14 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/notifications/presentation/notifications_screen.dart';
 import 'package:studafy_mobile/src/features/shell/application/shell_providers.dart';
 import 'package:studafy_mobile/src/features/shell/domain/shell_role.dart';
+import 'package:studafy_mobile/src/features/student/application/work_and_grades_providers.dart';
+import 'package:studafy_mobile/src/features/student/domain/work_and_grades.dart';
 
 import '../../support/wrap_with_localization.dart';
 import '../parent/support.dart';
@@ -15,6 +18,7 @@ Future<FakeNotificationsClient> _pump(
   WidgetTester tester, {
   required FakeNotificationsClient notifications,
   Locale locale = const Locale('en'),
+  ShellRole role = ShellRole.attendanceOfficer,
 }) async {
   await tester.pumpWidget(
     wrapWithLocalization(
@@ -23,15 +27,23 @@ Future<FakeNotificationsClient> _pump(
           apiClientProvider.overrideWithValue(
             FakeStudafyApiClient(notifications: notifications),
           ),
-          shellRoleProvider.overrideWithValue(ShellRole.attendanceOfficer),
+          shellRoleProvider.overrideWithValue(role),
         ],
         child: Builder(
-          builder: (context) => MaterialApp(
+          builder: (context) => MaterialApp.router(
             theme: AppTheme.light,
             locale: context.locale,
             supportedLocales: context.supportedLocales,
             localizationsDelegates: context.localizationDelegates,
-            home: const NotificationsScreen(),
+            // A tab target asks the router whether it can pop back to the shell.
+            routerConfig: GoRouter(
+              routes: [
+                GoRoute(
+                  path: '/',
+                  builder: (context, state) => const NotificationsScreen(),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -99,6 +111,46 @@ void main() {
     // Nothing unread left, so the action is gone.
     expect(find.byKey(const Key('notificationsMarkAllRead')), findsNothing);
   });
+
+  testWidgets(
+    "a student's grade notices open Work & grades on that kind of grade",
+    (tester) async {
+      await _pump(
+        tester,
+        role: ShellRole.student,
+        notifications: FakeNotificationsClient(
+          notifications: [
+            notificationFixture(id: 'n-1', notificationType: 'MARKS_RELEASED'),
+            notificationFixture(id: 'n-2', notificationType: 'GRADE_POSTED'),
+          ],
+        ),
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NotificationsScreen)),
+      );
+
+      await tester.tap(find.byKey(const Key('notification-n-1')));
+      await tester.pumpAndSettle();
+      expect(container.read(selectedShellTabProvider), workAndGradesTabKey);
+      expect(
+        container.read(workAndGradesProvider),
+        const WorkAndGradesSelection(
+          section: WorkAndGradesSection.grades,
+          gradesTab: GradesTab.exams,
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('notification-n-2')));
+      await tester.pumpAndSettle();
+      expect(
+        container.read(workAndGradesProvider),
+        const WorkAndGradesSelection(
+          section: WorkAndGradesSection.grades,
+          gradesTab: GradesTab.assignments,
+        ),
+      );
+    },
+  );
 
   testWidgets('an empty inbox says so', (tester) async {
     await _pump(tester, notifications: FakeNotificationsClient());

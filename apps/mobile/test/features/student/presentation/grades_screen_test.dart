@@ -172,7 +172,12 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(DefaultTabController.of(tester.element(examsTab)).index, 0);
+      expect(
+        tester.widget<TabBar>(find.byType(TabBar)).controller!.index,
+        GradesTab.exams.index,
+      );
+      // The official results stay one tap away in the app bar.
+      expect(find.byTooltip('Official results'), findsOneWidget);
       expect(find.byTooltip('Term marks'), findsNothing);
       expect(client.requestedStudents, ['student-1']);
       expect(find.text('First month'), findsWidgets);

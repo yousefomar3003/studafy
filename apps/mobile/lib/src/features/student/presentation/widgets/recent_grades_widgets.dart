@@ -75,9 +75,12 @@ class GradeKindChip extends StatelessWidget {
 
 /// A tab label led by its kind's icon ("Exams", "Assignments"), for the Grades screen's tab bar.
 class GradeKindTab extends StatelessWidget {
-  const GradeKindTab({required this.kind, super.key});
+  const GradeKindTab({required this.kind, this.label, super.key});
 
   final GradeKind kind;
+
+  /// The tab's text; the kind's [GradeKindVisuals.sectionLabel] when null.
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -87,7 +90,7 @@ class GradeKindTab extends StatelessWidget {
         children: [
           Icon(kind.icon, size: 18),
           const SizedBox(width: AppSpacing.space8),
-          Flexible(child: Text(kind.sectionLabel, overflow: TextOverflow.ellipsis)),
+          Flexible(child: Text(label ?? kind.sectionLabel, overflow: TextOverflow.ellipsis)),
         ],
       ),
     );
