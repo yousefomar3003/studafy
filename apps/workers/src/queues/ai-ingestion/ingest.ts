@@ -4,7 +4,7 @@ import { parseDocument, type ParseDocumentOptions } from "./parsers";
 
 import type { CostMeter, EmbeddingStage } from "./embedding";
 import type { OcrReport } from "./ocr";
-import type { MaterialChunk } from "./types";
+import type { MaterialChunk, ParsedBlock } from "./types";
 
 /**
  * A `MaterialChunk` plus the embedding columns it will be stored with.
@@ -61,6 +61,23 @@ export async function buildIngestChunks(
     ocrReport: parsed.ocrReport,
     embeddingTokens: embedded.tokens,
   };
+}
+
+/**
+ * The same chunk -> embed half for blocks that did not come from one document: an assignment AI
+ * source (000232) is the assignment's own text plus each of its attached files, parsed one by one
+ * (assignment-source.ts) and read as one source.
+ */
+export async function buildIngestChunksFromBlocks(
+  blocks: readonly ParsedBlock[],
+  options: Omit<IngestOptions, "ocr"> = {},
+): Promise<Omit<BuildIngestChunksResult, "ocrReport">> {
+  const embedder = options.embedder ?? defaultEmbedder;
+  const embedded = await embedder.embed(chunkBlocks(blocks), {
+    schoolId: options.schoolId,
+    meter: options.meter ?? nullCostMeter,
+  });
+  return { chunks: embedded.chunks, embeddingTokens: embedded.tokens };
 }
 
 const defaultEmbedder = createEmbeddingStage(createMockEmbeddingProvider());

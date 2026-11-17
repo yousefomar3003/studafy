@@ -61,6 +61,7 @@ import {
   aiMetricsRoutes,
   aiRetrievalRoutes,
   aiSummaryRoutes,
+  aiSourceRoutes,
   aiStudentSelfGate,
   aiPhotoTextRoutes,
   aiUsageRoutes,
@@ -1539,6 +1540,11 @@ export function createApp({
     );
     // Ask AI chat history: read-only, so behind the feature check but not the token budget.
     app.route("/", aiAskHistoryRoutes({ database }));
+    // A student's own AI sources (000232): their files and photos, and their assignments, used by
+    // every tool below wherever a study material goes. Nothing here calls the model or spends
+    // tokens, so it sits behind the AI feature check only; the tools that read a source keep their
+    // own gate, quota and usage meter. Uploads take the material pipeline (scan, then ingestion).
+    app.route("/", aiSourceRoutes({ database, storage, redis, scannerWarmup }));
     // Study-material summarizer. Mounted under the same gate so a generated summary reserves and
     // commits the caller's AI quota, and only when the gate's dependencies exist — the summarize
     // surface must never run un-metered. The provider may be null on the same kill-switch terms as

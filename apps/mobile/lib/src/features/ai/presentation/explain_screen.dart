@@ -8,10 +8,12 @@ import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/ai_study_providers.dart';
 import '../application/ask_ai_providers.dart';
 import '../domain/ai_explain.dart';
+import '../domain/ai_source.dart';
 import '../domain/ai_study.dart';
 import '../domain/ask_ai_conversation.dart';
 import 'widgets/ai_error_view.dart';
 import 'widgets/ai_quota_meter.dart';
+import 'widgets/ai_source_picker.dart';
 import 'widgets/ask_ai_citation_chip.dart';
 
 /// "Explain it simply": the student types a topic, picks how simple the explanation should be,
@@ -35,6 +37,9 @@ class _ExplainScreenState extends ConsumerState<ExplainScreen> {
 
   _Phase _phase = _Phase.idle;
   AiExplainLevel _level = AiExplainLevel.middle;
+
+  /// The one source to search, or null for every study material.
+  AiSourceChoice? _scope;
   List<AiExplainPassage> _passages = const [];
   AiExplainPassage? _passage;
   String? _explanation;
@@ -74,7 +79,7 @@ class _ExplainScreenState extends ConsumerState<ExplainScreen> {
     try {
       final passages = await ref
           .read(aiExplainClientProvider)
-          .search(studentId: studentId, topic: topic);
+          .search(studentId: studentId, topic: topic, materialId: _scope?.id);
       if (!mounted || request != _request) return;
       ref.invalidate(aiUsageProvider);
       if (passages.isEmpty) {
@@ -126,6 +131,18 @@ class _ExplainScreenState extends ConsumerState<ExplainScreen> {
     }
   }
 
+  /// Where to search: every study material, or one source -- a study material, one of the
+  /// student's assignments, or a file or photo of their own.
+  Future<void> _chooseScope() async {
+    final picked = await showModalBottomSheet<_ScopePick>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => _ScopeSheet(scope: _scope),
+    );
+    if (picked != null && mounted) setState(() => _scope = picked.choice);
+  }
+
   void _onLevelChanged(AiExplainLevel level) {
     if (level == _level) return;
     setState(() => _level = level);
@@ -166,7 +183,18 @@ class _ExplainScreenState extends ConsumerState<ExplainScreen> {
                         controller: _topicController,
                         enabled: !_busy,
                         onSubmitted: _search,
+                        scoped: _scope != null,
+                        onChooseScope: _chooseScope,
                       ),
+                      if (_scope case final scope?) ...[
+                        const SizedBox(height: AppSpacing.space8),
+                        _ScopeChip(
+                          scope: scope,
+                          enabled: !_busy,
+                          onTap: _chooseScope,
+                          onClear: () => setState(() => _scope = null),
+                        ),
+                      ],
                       const SizedBox(height: AppSpacing.space16),
                       _LevelPicker(
                         level: _level,
@@ -285,16 +313,119 @@ class _Intro extends StatelessWidget {
   }
 }
 
+/// The scope sheet: "All my study materials", or one source from the three-tab picker.
+class _ScopeSheet extends StatelessWidget {
+  const _ScopeSheet({required this.scope});
+
+  final AiSourceChoice? scope;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DraggableScrollableSheet(
+      expand: false,
+      initialChildSize: 0.7,
+      maxChildSize: 0.92,
+      builder: (context, controller) => ListView(
+        controller: controller,
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.space16,
+          0,
+          AppSpacing.space16,
+          AppSpacing.space24,
+        ),
+        children: [
+          Text('aiSources.scope.sheetTitle'.tr(), style: theme.textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.space12),
+          AiSourcePicker(
+            multiSelect: false,
+            selected: {?scope?.id},
+            onSelect: (choice) => Navigator.of(context).pop(_ScopePick(choice)),
+            studyMaterials: AiStudyMaterialChoiceList(
+              selectedId: scope?.id,
+              onSelect: (choice) => Navigator.of(context).pop(_ScopePick(choice)),
+              leading: ListTile(
+                key: const Key('aiExplainScopeAll'),
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(Icons.library_books_outlined, color: theme.colorScheme.primary),
+                title: Text('aiSources.scope.all'.tr()),
+                subtitle: Text('aiSources.scope.allHint'.tr()),
+                trailing: scope == null
+                    ? Icon(Icons.check_rounded, color: theme.colorScheme.primary)
+                    : null,
+                onTap: () => Navigator.of(context).pop(const _ScopePick(null)),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The one source the search is limited to, shown under the topic field; cleared to search every
+/// study material again.
+class _ScopeChip extends StatelessWidget {
+  const _ScopeChip({
+    required this.scope,
+    required this.enabled,
+    required this.onTap,
+    required this.onClear,
+  });
+
+  final AiSourceChoice scope;
+  final bool enabled;
+  final VoidCallback onTap;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Text(
+          'aiSources.scope.label'.tr(),
+          style: theme.textTheme.labelLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(width: AppSpacing.space8),
+        Flexible(
+          child: InputChip(
+            key: const Key('aiExplainScope'),
+            avatar: Icon(scope.kind.icon, size: 18),
+            label: Text(scope.title, overflow: TextOverflow.ellipsis),
+            onPressed: enabled ? onTap : null,
+            onDeleted: enabled ? onClear : null,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// What the scope sheet returns: a source, or "all" (null). Wrapped so a dismissed sheet (null)
+/// is not mistaken for "all".
+class _ScopePick {
+  const _ScopePick(this.choice);
+
+  final AiSourceChoice? choice;
+}
+
 class _TopicField extends StatelessWidget {
   const _TopicField({
     required this.controller,
     required this.enabled,
     required this.onSubmitted,
+    required this.scoped,
+    required this.onChooseScope,
   });
 
   final TextEditingController controller;
   final bool enabled;
   final VoidCallback onSubmitted;
+
+  /// The search is limited to one source.
+  final bool scoped;
+  final VoidCallback onChooseScope;
 
   @override
   Widget build(BuildContext context) {
@@ -308,6 +439,15 @@ class _TopicField extends StatelessWidget {
         labelText: 'aiExplain.topicLabel'.tr(),
         hintText: 'aiExplain.topicHint'.tr(),
         prefixIcon: const Icon(Icons.search_rounded),
+        suffixIcon: IconButton(
+          key: const Key('aiExplainChooseScope'),
+          tooltip: 'aiSources.scope.label'.tr(),
+          icon: Icon(
+            Icons.tune_rounded,
+            color: scoped ? Theme.of(context).colorScheme.primary : null,
+          ),
+          onPressed: enabled ? onChooseScope : null,
+        ),
         counterText: '',
         border: const OutlineInputBorder(borderRadius: AppRadius.lgRadius),
       ),

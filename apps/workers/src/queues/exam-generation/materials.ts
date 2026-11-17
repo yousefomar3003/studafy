@@ -40,6 +40,12 @@ export type LoadExamMaterialsResult =
 export async function loadExamMaterials(
   tx: TransactionSql,
   materialIds: readonly string[],
+  /**
+   * The student the exam is for. This runs as the system, past row scope, so a student's own
+   * (personal) source is matched to its owner here: another student's reads as absent, the same
+   * answer the create route's RLS-scoped check gave.
+   */
+  studentId?: string,
 ): Promise<LoadExamMaterialsResult> {
   const materials: { id: string; title: string | null }[] = [];
 
@@ -50,13 +56,18 @@ export async function loadExamMaterials(
       { id: string; title: string | null; ingest_status: string; ai_enabled: boolean }[]
     >`
       SELECT m.id, m.title, m.ingest_status,
-             COALESCE(
+             (m.source_kind = 'personal' OR COALESCE(
                (SELECT cl.ai_materials_enabled FROM app.classes cl
                 WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
                false
-             ) AS ai_enabled
+             )) AS ai_enabled
       FROM app.materials m
       WHERE m.id = ${materialId}::uuid
+        ${
+          studentId === undefined
+            ? tx``
+            : tx`AND (m.owner_student_id IS NULL OR m.owner_student_id = ${studentId}::uuid)`
+        }
     `;
     const material = rows[0];
     if (!material) return { status: "not_found", materialId };

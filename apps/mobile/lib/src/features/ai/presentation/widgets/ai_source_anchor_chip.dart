@@ -13,11 +13,20 @@ import '../../domain/ai_study.dart';
 /// The material is fetched on tap, not up front — a summary can carry many anchors and most are
 /// never opened. The owning [materialId] is passed in because the summarize/concepts endpoints are
 /// single-material and don't repeat it per anchor.
+///
+/// A source that is not a class material (an assignment, or the student's own file) has nothing to
+/// open in the viewer, so with [openable] off the chip is a plain label.
 class AiSourceAnchorChip extends ConsumerStatefulWidget {
-  const AiSourceAnchorChip({required this.anchor, required this.materialId, super.key});
+  const AiSourceAnchorChip({
+    required this.anchor,
+    required this.materialId,
+    this.openable = true,
+    super.key,
+  });
 
   final AiSourceAnchor anchor;
   final String materialId;
+  final bool openable;
 
   @override
   ConsumerState<AiSourceAnchorChip> createState() => _AiSourceAnchorChipState();
@@ -62,6 +71,13 @@ class _AiSourceAnchorChipState extends ConsumerState<AiSourceAnchorChip> {
         : page != null
         ? 'aiStudy.sources.page'.tr(namedArgs: {'page': '$page'})
         : 'aiStudy.sources.fallback'.tr(namedArgs: {'n': '${anchor.order}'});
+
+    if (!widget.openable) {
+      return Chip(
+        avatar: CircleAvatar(child: Text('${anchor.order}')),
+        label: Text(label, overflow: TextOverflow.ellipsis),
+      );
+    }
 
     return ActionChip(
       avatar: _opening

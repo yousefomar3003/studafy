@@ -114,6 +114,16 @@ const retrievalSearchBodySchema = z.object({
         "How many fused results to return. Defaults to 10, max 20. When re-ranking is enabled the " +
         `re-ranker cuts this to at most ${RERANK_K} (the cross-encoder output); a smaller limit still caps it.`,
     }),
+  material_id: z
+    .string()
+    .uuid()
+    .optional()
+    .openapi({
+      description:
+        "Search this one source only: a study material, an assignment source, or one of the " +
+        "student's own files or photos. When omitted, every class study material the student can " +
+        "read is searched.",
+    }),
 });
 
 const retrievalSearchParamsSchema = z.object({
@@ -221,6 +231,7 @@ export function aiRetrievalRoutes(deps: {
         // The re-ranker needs the full fused top-N to choose from; without it, respect the caller's
         // limit as before.
         limit: rerankEnabled ? RERANK_CANDIDATE_POOL : clampLimit(body.limit),
+        ...(body.material_id !== undefined ? { materialId: body.material_id } : {}),
       });
       await recordDurableUsage(tx, auth.schoolId, studentId, {
         totalTokens: tokensUsed,
