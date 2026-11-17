@@ -169,3 +169,52 @@ export const childTimetableResponseSchema = z
     }),
   })
   .openapi("ChildTimetable");
+
+export const childRecentGradesQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(20).default(6).openapi({
+      description: "How many of the newest marks to return, across every linked child.",
+    }),
+  })
+  .openapi("ChildRecentGradesQuery");
+
+export const childRecentGradeSchema = z
+  .object({
+    kind: z.enum(["exam", "assignment"]).openapi("ChildRecentGradeKind", {
+      description:
+        "exam: a mark school leadership approved and released. assignment: a published " +
+        "gradebook (coursework) grade.",
+    }),
+    id: uuidSchema.openapi({
+      description: "The exam's assessment id, or the assignment grade's id.",
+    }),
+    student_id: uuidSchema,
+    student_first_name: z.string(),
+    student_name: z.string(),
+    name: z.string().openapi({ description: "The exam's name, or the grade's label." }),
+    subject_name: z.string(),
+    term_name: z.string().nullable().openapi({
+      description: "The exam's term; null for a full-year exam and for assignment grades.",
+    }),
+    released_at: dateTimeSchema.openapi({
+      description: "When the mark reached the family (exam release, or grade publication).",
+    }),
+    attempt: z.number().int().min(1).openapi({ description: "2 for an exam retake." }),
+    status: z
+      .enum(["graded", "absent", "excused", "not_applicable"])
+      .openapi("ChildRecentGradeStatus"),
+    score: z.number().nullable(),
+    max_score: z.number(),
+    descriptor_label: z.string().nullable().openapi({
+      description: "Descriptive subjects: the descriptor the skill was given.",
+    }),
+  })
+  .openapi("ChildRecentGrade");
+
+export const childRecentGradesResponseSchema = z
+  .object({
+    items: z.array(childRecentGradeSchema).openapi({
+      description: "Newest first; on a tie an exam mark comes first.",
+    }),
+  })
+  .openapi("ChildRecentGrades");

@@ -299,6 +299,28 @@ void main() {
     expect(find.text('Weekly present rate'), findsOneWidget);
   });
 
+  testWidgets("the home's recent grades can bring the detail back to its Grades tab",
+      (tester) async {
+    _tallScreen(tester);
+    await tester.pumpWidget(wrapWithLocalization(_scope(
+      childIds: const ['child-1'],
+      breakdowns: {'child-1': childBreakdown(id: 'child-1', termAverage: 88)},
+    )));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Attendance'));
+    await tester.pumpAndSettle();
+    expect(find.text('Attendance this term'), findsOneWidget);
+
+    ProviderScope.containerOf(tester.element(find.byType(ChildDetailScreen)))
+        .read(childDetailGradesRequestProvider.notifier)
+        .request();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Term summary'), findsOneWidget);
+    expect(find.text('Attendance this term'), findsNothing);
+  });
+
   testWidgets(
     "timetable tab: the child's weekly lessons, with server-resolved names",
     (tester) async {

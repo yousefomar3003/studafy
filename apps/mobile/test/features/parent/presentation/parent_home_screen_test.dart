@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/child_comparison_report.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/child_recent_grade.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/notification.dart' as api_models;
 import 'package:studafy_mobile/src/core/offline/offline_database.dart';
 import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
@@ -65,6 +66,8 @@ void main() {
           childComparisonProvider
               .overrideWith((ref) => Completer<ChildComparisonReport>().future),
           familyFinanceProvider.overrideWith((ref) => Completer<FamilyFinanceView?>().future),
+          parentRecentGradesProvider
+              .overrideWith((ref) => Completer<List<ChildRecentGrade>>().future),
           parentNotificationsProvider
               .overrideWith((ref) => Completer<List<api_models.Notification>>().future),
         ],
@@ -84,6 +87,7 @@ void main() {
         overrides: [
           childComparisonProvider.overrideWith((ref) => comparisonReport(const [])),
           familyFinanceProvider.overrideWith((ref) async => null),
+          parentRecentGradesProvider.overrideWith((ref) async => const <ChildRecentGrade>[]),
           parentNotificationsProvider.overrideWith((ref) async => <api_models.Notification>[]),
         ],
         child: _homeApp(),
@@ -117,6 +121,17 @@ void main() {
             ]),
           ),
           familyFinanceProvider.overrideWith((ref) async => _financeOwing()),
+          parentRecentGradesProvider.overrideWith(
+            (ref) async => [
+              recentGrade(
+                kind: 'exam',
+                id: 'a-1',
+                studentId: 'child-2',
+                firstName: 'Lina',
+                name: 'First month',
+              ),
+            ],
+          ),
           parentNotificationsProvider.overrideWith(
             (ref) async => [notificationFixture(id: 'n1', title: 'Report card ready')],
           ),
@@ -132,6 +147,18 @@ void main() {
     expect(find.text('Needs attention'), findsOneWidget);
     expect(find.text('125.000 JOD outstanding'), findsOneWidget);
     expect(find.text('Report card ready'), findsOneWidget);
+    // The family's recent grades sit between the child summary and the notifications feed.
+    final recent = find.byKey(const ValueKey('parent-recent-grades'));
+    expect(find.descendant(of: recent, matching: find.text('First month')), findsOneWidget);
+    expect(find.descendant(of: recent, matching: find.text('Exam')), findsOneWidget);
+    expect(
+      tester.getTopLeft(find.text('125.000 JOD outstanding')).dy,
+      lessThan(tester.getTopLeft(recent).dy),
+    );
+    expect(
+      tester.getTopLeft(recent).dy,
+      lessThan(tester.getTopLeft(find.text('Report card ready')).dy),
+    );
   });
 
   testWidgets('picking a child in the switcher swaps the summary', (tester) async {
@@ -153,6 +180,7 @@ void main() {
             ]),
           ),
           familyFinanceProvider.overrideWith((ref) async => null),
+          parentRecentGradesProvider.overrideWith((ref) async => const <ChildRecentGrade>[]),
           parentNotificationsProvider.overrideWith((ref) async => <api_models.Notification>[]),
         ],
         child: _homeApp(),
@@ -177,6 +205,7 @@ void main() {
           childComparisonProvider
               .overrideWith((ref) => comparisonReport([childItem(id: 'child-1', name: 'Amir')])),
           familyFinanceProvider.overrideWith((ref) async => null),
+          parentRecentGradesProvider.overrideWith((ref) async => const <ChildRecentGrade>[]),
           parentNotificationsProvider.overrideWith((ref) async => <api_models.Notification>[]),
         ],
         child: _homeApp(),
@@ -210,6 +239,7 @@ void main() {
           ),
           academicYearTermsProvider.overrideWith((ref) async => const []),
           familyFinanceProvider.overrideWith((ref) async => null),
+          parentRecentGradesProvider.overrideWith((ref) async => const <ChildRecentGrade>[]),
           parentNotificationsProvider.overrideWith((ref) async => <api_models.Notification>[]),
         ],
         child: _homeApp(),

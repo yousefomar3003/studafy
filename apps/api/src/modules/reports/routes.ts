@@ -14,11 +14,14 @@ import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
 
 import { collectChildTimetable } from "./child-timetable";
+import { listRecentChildGrades } from "./recent-grades";
 import {
   childBreakdownParamsSchema,
   childBreakdownResponseSchema,
   childComparisonQuerySchema,
   childComparisonResponseSchema,
+  childRecentGradesQuerySchema,
+  childRecentGradesResponseSchema,
   childTimetableParamsSchema,
   childTimetableResponseSchema,
 } from "./schemas";
@@ -93,6 +96,24 @@ const timetableRoute = createRoute({
   ),
 });
 
+const recentGradesRoute = createRoute({
+  method: "get",
+  path: "/api/reports/children/recent-grades",
+  tags: ["Child Comparison Reports"],
+  operationId: "getChildrenRecentGrades",
+  summary: "The newest exam marks and assignment grades across the parent's linked children",
+  description:
+    "For the parent home: the newest released exam marks (approved by school leadership) and " +
+    "published assignment grades of every child linked to the calling parent, newest first, " +
+    "each with its kind and child. Parents only.",
+  security: [{ bearerAuth: [] }],
+  request: { query: childRecentGradesQuerySchema },
+  responses: standardResponses(
+    { 200: { description: "Newest marks.", schema: childRecentGradesResponseSchema } },
+    [400, 401, 403, 500],
+  ),
+});
+
 function tenantFrom(c: Context<AppEnv>): {
   schoolId: string;
   userId: string;
@@ -146,6 +167,7 @@ export function childComparisonRoutes(
     "/api/reports/children/:studentId/timetable",
     requirePermission(PERMISSIONS.GRADE_READ),
   );
+  routes.use(recentGradesRoute.path, requirePermission(PERMISSIONS.GRADE_READ));
 
   routes.openapi(comparisonRoute, async (c) => {
     const auth = requireAuth(c);
@@ -192,6 +214,21 @@ export function childComparisonRoutes(
     } catch (error) {
       return translateReportError(error);
     }
+  });
+
+  routes.openapi(recentGradesRoute, async (c) => {
+    const auth = requireAuth(c);
+    if (!auth.roles.includes(ROLES.PARENT)) {
+      throw new CodedHttpException(403, ERROR_CODES.ACCESS_DENIED, "Access denied");
+    }
+    const { limit } = c.req.valid("query");
+    const items = await withTenantTx(
+      databases,
+      tenantFrom(c),
+      (tx) => listRecentChildGrades(tx, auth.schoolId, auth.userId, limit),
+      { useReadReplica: true },
+    );
+    return c.json({ items }, 200);
   });
 
   routes.openapi(breakdownRoute, async (c) => {

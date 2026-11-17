@@ -5,6 +5,8 @@ import 'package:studafy_mobile/src/core/api/generated/models/attendance_report_p
 import 'package:studafy_mobile/src/core/api/generated/models/child_comparison_breakdown.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/child_comparison_item.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/child_comparison_report.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/child_recent_grade.dart';
+import 'package:studafy_mobile/src/core/api/generated/models/child_recent_grades.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/family.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/family_list.dart';
 import 'package:studafy_mobile/src/core/api/generated/models/notification.dart' as api_models;
@@ -222,6 +224,40 @@ ChildComparisonBreakdown childBreakdown({
   });
 }
 
+/// One row of the parent home's "Recent grades" (`GET /api/reports/children/recent-grades`).
+ChildRecentGrade recentGrade({
+  required String kind,
+  required String id,
+  required String studentId,
+  required String firstName,
+  required String name,
+  String subject = 'Mathematics',
+  String? termName,
+  String releasedAt = '2026-11-16T09:00:00.000Z',
+  int attempt = 1,
+  String status = 'graded',
+  num? score = 17.5,
+  num maxScore = 20,
+  String? descriptorLabel,
+}) {
+  return ChildRecentGrade.fromJson({
+    'kind': kind,
+    'id': id,
+    'student_id': studentId,
+    'student_first_name': firstName,
+    'student_name': '$firstName Test',
+    'name': name,
+    'subject_name': subject,
+    'term_name': termName,
+    'released_at': releasedAt,
+    'attempt': attempt,
+    'status': status,
+    'score': score,
+    'max_score': maxScore,
+    'descriptor_label': descriptorLabel,
+  });
+}
+
 ChildComparisonReport comparisonReport(List<ChildComparisonItem> children) {
   return ChildComparisonReport(
     generatedAt: DateTime.parse(_t0),
@@ -401,13 +437,22 @@ class FakeChildComparisonReportsClient extends Fake
   FakeChildComparisonReportsClient(
     this._report, {
     this.breakdowns = const {},
+    this.recentGrades = const [],
   });
 
 
   final ChildComparisonReport _report;
   final Map<String, ChildComparisonBreakdown> breakdowns;
+  final List<ChildRecentGrade> recentGrades;
   String? lastTermId;
   String? lastBreakdownStudentId;
+  int? lastRecentGradesLimit;
+
+  @override
+  Future<ChildRecentGrades> getChildrenRecentGrades({int? limit = 6}) async {
+    lastRecentGradesLimit = limit;
+    return ChildRecentGrades(items: recentGrades);
+  }
 
   @override
   Future<ChildComparisonReport> getChildrenComparison({required String termId}) async {

@@ -566,6 +566,7 @@ describe("structure", () => {
         "/api/inquiries",
         // Parent child comparison reports (ST-177). PARENT-role-gated metrics over linked children.
         "/api/reports/children/comparison",
+        "/api/reports/children/recent-grades",
         "/api/reports/children/{studentId}/breakdown",
         "/api/reports/children/{studentId}/timetable",
         "/api/school-applications/me",
@@ -1211,6 +1212,7 @@ describe("security", () => {
         "GET /api/realtime/ticket",
         // Parent child comparison reports (ST-177). Bearer-authenticated, then PARENT-role-gated.
         "GET /api/reports/children/comparison",
+        "GET /api/reports/children/recent-grades",
         "GET /api/reports/children/{studentId}/breakdown",
         "GET /api/reports/children/{studentId}/timetable",
         "PATCH /api/notification-preferences",

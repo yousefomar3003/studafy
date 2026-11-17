@@ -8,10 +8,12 @@ import 'widgets/child_summary.dart';
 import 'widgets/child_switcher.dart';
 import 'widgets/family_plus_coverage_card.dart';
 import 'widgets/parent_notifications_card.dart';
+import 'widgets/parent_recent_grades_card.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 
 /// The parent home tab: a switcher across the parent's linked children, the selected child's
-/// per-term summary (attendance, latest grades, fees due), and the combined notifications feed.
+/// per-term summary (attendance, latest grades, fees due), the newest exam marks and assignment
+/// grades across all the children, and the combined notifications feed.
 ///
 /// Each card owns its provider and its own loading / empty / error state, so a slow finance
 /// lookup never holds up attendance from rendering. Pull-to-refresh re-runs them all.
@@ -27,6 +29,7 @@ class ParentHomeScreen extends ConsumerWidget {
           ..invalidate(parentFamilyIdProvider)
           ..invalidate(familyFinanceProvider)
           ..invalidate(parentNotificationsProvider)
+          ..invalidate(parentRecentGradesProvider)
           ..invalidate(myFeaturesProvider);
       },
       child: ListView(
@@ -35,6 +38,8 @@ class ParentHomeScreen extends ConsumerWidget {
           ChildSwitcher(),
           SizedBox(height: AppSpacing.space16),
           ChildSummary(),
+          SizedBox(height: AppSpacing.space16),
+          ParentRecentGradesCard(),
           SizedBox(height: AppSpacing.space16),
           FamilyPlusCoverageCard(),
           SizedBox(height: AppSpacing.space16),
