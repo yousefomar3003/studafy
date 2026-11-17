@@ -72,7 +72,7 @@ The CSV gives whoever holds it access to those accounts. Hand the codes out, the
 | Per member | normalized member ID, whatever the IP                                    | 10 burst, ~10 per 15 min |
 | Per school | every member sign-in for one school (the school number in the member ID) | 300 burst, 5/s           |
 
-Five wrong passwords also lock an account for 15 minutes. A blocked request gets `429` with a
+Five wrong passwords from one address lock that address out of the member ID for 15 minutes; the member, from their own device or address, can still sign in. Twenty-five in a row from anywhere lock the account itself for 15 minutes. Either lock answers exactly like a wrong password (`401 AUTH_INVALID_CREDENTIALS`), so the response never confirms that an ID exists (QA-069); support sees the account lock in the user-support panel and can clear it. A blocked request gets `429` with a
 `Retry-After` header. It also logs `auth_rate_limit_block` with `route_class`
 `member-login-username` or `member-login-school`. A school block means many of that school's
 member IDs are being tried at once. Treat it as an incident: while that bucket is empty, member

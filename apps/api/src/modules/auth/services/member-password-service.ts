@@ -54,7 +54,17 @@ export const PRIVILEGED_ROLES: readonly Role[] = [
   ROLES.SUPPORT_AGENT,
 ];
 
+/**
+ * Wrong passwords from one address for one member ID before that address is locked out of it for
+ * LOCKOUT_MINUTES (QA-069). Kept in Redis by the sign-in route, so a stranger who knows a member ID
+ * locks out only themselves, not the member.
+ */
 export const MAX_FAILED_ATTEMPTS = 5;
+/**
+ * Wrong passwords in a row, from anywhere, before the account itself is locked: the backstop against
+ * guessing from many addresses, on top of the per-member-ID budget (config/rateLimits.ts).
+ */
+export const ACCOUNT_LOCK_FAILED_ATTEMPTS = 25;
 export const LOCKOUT_MINUTES = 15;
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_MAX_LENGTH = 128;
@@ -185,7 +195,8 @@ export function hashMemberPassword(password: string): Promise<string> {
 
 /** A real argon2id hash, verified against on paths with nothing to verify so they cost the same. */
 let dummyHash: Promise<string> | undefined;
-function burnVerification(password: string): Promise<boolean> {
+/** Exported for refusals that never reach a real verification (QA-069), so they cost the same. */
+export function burnVerification(password: string): Promise<boolean> {
   dummyHash ??= hashMemberPassword("studafy-timing-equalizer");
   return dummyHash.then((hash) => Bun.password.verify(password, hash));
 }
@@ -259,7 +270,7 @@ async function verifyStoredPassword(
 
   if (!matches) {
     const attempts = (row?.failed_attempts ?? 0) + 1;
-    const lock = attempts >= MAX_FAILED_ATTEMPTS;
+    const lock = attempts >= ACCOUNT_LOCK_FAILED_ATTEMPTS;
     await tx`
       INSERT INTO app.member_credentials (school_id, user_id, failed_attempts, locked_until)
       VALUES (

@@ -8,7 +8,11 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { KeyStore } from "../../src/modules/auth";
 import { AUTH_CHANNELS } from "../../src/modules/auth/channels";
-import { SETUP_CODE_TTL_DAYS } from "../../src/modules/auth/services/member-password-service";
+import {
+  ACCOUNT_LOCK_FAILED_ATTEMPTS,
+  MAX_FAILED_ATTEMPTS,
+  SETUP_CODE_TTL_DAYS,
+} from "../../src/modules/auth/services/member-password-service";
 import { createRedisClient } from "../../src/redis";
 import {
   appDatabaseFor,
@@ -100,6 +104,29 @@ const loginFrom = (deviceToken: string, username: string, password: string) =>
 async function deviceTokenOf(response: Response): Promise<string | undefined> {
   expect(response.status).toBe(200);
   return ((await response.json()) as { device_token?: string }).device_token;
+}
+
+/**
+ * Member codes and school numbers repeat across test files (each has its own database) but Redis is
+ * shared, so start this ID's and its school's buckets full. A bucket lives in `<key>:tokens` and
+ * `<key>:ts` (takeRateLimitToken).
+ */
+async function clearMemberBuckets(client: RedisClient, code: string): Promise<void> {
+  const keys = (["username", "school"] as const).flatMap((scope) => {
+    const key = buildMemberLoginRateLimitKey(scope, code);
+    return [`${key}:tokens`, `${key}:ts`];
+  });
+  await client.del(...keys);
+}
+
+/** Wrong passwords until the account-wide lock engages; every one answers 401 like any other. */
+async function lockAccount(code: string, from?: string): Promise<void> {
+  for (let attempt = 0; attempt < ACCOUNT_LOCK_FAILED_ATTEMPTS; attempt += 1) {
+    const response = from
+      ? await loginFrom(from, code, "wrong-guess")
+      : await login(code, "wrong-guess");
+    await expectCode(response, 401, "AUTH_INVALID_CREDENTIALS");
+  }
 }
 
 async function expectCode(response: Response, status: number, code: string): Promise<void> {
@@ -293,15 +320,17 @@ describe("member password sign-in", () => {
     await expectCode(await login(parent.code, setup_code), 401, "AUTH_INVALID_CREDENTIALS");
   });
 
-  integrationTest("five wrong passwords lock the account, even against the right one", async () => {
-    const parent = await member([ROLES.PARENT]);
-    const { setup_code } = await issueCode(parent.id);
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      await expectCode(await login(parent.code, "wrong-guess"), 401, "AUTH_INVALID_CREDENTIALS");
-    }
-    await expectCode(await login(parent.code, "wrong-guess"), 403, "AUTH_ACCOUNT_LOCKED");
-    await expectCode(await login(parent.code, setup_code), 403, "AUTH_ACCOUNT_LOCKED");
-  });
+  // QA-069: a lock answered 403 AUTH_ACCOUNT_LOCKED, which confirmed the ID exists (unknown IDs
+  // never lock). Now every lock answers exactly like a wrong password.
+  integrationTest(
+    "repeated wrong passwords lock the account, and the lock reads as a wrong password",
+    async () => {
+      const parent = await member([ROLES.PARENT]);
+      const { setup_code } = await issueCode(parent.id);
+      await lockAccount(parent.code);
+      await expectCode(await login(parent.code, setup_code), 401, "AUTH_INVALID_CREDENTIALS");
+    },
+  );
 
   integrationTest("unknown IDs and privileged accounts are refused the same way", async () => {
     await expectCode(await login("STU-999900001", "Any-Pass-123"), 401, "AUTH_INVALID_CREDENTIALS");
@@ -477,10 +506,8 @@ describe("member password sign-in", () => {
     expect(phone).toMatch(/^[\w-]{43}$/u);
 
     // Someone who knows the ID locks the account.
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await login(student.code, "wrong-guess");
-    }
-    await expectCode(await login(student.code, "Lunar-Otter-58"), 403, "AUTH_ACCOUNT_LOCKED");
+    await lockAccount(student.code);
+    await expectCode(await login(student.code, "Lunar-Otter-58"), 401, "AUTH_INVALID_CREDENTIALS");
 
     // The member's phone still signs in, keeps its token, and the lock is lifted.
     const again = await loginFrom(phone!, student.code, "Lunar-Otter-58");
@@ -503,18 +530,11 @@ describe("member password sign-in", () => {
     expect((await login(parent.code, "Quiet-Harbor-31")).status).toBe(200);
 
     // ...and after five it is an ordinary device again, under the account lockout.
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      await loginFrom(phone!, parent.code, "wrong-guess");
-    }
-    await expectCode(
-      await loginFrom(phone!, parent.code, "wrong-guess"),
-      403,
-      "AUTH_ACCOUNT_LOCKED",
-    );
+    await lockAccount(parent.code, phone!);
     await expectCode(
       await loginFrom(phone!, parent.code, "Quiet-Harbor-31"),
-      403,
-      "AUTH_ACCOUNT_LOCKED",
+      401,
+      "AUTH_INVALID_CREDENTIALS",
     );
   });
 
@@ -528,14 +548,12 @@ describe("member password sign-in", () => {
       401,
       "AUTH_INVALID_CREDENTIALS",
     );
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await login(second.code, "wrong-guess");
-    }
+    await lockAccount(second.code);
     // Trusted for the first account only: the second stays locked against it.
     await expectCode(
       await loginFrom(phone!, second.code, "Velvet-Comet-19"),
-      403,
-      "AUTH_ACCOUNT_LOCKED",
+      401,
+      "AUTH_INVALID_CREDENTIALS",
     );
   });
 
@@ -546,13 +564,11 @@ describe("member password sign-in", () => {
     const fresh = await deviceTokenOf(await login(teacher.code, setup_code, "Cedar-Window-73"));
     expect(fresh).not.toBe(phone);
 
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      await login(teacher.code, "wrong-guess");
-    }
+    await lockAccount(teacher.code);
     await expectCode(
       await loginFrom(phone!, teacher.code, "Cedar-Window-73"),
-      403,
-      "AUTH_ACCOUNT_LOCKED",
+      401,
+      "AUTH_INVALID_CREDENTIALS",
     );
     expect((await loginFrom(fresh!, teacher.code, "Cedar-Window-73")).status).toBe(200);
   });
@@ -613,10 +629,7 @@ describe("member password sign-in", () => {
       const student = await claimed([ROLES.STUDENT], "Harbor-Kettle-83");
       // Member codes repeat across test files (each has its own database) but Redis is shared, so
       // start this ID's and its school's buckets empty.
-      await client.del(
-        buildMemberLoginRateLimitKey("username", student.code),
-        buildMemberLoginRateLimitKey("school", student.code),
-      );
+      await clearMemberBuckets(client, student.code);
       const phone = await deviceTokenOf(
         await post(
           LOGIN,
@@ -654,6 +667,47 @@ describe("member password sign-in", () => {
         { "x-forwarded-for": "198.18.42.2" },
       );
       expect(own.status).toBe(200);
+    } finally {
+      client.disconnect();
+    }
+  });
+});
+
+// QA-069: five wrong passwords locked the account for everyone, so anyone who knew a teacher's or
+// student's ID could lock them out of web sign-in at will. The five-strike lock is now per address.
+describe("member sign-in lockout is per address (QA-069)", () => {
+  redisTest("a stranger's guesses lock out the stranger, not the member", async () => {
+    const logger = createLogger({ destination: () => undefined });
+    const client = createRedisClient({ url: redisUrl!, logger });
+    try {
+      const app = createApp({
+        isReady: () => true,
+        tracker: createInflightTracker(),
+        logger,
+        database: appDatabaseFor(sql),
+        redis: client,
+        keyStore,
+        jwtIssuer: TEST_JWT_ISSUER,
+        jwtAudience: TEST_JWT_AUDIENCE,
+      });
+      const teacher = await claimed([ROLES.INSTRUCTOR], "Amber-Falcon-27");
+      await clearMemberBuckets(client, teacher.code);
+      const from = (ip: string, password: string) =>
+        post(LOGIN, { username: teacher.code, password }, undefined, app, {
+          "x-forwarded-for": ip,
+        });
+
+      for (let attempt = 0; attempt < MAX_FAILED_ATTEMPTS; attempt += 1) {
+        await expectCode(await from("198.18.60.1", "wrong-guess"), 401, "AUTH_INVALID_CREDENTIALS");
+      }
+      // Locked out from that address, even with the right password -- answered like a wrong one.
+      await expectCode(
+        await from("198.18.60.1", "Amber-Falcon-27"),
+        401,
+        "AUTH_INVALID_CREDENTIALS",
+      );
+      // The member, from their own address, signs in.
+      expect((await from("198.18.60.2", "Amber-Falcon-27")).status).toBe(200);
     } finally {
       client.disconnect();
     }
