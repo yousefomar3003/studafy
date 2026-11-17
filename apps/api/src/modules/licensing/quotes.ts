@@ -88,7 +88,7 @@ export interface QuoteView {
   schedulePreview: ScheduledInstalment[];
   /** What the school pays in each licence year, from the schedule preview. */
   yearTotals: LicenceYearTotal[];
-  /** The school's request this quote answers (000231), and what it asked for. */
+  /** The school's request this quote answers (000233), and what it asked for. */
   changeRequestId: string | null;
   requestedTerms: RequestedTermsView | null;
   /** Where the quote departs from the school's choice; each needs `termsChangeReason`. */
@@ -430,7 +430,7 @@ export interface QuotePaymentTerms {
   /** Required for, and only for, a custom plan. */
   paymentSchedule?: CustomInstalmentInput[] | null;
   /**
-   * Why the quote's length, start or plan differs from the school's request (000231). Required when
+   * Why the quote's length, start or plan differs from the school's request (000233). Required when
    * it does (LICENSE_TERMS_CHANGE_REASON_REQUIRED); dropped when it does not. Unchanged when omitted
    * on replace.
    */

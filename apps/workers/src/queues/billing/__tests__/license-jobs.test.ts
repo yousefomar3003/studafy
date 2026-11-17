@@ -293,7 +293,7 @@ describe("license lifecycle", () => {
         startsAt: new Date(now.getTime() - DAY),
         endsAt: new Date(now.getTime() + 100 * DAY),
       });
-      // 29 days late: overdue, but the AI only stops on day 30 (000231; see the cutoff tests below).
+      // 29 days late: overdue, but the AI only stops on day 30 (000233; see the cutoff tests below).
       await invoice(schoolId, running, {
         dueDate: new Date(now.getTime() - 29 * DAY).toISOString().slice(0, 10),
       });
@@ -639,10 +639,10 @@ describe("instalments (000221)", () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
-// AI stops 30 days after an unpaid instalment (000231)
+// AI stops 30 days after an unpaid instalment (000233)
 // ---------------------------------------------------------------------------------------------------
 
-describe("AI stops 30 days after an unpaid instalment (000231)", () => {
+describe("AI stops 30 days after an unpaid instalment (000233)", () => {
   /** An open invoice on `lic` in instalments of `amount` due on each of `dueDates`. */
   async function instalments(
     schoolId: string,
@@ -857,10 +857,10 @@ describe("AI stops 30 days after an unpaid instalment (000231)", () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
-// Overdue-payment emails (000231)
+// Overdue-payment emails (000233)
 // ---------------------------------------------------------------------------------------------------
 
-describe("licence payment emails (000231)", () => {
+describe("licence payment emails (000233)", () => {
   async function queued(schoolId: string) {
     return admin(
       schoolId,

@@ -68,7 +68,7 @@ const NOTIFICATION_TYPES = [
   "MATERIAL_PUBLISHED",
   // Academic marks released to the family. Appended by 000230; sorts last.
   "MARKS_RELEASED",
-  // Licence AI cutoff for unpaid instalments. Appended by 000231, in that order; sort last.
+  // Licence AI cutoff for unpaid instalments. Appended by 000233, in that order; sort last.
   "LICENSE_AI_STOP_WARNING",
   "LICENSE_AI_STOPPED",
 ] as const;

@@ -544,7 +544,7 @@ export const ERROR_CODES = {
   // due date moved past the next instalment's.
   LICENSE_PAYMENT_SCHEDULE_INVALID: "LICENSE_PAYMENT_SCHEDULE_INVALID",
   // A quote answering a school's request changes the length, start or payment plan the school chose
-  // without saying why (000231).
+  // without saying why (000233).
   LICENSE_TERMS_CHANGE_REASON_REQUIRED: "LICENSE_TERMS_CHANGE_REASON_REQUIRED",
   // No such instalment on this licence invoice.
   LICENSE_INSTALMENT_NOT_FOUND: "LICENSE_INSTALMENT_NOT_FOUND",

@@ -3,7 +3,7 @@ import { LICENSE_NONPAYMENT_GRACE_DAYS, licenseAiStopDate } from "@studafy/const
 import type { TransactionSql } from "postgres";
 
 /**
- * AI stops 30 days after an unpaid instalment (migration 000231). The workers' licence lifecycle job
+ * AI stops 30 days after an unpaid instalment (migration 000233). The workers' licence lifecycle job
  * suspends an active licence once any unpaid instalment of one of its open invoices is
  * LICENSE_NONPAYMENT_GRACE_DAYS past its due date, marking it `nonpayment_suspended_at`; this module tells
  * the school when the next cutoff is (nonpayment.ts resumes a licence once it is paid).

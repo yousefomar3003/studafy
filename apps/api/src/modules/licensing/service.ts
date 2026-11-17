@@ -100,7 +100,7 @@ export interface LicenseRecord {
   activatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  /** When the workers stopped it for an instalment unpaid 30 days after its due date (000231). */
+  /** When the workers stopped it for an instalment unpaid 30 days after its due date (000233). */
   nonpaymentSuspendedAt: Date | null;
 }
 
@@ -1428,7 +1428,7 @@ export interface ChangeRequestInput {
   teacherPlanId?: string | null;
   parentPlanId?: string | null;
   note: string;
-  /** The licence length the school wants (000231); null leaves it to Studafy / the licence's term. */
+  /** The licence length the school wants (000233); null leaves it to Studafy / the licence's term. */
   months?: number | null;
   /** When a new licence should start (YYYY-MM-DD); null for as soon as possible. */
   startsOn?: string | null;
