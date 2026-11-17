@@ -84,7 +84,7 @@ interface Harness {
   clock: FakeClock;
 }
 
-function createHarness(ttlMs = ACCESS_TTL_MS): Harness {
+function createHarness(ttlMs = ACCESS_TTL_MS, onSignedOut?: () => void): Harness {
   const clock = createFakeClock();
   let refreshCalls = 0;
   let logoutCalls = 0;
@@ -114,6 +114,7 @@ function createHarness(ttlMs = ACCESS_TTL_MS): Harness {
     setTimeoutFn: clock.setTimeout,
     clearTimeoutFn: clock.clearTimeout,
     refreshMarginMs: MARGIN_MS,
+    onSignedOut,
   };
 
   const store = createSessionStore(options);
@@ -447,5 +448,20 @@ describe("cross-tab refresh (QA-033)", () => {
     expect(await tab.restore()).toBe("authenticated");
     expect(server.calls()).toBe(2);
     expect(server.burned()).toBe(false);
+  });
+});
+
+// QA-089: whatever this browser kept for the signed-in person (recent searches) goes on sign-out,
+// even when the server call fails.
+describe("sign-out cleanup (QA-089)", () => {
+  test("logout runs the sign-out hook, also when the server call fails", async () => {
+    let cleared = 0;
+    const { store, client } = createHarness(ACCESS_TTL_MS, () => {
+      cleared += 1;
+    });
+    await store.restore();
+    client.setLogoutFailure();
+    await store.logout().catch(() => undefined);
+    expect(cleared).toBe(1);
   });
 });

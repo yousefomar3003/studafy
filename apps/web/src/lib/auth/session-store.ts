@@ -131,6 +131,11 @@ export interface SessionStoreOptions {
   readonly refreshMarginMs?: number;
   /** Cross-tab coordination (QA-033). Omitted: this tab alone, as before. */
   readonly crossTab?: CrossTabCoordinator;
+  /**
+   * Runs on every sign-out, after the in-memory session is dropped, whether or not the server call
+   * succeeded: clears what this browser kept for the person (QA-089, recent searches).
+   */
+  readonly onSignedOut?: () => void;
 }
 
 export interface SessionStore {
@@ -341,6 +346,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       userId = null;
       cancelRotationTimer();
       setStatus("unauthenticated");
+      options.onSignedOut?.();
     }
   }
 
