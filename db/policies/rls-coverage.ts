@@ -108,6 +108,10 @@ approved_flexible_columns(table_name, column_name) AS (
     -- 000221: a custom payment plan's proposed instalments, as offered on the quote. What is owed is
     -- relational (license_invoice_instalments).
     ('license_quotes', 'payment_schedule'),
+    -- 000231: the school's proposed custom payments (dates and shares) on its request, a proposal
+    -- the super admin prices into the quote. What is owed is relational
+    -- (license_invoice_instalments).
+    ('license_change_requests', 'payment_proposal'),
     ('billing_events', 'payload'),
     ('fee_schedule_cache', 'erpnext_payload'),
     ('fee_structure_cache', 'erpnext_payload'),

@@ -525,14 +525,47 @@ export const LICENSE_PAYMENT_TEMPLATES: Record<LicensePaymentEmailKind, EmailTem
   ai_stopped: "license-ai-stopped",
 };
 
-/** "1 March 2027" / "١ مارس ٢٠٢٧": a calendar date, read in UTC. */
+const MONTHS = {
+  en: [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ],
+  ar: [
+    "يناير",
+    "فبراير",
+    "مارس",
+    "أبريل",
+    "مايو",
+    "يونيو",
+    "يوليو",
+    "أغسطس",
+    "سبتمبر",
+    "أكتوبر",
+    "نوفمبر",
+    "ديسمبر",
+  ],
+} as const;
+
+/**
+ * "1 March 2027" / "1 مارس 2027": a calendar date (YYYY-MM-DD). Spelled out here rather than with
+ * Intl, whose Arabic month names and digits differ between ICU builds (so the same email would read
+ * differently on different hosts); Western digits, as the amounts and invoice numbers use.
+ */
 function calendarDate(day: string, locale: "en" | "ar"): string {
-  const date = new Date(`${day.slice(0, 10)}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return day;
-  return new Intl.DateTimeFormat(locale === "ar" ? "ar" : "en-GB", {
-    dateStyle: "long",
-    timeZone: "UTC",
-  }).format(date);
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
+  const month = match ? MONTHS[locale][Number(match[2]) - 1] : undefined;
+  if (!match || !month) return day;
+  return `${Number(match[3])} ${month} ${match[1]}`;
 }
 
 const LICENSE_PAYMENT_COPY = {
