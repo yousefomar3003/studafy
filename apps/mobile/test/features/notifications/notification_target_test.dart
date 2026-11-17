@@ -49,7 +49,7 @@ void main() {
         metadata: const {},
         role: ShellRole.student,
       );
-      expect(target.tabLabelKey, 'shell.tabs.work');
+      expect(target.tabLabelKey, 'shell.tabs.workAndGrades');
     });
 
     test("a student opens the new material's class materials", () {
@@ -91,7 +91,7 @@ void main() {
           metadata: {'route': '/students/{studentId}/marks'},
           role: ShellRole.student,
         ).tabLabelKey,
-        'shell.tabs.work',
+        'shell.tabs.workAndGrades',
       );
       expect(
         notificationTargetFor(

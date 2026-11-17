@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/offline/staleness_banner.dart';
+import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/grade_providers.dart';
 import '../domain/grade_report.dart';
 import '../domain/recent_grades.dart';
+import '../domain/work_and_grades.dart';
 import 'academic_results_screen.dart';
 import 'widgets/grade_term_selector.dart';
 import 'widgets/grade_trend_card.dart';
@@ -17,14 +19,7 @@ import 'widgets/released_marks_widgets.dart';
 import 'widgets/subject_grades_card.dart';
 import 'widgets/term_grade_summary_card.dart';
 
-/// Which tab of [GradesScreen] to open on.
-enum GradesTab {
-  /// Exam marks school leadership has approved ([ReleasedMarksView]).
-  exams,
-
-  /// Published assignment (coursework) grades, one term at a time.
-  assignments,
-}
+export '../domain/work_and_grades.dart' show GradesTab;
 
 /// The student's grades, in two tabs that keep the two kinds of mark apart, each labelled with
 /// its kind's icon ([GradeKindVisuals], the same badges the home's "Recent grades" uses):
@@ -36,13 +31,14 @@ enum GradesTab {
 ///   term-average trend sparkline, the term/cumulative summary, and a card per subject with its
 ///   category breakdown.
 ///
-/// Reached three ways: pushed with no [courseId] from the home's "Recent grades" (on the tab of
-/// the kind tapped), or via the `GRADE_POSTED` push deep link `/courses/{courseId}/grades`, which
-/// always opens Assignments. On the deep-link path it resets the term selection to the active
-/// term and then lets [deepLinkGradeTermProvider] correct it to whichever term actually holds
-/// that course's freshly published grade — so the student lands on the right term (acceptance
-/// criterion) — and highlights that subject.
-class GradesScreen extends ConsumerStatefulWidget {
+/// The student app shows the same view ([GradesView]) as the "Grades" section of its "Work &
+/// grades" tab, which is where the home's "Recent grades" goes. This standalone screen is the
+/// `GRADE_POSTED` push deep link `/courses/{courseId}/grades`, which always opens Assignments,
+/// and the fallback for a "Recent grades" shown outside the student shell. On the deep-link path
+/// it resets the term selection to the active term and then lets [deepLinkGradeTermProvider]
+/// correct it to whichever term actually holds that course's freshly published grade — so the
+/// student lands on the right term (acceptance criterion) — and highlights that subject.
+class GradesScreen extends StatelessWidget {
   const GradesScreen({this.courseId, this.initialTab = GradesTab.exams, super.key});
 
   /// The course a push deep link pointed at, or null for a plain in-app open. Non-null also
@@ -54,13 +50,73 @@ class GradesScreen extends ConsumerStatefulWidget {
   final GradesTab initialTab;
 
   @override
-  ConsumerState<GradesScreen> createState() => _GradesScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('grades.title'.tr()),
+        actions: const [AcademicResultsButton()],
+      ),
+      body: GradesView(
+        courseId: courseId,
+        tab: courseId != null ? GradesTab.assignments : initialTab,
+      ),
+    );
+  }
 }
 
-class _GradesScreenState extends ConsumerState<GradesScreen> {
+/// Opens the official (finalized) results, certificates and report cards — distinct from the
+/// approved marks and published running grades the grades view shows.
+class AcademicResultsButton extends StatelessWidget {
+  const AcademicResultsButton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.workspace_premium_outlined),
+      tooltip: 'academicResults.entry'.tr(),
+      onPressed: () => Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => const AcademicResultsScreen())),
+    );
+  }
+}
+
+/// The grades themselves, under their "Exams" / "Assignments" tab bar: the body of
+/// [GradesScreen] and the "Grades" section of the student's "Work & grades" tab.
+///
+/// [tab] is the tab to show; changing it switches tabs (animated), and [onTabChanged] reports
+/// the student's own switches, so a parent can hold the selection.
+class GradesView extends ConsumerStatefulWidget {
+  const GradesView({
+    this.courseId,
+    this.tab = GradesTab.exams,
+    this.onTabChanged,
+    this.inWorkTab = false,
+    super.key,
+  });
+
+  /// See [GradesScreen.courseId].
+  final String? courseId;
+  final GradesTab tab;
+  final ValueChanged<GradesTab>? onTabChanged;
+
+  /// Shown as a section of the "Work & grades" tab rather than on its own screen: the coursework
+  /// tab reads "Assignment grades", the tab's other section being the assignments themselves.
+  final bool inWorkTab;
+
+  @override
+  ConsumerState<GradesView> createState() => _GradesViewState();
+}
+
+class _GradesViewState extends ConsumerState<GradesView> with SingleTickerProviderStateMixin {
   bool _bannerDismissed = false;
   bool _scrolledToHighlight = false;
   final _highlightKey = GlobalKey();
+  late final TabController _tabController = TabController(
+    length: GradesTab.values.length,
+    initialIndex: widget.tab.index,
+    vsync: this,
+  )..addListener(_reportTab);
 
   bool get _fromPush => widget.courseId != null;
 
@@ -78,6 +134,26 @@ class _GradesScreenState extends ConsumerState<GradesScreen> {
   }
 
   @override
+  void didUpdateWidget(GradesView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.tab != oldWidget.tab && _tabController.index != widget.tab.index) {
+      _tabController.animateTo(widget.tab.index);
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  void _reportTab() {
+    if (_tabController.indexIsChanging) return;
+    final tab = GradesTab.values[_tabController.index];
+    if (tab != widget.tab) widget.onTabChanged?.call(tab);
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_fromPush) {
       ref.listen(deepLinkGradeTermProvider(widget.courseId!), (previous, next) {
@@ -89,75 +165,71 @@ class _GradesScreenState extends ConsumerState<GradesScreen> {
 
     final status = ref.watch(gradeReportProvider);
 
-    final initialTab = _fromPush ? GradesTab.assignments : widget.initialTab;
+    final tabBar = TabBar(
+      controller: _tabController,
+      // Room for "Assignment grades" beside its icon on a phone-width screen.
+      labelPadding: widget.inWorkTab
+          ? const EdgeInsets.symmetric(horizontal: AppSpacing.space8)
+          : null,
+      tabs: [
+        const GradeKindTab(key: ValueKey('grades-tab-exams'), kind: GradeKind.exam),
+        GradeKindTab(
+          key: const ValueKey('grades-tab-assignments'),
+          kind: GradeKind.assignment,
+          label: widget.inWorkTab ? 'grades.sections.assignmentGrades'.tr() : null,
+        ),
+      ],
+    );
 
-    return DefaultTabController(
-      length: GradesTab.values.length,
-      initialIndex: initialTab.index,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text('grades.title'.tr()),
-          actions: [
-            // Official (finalized) results, certificates and report cards — distinct from the
-            // approved marks and published running grades this screen shows.
-            IconButton(
-              icon: const Icon(Icons.workspace_premium_outlined),
-              tooltip: 'academicResults.entry'.tr(),
-              onPressed: () => Navigator.of(
-                context,
-              ).push(MaterialPageRoute<void>(builder: (_) => const AcademicResultsScreen())),
-            ),
-          ],
-          bottom: const TabBar(
-            tabs: [
-              GradeKindTab(key: ValueKey('grades-tab-exams'), kind: GradeKind.exam),
-              GradeKindTab(key: ValueKey('grades-tab-assignments'), kind: GradeKind.assignment),
+    return Column(
+      children: [
+        tabBar,
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              const ReleasedMarksView(),
+              Column(
+                children: [
+                  const GradeTermSelector(),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: () async {
+                        ref
+                          ..invalidate(academicYearTermsProvider)
+                          ..invalidate(gradeSnapshotProvider);
+                      },
+                      child: status.when(
+                        loading: () => const GradesSkeleton(),
+                        error: (error, stackTrace) => const GradesMessage(
+                          messageKey: 'grades.error',
+                          icon: Icons.error_outline,
+                        ),
+                        data: (report) => switch (report) {
+                          GradeReportUnavailable() => const GradesMessage(
+                            messageKey: 'grades.unavailable',
+                            icon: Icons.info_outline,
+                          ),
+                          GradeReportReady(value: final cached) => _Report(
+                            report: cached.data,
+                            isStale: cached.isStale,
+                            fetchedAt: cached.fetchedAt,
+                            highlightCourseId: widget.courseId,
+                            highlightKey: _highlightKey,
+                            showBanner: _fromPush && !_bannerDismissed,
+                            onDismissBanner: () => setState(() => _bannerDismissed = true),
+                            onReportBuilt: _scrollToHighlightOnce,
+                          ),
+                        },
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
-        body: TabBarView(
-          children: [
-            const ReleasedMarksView(),
-            Column(
-              children: [
-                const GradeTermSelector(),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: () async {
-                      ref
-                        ..invalidate(academicYearTermsProvider)
-                        ..invalidate(gradeSnapshotProvider);
-                    },
-                    child: status.when(
-                      loading: () => const GradesSkeleton(),
-                      error: (error, stackTrace) => const GradesMessage(
-                        messageKey: 'grades.error',
-                        icon: Icons.error_outline,
-                      ),
-                      data: (report) => switch (report) {
-                        GradeReportUnavailable() => const GradesMessage(
-                          messageKey: 'grades.unavailable',
-                          icon: Icons.info_outline,
-                        ),
-                        GradeReportReady(value: final cached) => _Report(
-                          report: cached.data,
-                          isStale: cached.isStale,
-                          fetchedAt: cached.fetchedAt,
-                          highlightCourseId: widget.courseId,
-                          highlightKey: _highlightKey,
-                          showBanner: _fromPush && !_bannerDismissed,
-                          onDismissBanner: () => setState(() => _bannerDismissed = true),
-                          onReportBuilt: _scrollToHighlightOnce,
-                        ),
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+      ],
     );
   }
 
@@ -210,7 +282,7 @@ class _Report extends StatelessWidget {
     //    `Scrollable.ensureVisible` on [_highlightKey] — that needs every card materialised even
     //    when it is off-screen, which a lazily-built sliver cannot guarantee.
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.space16),
+      padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         if (showBanner) ...[

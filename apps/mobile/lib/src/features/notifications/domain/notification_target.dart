@@ -73,7 +73,7 @@ NotificationTarget notificationTargetFor({
     case 'GRADE_POSTED':
       if (role == ShellRole.student) {
         if (openable != null) return NotificationTarget.route(openable);
-        return const NotificationTarget.tab('shell.tabs.work');
+        return const NotificationTarget.tab('shell.tabs.workAndGrades');
       }
       if (role == ShellRole.parent) {
         return const NotificationTarget.tab('shell.tabs.children');
@@ -82,7 +82,7 @@ NotificationTarget notificationTargetFor({
       if (role == ShellRole.student || role == ShellRole.parent) {
         if (openable != null) return NotificationTarget.route(openable);
         return NotificationTarget.tab(
-          role == ShellRole.parent ? 'shell.tabs.children' : 'shell.tabs.work',
+          role == ShellRole.parent ? 'shell.tabs.children' : 'shell.tabs.workAndGrades',
         );
       }
     case 'MATERIAL_PUBLISHED':

@@ -22,7 +22,7 @@ List<String> navLabels(WidgetTester tester) => tester
 
 void main() {
   group('lands each role in its own shell', () {
-    testWidgets('student gets Home, Lessons, Work, AI, Profile', (
+    testWidgets('student gets Home, Lessons, Work & grades, AI, Profile', (
       tester,
     ) async {
       await pumpAppShell(
@@ -33,7 +33,7 @@ void main() {
       expect(navLabels(tester), [
         'Home',
         'Lessons',
-        'Work',
+        'Work & grades',
         'AI',
         'Profile',
       ]);
@@ -126,7 +126,7 @@ void main() {
       // No domain-specific tab.
       expect(find.text('Timetable'), findsNothing);
       expect(find.text('Lessons'), findsNothing);
-      expect(find.text('Work'), findsNothing);
+      expect(find.text('Work & grades'), findsNothing);
       expect(find.text('AI'), findsNothing);
       expect(find.text('Classes'), findsNothing);
       expect(find.text('Children'), findsNothing);
@@ -241,7 +241,7 @@ void main() {
       await tester.pump();
       expect(navBar(tester).selectedIndex, 1);
 
-      await gesture.moveTo(tester.getCenter(find.byTooltip('Work')));
+      await gesture.moveTo(tester.getCenter(find.byTooltip('Work & grades')));
       await tester.pump();
       expect(navBar(tester).selectedIndex, 2);
 

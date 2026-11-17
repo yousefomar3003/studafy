@@ -11,6 +11,9 @@ import 'widgets/assignment_list_tile.dart';
 /// The student's full assignment list: due, submitted, and graded tabs, each independently
 /// loaded — see [studentAssignmentsProvider]'s doc comment for why a `graded` tab costs more
 /// than a status query.
+///
+/// The student app shows the same list ([StudentAssignmentsView]) as the "Assignments" section
+/// of its "Work & grades" tab; this standalone screen is what the home's "Due soon" card pushes.
 class StudentAssignmentsScreen extends StatelessWidget {
   const StudentAssignmentsScreen({super.key});
 
@@ -21,16 +24,43 @@ class StudentAssignmentsScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: Text('assignments.list.title'.tr()),
-          bottom: TabBar(
-            tabs: [for (final filter in AssignmentListFilter.values) Tab(text: _tabLabel(filter))],
-          ),
+          bottom: const _AssignmentTabBar(),
         ),
-        body: TabBarView(
-          children: [
-            for (final filter in AssignmentListFilter.values) _AssignmentListTab(filter: filter),
-          ],
-        ),
+        body: const _AssignmentTabViews(),
       ),
+    );
+  }
+}
+
+/// The due / submitted / graded tab bar over its lists, without an app bar: the "Assignments"
+/// section of the student's "Work & grades" tab.
+class StudentAssignmentsView extends StatelessWidget {
+  const StudentAssignmentsView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DefaultTabController(
+      length: AssignmentListFilter.values.length,
+      child: const Column(
+        children: [
+          _AssignmentTabBar(),
+          Expanded(child: _AssignmentTabViews()),
+        ],
+      ),
+    );
+  }
+}
+
+class _AssignmentTabBar extends StatelessWidget implements PreferredSizeWidget {
+  const _AssignmentTabBar();
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kTextTabBarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    return TabBar(
+      tabs: [for (final filter in AssignmentListFilter.values) Tab(text: _tabLabel(filter))],
     );
   }
 
@@ -39,6 +69,19 @@ class StudentAssignmentsScreen extends StatelessWidget {
     AssignmentListFilter.submitted => 'assignments.list.tabs.submitted'.tr(),
     AssignmentListFilter.graded => 'assignments.list.tabs.graded'.tr(),
   };
+}
+
+class _AssignmentTabViews extends StatelessWidget {
+  const _AssignmentTabViews();
+
+  @override
+  Widget build(BuildContext context) {
+    return TabBarView(
+      children: [
+        for (final filter in AssignmentListFilter.values) _AssignmentListTab(filter: filter),
+      ],
+    );
+  }
 }
 
 class _AssignmentListTab extends ConsumerWidget {

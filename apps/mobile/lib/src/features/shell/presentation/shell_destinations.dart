@@ -9,9 +9,10 @@ import '../../notifications/presentation/notifications_screen.dart';
 import '../../parent/presentation/child_detail_screen.dart';
 import '../../parent/presentation/parent_communication_screen.dart';
 import '../../parent/presentation/parent_home_screen.dart';
-import '../../student/presentation/assignments_screen.dart';
+import '../../student/application/work_and_grades_providers.dart';
 import '../../student/presentation/materials_screen.dart';
 import '../../student/presentation/today_screen.dart';
+import '../../student/presentation/work_and_grades_screen.dart';
 import '../../teacher/presentation/teacher_class_list_screen.dart';
 import '../../teacher/presentation/teacher_home_screen.dart';
 import '../../teacher/presentation/teacher_timetable_screen.dart';
@@ -50,8 +51,10 @@ class ShellDestination {
 /// two-tab set — no domain-specific tab — matching its zero-mutation, view-only posture; its
 /// Home tab still varies by the session's actual role, via [ViewerHomeScreen].
 ///
-/// [ShellRole.student] swaps the Timetable tab for Lessons (the materials library) and Work
-/// (assignments); its weekly timetable stays one tap away from the Today timetable card.
+/// [ShellRole.student] swaps the Timetable tab for Lessons (the materials library) and Work &
+/// grades (assignments, and their exam and assignment grades, behind one section toggle — the
+/// bar holds five tabs at most); its weekly timetable stays one tap away from the Today timetable
+/// card.
 ///
 /// [ShellRole.parent] also gets a News tab: the school's announcements and attendance alerts
 /// ([ParentCommunicationScreen]), which the home's notifications card opens too.
@@ -89,10 +92,10 @@ List<ShellDestination> shellDestinationsFor(ShellRole role) {
           body: MaterialsScreen(),
         ),
         ShellDestination(
-          labelKey: 'shell.tabs.work',
+          labelKey: workAndGradesTabKey,
           icon: Icons.assignment_outlined,
           selectedIcon: Icons.assignment,
-          body: StudentAssignmentsScreen(),
+          body: WorkAndGradesScreen(),
         ),
         ShellDestination(
           labelKey: 'shell.tabs.ai',
