@@ -155,45 +155,6 @@ async function resolveOptedOutRecipientIds(
 // ---------------------------------------------------------------------------
 
 /**
- * Inserts one app.notifications row addressed to `params.userId` and returns its id. The id is
- * generated here rather than read back via `RETURNING id`: app.notifications carries a RESTRICTIVE,
- * SELECT-scoped `notifications_owner_select` policy (000017), and PostgreSQL evaluates a SELECT
- * policy against a `RETURNING` clause exactly as it would a real SELECT — so a plain INSERT for
- * someone else succeeds (there is no restrictive INSERT policy; see that migration's own comment)
- * while `RETURNING` on it would be silently disallowed for every row but the caller's own. Skipping
- * RETURNING sidesteps that read-side check entirely rather than working around it with an elevated
- * role the API's own runtime credential cannot assume (see resolveOptedOutRecipientIds' doc comment
- * for the same "no admin membership from apps/api" constraint on the write side of the problem).
- */
-async function insertAnnouncementNotification(
-  tx: TransactionSql,
-  params: {
-    schoolId: string;
-    userId: string;
-    notificationType: string;
-    title: string;
-    body: string;
-    announcementId: string;
-  },
-): Promise<string> {
-  const id = crypto.randomUUID();
-  const metadata = tx.json({ announcement_id: params.announcementId, route: "/announcements" });
-  await tx`
-    INSERT INTO app.notifications (id, school_id, user_id, notification_type, title, body, metadata)
-    VALUES (
-      ${id}::uuid,
-      ${params.schoolId}::uuid,
-      ${params.userId}::uuid,
-      ${params.notificationType}::app.notification_type,
-      ${params.title},
-      ${params.body},
-      ${metadata}
-    )
-  `;
-  return id;
-}
-
-/**
  * Publishes one announcement: atomically claims it (so a concurrent sweep tick or a retried request
  * can never double-publish — the same "status transition is the idempotency boundary" shape
  * grade-submission publication uses), resolves its audience, writes one app.notifications row per
@@ -237,41 +198,31 @@ export async function publishAnnouncement(
     : await resolveOptedOutRecipientIds(tx, recipientIds);
   const notifiedIds = recipientIds.filter((id) => !optedOut.has(id));
 
-  // Pipelined, not sequential: postgres.js issues everything queued on `tx` over its one connection
-  // as a pipeline, and Promise.all preserves result order against `notifiedIds`, so the zip below is
-  // safe without a lookup map.
-  const notificationIds = await Promise.all(
-    notifiedIds.map((userId) =>
-      insertAnnouncementNotification(tx, {
-        schoolId,
-        userId,
-        notificationType,
-        title: claimed.title,
-        body: claimed.body,
-        announcementId,
-      }),
-    ),
-  );
-  const notificationIdByUser = new Map(
-    notifiedIds.map((id, index) => [id, notificationIds[index]!]),
-  );
+  // Two set-based statements, whatever the audience size (QA-065): one row per notified recipient
+  // in app.notifications, then the full audience snapshot in app.announcement_recipients, joined to
+  // its notification. It used to be two single-row INSERTs per recipient -- ~10,000 statements for
+  // a school of 5,000 -- all inside this transaction. Ids are minted here so the two statements
+  // need no RETURNING round trip to be joined.
+  const notificationIds = notifiedIds.map(() => crypto.randomUUID());
+  if (notifiedIds.length > 0) {
+    const metadata = tx.json({ announcement_id: announcementId, route: "/announcements" });
+    await tx`
+      INSERT INTO app.notifications (id, school_id, user_id, notification_type, title, body, metadata)
+      SELECT n.id, ${schoolId}::uuid, n.user_id, ${notificationType}::app.notification_type,
+             ${claimed.title}, ${claimed.body}, ${metadata}
+      FROM unnest(${notificationIds}::uuid[], ${notifiedIds}::uuid[]) AS n (id, user_id)
+    `;
+  }
 
-  await Promise.all(
-    recipientIds.map((userId) => {
-      const notificationId = notificationIdByUser.get(userId) ?? null;
-      return tx`
-        INSERT INTO app.announcement_recipients
-          (school_id, announcement_id, user_id, notified_at, notification_id)
-        VALUES (
-          ${schoolId}::uuid,
-          ${announcementId}::uuid,
-          ${userId}::uuid,
-          ${notificationId ? now : null}::timestamptz,
-          ${notificationId}::uuid
-        )
-      `;
-    }),
-  );
+  await tx`
+    INSERT INTO app.announcement_recipients
+      (school_id, announcement_id, user_id, notified_at, notification_id)
+    SELECT ${schoolId}::uuid, ${announcementId}::uuid, r.user_id,
+           CASE WHEN n.id IS NULL THEN NULL ELSE ${now}::timestamptz END, n.id
+    FROM unnest(${recipientIds}::uuid[]) AS r (user_id)
+    LEFT JOIN unnest(${notificationIds}::uuid[], ${notifiedIds}::uuid[]) AS n (id, user_id)
+      ON n.user_id = r.user_id
+  `;
 
   return {
     published: true,
