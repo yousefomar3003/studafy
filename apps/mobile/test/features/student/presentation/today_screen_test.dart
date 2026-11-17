@@ -19,8 +19,13 @@ import 'package:studafy_mobile/src/core/api/api_exception.dart';
 import 'package:studafy_mobile/src/core/config/provider_retry_policy.dart';
 import 'package:studafy_mobile/src/core/offline/cached_value.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
+import 'package:studafy_mobile/src/features/shell/application/shell_providers.dart';
+import 'package:studafy_mobile/src/features/shell/domain/shell_role.dart';
 import 'package:studafy_mobile/src/features/student/application/today_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/work_and_grades_providers.dart';
 import 'package:studafy_mobile/src/features/student/domain/today_section.dart';
+import 'package:studafy_mobile/src/features/student/domain/work_and_grades.dart';
+import 'package:studafy_mobile/src/features/student/presentation/assignments_screen.dart';
 import 'package:studafy_mobile/src/features/student/presentation/today_screen.dart';
 import 'package:studafy_mobile/src/features/student/presentation/widgets/today_skeleton.dart';
 import 'package:studafy_mobile/src/features/student/presentation/widgets/today_state_message.dart';
@@ -203,6 +208,39 @@ void main() {
     expect(find.text('Sports Day'), findsOneWidget);
     // No grades were published, so the grades card falls back to its empty state.
     expect(find.text('No exam marks or assignment grades yet.'), findsOneWidget);
+  });
+
+  testWidgets('"Due soon" opens the Work & grades tab on the assignments', (tester) async {
+    await _pumpTodayScreen(
+      tester,
+      ProviderScope(
+        overrides: [
+          shellRoleProvider.overrideWithValue(ShellRole.student),
+          todayTimetableProvider.overrideWith(
+            (ref) => Stream.value(const TodaySectionUnavailable()),
+          ),
+          todayAssignmentsProvider.overrideWith(
+            (ref) => Stream.value(_live([_fakeAssignment()])),
+          ),
+          todayGradesProvider.overrideWith(
+            (ref) => Stream.value(const TodaySectionUnavailable()),
+          ),
+          todayAnnouncementsProvider.overrideWith((ref) => Stream.value(_live(const []))),
+        ],
+        child: _todayScreenScope(),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final container = ProviderScope.containerOf(tester.element(find.byType(TodayScreen)));
+    container.read(workAndGradesProvider.notifier).showGrades(GradesTab.exams);
+
+    await tester.tap(find.text('View all'));
+    await tester.pumpAndSettle();
+
+    expect(container.read(selectedShellTabProvider), workAndGradesTabKey);
+    expect(container.read(workAndGradesProvider).section, WorkAndGradesSection.assignments);
+    // Switched to, not pushed.
+    expect(find.byType(StudentAssignmentsScreen), findsNothing);
   });
 
   testWidgets('shows the unavailable message for grades and timetable when their context is unresolved', (

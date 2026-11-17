@@ -5,8 +5,8 @@ import 'package:studafy_mobile/src/features/parent/presentation/parent_communica
 import 'package:studafy_mobile/src/features/messaging/presentation/teacher_messages_screen.dart';
 import 'package:studafy_mobile/src/features/shell/domain/shell_role.dart';
 import 'package:studafy_mobile/src/features/shell/presentation/shell_destinations.dart';
-import 'package:studafy_mobile/src/features/student/presentation/assignments_screen.dart';
 import 'package:studafy_mobile/src/features/student/presentation/materials_screen.dart';
+import 'package:studafy_mobile/src/features/student/presentation/work_and_grades_screen.dart';
 import 'package:studafy_mobile/src/features/teacher/presentation/teacher_timetable_screen.dart';
 
 List<String> _labels(ShellRole role) => [
@@ -14,11 +14,11 @@ List<String> _labels(ShellRole role) => [
 ];
 
 void main() {
-  test('student: Home, Lessons, Work, AI, Profile', () {
+  test('student: Home, Lessons, Work & grades, AI, Profile', () {
     expect(_labels(ShellRole.student), [
       'shell.tabs.home',
       'shell.tabs.lessons',
-      'shell.tabs.work',
+      'shell.tabs.workAndGrades',
       'shell.tabs.ai',
       'shell.tabs.profile',
     ]);
@@ -28,7 +28,7 @@ void main() {
     );
     expect(
       shellDestinationsFor(ShellRole.student)[2].body,
-      isA<StudentAssignmentsScreen>(),
+      isA<WorkAndGradesScreen>(),
     );
   });
 

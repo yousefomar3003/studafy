@@ -142,6 +142,7 @@ text on a page. Import `kit/kit.dart` for all of them.
 | `AppIconListTile` / `AppIconListCard` | A row led by a coloured badge, bold title, muted subtitle, optional trailing pill or `footer`, and a direction-aware chevron when tappable. The card form is a stand-alone tappable card (class list). |
 | `AppStatTile` | One headline number on an accent tint ("78%" / "Term average"); lay 2–3 side by side. |
 | `AppStatusPill` | A small rounded status label in a tone (`neutral`, `brand`, `info`, `success`, `warning`, `danger`), optional icon. |
+| `AppSegmentedToggle` | A pill switch between a screen's sections ("Assignments \| Grades"): soft track, equal-width segments, the selected one the brand capsule the bottom bar uses, sliding (mirrored in RTL). Each segment is a selectable button in one mutually exclusive group for screen readers. |
 | `AppEmptyState` | Icon-illustrated empty / error message: full (disc in a halo, title, message, action) or `compact` (one row inside a card). No image assets. |
 | `AppIconBadge` | The rounded-square tinted icon (or short label) every other piece leads with. |
 | `AppCardSurface` | The kit's card: the themed `Card` plus a soft shadow. |

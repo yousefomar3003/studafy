@@ -8,7 +8,7 @@ import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/today_providers.dart';
 import '../assignment_detail_screen.dart';
-import '../assignments_screen.dart';
+import '../work_and_grades_screen.dart';
 import 'today_card_shell.dart';
 import 'today_skeleton.dart';
 import 'today_state_message.dart';
@@ -56,9 +56,8 @@ class TodayAssignmentsCard extends ConsumerWidget {
               Align(
                 alignment: AlignmentDirectional.centerEnd,
                 child: TextButton(
-                  onPressed: () => Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute<void>(builder: (_) => const StudentAssignmentsScreen())),
+                  // The "Work & grades" tab's assignments, the full list.
+                  onPressed: () => openStudentAssignments(context, ref),
                   child: Text('today.assignments.viewAll'.tr()),
                 ),
               ),
