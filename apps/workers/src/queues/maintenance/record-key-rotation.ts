@@ -10,6 +10,7 @@
  */
 import { openRecordValue, sealRecordValue } from "@studafy/records";
 
+import { emitAuditLog } from "../../db/audit";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 import { loadSchoolIds } from "../notifications/email/schools";
 
@@ -79,6 +80,7 @@ export async function resealRecordValues(
               WHERE school_id = ${schoolId}::uuid AND id = ${row.id}::uuid
             `;
           }
+          await auditReseal(tx, schoolId, "record_answers", rows, keyring.currentKeyId);
           return rows.length;
         });
         result.resealed += batch;
@@ -99,6 +101,29 @@ export async function resealRecordValues(
     }
   }
   return result;
+}
+
+/**
+ * One audit row per re-seal batch (QA-090): how many values of a table moved from which key ids to
+ * which, in the batch's own transaction. Never a value or any key material. The school is the
+ * target: a batch spans many rows.
+ */
+async function auditReseal(
+  tx: TransactionSql,
+  schoolId: string,
+  table: "record_answers" | "custom_list_values",
+  rows: readonly { value_key_id: string }[],
+  keyId: string,
+): Promise<void> {
+  if (rows.length === 0) return;
+  await emitAuditLog(tx, {
+    action: "update",
+    targetTable: table,
+    targetId: schoolId,
+    // Key ids name keys; they are not key material.
+    oldValues: { sealed_with_key_ids: [...new Set(rows.map((row) => row.value_key_id))].sort() },
+    newValues: { resealed: rows.length, resealed_to_key_id: keyId },
+  });
 }
 
 /** One batch of custom list cells still sealed under an older key; the number re-sealed. */
@@ -147,5 +172,6 @@ async function resealCustomListBatch(
       WHERE school_id = ${schoolId}::uuid AND id = ${row.id}::uuid
     `;
   }
+  await auditReseal(tx, schoolId, "custom_list_values", rows, keyring.currentKeyId);
   return rows.length;
 }
