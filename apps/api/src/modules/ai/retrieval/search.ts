@@ -117,6 +117,7 @@ function semanticLegCount(
     SELECT id
     FROM app.material_chunks
     WHERE ${materialId === undefined ? tx`TRUE` : tx`material_id = ${materialId}::uuid`}
+      AND ${groundable(tx, "app.material_chunks")}
     ORDER BY embedding <=> ${queryVector}::public.vector
     LIMIT ${HYBRID_LEG_LIMIT}
   `.then((rows) => rows.length);
@@ -127,6 +128,25 @@ function semanticLegCount(
  * through `app.material_chunks` (for the citation anchors) and `app.materials` (for the title a
  * citation renders from); both joins are tenant-composite, so a result can never cross schools.
  */
+/**
+ * The chunk may ground an answer for this caller: its material is one the caller can read (the
+ * materials policy carries the class scope) in a class whose AI materials setting is on. Applied
+ * inside each leg, before its LIMIT (QA-051). app.material_chunks itself is isolated by tenant only,
+ * so filtering after the legs let 50 chunks from classes the caller cannot read crowd out their own.
+ */
+function groundable(tx: TransactionSql, chunk: "c" | "app.material_chunks") {
+  const owner =
+    chunk === "c"
+      ? tx`gm.id = c.material_id AND gm.school_id = c.school_id`
+      : tx`gm.id = app.material_chunks.material_id AND gm.school_id = app.material_chunks.school_id`;
+  return tx`EXISTS (
+    SELECT 1 FROM app.materials AS gm
+    JOIN app.classes AS gc ON gc.id = gm.class_id AND gc.school_id = gm.school_id
+      AND gc.ai_materials_enabled
+    WHERE ${owner}
+  )`;
+}
+
 function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<HybridSearchHit[]> {
   const limit = clampLimit(input.limit);
   const { materialId, queryVector } = input;
@@ -139,15 +159,19 @@ function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<H
       SELECT id, row_number() OVER (ORDER BY embedding <=> ${queryVector}::public.vector) AS rank
       FROM app.material_chunks
       WHERE ${materialId === undefined ? tx`TRUE` : tx`material_id = ${materialId}::uuid`}
+        AND ${groundable(tx, "app.material_chunks")}
       ORDER BY embedding <=> ${queryVector}::public.vector
       LIMIT ${HYBRID_LEG_LIMIT}`;
   return tx<RawHit[]>`
     WITH semantic AS (${semantic}), keyword AS (
       SELECT c.id, row_number() OVER (ORDER BY ts_rank(c.content_tsv, q.query) DESC) AS rank
       FROM app.material_chunks c,
-           websearch_to_tsquery('english', ${input.query}) AS q(query)
+           -- English and Arabic parses of the question, ORed, matching content_tsv (000235).
+           (SELECT websearch_to_tsquery('english', ${input.query})
+                   || websearch_to_tsquery('arabic', ${input.query})) AS q(query)
       WHERE c.content_tsv @@ q.query
         AND ${materialId === undefined ? tx`TRUE` : tx`c.material_id = ${materialId}::uuid`}
+        AND ${groundable(tx, "c")}
       ORDER BY ts_rank(c.content_tsv, q.query) DESC
       LIMIT ${HYBRID_LEG_LIMIT}
     ), fused AS (

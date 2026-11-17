@@ -281,10 +281,11 @@ integrationTest(
           RETURNING id, content_tsv::text AS tsv
         `,
       );
-      // Stemmed and position-tagged by to_tsvector('english', ...), with the stop word removed.
+      // The English parse (stemmed) and the Arabic parse (000235, QA-051) together: the English
+      // stem "produc" is there; the Arabic parse keeps English words as they are.
       expect(row!.tsv).toContain("mitochondria");
       expect(row!.tsv).toContain("cellular");
-      expect(row!.tsv).not.toContain("produce'"); // stemmed to "produc"
+      expect(row!.tsv).toContain("'produc'");
 
       // Updating content regenerates the tsvector. No trigger is involved and none can be forgotten.
       const [updated] = await asSchool(
