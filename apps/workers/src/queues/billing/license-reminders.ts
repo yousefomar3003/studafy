@@ -200,6 +200,10 @@ async function dueReminders(
     });
   }
 
+  // The AI cutoff is a UTC date (licenseAiStopDate; the workers stop the licence on it in UTC), so it
+  // is compared with today's UTC date, not the school-local date the due reminders above use.
+  const today = now.toISOString().slice(0, 10);
+
   // The AI cutoff of every unpaid instalment on a licence in force: warned of once it is a week or
   // less away; told once the licence is stopped for it (the earliest such instalment per licence, so
   // a later instalment stopping it again is told again).

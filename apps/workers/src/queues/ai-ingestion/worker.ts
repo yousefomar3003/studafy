@@ -357,7 +357,8 @@ export async function processIngestJob(
     //    four more parses before the teacher sees "failed".
     // Anything else (the bucket, the database, the concurrency cap) may be transient and keeps its
     // retries.
-    const deterministic = error instanceof DocumentTooLargeError || error instanceof MaterialParseError;
+    const deterministic =
+      error instanceof DocumentTooLargeError || error instanceof MaterialParseError;
     if (deterministic || job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
       const reason = failureReason(error);
       await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
