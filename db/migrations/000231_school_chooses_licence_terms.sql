@@ -34,8 +34,24 @@
 --     cleared by trigger whenever the status leaves `suspended` (resumed, cancelled, expired).
 --   * app.license_reminders.kind gains ai_stop_warning (7 days before the cutoff) and ai_stopped.
 --   * app.notification_type gains LICENSE_AI_STOP_WARNING and LICENSE_AI_STOPPED (in-app and push
---     for the school's admins and principals and the super admins; never emailed). Nothing in this
---     migration uses them, so they can be added inside its transaction.
+--     for the school's admins and principals and the super admins). Nothing in this migration uses
+--     them, so they can be added inside its transaction.
+--
+-- ## 3. Overdue-payment emails
+--
+-- The owner wants overdue licence payments emailed: billing mail to the school's paying contacts,
+-- like the invoice itself, sent through the transactional email channel (outbox + dispatcher, with
+-- its suppression list), not as a notification. The licence reminder job writes one
+-- `licenseInvoice.paymentEmail` outbox event per recipient when it claims an instalment's
+-- invoice_overdue, ai_stop_warning or ai_stopped reminder, so each goes out once.
+--
+--   * app.email_template gains license-instalment-overdue, license-ai-stop-warning and
+--     license-ai-stopped (unused here, so added inside the transaction).
+--   * idx_outbox_events_school_email_claim (000199) and app.outbox_pending_school_ids('email')
+--     (000230) gain the event name; they must name exactly EMAIL_EVENT_NAMES
+--     (apps/workers/src/queues/notifications/email/resolve.ts). The index is rebuilt in this
+--     transaction (not CONCURRENTLY), as 000230 rebuilt the notify index: the outbox is briefly
+--     write-locked while it builds.
 --
 -- Depends on 000163 (licences, change requests), 000165 (billing), 000168 (request tiers), 000221
 -- (instalments), 000223 (quote decline).
@@ -177,5 +193,129 @@ ALTER TABLE app.license_reminders
 -- ck_notification_preferences_digest_eligible (000083).
 ALTER TYPE app.notification_type ADD VALUE IF NOT EXISTS 'LICENSE_AI_STOP_WARNING';
 ALTER TYPE app.notification_type ADD VALUE IF NOT EXISTS 'LICENSE_AI_STOPPED';
+
+-- ---------------------------------------------------------------------------------------------------
+-- 6. Overdue-payment emails
+-- ---------------------------------------------------------------------------------------------------
+
+ALTER TYPE app.email_template ADD VALUE IF NOT EXISTS 'license-instalment-overdue';
+ALTER TYPE app.email_template ADD VALUE IF NOT EXISTS 'license-ai-stop-warning';
+ALTER TYPE app.email_template ADD VALUE IF NOT EXISTS 'license-ai-stopped';
+
+SET LOCAL lock_timeout = '5s';
+
+DROP INDEX IF EXISTS app.idx_outbox_events_school_email_claim;
+
+CREATE INDEX idx_outbox_events_school_email_claim
+  ON app.outbox_events (school_id, id)
+  WHERE email_dispatched_at IS NULL
+    AND event_name IN (
+      'invitation.sent',
+      'school.verificationEmailSent',
+      'digest.sent',
+      'notification.digestSent',
+      'subscription.dunningSent',
+      'subscription.seatDriftReported',
+      'aiSubscription.paused',
+      'aiSubscription.resumed',
+      'account.deletionRequested',
+      'account.deleted',
+      'aiSubscription.purchaseConfirmed',
+      'licenseInvoice.paymentEmail'
+    );
+
+CREATE OR REPLACE FUNCTION app.outbox_pending_school_ids(p_consumer text)
+RETURNS SETOF uuid
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = pg_catalog
+AS $function$
+DECLARE
+  previous_school text := pg_catalog.current_setting('app.school_id', true);
+  candidate uuid;
+  pending boolean;
+BEGIN
+  IF p_consumer IS NULL OR p_consumer NOT IN ('relay', 'email', 'entitlement', 'notify', 'push') THEN
+    RAISE EXCEPTION 'unknown outbox consumer %', p_consumer USING ERRCODE = '22023';
+  END IF;
+
+  FOR candidate IN SELECT school.id FROM app.schools AS school ORDER BY school.id LOOP
+    PERFORM pg_catalog.set_config('app.school_id', candidate::text, true);
+
+    IF p_consumer = 'relay' THEN
+      -- idx_outbox_events_school_unrelayed (000022)
+      pending := EXISTS (
+        SELECT 1 FROM app.outbox_events AS event
+        WHERE event.school_id = candidate AND event.relayed_at IS NULL
+      );
+    ELSIF p_consumer = 'email' THEN
+      -- idx_outbox_events_school_email_claim (000199, rebuilt by 000231)
+      pending := EXISTS (
+        SELECT 1 FROM app.outbox_events AS event
+        WHERE event.school_id = candidate
+          AND event.email_dispatched_at IS NULL
+          AND event.event_name IN (
+            'invitation.sent',
+            'school.verificationEmailSent',
+            'digest.sent',
+            'notification.digestSent',
+            'subscription.dunningSent',
+            'subscription.seatDriftReported',
+            'aiSubscription.paused',
+            'aiSubscription.resumed',
+            'account.deletionRequested',
+            'account.deleted',
+            'aiSubscription.purchaseConfirmed',
+            'licenseInvoice.paymentEmail'
+          )
+          AND (event.email_next_attempt_at IS NULL
+               OR event.email_next_attempt_at <= CURRENT_TIMESTAMP)
+      );
+    ELSIF p_consumer = 'notify' THEN
+      -- idx_outbox_events_school_notify_pending (000230)
+      pending := EXISTS (
+        SELECT 1 FROM app.outbox_events AS event
+        WHERE event.school_id = candidate
+          AND event.notify_dispatched_at IS NULL
+          AND event.event_name IN (
+            'assignment.published',
+            'submission.graded',
+            'attendance.sessionSubmitted',
+            'material.published',
+            'marks.released'
+          )
+      );
+    ELSIF p_consumer = 'push' THEN
+      -- idx_notifications_push_pending (000216)
+      pending := EXISTS (
+        SELECT 1 FROM app.notifications AS notification
+        WHERE notification.school_id = candidate
+          AND notification.push_dispatched_at IS NULL
+      );
+    ELSE
+      -- idx_outbox_events_school_entitlement_pending (000080) and
+      -- idx_outbox_events_school_user_entitlement_pending (000162)
+      pending := EXISTS (
+        SELECT 1 FROM app.outbox_events AS event
+        WHERE event.school_id = candidate
+          AND event.entitlement_applied_at IS NULL
+          AND event.event_name IN ('subscription.statusChanged', 'aiSubscription.statusChanged')
+      ) OR EXISTS (
+        SELECT 1 FROM app.outbox_events AS event
+        WHERE event.school_id = candidate
+          AND event.entitlement_applied_at IS NULL
+          AND event.event_name = 'userEntitlement.changed'
+      );
+    END IF;
+
+    IF pending THEN
+      RETURN NEXT candidate;
+    END IF;
+  END LOOP;
+
+  PERFORM pg_catalog.set_config('app.school_id', COALESCE(previous_school, ''), true);
+  RETURN;
+END
+$function$;
 
 RESET ROLE;

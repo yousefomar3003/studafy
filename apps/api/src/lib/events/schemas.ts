@@ -414,6 +414,38 @@ export const eventPayloadSchemas = {
   // store purchase whose waiver it records, for a student with an email address. The email is the
   // durable-medium confirmation EU consumer law asks for (Terms of Service 7.7). acknowledgedAt is
   // when the student ticked the box, recordedAt when the server recorded the purchase with it.
+  // ── Licence instalment billing emails (000231) ────────────────────
+  // Raised by the workers' licence reminder job (apps/workers/src/queues/billing/license-reminders.ts
+  // writes it raw), once per instalment and kind for each billing recipient. Everything the email
+  // shows rides in the payload, so the dispatcher renders it without reading the invoice again.
+  [DOMAIN_EVENTS.LICENSE_PAYMENT_EMAIL]: z.object({
+    schoolId: uid,
+    invoiceId: uid,
+    instalmentId: uid,
+    kind: z.enum(["instalment_overdue", "ai_stop_warning", "ai_stopped"]),
+    email: z.string().email(),
+    locale: z.enum(["en", "ar"]),
+    invoiceNumber: z.string().min(1),
+    instalmentPosition: z.number().int().positive(),
+    instalmentCount: z.number().int().positive(),
+    amount: z.string().min(1),
+    dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    stopDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    licenseStartsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    licenseEndsOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    paymentReference: z.string().min(1),
+    paymentLink: z.string().url().nullable(),
+    bankDetails: z
+      .object({
+        bankName: z.string(),
+        accountName: z.string(),
+        iban: z.string(),
+        swift: z.string(),
+        currencyCode: z.string(),
+      })
+      .nullable(),
+  }),
+
   [DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED]: z.object({
     schoolId: uid,
     aiSubscriptionId: uid,

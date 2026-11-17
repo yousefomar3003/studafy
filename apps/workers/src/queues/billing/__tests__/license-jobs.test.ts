@@ -855,3 +855,117 @@ describe("AI stops 30 days after an unpaid instalment (000231)", () => {
     expect(notices[0]!.body).toContain("in 7 days");
   });
 });
+
+// ---------------------------------------------------------------------------------------------------
+// Overdue-payment emails (000231)
+// ---------------------------------------------------------------------------------------------------
+
+describe("licence payment emails (000231)", () => {
+  async function queued(schoolId: string) {
+    return admin(
+      schoolId,
+      (tx) => tx<
+        { email: string; kind: string; locale: string; payload: Record<string, unknown> }[]
+      >`
+        SELECT payload ->> 'email' AS email, payload ->> 'kind' AS kind,
+               payload ->> 'locale' AS locale, payload
+        FROM app.outbox_events
+        WHERE school_id = ${schoolId}::uuid AND event_name = 'licenseInvoice.paymentEmail'
+        ORDER BY id
+      `,
+    );
+  }
+
+  async function emailOf(schoolId: string, userId: string): Promise<string> {
+    return scalar(
+      schoolId,
+      (tx) =>
+        tx<{ v: string }[]>`SELECT normalized_email AS v FROM app.users WHERE id = ${userId}::uuid`,
+    );
+  }
+
+  jobTest(
+    "an overdue instalment is emailed once to the admins, principals and the school's verified address",
+    async () => {
+      const schoolId = await school("Email School");
+      const orgAdmin = await user(schoolId, "ORG_ADMIN");
+      const principal = await user(schoolId, "PRINCIPAL");
+      await user(schoolId, "INSTRUCTOR");
+      const schoolEmail = await admin(null, async (tx) => {
+        const [row] = await tx<{ email: string }[]>`
+          UPDATE app.schools SET email_verified_at = now() WHERE id = ${schoolId}::uuid
+          RETURNING normalized_email AS email
+        `;
+        return row!.email;
+      });
+      await admin(
+        schoolId,
+        (tx) => tx`
+          INSERT INTO app.school_settings (school_id, locale) VALUES (${schoolId}::uuid, 'ar')
+          ON CONFLICT (school_id) DO UPDATE SET locale = 'ar'
+        `,
+      );
+      const now = new Date();
+      const lic = await license(schoolId, {
+        startsAt: new Date(now.getTime() - 40 * DAY),
+        endsAt: new Date(now.getTime() + 300 * DAY),
+      });
+      const yesterday = new Date(now.getTime() - DAY).toISOString().slice(0, 10);
+      const invoiceId = await invoice(schoolId, lic, { dueDate: yesterday, total: 25_000 });
+
+      await runLicenseLifecycle(db!, now, silentLogger, [schoolId]);
+      const sent = await runLicenseReminders(db!, now, silentLogger, [schoolId]);
+      expect(sent.emails).toBe(3);
+
+      const rows = await queued(schoolId);
+      expect(rows.map((row) => row.email).sort()).toEqual(
+        [await emailOf(schoolId, orgAdmin), await emailOf(schoolId, principal), schoolEmail].sort(),
+      );
+      expect(rows.every((row) => row.kind === "instalment_overdue" && row.locale === "ar")).toBe(
+        true,
+      );
+      expect(rows[0]!.payload).toMatchObject({
+        invoiceId,
+        instalmentId: invoiceId,
+        instalmentPosition: 1,
+        instalmentCount: 1,
+        amount: "250.00 USD",
+        dueDate: yesterday,
+        stopDate: new Date(Date.parse(`${yesterday}T00:00:00Z`) + 30 * DAY)
+          .toISOString()
+          .slice(0, 10),
+        paymentLink: null,
+      });
+      // No student data in a billing email.
+      expect(JSON.stringify(rows[0]!.payload)).not.toContain("student");
+
+      // Re-runs queue nothing more.
+      expect((await runLicenseReminders(db!, now, silentLogger, [schoolId])).emails).toBe(0);
+      expect(await queued(schoolId)).toHaveLength(3);
+    },
+  );
+
+  jobTest("the 7-day warning and the stop are each emailed once", async () => {
+    const schoolId = await school("Cutoff Email School");
+    await user(schoolId, "ORG_ADMIN");
+    const lic = await license(schoolId, {
+      startsAt: new Date("2026-01-01T00:00:00Z"),
+      endsAt: new Date("2030-01-01T00:00:00Z"),
+    });
+    await invoice(schoolId, lic, { dueDate: "2026-03-01", total: 100_000 });
+
+    const at = (day: string) => new Date(`${day}T00:00:00Z`);
+    await runLicenseLifecycle(db!, at("2026-03-24"), silentLogger, [schoolId]);
+    await runLicenseReminders(db!, at("2026-03-24"), silentLogger, [schoolId]);
+    await runLicenseReminders(db!, at("2026-03-25"), silentLogger, [schoolId]);
+    await runLicenseLifecycle(db!, at("2026-03-31"), silentLogger, [schoolId]);
+    await runLicenseReminders(db!, at("2026-03-31"), silentLogger, [schoolId]);
+    await runLicenseReminders(db!, at("2026-04-01"), silentLogger, [schoolId]);
+
+    expect((await queued(schoolId)).map((row) => row.kind)).toEqual([
+      "instalment_overdue",
+      "ai_stop_warning",
+      "ai_stopped",
+    ]);
+  });
+});

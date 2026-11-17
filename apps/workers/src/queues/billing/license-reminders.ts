@@ -27,6 +27,7 @@
  */
 
 import {
+  DOMAIN_EVENTS,
   LICENSE_AI_STOP_WARNING_DAYS,
   LICENSE_NONPAYMENT_GRACE_DAYS,
   NOTIFICATION_TYPES,
@@ -60,6 +61,8 @@ export interface LicenseRemindersResult {
   schools: number;
   reminders: Record<LicenseReminderKind, number>;
   notifications: number;
+  /** Billing emails queued for the email dispatcher (000231). */
+  emails: number;
   failedSchools: number;
 }
 
@@ -312,6 +315,129 @@ async function notify(
   `;
 }
 
+/** The reminder kinds also emailed to the school's billing contacts, and the email kind each is. */
+const EMAILED: Partial<Record<LicenseReminderKind, string>> = {
+  invoice_overdue: "instalment_overdue",
+  ai_stop_warning: "ai_stop_warning",
+  ai_stopped: "ai_stopped",
+};
+
+/** Where the school's licence billing email goes: its admins and principals, and its own address. */
+async function billingAddresses(tx: TransactionSql): Promise<string[]> {
+  const rows = await tx<{ email: string }[]>`
+    SELECT DISTINCT u.normalized_email AS email
+    FROM app.user_roles AS ur
+    JOIN app.users AS u ON u.id = ur.user_id AND u.school_id = ur.school_id
+    WHERE ur.school_id = current_setting('app.school_id')::uuid
+      AND ur.role IN ('ORG_ADMIN'::app.user_role, 'PRINCIPAL'::app.user_role)
+      AND u.status = 'active'
+    UNION
+    SELECT s.normalized_email AS email
+    FROM app.schools AS s
+    WHERE s.id = current_setting('app.school_id')::uuid AND s.email_verified_at IS NOT NULL
+    ORDER BY email
+  `;
+  return rows.map((row) => row.email);
+}
+
+/** The platform's bank details for transfers, or null until the super admin has saved them all. */
+async function bankDetails(tx: TransactionSql): Promise<Record<string, string> | null> {
+  const keys = {
+    bankName: "license.bank.bank_name",
+    accountName: "license.bank.account_name",
+    iban: "license.bank.iban",
+    swift: "license.bank.swift",
+    currencyCode: "license.bank.currency",
+  };
+  const rows = await tx<{ key: string; text_value: string | null }[]>`
+    SELECT key, text_value FROM app.platform_settings WHERE key = ANY(${Object.values(keys)}::text[])
+  `;
+  const details: Record<string, string> = {};
+  for (const [field, key] of Object.entries(keys)) {
+    const value = rows.find((row) => row.key === key)?.text_value;
+    if (!value) return null;
+    details[field] = value;
+  }
+  return details;
+}
+
+/**
+ * Queue the billing email for one instalment reminder: one outbox event per billing address, with
+ * everything the email shows. Returns how many were queued.
+ */
+async function queuePaymentEmails(
+  tx: TransactionSql,
+  schoolId: string,
+  reminder: Reminder,
+  locale: TemplateLocale,
+): Promise<number> {
+  const kind = EMAILED[reminder.kind];
+  if (!kind) return 0;
+  const [instalment] = await tx<
+    {
+      invoice_id: string;
+      number: string;
+      payment_reference: string;
+      position: number;
+      count: number;
+      due_date: string;
+      balance_minor: string;
+      payment_link: string | null;
+      currency_code: string;
+      minor_unit: number;
+      starts_on: string;
+      ends_on: string;
+    }[]
+  >`
+    SELECT i.id::text AS invoice_id, i.number, i.payment_reference, inst.position,
+           (SELECT count(*)::int FROM app.license_invoice_instalments AS other
+            WHERE other.school_id = inst.school_id AND other.invoice_id = inst.invoice_id) AS count,
+           inst.due_date::text AS due_date, inst.balance_minor::text AS balance_minor,
+           inst.payment_link, c.code AS currency_code, c.minor_unit::int AS minor_unit,
+           (l.starts_at AT TIME ZONE 'UTC')::date::text AS starts_on,
+           (l.ends_at AT TIME ZONE 'UTC')::date::text AS ends_on
+    FROM app.license_invoice_instalments AS inst
+    JOIN app.license_invoices AS i ON i.id = inst.invoice_id AND i.school_id = inst.school_id
+    JOIN app.school_licenses AS l ON l.id = i.license_id AND l.school_id = i.school_id
+    JOIN app.currencies AS c ON c.id = i.currency_id
+    WHERE inst.school_id = current_setting('app.school_id')::uuid
+      AND inst.id = ${reminder.subjectId}::uuid
+  `;
+  if (!instalment) return 0;
+  const addresses = await billingAddresses(tx);
+  const bank = await bankDetails(tx);
+  for (const email of addresses) {
+    const payload = {
+      schoolId,
+      invoiceId: instalment.invoice_id,
+      instalmentId: reminder.subjectId,
+      kind,
+      email,
+      locale: locale === "ar" ? "ar" : "en",
+      invoiceNumber: instalment.number,
+      instalmentPosition: instalment.position,
+      instalmentCount: instalment.count,
+      amount: formatMoney(
+        Number(instalment.balance_minor),
+        instalment.minor_unit,
+        instalment.currency_code,
+      ),
+      dueDate: instalment.due_date,
+      stopDate: licenseAiStopDate(instalment.due_date),
+      licenseStartsOn: instalment.starts_on,
+      licenseEndsOn: instalment.ends_on,
+      paymentReference: instalment.payment_reference,
+      paymentLink: instalment.payment_link,
+      bankDetails: bank,
+    };
+    await tx`
+      INSERT INTO app.outbox_events (school_id, event_name, payload)
+      VALUES (${schoolId}::uuid, ${DOMAIN_EVENTS.LICENSE_PAYMENT_EMAIL}, ${tx.json(payload)})
+    `;
+  }
+  return addresses.length;
+}
+
 export async function runLicenseReminders(
   sql: Sql,
   now: Date,
@@ -339,6 +465,7 @@ export async function runLicenseReminders(
       ai_stopped: 0,
     },
     notifications: 0,
+    emails: 0,
     failedSchools: 0,
   };
 
@@ -372,6 +499,12 @@ export async function runLicenseReminders(
           `;
           result.reminders[reminder.kind] += 1;
           result.notifications += recipients.length;
+          result.emails += await queuePaymentEmails(
+            tx,
+            school.id,
+            reminder,
+            await schoolLocale(tx),
+          );
         }
       });
     } catch (err) {

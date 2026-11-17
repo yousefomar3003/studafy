@@ -90,6 +90,12 @@ dates", and "if an instalment is unpaid 30 days after its due date, the AI stops
    the cutoff, `LICENSE_AI_STOPPED` when it stops) to the school's admins and principals and the
    super admins, alongside the existing due and overdue reminders. The console's licence list marks
    licences stopped for non-payment.
+7. **Overdue payments are emailed** to the school's billing contacts (its admins and principals and
+   its verified contact address), once each: the day after an instalment's due date, 7 days before
+   the AI cutoff, and when the AI stops. Billing mail like the invoice, sent through the
+   transactional email channel (outbox + dispatcher, suppression list), in the school's language,
+   with how to pay and the invoice link -- a deliberate exception to "notifications are never
+   emailed".
 
 ## Review
 

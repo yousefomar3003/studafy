@@ -29,7 +29,8 @@ when it required the `version-bump` label.
   `aiStopDate`. `SchoolLicense` (and the platform/console licence views) add
   `nonpaymentSuspendedAt` and `nextAiStop` (`LicenseAiStop`). `LicensePaymentResult` adds
   `licenseResumed`. New notification types `LICENSE_AI_STOP_WARNING` and `LICENSE_AI_STOPPED`
-  (in-app + push).
+  (in-app + push). New domain event `licenseInvoice.paymentEmail` (billing emails for an overdue
+  instalment, the 7-day AI cutoff warning and the stop; consumed by the email dispatcher).
 
 - `MARKS_RELEASED` notification type (migration 000230, in-app + push, never emailed): approving a
   mark sheet or a single assessment notifies the students with released marks and their parents;

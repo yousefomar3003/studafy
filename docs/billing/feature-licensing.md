@@ -129,7 +129,9 @@ not reopened without the product owner.
 
 Overdue instalments trigger reminders. **AI stops 30 days after an unpaid instalment** (migration
 000231): the licence is suspended automatically once any instalment is still unpaid 30 days after its
-due date, and resumes as soon as the payment is recorded; a warning goes out 7 days before. Any
+due date, and resumes as soon as the payment is recorded; a warning goes out 7 days before. The
+school's billing contacts are emailed when an instalment goes overdue, 7 days before the cutoff and
+when the AI stops (billing email, not a notification). Any
 other suspension is a manual super admin decision.
 
 **The school chooses the length and plan (migration 000231, ADR-021 amendment).** The school's

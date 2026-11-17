@@ -74,6 +74,29 @@ A `dkim=pass` with an unrelated `d=` domain, or an `spf=pass` not followed by `d
 alignment is broken even though the individual mechanisms passed — check that the `From:` address
 is actually `@send.studafy.com`.
 
+### Licence payment emails (billing, not notifications)
+
+Overdue school-licence instalments are emailed (owner decision, 2026-11-17, migration 000231). These
+are billing mail to the school's paying contacts, like the invoice itself, so they go through this
+transactional channel and the "no notification email" rule above does not apply to them:
+
+- **When:** an instalment unpaid the day after its due date (`instalment_overdue`), 7 days before the
+  AI cutoff 30 days after its due date (`ai_stop_warning`), and when the licence's AI stops for it
+  (`ai_stopped`). Each once per instalment and kind: the workers' licence reminder job writes the
+  `licenseInvoice.paymentEmail` outbox events in the transaction that claims the reminder in
+  `app.license_reminders`.
+- **To:** the school's active ORG_ADMINs and PRINCIPALs and the school's own contact address once
+  verified, one outbox event (and one delivery row) per address. In the school's language
+  (`school_settings.locale`, English or Arabic).
+- **What:** the invoice number, which payment of how many, the amount still due, the due date, the
+  cutoff date, the licence period, how to pay (bank details and payment reference, and the
+  instalment's Revolut "Pay online" link when it has one) and a link to the invoice page. No student
+  data.
+- **Templates:** `license-instalment-overdue`, `license-ai-stop-warning`, `license-ai-stopped` in
+  `app.email_deliveries`; rendered by `renderLicensePaymentEmail`
+  (`apps/workers/src/queues/notifications/email/templates.ts`). Suppressions, retries and
+  idempotency keys apply as for every other transactional email.
+
 ## How sending is wired
 
 - **Sender:** apps/workers (`queues/notifications/email/sender.ts`) posts to Resend's
