@@ -102,6 +102,18 @@ Widget _gallery() {
             ),
         ],
       ),
+      AppSegmentedToggle<int>(
+        segments: const [
+          AppSegment(
+            value: 0,
+            label: 'Assignments',
+            icon: Icons.assignment_outlined,
+          ),
+          AppSegment(value: 1, label: 'Grades', icon: Icons.grade_outlined),
+        ],
+        selected: 0,
+        onChanged: (_) {},
+      ),
       const AppEmptyState(
         icon: Icons.inbox_outlined,
         title: 'Nothing yet',
@@ -466,6 +478,99 @@ void main() {
             ),
             findsOneWidget,
           );
+        },
+      );
+
+      testWidgets(
+        'AppSegmentedToggle slides its capsule to the tapped segment, in reading order',
+        (tester) async {
+          var selected = 'assignments';
+          final changes = <String>[];
+          await _pump(
+            tester,
+            StatefulBuilder(
+              builder: (context, setState) => AppSegmentedToggle<String>(
+                semanticLabel: 'Sections',
+                segments: const [
+                  AppSegment(
+                    value: 'assignments',
+                    label: 'Assignments',
+                    icon: Icons.assignment_outlined,
+                    selectedIcon: Icons.assignment,
+                  ),
+                  AppSegment(
+                    value: 'grades',
+                    label: 'Grades',
+                    icon: Icons.grade_outlined,
+                    selectedIcon: Icons.grade,
+                  ),
+                ],
+                selected: selected,
+                onChanged: (next) {
+                  changes.add(next);
+                  setState(() => selected = next);
+                },
+              ),
+            ),
+            direction: direction,
+          );
+
+          // The first segment sits on the start side and shows its filled icon while selected.
+          _expectLeadsText(
+            tester,
+            find.text('Assignments'),
+            find.text('Grades'),
+            direction,
+          );
+          expect(find.byIcon(Icons.assignment), findsOneWidget);
+          expect(find.byIcon(Icons.grade_outlined), findsOneWidget);
+
+          final handle = tester.ensureSemantics();
+          expect(
+            tester.getSemantics(find.text('Grades')),
+            isSemantics(
+              label: 'Grades',
+              isButton: true,
+              hasSelectedState: true,
+              isSelected: false,
+              isInMutuallyExclusiveGroup: true,
+              hasTapAction: true,
+            ),
+          );
+
+          await tester.tap(find.text('Grades'));
+          await tester.pumpAndSettle();
+          expect(changes, ['grades']);
+          expect(find.byIcon(Icons.grade), findsOneWidget);
+          expect(
+            tester.getSemantics(find.text('Grades')),
+            isSemantics(
+              label: 'Grades',
+              isButton: true,
+              hasSelectedState: true,
+              isSelected: true,
+              isInMutuallyExclusiveGroup: true,
+              hasTapAction: true,
+            ),
+          );
+
+          // Re-tapping the selected segment is a no-op.
+          await tester.tap(find.text('Grades'));
+          await tester.pumpAndSettle();
+          expect(changes, ['grades']);
+
+          // The capsule now sits under the selected segment.
+          final capsule = tester.getRect(
+            find
+                .descendant(
+                  of: find.byType(AnimatedAlign),
+                  matching: find.byType(DecoratedBox),
+                )
+                .first,
+          );
+          final grades = tester.getCenter(find.text('Grades'));
+          expect(capsule.contains(grades), isTrue);
+          handle.dispose();
         },
       );
 

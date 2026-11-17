@@ -12,6 +12,7 @@ import '../../../core/router/route_paths.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../shell/application/shell_providers.dart';
+import '../../student/application/work_and_grades_providers.dart';
 import '../application/notification_providers.dart';
 import '../domain/notification_target.dart';
 
@@ -259,6 +260,11 @@ class NotificationTile extends ConsumerWidget {
       return;
     }
     if (target.tabLabelKey != null) {
+      if (target.workSection case final section?) {
+        ref
+            .read(workAndGradesProvider.notifier)
+            .open(section, gradesTab: target.gradesTab);
+      }
       ref.read(selectedShellTabProvider.notifier).select(target.tabLabelKey!);
       // Back to the shell, wherever the inbox was opened from.
       if (GoRouter.of(context).canPop()) context.go(RoutePaths.home);
