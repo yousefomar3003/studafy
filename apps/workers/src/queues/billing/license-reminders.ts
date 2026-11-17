@@ -11,7 +11,7 @@
  * invoice's own for every invoice issued before instalments existed, so nothing is sent twice.
  *   receipt_uploaded                         -- the school uploaded a transfer receipt
  *   ai_stop_warning                          -- an unpaid instalment's AI cutoff (30 days after its
- *                                               due date, 000231) is 7 days away or less
+ *                                               due date, 000233) is 7 days away or less
  *   ai_stopped                               -- the licence was suspended for that instalment
  *
  * All but receipt_uploaded go to the school's ORG_ADMINs and PRINCIPALs and to every super admin; a receipt
@@ -61,7 +61,7 @@ export interface LicenseRemindersResult {
   schools: number;
   reminders: Record<LicenseReminderKind, number>;
   notifications: number;
-  /** Billing emails queued for the email dispatcher (000231). */
+  /** Billing emails queued for the email dispatcher (000233). */
   emails: number;
   failedSchools: number;
 }

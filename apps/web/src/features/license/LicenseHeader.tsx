@@ -87,7 +87,7 @@ export function LicenseBanners() {
     }
   }
 
-  // AI stops 30 days after an unpaid instalment (000231): say so once it has, and warn from the day
+  // AI stops 30 days after an unpaid instalment (000233): say so once it has, and warn from the day
   // the instalment is late until then.
   const stop = license?.nextAiStop ?? null;
   const stopDate = (iso: string) => formatDate(new Date(`${iso}T00:00:00Z`), { dateStyle: "long" });

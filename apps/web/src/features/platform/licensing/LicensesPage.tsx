@@ -283,7 +283,7 @@ export function ChangeRequestInbox() {
               : "platformLicensing.inbox.wants.familyPlusOff",
           )
         : null,
-      // The school's own length and payment plan (000231).
+      // The school's own length and payment plan (000233).
       request.months !== null
         ? request.licenseId
           ? t("platformLicensing.inbox.wants.moreMonths", { count: request.months })

@@ -6,7 +6,7 @@ import type { Changed } from "./service";
 import type { TransactionSql } from "postgres";
 
 /**
- * The API's half of "AI stops 30 days after an unpaid instalment" (migration 000231): the workers
+ * The API's half of "AI stops 30 days after an unpaid instalment" (migration 000233): the workers
  * suspend the licence; recording the payment that settles it resumes it at once, here.
  */
 

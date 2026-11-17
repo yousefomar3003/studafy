@@ -128,13 +128,13 @@ not reopened without the product owner.
    paid at once), OR the super admin **activates it early** with a payment due date.
 
 Overdue instalments trigger reminders. **AI stops 30 days after an unpaid instalment** (migration
-000231): the licence is suspended automatically once any instalment is still unpaid 30 days after its
+000233): the licence is suspended automatically once any instalment is still unpaid 30 days after its
 due date, and resumes as soon as the payment is recorded; a warning goes out 7 days before. The
 school's billing contacts are emailed when an instalment goes overdue, 7 days before the cutoff and
 when the AI stops (billing email, not a notification). Any
 other suspension is a manual super admin decision.
 
-**The school chooses the length and plan (migration 000231, ADR-021 amendment).** The school's
+**The school chooses the length and plan (migration 000233, ADR-021 amendment).** The school's
 request carries the months (1-36), an optional start and monthly / yearly / custom (dates and shares
 of the total); the super admin's quote starts from it and needs a reason the school reads to depart
 from it. Quotes, calculations and invoices show the total for each licence year.
@@ -539,7 +539,7 @@ operator's home school).
    it returns to pending, the license is untouched. An invoice with no payments can be voided; its
    overlap credits become available to the next quote.
 
-The only automatic suspension is for an instalment unpaid 30 days after its due date (000231,
+The only automatic suspension is for an instalment unpaid 30 days after its due date (000233,
 `nonpayment_suspended_at`), lifted when the payment is recorded. Any other suspension stays the super
 admin's decision (`POST .../licenses/{licenseId}/status`).
 
@@ -577,8 +577,8 @@ Super admin (`platform:read` / `platform:manage`, web channel):
 
 | Job                      | When                 | Does                                                                                                                                                                                                                                                                                                                                                                                  |
 | ------------------------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `run-license-lifecycle`  | hourly at :05 UTC    | Active or suspended licenses past `ends_at` → `expired`, bumping each seat holder's `user` version with `userEntitlement.changed`; sent quotes past `valid_until` → `expired`; unpaid invoices past their due date → `overdue_at`; active licences with an instalment unpaid 30+ days past due → `suspended` (`nonpayment_suspended_at`), and back to `active` once settled (000231). |
-| `run-license-reminders`  | hourly at :20 UTC    | In-app notifications, each once (`app.license_reminders`): a license ending in 30 and in 7 days, an invoice due today, an invoice overdue — to the school's ORG_ADMINs and PRINCIPALs and every super admin; a receipt uploaded — to the super admins; the AI cutoff 7 days ahead and when it stops (000231).                                                                         |
+| `run-license-lifecycle`  | hourly at :05 UTC    | Active or suspended licenses past `ends_at` → `expired`, bumping each seat holder's `user` version with `userEntitlement.changed`; sent quotes past `valid_until` → `expired`; unpaid invoices past their due date → `overdue_at`; active licences with an instalment unpaid 30+ days past due → `suspended` (`nonpayment_suspended_at`), and back to `active` once settled (000233). |
+| `run-license-reminders`  | hourly at :20 UTC    | In-app notifications, each once (`app.license_reminders`): a license ending in 30 and in 7 days, an invoice due today, an invoice overdue — to the school's ORG_ADMINs and PRINCIPALs and every super admin; a receipt uploaded — to the super admins; the AI cutoff 7 days ahead and when it stops (000233).                                                                         |
 | `run-usage-period-start` | 00:05 UTC on the 1st | Opens the month's zero meter for every seat holder of an active license and each metered feature of their tier.                                                                                                                                                                                                                                                                       |
 
 Each runs school by school in its own system tenant transaction, audits with no actor, and is

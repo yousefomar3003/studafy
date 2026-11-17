@@ -34,7 +34,7 @@ export function isAllowedLicensePaymentLink(value: string): boolean {
 
 /**
  * A licence's AI stops once an instalment is still unpaid this many days after its due date
- * (db/migrations/000231): due 1 March, the AI stops on 31 March (UTC) and resumes when it is paid.
+ * (db/migrations/000233): due 1 March, the AI stops on 31 March (UTC) and resumes when it is paid.
  * Every instalment counts, so a later one going unpaid stops it again.
  */
 export const LICENSE_NONPAYMENT_GRACE_DAYS = 30;

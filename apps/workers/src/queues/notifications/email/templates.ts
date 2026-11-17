@@ -484,7 +484,7 @@ export function renderSchoolApplicationRejectedEmail(
 }
 
 // ---------------------------------------------------------------------------------------------------
-// Licence instalment billing emails (000231)
+// Licence instalment billing emails (000233)
 // ---------------------------------------------------------------------------------------------------
 
 export type LicensePaymentEmailKind = "instalment_overdue" | "ai_stop_warning" | "ai_stopped";
@@ -657,7 +657,7 @@ const LICENSE_PAYMENT_COPY = {
 } as const;
 
 /**
- * A billing email about one licence instalment (000231), in the school's language: what is unpaid
+ * A billing email about one licence instalment (000233), in the school's language: what is unpaid
  * and since when, when the AI stops (or that it has), how to pay -- bank transfer with the payment
  * reference, or the instalment's online link -- and a link to the invoice. Never names a student.
  */

@@ -9,7 +9,7 @@
  *  3. unpaid invoices past their due date are marked overdue (`overdue_at`); their status still says
  *     how much is paid. Each instalment not paid by its due date is marked overdue the same way
  *     (000221); an invoice's due date is its earliest unpaid instalment's;
- *  4. AI stops 30 days after an unpaid instalment (000231): an active licence with any unpaid
+ *  4. AI stops 30 days after an unpaid instalment (000233): an active licence with any unpaid
  *     instalment LICENSE_NONPAYMENT_GRACE_DAYS or more past its due date (UTC dates) is suspended and
  *     marked `nonpayment_suspended_at`, and its seat holders' entitlements are bumped so the AI stops
  *     at once. Every instalment counts: a later one going unpaid stops it again;

@@ -26,7 +26,7 @@ import type {
 } from "@studafy/license-pricing";
 
 /**
- * The school's half of "how long, and how do we pay" (ADR-021 as amended by 000231): the licence
+ * The school's half of "how long, and how do we pay" (ADR-021 as amended by 000233): the licence
  * length in months (presets or any number from 1 to 36), when a new licence should start, and the
  * payment plan -- monthly, yearly, or custom dates with a share of the total each. The school has no
  * price yet, so the preview lists every payment's date and share and what each licence year carries;
