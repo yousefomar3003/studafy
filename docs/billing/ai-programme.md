@@ -74,3 +74,85 @@ currencyCode)` or `licenseAiProgramme(tx, license)`.
   applies it to what Studafy actually collects at that school's licence price.
 - `tierFor` / `nextTierFor` give the tier a value is in and the next one ("add N seats -> unlock X%").
 - No school-facing route reads these settings yet; phases 2-6 add the ones they need.
+
+# Phase 2: opt-in and programme seats
+
+Migrations 000235 (tables, rules) and 000239 (notification types). Pure pricing in
+`packages/license-pricing/src/ai-optin.ts`; API in `apps/api/src/modules/licensing/ai-optin*.ts`;
+workers `apps/workers/src/queues/billing/ai-optin-notices.ts`; web `/portal/license/student-ai`;
+app `/parent/student-ai`.
+
+## The flow
+
+1. **The school opens a window** (ORG_ADMIN / PRINCIPAL, `license:manage`) on its current licence
+   for an academic year (default: the current one), with school-local open and close dates and
+   optionally some grades or sections only. It needs a licence that takes seats (active or awaiting
+   payment) with a student tier, and a parent price in the licence's currency. The school must
+   accept the programme's **minimum seats** (it pays for at least `minSeats` even if fewer opt in);
+   when the licence has fewer seats, an automatic seat request is opened for Studafy to price. One
+   window open at a time; a window past its last day closes when the next opens.
+2. **Parents are told** (`AI_OPTIN_AVAILABLE`, in-app and push, once per child and window, hourly
+   job) and see, per eligible child, "Student AI for <child>": the price parents see per month ×
+   the months left in the school's academic year = total, paid with tuition, committed for the year.
+3. **A parent opts in** (`studentAi:optIn`, PARENT only; never ORG_ADMIN): linked to the child,
+   window open and including the child, terms accepted (`AI_OPTIN_TERMS_VERSION`), and the total
+   they were shown (else `AI_OPTIN_PRICE_CHANGED`). Recorded with who, when and the terms version.
+   It cannot be undone. Parents with children at several schools have an account per school (the
+   account switcher), so each school's offer is its own.
+4. **Or the school records it on the parent's behalf** (single, bulk, or a CSV column of school
+   admission numbers -- never a government ID), with a required note; same window, eligibility and
+   price. Audited.
+5. **Seats follow** (below). The child's parents get `AI_OPTIN_CONFIRMED`; school leadership gets a
+   daily `AI_OPTIN_SUMMARY` of new opt-ins (16:00 UTC run).
+
+**Late opt-in** is allowed while a window is open: priced for the remaining months only, starting
+this month (`aiOptInPeriod`). Months always follow the school's academic year.
+
+## Seats
+
+Each active opt-in holds a seat on its licence (`app.license_seats`, through `assignSeats`, so the
+existing entitlement path unlocks Student AI). **The licence's seat count is never raised by an
+opt-in** -- seats are what the super admin priced and the school accepted. When opt-ins need more
+seats than the licence has, the opt-in is recorded and **waits** (`seat_id` null), and one open
+`license_change_requests` row with `source = 'ai_optin'` asks for `max(minSeats, active opt-ins)`
+seats (raised as more opt in). The super admin prices it as a seat-increase quote; on acceptance
+(or a console seat change) waiting opt-ins get seats, oldest first (`fillWaitingOptInSeats`). A
+student who already held a seat keeps it, now held by the programme.
+
+**No removals.** A seat an active opt-in holds cannot be unassigned: the API answers 409
+`LICENSE_SEAT_PROGRAMME_LOCKED` and the database refuses it (`trg_license_seats_programme_lock`).
+The only exception is a student who has **left** (status graduated, withdrawn or archived):
+
+- **Transfer**: the seat goes to another enrolled student without an opt-in, with no billing change
+  (a `transfer` opt-in at the same monthly price, charged from the next month to the year's end; the leaver pays through this month).
+- **Release**: no longer charged from the **next** month (`released_effective_month`); the seat frees
+  now and goes to the next opt-in waiting for one.
+
+## Data (000235)
+
+| Table                                                     | What                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `app.ai_optin_windows`                                    | licence, academic year, `opens_on`/`closes_on` (school-local), note, opened/closed by and when. One not closed per school.                                                                                                                                                                                                                                                                                                                                  |
+| `app.ai_optin_window_scopes`                              | the grades or sections a window is limited to (none: every enrolled student).                                                                                                                                                                                                                                                                                                                                                                               |
+| `app.ai_optins`                                           | student, academic year, licence, window, `source` (parent, school_on_behalf, transfer), `parent_user_id`, `recorded_by`, note, `terms_version`, `opted_in_at`, `start_month`, `end_month`, `months`, currency, `monthly_price_minor`, `total_minor`, `seat_id`, `status` (active, released, transferred), ended by/at/note, `released_effective_month`, `transferred_to_id` / `transferred_from_id`, `admins_notified_at`. One active per student per year. |
+| `app.ai_optin_window_notices`                             | the workers' availability notices, one per window and student.                                                                                                                                                                                                                                                                                                                                                                                              |
+| `school_licenses.commitment`, `license_quotes.commitment` | `full_year` (default, every existing one) or `month_to_month`. New licences and extensions take the accepted quote's; a seat increase keeps the licence's.                                                                                                                                                                                                                                                                                                  |
+| `license_change_requests.source`                          | `school` or `ai_optin`.                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+
+An opt-in never changes after it is written except: the seat is linked once; status leaves `active`
+once (leadership only, restrictive UPDATE policy `ai_optins_end_scope`); leadership's summary marks
+it. Never deleted (`trg_ai_optins_guard`). Reads: tenant isolation plus `role_scope_visibility`
+(`app.can_read_ai_optin`): leadership sees all, a parent or the student only their own. Definer
+helpers `app.ai_optin_seat_locked(seat)` and `app.ai_optin_license_counts(licence)` (counts only, so
+a parent's opt-in can size the seat request).
+
+## For later phases
+
+- **Phase 3 (tuition line):** each active opt-in carries `monthly_price_minor × months =
+total_minor` from `start_month` to `end_month`; a released one stops at
+  `released_effective_month`; a `transfer` opt-in starts at its own `start_month`.
+- **Phase 4 (conversion):** opted in = `ai_optins` with `status = 'active'` (or ended after the
+  measurement date) per licence / academic year; enrolled = students `enrolled` (the window's
+  eligibility, `eligibleIn` in ai-optin.ts).
+- **Phase 5 (share):** `school_licenses.commitment`; programme seats billed per month = active seats
+  plus released ones until their effective month.

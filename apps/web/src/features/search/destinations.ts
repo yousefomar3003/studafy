@@ -356,6 +356,7 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   // The school's feature license.
   entry("license", "page", "/portal/license", LICENSE),
   entry("license-seats", "page", "/portal/license/seats", LICENSE),
+  entry("license-student-ai", "page", "/portal/license/student-ai", LICENSE),
   entry("license-quotes", "page", "/portal/license/quotes", LICENSE),
   entry("license-invoices", "page", "/portal/license/invoices", LICENSE),
   entry("license-storage", "page", "/portal/license/storage", LICENSE),

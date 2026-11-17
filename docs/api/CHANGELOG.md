@@ -13,6 +13,28 @@ when it required the `version-bump` label.
 
 ### Added
 
+- Student AI opt-in and programme seats (migration 000235; docs/billing/ai-programme.md, phase 2).
+  School (`license:read` / `license:manage`): `getSchoolStudentAi` (`GET /api/school/license/student-ai`,
+  `SchoolAiOptInOverview`), `openStudentAiWindow` (`POST .../student-ai/windows`,
+  `OpenAiOptInWindowBody`, 201 `AiOptInWindow`), `closeStudentAiWindow`
+  (`POST .../windows/{windowId}/close`), `listStudentAiStudents` (`GET .../student-ai/students`,
+  `AiOptInStudentList`), `recordStudentAiOptIns` (`POST .../student-ai/opt-ins`,
+  `RecordAiOptInsBody` -> `RecordAiOptInsResult`), `transferStudentAiOptIn` and
+  `releaseStudentAiOptIn` (`POST .../opt-ins/{optInId}/transfer|release`). Parent (new permission
+  `studentAi:optIn`, PARENT only): `getParentStudentAi` (`GET /api/parent/student-ai`,
+  `ParentAiOffers`) and `optInParentStudentAi` (`POST /api/parent/student-ai/opt-ins`,
+  `ParentAiOptInBody`, 201 `AiOptIn`). New error codes `AI_OPTIN_NO_LICENCE`,
+  `AI_OPTIN_PRICE_MISSING`, `AI_OPTIN_WINDOW_INVALID`, `AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED`,
+  `AI_OPTIN_WINDOW_CLOSED`, `AI_OPTIN_WINDOW_ALREADY_OPEN`, `AI_OPTIN_WINDOW_NOT_FOUND`,
+  `AI_OPTIN_NOT_ELIGIBLE`, `AI_OPTIN_ALREADY_OPTED_IN`, `AI_OPTIN_YEAR_OVER`,
+  `AI_OPTIN_TERMS_REQUIRED`, `AI_OPTIN_PRICE_CHANGED`, `AI_OPTIN_NOT_FOUND`, `AI_OPTIN_ENDED`,
+  `AI_OPTIN_STUDENT_NOT_LEFT` and `LICENSE_SEAT_PROGRAMME_LOCKED` (the school's and the console's
+  `DELETE .../seats/{seatId}` now answer 409 for a seat a Student AI opt-in holds). `LicenseSeat` adds
+  `programme`; `SchoolLicense`, `LicenseQuote` add `commitment` (`LicenseCommitment`: `full_year` |
+  `month_to_month`), and `LicenseQuoteBody` / `LicenseQuoteReplaceBody` take an optional
+  `commitment`; `LicenseChangeRequest` adds `source` (`school` | `ai_optin`). Notification types
+  `AI_OPTIN_AVAILABLE`, `AI_OPTIN_CONFIRMED`, `AI_OPTIN_SUMMARY`.
+
 - The Student AI programme's settings, versioned (migration 000234; docs/billing/ai-programme.md).
   Super admin only (`platform:read` to read, `platform:manage` to save, web channel):
   `platformGetAiProgramme` (`GET /api/platform/ai-programme`), `platformListAiProgrammeVersions` and

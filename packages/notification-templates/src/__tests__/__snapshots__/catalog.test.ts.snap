@@ -206,6 +206,24 @@ exports[`renderNotification — snapshot tests en MARKS_RELEASED / push renders 
 
 exports[`renderNotification — snapshot tests en MARKS_RELEASED / email renders correctly 1`] = `"First exam marks are out for Mathematics. Open Studafy to see them."`;
 
+exports[`renderNotification — snapshot tests en AI_OPTIN_AVAILABLE / in_app renders correctly 1`] = `"Student AI is available for Amina Tazi"`;
+
+exports[`renderNotification — snapshot tests en AI_OPTIN_AVAILABLE / push renders correctly 1`] = `"Amman Academy · 6.00 USD a month, paid with tuition · until 2026-12-15"`;
+
+exports[`renderNotification — snapshot tests en AI_OPTIN_AVAILABLE / email renders correctly 1`] = `"Amman Academy offers Student AI for Amina Tazi at 6.00 USD a month, paid with tuition. Open Studafy to opt in before 2026-12-15."`;
+
+exports[`renderNotification — snapshot tests en AI_OPTIN_CONFIRMED / in_app renders correctly 1`] = `"Student AI confirmed for Amina Tazi"`;
+
+exports[`renderNotification — snapshot tests en AI_OPTIN_CONFIRMED / push renders correctly 1`] = `"8 months from 2026-11: 48.00 USD, paid with tuition"`;
+
+exports[`renderNotification — snapshot tests en AI_OPTIN_CONFIRMED / email renders correctly 1`] = `"Student AI for Amina Tazi at Amman Academy is confirmed for 8 months from 2026-11: 48.00 USD in all, paid with tuition. It is committed for the school year and can't be cancelled mid-year."`;
+
+exports[`renderNotification — snapshot tests en AI_OPTIN_SUMMARY / in_app renders correctly 1`] = `"12 new Student AI opt-ins"`;
+
+exports[`renderNotification — snapshot tests en AI_OPTIN_SUMMARY / push renders correctly 1`] = `"48 students opted in · 3 waiting for a seat"`;
+
+exports[`renderNotification — snapshot tests en AI_OPTIN_SUMMARY / email renders correctly 1`] = `"12 more students opted in to Student AI. 48 students have it this year, and 3 are waiting for a seat on the licence."`;
+
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / in_app renders correctly 1`] = `"موعد تسليم Homework 5 هو 2026-08-15"`;
 
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_DUE_SOON / push renders correctly 1`] = `"Algebra II — Homework 5 مستحق في 2026-08-15"`;
@@ -411,3 +429,21 @@ exports[`renderNotification — snapshot tests ar MARKS_RELEASED / in_app render
 exports[`renderNotification — snapshot tests ar MARKS_RELEASED / push renders correctly 1`] = `"Amina Tazi · First exam marks are out for Mathematics"`;
 
 exports[`renderNotification — snapshot tests ar MARKS_RELEASED / email renders correctly 1`] = `"First exam marks are out for Mathematics. افتح Studafy للاطلاع عليها."`;
+
+exports[`renderNotification — snapshot tests ar AI_OPTIN_AVAILABLE / in_app renders correctly 1`] = `"الذكاء الاصطناعي للطلاب متاح لـ Amina Tazi"`;
+
+exports[`renderNotification — snapshot tests ar AI_OPTIN_AVAILABLE / push renders correctly 1`] = `"Amman Academy · 6.00 USD شهريًا مع الرسوم الدراسية · حتى 2026-12-15"`;
+
+exports[`renderNotification — snapshot tests ar AI_OPTIN_AVAILABLE / email renders correctly 1`] = `"تقدّم Amman Academy الذكاء الاصطناعي للطلاب لـ Amina Tazi مقابل 6.00 USD شهريًا تُدفع مع الرسوم الدراسية. افتح Studafy للاشتراك قبل 2026-12-15."`;
+
+exports[`renderNotification — snapshot tests ar AI_OPTIN_CONFIRMED / in_app renders correctly 1`] = `"تم تأكيد الذكاء الاصطناعي للطلاب لـ Amina Tazi"`;
+
+exports[`renderNotification — snapshot tests ar AI_OPTIN_CONFIRMED / push renders correctly 1`] = `"8 أشهر بدءًا من 2026-11: 48.00 USD مع الرسوم الدراسية"`;
+
+exports[`renderNotification — snapshot tests ar AI_OPTIN_CONFIRMED / email renders correctly 1`] = `"تم تأكيد الذكاء الاصطناعي للطلاب لـ Amina Tazi في Amman Academy لمدة 8 أشهر بدءًا من 2026-11: 48.00 USD إجمالًا، تُدفع مع الرسوم الدراسية. الاشتراك ملزم للعام الدراسي ولا يمكن إلغاؤه خلال العام."`;
+
+exports[`renderNotification — snapshot tests ar AI_OPTIN_SUMMARY / in_app renders correctly 1`] = `"12 اشتراكات جديدة في الذكاء الاصطناعي للطلاب"`;
+
+exports[`renderNotification — snapshot tests ar AI_OPTIN_SUMMARY / push renders correctly 1`] = `"48 طالبًا مشتركًا · 3 بانتظار مقعد"`;
+
+exports[`renderNotification — snapshot tests ar AI_OPTIN_SUMMARY / email renders correctly 1`] = `"اشترك 12 طلاب آخرين في الذكاء الاصطناعي للطلاب. لدى 48 طالبًا الخدمة هذا العام، و3 بانتظار مقعد في الترخيص."`;

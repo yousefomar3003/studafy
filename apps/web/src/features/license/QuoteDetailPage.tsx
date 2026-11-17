@@ -11,7 +11,7 @@ import { bpsToPercent, useMoney } from "../platform/licensing/format";
 import { LicenseHeader } from "./LicenseHeader";
 import { useAcceptQuote, useDeclineQuote } from "./mutations";
 import { PaymentSchedule } from "./PaymentSchedule";
-import { useQuoteQuery } from "./queries";
+import { useQuoteQuery, useStudentAiQuery } from "./queries";
 import { QuoteStatusPill } from "./QuotesPage";
 import { YearTotals } from "./YearTotals";
 
@@ -95,6 +95,7 @@ export default function QuoteDetailPage() {
                 : t("schoolLicense.quote.declinedNote")}
             </p>
           ) : null}
+          {data.status === "sent" ? <MinimumSeatsWarning quote={data} /> : null}
           <RequestedTermsNote quote={data} />
           <QuoteBreakdown quote={data} />
           <QuoteSchedule quote={data} />
@@ -105,6 +106,43 @@ export default function QuoteDetailPage() {
       ) : null}
       {data && declining ? <DeclineModal quote={data} onClose={() => setDeclining(false)} /> : null}
     </>
+  );
+}
+
+/** The student seats a quote sells (the Student AI seats), 0 when it sells none. */
+export function quoteStudentSeats(quote: Quote): number {
+  return quote.breakdown.lines.reduce(
+    (sum, line) =>
+      line.kind === "seats" && (line as SeatLine).audience === "student"
+        ? sum + (line as SeatLine).seats
+        : sum,
+    0,
+  );
+}
+
+/**
+ * Student AI's minimum seats: the school pays for at least the programme's minimum even if fewer
+ * students opt in. Shown before a quote with student seats is accepted, once Studafy has set the
+ * programme up for the school.
+ */
+function MinimumSeatsWarning({ quote }: { quote: Quote }) {
+  const { t } = useTranslation();
+  const { formatNumber } = useFormatters();
+  const studentAi = useStudentAiQuery();
+  const minSeats = studentAi.data?.programme?.minSeats ?? null;
+  if (minSeats === null || minSeats <= 0 || quoteStudentSeats(quote) === 0) return null;
+  return (
+    <div className="license-banner" data-tone="warning" role="note" data-testid="quote-minimum">
+      <div>
+        <p className="license-banner__title">
+          {t("schoolLicense.quote.minimum.title", {
+            count: minSeats,
+            seats: formatNumber(minSeats),
+          })}
+        </p>
+        <p className="license-banner__body">{t("schoolLicense.quote.minimum.body")}</p>
+      </div>
+    </div>
   );
 }
 
@@ -366,6 +404,7 @@ function AcceptModal({ quote, onClose }: { quote: Quote; onClose: () => void }) 
       })}
     >
       <Modal.Body>
+        <MinimumSeatsWarning quote={quote} />
         <p>{t("schoolLicense.quote.acceptHelp")}</p>
         <p>
           {t(`schoolLicense.schedule.plan.${quote.paymentPlan}`, {

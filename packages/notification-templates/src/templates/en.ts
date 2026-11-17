@@ -201,4 +201,24 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "{who}{released}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{released}. Open Studafy to see them.",
   },
+  [NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Student AI is available for {childName}",
+    [NOTIFICATION_CHANNELS.PUSH]:
+      "{schoolName} · {price} a month, paid with tuition · until {closesOn}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "{schoolName} offers Student AI for {childName} at {price} a month, paid with tuition. Open Studafy to opt in before {closesOn}.",
+  },
+  [NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Student AI confirmed for {childName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{months} months from {startMonth}: {total}, paid with tuition",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Student AI for {childName} at {schoolName} is confirmed for {months} months from {startMonth}: {total} in all, paid with tuition. It is committed for the school year and can't be cancelled mid-year.",
+  },
+  [NOTIFICATION_TYPES.AI_OPTIN_SUMMARY]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{newCount} new Student AI opt-ins",
+    [NOTIFICATION_CHANNELS.PUSH]:
+      "{totalCount} students opted in · {waitingCount} waiting for a seat",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "{newCount} more students opted in to Student AI. {totalCount} students have it this year, and {waitingCount} are waiting for a seat on the licence.",
+  },
 } as const satisfies LocaleTemplateSet;

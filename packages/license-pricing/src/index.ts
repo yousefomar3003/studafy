@@ -89,3 +89,15 @@ export type {
   RevenueSharePreview,
   RevenueSharePreviewInput,
 } from "./ai-programme";
+export {
+  AI_OPTIN_SOURCES,
+  AI_OPTIN_STATUSES,
+  AI_OPTIN_TERMS_VERSION,
+  LICENSE_COMMITMENTS,
+  aiOptInPeriod,
+  aiOptInTotal,
+  firstOfMonth,
+  firstOfNextMonth,
+  monthsBetween,
+} from "./ai-optin";
+export type { AiOptInPeriod, AiOptInSource, AiOptInStatus, LicenseCommitment } from "./ai-optin";

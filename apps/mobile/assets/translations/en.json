@@ -2373,7 +2373,7 @@
         },
         "fees": {
           "title": "Fees and billing",
-          "subtitle": "Invoices, payments and reminders"
+          "subtitle": "Invoices, payments, reminders and Student AI"
         },
         "schoolUpdates": {
           "title": "School updates",
@@ -2634,6 +2634,72 @@
     "otherSchools": "Children at other schools aren't covered by the {school} seat: they need your own Family+, or a seat from their school.",
     "askSchool": "{school} offers Family+ through its license. Ask the school for a parent seat.",
     "notCovered": "Family+ isn't active for your account at this school."
+  },
+  "studentAiOptIn": {
+    "title": "Student AI",
+    "home": {
+      "intro": "Your school offers Student AI for the school year, paid with tuition.",
+      "open": "See Student AI"
+    },
+    "status": {
+      "available": "Available",
+      "confirmed": "Confirmed",
+      "waitingSeat": "Waiting for a seat",
+      "ended": "Ended",
+      "closed": "Closed"
+    },
+    "screen": {
+      "intro": "Student AI is a study helper your school offers for the school year. It's paid together with tuition: the school collects it.",
+      "empty": "Student AI isn't offered for your children at this school.",
+      "loadError": "Couldn't load Student AI.",
+      "retry": "Try again"
+    },
+    "offer": {
+      "title": "Student AI for {child}",
+      "priceLine": {
+        "one": "{monthly}/month × 1 month = {total}",
+        "other": "{monthly}/month × {} months = {total}"
+      },
+      "paidWithTuition": "Paid with tuition",
+      "period": "From {start} to {end}",
+      "closesOn": "Opt in by {date}",
+      "termsTitle": "Before you confirm",
+      "termsCommitted": "It's committed for the school year and can't be cancelled mid-year.",
+      "termsTuition": "It's paid together with tuition. The school collects it.",
+      "termsFinal": "Once you confirm, it can't be undone in the app.",
+      "accept": "I understand: Student AI for {child} costs {total}, paid with tuition, and can't be cancelled mid-year.",
+      "confirm": "Confirm Student AI",
+      "confirmed": "Student AI confirmed for {child}.",
+      "errors": {
+        "priceChanged": "The price has changed. Check the new price and confirm again.",
+        "windowClosed": "Student AI opt-in has just closed at the school.",
+        "alreadyOptedIn": "Student AI is already confirmed for {child}.",
+        "notEligible": "{child} can't be opted in right now. Contact the school.",
+        "termsChanged": "The terms have changed. Read them and confirm again.",
+        "generic": "Couldn't confirm Student AI. Check your connection and try again."
+      }
+    },
+    "optedIn": {
+      "headline": "Student AI is confirmed for {child}.",
+      "period": {
+        "one": "1 month from {start}",
+        "other": "{} months from {start}"
+      },
+      "recordedBySchool": "Recorded by the school on your behalf.",
+      "transferred": "The school moved a seat to {child}.",
+      "waitingSeat": "Waiting for the school to add a seat. Student AI starts once it's added.",
+      "seatReady": "The school has a seat for {child}, so Student AI is on.",
+      "committed": "Committed for the school year. For any questions, contact the school."
+    },
+    "ended": {
+      "headline": "Student AI for {child} has ended.",
+      "released": "The seat was released. It isn't charged from {month}.",
+      "transferred": "The school moved the seat to another student."
+    },
+    "closed": {
+      "body": "Student AI opt-in is closed at {school} for now.",
+      "yourSchool": "your school"
+    }
   },
   "launch": {
     "guide": {

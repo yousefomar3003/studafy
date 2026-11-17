@@ -7,6 +7,7 @@ import {
   yearTotals,
 } from "@studafy/license-pricing";
 
+import { fillWaitingOptInSeats } from "./ai-optin";
 import { attachAiProgramme, currentAiProgrammeStamp } from "./ai-programme";
 import { auditLicenseChange, licenseError } from "./context";
 import { activateLicenseFor, integerSetting, issueInvoice, utcDate } from "./invoices";
@@ -28,6 +29,7 @@ import type { Audience, Changed } from "./service";
 import type {
   CustomInstalmentInput,
   LicenceYearTotal,
+  LicenseCommitment,
   PaymentPlan,
   PricingResult,
   ProposedInstalment,
@@ -83,6 +85,8 @@ export interface QuoteView {
   paymentPlan: PaymentPlan;
   /** The super admin's instalments, for a custom plan; null otherwise. */
   paymentSchedule: CustomInstalmentInput[] | null;
+  /** What the licence is signed with on acceptance (000235): full_year or month_to_month. */
+  commitment: LicenseCommitment;
   /**
    * The instalments the invoice would have if the quote were accepted today (the real ones are on the
    * invoice once it is).
@@ -149,6 +153,7 @@ interface QuoteRow {
   notes: string | null;
   payment_plan: PaymentPlan;
   payment_schedule: CustomInstalmentInput[] | null;
+  commitment: LicenseCommitment;
   created_by: string;
   sent_at: Date | null;
   accepted_at: Date | null;
@@ -177,7 +182,7 @@ const QUOTE_COLUMNS = (tx: TransactionSql) => tx`
   q.adjustment_minor::text AS adjustment_minor, q.adjustment_reason,
   q.list_total_minor::text AS list_total_minor, q.discount_total_minor::text AS discount_total_minor,
   q.credit_total_minor::text AS credit_total_minor, q.total_minor::text AS total_minor, q.breakdown,
-  q.priced_at, q.valid_until, q.notes, q.payment_plan, q.payment_schedule,
+  q.priced_at, q.valid_until, q.notes, q.payment_plan, q.payment_schedule, q.commitment,
   q.created_by::text AS created_by, q.sent_at, q.accepted_at,
   q.accepted_by::text AS accepted_by, q.accepted_by_platform, q.closed_at,
   q.declined_at, q.declined_by::text AS declined_by, q.decline_reason,
@@ -320,6 +325,7 @@ function toView(row: QuoteRow, preview: PreviewContext): QuoteView {
     notes: row.notes,
     paymentPlan: row.payment_plan,
     paymentSchedule: row.payment_schedule,
+    commitment: row.commitment,
     schedulePreview,
     yearTotals: yearTotals(
       schedulePreview,
@@ -421,6 +427,7 @@ function quoteSnapshot(quote: QuoteView): Record<string, unknown> {
     notes: quote.notes,
     payment_plan: quote.paymentPlan,
     payment_schedule: quote.paymentSchedule,
+    commitment: quote.commitment,
     change_request_id: quote.changeRequestId,
     terms_change_reason: quote.termsChangeReason,
   };
@@ -560,7 +567,11 @@ export async function createQuote(
   tx: TransactionSql,
   schoolId: string,
   terms: QuoteTerms &
-    QuotePaymentTerms & { notes?: string | null; changeRequestId?: string | null },
+    QuotePaymentTerms & {
+      notes?: string | null;
+      changeRequestId?: string | null;
+      commitment?: LicenseCommitment;
+    },
   actor: LicenseActor,
   now: Date = new Date(),
 ): Promise<QuoteView> {
@@ -571,6 +582,11 @@ export async function createQuote(
   const columns = pricedColumns(priced);
   // The Student AI programme values in force now: the licence is signed with them on acceptance.
   const programme = await currentAiProgrammeStamp(tx);
+  // The licence's own commitment unless the super admin chose one (000235).
+  const commitment =
+    terms.commitment ??
+    (priced.licenseId ? (await readLicense(tx, priced.licenseId))?.commitment : undefined) ??
+    "full_year";
   const payment = resolvePaymentPlan(
     terms,
     // Answering a request, the school's plan is the default.
@@ -604,7 +620,7 @@ export async function createQuote(
       parent_plan_id, parent_seats, adjustment_minor, adjustment_reason, list_total_minor,
       discount_total_minor, credit_total_minor, total_minor, breakdown, valid_until, notes,
       payment_plan, payment_schedule, created_by, change_request_id, terms_change_reason,
-      ai_programme_version_id, ai_programme_override_id
+      ai_programme_version_id, ai_programme_override_id, commitment
     ) VALUES (
       ${schoolId}::uuid, ${priced.kind}, ${priced.licenseId}::uuid, ${columns.currency_id}::uuid,
       ${columns.starts_at}, ${columns.ends_at}, ${columns.months}, ${columns.prorate_days},
@@ -617,7 +633,7 @@ export async function createQuote(
       ${terms.notes?.trim() || null}, ${payment.plan},
       ${payment.schedule ? tx.json(payment.schedule as unknown as JSONValue) : null},
       ${actor.userId}::uuid, ${terms.changeRequestId ?? null}::uuid, ${reason},
-      ${programme.versionId}::uuid, ${programme.overrideId}::uuid
+      ${programme.versionId}::uuid, ${programme.overrideId}::uuid, ${commitment}
     )
     RETURNING id::text AS id
   `;
@@ -636,7 +652,8 @@ export async function replaceQuote(
   tx: TransactionSql,
   schoolId: string,
   quoteId: string,
-  terms: Omit<QuoteTerms, "kind" | "licenseId"> & QuotePaymentTerms & { notes?: string | null },
+  terms: Omit<QuoteTerms, "kind" | "licenseId"> &
+    QuotePaymentTerms & { notes?: string | null; commitment?: LicenseCommitment },
   actor: LicenseActor,
   now: Date = new Date(),
 ): Promise<QuoteView> {
@@ -690,6 +707,7 @@ export async function replaceQuote(
       terms_change_reason = ${reason},
       ai_programme_version_id = ${programme.versionId}::uuid,
       ai_programme_override_id = ${programme.overrideId}::uuid,
+      commitment = ${terms.commitment ?? before.commitment},
       updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
     WHERE school_id = current_setting('app.school_id')::uuid AND id = ${quoteId}::uuid
   `;
@@ -939,6 +957,11 @@ export async function acceptQuote(
     merge(await extendLicense(tx, schoolId, licenseId, new Date(quote.endsAt), actor));
     await attachAiProgramme(tx, before!, programme);
   }
+  // A new licence and a renewal are signed with the quote's commitment; a seat increase keeps the
+  // licence's (000235).
+  if (quote.kind !== "seat_increase") {
+    await signCommitment(tx, schoolId, licenseId, quote.commitment, actor);
+  }
 
   const invoice = await issueInvoice(
     tx,
@@ -1003,9 +1026,39 @@ export async function acceptQuote(
     }
   }
 
+  // More seats (or a licence where there was none): Student AI opt-ins waiting for a seat get one.
+  const filled = await fillWaitingOptInSeats(tx, schoolId, licenseId, actor, now);
+  merge(filled);
+
   return {
     result: { quote: (await readQuote(tx, quoteId))!, invoice },
     versions,
-    pending: activation.pending,
+    pending: [...activation.pending, ...filled.pending],
   };
+}
+
+/** Set a licence's commitment, audited, when it changes. Leaves `updated_at` alone. */
+async function signCommitment(
+  tx: TransactionSql,
+  schoolId: string,
+  licenseId: string,
+  commitment: LicenseCommitment,
+  actor: LicenseActor,
+): Promise<void> {
+  const [changed] = await tx<{ before: LicenseCommitment }[]>`
+    UPDATE app.school_licenses AS l SET commitment = ${commitment}
+    FROM (SELECT commitment FROM app.school_licenses
+          WHERE school_id = current_setting('app.school_id')::uuid AND id = ${licenseId}::uuid) AS old
+    WHERE l.school_id = current_setting('app.school_id')::uuid AND l.id = ${licenseId}::uuid
+      AND l.commitment <> ${commitment}
+    RETURNING old.commitment AS before
+  `;
+  if (!changed) return;
+  await auditLicenseChange(tx, schoolId, actor, {
+    action: "update",
+    targetTable: "school_licenses",
+    targetId: licenseId,
+    oldValues: { commitment: changed.before },
+    newValues: { commitment },
+  });
 }

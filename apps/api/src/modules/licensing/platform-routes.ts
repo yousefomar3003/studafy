@@ -9,6 +9,7 @@ import { openApiValidationHook } from "../../openapi/hook";
 import { standardResponses } from "../../openapi/responses";
 import { AUTH_CHANNELS } from "../auth/channels";
 
+import { fillWaitingOptInSeats } from "./ai-optin";
 import { licenseError } from "./context";
 import {
   assignSeatsBodySchema,
@@ -229,7 +230,7 @@ const unassignSeatRoute = createRoute({
   request: { params: platformSeatParamsSchema },
   responses: standardResponses(
     { 200: { description: "The freed seat", schema: unassignSeatResponseSchema } },
-    [401, 403, 404],
+    [401, 403, 404, 409],
   ),
 });
 
@@ -387,7 +388,14 @@ export function platformLicenseRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> 
         },
         actor,
       );
-      return { ...changed, result: await platformLicenseView(tx, changed.result) };
+      // More student seats: Student AI opt-ins waiting for one get it (000235).
+      const filled = await fillWaitingOptInSeats(tx, schoolId, licenseId, actor);
+      for (const [userId, version] of filled.versions) changed.versions.set(userId, version);
+      return {
+        ...changed,
+        pending: [...changed.pending, ...filled.pending],
+        result: await platformLicenseView(tx, (await readLicense(tx, licenseId))!),
+      };
     });
     return c.json(result, 200);
   });

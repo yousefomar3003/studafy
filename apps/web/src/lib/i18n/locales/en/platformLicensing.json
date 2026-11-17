@@ -286,7 +286,10 @@
       "plan": "Payment plan",
       "open": "Left to Studafy",
       "proposalRow": "{{date}}: {{percent}}% of the total"
-    }
+    },
+    "commitmentLabel": "Commitment",
+    "commitmentDefault": "Keep the licence's (full year for a new licence)",
+    "commitmentHelp": "Full year: the school's whole academic year, can't be cancelled. Month to month: cancellable, with no revenue share by default."
   },
   "quotes": {
     "title": "Quotes",
@@ -392,7 +395,8 @@
     "done": {
       "resolved": "Request resolved.",
       "declined": "Request declined."
-    }
+    },
+    "automatic": "Automatic · Student AI opt-ins"
   },
   "payments": {
     "title": "Payments",
@@ -612,7 +616,9 @@
     "assignPicked_one": "Assign {{count}} person",
     "assignPicked_other": "Assign {{count}} people",
     "assignedCount_one": "{{count}} seat assigned ({{skipped}} not).",
-    "assignedCount_other": "{{count}} seats assigned ({{skipped}} not)."
+    "assignedCount_other": "{{count}} seats assigned ({{skipped}} not).",
+    "programme": "Student AI (whole year)",
+    "programmeLocked": "Held by a Student AI opt-in for the year: it can't be unassigned. The school transfers or releases it when the student leaves."
   },
   "history": {
     "byStudafy": "by Studafy",
@@ -849,5 +855,10 @@
     "applyFromTo": "From version {{from}} to version {{to}}.",
     "applyConfirm": "Apply settings",
     "applied": "Current settings applied to the licence."
+  },
+  "commitment": {
+    "label": "Commitment",
+    "full_year": "Full year committed",
+    "month_to_month": "Month to month"
   }
 }

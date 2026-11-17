@@ -18,6 +18,7 @@ export type FeatureStatus = Schemas["FeatureStatus"];
 export type ConsoleTier = Schemas["ConsoleTier"];
 export type LicenseAudience = Schemas["LicenseAudience"];
 export type LicenseStatus = Schemas["LicenseStatus"];
+export type LicenseCommitment = Schemas["LicenseCommitment"];
 export type PriceSettings = Schemas["LicensePriceSettings"];
 export type BankDetails = NonNullable<Schemas["LicenseBankDetails"]>;
 export type QuoteCalculation = Schemas["LicenseQuoteCalculation"];

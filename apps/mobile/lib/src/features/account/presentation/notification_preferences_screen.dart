@@ -44,6 +44,10 @@ NotificationCategory notificationCategoryOf(String type) => switch (type) {
   'SUPPORT_MESSAGE' ||
   'STUDY_GROUP_INVITE' => NotificationCategory.messages,
   'ANNOUNCEMENT' || 'ADMIN_ANNOUNCEMENT' => NotificationCategory.announcements,
+  // Student AI for a child is paid with tuition, so the parent's notices sit with fees; the
+  // leadership's daily opt-in summary is a school update.
+  'AI_OPTIN_AVAILABLE' || 'AI_OPTIN_CONFIRMED' => NotificationCategory.fees,
+  'AI_OPTIN_SUMMARY' => NotificationCategory.schoolUpdates,
   _ when type.startsWith('FEE_') || type.startsWith('LICENSE_') => NotificationCategory.fees,
   _ => NotificationCategory.schoolUpdates,
 };

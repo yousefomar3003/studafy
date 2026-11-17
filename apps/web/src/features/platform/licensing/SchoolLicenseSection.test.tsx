@@ -62,6 +62,7 @@ function license(status: "active" | "suspended" | "awaiting_payment") {
       nonpaymentGraceDays: 30,
       current: false,
     },
+    commitment: "full_year",
   };
 }
 
@@ -158,10 +159,24 @@ const getMock = mock((path: string, _init?: unknown) => {
             assignedAt: "2026-09-02T00:00:00.000Z",
             assignedByPlatform: false,
             unassignedAt: null,
+            programme: false,
+            overlap: null,
+          },
+          {
+            seatId: "99999999-9999-4999-8999-999999999999",
+            userId: OTHER_USER,
+            studentId: "s-2",
+            audience: "student",
+            name: "Lina Haddad",
+            email: "lina@alpha.test",
+            assignedAt: "2026-09-03T00:00:00.000Z",
+            assignedByPlatform: false,
+            unassignedAt: null,
+            programme: true,
             overlap: null,
           },
         ],
-        total: 1,
+        total: 2,
       },
     });
   }
@@ -295,6 +310,7 @@ describe("SchoolLicenseSection", () => {
     expect(within(usage).getByText("1,200 messages")).toBeTruthy();
     expect(within(usage).getByText("35 submissions")).toBeTruthy();
     expect(screen.getByText("Nothing owed")).toBeTruthy();
+    expect(screen.getByTestId("license-commitment").textContent).toBe("Full year committed");
 
     const history = screen.getByRole("list", { name: "History" });
     expect(within(history).getByText(/→ active/)).toBeTruthy();
@@ -405,6 +421,17 @@ describe("SchoolLicenseSection", () => {
       seatId: SEAT_ID,
     });
     expect(await screen.findByText("Seat unassigned.")).toBeTruthy();
+  });
+
+  test("a Student AI seat held for the year is marked and can't be unassigned", async () => {
+    await renderSection();
+    const button = await screen.findByRole("button", { name: "Unassign Lina Haddad" });
+    const row = button.closest("tr")!;
+    expect(within(row).getByTestId("programme-seat").textContent).toBe("Student AI (whole year)");
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: "Unassign Sara Ali" }) as HTMLButtonElement).disabled,
+    ).toBe(false);
   });
 
   test("assigns seats to people picked from the school", async () => {

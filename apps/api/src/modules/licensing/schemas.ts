@@ -3,6 +3,7 @@ import { FEATURE_KEYS, FEATURE_USAGE_UNITS } from "@studafy/constants";
 import {
   MAX_CUSTOM_INSTALMENTS,
   MAX_REQUEST_MONTHS,
+  LICENSE_COMMITMENTS,
   MIN_REQUEST_MONTHS,
   SCHOOL_PAYMENT_PLANS,
   SHARE_SCALE,
@@ -18,6 +19,8 @@ import { AUDIENCES, LICENSE_STATUSES, MAX_ASSIGN_USER_IDS } from "./service";
 
 export const audienceSchema = z.enum(AUDIENCES).openapi("LicenseAudience");
 export const licenseStatusSchema = z.enum(LICENSE_STATUSES).openapi("LicenseStatus");
+/** full_year: the whole academic year, cannot be cancelled; month_to_month: cancellable (000235). */
+export const licenseCommitmentSchema = z.enum(LICENSE_COMMITMENTS).openapi("LicenseCommitment");
 
 const uuid = z.string().uuid();
 
@@ -146,6 +149,7 @@ export const licenseSchema = z
           "null unless the licence is suspended for that. Recording the payment resumes it.",
       }),
     nextAiStop: aiStopSchema.nullable(),
+    commitment: licenseCommitmentSchema,
   })
   .openapi("SchoolLicense");
 
@@ -260,6 +264,11 @@ const seatSchema = z
     assignedAt: z.string().datetime(),
     assignedByPlatform: z.boolean(),
     unassignedAt: z.string().datetime().nullable(),
+    programme: z.boolean().openapi({
+      description:
+        "True when a Student AI opt-in holds the seat for the year: it cannot be unassigned (409 " +
+        "LICENSE_SEAT_PROGRAMME_LOCKED), only transferred or released when the student leaves.",
+    }),
     overlap: seatOverlapSchema.nullable(),
   })
   .openapi("LicenseSeat");
@@ -427,6 +436,11 @@ export const changeRequestSchema = z
     startsOn: isoDay.nullable(),
     paymentPlan: schoolPaymentPlan().nullable(),
     paymentProposal: z.array(proposedInstalmentSchema).nullable(),
+    source: z.enum(["school", "ai_optin"]).openapi("LicenseChangeRequestSource", {
+      description:
+        "school: asked by the school; ai_optin: opened automatically because Student AI opt-ins " +
+        "need more seats than the licence has (the larger of the opt-ins and the minimum).",
+    }),
   })
   .openapi("LicenseChangeRequest");
 

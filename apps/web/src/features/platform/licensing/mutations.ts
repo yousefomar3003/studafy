@@ -93,7 +93,14 @@ export function useSaveBankDetails() {
 
 export function useCreateQuote() {
   return useLicensingMutation(
-    async (input: { schoolId: string; body: QuoteCalculateBody & { notes?: string | null } }) => {
+    async (input: {
+      schoolId: string;
+      body: QuoteCalculateBody & {
+        notes?: string | null;
+        /** Unset keeps the licence's commitment (full year for a new licence). */
+        commitment?: Schemas["LicenseCommitment"];
+      };
+    }) => {
       const { schoolId: _ignored, ...body } = input.body;
       const { data } = await api.POST("/api/platform/schools/{schoolId}/license-quotes", {
         params: { path: { schoolId: input.schoolId } },

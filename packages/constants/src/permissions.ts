@@ -154,6 +154,10 @@ export const PERMISSIONS = {
   // request a change.
   LICENSE_READ: "license:read",
   LICENSE_MANAGE: "license:manage",
+  // A parent opts their own linked child into Student AI while the school's opt-in window is open
+  // (docs/billing/ai-programme.md, phase 2). Row scope is app.is_related_to_student: a parent sees and
+  // opts in only their own children. Held by PARENT alone.
+  STUDENT_AI_OPT_IN: "studentAi:optIn",
 
   AUDIT_LOG_READ: "auditLog:read",
   AUDIT_LOG_EXPORT: "auditLog:export",
@@ -301,7 +305,10 @@ const ORG_ADMIN_PERMISSIONS: readonly Permission[] = ALL_PERMISSIONS.filter(
     // officer and the principal; the school admin views it.
     permission !== PERMISSIONS.ATTENDANCE_RECORD_CREATE &&
     permission !== PERMISSIONS.ATTENDANCE_RECORD_CORRECT &&
-    permission !== PERMISSIONS.ATTENDANCE_CORRECTION_OVERRIDE,
+    permission !== PERMISSIONS.ATTENDANCE_CORRECTION_OVERRIDE &&
+    // A parent's own commitment for their child: the school records it on the parent's behalf
+    // through license:manage instead (Student AI opt-in, 000235).
+    permission !== PERMISSIONS.STUDENT_AI_OPT_IN,
 );
 
 const INSTRUCTOR_PERMISSIONS: readonly Permission[] = [
@@ -433,6 +440,8 @@ const PARENT_PERMISSIONS: readonly Permission[] = [
   // Row scope is app.is_related_to_student, as for every other child-scoped read above. A parent
   // enters nothing: no studentRecord:update.
   PERMISSIONS.STUDENT_RECORD_READ,
+  // Opt their own child into Student AI while the school's window is open; never undo it.
+  PERMISSIONS.STUDENT_AI_OPT_IN,
 ];
 
 const GUEST_PERMISSIONS: readonly Permission[] = [PERMISSIONS.COURSE_READ, PERMISSIONS.LESSON_READ];

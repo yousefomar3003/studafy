@@ -500,6 +500,14 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/school/license/seats",
   "DELETE /api/school/license/seats/{seatId}",
   "POST /api/school/license/change-requests",
+  // Student AI opt-in (000235): the school's on license:manage, a parent's on studentAi:optIn, in
+  // modules/licensing/ai-optin-routes.ts.
+  "POST /api/school/license/student-ai/windows",
+  "POST /api/school/license/student-ai/windows/{windowId}/close",
+  "POST /api/school/license/student-ai/opt-ins",
+  "POST /api/school/license/student-ai/opt-ins/{optInId}/transfer",
+  "POST /api/school/license/student-ai/opt-ins/{optInId}/release",
+  "POST /api/parent/student-ai/opt-ins",
   // License billing (session 3): the console's routes on platform:manage (web channel), the
   // school's accept and receipt upload on license:manage, in modules/licensing/billing-*-routes.ts.
   "PUT /api/platform/licenses/price-settings/{currencyCode}",

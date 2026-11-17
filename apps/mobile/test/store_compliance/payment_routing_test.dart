@@ -28,8 +28,12 @@ void main() {
   });
 
   test('no hand-written code reaches a digital-goods purchase route', () {
-    // Web pages that sell a digital subscription, and the API routes behind them.
-    final purchasePaths = RegExp(r'''['"/](account/ai|billing|pricing)\b|/api/subscriptions''');
+    // Web pages that sell a digital subscription, and the API routes behind them. A JSON map key
+    // read (`json['pricing']`, the parent Student AI offer's price block) is not a route: `/pricing`
+    // and `'/billing'` still match through their slash.
+    final purchasePaths = RegExp(
+      r'''(?<!\[)['"/](account/ai|billing|pricing)\b|/api/subscriptions''',
+    );
     // Generated `SubscriptionsClient` methods that start, manage or cancel a paid plan.
     final purchaseCalls = RegExp(
       r'\.(createCheckoutSession|createAiCheckoutSession|createSchoolCheckoutSession|'

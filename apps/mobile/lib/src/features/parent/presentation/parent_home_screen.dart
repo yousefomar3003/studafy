@@ -4,16 +4,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/features/features_providers.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/parent_providers.dart';
+import '../application/student_ai_providers.dart';
 import 'widgets/child_summary.dart';
 import 'widgets/child_switcher.dart';
 import 'widgets/family_plus_coverage_card.dart';
 import 'widgets/parent_notifications_card.dart';
 import 'widgets/parent_recent_grades_card.dart';
+import 'widgets/student_ai_home_card.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 
 /// The parent home tab: a switcher across the parent's linked children, the selected child's
 /// per-term summary (attendance, latest grades, fees due), the newest exam marks and assignment
-/// grades across all the children, and the combined notifications feed.
+/// grades across all the children, Student AI for the children the school offers it to, and the
+/// combined notifications feed.
 ///
 /// Each card owns its provider and its own loading / empty / error state, so a slow finance
 /// lookup never holds up attendance from rendering. Pull-to-refresh re-runs them all.
@@ -30,6 +33,7 @@ class ParentHomeScreen extends ConsumerWidget {
           ..invalidate(familyFinanceProvider)
           ..invalidate(parentNotificationsProvider)
           ..invalidate(parentRecentGradesProvider)
+          ..invalidate(studentAiOffersProvider)
           ..invalidate(myFeaturesProvider);
       },
       child: ListView(
@@ -41,6 +45,8 @@ class ParentHomeScreen extends ConsumerWidget {
           SizedBox(height: AppSpacing.space16),
           ParentRecentGradesCard(),
           SizedBox(height: AppSpacing.space16),
+          // Only when the school offered Student AI to a child; brings its own gap below.
+          StudentAiHomeCard(),
           FamilyPlusCoverageCard(),
           SizedBox(height: AppSpacing.space16),
           ParentNotificationsCard(),

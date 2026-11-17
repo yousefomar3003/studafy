@@ -161,6 +161,9 @@ IconData _iconFor(String type) => switch (type) {
   'FEE_PAYMENT_RECEIVED' ||
   'FEE_PAYMENT_REMINDER' ||
   'FEE_STATEMENT' => Icons.receipt_long_outlined,
+  'AI_OPTIN_AVAILABLE' ||
+  'AI_OPTIN_CONFIRMED' ||
+  'AI_OPTIN_SUMMARY' => Icons.auto_awesome_outlined,
   _ => Icons.notifications_none_outlined,
 };
 

@@ -20,6 +20,7 @@ let endsInDays = 200;
 let overdue: unknown[] = [];
 let hasLicense = true;
 let licenseExtra: Record<string, unknown> = {};
+let requestSource = "school";
 
 function overview() {
   return {
@@ -45,6 +46,7 @@ function overview() {
           ],
           nonpaymentSuspendedAt: null,
           nextAiStop: null,
+          commitment: "full_year",
           ...licenseExtra,
         },
     usage: [
@@ -73,6 +75,7 @@ function overview() {
         startsOn: null,
         paymentPlan: "yearly",
         paymentProposal: null,
+        source: requestSource,
       },
     ],
   };
@@ -159,6 +162,7 @@ afterEach(() => {
   cleanup();
   hasLicense = true;
   licenseExtra = {};
+  requestSource = "school";
   endsInDays = 200;
   overdue = [];
   getMock.mockClear();
@@ -174,6 +178,7 @@ describe("LicensePage", () => {
     // Family+ is not built yet: no Family+ fact on a license without it.
     expect(screen.queryByText("Family+", { selector: "dt" })).toBeNull();
     await waitFor(() => expect(facts("Balance due")).toBe("$600.00"));
+    expect(facts("Commitment")).toBe("Full year committed");
 
     const table = within(
       await screen.findByRole("table", { name: "Seats and what each group gets" }),
@@ -200,6 +205,23 @@ describe("LicensePage", () => {
     expect(
       requests.getByText(/60 student seats · Student Pro for Students · 12 months · paid yearly/),
     ).toBeTruthy();
+    expect(requests.queryByTestId("request-automatic")).toBeNull();
+  });
+
+  test("a seat request Student AI opt-ins opened on their own is marked automatic", async () => {
+    requestSource = "ai_optin";
+    licenseExtra = { commitment: "month_to_month" };
+    await renderPage();
+    const requests = within(
+      await screen.findByRole("region", { name: "Requests waiting for Studafy" }),
+    );
+    expect(requests.getByTestId("request-automatic").textContent).toBe(
+      "Automatic · Student AI opt-ins",
+    );
+    expect(
+      screen.getByText("Commitment", { selector: "dt" }).parentElement!.querySelector("dd")!
+        .textContent,
+    ).toBe("Month to month");
   });
 
   test("warns when seats are almost full, the license ends soon and an invoice is overdue", async () => {

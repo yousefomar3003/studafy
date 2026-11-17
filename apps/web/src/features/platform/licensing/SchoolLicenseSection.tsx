@@ -200,6 +200,10 @@ function LicenseSummary({
               </dd>
             </>
           ) : null}
+          <dt>{t("platformLicensing.commitment.label")}</dt>
+          <dd data-testid="license-commitment">
+            {t(`platformLicensing.commitment.${license.commitment}`)}
+          </dd>
           <dt>{t("platformLicensing.school.currency")}</dt>
           <dd>{license.currencyCode}</dd>
           <dt>{t("platformLicensing.school.balance")}</dt>
@@ -481,6 +485,11 @@ function SeatsCard({
                           <div className="platform-cell-stack">
                             <span>{seat.name}</span>
                             <span className="platform-muted">{seat.email}</span>
+                            {seat.programme ? (
+                              <span className="platform-pill" data-testid="programme-seat">
+                                {t("platformLicensing.seats.programme")}
+                              </span>
+                            ) : null}
                           </div>
                         </td>
                         <td>
@@ -502,7 +511,12 @@ function SeatsCard({
                         <td>
                           <Button
                             variant="tertiary"
-                            disabled={unassign.isPending}
+                            disabled={unassign.isPending || seat.programme}
+                            title={
+                              seat.programme
+                                ? t("platformLicensing.seats.programmeLocked")
+                                : undefined
+                            }
                             onClick={() => remove(seat.seatId)}
                             aria-label={t("platformLicensing.seats.unassignNamed", {
                               name: seat.name,

@@ -150,6 +150,7 @@ import { inquiryRoutes } from "./modules/inquiries";
 import {
   platformLicenseBillingRoutes,
   platformLicenseConsoleRoutes,
+  aiOptInRoutes,
   platformAiProgrammeRoutes,
   platformLicenseRoutes,
   schoolLicenseBillingRoutes,
@@ -1285,6 +1286,9 @@ export function createApp({
     // The Student AI programme's settings (000234): global and per-school versions, and the values a
     // licence was signed with.
     app.route("/", platformAiProgrammeRoutes(licensingDeps));
+    // Student AI opt-in (000235): the school's windows, opt-ins and programme seats, and a parent's
+    // opt-in for their own children.
+    app.route("/", aiOptInRoutes(licensingDeps));
   }
 
   // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with

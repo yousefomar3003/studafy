@@ -567,6 +567,34 @@ export const ERROR_CODES = {
   AI_PROGRAMME_CURRENCY_INVALID: "AI_PROGRAMME_CURRENCY_INVALID",
   AI_PROGRAMME_REASON_REQUIRED: "AI_PROGRAMME_REASON_REQUIRED",
   AI_PROGRAMME_VERSION_CONFLICT: "AI_PROGRAMME_VERSION_CONFLICT",
+  // Student AI opt-in and programme seats (000235). AI_OPTIN_NO_LICENCE: no licence with student seats
+  // (active or awaiting payment) to open a window on. AI_OPTIN_PRICE_MISSING: no parent price in the
+  // licence's currency. AI_OPTIN_WINDOW_INVALID: dates out of order or past the academic year, or a
+  // grade/section not of that year. AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED: opening the window needs the
+  // school to accept the programme's minimum seats. AI_OPTIN_WINDOW_CLOSED: no window open today.
+  // AI_OPTIN_WINDOW_ALREADY_OPEN: close the current window before opening another.
+  // AI_OPTIN_NOT_ELIGIBLE: not an enrolled student of the window's grades/sections (or not the
+  // caller's child). AI_OPTIN_ALREADY_OPTED_IN: one per student per year. AI_OPTIN_YEAR_OVER: no
+  // months left. AI_OPTIN_TERMS_REQUIRED: the terms were not accepted, or an older version was.
+  // AI_OPTIN_PRICE_CHANGED: the total the parent saw is no longer the price. AI_OPTIN_ENDED: already
+  // released or transferred. AI_OPTIN_STUDENT_NOT_LEFT: a seat is transferred or released only for a
+  // student who left. LICENSE_SEAT_PROGRAMME_LOCKED: a programme seat cannot be unassigned.
+  AI_OPTIN_NO_LICENCE: "AI_OPTIN_NO_LICENCE",
+  AI_OPTIN_PRICE_MISSING: "AI_OPTIN_PRICE_MISSING",
+  AI_OPTIN_WINDOW_INVALID: "AI_OPTIN_WINDOW_INVALID",
+  AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED: "AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED",
+  AI_OPTIN_WINDOW_CLOSED: "AI_OPTIN_WINDOW_CLOSED",
+  AI_OPTIN_WINDOW_ALREADY_OPEN: "AI_OPTIN_WINDOW_ALREADY_OPEN",
+  AI_OPTIN_WINDOW_NOT_FOUND: "AI_OPTIN_WINDOW_NOT_FOUND",
+  AI_OPTIN_NOT_ELIGIBLE: "AI_OPTIN_NOT_ELIGIBLE",
+  AI_OPTIN_ALREADY_OPTED_IN: "AI_OPTIN_ALREADY_OPTED_IN",
+  AI_OPTIN_YEAR_OVER: "AI_OPTIN_YEAR_OVER",
+  AI_OPTIN_TERMS_REQUIRED: "AI_OPTIN_TERMS_REQUIRED",
+  AI_OPTIN_PRICE_CHANGED: "AI_OPTIN_PRICE_CHANGED",
+  AI_OPTIN_NOT_FOUND: "AI_OPTIN_NOT_FOUND",
+  AI_OPTIN_ENDED: "AI_OPTIN_ENDED",
+  AI_OPTIN_STUDENT_NOT_LEFT: "AI_OPTIN_STUDENT_NOT_LEFT",
+  LICENSE_SEAT_PROGRAMME_LOCKED: "LICENSE_SEAT_PROGRAMME_LOCKED",
 
   // Third-party AI data-sharing consent (ST-305). AI_CONSENT_REQUIRED is the consent gate's refusal:
   // the caller has no live consent for the current disclosure, so nothing was sent to the model

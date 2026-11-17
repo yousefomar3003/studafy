@@ -93,6 +93,9 @@ void main() {
     expect(notificationCategoryOf('ENROLLMENT_APPROVED'), NotificationCategory.schoolUpdates);
     expect(notificationCategoryOf('MATERIAL_PUBLISHED'), NotificationCategory.lessons);
     expect(notificationCategoryOf('MARKS_RELEASED'), NotificationCategory.grades);
+    expect(notificationCategoryOf('AI_OPTIN_AVAILABLE'), NotificationCategory.fees);
+    expect(notificationCategoryOf('AI_OPTIN_CONFIRMED'), NotificationCategory.fees);
+    expect(notificationCategoryOf('AI_OPTIN_SUMMARY'), NotificationCategory.schoolUpdates);
   });
 
   testWidgets('one switch turns off every type in the kind, in a single save', (tester) async {

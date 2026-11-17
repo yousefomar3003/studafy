@@ -8,7 +8,7 @@ import {
   PLATFORM_INVOICE_PAGE_MAX,
 } from "./invoices";
 import { QUOTE_STATUSES } from "./quotes";
-import { audienceSchema, proposedInstalmentSchema } from "./schemas";
+import { audienceSchema, licenseCommitmentSchema, proposedInstalmentSchema } from "./schemas";
 import { AUDIENCES } from "./service";
 
 /**
@@ -324,6 +324,11 @@ const paymentTermsShape = {
     }),
 };
 
+// The commitment the licence is signed with when the quote is accepted (a new licence or an
+// extension; a seat increase keeps the licence's); defaults to the licence's, else full_year. No
+// description here: one on an optional $ref breaks the Dart client generator.
+const commitmentInput = licenseCommitmentSchema.optional();
+
 export const quoteBodySchema = z
   .object({
     kind: quoteKindSchema,
@@ -339,6 +344,7 @@ export const quoteBodySchema = z
       }),
     ...termsShape,
     ...paymentTermsShape,
+    commitment: commitmentInput,
     notes: z.string().trim().min(1).max(2000).nullable().optional(),
   })
   .openapi("LicenseQuoteBody");
@@ -347,6 +353,7 @@ export const quoteReplaceBodySchema = z
   .object({
     ...termsShape,
     ...paymentTermsShape,
+    commitment: commitmentInput,
     notes: z.string().trim().min(1).max(2000).nullable().optional(),
   })
   .openapi("LicenseQuoteReplaceBody");
@@ -435,6 +442,7 @@ export const quoteSchema = z
     notes: z.string().nullable(),
     paymentPlan: paymentPlanSchema,
     paymentSchedule: z.array(customInstalmentSchema).nullable(),
+    commitment: licenseCommitmentSchema,
     schedulePreview: z.array(scheduledInstalmentSchema).openapi({
       description:
         "The instalments the invoice would have if the quote were accepted today; the invoice " +

@@ -385,6 +385,11 @@
       "where": "License › Seats",
       "keywords": "seats, assign seats, seat usage, licensed users, seat count, free seats"
     },
+    "license-student-ai": {
+      "title": "Student AI opt-in",
+      "where": "License › Student AI",
+      "keywords": "student ai, opt in, opt-in window, parents choose ai, record on behalf, transfer seat, release seat, minimum seats, ai with tuition, admission numbers csv"
+    },
     "license-quotes": {
       "title": "License quotes",
       "where": "License › Quotes",

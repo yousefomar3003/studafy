@@ -38,6 +38,7 @@ function quote(overrides: Record<string, unknown> = {}) {
     totalMinor: 406_400,
     paymentPlan: "in_full",
     paymentSchedule: null,
+    commitment: "full_year",
     schedulePreview: [{ position: 1, amountMinor: 406_400, dueDate: "2026-12-01" }],
     yearTotals: [
       {
@@ -101,6 +102,26 @@ function quote(overrides: Record<string, unknown> = {}) {
 }
 
 let current = quote();
+/** The Student AI programme's minimum seats for the school; null when it isn't set up. */
+let minSeats: number | null = 30;
+
+function studentAi() {
+  return {
+    license: null,
+    programme:
+      minSeats === null
+        ? null
+        : { currencyCode: "USD", minorUnit: 2, monthlyPriceMinor: 600, minSeats },
+    window: null,
+    pricingToday: null,
+    counts: { eligible: 0, optedIn: 0, waitingForSeat: 0, released: 0, transferred: 0 },
+    seatsNeeded: minSeats ?? 0,
+    openSeatRequest: null,
+    blocker: "no_licence",
+    termsVersion: "2026-11",
+    today: "2026-11-17",
+  };
+}
 
 const getMock = mock((path: string) => {
   if (path === "/api/school/license/quotes/{quoteId}") return Promise.resolve({ data: current });
@@ -110,6 +131,7 @@ const getMock = mock((path: string) => {
   if (path === "/api/school/license/invoices") {
     return Promise.resolve({ data: { invoices: [], status: "overdue" } });
   }
+  if (path === "/api/school/license/student-ai") return Promise.resolve({ data: studentAi() });
   throw new Error(`Unhandled GET ${path}`);
 });
 const postMock = mock((path: string, _init?: unknown) => {
@@ -148,6 +170,7 @@ async function renderPage(role = "PRINCIPAL") {
 afterEach(() => {
   cleanup();
   current = quote();
+  minSeats = 30;
   getMock.mockClear();
   postMock.mockClear();
 });
@@ -284,6 +307,46 @@ describe("QuoteDetailPage", () => {
     expect(
       await screen.findByText("Quote accepted. Invoice LIC-2026-000043 is ready."),
     ).toBeTruthy();
+  });
+
+  test("warns that the school pays for Student AI's minimum seats before it accepts", async () => {
+    await renderPage();
+    const warning = await screen.findByTestId("quote-minimum");
+    expect(warning.textContent).toContain(
+      "Student AI: the school pays for at least 30 student seats",
+    );
+    expect(warning.textContent).toContain("Even if fewer students opt in");
+
+    fireEvent.click(screen.getByRole("button", { name: "Accept quote" }));
+    const dialog = await screen.findByRole("dialog", { name: "Accept this quote?" });
+    expect(within(dialog).getByTestId("quote-minimum").textContent).toContain(
+      "at least 30 student seats",
+    );
+  });
+
+  test("no minimum warning without student seats or before the programme is set up", async () => {
+    minSeats = null;
+    await renderPage();
+    await screen.findByRole("table", { name: "Price breakdown" });
+    await waitFor(() =>
+      expect(getMock.mock.calls.some(([path]) => path === "/api/school/license/student-ai")).toBe(
+        true,
+      ),
+    );
+    expect(screen.queryByTestId("quote-minimum")).toBeNull();
+    cleanup();
+
+    minSeats = 30;
+    const base = quote();
+    current = quote({
+      breakdown: {
+        ...base.breakdown,
+        lines: [{ ...base.breakdown.lines[0], audience: "teacher" }],
+      },
+    });
+    await renderPage();
+    await screen.findByRole("table", { name: "Price breakdown" });
+    expect(screen.queryByTestId("quote-minimum")).toBeNull();
   });
 
   test("an expired or accepted quote cannot be accepted", async () => {

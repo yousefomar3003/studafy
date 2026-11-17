@@ -98,6 +98,15 @@ describe("templates — completeness", () => {
                       "subjectName",
                       "released",
                       "stopDate",
+                      "childName",
+                      "price",
+                      "closesOn",
+                      "months",
+                      "total",
+                      "startMonth",
+                      "newCount",
+                      "totalCount",
+                      "waitingCount",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -262,6 +271,24 @@ describe("renderNotification — snapshot tests", () => {
       who: "Amina Tazi · ",
       subjectName: "Mathematics",
       released: "First exam marks are out for Mathematics",
+    },
+    [NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE]: {
+      childName: "Amina Tazi",
+      schoolName: "Amman Academy",
+      price: "6.00 USD",
+      closesOn: "2026-12-15",
+    },
+    [NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED]: {
+      childName: "Amina Tazi",
+      schoolName: "Amman Academy",
+      months: "8",
+      total: "48.00 USD",
+      startMonth: "2026-11",
+    },
+    [NOTIFICATION_TYPES.AI_OPTIN_SUMMARY]: {
+      newCount: "12",
+      totalCount: "48",
+      waitingCount: "3",
     },
   } as const;
 

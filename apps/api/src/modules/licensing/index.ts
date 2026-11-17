@@ -11,6 +11,14 @@ export { platformLicenseBillingRoutes } from "./billing-platform-routes";
 export { schoolLicenseBillingRoutes } from "./billing-school-routes";
 export { platformLicenseConsoleRoutes } from "./console-routes";
 export { platformAiProgrammeRoutes } from "./ai-programme-routes";
+export { aiOptInRoutes } from "./ai-optin-routes";
+export {
+  fillWaitingOptInSeats,
+  parentOffers,
+  schoolAiOptInOverview,
+  type AiOptInView,
+  type AiOptInWindowView,
+} from "./ai-optin";
 export {
   INITIAL_AI_PROGRAMME_VERSION_ID,
   attachAiProgramme,

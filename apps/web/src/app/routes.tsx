@@ -319,6 +319,10 @@ const LicenseSeatsPage = lazyWithCatalogs(
   LICENSE_CATALOGS,
   () => import("../features/license/SeatsPage"),
 );
+const LicenseStudentAiPage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/StudentAiPage"),
+);
 const LicenseQuotesPage = lazyWithCatalogs(
   LICENSE_CATALOGS,
   () => import("../features/license/QuotesPage"),
@@ -1271,6 +1275,9 @@ export const routes: RouteObject[] = [
             [
               ["license", <LicensePage key="license" />],
               ["license/seats", <LicenseSeatsPage key="seats" />],
+              // Student AI opt-in (000235): opening a window, recording choices and moving or
+              // releasing a left student's seat need `license:manage` too.
+              ["license/student-ai", <LicenseStudentAiPage key="student-ai" />],
               ["license/quotes", <LicenseQuotesPage key="quotes" />],
               ["license/quotes/:quoteId", <LicenseQuotePage key="quote" />],
               ["license/invoices", <LicenseInvoicesPage key="invoices" />],

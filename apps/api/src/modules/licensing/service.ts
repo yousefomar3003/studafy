@@ -32,7 +32,11 @@ import type { StorageService } from "../../lib/storage";
 import type { Logger } from "../../logger";
 import type { RedisClient } from "../../redis";
 import type { FeatureKey, FeatureUsageUnit } from "@studafy/constants";
-import type { ProposedInstalment, SchoolPaymentPlan } from "@studafy/license-pricing";
+import type {
+  LicenseCommitment,
+  ProposedInstalment,
+  SchoolPaymentPlan,
+} from "@studafy/license-pricing";
 import type { JSONValue, TransactionSql } from "postgres";
 
 /**
@@ -114,6 +118,8 @@ export interface LicenseRecord {
   aiProgrammeAppliedAt: Date;
   /** Days after an unpaid instalment's due date that its AI stops, from those values (000234). */
   nonpaymentGraceDays: number;
+  /** full_year (cannot be cancelled) or month_to_month (000235). */
+  commitment: LicenseCommitment;
 }
 
 export interface LicenseRow {
@@ -141,6 +147,7 @@ export interface LicenseRow {
   ai_programme_override_id: string | null;
   ai_programme_applied_at: Date;
   nonpayment_grace_days: number;
+  commitment: LicenseCommitment;
 }
 
 function toRecord(row: LicenseRow): LicenseRecord {
@@ -169,6 +176,7 @@ function toRecord(row: LicenseRow): LicenseRecord {
     aiProgrammeOverrideId: row.ai_programme_override_id,
     aiProgrammeAppliedAt: row.ai_programme_applied_at,
     nonpaymentGraceDays: row.nonpayment_grace_days,
+    commitment: row.commitment,
   };
 }
 
@@ -194,7 +202,7 @@ const LICENSE_COLUMNS = (tx: TransactionSql) => tx`
   l.activated_at, l.created_at, l.updated_at, l.nonpayment_suspended_at,
   l.ai_programme_version_id::text AS ai_programme_version_id,
   l.ai_programme_override_id::text AS ai_programme_override_id, l.ai_programme_applied_at,
-  l.nonpayment_grace_days
+  l.nonpayment_grace_days, l.commitment
 `;
 
 export async function readLicense(
@@ -283,6 +291,7 @@ export interface LicenseView {
   nonpaymentSuspendedAt: string | null;
   /** The earliest unpaid instalment on the licence and the day its AI stops if it stays unpaid. */
   nextAiStop: AiStopView | null;
+  commitment: LicenseCommitment;
 }
 
 export interface PlatformLicenseView extends LicenseView {
@@ -345,6 +354,7 @@ export async function licenseView(
       license.status === "active" || license.status === "suspended"
         ? await nextAiStop(tx, license.id)
         : null,
+    commitment: license.commitment,
   };
 }
 
@@ -1211,6 +1221,11 @@ export async function unassignSeat(
   if (!seat || seat.unassigned_at) {
     throw licenseError(404, ERROR_CODES.LICENSE_SEAT_NOT_FOUND, actor.locale);
   }
+  // A Student AI programme seat is committed for the year: it is transferred or released (when the
+  // student leaves) through the opt-in, never unassigned (000235; the seat trigger refuses it too).
+  if (await isProgrammeSeat(tx, seatId)) {
+    throw licenseError(409, ERROR_CODES.LICENSE_SEAT_PROGRAMME_LOCKED, actor.locale);
+  }
 
   const [updated] = await tx<{ unassigned_at: Date }[]>`
     UPDATE app.license_seats
@@ -1232,6 +1247,14 @@ export async function unassignSeat(
   return { result: { seatId, userId: seat.user_id }, versions, pending: [] };
 }
 
+/** Whether an active Student AI opt-in holds the seat (counted by the definer helper of 000235). */
+async function isProgrammeSeat(tx: TransactionSql, seatId: string): Promise<boolean> {
+  const [row] = await tx<
+    { locked: boolean }[]
+  >`SELECT app.ai_optin_seat_locked(${seatId}::uuid) AS locked`;
+  return row?.locked ?? false;
+}
+
 export interface SeatView {
   seatId: string;
   audience: Audience;
@@ -1242,6 +1265,11 @@ export interface SeatView {
   assignedAt: string;
   assignedByPlatform: boolean;
   unassignedAt: string | null;
+  /**
+   * True when an active Student AI opt-in holds the seat (000235): it cannot be unassigned, only
+   * transferred or released through the opt-in when the student leaves.
+   */
+  programme: boolean;
   /** The latest overlap with a personal subscription, if the seat holder pays personally. */
   overlap: {
     provider: string | null;
@@ -1275,6 +1303,7 @@ export async function listSeats(
       assigned_at: Date;
       assigned_by_platform: boolean;
       unassigned_at: Date | null;
+      programme: boolean;
       provider: string | null;
       overlap_days: number | null;
       credit_minor: string | null;
@@ -1287,6 +1316,7 @@ export async function listSeats(
            s.student_id::text AS student_id,
            COALESCE(NULLIF(btrim(concat_ws(' ', st.first_name, st.last_name)), ''), u.display_name, u.email) AS name,
            u.email, s.assigned_at, s.assigned_by_platform, s.unassigned_at,
+           (s.unassigned_at IS NULL AND app.ai_optin_seat_locked(s.id)) AS programme,
            o.provider, o.overlap_days, o.credit_minor::text AS credit_minor, o.renewal_action,
            o.renewal_status,
            count(*) OVER ()::text AS total
@@ -1320,6 +1350,7 @@ export async function listSeats(
       assignedAt: row.assigned_at.toISOString(),
       assignedByPlatform: row.assigned_by_platform,
       unassignedAt: row.unassigned_at?.toISOString() ?? null,
+      programme: row.programme,
       overlap: row.renewal_action
         ? {
             provider: row.provider,
@@ -1499,6 +1530,8 @@ export interface ChangeRequestView {
   startsOn: string | null;
   paymentPlan: SchoolPaymentPlan | null;
   paymentProposal: ProposedInstalment[] | null;
+  /** school, or ai_optin: opened automatically for Student AI opt-ins (000235). */
+  source: "school" | "ai_optin";
 }
 
 export interface ChangeRequestRow {
@@ -1521,6 +1554,7 @@ export interface ChangeRequestRow {
   starts_on: string | null;
   payment_plan: SchoolPaymentPlan | null;
   payment_proposal: ProposedInstalment[] | null;
+  source: "school" | "ai_optin";
 }
 
 /** The requested tiers' names, in one read for every row. */
@@ -1570,6 +1604,7 @@ function toChangeRequestView(
     startsOn: row.starts_on,
     paymentPlan: row.payment_plan,
     paymentProposal: row.payment_proposal,
+    source: row.source,
   };
 }
 
@@ -1578,7 +1613,7 @@ const CHANGE_REQUEST_COLUMNS = (tx: TransactionSql) => tx`
   include_family_plus, student_plan_id::text AS student_plan_id,
   teacher_plan_id::text AS teacher_plan_id, parent_plan_id::text AS parent_plan_id, note, status,
   requested_by::text AS requested_by, created_at, resolved_at, resolution_note, months,
-  starts_on::text AS starts_on, payment_plan, payment_proposal
+  starts_on::text AS starts_on, payment_plan, payment_proposal, source
 `;
 
 /** Licences in force: a request for one is more seats or more months on it. */

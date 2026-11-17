@@ -582,6 +582,14 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/school/license/seats",
   "DELETE /api/school/license/seats/{seatId}",
   "POST /api/school/license/change-requests",
+  // Student AI opt-in (000235): windows, opt-ins, transfers and releases are audited from inside the
+  // service transaction (ai_optin_windows, ai_optins, license_seats, license_change_requests).
+  "POST /api/school/license/student-ai/windows",
+  "POST /api/school/license/student-ai/windows/{windowId}/close",
+  "POST /api/school/license/student-ai/opt-ins",
+  "POST /api/school/license/student-ai/opt-ins/{optInId}/transfer",
+  "POST /api/school/license/student-ai/opt-ins/{optInId}/release",
+  "POST /api/parent/student-ai/opt-ins",
   // License billing (session 3). Quotes, invoices, payments and receipts are audited from inside the
   // service transaction (the console's two rows for a super admin); price settings and bank details
   // in the operator's home school. The calculator and the upload URL write nothing (declared for
