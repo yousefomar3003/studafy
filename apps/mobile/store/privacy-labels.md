@@ -81,7 +81,7 @@ SDKs collect nothing identifying by default. This app links their data by callin
 | --- | --- |
 | Does your app collect or share any of the required user data types? | Yes |
 | Is all of the user data collected by your app encrypted in transit? | Yes |
-| Which ways do you provide for users to request that their data is deleted? | On the web (`/legal/delete-account`, no app or sign-in needed). The app itself has no per-user deletion action; its only one, the school admin's "Delete school", closes the school and keeps the data — see `review-checklist.md` §1 |
+| Which ways do you provide for users to request that their data is deleted? | In the app (Profile → Delete account, every role: `POST /api/account/deletion`, a 14-day grace period and then erasure) and on the web (`/legal/delete-account`, no app or sign-in needed). The school admin's separate "Delete school" closes the school and keeps the data — see `review-checklist.md` §1 (corrected by QA-082) |
 | Delete account URL | `https://app.studafy.com/legal/delete-account` |
 | Data deletion: can users request deletion of some data without deleting the account? | No. Per-item deletion is not offered, so leave the optional "data deletion" URL empty. |
 | Independent security review | No |
