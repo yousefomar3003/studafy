@@ -260,6 +260,23 @@ async function applyClaimedEvent(
   // the subscription level: `customer.created` concerns a school that may not have bought anything
   // yet. Running it through attribution would park it for "no subscription to apply this to", which
   // would fill the dead-letter queue with events behaving exactly as intended.
+  if (resolution.kind === "alert") {
+    // A dispute names a charge, not a subscription, so nothing is attributed or transitioned here;
+    // the alert is what makes a human look at the charge and decide on the account (QA-056).
+    options.logger.warn(
+      {
+        alert: "billing_alert",
+        billing_alert: resolution.alert,
+        event_id: event.id,
+        event_type: event.type,
+        customer_id: extractCustomerId(event.data),
+      },
+      "billing event needs a human: payment disputed",
+    );
+    await markProcessed(tx, rowId);
+    return { outcome: "processed", transitioned: false };
+  }
+
   if (resolution.kind === "ignored") {
     if (event.provider === "stripe") {
       await applyCustomerSideEffects(tx, event.type, event.data);
