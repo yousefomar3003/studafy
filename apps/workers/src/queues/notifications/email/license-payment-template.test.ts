@@ -8,7 +8,7 @@ import { renderLicensePaymentEmail } from "./templates";
 import type { LicensePaymentEmailData, LicensePaymentEmailKind } from "./templates";
 
 /**
- * The licence instalment billing emails (000231): overdue, the 7-day warning before the AI stops,
+ * The licence instalment billing emails (000233): overdue, the 7-day warning before the AI stops,
  * and the AI stopped -- in English and Arabic, with how to pay and the invoice link, and no student
  * data. Snapshots pin the full copy of each.
  */

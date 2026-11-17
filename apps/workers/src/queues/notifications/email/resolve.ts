@@ -54,7 +54,7 @@ const TERMS_PATH = "/terms";
 // The school portal's licence invoice page (apps/web features/license/InvoiceDetailPage).
 const LICENSE_INVOICE_PATH = "/portal/license/invoices/{invoiceId}";
 
-/** The licence billing email payload the licence reminder job writes (000231). */
+/** The licence billing email payload the licence reminder job writes (000233). */
 type LicensePaymentPayload = Omit<LicensePaymentEmailData, "schoolName" | "invoiceUrl"> & {
   email: string;
   invoiceId: string;

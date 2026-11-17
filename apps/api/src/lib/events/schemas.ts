@@ -414,7 +414,7 @@ export const eventPayloadSchemas = {
   // store purchase whose waiver it records, for a student with an email address. The email is the
   // durable-medium confirmation EU consumer law asks for (Terms of Service 7.7). acknowledgedAt is
   // when the student ticked the box, recordedAt when the server recorded the purchase with it.
-  // ── Licence instalment billing emails (000231) ────────────────────
+  // ── Licence instalment billing emails (000233) ────────────────────
   // Raised by the workers' licence reminder job (apps/workers/src/queues/billing/license-reminders.ts
   // writes it raw), once per instalment and kind for each billing recipient. Everything the email
   // shows rides in the payload, so the dispatcher renders it without reading the invoice again.

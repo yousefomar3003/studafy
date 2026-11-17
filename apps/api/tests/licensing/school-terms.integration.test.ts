@@ -1,5 +1,5 @@
 /**
- * The school chooses its licence length and payment plan (migration 000231, docs/adr/0021): the
+ * The school chooses its licence length and payment plan (migration 000233, docs/adr/0021): the
  * request carries the months, start and plan (a custom plan as dates and shares); the super admin's
  * quote starts from it and needs a reason to depart from it; accepting the quote resolves the request;
  * the yearly plan and per-year totals; and the AI resuming the moment the payment that settles a

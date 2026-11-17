@@ -52,7 +52,7 @@ admin activated it by hand).
   That is the point of the plan; the reminders, the overdue marks and the console's unpaid balance are
   how the super admin follows it up.
 
-## Amendment (2026-11-17, migration 000231): the school chooses, and AI stops 30 days late
+## Amendment (2026-11-17, migration 000233): the school chooses, and AI stops 30 days late
 
 Owner decisions: "the school chooses the amount of months they want the AI for, not us; the school
 chooses to pay monthly, yearly or custom; they see each year's payment and the full list of payment
