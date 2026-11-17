@@ -98,6 +98,7 @@ export {
   LOCK_CATCH_UP_DAYS,
   REVENUE_SHARE_STATUSES,
   insertSnapshot,
+  licenceInProgramme,
   lockDueConversionSnapshots,
   measureConversion,
   measurementPeriods,
@@ -133,4 +134,24 @@ export {
 } from "./ai-revenue-share/measures";
 export type { ConsistencyPeriod, RevenueShareMeasures } from "./ai-revenue-share/measures";
 export { readProgrammeValues } from "./ai-revenue-share/programme";
+export {
+  activateLicence,
+  isRetryableTransactionError,
+  licencesToPutInForce,
+  personalSubscriptionsOnLicence,
+  withTransactionRetry,
+} from "./ai-revenue-share/activation";
+export type { LicencesToPutInForce } from "./ai-revenue-share/activation";
+export {
+  schoolCalendar,
+  studentAiClassIds,
+  uploadConsistency,
+} from "./ai-revenue-share/upload-consistency";
+export type {
+  SchoolCalendar,
+  UploadConsistencyClassView,
+  UploadConsistencyReport,
+  UploadConsistencyTeacherView,
+  UploadPeriod,
+} from "./ai-revenue-share/upload-consistency";
 export type { ProgrammeStamp } from "./ai-revenue-share/programme";

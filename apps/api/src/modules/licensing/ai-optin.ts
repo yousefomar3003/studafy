@@ -13,7 +13,7 @@ import {
 
 import { publishUserEntitlementChanges } from "../subscriptions/entitlements/entitlement-change-publisher";
 
-import { resolveAiProgrammeStamp } from "./ai-programme";
+import { resolveAiProgrammeValues } from "./ai-programme";
 import { auditLicenseChange, licenseError } from "./context";
 import { assignSeats, currentLicense, readLicense } from "./service";
 
@@ -318,7 +318,7 @@ export async function optInProgramme(
   tx: TransactionSql,
   license: LicenseRecord,
 ): Promise<OptInProgramme> {
-  const { values } = await resolveAiProgrammeStamp(
+  const values = await resolveAiProgrammeValues(
     tx,
     { versionId: license.aiProgrammeVersionId, overrideId: license.aiProgrammeOverrideId },
     license.currencyCode,
@@ -1282,7 +1282,7 @@ export async function releaseOptIn(
   actor: LicenseActor,
   now: Date = new Date(),
 ): Promise<Changed<AiOptInView>> {
-  const optIn = await requireLeftStudentOptIn(tx, optInId, actor);
+  await requireLeftStudentOptIn(tx, optInId, actor);
   const effective = firstOfNextMonth(await schoolToday(tx, now));
   await tx`
     UPDATE app.ai_optins

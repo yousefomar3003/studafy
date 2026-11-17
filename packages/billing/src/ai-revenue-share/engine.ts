@@ -15,7 +15,7 @@ import type { ProgrammeStamp } from "./programme";
 import type {
   PaymentPlan,
   ResolvedAiProgramme,
-  RevenueShareCommitment,
+  LicenseCommitment,
   RevenueShareResult,
 } from "@studafy/license-pricing";
 import type { TransactionSql } from "postgres";
@@ -125,6 +125,28 @@ async function readLicence(tx: TransactionSql, licenseId: string): Promise<Licen
     graceDays: row.grace_days,
     stamp: { versionId: row.version_id, overrideId: row.override_id },
   };
+}
+
+/**
+ * Whether a licence is in the Student AI programme: the school opened at least one opt-in window on
+ * it, or it holds programme opt-ins (phase 2, 000235; a transfer's opt-in has no window of its own).
+ * Only such a licence earns a revenue share: a licence without it gets no ledger entries and no
+ * conversion measurement.
+ */
+export async function licenceInProgramme(tx: TransactionSql, licenseId: string): Promise<boolean> {
+  const [row] = await tx<{ in_programme: boolean }[]>`
+    SELECT EXISTS (
+             SELECT 1 FROM app.ai_optin_windows AS w
+             WHERE w.school_id = current_setting('app.school_id')::uuid
+               AND w.license_id = ${licenseId}::uuid
+           )
+        OR EXISTS (
+             SELECT 1 FROM app.ai_optins AS o
+             WHERE o.school_id = current_setting('app.school_id')::uuid
+               AND o.license_id = ${licenseId}::uuid
+           ) AS in_programme
+  `;
+  return row?.in_programme ?? false;
 }
 
 /**
@@ -321,7 +343,13 @@ export async function lockDueConversionSnapshots(
     FROM app.school_licenses AS l
     WHERE l.school_id = current_setting('app.school_id')::uuid
       AND (
-        (l.status IN ('awaiting_payment', 'active', 'suspended') AND l.student_seats > 0)
+        (l.status IN ('awaiting_payment', 'active', 'suspended') AND l.student_seats > 0
+         AND (
+           EXISTS (SELECT 1 FROM app.ai_optin_windows AS w
+                   WHERE w.school_id = l.school_id AND w.license_id = l.id)
+           OR EXISTS (SELECT 1 FROM app.ai_optins AS o
+                      WHERE o.school_id = l.school_id AND o.license_id = l.id)
+         ))
         OR EXISTS (
           SELECT 1 FROM app.ai_programme_revenue_share_entries AS e
           WHERE e.school_id = l.school_id AND e.license_id = l.id AND e.status = 'pending'
@@ -370,7 +398,7 @@ interface FigureInput {
   measurementPeriodStart: string;
   periodFrom: string;
   periodTo: string;
-  commitment: RevenueShareCommitment;
+  commitment: LicenseCommitment;
   baseMinor: number;
 }
 
@@ -506,6 +534,8 @@ export async function recordPaymentShares(
   if (!payment) throw new Error(`Unknown licence payment ${paymentId}.`);
   const studentLines = Number(payment.student_lines);
   if (studentLines <= 0) return [];
+  // Only a licence in the Student AI programme earns a share (an opt-in window, or opt-ins).
+  if (!(await licenceInProgramme(tx, payment.license_id))) return [];
   const licence = (await readLicence(tx, payment.license_id))!;
   const commitment = await measuresOf(ctx).licenceCommitment(tx, ctx.schoolId, licence.id);
 
@@ -648,7 +678,7 @@ export async function resolvePendingShares(
       measurement_period_start: string;
       period_from: string;
       period_to: string;
-      commitment: RevenueShareCommitment;
+      commitment: LicenseCommitment;
       base_minor: string;
       amount_minor: string;
       total_bps: number;
@@ -916,7 +946,9 @@ export async function settleRevenueShare(
       action: "update" as const,
       targetTable: "license_invoices",
       targetId: invoice.id,
-      oldValues: null,
+      // An update's audit row carries what changed from (ck_audit_logs_payload): the total before
+      // the credit came off it.
+      oldValues: { total_minor: Number(invoice.total_minor) + credits.get(invoice.id)!.amount },
       newValues: {
         ai_share_credit_minor: credits.get(invoice.id)!.amount,
         ai_share_entries: credits.get(invoice.id)!.entries,

@@ -1,18 +1,18 @@
-import type { RevenueShareCommitment } from "@studafy/license-pricing";
+import { uploadConsistency } from "./upload-consistency";
+
+import type { LicenseCommitment } from "@studafy/license-pricing";
 import type { TransactionSql } from "postgres";
 
 /**
- * What the revenue share engine measures about a school, each behind one function so the phases
- * built in parallel plug in at a single place:
+ * What the revenue share engine measures about a school, each behind one function:
  *
- *   * countOptedInStudents       -- ADAPTER, phase 2 (opt-in). Temporary: the licence's student
- *                                   seats held at the end of the day.
- *   * uploadConsistencyForPeriod -- ADAPTER, phase 4 (upload consistency). Temporary: unknown (null),
- *                                   so the content bonus stays pending.
- *   * licenceCommitment          -- reads school_licenses.commitment once phase 2 adds it (000235);
- *                                   full_year until then (every licence sold so far is a fixed,
- *                                   non-cancellable term).
- *   * countEnrolledStudents      -- this phase's own definition of "enrolled".
+ *   * countEnrolledStudents      -- students enrolled at the end of the day.
+ *   * countOptedInStudents       -- phase 2's opt-ins (app.ai_optins) active at the end of the day,
+ *                                   for the academic year covering it.
+ *   * uploadConsistencyForPeriod -- phase 4's upload consistency over the days a payment covers
+ *                                   (./upload-consistency.ts, the same read the API's views use),
+ *                                   once those days are over.
+ *   * licenceCommitment          -- school_licenses.commitment (000235).
  *
  * All run inside the caller's transaction, scoped to the armed school (app.school_id), and count as
  * of the END of `onDate` (UTC). Student status keeps no history, so "enrolled on a day" is today's
@@ -42,7 +42,7 @@ export interface RevenueShareMeasures {
     tx: TransactionSql,
     schoolId: string,
     licenseId: string,
-  ): Promise<RevenueShareCommitment>;
+  ): Promise<LicenseCommitment>;
 }
 
 /** Students enrolled in the armed school at the end of `onDate`: status enrolled, admitted by then. */
@@ -63,64 +63,70 @@ export async function countEnrolledStudents(
 }
 
 /**
- * ADAPTER -- students opted in to Student AI on the licence at the end of `onDate`.
+ * Students opted in to Student AI at the end of `onDate`: the school's phase 2 opt-ins
+ * (app.ai_optins) for the academic year covering `onDate` -- or, before any year has begun, the next
+ * one (parents opt in before the year starts) -- taken by then and not ended by then (released or
+ * transferred after the day still count), each student once.
  *
- * TODO(ai-revshare phase 2 integration): count phase 2's opt-in records instead (app.ai_optins of
- * this licence's school and academic year, active at the end of `onDate`), and keep this signature.
- * Temporary implementation: the licence's student seats held at the end of the day -- what the
- * licensing model (000163) already records for every student given Student AI.
+ * Opt-ins are per academic year: parents choose again each new year, and a licence renewal does NOT
+ * carry them over. They are counted for the school's year, not only this licence's, so a renewal (or
+ * a second licence in the same year) measures the year's opt-ins rather than 0. `licenseId` is kept
+ * for the signature; it does not narrow the count.
  */
 export async function countOptedInStudents(
   tx: TransactionSql,
   _schoolId: string,
-  licenseId: string,
+  _licenseId: string,
   onDate: string,
 ): Promise<number> {
   const [row] = await tx<{ count: number }[]>`
-    SELECT count(DISTINCT seat.student_id)::int AS count
-    FROM app.license_seats AS seat
-    WHERE seat.school_id = current_setting('app.school_id')::uuid
-      AND seat.license_id = ${licenseId}::uuid
-      AND seat.audience = 'student'
-      AND seat.assigned_at < ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
+    WITH year AS (
+      SELECT ay.id
+      FROM app.academic_years AS ay
+      WHERE ay.school_id = current_setting('app.school_id')::uuid
+        AND ay.ends_on >= ${onDate}::date
+      ORDER BY (ay.starts_on <= ${onDate}::date) DESC,
+               CASE WHEN ay.starts_on <= ${onDate}::date THEN ay.starts_on END DESC,
+               ay.starts_on ASC
+      LIMIT 1
+    )
+    SELECT count(DISTINCT o.student_id)::int AS count
+    FROM app.ai_optins AS o
+    JOIN year ON year.id = o.academic_year_id
+    WHERE o.school_id = current_setting('app.school_id')::uuid
+      AND o.opted_in_at < ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
       AND (
-        seat.unassigned_at IS NULL
-        OR seat.unassigned_at >= ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
+        o.status = 'active'
+        OR o.ended_at >= ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
       )
   `;
   return row?.count ?? 0;
 }
 
 /**
- * ADAPTER -- upload consistency over the school days of `from`..`to` (inclusive), averaged across
- * the classes that have Student AI, in basis points; null while it cannot be known.
- *
- * TODO(ai-revshare phase 4 integration): return phase 4's
- * `uploadConsistency({ schoolId, from, to })` converted to basis points (null when it has nothing to
- * measure yet), and keep this signature. Temporary implementation: unknown, so every share's
- * content bonus is pending (bonus_pending) and the share stays pending until this returns a value
- * (the super admin's recompute, and the workers' hourly run, pick it up).
+ * Upload consistency over the school days of `from`..`to` (inclusive), averaged across the classes
+ * that have Student AI, in basis points (phase 4, ./upload-consistency.ts). Null while it cannot be
+ * known yet: until the last day of the period has passed in the school's timezone, the bonus waits
+ * (the share stays bonus-pending and the workers' hourly job, or the next payment or recompute,
+ * works it out once the days are over). A finished period with no class to measure is 0.
  */
 export async function uploadConsistencyForPeriod(
-  _tx: TransactionSql,
-  _period: ConsistencyPeriod,
+  tx: TransactionSql,
+  period: ConsistencyPeriod,
 ): Promise<number | null> {
-  return null;
+  const report = await uploadConsistency(tx, { from: period.from, to: period.to });
+  if (report.today <= period.to) return null;
+  return report.consistencyBps ?? 0;
 }
 
-/**
- * The licence's commitment: `school_licenses.commitment` (phase 2, 000235) when the column exists,
- * else full_year. Read through to_jsonb so this works before and after phase 2's migration.
- *
- * TODO(ai-revshare phase 2 integration): read `l.commitment` directly.
- */
+/** The licence's commitment: `school_licenses.commitment` (000235). */
 export async function licenceCommitment(
   tx: TransactionSql,
   _schoolId: string,
   licenseId: string,
-): Promise<RevenueShareCommitment> {
-  const [row] = await tx<{ commitment: string | null }[]>`
-    SELECT to_jsonb(l) ->> 'commitment' AS commitment
+): Promise<LicenseCommitment> {
+  const [row] = await tx<{ commitment: LicenseCommitment }[]>`
+    SELECT l.commitment
     FROM app.school_licenses AS l
     WHERE l.school_id = current_setting('app.school_id')::uuid AND l.id = ${licenseId}::uuid
   `;

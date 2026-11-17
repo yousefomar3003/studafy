@@ -29,6 +29,7 @@ export {
   licenseAiProgramme,
   reapplyAiProgramme,
   resolveAiProgrammeStamp,
+  resolveAiProgrammeValues,
   saveAiProgrammeVersion,
   saveSchoolOverride,
   schoolAiProgramme,

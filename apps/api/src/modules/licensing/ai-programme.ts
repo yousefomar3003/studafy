@@ -1,3 +1,4 @@
+import { readProgrammeValues } from "@studafy/billing";
 import { ERROR_CODES } from "@studafy/constants";
 import {
   AI_PROGRAMME_LIMITS,
@@ -417,7 +418,27 @@ export async function currentAiProgrammeStamp(tx: TransactionSql): Promise<AiPro
   return { versionId: row!.version_id, overrideId: row!.override_id };
 }
 
-/** What a stamp resolves to in `currencyCode`, with the versions themselves. */
+/**
+ * THE core resolver: the values a stamp resolves to in `currencyCode`, and nothing else. It reads
+ * only the version tables and the armed school's own override (@studafy/billing
+ * `readProgrammeValues`, which the workers use too), never the names of the super admins who saved
+ * the versions -- so it is the one for school-facing requests (a parent's opt-in, the school's
+ * upload consistency, the tuition line) and worker reads.
+ */
+export function resolveAiProgrammeValues(
+  tx: TransactionSql,
+  stamp: AiProgrammeStamp,
+  currencyCode: string,
+): Promise<ResolvedAiProgramme> {
+  return readProgrammeValues(tx, stamp, currencyCode);
+}
+
+/**
+ * PLATFORM VIEWS ONLY: what a stamp resolves to in `currencyCode`, with the versions themselves and
+ * their authors' names. Looking the names up arms each super admin's home school in turn (they are
+ * users of another school), so this must never run in a school's own request; use
+ * `resolveAiProgrammeValues` there.
+ */
 export async function resolveAiProgrammeStamp(
   tx: TransactionSql,
   stamp: AiProgrammeStamp,
@@ -764,7 +785,7 @@ export async function programmeColumnsFor(
   stamp: AiProgrammeStamp,
   currencyCode: string,
 ): Promise<AiProgrammeStamp & { nonpaymentGraceDays: number }> {
-  const { values } = await resolveAiProgrammeStamp(tx, stamp, currencyCode);
+  const values = await resolveAiProgrammeValues(tx, stamp, currencyCode);
   return { ...stamp, nonpaymentGraceDays: values.nonpaymentGraceDays };
 }
 
