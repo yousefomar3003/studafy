@@ -18,6 +18,9 @@ export const UPLOAD_SCAN_TARGETS = [
   "license_receipt",
   "school_application_proof",
   "import_source",
+  // QA-055: a license payment's and a manual grant's attached receipt (000233).
+  "payment_receipt_file",
+  "grant_receipt",
 ] as const;
 
 export type UploadScanTarget = (typeof UPLOAD_SCAN_TARGETS)[number];

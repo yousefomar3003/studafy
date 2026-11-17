@@ -1,4 +1,4 @@
-import { ERROR_CODES } from "@studafy/constants";
+import { ERROR_CODES, isServableUploadScanStatus } from "@studafy/constants";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { pipelinePerSchool, withSystemTx } from "../../db/tenant-tx";
@@ -341,10 +341,11 @@ export async function grantReceiptKey(
   grantId: string,
   actor: LicenseActor,
 ): Promise<string | null> {
-  const [row] = await tx<{ receipt_storage_key: string | null }[]>`
-    SELECT receipt_storage_key FROM app.manual_grants
+  const [row] = await tx<{ receipt_storage_key: string | null; scan: string }[]>`
+    SELECT receipt_storage_key, receipt_scan_status::text AS scan FROM app.manual_grants
     WHERE school_id = current_setting('app.school_id')::uuid AND id = ${grantId}::uuid
   `;
   if (!row) throw licenseError(404, ERROR_CODES.MANUAL_GRANT_NOT_FOUND, actor.locale);
-  return row.receipt_storage_key;
+  // A receipt still being scanned, or quarantined, is not served (QA-055).
+  return isServableUploadScanStatus(row.scan) ? row.receipt_storage_key : null;
 }

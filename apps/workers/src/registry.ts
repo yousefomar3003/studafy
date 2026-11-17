@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 import { injectTraceContext } from "@studafy/observability";
 import { resolveRecordKeyring } from "@studafy/records";
@@ -53,6 +55,7 @@ import type {
   DispatchNotificationJobData,
 } from "./queues/notifications/dispatcher.worker";
 import type { PushSender } from "./queues/notifications/push";
+import type { UploadScanJobRequest } from "./queues/scan/stuck-scan-sweep";
 import type { QueueName } from "@studafy/constants";
 import type { Job } from "bullmq";
 
@@ -167,6 +170,34 @@ function enqueueIngestion(schoolId: string, materialId: string): Promise<void> {
  * created for the same reason `derivationQueue` is.
  */
 let maintenanceQueueInstance: Queue | null = null;
+
+let scanQueueInstance: Queue | null = null;
+
+/**
+ * The upload-scan sweep's enqueuer (QA-055): the same job and options as the API's. The job id
+ * carries the hour, so a file stuck while the scanner is down costs one queued job an hour.
+ */
+function enqueueUploadScanJobs(requests: readonly UploadScanJobRequest[]): Promise<void> {
+  scanQueueInstance ??= new Queue(QUEUE_NAMES.SCAN, {
+    connection: createRedisConnection(workerEnv) as never,
+  });
+  const hour = Math.floor(Date.now() / 3_600_000);
+  return scanQueueInstance
+    .addBulk(
+      requests.map((request) => ({
+        name: JOB_NAMES.SCAN_UPLOAD,
+        data: request,
+        opts: {
+          jobId: `sweep-${request.target}-${createHash("sha256").update(request.storageKey).digest("hex").slice(0, 32)}-${hour}`,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5_000 },
+          removeOnComplete: { age: 7 * 24 * 60 * 60 },
+          removeOnFail: { age: 30 * 24 * 60 * 60 },
+        },
+      })),
+    )
+    .then(() => undefined);
+}
 
 function enqueueDsrJob(input: {
   schoolId: string;
@@ -548,6 +579,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           googlePlayPackageName: workerEnv.GOOGLE_PLAY_PACKAGE_NAME,
           googlePlayServiceAccount: workerEnv.GOOGLE_PLAY_SERVICE_ACCOUNT,
           recordKeyring: resolveRecordKeyring(workerEnv),
+          enqueueUploadScans: enqueueUploadScanJobs,
         },
         enqueueDsrJob,
       ),

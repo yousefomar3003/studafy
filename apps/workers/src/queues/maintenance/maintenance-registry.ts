@@ -12,6 +12,7 @@ import { JOB_NAMES } from "@studafy/constants";
 import { workerLogger } from "../../log";
 import { createStorageQuotaS3 } from "../billing/storage-quota-s3";
 import { createReportS3 } from "../reports/report-s3";
+import { sweepStuckUploadScans } from "../scan/stuck-scan-sweep";
 
 import { runAccountDeletionSweep } from "./account-deletion-sweep";
 import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
@@ -80,6 +81,15 @@ export async function processMaintenanceJob(
   if (job.name === JOB_NAMES.PURGE_EXPIRED_IP_ADDRESSES) {
     const result = await withPrimarySql(config, (sql) =>
       purgeExpiredIpAddresses(sql, new Date(), workerLogger),
+    );
+    return { processed: true, ...result };
+  }
+
+  if (job.name === JOB_NAMES.SWEEP_STUCK_UPLOAD_SCANS) {
+    const enqueueUploadScans = config.enqueueUploadScans;
+    if (!enqueueUploadScans) return { processed: false, reason: "no scan queue configured" };
+    const result = await withPrimarySql(config, (sql) =>
+      sweepStuckUploadScans(sql, enqueueUploadScans, new Date(), workerLogger),
     );
     return { processed: true, ...result };
   }

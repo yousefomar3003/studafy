@@ -29,6 +29,7 @@ import {
   scheduleAccountDeletionSweepJob,
   scheduleAiMessageRetentionSweepJob,
   scheduleIpAddressRetentionSweepJob,
+  scheduleStuckUploadScanSweepJob,
   scheduleDataRetentionSweepJob,
   schedulePartitionMaintenanceJob,
   scheduleRecordRetentionSweepJob,
@@ -344,6 +345,11 @@ const ipAddressRetentionRedis = createRedisConnection(env);
 void scheduleIpAddressRetentionSweepJob(ipAddressRetentionRedis).then(() =>
   ipAddressRetentionRedis.disconnect(),
 );
+
+// Upload-scan sweep scheduler (QA-055): idempotently register the 15-minute re-enqueue of uploads
+// stuck in `scanning` or left `unscanned` on the maintenance queue.
+const stuckScanRedis = createRedisConnection(env);
+void scheduleStuckUploadScanSweepJob(stuckScanRedis).then(() => stuckScanRedis.disconnect());
 
 // Sensitive record retention scheduler (docs/modules/student-records.md "Retention"):
 // idempotently register the daily 08:50 deletion of sensitive answers past their retention period.

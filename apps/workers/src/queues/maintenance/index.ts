@@ -27,6 +27,7 @@ export {
   scheduleIpAddressRetentionSweepJob,
 } from "./ip-address-retention-sweep-scheduler";
 export { MONTHS_AHEAD, ensureFuturePartitions } from "./partition-maintenance";
+export { scheduleStuckUploadScanSweepJob } from "./stuck-scan-sweep-scheduler";
 export type { PartitionMaintenanceResult } from "./partition-maintenance";
 export {
   PARTITION_MAINTENANCE_CRON_PATTERN,

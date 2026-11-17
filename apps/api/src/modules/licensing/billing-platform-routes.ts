@@ -4,6 +4,7 @@ import { customScheduleErrors } from "@studafy/license-pricing";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { withSystemTx } from "../../db/tenant-tx";
+import { enqueueUploadScans } from "../../lib/storage/upload-scan";
 import { auditAction } from "../../middleware/auditEmitter";
 import { requireAuth } from "../../middleware/authContext";
 import { requirePermission } from "../../middleware/authz";
@@ -1090,6 +1091,12 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
         actor,
       ),
     );
+    // Scanned like every other upload (QA-055); served only once clean.
+    if (receiptStorageKey) {
+      await enqueueUploadScans(c, [
+        { target: "payment_receipt_file", schoolId, storageKey: receiptStorageKey },
+      ]);
+    }
     return c.json({ ...result, renewalStops: renewals }, 201);
   });
 

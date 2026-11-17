@@ -27,6 +27,7 @@ import { runTenantExport } from "./tenant-export.worker";
 
 import type { MaintenanceS3Client } from "./export-storage";
 import type { DatabaseLease } from "../../db/pool";
+import type { EnqueueUploadScanJobs } from "../scan/stuck-scan-sweep";
 import type { RecordKeyring } from "@studafy/records";
 import type { Job } from "bullmq";
 import type { Sql } from "postgres";
@@ -47,6 +48,8 @@ export interface MaintenanceRunnerConfig {
   googlePlayServiceAccount?: string;
   /** Opens sensitive record answers for a DSR export (ADR-019). */
   recordKeyring: RecordKeyring;
+  /** Puts scan-upload jobs on the file-scan queue, for the upload-scan sweep (QA-055). */
+  enqueueUploadScans?: EnqueueUploadScanJobs;
 }
 
 export interface DsrJobResult {
