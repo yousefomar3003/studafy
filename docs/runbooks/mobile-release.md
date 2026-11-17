@@ -65,9 +65,26 @@ schedule, which is the only staged-rollout control App Store Connect exposes.
 
 ## Secrets
 
-Repository secrets, consumed by `mobile-release.yml` and passed through to the lanes. None is ever
+Secrets consumed by `mobile-release.yml` and passed through to the lanes. None is ever
 committed; the workflow writes the file-shaped ones (`fastlane/play-store-key.json`,
 `android/key.properties`, the keystore) at run time and `.gitignore` blocks all of them.
+
+### Where they live (QA-006)
+
+Every job in `mobile-release.yml` runs in the `mobile-release` environment. A repository secret is
+readable by any workflow pushed to any branch, so a malicious or careless workflow on a feature
+branch could print the upload keystore or the match password. An environment secret is readable
+only by jobs that target the environment, and the environment can refuse branches. One-time setup
+by a repository admin (GitHub → Settings → Environments):
+
+1. Create the environment `mobile-release`.
+2. Under **Deployment branches and tags**, choose **Selected branches and tags** and allow `main`
+   and the tag pattern `mobile-v*`.
+3. Move every secret listed below from the repository's secrets to this environment's secrets,
+   then delete the repository copies.
+4. Run `mobile-release` once from `main` (workflow_dispatch) to confirm the lanes still find them.
+
+Until step 3 is done the jobs keep reading the repository secrets, so nothing breaks in between.
 
 ### Android
 

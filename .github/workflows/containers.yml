@@ -113,7 +113,7 @@ jobs:
       # Authenticated Docker Hub pulls are rate-limited far less aggressively and avoid the
       # "context deadline exceeded" timeouts that unauthenticated pulls hit on GH Actions runners.
       # Conditional so the job doesn't fail when the secrets haven't been configured yet.
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         if: ${{ env.DOCKERHUB_USERNAME != '' }}
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -134,7 +134,7 @@ jobs:
           done
           echo "Build failed after 3 attempts" >&2
           exit 1
-      - uses: anchore/sbom-action@v0
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           image: studafy/${{ matrix.service }}:ci
           artifact-name: ${{ matrix.service }}.spdx.json
@@ -145,7 +145,7 @@ jobs:
           max=$(( ${{ matrix.max_mb }} * 1024 * 1024 ))
           echo "image size: $((bytes / 1024 / 1024))MB ($bytes bytes) -- budget: ${{ matrix.max_mb }}MB ($max bytes)"
           test "$bytes" -le "$max"
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.72.0
           image-ref: studafy/${{ matrix.service }}:ci

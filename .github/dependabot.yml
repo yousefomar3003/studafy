@@ -5,7 +5,12 @@ updates:
   # dependency scan is supposed to cover, so leaving them to drift unpatched would undercut
   # security-scan/sast rather than complement them.
   - package-ecosystem: github-actions
-    directory: /
+    # QA-006: every action is pinned to a commit SHA with its release in a comment; Dependabot
+    # updates both. The composite action under .github/actions is listed explicitly: `/` covers
+    # only .github/workflows.
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     # A newly published release/tag can be malicious or unstable (the same supply-chain risk the

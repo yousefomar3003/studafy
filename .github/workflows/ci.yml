@@ -307,7 +307,7 @@ jobs:
         working-directory: apps/web
       - name: Upload keyboard-walkthrough recordings
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: a11y-walkthrough-videos
           path: apps/web/test-results/**/*.webm
@@ -331,7 +331,7 @@ jobs:
         run: bunx turbo run build --filter=@studafy/api^...
       - name: Regenerate the OpenAPI document
         run: bun run openapi:generate
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: 3.44.8
           channel: stable
@@ -387,7 +387,7 @@ jobs:
         run: bunx turbo run build --filter=@studafy/api^...
       - name: Regenerate the OpenAPI document
         run: bun run openapi:generate
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: 3.44.8
           channel: stable
@@ -429,7 +429,7 @@ jobs:
         working-directory: apps/mobile
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: mobile-coverage-report
           path: |
@@ -611,8 +611,10 @@ jobs:
         run: echo "filter=$(bash .github/scripts/resolve-affected-filter.sh)" >> "$GITHUB_OUTPUT"
       - run: bun run format:check
       # Repo-level script and infra guards: the deploy gate and release scripts (QA-005, against fake
-      # gh/flyctl/curl) and the container base-image pins (QA-053).
+      # gh/flyctl/curl), the container base-image pins (QA-053) and the action SHA pins (QA-006).
       - run: bun test scripts/deploy scripts/ci
+      - name: Every action is pinned to a commit SHA (QA-006)
+        run: bash scripts/ci/check-pinned-actions.sh
       # `--continue=dependencies-successful` surfaces every independent package's failures in one
       # run instead of stopping at the first, so a PR sees all its annotations at once. Piped
       # through annotate-diagnostics.mjs to turn tsc/ESLint output into inline PR annotations --
@@ -694,7 +696,7 @@ jobs:
         if: github.event_name == 'pull_request' && steps.base_spec.outputs.exists == 'true'
         id: breaking_check
         continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'version-bump') }}
-        uses: oasdiff/oasdiff-action/breaking@v0.1.6
+        uses: oasdiff/oasdiff-action/breaking@024f6c399f9a21ada1addb0f9a36ce1bfac995f1 # v0.1.6
         with:
           base: .oasdiff/base.json
           revision: apps/api/openapi.json
