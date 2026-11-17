@@ -3,27 +3,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/api/generated/models/grade_trend_point.dart';
+import '../../../../core/api/generated/models/published_grade.dart';
 import '../../../../core/api/generated/models/published_term_summary.dart';
+import '../../../../design/kit/kit.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../../student/application/released_marks_providers.dart';
+import '../../../student/domain/recent_grades.dart';
 import '../../../student/presentation/academic_results_screen.dart';
 import '../../../student/presentation/released_marks_screen.dart';
-import '../../../student/presentation/widgets/released_marks_widgets.dart';
+import '../../../student/presentation/widgets/recent_grades_widgets.dart';
 import '../../../student/presentation/widgets/subject_grades_card.dart';
 import '../../application/child_detail_providers.dart';
 import '../../domain/child_subject_grades.dart';
 import 'child_detail_placeholders.dart';
 import '../../../../design/layout/bottom_inset_padding.dart';
 
-/// The Grades tab of `ChildDetailScreen`: first the child's approved exam marks
-/// ([ReleasedMarksSummaryCard], the newest few with a link to all of them — the same marks the
-/// child sees in their own "Exam marks" tab), then the child's term summary, their term-over-term
-/// average trend, and one `SubjectGradesCard` per course — the same per-subject breakdown widget
-/// the child sees on their own grades screen, so the numbers match exactly (acceptance criterion
-/// "data parity with the child's own student views").
+/// The Grades tab of `ChildDetailScreen`, keeping the child's two kinds of mark apart the way
+/// the child's own app does ([GradeKindVisuals]):
+///
+/// 1. **Recent grades** — the newest approved exam marks and published assignment grades
+///    together, newest first, each labelled "Exam" or "Assignment" (the list on the child's own
+///    home). An exam mark opens the child's full marks ([ReleasedMarksScreen]).
+/// 2. **Exam marks** — the way into every approved exam mark, and the official (finalized)
+///    results.
+/// 3. **Assignment grades** — the child's term summary, their term-over-term average trend, and one
+///    `SubjectGradesCard` per course — the same per-subject breakdown widget the child sees on
+///    their own grades screen, so the numbers match exactly (acceptance criterion "data parity
+///    with the child's own student views").
 ///
 /// The exam marks come from their own endpoint, so they show even when the coursework breakdown
-/// fails to load.
+/// fails to load. Everything is keyed by [studentId], so switching child re-scopes the tab.
 class ChildGradesView extends ConsumerWidget {
   const ChildGradesView({required this.studentId, this.studentName, super.key});
 
@@ -36,23 +45,35 @@ class ChildGradesView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final breakdown = ref.watch(childBreakdownProvider(studentId));
 
-    // The exam marks and official-results entry lead the tab in every state but the first load.
-    Widget page(List<Widget> rest) => ListView(
+    void openMarks() => Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReleasedMarksScreen(studentId: studentId, studentName: studentName),
+      ),
+    );
+
+    // Recent grades and the exams section lead the tab in every state but the first load.
+    Widget page(List<PublishedGrade> grades, List<Widget> assignments) => ListView(
       padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
-        ReleasedMarksSummaryCard(
-          studentId: studentId,
-          onSeeAll: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => ReleasedMarksScreen(studentId: studentId, studentName: studentName),
-            ),
-          ),
+        _RecentGradesCard(studentId: studentId, grades: grades, onOpenExam: openMarks),
+        const SizedBox(height: AppSpacing.space24),
+        const _KindHeader(kind: GradeKind.exam),
+        const SizedBox(height: AppSpacing.space12),
+        AppIconListCard(
+          key: ValueKey('child-exam-marks-$studentId'),
+          icon: GradeKind.exam.icon,
+          accent: GradeKind.exam.accent,
+          title: 'releasedMarks.seeAll'.tr(),
+          subtitle: 'parent.childDetail.grades.examsHint'.tr(),
+          onTap: openMarks,
         ),
-        const SizedBox(height: AppSpacing.space16),
+        const SizedBox(height: AppSpacing.space12),
         _OfficialResultsTile(studentId: studentId, studentName: studentName),
-        const SizedBox(height: AppSpacing.space16),
-        ...rest,
+        const SizedBox(height: AppSpacing.space24),
+        const _KindHeader(kind: GradeKind.assignment),
+        const SizedBox(height: AppSpacing.space12),
+        ...assignments,
       ],
     );
 
@@ -64,12 +85,12 @@ class ChildGradesView extends ConsumerWidget {
       },
       child: breakdown.when(
         loading: () => const ChildDetailSkeleton(),
-        error: (_, _) => page(const [
+        error: (_, _) => page(const [], const [
           _InlineMessage(messageKey: 'parent.childDetail.error', icon: Icons.error_outline),
         ]),
         data: (data) {
           final subjects = groupChildSubjects(data.grade.grades);
-          return page([
+          return page(data.grade.grades, [
             _TermSummaryCard(summary: data.grade.termSummary),
             const SizedBox(height: AppSpacing.space16),
             if (_TrendCard.hasTrend(data.gradeTrend)) ...[
@@ -93,6 +114,94 @@ class ChildGradesView extends ConsumerWidget {
   }
 }
 
+/// The child's newest exam marks and assignment grades together, newest first, each with its
+/// kind chip. [grades] are the breakdown's published assignment grades (empty when it failed);
+/// the exam marks load here, from their own endpoint.
+class _RecentGradesCard extends ConsumerWidget {
+  const _RecentGradesCard({
+    required this.studentId,
+    required this.grades,
+    required this.onOpenExam,
+  });
+
+  final String studentId;
+  final List<PublishedGrade> grades;
+  final VoidCallback onOpenExam;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final marks = ref.watch(studentReleasedMarksProvider(studentId));
+    final items = mergeRecentGrades(grades: grades, marks: marks.value ?? const []);
+    final marksFailed = marks.hasError && !marks.hasValue;
+
+    final Widget body;
+    if (marks.isLoading && !marks.hasValue && !marks.hasError) {
+      body = const Padding(
+        padding: EdgeInsets.all(AppSpacing.space8),
+        child: Center(child: CircularProgressIndicator()),
+      );
+    } else {
+      body = Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (items.isEmpty && !marksFailed)
+            AppEmptyState(
+              compact: true,
+              icon: Icons.check_circle_outline,
+              message: 'grades.recent.empty'.tr(),
+            ),
+          // Assignment grades are rows on this tab already, below; only an exam opens elsewhere.
+          RecentGradesList(
+            items: items,
+            onTap: (item) => item.kind == GradeKind.exam ? onOpenExam : null,
+          ),
+          if (marksFailed)
+            AppEmptyState(
+              compact: true,
+              icon: Icons.error_outline,
+              accent: AppTone.danger.accent,
+              message: 'releasedMarks.error'.tr(),
+              action: TextButton(
+                onPressed: () => ref.invalidate(studentReleasedMarksProvider(studentId)),
+                child: Text('releasedMarks.retry'.tr()),
+              ),
+            ),
+        ],
+      );
+    }
+
+    return AppSectionCard(
+      key: ValueKey('child-recent-grades-$studentId'),
+      title: 'grades.recent.title'.tr(),
+      icon: Icons.grade_outlined,
+      accent: AppAccent.emerald,
+      child: body,
+    );
+  }
+}
+
+/// A section title in its kind's colours: "Exam marks" or "Assignment grades" (worded apart from
+/// the screen's own "Assignments" tab, which is about hand-ins, not grades).
+class _KindHeader extends StatelessWidget {
+  const _KindHeader({required this.kind});
+
+  final GradeKind kind;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSectionHeader(
+      key: ValueKey('child-grades-section-${kind.name}'),
+      title: switch (kind) {
+        GradeKind.exam => 'releasedMarks.title',
+        GradeKind.assignment => 'grades.sections.assignmentGrades',
+      }.tr(),
+      icon: kind.icon,
+      accent: kind.accent,
+      badgeSize: 32,
+    );
+  }
+}
+
 /// Opens the child's official (finalized) results, certificates and report cards — the same
 /// [AcademicResultsScreen] the child sees from their own grades screen.
 class _OfficialResultsTile extends StatelessWidget {
@@ -103,17 +212,14 @@ class _OfficialResultsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        leading: const Icon(Icons.workspace_premium_outlined),
-        title: Text('academicResults.entry'.tr()),
-        subtitle: Text('academicResults.entrySubtitle'.tr()),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => AcademicResultsScreen(studentId: studentId, studentName: studentName),
-          ),
+    return AppIconListCard(
+      icon: Icons.workspace_premium_outlined,
+      accent: AppAccent.amber,
+      title: 'academicResults.entry'.tr(),
+      subtitle: 'academicResults.entrySubtitle'.tr(),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => AcademicResultsScreen(studentId: studentId, studentName: studentName),
         ),
       ),
     );
@@ -256,7 +362,7 @@ class _TrendCard extends StatelessWidget {
 }
 
 /// A one-line message inside the tab's list rather than replacing the whole tab — "nothing
-/// published yet" under the term summary, or the breakdown's load error under the exam marks. A
+/// published yet" under the term summary, or the breakdown's load error under "Assignments". A
 /// non-scrolling row so it nests inside the view's `ListView` (mirrors the student grades
 /// screen's own `_EmptyTerm`).
 class _InlineMessage extends StatelessWidget {

@@ -202,7 +202,7 @@ void main() {
     expect(find.text('Algebra Worksheet'), findsOneWidget);
     expect(find.text('Sports Day'), findsOneWidget);
     // No grades were published, so the grades card falls back to its empty state.
-    expect(find.text('No grades published yet this term.'), findsOneWidget);
+    expect(find.text('No exam marks or assignment grades yet.'), findsOneWidget);
   });
 
   testWidgets('shows the unavailable message for grades and timetable when their context is unresolved', (
