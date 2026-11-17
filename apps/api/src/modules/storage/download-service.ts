@@ -61,6 +61,7 @@ const RESOLVERS: Readonly<Record<DownloadClassKey, Resolver>> = {
       SELECT storage_key
       FROM app.materials
       WHERE id = ${objectId} AND school_id = ${schoolId} AND ingest_status = 'ready'
+        AND source_kind = 'class'
     `;
     return row ? { storageKey: row.storage_key, targetTable: "materials" } : null;
   },

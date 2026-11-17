@@ -560,6 +560,14 @@ export const ERROR_CODES = {
   // returned. Too large refuses before the bytes are read; anything but JPEG or PNG is refused unread.
   AI_PHOTO_TOO_LARGE: "AI_PHOTO_TOO_LARGE",
   AI_PHOTO_UNSUPPORTED_TYPE: "AI_PHOTO_UNSUPPORTED_TYPE",
+  // A student's own AI sources (000232): a file or photo uploaded for the AI study tools. The type is
+  // not one the ingestion pipeline reads, the file is over the per-file cap, or the student already
+  // holds as many sources (or bytes) as one student may; and an assignment whose class has its AI
+  // materials setting off cannot be used as a source.
+  AI_SOURCE_UNSUPPORTED_TYPE: "AI_SOURCE_UNSUPPORTED_TYPE",
+  AI_SOURCE_TOO_LARGE: "AI_SOURCE_TOO_LARGE",
+  AI_SOURCE_LIMIT_REACHED: "AI_SOURCE_LIMIT_REACHED",
+  AI_SOURCE_AI_DISABLED: "AI_SOURCE_AI_DISABLED",
   AI_CONSENT_DISCLOSURE_OUTDATED: "AI_CONSENT_DISCLOSURE_OUTDATED",
 
   // LLM gateway (ST-164). The generate route answers with one of three provider-stage codes:

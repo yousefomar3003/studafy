@@ -53,6 +53,7 @@ export { aiRetrievalRoutes } from "./routes/retrieval-routes";
 export { aiGatewayRoutes } from "./routes/gateway-routes";
 export { aiAskRoutes } from "./routes/ask-routes";
 export { aiAskHistoryRoutes } from "./routes/ask-history-routes";
+export { aiSourceRoutes } from "./routes/source-routes";
 export { aiSummaryRoutes } from "./routes/summary-routes";
 export { aiConceptsRoutes } from "./routes/concepts-routes";
 export { aiExplainRoutes } from "./routes/explain-routes";

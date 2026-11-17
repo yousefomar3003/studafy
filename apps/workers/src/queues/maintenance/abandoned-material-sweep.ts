@@ -13,6 +13,12 @@
  *  - a `failed` material the teacher neither retried nor deleted within 14 days of the failure
  *    (updated_at is when it failed).
  *
+ * The same sweep applies the retention of a student's own AI sources (000232): the files and photos
+ * a student uploaded for the AI study tools are kept for PERSONAL_SOURCE_RETENTION_DAYS after upload
+ * (the app tells them so), then deleted with their text and file like a material. Their unconfirmed
+ * and failed uploads are swept by the two rules above, as a teacher's are. An assignment's AI source
+ * holds no file and is never swept: it goes with its assignment.
+ *
  * Once a day, per school, those rows are deleted and their stored files freed the way the API's
  * delete does (apps/api/src/modules/storage/free-objects.ts): after the delete commits, a key no
  * other row still points at (app.referenced_storage_keys) is read for its size, removed, and only
@@ -34,6 +40,11 @@ import type { Sql } from "postgres";
 export const ABANDONED_UPLOAD_AGE_HOURS = 24;
 /** A failed material left this long after it failed is removed. */
 export const FAILED_MATERIAL_RETENTION_DAYS = 14;
+/**
+ * How long a student's own AI source is kept after it was uploaded. Mirrors AI_SOURCE_RETENTION_DAYS
+ * in apps/api/src/modules/ai/sources/limits.ts, which the app shows the student.
+ */
+export const PERSONAL_SOURCE_RETENTION_DAYS = 365;
 /** Rows deleted per statement. */
 export const ABANDONED_MATERIAL_BATCH_SIZE = 200;
 
@@ -56,6 +67,8 @@ export interface PurgeAbandonedMaterialsResult {
   abandonedUploads: number;
   /** Failed materials deleted. */
   failedMaterials: number;
+  /** Students' own AI sources deleted at the end of their retention period. */
+  expiredPersonalSources: number;
   /** Stored objects removed, and their bytes. */
   objectsRemoved: number;
   bytesFreed: number;
@@ -65,12 +78,17 @@ export interface PurgeAbandonedMaterialsResult {
 
 interface DeletedMaterial {
   id: string;
-  class_id: string;
+  /** NULL for a student's own AI source (000232). */
+  class_id: string | null;
+  source_kind: string;
   uploaded_by_user_id: string;
-  ingest_status: "uploaded" | "failed";
+  ingest_status: string;
+  /** Which rule removed it. */
+  reason: "uploaded" | "failed" | "expired";
   ingest_error: string | null;
   original_file_name: string;
-  storage_key: string;
+  /** NULL for an assignment AI source (000232), which stores no file. */
+  storage_key: string | null;
   thumbnail_key: string | null;
   preview_key: string | null;
   created_at: Date;
@@ -87,11 +105,13 @@ export async function purgeAbandonedMaterials(
 ): Promise<PurgeAbandonedMaterialsResult> {
   const uploadCutoff = new Date(now.getTime() - ABANDONED_UPLOAD_AGE_HOURS * HOUR_MS);
   const failedCutoff = new Date(now.getTime() - FAILED_MATERIAL_RETENTION_DAYS * 24 * HOUR_MS);
+  const personalCutoff = new Date(now.getTime() - PERSONAL_SOURCE_RETENTION_DAYS * 24 * HOUR_MS);
   const schoolIds = await loadSchoolIds(sql);
   const result: PurgeAbandonedMaterialsResult = {
     schools: schoolIds.length,
     abandonedUploads: 0,
     failedMaterials: 0,
+    expiredPersonalSources: 0,
     objectsRemoved: 0,
     bytesFreed: 0,
     failed: 0,
@@ -115,6 +135,7 @@ export async function purgeAbandonedMaterials(
                     AND created_at < ${uploadCutoff})
                   OR (ingest_status = 'failed'::app.material_ingest_status
                     AND updated_at < ${failedCutoff})
+                  OR (source_kind = 'personal' AND created_at < ${personalCutoff})
                 )
               ORDER BY created_at, id
               LIMIT ${ABANDONED_MATERIAL_BATCH_SIZE}
@@ -123,22 +144,32 @@ export async function purgeAbandonedMaterials(
             DELETE FROM app.materials AS m
             USING batch
             WHERE m.id = batch.id AND m.school_id = ${schoolId}::uuid
-            RETURNING m.id, m.class_id, m.uploaded_by_user_id,
-                      m.ingest_status::text AS ingest_status, m.ingest_error,
+            RETURNING m.id, m.class_id, m.source_kind, m.uploaded_by_user_id,
+                      m.ingest_status::text AS ingest_status,
+                      CASE
+                        WHEN m.ingest_status = 'uploaded'::app.material_ingest_status
+                          AND m.created_at < ${uploadCutoff} THEN 'uploaded'
+                        WHEN m.ingest_status = 'failed'::app.material_ingest_status
+                          AND m.updated_at < ${failedCutoff} THEN 'failed'
+                        ELSE 'expired'
+                      END AS reason,
+                      m.ingest_error,
                       m.original_file_name, m.storage_key, m.thumbnail_key, m.preview_key,
                       m.created_at, m.updated_at
           `,
         );
 
         for (const row of deleted) {
-          if (row.ingest_status === "uploaded") result.abandonedUploads += 1;
-          else result.failedMaterials += 1;
+          if (row.reason === "uploaded") result.abandonedUploads += 1;
+          else if (row.reason === "failed") result.failedMaterials += 1;
+          else result.expiredPersonalSources += 1;
           log.info(
             {
               event: "material_swept",
               school_id: schoolId,
               material_id: row.id,
               class_id: row.class_id,
+              source_kind: row.source_kind,
               uploaded_by_user_id: row.uploaded_by_user_id,
               ingest_status: row.ingest_status,
               ingest_error: row.ingest_error,
@@ -147,9 +178,11 @@ export async function purgeAbandonedMaterials(
               created_at: row.created_at.toISOString(),
               updated_at: row.updated_at.toISOString(),
             },
-            row.ingest_status === "uploaded"
+            row.reason === "uploaded"
               ? "deleted a material upload that was never confirmed"
-              : "deleted a failed material nobody retried",
+              : row.reason === "failed"
+                ? "deleted a failed material nobody retried"
+                : "deleted a student's AI source at the end of its retention period",
           );
         }
 

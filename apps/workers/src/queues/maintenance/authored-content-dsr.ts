@@ -28,6 +28,10 @@
  *   safety filter's audit trail. Reports of AI content (app.ai_content_reports) are kept; they carry
  *   their own snapshot of the reported text.
  *
+ * The student's own AI sources (000232) -- the files and photos they uploaded for the AI study
+ * tools -- are deleted outright with their text, and their stored files returned for removal like
+ * message images. They are the student's private study notes: nothing in the school depends on them.
+ *
  * A tenant closure (no subject) applies the same rules to everyone in the school.
  */
 
@@ -82,10 +86,13 @@ export async function eraseAuthoredContent(
 ): Promise<AuthoredContentErasure> {
   const messages = await eraseMessages(tx, schoolId, subject);
   const ai = await eraseAiContent(tx, schoolId, subject);
+  const sources = await erasePersonalAiSources(tx, schoolId, subject);
   return {
-    redacted: [...messages.redacted, ...ai.redacted].filter((item) => item.rows > 0),
+    redacted: [...messages.redacted, ...ai.redacted, ...sources.redacted].filter(
+      (item) => item.rows > 0,
+    ),
     retained: [...messages.retained, ...ai.retained],
-    storageKeys: messages.storageKeys,
+    storageKeys: [...messages.storageKeys, ...sources.storageKeys],
   };
 }
 
@@ -348,5 +355,34 @@ async function eraseAiContent(
     redacted: counts.map(([table, rows]) => entry(table, rows)),
     retained:
       reports!.n > 0 ? [{ table: "ai_content_reports", reason: AI_CONTENT_REPORT_REASON }] : [],
+  };
+}
+
+/**
+ * A student's own AI sources (000232): app.materials rows of kind 'personal', deleted with their
+ * chunks (and whatever the AI tools grounded on those, already erased above for the same student).
+ * Their stored files go to the caller, to remove once the erasure has committed. Not an
+ * AUTHORED_CONTENT_TABLES entry: the rest of app.materials is a class's, and the generic walk still
+ * redacts the uploader columns of those.
+ */
+export async function erasePersonalAiSources(
+  tx: TransactionSql,
+  schoolId: string,
+  subject: SubjectIdentifiers | undefined,
+): Promise<{ redacted: RedactedTableEntry[]; storageKeys: string[] }> {
+  if (subject && !subject.studentId) return { redacted: [], storageKeys: [] };
+  const removed = await tx<
+    { storage_key: string | null; thumbnail_key: string | null; preview_key: string | null }[]
+  >`
+    DELETE FROM app.materials AS m
+    WHERE m.school_id = ${schoolId}::uuid AND m.source_kind = 'personal'
+      ${subject ? tx`AND m.owner_student_id = ${subject.studentId!}::uuid` : tx``}
+    RETURNING m.storage_key, m.thumbnail_key, m.preview_key
+  `;
+  return {
+    redacted: [{ table: "materials", action: "hard_deleted", columns: [], rows: removed.length }],
+    storageKeys: removed
+      .flatMap((row) => [row.storage_key, row.thumbnail_key, row.preview_key])
+      .filter((key): key is string => key !== null),
   };
 }
