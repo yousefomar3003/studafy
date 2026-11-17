@@ -2277,7 +2277,9 @@
         "sendTest": "Send a test notification",
         "testSent": "Sent. It should arrive on this phone in a few seconds.",
         "testFailed": "Couldn't send the test. Wait a moment and try again.",
-        "notRegistered": "This phone couldn't sign up for notifications, so nothing can reach it. Reason: {reason}"
+        "notRegistered": "This phone couldn't sign up for notifications, so nothing can reach it. Reason: {reason}",
+        "problem": "Reason: {reason}",
+        "retrySetup": "Try again"
       },
       "kinds": {
         "title": "What to notify me about",
