@@ -40,6 +40,8 @@ import {
   migrateDatabase,
 } from "../harness";
 
+import { insertOptIn, insertOptInWindow, releaseTestOptIn } from "./programme-optins";
+
 import type { LicenseActor, LicensingDeps } from "../../src/modules/licensing";
 import type { SchoolOverrideInput } from "../../src/modules/licensing/ai-programme";
 import type { TestApp, TestDatabase } from "../harness";
@@ -249,6 +251,13 @@ async function fixture(name: string): Promise<Fixture> {
       FROM app.currencies AS c WHERE c.code = 'USD'
       RETURNING id::text AS id
     `;
+    // Student AI in the programme (000235): each seated student holds a programme opt-in on it.
+    const windowId = await insertOptInWindow(tx, {
+      schoolId,
+      licenseId: license!.id,
+      academicYearId: year!.id,
+      openedBy: admin.id,
+    });
     const seat = async (student: { id: string; userId: string }) => {
       const [row] = await tx<{ id: string }[]>`
         INSERT INTO app.license_seats
@@ -257,16 +266,38 @@ async function fixture(name: string): Promise<Fixture> {
                 ${student.id}::uuid, '2026-09-01T06:00:00Z', ${admin.id}::uuid)
         RETURNING id::text AS id
       `;
-      return row!.id;
+      const optInId = await insertOptIn(tx, {
+        schoolId,
+        licenseId: license!.id,
+        academicYearId: year!.id,
+        windowId,
+        studentId: student.id,
+        recordedBy: admin.id,
+        startMonth: "2026-09-01",
+        endMonth: "2027-06-01",
+        monthlyPriceMinor: 600,
+        seatId: row!.id,
+        seatAssignedAt: "2026-09-01T06:00:00Z",
+        optedInAt: "2026-08-30T06:00:00Z",
+      });
+      return { seatId: row!.id, optInId };
     };
     await seat(seated);
     const unseatedSeat = await seat(unseated);
     await seat(withdrawn);
-    // Unseated in October: had Student AI in September and October, not in November.
+    // Unseated in October (the opt-in released first, as the service does): had Student AI in
+    // September and October, not in November.
+    await releaseTestOptIn(
+      tx,
+      unseatedSeat.optInId,
+      admin.id,
+      "2026-11-01",
+      "2026-10-15T06:00:00Z",
+    );
     await tx`
       UPDATE app.license_seats
       SET unassigned_at = '2026-10-15T06:00:00Z', unassigned_by = ${admin.id}::uuid
-      WHERE id = ${unseatedSeat}::uuid
+      WHERE id = ${unseatedSeat.seatId}::uuid
     `;
     // Withdrew from Economics in October.
     await tx`

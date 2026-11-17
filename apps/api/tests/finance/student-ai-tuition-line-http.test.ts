@@ -5,13 +5,14 @@
  * being frozen, the parent's line in the family financial view, and that parents see only their own
  * children's lines (in their school only).
  *
- * Opt-ins come from the temporary adapter (licence student seats, see
- * src/modules/finance/student-ai/opt-ins.ts) until phase 2's opt-in table is wired in.
+ * Opt-ins are phase 2's app.ai_optins rows (tests/licensing/programme-optins.ts writes them as the
+ * service does), read through src/modules/finance/student-ai/opt-ins.ts.
  *
  *   TEST_DATABASE_URL=postgres://... bun test tests/finance/student-ai-tuition-line-http.test.ts
  */
 
 import { ROLES } from "@studafy/constants";
+import { aiOptInPeriod, firstOfNextMonth } from "@studafy/license-pricing";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -28,6 +29,12 @@ import {
   integrationEnabled,
   migrateDatabase,
 } from "../harness";
+import {
+  insertOptIn,
+  insertOptInWindow,
+  releaseTestOptIn,
+  transferTestOptIn,
+} from "../licensing/programme-optins";
 
 import type { StudentRecord, TenantFixture, TestApp, TestDatabase } from "../harness";
 import type { Role } from "@studafy/constants";
@@ -101,6 +108,8 @@ interface Actor {
 interface Scenario {
   fixture: TenantFixture;
   yearId: string;
+  year: { startsOn: string; endsOn: string };
+  windowId: string;
   licenceId: string;
   familyId: string;
   student: StudentRecord;
@@ -113,7 +122,7 @@ async function scenario(year: { startsOn: string; endsOn: string }): Promise<Sce
   const fixture = await createFullTenant(database!.sql);
   const schoolId = fixture.schoolId;
   // One active year per school: the fixture's (this calendar year) steps aside for the year under
-  // test. The temporary opt-in adapter picks the latest-starting year containing a seat's date.
+  // test, which the opt-ins below are for.
   await admin(
     schoolId,
     (tx) => tx`
@@ -130,7 +139,7 @@ async function scenario(year: { startsOn: string; endsOn: string }): Promise<Sce
   await assignRole(database!.sql, schoolId, financeUser.id, ROLES.FINANCE);
   const student = fixture.students[0]!;
 
-  const { licenceId, familyId } = await admin(schoolId, async (tx) => {
+  const { licenceId, familyId, windowId } = await admin(schoolId, async (tx) => {
     const [licence] = await tx<{ id: string }[]>`
       INSERT INTO app.school_licenses (
         school_id, status, starts_at, ends_at, student_plan_id, student_seats, currency_id,
@@ -153,12 +162,21 @@ async function scenario(year: { startsOn: string; endsOn: string }): Promise<Sce
       VALUES (${schoolId}::uuid, ${family!.id}::uuid, ${fixture.users.PARENT.id}::uuid,
               ${student.id}::uuid, 'mother')
     `;
-    return { licenceId: licence!.id, familyId: family!.id };
+    // The licence is in the Student AI programme: the school opened an opt-in window (phase 2).
+    const windowId = await insertOptInWindow(tx, {
+      schoolId,
+      licenseId: licence!.id,
+      academicYearId: dated.id,
+      openedBy: fixture.users.ORG_ADMIN.id,
+    });
+    return { licenceId: licence!.id, familyId: family!.id, windowId };
   });
 
   return {
     fixture,
     yearId: dated.id,
+    year,
+    windowId,
     licenceId,
     familyId,
     student,
@@ -167,31 +185,43 @@ async function scenario(year: { startsOn: string; endsOn: string }): Promise<Sce
   };
 }
 
-/** The student opts in (temporary adapter: a licence seat assigned on `assignedAt`). */
-function optIn(s: Scenario, student: StudentRecord, assignedAt: string): Promise<string> {
-  return admin(s.fixture.schoolId, async (tx) => {
-    const [seat] = await tx<{ id: string }[]>`
-      INSERT INTO app.license_seats (
-        school_id, license_id, audience, user_id, student_id, assigned_at, assigned_by
-      ) VALUES (
-        ${s.fixture.schoolId}::uuid, ${s.licenceId}::uuid, 'student', ${student.userId}::uuid,
-        ${student.id}::uuid, ${assignedAt}::timestamptz, ${s.fixture.users.ORG_ADMIN.id}::uuid
-      )
-      RETURNING id::text AS id
-    `;
-    return seat!.id;
-  });
+/**
+ * The student opts in on `at` (phase 2's app.ai_optins, recorded on the parent's behalf): the months
+ * aiOptInPeriod gives for that day, at `monthlyPriceMinor` a month (the default parent price, $6).
+ */
+function optIn(
+  s: Scenario,
+  student: StudentRecord,
+  at: string,
+  monthlyPriceMinor = 600,
+): Promise<string> {
+  const period = aiOptInPeriod(s.year, at.slice(0, 10))!;
+  return admin(s.fixture.schoolId, (tx) =>
+    insertOptIn(tx, {
+      schoolId: s.fixture.schoolId,
+      licenseId: s.licenceId,
+      academicYearId: s.yearId,
+      windowId: s.windowId,
+      studentId: student.id,
+      recordedBy: s.fixture.users.ORG_ADMIN.id,
+      startMonth: period.startMonth,
+      endMonth: period.endMonth,
+      monthlyPriceMinor,
+      optedInAt: at,
+    }),
+  );
 }
 
-/** The student leaves on `at`: the seat is released (temporary adapter: unassigned). */
-function release(s: Scenario, seatId: string, at: string): Promise<unknown> {
-  return admin(
-    s.fixture.schoolId,
-    (tx) => tx`
-      UPDATE app.license_seats
-      SET unassigned_at = ${at}::timestamptz, unassigned_by = ${s.fixture.users.ORG_ADMIN.id}::uuid
-      WHERE id = ${seatId}::uuid
-    `,
+/** The student leaves on `at`: the opt-in is released from the next month (as releaseOptIn does). */
+function release(s: Scenario, optInId: string, at: string): Promise<unknown> {
+  return admin(s.fixture.schoolId, (tx) =>
+    releaseTestOptIn(
+      tx,
+      optInId,
+      s.fixture.users.ORG_ADMIN.id,
+      firstOfNextMonth(at.slice(0, 10)),
+      at,
+    ),
   );
 }
 
@@ -389,13 +419,13 @@ describeDb("the Student AI line on tuition", () => {
   test("a released seat stops from the next month; invoiced portions are not changed", async () => {
     const s = await scenario(TEN_MONTHS);
     await instalments(s, s.student, ["2026-09-01", "2027-01-01", "2027-04-01"]);
-    const seat = await optIn(s, s.student, "2026-09-03T08:00:00Z");
+    const optInId = await optIn(s, s.student, "2026-09-03T08:00:00Z");
     await sync(s);
     const [september] = await portionsOf(s, s.student);
     await invoice(s, september!.id, "ACC-SINV-2026-00001");
 
     // Leaves on 10 February: charged to the end of February, nothing from March.
-    await release(s, seat, "2027-02-10T08:00:00Z");
+    await release(s, optInId, "2027-02-10T08:00:00Z");
     await sync(s);
 
     const line = await lineOf(s);
@@ -427,12 +457,12 @@ describeDb("the Student AI line on tuition", () => {
   test("released in December after the first instalment was invoiced: nothing more is planned", async () => {
     const s = await scenario(TEN_MONTHS);
     await instalments(s, s.student, ["2026-09-01", "2027-01-01", "2027-04-01"]);
-    const seat = await optIn(s, s.student, "2026-09-03T08:00:00Z");
+    const optInId = await optIn(s, s.student, "2026-09-03T08:00:00Z");
     await sync(s);
     const [september] = await portionsOf(s, s.student);
     await invoice(s, september!.id, "ACC-SINV-2026-00003");
 
-    await release(s, seat, "2026-12-10T08:00:00Z");
+    await release(s, optInId, "2026-12-10T08:00:00Z");
     await sync(s);
     expect((await portionsOf(s, s.student)).map((p) => p.status)).toEqual(["invoiced"]);
     expect(await lineOf(s)).toMatchObject({
@@ -444,7 +474,7 @@ describeDb("the Student AI line on tuition", () => {
     });
   });
 
-  test("a transferred seat: the leaver stops next month, the new student pays from the transfer month", async () => {
+  test("a transferred seat: the leaver is charged through the transfer month, the new student from the next", async () => {
     const s = await scenario(TEN_MONTHS);
     const newcomer = await createStudent(database!.sql, s.fixture.schoolId);
     await admin(
@@ -458,24 +488,36 @@ describeDb("the Student AI line on tuition", () => {
     );
     await instalments(s, s.student, ["2026-09-01", "2027-01-01"]);
     await instalments(s, newcomer, ["2026-09-01", "2027-01-01"]);
-    const seat = await optIn(s, s.student, "2026-09-03T08:00:00Z");
+    const optInId = await optIn(s, s.student, "2026-09-03T08:00:00Z");
     await sync(s);
 
-    // The seat moves in December: the leaver is charged through December, the newcomer from it.
-    await release(s, seat, "2026-12-05T08:00:00Z");
-    await optIn(s, newcomer, "2026-12-05T09:00:00Z");
+    // The seat moves on 5 December: the leaver is charged through December, the newcomer from
+    // January (phase 2 starts the receiving opt-in the month after) -- December is charged once.
+    await admin(s.fixture.schoolId, (tx) =>
+      transferTestOptIn(tx, {
+        fromOptInId: optInId,
+        toStudentId: newcomer.id,
+        endedBy: s.fixture.users.ORG_ADMIN.id,
+        receiverStartMonth: "2027-01-01",
+        transferredAt: "2026-12-05T08:00:00Z",
+      }),
+    );
     await sync(s);
 
-    expect(await lineOf(s, s.student)).toMatchObject({ months: 4, stopped_from: "2027-01" });
+    expect(await lineOf(s, s.student)).toMatchObject({
+      months: 4,
+      stopped_from: "2027-01",
+      status: "transferred",
+    });
     expect(await lineOf(s, newcomer)).toMatchObject({
-      months: 7,
-      total: "42.00",
-      start_month: "2026-12",
+      months: 6,
+      total: "36.00",
+      start_month: "2027-01",
       late_start: true,
     });
     expect(
       (await portionsOf(s, newcomer)).map((p) => [p.due_date, p.first_month, p.month_count]),
-    ).toEqual([["2027-01-01", "2026-12-01", 7]]);
+    ).toEqual([["2027-01-01", "2027-01-01", 6]]);
   });
 
   test("auto-billing off: no fee items are planned, the parent still sees the line", async () => {
@@ -531,8 +573,12 @@ describeDb("the Student AI line on tuition", () => {
     }
   });
 
-  test("no line when the licence has no parent price in the school's currency", async () => {
+  test("the line carries the price the parent agreed to on the opt-in, fixed", async () => {
     const s = await scenario(TEN_MONTHS);
+    await optIn(s, s.student, "2026-09-03T08:00:00Z", 450);
+    expect(await sync(s)).toMatchObject({ created: 1 });
+    expect(await lineOf(s)).toMatchObject({ monthly_price_minor: 450, total: "45.00", months: 10 });
+    // A later change of the school's currency or programme values never re-prices the line.
     await admin(
       null,
       (tx) => tx`
@@ -540,8 +586,8 @@ describeDb("the Student AI line on tuition", () => {
         WHERE id = ${s.fixture.schoolId}::uuid
       `,
     );
-    await optIn(s, s.student, "2026-09-03T08:00:00Z");
-    expect(await sync(s)).toMatchObject({ created: 0, skipped_no_price: 1 });
+    expect(await sync(s)).toMatchObject({ created: 0, unchanged: 1 });
+    expect(await lineOf(s)).toMatchObject({ monthly_price_minor: 450, currency: "USD" });
   });
 
   test("parents see only their own children's lines, in their own school", async () => {

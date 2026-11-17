@@ -1,9 +1,10 @@
 /**
  * The Student AI revenue share in the hourly licence lifecycle job (migration 000237): the conversion
  * measurement taken and locked on its measurement day -- not the day before, and once -- with the
- * temporary adapters (enrolled students; the licence's student seats standing in for phase 2's
- * opt-ins); and, once the job stops a licence's AI for an instalment unpaid past its grace period,
- * that instalment's share forfeited while the shares of paid ones stay owed.
+ * real measures (enrolled students; phase 2's opt-ins for the year); once the job stops a licence's
+ * AI for an instalment unpaid past its grace period, that instalment's share forfeited while the
+ * shares of paid ones stay owed; and a credit the job applies that pays a new licence's first
+ * instalment puts that licence in force, as the API's payment path does.
  *
  * Needs TEST_DATABASE_URL pointing at a fully migrated database, like the other billing job tests.
  */
@@ -151,12 +152,40 @@ describe("conversion measurement", () => {
     });
     const students: { userId: string; studentId: string }[] = [];
     for (let i = 0; i < 4; i += 1) students.push(await student(schoolId));
+    // The licence is in the programme (an opt-in window) and three of the four opt in (phase 2).
     await admin(schoolId, async (tx) => {
+      const opener = await user(schoolId, "ORG_ADMIN");
+      const [year] = await tx<{ id: string }[]>`
+        INSERT INTO app.academic_years (school_id, code, name, starts_on, ends_on, status)
+        VALUES (${schoolId}::uuid, 'AY-W', 'Year', ${iso(start)}::date - 10, ${iso(start)}::date + 300,
+                'active')
+        RETURNING id::text AS id
+      `;
+      const [window] = await tx<{ id: string }[]>`
+        INSERT INTO app.ai_optin_windows
+          (school_id, license_id, academic_year_id, opens_on, closes_on, opened_by)
+        VALUES (${schoolId}::uuid, ${lic}::uuid, ${year!.id}::uuid, CURRENT_DATE, CURRENT_DATE + 20,
+                ${opener}::uuid)
+        RETURNING id::text AS id
+      `;
       for (const holder of students.slice(0, 3)) {
-        await tx`
+        const [seat] = await tx<{ id: string }[]>`
           INSERT INTO app.license_seats (school_id, license_id, audience, user_id, student_id, assigned_by)
           VALUES (${schoolId}::uuid, ${lic}::uuid, 'student', ${holder.userId}::uuid,
                   ${holder.studentId}::uuid, ${superAdmin}::uuid)
+          RETURNING id::text AS id
+        `;
+        await tx`
+          INSERT INTO app.ai_optins (
+            school_id, student_id, academic_year_id, license_id, window_id, source, recorded_by,
+            note, terms_version, start_month, end_month, months, currency_id, monthly_price_minor,
+            total_minor, seat_id, seat_assigned_at
+          ) VALUES (
+            ${schoolId}::uuid, ${holder.studentId}::uuid, ${year!.id}::uuid, ${lic}::uuid,
+            ${window!.id}::uuid, 'school_on_behalf', ${opener}::uuid, 'Paper form', '2026-11-17',
+            date_trunc('month', CURRENT_DATE)::date, date_trunc('month', CURRENT_DATE)::date, 1,
+            ${usd}::uuid, 600, 600, ${seat!.id}::uuid, CURRENT_TIMESTAMP
+          )
         `;
       }
     });
@@ -197,7 +226,7 @@ describe("conversion measurement", () => {
         WHERE school_id = ${schoolId}::uuid AND license_id = ${lic}::uuid
       `,
     );
-    // 3 of 4 enrolled students hold a seat: 75%, the 70-84% tier (10%).
+    // 3 of 4 enrolled students opted in: 75%, the 70-84% tier (10%).
     expect([...snapshots]).toEqual([
       {
         period_start: iso(start),
@@ -361,5 +390,154 @@ describe("forfeiture after the AI stops", () => {
       schoolId,
     ]);
     expect(again.sharesSettled).toBe(0);
+  });
+});
+
+describe("a credit that pays a new licence's first instalment", () => {
+  jobTest("puts the licence in force, as the API's payment path does", async () => {
+    const schoolId = await school("Credited School");
+    // Last year's licence (ended) earned a share, owed; this year's waits for its first instalment.
+    const old = await license(schoolId, {
+      startsAt: new Date("2025-01-01T00:00:00Z"),
+      endsAt: new Date("2026-01-01T00:00:00Z"),
+      seats: 10,
+    });
+    const next = await admin(schoolId, async (tx) => {
+      await tx`UPDATE app.school_licenses SET status = 'expired' WHERE id = ${old}::uuid`;
+      const [row] = await tx<{ id: string }[]>`
+        INSERT INTO app.school_licenses (
+          school_id, status, starts_at, ends_at, student_plan_id, student_seats, currency_id,
+          created_by, ai_programme_version_id, nonpayment_grace_days
+        ) VALUES (
+          ${schoolId}::uuid, 'awaiting_payment', now() + interval '1 day', now() + interval '300 days',
+          ${tier}::uuid, 10, ${usd}::uuid, ${superAdmin}::uuid, ${PROGRAMME_V1}::uuid, 30
+        )
+        RETURNING id::text AS id
+      `;
+      return row!.id;
+    });
+    await admin(schoolId, async (tx) => {
+      const reference = () =>
+        `STF-${crypto.randomUUID().slice(0, 4).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`.replace(
+          /[ILOU]/g,
+          "A",
+        );
+      const invoice = async (
+        licenseId: string,
+        issueDate: string,
+        total: number,
+        paid: number,
+        status: string,
+        createdAt: string,
+      ) =>
+        (
+          await tx<{ id: string }[]>`
+            INSERT INTO app.license_invoices (
+              school_id, license_id, number, payment_reference, currency_id, issue_date, due_date,
+              subtotal_minor, total_minor, paid_minor, status, issued_by, payment_plan, created_at,
+              updated_at
+            ) VALUES (
+              ${schoolId}::uuid, ${licenseId}::uuid, app.next_license_invoice_number(${issueDate}::date),
+              ${reference()}, ${usd}::uuid, ${issueDate}, ${issueDate}::date + 30, ${total}, ${total},
+              ${paid}, ${status}, ${superAdmin}::uuid, 'monthly', ${createdAt}, ${createdAt}
+            )
+            RETURNING id::text AS id
+          `
+        )[0]!.id;
+      const oldInvoice = await invoice(
+        old,
+        "2024-12-20",
+        4000,
+        4000,
+        "paid",
+        "2024-12-20T10:00:00Z",
+      );
+      const [oldInstalment] = await tx<{ id: string }[]>`
+        INSERT INTO app.license_invoice_instalments (
+          school_id, invoice_id, position, amount_minor, paid_minor, due_date, status
+        ) VALUES (${schoolId}::uuid, ${oldInvoice}::uuid, 1, 4000, 4000, '2025-01-01', 'paid')
+        RETURNING id::text AS id
+      `;
+      const [payment] = await tx<{ id: string }[]>`
+        INSERT INTO app.license_payments (
+          school_id, invoice_id, amount_minor, currency_id, received_at, bank_reference, recorded_by
+        ) VALUES (
+          ${schoolId}::uuid, ${oldInvoice}::uuid, 4000, ${usd}::uuid, '2025-01-01T10:00:00Z',
+          ${`FT-${crypto.randomUUID().slice(0, 6)}`}, ${superAdmin}::uuid
+        )
+        RETURNING id::text AS id
+      `;
+      const [snapshot] = await tx<{ id: string }[]>`
+        INSERT INTO app.ai_programme_conversion_snapshots (
+          school_id, license_id, period_start, measure_on, as_of, enrolled_count, opted_in_count,
+          conversion_bps, seats, conversion_share_bps, floor_applied, ai_programme_version_id,
+          locked, source
+        ) VALUES (
+          ${schoolId}::uuid, ${old}::uuid, '2025-01-01', '2025-01-31', '2025-01-31', 10, 7, 7000,
+          10, 1000, false, ${PROGRAMME_V1}::uuid, true, 'scheduled'
+        )
+        RETURNING id::text AS id
+      `;
+      // Its share: 13% of $40 = $5.20, owed.
+      await tx`
+        INSERT INTO app.ai_programme_revenue_share_entries (
+          school_id, license_id, invoice_id, payment_id, instalment_id, received_on, period_from,
+          period_to, measurement_period_start, currency_id, collected_minor, base_minor, commitment,
+          ai_programme_version_id, snapshot_id, seats, conversion_bps, conversion_share_bps,
+          floor_applied, upload_consistency_bps, bonus_bps, capped, multiplier_bps, total_bps,
+          amount_minor, conversion_pending, bonus_pending, status
+        ) VALUES (
+          ${schoolId}::uuid, ${old}::uuid, ${oldInvoice}::uuid, ${payment!.id}::uuid,
+          ${oldInstalment!.id}::uuid, '2025-01-01', '2025-01-01', '2025-12-31', '2025-01-01',
+          ${usd}::uuid, 4000, 4000, 'full_year', ${PROGRAMME_V1}::uuid, ${snapshot!.id}::uuid, 10,
+          7000, 1000, false, 8500,
+          300, false, 10000, 1300, 520, false, false, 'owed'
+        )
+      `;
+      // This year's invoice: two instalments of $5.20, nothing paid.
+      const nextInvoice = await invoice(
+        next,
+        iso(new Date()),
+        1040,
+        0,
+        "issued",
+        new Date().toISOString(),
+      );
+      await tx`
+        INSERT INTO app.license_invoice_instalments (
+          school_id, invoice_id, position, amount_minor, paid_minor, due_date, status
+        ) VALUES
+          (${schoolId}::uuid, ${nextInvoice}::uuid, 1, 520, 0, CURRENT_DATE + 10, 'due'),
+          (${schoolId}::uuid, ${nextInvoice}::uuid, 2, 520, 0, CURRENT_DATE + 40, 'due')
+      `;
+    });
+
+    const run = await runLicenseLifecycle(db!, new Date(), silentLogger, [schoolId]);
+    expect(run).toMatchObject({
+      failedRevenueShareSchools: 0,
+      sharesSettled: 1,
+      licensesActivatedByCredit: 1,
+      licensesAwaitingApiActivation: 0,
+    });
+    const [state] = await admin(
+      schoolId,
+      (tx) => tx<{ status: string; activated: boolean }[]>`
+        SELECT status, activated_at IS NOT NULL AS activated FROM app.school_licenses
+        WHERE id = ${next}::uuid
+      `,
+    );
+    expect(state).toEqual({ status: "active", activated: true });
+    const [audit] = await admin(
+      schoolId,
+      (tx) => tx<{ v: string; actor: string | null }[]>`
+        SELECT new_values ->> 'status' AS v, actor_id::text AS actor FROM app.audit_logs
+        WHERE school_id = ${schoolId}::uuid AND target_table = 'school_licenses'
+          AND target_id = ${next}::uuid
+      `,
+    );
+    expect(audit).toEqual({ v: "active", actor: null });
+    // Idempotent: nothing more to do.
+    const again = await runLicenseLifecycle(db!, new Date(), silentLogger, [schoolId]);
+    expect(again).toMatchObject({ sharesSettled: 0, licensesActivatedByCredit: 0 });
   });
 });

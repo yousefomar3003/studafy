@@ -5,24 +5,27 @@
  * school's next invoice and its instalments; the payout when there is no next invoice (and in payout
  * mode); forfeiture past the cutoff; voids; month-to-month licences; the super admin's re-measure
  * before the lock; the school's own read and the routes' permissions; tenant isolation and the
- * ledger's guards; the measures' temporary adapters; and the programme values a share uses -- the
+ * ledger's guards; the measures' real adapters and the programme gate; and the programme values a share uses -- the
  * licence's own, until the super admin re-applies the current ones.
  *
- * Phases 2 and 4 are not on this branch: the opt-in count, the upload consistency and the
- * commitment are stood in for with useRevenueShareMeasures, school by school, except where the test
- * is about the temporary adapters themselves.
+ * The opt-in count, the upload consistency and the commitment are stood in for with
+ * useRevenueShareMeasures, school by school, so the figures are the spec's; "the measures" tests
+ * run the real adapters (phase 2's opt-ins, phase 4's upload consistency, the licence's
+ * commitment). Every programme licence below has an opt-in window (it is in the programme: only
+ * such a licence earns a share).
  *
  * The tests share one database and run in order; the last one saves a new global programme version.
  */
 
 import {
   REVENUE_SHARE_MEASURES,
+  licenceInProgramme,
   lockDueConversionSnapshots,
   measureConversion,
   readProgrammeValues,
 } from "@studafy/billing";
 import { ROLES } from "@studafy/constants";
-import { splitEvenly } from "@studafy/license-pricing";
+import { instalmentPeriods, splitEvenly } from "@studafy/license-pricing";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -30,7 +33,6 @@ import { createLogger } from "../../src/logger";
 import { AUTH_CHANNELS } from "../../src/modules/auth/channels";
 import {
   acceptQuote,
-  assignSeats,
   createLicense,
   createQuote,
   currentAiProgrammeVersion,
@@ -65,12 +67,14 @@ import {
   migrateDatabase,
 } from "../harness";
 
+import { insertOptIn, insertOptInWindow, releaseTestOptIn } from "./programme-optins";
+
 import type { LicenseActor, LicensingDeps, QuoteTerms } from "../../src/modules/licensing";
 import type { SchoolOverrideInput } from "../../src/modules/licensing/ai-programme";
 import type { RevenueShareEntryView } from "../../src/modules/licensing/revenue-share";
 import type { TestApp, TestDatabase } from "../harness";
 import type { RevenueShareMeasures } from "@studafy/billing";
-import type { RevenueShareCommitment } from "@studafy/license-pricing";
+import type { LicenseCommitment } from "@studafy/license-pricing";
 import type { TransactionSql } from "postgres";
 
 const integrationTest = test.skipIf(!integrationEnabled);
@@ -90,7 +94,7 @@ interface Measured {
   enrolled: number;
   optedIn: number;
   upload: number | null;
-  commitment: RevenueShareCommitment;
+  commitment: LicenseCommitment;
 }
 const measured = new Map<string, Measured>();
 const fakeMeasures: RevenueShareMeasures = {
@@ -203,6 +207,8 @@ afterAll(async () => {
 interface SchoolFixture {
   schoolId: string;
   admin: LicenseActor;
+  /** The academic year opt-in windows are opened for (it covers every licence below). */
+  academicYearId: string;
 }
 
 async function school(
@@ -219,7 +225,31 @@ async function school(
     commitment: "full_year",
     ...measures,
   });
-  return { schoolId, admin: { kind: "school", userId: admin.id, homeSchoolId: schoolId } };
+  const academicYearId = await asAdmin(schoolId, async (tx) => {
+    const [year] = await tx<{ id: string }[]>`
+      INSERT INTO app.academic_years (school_id, code, name, starts_on, ends_on, status)
+      VALUES (${schoolId}::uuid, 'AY-RS', 'Year', CURRENT_DATE - 60, CURRENT_DATE + 400, 'active')
+      RETURNING id::text AS id
+    `;
+    return year!.id;
+  });
+  return {
+    schoolId,
+    admin: { kind: "school", userId: admin.id, homeSchoolId: schoolId },
+    academicYearId,
+  };
+}
+
+/** Put a licence in the Student AI programme: an opt-in window on it (phase 2). */
+function joinProgramme(f: SchoolFixture, licenseId: string): Promise<string> {
+  return asAdmin(f.schoolId, (tx) =>
+    insertOptInWindow(tx, {
+      schoolId: f.schoolId,
+      licenseId,
+      academicYearId: f.academicYearId,
+      openedBy: f.admin.userId,
+    }),
+  );
 }
 
 const ISO = (date: Date) => date.toISOString().slice(0, 10);
@@ -243,12 +273,16 @@ interface ProgrammeLicence {
   due: (k: number) => Date;
 }
 
-/** A 10-month Student AI licence for `seats` seats, paid monthly, accepted by the school. */
+/**
+ * A 10-month Student AI licence for `seats` seats, paid monthly, accepted by the school, in the
+ * programme (an opt-in window on it) unless `inProgramme` is false.
+ */
 async function programmeLicence(
   f: SchoolFixture,
   seats = 350,
   extra: Partial<QuoteTerms> = {},
   months = 10,
+  inProgramme = true,
 ): Promise<ProgrammeLicence> {
   const start = tomorrow();
   const quote = await as(f.schoolId, operator, async (tx) => {
@@ -273,6 +307,7 @@ async function programmeLicence(
     f.admin,
     (tx) => acceptQuote(tx, f.schoolId, quote.id, f.admin) as never,
   )) as Awaited<ReturnType<typeof acceptQuote>>["result"];
+  if (inProgramme) await joinProgramme(f, invoice.licenseId);
   return {
     licenseId: invoice.licenseId,
     invoiceId: invoice.id,
@@ -372,7 +407,16 @@ describe("the spec's worked example", () => {
         collectedMinor: 140_000,
         baseMinor: 140_000,
         periodFrom: ISO(licence.start),
-        periodTo: ISO(addDays(addMonths(licence.start, 1), -1)),
+        periodTo: instalmentPeriods({
+          plan: "monthly",
+          startDate: ISO(licence.start),
+          endDate: ISO(addMonths(licence.start, 10)),
+          months: 10,
+          instalments: Array.from({ length: 10 }, (_, i) => ({
+            position: i + 1,
+            dueDate: ISO(licence.due(i + 1)),
+          })),
+        })[0]!.to,
         measurementPeriodStart: ISO(licence.start),
         conversionBps: null,
         amountMinor: 0,
@@ -1036,15 +1080,15 @@ describe("the ledger's guards", () => {
 });
 
 // ---------------------------------------------------------------------------------------------------
-// The temporary adapters, and the programme values
+// The measures, the programme gate, and the programme values
 // ---------------------------------------------------------------------------------------------------
 
-describe("the temporary adapters", () => {
+describe("the measures", () => {
   integrationTest(
-    "enrolled students and the licence's student seats held that day (phase 2 swaps the second)",
+    "enrolled students, and phase 2's opt-ins for the year active at the end of the day",
     async () => {
       const f = await school();
-      const students: { userId: string }[] = [];
+      const students: { id: string; userId: string }[] = [];
       for (let i = 0; i < 4; i += 1) students.push(await createStudent(db.sql, f.schoolId));
       const licenseId = await as(f.schoolId, operator, async (tx) => {
         const license = await createLicense(
@@ -1062,18 +1106,32 @@ describe("the temporary adapters", () => {
         const active = await transitionLicense(tx, f.schoolId, license.id, "active", operator);
         return { result: active.result.id, versions: active.versions };
       });
-      await as(
-        f.schoolId,
-        operator,
-        (tx) =>
-          assignSeats(
-            tx,
-            f.schoolId,
-            licenseId,
-            { audience: "student", userIds: students.slice(0, 3).map((s) => s.userId) },
-            operator,
-          ) as never,
-      );
+      const windowId = await joinProgramme(f, licenseId);
+      // Three opt in three days ago; one of them is released yesterday.
+      const optIns = await asAdmin(f.schoolId, async (tx) => {
+        const ids: string[] = [];
+        for (const student of students.slice(0, 3)) {
+          ids.push(
+            await insertOptIn(tx, {
+              schoolId: f.schoolId,
+              licenseId,
+              academicYearId: f.academicYearId,
+              windowId,
+              studentId: student.id,
+              recordedBy: f.admin.userId,
+              startMonth: `${ISO(new Date()).slice(0, 7)}-01`,
+              endMonth: `${ISO(addDays(new Date(), 300)).slice(0, 7)}-01`,
+              monthlyPriceMinor: 600,
+              optedInAt: addDays(new Date(), -3).toISOString(),
+            }),
+          );
+        }
+        return ids;
+      });
+      const count = (onDate: string) =>
+        asAdmin(f.schoolId, (tx) =>
+          REVENUE_SHARE_MEASURES.countOptedInStudents(tx, f.schoolId, licenseId, onDate),
+        );
       const today = ISO(new Date());
       const measurement = await asAdmin(f.schoolId, (tx) =>
         measureConversion(
@@ -1095,27 +1153,65 @@ describe("the temporary adapters", () => {
         conversionBps: 7500,
         seats: 3,
       });
-      // Before the seats were held, nobody had opted in.
-      const before = await asAdmin(f.schoolId, (tx) =>
-        REVENUE_SHARE_MEASURES.countOptedInStudents(
+      // Before they opted in, nobody had.
+      expect(await count(ISO(addDays(new Date(), -4)))).toBe(0);
+      // Released yesterday: still counted on the days before, not after.
+      await asAdmin(f.schoolId, (tx) =>
+        releaseTestOptIn(
           tx,
-          f.schoolId,
-          licenseId,
-          ISO(new Date(Date.now() - 2 * DAY)),
+          optIns[0]!,
+          f.admin.userId,
+          `${ISO(addDays(new Date(), 40)).slice(0, 7)}-01`,
+          addDays(new Date(), -1).toISOString(),
         ),
       );
-      expect(before).toBe(0);
-      // No upload consistency until phase 4; full_year until phase 2 adds the commitment.
+      expect(await count(ISO(addDays(new Date(), -2)))).toBe(3);
+      expect(await count(today)).toBe(2);
+
+      // Upload consistency waits until the days are over; a finished period with no class that has
+      // Student AI measures 0. The commitment is the licence's own.
       const adapters = await asAdmin(f.schoolId, async (tx) => ({
-        upload: await REVENUE_SHARE_MEASURES.uploadConsistencyForPeriod(tx, {
+        ongoing: await REVENUE_SHARE_MEASURES.uploadConsistencyForPeriod(tx, {
           schoolId: f.schoolId,
           licenseId,
           from: today,
           to: today,
         }),
+        finished: await REVENUE_SHARE_MEASURES.uploadConsistencyForPeriod(tx, {
+          schoolId: f.schoolId,
+          licenseId,
+          from: ISO(addDays(new Date(), -10)),
+          to: ISO(addDays(new Date(), -3)),
+        }),
         commitment: await REVENUE_SHARE_MEASURES.licenceCommitment(tx, f.schoolId, licenseId),
+        inProgramme: await licenceInProgramme(tx, licenseId),
       }));
-      expect(adapters).toEqual({ upload: null, commitment: "full_year" });
+      expect(adapters).toEqual({
+        ongoing: null,
+        finished: 0,
+        commitment: "full_year",
+        inProgramme: true,
+      });
+    },
+  );
+
+  integrationTest(
+    "a licence outside the programme (no opt-in window, no opt-ins) earns no share",
+    async () => {
+      const f = await school({}, "Not In The Programme");
+      const licence = await programmeLicence(f, 350, {}, 10, false);
+      await lock(f, addDays(licence.start, 30));
+      const first = await pay(f, licence.invoiceId, 140_000, licence.start);
+      expect(first.licenseActivated).toBe(true);
+      expect(await ledger(f)).toEqual([]);
+      const snapshots = await asAdmin(
+        f.schoolId,
+        (tx) => tx`
+        SELECT 1 FROM app.ai_programme_conversion_snapshots
+        WHERE school_id = ${f.schoolId}::uuid
+      `,
+      );
+      expect(snapshots).toHaveLength(0);
     },
   );
 });
