@@ -79,6 +79,24 @@ when it required the `version-bump` label.
   (`UploadPeriodBasis`) and `bonus` (`UploadConsistencyBonus`: the content-bonus tier on the
   licence's values, the next tier and `targetBps`; no amounts).
 
+- The Student AI revenue share engine (migration 000237; docs/billing/ai-programme.md, "Revenue share
+  engine"). Super admin only (`platform:read` / `platform:manage`, web channel):
+  `platformListAiRevenueShare` (`GET /api/platform/schools/{schoolId}/ai-revenue-share`, query
+  `licenseId`, `status`: `AiRevenueShareLedger` -- `AiRevenueShareEntry[]`, `AiRevenueShareTotals[]`
+  per currency, `AiRevenueSharePayout[]`), `platformGetLicenseAiRevenueShare`
+  (`GET /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share`:
+  `AiLicenseRevenueShare` with the licence's `AiConversionMeasurementPeriod[]` and the
+  `AiRevenueShareRate` in force), `platformMeasureLicenseConversion`
+  (`POST .../licenses/{licenseId}/ai-revenue-share/measure`, `AiConversionRemeasureBody` with a
+  `reason`; 409 `AI_REVENUE_SHARE_CONVERSION_LOCKED` once locked), `platformRecomputeAiRevenueShare`
+  (`POST .../ai-revenue-share/recompute`: `AiRevenueShareRecomputeResult`) and
+  `platformRecordAiRevenueSharePayout` (`POST .../ai-revenue-share/payouts`,
+  `AiRevenueSharePayoutBody`; 409 `AI_REVENUE_SHARE_PAYOUT_CHANGED` / `AI_REVENUE_SHARE_NOTHING_DUE`).
+  School: `schoolGetAiRevenueShare` (`GET /api/school/ai-revenue-share`, new permission
+  `aiRevenueShare:read` held by ORG_ADMIN, PRINCIPAL and FINANCE). `LicenseInvoiceLineKind` adds
+  `ai_share_credit`: the revenue share credited on an invoice (a negative line; the invoice's
+  `creditTotalMinor`, total and earliest unpaid instalments come down by it).
+
 - The school chooses its licence length and payment plan; AI stops 30 days after an unpaid
   instalment (migration 000233, ADR-021 amendment). `CreateLicenseChangeRequestBody` takes optional
   `months` (1-36), `startsOn`, `paymentPlan` (`monthly`, `yearly`, `custom`) and, for custom,

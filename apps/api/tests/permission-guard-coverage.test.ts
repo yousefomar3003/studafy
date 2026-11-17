@@ -520,6 +520,10 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/platform/schools/{schoolId}/ai-programme/override/clear",
   "POST /api/platform/schools/{schoolId}/ai-programme/preview",
   "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply",
+  // Student AI revenue share (000237), platform:manage.
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share/measure",
+  "POST /api/platform/schools/{schoolId}/ai-revenue-share/recompute",
+  "POST /api/platform/schools/{schoolId}/ai-revenue-share/payouts",
   "PUT /api/platform/licenses/bank-details",
   "POST /api/platform/licenses/quote",
   "POST /api/platform/schools/{schoolId}/license-quotes",

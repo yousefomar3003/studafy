@@ -190,6 +190,14 @@ describe("structure", () => {
         "/api/platform/schools/{schoolId}/ai-programme/preview",
         "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme",
         "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply",
+        // Student AI revenue share (000237): platform:read / platform:manage, web channel; the
+        // school's own read on aiRevenueShare:read.
+        "/api/platform/schools/{schoolId}/ai-revenue-share",
+        "/api/platform/schools/{schoolId}/ai-revenue-share/recompute",
+        "/api/platform/schools/{schoolId}/ai-revenue-share/payouts",
+        "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share",
+        "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share/measure",
+        "/api/school/ai-revenue-share",
         "/api/platform/licenses/bank-details",
         "/api/platform/licenses/quote",
         "/api/platform/licenses/invoices",
@@ -1020,6 +1028,14 @@ describe("security", () => {
         "POST /api/platform/schools/{schoolId}/ai-programme/preview",
         "GET /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme",
         "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply",
+        // Student AI revenue share (000237): platform:read / platform:manage, web channel; the
+        // school's own read on aiRevenueShare:read.
+        "GET /api/platform/schools/{schoolId}/ai-revenue-share",
+        "POST /api/platform/schools/{schoolId}/ai-revenue-share/recompute",
+        "POST /api/platform/schools/{schoolId}/ai-revenue-share/payouts",
+        "GET /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share",
+        "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share/measure",
+        "GET /api/school/ai-revenue-share",
         "GET /api/platform/licenses/bank-details",
         "PUT /api/platform/licenses/bank-details",
         "POST /api/platform/licenses/quote",

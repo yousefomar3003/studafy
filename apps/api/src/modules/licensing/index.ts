@@ -19,6 +19,7 @@ export {
   type AiOptInView,
   type AiOptInWindowView,
 } from "./ai-optin";
+export { platformAiRevenueShareRoutes, schoolAiRevenueShareRoutes } from "./revenue-share-routes";
 export {
   INITIAL_AI_PROGRAMME_VERSION_ID,
   attachAiProgramme,
@@ -101,3 +102,11 @@ export {
   type UploadConsistencyView,
   type UploadPeriod,
 } from "./upload-consistency";
+export {
+  licenseRevenueShare,
+  recomputeRevenueShare,
+  recordRevenueSharePayout,
+  remeasureConversion,
+  schoolRevenueShare,
+} from "./revenue-share";
+export { useRevenueShareMeasures } from "./revenue-share-context";

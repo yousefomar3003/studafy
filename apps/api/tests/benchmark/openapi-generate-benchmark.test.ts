@@ -610,6 +610,14 @@ const EXPECTED_PATHS = [
   "/api/platform/schools/{schoolId}/ai-programme/preview",
   "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme",
   "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply",
+  // Student AI revenue share (000237): platform:read / platform:manage, web channel; the school's
+  // own read on aiRevenueShare:read.
+  "/api/platform/schools/{schoolId}/ai-revenue-share",
+  "/api/platform/schools/{schoolId}/ai-revenue-share/recompute",
+  "/api/platform/schools/{schoolId}/ai-revenue-share/payouts",
+  "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share",
+  "/api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share/measure",
+  "/api/school/ai-revenue-share",
   "/api/platform/licenses/quote",
   "/api/platform/licenses/receipts",
   "/api/platform/schools/{schoolId}/license-invoices/{invoiceId}",

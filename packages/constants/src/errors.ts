@@ -553,6 +553,13 @@ export const ERROR_CODES = {
   LICENSE_PAYMENT_VOIDED: "LICENSE_PAYMENT_VOIDED",
   LICENSE_RECEIPT_NOT_FOUND: "LICENSE_RECEIPT_NOT_FOUND",
   LICENSE_RECEIPT_ALREADY_MATCHED: "LICENSE_RECEIPT_ALREADY_MATCHED",
+  // The Student AI revenue share (000237), the super admin's. AI_REVENUE_SHARE_CONVERSION_LOCKED: the
+  // licence period's conversion is locked, so it is not measured again. AI_REVENUE_SHARE_NOTHING_DUE:
+  // no share is due to be paid out in that currency. AI_REVENUE_SHARE_PAYOUT_CHANGED: the amount due
+  // is no longer the one the payout was recorded for -- reload and check it.
+  AI_REVENUE_SHARE_CONVERSION_LOCKED: "AI_REVENUE_SHARE_CONVERSION_LOCKED",
+  AI_REVENUE_SHARE_NOTHING_DUE: "AI_REVENUE_SHARE_NOTHING_DUE",
+  AI_REVENUE_SHARE_PAYOUT_CHANGED: "AI_REVENUE_SHARE_PAYOUT_CHANGED",
   // The Student AI programme's settings (000234), the super admin's. AI_PROGRAMME_VALUE_OUT_OF_RANGE:
   // a price, percentage, seat count or day count outside its bounds. AI_PROGRAMME_TIERS_INVALID: a
   // tier table must start at 0%, raise its threshold on every row, never lower a share, and have at

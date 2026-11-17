@@ -117,3 +117,21 @@ export type {
   UploadConsistencyResult,
   UploadConsistencyTeacherResult,
 } from "./upload-consistency";
+export {
+  REVENUE_SHARE_COMMITMENTS,
+  addDaysUtc,
+  computeRevenueShare,
+  instalmentPeriods,
+  measurementDateOf,
+  ratioBps,
+  shareAmountOf,
+  studentPartOf,
+} from "./revenue-share";
+export type {
+  InstalmentPeriod,
+  InstalmentPeriodInput,
+  RevenueShareCommitment,
+  RevenueShareInput,
+  RevenueShareResult,
+  RevenueShareSettings,
+} from "./revenue-share";
