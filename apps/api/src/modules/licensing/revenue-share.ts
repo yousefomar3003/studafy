@@ -1,9 +1,11 @@
 import {
   insertSnapshot,
+  licenceInProgramme,
   measureConversion,
   measurementPeriods,
   periodFor,
   readProgrammeValues,
+  recordEarlierPaymentShares,
   resolvePendingShares,
   utcDay,
 } from "@studafy/billing";
@@ -14,13 +16,17 @@ import {
   measurementDateOf,
 } from "@studafy/license-pricing";
 
+import { setTenantScope, withSystemTx } from "../../db/tenant-tx";
+
 import { auditLicenseChange, licenseError } from "./context";
 import { settleShares } from "./invoices";
 import { revenueShareMeasures, shareContext } from "./revenue-share-context";
 
 import type { LicenseActor } from "./context";
 import type { Changed, LicenseRecord } from "./service";
-import type { RevenueShareStatus } from "@studafy/billing";
+import type { Database, DatabasePools } from "../../db/client";
+import type { Logger } from "../../logger";
+import type { RecordedShare, RevenueShareStatus } from "@studafy/billing";
 import type { LicenseCommitment } from "@studafy/license-pricing";
 import type { TransactionSql } from "postgres";
 
@@ -538,14 +544,69 @@ export async function recomputeRevenueShare(
   schoolId: string,
   actor: LicenseActor,
   now: Date = new Date(),
-): Promise<Changed<{ resolved: number; settled: number }>> {
-  const resolved = await resolvePendingShares(tx, shareContext(tx, schoolId, actor, now));
+): Promise<Changed<{ recorded: number; resolved: number; settled: number }>> {
+  const ctx = shareContext(tx, schoolId, actor, now);
+  // A payment recorded before its licence entered the programme, whose entries were not recorded
+  // when it did (the after-commit step failed, or it entered another way): recorded now.
+  let recorded = 0;
+  for (const licenseId of await programmeLicenceIds(tx)) {
+    recorded += (await recordEarlierPaymentShares(tx, ctx, licenseId)).length;
+  }
+  const resolved = await resolvePendingShares(tx, ctx);
   const settled = await settleSharesCounted(tx, schoolId, actor, now);
   return {
-    result: { resolved: resolved.length, settled: settled.count },
+    result: { recorded, resolved: resolved.length, settled: settled.count },
     versions: settled.versions,
     pending: settled.pending,
   };
+}
+
+/** The armed school's licences that can still earn and are in the Student AI programme. */
+async function programmeLicenceIds(tx: TransactionSql): Promise<string[]> {
+  const rows = await tx<{ id: string }[]>`
+    SELECT l.id::text AS id
+    FROM app.school_licenses AS l
+    WHERE l.school_id = current_setting('app.school_id')::uuid
+      AND l.status IN ('awaiting_payment', 'active', 'suspended')
+    ORDER BY l.starts_at, l.id
+  `;
+  const ids: string[] = [];
+  for (const row of rows) if (await licenceInProgramme(tx, row.id)) ids.push(row.id);
+  return ids;
+}
+
+/**
+ * Once a licence has entered the programme (the school opened its first opt-in window), record the
+ * revenue share of the payments recorded on it this period before it did
+ * (`recordEarlierPaymentShares`: new entries only, idempotent). Run after the window's transaction
+ * commits, in a system transaction armed for the school with the acting user (the ledger is written
+ * by the system role, never the school's). Best effort: the window stands, and a failure is logged
+ * at error level -- the super admin's recompute records what is missing.
+ */
+export async function recordEarlierSharesAfterCommit(
+  database: Database | DatabasePools,
+  actor: LicenseActor,
+  licenseId: string,
+  log: Pick<Logger, "error">,
+  now: Date = new Date(),
+): Promise<RecordedShare[]> {
+  try {
+    return await withSystemTx(database, async (tx) => {
+      await setTenantScope(tx, actor.homeSchoolId, actor.requestId);
+      await tx`SELECT set_config('app.user_id', ${actor.userId}, true)`;
+      return recordEarlierPaymentShares(
+        tx,
+        shareContext(tx, actor.homeSchoolId, actor, now),
+        licenseId,
+      );
+    });
+  } catch (err) {
+    log.error(
+      { err, school_id: actor.homeSchoolId, license_id: licenseId },
+      "ai revenue share: recording the shares of earlier payments failed; the console's recompute records them",
+    );
+    return [];
+  }
 }
 
 async function settleSharesCounted(

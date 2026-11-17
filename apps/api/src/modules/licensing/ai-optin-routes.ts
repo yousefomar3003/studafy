@@ -36,6 +36,7 @@ import {
   transferResultSchema,
   windowParamsSchema,
 } from "./ai-optin-schemas";
+import { recordEarlierSharesAfterCommit } from "./revenue-share";
 import { readInSchool, runLicenseChange } from "./service";
 
 import type { LicenseActor } from "./context";
@@ -308,6 +309,10 @@ export function aiOptInRoutes(deps: LicensingDeps): OpenAPIHono<AppEnv> {
     const { result } = await runLicenseChange(deps, actor.schoolId, actor, async (tx) =>
       unchanged(await openWindow(tx, actor.schoolId, body, actor)),
     );
+    // The licence is in the programme now (000237's gate): payments recorded on it this period
+    // before it was earned nothing then, so their revenue share entries are recorded now -- in the
+    // system's transaction, since the ledger is written by the system role, not the school's.
+    await recordEarlierSharesAfterCommit(deps.database, actor, result.licenseId, c.get("log"));
     return c.json(result, 201);
   });
 

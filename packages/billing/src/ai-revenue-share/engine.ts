@@ -1,4 +1,5 @@
 import {
+  allocatePayments,
   computeRevenueShare,
   instalmentPeriods,
   measurementDateOf,
@@ -644,6 +645,83 @@ export async function recordPaymentShares(
       amountMinor: figures.result.amountMinor,
       totalBps: figures.result.totalBps,
     });
+  }
+  return recorded;
+}
+
+/**
+ * A licence just entered the Student AI programme (its first opt-in window, or its first opt-in):
+ * the payments already recorded on it for the current licence period earned nothing when they were
+ * recorded (the programme gate is tested at record time), so record their shares now, as
+ * `recordPaymentShares` would have -- the same figures, pending or final, and forfeited when the
+ * money came on or after the instalment's cutoff.
+ *
+ * Only payments that are not voided and have no ledger entry get one: entries are created, never
+ * rewritten, and calling it again records nothing. "The current licence period" is the measurement
+ * period today falls in (the licence's start, or the start of the term a renewal added): the
+ * invoices whose term starts in it. Each earlier payment's part of each instalment is worked out as
+ * `recordPayment` did, by replaying the invoice's payments in the order they were recorded,
+ * earliest instalment first (`allocatePayments`).
+ */
+export async function recordEarlierPaymentShares(
+  tx: TransactionSql,
+  ctx: RevenueShareContext,
+  licenseId: string,
+): Promise<RecordedShare[]> {
+  if (!(await licenceInProgramme(tx, licenseId))) return [];
+  const periods = await measurementPeriods(tx, licenseId);
+  if (periods.length === 0) return [];
+  const current = periodFor(periods, utcDay(ctx.now));
+  const next = periods.find((start) => start > current) ?? null;
+  const invoices = await tx<{ id: string }[]>`
+    SELECT i.id::text AS id
+    FROM app.license_invoices AS i
+    JOIN app.school_licenses AS l ON l.id = i.license_id AND l.school_id = i.school_id
+    LEFT JOIN app.license_quotes AS q ON q.id = i.quote_id AND q.school_id = i.school_id
+    WHERE i.school_id = current_setting('app.school_id')::uuid
+      AND i.license_id = ${licenseId}::uuid
+      AND i.status <> 'void'
+      AND ((COALESCE(q.starts_at, l.starts_at) AT TIME ZONE 'UTC')::date) >= ${current}::date
+      AND (${next}::date IS NULL
+           OR ((COALESCE(q.starts_at, l.starts_at) AT TIME ZONE 'UTC')::date) < ${next}::date)
+    ORDER BY i.issue_date, i.number
+  `;
+  const recorded: RecordedShare[] = [];
+  for (const invoice of invoices) {
+    const instalments = await tx<{ id: string; position: number; amount_minor: string }[]>`
+      SELECT id::text AS id, position, amount_minor::text AS amount_minor
+      FROM app.license_invoice_instalments
+      WHERE school_id = current_setting('app.school_id')::uuid
+        AND invoice_id = ${invoice.id}::uuid
+      ORDER BY position
+    `;
+    const payments = await tx<{ id: string; amount_minor: string; has_entries: boolean }[]>`
+      SELECT p.id::text AS id, p.amount_minor::text AS amount_minor,
+             EXISTS (
+               SELECT 1 FROM app.ai_programme_revenue_share_entries AS e
+               WHERE e.school_id = p.school_id AND e.payment_id = p.id
+             ) AS has_entries
+      FROM app.license_payments AS p
+      WHERE p.school_id = current_setting('app.school_id')::uuid
+        AND p.invoice_id = ${invoice.id}::uuid AND p.voided_at IS NULL
+      ORDER BY p.created_at, p.id
+    `;
+    const amounts = instalments.map((i) => ({
+      position: i.position,
+      amountMinor: Number(i.amount_minor),
+    }));
+    let paidBefore = 0;
+    for (const payment of payments) {
+      const before = allocatePayments(amounts, paidBefore);
+      paidBefore += Number(payment.amount_minor);
+      if (payment.has_entries) continue;
+      const after = allocatePayments(amounts, paidBefore);
+      const portions = instalments.map((instalment, index) => ({
+        instalmentId: instalment.id,
+        amountMinor: after[index]!.paidMinor - before[index]!.paidMinor,
+      }));
+      recorded.push(...(await recordPaymentShares(tx, ctx, payment.id, portions)));
+    }
   }
   return recorded;
 }

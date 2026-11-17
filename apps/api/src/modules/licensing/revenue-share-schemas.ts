@@ -186,6 +186,9 @@ export const remeasureBodySchema = z
 
 export const recomputeResultSchema = z
   .object({
+    recorded: int.openapi({
+      description: "Entries recorded for payments made before their licence entered the programme.",
+    }),
     resolved: int,
     settled: int,
     revenueShare: schoolRevenueShareSchema,

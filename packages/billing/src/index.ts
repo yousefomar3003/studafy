@@ -103,6 +103,7 @@ export {
   measureConversion,
   measurementPeriods,
   periodFor,
+  recordEarlierPaymentShares,
   recordPaymentShares,
   resolvePendingShares,
   restoreCreditsOfVoidedInvoice,
