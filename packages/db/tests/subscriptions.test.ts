@@ -192,10 +192,14 @@ integrationTest(
       expect(billingPolicies).toHaveLength(1);
       expect(billingPolicies[0]!.name).toBe("global_admin_only");
 
-      const [adminRoleOid] = await database.sql<{ oid: number }[]>`
-        SELECT oid::integer AS oid FROM pg_roles WHERE rolname = 'studafy_admin'
+      // The owner and, since QA-015, the non-owner role system transactions run as.
+      const ownerRoles = await database.sql<{ oid: number }[]>`
+        SELECT oid::integer AS oid FROM pg_roles
+        WHERE rolname IN ('studafy_admin', 'studafy_system') ORDER BY oid
       `;
-      expect(billingPolicies[0]!.roles).toEqual([adminRoleOid!.oid]);
+      expect([...billingPolicies[0]!.roles].sort((a, b) => a - b)).toEqual(
+        ownerRoles.map((role) => role.oid),
+      );
     } finally {
       await database.cleanup();
     }

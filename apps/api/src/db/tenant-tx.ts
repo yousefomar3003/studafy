@@ -88,8 +88,10 @@ export async function withAppTx<T>(
  * header of 000016) -- so there is no `school_id` to hand `withTenantTx` at BEGIN time. There is
  * also no acting user: Stripe is not a person.
  *
- * `studafy_admin` is required rather than convenient: `app.billing_events` revokes every privilege
- * from `studafy_app` and its only policy names `studafy_admin`. The elevation is transaction-local
+ * `studafy_system` is required rather than convenient: `app.billing_events` revokes every privilege
+ * from `studafy_app` and its only policy names `studafy_admin` and `studafy_system`. The system role
+ * has the owner's grants and policies but owns nothing, so it cannot switch RLS off, drop a policy
+ * or truncate the audit log (QA-015). The elevation is transaction-local
  * (`SET LOCAL ROLE` ends at COMMIT), which is what keeps it safe under PgBouncer transaction
  * pooling, exactly as the GUC-setting in `configureTenantTx` is.
  *
@@ -106,7 +108,7 @@ export async function withSystemTx<T>(
   const selected = selectDatabase(database, {});
   let result: T | undefined;
   await selected.begin(async (tx) => {
-    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx.unsafe("SET LOCAL ROLE studafy_system");
     result = await fn(tx);
   });
   return result as T;

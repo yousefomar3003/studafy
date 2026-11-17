@@ -320,7 +320,7 @@ export async function processMaterialDerivation(
 
     // Guarded by the same NULL check that claimed the material, so a concurrent duplicate becomes
     // a no-op rather than overwriting a finished run. The write is transactional with the row's
-    // RLS context (SET LOCAL ROLE studafy_admin), like every other material flip.
+    // RLS context (SET LOCAL ROLE studafy_system), like every other material flip.
     await withSystemTenantTx(sql, { schoolId }, async (tx) => {
       await tx`
         UPDATE app.materials

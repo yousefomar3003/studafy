@@ -520,7 +520,7 @@ async function runConcurrent<T>(
 // idle-in-transaction timeouts and long lock waits for no benefit -- nothing here needs cross-item
 // atomicity, only per-item atomicity (an item's own invoice_batch_items row and the batch's running
 // counters commit together, or not at all). `withSystemTenantTx` (apps/workers/src/db/tenant-tx.ts)
-// is the shared "set_config app.school_id + SET LOCAL ROLE studafy_admin, no acting user" helper —
+// is the shared "set_config app.school_id + SET LOCAL ROLE studafy_system, no acting user" helper —
 // the right one here since a batch job runs unattended, on the school's behalf.
 // ---------------------------------------------------------------------------
 

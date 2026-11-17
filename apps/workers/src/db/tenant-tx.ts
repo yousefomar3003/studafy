@@ -47,9 +47,10 @@ export async function withTenantTx<T>(
  * point, and it is worth being precise about why it is safe:
  *
  * - `tenant_isolation` is PERMISSIVE, granted `TO PUBLIC`, and every table it guards is created
- *   with FORCE ROW LEVEL SECURITY — which extends RLS to the table's owner. `studafy_admin` owns
- *   these tables and has neither SUPERUSER nor BYPASSRLS, so it is still fully subject to
- *   `school_id = current_setting('app.school_id')`. A bug here cannot cross a tenant boundary.
+ *   with FORCE ROW LEVEL SECURITY. `studafy_system` owns nothing and has neither SUPERUSER nor
+ *   BYPASSRLS, so it is fully subject to `school_id = current_setting('app.school_id')`, and,
+ *   unlike the owner `studafy_admin` it replaced here (QA-015), it cannot switch RLS off, drop a
+ *   policy or truncate the audit log. A bug here cannot cross a tenant boundary.
  * - `role_scope_visibility`, `notifications_owner_select` and friends are RESTRICTIVE and granted
  *   `TO studafy_app` specifically. They resolve the *acting user* from `app.user_id`, and an
  *   unattended process has none.
@@ -72,7 +73,7 @@ export async function withSystemTenantTx<T>(
   await sql.begin(async (tx) => {
     // Order matters: the GUC is set first so tenant isolation is armed before the role changes.
     await tx`SELECT set_config('app.school_id', ${context.schoolId}, true)`.execute();
-    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx.unsafe("SET LOCAL ROLE studafy_system");
     result = await fn(tx);
   });
   return result as T;
@@ -82,7 +83,7 @@ export async function withSystemTenantTx<T>(
  * A system transaction whose tenant is not known at BEGIN time.
  *
  * The billing-event retry (ST-132) is the one caller. It starts from a `provider_event_id` and has
- * to read `app.billing_events` — a global, `studafy_admin`-only table — before it can say which
+ * to read `app.billing_events` — a global table only `studafy_admin` and `studafy_system` may read — before it can say which
  * school the event concerns. There is no `school_id` to hand `withSystemTenantTx`, and guessing one
  * would be worse than having none.
  *
@@ -97,7 +98,7 @@ export async function withSystemTx<T>(
 ): Promise<T> {
   let result: T | undefined;
   await sql.begin(async (tx) => {
-    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx.unsafe("SET LOCAL ROLE studafy_system");
     result = await fn(tx);
   });
   return result as T;

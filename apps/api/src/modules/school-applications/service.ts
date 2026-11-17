@@ -643,7 +643,7 @@ export async function approveApplication(
       actor.requestId,
     );
 
-    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx.unsafe("SET LOCAL ROLE studafy_system");
     const after = await loadApplication(tx, applicationId);
     return {
       row: after,

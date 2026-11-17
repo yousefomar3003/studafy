@@ -210,13 +210,16 @@ integrationTest(
         "oauth_identities.oauth_identity_login_lookup",
         "users.user_deletion_request_lookup",
       ]);
-      const [adminRole] = await database.sql<{ oid: number }[]>`
-        SELECT oid::integer AS oid FROM pg_roles WHERE rolname = 'studafy_admin'
+      // studafy_system, the non-owner role system transactions run as since QA-015, holds the
+      // owner's policies too.
+      const ownerRoles = await database.sql<{ oid: number }[]>`
+        SELECT oid::integer AS oid FROM pg_roles
+        WHERE rolname IN ('studafy_admin', 'studafy_system') ORDER BY oid
       `;
       for (const policy of seamPolicies) {
         // 'r' is SELECT — the seam can read one row, never write.
         expect(policy.command).toBe("r");
-        expect(policy.roles).toEqual([adminRole!.oid]);
+        expect([...policy.roles].sort((a, b) => a - b)).toEqual(ownerRoles.map((role) => role.oid));
         expect(policy.check_expression).toBeNull();
       }
       // Each seam pins its lookup to the GUC-carried value(s) its SECURITY DEFINER function sets, so the
