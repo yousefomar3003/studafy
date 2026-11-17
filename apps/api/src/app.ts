@@ -155,6 +155,7 @@ import {
   schoolLicenseBillingRoutes,
   schoolLicenseRoutes,
 } from "./modules/licensing";
+import { uploadConsistencyRoutes } from "./modules/licensing/upload-consistency-routes";
 import { messagingRoutes } from "./modules/messaging";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
@@ -1273,6 +1274,10 @@ export function createApp({
       logger,
       storage,
     };
+    // Student AI content bonus (phase 4): upload consistency per class, teacher and school, read by
+    // the school (license:read) and the super admin (platform:read). Before the routes below, so its
+    // own guards are the ones that answer for its paths.
+    app.route("/", uploadConsistencyRoutes(licensingDeps));
     app.route("/", schoolLicenseRoutes(licensingDeps));
     app.route("/", platformLicenseRoutes(licensingDeps));
     // Session 3: pricing, quotes, invoices and bank-transfer payments. `storage` carries transfer

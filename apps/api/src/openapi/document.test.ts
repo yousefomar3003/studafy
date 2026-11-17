@@ -145,6 +145,10 @@ describe("structure", () => {
         "/api/school/license/tiers",
         "/api/school/license/seats",
         "/api/school/license/seats/{seatId}",
+        // Student AI content bonus (phase 4): upload consistency, license:read for the school and
+        // platform:read (web channel) for the super admin.
+        "/api/school/license/upload-consistency",
+        "/api/platform/schools/{schoolId}/ai-programme/upload-consistency",
         "/api/platform/schools/{schoolId}/license-requests",
         "/api/platform/schools/{schoolId}/license-requests/{requestId}/resolve",
         "/api/platform/schools/{schoolId}/licenses",
@@ -954,6 +958,9 @@ describe("security", () => {
         "GET /api/school/license/eligible",
         "GET /api/school/license/people",
         "GET /api/school/license/tiers",
+        // Student AI content bonus (phase 4): license:read / platform:read (web channel).
+        "GET /api/school/license/upload-consistency",
+        "GET /api/platform/schools/{schoolId}/ai-programme/upload-consistency",
         "POST /api/school/license/change-requests",
         "GET /api/platform/schools/{schoolId}/licenses",
         "POST /api/platform/schools/{schoolId}/licenses",

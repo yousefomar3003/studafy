@@ -89,3 +89,19 @@ export type {
   RevenueSharePreview,
   RevenueSharePreviewInput,
 } from "./ai-programme";
+export {
+  computeUploadConsistency,
+  contentBonusStanding,
+  daysInRange,
+  nextDay,
+  schoolDaysBetween,
+} from "./upload-consistency";
+export type {
+  ContentBonusStanding,
+  DayRange,
+  UploadConsistencyClassInput,
+  UploadConsistencyClassResult,
+  UploadConsistencyInput,
+  UploadConsistencyResult,
+  UploadConsistencyTeacherResult,
+} from "./upload-consistency";
