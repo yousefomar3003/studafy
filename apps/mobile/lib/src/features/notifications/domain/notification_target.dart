@@ -1,20 +1,38 @@
 import '../../../core/router/route_paths.dart';
 import '../../shell/domain/shell_role.dart';
+import '../../student/domain/work_and_grades.dart';
 
 /// Where tapping a notification in the inbox takes the user.
 ///
 /// Exactly one of [route] (a screen to push) or [tabLabelKey] (a shell tab to switch to) is set;
 /// when neither is, the inbox shows the notification's full text in place instead.
 class NotificationTarget {
-  const NotificationTarget.route(String this.route) : tabLabelKey = null;
-  const NotificationTarget.tab(String this.tabLabelKey) : route = null;
-  const NotificationTarget.none() : route = null, tabLabelKey = null;
+  const NotificationTarget.route(String this.route)
+    : tabLabelKey = null,
+      workSection = null,
+      gradesTab = null;
+  const NotificationTarget.tab(String this.tabLabelKey, {this.workSection, this.gradesTab})
+    : route = null;
+  const NotificationTarget.none()
+    : route = null,
+      tabLabelKey = null,
+      workSection = null,
+      gradesTab = null;
 
   final String? route;
   final String? tabLabelKey;
 
+  /// For the student's "Work & grades" tab: the section to open on, and for the grades section
+  /// the tab ([gradesTab]) — a grade notice lands on its own kind of grade, not on whatever
+  /// section was last open.
+  final WorkAndGradesSection? workSection;
+  final GradesTab? gradesTab;
+
   bool get isNone => route == null && tabLabelKey == null;
 }
+
+/// The student's "Work & grades" shell tab (`workAndGradesTabKey`).
+const _workAndGradesTab = 'shell.tabs.workAndGrades';
 
 final _assignmentRoute = RegExp(r'^/courses/[^/{}]+/assignments/[^/{}]+$');
 final _gradesRoute = RegExp(r'^/courses/[^/{}]+/grades$');
@@ -73,7 +91,16 @@ NotificationTarget notificationTargetFor({
     case 'GRADE_POSTED':
       if (role == ShellRole.student) {
         if (openable != null) return NotificationTarget.route(openable);
-        return const NotificationTarget.tab('shell.tabs.workAndGrades');
+        return type == 'ASSIGNMENT_GRADED' || type == 'GRADE_POSTED'
+            ? const NotificationTarget.tab(
+                _workAndGradesTab,
+                workSection: WorkAndGradesSection.grades,
+                gradesTab: GradesTab.assignments,
+              )
+            : const NotificationTarget.tab(
+                _workAndGradesTab,
+                workSection: WorkAndGradesSection.assignments,
+              );
       }
       if (role == ShellRole.parent) {
         return const NotificationTarget.tab('shell.tabs.children');
@@ -81,9 +108,13 @@ NotificationTarget notificationTargetFor({
     case 'MARKS_RELEASED':
       if (role == ShellRole.student || role == ShellRole.parent) {
         if (openable != null) return NotificationTarget.route(openable);
-        return NotificationTarget.tab(
-          role == ShellRole.parent ? 'shell.tabs.children' : 'shell.tabs.workAndGrades',
-        );
+        return role == ShellRole.parent
+            ? const NotificationTarget.tab('shell.tabs.children')
+            : const NotificationTarget.tab(
+                _workAndGradesTab,
+                workSection: WorkAndGradesSection.grades,
+                gradesTab: GradesTab.exams,
+              );
       }
     case 'MATERIAL_PUBLISHED':
       if (role == ShellRole.student) {

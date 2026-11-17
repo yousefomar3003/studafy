@@ -13,7 +13,8 @@ import 'widgets/assignment_list_tile.dart';
 /// than a status query.
 ///
 /// The student app shows the same list ([StudentAssignmentsView]) as the "Assignments" section
-/// of its "Work & grades" tab; this standalone screen is what the home's "Due soon" card pushes.
+/// of its "Work & grades" tab, where the home's "Due soon" goes; this standalone screen is the
+/// fallback for a "Due soon" shown outside the student shell.
 class StudentAssignmentsScreen extends StatelessWidget {
   const StudentAssignmentsScreen({super.key});
 

@@ -18,8 +18,8 @@ import 'grades_screen.dart';
 ///   ([GradesView]), with the official-results entry ([AcademicResultsButton]) beside the toggle.
 ///
 /// The selection lives in [workAndGradesProvider], so the section (and grades tab) a student last
-/// picked is still showing when they come back, and the home's "Recent grades" can open the tab
-/// straight onto the grades ([openStudentGrades]). Each section is built the first time it is
+/// picked is still showing when they come back, and the home's cards can open the tab straight
+/// onto the grades ([openStudentGrades]) or the assignments ([openStudentAssignments]). Each section is built the first time it is
 /// shown (the grades cost requests of their own) and then kept, so its tab and scroll position
 /// survive switching back and forth.
 class WorkAndGradesScreen extends ConsumerStatefulWidget {
@@ -122,4 +122,17 @@ void openStudentGrades(BuildContext context, WidgetRef ref, GradesTab tab) {
   Navigator.of(
     context,
   ).push(MaterialPageRoute<void>(builder: (_) => GradesScreen(initialTab: tab)));
+}
+
+/// Shows the student's assignment list: in the student shell, switches to the "Work & grades" tab
+/// on its "Assignments" section; anywhere else, pushes [StudentAssignmentsScreen].
+void openStudentAssignments(BuildContext context, WidgetRef ref) {
+  if (ref.read(shellRoleProvider) == ShellRole.student) {
+    ref.read(workAndGradesProvider.notifier).selectSection(WorkAndGradesSection.assignments);
+    ref.read(selectedShellTabProvider.notifier).select(workAndGradesTabKey);
+    return;
+  }
+  Navigator.of(
+    context,
+  ).push(MaterialPageRoute<void>(builder: (_) => const StudentAssignmentsScreen()));
 }

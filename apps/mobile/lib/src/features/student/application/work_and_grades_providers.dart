@@ -9,8 +9,8 @@ const workAndGradesTabKey = 'shell.tabs.workAndGrades';
 ///
 /// App-scoped on purpose, like `selectedGradeTermProvider`: the section a student last picked is
 /// still selected when they come back to the tab later in the session (a fresh app start opens on
-/// the assignments). The home's "Recent grades" writes to it ([showGrades]) before switching to
-/// the tab, so the tab opens on the grades of the kind tapped.
+/// the assignments). The home's "Recent grades" and "Due soon" and the notification inbox write to
+/// it ([showGrades], [open]) before switching to the tab, so it opens on what was tapped.
 class WorkAndGradesNotifier extends Notifier<WorkAndGradesSelection> {
   @override
   WorkAndGradesSelection build() => const WorkAndGradesSelection();
@@ -18,6 +18,10 @@ class WorkAndGradesNotifier extends Notifier<WorkAndGradesSelection> {
   void selectSection(WorkAndGradesSection section) => state = state.copyWith(section: section);
 
   void selectGradesTab(GradesTab tab) => state = state.copyWith(gradesTab: tab);
+
+  /// Opens [section], and with [gradesTab] the grades on that tab; the other choice is kept.
+  void open(WorkAndGradesSection section, {GradesTab? gradesTab}) =>
+      state = state.copyWith(section: section, gradesTab: gradesTab);
 
   /// Opens the grades section on [tab].
   void showGrades(GradesTab tab) =>

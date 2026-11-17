@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/features/notifications/domain/notification_target.dart';
 import 'package:studafy_mobile/src/features/shell/domain/shell_role.dart';
+import 'package:studafy_mobile/src/features/student/domain/work_and_grades.dart';
 
 void main() {
   group('isOpenableNotificationRoute', () {
@@ -43,13 +44,37 @@ void main() {
       expect(target.route, '/courses/c-1/assignments/a-1');
     });
 
-    test('a student without a usable link lands on the Work tab', () {
-      final target = notificationTargetFor(
-        type: 'ASSIGNMENT_GRADED',
-        metadata: const {},
-        role: ShellRole.student,
-      );
-      expect(target.tabLabelKey, 'shell.tabs.workAndGrades');
+    test(
+      'a graded assignment without a usable link opens the assignment grades',
+      () {
+        for (final type in ['ASSIGNMENT_GRADED', 'GRADE_POSTED']) {
+          final target = notificationTargetFor(
+            type: type,
+            metadata: const {},
+            role: ShellRole.student,
+          );
+          expect(target.tabLabelKey, 'shell.tabs.workAndGrades', reason: type);
+          expect(target.workSection, WorkAndGradesSection.grades, reason: type);
+          expect(target.gradesTab, GradesTab.assignments, reason: type);
+        }
+      },
+    );
+
+    test('a new or due assignment without a usable link opens the assignments', () {
+      for (final type in ['ASSIGNMENT_PUBLISHED', 'ASSIGNMENT_DUE_SOON']) {
+        final target = notificationTargetFor(
+          type: type,
+          metadata: const {},
+          role: ShellRole.student,
+        );
+        expect(target.tabLabelKey, 'shell.tabs.workAndGrades', reason: type);
+        expect(
+          target.workSection,
+          WorkAndGradesSection.assignments,
+          reason: type,
+        );
+        expect(target.gradesTab, isNull, reason: type);
+      }
     });
 
     test("a student opens the new material's class materials", () {
@@ -84,23 +109,37 @@ void main() {
       },
     );
 
-    test('released marks without a usable link land on Work or Children', () {
-      expect(
-        notificationTargetFor(
+    test(
+      'released marks without a usable link land on the exam grades or Children',
+      () {
+        final student = notificationTargetFor(
           type: 'MARKS_RELEASED',
           metadata: {'route': '/students/{studentId}/marks'},
           role: ShellRole.student,
-        ).tabLabelKey,
-        'shell.tabs.workAndGrades',
-      );
-      expect(
-        notificationTargetFor(
+        );
+        expect(student.tabLabelKey, 'shell.tabs.workAndGrades');
+        expect(student.workSection, WorkAndGradesSection.grades);
+        expect(student.gradesTab, GradesTab.exams);
+
+        final parent = notificationTargetFor(
           type: 'MARKS_RELEASED',
           metadata: const {},
           role: ShellRole.parent,
-        ).tabLabelKey,
-        'shell.tabs.children',
+        );
+        expect(parent.tabLabelKey, 'shell.tabs.children');
+        expect(parent.workSection, isNull);
+      },
+    );
+
+    test('a link that opens a screen carries no Work & grades section', () {
+      final target = notificationTargetFor(
+        type: 'GRADE_POSTED',
+        metadata: {'route': '/courses/c-1/grades'},
+        role: ShellRole.student,
       );
+      expect(target.route, '/courses/c-1/grades');
+      expect(target.workSection, isNull);
+      expect(target.gradesTab, isNull);
     });
 
     test("a parent's school-work notices open the Children tab", () {
