@@ -6,7 +6,9 @@
 
 # QA-053: base images are pinned by tag and digest (the multi-arch index), written out in each FROM
 # so Dependabot can propose bumps; change both together.
-# nginx 1.28: the supported stable line (1.27 is superseded).
+# nginx 1.30: the current stable line. QA-073: 1.28 is superseded, and its last image (nginx
+# 1.28.3-r1) carries five fixed HIGH nginx CVEs that `apk upgrade` cannot reach, since that
+# package comes from nginx.org's repository, not Alpine's.
 
 FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS build
 WORKDIR /app
@@ -95,9 +97,9 @@ RUN --mount=type=secret,id=sentry_auth_token \
     [ -n "$VITE_SENTRY_ENVIRONMENT" ] || unset VITE_SENTRY_ENVIRONMENT; \
     bunx turbo run build --filter=@studafy/web
 
-FROM nginx:1.28-alpine@sha256:a8b39bd9cf0f83869a2162827a0caf6137ddf759d50a171451b335cecc87d236 AS runtime
+FROM nginx:1.30-alpine@sha256:901e593c95dc85f5a729f5765516321366ef4ac401821431d408897e95287d0a AS runtime
 
-# The pinned nginx:1.27-alpine tag doesn't get rebuilt every time an Alpine security advisory
+# The pinned nginx:1.30-alpine image doesn't get rebuilt every time an Alpine security advisory
 # lands, so `apk upgrade` pulls in whatever patched package versions the 3.x branch it's built
 # from already has published — this is what closed CVE-2026-31789 (OpenSSL libcrypto3/libssl3
 # heap overflow) in trivy's scan of an unpatched build of this image.

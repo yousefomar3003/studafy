@@ -62,6 +62,12 @@ RUN bun run --cwd apps/api build:ocr
 FROM oven/bun:1.3.14-alpine@sha256:5acc90a93e91ff07bf72aa90a7c9f0fa189765aec90b47bdbf2152d2196383c0 AS runtime
 WORKDIR /app
 
+# QA-073: the digest-pinned base keeps the Alpine packages it was published with, so take the
+# 3.x branch's published fixes (OpenSSL, musl, zlib) at build time; containers.yml fails the image
+# on any fixed HIGH. Same as infra/docker/web.Dockerfile.
+RUN apk upgrade --no-cache
+
+
 # Fixed uid/gid rather than relying on whatever non-root user (if any) ships in the upstream
 # image, so the runtime identity is a property of this Dockerfile, not of oven/bun's internals.
 # WORKDIR itself is chowned, not just the dist/ copied into it: Bun's `--target bun` bundle

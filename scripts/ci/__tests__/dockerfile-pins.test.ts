@@ -45,6 +45,18 @@ describe("container base images (QA-053)", () => {
     expect(major! > 1 || minor! >= 28).toBe(true);
   });
 
+  // QA-073: containers.yml fails an app image on any fixed HIGH finding. A digest-pinned Alpine base
+  // keeps the OpenSSL/musl/zlib it was published with, so every Alpine runtime stage takes the
+  // branch's published fixes at build time (trivy found 7 fixed HIGHs in the api image without it).
+  for (const name of dockerfiles) {
+    const text = readFileSync(join(dockerDir, name), "utf8");
+    const runtime = text.slice(text.lastIndexOf("\nFROM "));
+    if (!/^\nFROM\s+\S+-alpine@/.test(runtime)) continue;
+    test(`${name} upgrades its Alpine runtime packages`, () => {
+      expect(runtime).toMatch(/^RUN apk upgrade --no-cache\b/m);
+    });
+  }
+
   test("Dependabot proposes Docker base image updates", () => {
     const config = readFileSync(join(root, ".github/dependabot.yml"), "utf8");
     expect(config).toMatch(/package-ecosystem:\s*docker/);

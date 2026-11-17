@@ -77,9 +77,11 @@ jobs:
             dockerfile: infra/docker/workers.Dockerfile
             max_mb: 250
             trivy_exit_code: "1"
+          # 110, not 100: QA-073's `apk upgrade` layer (patched OpenSSL, musl, zlib) adds ~7MB to an
+          # image that measured ~100MB (layer sum 106.8MB after it).
           - service: migrations
             dockerfile: infra/docker/migrations.Dockerfile
-            max_mb: 100
+            max_mb: 110
             trivy_exit_code: "1"
           - service: web
             dockerfile: infra/docker/web.Dockerfile
