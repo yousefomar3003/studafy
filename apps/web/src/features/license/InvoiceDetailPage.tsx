@@ -14,6 +14,7 @@ import { LicenseHeader } from "./LicenseHeader";
 import { receiptFileUrl, useUploadReceipt } from "./mutations";
 import { PaymentSchedule } from "./PaymentSchedule";
 import { useInvoiceQuery } from "./queries";
+import { YearTotals } from "./YearTotals";
 
 import type { InvoiceDetail, Receipt } from "./queries";
 
@@ -58,9 +59,19 @@ export default function InvoiceDetailPage() {
       {invoice.isError ? <p role="alert">{t("schoolLicense.common.loadError")}</p> : null}
       {data ? (
         <>
+          {data.aiStopped ? (
+            <p
+              className="license-banner"
+              data-tone="danger"
+              role="alert"
+              data-testid="invoice-ai-stopped"
+            >
+              {t("schoolLicense.aiStop.stoppedInvoice")}
+            </p>
+          ) : null}
           <InvoiceSummary invoice={data} />
           <InvoiceLines invoice={data} />
-          {data.instalments.length > 1 ? <InvoiceSchedule invoice={data} /> : null}
+          {data.status !== "void" ? <InvoiceSchedule invoice={data} /> : null}
           {data.status !== "void" && data.status !== "paid" ? <HowToPay invoice={data} /> : null}
           <section className="license-section license-no-print" aria-labelledby="invoice-receipts">
             <h2 id="invoice-receipts">{t("schoolLicense.invoice.receiptsTitle")}</h2>
@@ -158,12 +169,26 @@ function InvoiceSchedule({ invoice }: { invoice: InvoiceDetail }) {
           count: invoice.instalments.length,
         })}
       </p>
+      {invoice.yearTotals.length > 0 ? (
+        <>
+          <h3>{t("schoolLicense.years.title")}</h3>
+          <YearTotals
+            rows={invoice.yearTotals}
+            currencyCode={invoice.currencyCode}
+            minorUnit={invoice.minorUnit}
+          />
+          <h3>{t("schoolLicense.schedule.listTitle")}</h3>
+        </>
+      ) : null}
       <PaymentSchedule
         rows={invoice.instalments}
         currencyCode={invoice.currencyCode}
         minorUnit={invoice.minorUnit}
         caption={title}
       />
+      {invoice.status === "issued" || invoice.status === "partially_paid" ? (
+        <p className="license-muted">{t("schoolLicense.aiStop.rule")}</p>
+      ) : null}
     </section>
   );
 }

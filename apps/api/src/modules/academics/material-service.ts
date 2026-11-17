@@ -168,6 +168,7 @@ export async function listMaterials(
              m.ingested_at, m.week_number, m.day_of_week, m.created_at, m.updated_at
       FROM app.materials AS m
       WHERE m.school_id = ${schoolId}
+        AND m.source_kind = 'class'
         ${classFilter}
         ${statusFilter}
         ${weekFilter}
@@ -181,6 +182,7 @@ export async function listMaterials(
       SELECT count(*)::int AS count
       FROM app.materials AS m
       WHERE m.school_id = ${schoolId}
+        AND m.source_kind = 'class'
         ${classFilter}
         ${statusFilter}
         ${weekFilter}
@@ -208,6 +210,8 @@ export async function getMaterial(
            ingested_at, week_number, day_of_week, created_at, updated_at
     FROM app.materials
     WHERE id = ${materialId} AND school_id = ${schoolId}
+      -- A student's own AI source or an assignment's AI source (000232) is never a class material.
+      AND source_kind = 'class'
       ${visibilityFilter}
   `;
   return row;

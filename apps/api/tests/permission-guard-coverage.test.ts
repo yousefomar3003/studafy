@@ -423,6 +423,11 @@ const EXPECTED_MUTATING_ROUTES = [
   // Key-concept extraction (ST-169). Same gate and same rationale as the summarizer route above;
   // the concepts route's one write is the metered student's own usage ledger.
   "POST /api/ai/students/{studentId}/concepts",
+  // A student's own AI sources (000232).
+  "POST /api/ai/students/{studentId}/sources/upload",
+  "POST /api/ai/students/{studentId}/sources/{sourceId}/confirm",
+  "DELETE /api/ai/students/{studentId}/sources/{sourceId}",
+  "POST /api/ai/students/{studentId}/assignment-sources/{assignmentId}",
   // Simplified explanations (ST-170). Same gate and same rationale as the concepts route above;
   // the explain route's one write is the metered student's own usage ledger, and the passage it
   // rewrites is scoped by the tenant transaction (see explain/materials.ts).
@@ -703,6 +708,14 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Key-concept extraction (ST-169) — same gate, same RLS, same single write to the metered
   // student's own ai_usage_meters row.
   "POST /api/ai/students/{studentId}/concepts",
+  // A student's own AI sources (000232) -- the AI feature check and the student-self gate on
+  // /api/ai/students/{studentId}/*, not the permission matrix. Every write is to the caller's own
+  // files and photos (RLS shows a personal source to its owner alone), or to the shared AI source of
+  // an assignment the caller is enrolled for.
+  "POST /api/ai/students/{studentId}/sources/upload",
+  "POST /api/ai/students/{studentId}/sources/{sourceId}/confirm",
+  "DELETE /api/ai/students/{studentId}/sources/{sourceId}",
+  "POST /api/ai/students/{studentId}/assignment-sources/{assignmentId}",
   // Simplified explanations (ST-170) — same gate, same RLS, same single write to the metered
   // student's own ai_usage_meters row.
   "POST /api/ai/students/{studentId}/explain",

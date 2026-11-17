@@ -254,7 +254,8 @@
     "plan": {
       "in_full": "All at once",
       "monthly": "Monthly, over the licence months",
-      "custom": "Custom schedule"
+      "custom": "Custom schedule",
+      "yearly": "Yearly, one payment per licence year"
     },
     "customHeading": "Instalments",
     "customAmountLabel": "Instalment {{position}} amount ({{currency}})",
@@ -271,6 +272,19 @@
       "not_ascending": "Put the due dates in order, earliest first.",
       "sum_mismatch": "The instalments must add up to the quote's total exactly.",
       "in_past": "A due date can't be before today."
+    },
+    "termsChanged": "These terms change the school's choice ({{changes}}). Say why: the school reads it on the quote.",
+    "termsKept": "These terms follow the school's chosen length and payment plan.",
+    "termsReasonLabel": "Why change what the school chose?",
+    "termsReasonHelp": "Required when the length, start date or payment plan differs from the school's request. Shown to the school on the quote.",
+    "termsReasonRequired": "Give the school a reason for the change.",
+    "request": {
+      "title": "The school's request",
+      "length": "Length",
+      "start": "Start",
+      "plan": "Payment plan",
+      "open": "Left to Studafy",
+      "proposalRow": "{{date}}: {{percent}}% of the total"
     }
   },
   "quotes": {
@@ -281,7 +295,8 @@
       "kind": "Kind",
       "total": "Total",
       "validUntil": "Valid until",
-      "status": "Status"
+      "status": "Status",
+      "terms": "Length and plan"
     },
     "actions": {
       "send": "Send",
@@ -295,7 +310,10 @@
     },
     "openInvoice": "Open invoice",
     "declineReason": "Reason: “{{reason}}”",
-    "declinedNoReason": "No reason given."
+    "declinedNoReason": "No reason given.",
+    "termsValue": "{{months}} months · {{plan}}",
+    "changedFromRequest": "Changed from the school's request: {{reason}}",
+    "asRequested": "As the school requested"
   },
   "licenses": {
     "title": "Licenses",
@@ -318,7 +336,9 @@
     },
     "daysLeft_one": "{{count}} day left",
     "daysLeft_other": "{{count}} days left",
-    "seatsCell": "{{audience}}: {{assigned}} / {{purchased}}"
+    "seatsCell": "{{audience}}: {{assigned}} / {{purchased}}",
+    "stoppedForNonPayment": "AI stopped for non-payment on {{date}}",
+    "aiStopsOn": "AI stops on {{date}} unless paid"
   },
   "inbox": {
     "title": "Seat change requests",
@@ -346,7 +366,18 @@
       "studentAi_one": "Student AI: {{count}} seat",
       "studentAi_other": "Student AI: {{count}} seats",
       "studentAiNoSeats": "Student AI",
-      "studentAiTier": "tier {{tier}}"
+      "studentAiTier": "tier {{tier}}",
+      "months_one": "{{count}} month",
+      "months_other": "{{count}} months",
+      "moreMonths_one": "{{count}} more month",
+      "moreMonths_other": "{{count}} more months",
+      "startsOn": "from {{date}}",
+      "plan": {
+        "monthly": "pays monthly",
+        "yearly": "pays yearly",
+        "custom_one": "pays in {{count}} payment on its own dates",
+        "custom_other": "pays in {{count}} payments on its own dates"
+      }
     },
     "price": "Price it",
     "resolve": "Resolve",
@@ -491,7 +522,9 @@
       "openLink": "Open the link",
       "linkSaved": "Payment link for instalment {{position}} saved.",
       "linkRemoved": "Payment link for instalment {{position}} removed."
-    }
+    },
+    "recordedResumed": "Payment recorded. The licence's AI is running again.",
+    "aiStopped": "This licence's AI is stopped: an instalment is more than 30 days late. Recording the payment starts it again."
   },
   "school": {
     "title": "License",

@@ -15,15 +15,17 @@ class AiExplainClient {
   final Dio _dio;
 
   /// The passages best matching [topic], most relevant first. Empty when nothing in the student's
-  /// materials matches.
+  /// materials matches. With [materialId], only that one source is searched: a study material,
+  /// an assignment, or one of the student's own files.
   Future<List<AiExplainPassage>> search({
     required String studentId,
     required String topic,
     int limit = 5,
+    String? materialId,
   }) async {
     final response = await _dio.post<Map<String, dynamic>>(
       '/api/ai/students/$studentId/search',
-      data: {'query': topic, 'limit': limit},
+      data: {'query': topic, 'limit': limit, 'material_id': ?materialId},
     );
     final raw = response.data?['results'];
     if (raw is! List) return const [];

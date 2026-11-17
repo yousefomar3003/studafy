@@ -1,5 +1,12 @@
 import { z } from "@hono/zod-openapi";
 import { FEATURE_KEYS, FEATURE_USAGE_UNITS } from "@studafy/constants";
+import {
+  MAX_CUSTOM_INSTALMENTS,
+  MAX_REQUEST_MONTHS,
+  MIN_REQUEST_MONTHS,
+  SCHOOL_PAYMENT_PLANS,
+  SHARE_SCALE,
+} from "@studafy/license-pricing";
 
 import { AUDIENCES, LICENSE_STATUSES, MAX_ASSIGN_USER_IDS } from "./service";
 
@@ -100,6 +107,24 @@ const audienceSeatsSchema = z
   })
   .openapi("LicenseAudienceSeats");
 
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+
+const aiStopSchema = z
+  .object({
+    invoiceId: uuid,
+    invoiceNumber: z.string(),
+    position: z.number().int(),
+    dueDate: isoDay,
+    stopDate: isoDay.openapi({
+      description: "The AI stops on this day (UTC) if the instalment is still unpaid.",
+    }),
+    balanceMinor: z.number().int(),
+    currencyCode: z.string(),
+    minorUnit: z.number().int(),
+    daysLeft: z.number().int(),
+  })
+  .openapi("LicenseAiStop");
+
 export const licenseSchema = z
   .object({
     id: uuid,
@@ -110,6 +135,16 @@ export const licenseSchema = z
     currencyCode: z.string(),
     activatedAt: z.string().datetime().nullable(),
     audiences: z.array(audienceSeatsSchema),
+    nonpaymentSuspendedAt: z
+      .string()
+      .datetime()
+      .nullable()
+      .openapi({
+        description:
+          "When the AI stopped because an instalment was still unpaid 30 days after its due date; " +
+          "null unless the licence is suspended for that. Recording the payment resumes it.",
+      }),
+    nextAiStop: aiStopSchema.nullable(),
   })
   .openapi("SchoolLicense");
 
@@ -357,6 +392,18 @@ export const featureUsageSchema = z
   })
   .openapi("LicenseFeatureUsage");
 
+// How the school wants to pay: monthly (one payment per licence month), yearly (one per licence
+// year) or custom (its own dates and shares). Nullable, so inline: a nullable reference to a named
+// enum becomes a wrapper class the Dart generator cannot compile (see billing-schemas.ts).
+const schoolPaymentPlan = () => z.enum(SCHOOL_PAYMENT_PLANS);
+
+export const proposedInstalmentSchema = z
+  .object({
+    dueDate: isoDay,
+    shareBps: z.number().int().min(1).max(SHARE_SCALE),
+  })
+  .openapi("LicenseProposedInstalment");
+
 export const changeRequestSchema = z
   .object({
     id: uuid,
@@ -374,6 +421,10 @@ export const changeRequestSchema = z
     createdAt: z.string().datetime(),
     resolvedAt: z.string().datetime().nullable(),
     resolutionNote: z.string().nullable(),
+    months: z.number().int().nullable(),
+    startsOn: isoDay.nullable(),
+    paymentPlan: schoolPaymentPlan().nullable(),
+    paymentProposal: z.array(proposedInstalmentSchema).nullable(),
   })
   .openapi("LicenseChangeRequest");
 
@@ -404,6 +455,23 @@ export const createChangeRequestBodySchema = z
     teacherPlanId: uuid.nullable().optional(),
     parentPlanId: uuid.nullable().optional(),
     note: z.string().trim().min(1).max(2000),
+    months: z.number().int().min(MIN_REQUEST_MONTHS).max(MAX_REQUEST_MONTHS).nullable().optional(),
+    startsOn: isoDay.nullable().optional(),
+    paymentPlan: schoolPaymentPlan().nullable().optional(),
+    paymentProposal: z
+      .array(proposedInstalmentSchema)
+      .min(1)
+      .max(MAX_CUSTOM_INSTALMENTS)
+      .nullable()
+      .optional()
+      .openapi({
+        description:
+          "For a custom plan only: the payment dates (in order, from today, before the term ends) " +
+          "and each one's share of the total in basis points, adding up to 10000. The term is " +
+          "`months` from `startsOn` (or today) for a new licence; for a licence in force, `months` " +
+          "more from its end, or the rest of its term. 422 LICENSE_PAYMENT_SCHEDULE_INVALID " +
+          "otherwise.",
+      }),
   })
   .openapi("CreateLicenseChangeRequestBody");
 

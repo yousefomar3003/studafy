@@ -173,8 +173,15 @@ function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<H
     -- A class whose AI materials setting is off (000196) never grounds an answer. Its chunks are
     -- deleted when the setting is turned off; this keeps the guarantee even for a chunk written by
     -- a race the ingestion worker's re-claim did not see.
-    JOIN app.classes cl ON cl.id = m.class_id AND cl.school_id = m.school_id
-      AND cl.ai_materials_enabled
+    LEFT JOIN app.classes cl ON cl.id = m.class_id AND cl.school_id = m.school_id
+    -- A search over everything reads the class's study materials only. A student's own source or an
+    -- assignment source (000232) grounds an answer only when it is the one material asked about;
+    -- RLS has already limited a personal source to its owner.
+    WHERE ${
+      materialId === undefined
+        ? tx`m.source_kind = 'class' AND cl.ai_materials_enabled`
+        : tx`(m.source_kind = 'personal' OR cl.ai_materials_enabled IS TRUE)`
+    }
     ORDER BY f.rrf_score DESC
     LIMIT ${limit}
   `.then((rows) =>

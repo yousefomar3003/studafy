@@ -90,10 +90,21 @@ export class PatternModerationProvider implements ModerationProvider {
   }
 }
 
+/**
+ * Arabic-Indic (U+0660-0669) and Extended Arabic-Indic (U+06F0-06F9) digits as ASCII, so a phone
+ * number typed with Arabic digits is caught by the same patterns.
+ */
+function asciiDigits(text: string): string {
+  return text.replace(/[\u0660-\u0669\u06F0-\u06F9]/g, (d) =>
+    String((d.charCodeAt(0) & 0x0f) % 10),
+  );
+}
+
 function checkText(text: string, level: AgeLevel): ModerationResult {
+  const normalized = asciiDigits(text);
   for (const category of MODERATION_CATEGORIES) {
     if (!levelBlocked(level, category.blockThreshold)) continue;
-    if (matchesAny(text, category)) {
+    if (matchesAny(normalized, category)) {
       return {
         blocked: true,
         category: category.key,

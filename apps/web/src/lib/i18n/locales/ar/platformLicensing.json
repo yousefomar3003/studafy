@@ -262,7 +262,8 @@
     "plan": {
       "in_full": "دفعة واحدة",
       "monthly": "شهريًا، على أشهر الترخيص",
-      "custom": "جدول مخصص"
+      "custom": "جدول مخصص",
+      "yearly": "سنويًا، دفعة لكل سنة من الترخيص"
     },
     "customHeading": "الأقساط",
     "customAmountLabel": "مبلغ القسط {{position}} ({{currency}})",
@@ -279,6 +280,19 @@
       "not_ascending": "رتّب تواريخ الاستحقاق من الأقرب إلى الأبعد.",
       "sum_mismatch": "يجب أن يساوي مجموع الأقساط إجمالي العرض تمامًا.",
       "in_past": "لا يمكن أن يكون تاريخ الاستحقاق قبل اليوم."
+    },
+    "termsChanged": "تغيّر هذه الشروط ما اختارته المدرسة ({{changes}}). اذكروا السبب: تقرؤه المدرسة في العرض.",
+    "termsKept": "تتبع هذه الشروط المدة وخطة الدفع اللتين اختارتهما المدرسة.",
+    "termsReasonLabel": "لماذا تغيّرون ما اختارته المدرسة؟",
+    "termsReasonHelp": "مطلوب عندما تختلف المدة أو تاريخ البدء أو خطة الدفع عن طلب المدرسة. يظهر للمدرسة في العرض.",
+    "termsReasonRequired": "اذكروا للمدرسة سبب التغيير.",
+    "request": {
+      "title": "طلب المدرسة",
+      "length": "المدة",
+      "start": "البدء",
+      "plan": "خطة الدفع",
+      "open": "متروك لـ Studafy",
+      "proposalRow": "{{date}}: {{percent}}% من الإجمالي"
     }
   },
   "quotes": {
@@ -289,7 +303,8 @@
       "kind": "النوع",
       "total": "الإجمالي",
       "validUntil": "صالح حتى",
-      "status": "الحالة"
+      "status": "الحالة",
+      "terms": "المدة والخطة"
     },
     "actions": {
       "send": "إرسال",
@@ -303,7 +318,10 @@
     },
     "openInvoice": "فتح الفاتورة",
     "declineReason": "السبب: «{{reason}}»",
-    "declinedNoReason": "لم يُذكر سبب."
+    "declinedNoReason": "لم يُذكر سبب.",
+    "termsValue": "{{months}} شهر · {{plan}}",
+    "changedFromRequest": "تغيّر عن طلب المدرسة: {{reason}}",
+    "asRequested": "كما طلبت المدرسة"
   },
   "licenses": {
     "title": "التراخيص",
@@ -330,7 +348,9 @@
     "daysLeft_two": "يومان متبقيان",
     "daysLeft_few": "{{count}} أيام متبقية",
     "daysLeft_many": "{{count}} يوماً متبقياً",
-    "daysLeft_other": "{{count}} يوماً متبقياً"
+    "daysLeft_other": "{{count}} يوماً متبقياً",
+    "stoppedForNonPayment": "توقف الذكاء الاصطناعي لعدم الدفع في {{date}}",
+    "aiStopsOn": "يتوقف الذكاء الاصطناعي في {{date}} ما لم يُدفع"
   },
   "inbox": {
     "title": "طلبات تغيير المقاعد",
@@ -374,7 +394,30 @@
       "studentAi_many": "الذكاء الاصطناعي للطلاب: {{count}} مقعدًا",
       "studentAi_other": "الذكاء الاصطناعي للطلاب: {{count}} مقعد",
       "studentAiNoSeats": "الذكاء الاصطناعي للطلاب",
-      "studentAiTier": "الباقة {{tier}}"
+      "studentAiTier": "الباقة {{tier}}",
+      "months_zero": "{{count}} شهر",
+      "months_one": "شهر واحد",
+      "months_two": "شهران",
+      "months_few": "{{count}} أشهر",
+      "months_many": "{{count}} شهرًا",
+      "months_other": "{{count}} شهر",
+      "moreMonths_zero": "أشهر إضافية",
+      "moreMonths_one": "شهر إضافي",
+      "moreMonths_two": "شهران إضافيان",
+      "moreMonths_few": "{{count}} أشهر إضافية",
+      "moreMonths_many": "{{count}} شهرًا إضافيًا",
+      "moreMonths_other": "{{count}} شهر إضافي",
+      "startsOn": "ابتداءً من {{date}}",
+      "plan": {
+        "monthly": "تدفع شهريًا",
+        "yearly": "تدفع سنويًا",
+        "custom_zero": "تدفع في تواريخها الخاصة",
+        "custom_one": "تدفع دفعة واحدة في تاريخها الخاص",
+        "custom_two": "تدفع دفعتين في تواريخها الخاصة",
+        "custom_few": "تدفع {{count}} دفعات في تواريخها الخاصة",
+        "custom_many": "تدفع {{count}} دفعة في تواريخها الخاصة",
+        "custom_other": "تدفع {{count}} دفعة في تواريخها الخاصة"
+      }
     },
     "price": "تسعيره",
     "resolve": "إنجاز",
@@ -531,7 +574,9 @@
       "openLink": "فتح الرابط",
       "linkSaved": "حُفظ رابط الدفع للقسط {{position}}.",
       "linkRemoved": "أُزيل رابط الدفع للقسط {{position}}."
-    }
+    },
+    "recordedResumed": "سُجّلت الدفعة. عاد الذكاء الاصطناعي في الترخيص إلى العمل.",
+    "aiStopped": "الذكاء الاصطناعي في هذا الترخيص متوقف: قسط متأخر أكثر من 30 يومًا. تسجيل الدفعة يعيد تشغيله."
   },
   "school": {
     "title": "الترخيص",

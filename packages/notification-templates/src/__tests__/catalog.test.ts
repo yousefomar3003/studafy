@@ -97,6 +97,7 @@ describe("templates — completeness", () => {
                       "placement",
                       "subjectName",
                       "released",
+                      "stopDate",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -218,6 +219,21 @@ describe("renderNotification — snapshot tests", () => {
     [NOTIFICATION_TYPES.LICENSE_RECEIPT_UPLOADED]: {
       schoolName: "Amman Academy",
       invoiceNumber: "LIC-2026-000042",
+    },
+    [NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING]: {
+      schoolName: "Amman Academy",
+      invoiceNumber: "LIC-2026-000042",
+      balance: "364.50 USD",
+      dueDate: "2026-11-01",
+      stopDate: "2026-12-01",
+      daysLeft: "7",
+    },
+    [NOTIFICATION_TYPES.LICENSE_AI_STOPPED]: {
+      schoolName: "Amman Academy",
+      invoiceNumber: "LIC-2026-000042",
+      balance: "364.50 USD",
+      dueDate: "2026-11-01",
+      stopDate: "2026-12-01",
     },
     [NOTIFICATION_TYPES.ASSIGNMENT_PUBLISHED]: {
       who: "Amina Tazi · ",

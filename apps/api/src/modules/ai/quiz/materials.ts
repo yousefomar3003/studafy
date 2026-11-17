@@ -46,16 +46,17 @@ export async function loadQuizMaterials(
   // One query for every requested material rather than one per id -- the failure check below
   // still walks materialIds in request order, so "first invalid material" reporting is unchanged.
   // ai_enabled: the class's AI materials setting (000196). A material of a class with it off is
-  // reported not_ready, like one not yet ingested; the class lookup fails closed.
+  // reported not_ready, like one not yet ingested; the class lookup fails closed. A student's own
+  // (personal) source has no class and only its owner can read it (000232), so it always passes.
   const rows = await tx<
     { id: string; title: string | null; ingest_status: string; ai_enabled: boolean }[]
   >`
     SELECT m.id, m.title, m.ingest_status,
-           COALESCE(
+           (m.source_kind = 'personal' OR COALESCE(
              (SELECT cl.ai_materials_enabled FROM app.classes cl
               WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
              false
-           ) AS ai_enabled
+           )) AS ai_enabled
     FROM app.materials m
     WHERE m.id = ANY (${materialIds}::uuid[])
   `;

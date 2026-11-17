@@ -7,6 +7,7 @@ import '../../../student/application/materials_providers.dart';
 import '../../../student/application/student_context_providers.dart';
 import '../../../student/domain/material_ready_state.dart';
 import '../../application/ask_ai_controller.dart';
+import 'ai_source_picker.dart';
 
 /// Lets the student pick what to ask about: "All my materials" or one material. Lists the same
 /// per-class materials as the quiz picker (`materialsForClassProvider`). Only materials Ask AI can
@@ -57,7 +58,32 @@ class _MaterialSheetBody extends ConsumerWidget {
           'askAi.material.sheetHint'.tr(),
           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
-        const SizedBox(height: AppSpacing.space8),
+        const SizedBox(height: AppSpacing.space12),
+        // A study material, one of the student's assignments, or a file or photo of their own.
+        AiSourcePicker(
+          multiSelect: false,
+          selected: {?current?.id},
+          onSelect: (choice) =>
+              Navigator.of(context).pop(AskAiMaterialScope(id: choice.id, title: choice.title)),
+          studyMaterials: _StudyMaterials(classIds: classIds, current: current),
+        ),
+      ],
+    );
+  }
+}
+
+class _StudyMaterials extends StatelessWidget {
+  const _StudyMaterials({required this.classIds, required this.current});
+
+  final List<String> classIds;
+  final AskAiMaterialScope? current;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
         ListTile(
           key: const Key('askAiMaterialAll'),
           contentPadding: EdgeInsets.zero,

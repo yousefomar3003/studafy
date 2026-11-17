@@ -13,6 +13,7 @@ import { useAcceptQuote, useDeclineQuote } from "./mutations";
 import { PaymentSchedule } from "./PaymentSchedule";
 import { useQuoteQuery } from "./queries";
 import { QuoteStatusPill } from "./QuotesPage";
+import { YearTotals } from "./YearTotals";
 
 import type { PriceLine, Quote } from "./queries";
 import type { ReactNode } from "react";
@@ -94,6 +95,7 @@ export default function QuoteDetailPage() {
                 : t("schoolLicense.quote.declinedNote")}
             </p>
           ) : null}
+          <RequestedTermsNote quote={data} />
           <QuoteBreakdown quote={data} />
           <QuoteSchedule quote={data} />
         </>
@@ -106,7 +108,10 @@ export default function QuoteDetailPage() {
   );
 }
 
-/** How the quote is to be paid, and when: the invoice's instalments if it were accepted today. */
+/**
+ * How the quote is to be paid, and when: what each licence year carries, and every payment with its
+ * date and amount -- the invoice's instalments if it were accepted today.
+ */
 function QuoteSchedule({ quote }: { quote: Quote }) {
   const { t } = useTranslation();
   const title = t("schoolLicense.schedule.title");
@@ -118,20 +123,89 @@ function QuoteSchedule({ quote }: { quote: Quote }) {
           count: quote.schedulePreview.length,
         })}
       </p>
-      {quote.schedulePreview.length > 1 ? (
-        <>
-          <PaymentSchedule
-            rows={quote.schedulePreview}
-            currencyCode={quote.currencyCode}
-            minorUnit={quote.minorUnit}
-            caption={title}
-          />
-          {quote.status === "sent" ? (
-            <p className="license-muted">{t("schoolLicense.schedule.previewNote")}</p>
-          ) : null}
-        </>
+      <h3>{t("schoolLicense.years.title")}</h3>
+      <YearTotals
+        rows={quote.yearTotals}
+        currencyCode={quote.currencyCode}
+        minorUnit={quote.minorUnit}
+      />
+      <h3>{t("schoolLicense.schedule.listTitle")}</h3>
+      <PaymentSchedule
+        rows={quote.schedulePreview}
+        currencyCode={quote.currencyCode}
+        minorUnit={quote.minorUnit}
+        caption={title}
+      />
+      {quote.status === "sent" ? (
+        <p className="license-muted">{t("schoolLicense.schedule.previewNote")}</p>
       ) : null}
       <p className="license-muted">{t("schoolLicense.schedule.activationNote")}</p>
+      <p className="license-muted">{t("schoolLicense.aiStop.rule")}</p>
+    </section>
+  );
+}
+
+/**
+ * What the school asked for against what Studafy offers: the length, start and plan, and -- when
+ * Studafy changed any of them -- its reason.
+ */
+export function RequestedTermsNote({ quote }: { quote: Quote }) {
+  const { t } = useTranslation();
+  const { formatDate } = useFormatters();
+  const asked = quote.requestedTerms;
+  if (!asked) return null;
+  const date = (iso: string) =>
+    formatDate(new Date(`${iso.slice(0, 10)}T00:00:00Z`), { dateStyle: "medium" });
+  const describe = (terms: {
+    months: number | null;
+    startsOn: string | null;
+    paymentPlan: string | null;
+  }) =>
+    [
+      terms.months !== null
+        ? t("schoolLicense.quote.terms.months", { count: terms.months })
+        : t("schoolLicense.quote.terms.monthsOpen"),
+      terms.startsOn ? t("schoolLicense.quote.terms.from", { date: date(terms.startsOn) }) : null,
+      terms.paymentPlan
+        ? t(`schoolLicense.quote.terms.plan.${terms.paymentPlan}`)
+        : t("schoolLicense.quote.terms.planOpen"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  const changed = quote.termsChanges.length > 0;
+  return (
+    <section className="license-section" aria-labelledby="quote-terms" data-testid="quote-terms">
+      <h2 id="quote-terms">{t("schoolLicense.quote.terms.title")}</h2>
+      <dl className="license-terms-compare">
+        <div>
+          <dt>{t("schoolLicense.quote.terms.asked")}</dt>
+          <dd>{describe(asked)}</dd>
+        </div>
+        <div>
+          <dt>{t("schoolLicense.quote.terms.offered")}</dt>
+          <dd>
+            {describe({
+              months: quote.kind === "seat_increase" ? null : quote.months,
+              startsOn: quote.kind === "new" ? quote.startsAt : null,
+              paymentPlan: quote.paymentPlan,
+            })}
+          </dd>
+        </div>
+      </dl>
+      {changed ? (
+        <p className="license-note" data-testid="quote-terms-changed">
+          {t("schoolLicense.quote.terms.changed", {
+            changes: quote.termsChanges
+              .map((change) => t(`schoolLicense.quote.terms.change.${change}`))
+              .join(", "),
+          })}{" "}
+          {quote.termsChangeReason
+            ? t("schoolLicense.quote.terms.reason", { reason: quote.termsChangeReason })
+            : null}
+        </p>
+      ) : (
+        <p className="license-muted">{t("schoolLicense.quote.terms.same")}</p>
+      )}
     </section>
   );
 }
@@ -293,6 +367,22 @@ function AcceptModal({ quote, onClose }: { quote: Quote; onClose: () => void }) 
     >
       <Modal.Body>
         <p>{t("schoolLicense.quote.acceptHelp")}</p>
+        <p>
+          {t(`schoolLicense.schedule.plan.${quote.paymentPlan}`, {
+            count: quote.schedulePreview.length,
+          })}
+        </p>
+        <YearTotals
+          rows={quote.yearTotals}
+          currencyCode={quote.currencyCode}
+          minorUnit={quote.minorUnit}
+        />
+        <PaymentSchedule
+          rows={quote.schedulePreview}
+          currencyCode={quote.currencyCode}
+          minorUnit={quote.minorUnit}
+          caption={t("schoolLicense.schedule.title")}
+        />
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>

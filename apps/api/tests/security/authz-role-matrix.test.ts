@@ -738,6 +738,13 @@ const GUARD_CASES: GuardCase[] = [
   },
   {
     method: "GET",
+    path: "/api/reports/children/recent-grades",
+    permission: "grade:read",
+    source: "reports/routes.ts",
+    allowedRoleAlsoRestrictedBy: "caller must also hold the PARENT role (see reports/routes.ts)",
+  },
+  {
+    method: "GET",
     path: "/api/reports/children/{studentId}/breakdown",
     permission: "grade:read",
     source: "reports/routes.ts",

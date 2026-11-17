@@ -1,13 +1,19 @@
 import { randomInt } from "node:crypto";
 
-import { ERROR_CODES, isAllowedLicensePaymentLink } from "@studafy/constants";
-import { allocatePayments, buildSchedule } from "@studafy/license-pricing";
+import { ERROR_CODES, isAllowedLicensePaymentLink, licenseAiStopDate } from "@studafy/constants";
+import {
+  allocatePayments,
+  buildSchedule,
+  scheduleMonths,
+  yearTotals,
+} from "@studafy/license-pricing";
 import postgres from "postgres";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { pipelinePerSchool, withSystemTx } from "../../db/tenant-tx";
 
 import { auditLicenseChange, licenseError } from "./context";
+import { resumeIfSettled } from "./nonpayment";
 import { auditPlatformChange } from "./pricing";
 import { readLicense, transitionLicense } from "./service";
 
@@ -18,6 +24,7 @@ import type { SchoolStatement, SchoolStatementResults } from "../../db/tenant-tx
 import type {
   CustomInstalmentInput,
   InstalmentStatus,
+  LicenceYearTotal,
   PaymentPlan,
   PricingLine,
 } from "@studafy/license-pricing";
@@ -347,6 +354,8 @@ export interface InstalmentView {
   current: boolean;
   /** Its online payment link, while it can be paid; null otherwise. */
   paymentLink: string | null;
+  /** The day (UTC) the licence's AI stops if it is still unpaid (000231). */
+  aiStopDate: string;
 }
 
 interface InstalmentRow {
@@ -400,6 +409,7 @@ export async function invoiceInstalments(
       overdueAt: row.overdue_at?.toISOString() ?? null,
       current: row.id === currentId,
       paymentLink: open ? row.payment_link : null,
+      aiStopDate: licenseAiStopDate(row.due_date),
     };
   });
 }
@@ -408,6 +418,10 @@ export interface InvoiceDetail extends InvoiceRecord {
   overdue: boolean;
   /** What is due when, earliest first. One instalment for an invoice paid at once. */
   instalments: InstalmentView[];
+  /** What is paid in each licence year (000231); empty for an invoice with no quote. */
+  yearTotals: LicenceYearTotal[];
+  /** Its licence is suspended for an instalment unpaid 30 days past due (000231). */
+  aiStopped: boolean;
   lines: InvoiceLineView[];
   payments: PaymentView[];
   receipts: ReceiptView[];
@@ -576,10 +590,32 @@ export async function invoiceDetail(
   invoice: InvoiceRecord,
   now: Date = new Date(),
 ): Promise<InvoiceDetail> {
+  const instalments = await invoiceInstalments(tx, invoice, now);
+  // The licence years come from the quote the invoice was issued for: its start and months (for a
+  // seat increase, the months left).
+  const [term] = await tx<
+    { starts_at: Date; months: number; prorate_days: number | null; suspended: boolean }[]
+  >`
+    SELECT q.starts_at, q.months, q.prorate_days,
+           (l.nonpayment_suspended_at IS NOT NULL) AS suspended
+    FROM app.school_licenses AS l
+    LEFT JOIN app.license_quotes AS q
+      ON q.school_id = l.school_id AND q.id = ${invoice.quoteId}::uuid
+    WHERE l.school_id = current_setting('app.school_id')::uuid AND l.id = ${invoice.licenseId}::uuid
+  `;
   return {
     ...invoice,
     overdue: isOverdue(invoice, now),
-    instalments: await invoiceInstalments(tx, invoice, now),
+    instalments,
+    yearTotals:
+      term?.starts_at && invoice.status !== "void"
+        ? yearTotals(
+            instalments,
+            term.starts_at.toISOString(),
+            scheduleMonths(term.months, term.prorate_days),
+          )
+        : [],
+    aiStopped: term?.suspended ?? false,
     lines: await invoiceLines(tx, invoice.id),
     payments: await listPayments(tx, invoice.id),
     receipts: await invoiceReceipts(tx, invoice.id),
@@ -1209,6 +1245,8 @@ export interface PaymentResult {
   payment: PaymentView;
   invoice: InvoiceRecord;
   licenseActivated: boolean;
+  /** The payment settled what had stopped the licence's AI (000231): it is active again. */
+  licenseResumed: boolean;
 }
 
 export interface RecordPaymentInput {
@@ -1281,18 +1319,26 @@ export async function recordPayment(
     after.status === "paid" || (await firstInstalmentPaid(tx, after.id))
       ? await activateLicenseFor(tx, schoolId, after, actor, now)
       : { activated: false, versions: new Map<string, number>(), pending: [] };
+  // A licence whose AI stopped for an unpaid instalment resumes once nothing is past the cutoff.
+  const resumed = await resumeIfSettled(tx, schoolId, after.licenseId, actor, now);
 
   const payment = (await listPayments(tx, invoiceId)).find((p) => p.id === paymentId)!;
   return {
-    result: { payment, invoice: after, licenseActivated: activation.activated },
-    versions: activation.versions,
-    pending: activation.pending,
+    result: {
+      payment,
+      invoice: after,
+      licenseActivated: activation.activated,
+      licenseResumed: resumed.resumed,
+    },
+    versions: new Map([...activation.versions, ...resumed.versions]),
+    pending: [...activation.pending, ...resumed.pending],
   };
 }
 
 /**
  * Void a payment with a reason. The invoice's paid amount and status follow; a receipt matched to it
- * goes back to pending. The license is left as it is: suspending it is the super admin's call.
+ * goes back to pending. The license is left as it is; if an instalment is now 30 days late, the
+ * workers' lifecycle job stops its AI (000231).
  */
 export async function voidPayment(
   tx: TransactionSql,

@@ -174,6 +174,18 @@ export const NOTIFICATION_CATALOG = {
       route: "/",
     },
   },
+  [NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING]: {
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
+  [NOTIFICATION_TYPES.LICENSE_AI_STOPPED]: {
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
   // Everyday school events (000215). The route is the student's; a parent's row carries its own
   // (the parent home, or the alert center for attendance) in metadata.route.
   [NOTIFICATION_TYPES.ASSIGNMENT_PUBLISHED]: {

@@ -68,6 +68,9 @@ const NOTIFICATION_TYPES = [
   "MATERIAL_PUBLISHED",
   // Academic marks released to the family. Appended by 000230; sorts last.
   "MARKS_RELEASED",
+  // Licence AI cutoff for unpaid instalments. Appended by 000231, in that order; sort last.
+  "LICENSE_AI_STOP_WARNING",
+  "LICENSE_AI_STOPPED",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;

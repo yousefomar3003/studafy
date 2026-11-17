@@ -35,6 +35,10 @@ const openRequest = {
   resolutionNote: null,
   resolvedAt: null,
   createdAt: "2026-10-20T09:00:00.000Z",
+  months: 12,
+  startsOn: null,
+  paymentPlan: "monthly",
+  paymentProposal: null,
 };
 
 const consoleLicense = {
@@ -66,9 +70,13 @@ const consoleLicense = {
     { audience: "teacher", purchased: 0, assigned: 0, tier: null },
     { audience: "parent", purchased: 0, assigned: 0, tier: null },
   ],
+  nonpaymentSuspendedAt: null as string | null,
+  nextAiStop: null,
 };
 
 type Query = Record<string, unknown> | undefined;
+
+let licenseExtra: Record<string, unknown> = {};
 
 const getMock = mock((path: string, init?: { params?: { query?: Query } }) => {
   if (path === "/api/platform/licenses/change-requests") {
@@ -78,7 +86,7 @@ const getMock = mock((path: string, init?: { params?: { query?: Query } }) => {
     });
   }
   if (path === "/api/platform/licenses") {
-    return Promise.resolve({ data: { licenses: [consoleLicense] } });
+    return Promise.resolve({ data: { licenses: [{ ...consoleLicense, ...licenseExtra }] } });
   }
   throw new Error(`Unhandled GET ${path}`);
 });
@@ -142,6 +150,15 @@ describe("LicensesPage", () => {
     expect(within(row).getByText("$1,250.00")).toBeTruthy();
   });
 
+  test("marks a licence whose AI is stopped for non-payment", async () => {
+    licenseExtra = { status: "suspended", nonpaymentSuspendedAt: "2026-11-02T00:05:00.000Z" };
+    await renderPage();
+    expect((await screen.findByTestId("license-nonpayment")).textContent).toBe(
+      "AI stopped for non-payment on Nov 2, 2026",
+    );
+    licenseExtra = {};
+  });
+
   test("filters by status, ending soon, nearly full and unpaid", async () => {
     await renderPage();
     await screen.findByRole("table", { name: "All licenses" });
@@ -172,11 +189,15 @@ describe("LicensesPage", () => {
   test("shows an open request with what the school wants and a link to price it", async () => {
     await renderPage();
     const box = await inbox();
-    expect(await box.findByText("Student AI: 120 seats · tier Student Pro")).toBeTruthy();
+    expect(
+      await box.findByText(
+        "Student AI: 120 seats · tier Student Pro · 12 more months · pays monthly",
+      ),
+    ).toBeTruthy();
     expect(box.getByText("“New grade 7 section”")).toBeTruthy();
     expect(box.getByRole("link", { name: "Price it" }).getAttribute("href")).toBe(
-      `/portal/platform/quotes?schoolId=${SCHOOL_ID}&licenseId=${LICENSE_ID}&kind=seat_increase` +
-        "&studentSeats=120&studentTier=t-2",
+      `/portal/platform/quotes?schoolId=${SCHOOL_ID}&requestId=${REQUEST_ID}` +
+        `&licenseId=${LICENSE_ID}&kind=seat_increase&studentSeats=120&studentTier=t-2`,
     );
   });
 
@@ -213,7 +234,9 @@ describe("LicensesPage", () => {
   test("switches the inbox between open, resolved and declined requests", async () => {
     await renderPage();
     const box = await inbox();
-    await box.findByText("Student AI: 120 seats · tier Student Pro");
+    await box.findByText(
+      "Student AI: 120 seats · tier Student Pro · 12 more months · pays monthly",
+    );
     const chips = within(box.getByRole("group", { name: "Show requests" }));
     expect(chips.getByRole("button", { name: "Open" }).getAttribute("aria-pressed")).toBe("true");
 

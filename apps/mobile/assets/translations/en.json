@@ -276,8 +276,6 @@
       "viewAll": "View all"
     },
     "grades": {
-      "title": "New grades",
-      "empty": "No grades published yet this term.",
       "unavailable": "Grades aren't available yet.",
       "error": "Couldn't load grades."
     },
@@ -285,9 +283,6 @@
       "title": "Announcements",
       "empty": "No announcements yet.",
       "error": "Couldn't load announcements."
-    },
-    "newMarks": {
-      "title": "New exam marks"
     }
   },
   "assignments": {
@@ -403,9 +398,18 @@
       "body": "New results have just been published — here's where you stand this term.",
       "dismiss": "Dismiss"
     },
-    "tabs": {
-      "examMarks": "Exam marks",
-      "coursework": "Coursework"
+    "kind": {
+      "exam": "Exam",
+      "assignment": "Assignment"
+    },
+    "sections": {
+      "exams": "Exams",
+      "assignments": "Assignments",
+      "assignmentGrades": "Assignment grades"
+    },
+    "recent": {
+      "title": "Recent grades",
+      "empty": "No exam marks or assignment grades yet."
     }
   },
   "timetable": {
@@ -1046,6 +1050,69 @@
       "notAllowed": "You're not allowed to use the AI tools here.",
       "network": "No connection. Check your network and try again.",
       "unknown": "Something went wrong. Try again."
+    }
+  },
+  "aiSources": {
+    "tabs": {
+      "material": "Study materials",
+      "assignment": "My assignments",
+      "personal": "My files & photos"
+    },
+    "chooser": {
+      "title": "Choose a source",
+      "summaryHint": "Pick what you want summarized.",
+      "conceptsHint": "Pick what you want the key concepts of.",
+      "materialsEmpty": "No study materials are ready for the AI tools yet."
+    },
+    "scope": {
+      "label": "Search in",
+      "all": "All my study materials",
+      "allHint": "Every study material from your classes",
+      "sheetTitle": "Where should the AI look?"
+    },
+    "assignments": {
+      "empty": "You have no assignments to study from yet.",
+      "due": "Due {date}",
+      "files": "{count} files",
+      "use": "Use",
+      "aiOff": "AI off"
+    },
+    "files": {
+      "intro": "Add your own notes or a page from a book. Only you can see them.",
+      "uploadFile": "Upload file",
+      "takePhoto": "Take photo",
+      "choosePhoto": "Gallery",
+      "empty": "No files yet. Add a PDF, Word or PowerPoint file, or a photo of your notes.",
+      "usage": "{count} of {max} files · kept for {months} months",
+      "uploading": "Uploading {name}…",
+      "uploaded": "Uploaded. It will be ready in a moment.",
+      "delete": "Delete",
+      "deleteTitle": "Delete this file?",
+      "deleteBody": "Its text is removed too, along with any quiz questions or flashcards made from it.",
+      "cancel": "Cancel",
+      "deleted": "File deleted."
+    },
+    "status": {
+      "uploading": "Uploading",
+      "scanning": "Checking for viruses",
+      "processing": "Reading the text",
+      "ready": "Ready",
+      "failed": "Couldn't read it",
+      "blocked": "Blocked: unsafe file",
+      "noText": "No text found",
+      "retry": "Try again"
+    },
+    "errors": {
+      "unsupported": "Only PDF, Word, PowerPoint, JPEG or PNG files can be used.",
+      "tooLarge": "This file is too large. Use one under 25 MB.",
+      "limit": "You've reached the limit for your own files. Delete one you no longer need.",
+      "aiOff": "Your school has turned off the AI study tools for this class.",
+      "name": "Please rename this file and try again.",
+      "storageFull": "Your school's storage is full. Delete a file or ask your school.",
+      "permission": "Allow camera or photo access in Settings to add a photo.",
+      "network": "No connection. Check your network and try again.",
+      "generic": "Something went wrong. Try again.",
+      "load": "Couldn't load this list."
     }
   },
   "teacher": {
@@ -1871,7 +1938,8 @@
         "gpa": "GPA",
         "credits": "Credits",
         "trend": "Average trend",
-        "empty": "No grades published this term yet."
+        "empty": "No grades published this term yet.",
+        "examsHint": "Every mark the school has approved, by term and subject."
       },
       "attendance": {
         "title": "Attendance this term",
@@ -2272,7 +2340,9 @@
         "sendTest": "Send a test notification",
         "testSent": "Sent. It should arrive on this phone in a few seconds.",
         "testFailed": "Couldn't send the test. Wait a moment and try again.",
-        "notRegistered": "This phone couldn't sign up for notifications, so nothing can reach it. Reason: {reason}"
+        "notRegistered": "This phone couldn't sign up for notifications, so nothing can reach it. Reason: {reason}",
+        "problem": "Reason: {reason}",
+        "retrySetup": "Try again"
       },
       "kinds": {
         "title": "What to notify me about",
@@ -2411,7 +2481,6 @@
     "latest": "Latest mark",
     "subjectInPeriod": "{subject} · {period}",
     "moreToCome": "More to come",
-    "moreToComeNote": "More marks for this term are still to come.",
     "seeAll": "See all exam marks"
   },
   "academicResults": {
