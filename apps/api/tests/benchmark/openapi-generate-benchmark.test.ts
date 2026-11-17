@@ -436,6 +436,7 @@ const EXPECTED_PATHS = [
   "/api/privacy/dsr/{requestId}",
   "/api/privacy/me/dsr",
   "/api/reports/children/comparison",
+  "/api/reports/children/recent-grades",
   "/api/reports/children/{studentId}/breakdown",
   "/api/reports/children/{studentId}/timetable",
   "/api/school-applications/me",

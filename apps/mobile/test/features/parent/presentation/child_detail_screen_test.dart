@@ -49,7 +49,8 @@ ProviderScope _scope({
       // An in-memory store so `persistedSelectedChildIdProvider` (and the switcher's persist on
       // tap) has somewhere real to read and write, same as the parent home switcher test.
       offlineDatabaseProvider.overrideWithValue(OfflineDatabase(NativeDatabase.memory())),
-      // The Grades tab leads with the child's approved exam marks, from their own endpoint.
+      // The Grades tab's recent grades include the child's approved exam marks, from their own
+      // endpoint.
       releasedMarksClientProvider.overrideWithValue(marks ?? FakeReleasedMarksClient()),
       childComparisonProvider.overrideWith(
         (ref) => comparisonReport([
@@ -127,45 +128,108 @@ void main() {
   });
 
   testWidgets(
-      "grades tab: the selected child's approved exam marks lead the tab, and open in full",
-      (tester) async {
+      "grades tab: recent grades mix the selected child's exam marks and assignment grades, "
+      'each labelled, then separate exam-mark and assignment-grade sections', (tester) async {
     _tallScreen(tester);
     final marks = FakeReleasedMarksClient(periodsByStudent: {
       'child-1': singleReleasedExamPeriods(releasedAt: DateTime.utc(2026, 11, 16)),
       'child-2': singleReleasedExamPeriods(
         releasedAt: DateTime.utc(2026, 11, 15),
         subject: 'Science',
+        assessment: 'Lab exam',
         score: 12,
       ),
     });
     await tester.pumpWidget(wrapWithLocalization(_scope(
       childIds: const ['child-1', 'child-2'],
       breakdowns: {
-        'child-1': childBreakdown(id: 'child-1', gradeRows: const []),
+        'child-1': childBreakdown(id: 'child-1', gradeRows: [
+          gradeRowJson(
+            id: 'g1',
+            courseId: 'phys',
+            courseName: 'Physics',
+            label: 'Lab report',
+            publishedAt: '2026-11-10T00:00:00.000Z',
+          ),
+        ]),
         'child-2': childBreakdown(id: 'child-2', gradeRows: const []),
       },
       marks: marks,
     )));
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('released-marks-summary-child-1')), findsOneWidget);
-    expect(find.text('Exam marks'), findsOneWidget);
-    expect(find.text('First month'), findsOneWidget);
-    expect(find.text('Mathematics · First term'), findsOneWidget);
-    expect(find.text('17.5 / 20'), findsOneWidget);
-    expect(find.text('More marks for this term are still to come.'), findsOneWidget);
-    // Above the coursework summary.
+    final recent = find.byKey(const ValueKey('child-recent-grades-child-1'));
+    expect(recent, findsOneWidget);
+    expect(find.descendant(of: recent, matching: find.text('Recent grades')), findsOneWidget);
+    // Newest first: the exam (16 Nov) above the assignment (10 Nov), each with its kind chip.
+    final exam = find.descendant(of: recent, matching: find.text('First month'));
+    final assignment = find.descendant(of: recent, matching: find.text('Lab report'));
+    expect(tester.getTopLeft(exam).dy, lessThan(tester.getTopLeft(assignment).dy));
+    expect(find.descendant(of: recent, matching: find.text('Mathematics · First term')),
+        findsOneWidget);
+    expect(find.descendant(of: recent, matching: find.text('17.5 / 20')), findsOneWidget);
+    expect(find.descendant(of: recent, matching: find.text('Exam')), findsOneWidget);
+    expect(find.descendant(of: recent, matching: find.text('Assignment')), findsOneWidget);
+
+    // The two kinds then get sections of their own, exams first, both under the recent list.
+    final exams = find.byKey(const ValueKey('child-grades-section-exam'));
+    final assignments = find.byKey(const ValueKey('child-grades-section-assignment'));
+    expect(find.descendant(of: exams, matching: find.text('Exam marks')), findsOneWidget);
     expect(
-      tester.getTopLeft(find.text('First month')).dy,
+      find.descendant(of: assignments, matching: find.text('Assignment grades')),
+      findsOneWidget,
+    );
+    expect(tester.getTopLeft(recent).dy, lessThan(tester.getTopLeft(exams).dy));
+    expect(tester.getTopLeft(exams).dy, lessThan(tester.getTopLeft(assignments).dy));
+    expect(
+      tester.getTopLeft(assignments).dy,
       lessThan(tester.getTopLeft(find.text('Term summary')).dy),
     );
 
-    await tester.tap(find.text('See all exam marks'));
+    // An assignment grade is listed right on this tab, so its row opens nothing.
+    await tester.tap(assignment);
+    await tester.pumpAndSettle();
+    expect(find.byType(ReleasedMarksScreen), findsNothing);
+
+    // An exam mark opens the child's marks in full.
+    await tester.tap(exam);
     await tester.pumpAndSettle();
     final screen = tester.widget<ReleasedMarksScreen>(find.byType(ReleasedMarksScreen));
     expect([screen.studentId, screen.studentName], ['child-1', 'Amir']);
     expect(find.text('Amir'), findsWidgets);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    // So does the Exams section's entry.
+    await tester.tap(find.text('See all exam marks'));
+    await tester.pumpAndSettle();
+    expect(find.byType(ReleasedMarksScreen), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
     expect(marks.requestedStudents.toSet(), {'child-1'});
+
+    // Switching child re-scopes the list to that child's marks.
+    await tester.tap(find.text('Lina'));
+    await tester.pumpAndSettle();
+    final lina = find.byKey(const ValueKey('child-recent-grades-child-2'));
+    expect(find.descendant(of: lina, matching: find.text('Lab exam')), findsOneWidget);
+    expect(find.text('First month'), findsNothing);
+    expect(find.text('Lab report'), findsNothing);
+    expect(marks.requestedStudents.toSet(), {'child-1', 'child-2'});
+  });
+
+  testWidgets('grades tab: recent grades with nothing released or published says so',
+      (tester) async {
+    _tallScreen(tester);
+    await tester.pumpWidget(wrapWithLocalization(_scope(
+      childIds: const ['child-1'],
+      breakdowns: {'child-1': childBreakdown(id: 'child-1', gradeRows: const [])},
+    )));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No exam marks or assignment grades yet.'), findsOneWidget);
+    expect(find.text('Exam'), findsNothing);
+    expect(find.text('Assignment'), findsNothing);
   });
 
   testWidgets('grades tab: exam marks still show when the coursework breakdown fails',
@@ -201,6 +265,7 @@ void main() {
   });
 
   testWidgets('grades tab: no published grades shows the empty state', (tester) async {
+    _tallScreen(tester);
     await tester.pumpWidget(wrapWithLocalization(_scope(
       childIds: const ['child-1'],
       breakdowns: {'child-1': childBreakdown(id: 'child-1', gradeRows: const [])},
@@ -232,6 +297,28 @@ void main() {
     expect(find.text('6 (15%)'), findsOneWidget);
     expect(find.text('Needs attention'), findsOneWidget);
     expect(find.text('Weekly present rate'), findsOneWidget);
+  });
+
+  testWidgets("the home's recent grades can bring the detail back to its Grades tab",
+      (tester) async {
+    _tallScreen(tester);
+    await tester.pumpWidget(wrapWithLocalization(_scope(
+      childIds: const ['child-1'],
+      breakdowns: {'child-1': childBreakdown(id: 'child-1', termAverage: 88)},
+    )));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Attendance'));
+    await tester.pumpAndSettle();
+    expect(find.text('Attendance this term'), findsOneWidget);
+
+    ProviderScope.containerOf(tester.element(find.byType(ChildDetailScreen)))
+        .read(childDetailGradesRequestProvider.notifier)
+        .request();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Term summary'), findsOneWidget);
+    expect(find.text('Attendance this term'), findsNothing);
   });
 
   testWidgets(

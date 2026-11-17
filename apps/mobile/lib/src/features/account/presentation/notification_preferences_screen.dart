@@ -99,6 +99,7 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
   NotificationQuietHours? _savedQuietHours;
   final Set<String> _saving = {};
   bool _sendingTest = false;
+  bool _retryingSetup = false;
 
   @override
   void initState() {
@@ -116,7 +117,7 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ref.invalidate(pushPermissionProvider);
+      ref.invalidate(pushPhoneStatusProvider);
     }
   }
 
@@ -158,9 +159,21 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
     } catch (_) {
       // Shown through the status below.
     }
-    ref.invalidate(pushPermissionProvider);
+    ref.invalidate(pushPhoneStatusProvider);
     // The shell's "turn on notifications" banner no longer needs to ask.
     ref.read(pushSetupProvider.notifier).accountChanged();
+  }
+
+  /// "Try again" after push setup failed: runs it again, then shows where it now stands.
+  Future<void> _retrySetup() async {
+    setState(() => _retryingSetup = true);
+    try {
+      await ref.read(pushServiceProvider).retrySetup();
+    } catch (_) {
+      // The reason is on the card (PushService.problem).
+    }
+    ref.invalidate(pushPhoneStatusProvider);
+    if (mounted) setState(() => _retryingSetup = false);
   }
 
   Future<void> _sendTest() async {
@@ -173,6 +186,8 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
     } on PushRegistrationException catch (e) {
       // The test would be queued but could never reach this phone: say why instead of "Sent".
       _snackText('account.notifications.phone.notRegistered'.tr(namedArgs: {'reason': e.reason}));
+      // The card shows the reason too, with "Try again".
+      ref.invalidate(pushPhoneStatusProvider);
     } on Object {
       _snack('account.notifications.phone.testFailed');
     } finally {
@@ -227,9 +242,11 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
         children: [
           _PhoneCard(
             sendingTest: _sendingTest,
+            retrying: _retryingSetup,
             onTurnOn: _turnOnPhone,
             onOpenSettings: () => ref.read(pushServiceProvider).openSystemSettings(),
             onSendTest: _sendTest,
+            onRetry: _retrySetup,
           ),
           const SizedBox(height: AppSpacing.space24),
           _SectionTitle('account.notifications.kinds.title'.tr()),
@@ -350,24 +367,36 @@ class _RetryCard extends StatelessWidget {
   }
 }
 
-/// Whether this phone shows notifications, and the one action that fits.
+/// Whether this phone shows notifications, and the action that fits. When push setup failed, the
+/// reason is shown under the status with "Try again", so a phone that gets nothing can say why.
 class _PhoneCard extends ConsumerWidget {
   const _PhoneCard({
     required this.sendingTest,
+    required this.retrying,
     required this.onTurnOn,
     required this.onOpenSettings,
     required this.onSendTest,
+    required this.onRetry,
   });
 
   final bool sendingTest;
+  final bool retrying;
   final VoidCallback onTurnOn;
   final VoidCallback onOpenSettings;
   final VoidCallback onSendTest;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final status = ref.watch(pushPermissionProvider).value;
+    final phone = ref.watch(pushPhoneStatusProvider).value;
+    final status = phone?.permission;
+    // A failure is worth showing when push is unavailable, or allowed but this phone could not be
+    // registered; when notifications are simply off or not asked for yet, the action says it all.
+    final problem = switch (status) {
+      PushPermission.unavailable || PushPermission.granted => phone?.problem,
+      _ => null,
+    };
     final (icon, color, key) = switch (status) {
       PushPermission.granted => (
         Icons.notifications_active_outlined,
@@ -414,32 +443,55 @@ class _PhoneCard extends ConsumerWidget {
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
+                      if (problem != null)
+                        Text(
+                          'account.notifications.phone.problem'.tr(namedArgs: {'reason': problem}),
+                          key: const Key('notificationPhoneProblem'),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
                     ],
                   ),
                 ),
               ],
             ),
             const SizedBox(height: AppSpacing.space12),
-            switch (status) {
-              PushPermission.granted => OutlinedButton.icon(
-                key: const Key('notificationSendTest'),
-                onPressed: sendingTest ? null : onSendTest,
-                icon: const Icon(Icons.send_outlined),
-                label: Text('account.notifications.phone.sendTest'.tr()),
-              ),
-              PushPermission.denied => FilledButton.icon(
-                key: const Key('notificationOpenSettings'),
-                onPressed: onOpenSettings,
-                icon: const Icon(Icons.settings_outlined),
-                label: Text('account.notifications.phone.openSettings'.tr()),
-              ),
-              PushPermission.notDetermined => FilledButton(
-                key: const Key('notificationTurnOn'),
-                onPressed: onTurnOn,
-                child: Text('account.notifications.phone.turnOn'.tr()),
-              ),
-              _ => const SizedBox.shrink(),
-            },
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              spacing: AppSpacing.space8,
+              children: [
+                // Push failed (unavailable, or this phone could not be registered): set it up again.
+                if (status == PushPermission.unavailable || problem != null)
+                  FilledButton.tonalIcon(
+                    key: const Key('notificationRetrySetup'),
+                    onPressed: retrying ? null : onRetry,
+                    icon: const Icon(Icons.refresh),
+                    label: Text('account.notifications.phone.retrySetup'.tr()),
+                  ),
+                if (status == PushPermission.granted ||
+                    (status == PushPermission.unavailable && (phone?.canSendTest ?? false)))
+                  OutlinedButton.icon(
+                    key: const Key('notificationSendTest'),
+                    onPressed: sendingTest ? null : onSendTest,
+                    icon: const Icon(Icons.send_outlined),
+                    label: Text('account.notifications.phone.sendTest'.tr()),
+                  ),
+                if (status == PushPermission.denied)
+                  FilledButton.icon(
+                    key: const Key('notificationOpenSettings'),
+                    onPressed: onOpenSettings,
+                    icon: const Icon(Icons.settings_outlined),
+                    label: Text('account.notifications.phone.openSettings'.tr()),
+                  ),
+                if (status == PushPermission.notDetermined)
+                  FilledButton(
+                    key: const Key('notificationTurnOn'),
+                    onPressed: onTurnOn,
+                    child: Text('account.notifications.phone.turnOn'.tr()),
+                  ),
+              ],
+            ),
           ],
         ),
       ),

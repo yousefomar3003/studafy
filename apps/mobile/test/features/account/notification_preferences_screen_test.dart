@@ -55,12 +55,11 @@ Widget _app({
   List<(String?, String?)>? quietSaves,
   void Function()? onTest,
 }) {
-  final pushService = push ?? FakePushService();
+  final pushService = (push ?? FakePushService())..permission = permission;
   return ProviderScope(
     overrides: [
       sessionRolesProvider.overrideWithValue(roles),
       pushServiceProvider.overrideWithValue(pushService),
-      pushPermissionProvider.overrideWith((ref) async => permission),
       accountNotificationPreferencesProvider.overrideWith((ref) async => _matrix()),
       updateNotificationPreferencesProvider.overrideWithValue((changes) async {
         saved?.add(changes);
@@ -205,6 +204,73 @@ void main() {
     await tester.tap(find.byKey(const Key('notificationTurnOn')));
     await tester.pumpAndSettle();
     expect(push.permissionRequests, 1);
+  });
+
+  testWidgets('unavailable: says why, and Try again sets push up again', (tester) async {
+    final push = FakePushService()
+      ..token = null
+      ..problem =
+          'PlatformException: NullPointerException: FirebaseCrashlytics component is not '
+          'present.'
+      ..onRetrySetup = (push) => push
+        ..permission = PushPermission.granted
+        ..problem = null
+        ..token = 'fake-fcm-token';
+    await pumpAccountScreen(
+      tester,
+      _app(roles: const ['STUDENT'], permission: PushPermission.unavailable, push: push),
+    );
+
+    expect(find.text('Not available in this version of the app.'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('notificationPhoneProblem'))).data,
+      'Reason: PlatformException: NullPointerException: FirebaseCrashlytics component is not '
+      'present.',
+    );
+    // No token, so a test could not reach this phone.
+    expect(find.byKey(const Key('notificationSendTest')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('notificationRetrySetup')));
+    await tester.pumpAndSettle();
+
+    expect(push.setupRetries, 1);
+    expect(find.byKey(const Key('notificationPhoneProblem')), findsNothing);
+    expect(find.byKey(const Key('notificationRetrySetup')), findsNothing);
+    expect(find.textContaining('On. Notices show'), findsOneWidget);
+    expect(find.byKey(const Key('notificationSendTest')), findsOneWidget);
+  });
+
+  testWidgets('unavailable but this phone has a token: the test stays available', (tester) async {
+    final push = FakePushService()..problem = 'FirebaseException(core/not-initialized)';
+    await pumpAccountScreen(
+      tester,
+      _app(roles: const ['STUDENT'], permission: PushPermission.unavailable, push: push),
+    );
+
+    expect(find.byKey(const Key('notificationPhoneProblem')), findsOneWidget);
+    expect(find.byKey(const Key('notificationRetrySetup')), findsOneWidget);
+    expect(find.byKey(const Key('notificationSendTest')), findsOneWidget);
+  });
+
+  testWidgets('allowed but not registered: says why, with Try again', (tester) async {
+    final push = FakePushService()..problem = 'the server did not accept this phone: HTTP 500';
+    await pumpAccountScreen(tester, _app(roles: const ['STUDENT'], push: push));
+
+    expect(find.text('Reason: the server did not accept this phone: HTTP 500'), findsOneWidget);
+    expect(find.byKey(const Key('notificationRetrySetup')), findsOneWidget);
+    expect(find.byKey(const Key('notificationSendTest')), findsOneWidget);
+  });
+
+  testWidgets('turned off in the phone: no failure reason, only Settings', (tester) async {
+    final push = FakePushService()..problem = 'notifications are turned off for this app';
+    await pumpAccountScreen(
+      tester,
+      _app(roles: const ['STUDENT'], permission: PushPermission.denied, push: push),
+    );
+
+    expect(find.byKey(const Key('notificationPhoneProblem')), findsNothing);
+    expect(find.byKey(const Key('notificationRetrySetup')), findsNothing);
+    expect(find.byKey(const Key('notificationOpenSettings')), findsOneWidget);
   });
 
   testWidgets('quiet hours turn on with a default window and turn off', (tester) async {

@@ -11,12 +11,9 @@ import '../../domain/released_marks.dart';
 import 'academic_result_widgets.dart';
 
 /// The kit pieces every view of a student's approved exam marks shares: the full list
-/// ([ReleasedMarksView], the student's "Exam marks" tab and the notification's screen), the
-/// summary card ([ReleasedMarksSummaryCard], a parent's Grades tab and the student's home) and
-/// the one-assessment row ([ReleasedMarkTile]).
-
-/// How long a released mark counts as "new" on the student's home.
-const releasedMarksRecentWindow = Duration(days: 14);
+/// ([ReleasedMarksView], the student's "Exams" tab and the notification's screen), the
+/// one-assessment row ([ReleasedMarkTile]) and that row with its subject and period
+/// ([ReleasedMarkEntryTile], a "Recent grades" list).
 
 /// The printed mark of [attempt]: "17.5 / 20", a descriptor, or absent / excused / N/A.
 String releasedMarkValue(
@@ -82,6 +79,7 @@ class ReleasedMarkTile extends StatelessWidget {
     this.subtitle,
     this.icon,
     this.accent = AppAccent.blue,
+    this.footer,
     this.onTap,
     super.key,
   });
@@ -93,6 +91,9 @@ class ReleasedMarkTile extends StatelessWidget {
   /// A leading badge (the subject's icon in a summary list); none inside a subject's own card.
   final IconData? icon;
   final AppAccent accent;
+
+  /// Under the text (a "Recent grades" row's kind chip).
+  final Widget? footer;
   final VoidCallback? onTap;
 
   @override
@@ -118,6 +119,7 @@ class ReleasedMarkTile extends StatelessWidget {
           tone: _toneOf(assessment, attempt),
         ),
       ),
+      footer: footer,
       onTap: onTap,
     );
   }
@@ -322,158 +324,38 @@ class _SubjectMarksCard extends StatelessWidget {
   }
 }
 
-/// A card listing a student's newest released marks, each with its subject, linking to the full
-/// list. [onSeeAll] opens it (the student's Grades tab, or the marks screen for a parent's child).
-///
-/// With [recentOnly] it lists only marks released within [releasedMarksRecentWindow] and
-/// disappears entirely when there are none, or while it loads or fails: the student home's
-/// "New exam marks" card, which should never take space for nothing. Otherwise it always shows,
-/// with an empty or error state of its own (a parent's Grades tab).
-class ReleasedMarksSummaryCard extends ConsumerWidget {
-  const ReleasedMarksSummaryCard({
-    required this.studentId,
-    required this.onSeeAll,
-    this.titleKey = 'releasedMarks.title',
-    this.maxItems = 4,
-    this.recentOnly = false,
-    this.now,
-    this.margin = EdgeInsets.zero,
+/// One released mark with where it sits ("Mathematics · First term"), led by [icon] in
+/// [accent]: a row of a "Recent grades" list, with [footer] for its kind chip.
+class ReleasedMarkEntryTile extends StatelessWidget {
+  const ReleasedMarkEntryTile({
+    required this.entry,
+    required this.icon,
+    required this.accent,
+    this.footer,
+    this.onTap,
     super.key,
   });
 
-  final String studentId;
-  final VoidCallback onSeeAll;
-  final String titleKey;
-  final int maxItems;
-  final bool recentOnly;
-
-  /// The clock for [recentOnly] (tests); defaults to the current time.
-  final DateTime? now;
-
-  /// Space around the card when it shows (none when a [recentOnly] card hides itself).
-  final EdgeInsetsGeometry margin;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final marks = ref.watch(studentReleasedMarksProvider(studentId));
-
-    Widget card(Widget child, {Widget? trailing}) => Padding(
-      padding: margin,
-      child: AppSectionCard(
-        key: ValueKey('released-marks-summary-$studentId'),
-        title: titleKey.tr(),
-        icon: Icons.fact_check_outlined,
-        accent: AppAccent.indigo,
-        trailing: trailing,
-        child: child,
-      ),
-    );
-
-    return marks.when(
-      skipLoadingOnRefresh: true,
-      loading: () => recentOnly
-          ? const SizedBox.shrink()
-          : card(
-              const Padding(
-                padding: EdgeInsets.all(AppSpacing.space8),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-            ),
-      error: (_, _) => recentOnly
-          ? const SizedBox.shrink()
-          : card(
-              AppEmptyState(
-                compact: true,
-                icon: Icons.error_outline,
-                accent: AppTone.danger.accent,
-                message: 'releasedMarks.error'.tr(),
-                action: TextButton(
-                  onPressed: () =>
-                      ref.invalidate(studentReleasedMarksProvider(studentId)),
-                  child: Text('releasedMarks.retry'.tr()),
-                ),
-              ),
-            ),
-      data: (periods) {
-        var entries = releasedMarkEntries(periods);
-        if (recentOnly) {
-          final since = (now ?? DateTime.now()).subtract(
-            releasedMarksRecentWindow,
-          );
-          entries = [
-            for (final entry in entries)
-              if (entry.assessment.releasedAt?.isAfter(since) ?? false) entry,
-          ];
-          if (entries.isEmpty) return const SizedBox.shrink();
-        }
-        if (entries.isEmpty) {
-          return card(
-            AppEmptyState(
-              compact: true,
-              icon: Icons.fact_check_outlined,
-              message: 'releasedMarks.empty'.tr(),
-            ),
-          );
-        }
-        final shown = entries.take(maxItems).toList();
-        final partial = shown.any((entry) => !entry.subject.periodApproved);
-        return card(
-          trailing: AppStatusPill(
-            label: '${entries.length}',
-            tone: AppTone.brand,
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (final entry in shown)
-                _SummaryRow(entry: entry, onTap: onSeeAll),
-              if (partial) ...[
-                const SizedBox(height: AppSpacing.space4),
-                Text(
-                  'releasedMarks.moreToComeNote'.tr(),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: TextButton(
-                  onPressed: onSeeAll,
-                  child: Text('releasedMarks.seeAll'.tr()),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({required this.entry, required this.onTap});
-
   final ReleasedMarkEntry entry;
-  final VoidCallback onTap;
+  final IconData icon;
+  final AppAccent accent;
+  final Widget? footer;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    final visual = SubjectVisuals.of(
-      entry.subject.name,
-      fallbackKey: entry.subject.id,
-    );
     return ReleasedMarkTile(
       assessment: entry.assessment,
       attempt: entry.assessment.latestAttempt!,
-      icon: visual.icon,
-      accent: visual.accent,
+      icon: icon,
+      accent: accent,
       subtitle: 'releasedMarks.subjectInPeriod'.tr(
         namedArgs: {
           'subject': entry.subject.name,
           'period': _periodName(entry.period),
         },
       ),
+      footer: footer,
       onTap: onTap,
     );
   }
