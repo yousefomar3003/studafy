@@ -354,7 +354,7 @@ export interface InstalmentView {
   current: boolean;
   /** Its online payment link, while it can be paid; null otherwise. */
   paymentLink: string | null;
-  /** The day (UTC) the licence's AI stops if it is still unpaid (000231). */
+  /** The day (UTC) the licence's AI stops if it is still unpaid (000233). */
   aiStopDate: string;
 }
 
@@ -418,9 +418,9 @@ export interface InvoiceDetail extends InvoiceRecord {
   overdue: boolean;
   /** What is due when, earliest first. One instalment for an invoice paid at once. */
   instalments: InstalmentView[];
-  /** What is paid in each licence year (000231); empty for an invoice with no quote. */
+  /** What is paid in each licence year (000233); empty for an invoice with no quote. */
   yearTotals: LicenceYearTotal[];
-  /** Its licence is suspended for an instalment unpaid 30 days past due (000231). */
+  /** Its licence is suspended for an instalment unpaid 30 days past due (000233). */
   aiStopped: boolean;
   lines: InvoiceLineView[];
   payments: PaymentView[];
@@ -1245,7 +1245,7 @@ export interface PaymentResult {
   payment: PaymentView;
   invoice: InvoiceRecord;
   licenseActivated: boolean;
-  /** The payment settled what had stopped the licence's AI (000231): it is active again. */
+  /** The payment settled what had stopped the licence's AI (000233): it is active again. */
   licenseResumed: boolean;
 }
 
@@ -1338,7 +1338,7 @@ export async function recordPayment(
 /**
  * Void a payment with a reason. The invoice's paid amount and status follow; a receipt matched to it
  * goes back to pending. The license is left as it is; if an instalment is now 30 days late, the
- * workers' lifecycle job stops its AI (000231).
+ * workers' lifecycle job stops its AI (000233).
  */
 export async function voidPayment(
   tx: TransactionSql,

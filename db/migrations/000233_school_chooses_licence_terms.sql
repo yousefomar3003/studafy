@@ -79,7 +79,7 @@ ALTER TABLE app.license_invoices
   );
 
 COMMENT ON COLUMN app.license_quotes.payment_plan IS
-  'How the invoice this quote issues is paid: in_full, monthly over the licence months, yearly (one instalment per licence year), or custom (000221, 000231).';
+  'How the invoice this quote issues is paid: in_full, monthly over the licence months, yearly (one instalment per licence year), or custom (000221, 000233).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 2. The school's choice on its request
@@ -104,13 +104,13 @@ ALTER TABLE app.license_change_requests
   );
 
 COMMENT ON COLUMN app.license_change_requests.months IS
-  'The licence length in months the school asks for, or NULL to leave it to Studafy (000231).';
+  'The licence length in months the school asks for, or NULL to leave it to Studafy (000233).';
 COMMENT ON COLUMN app.license_change_requests.starts_on IS
-  'When the school wants a new licence to start, or NULL for as soon as possible (000231).';
+  'When the school wants a new licence to start, or NULL for as soon as possible (000233).';
 COMMENT ON COLUMN app.license_change_requests.payment_plan IS
-  'How the school wants to pay: monthly, yearly or custom; NULL when not chosen (000231).';
+  'How the school wants to pay: monthly, yearly or custom; NULL when not chosen (000233).';
 COMMENT ON COLUMN app.license_change_requests.payment_proposal IS
-  'For a custom plan, the school''s payments: [{"dueDate": "YYYY-MM-DD", "shareBps": n}], shares adding up to 10000 (000231).';
+  'For a custom plan, the school''s payments: [{"dueDate": "YYYY-MM-DD", "shareBps": n}], shares adding up to 10000 (000233).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 3. The quote answering a request, and why it departs from it
@@ -138,9 +138,9 @@ CREATE INDEX idx_license_quotes_school_change_request
   WHERE change_request_id IS NOT NULL;
 
 COMMENT ON COLUMN app.license_quotes.change_request_id IS
-  'The school''s request this quote answers; accepting the quote resolves it (000231).';
+  'The school''s request this quote answers; accepting the quote resolves it (000233).';
 COMMENT ON COLUMN app.license_quotes.terms_change_reason IS
-  'Why the quote''s length, start date or payment plan differs from what the school asked for (000231).';
+  'Why the quote''s length, start date or payment plan differs from what the school asked for (000233).';
 
 -- ---------------------------------------------------------------------------------------------------
 -- 4. Stopped for non-payment
@@ -155,7 +155,7 @@ ALTER TABLE app.school_licenses
   );
 
 COMMENT ON COLUMN app.school_licenses.nonpayment_suspended_at IS
-  'When the workers suspended this licence because an instalment was unpaid 30 days after its due date; NULL otherwise (000231).';
+  'When the workers suspended this licence because an instalment was unpaid 30 days after its due date; NULL otherwise (000233).';
 
 -- Leaving `suspended` (resumed by a payment or by the super admin, cancelled, expired) ends the stop.
 CREATE FUNCTION app.school_licenses_clear_nonpayment()
@@ -249,7 +249,7 @@ BEGIN
         WHERE event.school_id = candidate AND event.relayed_at IS NULL
       );
     ELSIF p_consumer = 'email' THEN
-      -- idx_outbox_events_school_email_claim (000199, rebuilt by 000231)
+      -- idx_outbox_events_school_email_claim (000199, rebuilt by 000233)
       pending := EXISTS (
         SELECT 1 FROM app.outbox_events AS event
         WHERE event.school_id = candidate

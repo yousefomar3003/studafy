@@ -12,7 +12,7 @@ export interface ScheduleRow {
   status?: "due" | "partially_paid" | "paid";
   overdue?: boolean;
   current?: boolean;
-  /** YYYY-MM-DD: the AI stops this day if the instalment is still unpaid (000231). */
+  /** YYYY-MM-DD: the AI stops this day if the instalment is still unpaid (000233). */
   aiStopDate?: string;
 }
 

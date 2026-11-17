@@ -76,7 +76,7 @@ is actually `@send.studafy.com`.
 
 ### Licence payment emails (billing, not notifications)
 
-Overdue school-licence instalments are emailed (owner decision, 2026-11-17, migration 000231). These
+Overdue school-licence instalments are emailed (owner decision, 2026-11-17, migration 000233). These
 are billing mail to the school's paying contacts, like the invoice itself, so they go through this
 transactional channel and the "no notification email" rule above does not apply to them:
 

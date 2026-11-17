@@ -72,7 +72,7 @@ interface AudienceState {
  * licence months, yearly, or a custom schedule of amounts and dates; the API previews the
  * instalments and what each licence year carries live.
  *
- * `&requestId=` prices a school's request (000231): its length, start and payment plan prefill the
+ * `&requestId=` prices a school's request (000233): its length, start and payment plan prefill the
  * terms (a custom plan's shares become amounts once the total is known), and changing any of them
  * needs a reason the school reads on the quote. Accepting the quote resolves the request.
  */

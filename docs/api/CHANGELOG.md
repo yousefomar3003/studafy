@@ -14,7 +14,7 @@ when it required the `version-bump` label.
 ### Added
 
 - The school chooses its licence length and payment plan; AI stops 30 days after an unpaid
-  instalment (migration 000231, ADR-021 amendment). `CreateLicenseChangeRequestBody` takes optional
+  instalment (migration 000233, ADR-021 amendment). `CreateLicenseChangeRequestBody` takes optional
   `months` (1-36), `startsOn`, `paymentPlan` (`monthly`, `yearly`, `custom`) and, for custom,
   `paymentProposal` (`LicenseProposedInstalment[]`: `dueDate`, `shareBps` adding up to 10000; 422
   `LICENSE_PAYMENT_SCHEDULE_INVALID` otherwise); `LicenseChangeRequest` echoes them.
