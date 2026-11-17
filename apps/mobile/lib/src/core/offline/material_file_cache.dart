@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -66,6 +67,12 @@ class MaterialFileCache {
   }
 }
 
+/// The directory downloaded school files (materials, attachment pictures) are kept under: the OS
+/// cache directory, which backups never copy (QA-080). Tests point it at a temporary directory.
+final offlineFilesRootProvider = Provider<Future<Directory> Function()>(
+  (ref) => getApplicationCacheDirectory,
+);
+
 /// A bare [Dio] used only to fetch pre-signed download bytes.
 ///
 /// Deliberately not `apiClientProvider`'s (`core/auth/auth_providers.dart`): the pre-signed URL
@@ -75,14 +82,18 @@ class MaterialFileCache {
 /// shape).
 final materialBytesDioProvider = Provider<Dio>((ref) => Dio());
 
-/// Wipes itself the moment a session logs out, the same rule [OfflineDatabase]'s own provider
-/// (`offline_providers.dart`) follows: a downloaded material's bytes are school data and must not
-/// survive into a different account signing in on the same device.
+/// Wipes itself the moment a session logs out or the account switches, the same rule
+/// [OfflineDatabase]'s own provider (`offline_providers.dart`) follows: a downloaded material's
+/// bytes are school data and must not survive into a different account signing in on the same
+/// device.
 final materialFileCacheProvider = Provider<MaterialFileCache>((ref) {
-  const cache = MaterialFileCache();
+  final cache = MaterialFileCache(root: ref.watch(offlineFilesRootProvider));
   ref.listen(authStatusProvider, (previous, next) {
-    if (previous == AuthStatus.authenticated && next == AuthStatus.unauthenticated) {
-      cache.clear();
+    // Any exit from `authenticated`, not only to `unauthenticated` (QA-081): logging out with
+    // another account on the phone, and switching accounts, go authenticated → loading →
+    // authenticated. The same condition as `offlineDatabaseProvider`.
+    if (previous == AuthStatus.authenticated && next != AuthStatus.authenticated) {
+      unawaited(cache.clear());
     }
   });
   return cache;
