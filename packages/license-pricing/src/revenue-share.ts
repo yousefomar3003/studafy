@@ -1,7 +1,9 @@
+import { academicYearMonths, monthCount, monthEnd, monthStart } from "./academic-months";
 import { previewRevenueShare } from "./ai-programme";
 import { BPS_SCALE, divideHalfUp, toSafeNumber } from "./money";
 import { addMonthsUtc, licenceYears } from "./schedule";
 
+import type { LicenseCommitment } from "./ai-optin";
 import type { ResolvedAiProgramme } from "./ai-programme";
 import type { PaymentPlan } from "./schedule";
 
@@ -36,10 +38,6 @@ import type { PaymentPlan } from "./schedule";
  *     amount per entry (a payment's part of one instalment), so a licence's total share can differ
  *     from the share of its total by at most half a minor unit per entry.
  */
-
-export const REVENUE_SHARE_COMMITMENTS = ["full_year", "month_to_month"] as const;
-/** full_year: committed for the school's whole academic year. month_to_month: cancellable. */
-export type RevenueShareCommitment = (typeof REVENUE_SHARE_COMMITMENTS)[number];
 
 /** `numerator / denominator` as basis points, rounded down, within 0..10_000. 0 when nothing to divide by. */
 export function ratioBps(numerator: number, denominator: number): number {
@@ -97,7 +95,7 @@ export interface RevenueShareInput {
   uploadConsistencyBps: number | null;
   /** Student seats on the licence when conversion was measured (the large-school floor's test). */
   seats: number;
-  commitment: RevenueShareCommitment;
+  commitment: LicenseCommitment;
   /** The Student AI part of the money Studafy collected, in minor units. */
   baseMinor: number;
 }
@@ -211,10 +209,15 @@ export interface InstalmentPeriod {
 
 /**
  * The days each instalment pays for -- the school days whose uploads give a payment its content
- * bonus. A monthly plan: instalment k is licence month k. Yearly: licence year k. At once: the whole
- * term. Custom: from its due date (the term's start for the first) to the day before the next one's
- * (the term's end for the last). Always within the term; when the instalments do not match the plan
- * (edited by hand), each pays for the whole term.
+ * bonus. A monthly plan: instalment k is the term's k-th month by THE month rule
+ * (`academicYearMonths`, a calendar month counts when the term covers at least half of it -- the
+ * months the licence, the parent's opt-in and the tuition line count), the first stretched back to
+ * the term's first day and the last on to its last day; when the term's counted months do not match
+ * the instalments (a term the rule counts differently from the schedule), licence month k from the
+ * start date. Yearly: licence year k. At once: the whole term. Custom: from its due date (the term's
+ * start for the first) to the day before the next one's (the term's end for the last). Always within
+ * the term; when the instalments do not match the plan (edited by hand), each pays for the whole
+ * term.
  */
 export function instalmentPeriods(input: InstalmentPeriodInput): InstalmentPeriod[] {
   const start = input.startDate.slice(0, 10);
@@ -229,6 +232,19 @@ export function instalmentPeriods(input: InstalmentPeriodInput): InstalmentPerio
 
   if (input.plan === "in_full" || ordered.length <= 1) return whole();
   if (input.plan === "monthly") {
+    const counted = academicYearMonths(start, last);
+    if (counted && monthCount(counted) === ordered.length) {
+      return ordered.map((instalment, index) => {
+        const month = counted.first + index;
+        return {
+          position: instalment.position,
+          ...clamp(
+            index === 0 ? start : monthStart(month),
+            index === ordered.length - 1 ? last : monthEnd(month),
+          ),
+        };
+      });
+    }
     if (ordered.length !== Math.max(1, input.months)) return whole();
     return ordered.map((instalment, index) => ({
       position: instalment.position,

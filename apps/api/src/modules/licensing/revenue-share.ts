@@ -21,7 +21,7 @@ import { revenueShareMeasures, shareContext } from "./revenue-share-context";
 import type { LicenseActor } from "./context";
 import type { Changed, LicenseRecord } from "./service";
 import type { RevenueShareStatus } from "@studafy/billing";
-import type { RevenueShareCommitment } from "@studafy/license-pricing";
+import type { LicenseCommitment } from "@studafy/license-pricing";
 import type { TransactionSql } from "postgres";
 
 /**
@@ -54,7 +54,7 @@ export interface RevenueShareEntryView {
   minorUnit: number;
   collectedMinor: number;
   baseMinor: number;
-  commitment: RevenueShareCommitment;
+  commitment: LicenseCommitment;
   programmeVersionId: string;
   programmeOverrideId: string | null;
   seats: number | null;
@@ -98,7 +98,7 @@ interface EntryRow {
   minor_unit: number;
   collected_minor: string;
   base_minor: string;
-  commitment: RevenueShareCommitment;
+  commitment: LicenseCommitment;
   version_id: string;
   override_id: string | null;
   seats: number | null;
@@ -401,7 +401,7 @@ export interface MeasurementPeriodView {
 export interface LicenseRevenueShareView {
   licenseId: string;
   currencyCode: string;
-  commitment: RevenueShareCommitment;
+  commitment: LicenseCommitment;
   periods: MeasurementPeriodView[];
   /**
    * The share a payment recorded today would get (before the content bonus, which depends on the

@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 import { REVENUE_SHARE_STATUSES } from "@studafy/billing";
-import { AI_PROGRAMME_LIMITS, REVENUE_SHARE_COMMITMENTS } from "@studafy/license-pricing";
+import { AI_PROGRAMME_LIMITS } from "@studafy/license-pricing";
+
+import { licenseCommitmentSchema } from "./schemas";
 
 /**
  * OpenAPI schemas for the Student AI revenue share (000237). As in billing-schemas.ts and
@@ -25,9 +27,9 @@ export const revenueShareLicenseParamsSchema = z.object({
 export const revenueShareStatusSchema = z
   .enum(REVENUE_SHARE_STATUSES)
   .openapi("AiRevenueShareStatus");
-export const revenueShareCommitmentSchema = z
-  .enum(REVENUE_SHARE_COMMITMENTS)
-  .openapi("AiRevenueShareCommitment");
+// The licence's own commitment (LicenseCommitment, 000235): one enum for the licence, the quote and
+// the revenue share.
+export const revenueShareCommitmentSchema = licenseCommitmentSchema;
 
 export const revenueShareQuerySchema = z.object({
   licenseId: uuid.optional().openapi({ param: { name: "licenseId", in: "query" } }),

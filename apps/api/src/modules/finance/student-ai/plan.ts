@@ -27,13 +27,14 @@
  * mid-year, months before that are the school's to bill (they are not planned either).
  */
 
-/** A month as one integer: year * 12 + (month - 1). */
-export type MonthIndex = number;
+import { academicYearMonths, monthIndex, monthKey, monthStart } from "@studafy/license-pricing";
 
-export interface MonthRange {
-  first: MonthIndex;
-  last: MonthIndex;
-}
+import type { MonthIndex, MonthRange } from "@studafy/license-pricing";
+
+// The month rule lives in @studafy/license-pricing (academic-months.ts) so phase 2's opt-in and
+// phase 5's revenue share periods count exactly the same months as this line.
+export { academicYearMonths, monthIndex, monthKey, monthStart };
+export type { MonthIndex, MonthRange };
 
 export interface PortionPlan {
   /** ISO date. */
@@ -42,61 +43,6 @@ export interface PortionPlan {
   firstMonth: string;
   monthCount: number;
   amountMinor: number;
-}
-
-const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})/;
-
-function parts(date: string): [number, number, number] {
-  const match = ISO_DATE.exec(date);
-  if (!match) throw new RangeError(`Not an ISO date: ${date}`);
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
-}
-
-export function monthIndex(date: string): MonthIndex {
-  const [year, month] = parts(date);
-  return year * 12 + (month - 1);
-}
-
-/** The first day of a month, as an ISO date. */
-export function monthStart(index: MonthIndex): string {
-  const year = Math.floor(index / 12);
-  const month = (index % 12) + 1;
-  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-01`;
-}
-
-/** "2026-09" for a month: how the API names months. */
-export function monthKey(index: MonthIndex): string {
-  return monthStart(index).slice(0, 7);
-}
-
-function daysInMonth(index: MonthIndex): number {
-  const year = Math.floor(index / 12);
-  const month = index % 12;
-  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-}
-
-/**
- * The months of an academic year from its first and last day (inclusive): the calendar months it
- * covers at least half of. Null when it covers no month that far (a year shorter than ~a month).
- */
-export function academicYearMonths(startsOn: string, endsOn: string): MonthRange | null {
-  const startIndex = monthIndex(startsOn);
-  const endIndex = monthIndex(endsOn);
-  const startDay = parts(startsOn)[2];
-  const endDay = parts(endsOn)[2];
-
-  const counts = (index: MonthIndex): boolean => {
-    const days = daysInMonth(index);
-    const from = index === startIndex ? startDay : 1;
-    const to = index === endIndex ? Math.min(endDay, days) : days;
-    return (to - from + 1) * 2 >= days;
-  };
-
-  let first = startIndex;
-  while (first <= endIndex && !counts(first)) first += 1;
-  let last = endIndex;
-  while (last >= first && !counts(last)) last -= 1;
-  return first <= last ? { first, last } : null;
 }
 
 /**

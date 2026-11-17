@@ -90,6 +90,15 @@ export type {
   RevenueSharePreviewInput,
 } from "./ai-programme";
 export {
+  academicYearMonths,
+  monthCount,
+  monthEnd,
+  monthIndex,
+  monthKey,
+  monthStart,
+} from "./academic-months";
+export type { MonthIndex, MonthRange } from "./academic-months";
+export {
   AI_OPTIN_SOURCES,
   AI_OPTIN_STATUSES,
   AI_OPTIN_TERMS_VERSION,
@@ -118,7 +127,6 @@ export type {
   UploadConsistencyTeacherResult,
 } from "./upload-consistency";
 export {
-  REVENUE_SHARE_COMMITMENTS,
   addDaysUtc,
   computeRevenueShare,
   instalmentPeriods,
@@ -130,7 +138,6 @@ export {
 export type {
   InstalmentPeriod,
   InstalmentPeriodInput,
-  RevenueShareCommitment,
   RevenueShareInput,
   RevenueShareResult,
   RevenueShareSettings,
