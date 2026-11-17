@@ -18,8 +18,9 @@ import 'widgets/released_marks_widgets.dart';
 ///
 /// Opened by the `MARKS_RELEASED` notification (`/students/:studentId/marks`, for the student
 /// themself or for a parent's child — the notification carries the student id, so a parent of
-/// several children lands on the right one) and by a parent's "See all" on the child's Grades
-/// tab. The student's own Grades screen shows the same view in its "Exam marks" tab.
+/// several children lands on the right one) and from a parent's child Grades tab (an exam mark
+/// in "Recent grades", or "See all exam marks"). The student's own Grades screen shows the same
+/// view in its "Exams" tab.
 class ReleasedMarksScreen extends ConsumerWidget {
   const ReleasedMarksScreen({this.studentId, this.studentName, super.key});
 

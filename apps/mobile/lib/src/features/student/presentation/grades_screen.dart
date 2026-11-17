@@ -6,11 +6,13 @@ import '../../../core/offline/staleness_banner.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../application/grade_providers.dart';
 import '../domain/grade_report.dart';
+import '../domain/recent_grades.dart';
 import 'academic_results_screen.dart';
 import 'widgets/grade_term_selector.dart';
 import 'widgets/grade_trend_card.dart';
 import 'widgets/grades_placeholders.dart';
 import 'widgets/grades_publish_banner.dart';
+import 'widgets/recent_grades_widgets.dart';
 import 'widgets/released_marks_widgets.dart';
 import 'widgets/subject_grades_card.dart';
 import 'widgets/term_grade_summary_card.dart';
@@ -18,35 +20,37 @@ import 'widgets/term_grade_summary_card.dart';
 /// Which tab of [GradesScreen] to open on.
 enum GradesTab {
   /// Exam marks school leadership has approved ([ReleasedMarksView]).
-  examMarks,
+  exams,
 
-  /// Published coursework grades (assignments and submissions), one term at a time.
-  coursework,
+  /// Published assignment (coursework) grades, one term at a time.
+  assignments,
 }
 
-/// The student's grades, in two tabs:
+/// The student's grades, in two tabs that keep the two kinds of mark apart, each labelled with
+/// its kind's icon ([GradeKindVisuals], the same badges the home's "Recent grades" uses):
 ///
-/// - **Exam marks** — every mark school leadership has approved (a whole term's mark sheet, or
-///   one exam on its own such as the first monthly exam), by term and subject. The default tab,
-///   so an approved exam is the first thing a student sees here, not hidden behind an icon.
-/// - **Coursework** — the published grades for one term: the term picker, a term-average trend
-///   sparkline, the term/cumulative summary, and a card per subject with its category breakdown.
+/// - **Exams** — every mark school leadership has approved (a whole term's mark sheet, or one
+///   exam on its own such as the first monthly exam), by term and subject. The default tab, so an
+///   approved exam is the first thing a student sees here, not hidden behind an icon.
+/// - **Assignments** — the published coursework grades for one term: the term picker, a
+///   term-average trend sparkline, the term/cumulative summary, and a card per subject with its
+///   category breakdown.
 ///
-/// Reached three ways: pushed with no [courseId] from a home card ("New grades" opens
-/// coursework, "New exam marks" opens exam marks), or via the `GRADE_POSTED` push deep link
-/// `/courses/{courseId}/grades`, which always opens coursework. On the deep-link path it
-/// resets the term selection to the active term and then lets [deepLinkGradeTermProvider]
-/// correct it to whichever term actually holds that course's freshly published grade — so the
-/// student lands on the right term (acceptance criterion) — and highlights that subject.
+/// Reached three ways: pushed with no [courseId] from the home's "Recent grades" (on the tab of
+/// the kind tapped), or via the `GRADE_POSTED` push deep link `/courses/{courseId}/grades`, which
+/// always opens Assignments. On the deep-link path it resets the term selection to the active
+/// term and then lets [deepLinkGradeTermProvider] correct it to whichever term actually holds
+/// that course's freshly published grade — so the student lands on the right term (acceptance
+/// criterion) — and highlights that subject.
 class GradesScreen extends ConsumerStatefulWidget {
-  const GradesScreen({this.courseId, this.initialTab = GradesTab.examMarks, super.key});
+  const GradesScreen({this.courseId, this.initialTab = GradesTab.exams, super.key});
 
   /// The course a push deep link pointed at, or null for a plain in-app open. Non-null also
   /// means "arrived from the grade-posted notification", which is what shows the publish
   /// banner.
   final String? courseId;
 
-  /// The tab to open on; a [courseId] deep link always opens [GradesTab.coursework].
+  /// The tab to open on; a [courseId] deep link always opens [GradesTab.assignments].
   final GradesTab initialTab;
 
   @override
@@ -85,7 +89,7 @@ class _GradesScreenState extends ConsumerState<GradesScreen> {
 
     final status = ref.watch(gradeReportProvider);
 
-    final initialTab = _fromPush ? GradesTab.coursework : widget.initialTab;
+    final initialTab = _fromPush ? GradesTab.assignments : widget.initialTab;
 
     return DefaultTabController(
       length: GradesTab.values.length,
@@ -104,13 +108,10 @@ class _GradesScreenState extends ConsumerState<GradesScreen> {
               ).push(MaterialPageRoute<void>(builder: (_) => const AcademicResultsScreen())),
             ),
           ],
-          bottom: TabBar(
+          bottom: const TabBar(
             tabs: [
-              Tab(key: const ValueKey('grades-tab-exam-marks'), text: 'grades.tabs.examMarks'.tr()),
-              Tab(
-                key: const ValueKey('grades-tab-coursework'),
-                text: 'grades.tabs.coursework'.tr(),
-              ),
+              GradeKindTab(key: ValueKey('grades-tab-exams'), kind: GradeKind.exam),
+              GradeKindTab(key: ValueKey('grades-tab-assignments'), kind: GradeKind.assignment),
             ],
           ),
         ),

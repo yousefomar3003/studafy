@@ -123,12 +123,43 @@ final sendTestNotificationProvider = Provider<Future<void> Function()>((ref) {
   };
 });
 
-/// What this phone allows for the app's notifications. Refreshed when the screen comes back from
-/// the Settings app.
-final pushPermissionProvider = FutureProvider.autoDispose<PushPermission>((
+/// Where notifications stand on this phone: what the phone allows, why push setup failed when it
+/// did ([PushService.problem]), and whether a test notification can still reach it.
+class PushPhoneStatus {
+  const PushPhoneStatus(
+    this.permission, {
+    this.problem,
+    this.canSendTest = false,
+  });
+
+  final PushPermission permission;
+
+  /// Short, token-free reason push could not be set up or this phone could not be registered.
+  final String? problem;
+
+  /// Whether this phone has a push token, so "Send a test notification" can reach it.
+  final bool canSendTest;
+}
+
+/// [PushPhoneStatus] for this phone. Refreshed when the screen comes back from the Settings app
+/// and after "Try again".
+final pushPhoneStatusProvider = FutureProvider.autoDispose<PushPhoneStatus>((
   ref,
-) {
-  return ref.watch(pushServiceProvider).permissionStatus();
+) async {
+  final push = ref.watch(pushServiceProvider);
+  final permission = await push.permissionStatus();
+  final canSendTest = switch (permission) {
+    PushPermission.granted => true,
+    // Setup failed somewhere, but a token may still be had (e.g. only the permission check
+    // failed): then the test is the quickest way to find out whether this phone is reachable.
+    PushPermission.unavailable => await push.currentToken() != null,
+    PushPermission.denied || PushPermission.notDetermined => false,
+  };
+  return PushPhoneStatus(
+    permission,
+    problem: push.problem,
+    canSendTest: canSendTest,
+  );
 });
 
 /// The roles that make someone a member of the school's staff, and so the subject of a staff

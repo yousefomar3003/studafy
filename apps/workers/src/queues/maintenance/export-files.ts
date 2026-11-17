@@ -5,7 +5,8 @@
  *   holds: class materials, assignment and submission attachments, question images, record
  *   documents, expense attachments, licence payment receipts and original student import files.
  * - **One person:** the files that are theirs. Attachments on their own submissions (as a student),
- *   and materials and assignment attachments they uploaded. Their record documents come from
+ *   and materials and assignment attachments they uploaded -- a student's own AI source files
+ *   (000232) among them. An assignment's AI source stores no file of its own and is left out. Their record documents come from
  *   records-dsr.ts. Other people's files are never included: a parent's export does not carry their
  *   child's submissions, and a teacher's does not carry the students' work they marked.
  *
@@ -83,7 +84,7 @@ async function schoolFiles(tx: TransactionSql, schoolId: string): Promise<FileRo
   return tx<FileRow[]>`
     SELECT 'materials' AS table, id::text AS source_id, storage_key,
            original_file_name AS file_name, checksum_sha256, size_bytes
-    FROM app.materials WHERE school_id = ${schoolId}::uuid
+    FROM app.materials WHERE school_id = ${schoolId}::uuid AND storage_key IS NOT NULL
     UNION ALL
     SELECT 'assignment_attachments', id::text, storage_key, original_file_name, checksum_sha256,
            size_bytes
@@ -138,6 +139,7 @@ async function subjectFiles(
            original_file_name AS file_name, checksum_sha256, size_bytes
     FROM app.materials
     WHERE school_id = ${schoolId}::uuid AND uploaded_by_user_id = ${subject.userId}::uuid
+      AND storage_key IS NOT NULL
     UNION ALL
     SELECT 'assignment_attachments', id::text, storage_key, original_file_name, checksum_sha256,
            size_bytes

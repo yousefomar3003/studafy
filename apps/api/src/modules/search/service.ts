@@ -659,6 +659,7 @@ const materialQuery: SectionQuery<RawMaterialRow> = (
     CROSS JOIN LATERAL (
       SELECT * FROM app.materials x
       WHERE x.id = c.id AND x.school_id = ${schoolId}::uuid AND x.search_tsv @@ q.query
+        AND x.source_kind = 'class'
         AND (NOT ${access.materialsReadyOnly}::boolean
              OR x.ingest_status = 'ready'::app.material_ingest_status)
       OFFSET 0

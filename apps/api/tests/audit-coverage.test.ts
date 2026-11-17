@@ -495,6 +495,14 @@ const EXPECTED_MUTATING_ROUTES = [
   // Key-concept extraction (ST-169). POST carries the material id; the route's one write is the
   // durable per-student usage meter, recorded with the same declaration as the retrieval route above.
   "POST /api/ai/students/{studentId}/concepts",
+  // A student's own AI sources (000232). Upload creates the source row, confirm moves it to the
+  // malware scan, delete removes it and its file, and using an assignment creates or rebuilds the
+  // assignment's source: each writes its app.audit_logs row inside the same transaction
+  // (modules/ai/sources/service.ts), behind the auditAction declarations in routes/source-routes.ts.
+  "POST /api/ai/students/{studentId}/sources/upload",
+  "POST /api/ai/students/{studentId}/sources/{sourceId}/confirm",
+  "DELETE /api/ai/students/{studentId}/sources/{sourceId}",
+  "POST /api/ai/students/{studentId}/assignment-sources/{assignmentId}",
   // Simplified explanations (ST-170). POST carries the chunk id; the route's one write is the
   // durable per-student usage meter, recorded with the same declaration as the retrieval route above.
   "POST /api/ai/students/{studentId}/explain",

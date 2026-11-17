@@ -94,7 +94,7 @@ CachedValue<GradeReport> _readyReport(Term term, List<PublishedGrade> grades) {
 
 Widget _screenApp({
   String? courseId,
-  GradesTab initialTab = GradesTab.coursework,
+  GradesTab initialTab = GradesTab.assignments,
 }) {
   return Builder(
     builder: (context) => MaterialApp(
@@ -117,7 +117,7 @@ void main() {
   setUpAll(ensureDateFormattingInitialized);
 
   testWidgets(
-    'opens on the Exam marks tab with an approved exam, coursework one tab away',
+    'opens on the Exams tab with an approved exam, assignment grades one tab away',
     (tester) async {
       final term = _term('term-1', 1);
       final client = FakeReleasedMarksClient(
@@ -140,15 +140,39 @@ void main() {
               ),
             ),
           ],
-          child: _screenApp(initialTab: GradesTab.examMarks),
+          child: _screenApp(initialTab: GradesTab.exams),
         ),
       );
 
-      // No icon to find: the tab is there by name, selected, with the mark on it.
+      // No icon to find: the tab is there by name, selected, with the mark on it. Each tab is
+      // led by its kind's icon, the same one the home's "Recent grades" rows use.
+      final examsTab = find.byKey(const ValueKey('grades-tab-exams'));
+      final assignmentsTab = find.byKey(
+        const ValueKey('grades-tab-assignments'),
+      );
       expect(
-        find.byKey(const ValueKey('grades-tab-exam-marks')),
+        find.descendant(of: examsTab, matching: find.text('Exams')),
         findsOneWidget,
       );
+      expect(
+        find.descendant(
+          of: examsTab,
+          matching: find.byIcon(Icons.fact_check_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: assignmentsTab, matching: find.text('Assignments')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: assignmentsTab,
+          matching: find.byIcon(Icons.assignment_turned_in_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(DefaultTabController.of(tester.element(examsTab)).index, 0);
       expect(find.byTooltip('Term marks'), findsNothing);
       expect(client.requestedStudents, ['student-1']);
       expect(find.text('First month'), findsWidgets);
@@ -156,7 +180,7 @@ void main() {
       expect(find.text('More to come'), findsOneWidget);
       expect(find.byType(SubjectGradesCard), findsNothing);
 
-      await tester.tap(find.byKey(const ValueKey('grades-tab-coursework')));
+      await tester.tap(assignmentsTab);
       await tester.pumpAndSettle();
       expect(find.byType(SubjectGradesCard), findsOneWidget);
       expect(find.text('Algebra'), findsOneWidget);

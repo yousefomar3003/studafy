@@ -79,6 +79,23 @@ class FakePushService implements PushService {
     settingsOpened++;
   }
 
+  /// [PushService.problem]'s answer: why push setup failed, or null.
+  @override
+  String? problem;
+
+  /// How many times [retrySetup] ran ("Try again").
+  int setupRetries = 0;
+
+  /// Runs on [retrySetup], e.g. to make the retry succeed by changing [permission] and [problem].
+  void Function(FakePushService push)? onRetrySetup;
+
+  @override
+  Future<String?> retrySetup() async {
+    setupRetries++;
+    onRetrySetup?.call(this);
+    return null;
+  }
+
   @override
   void dispose() {
     _messageController.close();
