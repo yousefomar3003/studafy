@@ -68,7 +68,7 @@ function cell(res: PreferencesResponse, type: string, channel: string): Preferen
 }
 
 describeDb("notification preferences HTTP", () => {
-  test("GET returns the seeded default matrix", async () => {
+  test("GET returns the default matrix, in_app and push only, never email", async () => {
     const school = await createSchool(database!.sql);
     const user = await createUserFactory(database!.sql, school.id);
 
@@ -80,9 +80,11 @@ describeDb("notification preferences HTTP", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as PreferencesResponse;
     expect(body.attendance_alert_threshold).toBeNull();
-    expect(cell(body, NOTIFICATION_TYPES.GRADE_POSTED, "email").enabled).toBe(true);
-    expect(cell(body, NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT, "email").mandatory).toBe(true);
-    expect(cell(body, NOTIFICATION_TYPES.DISCUSSION_REPLY, "email").digest_eligible).toBe(true);
+    expect(cell(body, NOTIFICATION_TYPES.GRADE_POSTED, "push").enabled).toBe(true);
+    expect(cell(body, NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT, "push").mandatory).toBe(true);
+    // Studafy sends no notification email: no email cell, and no digest anywhere.
+    expect(new Set(body.preferences.map((p) => p.channel))).toEqual(new Set(["in_app", "push"]));
+    expect(body.preferences.some((p) => p.digest || p.digest_eligible)).toBe(false);
   });
 
   test("PATCH toggles a channel and it sticks on the next GET", async () => {
@@ -96,20 +98,20 @@ describeDb("notification preferences HTTP", () => {
       { schoolId: school.id, userId: user.id },
       jsonBody({
         preferences: [
-          { notification_type: NOTIFICATION_TYPES.GRADE_POSTED, channel: "email", enabled: false },
+          { notification_type: NOTIFICATION_TYPES.GRADE_POSTED, channel: "push", enabled: false },
         ],
       }),
     );
     expect(patchRes.status).toBe(200);
     const patched = (await patchRes.json()) as PreferencesResponse;
-    expect(cell(patched, NOTIFICATION_TYPES.GRADE_POSTED, "email").enabled).toBe(false);
+    expect(cell(patched, NOTIFICATION_TYPES.GRADE_POSTED, "push").enabled).toBe(false);
 
     const getRes = await authenticatedRequest(harness!, "GET", "/api/notification-preferences", {
       schoolId: school.id,
       userId: user.id,
     });
     const body = (await getRes.json()) as PreferencesResponse;
-    expect(cell(body, NOTIFICATION_TYPES.GRADE_POSTED, "email").enabled).toBe(false);
+    expect(cell(body, NOTIFICATION_TYPES.GRADE_POSTED, "push").enabled).toBe(false);
   });
 
   test("PATCH rejects disabling a mandatory type with 422", async () => {
@@ -136,7 +138,7 @@ describeDb("notification preferences HTTP", () => {
     expect(res.headers.get("content-type")).toBe("application/problem+json");
   });
 
-  test("PATCH rejects digest on a non-email channel with 422", async () => {
+  test("PATCH rejects turning digest on with 422", async () => {
     const school = await createSchool(database!.sql);
     const user = await createUserFactory(database!.sql, school.id);
 
@@ -153,6 +155,25 @@ describeDb("notification preferences HTTP", () => {
     );
 
     expect(res.status).toBe(422);
+  });
+
+  test("PATCH rejects the email channel with 400", async () => {
+    const school = await createSchool(database!.sql);
+    const user = await createUserFactory(database!.sql, school.id);
+
+    const res = await authenticatedRequest(
+      harness!,
+      "PATCH",
+      "/api/notification-preferences",
+      { schoolId: school.id, userId: user.id },
+      jsonBody({
+        preferences: [
+          { notification_type: NOTIFICATION_TYPES.GRADE_POSTED, channel: "email", enabled: true },
+        ],
+      }),
+    );
+
+    expect(res.status).toBe(400);
   });
 
   test("PATCH sets and clears the attendance-alert threshold", async () => {
@@ -222,7 +243,7 @@ describeDb("notification preferences HTTP", () => {
       { schoolId: school.id, userId: owner.id },
       jsonBody({
         preferences: [
-          { notification_type: NOTIFICATION_TYPES.GRADE_POSTED, channel: "email", enabled: false },
+          { notification_type: NOTIFICATION_TYPES.GRADE_POSTED, channel: "push", enabled: false },
         ],
       }),
     );
@@ -232,7 +253,7 @@ describeDb("notification preferences HTTP", () => {
       userId: other.id,
     });
     const body = (await res.json()) as PreferencesResponse;
-    expect(cell(body, NOTIFICATION_TYPES.GRADE_POSTED, "email").enabled).toBe(true);
+    expect(cell(body, NOTIFICATION_TYPES.GRADE_POSTED, "push").enabled).toBe(true);
   });
 
   test("requires authentication", async () => {

@@ -18,10 +18,16 @@ What runs when:
 - **api, web**: always on (`min_machines_running = 1`). A cold start would land on a person's
   request, and the web machine is 256 MB (about $2 a month).
 - **workers**: always on; they poll their queues.
-- **scanner**: on demand. The workers' first connection to its Flycast address starts it, and fly's
-  proxy stops it again a few minutes after the last scan. The scan worker waits up to two minutes
-  for clamd to answer before it streams a file (`CLAMD_STARTUP_WAIT_MS`), so a cold start (about
-  30 s) delays a scan, never fails it.
+- **scanner**: on demand. The first connection to its Flycast address starts it, and fly's proxy
+  stops it again a few minutes after the last one. The scan worker waits up to two minutes for clamd
+  to answer before it streams a file (`CLAMD_STARTUP_WAIT_MS`), so a cold start (about 30 s) delays
+  a scan, never fails it. To hide most of that wait, the API knocks on the scanner when a material
+  upload starts: one short connection that sends clamd's `zPING`, unawaited, at most once every 30 s
+  per API machine, errors ignored (`apps/api/src/lib/scanner-warmup.ts`). The machine then boots
+  while the teacher's file uploads. This is set by `CLAMAV_HOST = "studafy-core-scanner.flycast"`
+  and `CLAMAV_PORT = "3310"` in api.toml's `[env]` (plain settings, not secrets; the API needs no
+  new secret). Without `CLAMAV_HOST` the API skips the knock and nothing else changes. The scanner
+  still scales to zero: a knock keeps it up only for fly's usual idle period.
 - **realtime**: scaled to zero while live updates are deferred. Nothing reaches it: the web build
   and the mobile builds leave the socket off (`VITE_REALTIME_ENABLED`, `REALTIME_ENABLED`) and the
   API has no `/ws` route while `REALTIME_FLY_APP` is unset. To turn realtime on, set
@@ -61,7 +67,7 @@ Supabase's `postgres` is not a superuser, which the first migrations ran into on
   and installs `pg_stat_statements` in its own `extensions` schema, so 000003's three grants for
   `studafy_monitor` cannot run. Production applied 000003 without those three statements and
   recorded it under the file's real checksum; everything else in it ran as written. The app does
-  not use `studafy_monitor`. Migration 000234 (QA-074) re-applies the `REVOKE ALL … FROM PUBLIC`
+  not use `studafy_monitor`. Migration 000242 (QA-074) re-applies the `REVOKE ALL … FROM PUBLIC`
   on `pg_stat_statements` wherever the extension lives, and warns rather than fails where Supabase
   refuses a grant. Check its warnings in the deploy log; if it could not revoke, run the revoke as
   the view's owner.

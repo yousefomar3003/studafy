@@ -1,10 +1,12 @@
 import { ApiError } from "@studafy/api-client";
+import { amountsFromShares } from "@studafy/license-pricing";
 import { Button, Card, Checkbox, Input, Select, useToast } from "@studafy/ui";
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { PaymentSchedule } from "../../license/PaymentSchedule";
+import { YearTotals } from "../../license/YearTotals";
 import { PlatformPageHeader } from "../PlatformNav";
 import { useSchoolDetailQuery, useSchoolsListQuery } from "../queries";
 
@@ -13,6 +15,7 @@ import { bpsToPercent, currencyMinorUnit, toMinor, useMoney } from "./format";
 import { useCreateQuote, useQuoteAction } from "./mutations";
 import {
   useCalculationQuery,
+  useChangeRequestsQuery,
   useSchoolLicensesQuery,
   useSchoolQuotesQuery,
   useTiersQuery,
@@ -24,6 +27,7 @@ import "./licensing.css";
 
 import type { QuoteAction } from "./mutations";
 import type {
+  ChangeRequest,
   ConsoleTier,
   LicenseAudience,
   PlatformLicense,
@@ -36,7 +40,7 @@ import type {
 type QuoteKind = QuoteCalculateBody["kind"];
 type PaymentPlan = NonNullable<QuoteCalculateBody["paymentPlan"]>;
 
-const PAYMENT_PLANS: readonly PaymentPlan[] = ["in_full", "monthly", "custom"];
+const PAYMENT_PLANS: readonly PaymentPlan[] = ["in_full", "monthly", "yearly", "custom"];
 
 interface CustomRow {
   key: number;
@@ -65,13 +69,23 @@ interface AudienceState {
  * students" does from the console inbox.
  *
  * The super admin also picks how the school pays (docs/adr/0021): all at once, monthly over the
- * licence months, or a custom schedule of amounts and dates; the API previews the instalments live.
+ * licence months, yearly, or a custom schedule of amounts and dates; the API previews the
+ * instalments and what each licence year carries live.
+ *
+ * `&requestId=` prices a school's request (000233): its length, start and payment plan prefill the
+ * terms (a custom plan's shares become amounts once the total is known), and changing any of them
+ * needs a reason the school reads on the quote. Accepting the quote resolves the request.
  */
 export default function CalculatorPage() {
   const { t } = useTranslation();
   const { show } = useToast();
   const [params, setParams] = useSearchParams();
   const schoolId = params.get("schoolId");
+  const requestId = params.get("requestId");
+  const openRequests = useChangeRequestsQuery("open", requestId !== null);
+  const request: ChangeRequest | null =
+    (requestId && openRequests.data?.find((r) => r.id === requestId && r.schoolId === schoolId)) ||
+    null;
   const tiers = useTiersQuery();
   const school = useSchoolDetailQuery(schoolId ?? "", schoolId !== null);
   const licenses = useSchoolLicensesQuery(schoolId);
@@ -101,6 +115,16 @@ export default function CalculatorPage() {
   const [notes, setNotes] = useState("");
   const [plan, setPlan] = useState<PaymentPlan>("in_full");
   const [customRows, setCustomRows] = useState<CustomRow[]>([{ key: 1, amount: "", dueDate: "" }]);
+  const [termsReason, setTermsReason] = useState("");
+
+  // The school's request seeds the length, start and plan once.
+  const [seededRequest, setSeededRequest] = useState<string | null>(null);
+  if (request && seededRequest !== request.id) {
+    setSeededRequest(request.id);
+    if (request.months !== null) setMonths(String(request.months));
+    if (request.startsOn) setStartsAt(request.startsOn);
+    if (request.paymentPlan) setPlan(request.paymentPlan);
+  }
 
   const changesLicense = kind !== "new";
   // A change prices a license in force; a new term may instead re-price a draft or awaiting-payment
@@ -201,8 +225,10 @@ export default function CalculatorPage() {
           : null,
       paymentPlan: plan,
       paymentSchedule: plan === "custom" ? customSchedule : null,
+      changeRequestId: request?.id ?? null,
     };
   }, [
+    request,
     adjustmentMinor,
     adjustmentReason,
     audiences,
@@ -222,6 +248,27 @@ export default function CalculatorPage() {
   ]);
   const settledBody = useDebounced(body, DEBOUNCE_MS);
   const calculation = useCalculationQuery(settledBody);
+  // A custom proposal is shares of a total the school did not have: once priced, they become amounts.
+  const [seededShares, setSeededShares] = useState<string | null>(null);
+  const pricedTotal = calculation.data?.breakdown.totalMinor;
+  if (
+    request?.paymentProposal &&
+    plan === "custom" &&
+    pricedTotal !== undefined &&
+    seededShares !== request.id
+  ) {
+    setSeededShares(request.id);
+    const minorUnit = currencyMinorUnit(effectiveCurrency);
+    setCustomRows(
+      amountsFromShares(pricedTotal, request.paymentProposal).map((instalment, index) => ({
+        key: index + 1,
+        amount: (instalment.amountMinor / 10 ** minorUnit).toFixed(minorUnit),
+        dueDate: instalment.dueDate,
+      })),
+    );
+  }
+  const termsChanges = calculation.data?.termsChanges ?? [];
+  const termsReasonMissing = termsChanges.length > 0 && termsReason.trim() === "";
   const reasonMissing =
     adjustmentMinor !== 0 && adjustmentMinor !== null && adjustmentReason.trim() === "";
   const scheduleInvalid =
@@ -229,9 +276,18 @@ export default function CalculatorPage() {
     (customSchedule === null || (calculation.data?.scheduleErrors.length ?? 0) > 0);
 
   function save() {
-    if (!schoolId || !body || reasonMissing || scheduleInvalid) return;
+    if (!schoolId || !body || reasonMissing || scheduleInvalid || termsReasonMissing) return;
+    const { changeRequestId, ...terms } = body;
     createQuote.mutate(
-      { schoolId, body: { ...body, notes: notes.trim() || null } },
+      {
+        schoolId,
+        body: {
+          ...terms,
+          changeRequestId,
+          termsChangeReason: termsChanges.length > 0 ? termsReason.trim() : null,
+          notes: notes.trim() || null,
+        },
+      },
       {
         onSuccess: () =>
           show({ variant: "success", title: t("platformLicensing.calculator.saved") }),
@@ -260,6 +316,8 @@ export default function CalculatorPage() {
         schoolName={school.data?.name ?? null}
         onPick={(id) => setParams(id ? { schoolId: id } : {})}
       />
+
+      {request ? <SchoolRequestCard request={request} /> : null}
 
       <div className="licensing-calculator">
         <Card as="section" aria-labelledby="calculator-terms">
@@ -401,6 +459,33 @@ export default function CalculatorPage() {
                 onChange={setCustomRows}
               />
             ) : null}
+            {request ? (
+              <div className="platform-stack" data-testid="terms-change">
+                {termsChanges.length > 0 ? (
+                  <p role="status" className="licensing-errors">
+                    {t("platformLicensing.calculator.termsChanged", {
+                      changes: termsChanges
+                        .map((change) => t(`schoolLicense.quote.terms.change.${change}`))
+                        .join(", "),
+                    })}
+                  </p>
+                ) : (
+                  <p className="platform-muted">{t("platformLicensing.calculator.termsKept")}</p>
+                )}
+                <Input
+                  label={t("platformLicensing.calculator.termsReasonLabel")}
+                  helperText={t("platformLicensing.calculator.termsReasonHelp")}
+                  value={termsReason}
+                  maxLength={1000}
+                  error={
+                    termsReasonMissing
+                      ? t("platformLicensing.calculator.termsReasonRequired")
+                      : undefined
+                  }
+                  onChange={(event) => setTermsReason(event.target.value)}
+                />
+              </div>
+            ) : null}
           </Card.Body>
         </Card>
 
@@ -438,7 +523,12 @@ export default function CalculatorPage() {
               <Button
                 variant="primary"
                 disabled={
-                  !schoolId || !body || reasonMissing || scheduleInvalid || !calculation.data
+                  !schoolId ||
+                  !body ||
+                  reasonMissing ||
+                  scheduleInvalid ||
+                  termsReasonMissing ||
+                  !calculation.data
                 }
                 loading={createQuote.isPending}
                 onClick={save}
@@ -457,6 +547,59 @@ export default function CalculatorPage() {
 
       {schoolId ? <SchoolQuotes schoolId={schoolId} /> : null}
     </>
+  );
+}
+
+/** What the school asked for: the calculator starts from it, and departing from it needs a reason. */
+function SchoolRequestCard({ request }: { request: ChangeRequest }) {
+  const { t } = useTranslation();
+  const { formatDate, formatNumber } = useFormatters();
+  const date = (iso: string) => formatDate(new Date(`${iso}T00:00:00Z`), { dateStyle: "medium" });
+  return (
+    <Card as="section" aria-labelledby="calculator-request" data-testid="school-request">
+      <Card.Header>
+        <h2 id="calculator-request">{t("platformLicensing.calculator.request.title")}</h2>
+      </Card.Header>
+      <Card.Body>
+        <dl className="licensing-request">
+          <div>
+            <dt>{t("platformLicensing.calculator.request.length")}</dt>
+            <dd>
+              {request.months !== null
+                ? t("platformLicensing.inbox.wants.months", { count: request.months })
+                : t("platformLicensing.calculator.request.open")}
+            </dd>
+          </div>
+          {request.startsOn ? (
+            <div>
+              <dt>{t("platformLicensing.calculator.request.start")}</dt>
+              <dd>{date(request.startsOn)}</dd>
+            </div>
+          ) : null}
+          <div>
+            <dt>{t("platformLicensing.calculator.request.plan")}</dt>
+            <dd>
+              {request.paymentPlan
+                ? t(`platformLicensing.calculator.plan.${request.paymentPlan}`)
+                : t("platformLicensing.calculator.request.open")}
+            </dd>
+          </div>
+        </dl>
+        {request.paymentProposal ? (
+          <ol className="licensing-proposal">
+            {request.paymentProposal.map((instalment, index) => (
+              <li key={index}>
+                {t("platformLicensing.calculator.request.proposalRow", {
+                  date: date(instalment.dueDate),
+                  percent: formatNumber(instalment.shareBps / 100, { maximumFractionDigits: 2 }),
+                })}
+              </li>
+            ))}
+          </ol>
+        ) : null}
+        <p className="platform-muted">“{request.note}”</p>
+      </Card.Body>
+    </Card>
   );
 }
 
@@ -574,6 +717,9 @@ function SchedulePreview({
                 count: calculation.schedulePreview.length,
               })}
             </p>
+            <h3>{t("schoolLicense.years.title")}</h3>
+            <YearTotals rows={calculation.yearTotals} currencyCode={calculation.currencyCode} />
+            <h3>{t("schoolLicense.schedule.listTitle")}</h3>
             <PaymentSchedule
               rows={calculation.schedulePreview}
               currencyCode={calculation.currencyCode}
@@ -958,6 +1104,7 @@ export function SchoolQuotes({ schoolId }: { schoolId: string }) {
                 <tr>
                   <th scope="col">{t("platformLicensing.quotes.columns.created")}</th>
                   <th scope="col">{t("platformLicensing.quotes.columns.kind")}</th>
+                  <th scope="col">{t("platformLicensing.quotes.columns.terms")}</th>
                   <th scope="col">{t("platformLicensing.quotes.columns.total")}</th>
                   <th scope="col">{t("platformLicensing.quotes.columns.validUntil")}</th>
                   <th scope="col">{t("platformLicensing.quotes.columns.status")}</th>
@@ -973,6 +1120,25 @@ export function SchoolQuotes({ schoolId }: { schoolId: string }) {
                   <tr key={quote.id}>
                     <td>{formatDate(new Date(quote.createdAt), { dateStyle: "medium" })}</td>
                     <td>{t(`platformLicensing.quoteKind.${quote.kind}`)}</td>
+                    <td>
+                      <div className="platform-cell-stack">
+                        <span>
+                          {t("platformLicensing.quotes.termsValue", {
+                            months: quote.months,
+                            plan: t(`platformLicensing.calculator.plan.${quote.paymentPlan}`),
+                          })}
+                        </span>
+                        {quote.changeRequestId ? (
+                          <span className="platform-muted" data-testid="quote-terms-source">
+                            {quote.termsChanges.length > 0
+                              ? t("platformLicensing.quotes.changedFromRequest", {
+                                  reason: quote.termsChangeReason ?? "",
+                                })
+                              : t("platformLicensing.quotes.asRequested")}
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td className="licensing-amount">
                       {money(quote.totalMinor, quote.currencyCode, quote.minorUnit)}
                     </td>

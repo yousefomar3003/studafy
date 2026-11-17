@@ -79,10 +79,11 @@ export const JOB_NAMES = {
   GENERATE_PROGRESS_REPORT: "generate-progress-report",
   GENERATE_INVOICE: "generate-invoice",
   GENERATE_BATCH_INVOICES: "generate-batch-invoices",
+  // Retired: the daily digest emails (parent attendance/fee digest, and the per-recipient
+  // notification digest). Studafy sends no notification email. The names stay so the workers can
+  // remove their schedulers from Redis and drop any job still queued under them
+  // (apps/workers/src/queues/notifications/email/retired-digests.ts).
   SEND_DIGESTS: "send-digests",
-  // Daily notification digest. Distinct from SEND_DIGESTS above, which is the parent-specific
-  // attendance/fee digest — this one is the general, per-recipient digest driven by
-  // app.notification_preferences.digest (ST-143).
   SEND_NOTIFICATION_DIGESTS: "send-notification-digests",
   // Notification dispatch (ST-139). DISPATCH resolves recipients and decides what each of them
   // should receive; DELIVER carries one already-decided message to one recipient on one channel.
@@ -215,6 +216,11 @@ export const JOB_NAMES = {
   // Every 15 minutes (QA-055): re-enqueue uploads stuck in `scanning`, and scan the ones left
   // `unscanned` from before scanning covered them. Maintenance queue.
   SWEEP_STUCK_UPLOAD_SCANS: "sweep-stuck-upload-scans",
+  // Scheduled deletion of materials that will never become available: an upload never confirmed
+  // after 24 hours, and a failed material left for 14 days. Their stored files are removed and the
+  // space released. Carries no payload. Registered on the maintenance queue via Job Scheduler
+  // (apps/workers/src/queues/maintenance/abandoned-material-sweep.ts).
+  PURGE_ABANDONED_MATERIALS: "purge-abandoned-materials",
   // Scheduled deletion of data past its fixed retention period (docs/modules/data-retention.md):
   // security events, sales inquiries, rejected school applications (and their proof file) and
   // in-app notifications after 12 months, data subject request export bundles 30 days after the

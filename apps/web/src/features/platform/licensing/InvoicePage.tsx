@@ -6,6 +6,7 @@ import { useParams } from "react-router-dom";
 
 import { useFormatters, useTranslation } from "../../../lib/i18n";
 import { PaymentSchedule } from "../../license/PaymentSchedule";
+import { YearTotals } from "../../license/YearTotals";
 import { PlatformPageHeader } from "../PlatformNav";
 import { useSchoolDetailQuery } from "../queries";
 
@@ -93,6 +94,11 @@ export default function InvoicePage() {
       {invoice.isError ? <p role="alert">{t("platformLicensing.common.loadError")}</p> : null}
       {data ? (
         <div className="platform-stack">
+          {data.aiStopped && data.instalments.length <= 1 ? (
+            <p role="alert" className="licensing-errors" data-testid="invoice-ai-stopped">
+              {t("platformLicensing.invoice.aiStopped")}
+            </p>
+          ) : null}
           <InvoiceDocument invoice={data} schoolName={school.data?.name ?? null} />
           {data.instalments.length > 1 ? (
             <InstalmentsCard invoice={data} schoolId={schoolId} open={open} />
@@ -429,6 +435,22 @@ export function InstalmentsCard({
           })}{" "}
           {t("platformLicensing.invoice.instalments.help")}
         </p>
+        {invoice.aiStopped ? (
+          <p role="alert" className="licensing-errors" data-testid="invoice-ai-stopped">
+            {t("platformLicensing.invoice.aiStopped")}
+          </p>
+        ) : null}
+        {invoice.yearTotals.length > 0 ? (
+          <>
+            <h3>{t("schoolLicense.years.title")}</h3>
+            <YearTotals
+              rows={invoice.yearTotals}
+              currencyCode={invoice.currencyCode}
+              minorUnit={invoice.minorUnit}
+            />
+            <h3>{t("schoolLicense.schedule.listTitle")}</h3>
+          </>
+        ) : null}
         <PaymentSchedule
           rows={invoice.instalments}
           currencyCode={invoice.currencyCode}
@@ -846,7 +868,9 @@ function RecordPaymentModal({
             variant: "success",
             title: result.licenseActivated
               ? t("platformLicensing.invoice.recordedActivated")
-              : t("platformLicensing.invoice.recorded"),
+              : result.licenseResumed
+                ? t("platformLicensing.invoice.recordedResumed")
+                : t("platformLicensing.invoice.recorded"),
           });
           close();
         },

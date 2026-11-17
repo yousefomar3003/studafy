@@ -33,8 +33,8 @@ outside `graphify-out`. Each task is a `fix(QA-xxx)` commit followed by a `docs(
 evidence` commit. The tip branch, `qa/needs-human-027-048-078-082-083`, contains everything.
 Merging it into `dev` brings in the whole audit. Production deploys go out from `dev`, as usual.
 
-Ten new migrations, **000226–000235**. All are forward-only and additive, with no drops of data.
-000235 rewrites `app.material_chunks` (its statement timeout is 30 minutes).
+Ten new migrations, **000234–000243**. All are forward-only and additive, with no drops of data.
+000243 rewrites `app.material_chunks` (its statement timeout is 30 minutes).
 
 ## Before you deploy — blockers
 
@@ -48,7 +48,7 @@ These will break the deploy, or a feature, if skipped:
    plus a CA for the database. Confirm the Fly secrets match before deploying.
 3. **QA-022: ERPNext idempotency field.** Add `custom_studafy_idempotency_key` on every production
    ERPNext site first (`docs/runbooks/erpnext-invoice-idempotency.md`).
-4. **QA-015: database role.** Migration 000232 creates `studafy_system` and grants it to every
+4. **QA-015: database role.** Migration 000240 creates `studafy_system` and grants it to every
    login that may switch to `studafy_admin`, so it works on first boot. Watch the migration log
    for errors.
 5. **QA-084: mobile release.** Resolved: the mobile release reuses the existing repository
@@ -96,7 +96,7 @@ These will break the deploy, or a feature, if skipped:
 - QA-083: Sign in with Apple, or the exemption argument in the review notes.
 - QA-085: set `REVIEW_LOGIN_ALLOWED_EMAILS`, and add an Axiom alert on `review_login_used`.
 - QA-054: redeploy the scanner app so the new clamd limits take effect.
-- QA-074: after deploy, check 000234's warnings; run `db:test:rls-coverage` read-only against prod.
+- QA-074: after deploy, check 000242's warnings; run `db:test:rls-coverage` read-only against prod.
 
 **Operations and capacity**
 

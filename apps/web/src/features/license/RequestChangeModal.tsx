@@ -5,6 +5,14 @@ import { useState } from "react";
 
 import { useTranslation } from "../../lib/i18n";
 
+import {
+  EMPTY_TERMS,
+  LicenceTermsFields,
+  inForce,
+  termsErrors,
+  termsPayload,
+  utcToday,
+} from "./LicenceTermsFields";
 import { useRequestChange } from "./mutations";
 import { AUDIENCES } from "./queries";
 
@@ -27,9 +35,11 @@ const EMPTY: Record<LicenseAudience, AudienceWish> = {
 const REQUESTABLE = AUDIENCES.filter(isLicensableAudience);
 
 /**
- * "Request AI for students": how many students should get Studafy AI, the AI tier, and an optional
- * note. It creates a request for the super admin, who prices it as a quote; nothing on the license
- * changes until that quote is accepted. Teacher and parent seats and Family+ appear here only once
+ * "Request AI for students": how many students should get Studafy AI, the AI tier, for how many
+ * months and how the school wants to pay (monthly, yearly or its own dates), and an optional note.
+ * It creates a request for the super admin, who prices it as a quote -- keeping the school's length
+ * and plan, or changing them with a reason the school reads; nothing on the license changes until
+ * the school accepts that quote. Teacher and parent seats and Family+ appear here only once
  * their features are built (`LICENSABLE_AUDIENCES`).
  */
 export function RequestChangeModal({
@@ -49,6 +59,17 @@ export function RequestChangeModal({
   const [wishes, setWishes] = useState(EMPTY);
   const [familyPlus, setFamilyPlus] = useState<FamilyPlusChoice>("same");
   const [note, setNote] = useState("");
+  const [terms, setTerms] = useState(EMPTY_TERMS);
+  // A licence in force keeps its end date unless the school asks for more months.
+  const [termsFor, setTermsFor] = useState<string | null>(null);
+  const termsKey = inForce(license) ? license.id : "new";
+  if (termsFor !== termsKey) {
+    setTermsFor(termsKey);
+    setTerms({ ...EMPTY_TERMS, length: inForce(license) ? "" : EMPTY_TERMS.length });
+  }
+  const today = utcToday();
+  const termsInvalid = termsErrors(terms, license, today).length > 0;
+  const changesTerms = inForce(license) && terms.length !== "";
 
   const offersFamilyPlus = isLicensableAudience("parent");
   const hasFamilyPlus = license?.includeFamilyPlus ?? false;
@@ -58,15 +79,18 @@ export function RequestChangeModal({
   const seatsInvalid = (value: string) => value !== "" && !/^\d{1,6}$/.test(value);
   const invalid = audiences.some((a) => seatsInvalid(wishes[a].seats));
   const asksSomething =
-    familyPlus !== "same" || audiences.some((a) => wishes[a].seats !== "" || wishes[a].planId);
+    familyPlus !== "same" ||
+    changesTerms ||
+    audiences.some((a) => wishes[a].seats !== "" || wishes[a].planId);
   // With no license yet, the request is for a first one: it needs a number of students.
   const needsStudents = license === null && wishes.student.seats === "";
-  const valid = !invalid && asksSomething && !needsStudents;
+  const valid = !invalid && asksSomething && !needsStudents && !termsInvalid;
 
   function close() {
     setWishes(EMPTY);
     setFamilyPlus("same");
     setNote("");
+    setTerms({ ...EMPTY_TERMS, length: inForce(license) ? "" : EMPTY_TERMS.length });
     onClose();
   }
 
@@ -86,6 +110,7 @@ export function RequestChangeModal({
         parentPlanId: wish("parent").planId || null,
         includeFamilyPlus:
           !offersFamilyPlus || familyPlus === "same" ? null : familyPlus === "include",
+        ...termsPayload(terms, license),
         // The note is optional for the school; the request always carries one for the inbox.
         note:
           note.trim() ||
@@ -204,6 +229,7 @@ export function RequestChangeModal({
             ]}
           />
         ) : null}
+        <LicenceTermsFields value={terms} onChange={setTerms} license={license} today={today} />
         <Input
           label={t("schoolLicense.aiRequest.noteLabel")}
           helperText={t("schoolLicense.request.noteHelp")}

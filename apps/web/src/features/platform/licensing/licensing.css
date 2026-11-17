@@ -162,3 +162,25 @@
   padding-inline-start: var(--space-24);
   color: var(--color-danger);
 }
+
+/* --- The school's request in the calculator (000233) --- */
+
+.licensing-request {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-12);
+  margin: 0 0 var(--space-12);
+}
+
+.licensing-request dt {
+  font-weight: var(--font-weight-semibold);
+}
+
+.licensing-request dd {
+  margin: 0;
+}
+
+.licensing-proposal {
+  margin: 0 0 var(--space-12);
+  padding-inline-start: var(--space-20, 1.25rem);
+}

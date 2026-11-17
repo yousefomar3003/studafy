@@ -1477,6 +1477,14 @@ export const materialIngestStatusSchema = z
 
 export type MaterialIngestStatus = z.infer<typeof materialIngestStatusSchema>;
 
+/** Week of the class's term a material belongs to: 1 is the week containing the term start. */
+const materialWeekNumberSchema = z.number().int().min(1).max(60);
+
+/** ISO weekday within that week, 1 = Monday .. 7 = Sunday (the numbering timetable slots use). */
+const materialDayOfWeekSchema = z.number().int().min(1).max(7);
+
+const MATERIAL_WEEK_DAY_PAIR_MESSAGE = "week_number and day_of_week must be set together.";
+
 export const materialSchema = z
   .object({
     id: uuidSchema.openapi({ description: "Primary key." }),
@@ -1513,6 +1521,17 @@ export const materialSchema = z
     ingested_at: dateTimeSchema
       .nullable()
       .openapi({ description: "When ingestion last completed successfully." }),
+    week_number: materialWeekNumberSchema.nullable().openapi({
+      description:
+        "Week of the class's term this material belongs to (1 = the week containing the term " +
+        "start), or null when unscheduled. Always set together with day_of_week.",
+      example: 3,
+    }),
+    day_of_week: materialDayOfWeekSchema.nullable().openapi({
+      description:
+        "ISO weekday within week_number (1 = Monday .. 7 = Sunday), or null when unscheduled.",
+      example: 2,
+    }),
     created_at: dateTimeSchema,
     updated_at: dateTimeSchema,
   })
@@ -1550,6 +1569,21 @@ export const createMaterialBodySchema = z
       .regex(/^[0-9a-f]{64}$/)
       .optional()
       .openapi({ description: "SHA-256 hex digest." }),
+    // Optional so app versions that predate week placement keep uploading (as unscheduled).
+    week_number: materialWeekNumberSchema.optional().openapi({
+      description:
+        "Week of the class's term (1 = the week containing the term start). Send together with " +
+        "day_of_week, or omit both for an unscheduled material.",
+      example: 3,
+    }),
+    day_of_week: materialDayOfWeekSchema.optional().openapi({
+      description: "ISO weekday within week_number (1 = Monday .. 7 = Sunday).",
+      example: 2,
+    }),
+  })
+  .refine((body) => (body.week_number === undefined) === (body.day_of_week === undefined), {
+    message: MATERIAL_WEEK_DAY_PAIR_MESSAGE,
+    path: ["day_of_week"],
   })
   .openapi("CreateMaterialBody");
 
@@ -1564,7 +1598,25 @@ export const updateMaterialBodySchema = z
       .nullable()
       .optional()
       .openapi({ description: "Optional description." }),
+    week_number: materialWeekNumberSchema
+      .nullable()
+      .optional()
+      .openapi({
+        description:
+          "Move the material to this week of the term; null (with a null day_of_week) makes it " +
+          "unscheduled. Send together with day_of_week, or omit both to leave the placement alone.",
+      }),
+    day_of_week: materialDayOfWeekSchema.nullable().optional().openapi({
+      description: "ISO weekday within week_number (1 = Monday .. 7 = Sunday), or null to clear.",
+    }),
   })
+  // Both or neither, and both numbers or both null: a placement is never half-changed.
+  .refine(
+    (body) =>
+      (body.week_number === undefined) === (body.day_of_week === undefined) &&
+      (body.week_number === null) === (body.day_of_week === null),
+    { message: MATERIAL_WEEK_DAY_PAIR_MESSAGE, path: ["day_of_week"] },
+  )
   .openapi("UpdateMaterialBody");
 
 export type UpdateMaterialBody = z.infer<typeof updateMaterialBodySchema>;
@@ -1582,6 +1634,20 @@ export const materialQuerySchema = z
     offset: z.coerce.number().int().min(0).default(0),
     class_id: uuidSchema.optional(),
     ingest_status: materialIngestStatusSchema.optional(),
+    week_number: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(60)
+      .optional()
+      .openapi({ description: "Only materials placed in this week of the term." }),
+    day_of_week: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(7)
+      .optional()
+      .openapi({ description: "Only materials placed on this ISO weekday (1 = Mon .. 7 = Sun)." }),
   })
   .openapi("MaterialQuery");
 

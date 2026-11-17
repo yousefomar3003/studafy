@@ -380,6 +380,10 @@ export async function legacyGetGradingOverview(
     SELECT count(*)::int AS count FROM app.mark_sheets
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid AND status = 'submitted'
   `;
+  const [pendingReleases] = await tx<{ count: number }[]>`
+    SELECT count(*)::int AS count FROM app.assessment_mark_releases
+    WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid AND status = 'submitted'
+  `;
   const [proposed] = await tx<{ count: number }[]>`
     SELECT count(*)::int AS count FROM app.subject_config_assessments
     WHERE school_id = ${schoolId}::uuid AND academic_year_id = ${yearId}::uuid AND status = 'proposed'
@@ -398,6 +402,7 @@ export async function legacyGetGradingOverview(
     missing_teacher_assignments: 0,
     students_with_incomplete_marks: 0,
     mark_sheets_awaiting_approval: pendingSheets?.count ?? 0,
+    assessment_releases_awaiting_approval: pendingReleases?.count ?? 0,
     proposed_assessments: proposed?.count ?? 0,
     certificates_ready: 0,
     certificates_blocked: 0,

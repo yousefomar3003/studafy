@@ -2,33 +2,39 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../design/layout/bottom_inset_padding.dart';
-import '../../../design/tokens/app_spacing_tokens.dart';
-import '../application/released_marks_providers.dart';
-import '../application/student_context_providers.dart';
-import '../domain/released_marks.dart';
-import 'widgets/academic_result_widgets.dart';
+import '../../parent/application/parent_providers.dart';
+import '../../shell/application/shell_providers.dart';
+import '../../shell/domain/shell_role.dart';
+import 'widgets/released_marks_widgets.dart';
 import '../../../design/widgets/protected_screen.dart';
 
-/// A student's approved marks: each term on its own (first semester, second semester, …), then
-/// the annual period for year-long assessments such as the final exam. Under each, one card per
-/// subject with its categories (midterm, final exam, quizzes, …) and every assessment's mark.
+/// A student's approved exam marks on their own page ([ReleasedMarksView]): each term on its own
+/// (first semester, second semester, …), then the annual period for year-long assessments such
+/// as the final exam, with a card per subject listing every released assessment by category.
 ///
-/// A teacher's marks reach this screen only once school leadership approves that term's mark
-/// sheet; the API returns nothing else. Shared by both audiences like `AcademicResultsScreen`:
-/// the student opens it with no [studentId]; a parent opens it for the selected child.
+/// A teacher's marks reach this screen only once school leadership approves them: the whole term's
+/// mark sheet, or one assessment on its own (say, the first exam before the rest of the term); the
+/// API returns nothing else. A subject released one assessment at a time says more marks are still
+/// to come, and nothing here is ever a term total.
+///
+/// Opened by the `MARKS_RELEASED` notification (`/students/:studentId/marks`, for the student
+/// themself or for a parent's child — the notification carries the student id, so a parent of
+/// several children lands on the right one) and from a parent's child Grades tab (an exam mark
+/// in "Recent grades", or "See all exam marks"). The student's own Grades screen shows the same
+/// view in its "Exams" tab.
 class ReleasedMarksScreen extends ConsumerWidget {
   const ReleasedMarksScreen({this.studentId, this.studentName, super.key});
 
   /// Whose marks to show. Null = the signed-in student.
   final String? studentId;
 
-  /// Shown under the title (a parent's child name).
+  /// Shown under the title (a parent's child name). When a parent opens a child's marks without
+  /// it (the notification's deep link), the name is looked up among their linked children.
   final String? studentName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final id = studentId ?? ref.watch(currentStudentIdProvider);
+    final name = studentName ?? _linkedChildName(ref);
 
     final screen = Scaffold(
       appBar: AppBar(
@@ -36,227 +42,26 @@ class ReleasedMarksScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('releasedMarks.title'.tr()),
-            if (studentName != null)
-              Text(studentName!, style: Theme.of(context).textTheme.bodySmall),
+            if (name != null)
+              Text(name, style: Theme.of(context).textTheme.bodySmall),
           ],
         ),
       ),
-      body: id == null
-          ? (studentId == null &&
-                    ref.watch(currentStudentSelfProvider).isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _Message(
-                    icon: Icons.info_outline,
-                    message: 'releasedMarks.unavailable'.tr(),
-                  ))
-          : _MarksBody(studentId: id),
+      body: ReleasedMarksView(studentId: studentId),
     );
     // Grades and transcripts: no screenshots, hidden in the app switcher (QA-084).
     return ProtectedScreen(child: screen);
   }
-}
 
-class _MarksBody extends ConsumerWidget {
-  const _MarksBody({required this.studentId});
-
-  final String studentId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final marks = ref.watch(studentReleasedMarksProvider(studentId));
-    final theme = Theme.of(context);
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        ref.invalidate(studentReleasedMarksProvider(studentId));
-        await ref.read(studentReleasedMarksProvider(studentId).future);
-      },
-      child: marks.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, _) => _Message(
-          icon: Icons.error_outline,
-          message: 'releasedMarks.error'.tr(),
-          onRetry: () =>
-              ref.invalidate(studentReleasedMarksProvider(studentId)),
-        ),
-        data: (periods) {
-          if (periods.isEmpty) {
-            return _Message(
-              icon: Icons.fact_check_outlined,
-              message: 'releasedMarks.empty'.tr(),
-            );
-          }
-          final showYears =
-              periods.map((p) => p.academicYearId).toSet().length > 1;
-          return ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.all(
-              AppSpacing.space16,
-            ).withBottomInset(context),
-            children: [
-              for (final (index, period) in periods.indexed) ...[
-                if (showYears &&
-                    (index == 0 ||
-                        periods[index - 1].academicYearId !=
-                            period.academicYearId))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.space8),
-                    child: Text(
-                      period.academicYearName,
-                      style: theme.textTheme.titleLarge,
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.space8),
-                  child: Text(
-                    period.termName ?? 'releasedMarks.annual'.tr(),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                ),
-                for (final subject in period.subjects)
-                  _SubjectMarksCard(subject: subject),
-                const SizedBox(height: AppSpacing.space8),
-              ],
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SubjectMarksCard extends StatelessWidget {
-  const _SubjectMarksCard({required this.subject});
-
-  final ReleasedMarkSubject subject;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final approvedAt = subject.approvedAt;
-    return Card(
-      margin: const EdgeInsets.only(bottom: AppSpacing.space12),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.space16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(subject.name, style: theme.textTheme.titleMedium),
-            if (approvedAt != null) ...[
-              const SizedBox(height: AppSpacing.space4),
-              Text(
-                'releasedMarks.approvedOn'.tr(
-                  namedArgs: {
-                    'date': DateFormat.yMMMd(
-                      context.locale.toString(),
-                    ).format(approvedAt.toLocal()),
-                  },
-                ),
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-            for (final category in subject.categories) ...[
-              const SizedBox(height: AppSpacing.space12),
-              Text(
-                category.name,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  color: theme.colorScheme.primary,
-                ),
-              ),
-              for (final assessment in category.assessments)
-                for (final attempt in assessment.attempts)
-                  _MarkRow(assessment: assessment, attempt: attempt),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MarkRow extends StatelessWidget {
-  const _MarkRow({required this.assessment, required this.attempt});
-
-  final ReleasedAssessment assessment;
-  final ReleasedMarkAttempt attempt;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final score = attempt.score;
-    final value = switch (attempt.status) {
-      ReleasedMarkStatus.graded when attempt.descriptorLabel != null =>
-        attempt.descriptorLabel!,
-      ReleasedMarkStatus.graded when score != null =>
-        '${formatResultNumber(score)} / ${formatResultNumber(assessment.maxMarks)}',
-      ReleasedMarkStatus.graded => '—',
-      ReleasedMarkStatus.absent => 'releasedMarks.status.absent'.tr(),
-      ReleasedMarkStatus.excused => 'releasedMarks.status.excused'.tr(),
-      ReleasedMarkStatus.notApplicable =>
-        'releasedMarks.status.notApplicable'.tr(),
-    };
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.space8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              attempt.attempt > 1
-                  ? 'releasedMarks.retake'.tr(
-                      namedArgs: {'name': assessment.name},
-                    )
-                  : assessment.name,
-              style: theme.textTheme.bodyMedium,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.space12),
-          Text(
-            value,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Message extends StatelessWidget {
-  const _Message({required this.icon, required this.message, this.onRetry});
-
-  final IconData icon;
-  final String message;
-  final VoidCallback? onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(AppSpacing.space32),
-      children: [
-        Icon(icon, size: 32, color: theme.colorScheme.onSurfaceVariant),
-        const SizedBox(height: AppSpacing.space12),
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        if (onRetry != null) ...[
-          const SizedBox(height: AppSpacing.space12),
-          Center(
-            child: OutlinedButton(
-              onPressed: onRetry,
-              child: Text('releasedMarks.retry'.tr()),
-            ),
-          ),
-        ],
-      ],
-    );
+  String? _linkedChildName(WidgetRef ref) {
+    final id = studentId;
+    if (id == null || ref.watch(shellRoleProvider) != ShellRole.parent) {
+      return null;
+    }
+    final children = ref.watch(linkedChildrenProvider).value ?? const [];
+    for (final child in children) {
+      if (child.studentId == id) return child.studentName;
+    }
+    return null;
   }
 }

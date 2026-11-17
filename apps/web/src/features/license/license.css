@@ -437,3 +437,45 @@
   align-items: center;
   gap: var(--space-8);
 }
+
+/* --- The school's licence length and payment plan (request form, quote) --- */
+
+.license-terms {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin-block: var(--space-12);
+}
+
+.license-terms__legend {
+  font-weight: var(--font-weight-semibold);
+  margin-block-end: var(--space-8);
+}
+
+.license-terms__custom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-12);
+}
+
+.license-terms__preview h3 {
+  margin-block: 0 var(--space-8);
+}
+
+.license-terms-compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-12);
+  margin: 0;
+}
+
+.license-terms-compare dt {
+  font-weight: var(--font-weight-semibold);
+}
+
+.license-terms-compare dd {
+  margin: 0;
+}

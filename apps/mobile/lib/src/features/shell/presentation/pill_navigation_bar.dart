@@ -4,20 +4,29 @@ import 'package:flutter/services.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 
-/// One tab in a [PillNavigationBar]: its icon (already decorated, e.g. with an unread badge) and
-/// its translated label.
+/// One tab in a [PillNavigationBar]: its icon (already decorated, e.g. with an unread badge), the
+/// filled variant shown while selected, and its translated label.
 class PillNavigationDestination {
-  const PillNavigationDestination({required this.icon, required this.label});
+  const PillNavigationDestination({
+    required this.icon,
+    required this.label,
+    this.selectedIcon,
+  });
 
   final Widget icon;
+
+  /// Shown instead of [icon] while the tab is selected; [icon] when null.
+  final Widget? selectedIcon;
   final String label;
 }
 
 /// The shell's floating bottom navigation: a rounded pill that floats above the bottom edge,
-/// with the selected tab drawn as a filled inverse-colour capsule showing its icon and label.
+/// with the selected tab drawn as a brand-coloured capsule showing its filled icon and label.
 ///
 /// Unselected tabs show only their icon so up to five tabs fit on a phone-width screen; their
 /// label is still exposed to screen readers, and shown on the capsule as soon as a tab is selected.
+/// The capsule takes the width the icons leave and always shows its label whole, stepping down to
+/// a smaller label (or dropping its icon) on a narrow phone rather than cutting it short.
 ///
 /// Sliding a finger along the bar — straight away or after pressing and holding — selects the tab
 /// under it as it passes, with a selection haptic on each change, the way Instagram's and
@@ -191,13 +200,44 @@ class _PillNavigationItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The selected capsule takes whatever the unselected icons leave it, and fits its label into
+    // that room (see [_CapsuleFit]) rather than cutting it short.
+    if (selected) {
+      return Flexible(
+        child: LayoutBuilder(
+          builder: (context, constraints) => _item(
+            context,
+            _CapsuleFit.choose(context, destination.label, constraints.maxWidth),
+          ),
+        ),
+      );
+    }
+    // Manual trigger: a press-and-hold on the bar scrubs between tabs, and a long-press tooltip
+    // would compete with it for the same gesture. The scrubbed-to capsule shows the label instead.
+    return Tooltip(
+      message: destination.label,
+      triggerMode: TooltipTriggerMode.manual,
+      excludeFromSemantics: true,
+      child: _item(context, null),
+    );
+  }
+
+  /// The tab: an icon on its own, or with [fit] (selected) the brand capsule with its label.
+  Widget _item(BuildContext context, _CapsuleFit? fit) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final foreground = selected
-        ? colors.onInverseSurface
-        : colors.onSurfaceVariant;
+    final foreground = selected ? colors.onPrimary : colors.onSurfaceVariant;
+    final label = fit == null
+        ? null
+        : Text(
+            destination.label,
+            maxLines: 1,
+            softWrap: false,
+            overflow: TextOverflow.ellipsis,
+            style: fit.style?.copyWith(color: foreground),
+          );
 
-    final item = Semantics(
+    return Semantics(
       key: itemKey,
       button: true,
       selected: selected,
@@ -214,33 +254,39 @@ class _PillNavigationItem extends StatelessWidget {
             height: double.infinity,
             constraints: const BoxConstraints(minWidth: 48),
             padding: EdgeInsets.symmetric(
-              horizontal: selected ? AppSpacing.space16 : AppSpacing.space12,
+              horizontal: fit?.padding ?? AppSpacing.space12,
             ),
             decoration: BoxDecoration(
-              color: selected ? colors.inverseSurface : Colors.transparent,
+              color: selected ? colors.primary : Colors.transparent,
               borderRadius: AppRadius.fullRadius,
+              boxShadow: [
+                if (selected)
+                  BoxShadow(
+                    color: colors.primary.withValues(alpha: 0.32),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+              ],
             ),
             child: IconTheme.merge(
-              data: IconThemeData(size: 22, color: foreground),
+              data: IconThemeData(size: _CapsuleFit.iconSize, color: foreground),
               child: AnimatedSize(
                 duration: _duration,
                 curve: Curves.easeOutCubic,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    destination.icon,
-                    if (selected) ...[
-                      const SizedBox(width: AppSpacing.space8),
+                    if (fit == null)
+                      destination.icon
+                    else ...[
+                      if (fit.showIcon) ...[
+                        destination.selectedIcon ?? destination.icon,
+                        const SizedBox(width: AppSpacing.space8),
+                      ],
                       Flexible(
-                        child: Text(
-                          destination.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: foreground,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: fit.scaleDown
+                            ? FittedBox(fit: BoxFit.scaleDown, child: label)
+                            : label!,
                       ),
                     ],
                   ],
@@ -251,15 +297,62 @@ class _PillNavigationItem extends StatelessWidget {
         ),
       ),
     );
+  }
+}
 
-    if (selected) return Flexible(child: item);
-    // Manual trigger: a press-and-hold on the bar scrubs between tabs, and a long-press tooltip
-    // would compete with it for the same gesture. The scrubbed-to capsule shows the label instead.
-    return Tooltip(
-      message: destination.label,
-      triggerMode: TooltipTriggerMode.manual,
-      excludeFromSemantics: true,
-      child: item,
+/// How the selected tab's capsule fits its label into the width the unselected tabs leave it.
+///
+/// Five tabs on a 360–430px phone leave the capsule little room, and a long label ("Work &
+/// grades", "الذكاء الاصطناعي") would be cut short. So the capsule steps down until the label fits
+/// whole: the full capsule; then tighter padding and the smaller label size; then the label
+/// without its icon (the tab is still marked by the capsule); and, only past all of those (a large
+/// accessibility text size), the smaller label scaled down to fit — never an ellipsis.
+class _CapsuleFit {
+  const _CapsuleFit({
+    required this.padding,
+    required this.showIcon,
+    required this.style,
+    this.scaleDown = false,
+  });
+
+  static const double iconSize = 22;
+
+  final double padding;
+  final bool showIcon;
+  final TextStyle? style;
+  final bool scaleDown;
+
+  static _CapsuleFit choose(BuildContext context, String label, double maxWidth) {
+    final textTheme = Theme.of(context).textTheme;
+    final large = textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w600);
+    final small = textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600);
+    final candidates = [
+      _CapsuleFit(padding: AppSpacing.space16, showIcon: true, style: large),
+      _CapsuleFit(padding: AppSpacing.space12, showIcon: true, style: small),
+      _CapsuleFit(padding: AppSpacing.space12, showIcon: false, style: large),
+      _CapsuleFit(padding: AppSpacing.space12, showIcon: false, style: small),
+    ];
+    for (final fit in candidates) {
+      if (fit._width(context, label) <= maxWidth) return fit;
+    }
+    return _CapsuleFit(
+      padding: AppSpacing.space12,
+      showIcon: false,
+      style: small,
+      scaleDown: true,
     );
+  }
+
+  /// The capsule's width with this fit, with a pixel or two to spare for rounding.
+  double _width(BuildContext context, String label) {
+    final painter = TextPainter(
+      text: TextSpan(text: label, style: DefaultTextStyle.of(context).style.merge(style)),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final textWidth = painter.width;
+    painter.dispose();
+    return 2 * padding + (showIcon ? iconSize + AppSpacing.space8 : 0) + textWidth + 2;
   }
 }

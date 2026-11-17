@@ -7,9 +7,10 @@ import postgres from "postgres";
 import { leaseDatabase } from "../../db/pool";
 import { withSystemTenantTx } from "../../db/tenant-tx";
 
+import { buildAssignmentBlocks, loadAssignmentSourceContent } from "./assignment-source";
 import { createEmbeddingStage, createMockEmbeddingProvider } from "./embedding";
 import { DocumentTooLargeError, MaterialParseError } from "./errors";
-import { buildIngestChunks } from "./ingest";
+import { buildIngestChunks, buildIngestChunksFromBlocks } from "./ingest";
 import { aiIngestionJobDataSchema } from "./job";
 import { lowConfidencePages, TesseractOcrEngine } from "./ocr";
 import { isOcrCandidate } from "./parsers";
@@ -58,7 +59,8 @@ export interface AiIngestionWorkerConfig {
 
 /** The material columns the claim reads, snake_case — postgres.js maps results as-is without a transform option. */
 interface MaterialClaim {
-  storage_key: string;
+  /** NULL only for an assignment source (000232), which has no file of its own. */
+  storage_key: string | null;
   mime_type: string;
   ingest_status: string;
   original_file_name: string;
@@ -66,6 +68,14 @@ interface MaterialClaim {
   ai_visible: boolean;
   /** The class's AI materials setting (000196). */
   class_ai_enabled: boolean;
+  /**
+   * 'class', or a student's AI source (000232): 'personal' (their own upload, read like any
+   * material, but with no thumbnail and no notification -- the student follows it in the AI tools'
+   * source list) or 'assignment' (no file of its own: assignment-source.ts reads the assignment
+   * and its attachments).
+   */
+  source_kind: string;
+  assignment_id: string | null;
 }
 
 /** The columns a re-claim re-reads under FOR UPDATE, to decide whether the work still commits. */
@@ -100,10 +110,10 @@ const CONTENDED_RETRY_MS = 10_000;
  *    (or, if the setting went off mid-parse, the re-claim) finishes it as `ready` with no chunks and
  *    deletes any it had, so the class's text never reaches the embedding stage and a queued job
  *    cannot strand the material in `queued`. Turning the setting back on re-stages it;
- *  - a terminal failure (the last attempt) records `failed` + a reason in `ingest_error` and
- *    notifies the uploader. The transaction boundary is what makes this safe: a crash mid-insert
- *    rolls back and the retry re-claims from `processing`; a committed insert and a committed
- *    `ready` never diverge.
+ *  - a terminal failure (the last attempt, or a parse error, which no retry can fix) records
+ *    `failed` + a reason in `ingest_error` and notifies the uploader. The transaction boundary is
+ *    what makes this safe: a crash mid-insert rolls back and the retry re-claims from
+ *    `processing`; a committed insert and a committed `ready` never diverge.
  */
 export async function processIngestJob(
   job: Job,
@@ -145,20 +155,24 @@ export async function processIngestJob(
     }
 
     let heldBack = false;
+    // Thumbnails and notifications are for class materials only (see MaterialClaim.source_kind).
+    let classMaterial = true;
     const claim = await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
       const [locked] = await tx<MaterialClaim[]>`
         SELECT m.storage_key, m.mime_type, m.ingest_status::text AS ingest_status,
-               m.original_file_name, m.uploaded_by_user_id, m.ai_visible,
-               COALESCE(
+               m.original_file_name, m.uploaded_by_user_id, m.ai_visible, m.source_kind,
+               m.assignment_id,
+               (m.source_kind = 'personal' OR COALESCE(
                  (SELECT cl.ai_materials_enabled FROM app.classes cl
                   WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
                  false
-               ) AS class_ai_enabled
+               )) AS class_ai_enabled
         FROM app.materials m
         WHERE m.school_id = ${data.schoolId}::uuid AND m.id = ${data.materialId}::uuid
         FOR UPDATE OF m
       `;
       if (!locked) throw new Error("material does not exist");
+      classMaterial = locked.source_kind === "class";
       if (
         locked.ingest_status === "ready" ||
         !locked.ai_visible ||
@@ -184,7 +198,7 @@ export async function processIngestJob(
     });
 
     if (!claim) {
-      if (heldBack) {
+      if (heldBack && classMaterial) {
         await config
           .enqueueDerivation?.({ schoolId: data.schoolId, materialId: data.materialId })
           .catch(() => undefined);
@@ -197,20 +211,21 @@ export async function processIngestJob(
     // the claim through this non-optional name.
     const claimedMaterial = material;
 
-    const bytes = config.fetchBytes
-      ? await config.fetchBytes(claimedMaterial.storage_key)
-      : await fetchFromS3(config, claimedMaterial.storage_key);
+    const fetchBytes = (storageKey: string) =>
+      config.fetchBytes ? config.fetchBytes(storageKey) : fetchFromS3(config, storageKey);
     // Rasters always OCR; PDFs may need it for scanned pages. The engine is a cheap wrapper and
     // spawns its tesseract worker lazily, so a text PDF never pays for the thread.
-    const ocr = isOcrCandidate(claimedMaterial.mime_type)
-      ? new TesseractOcrEngine({
-          ...(config.ocrLowConfidenceThreshold !== undefined
-            ? { lowConfidenceThreshold: config.ocrLowConfidenceThreshold }
-            : {}),
-          ...(config.ocrWorkerPath !== undefined ? { workerPath: config.ocrWorkerPath } : {}),
-          ...(config.ocrLangPath !== undefined ? { langPath: config.ocrLangPath } : {}),
-        })
-      : undefined;
+    let ocr: TesseractOcrEngine | undefined;
+    const ocrEngine = () => {
+      ocr ??= new TesseractOcrEngine({
+        ...(config.ocrLowConfidenceThreshold !== undefined
+          ? { lowConfidenceThreshold: config.ocrLowConfidenceThreshold }
+          : {}),
+        ...(config.ocrWorkerPath !== undefined ? { workerPath: config.ocrWorkerPath } : {}),
+        ...(config.ocrLangPath !== undefined ? { langPath: config.ocrLangPath } : {}),
+      });
+      return ocr;
+    };
     let chunks: IngestChunk[];
     let ocrReport: OcrReport | null = null;
     let embeddingTokens = 0;
@@ -221,15 +236,32 @@ export async function processIngestJob(
       // only satisfy `embedding NOT NULL`: the API reads none of them while retrieval is
       // lexical-only (ADR-020, QA-15/F-06).
       const embedder = createEmbeddingStage(createMockEmbeddingProvider());
-      ({ chunks, ocrReport, embeddingTokens } = await buildIngestChunks(
-        bytes,
-        claimedMaterial.mime_type,
-        {
-          ocr,
+      if (claimedMaterial.source_kind === "assignment") {
+        // An assignment source (000232): the assignment's text and its attached files, read in
+        // place. A deleted assignment cascades its source away, so a missing one is a race the
+        // final re-claim below resolves (the row is gone, nothing is written).
+        const content = await withSystemTenantTx(database, { schoolId: data.schoolId }, (tx) =>
+          loadAssignmentSourceContent(tx, data.schoolId, claimedMaterial.assignment_id!),
+        );
+        const blocks = content
+          ? await buildAssignmentBlocks(content, { fetchBytes, ocr: ocrEngine })
+          : [];
+        ({ chunks, embeddingTokens } = await buildIngestChunksFromBlocks(blocks, {
           schoolId: data.schoolId,
           embedder,
-        },
-      ));
+        }));
+      } else {
+        const bytes = await fetchBytes(claimedMaterial.storage_key!);
+        ({ chunks, ocrReport, embeddingTokens } = await buildIngestChunks(
+          bytes,
+          claimedMaterial.mime_type,
+          {
+            ...(isOcrCandidate(claimedMaterial.mime_type) ? { ocr: ocrEngine() } : {}),
+            schoolId: data.schoolId,
+            embedder,
+          },
+        ));
+      }
     } finally {
       // The engine lazily spawns a worker thread on first recognize; close it either way so a job
       // never leaks one. `catch` guards close() itself: terminating a broken worker must not mask
@@ -246,11 +278,11 @@ export async function processIngestJob(
       async (tx) => {
         const [state] = await tx<MaterialState[]>`
         SELECT m.ingest_status::text AS ingest_status, m.ai_visible,
-               COALESCE(
+               (m.source_kind = 'personal' OR COALESCE(
                  (SELECT cl.ai_materials_enabled FROM app.classes cl
                   WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
                  false
-               ) AS class_ai_enabled
+               )) AS class_ai_enabled
         FROM app.materials m
         WHERE m.school_id = ${data.schoolId}::uuid AND m.id = ${data.materialId}::uuid
         FOR UPDATE OF m
@@ -274,7 +306,7 @@ export async function processIngestJob(
         if (chunks.length > 0) {
           await insertChunks(tx, data.schoolId, data.materialId, chunks);
         }
-        if (lowConfidencePagesList.length > 0) {
+        if (lowConfidencePagesList.length > 0 && classMaterial) {
           await notifyLowConfidencePages(
             tx,
             claimedMaterial,
@@ -283,7 +315,9 @@ export async function processIngestJob(
             lowConfidencePagesList,
           );
         }
-        await notifyIngested(tx, claimedMaterial, data.materialId, data.schoolId);
+        if (classMaterial) {
+          await notifyIngested(tx, claimedMaterial, data.materialId, data.schoolId);
+        }
         await tx`
         UPDATE app.materials
         SET ingest_status = 'ready'::app.material_ingest_status,
@@ -300,7 +334,7 @@ export async function processIngestJob(
     // The material is `ready` now, so the thumbnail/preview can be derived from the same bytes.
     // Best-effort by design: an enqueue failure must not fail an already-committed ingestion, and a
     // missing thumbnail degrades to the list's type icon rather than a failed material.
-    if (committed || heldBack) {
+    if ((committed || heldBack) && classMaterial) {
       await config
         .enqueueDerivation?.({ schoolId: data.schoolId, materialId: data.materialId })
         .catch(() => undefined);
@@ -315,10 +349,16 @@ export async function processIngestJob(
   } catch (error) {
     // A delayed job (QA-064) has not failed: nothing to record.
     if (error instanceof DelayedError) throw error;
-    // A file over an ingestion limit (QA-043) is over it on every attempt: fail it now rather than
-    // spend each retry re-reading it (a parse timeout would cost minutes per attempt).
-    const tooLarge = error instanceof DocumentTooLargeError;
-    if (tooLarge || job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
+    // A verdict on the file itself fails it now rather than spending each retry re-reading it:
+    //  - a file over an ingestion limit (QA-043) is over it on every attempt (a parse timeout would
+    //    cost minutes per attempt);
+    //  - a parse error (corrupt, encrypted, unsupported, no text) reads the same bytes and fails the
+    //    same way every time, only later -- with the default 5 attempts that is 75 s of backoff plus
+    //    four more parses before the teacher sees "failed".
+    // Anything else (the bucket, the database, the concurrency cap) may be transient and keeps its
+    // retries.
+    const deterministic = error instanceof DocumentTooLargeError || error instanceof MaterialParseError;
+    if (deterministic || job.attemptsMade + 1 >= (job.opts.attempts ?? 1)) {
       const reason = failureReason(error);
       await withSystemTenantTx(database, { schoolId: data.schoolId }, async (tx) => {
         const [state] = await tx<MaterialState[]>`
@@ -337,12 +377,12 @@ export async function processIngestJob(
               updated_at = clock_timestamp()
           WHERE school_id = ${data.schoolId}::uuid AND id = ${data.materialId}::uuid
         `;
-        if (material) {
+        if (material && material.source_kind === "class") {
           await notifyIngestFailed(tx, material, data.materialId, data.schoolId, reason);
         }
       });
     }
-    if (tooLarge) throw new UnrecoverableError((error as Error).message);
+    if (deterministic) throw new UnrecoverableError((error as Error).message);
     throw error;
   } finally {
     await lease?.release().catch(() => undefined);

@@ -1,10 +1,10 @@
 import { NOTIFICATION_TYPES } from "@studafy/constants";
-import { NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
+import { DELIVERED_NOTIFICATION_CHANNELS } from "@studafy/notification-templates";
 
 import { i18next } from "../../lib/i18n/i18next";
 
 import type { NotificationType } from "@studafy/constants";
-import type { NotificationChannel } from "@studafy/notification-templates";
+import type { DeliveredNotificationChannel } from "@studafy/notification-templates";
 
 type Translate = (key: string) => string;
 
@@ -23,8 +23,9 @@ export function notificationTypeLabel(type: string, t: Translate = defaultTransl
   return KNOWN_TYPES.has(type) ? t(`site.notifications.types.${type}`) : type;
 }
 
+// In-app and push: Studafy sends no notification email, so there is no email label to show.
 const KNOWN_CHANNELS = new Set<string>(
-  Object.values(NOTIFICATION_CHANNELS) satisfies NotificationChannel[],
+  DELIVERED_NOTIFICATION_CHANNELS satisfies readonly DeliveredNotificationChannel[],
 );
 
 export function notificationChannelLabel(channel: string, t: Translate = defaultTranslate): string {

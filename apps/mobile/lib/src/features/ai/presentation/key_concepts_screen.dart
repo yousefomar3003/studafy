@@ -16,12 +16,24 @@ import 'widgets/ai_source_anchor_chip.dart';
 /// source anchors it draws on. One-shot (no length preset), so it reads straight from
 /// [keyConceptsProvider].
 ///
-/// Pushed from [MaterialViewerScreen] for an AI-visible material; shows the signed-out state with
-/// no session.
+/// Pushed from [MaterialViewerScreen] for an AI-visible material, or from the AI hub's source
+/// chooser for any source ([KeyConceptsScreen.source]: an assignment or the student's own file);
+/// shows the signed-out state with no session.
 class KeyConceptsScreen extends ConsumerWidget {
-  const KeyConceptsScreen({required this.material, super.key});
+  KeyConceptsScreen({required Material material, super.key})
+    : materialId = material.id,
+      title = material.title,
+      openSources = true;
 
-  final Material material;
+  /// A source that is not a class material: its anchors are labels, not links to a material.
+  const KeyConceptsScreen.source({required this.materialId, required this.title, super.key})
+    : openSources = false;
+
+  final String materialId;
+  final String title;
+
+  /// Whether a source anchor opens the class material it points into.
+  final bool openSources;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,7 +46,7 @@ class KeyConceptsScreen extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(material.title, style: textTheme.titleMedium, overflow: TextOverflow.ellipsis),
+            Text(title, style: textTheme.titleMedium, overflow: TextOverflow.ellipsis),
             Text(
               'aiStudy.concepts.subtitle'.tr(),
               style: textTheme.labelSmall?.copyWith(
@@ -48,7 +60,9 @@ class KeyConceptsScreen extends ConsumerWidget {
           ? const AiSignedOutView()
           : Column(
               children: [
-                Expanded(child: _ConceptsBody(materialId: material.id)),
+                Expanded(
+                  child: _ConceptsBody(materialId: materialId, openSources: openSources),
+                ),
                 const AiQuotaMeter(),
               ],
             ),
@@ -57,9 +71,10 @@ class KeyConceptsScreen extends ConsumerWidget {
 }
 
 class _ConceptsBody extends ConsumerWidget {
-  const _ConceptsBody({required this.materialId});
+  const _ConceptsBody({required this.materialId, required this.openSources});
 
   final String materialId;
+  final bool openSources;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -77,8 +92,11 @@ class _ConceptsBody extends ConsumerWidget {
               padding: const EdgeInsets.all(AppSpacing.space16),
               itemCount: concepts.length,
               separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.space12),
-              itemBuilder: (_, index) =>
-                  _ConceptCard(concept: concepts[index], materialId: materialId),
+              itemBuilder: (_, index) => _ConceptCard(
+                concept: concepts[index],
+                materialId: materialId,
+                openSources: openSources,
+              ),
             );
           },
         );
@@ -86,10 +104,11 @@ class _ConceptsBody extends ConsumerWidget {
 }
 
 class _ConceptCard extends StatelessWidget {
-  const _ConceptCard({required this.concept, required this.materialId});
+  const _ConceptCard({required this.concept, required this.materialId, required this.openSources});
 
   final AiConcept concept;
   final String materialId;
+  final bool openSources;
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +137,7 @@ class _ConceptCard extends StatelessWidget {
               runSpacing: AppSpacing.space4,
               children: [
                 for (final anchor in concept.sources)
-                  AiSourceAnchorChip(anchor: anchor, materialId: materialId),
+                  AiSourceAnchorChip(anchor: anchor, materialId: materialId, openable: openSources),
               ],
             ),
           ],

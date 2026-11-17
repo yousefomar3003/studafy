@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../application/quiz_controller.dart';
 import '../../domain/quiz_state.dart';
+import 'ai_source_picker.dart';
 import 'quiz_material_picker.dart';
 import '../../../../core/features/feature_gate.dart';
 
@@ -52,10 +53,16 @@ class _QuizSetupViewState extends State<QuizSetupView> {
           style: TextStyle(color: colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: AppSpacing.space16),
-        QuizMaterialPicker(
+        // Study materials, an assignment, or the student's own files and photos -- one selection.
+        AiSourcePicker(
           selected: _selected,
-          onToggle: _toggle,
-          maxSelectable: quizMaxMaterials,
+          onSelect: (choice) => _toggle(choice.id),
+          atLimit: _selected.length >= quizMaxMaterials,
+          studyMaterials: QuizMaterialPicker(
+            selected: _selected,
+            onToggle: _toggle,
+            maxSelectable: quizMaxMaterials,
+          ),
         ),
         const SizedBox(height: AppSpacing.space20),
         Text('quiz.setup.questionCount'.tr(), style: Theme.of(context).textTheme.titleSmall),

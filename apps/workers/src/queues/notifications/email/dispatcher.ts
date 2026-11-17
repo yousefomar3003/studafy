@@ -44,7 +44,7 @@ import { pendingSchoolIdsFragment } from "../../outbox-discovery";
 import { startPollLoop } from "../../poll-loop";
 
 import { claimEmailRows } from "./claim";
-import { resolveEmail } from "./resolve";
+import { RETIRED_EMAIL_EVENT_NAMES, resolveEmail } from "./resolve";
 import { pendingSalesInquiriesExist, processSalesInquiries } from "./sales-inquiries";
 import { pendingSchoolApplicationsExist, processSchoolApplications } from "./school-applications";
 import { isRetryableSendError } from "./sender";
@@ -93,8 +93,11 @@ export interface DispatcherHandle {
   lastCycleAt(): number | null;
 }
 
-/** "deferred": the attempt failed transiently and the row was rescheduled (see the header). */
-export type RowOutcome = "sent" | "suppressed" | "duplicate" | "failed" | "deferred";
+/**
+ * "deferred": the attempt failed transiently and the row was rescheduled (see the header).
+ * "retired": a notification email Studafy no longer sends (a daily digest); dropped unsent.
+ */
+export type RowOutcome = "sent" | "suppressed" | "duplicate" | "failed" | "deferred" | "retired";
 
 /** The max length the email_deliveries.last_error CHECK enforces. */
 const MAX_ERROR_LENGTH = 1000;
@@ -275,6 +278,18 @@ async function processRow(
   if (rows.length === 0) return "empty";
 
   const row = rows[0]!;
+
+  // Studafy sends no notification email. A digest row written before the digests were retired is
+  // marked dispatched without being resolved, rendered or sent, and records no delivery row.
+  if (RETIRED_EMAIL_EVENT_NAMES.has(row.event_name)) {
+    await markDispatched(tx, row);
+    ctx.logger.info(
+      { event: row.event_name, outbox_id: row.id },
+      "email skipped — notification emails are retired",
+    );
+    return "retired";
+  }
+
   const attempt: { resolved?: ResolvedEmail } = {};
   try {
     return await tx.savepoint(async (sp) => {
@@ -311,8 +326,8 @@ export async function processSchool(
     if (outcome === "empty") break;
     processed += 1;
 
-    // Only actual sends consume rate tokens; suppressed, duplicate, failed and deferred rows cost
-    // nothing.
+    // Only actual sends consume rate tokens; suppressed, duplicate, failed, deferred and retired
+    // rows cost nothing.
     if (outcome === "sent") {
       await ctx.limiter.wait();
     }

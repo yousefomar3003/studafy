@@ -61,8 +61,7 @@ void bootstrapApp(AppEnvironment environment) {
       final packageInfo = await PackageInfo.fromPlatform();
       final monitoringConfig = MonitoringConfig.fromEnvironment(
         environment,
-        release:
-            '${packageInfo.packageName}@${packageInfo.version}+${packageInfo.buildNumber}',
+        release: '${packageInfo.packageName}@${packageInfo.version}+${packageInfo.buildNumber}',
       );
       crashReporter = CompositeCrashReporter([
         SentryCrashReporter(monitoringConfig),
@@ -78,25 +77,21 @@ void bootstrapApp(AppEnvironment environment) {
         return true;
       };
 
-      final authClient = MobileAuthClient(
-        baseUrl: appConfig.apiBaseUrl.toString(),
-      );
+      final authClient = MobileAuthClient(baseUrl: appConfig.apiBaseUrl.toString());
       final secureStore = SecureTokenStore();
       await secureStore.discardIfReinstalled();
-      final session = AuthSession(
-        authClient: authClient,
-        secureStore: secureStore,
-      );
+      final session = AuthSession(authClient: authClient, secureStore: secureStore);
       await session.restore();
-      final launchIntro = await resolveLaunchIntro(
-        isAuthenticated: session.isAuthenticated,
-      );
+      final launchIntro = await resolveLaunchIntro(isAuthenticated: session.isAuthenticated);
 
       runApp(
         EasyLocalization(
           supportedLocales: AppLocales.supported,
           path: AppLocales.translationsPath,
           fallbackLocale: AppLocales.fallback,
+          // Use each language's own plural rules. The default (true) only knows zero/one/two/other,
+          // so Arabic never reached its "few" (3-10) and "many" (11-99) forms: "4 مادة", not "4 مواد".
+          ignorePluralRules: false,
           child: ProviderScope(
             // No automatic retries on 4xx, short backoff otherwise — see providerRetryPolicy.
             retry: providerRetryPolicy,
@@ -144,8 +139,29 @@ Future<void> _deferredSetup(CrashReporter crashReporter) async {
   // default app up first. A notification arriving in the brief pre-Firebase window is still
   // displayed by the OS (the pushed payload always carries notification fields); only a tap in
   // that sub-second gap would not reach the Dart handler — acceptable and documented.
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  //
+  // A Firebase failure (e.g. a build whose google-services.json / GoogleService-Info.plist does not
+  // match the app) must not take crash reporting down with it: Sentry would never start, and the
+  // one error that explains "no notifications on this phone" would go nowhere. So it is caught,
+  // crash reporting starts regardless, and the failure is then reported.
+  Object? firebaseError;
+  StackTrace? firebaseStack;
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (error, stack) {
+    firebaseError = error;
+    firebaseStack = stack;
+  }
 
   await crashReporter.initialize();
+
+  if (firebaseError != null) {
+    debugPrint('[push] Firebase.initializeApp failed: $firebaseError');
+    await crashReporter.recordError(
+      firebaseError,
+      firebaseStack ?? StackTrace.current,
+      reason: 'Firebase.initializeApp failed: push notifications are off on this phone',
+    );
+  }
 }

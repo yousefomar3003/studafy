@@ -110,9 +110,10 @@ class AiStoreActivated extends AiStoreState {
 ///    right to cancel, and send that acknowledgement with the purchase it was given for — kept on
 ///    the device ([WithdrawalWaiverStore]) until then, since the purchase may arrive on a later
 ///    launch. Never with a restored purchase.
-/// 3. Buy the product the server picked for this student, with the student's id stamped on the
-///    purchase (the server credits it to that student only). One store account holds one
-///    subscription per product, so a second child on the same phone gets the next product.
+/// 3. Buy a product this phone's store account does not already hold for someone else, with the
+///    student's id stamped on the purchase (the server credits it to that student only). One store
+///    account holds one subscription per product, so a second child on the same phone gets the
+///    next product ([AiStoreController._pickProduct]).
 /// 4. Send each delivered purchase to the server, and finish it with the store only once the
 ///    server has recorded it — an unfinished purchase is redelivered on the next launch, so a
 ///    failed report retries itself. A purchase the server refuses for good (another family's,
@@ -177,23 +178,27 @@ class AiStoreController extends AsyncNotifier<AiStoreState> {
         return AiStoreUnavailable('aiStore.unavailable.notConfigured', name: name);
       case AiStoreUnavailableReason.schoolPlanInactive:
         return AiStoreUnavailable('aiStore.unavailable.schoolPlan', name: name);
+      // The server only knows the brothers and sisters linked to the same parent in this school;
+      // this phone's store account may well have a product free. Checked below.
       case AiStoreUnavailableReason.noFreeProduct:
-        return AiStoreUnavailable('aiStore.unavailable.familyFull', name: name);
       case null:
         break;
     }
-    if (!setup.offers(platform)) {
-      return AiStoreUnavailable('aiStore.unavailable.notConfigured', name: name);
+    if (!setup.sellsOn(platform)) {
+      return AiStoreUnavailable(
+        setup.unavailableReason == AiStoreUnavailableReason.noFreeProduct
+            ? 'aiStore.unavailable.familyFull'
+            : 'aiStore.unavailable.notConfigured',
+        name: name,
+      );
     }
 
     try {
       if (!await _gateway.isAvailable()) {
         return AiStoreUnavailable('aiStore.unavailable.store', name: name);
       }
-      final product = await _gateway.product(setup.productId!);
-      // The store does not list the product picked for this student — for a second child, the
-      // extra product has not been set up in the store yet.
-      if (product == null) return AiStoreUnavailable('aiStore.unavailable.notListed', name: name);
+      final (product, unavailableKey) = await _pickProduct(setup);
+      if (product == null) return AiStoreUnavailable(unavailableKey!, name: name);
       _platform = platform;
       _product = product;
     } on Object {
@@ -203,6 +208,52 @@ class AiStoreController extends AsyncNotifier<AiStoreState> {
     final subscription = _gateway.purchaseStream.listen(_onPurchases);
     ref.onDispose(subscription.cancel);
     return AiStoreOffering(price: _product!.price, name: name);
+  }
+
+  /// The product to buy for this student with this phone's store account, or why there is none.
+  ///
+  /// One App Store / Google Play account holds one subscription per product, and brothers and
+  /// sisters share the phone's account: a mother buying for three children, children at
+  /// different schools, or siblings each signed in to their own account on one phone. So the
+  /// device's own store account decides, not just Studafy's parent links: a product it already
+  /// holds for someone else is skipped, and the first free one the store lists is bought. A
+  /// product it holds for this very student is offered again (the store redelivers it instead of
+  /// charging twice, and the server credits it). When the store account cannot be read, the
+  /// server's pick stands, as before.
+  Future<(ProductDetails?, String?)> _pickProduct(AiStoreSetup setup) async {
+    final picked = setup.productId;
+    final all = setup.productIds.isNotEmpty ? setup.productIds : [?picked];
+    // The server's pick first: the product this student already holds, else the first no brother
+    // or sister it knows of holds.
+    var candidates = [?picked, ...all.where((id) => id != picked)];
+
+    List<HeldSubscription>? held;
+    try {
+      held = await _gateway.heldSubscriptions();
+    } on Object {
+      held = null;
+    }
+    if (held == null) {
+      if (picked == null) return (null, 'aiStore.unavailable.familyFull');
+      candidates = [picked];
+    } else {
+      final token = setup.accountToken?.toLowerCase();
+      final own = held
+          .where((h) => all.contains(h.productId) && h.accountToken?.toLowerCase() == token)
+          .firstOrNull;
+      if (own != null) {
+        candidates = [own.productId];
+      } else {
+        final taken = {for (final h in held) h.productId};
+        candidates = candidates.where((id) => !taken.contains(id)).toList();
+      }
+    }
+    if (candidates.isEmpty) return (null, 'aiStore.unavailable.familyFull');
+
+    final listed = await _gateway.products(candidates.toSet());
+    final product = candidates.map((id) => listed[id]).nonNulls.firstOrNull;
+    // Not set up in App Store Connect / the Play Console yet.
+    return product == null ? (null, 'aiStore.unavailable.notListed') : (product, null);
   }
 
   /// Ticks or unticks the withdrawal acknowledgement on the offer.
@@ -284,7 +335,7 @@ class AiStoreController extends AsyncNotifier<AiStoreState> {
         case PurchaseStatus.purchased:
           await _register(
             purchase,
-            waiver: purchase.productID == _setup?.productId
+            waiver: purchase.productID == _product?.id
                 ? _waiverAcknowledgedAt ?? await _waivers.read()
                 : null,
           );
@@ -296,10 +347,12 @@ class AiStoreController extends AsyncNotifier<AiStoreState> {
   }
 
   /// Whether [productId] is one of the add-on's products: the one offered here, or a brother or
-  /// sister's. They share the primary id as a prefix (`studafy_ai_monthly`,
-  /// `studafy_ai_monthly_2`, ...); the server checks the real list.
+  /// sister's. The server lists them; failing that, they share the primary id as a prefix
+  /// (`studafy_ai_monthly`, `studafy_ai_monthly_2`, ...). The server checks the real list.
   bool _isAddOnProduct(String productId) {
-    final offered = _setup?.productId;
+    final listed = _setup?.productIds ?? const <String>[];
+    if (listed.contains(productId)) return true;
+    final offered = _product?.id ?? _setup?.productId;
     if (offered == null) return false;
     if (productId == offered) return true;
     final base = offered.replaceFirst(RegExp(r'_\d+$'), '');

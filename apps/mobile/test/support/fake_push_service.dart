@@ -54,8 +54,14 @@ class FakePushService implements PushService {
     return null;
   }
 
+  /// When set, [registerIfAuthenticated] fails with it: a phone that could not be registered.
+  PushRegistrationException? registrationError;
+
   @override
-  Future<void> registerIfAuthenticated() async {}
+  Future<void> registerIfAuthenticated() async {
+    final error = registrationError;
+    if (error != null) throw error;
+  }
 
   @override
   Future<String?> currentToken() async => token;
@@ -71,6 +77,23 @@ class FakePushService implements PushService {
   @override
   Future<void> openSystemSettings() async {
     settingsOpened++;
+  }
+
+  /// [PushService.problem]'s answer: why push setup failed, or null.
+  @override
+  String? problem;
+
+  /// How many times [retrySetup] ran ("Try again").
+  int setupRetries = 0;
+
+  /// Runs on [retrySetup], e.g. to make the retry succeed by changing [permission] and [problem].
+  void Function(FakePushService push)? onRetrySetup;
+
+  @override
+  Future<String?> retrySetup() async {
+    setupRetries++;
+    onRetrySetup?.call(this);
+    return null;
   }
 
   @override

@@ -7,12 +7,14 @@ import '../../../core/config/legal_links.dart';
 import '../../../core/di/app_providers.dart';
 import '../../../design/tokens/app_radius_tokens.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
+import '../presentation/widgets/ai_not_active_card.dart';
 import 'ai_store_backend.dart';
 import 'ai_store_controller.dart';
 import 'store_gateway.dart';
 
 /// Buying the AI add-on through the App Store / Google Play: under the not-active notice in the
-/// student's AI tab, or — with [studentId] — for one of a parent's children in the parent app.
+/// student's AI tab, or — with [studentId] — for one of a parent's children in the parent app,
+/// where the offer also lists what the add-on includes ([AiIncludedFeatures]).
 ///
 /// What the stores require of a subscription purchase screen: the store's own localized price and
 /// period, a way to restore purchases, how renewal and cancelling work, and links to the privacy
@@ -147,6 +149,12 @@ class _Offer extends ConsumerWidget {
             'aiStore.price'.tr(namedArgs: {'price': offer.price}),
             style: textTheme.headlineSmall,
           ),
+          // A parent buying for a child sees this sheet alone, without the AI tab's "what's
+          // included" above it; the student's AI tab already shows that list.
+          if (studentId != null) ...[
+            const SizedBox(height: AppSpacing.space16),
+            const AiIncludedFeatures(),
+          ],
           const SizedBox(height: AppSpacing.space12),
           CheckboxListTile(
             key: const ValueKey('aiStore.waiver'),

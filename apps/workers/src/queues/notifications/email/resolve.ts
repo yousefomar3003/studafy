@@ -9,20 +9,20 @@
 import { DOMAIN_EVENTS } from "@studafy/constants";
 
 import {
+  LICENSE_PAYMENT_TEMPLATES,
   renderAccountDeletionConfirmationEmail,
   renderAccountDeletionVerificationEmail,
   renderAiStorePurchaseConfirmationEmail,
   renderAiSubscriptionPausedEmail,
   renderAiSubscriptionResumedEmail,
-  renderDigestEmail,
   renderInvitationEmail,
-  renderNotificationDigestEmail,
+  renderLicensePaymentEmail,
   renderSeatDriftEmail,
   renderSubscriptionDunningEmail,
   renderVerificationEmail,
 } from "./templates";
 
-import type { EmailTemplate, RenderedEmail } from "./templates";
+import type { EmailTemplate, LicensePaymentEmailData, RenderedEmail } from "./templates";
 
 export interface ClaimedOutboxRow {
   id: string;
@@ -51,6 +51,14 @@ const VERIFICATION_ACTION_PATH = "/verify-email#token={token}";
 const ACCOUNT_DELETION_ACTION_PATH = "/legal/delete-account/confirm#token={token}";
 // The public Terms of Service page (apps/web LegalDocumentPage), linked from purchase confirmations.
 const TERMS_PATH = "/terms";
+// The school portal's licence invoice page (apps/web features/license/InvoiceDetailPage).
+const LICENSE_INVOICE_PATH = "/portal/license/invoices/{invoiceId}";
+
+/** The licence billing email payload the licence reminder job writes (000233). */
+type LicensePaymentPayload = Omit<LicensePaymentEmailData, "schoolName" | "invoiceUrl"> & {
+  email: string;
+  invoiceId: string;
+};
 
 interface InvitationPayload {
   email: string;
@@ -74,28 +82,6 @@ interface AccountDeletionRequestedPayload {
 interface AccountDeletedPayload {
   email: string;
   completesBy: string;
-}
-
-interface DigestPayload {
-  email: string;
-  digestDate: string;
-  items: {
-    kind: "attendance_alert" | "fee_overdue";
-    studentName: string | null;
-    text: string;
-    occurredAt: string;
-  }[];
-}
-
-interface NotificationDigestPayload {
-  email: string;
-  digestDate: string;
-  items: {
-    notificationType: string;
-    title: string;
-    body: string;
-    occurredAt: string;
-  }[];
 }
 
 /**
@@ -176,34 +162,6 @@ export function resolveEmail(
           schoolName: context.schoolName,
           actionUrl: `${context.frontendUrl}${VERIFICATION_ACTION_PATH.replace("{token}", payload.token)}`,
           expiresAt: payload.expiresAt,
-        }),
-      };
-    }
-    case DOMAIN_EVENTS.DIGEST_SENT: {
-      const payload = row.payload as unknown as DigestPayload;
-      return {
-        template: "digest",
-        recipient: payload.email,
-        content: renderDigestEmail({
-          schoolName: context.schoolName,
-          digestDate: payload.digestDate,
-          items: payload.items,
-        }),
-      };
-    }
-    case DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT: {
-      const payload = row.payload as unknown as NotificationDigestPayload;
-      return {
-        // Reuses the "digest" app.email_template label rather than adding a new enum value: the
-        // event name on the outbox row (and email_deliveries.outbox_event_id) already distinguish
-        // this from the parent digest for anyone auditing deliveries, so a second label would say
-        // nothing a join can't already answer.
-        template: "digest",
-        recipient: payload.email,
-        content: renderNotificationDigestEmail({
-          schoolName: context.schoolName,
-          digestDate: payload.digestDate,
-          items: payload.items,
         }),
       };
     }
@@ -290,15 +248,43 @@ export function resolveEmail(
         }),
       };
     }
+    case DOMAIN_EVENTS.LICENSE_PAYMENT_EMAIL: {
+      const payload = row.payload as unknown as LicensePaymentPayload;
+      return {
+        template: LICENSE_PAYMENT_TEMPLATES[payload.kind],
+        recipient: payload.email,
+        content: renderLicensePaymentEmail({
+          ...payload,
+          schoolName: context.schoolName,
+          invoiceUrl: `${context.frontendUrl}${LICENSE_INVOICE_PATH.replace("{invoiceId}", payload.invoiceId)}`,
+        }),
+      };
+    }
     default:
       throw new Error(`no email template for outbox event ${row.event_name}`);
   }
 }
 
+/**
+ * Outbox events the dispatcher still claims but never sends: the retired daily digest emails.
+ * Studafy sends no notification email (see retired-digests.ts). Nothing produces these any more;
+ * a row written before that is marked dispatched without a send, so it can never go out late.
+ *
+ * They stay in EMAIL_EVENT_NAMES so the claim keeps matching idx_outbox_events_school_email_claim
+ * (000199) and app.outbox_pending_school_ids('email') (000216) exactly. Dropping them from the list
+ * alone would leave such a row pending in discovery but unclaimable, and its school would be
+ * visited every cycle forever.
+ */
+export const RETIRED_EMAIL_EVENT_NAMES: ReadonlySet<string> = new Set([
+  DOMAIN_EVENTS.DIGEST_SENT,
+  DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT,
+]);
+
 /** The outbox event names the dispatcher claims. Everything else is out of the email channel's scope. */
 export const EMAIL_EVENT_NAMES: readonly string[] = [
   DOMAIN_EVENTS.INVITATION_SENT,
   DOMAIN_EVENTS.SCHOOL_VERIFICATION_EMAIL_SENT,
+  // Retired: claimed only to be dropped unsent (RETIRED_EMAIL_EVENT_NAMES above).
   DOMAIN_EVENTS.DIGEST_SENT,
   DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT,
   DOMAIN_EVENTS.SUBSCRIPTION_DUNNING_SENT,
@@ -308,4 +294,5 @@ export const EMAIL_EVENT_NAMES: readonly string[] = [
   DOMAIN_EVENTS.ACCOUNT_DELETION_REQUESTED,
   DOMAIN_EVENTS.ACCOUNT_DELETED,
   DOMAIN_EVENTS.AI_STORE_PURCHASE_CONFIRMED,
+  DOMAIN_EVENTS.LICENSE_PAYMENT_EMAIL,
 ];

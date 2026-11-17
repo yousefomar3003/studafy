@@ -1,6 +1,6 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
-import { customScheduleErrors } from "@studafy/license-pricing";
+import { customScheduleErrors, scheduleMonths, yearTotals } from "@studafy/license-pricing";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { withSystemTx } from "../../db/tenant-tx";
@@ -82,6 +82,8 @@ import {
   replaceQuote,
   requireQuote,
   scheduleFor,
+  changesFromRequest,
+  requestedTermsOf,
   sendQuote,
   withdrawQuote,
 } from "./quotes";
@@ -89,6 +91,7 @@ import { readInSchool, runLicenseChange } from "./service";
 
 import type { LicenseActor } from "./context";
 import type { PricedQuote, QuoteTerms } from "./pricing";
+import type { RequestedTermsView } from "./quotes";
 import type { LicensingDeps } from "./service";
 import type { StorageService } from "../../lib/storage";
 import type { SupportedLocale } from "../../middleware/locale";
@@ -633,6 +636,7 @@ function schedulePreviewFor(
           {
             totalMinor,
             months: priced.months,
+            prorateDays: priced.prorateDays,
             startsAt: priced.startsAt.toISOString(),
             paymentPlan,
             paymentSchedule: custom,
@@ -640,7 +644,16 @@ function schedulePreviewFor(
           today,
           dueDays,
         );
-  return { paymentPlan, schedulePreview, scheduleErrors };
+  return {
+    paymentPlan,
+    schedulePreview,
+    scheduleErrors,
+    yearTotals: yearTotals(
+      schedulePreview,
+      priced.startsAt.toISOString(),
+      scheduleMonths(priced.months, priced.prorateDays),
+    ),
+  };
 }
 
 function platformActor(c: Context<AppEnv>): LicenseActor {
@@ -867,12 +880,16 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
   });
 
   routes.openapi(calculateRoute, async (c) => {
-    const { schoolId, ...body } = c.req.valid("json");
+    const { schoolId, changeRequestId, ...body } = c.req.valid("json");
     const actor = platformActor(c);
     const terms = termsFrom(body) as QuoteTerms;
     let priced: PricedQuote;
+    let requested: RequestedTermsView | null = null;
     if (schoolId) {
-      priced = await readInSchool(deps, schoolId, actor, (tx) => priceQuote(tx, terms, actor));
+      [priced, requested] = await readInSchool(deps, schoolId, actor, async (tx) => [
+        await priceQuote(tx, terms, actor),
+        changeRequestId ? await requestedTermsOf(tx, changeRequestId) : null,
+      ]);
     } else {
       // A list-price preview: no school, so no license and no credits.
       if (terms.licenseId) throw licenseError(422, ERROR_CODES.VALIDATION_FAILED, actor.locale);
@@ -883,10 +900,24 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
     const dueDays = await withSystemTx(deps.database, (tx) =>
       integerSetting(tx, "license.invoice_due_days", 30),
     );
+    const schedule = schedulePreviewFor(
+      priced,
+      body.paymentPlan,
+      body.paymentSchedule ?? null,
+      dueDays,
+    );
     return c.json(
       {
         ...calculationView(priced),
-        ...schedulePreviewFor(priced, body.paymentPlan, body.paymentSchedule ?? null, dueDays),
+        ...schedule,
+        termsChanges: changesFromRequest(requested, {
+          kind: priced.kind,
+          months: priced.months,
+          startsAt: priced.startsAt.toISOString(),
+          paymentPlan: schedule.paymentPlan,
+          paymentSchedule: schedule.paymentPlan === "custom" ? (body.paymentSchedule ?? []) : null,
+          totalMinor: priced.pricing.totalMinor,
+        }),
       },
       200,
     );

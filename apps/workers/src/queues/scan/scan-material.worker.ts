@@ -106,6 +106,12 @@ interface MaterialScanRow {
   ai_visible: boolean;
   /** The class's AI materials setting (000196); false keeps the material out of AI ingestion. */
   class_ai_enabled: boolean;
+  /**
+   * 'class' for a class's study material; 'personal' for a student's own AI source (000232), which
+   * has no class (it always counts as AI-enabled), gets no thumbnail and raises no notification:
+   * the student follows it in the AI tools' source list.
+   */
+  source_kind: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,7 +189,10 @@ async function applyQuarantine(
   // tx.json(), not JSON.stringify() + ::jsonb: ck_notifications_metadata requires a jsonb object,
   // and app.outbox_events has no CHECK to catch the same mistake, so it would store a jsonb string
   // and corrupt every consumer downstream. Same trap attendance-alert.worker.ts documents.
-  await tx`
+  // A student's own AI source shows "blocked" in their source list; it raises no notification,
+  // whose link would lead to a class material that does not exist.
+  if (material.source_kind === "class") {
+    await tx`
     INSERT INTO app.notifications (school_id, user_id, notification_type, title, body, metadata)
     VALUES (
       ${schoolId}::uuid,
@@ -194,6 +203,7 @@ async function applyQuarantine(
       ${tx.json({ material_id: material.id, virus })}
     )
   `;
+  }
 
   // Shape must match eventPayloadSchemas[MATERIAL_QUARANTINED] in apps/api/src/lib/events/schemas.ts.
   await tx`
@@ -238,12 +248,12 @@ export async function processMaterialScan(
     const material = await withSystemTenantTx(sql, { schoolId }, async (tx) => {
       const [row] = await tx<MaterialScanRow[]>`
         SELECT m.id, m.school_id, m.storage_key, m.original_file_name, m.uploaded_by_user_id,
-               m.ingest_status::text AS ingest_status, m.ai_visible,
-               COALESCE(
+               m.ingest_status::text AS ingest_status, m.ai_visible, m.source_kind,
+               (m.source_kind = 'personal' OR COALESCE(
                  (SELECT cl.ai_materials_enabled FROM app.classes cl
                   WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
                  false
-               ) AS class_ai_enabled
+               )) AS class_ai_enabled
         FROM app.materials m
         WHERE m.id = ${materialId}::uuid AND m.school_id = ${schoolId}::uuid
       `;
@@ -269,7 +279,7 @@ export async function processMaterialScan(
     // a prior attempt committed the clean flip but died before (or while) enqueueing the derivation
     // job, so re-enqueue best-effort here and let the derivation worker's status guard dedup it.
     if (material.ingest_status !== "scanning") {
-      if (material.ingest_status === "ready") {
+      if (material.ingest_status === "ready" && material.source_kind === "class") {
         await config.enqueueDerivation({ schoolId, materialId }).catch(() => undefined);
       }
       return { processed: true, outcome: "skipped" };
@@ -344,11 +354,14 @@ export async function processMaterialScan(
         `;
       });
 
-      // The material is clean, so now the thumbnail/preview can be derived from the same bytes.
+      // The material is clean, so now the thumbnail/preview can be derived from the same bytes. A
+      // student's own source is never shown as a file, so it gets none.
       // An enqueue failure propagates: the job retries and self-heals via the already-'ready' path
       // above (status guard) or the derivation worker's keys guard. The derivation job must not be
       // enqueued before the ready flip commits — see the status/keys guards in derivation.worker.ts.
-      await config.enqueueDerivation({ schoolId, materialId });
+      if (material.source_kind === "class") {
+        await config.enqueueDerivation({ schoolId, materialId });
+      }
 
       return { processed: true, outcome: "clean" };
     }
@@ -440,8 +453,10 @@ async function handleScanFailure(params: {
   const sql = lease.sql;
   try {
     await withSystemTenantTx(sql, { schoolId }, async (tx) => {
-      const [material] = await tx<{ original_file_name: string; uploaded_by_user_id: string }[]>`
-        SELECT original_file_name, uploaded_by_user_id
+      const [material] = await tx<
+        { original_file_name: string; uploaded_by_user_id: string; source_kind: string }[]
+      >`
+        SELECT original_file_name, uploaded_by_user_id, source_kind
         FROM app.materials
         WHERE id = ${materialId}::uuid AND school_id = ${schoolId}::uuid
       `;
@@ -455,6 +470,9 @@ async function handleScanFailure(params: {
         WHERE id = ${materialId}::uuid AND school_id = ${schoolId}::uuid
           AND ingest_status = 'scanning'::app.material_ingest_status
       `;
+
+      // A student's own AI source shows "failed" in their source list instead.
+      if (material.source_kind !== "class") return;
 
       await tx`
         INSERT INTO app.notifications (school_id, user_id, notification_type, title, body, metadata)

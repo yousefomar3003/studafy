@@ -29,6 +29,7 @@ import {
   scheduleAiMessageRetentionSweepJob,
   scheduleIpAddressRetentionSweepJob,
   scheduleStuckUploadScanSweepJob,
+  scheduleAbandonedMaterialSweepJob,
   scheduleDataRetentionSweepJob,
   schedulePartitionMaintenanceJob,
   scheduleRecordRetentionSweepJob,
@@ -36,8 +37,7 @@ import {
 } from "./queues/maintenance";
 import {
   createEmailSender,
-  scheduleDigestJob,
-  scheduleNotificationDigestJob,
+  removeRetiredDigestSchedulers,
   startEmailDispatcher,
   TokenBucket,
 } from "./queues/notifications/email";
@@ -190,8 +190,8 @@ const emailDispatcher = startEmailDispatcher({
   logger: emailLogger,
 });
 
-// School-event notices: assignment.published, submission.graded and attendance.sessionSubmitted
-// outbox rows become inbox notifications for the students and parents concerned. Its own pool, like
+// School-event notices: assignment.published, submission.graded, attendance.sessionSubmitted,
+// material.published and marks.released outbox rows become inbox notifications for the students and parents concerned. Its own pool, like
 // the other always-on consumers; idle cycles back off to one discovery statement every 5 s.
 const notifyDb = loopPool(2);
 const schoolEventNotifier = startSchoolEventNotifier({ db: notifyDb, logger: workerLogger });
@@ -238,18 +238,18 @@ const heartbeat = startHeartbeat({
   logger: workerLogger,
 });
 
-// Digest scheduler: idempotently register the daily 06:00 parent-digest on the notifications
-// queue. Its own Redis connection so the upsert never contends with worker polling.
+// Studafy sends no notification email, so the daily digest emails are retired. Their BullMQ Job
+// Schedulers outlive the code that registered them, so every boot removes them (a no-op once gone).
+// See email/retired-digests.ts.
 const digestRedis = createRedisConnection(env);
-void scheduleDigestJob(digestRedis).then(() => digestRedis.disconnect());
-
-// Notification digest scheduler: idempotently register the daily 06:30 per-recipient digest
-// (ST-143's preferences.digest flag) on the notifications queue, its own hour after the parent
-// digest above so the two never contend for the same outbox-insert window.
-const notificationDigestRedis = createRedisConnection(env);
-void scheduleNotificationDigestJob(notificationDigestRedis).then(() =>
-  notificationDigestRedis.disconnect(),
-);
+void removeRetiredDigestSchedulers(digestRedis)
+  .catch((err: unknown) =>
+    workerLogger.warn(
+      { err },
+      "could not remove the retired digest schedulers; retrying next boot",
+    ),
+  )
+  .finally(() => digestRedis.disconnect());
 
 // Dunning scheduler: idempotently register the daily 04:00 grace-period sweep on the billing queue.
 const dunningRedis = createRedisConnection(env);
@@ -361,6 +361,12 @@ void scheduleIpAddressRetentionSweepJob(ipAddressRetentionRedis).then(() =>
 // stuck in `scanning` or left `unscanned` on the maintenance queue.
 const stuckScanRedis = createRedisConnection(env);
 void scheduleStuckUploadScanSweepJob(stuckScanRedis).then(() => stuckScanRedis.disconnect());
+// Abandoned material sweep scheduler: idempotently register the daily 04:20 deletion of material
+// uploads never confirmed after 24 hours and of failed materials left for 14 days, with their files.
+const abandonedMaterialRedis = createRedisConnection(env);
+void scheduleAbandonedMaterialSweepJob(abandonedMaterialRedis).then(() =>
+  abandonedMaterialRedis.disconnect(),
+);
 
 // Sensitive record retention scheduler (docs/modules/student-records.md "Retention"):
 // idempotently register the daily 08:50 deletion of sensitive answers past their retention period.

@@ -155,6 +155,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "DELETE /api/grading/subject-configs/{configId}",
   "DELETE /api/grading/teacher-assignments/{assignmentId}",
   "POST /api/grading/assessments/{assessmentId}/decision",
+  "POST /api/grading/assessment-releases/{releaseId}/decision",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/assessments/{assessmentId}/release",
   "POST /api/grading/certificates/{certificateId}/reissue",
   "POST /api/grading/certificates/{certificateId}/revoke",
   "POST /api/grading/exam-structure/apply",
@@ -320,13 +322,15 @@ const EXPECTED_MUTATING_ROUTES = [
   // EVALUATION_SCORE_CREATE/DELETE.
   "PUT /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
   "DELETE /api/evaluations/{evaluationId}/scores/{criteriaTemplateId}",
-  // Learning materials (ST-102). Tenant-scoped CRUD protected by requireAuth; school-level
-  // catalog data with no cross-user row-level permission.
+  // Learning materials (ST-102). Guarded by requirePermission(): upload and confirm by
+  // MATERIAL_CREATE, edit and retry by MATERIAL_UPDATE, AI visibility by MATERIAL_MANAGE_AI, delete
+  // by MATERIAL_DELETE; the service then narrows a teacher to the classes they teach.
   "POST /api/academics/materials/upload",
   "POST /api/academics/materials/{materialId}/confirm",
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  "POST /api/academics/materials/{materialId}/retry",
   // Generic object storage gateway (SAD §22). Authorized per content class by requirePermissionIn()
   // in the handler — the required permission arrives in the request body, so the mount-time
   // requirePermission() form cannot see it. Exempted below on that basis.
@@ -419,6 +423,11 @@ const EXPECTED_MUTATING_ROUTES = [
   // Key-concept extraction (ST-169). Same gate and same rationale as the summarizer route above;
   // the concepts route's one write is the metered student's own usage ledger.
   "POST /api/ai/students/{studentId}/concepts",
+  // A student's own AI sources (000232).
+  "POST /api/ai/students/{studentId}/sources/upload",
+  "POST /api/ai/students/{studentId}/sources/{sourceId}/confirm",
+  "DELETE /api/ai/students/{studentId}/sources/{sourceId}",
+  "POST /api/ai/students/{studentId}/assignment-sources/{assignmentId}",
   // Simplified explanations (ST-170). Same gate and same rationale as the concepts route above;
   // the explain route's one write is the metered student's own usage ledger, and the passage it
   // rewrites is scoped by the tenant transaction (see explain/materials.ts).
@@ -628,8 +637,9 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Academic years, terms, class enrolments and exams are NOT exempt: RLS fences them to the
   // school but not to a role, so without TIMETABLE_MANAGE any signed-in student or parent could
   // roll the year over (archiving every enrolment) or delete an exam.
-  // Learning materials (ST-106) are no longer exempt: they carry per-method material:* guards and a
-  // teaches-the-class check since QA-008.
+  // Learning materials are NOT exempt either: RLS lets everyone who can read a class (its enrolled
+  // students and their parents included) see its materials, and nothing in RLS stops them writing.
+  // They carry per-method material:* guards and a teaches-the-class check since QA-008.
   // In-app inbox (ST-142) — personal per-user read state; the caller's own rows only. RLS
   // (`user_id = app.current_user_id()`) is the fence, so the bearer identity is sufficient
   // authorization — same rationale as the session-lifecycle routes above.
@@ -699,6 +709,14 @@ const GUARD_EXEMPT_ROUTES = new Set([
   // Key-concept extraction (ST-169) — same gate, same RLS, same single write to the metered
   // student's own ai_usage_meters row.
   "POST /api/ai/students/{studentId}/concepts",
+  // A student's own AI sources (000232) -- the AI feature check and the student-self gate on
+  // /api/ai/students/{studentId}/*, not the permission matrix. Every write is to the caller's own
+  // files and photos (RLS shows a personal source to its owner alone), or to the shared AI source of
+  // an assignment the caller is enrolled for.
+  "POST /api/ai/students/{studentId}/sources/upload",
+  "POST /api/ai/students/{studentId}/sources/{sourceId}/confirm",
+  "DELETE /api/ai/students/{studentId}/sources/{sourceId}",
+  "POST /api/ai/students/{studentId}/assignment-sources/{assignmentId}",
   // Simplified explanations (ST-170) — same gate, same RLS, same single write to the metered
   // student's own ai_usage_meters row.
   "POST /api/ai/students/{studentId}/explain",

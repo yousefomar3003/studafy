@@ -408,6 +408,8 @@ export const ERROR_CODES = {
   MATERIAL_NOT_FOUND: "MATERIAL_NOT_FOUND",
   MATERIAL_STORAGE_CONFIRM_FAILED: "MATERIAL_STORAGE_CONFIRM_FAILED",
   MATERIAL_INGEST_IN_PROGRESS: "MATERIAL_INGEST_IN_PROGRESS",
+  // The caller holds the material permission but neither teaches the material's class nor leads
+  // the school, so may not upload to it or change its materials.
   MATERIAL_CLASS_FORBIDDEN: "MATERIAL_CLASS_FORBIDDEN",
   // The caller holds material:manageAi but neither teaches the class nor leads the school, so may
   // not change whether the class's materials are used with the AI study assistant (000196).
@@ -547,6 +549,9 @@ export const ERROR_CODES = {
   // don't add up to the total, with dates out of order or in the past, too many instalments, or a
   // due date moved past the next instalment's.
   LICENSE_PAYMENT_SCHEDULE_INVALID: "LICENSE_PAYMENT_SCHEDULE_INVALID",
+  // A quote answering a school's request changes the length, start or payment plan the school chose
+  // without saying why (000233).
+  LICENSE_TERMS_CHANGE_REASON_REQUIRED: "LICENSE_TERMS_CHANGE_REASON_REQUIRED",
   // No such instalment on this licence invoice.
   LICENSE_INSTALMENT_NOT_FOUND: "LICENSE_INSTALMENT_NOT_FOUND",
   LICENSE_PAYMENT_NOT_FOUND: "LICENSE_PAYMENT_NOT_FOUND",
@@ -564,6 +569,14 @@ export const ERROR_CODES = {
   // returned. Too large refuses before the bytes are read; anything but JPEG or PNG is refused unread.
   AI_PHOTO_TOO_LARGE: "AI_PHOTO_TOO_LARGE",
   AI_PHOTO_UNSUPPORTED_TYPE: "AI_PHOTO_UNSUPPORTED_TYPE",
+  // A student's own AI sources (000232): a file or photo uploaded for the AI study tools. The type is
+  // not one the ingestion pipeline reads, the file is over the per-file cap, or the student already
+  // holds as many sources (or bytes) as one student may; and an assignment whose class has its AI
+  // materials setting off cannot be used as a source.
+  AI_SOURCE_UNSUPPORTED_TYPE: "AI_SOURCE_UNSUPPORTED_TYPE",
+  AI_SOURCE_TOO_LARGE: "AI_SOURCE_TOO_LARGE",
+  AI_SOURCE_LIMIT_REACHED: "AI_SOURCE_LIMIT_REACHED",
+  AI_SOURCE_AI_DISABLED: "AI_SOURCE_AI_DISABLED",
   AI_CONSENT_DISCLOSURE_OUTDATED: "AI_CONSENT_DISCLOSURE_OUTDATED",
 
   // LLM gateway (ST-164). The generate route answers with one of three provider-stage codes:

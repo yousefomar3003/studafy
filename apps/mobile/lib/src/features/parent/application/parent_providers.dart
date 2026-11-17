@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/api/generated/models/child_comparison_item.dart';
 import '../../../core/api/generated/models/child_comparison_report.dart';
+import '../../../core/api/generated/models/child_recent_grade.dart';
 // Aliased: the generated model class is named `Notification`, which collides with the Flutter
 // widget of the same name wherever a consumer also imports `flutter/material.dart`.
 import '../../../core/api/generated/models/notification.dart' as api_models;
@@ -103,6 +104,42 @@ final selectedChildProvider = Provider<AsyncValue<ChildComparisonItem?>>((ref) {
     }
     return children.first;
   });
+});
+
+/// Asks the Children tab's child detail to show its Grades tab: each [request] bumps the count,
+/// and the open child detail listens and switches (a child detail built afresh opens on Grades
+/// anyway). Used by the home's "Recent grades" to land on the grade that was tapped.
+class ChildDetailGradesRequest extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void request() => state++;
+}
+
+final childDetailGradesRequestProvider = NotifierProvider<ChildDetailGradesRequest, int>(
+  ChildDetailGradesRequest.new,
+);
+
+// ---------------------------------------------------------------------------
+// Recent grades across the linked children
+// ---------------------------------------------------------------------------
+
+/// How many marks the parent home's "Recent grades" lists.
+const parentRecentGradesLimit = 4;
+
+/// The newest exam marks (released by school leadership) and published assignment grades across
+/// every linked child, newest first, each with its kind and child
+/// (`GET /api/reports/children/recent-grades`).
+///
+/// One small request for the whole family, capped server-side, rather than each child's full
+/// breakdown, so it is cheap on every home load. Parent-only and scoped server-side to the
+/// caller's `app.parent_child_links`, like [childComparisonProvider]; refreshed with the home.
+final parentRecentGradesProvider = FutureProvider<List<ChildRecentGrade>>((ref) async {
+  final result = await ref
+      .watch(apiClientProvider)
+      .childComparisonReports
+      .getChildrenRecentGrades(limit: parentRecentGradesLimit);
+  return result.items;
 });
 
 // ---------------------------------------------------------------------------

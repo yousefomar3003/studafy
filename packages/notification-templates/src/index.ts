@@ -9,8 +9,13 @@
  * imported the catalog from there had to change.
  */
 export { NOTIFICATION_CATALOG } from "./registry";
-export { NOTIFICATION_CHANNELS } from "./types";
-export type { NotificationChannel, NotificationCatalog, NotificationTypeVars } from "./types";
+export { DELIVERED_NOTIFICATION_CHANNELS, NOTIFICATION_CHANNELS } from "./types";
+export type {
+  DeliveredNotificationChannel,
+  NotificationChannel,
+  NotificationCatalog,
+  NotificationTypeVars,
+} from "./types";
 export { renderNotification, TEMPLATE_LOCALES, isTemplateLocale } from "./templates/renderer";
 export type { TemplateLocale } from "./templates/renderer";
 export { AR_TEMPLATES } from "./templates/ar";

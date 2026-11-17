@@ -111,6 +111,24 @@ async function seedInvitation(schoolId: string, email: string, attempts = 0): Pr
   return rows[0]!.id;
 }
 
+/** A digest row as the retired digest producers used to write it. */
+async function seedDigest(schoolId: string, eventName: string, email: string): Promise<string> {
+  const rows = await db!.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
+    return tx<{ id: string }[]>`
+      INSERT INTO app.outbox_events (school_id, event_name, payload, relayed_at)
+      VALUES (
+        ${schoolId}::uuid, ${eventName},
+        ${tx.json({ email, digestDate: "2026-11-16", items: [] })},
+        CURRENT_TIMESTAMP
+      )
+      RETURNING id::text AS id
+    `;
+  });
+  return rows[0]!.id;
+}
+
 interface RowState {
   dispatched: boolean;
   /** QA-032: whether the payload still carries the one-time token. */
@@ -216,6 +234,29 @@ describe("email dispatcher", () => {
     expect(state.dispatched).toBe(true);
     expect(state.attempts).toBe(0);
     expect(state.deliveries.map((d) => d.status)).toEqual(["failed"]);
+  });
+
+  dbTest("a digest row is dropped unsent: Studafy sends no notification email", async () => {
+    const school = await seedSchool();
+    const parentDigest = await seedDigest(school, DOMAIN_EVENTS.DIGEST_SENT, "p@example.test");
+    const notificationDigest = await seedDigest(
+      school,
+      DOMAIN_EVENTS.NOTIFICATION_DIGEST_SENT,
+      "n@example.test",
+    );
+    const invitation = await seedInvitation(school, "still-sent@example.test");
+    const { sender, attempts } = stubSender();
+
+    expect(await processSchool(context(sender), school)).toBe(3);
+    // Only the account email went out.
+    expect(attempts.map((a) => a.to)).toEqual(["still-sent@example.test"]);
+    for (const id of [parentDigest, notificationDigest]) {
+      const state = await readRow(school, id);
+      // Marked done, so it never comes back, and no delivery was ever recorded.
+      expect(state.dispatched).toBe(true);
+      expect(state.deliveries).toEqual([]);
+    }
+    expect((await readRow(school, invitation)).deliveries.map((d) => d.status)).toEqual(["sent"]);
   });
 
   dbTest("a cycle visits only schools discovery names", async () => {

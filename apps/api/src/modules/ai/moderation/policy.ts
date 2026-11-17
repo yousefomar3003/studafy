@@ -185,6 +185,14 @@ export const MODERATION_CATEGORIES: readonly ModerationCategory[] = [
       /\b\d{3}[-.\s]\d{2}[-.\s]\d{4}\b/,
       /\b\d{16}\b/,
       /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/,
+      // International numbers: +962 77 017 9334, 00962770179334. The lookbehind keeps sums such as
+      // "1+1234567" out.
+      /(?<![\w)])\+\d{1,3}(?:[-.\s]?\d){6,12}\b/,
+      /\b00\d{1,3}(?:[-.\s]?\d){6,12}\b/,
+      // Local mobiles in Jordan (077/078/079) and the Gulf (05x): 0770179334, 079 123 4567.
+      /\b0(?:7[789]|5\d)(?:[-.\s]?\d){7}\b/,
+      // A 10-digit national number (Jordan's start with 9 or 2).
+      /\b[29]\d{9}\b/,
     ],
     blockThreshold: "high",
     guidance: {

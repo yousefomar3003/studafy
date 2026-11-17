@@ -92,7 +92,7 @@ export async function processExamGeneration(
     }
 
     const materialsResult = await withSystemTenantTx(sql, { schoolId: data.schoolId }, (tx) =>
-      loadExamMaterials(tx, data.materialIds),
+      loadExamMaterials(tx, data.materialIds, data.studentId),
     );
     if (materialsResult.status !== "ok") {
       const reason =

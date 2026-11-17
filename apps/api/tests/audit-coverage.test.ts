@@ -227,6 +227,8 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/mark-sheets/submit",
   "POST /api/grading/mark-sheets/{sheetId}/decision",
   "POST /api/grading/assessments/{assessmentId}/decision",
+  "POST /api/grading/assessment-releases/{releaseId}/decision",
+  "POST /api/grading/sections/{sectionId}/subjects/{subjectId}/assessments/{assessmentId}/release",
   "POST /api/grading/sections/{sectionId}/results/finalize",
   "POST /api/grading/finalizations/{finalizationId}/corrections",
   "POST /api/grading/finalizations/{finalizationId}/certificates",
@@ -310,6 +312,7 @@ const EXPECTED_MUTATING_ROUTES = [
   "PATCH /api/academics/materials/{materialId}",
   "PATCH /api/academics/materials/{materialId}/ai-visible",
   "DELETE /api/academics/materials/{materialId}",
+  "POST /api/academics/materials/{materialId}/retry",
   // Class AI materials setting (000196). Audited as an update on classes.
   "PUT /api/academics/classes/{classId}/ai-materials",
   // Generic object storage gateway (SAD §22). Content-class-gated pre-signed upload + confirm.
@@ -492,6 +495,14 @@ const EXPECTED_MUTATING_ROUTES = [
   // Key-concept extraction (ST-169). POST carries the material id; the route's one write is the
   // durable per-student usage meter, recorded with the same declaration as the retrieval route above.
   "POST /api/ai/students/{studentId}/concepts",
+  // A student's own AI sources (000232). Upload creates the source row, confirm moves it to the
+  // malware scan, delete removes it and its file, and using an assignment creates or rebuilds the
+  // assignment's source: each writes its app.audit_logs row inside the same transaction
+  // (modules/ai/sources/service.ts), behind the auditAction declarations in routes/source-routes.ts.
+  "POST /api/ai/students/{studentId}/sources/upload",
+  "POST /api/ai/students/{studentId}/sources/{sourceId}/confirm",
+  "DELETE /api/ai/students/{studentId}/sources/{sourceId}",
+  "POST /api/ai/students/{studentId}/assignment-sources/{assignmentId}",
   // Simplified explanations (ST-170). POST carries the chunk id; the route's one write is the
   // durable per-student usage meter, recorded with the same declaration as the retrieval route above.
   "POST /api/ai/students/{studentId}/explain",

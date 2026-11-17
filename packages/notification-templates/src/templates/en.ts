@@ -160,6 +160,20 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "{schoolName} uploaded a bank transfer receipt for invoice {invoiceNumber}. Record the payment and match the receipt to it in the license console.",
   },
+  [NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "{schoolName}'s Studafy AI stops on {stopDate}, in {daysLeft} days, unless invoice {invoiceNumber} (due {dueDate}) is paid. Balance: {balance}.",
+    [NOTIFICATION_CHANNELS.PUSH]: "Studafy AI stops on {stopDate} unless {invoiceNumber} is paid",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "A payment of {balance} on invoice {invoiceNumber} for {schoolName}'s Studafy license was due on {dueDate}. If it is still unpaid on {stopDate}, in {daysLeft} days, the AI features the license covers stop for every seat holder until it is paid. Please pay by bank transfer with the payment reference printed on the invoice, and upload the receipt in Studafy.",
+  },
+  [NOTIFICATION_TYPES.LICENSE_AI_STOPPED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "{schoolName}'s Studafy AI has stopped: invoice {invoiceNumber} was due on {dueDate} and {balance} is still unpaid. It starts again as soon as the payment is recorded.",
+    [NOTIFICATION_CHANNELS.PUSH]: "Studafy AI stopped: {invoiceNumber} is unpaid",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "{schoolName}'s Studafy AI stopped on {stopDate} because invoice {invoiceNumber}, due on {dueDate}, still has {balance} unpaid. Students and teachers holding the license's seats have lost its AI features until it is paid. Pay by bank transfer with the payment reference printed on the invoice and upload the receipt in Studafy; the AI starts again as soon as Studafy records the payment.",
+  },
   [NOTIFICATION_TYPES.ASSIGNMENT_PUBLISHED]: {
     [NOTIFICATION_CHANNELS.IN_APP]: "New assignment: {assignmentTitle}",
     [NOTIFICATION_CHANNELS.PUSH]: "{who}{courseName} · due {dueDate}",
@@ -175,5 +189,16 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.IN_APP]: "{studentName} was marked {status}",
     [NOTIFICATION_CHANNELS.PUSH]: "{courseName} · {date}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{studentName} was marked {status} in {courseName} on {date}.",
+  },
+  [NOTIFICATION_TYPES.MATERIAL_PUBLISHED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "New material: {materialTitle}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{courseName}{placement}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Your teacher shared a new material, {materialTitle}, in {courseName}{placement}.",
+  },
+  [NOTIFICATION_TYPES.MARKS_RELEASED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Marks released: {subjectName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "{who}{released}",
+    [NOTIFICATION_CHANNELS.EMAIL]: "{released}. Open Studafy to see them.",
   },
 } as const satisfies LocaleTemplateSet;

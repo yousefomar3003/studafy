@@ -11,6 +11,7 @@ import { createApp } from "./app";
 import { closeDatabasePools, createDatabase, createReadDatabase } from "./database";
 import { loadEnv } from "./env";
 import { RedisCircuitBreaker } from "./lib/circuit-breaker";
+import { createScannerWarmup } from "./lib/scanner-warmup";
 import { createSecurityEventSink } from "./lib/security/securityEventSink";
 import { createStorageService } from "./lib/storage";
 import { createInflightTracker, gracefulShutdown } from "./lifecycle";
@@ -131,6 +132,12 @@ const securityEventSink = createSecurityEventSink({ database, logger });
 // normal state in development — the attachment endpoints then answer 503 rather than the process
 // refusing to start over a feature the developer may not be touching.
 const storage = createStorageService(env);
+
+// Wakes the scaled-to-zero scanner when a material upload starts (lib/scanner-warmup.ts). Null
+// without CLAMAV_HOST (development), where there is nothing to wake.
+const scannerWarmup = env.CLAMAV_HOST
+  ? createScannerWarmup({ host: env.CLAMAV_HOST, port: env.CLAMAV_PORT })
+  : null;
 
 // Stripe billing adapter. Null when STRIPE_SECRET_KEY is absent — the checkout and webhook routes
 // still register but answer 503 at request time.
@@ -268,6 +275,7 @@ const app = createApp({
   rateLimitDisabled: env.RATE_LIMIT_DISABLED === "true",
   securityEventSink,
   storage,
+  scannerWarmup,
   stripeProvider,
   tapProvider,
   tapCountries: env.TAP_COUNTRIES,

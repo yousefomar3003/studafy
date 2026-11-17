@@ -12,12 +12,16 @@ import 'package:studafy_mobile/src/core/api/generated/models/term.dart';
 import 'package:studafy_mobile/src/core/offline/cached_value.dart';
 import 'package:studafy_mobile/src/design/theme/app_theme.dart';
 import 'package:studafy_mobile/src/features/student/application/grade_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/released_marks_providers.dart';
+import 'package:studafy_mobile/src/features/student/application/student_context_providers.dart';
 import 'package:studafy_mobile/src/features/student/domain/grade_report.dart';
 import 'package:studafy_mobile/src/features/student/presentation/grades_screen.dart';
 import 'package:studafy_mobile/src/features/student/presentation/widgets/grades_placeholders.dart';
 import 'package:studafy_mobile/src/features/student/presentation/widgets/grades_publish_banner.dart';
 import 'package:studafy_mobile/src/features/student/presentation/widgets/subject_grades_card.dart';
 
+import '../../../support/ensure_date_formatting.dart';
+import '../../../support/fake_released_marks_client.dart';
 import '../../../support/wrap_with_localization.dart';
 
 Term _term(String id, int sequence) {
@@ -88,7 +92,10 @@ CachedValue<GradeReport> _readyReport(Term term, List<PublishedGrade> grades) {
   );
 }
 
-Widget _screenApp({String? courseId}) {
+Widget _screenApp({
+  String? courseId,
+  GradesTab initialTab = GradesTab.assignments,
+}) {
   return Builder(
     builder: (context) => MaterialApp(
       theme: AppTheme.light,
@@ -96,7 +103,7 @@ Widget _screenApp({String? courseId}) {
       locale: context.locale,
       supportedLocales: context.supportedLocales,
       localizationsDelegates: context.localizationDelegates,
-      home: GradesScreen(courseId: courseId),
+      home: GradesScreen(courseId: courseId, initialTab: initialTab),
     ),
   );
 }
@@ -107,6 +114,84 @@ Future<void> _pump(WidgetTester tester, ProviderScope scope) async {
 }
 
 void main() {
+  setUpAll(ensureDateFormattingInitialized);
+
+  testWidgets(
+    'opens on the Exams tab with an approved exam, assignment grades one tab away',
+    (tester) async {
+      final term = _term('term-1', 1);
+      final client = FakeReleasedMarksClient(
+        periods: singleReleasedExamPeriods(
+          releasedAt: DateTime.utc(2026, 11, 16),
+        ),
+      );
+      await _pump(
+        tester,
+        ProviderScope(
+          overrides: [
+            releasedMarksClientProvider.overrideWithValue(client),
+            currentStudentIdProvider.overrideWithValue('student-1'),
+            academicYearTermsProvider.overrideWith((ref) async => [term]),
+            gradeReportProvider.overrideWith(
+              (ref) => AsyncData<GradeReportStatus>(
+                GradeReportReady(
+                  _readyReport(term, [_grade('math', 'Algebra')]),
+                ),
+              ),
+            ),
+          ],
+          child: _screenApp(initialTab: GradesTab.exams),
+        ),
+      );
+
+      // No icon to find: the tab is there by name, selected, with the mark on it. Each tab is
+      // led by its kind's icon, the same one the home's "Recent grades" rows use.
+      final examsTab = find.byKey(const ValueKey('grades-tab-exams'));
+      final assignmentsTab = find.byKey(
+        const ValueKey('grades-tab-assignments'),
+      );
+      expect(
+        find.descendant(of: examsTab, matching: find.text('Exams')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: examsTab,
+          matching: find.byIcon(Icons.fact_check_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: assignmentsTab, matching: find.text('Assignments')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: assignmentsTab,
+          matching: find.byIcon(Icons.assignment_turned_in_outlined),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<TabBar>(find.byType(TabBar)).controller!.index,
+        GradesTab.exams.index,
+      );
+      // The official results stay one tap away in the app bar.
+      expect(find.byTooltip('Official results'), findsOneWidget);
+      expect(find.byTooltip('Term marks'), findsNothing);
+      expect(client.requestedStudents, ['student-1']);
+      expect(find.text('First month'), findsWidgets);
+      expect(find.text('17.5 / 20'), findsWidgets);
+      expect(find.text('More to come'), findsOneWidget);
+      expect(find.byType(SubjectGradesCard), findsNothing);
+
+      await tester.tap(assignmentsTab);
+      await tester.pumpAndSettle();
+      expect(find.byType(SubjectGradesCard), findsOneWidget);
+      expect(find.text('Algebra'), findsOneWidget);
+    },
+  );
+
   testWidgets(
     'renders the subject breakdown and term summary for a ready report',
     (tester) async {

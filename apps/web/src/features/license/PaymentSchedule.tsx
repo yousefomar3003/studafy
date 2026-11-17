@@ -12,6 +12,8 @@ export interface ScheduleRow {
   status?: "due" | "partially_paid" | "paid";
   overdue?: boolean;
   current?: boolean;
+  /** YYYY-MM-DD: the AI stops this day if the instalment is still unpaid (000233). */
+  aiStopDate?: string;
 }
 
 /**
@@ -38,6 +40,7 @@ export function PaymentSchedule({
   const { formatDate } = useFormatters();
   const money = useMoney();
   const withStatus = rows.some((row) => row.status !== undefined);
+  const withAiStop = rows.some((row) => row.aiStopDate !== undefined && row.status !== "paid");
   const m = (amount: number) => money(amount, currencyCode, minorUnit);
 
   return (
@@ -55,6 +58,7 @@ export function PaymentSchedule({
                 <th scope="col">{t("schoolLicense.schedule.columns.status")}</th>
               </>
             ) : null}
+            {withAiStop ? <th scope="col">{t("schoolLicense.schedule.columns.aiStop")}</th> : null}
             {action ? <th scope="col">{actionHeader}</th> : null}
           </tr>
         </thead>
@@ -81,6 +85,13 @@ export function PaymentSchedule({
                     ) : null}
                   </td>
                 </>
+              ) : null}
+              {withAiStop ? (
+                <td>
+                  {row.aiStopDate && row.status !== "paid"
+                    ? formatDate(new Date(`${row.aiStopDate}T00:00:00Z`), { dateStyle: "medium" })
+                    : "—"}
+                </td>
               ) : null}
               {action ? <td>{action(row)}</td> : null}
             </tr>

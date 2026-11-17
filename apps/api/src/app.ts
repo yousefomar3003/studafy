@@ -60,6 +60,7 @@ import {
   aiMetricsRoutes,
   aiRetrievalRoutes,
   aiSummaryRoutes,
+  aiSourceRoutes,
   aiStudentSelfGate,
   aiPhotoTextRoutes,
   aiUsageRoutes,
@@ -204,6 +205,7 @@ import { OPENAPI_DOCUMENT_CONFIG } from "./openapi/config";
 import { openApiValidationHook } from "./openapi/hook";
 
 import type { Database } from "./db";
+import type { ScannerWarmup } from "./lib/scanner-warmup";
 import type { SecurityEventSink } from "./lib/security/securityEventSink";
 import type { StorageService } from "./lib/storage";
 import type { UploadScanEnqueuer } from "./lib/storage/upload-scan";
@@ -350,6 +352,12 @@ export interface AppOptions {
    */
   uploadScanEnqueuer?: UploadScanEnqueuer | null;
   /**
+   * Wakes the scaled-to-zero malware scanner when a material upload starts, so it boots while the
+   * file uploads (lib/scanner-warmup.ts). Fire-and-forget. Absent (tests, local dev without
+   * CLAMAV_HOST): no warm-up.
+   */
+  scannerWarmup?: ScannerWarmup | null;
+  /**
    * Stripe payment provider for subscription billing.
    *
    * Nullable: when absent, checkout, portal, and webhook routes still register (so the OpenAPI
@@ -430,6 +438,7 @@ export function createApp({
   idTokenLoginEnabled = false,
   storage = null,
   uploadScanEnqueuer,
+  scannerWarmup = null,
   stripeProvider = null,
   tapProvider = null,
   tapCountries = new Set(),
@@ -1322,7 +1331,7 @@ export function createApp({
   // the same way: when absent, confirm still flips the material to 'scanning' but no scan job is
   // enqueued.
   if (database) {
-    app.route("/", materialRoutes(database, storage, redis ?? null));
+    app.route("/", materialRoutes(database, storage, redis ?? null, { scannerWarmup }));
     // Per-class "use this class's materials with the AI study assistant" setting (000196). Turning
     // it back on enqueues ingestion, so it takes Redis the same optional way.
     app.route("/", classAiMaterialsRoutes(database, redis ?? null));
@@ -1535,6 +1544,11 @@ export function createApp({
     );
     // Ask AI chat history: read-only, so behind the feature check but not the token budget.
     app.route("/", aiAskHistoryRoutes({ database }));
+    // A student's own AI sources (000232): their files and photos, and their assignments, used by
+    // every tool below wherever a study material goes. Nothing here calls the model or spends
+    // tokens, so it sits behind the AI feature check only; the tools that read a source keep their
+    // own gate, quota and usage meter. Uploads take the material pipeline (scan, then ingestion).
+    app.route("/", aiSourceRoutes({ database, storage, redis, scannerWarmup }));
     // Study-material summarizer. Mounted under the same gate so a generated summary reserves and
     // commits the caller's AI quota, and only when the gate's dependencies exist — the summarize
     // surface must never run un-metered. The provider may be null on the same kill-switch terms as

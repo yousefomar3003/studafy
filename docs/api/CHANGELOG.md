@@ -13,6 +13,45 @@ when it required the `version-bump` label.
 
 ### Added
 
+- The school chooses its licence length and payment plan; AI stops 30 days after an unpaid
+  instalment (migration 000233, ADR-021 amendment). `CreateLicenseChangeRequestBody` takes optional
+  `months` (1-36), `startsOn`, `paymentPlan` (`monthly`, `yearly`, `custom`) and, for custom,
+  `paymentProposal` (`LicenseProposedInstalment[]`: `dueDate`, `shareBps` adding up to 10000; 422
+  `LICENSE_PAYMENT_SCHEDULE_INVALID` otherwise); `LicenseChangeRequest` echoes them.
+  `LicensePaymentPlan` adds `yearly`. `LicenseQuoteBody` takes `changeRequestId` (404 when not an
+  open request of the school); quote bodies take `termsChangeReason`, required when the quote's
+  length, start or plan departs from the request (422 `LICENSE_TERMS_CHANGE_REASON_REQUIRED`).
+  `LicenseQuote` adds `yearTotals` (`LicenseYearTotal[]`), `changeRequestId`, `requestedTerms`
+  (`LicenseRequestedTerms`), `termsChanges` (`LicenseTermsChange[]`) and `termsChangeReason`;
+  `LicenseQuoteCalculateBody` takes `changeRequestId` and `LicenseQuoteCalculation` adds
+  `yearTotals` and `termsChanges`. Accepting a quote resolves its request.
+  `LicenseInvoiceDetail` adds `yearTotals` and `aiStopped`; `LicenseInvoiceInstalment` adds
+  `aiStopDate`. `SchoolLicense` (and the platform/console licence views) add
+  `nonpaymentSuspendedAt` and `nextAiStop` (`LicenseAiStop`). `LicensePaymentResult` adds
+  `licenseResumed`. New notification types `LICENSE_AI_STOP_WARNING` and `LICENSE_AI_STOPPED`
+  (in-app + push). New domain event `licenseInvoice.paymentEmail` (billing emails for an overdue
+  instalment, the 7-day AI cutoff warning and the stop; consumed by the email dispatcher).
+
+- `MARKS_RELEASED` notification type (migration 000230, in-app + push, never emailed): approving a
+  mark sheet or a single assessment notifies the students with released marks and their parents;
+  the route is `/students/{studentId}/marks`. New domain event `marks.released`.
+- Releasing marks one assessment at a time (migration 000229): `submitAssessmentRelease`
+  (`POST .../sections/{sectionId}/subjects/{subjectId}/assessments/{assessmentId}/release`,
+  `grade:update`) sends one complete assessment for leadership approval, always `submitted` even
+  where sheets need no approval step (409
+  `RESULTS_INCOMPLETE` while a student's mark is missing, 409 `CONFLICT_STATE_MISMATCH` when it or
+  its period's sheet is already sent); `GET /api/grading/years/{yearId}/assessment-releases`
+  (`listAssessmentReleases`) and `POST /api/grading/assessment-releases/{releaseId}/decision`
+  (`decideAssessmentRelease`: approve, return or reopen/withdraw with a reason), both
+  `approval:review`. `MarkSheetAssessment` adds `release_id`, `release_status`,
+  `release_submitted_at`, `release_decided_at`, `release_return_reason`, `released` and
+  `missing_count`; `ReleasedMarkSubject` adds `period_approved` and `ReleasedAssessment` adds
+  `released_at` (`approved_at` stays the whole period's approval, null while only single
+  assessments are released); `GradingOverview.counts` adds `assessment_releases_awaiting_approval`.
+- `POST /api/academics/materials/{materialId}/retry` (`retryMaterial`, needs `material:update`):
+  sends a `failed` material back to `scanning` (its `ingest_error` cleared) and enqueues the malware
+  scan, as confirm does. 409 `CONFLICT_STATE_MISMATCH` for any other state, 409
+  `MATERIAL_STORAGE_CONFIRM_FAILED` when its file is no longer in storage.
 - Stripe Sandbox support (docs/billing/stripe-modes.md): `StorageAddOnOffer.testMode` (true while
   payments run on Stripe Sandbox keys: test cards only, no real money), `SystemHealth.stripeMode`
   (`live`, `sandbox` or `not_configured`), and the Stripe webhook's `outcome` gains `ignored` for an
@@ -64,6 +103,11 @@ when it required the `version-bump` label.
 
 ### Changed
 
+- `GET /api/academics/materials` and `GET /api/academics/materials/{materialId}`: a caller who is
+  not school staff (students, parents, guests) sees only `ready` materials; another state is left
+  out of the list and answers 404 by id. Staff still see every state.
+- `POST /api/academics/materials/upload` also replaces the caller's own `failed` attempt at the same
+  file in the class (as it already did an unconfirmed `uploaded` one) and frees its stored file.
 - `LicenseInvoice.paymentLink` is now the link of the instalment to pay now, and the invoice-level
   `PUT|DELETE …/license-invoices/{invoiceId}/payment-link` sets that instalment's link (one
   instalment for an invoice paid at once, so nothing changes for those). A licence now activates once

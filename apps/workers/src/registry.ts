@@ -24,13 +24,16 @@ import { processStudentImport } from "./queues/imports/worker";
 import { processMaintenanceJob } from "./queues/maintenance";
 import { processAttendanceAlert } from "./queues/notifications/attendance-alert.worker";
 import { processBulkInvite } from "./queues/notifications/bulk-invite-processor";
-import { deadLetterListener } from "./queues/notifications/dead-letter";
+import { deadLetterListener, isTerminalFailure } from "./queues/notifications/dead-letter";
 import { processNotificationDelivery } from "./queues/notifications/delivery.worker";
 import {
   DELIVERY_JOB_OPTIONS,
   processNotificationDispatch,
 } from "./queues/notifications/dispatcher.worker";
-import { processDigest, processNotificationDigest } from "./queues/notifications/email";
+import {
+  RETIRED_DIGEST_JOB_NAMES,
+  skipRetiredDigestJob,
+} from "./queues/notifications/email/retired-digests";
 import { createFcmSender } from "./queues/notifications/push";
 import { processReportJob } from "./queues/reports";
 import { createReportS3 } from "./queues/reports/report-s3";
@@ -323,6 +326,27 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         token,
       );
     },
+    // The processor itself marks the material failed and alerts the uploader on the last attempt;
+    // this only makes that visible in the logs, which otherwise showed nothing for a failed material.
+    onFailed: (job, error) => {
+      const data = (job?.data ?? {}) as Partial<AiIngestionJobData>;
+      const fields = {
+        event: "material_ingestion_failed",
+        school_id: data.schoolId ?? null,
+        material_id: data.materialId ?? null,
+        job_id: job?.id ?? null,
+        attempts_made: job?.attemptsMade ?? null,
+        err: { type: error.name, message: error.message, stack: error.stack },
+      };
+      if (isTerminalFailure(job)) {
+        workerLogger.error(
+          fields,
+          "material ingestion exhausted its retries; material marked failed",
+        );
+      } else {
+        workerLogger.warn(fields, "material ingestion attempt failed; retrying");
+      }
+    },
   },
   {
     name: QUEUE_NAMES.AI_EXAM_GENERATION,
@@ -392,12 +416,10 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
         return publishDueAnnouncements(db(), new Date(), workerLogger);
       }
 
-      if (job.name === JOB_NAMES.SEND_DIGESTS) {
-        return processDigest(db());
-      }
-
-      if (job.name === JOB_NAMES.SEND_NOTIFICATION_DIGESTS) {
-        return processNotificationDigest(db());
+      // The daily digest emails are retired: Studafy sends no notification email. A digest job
+      // still queued, or fired by a scheduler not yet removed, is acknowledged and does nothing.
+      if (RETIRED_DIGEST_JOB_NAMES.has(job.name)) {
+        return skipRetiredDigestJob();
       }
 
       const data = job.data as { bulkInviteId?: string; schoolId?: string };

@@ -12,6 +12,14 @@ const schoolId = '1a2b3c4d-5e6f-4a1b-8c2d-3e4f5a6b7c8d';
 
 const siblingId = '9c0d4e21-7f3b-4a6e-8b11-2c5d6e7f8a90';
 
+/// The add-on's products, as production configures them (one per child on a shared store account).
+const addOnProducts = [
+  'studafy_ai_monthly',
+  'studafy_ai_monthly_2',
+  'studafy_ai_monthly_3',
+  'studafy_ai_monthly_4',
+];
+
 AiStoreSetup storeSetup({
   bool purchasable = true,
   bool google = true,
@@ -20,14 +28,17 @@ AiStoreSetup storeSetup({
   bool subscribed = false,
   AiStoreUnavailableReason? unavailableReason,
   String forStudent = studentId,
+  List<String> productIds = addOnProducts,
+  bool stamped = false,
 }) => AiStoreSetup(
   enabled: true,
   productId: purchasable ? productId : null,
+  productIds: productIds,
   apple: apple,
   google: google,
   purchasable: purchasable,
-  accountToken: purchasable ? forStudent : null,
-  profileId: purchasable ? schoolId : null,
+  accountToken: purchasable || stamped ? forStudent : null,
+  profileId: purchasable || stamped ? schoolId : null,
   studentId: forStudent,
   studentFirstName: 'Sara',
   subscribed: subscribed,
@@ -45,7 +56,15 @@ class FakeGateway implements StoreGateway {
     rawPrice: 2.99,
     currencyCode: 'JOD',
   );
-  final bought = <({String accountToken, String? profileId})>[];
+
+  /// The products the store lists (null: every one asked for), each priced like [listed].
+  Set<String>? listedIds;
+
+  /// What this device's store account holds; [heldFails] makes reading it throw.
+  final held = <HeldSubscription>[];
+  bool heldFails = false;
+
+  final bought = <({String productId, String accountToken, String? profileId})>[];
   final completed = <PurchaseDetails>[];
   int restores = 0;
 
@@ -56,7 +75,28 @@ class FakeGateway implements StoreGateway {
   Future<bool> isAvailable() async => available;
 
   @override
-  Future<ProductDetails?> product(String productId) async => listed;
+  Future<Map<String, ProductDetails>> products(Set<String> productIds) async {
+    final template = listed;
+    if (template == null) return {};
+    return {
+      for (final id in productIds)
+        if (listedIds == null || listedIds!.contains(id))
+          id: ProductDetails(
+            id: id,
+            title: template.title,
+            description: template.description,
+            price: template.price,
+            rawPrice: template.rawPrice,
+            currencyCode: template.currencyCode,
+          ),
+    };
+  }
+
+  @override
+  Future<List<HeldSubscription>> heldSubscriptions() async {
+    if (heldFails) throw StateError('store account unreadable');
+    return held;
+  }
 
   @override
   Future<void> buy(
@@ -64,7 +104,7 @@ class FakeGateway implements StoreGateway {
     required String accountToken,
     String? profileId,
   }) async {
-    bought.add((accountToken: accountToken, profileId: profileId));
+    bought.add((productId: product.id, accountToken: accountToken, profileId: profileId));
   }
 
   @override

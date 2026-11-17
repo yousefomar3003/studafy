@@ -1,0 +1,149 @@
+{
+  "identifier": "5E1D7A3C",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "21000001",
+      "localizations": [],
+      "name": "Studafy AI",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "5.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "31000001",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "AI study assistant built on your class materials",
+              "displayName": "Studafy AI",
+              "locale": "en_US"
+            },
+            {
+              "description": "مساعد دراسة بالذكاء الاصطناعي مبني على مواد صفك",
+              "displayName": "Studafy AI",
+              "locale": "ar"
+            }
+          ],
+          "productID": "studafy_ai_monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Studafy AI",
+          "subscriptionGroupID": "21000001",
+          "type": "RecurringSubscription"
+        }
+      ]
+    },
+    {
+      "id": "21000002",
+      "localizations": [],
+      "name": "Studafy AI – 2nd child",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "5.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "31000002",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "AI study assistant built on your class materials",
+              "displayName": "Studafy AI",
+              "locale": "en_US"
+            },
+            {
+              "description": "مساعد دراسة بالذكاء الاصطناعي مبني على مواد صفك",
+              "displayName": "Studafy AI",
+              "locale": "ar"
+            }
+          ],
+          "productID": "studafy_ai_monthly_2",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Studafy AI – 2nd child",
+          "subscriptionGroupID": "21000002",
+          "type": "RecurringSubscription"
+        }
+      ]
+    },
+    {
+      "id": "21000003",
+      "localizations": [],
+      "name": "Studafy AI – 3rd child",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "5.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "31000003",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "AI study assistant built on your class materials",
+              "displayName": "Studafy AI",
+              "locale": "en_US"
+            },
+            {
+              "description": "مساعد دراسة بالذكاء الاصطناعي مبني على مواد صفك",
+              "displayName": "Studafy AI",
+              "locale": "ar"
+            }
+          ],
+          "productID": "studafy_ai_monthly_3",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Studafy AI – 3rd child",
+          "subscriptionGroupID": "21000003",
+          "type": "RecurringSubscription"
+        }
+      ]
+    },
+    {
+      "id": "21000004",
+      "localizations": [],
+      "name": "Studafy AI – 4th child",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "5.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "31000004",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "AI study assistant built on your class materials",
+              "displayName": "Studafy AI",
+              "locale": "en_US"
+            },
+            {
+              "description": "مساعد دراسة بالذكاء الاصطناعي مبني على مواد صفك",
+              "displayName": "Studafy AI",
+              "locale": "ar"
+            }
+          ],
+          "productID": "studafy_ai_monthly_4",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "Studafy AI – 4th child",
+          "subscriptionGroupID": "21000004",
+          "type": "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

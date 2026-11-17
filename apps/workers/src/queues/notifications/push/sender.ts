@@ -21,6 +21,12 @@
  * this channel uses to prune. Any error that fails the *whole* call (auth, transport, quota)
  * throws; the delivery job's BullMQ retries and the dead-letter path decide what happens to it.
  * The sender never has to guess about those, because it never sees them as a response.
+ *
+ * Every other per-token failure is logged, never swallowed. The one that matters most is Apple
+ * refusing Firebase's APNs credential (`messaging/third-party-auth-error`): FCM then fails every
+ * iPhone token while Android keeps working, so iPhones silently get nothing. That happened twice
+ * before this was logged; the fix is re-uploading the APNs key in Firebase
+ * (docs/runbooks/fcm-setup.md, "iPhones stop getting notifications").
  */
 
 import { cert, getApps, initializeApp } from "firebase-admin/app";
@@ -64,6 +70,7 @@ export interface PushSender {
 
 export interface PushSenderLogger {
   warn(fields: Record<string, unknown>, message: string): void;
+  error?(fields: Record<string, unknown>, message: string): void;
 }
 
 export interface PushSenderEnv {
@@ -89,6 +96,50 @@ export const ANDROID_CHANNEL_ID = "studafy_push";
 /** Whether a per-token error means the token itself has stopped being a valid route. */
 export function isUnregisteredToken(error: { code?: string }): boolean {
   return error.code !== undefined && UNREGISTERED_ERROR_CODES.has(error.code);
+}
+
+/**
+ * Per-token codes that mean Studafy's own Firebase / APNs setup is wrong, not the phone: every
+ * iPhone (or every phone) fails until someone fixes the credential in the Firebase console.
+ */
+const CREDENTIAL_ERROR_CODES = new Set([
+  "messaging/third-party-auth-error",
+  "messaging/invalid-apns-credentials",
+  "messaging/mismatched-credential",
+  "messaging/sender-id-mismatch",
+]);
+
+/** Per-token failures other than a dead token, counted by error code. */
+export function failuresByCode(
+  responses: readonly { success: boolean; error?: { code?: string } }[],
+): Record<string, number> {
+  const counts = new Map<string, number>();
+  for (const response of responses) {
+    if (response.success || !response.error || isUnregisteredToken(response.error)) continue;
+    const code = response.error.code ?? "unknown";
+    counts.set(code, (counts.get(code) ?? 0) + 1);
+  }
+  return Object.fromEntries(counts);
+}
+
+/** Whether any of [codes] means the Firebase / APNs credential itself is broken. */
+export function hasCredentialFailure(codes: Record<string, number>): boolean {
+  return Object.keys(codes).some((code) => CREDENTIAL_ERROR_CODES.has(code));
+}
+
+/**
+ * The longest one FCM call may take. A send that never settles must fail, not hang: the push loop
+ * awaits it, so a hang would stop every later notification (the caller logs the failure).
+ */
+export const SEND_TIMEOUT_MS = 30_000;
+
+/** `promise`, or a rejection once `ms` have passed without it settling. */
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`FCM send timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** The `data` payload every FCM message carries. Values must be strings — FCM rejects anything else. */
@@ -125,6 +176,11 @@ export function createFcmSender(env: PushSenderEnv, logger: PushSenderLogger): P
 
   const app = buildFirebaseApp(serviceAccountJson);
   const messaging: Messaging = getMessaging(app);
+  // HTTP/1.1, not firebase-admin's default HTTP/2 session. Under Bun the shared HTTP/2 session
+  // stopped answering once it had sat idle: the first sends after a restart went through, then a
+  // send never settled, the push loop waited on it forever, and every later notification stayed
+  // unsent until the next deploy (seen 2026-11-16). One request per token is plenty at our volume.
+  messaging.enableLegacyHttpTransport();
 
   return {
     async send(message: PushMessage, devices: PushDevice[]): Promise<PushSendResult> {
@@ -132,22 +188,25 @@ export function createFcmSender(env: PushSenderEnv, logger: PushSenderLogger): P
         return { unregisteredDeviceIds: [], sent: 0, dryRun: false };
       }
 
-      const result = await messaging.sendEachForMulticast({
-        tokens: devices.map((device) => device.token),
-        notification: { title: message.title, body: message.body },
-        data: buildDataPayload(message),
-        // Without these a notification can arrive silently: Android delivers normal-priority
-        // messages late on a dozing phone, and iOS plays no sound unless the payload asks for one.
-        android: {
-          priority: "high",
-          notification: { sound: "default", channelId: ANDROID_CHANNEL_ID },
-        },
-        // apns-priority 10 + push-type alert: shown at once, including on the lock screen.
-        apns: {
-          headers: { "apns-priority": "10", "apns-push-type": "alert" },
-          payload: { aps: { sound: "default" } },
-        },
-      });
+      const result = await withTimeout(
+        messaging.sendEachForMulticast({
+          tokens: devices.map((device) => device.token),
+          notification: { title: message.title, body: message.body },
+          data: buildDataPayload(message),
+          // Without these a notification can arrive silently: Android delivers normal-priority
+          // messages late on a dozing phone, and iOS plays no sound unless the payload asks for one.
+          android: {
+            priority: "high",
+            notification: { sound: "default", channelId: ANDROID_CHANNEL_ID },
+          },
+          // apns-priority 10 + push-type alert: shown at once, including on the lock screen.
+          apns: {
+            headers: { "apns-priority": "10", "apns-push-type": "alert" },
+            payload: { aps: { sound: "default" } },
+          },
+        }),
+        SEND_TIMEOUT_MS,
+      );
 
       const unregisteredDeviceIds: string[] = [];
       for (const [index, device] of devices.entries()) {
@@ -159,6 +218,25 @@ export function createFcmSender(env: PushSenderEnv, logger: PushSenderLogger): P
           isUnregisteredToken(response.error)
         ) {
           unregisteredDeviceIds.push(device.id);
+        }
+      }
+
+      const failures = failuresByCode(result.responses);
+      if (Object.keys(failures).length > 0) {
+        const fields = {
+          notification_type: message.notificationType,
+          dispatch_log_id: message.dispatchLogId,
+          failures,
+        };
+        if (hasCredentialFailure(failures)) {
+          // Apple or Google refused Studafy's own credential: nobody on that platform gets pushes.
+          (logger.error ?? logger.warn).call(
+            logger,
+            fields,
+            "notification_push_credential_rejected: re-upload the APNs key in Firebase (docs/runbooks/fcm-setup.md)",
+          );
+        } else {
+          logger.warn(fields, "notification_push_tokens_failed");
         }
       }
 

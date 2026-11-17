@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/router/route_paths.dart';
 import '../../../../design/tokens/app_spacing_tokens.dart';
 import '../../domain/ai_feature.dart';
-import '../../../student/presentation/materials_screen.dart';
+import '../ai_source_chooser_screen.dart';
 
 /// The subscribed-state feature hub: one tile per [AiFeature], in the same order as the backend's
 /// own `AI_FEATURES` list.
@@ -43,8 +43,8 @@ class _AiFeatureTile extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        // Summaries and key concepts are per-material, so their tiles open the Lessons library,
-        // where each AI-visible material's viewer offers both.
+        // Summaries and key concepts work on one source, so their tiles first ask which: a study
+        // material, one of the student's assignments, or a file or photo of their own.
         onTap: () => switch (feature) {
           AiFeature.ask => GoRouter.of(context).push(RoutePaths.askAi),
           AiFeature.quiz => GoRouter.of(context).push(RoutePaths.quiz),
@@ -53,8 +53,17 @@ class _AiFeatureTile extends StatelessWidget {
           ).push(RoutePaths.flashcards),
           AiFeature.exam => GoRouter.of(context).push(RoutePaths.examMode),
           AiFeature.explain => GoRouter.of(context).push(RoutePaths.explain),
-          AiFeature.summary || AiFeature.concepts => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const MaterialsScreen()),
+          AiFeature.summary => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  const AiSourceChooserScreen(tool: AiSourceTool.summary),
+            ),
+          ),
+          AiFeature.concepts => Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) =>
+                  const AiSourceChooserScreen(tool: AiSourceTool.concepts),
+            ),
           ),
         },
         child: Padding(

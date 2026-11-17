@@ -12,6 +12,7 @@ import '../../../core/router/route_paths.dart';
 import '../../../design/layout/bottom_inset_padding.dart';
 import '../../../design/tokens/app_spacing_tokens.dart';
 import '../../shell/application/shell_providers.dart';
+import '../../student/application/work_and_grades_providers.dart';
 import '../application/notification_providers.dart';
 import '../domain/notification_target.dart';
 
@@ -152,7 +153,10 @@ IconData _iconFor(String type) => switch (type) {
   'ATTENDANCE_ALERT' || 'ATTENDANCE_MARKED' => Icons.event_busy_outlined,
   'ANNOUNCEMENT' || 'ADMIN_ANNOUNCEMENT' => Icons.campaign_outlined,
   'ASSIGNMENT_PUBLISHED' || 'ASSIGNMENT_DUE_SOON' => Icons.assignment_outlined,
-  'ASSIGNMENT_GRADED' || 'GRADE_POSTED' => Icons.grading_outlined,
+  'ASSIGNMENT_GRADED' ||
+  'GRADE_POSTED' ||
+  'MARKS_RELEASED' => Icons.grading_outlined,
+  'MATERIAL_PUBLISHED' => Icons.menu_book_outlined,
   'FEE_INVOICE_ISSUED' ||
   'FEE_PAYMENT_RECEIVED' ||
   'FEE_PAYMENT_REMINDER' ||
@@ -256,6 +260,11 @@ class NotificationTile extends ConsumerWidget {
       return;
     }
     if (target.tabLabelKey != null) {
+      if (target.workSection case final section?) {
+        ref
+            .read(workAndGradesProvider.notifier)
+            .open(section, gradesTab: target.gradesTab);
+      }
       ref.read(selectedShellTabProvider.notifier).select(target.tabLabelKey!);
       // Back to the shell, wherever the inbox was opened from.
       if (GoRouter.of(context).canPop()) context.go(RoutePaths.home);

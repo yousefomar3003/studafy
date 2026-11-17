@@ -8,6 +8,7 @@ import { AUTH_CHANNELS, KeyStore, signAccessToken } from "../../src/modules/auth
 import { appDatabaseFor, assertLeastPrivilege } from "./database";
 
 import type { Database } from "../../src/db";
+import type { ScannerWarmup } from "../../src/lib/scanner-warmup";
 import type { StorageService } from "../../src/lib/storage";
 import type { UploadScanEnqueuer } from "../../src/lib/storage/upload-scan";
 import type { AppEnv } from "../../src/middleware/requestId";
@@ -64,6 +65,8 @@ export interface TestAppOptions {
   uploadScanEnqueuer?: UploadScanEnqueuer | null;
   /** Load the signing key from this PKCS#8 PEM, as a deployed API does (QA-023). Default: random. */
   jwtPrivateKeyPem?: string;
+  /** Called when a material upload starts (lib/scanner-warmup.ts). Defaults to none. */
+  scannerWarmup?: ScannerWarmup | null;
 }
 
 /** A test app plus the key store whose keys its tokens must be signed with. */
@@ -102,6 +105,7 @@ export function createTestApp(options: TestAppOptions): TestApp & { ready: Promi
     stripeProvider: options.stripeProvider ?? null,
     storage: options.storage ?? null,
     uploadScanEnqueuer: options.uploadScanEnqueuer ?? null,
+    scannerWarmup: options.scannerWarmup ?? null,
   });
 
   const ready = Promise.all([

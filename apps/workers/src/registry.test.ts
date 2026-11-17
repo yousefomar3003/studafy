@@ -1,4 +1,4 @@
-import { DEAD_LETTER_QUEUE_NAMES, QUEUE_NAMES } from "@studafy/constants";
+import { DEAD_LETTER_QUEUE_NAMES, JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
@@ -24,6 +24,19 @@ describe("QUEUE_REGISTRY", () => {
     for (const definition of QUEUE_REGISTRY) {
       const job = { id: "1", name: "test", data: {} } as unknown as Job;
       await expect(definition.processor(job)).resolves.toBeDefined();
+    }
+  });
+
+  test("a retired digest email job is acknowledged and does nothing", async () => {
+    // Studafy sends no notification email. A digest job still in Redis must not touch the database
+    // (none is configured here) or produce mail; it resolves with the reason it was skipped.
+    const notifications = QUEUE_REGISTRY.find((d) => d.name === QUEUE_NAMES.NOTIFICATIONS)!;
+    for (const name of [JOB_NAMES.SEND_DIGESTS, JOB_NAMES.SEND_NOTIFICATION_DIGESTS]) {
+      const job = { id: "1", name, data: {} } as unknown as Job;
+      await expect(notifications.processor(job)).resolves.toEqual({
+        processed: true,
+        skipped: "notification-email-retired",
+      });
     }
   });
 

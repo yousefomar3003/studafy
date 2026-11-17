@@ -224,7 +224,7 @@ async function ingestEvent(db: Database, event: ParsedEmailEvent, logger: Logger
  *
  * The message_id → school resolution is inherently cross-tenant. It used to be a plain SELECT on
  * this FORCE-RLS table, which returned rows only because the production login bypasses RLS (QA-014).
- * It now goes through app.resolve_email_delivery_schools (000226): a SECURITY DEFINER resolver that
+ * It now goes through app.resolve_email_delivery_schools (000234): a SECURITY DEFINER resolver that
  * sees exactly the rows carrying this message id and returns their school ids, nothing else. Each
  * update then runs under that school's tenant scope.
  */

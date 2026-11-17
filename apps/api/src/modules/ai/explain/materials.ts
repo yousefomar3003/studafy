@@ -57,11 +57,11 @@ export async function loadExplainPassage(
            c.page_number,
            c.section_title,
            m.ingest_status,
-           COALESCE(
+           (m.source_kind = 'personal' OR COALESCE(
              (SELECT cl.ai_materials_enabled FROM app.classes cl
               WHERE cl.id = m.class_id AND cl.school_id = m.school_id),
              false
-           ) AS ai_enabled
+           )) AS ai_enabled
     FROM app.material_chunks c
     JOIN app.materials m ON m.id = c.material_id AND m.school_id = c.school_id
     WHERE c.id = ${chunkId}::uuid

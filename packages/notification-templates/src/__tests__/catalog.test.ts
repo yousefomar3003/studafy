@@ -6,7 +6,7 @@ import { NOTIFICATION_CATALOG } from "../registry";
 import { AR_TEMPLATES } from "../templates/ar";
 import { EN_TEMPLATES } from "../templates/en";
 import { renderNotification } from "../templates/renderer";
-import { NOTIFICATION_CHANNELS } from "../types";
+import { DELIVERED_NOTIFICATION_CHANNELS, NOTIFICATION_CHANNELS } from "../types";
 
 import type { NotificationChannel } from "../types";
 
@@ -25,12 +25,11 @@ describe("notification catalog", () => {
     }
   });
 
-  test("every catalog entry has all three channels", () => {
+  test("every catalog entry is delivered in-app and by push, and never by email", () => {
     for (const type of ALL_TYPES) {
       const entry = NOTIFICATION_CATALOG[type];
-      for (const channel of ALL_CHANNELS) {
-        expect(entry.channels).toContain(channel);
-      }
+      expect([...entry.channels].sort()).toEqual([...DELIVERED_NOTIFICATION_CHANNELS].sort());
+      expect(entry.channels as readonly string[]).not.toContain(NOTIFICATION_CHANNELS.EMAIL);
     }
   });
 });
@@ -94,6 +93,11 @@ describe("templates — completeness", () => {
                       "assignmentTitle",
                       "result",
                       "status",
+                      "materialTitle",
+                      "placement",
+                      "subjectName",
+                      "released",
+                      "stopDate",
                     ].includes(varName),
                 ).toBe(true);
               }
@@ -216,6 +220,21 @@ describe("renderNotification — snapshot tests", () => {
       schoolName: "Amman Academy",
       invoiceNumber: "LIC-2026-000042",
     },
+    [NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING]: {
+      schoolName: "Amman Academy",
+      invoiceNumber: "LIC-2026-000042",
+      balance: "364.50 USD",
+      dueDate: "2026-11-01",
+      stopDate: "2026-12-01",
+      daysLeft: "7",
+    },
+    [NOTIFICATION_TYPES.LICENSE_AI_STOPPED]: {
+      schoolName: "Amman Academy",
+      invoiceNumber: "LIC-2026-000042",
+      balance: "364.50 USD",
+      dueDate: "2026-11-01",
+      stopDate: "2026-12-01",
+    },
     [NOTIFICATION_TYPES.ASSIGNMENT_PUBLISHED]: {
       who: "Amina Tazi · ",
       assignmentTitle: "Gravity",
@@ -233,6 +252,16 @@ describe("renderNotification — snapshot tests", () => {
       status: "absent",
       courseName: "Physics",
       date: "2026-11-12",
+    },
+    [NOTIFICATION_TYPES.MATERIAL_PUBLISHED]: {
+      materialTitle: "Newton's laws",
+      courseName: "Physics",
+      placement: " · Week 3, Monday",
+    },
+    [NOTIFICATION_TYPES.MARKS_RELEASED]: {
+      who: "Amina Tazi · ",
+      subjectName: "Mathematics",
+      released: "First exam marks are out for Mathematics",
     },
   } as const;
 

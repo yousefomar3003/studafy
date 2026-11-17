@@ -99,7 +99,7 @@
       "registers": "Registers",
       "notifications": "Notifications",
       "lessons": "Lessons",
-      "work": "Work",
+      "workAndGrades": "Work & grades",
       "news": "News"
     },
     "profile": {
@@ -276,8 +276,6 @@
       "viewAll": "View all"
     },
     "grades": {
-      "title": "New grades",
-      "empty": "No grades published yet this term.",
       "unavailable": "Grades aren't available yet.",
       "error": "Couldn't load grades."
     },
@@ -399,6 +397,19 @@
       "title": "Your latest grades are in",
       "body": "New results have just been published — here's where you stand this term.",
       "dismiss": "Dismiss"
+    },
+    "kind": {
+      "exam": "Exam",
+      "assignment": "Assignment"
+    },
+    "sections": {
+      "exams": "Exams",
+      "assignments": "Assignments",
+      "assignmentGrades": "Assignment grades"
+    },
+    "recent": {
+      "title": "Recent grades",
+      "empty": "No exam marks or assignment grades yet."
     }
   },
   "timetable": {
@@ -432,6 +443,15 @@
     "unknownClass": "Class",
     "error": "Couldn't load materials for this class.",
     "empty": "No materials yet.",
+    "weeks": {
+      "week": "Week {number}",
+      "unscheduled": "Unscheduled",
+      "thisWeek": "This week",
+      "count": {
+        "one": "1 material",
+        "other": "{} materials"
+      }
+    },
     "status": {
       "pendingScan": "Pending scan",
       "scanning": "Scanning",
@@ -1032,6 +1052,69 @@
       "unknown": "Something went wrong. Try again."
     }
   },
+  "aiSources": {
+    "tabs": {
+      "material": "Study materials",
+      "assignment": "My assignments",
+      "personal": "My files & photos"
+    },
+    "chooser": {
+      "title": "Choose a source",
+      "summaryHint": "Pick what you want summarized.",
+      "conceptsHint": "Pick what you want the key concepts of.",
+      "materialsEmpty": "No study materials are ready for the AI tools yet."
+    },
+    "scope": {
+      "label": "Search in",
+      "all": "All my study materials",
+      "allHint": "Every study material from your classes",
+      "sheetTitle": "Where should the AI look?"
+    },
+    "assignments": {
+      "empty": "You have no assignments to study from yet.",
+      "due": "Due {date}",
+      "files": "{count} files",
+      "use": "Use",
+      "aiOff": "AI off"
+    },
+    "files": {
+      "intro": "Add your own notes or a page from a book. Only you can see them.",
+      "uploadFile": "Upload file",
+      "takePhoto": "Take photo",
+      "choosePhoto": "Gallery",
+      "empty": "No files yet. Add a PDF, Word or PowerPoint file, or a photo of your notes.",
+      "usage": "{count} of {max} files · kept for {months} months",
+      "uploading": "Uploading {name}…",
+      "uploaded": "Uploaded. It will be ready in a moment.",
+      "delete": "Delete",
+      "deleteTitle": "Delete this file?",
+      "deleteBody": "Its text is removed too, along with any quiz questions or flashcards made from it.",
+      "cancel": "Cancel",
+      "deleted": "File deleted."
+    },
+    "status": {
+      "uploading": "Uploading",
+      "scanning": "Checking for viruses",
+      "processing": "Reading the text",
+      "ready": "Ready",
+      "failed": "Couldn't read it",
+      "blocked": "Blocked: unsafe file",
+      "noText": "No text found",
+      "retry": "Try again"
+    },
+    "errors": {
+      "unsupported": "Only PDF, Word, PowerPoint, JPEG or PNG files can be used.",
+      "tooLarge": "This file is too large. Use one under 25 MB.",
+      "limit": "You've reached the limit for your own files. Delete one you no longer need.",
+      "aiOff": "Your school has turned off the AI study tools for this class.",
+      "name": "Please rename this file and try again.",
+      "storageFull": "Your school's storage is full. Delete a file or ask your school.",
+      "permission": "Allow camera or photo access in Settings to add a photo.",
+      "network": "No connection. Check your network and try again.",
+      "generic": "Something went wrong. Try again.",
+      "load": "Couldn't load this list."
+    }
+  },
   "teacher": {
     "student": {
       "error": "Couldn't load this student. Pull to try again.",
@@ -1328,6 +1411,32 @@
         "added": "Assessment added.",
         "proposed": "Sent for approval. It can be marked once approved.",
         "noCategory": "This period has no category that accepts new assessments."
+      },
+      "release": {
+        "title": "Students and parents",
+        "send": "Send for approval",
+        "confirmTitle": "Send {assessment} for approval?",
+        "confirmBody": "These marks go to the reviewer on their own. Once approved, students and parents see them right away; you don't need to finish the rest of the term first. You can't change them while they wait or after approval.",
+        "confirm": "Send",
+        "sent": "Sent for approval.",
+        "releasedNow": "Released to students and parents.",
+        "incompleteError": "Some students still have no mark for this assessment. Enter a mark, or absent / excused, for everyone first.",
+        "alreadySent": "This assessment, or its whole term, has already been sent.",
+        "ready": "Every student has a mark. You can send this assessment for approval now, without waiting for the rest of the term.",
+        "incomplete": "Students still without a mark: {count}. Enter a mark (or absent / excused) for everyone to send this assessment for approval on its own.",
+        "withPeriod": "These marks go to the reviewer with the whole term.",
+        "lockedSubmitted": "Waiting for approval. These marks are read-only until the reviewer approves or returns them.",
+        "lockedApproved": "Released to students and parents. Ask an administrator to withdraw them before changing a mark.",
+        "released": "Students and parents can see these marks.",
+        "releasedOn": "Released to students and parents {date}.",
+        "returned": "Returned by the reviewer: {reason}",
+        "returnedNoReason": "Returned by the reviewer. Correct the marks and send them again.",
+        "saveFirst": "Save your changes before sending.",
+        "status": {
+          "submitted": "Awaiting approval",
+          "released": "Released",
+          "returned": "Returned"
+        }
       }
     },
     "home": {
@@ -1399,7 +1508,17 @@
         "upload": "Upload material",
         "edit": "Edit material",
         "empty": "No materials yet.",
-        "loadError": "Could not load materials."
+        "emptyHint": "Upload notes, worksheets or slides for this class. Students see each one once it's ready.",
+        "loadError": "Could not load materials.",
+        "retry": "Retry",
+        "retried": "Checking the file again.",
+        "retryError": "Couldn't retry this material. Try again.",
+        "retryFileMissing": "This file is no longer stored. Delete it and upload it again.",
+        "delete": "Delete",
+        "deleteTitle": "Delete this material?",
+        "deleteBody": "\"{title}\" will be removed for everyone in this class, and its storage freed.",
+        "deleteError": "Couldn't delete this material. Try again.",
+        "cancel": "Cancel"
       },
       "aiMaterials": {
         "title": "Use this class's materials with the AI study assistant",
@@ -1419,6 +1538,10 @@
         "details": "Instructions (optional)",
         "points": "Points",
         "pointsInvalid": "Enter valid points.",
+        "pointsHint": "Out of how many points?",
+        "pointsRequired": "Enter how many points this assignment is out of.",
+        "pointsTooHigh": "Points can't be more than 10,000.",
+        "pointsDecimals": "Use at most two decimal places.",
         "dueDate": "Due date",
         "lateAllowed": "Allow late submissions",
         "status": "Status",
@@ -1437,6 +1560,10 @@
         "cameraDenied": "Camera access is off. Turn it on in Settings > Studafy > Camera to take a photo.",
         "cameraError": "Could not open the camera.",
         "fileRequired": "Choose a file or take a photo.",
+        "week": "Week",
+        "weekRequired": "Choose the week this material is for.",
+        "day": "Day",
+        "dayRequired": "Choose the day this material is for.",
         "uploading": "Uploading…",
         "save": "Save changes"
       },
@@ -1506,6 +1633,7 @@
         "labelHint": "e.g. Midterm, Homework 3",
         "labelRequired": "Give the assessment a name.",
         "maxScoreField": "Max score",
+        "maxScoreHint": "Out of how many points?",
         "weightField": "Weight",
         "positiveNumber": "Enter a number above 0.",
         "submit": "Add assessment",
@@ -1810,7 +1938,8 @@
         "gpa": "GPA",
         "credits": "Credits",
         "trend": "Average trend",
-        "empty": "No grades published this term yet."
+        "empty": "No grades published this term yet.",
+        "examsHint": "Every mark the school has approved, by term and subject."
       },
       "attendance": {
         "title": "Attendance this term",
@@ -2197,8 +2326,7 @@
       "saveFailed": "Couldn't save that change. Try again.",
       "mandatory": "Required by your school",
       "channels": {
-        "push": "Phone",
-        "email": "Email"
+        "push": "Phone"
       },
       "phone": {
         "title": "Notifications on this phone",
@@ -2211,14 +2339,21 @@
         "openSettings": "Open Settings to turn them on",
         "sendTest": "Send a test notification",
         "testSent": "Sent. It should arrive on this phone in a few seconds.",
-        "testFailed": "Couldn't send the test. Wait a moment and try again."
+        "testFailed": "Couldn't send the test. Wait a moment and try again.",
+        "notRegistered": "This phone couldn't sign up for notifications, so nothing can reach it. Reason: {reason}",
+        "problem": "Reason: {reason}",
+        "retrySetup": "Try again"
       },
       "kinds": {
         "title": "What to notify me about",
-        "intro": "Everything always appears under the bell. These switches decide what also reaches your phone or your email.",
+        "intro": "Everything always appears under the bell. These switches decide what also reaches your phone.",
         "assignments": {
           "title": "Homework",
           "subtitle": "New homework and due-date reminders"
+        },
+        "lessons": {
+          "title": "Lessons",
+          "subtitle": "New materials your teachers share"
         },
         "grades": {
           "title": "Marks",
@@ -2327,12 +2462,10 @@
     }
   },
   "releasedMarks": {
-    "title": "Term marks",
-    "entry": "Term marks",
-    "entrySubtitle": "Midterm, final exam and other marks your school has approved",
+    "title": "Exam marks",
     "error": "Couldn't load marks.",
     "unavailable": "Marks aren't available for this account.",
-    "empty": "No approved marks yet. A term's marks appear here once the school approves them.",
+    "empty": "Exam marks appear here once your school approves them.",
     "retry": "Try again",
     "annual": "Full year",
     "approvedOn": "Approved {date}",
@@ -2341,7 +2474,14 @@
       "absent": "Absent",
       "excused": "Excused",
       "notApplicable": "N/A"
-    }
+    },
+    "partial": "More marks for this term are still to come. The term result is not final yet.",
+    "emptyTitle": "No exam marks yet",
+    "releasedOn": "Released {date}",
+    "latest": "Latest mark",
+    "subjectInPeriod": "{subject} · {period}",
+    "moreToCome": "More to come",
+    "seeAll": "See all exam marks"
   },
   "academicResults": {
     "skillLine": "{skill}: {descriptor}",

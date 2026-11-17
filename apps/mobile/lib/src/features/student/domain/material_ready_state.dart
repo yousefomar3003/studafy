@@ -22,9 +22,9 @@ enum MaterialReadyState {
   /// will mint a download URL for.
   ready,
 
-  /// Scanned clean, but AI ingestion failed. The gateway still requires `ready` to serve a
-  /// download, so a failed material stays unopenable until ingestion is retried (re-toggling AI
-  /// visibility server-side) and completes.
+  /// The scan or AI ingestion gave up on it. The gateway still requires `ready` to serve a
+  /// download, so a failed material stays unopenable until the teacher retries it (or deletes it
+  /// and uploads it again) and the pipeline completes.
   failed,
 
   /// The malware scan found a threat. Never openable.
@@ -37,7 +37,9 @@ enum MaterialReadyState {
 /// `material.ingestStatus.name` — every value here (`uploaded`, `scanning`, ...) is a single
 /// word, so the generated enum's Dart member name and its wire value are identical, with no
 /// snake_case-to-camelCase remapping to get wrong.
-MaterialReadyState materialReadyStateFromWireName(String ingestStatus) => switch (ingestStatus) {
+MaterialReadyState materialReadyStateFromWireName(
+  String ingestStatus,
+) => switch (ingestStatus) {
   'uploaded' => MaterialReadyState.pendingScan,
   'scanning' => MaterialReadyState.scanning,
   'queued' => MaterialReadyState.queued,
@@ -55,13 +57,18 @@ extension MaterialReadyStateX on MaterialReadyState {
   /// state — true only for [MaterialReadyState.ready].
   bool get isOpenable => this == MaterialReadyState.ready;
 
-  /// Whether the pipeline is done with this material — [MaterialReadyState.ready],
-  /// [MaterialReadyState.failed] or [MaterialReadyState.quarantined] — so re-reading it will not
-  /// show a different state without someone acting on it. Screens poll only while some material
-  /// is not settled.
+  /// Whether re-reading this material will not show a different state without someone acting on
+  /// it, so screens need not poll for it: [MaterialReadyState.ready],
+  /// [MaterialReadyState.failed] and [MaterialReadyState.quarantined], where the pipeline is
+  /// done, and [MaterialReadyState.pendingScan], which only the uploader's confirm moves on (the
+  /// upload screen confirms before it closes, so a material left there is an abandoned attempt,
+  /// replaced by the next upload of the file or removed by the server after a day). Screens poll
+  /// only while some material is not settled.
   bool get isSettled => switch (this) {
-    MaterialReadyState.ready || MaterialReadyState.failed || MaterialReadyState.quarantined => true,
-    MaterialReadyState.pendingScan ||
+    MaterialReadyState.ready ||
+    MaterialReadyState.failed ||
+    MaterialReadyState.quarantined ||
+    MaterialReadyState.pendingScan => true,
     MaterialReadyState.scanning ||
     MaterialReadyState.queued ||
     MaterialReadyState.processing => false,

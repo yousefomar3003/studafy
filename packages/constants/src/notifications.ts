@@ -76,6 +76,12 @@ export const NOTIFICATION_TYPES = {
   LICENSE_INVOICE_DUE: "LICENSE_INVOICE_DUE",
   LICENSE_INVOICE_OVERDUE: "LICENSE_INVOICE_OVERDUE",
   LICENSE_RECEIPT_UPLOADED: "LICENSE_RECEIPT_UPLOADED",
+  // A licence paid in instalments stops covering its AI seats once an instalment is unpaid
+  // LICENSE_NONPAYMENT_GRACE_DAYS after its due date (000233): a warning 7 days before that cutoff,
+  // and a notice when the AI stops. Same recipients and delivery as the reminders above (in-app and
+  // push, never emailed). Mirrored in app.notification_type by migration 000233.
+  LICENSE_AI_STOP_WARNING: "LICENSE_AI_STOP_WARNING",
+  LICENSE_AI_STOPPED: "LICENSE_AI_STOPPED",
   // Everyday school events, written by the workers' outbox notify consumer
   // (apps/workers/src/queues/notifications/school-events.ts): an assignment published (to the class's
   // students and their parents), a hand-in's mark released (to that student and their parents), and a
@@ -84,6 +90,17 @@ export const NOTIFICATION_TYPES = {
   ASSIGNMENT_PUBLISHED: "ASSIGNMENT_PUBLISHED",
   ASSIGNMENT_GRADED: "ASSIGNMENT_GRADED",
   ATTENDANCE_MARKED: "ATTENDANCE_MARKED",
+  // A class material became visible to its students: written by the same outbox notify consumer
+  // from material.published, which app.materials' trg_materials_published raises the first time a
+  // material turns `ready` (000228). To the class's active students only -- parents have no
+  // materials screen to open. Optional, immediate-only and never emailed. Mirrored in
+  // app.notification_type by migration 000228.
+  MATERIAL_PUBLISHED: "MATERIAL_PUBLISHED",
+  // Academic marks were released to the family: written by the same outbox notify consumer from
+  // marks.released (a whole period's mark sheet, or one assessment, approved by leadership). To the
+  // student and their linked parents. Optional, immediate-only and never emailed. Mirrored in
+  // app.notification_type by migration 000230.
+  MARKS_RELEASED: "MARKS_RELEASED",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];
@@ -108,33 +125,4 @@ export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICA
  */
 export const MANDATORY_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
   NOTIFICATION_TYPES.ADMIN_ANNOUNCEMENT,
-]);
-
-/**
- * Notification types a user may route to email as a batched digest instead of an immediate send.
- *
- * A property of the type, not the channel or the user: whether a delay is tolerable is a fact about
- * what the notification means, the same reasoning URGENT_NOTIFICATION_TYPES applies to quiet hours.
- * Deadline- and status-critical types are excluded on purpose — ASSIGNMENT_DUE_SOON is a deadline
- * reminder a digest could deliver after the deadline, GRADE_POSTED/ENROLLMENT_APPROVED/
- * CERTIFICATE_ISSUED/SUPPORT_MESSAGE are individually significant results a recipient is actively
- * waiting on, and ADMIN_ANNOUNCEMENT is mandatory and therefore always immediate. ATTENDANCE_ALERT is
- * included because a parent digest already exists for it (apps/workers/.../email/digest-producer.ts);
- * the other three are lower-stakes social/catalog updates. ANNOUNCEMENT is excluded too, on purpose:
- * even a non-mandatory school notice loses the point of being timely if it can sit in a batch until
- * the next digest window, so it stays immediate-only like its mandatory sibling — a recipient's only
- * lever is the enabled/disabled toggle, not delay.
- *
- * Mirrored in ck_notification_preferences_digest_eligible (migration 000083) for the same
- * lockstep reason MANDATORY_NOTIFICATION_TYPES is.
- *
- * This only records which types *may* be marked for digest delivery, and the notification
- * preferences API persists that choice. Whether the wider dispatch pipeline honors it for anything
- * beyond the two events digest-producer.ts already aggregates is a separate, later piece of work.
- */
-export const DIGEST_ELIGIBLE_NOTIFICATION_TYPES: ReadonlySet<NotificationType> = new Set([
-  NOTIFICATION_TYPES.DISCUSSION_REPLY,
-  NOTIFICATION_TYPES.STUDY_GROUP_INVITE,
-  NOTIFICATION_TYPES.COURSE_PUBLISHED,
-  NOTIFICATION_TYPES.ATTENDANCE_ALERT,
 ]);

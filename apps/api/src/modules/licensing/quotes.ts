@@ -1,5 +1,11 @@
 import { ERROR_CODES } from "@studafy/constants";
-import { buildSchedule, customScheduleErrors } from "@studafy/license-pricing";
+import {
+  buildSchedule,
+  customScheduleErrors,
+  scheduleMonths,
+  termsChanges,
+  yearTotals,
+} from "@studafy/license-pricing";
 
 import { auditLicenseChange, licenseError } from "./context";
 import { activateLicenseFor, integerSetting, issueInvoice, utcDate } from "./invoices";
@@ -19,9 +25,12 @@ import type { PricedQuote, QuoteAudienceInput, QuoteKind, QuoteTerms } from "./p
 import type { Audience, Changed } from "./service";
 import type {
   CustomInstalmentInput,
+  LicenceYearTotal,
   PaymentPlan,
   PricingResult,
+  ProposedInstalment,
   ScheduledInstalment,
+  TermsChange,
 } from "@studafy/license-pricing";
 import type { JSONValue, TransactionSql } from "postgres";
 
@@ -77,6 +86,14 @@ export interface QuoteView {
    * invoice once it is).
    */
   schedulePreview: ScheduledInstalment[];
+  /** What the school pays in each licence year, from the schedule preview. */
+  yearTotals: LicenceYearTotal[];
+  /** The school's request this quote answers (000233), and what it asked for. */
+  changeRequestId: string | null;
+  requestedTerms: RequestedTermsView | null;
+  /** Where the quote departs from the school's choice; each needs `termsChangeReason`. */
+  termsChanges: TermsChange[];
+  termsChangeReason: string | null;
   createdBy: string;
   sentAt: string | null;
   acceptedAt: string | null;
@@ -89,6 +106,14 @@ export interface QuoteView {
   declineReason: string | null;
   invoiceId: string | null;
   createdAt: string;
+}
+
+/** The length, start and payment plan the school chose on its request. */
+export interface RequestedTermsView {
+  months: number | null;
+  startsOn: string | null;
+  paymentPlan: PaymentPlan | null;
+  paymentProposal: ProposedInstalment[] | null;
 }
 
 interface QuoteRow {
@@ -133,6 +158,12 @@ interface QuoteRow {
   decline_reason: string | null;
   invoice_id: string | null;
   created_at: Date;
+  change_request_id: string | null;
+  terms_change_reason: string | null;
+  request_months: number | null;
+  request_starts_on: string | null;
+  request_payment_plan: PaymentPlan | null;
+  request_payment_proposal: ProposedInstalment[] | null;
 }
 
 const QUOTE_COLUMNS = (tx: TransactionSql) => tx`
@@ -150,8 +181,47 @@ const QUOTE_COLUMNS = (tx: TransactionSql) => tx`
   q.declined_at, q.declined_by::text AS declined_by, q.decline_reason,
   (SELECT i.id::text FROM app.license_invoices AS i
    WHERE i.school_id = q.school_id AND i.quote_id = q.id) AS invoice_id,
-  q.created_at
+  q.created_at, q.change_request_id::text AS change_request_id, q.terms_change_reason,
+  r.months AS request_months, r.starts_on::text AS request_starts_on,
+  r.payment_plan AS request_payment_plan, r.payment_proposal AS request_payment_proposal
 `;
+
+/** The quote's request, for what the school asked for. */
+const REQUEST_JOIN = (tx: TransactionSql) => tx`
+  LEFT JOIN app.license_change_requests AS r
+    ON r.id = q.change_request_id AND r.school_id = q.school_id
+`;
+
+/** Where `offered` departs from the school's request; none without a request. */
+export function changesFromRequest(
+  requested: RequestedTermsView | null,
+  offered: {
+    kind: QuoteKind;
+    months: number;
+    startsAt: string;
+    paymentPlan: PaymentPlan;
+    paymentSchedule: readonly CustomInstalmentInput[] | null;
+    totalMinor: number;
+  },
+): TermsChange[] {
+  if (!requested) return [];
+  return termsChanges(
+    {
+      months: requested.months,
+      startDate: requested.startsOn,
+      paymentPlan: requested.paymentPlan,
+      proposal: requested.paymentProposal,
+    },
+    {
+      // A seat increase runs to the licence's end: its length is not the school's to choose.
+      months: offered.kind === "seat_increase" ? null : offered.months,
+      startDate: offered.kind === "new" ? offered.startsAt : null,
+      paymentPlan: offered.paymentPlan,
+      custom: offered.paymentSchedule,
+      totalMinor: offered.totalMinor,
+    },
+  );
+}
 
 /** What a quote preview needs from the settings: when an invoice paid at once falls due. */
 interface PreviewContext {
@@ -168,6 +238,8 @@ export function scheduleFor(
   terms: {
     totalMinor: number;
     months: number;
+    /** Set for a seat increase: the schedule spreads over the months left, not the whole term. */
+    prorateDays?: number | null;
     startsAt: string;
     paymentPlan: PaymentPlan;
     paymentSchedule: readonly CustomInstalmentInput[] | null;
@@ -185,7 +257,7 @@ export function scheduleFor(
   return buildSchedule({
     plan,
     totalMinor: terms.totalMinor,
-    months: terms.months,
+    months: scheduleMonths(terms.months, terms.prorateDays ?? null),
     startDate: terms.startsAt.slice(0, 10),
     issueDate,
     inFullDueDate: utcDate(new Date(Date.parse(issueDate) + dueDays * DAY_MS)),
@@ -196,6 +268,26 @@ export function scheduleFor(
 function toView(row: QuoteRow, preview: PreviewContext): QuoteView {
   const iso = (d: Date | null) => d?.toISOString() ?? null;
   const issueDate = row.accepted_at ? utcDate(row.accepted_at) : preview.today;
+  const schedulePreview = scheduleFor(
+    {
+      totalMinor: Number(row.total_minor),
+      months: row.months,
+      prorateDays: row.prorate_days,
+      startsAt: row.starts_at.toISOString(),
+      paymentPlan: row.payment_plan,
+      paymentSchedule: row.payment_schedule,
+    },
+    issueDate,
+    preview.dueDays,
+  );
+  const requestedTerms: RequestedTermsView | null = row.change_request_id
+    ? {
+        months: row.request_months,
+        startsOn: row.request_starts_on,
+        paymentPlan: row.request_payment_plan,
+        paymentProposal: row.request_payment_proposal,
+      }
+    : null;
   return {
     id: row.id,
     schoolId: row.school_id,
@@ -226,17 +318,23 @@ function toView(row: QuoteRow, preview: PreviewContext): QuoteView {
     notes: row.notes,
     paymentPlan: row.payment_plan,
     paymentSchedule: row.payment_schedule,
-    schedulePreview: scheduleFor(
-      {
-        totalMinor: Number(row.total_minor),
-        months: row.months,
-        startsAt: row.starts_at.toISOString(),
-        paymentPlan: row.payment_plan,
-        paymentSchedule: row.payment_schedule,
-      },
-      issueDate,
-      preview.dueDays,
+    schedulePreview,
+    yearTotals: yearTotals(
+      schedulePreview,
+      row.starts_at.toISOString(),
+      scheduleMonths(row.months, row.prorate_days),
     ),
+    changeRequestId: row.change_request_id,
+    requestedTerms,
+    termsChanges: changesFromRequest(requestedTerms, {
+      kind: row.kind,
+      months: row.months,
+      startsAt: row.starts_at.toISOString(),
+      paymentPlan: row.payment_plan,
+      paymentSchedule: row.payment_schedule,
+      totalMinor: Number(row.total_minor),
+    }),
+    termsChangeReason: row.terms_change_reason,
     createdBy: row.created_by,
     sentAt: iso(row.sent_at),
     acceptedAt: iso(row.accepted_at),
@@ -260,6 +358,7 @@ export async function readQuote(
     SELECT ${QUOTE_COLUMNS(tx)}
     FROM app.license_quotes AS q
     JOIN app.currencies AS c ON c.id = q.currency_id
+    ${REQUEST_JOIN(tx)}
     WHERE q.school_id = current_setting('app.school_id')::uuid AND q.id = ${quoteId}::uuid
     ${options.forUpdate ? tx`FOR UPDATE OF q` : tx``}
   `;
@@ -292,6 +391,7 @@ export async function listQuotes(
     SELECT ${QUOTE_COLUMNS(tx)}
     FROM app.license_quotes AS q
     JOIN app.currencies AS c ON c.id = q.currency_id
+    ${REQUEST_JOIN(tx)}
     WHERE q.school_id = current_setting('app.school_id')::uuid
       AND q.status = ANY(${statuses as QuoteStatus[]}::text[])
     ORDER BY q.created_at DESC, q.id
@@ -319,6 +419,8 @@ function quoteSnapshot(quote: QuoteView): Record<string, unknown> {
     notes: quote.notes,
     payment_plan: quote.paymentPlan,
     payment_schedule: quote.paymentSchedule,
+    change_request_id: quote.changeRequestId,
+    terms_change_reason: quote.termsChangeReason,
   };
 }
 
@@ -327,6 +429,64 @@ export interface QuotePaymentTerms {
   paymentPlan?: PaymentPlan;
   /** Required for, and only for, a custom plan. */
   paymentSchedule?: CustomInstalmentInput[] | null;
+  /**
+   * Why the quote's length, start or plan differs from the school's request (000233). Required when
+   * it does (LICENSE_TERMS_CHANGE_REASON_REQUIRED); dropped when it does not. Unchanged when omitted
+   * on replace.
+   */
+  termsChangeReason?: string | null;
+}
+
+/** What the school asked for on an open request of the armed school; null when there is none. */
+export async function requestedTermsOf(
+  tx: TransactionSql,
+  requestId: string,
+): Promise<RequestedTermsView | null> {
+  const [row] = await tx<
+    {
+      months: number | null;
+      starts_on: string | null;
+      payment_plan: PaymentPlan | null;
+      payment_proposal: ProposedInstalment[] | null;
+    }[]
+  >`
+    SELECT months, starts_on::text AS starts_on, payment_plan, payment_proposal
+    FROM app.license_change_requests
+    WHERE school_id = current_setting('app.school_id')::uuid AND id = ${requestId}::uuid
+      AND status = 'open'
+  `;
+  if (!row) return null;
+  return {
+    months: row.months,
+    startsOn: row.starts_on,
+    paymentPlan: row.payment_plan,
+    paymentProposal: row.payment_proposal,
+  };
+}
+
+/** The open request a new quote answers: 404 when it is not one. */
+async function openRequestTerms(
+  tx: TransactionSql,
+  requestId: string,
+  actor: LicenseActor,
+): Promise<RequestedTermsView> {
+  const terms = await requestedTermsOf(tx, requestId);
+  if (!terms) throw licenseError(404, ERROR_CODES.LICENSE_NOT_FOUND, actor.locale);
+  return terms;
+}
+
+/** The reason to store: required when the offer departs from the request, else none. */
+function termsReason(
+  changes: readonly TermsChange[],
+  reason: string | null | undefined,
+  actor: LicenseActor,
+): string | null {
+  if (changes.length === 0) return null;
+  const trimmed = reason?.trim() || null;
+  if (!trimmed) {
+    throw licenseError(422, ERROR_CODES.LICENSE_TERMS_CHANGE_REASON_REQUIRED, actor.locale);
+  }
+  return trimmed.slice(0, 1000);
 }
 
 /**
@@ -397,18 +557,41 @@ function pricedColumns(priced: PricedQuote) {
 export async function createQuote(
   tx: TransactionSql,
   schoolId: string,
-  terms: QuoteTerms & QuotePaymentTerms & { notes?: string | null },
+  terms: QuoteTerms &
+    QuotePaymentTerms & { notes?: string | null; changeRequestId?: string | null },
   actor: LicenseActor,
   now: Date = new Date(),
 ): Promise<QuoteView> {
+  const requested = terms.changeRequestId
+    ? await openRequestTerms(tx, terms.changeRequestId, actor)
+    : null;
   const priced = await priceQuote(tx, terms, actor, { now });
   const columns = pricedColumns(priced);
   const payment = resolvePaymentPlan(
     terms,
-    { plan: "in_full", schedule: null },
+    // Answering a request, the school's plan is the default.
+    {
+      plan:
+        requested?.paymentPlan && requested.paymentPlan !== "custom"
+          ? requested.paymentPlan
+          : "in_full",
+      schedule: null,
+    },
     priced.pricing.totalMinor,
     actor,
     now,
+  );
+  const reason = termsReason(
+    changesFromRequest(requested, {
+      kind: priced.kind,
+      months: priced.months,
+      startsAt: priced.startsAt.toISOString(),
+      paymentPlan: payment.plan,
+      paymentSchedule: payment.schedule,
+      totalMinor: priced.pricing.totalMinor,
+    }),
+    terms.termsChangeReason,
+    actor,
   );
   const [row] = await tx<{ id: string }[]>`
     INSERT INTO app.license_quotes (
@@ -416,7 +599,7 @@ export async function createQuote(
       student_plan_id, student_seats, teacher_plan_id, teacher_seats, include_family_plus,
       parent_plan_id, parent_seats, adjustment_minor, adjustment_reason, list_total_minor,
       discount_total_minor, credit_total_minor, total_minor, breakdown, valid_until, notes,
-      payment_plan, payment_schedule, created_by
+      payment_plan, payment_schedule, created_by, change_request_id, terms_change_reason
     ) VALUES (
       ${schoolId}::uuid, ${priced.kind}, ${priced.licenseId}::uuid, ${columns.currency_id}::uuid,
       ${columns.starts_at}, ${columns.ends_at}, ${columns.months}, ${columns.prorate_days},
@@ -428,7 +611,7 @@ export async function createQuote(
       ${tx.json(priced.pricing as unknown as JSONValue)}, ${await validUntil(tx, now)},
       ${terms.notes?.trim() || null}, ${payment.plan},
       ${payment.schedule ? tx.json(payment.schedule as unknown as JSONValue) : null},
-      ${actor.userId}::uuid
+      ${actor.userId}::uuid, ${terms.changeRequestId ?? null}::uuid, ${reason}
     )
     RETURNING id::text AS id
   `;
@@ -469,6 +652,18 @@ export async function replaceQuote(
     actor,
     now,
   );
+  const reason = termsReason(
+    changesFromRequest(before.requestedTerms, {
+      kind: priced.kind,
+      months: priced.months,
+      startsAt: priced.startsAt.toISOString(),
+      paymentPlan: payment.plan,
+      paymentSchedule: payment.schedule,
+      totalMinor: priced.pricing.totalMinor,
+    }),
+    terms.termsChangeReason !== undefined ? terms.termsChangeReason : before.termsChangeReason,
+    actor,
+  );
   await tx`
     UPDATE app.license_quotes SET
       currency_id = ${c.currency_id}::uuid, starts_at = ${c.starts_at}, ends_at = ${c.ends_at},
@@ -485,6 +680,7 @@ export async function replaceQuote(
       notes = ${terms.notes !== undefined ? terms.notes?.trim() || null : before.notes},
       payment_plan = ${payment.plan},
       payment_schedule = ${payment.schedule ? tx.json(payment.schedule as unknown as JSONValue) : null},
+      terms_change_reason = ${reason},
       updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
     WHERE school_id = current_setting('app.school_id')::uuid AND id = ${quoteId}::uuid
   `;
@@ -724,7 +920,7 @@ export async function acceptQuote(
       planIds: Object.fromEntries(AUDIENCES.map((a) => [a, audience(a).planId])),
       schedule: {
         plan: quote.paymentPlan,
-        months: quote.months,
+        months: scheduleMonths(quote.months, quote.prorateDays),
         startDate: quote.startsAt.slice(0, 10),
         custom: quote.paymentSchedule,
       },
@@ -755,6 +951,26 @@ export async function acceptQuote(
     oldValues: { status: quote.status, license_id: quote.licenseId },
     newValues: { status: "accepted", license_id: licenseId, invoice_id: invoice.id },
   });
+  // The request this quote answered is done.
+  if (quote.changeRequestId) {
+    const resolved = await tx<{ id: string }[]>`
+      UPDATE app.license_change_requests
+      SET status = 'resolved', resolved_at = CURRENT_TIMESTAMP, resolved_by = ${actor.userId}::uuid,
+          updated_at = GREATEST(CURRENT_TIMESTAMP, updated_at)
+      WHERE school_id = current_setting('app.school_id')::uuid
+        AND id = ${quote.changeRequestId}::uuid AND status = 'open'
+      RETURNING id::text AS id
+    `;
+    if (resolved.length > 0) {
+      await auditLicenseChange(tx, schoolId, actor, {
+        action: "update",
+        targetTable: "license_change_requests",
+        targetId: quote.changeRequestId,
+        oldValues: { status: "open" },
+        newValues: { status: "resolved", quote_id: quoteId },
+      });
+    }
+  }
 
   return {
     result: { quote: (await readQuote(tx, quoteId))!, invoice },

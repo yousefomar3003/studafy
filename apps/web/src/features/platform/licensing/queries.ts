@@ -149,8 +149,9 @@ export function useLicensesQuery(filters: LicenseListFilters) {
   });
 }
 
-export function useChangeRequestsQuery(status: ChangeRequest["status"] | "") {
+export function useChangeRequestsQuery(status: ChangeRequest["status"] | "", enabled = true) {
   return useQuery({
+    enabled,
     queryKey: [...LICENSING_KEY, "change-requests", status] as const,
     queryFn: async () => {
       const { data } = await api.GET("/api/platform/licenses/change-requests", {

@@ -64,6 +64,13 @@ const NOTIFICATION_TYPES = [
   "ASSIGNMENT_PUBLISHED",
   "ASSIGNMENT_GRADED",
   "ATTENDANCE_MARKED",
+  // A class material became visible to its students. Appended by 000228; sorts last.
+  "MATERIAL_PUBLISHED",
+  // Academic marks released to the family. Appended by 000230; sorts last.
+  "MARKS_RELEASED",
+  // Licence AI cutoff for unpaid instalments. Appended by 000233, in that order; sort last.
+  "LICENSE_AI_STOP_WARNING",
+  "LICENSE_AI_STOPPED",
 ] as const;
 const NOTIFICATION_CHANNELS = ["in_app", "email", "push"] as const;
 const DEFAULT_PREFERENCES = NOTIFICATION_TYPES.length * NOTIFICATION_CHANNELS.length;

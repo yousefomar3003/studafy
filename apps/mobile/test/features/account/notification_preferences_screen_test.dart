@@ -31,31 +31,18 @@ NotificationPreference _cell(
 
 NotificationPreferences _matrix({bool gradesPush = true}) {
   const push = NotificationPreferenceChannel.push;
-  const email = NotificationPreferenceChannel.email;
   const inApp = NotificationPreferenceChannel.inApp;
   return NotificationPreferences(
     attendanceAlertThreshold: 3,
     preferences: [
-      _cell(
-        NotificationPreferenceNotificationType.gradePosted,
-        push,
-        enabled: gradesPush,
-      ),
-      _cell(
-        NotificationPreferenceNotificationType.assignmentGraded,
-        push,
-        enabled: gradesPush,
-      ),
-      _cell(NotificationPreferenceNotificationType.gradePosted, email),
+      _cell(NotificationPreferenceNotificationType.gradePosted, push, enabled: gradesPush),
+      _cell(NotificationPreferenceNotificationType.assignmentGraded, push, enabled: gradesPush),
       _cell(NotificationPreferenceNotificationType.gradePosted, inApp),
-      _cell(
-        NotificationPreferenceNotificationType.adminAnnouncement,
-        push,
-        mandatory: true,
-      ),
+      _cell(NotificationPreferenceNotificationType.adminAnnouncement, push, mandatory: true),
       _cell(NotificationPreferenceNotificationType.feeInvoiceIssued, push),
       _cell(NotificationPreferenceNotificationType.materialIngested, push),
       _cell(NotificationPreferenceNotificationType.attendanceAlert, push),
+      _cell(NotificationPreferenceNotificationType.materialPublished, push),
     ],
   );
 }
@@ -68,37 +55,24 @@ Widget _app({
   List<(String?, String?)>? quietSaves,
   void Function()? onTest,
 }) {
-  final pushService = push ?? FakePushService();
+  final pushService = (push ?? FakePushService())..permission = permission;
   return ProviderScope(
     overrides: [
       sessionRolesProvider.overrideWithValue(roles),
       pushServiceProvider.overrideWithValue(pushService),
-      pushPermissionProvider.overrideWith((ref) async => permission),
-      accountNotificationPreferencesProvider.overrideWith(
-        (ref) async => _matrix(),
-      ),
+      accountNotificationPreferencesProvider.overrideWith((ref) async => _matrix()),
       updateNotificationPreferencesProvider.overrideWithValue((changes) async {
         saved?.add(changes);
         return _matrix(gradesPush: false);
       }),
       notificationQuietHoursProvider.overrideWith(
-        (ref) async => const NotificationQuietHours(
-          start: null,
-          end: null,
-          timezone: 'Asia/Amman',
-        ),
+        (ref) async => const NotificationQuietHours(start: null, end: null, timezone: 'Asia/Amman'),
       ),
       updateQuietHoursProvider.overrideWithValue((start, end) async {
         quietSaves?.add((start, end));
-        return NotificationQuietHours(
-          start: start,
-          end: end,
-          timezone: 'Asia/Amman',
-        );
+        return NotificationQuietHours(start: start, end: end, timezone: 'Asia/Amman');
       }),
-      sendTestNotificationProvider.overrideWithValue(
-        () async => onTest?.call(),
-      ),
+      sendTestNotificationProvider.overrideWithValue(() async => onTest?.call()),
     ],
     child: accountScreenApp(const NotificationPreferencesScreen()),
   );
@@ -110,44 +84,20 @@ Switch _switch(WidgetTester tester, String key) =>
 void main() {
   test('groups server notification types into the kinds people recognise', () {
     expect(notificationCategoryOf('GRADE_POSTED'), NotificationCategory.grades);
-    expect(
-      notificationCategoryOf('ASSIGNMENT_GRADED'),
-      NotificationCategory.grades,
-    );
-    expect(
-      notificationCategoryOf('ASSIGNMENT_PUBLISHED'),
-      NotificationCategory.assignments,
-    );
-    expect(
-      notificationCategoryOf('DIRECT_MESSAGE'),
-      NotificationCategory.messages,
-    );
-    expect(
-      notificationCategoryOf('ATTENDANCE_MARKED'),
-      NotificationCategory.attendance,
-    );
-    expect(
-      notificationCategoryOf('FEE_PAYMENT_REMINDER'),
-      NotificationCategory.fees,
-    );
-    expect(
-      notificationCategoryOf('LICENSE_INVOICE_DUE'),
-      NotificationCategory.fees,
-    );
-    expect(
-      notificationCategoryOf('ENROLLMENT_APPROVED'),
-      NotificationCategory.schoolUpdates,
-    );
+    expect(notificationCategoryOf('ASSIGNMENT_GRADED'), NotificationCategory.grades);
+    expect(notificationCategoryOf('ASSIGNMENT_PUBLISHED'), NotificationCategory.assignments);
+    expect(notificationCategoryOf('DIRECT_MESSAGE'), NotificationCategory.messages);
+    expect(notificationCategoryOf('ATTENDANCE_MARKED'), NotificationCategory.attendance);
+    expect(notificationCategoryOf('FEE_PAYMENT_REMINDER'), NotificationCategory.fees);
+    expect(notificationCategoryOf('LICENSE_INVOICE_DUE'), NotificationCategory.fees);
+    expect(notificationCategoryOf('ENROLLMENT_APPROVED'), NotificationCategory.schoolUpdates);
+    expect(notificationCategoryOf('MATERIAL_PUBLISHED'), NotificationCategory.lessons);
+    expect(notificationCategoryOf('MARKS_RELEASED'), NotificationCategory.grades);
   });
 
-  testWidgets('one switch turns off every type in the kind, in a single save', (
-    tester,
-  ) async {
+  testWidgets('one switch turns off every type in the kind, in a single save', (tester) async {
     final saved = <List<PreferenceChange>>[];
-    await pumpAccountScreen(
-      tester,
-      _app(roles: const ['STUDENT'], saved: saved),
-    );
+    await pumpAccountScreen(tester, _app(roles: const ['STUDENT'], saved: saved));
 
     expect(find.text('Marks'), findsOneWidget);
     expect(_switch(tester, 'grades/push').value, isTrue);
@@ -165,6 +115,21 @@ void main() {
     expect(_switch(tester, 'grades/push').value, isFalse);
   });
 
+  testWidgets('offers no email choice: notifications are never emailed', (tester) async {
+    await pumpAccountScreen(tester, _app(roles: const ['PARENT']));
+
+    expect(find.text('Phone'), findsOneWidget);
+    expect(find.text('Email'), findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.endsWith('/email'),
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('a kind the school requires is locked on', (tester) async {
     await pumpAccountScreen(tester, _app(roles: const ['PARENT']));
 
@@ -176,17 +141,18 @@ void main() {
     await pumpAccountScreen(tester, _app(roles: const ['STUDENT']));
     expect(find.text('Fees and billing'), findsNothing);
     expect(find.text('Attendance'), findsOneWidget);
+    // New materials are a student's notice, never hidden as a teacher-only MATERIAL_ type.
+    expect(find.text('Lessons'), findsOneWidget);
+    expect(_switch(tester, 'lessons/push').value, isTrue);
 
     await pumpAccountScreen(tester, _app(roles: const ['PARENT']));
     expect(find.text('Fees and billing'), findsOneWidget);
+    expect(find.text('Lessons'), findsNothing);
   });
 
   testWidgets('allowed: sends a test notification', (tester) async {
     var tests = 0;
-    await pumpAccountScreen(
-      tester,
-      _app(roles: const ['STUDENT'], onTest: () => tests++),
-    );
+    await pumpAccountScreen(tester, _app(roles: const ['STUDENT'], onTest: () => tests++));
 
     await tester.tap(find.byKey(const Key('notificationSendTest')));
     await tester.pumpAndSettle();
@@ -195,15 +161,31 @@ void main() {
     expect(find.textContaining('Sent.'), findsOneWidget);
   });
 
+  testWidgets('a phone that could not register says why instead of claiming the test was sent', (
+    tester,
+  ) async {
+    var tests = 0;
+    final push = FakePushService()
+      ..registrationError = const PushRegistrationException('no push token: FIS_AUTH_ERROR');
+    await pumpAccountScreen(
+      tester,
+      _app(roles: const ['STUDENT'], onTest: () => tests++, push: push),
+    );
+
+    await tester.tap(find.byKey(const Key('notificationSendTest')));
+    await tester.pumpAndSettle();
+
+    expect(tests, 0);
+    expect(find.textContaining('Sent.'), findsNothing);
+    expect(find.textContaining("This phone couldn't sign up for notifications"), findsOneWidget);
+    expect(find.textContaining('FIS_AUTH_ERROR'), findsOneWidget);
+  });
+
   testWidgets('turned off in the phone: offers Settings', (tester) async {
     final push = FakePushService();
     await pumpAccountScreen(
       tester,
-      _app(
-        roles: const ['STUDENT'],
-        permission: PushPermission.denied,
-        push: push,
-      ),
+      _app(roles: const ['STUDENT'], permission: PushPermission.denied, push: push),
     );
 
     expect(find.byKey(const Key('notificationSendTest')), findsNothing);
@@ -216,11 +198,7 @@ void main() {
     final push = FakePushService(permissionUnanswered: true);
     await pumpAccountScreen(
       tester,
-      _app(
-        roles: const ['STUDENT'],
-        permission: PushPermission.notDetermined,
-        push: push,
-      ),
+      _app(roles: const ['STUDENT'], permission: PushPermission.notDetermined, push: push),
     );
 
     await tester.tap(find.byKey(const Key('notificationTurnOn')));
@@ -228,14 +206,76 @@ void main() {
     expect(push.permissionRequests, 1);
   });
 
-  testWidgets('quiet hours turn on with a default window and turn off', (
-    tester,
-  ) async {
-    final saves = <(String?, String?)>[];
+  testWidgets('unavailable: says why, and Try again sets push up again', (tester) async {
+    final push = FakePushService()
+      ..token = null
+      ..problem =
+          'PlatformException: NullPointerException: FirebaseCrashlytics component is not '
+          'present.'
+      ..onRetrySetup = (push) => push
+        ..permission = PushPermission.granted
+        ..problem = null
+        ..token = 'fake-fcm-token';
     await pumpAccountScreen(
       tester,
-      _app(roles: const ['STUDENT'], quietSaves: saves),
+      _app(roles: const ['STUDENT'], permission: PushPermission.unavailable, push: push),
     );
+
+    expect(find.text('Not available in this version of the app.'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('notificationPhoneProblem'))).data,
+      'Reason: PlatformException: NullPointerException: FirebaseCrashlytics component is not '
+      'present.',
+    );
+    // No token, so a test could not reach this phone.
+    expect(find.byKey(const Key('notificationSendTest')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('notificationRetrySetup')));
+    await tester.pumpAndSettle();
+
+    expect(push.setupRetries, 1);
+    expect(find.byKey(const Key('notificationPhoneProblem')), findsNothing);
+    expect(find.byKey(const Key('notificationRetrySetup')), findsNothing);
+    expect(find.textContaining('On. Notices show'), findsOneWidget);
+    expect(find.byKey(const Key('notificationSendTest')), findsOneWidget);
+  });
+
+  testWidgets('unavailable but this phone has a token: the test stays available', (tester) async {
+    final push = FakePushService()..problem = 'FirebaseException(core/not-initialized)';
+    await pumpAccountScreen(
+      tester,
+      _app(roles: const ['STUDENT'], permission: PushPermission.unavailable, push: push),
+    );
+
+    expect(find.byKey(const Key('notificationPhoneProblem')), findsOneWidget);
+    expect(find.byKey(const Key('notificationRetrySetup')), findsOneWidget);
+    expect(find.byKey(const Key('notificationSendTest')), findsOneWidget);
+  });
+
+  testWidgets('allowed but not registered: says why, with Try again', (tester) async {
+    final push = FakePushService()..problem = 'the server did not accept this phone: HTTP 500';
+    await pumpAccountScreen(tester, _app(roles: const ['STUDENT'], push: push));
+
+    expect(find.text('Reason: the server did not accept this phone: HTTP 500'), findsOneWidget);
+    expect(find.byKey(const Key('notificationRetrySetup')), findsOneWidget);
+    expect(find.byKey(const Key('notificationSendTest')), findsOneWidget);
+  });
+
+  testWidgets('turned off in the phone: no failure reason, only Settings', (tester) async {
+    final push = FakePushService()..problem = 'notifications are turned off for this app';
+    await pumpAccountScreen(
+      tester,
+      _app(roles: const ['STUDENT'], permission: PushPermission.denied, push: push),
+    );
+
+    expect(find.byKey(const Key('notificationPhoneProblem')), findsNothing);
+    expect(find.byKey(const Key('notificationRetrySetup')), findsNothing);
+    expect(find.byKey(const Key('notificationOpenSettings')), findsOneWidget);
+  });
+
+  testWidgets('quiet hours turn on with a default window and turn off', (tester) async {
+    final saves = <(String?, String?)>[];
+    await pumpAccountScreen(tester, _app(roles: const ['STUDENT'], quietSaves: saves));
 
     await tester.ensureVisible(find.byKey(const Key('notificationQuietHours')));
     await tester.tap(find.byKey(const Key('notificationQuietHours')));

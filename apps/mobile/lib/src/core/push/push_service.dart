@@ -53,6 +53,81 @@ class PushTap {
   final String? userId;
 }
 
+/// Why this phone could not be signed up for notifications: no push token (notifications turned
+/// off, or Firebase could not issue one) or the API refused the registration. [reason] is a short,
+/// token-free description shown on the notification settings screen and sent to crash reporting,
+/// so a phone that silently gets nothing can say why.
+class PushRegistrationException implements Exception {
+  const PushRegistrationException(this.reason);
+
+  final String reason;
+
+  @override
+  String toString() => 'PushRegistrationException: $reason';
+}
+
+/// A short, token-free description of why push setup failed, for the notification settings screen
+/// and crash reporting: the exception type and the first line of its message, at most [maxLength]
+/// characters. A chain of wrapped Java exceptions is reduced to the innermost one, which is the one
+/// that says what went wrong. HTTP failures name only the status (never a header or body), and any
+/// long token-like run of characters is masked, so an FCM token is never shown or reported.
+String describePushFailure(Object error, {int maxLength = 120}) {
+  final text = switch (error) {
+    PushRegistrationException(:final reason) => reason,
+    DioException(:final response?) => 'HTTP ${response.statusCode}',
+    DioException(:final type) => 'network error (${type.name})',
+    FirebaseException(:final plugin, :final code, :final message) => _withMessage(
+      'FirebaseException($plugin/$code)',
+      message,
+    ),
+    // Errors from Firebase's generated platform channels carry the Java exception's toString() as
+    // the code and only its class name as the message.
+    PlatformException(:final code) when code.contains(' ') || code.contains(':') => _withMessage(
+      'PlatformException',
+      code,
+    ),
+    PlatformException(:final code, :final message) => _withMessage(
+      'PlatformException($code)',
+      message,
+    ),
+    _ => _withMessage(error.runtimeType.toString(), error.toString()),
+  };
+  final masked = text.replaceAll(RegExp(r'[A-Za-z0-9_:\-]{40,}'), '…');
+  return masked.length <= maxLength ? masked : '${masked.substring(0, maxLength - 1)}…';
+}
+
+/// `type: first line of message`, without repeating the type when the message already starts
+/// with it (most `toString()`s do).
+String _withMessage(String type, String? message) {
+  final line = _innermostCause(message?.trim().split('\n').first.trim() ?? '');
+  if (line.isEmpty || line == type) return type;
+  if (line.startsWith('$type:') || line.startsWith('$type(')) return line;
+  return '$type: $line';
+}
+
+final _exceptionWrapper = RegExp(
+  r'^(?:[\w$]+\.)*[\w$]+(?:Exception|Error): (?=(?:[\w$]+\.)*[\w$]+(?:Exception|Error)\b)',
+);
+final _qualifiedClassName = RegExp(r'\b(?:[a-z_][\w$]*\.)+([A-Z][\w$]*)');
+
+/// `a.ExecutionException: b.ExecutionException: java.lang.NullPointerException: x` → the
+/// innermost `NullPointerException: x`, with package names dropped.
+String _innermostCause(String line) {
+  var out = line;
+  for (
+    var m = _exceptionWrapper.firstMatch(out);
+    m != null;
+    m = _exceptionWrapper.firstMatch(out)
+  ) {
+    out = out.substring(m.end);
+  }
+  return out.replaceAllMapped(_qualifiedClassName, (m) => m[1]!);
+}
+
+/// Receives push setup failures that would otherwise be invisible on a release build: token
+/// fetches and device registrations that fail in the background. Wired to the crash reporter.
+typedef PushErrorReporter = void Function(Object error, StackTrace stack, String reason);
+
 /// What the phone allows for this app's notifications.
 enum PushPermission {
   /// Notifications show (including iOS "provisional", delivered quietly).
@@ -64,7 +139,8 @@ enum PushPermission {
   /// Never asked yet: the app can show the OS prompt.
   notDetermined,
 
-  /// Push isn't available in this build (no Firebase configuration).
+  /// Push could not be set up on this phone (no Firebase configuration, or Firebase failed to
+  /// start); [PushService.problem] says why.
   unavailable,
 }
 
@@ -96,6 +172,9 @@ abstract class PushService {
 
   /// Manually trigger registration (e.g. after login when the service was
   /// already initialized but had no auth token at the time).
+  ///
+  /// Throws [PushRegistrationException] when this phone could not be registered, so a caller that
+  /// tells the user something ("Send a test notification") can say why instead of claiming success.
   Future<void> registerIfAuthenticated();
 
   /// This phone's push token, or null when push isn't set up (no permission, no Firebase). Never
@@ -112,6 +191,17 @@ abstract class PushService {
   /// Opens this app's notification settings in the phone's Settings app.
   Future<void> openSystemSettings();
 
+  /// Why push setup last failed on this phone ([describePushFailure]), or null when nothing has:
+  /// set when [permissionStatus] answers [PushPermission.unavailable] or this phone's token could
+  /// not be fetched or registered; cleared once that works again. Shown on the notification
+  /// settings screen so a phone that gets nothing can say why.
+  String? get problem;
+
+  /// Runs push setup again after a failure ("Try again"): retries Firebase setup and, when
+  /// permission is granted, fetches and registers this phone's token. Never prompts. Returns the
+  /// token, or null when push is still unavailable (see [problem]).
+  Future<String?> retrySetup();
+
   /// Tear down listeners. Call on logout or app dispose.
   void dispose();
 }
@@ -126,10 +216,12 @@ class FirebasePushService implements PushService {
     required Uri apiBaseUrl,
     required this._getToken,
     FlutterSecureStorage? storage,
+    this._onError,
   }) : _dio = Dio(BaseOptions(baseUrl: apiBaseUrl.toString())),
        _storage = storage ?? const FlutterSecureStorage();
 
   final TokenProvider _getToken;
+  final PushErrorReporter? _onError;
   final Dio _dio;
   final FlutterSecureStorage _storage;
 
@@ -138,8 +230,9 @@ class FirebasePushService implements PushService {
   // which now runs before `Firebase.initializeApp()` completes (deferred init, see
   // app_bootstrap.dart). The first Firebase touch is therefore `initialize()`, which is gated on
   // authentication and can itself await Firebase setup.
-  late final FirebaseMessaging _messaging;
-  late final FlutterLocalNotificationsPlugin _localNotifications;
+  // Not `final`: a failed setup is retried ([_ensureFirebase]), which assigns them again.
+  late FirebaseMessaging _messaging;
+  late FlutterLocalNotificationsPlugin _localNotifications;
 
   final _messageController = StreamController<RemoteMessage>.broadcast();
   final _tapController = StreamController<PushTap>.broadcast();
@@ -149,7 +242,14 @@ class FirebasePushService implements PushService {
   StreamSubscription<String>? _tokenRefreshSub;
 
   bool _initialized = false;
+  bool _localNotificationsReady = false;
   bool _messagingStarted = false;
+
+  String? _statusProblem;
+  String? _registrationProblem;
+
+  @override
+  String? get problem => _statusProblem ?? _registrationProblem;
 
   /// Stream of messages received while the app is in the foreground.
   @override
@@ -160,22 +260,41 @@ class FirebasePushService implements PushService {
 
   @override
   Future<String?> initialize() async {
-    if (_initialized) return await _messaging.getToken();
+    if (_initialized) return await _fetchToken();
     _initialized = true;
 
-    await _ensureFirebase();
+    try {
+      await _ensureFirebase();
 
-    await _initLocalNotifications();
+      await _initLocalNotificationsOnce();
 
-    final settings = await _messaging.getNotificationSettings();
-    if (!_allowed(settings.authorizationStatus)) return null;
+      final settings = await _messaging.getNotificationSettings();
+      if (!_allowed(settings.authorizationStatus)) return null;
 
+      return await _startMessaging();
+    } catch (e, stack) {
+      // Not set up: let the next initialize() (or retrySetup) start over instead of only fetching
+      // a token from a Firebase that never came up.
+      _initialized = false;
+      _registrationProblem = describePushFailure(e);
+      _report(e, stack, 'push setup failed');
+      rethrow;
+    }
+  }
+
+  @override
+  Future<String?> retrySetup() async {
+    _statusProblem = null;
+    _registrationProblem = null;
+    if (!_initialized) return initialize();
+    final permission = await permissionStatus();
+    if (permission != PushPermission.granted) return null;
+    await _initLocalNotificationsOnce();
     return _startMessaging();
   }
 
   static bool _allowed(AuthorizationStatus status) =>
-      status == AuthorizationStatus.authorized ||
-      status == AuthorizationStatus.provisional;
+      status == AuthorizationStatus.authorized || status == AuthorizationStatus.provisional;
 
   @override
   Future<bool> canRequestPermission() async {
@@ -184,40 +303,55 @@ class FirebasePushService implements PushService {
     return switch (settings.authorizationStatus) {
       // iOS, before the prompt has been shown.
       AuthorizationStatus.notDetermined => true,
-      // Android 13+ reports a POST_NOTIFICATIONS permission it has never asked for as denied, the
-      // same as a refusal, so whether the app has asked is remembered here.
-      AuthorizationStatus.denied =>
-        defaultTargetPlatform == TargetPlatform.android &&
-            !await _storage.containsKey(key: _permissionRequestedKey),
+      AuthorizationStatus.denied => await _canAskAgain(),
       _ => false,
     };
   }
 
+  /// Android 13+ reports a POST_NOTIFICATIONS permission it has never asked for as denied, the
+  /// same as a refusal, so whether the app has asked is remembered in secure storage. If that
+  /// storage can't be read (a Keystore problem after a reinstall or restore), the answer is "asked
+  /// already": the phone then offers its Settings, which always works, rather than calling push
+  /// unavailable.
+  Future<bool> _canAskAgain() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return false;
+    try {
+      return !await _storage.containsKey(key: _permissionRequestedKey);
+    } catch (e, stack) {
+      _report(e, stack, 'push permission prompt state unreadable');
+      return false;
+    }
+  }
+
   @override
   Future<String?> requestPermission() async {
-    await _ensureFirebase();
-    await _storage.write(key: _permissionRequestedKey, value: 'true');
+    try {
+      await _ensureFirebase();
+      try {
+        await _storage.write(key: _permissionRequestedKey, value: 'true');
+      } catch (e, stack) {
+        // Only means the app may offer the prompt again later; the prompt itself still works.
+        _report(e, stack, 'push permission prompt state not saved');
+      }
 
-    final settings = await _messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    if (!_allowed(settings.authorizationStatus)) return null;
+      final settings = await _messaging.requestPermission(alert: true, badge: true, sound: true);
+      if (!_allowed(settings.authorizationStatus)) return null;
 
-    if (!_initialized) {
       _initialized = true;
-      await _initLocalNotifications();
+      await _initLocalNotificationsOnce();
+      return await _startMessaging();
+    } catch (e, stack) {
+      _report(e, stack, 'push permission request failed');
+      rethrow;
     }
-    return _startMessaging();
   }
 
   /// Listen for messages and token refreshes, register the token, and handle the notification
   /// that launched the app, if any. Runs once permission is granted.
   Future<String?> _startMessaging() async {
     if (_messagingStarted) {
-      final token = await _messaging.getToken();
-      if (token != null) await _registerToken(token);
+      final token = await _fetchToken();
+      if (token != null) await _registerQuietly(token);
       return token;
     }
     _messagingStarted = true;
@@ -234,9 +368,9 @@ class FirebasePushService implements PushService {
     _tapSub = FirebaseMessaging.onMessageOpenedApp.listen(_onTap);
     _tokenRefreshSub = _messaging.onTokenRefresh.listen(_onTokenRefresh);
 
-    final token = await _messaging.getToken();
+    final token = await _fetchToken();
     if (token != null) {
-      await _registerToken(token);
+      await _registerQuietly(token);
     }
 
     final initialMessage = await _messaging.getInitialMessage();
@@ -251,10 +385,26 @@ class FirebasePushService implements PushService {
   /// already initialized but had no auth token at the time).
   @override
   Future<void> registerIfAuthenticated() async {
-    final token = await currentToken();
-    if (token != null) {
-      await _registerToken(token);
+    final String? token;
+    try {
+      await _ensureFirebase();
+      final settings = await _messaging.getNotificationSettings();
+      if (!_allowed(settings.authorizationStatus)) {
+        throw const PushRegistrationException('notifications are turned off for this app');
+      }
+      token = await _messaging.getToken();
+    } on PushRegistrationException {
+      rethrow;
+    } catch (e, stack) {
+      _report(e, stack, 'FCM token unavailable');
+      _registrationProblem = 'no push token: ${describePushFailure(e)}';
+      throw PushRegistrationException(_registrationProblem!);
     }
+    if (token == null) {
+      _registrationProblem = 'no push token: Firebase returned none';
+      throw PushRegistrationException(_registrationProblem!);
+    }
+    await _registerToken(token);
   }
 
   @override
@@ -266,7 +416,7 @@ class FirebasePushService implements PushService {
       return await _messaging.getToken();
     } catch (e) {
       // No Firebase configuration in this build, or (iOS) no APNs token yet.
-      debugPrint('FCM token unavailable: $e');
+      debugPrint('[push] FCM token unavailable: ${describePushFailure(e)}');
       return null;
     }
   }
@@ -284,16 +434,17 @@ class FirebasePushService implements PushService {
     try {
       await _ensureFirebase();
       final settings = await _messaging.getNotificationSettings();
-      return switch (settings.authorizationStatus) {
-        AuthorizationStatus.authorized ||
-        AuthorizationStatus.provisional => PushPermission.granted,
+      final permission = switch (settings.authorizationStatus) {
+        AuthorizationStatus.authorized || AuthorizationStatus.provisional => PushPermission.granted,
         AuthorizationStatus.notDetermined => PushPermission.notDetermined,
         AuthorizationStatus.denied =>
-          await canRequestPermission()
-              ? PushPermission.notDetermined
-              : PushPermission.denied,
+          await _canAskAgain() ? PushPermission.notDetermined : PushPermission.denied,
       };
-    } catch (_) {
+      _statusProblem = null;
+      return permission;
+    } catch (e, stack) {
+      _statusProblem = describePushFailure(e);
+      _report(e, stack, 'push permission status unavailable');
       return PushPermission.unavailable;
     }
   }
@@ -325,30 +476,44 @@ class FirebasePushService implements PushService {
 
   Future<void>? _firebaseReady;
 
-  /// Resolves the lazily-initialized Firebase-backed members, once. `Firebase.initializeApp`
-  /// returns the existing default app on repeat calls, so both the deferred bootstrap setup and
-  /// `initialize()` can trigger it without coordination; the members themselves are `late final`
-  /// and must be assigned only the first time.
-  Future<void> _ensureFirebase() => _firebaseReady ??= () async {
-    await Firebase.initializeApp();
-    _messaging = FirebaseMessaging.instance;
-    _localNotifications = FlutterLocalNotificationsPlugin();
-  }();
+  /// Resolves the lazily-initialized Firebase-backed members, once it has worked. `Firebase
+  /// .initializeApp` returns the existing default app on repeat calls, so both the deferred
+  /// bootstrap setup and `initialize()` can trigger it without coordination. A failure is not
+  /// cached: the next call (e.g. "Try again" on the notification settings screen) tries again.
+  Future<void> _ensureFirebase() {
+    final ready = _firebaseReady ??= () async {
+      await Firebase.initializeApp();
+      _messaging = FirebaseMessaging.instance;
+      _localNotifications = FlutterLocalNotificationsPlugin();
+    }();
+    return ready.catchError((Object error, StackTrace stack) {
+      if (identical(_firebaseReady, ready)) _firebaseReady = null;
+      return Future<void>.error(error, stack);
+    });
+  }
+
+  /// [_initLocalNotifications] the first time it succeeds. Its failure is reported but does not
+  /// stop push registration: notifications from the server are shown by the OS without it; only
+  /// the copy shown while the app is open on Android, and its tap, depend on it.
+  Future<void> _initLocalNotificationsOnce() async {
+    if (_localNotificationsReady) return;
+    try {
+      await _initLocalNotifications();
+      _localNotificationsReady = true;
+    } catch (e, stack) {
+      _report(e, stack, 'local notifications setup failed');
+    }
+  }
 
   Future<void> _initLocalNotifications() async {
-    const androidSettings = AndroidInitializationSettings(
-      '@mipmap/ic_launcher',
-    );
+    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     // No prompts from this plugin: the app asks through Firebase Messaging, after explaining why.
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: false,
       requestBadgePermission: false,
       requestSoundPermission: false,
     );
-    const settings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
+    const settings = InitializationSettings(android: androidSettings, iOS: iosSettings);
 
     await _localNotifications.initialize(
       settings,
@@ -367,9 +532,7 @@ class FirebasePushService implements PushService {
       importance: Importance.high,
     );
     await _localNotifications
-        .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >()
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(androidChannel);
   }
 
@@ -378,7 +541,7 @@ class FirebasePushService implements PushService {
 
     // iOS already shows the banner (setForegroundNotificationPresentationOptions); a local copy
     // there would show it twice.
-    if (defaultTargetPlatform != TargetPlatform.android) return;
+    if (defaultTargetPlatform != TargetPlatform.android || !_localNotificationsReady) return;
     final notification = message.notification;
     if (notification == null) return;
 
@@ -407,40 +570,72 @@ class FirebasePushService implements PushService {
     if (route != null) {
       final userId = data['user_id'];
       _tapController.add(
-        PushTap(
-          route,
-          userId: userId is String && userId.isNotEmpty ? userId : null,
-        ),
+        PushTap(route, userId: userId is String && userId.isNotEmpty ? userId : null),
       );
     }
   }
 
   Future<void> _onTokenRefresh(String token) async {
-    await _registerToken(token);
+    await _registerQuietly(token);
   }
 
+  /// This phone's FCM token, or null when Firebase could not issue one. The failure (on Android
+  /// typically a Firebase configuration or API-key problem: `FIS_AUTH_ERROR`,
+  /// `SERVICE_NOT_AVAILABLE`) is reported rather than thrown, so setup still finishes.
+  Future<String?> _fetchToken() async {
+    try {
+      final token = await _messaging.getToken();
+      if (token == null) _registrationProblem = 'no push token: Firebase returned none';
+      return token;
+    } catch (e, stack) {
+      _registrationProblem = 'no push token: ${describePushFailure(e)}';
+      _report(e, stack, 'FCM token unavailable');
+      return null;
+    }
+  }
+
+  /// [_registerToken] for background paths (setup, token refresh): the failure is already
+  /// reported, and nothing is waiting on the result.
+  Future<void> _registerQuietly(String fcmToken) async {
+    try {
+      await _registerToken(fcmToken);
+    } on PushRegistrationException {
+      // Reported in _registerToken.
+    }
+  }
+
+  /// Logs (logcat / Xcode console, tag `flutter`, prefix `[push]`) and forwards to crash reporting.
+  void _report(Object error, StackTrace stack, String reason) {
+    debugPrint('[push] $reason: ${describePushFailure(error, maxLength: 400)}');
+    try {
+      _onError?.call(error, stack, reason);
+    } catch (_) {
+      // Reporting is best-effort.
+    }
+  }
+
+  /// Registers [fcmToken] for the active account (or [bearerToken]'s). Throws
+  /// [PushRegistrationException] — after reporting it — when the API refuses or can't be reached.
+  /// Signed out (no bearer token) is not a failure: there is no one to register for.
   Future<void> _registerToken(String fcmToken, {String? bearerToken}) async {
     bearerToken ??= await _getToken();
     if (bearerToken == null) return;
 
-    final platform = defaultTargetPlatform == TargetPlatform.iOS
-        ? 'ios'
-        : 'android';
+    final platform = defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
     try {
       await _dio.post(
         '/api/auth/devices',
         // Every account signed in on this phone keeps receiving its notices; each one removes its
         // own registration when it signs out (fcm_token on POST /api/auth/logout).
-        data: {
-          'fcm_token': fcmToken,
-          'platform': platform,
-          'keep_other_accounts': true,
-        },
+        data: {'fcm_token': fcmToken, 'platform': platform, 'keep_other_accounts': true},
         options: Options(headers: {'Authorization': 'Bearer $bearerToken'}),
       );
-    } catch (e) {
-      debugPrint('FCM token registration failed: $e');
+      _registrationProblem = null;
+    } catch (e, stack) {
+      _report(e, stack, 'push token registration failed');
+      _registrationProblem = 'the server did not accept this phone: ${describePushFailure(e)}';
+      throw PushRegistrationException(_registrationProblem!);
     }
   }
 }

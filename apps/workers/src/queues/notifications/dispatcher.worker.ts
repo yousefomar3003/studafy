@@ -12,8 +12,8 @@
  * both commit or neither does, and a lost race is indistinguishable from never having run.
  *
  * This dispatcher is not in that position for every channel. `in_app` writes a row and is
- * transactional, so it keeps the single-transaction shape. `push` and `email` hand work to a
- * delivery job in Redis, which no database transaction can roll back. With a bare claim, a crash
+ * transactional, so it keeps the single-transaction shape. `push` hands work to a delivery job in
+ * Redis, which no database transaction can roll back. With a bare claim, a crash
  * between the key insert and the enqueue would leave a committed key with nothing sent; the retry
  * would see the key, skip that recipient, and the job would then *succeed* — a silent drop that
  * produces no dead-letter row, no failed job, and no trace anywhere. That is strictly worse than a
@@ -23,6 +23,12 @@
  * IDEMPOTENCY_LEASE_MS is reclaimable. `dispatched_at IS NULL` means the outcome is unknown, not
  * that nothing happened — which is the honest thing for the database to say, and the thing a retry
  * needs to know. Same shape 000069 already uses for payment idempotency.
+ *
+ * ## No email
+ *
+ * Studafy sends no notification email. The channels come from NOTIFICATION_CATALOG, whose entries
+ * are typed DeliveredNotificationChannel (in_app | push), so this dispatcher never takes an email
+ * branch, and the type checker rejects putting email back into the catalog.
  *
  * ## One transaction per recipient
  *
@@ -45,7 +51,10 @@ import { render, resolveLocale, resolveRoute } from "./templates/renderer";
 
 import type { DispatchRecipient, GradeEventContext } from "./resolvers/recipient.resolver";
 import type { NotificationType } from "@studafy/constants";
-import type { NotificationChannel } from "@studafy/notification-templates";
+import type {
+  DeliveredNotificationChannel,
+  NotificationChannel,
+} from "@studafy/notification-templates";
 import type { Sql, TransactionSql } from "postgres";
 
 // ---------------------------------------------------------------------------
@@ -157,8 +166,8 @@ export const DELIVERY_JOB_OPTIONS = {
 /**
  * `{event_type}:{event_id}:{recipient_id}:{channel}`, as ST-139 specifies.
  *
- * The channel is in the key, not just the row: a recipient who should get both an email and a push
- * is two deliveries, and keying without it would let the first channel's reservation swallow the
+ * The channel is in the key, not just the row: a recipient who should get both an inbox row and a
+ * push is two deliveries, and keying without it would let the first channel's reservation swallow the
  * second's — the same trap 000056 documents for `parent_user_id`. The school is deliberately *not*
  * in the string; it is a column, and the unique index is `(school_id, idempotency_key)`.
  */
@@ -529,7 +538,7 @@ type DispatchOutcome =
  *             "delivery" *is* a database write. There is no external boundary to straddle, so the
  *             single-transaction shape of attendance-alert.worker.ts applies unchanged.
  *
- *   push/email — reserve and log in one transaction, enqueue the delivery job, confirm in a second.
+ *   push    — reserve and log in one transaction, enqueue the delivery job, confirm in a second.
  *             The enqueue is a Redis call no transaction can roll back, so the reservation has to
  *             outlive the first commit in an explicitly unconfirmed state.
  */
@@ -540,7 +549,7 @@ async function dispatchOne(
     eventId: string;
     eventType: string;
     recipient: DispatchRecipient;
-    channel: NotificationChannel;
+    channel: DeliveredNotificationChannel;
     notificationType: NotificationType;
     context: GradeEventContext;
     templateVars: Record<string, string>;

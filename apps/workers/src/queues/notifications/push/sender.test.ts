@@ -1,7 +1,14 @@
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { describe, expect, test } from "bun:test";
 
-import { buildDataPayload, createFcmSender, isUnregisteredToken } from "./sender";
+import {
+  buildDataPayload,
+  createFcmSender,
+  failuresByCode,
+  hasCredentialFailure,
+  isUnregisteredToken,
+  withTimeout,
+} from "./sender";
 
 import type { PushDevice } from "./sender";
 
@@ -51,6 +58,49 @@ describe("buildDataPayload", () => {
     const payload = buildDataPayload({ ...base, route: "" });
     expect(payload.route).toBeUndefined();
     expect(payload).toEqual({ notification_type: "GRADE_POSTED", dispatch_log_id: "log-1" });
+  });
+});
+
+describe("withTimeout", () => {
+  test("passes a settled send through", async () => {
+    expect(await withTimeout(Promise.resolve(3), 50)).toBe(3);
+  });
+
+  test("fails a send that never settles instead of hanging", async () => {
+    const never = new Promise<number>(() => undefined);
+    let error: unknown;
+    try {
+      await withTimeout(never, 20);
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toContain("timed out");
+  });
+});
+
+describe("failuresByCode", () => {
+  test("counts every failure except dead tokens and successes", () => {
+    const failures = failuresByCode([
+      { success: true },
+      { success: false, error: { code: "messaging/registration-token-not-registered" } },
+      { success: false, error: { code: "messaging/third-party-auth-error" } },
+      { success: false, error: { code: "messaging/third-party-auth-error" } },
+      { success: false, error: { code: "messaging/internal-error" } },
+      { success: false, error: {} },
+    ]);
+    expect(failures).toEqual({
+      "messaging/third-party-auth-error": 2,
+      "messaging/internal-error": 1,
+      unknown: 1,
+    });
+  });
+
+  test("an APNs credential refusal is told apart from a passing glitch", () => {
+    expect(hasCredentialFailure({ "messaging/third-party-auth-error": 3 })).toBe(true);
+    expect(hasCredentialFailure({ "messaging/invalid-apns-credentials": 1 })).toBe(true);
+    expect(hasCredentialFailure({ "messaging/internal-error": 1 })).toBe(false);
+    expect(hasCredentialFailure({})).toBe(false);
   });
 });
 

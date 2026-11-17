@@ -2,7 +2,8 @@
  * Job dispatch for the `maintenance` queue (ST-268): the scheduled tenant-closure sweep, every data
  * subject request (export or erasure) it and the DSR API file, the scheduled Ask AI message
  * retention purge (ST-309), the scheduled data retention sweep (data-retention-sweep.ts), the
- * scheduled IP-address retention sweep and the scheduled account-deletion sweep (000143). Mirrors
+ * scheduled IP-address retention sweep, the scheduled account-deletion sweep (000143) and the
+ * scheduled abandoned-material sweep (abandoned-material-sweep.ts). Mirrors
  * the reports queue's report-registry.ts dispatch shape -- one
  * function the queue's Worker hands every job to.
  */
@@ -14,6 +15,7 @@ import { createStorageQuotaS3 } from "../billing/storage-quota-s3";
 import { createReportS3 } from "../reports/report-s3";
 import { sweepStuckUploadScans } from "../scan/stuck-scan-sweep";
 
+import { purgeAbandonedMaterials } from "./abandoned-material-sweep";
 import { runAccountDeletionSweep } from "./account-deletion-sweep";
 import { purgeExpiredAiMessages } from "./ai-message-retention-sweep";
 import { CLOSURE_ERASURE_RETENTION_HOLD_DAYS, runTenantClosureSweep } from "./closure-sweep";
@@ -21,6 +23,7 @@ import { purgeExpiredRetainedData } from "./data-retention-sweep";
 import { leaseMaintenancePool, processDsrJob } from "./dsr-processor";
 import { GooglePlayAiBillingCanceller } from "./google-play-ai-billing-canceller";
 import { purgeExpiredIpAddresses } from "./ip-address-retention-sweep";
+import { createMaterialObjectStore } from "./material-object-store";
 import { ensureFuturePartitions } from "./partition-maintenance";
 import { resealRecordValues } from "./record-key-rotation";
 import { purgeExpiredSensitiveRecords } from "./record-retention-sweep";
@@ -90,6 +93,25 @@ export async function processMaintenanceJob(
     if (!enqueueUploadScans) return { processed: false, reason: "no scan queue configured" };
     const result = await withPrimarySql(config, (sql) =>
       sweepStuckUploadScans(sql, enqueueUploadScans, new Date(), workerLogger),
+    );
+    return { processed: true, ...result };
+  }
+
+  if (job.name === JOB_NAMES.PURGE_ABANDONED_MATERIALS) {
+    const storage =
+      config.s3Region && config.bucket
+        ? createMaterialObjectStore({
+            region: config.s3Region,
+            endpoint: config.s3Endpoint,
+            bucket: config.bucket,
+          })
+        : null;
+    const result = await withPrimarySql(config, (sql) =>
+      purgeAbandonedMaterials(sql, storage, new Date(), workerLogger),
+    );
+    workerLogger.info(
+      { event: "abandoned_material_sweep", ...result },
+      "abandoned material sweep done",
     );
     return { processed: true, ...result };
   }

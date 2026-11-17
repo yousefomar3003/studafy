@@ -17,11 +17,7 @@ export type { DomainEvent } from "./events";
 export { ERROR_CODES } from "./errors";
 export { LEGAL_DOCUMENT_VERSIONS } from "./legal";
 export type { ErrorCode } from "./errors";
-export {
-  NOTIFICATION_TYPES,
-  MANDATORY_NOTIFICATION_TYPES,
-  DIGEST_ELIGIBLE_NOTIFICATION_TYPES,
-} from "./notifications";
+export { NOTIFICATION_TYPES, MANDATORY_NOTIFICATION_TYPES } from "./notifications";
 export type { NotificationType } from "./notifications";
 export { PERMISSIONS, ROLE_PERMISSIONS } from "./permissions";
 export type { Permission } from "./permissions";
@@ -85,7 +81,10 @@ export {
 } from "./storage-addon";
 export {
   isAllowedLicensePaymentLink,
+  LICENSE_AI_STOP_WARNING_DAYS,
+  LICENSE_NONPAYMENT_GRACE_DAYS,
   LICENSE_PAYMENT_LINK_HOSTS,
   LICENSE_PAYMENT_LINK_MAX_LENGTH,
+  licenseAiStopDate,
 } from "./payment-links";
 export type { StorageAddonPlanCode } from "./storage-addon";

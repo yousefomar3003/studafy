@@ -125,7 +125,29 @@ function LicenseTable({ licenses }: { licenses: ConsoleLicense[] }) {
                 </Link>
               </td>
               <td>
-                <LicenseStatusPill status={license.status} />
+                <div className="platform-cell-stack">
+                  <LicenseStatusPill status={license.status} />
+                  {license.nonpaymentSuspendedAt ? (
+                    <span className="platform-muted" data-testid="license-nonpayment">
+                      {t("platformLicensing.licenses.stoppedForNonPayment", {
+                        date: formatDate(new Date(license.nonpaymentSuspendedAt), {
+                          dateStyle: "medium",
+                        }),
+                      })}
+                    </span>
+                  ) : license.status === "active" &&
+                    license.nextAiStop &&
+                    license.nextAiStop.daysLeft > 0 &&
+                    license.nextAiStop.daysLeft < 30 ? (
+                    <span className="platform-muted" data-testid="license-ai-stop">
+                      {t("platformLicensing.licenses.aiStopsOn", {
+                        date: formatDate(new Date(`${license.nextAiStop.stopDate}T00:00:00Z`), {
+                          dateStyle: "medium",
+                        }),
+                      })}
+                    </span>
+                  ) : null}
+                </div>
               </td>
               <td>
                 <div className="platform-cell-stack">
@@ -194,14 +216,18 @@ export function SeatMeter({ assigned, purchased }: { assigned: number; purchased
 type RequestStatus = ChangeRequest["status"];
 
 /**
- * The calculator, prefilled from a request: the school, its license in force (as a seat increase)
- * when it has one, and the student seats and tier asked for.
+ * The calculator, prefilled from a request: the school, its license in force (as a seat increase,
+ * or an extension when the school only asked for more months) when it has one, the student seats
+ * and tier asked for, and the request itself -- whose length, start and payment plan the calculator
+ * starts from.
  */
 export function priceLink(request: ChangeRequest): string {
-  const params = new URLSearchParams({ schoolId: request.schoolId });
+  const params = new URLSearchParams({ schoolId: request.schoolId, requestId: request.id });
   if (request.licenseId) {
     params.set("licenseId", request.licenseId);
-    params.set("kind", "seat_increase");
+    const moreMonthsOnly =
+      request.months !== null && request.studentSeats === null && !request.studentTier;
+    params.set("kind", moreMonthsOnly ? "extension" : "seat_increase");
   }
   if (request.studentSeats !== null) params.set("studentSeats", String(request.studentSeats));
   if (request.studentTier) params.set("studentTier", request.studentTier.id);
@@ -256,6 +282,22 @@ export function ChangeRequestInbox() {
               ? "platformLicensing.inbox.wants.familyPlusOn"
               : "platformLicensing.inbox.wants.familyPlusOff",
           )
+        : null,
+      // The school's own length and payment plan (000233).
+      request.months !== null
+        ? request.licenseId
+          ? t("platformLicensing.inbox.wants.moreMonths", { count: request.months })
+          : t("platformLicensing.inbox.wants.months", { count: request.months })
+        : null,
+      request.startsOn
+        ? t("platformLicensing.inbox.wants.startsOn", {
+            date: formatDate(new Date(`${request.startsOn}T00:00:00Z`), { dateStyle: "medium" }),
+          })
+        : null,
+      request.paymentPlan
+        ? t(`platformLicensing.inbox.wants.plan.${request.paymentPlan}`, {
+            count: request.paymentProposal?.length ?? 0,
+          })
         : null,
     ]
       .filter(Boolean)

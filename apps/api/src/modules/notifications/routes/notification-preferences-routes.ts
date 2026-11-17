@@ -48,8 +48,9 @@ const getPreferencesRoute = createRoute({
   summary: "Get notification preferences",
   description:
     "The authenticated user's full per-type, per-channel notification preference matrix, plus " +
-    "their personal attendance-alert threshold override. Every type-channel pair is represented, " +
-    "including ones the user has never touched — those default to enabled and non-digest.",
+    "their personal attendance-alert threshold override. Every type is listed for the in_app and " +
+    "push channels, including ones the user has never touched — those default to enabled. " +
+    "Notifications are never emailed, so there is no email channel.",
   security: [{ bearerAuth: [] }],
   responses: standardResponses(
     {
@@ -69,9 +70,10 @@ const updatePreferencesRoute = createRoute({
   operationId: "updateNotificationPreferences",
   summary: "Update notification preferences",
   description:
-    "Toggle channels, set digest mode on eligible types, and/or set a personal attendance-alert " +
-    "threshold. Unlisted (type, channel) cells are left unchanged. Disabling a mandatory type, or " +
-    "enabling digest on a non-email channel or a non-eligible type, fails with 422.",
+    "Toggle the in_app and push channels and/or set a personal attendance-alert threshold. " +
+    "Unlisted (type, channel) cells are left unchanged. The email channel is not accepted " +
+    "(notifications are never emailed). Disabling a mandatory type, or setting digest to true, " +
+    "fails with 422.",
   security: [{ bearerAuth: [] }],
   request: {
     body: {
@@ -152,10 +154,11 @@ const sendTestNotificationRoute = createRoute({
  * regardless of permissions, so there is no other user's row this could reach and no
  * requirePermission() to add (see permission-guard-coverage.test.ts's GUARD_EXEMPT_ROUTES).
  *
- * The mandatory-type and digest-eligibility rules are enforced twice on purpose: once here for a
- * clean 422 with a message naming the rule, and again by ck_notification_preferences_mandatory_enabled
- * / ck_notification_preferences_digest_channel / ck_notification_preferences_digest_eligible
- * (migration 000083), which is what makes the rule true regardless of caller, not just of this route.
+ * The mandatory-type rule is enforced twice on purpose: once here for a clean 422 with a message
+ * naming the rule, and again by ck_notification_preferences_mandatory_enabled (migration 000083),
+ * which is what makes the rule true regardless of caller, not just of this route. Studafy sends no
+ * notification email: the request schema accepts only in_app and push, and digest (an email-only
+ * feature) can no longer be turned on.
  */
 export function notificationPreferencesRoutes(database: Database): OpenAPIHono<AppEnv> {
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });

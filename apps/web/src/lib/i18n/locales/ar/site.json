@@ -316,12 +316,13 @@
       "FEE_STATEMENT": "كشوف حساب رسوم العائلة",
       "ASSIGNMENT_PUBLISHED": "الواجبات الجديدة",
       "ASSIGNMENT_GRADED": "الواجبات المصححة",
-      "ATTENDANCE_MARKED": "الغياب والتأخير"
+      "ATTENDANCE_MARKED": "الغياب والتأخير",
+      "MATERIAL_PUBLISHED": "المواد التعليمية الجديدة",
+      "MARKS_RELEASED": "صدور الدرجات"
     },
     "channels": {
       "in_app": "داخل التطبيق",
-      "push": "إشعارات فورية",
-      "email": "البريد الإلكتروني"
+      "push": "إشعارات فورية"
     },
     "inbox": {
       "title": "الإشعارات",
@@ -338,7 +339,7 @@
     },
     "preferences": {
       "title": "إعدادات الإشعارات",
-      "description": "اختر القنوات التي تصلك عبرها كل فئة من الإشعارات، ومتى تُجمع في ملخّص يومي.",
+      "description": "اختر القنوات التي تصلك عبرها كل فئة من الإشعارات. لا تُرسَل الإشعارات عبر البريد الإلكتروني.",
       "backToInbox": "العودة إلى صندوق الوارد",
       "loadError": "تعذّر تحميل تفضيلات الإشعارات. حاول إعادة تحميل الصفحة.",
       "channelsLabel": "تفضيلات القنوات",
@@ -346,10 +347,8 @@
       "channelsDescription": "الفئة المقفلة إلزامية وتُرسل دائمًا عبر جميع القنوات.",
       "tableCaption": "تفضيلات قنوات الإشعارات",
       "typeColumn": "نوع الإشعار",
-      "digestColumn": "الملخّص اليومي",
       "mandatory": "إلزامي",
       "cellLabel": "{{type}} — {{channel}}",
-      "digestCellLabel": "{{type}} — الملخّص اليومي",
       "saveChannels": "حفظ تفضيلات القنوات",
       "thresholdLabel": "حدّ تنبيه الحضور",
       "attendanceHeading": "تنبيهات الحضور",

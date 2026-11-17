@@ -61,6 +61,8 @@ class _ChildDetail extends ConsumerWidget {
       length: 5,
       child: Column(
         children: [
+          // Takes no room; switches to Grades when the home's "Recent grades" asks.
+          const _OpenGradesOnRequest(),
           if (children.length > 1)
             ChildSwitcherBar(children: children, selectedId: child.studentId),
           // "Add (name) to this phone" / "Open (name)": the child's own account in the switcher.
@@ -118,5 +120,19 @@ class _ChildDetail extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+/// Switches the child detail to its Grades tab whenever [childDetailGradesRequestProvider] asks
+/// (the parent home's "Recent grades" opening an assignment grade).
+class _OpenGradesOnRequest extends ConsumerWidget {
+  const _OpenGradesOnRequest();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(childDetailGradesRequestProvider, (previous, next) {
+      DefaultTabController.of(context).animateTo(0);
+    });
+    return const SizedBox.shrink();
   }
 }

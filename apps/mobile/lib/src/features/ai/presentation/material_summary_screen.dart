@@ -19,12 +19,28 @@ import 'widgets/ai_source_anchor_chip.dart';
 /// already fetched re-renders instantly from [MaterialSummaryController]'s in-memory cache; the
 /// first switch to each preset costs one request, then the server serves that preset for free.
 ///
-/// Pushed from [MaterialViewerScreen] for an AI-visible material. Needs the signed-in student's id
-/// (their student record id — see `askAiStudentIdProvider`); with no session it shows the signed-out state.
+/// Pushed from [MaterialViewerScreen] for an AI-visible material, or from the AI hub's source
+/// chooser for any source ([MaterialSummaryScreen.source]: an assignment or the student's own
+/// file). Needs the signed-in student's id (their student record id — see
+/// `askAiStudentIdProvider`); with no session it shows the signed-out state.
 class MaterialSummaryScreen extends ConsumerStatefulWidget {
-  const MaterialSummaryScreen({required this.material, super.key});
+  MaterialSummaryScreen({required Material material, super.key})
+    : materialId = material.id,
+      title = material.title,
+      openSources = true;
 
-  final Material material;
+  /// A source that is not a class material: its anchors are labels, not links to a material.
+  const MaterialSummaryScreen.source({
+    required this.materialId,
+    required this.title,
+    super.key,
+  }) : openSources = false;
+
+  final String materialId;
+  final String title;
+
+  /// Whether a source anchor opens the class material it points into.
+  final bool openSources;
 
   @override
   ConsumerState<MaterialSummaryScreen> createState() => _MaterialSummaryScreenState();
@@ -41,7 +57,7 @@ class _MaterialSummaryScreenState extends ConsumerState<MaterialSummaryScreen> {
       final controller = MaterialSummaryController(
         client: ref.read(aiStudyClientProvider),
         studentId: studentId,
-        materialId: widget.material.id,
+        materialId: widget.materialId,
         onUsageChanged: () => ref.invalidate(aiUsageProvider),
       )..addListener(_onChange);
       _controller = controller;
@@ -71,13 +87,13 @@ class _MaterialSummaryScreenState extends ConsumerState<MaterialSummaryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: _AppBarTitle(
-          title: widget.material.title,
+          title: widget.title,
           subtitle: 'aiStudy.summary.subtitle'.tr(),
         ),
         actions: [
           if (controller?.current != null)
             AiReportButton(
-              target: AiReportTarget.summary(widget.material.id, controller!.selected),
+              target: AiReportTarget.summary(widget.materialId, controller!.selected),
             ),
         ],
       ),
@@ -101,7 +117,8 @@ class _MaterialSummaryScreenState extends ConsumerState<MaterialSummaryScreen> {
                 Expanded(
                   child: _SummaryBody(
                     controller: controller,
-                    materialId: widget.material.id,
+                    materialId: widget.materialId,
+                    openSources: widget.openSources,
                   ),
                 ),
                 const AiQuotaMeter(),
@@ -165,10 +182,15 @@ class _LengthSelector extends StatelessWidget {
 }
 
 class _SummaryBody extends StatelessWidget {
-  const _SummaryBody({required this.controller, required this.materialId});
+  const _SummaryBody({
+    required this.controller,
+    required this.materialId,
+    required this.openSources,
+  });
 
   final MaterialSummaryController controller;
   final String materialId;
+  final bool openSources;
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +239,11 @@ class _SummaryBody extends StatelessWidget {
             runSpacing: AppSpacing.space4,
             children: [
               for (final anchor in summary.sources)
-                AiSourceAnchorChip(anchor: anchor, materialId: materialId),
+                AiSourceAnchorChip(
+                  anchor: anchor,
+                  materialId: materialId,
+                  openable: openSources,
+                ),
             ],
           ),
         ],

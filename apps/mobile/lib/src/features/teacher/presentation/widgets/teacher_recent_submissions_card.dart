@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/localization/relative_time.dart';
-import '../../../../design/tokens/app_spacing_tokens.dart';
+import '../../../../design/kit/kit.dart';
 import '../../application/teacher_providers.dart';
 import '../../domain/teacher_home.dart';
 import '../assignment_submissions_screen.dart';
@@ -23,6 +23,7 @@ class TeacherRecentSubmissionsCard extends ConsumerWidget {
     return TeacherSectionCard(
       titleKey: 'teacher.home.recent.title',
       icon: Icons.inbox_outlined,
+      accent: AppAccent.violet,
       child: pending.when(
         loading: () => const TeacherCardSkeleton(),
         error: (error, stackTrace) => const TeacherCardMessage(
@@ -55,8 +56,6 @@ class _SubmissionRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
     final studentId = pending.submission.studentId;
     final name =
         ref.watch(rosterStudentNameProvider(studentId)) ??
@@ -64,7 +63,17 @@ class _SubmissionRow extends ConsumerWidget {
           namedArgs: {'id': shortStudentId(studentId)},
         );
 
-    return InkWell(
+    return AppIconListTile(
+      icon: Icons.description_outlined,
+      accent: AppAccent.violet,
+      title: pending.assignment.title,
+      subtitle: relativeTimeLabel(pending.submittedAt),
+      trailing: pending.submission.isLate
+          ? AppStatusPill(
+              label: 'teacher.home.recent.late'.tr(),
+              tone: AppTone.danger,
+            )
+          : null,
       onTap: () => Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => SubmissionMarkingScreen(
@@ -72,39 +81,6 @@ class _SubmissionRow extends ConsumerWidget {
             submissionId: pending.submission.id,
             studentName: name,
           ),
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: AppSpacing.space8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    pending.assignment.title,
-                    style: textTheme.bodyMedium,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    relativeTimeLabel(pending.submittedAt),
-                    style: textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (pending.submission.isLate) ...[
-              const SizedBox(width: AppSpacing.space8),
-              Text(
-                'teacher.home.recent.late'.tr(),
-                style: textTheme.labelSmall?.copyWith(color: colorScheme.error),
-              ),
-            ],
-          ],
         ),
       ),
     );
