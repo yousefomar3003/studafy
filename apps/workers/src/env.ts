@@ -10,6 +10,27 @@ function emptyAsUnset(value: unknown): unknown {
 }
 
 /**
+ * Same helper as apps/api/src/env.ts. QA-066: whether a Redis URL keeps its traffic encrypted. `rediss://` is TLS. Plain `redis://` is
+ * accepted only for a host on Fly's private network (`*.internal`, `*.flycast`), whose 6PN links are
+ * WireGuard tunnels already. Anything else, including a URL that does not parse, is refused.
+ */
+export function isEncryptedRedisUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "rediss:") return true;
+  if (url.protocol !== "redis:") return false;
+  const host = url.hostname.toLowerCase();
+  return host.endsWith(".internal") || host.endsWith(".flycast");
+}
+
+export const PLAINTEXT_REDIS_MESSAGE =
+  "must use rediss:// (TLS) in production, unless its host is on Fly's private network (.internal or .flycast)";
+
+/**
  * Environment configuration for the workers process. Parsed and validated once at bootstrap so
  * that an invalid environment fails fast — before any Redis connection is opened — with a named,
  * readable error.
@@ -51,6 +72,10 @@ export const envSchema = z
     // verify-full: TLS with certificate verification on every pool (databaseUrlFrom), for a
     // database reached over the internet. Unset keeps the plain connection a private PgBouncer used.
     DATABASE_SSL_MODE: z.preprocess(emptyAsUnset, z.enum(["verify-full"]).optional()),
+    // Node's own extra-CA bundle (a file path). Read here only so production can require *some* CA
+    // to verify the database against: workers.toml mounts Supabase's root CA and points this at it,
+    // where DATABASE_CA_CERT would carry the PEM inline. Node itself reads it at startup.
+    NODE_EXTRA_CA_CERTS: z.preprocess(emptyAsUnset, z.string().min(1).optional()),
     READ_DATABASE_URL: z.string().min(1).optional(),
     READ_DATABASE_HOST: z.string().min(1).optional(),
     READ_DATABASE_PORT: z.coerce.number().int().min(1).max(65535).optional(),
@@ -229,6 +254,37 @@ export const envSchema = z
 
     if (env.NODE_ENV !== "production") return;
 
+    // QA-066: a deployed worker reaches Postgres over the internet (Supabase's pooler), so every
+    // pool must verify the server certificate, as the API's does. databaseUrlFrom() and
+    // readDatabaseUrlFrom() are what every pool is built from; without the discrete settings the
+    // URL is the local-development default, which fails here too.
+    for (const url of [databaseUrlFrom(env), readDatabaseUrlFrom(env)]) {
+      if (sslModeOf(url) !== "verify-full") {
+        context.addIssue({
+          code: "custom",
+          path: ["DATABASE_SSL_MODE"],
+          message:
+            "DATABASE_SSL_MODE must be verify-full in production (with DATABASE_HOST and DATABASE_USER, or sslmode=verify-full in DATABASE_URL)",
+        });
+        break;
+      }
+    }
+    if (env.DATABASE_CA_CERT === undefined && env.NODE_EXTRA_CA_CERTS === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["DATABASE_CA_CERT"],
+        message:
+          "DATABASE_CA_CERT or NODE_EXTRA_CA_CERTS is required in production, to verify the database certificate",
+      });
+    }
+    if (!isEncryptedRedisUrl(env.REDIS_URL)) {
+      context.addIssue({
+        code: "custom",
+        path: ["REDIS_URL"],
+        message: `REDIS_URL ${PLAINTEXT_REDIS_MESSAGE}`,
+      });
+    }
+
     if (env.RECORDS_ENCRYPTION_KEYS === undefined) {
       context.addIssue({
         code: "custom",
@@ -324,6 +380,15 @@ export function readDatabaseUrlFrom(env: Env): string {
   const username = env.DATABASE_USER ?? "";
   const password = env.DATABASE_PASSWORD ?? "";
   return `postgresql://${encodeURIComponent(username)}:${encodeURIComponent(password)}@${env.READ_DATABASE_HOST}:${port}/${name}${sslQuery(env)}`;
+}
+
+/** The `sslmode` a connection string asks for, or null when it names none or does not parse. */
+function sslModeOf(connectionString: string): string | null {
+  try {
+    return new URL(connectionString).searchParams.get("sslmode");
+  } catch {
+    return null;
+  }
 }
 
 function sslQuery(env: Env): string {

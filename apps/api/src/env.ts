@@ -58,6 +58,27 @@ function emptyAsUnset(value: unknown): unknown {
 }
 
 /**
+ * QA-066: whether a Redis URL keeps its traffic encrypted. `rediss://` is TLS. Plain `redis://` is
+ * accepted only for a host on Fly's private network (`*.internal`, `*.flycast`), whose 6PN links are
+ * WireGuard tunnels already. Anything else, including a URL that does not parse, is refused.
+ */
+export function isEncryptedRedisUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "rediss:") return true;
+  if (url.protocol !== "redis:") return false;
+  const host = url.hostname.toLowerCase();
+  return host.endsWith(".internal") || host.endsWith(".flycast");
+}
+
+export const PLAINTEXT_REDIS_MESSAGE =
+  "must use rediss:// (TLS) in production, unless its host is on Fly's private network (.internal or .flycast)";
+
+/**
  * A PEM held in a secret store. Empty means unset, and a single-line value with literal `\n`
  * escapes (how most secret UIs and `fly secrets set` carry one) gets its newlines back.
  */
@@ -734,6 +755,22 @@ export const envSchema = z
     }
 
     if (env.NODE_ENV !== "production") return;
+
+    // QA-066: without Redis, token revocation, rate limiting and entitlement checks silently
+    // degrade and the OAuth state store falls back to process memory, so production needs it.
+    if (env.REDIS_URL === undefined) {
+      context.addIssue({
+        code: "custom",
+        path: ["REDIS_URL"],
+        message: "REDIS_URL is required in production",
+      });
+    } else if (!isEncryptedRedisUrl(env.REDIS_URL)) {
+      context.addIssue({
+        code: "custom",
+        path: ["REDIS_URL"],
+        message: `REDIS_URL ${PLAINTEXT_REDIS_MESSAGE}`,
+      });
+    }
 
     if (appleStore && env.APPLE_IAP_APP_APPLE_ID === undefined) {
       context.addIssue({

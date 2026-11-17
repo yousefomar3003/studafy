@@ -17,6 +17,27 @@ function emptyAsUnset(value: unknown): unknown {
 }
 
 /**
+ * Same helper as apps/api/src/env.ts. QA-066: whether a Redis URL keeps its traffic encrypted. `rediss://` is TLS. Plain `redis://` is
+ * accepted only for a host on Fly's private network (`*.internal`, `*.flycast`), whose 6PN links are
+ * WireGuard tunnels already. Anything else, including a URL that does not parse, is refused.
+ */
+export function isEncryptedRedisUrl(value: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    return false;
+  }
+  if (url.protocol === "rediss:") return true;
+  if (url.protocol !== "redis:") return false;
+  const host = url.hostname.toLowerCase();
+  return host.endsWith(".internal") || host.endsWith(".flycast");
+}
+
+export const PLAINTEXT_REDIS_MESSAGE =
+  "must use rediss:// (TLS) in production, unless its host is on Fly's private network (.internal or .flycast)";
+
+/**
  * Environment configuration for the realtime gateway. Parsed and validated once at bootstrap so
  * that an invalid environment fails fast — before the server binds a port or opens a Redis
  * connection — with a named, readable error.
@@ -87,6 +108,19 @@ export const envSchema = z
           path: ["AUTH_REDIS_URL"],
           message: "AUTH_REDIS_URL is required when NODE_ENV is production",
         });
+      }
+      // QA-066: the localhost default fails this too, so a deploy cannot forget REDIS_URL either.
+      for (const [name, value] of [
+        ["REDIS_URL", env.REDIS_URL],
+        ["AUTH_REDIS_URL", env.AUTH_REDIS_URL],
+      ] as const) {
+        if (value !== undefined && !isEncryptedRedisUrl(value)) {
+          context.addIssue({
+            code: "custom",
+            path: [name],
+            message: `${name} ${PLAINTEXT_REDIS_MESSAGE}`,
+          });
+        }
       }
     }
     if (env.NODE_ENV === "production" && env.WS_ALLOWED_ORIGINS.length === 0) {

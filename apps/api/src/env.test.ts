@@ -108,6 +108,58 @@ describe("loadEnv", () => {
     expect(() => loadEnv({ NODE_ENV: "production" })).toThrow(EnvValidationError);
   });
 
+  // QA-066: without Redis, token revocation, rate limiting and entitlement checks silently degrade
+  // and the OAuth state store falls back to process memory, so production must not boot without it,
+  // and its URL must be TLS unless it names a host on Fly's private network.
+  describe("Redis in production (QA-066)", () => {
+    const production = {
+      NODE_ENV: "production",
+      DATABASE_HOST: "db",
+      DATABASE_PORT: "6432",
+      DATABASE_NAME: "studafy",
+      DATABASE_USER: "studafy_app",
+      DATABASE_PASSWORD: "secret",
+      DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----",
+      READ_DATABASE_HOST: "db-read",
+      READ_DATABASE_NAME: "api_read",
+    };
+
+    test("refuses to boot without REDIS_URL", () => {
+      expect(() => loadEnv(production)).toThrow(/REDIS_URL is required in production/);
+    });
+
+    test("refuses a plaintext Redis URL", () => {
+      for (const REDIS_URL of [
+        "redis://redis.example.com:6379",
+        "redis://10.0.0.5:6379",
+        "redis://localhost:6379",
+        "redis://evil.internal.example.com:6379",
+        "not a url",
+      ]) {
+        expect(() => loadEnv({ ...production, REDIS_URL })).toThrow(
+          /REDIS_URL must use rediss:\/\//,
+        );
+      }
+    });
+
+    test("accepts TLS, or plaintext only on Fly's private network", () => {
+      for (const REDIS_URL of [
+        "rediss://default:pw@redis.example.com:6380",
+        "redis://studafy-redis.internal:6379",
+        "redis://studafy-redis.flycast:6379",
+      ]) {
+        expect(loadEnv({ ...production, REDIS_URL }).REDIS_URL).toBe(REDIS_URL);
+      }
+    });
+
+    test("keeps Redis optional outside production", () => {
+      expect(loadEnv({}).REDIS_URL).toBeUndefined();
+      expect(loadEnv({ REDIS_URL: "redis://localhost:6379" }).REDIS_URL).toBe(
+        "redis://localhost:6379",
+      );
+    });
+  });
+
   test("requires a non-empty CORS_ALLOWED_ORIGINS in every deployed tier", () => {
     // NODE_ENV stays at its default here on purpose: the constraint keys off the deployment tier,
     // not the build mode, so a staging box must be held to it either way.
@@ -287,6 +339,7 @@ describe("loadEnv", () => {
         DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----",
         READ_DATABASE_HOST: "db-read",
         READ_DATABASE_NAME: "api_read",
+        REDIS_URL: "rediss://redis.example.com:6380",
       }).RELEASE_VERSION,
     ).toBe("unknown");
   });
@@ -562,6 +615,7 @@ describe("in-app purchase configuration", () => {
       DATABASE_CA_CERT: "-----BEGIN CERTIFICATE-----",
       READ_DATABASE_HOST: "db-read",
       READ_DATABASE_NAME: "api_read",
+      REDIS_URL: "rediss://redis.example.com:6380",
     };
     const issues = () => {
       try {

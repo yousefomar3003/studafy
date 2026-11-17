@@ -4,10 +4,9 @@ import {
   startQueueGauges,
   startTracing,
 } from "@studafy/observability";
-import postgres from "postgres";
 
 import { createRedisConnection } from "./connection";
-import { closeWorkerPools } from "./db/pool";
+import { closeWorkerPools, createPool } from "./db/pool";
 import { databaseUrlFrom, loadEnv } from "./env";
 import { evaluateHealth, startHealthServer, startHeartbeat } from "./health";
 import { workerLogger } from "./log";
@@ -92,15 +91,20 @@ const queueGauges = startQueueGauges(
   queueMetricsConnection as never,
 );
 
+/**
+ * A dedicated pool for one of the long-lived polling loops below. Through createPool(), like the
+ * process-wide pool, so it carries the same TLS settings (QA-066: DATABASE_CA_CERT was dropped
+ * here before, leaving these loops to the system trust store alone).
+ */
+function loopPool(max: number) {
+  return createPool(databaseUrlFrom(env), { max, databaseCaCert: env.DATABASE_CA_CERT });
+}
+
 // Payment pipeline liveness (ST-262): `app.billing_events`' unresolved tail, read on every scrape.
 // Its own small pool, like every other polling loop in this file — the scrape path must never wait
 // behind a job processor for a connection, and vice versa. `max: 1` because there is exactly one
 // in-flight query at a time (one scrape, one callback) and a second connection would only sit idle.
-const billingPipelineDb = postgres(databaseUrlFrom(env), {
-  max: 1,
-  idle_timeout: 20,
-  prepare: false,
-});
+const billingPipelineDb = loopPool(1);
 const billingPipelineGauges = startBillingPipelineGauges({
   db: billingPipelineDb,
   logger: workerLogger,
@@ -114,7 +118,7 @@ const billingPipelineGauges = startBillingPipelineGauges({
 // Falling back to app.schools (a global, RLS-free table) makes the relay self-configuring, and
 // re-reading it each cycle means a newly registered school no longer waits for a worker restart.
 const configuredSchoolIds = env.SCHOOL_IDS.split(",").filter(Boolean);
-const relayDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const relayDb = loopPool(2);
 const relayRedis = createRedisConnection(env);
 
 let relayHandle: RelayHandle | null = null;
@@ -138,7 +142,7 @@ void relayRedis.connect().then(() => {
 // Entitlement invalidation (ST-133): the durable consumer the propagation SLA rests on. Started
 // unconditionally, like the email dispatcher and unlike the relay above, because losing an
 // invalidation means serving a canceled school until the cache TTL expires.
-const entitlementDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const entitlementDb = loopPool(2);
 const entitlementRedis = createRedisConnection(env);
 const entitlementInvalidator = startEntitlementInvalidator({
   db: entitlementDb,
@@ -156,7 +160,7 @@ const entitlementInvalidator = startEntitlementInvalidator({
 // Email channel: a second polling loop that consumes email-relevant outbox events directly, on its
 // own postgres pool, pacing sends through an in-process token bucket. databaseUrlFrom() — not the
 // raw DATABASE_URL default — so a deployed worker honours the discrete production DB settings.
-const emailDb = postgres(databaseUrlFrom(env), { max: 4, idle_timeout: 20, prepare: false });
+const emailDb = loopPool(4);
 const emailLogger = {
   info: (fields: Record<string, unknown>, msg: string) =>
     console.log(JSON.stringify({ ...fields, msg })),
@@ -182,12 +186,12 @@ const emailDispatcher = startEmailDispatcher({
 // School-event notices: assignment.published, submission.graded and attendance.sessionSubmitted
 // outbox rows become inbox notifications for the students and parents concerned. Its own pool, like
 // the other always-on consumers; idle cycles back off to one discovery statement every 5 s.
-const notifyDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const notifyDb = loopPool(2);
 const schoolEventNotifier = startSchoolEventNotifier({ db: notifyDb, logger: workerLogger });
 
 // Push for every inbox notification (messages, announcements, fees, attendance, school events):
 // before this only the grades dispatcher ever reached a phone.
-const pushDb = postgres(databaseUrlFrom(env), { max: 2, idle_timeout: 20, prepare: false });
+const pushDb = loopPool(2);
 const pushConsumer = startPushConsumer({
   db: pushDb,
   sender: createFcmSender(env, workerLogger),
