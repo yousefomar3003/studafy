@@ -22,6 +22,11 @@ const SECTIONS = [
   {
     to: "/portal/platform/ai-programme",
     labelKey: "platformLicensing.nav.aiProgramme",
+    end: true,
+  },
+  {
+    to: "/portal/platform/ai-programme/schools",
+    labelKey: "platformLicensing.nav.aiProgrammeSchools",
     end: false,
   },
   { to: "/portal/platform/settings", labelKey: "platform.nav.settings", end: false },

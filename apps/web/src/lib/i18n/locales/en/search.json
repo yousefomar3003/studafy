@@ -589,6 +589,21 @@
       "title": "Feature switches",
       "where": "Studafy platform › Feature switches",
       "keywords": "feature switches, kill switch, flag overrides, rollout, school overrides"
+    },
+    "platform-ai-programme-schools": {
+      "title": "Student AI schools",
+      "where": "Studafy platform › Student AI › Schools",
+      "keywords": "student ai, revenue share, conversion, upload consistency, payouts, owed, forfeited, studafy net per seat, ledger"
+    },
+    "license-student-ai-results": {
+      "title": "Student AI results",
+      "where": "License › Student AI results",
+      "keywords": "student ai, conversion, tier, next tier, add seats, unlock, upload consistency, teachers below target, earnings"
+    },
+    "student-ai-earnings": {
+      "title": "Student AI earnings",
+      "where": "Finance › Student AI earnings",
+      "keywords": "student ai, revenue share, owed to studafy, paid to studafy, credit, payout, earnings, margin"
     }
   }
 }

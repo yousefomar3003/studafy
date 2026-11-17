@@ -13,7 +13,8 @@
     "quotes": "Quotes",
     "invoices": "Invoices and payments",
     "storage": "Storage",
-    "studentAi": "Student AI"
+    "studentAi": "Student AI",
+    "studentAiResults": "Student AI results"
   },
   "audience": {
     "student": "Students",
@@ -865,5 +866,127 @@
     "label": "Commitment",
     "full_year": "Full year committed",
     "month_to_month": "Month to month"
+  },
+  "programme": {
+    "tierFrom": "{{from}} and up",
+    "tierShare": "{{share}} share",
+    "periodValue": "{{from}} to {{to}}",
+    "next": {
+      "top": "The school is in the top conversion tier.",
+      "reached": "Today's opt-ins already reach {{share}}: it counts once the conversion is measured.",
+      "add_one": "Add {{seats}} more seat → unlock {{share}}",
+      "add_other": "Add {{seats}} more seats → unlock {{share}}",
+      "explain": "A seat here is a student opted in. Conversion is opted-in students ÷ the {{enrolled}} enrolled; {{from}} or more earns the next tier.",
+      "floor_one": "Or reach {{minSeats}} licence seats ({{seats}} more) for the large-school floor of {{share}}.",
+      "floor_other": "Or reach {{minSeats}} licence seats ({{seats}} more) for the large-school floor of {{share}}.",
+      "floorCloser_one": "Closer: reach {{minSeats}} licence seats ({{seats}} more) for the large-school floor of {{share}}.",
+      "floorCloser_other": "Closer: reach {{minSeats}} licence seats ({{seats}} more) for the large-school floor of {{share}}."
+    },
+    "conversion": {
+      "title": "Conversion and tier",
+      "noLicence": "The school has no licence yet, so there is no conversion to measure.",
+      "sentence": "{{optedIn}} of {{enrolled}} enrolled students opted in: {{conversion}} conversion, which earns a {{share}} share.",
+      "tiers": "Conversion tiers",
+      "locked": "Measured and locked on {{date}} for this licence period.",
+      "provisional": "Re-measured by Studafy; it is locked on {{date}}.",
+      "live": "Today's figure. It is measured and locked on {{date}}.",
+      "floorApplied": "Raised to the large-school floor ({{minSeats}}+ seats earn at least {{share}})."
+    },
+    "formula": {
+      "sentence": "Collected {{collected}}, conversion {{conversion}} plus bonus {{bonus}} equals {{total}}, share {{amount}}",
+      "arrow": "→",
+      "collected": "Collected",
+      "conversion": "Conversion",
+      "bonus": "Bonus",
+      "total": "Total",
+      "totalCapped": "Total (capped)",
+      "totalScaled": "Total (× {{multiplier}})",
+      "amount": "Share"
+    },
+    "status": {
+      "pending": "Pending",
+      "owed": "Owed",
+      "zero": "No share",
+      "credited": "Credited",
+      "payout_due": "Payout due",
+      "paid_out": "Paid out",
+      "forfeited": "Forfeited",
+      "void": "Void"
+    },
+    "destination": {
+      "credited": "Credited on invoice {{number}}",
+      "paidOut": "Paid out by Studafy",
+      "payoutDue": "To be paid out by Studafy",
+      "owed": "Credited on the next invoice",
+      "forfeitedLate": "Forfeited: the instalment was paid after its cutoff",
+      "forfeitedUnpaid": "Forfeited: the instalment was unpaid at its cutoff",
+      "pendingConversion": "Waits for the conversion to be locked",
+      "pendingBonus": "Waits for the period's upload consistency"
+    },
+    "earnings": {
+      "share": "Revenue share earned",
+      "shareNote": "Final shares of this year's payments to Studafy: owed, credited on an invoice, or paid out.",
+      "marginCollected": "Margin on Student AI lines collected",
+      "marginCollectedNote": "Parent price − licence price per student per month, on Student AI lines Studafy invoiced ({{billed}}), as far as parents have paid those invoices.",
+      "marginEstimated": "Margin on lines the school bills",
+      "estimated": "Estimated",
+      "marginEstimatedNote": "Auto-billing is off for these lines, so Studafy can't see what parents paid: counted as if paid in full.",
+      "margin": "Margin on Student AI lines",
+      "marginNone": "No Student AI tuition lines this year.",
+      "totalFor": "Total earnings, {{year}}",
+      "total": "Total earnings",
+      "totalEstimated": "Includes an estimate.",
+      "marginRule": "Margin: {{margin}} per student per month.",
+      "pending": "{{amount}} of revenue share is still pending and not counted yet.",
+      "expected": "Margin once every line is paid: {{amount}}."
+    },
+    "uploads": {
+      "title": "Upload consistency",
+      "description": "The share of school days on which teachers published lessons or materials, in the classes that have Student AI, this licence period so far. It sets the content bonus.",
+      "aim": "Target: {{aim}} of school days, the next content-bonus tier (or the top one, to keep it).",
+      "teachers": "Per teacher",
+      "teacher": "Teacher",
+      "classes": "Classes",
+      "classesTitle": "Per class",
+      "class": "Class",
+      "days": "Days with uploads",
+      "daysValue": "{{uploaded}} of {{days}}",
+      "consistency": "Consistency",
+      "standing": "Against the target",
+      "belowTarget": "Below target",
+      "none": "No class with Student AI has a school day yet."
+    },
+    "results": {
+      "title": "Student AI results",
+      "description": "How the programme is doing: opt-ins, conversion and its tier, what the next tier takes, the school's earnings and teachers' upload consistency.",
+      "notInProgramme": "The licence is not in the Student AI programme yet: open an opt-in window to start.",
+      "openOptIn": "Go to Student AI opt-in",
+      "earningsTitle": "Earnings this year"
+    },
+    "stats": {
+      "label": "Student AI at a glance",
+      "enrolled": "Students enrolled",
+      "optedIn": "Opted in",
+      "optedInHint": "{{conversion}} of enrolled students today",
+      "conversion": "Conversion",
+      "tier": "Current tier",
+      "floor": "Large-school floor",
+      "uploads": "Upload consistency",
+      "uploadsHint": "Bonus tier {{bonus}}, {{from}} to {{to}}",
+      "rate": "Revenue share rate",
+      "rateHint": "Conversion {{conversion}} + bonus {{bonus}}",
+      "earnings": "Total earnings",
+      "earningsFor": "Earnings, {{year}}"
+    },
+    "tile": {
+      "title": "Student AI",
+      "error": "Student AI results could not be loaded.",
+      "none": "No Student AI licence yet.",
+      "conversion": "Conversion",
+      "tier": "Tier",
+      "earnings": "Earned this year",
+      "students": "{{optedIn}} of {{enrolled}} students opted in",
+      "link": "Open Student AI results"
+    }
   }
 }

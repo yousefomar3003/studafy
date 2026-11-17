@@ -62,7 +62,8 @@
       "expenses": "Expenses →",
       "families": "Families →",
       "tax": "Sales tax (VAT)",
-      "studentAi": "Student AI on tuition"
+      "studentAi": "Student AI on tuition",
+      "studentAiEarnings": "Student AI earnings →"
     }
   },
   "overdue": {
@@ -750,5 +751,43 @@
     "period": "{{start}} to {{end}}",
     "stoppedFrom": "From {{start}}, stopped from {{stop}}",
     "billedBySchool": "Billed by the school"
+  },
+  "studentAiEarnings": {
+    "title": "Student AI earnings",
+    "intro": "What the school owes and has paid Studafy for its licence, the revenue share Studafy gives back on each payment, and what the school earns from Student AI this year.",
+    "billingLink": "Student AI on tuition (auto-billing and lines)",
+    "loadError": "Student AI earnings could not be loaded.",
+    "earningsTitle": "This year's earnings",
+    "periodsTitle": "Revenue share per period",
+    "periodsIntro": "Each payment to Studafy earns a share of its Student AI part: collected → conversion % + bonus % = total % → amount.",
+    "empty": "No revenue share yet: it starts with the school's first payment to Studafy once Student AI opt-in is open.",
+    "paidOn": "Paid {{date}}",
+    "instalment": "Invoice {{number}}, instalment {{position}}",
+    "reversal": "Reversal of a share whose payment was voided",
+    "payoutsTitle": "Payouts from Studafy",
+    "noPayouts": "No payouts yet. Shares are credited on the school's next invoice unless Studafy pays them out.",
+    "stats": {
+      "label": "Student AI money",
+      "owed": "Owed to Studafy",
+      "owedHint": "Open licence invoices",
+      "overdue": "{{amount}} overdue",
+      "paid": "Paid to Studafy",
+      "paidHint": "Of {{invoiced}} invoiced",
+      "share": "Revenue share earned",
+      "shareFor": "Revenue share, {{year}}",
+      "shareHint": "On {{collected}} collected for Student AI seats",
+      "total": "Total earnings",
+      "totalFor": "Total earnings, {{year}}"
+    },
+    "columns": {
+      "period": "Period",
+      "payment": "Payment",
+      "share": "Share",
+      "status": "Status",
+      "destination": "Where it went",
+      "paidOn": "Paid on",
+      "reference": "Reference",
+      "amount": "Amount"
+    }
   }
 }

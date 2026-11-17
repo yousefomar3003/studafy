@@ -20,7 +20,8 @@ import "./license.css";
 const SECTIONS = [
   { to: "/portal/license", key: "overview", end: true },
   { to: "/portal/license/seats", key: "seats", end: false },
-  { to: "/portal/license/student-ai", key: "studentAi", end: false },
+  { to: "/portal/license/student-ai", key: "studentAi", end: true },
+  { to: "/portal/license/student-ai/results", key: "studentAiResults", end: false },
   { to: "/portal/license/quotes", key: "quotes", end: false },
   { to: "/portal/license/invoices", key: "invoices", end: false },
   { to: "/portal/license/storage", key: "storage", end: false },

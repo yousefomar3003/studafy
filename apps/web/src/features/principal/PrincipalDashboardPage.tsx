@@ -6,6 +6,7 @@ import { HomeShortcuts, SummaryStrip } from "../../components/home/SummaryStrip"
 import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
 import { LicenseTile } from "../license/LicenseTile";
+import { StudentAiProgrammeTile } from "../license/StudentAiProgrammeTile";
 import { MissingRecordsTile } from "../records/missing/MissingRecordsTile";
 
 import {
@@ -210,6 +211,7 @@ export default function PrincipalDashboardPage() {
           <AttendanceHeatMapTile />
           <RecentAnnouncementsTile />
           {permissions.has(PERMISSIONS.LICENSE_READ) ? <LicenseTile /> : null}
+          {permissions.has(PERMISSIONS.AI_REVENUE_SHARE_READ) ? <StudentAiProgrammeTile /> : null}
         </div>
       </section>
     </>

@@ -138,6 +138,7 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("platform-tiers", "page", "/portal/platform/tiers", PLATFORM),
   entry("platform-pricing", "page", "/portal/platform/pricing", PLATFORM),
   entry("platform-ai-programme", "page", "/portal/platform/ai-programme", PLATFORM),
+  entry("platform-ai-programme-schools", "page", "/portal/platform/ai-programme/schools", PLATFORM),
   entry("build-license-quote", "action", "/portal/platform/quotes", PLATFORM),
   entry("platform-licenses", "page", "/portal/platform/licenses", PLATFORM),
   entry("platform-payments", "page", "/portal/platform/payments", PLATFORM),
@@ -357,6 +358,7 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("license", "page", "/portal/license", LICENSE),
   entry("license-seats", "page", "/portal/license/seats", LICENSE),
   entry("license-student-ai", "page", "/portal/license/student-ai", LICENSE),
+  entry("license-student-ai-results", "page", "/portal/license/student-ai/results", LICENSE),
   entry("license-quotes", "page", "/portal/license/quotes", LICENSE),
   entry("license-invoices", "page", "/portal/license/invoices", LICENSE),
   entry("license-storage", "page", "/portal/license/storage", LICENSE),
@@ -387,6 +389,11 @@ export const SEARCH_DESTINATIONS: readonly SearchDestination[] = [
   entry("tax-settings", "page", "/portal/finance/settings/tax", BILLING_READ),
   // The Student AI line on tuition (000238): finance reads it; switching needs billing:update.
   entry("student-ai-billing", "page", "/portal/finance/settings/student-ai", BILLING_READ),
+  // The school's Student AI earnings and revenue share (aiRevenueShare:read, phase 6).
+  entry("student-ai-earnings", "page", "/portal/finance/student-ai", {
+    requiredPermission: P.AI_REVENUE_SHARE_READ,
+    ...SCHOOL,
+  }),
 ];
 
 const BY_ID = new Map(SEARCH_DESTINATIONS.map((destination) => [destination.id, destination]));
