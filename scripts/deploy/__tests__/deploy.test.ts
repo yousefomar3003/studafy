@@ -102,6 +102,36 @@ describe("release.sh", () => {
     expect(result.stdout.trim()).toBe(`registry.fly.io/studafy-core-api@${digest}`);
   });
 
+  test("build waits for a registry that lags the push", () => {
+    const counter = join(mkdtempSync(join(tmpdir(), "qa005-")), "count");
+    const result = run("release.sh", ["build", "studafy-core-web", "infra/fly/web.toml", "rel1"], {
+      FLYCTL: fake("flyctl", "exit 0"),
+      // "not found" twice, then the manifest: what registry.fly.io did right after a push.
+      DOCKER: fake(
+        "docker",
+        `n=$(( $(cat "${counter}" 2>/dev/null || echo 0) + 1 )); echo $n > "${counter}"
+if [ $n -lt 3 ]; then echo "ERROR: not found" >&2; exit 1; fi
+echo '{"digest":"${digest}"}'`,
+      ),
+      DIGEST_RETRY_DELAY: "0",
+    });
+    expect(result.code).toBe(0);
+    expect(result.stdout.trim()).toBe(`registry.fly.io/studafy-core-web@${digest}`);
+    expect(readFileSync(counter, "utf8").trim()).toBe("3");
+  });
+
+  test("build fails, printing nothing, when the digest never appears", () => {
+    const result = run("release.sh", ["build", "studafy-core-web", "infra/fly/web.toml", "rel1"], {
+      FLYCTL: fake("flyctl", "exit 0"),
+      DOCKER: fake("docker", `echo "ERROR: not found" >&2; exit 1`),
+      DIGEST_ATTEMPTS: "2",
+      DIGEST_RETRY_DELAY: "0",
+    });
+    expect(result.code).toBe(1);
+    expect(result.stdout.trim()).toBe("");
+    expect(result.stderr).toContain("Could not resolve a digest");
+  });
+
   test("deploy refuses a mutable tag", () => {
     const result = run(
       "release.sh",

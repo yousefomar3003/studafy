@@ -168,16 +168,24 @@ jobs:
           set -euo pipefail
           flyctl auth docker
           build() { scripts/deploy/release.sh build "studafy-core-$1" "infra/fly/$1.toml" "$RELEASE" "${@:2}"; }
-          echo "api=$(build api)" >> "$GITHUB_OUTPUT"
-          echo "realtime=$(build realtime)" >> "$GITHUB_OUTPUT"
-          echo "workers=$(build workers)" >> "$GITHUB_OUTPUT"
-          echo "web=$(build web \
+          # Assigned first so `set -e` stops the job when a build fails; inside `echo "x=$(...)"`
+          # a failure was swallowed and the scan got an empty image reference.
+          api="$(build api)"
+          realtime="$(build realtime)"
+          workers="$(build workers)"
+          web="$(build web \
             --build-arg "VITE_RELEASE_VERSION=$RELEASE" \
             --build-arg "VITE_TURNSTILE_SITE_KEY=${{ vars.VITE_TURNSTILE_SITE_KEY }}" \
             --build-arg "VITE_SENTRY_DSN=${{ vars.VITE_SENTRY_DSN }}" \
             --build-arg "SENTRY_ORG=${{ vars.SENTRY_ORG }}" \
             --build-arg "SENTRY_PROJECT=${{ vars.SENTRY_PROJECT }}" \
-            ${SENTRY_AUTH_TOKEN:+--build-secret "sentry_auth_token=$SENTRY_AUTH_TOKEN"})" >> "$GITHUB_OUTPUT"
+            ${SENTRY_AUTH_TOKEN:+--build-secret "sentry_auth_token=$SENTRY_AUTH_TOKEN"})"
+          {
+            echo "api=$api"
+            echo "realtime=$realtime"
+            echo "workers=$workers"
+            echo "web=$web"
+          } >> "$GITHUB_OUTPUT"
         env:
           # Source maps upload to Sentry only when the token is there (web.Dockerfile mounts it as a
           # BuildKit secret, so it never lands in the image).

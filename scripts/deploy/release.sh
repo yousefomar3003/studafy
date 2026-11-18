@@ -29,8 +29,16 @@ build() {
   "$flyctl_bin" deploy . --config "$config" --app "$app" --remote-only --build-only --push \
     --image-label "$label" "$@" >&2
   local tag="registry.fly.io/$app:$label"
-  local digest
-  digest="$("$docker_bin" buildx imagetools inspect "$tag" --format '{{json .Manifest}}' | jq -r '.digest')"
+  local digest="" attempt
+  # The Fly registry can answer "not found" for a few seconds after the push completes, so look
+  # the tag up again before giving up.
+  for attempt in $(seq 1 "${DIGEST_ATTEMPTS:-10}"); do
+    digest="$("$docker_bin" buildx imagetools inspect "$tag" --format '{{json .Manifest}}' |
+      jq -r '.digest' 2>/dev/null || true)"
+    [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] && break
+    echo "No digest for $tag yet (attempt $attempt); retrying." >&2
+    sleep "${DIGEST_RETRY_DELAY:-6}"
+  done
   if ! [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
     echo "::error::Could not resolve a digest for $tag (got '$digest')." >&2
     return 1
