@@ -1,10 +1,10 @@
 # Runbook: production deploys (QA-005)
 
-Production is released by **Production deploy (fly.io)**, `.github/workflows/fly-production-deploy.yml`, dispatched from the Actions tab **on `dev`**. By-hand `fly deploy` from a laptop is for emergencies only (see [infra/fly/README.md](../../infra/fly/README.md#deploying)).
+Production is released by **Production deploy (fly.io)**, `.github/workflows/fly-production-deploy.yml`, dispatched from the Actions tab **on `main`**. Changes reach `main` through `dev`: feature branch → PR into `dev` → PR from `dev` into `main` → deploy `main`. By-hand `fly deploy` from a laptop is for emergencies only (see [infra/fly/README.md](../../infra/fly/README.md#deploying)).
 
 ## What the workflow guarantees
 
-1. **Gate** (`scripts/deploy/verify-ci-green.sh`, its own job with no secrets): the run must be on `refs/heads/dev`, and the newest `CI` push run for that exact commit must have completed with `success`. Running, failed, cancelled or missing CI refuses the release. `stage` can't be released, because it carries the 000003 migration drift.
+1. **Gate** (`scripts/deploy/verify-ci-green.sh`, its own job with no secrets): the run must be on `refs/heads/main`, and the newest `CI` push run for that exact commit must have completed with `success`. Running, failed, cancelled or missing CI refuses the release. `dev` and `stage` can't be released; `stage` also carries the 000003 migration drift.
 2. **Build once, scan, deploy by digest** (`scripts/deploy/release.sh`):
    - api, realtime, workers and web are each built once on Fly's builder and pushed;
    - each image's digest is resolved from the registry;
@@ -22,9 +22,9 @@ Production is released by **Production deploy (fly.io)**, `.github/workflows/fly
 
 The workflow file runs from the dispatched ref, so on its own it can't stop a modified copy on another branch. GitHub's environment settings can:
 
-1. **Settings → Environments → `prod` → Deployment branches and tags**: choose "Selected branches and tags" and add **`dev` only**. Every `prod` secret is then unavailable to a run from any other ref.
+1. **Settings → Environments → `prod` → Deployment branches and tags**: choose "Selected branches and tags" and add **`main` only**. Every `prod` secret is then unavailable to a run from any other ref.
 2. **Required reviewers** on `prod`: at least one person other than the dispatcher. Turn on "Prevent self-review".
-3. **Branch protection on `dev`**: require the `CI` checks and a pull request review, so `dev` only ever holds reviewed, green commits.
+3. **Branch protection on `main`** (and on `dev`, which feeds it): require the `CI` checks and a pull request review, so `main` only ever holds reviewed, green commits.
 4. **Secrets**: `JWT_PRIVATE_KEY_PEM` must exist in `prod` before the first release that contains QA-023 ([rotation-jwt-jwks.md](security/rotation-jwt-jwks.md)). The deploy refuses to start without it.
 
 ## Still to decide (NEEDS HUMAN)
