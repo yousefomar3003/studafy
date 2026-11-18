@@ -130,6 +130,13 @@ export type {
   SnapshotRecord,
   VoidedShare,
 } from "./ai-revenue-share/engine";
+// Collected Student AI months and the weekly statements (000251).
+export {
+  buildWeeklyStatements,
+  recordCollectedStudentAiMonths,
+  weekStartOf,
+} from "./ai-revenue-share/statements";
+export type { CollectedMonths, WeeklyStatementRecord } from "./ai-revenue-share/statements";
 export {
   REVENUE_SHARE_MEASURES,
   countEnrolledStudents,

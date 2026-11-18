@@ -318,6 +318,44 @@ for the caller to audit) runs after a payment is recorded or voided, after an in
    invoice: it becomes `payout_due`. The super admin records the payout (`POST .../payouts`, with the
    amount shown as a guard), audited.
 
+### Weekly statements (000251)
+
+Owner's rules of 2026-11-18: a parent opt-in's Student AI is paid **per student, as parents pay**.
+The full amount (price x the year's months) is on the parent's tuition and spread over the tuition
+instalments they pay with (phase 3); the school pays Studafy for the months it has collected,
+less its revenue share, every week; nothing is billed, credited or paid before a super admin
+approves.
+
+- **Collected months** (`app.student_ai_months`, `recordCollectedStudentAiMonths` in
+  `packages/billing/src/ai-revenue-share/statements.ts`): every month of a tuition portion billed
+  through Studafy (auto-billing) whose ERPNext invoice is **paid in full** (`invoice_cache`:
+  outstanding 0, not cancelled, draft, returned or credit-noted). A part payment does not count:
+  Studafy cannot tell which fees it paid. One row per student and month, priced at the licence's
+  programme seat price (`licensePriceMinor`, the licence's currency). A month not yet on a statement
+  whose invoice is cancelled later is `void`. The workers' hourly lifecycle job runs it (step 6).
+- **The statement** (`app.ai_programme_weekly_statements`, `buildWeeklyStatements`): every Monday
+  at 06:00 UTC (`run-ai-revenue-share-statements`), for the Monday-to-Sunday week that just ended,
+  one per school and currency: the collected months not on a statement yet, each with its share --
+  the conversion tier of the month it was **collected in** (its locked snapshot) plus the upload
+  bonus of the month before, capped, times the month-to-month multiplier -- and the licence shares
+  (school-assigned seats, from licence payments) that became final that week (`awaiting_approval`).
+  Gross = the months' prices, share = their shares, net = gross - share. A month whose share is not
+  known yet waits for a later week. The super admins are told once (`AI_REVENUE_SHARE_STATEMENTS_READY`).
+- **The decision** (console, `platform:manage`, audited; `apps/api/src/modules/licensing/statements.ts`):
+  - **Approve** (with the net and licence share shown, refused with
+    `AI_REVENUE_SHARE_STATEMENT_CHANGED` when they changed): the licence shares become owed (or
+    payout due) and settle; Studafy issues a licence invoice of kind `ai_statement` -- a
+    `student_ai_months` line and the share as an `ai_share_credit` line -- and the months are
+    `billed`.
+  - **Hold** (with a note): it waits.
+  - **Reject** (with a reason): its licence shares are `rejected`; its months leave it and wait for
+    a later statement.
+- **Activation**: when the statement invoice is paid in full (`recordPayment`, or at issue when
+  credits cover it) its months are `activated`. Voided unpaid, its months go back to `collected`.
+- **A statement invoice never starts or stops a licence**: `license_invoices.kind = 'ai_statement'`
+  is left out of activation, the non-payment stop and resume, and the AI-stop warnings. It still
+  gets the invoice-due and overdue reminders.
+
 ### Forfeiture (decision 11)
 
 An instalment is **forfeit** once it was not paid in full by its cutoff -- its due date + the

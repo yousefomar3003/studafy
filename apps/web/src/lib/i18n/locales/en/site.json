@@ -317,7 +317,8 @@
       "MARKS_RELEASED": "Released marks",
       "AI_OPTIN_AVAILABLE": "Student AI available",
       "AI_OPTIN_CONFIRMED": "Student AI confirmations",
-      "AI_OPTIN_SUMMARY": "Student AI opt-in summaries"
+      "AI_OPTIN_SUMMARY": "Student AI opt-in summaries",
+      "AI_REVENUE_SHARE_STATEMENTS_READY": "Student AI weekly statements"
     },
     "channels": {
       "in_app": "In-app",

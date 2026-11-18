@@ -30,6 +30,8 @@ export async function instalmentsPastCutoff(
     WHERE inst.school_id = current_setting('app.school_id')::uuid
       AND i.license_id = ${licenseId}::uuid
       AND i.status IN ('issued', 'partially_paid')
+      -- A Student AI weekly statement's invoice never stops a licence (000251).
+      AND i.kind = 'licence'
       AND inst.status <> 'paid'
       AND inst.due_date + l.nonpayment_grace_days <= ${today(now)}::date
   `;
@@ -78,6 +80,8 @@ export async function nextAiStop(
     WHERE inst.school_id = current_setting('app.school_id')::uuid
       AND i.license_id = ${licenseId}::uuid
       AND i.status IN ('issued', 'partially_paid')
+      -- A Student AI weekly statement's invoice never stops a licence (000251).
+      AND i.kind = 'licence'
       AND inst.status <> 'paid'
     ORDER BY inst.due_date, i.number, inst.position
     LIMIT 1

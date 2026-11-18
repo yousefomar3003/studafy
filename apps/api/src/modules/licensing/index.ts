@@ -21,6 +21,10 @@ export {
 } from "./ai-optin";
 export { platformAiRevenueShareRoutes, schoolAiRevenueShareRoutes } from "./revenue-share-routes";
 export {
+  platformAiRevenueShareStatementRoutes,
+  schoolAiRevenueShareStatementRoutes,
+} from "./statement-routes";
+export {
   INITIAL_AI_PROGRAMME_VERSION_ID,
   attachAiProgramme,
   clearSchoolOverride,
