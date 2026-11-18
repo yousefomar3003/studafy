@@ -531,6 +531,9 @@ const invoiceShape = {
   voidedAt: z.string().datetime().nullable(),
   voidReason: z.string().nullable(),
   paymentPlan: paymentPlanSchema,
+  kind: z.enum(["licence", "ai_statement"]).openapi("LicenseInvoiceKind", {
+    description: "licence: seats and terms; ai_statement: a Student AI weekly statement (000251).",
+  }),
   paymentLink: z
     .string()
     .url()
@@ -572,7 +575,7 @@ const invoiceLineSchema = z
   .object({
     position: z.number().int(),
     kind: z
-      .enum(["seats", "overlap_credit", "adjustment", "ai_share_credit"])
+      .enum(["seats", "overlap_credit", "adjustment", "ai_share_credit", "student_ai_months"])
       .openapi("LicenseInvoiceLineKind"),
     description: z.string(),
     audience: nullableAudience(),

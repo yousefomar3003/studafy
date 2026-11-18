@@ -86,7 +86,7 @@ export function utcDay(date: Date): string {
 // Licences and their measurement periods
 // ---------------------------------------------------------------------------------------------------
 
-interface LicenceFacts {
+export interface LicenceFacts {
   id: string;
   status: string;
   startsOn: string;
@@ -99,7 +99,10 @@ interface LicenceFacts {
   stamp: ProgrammeStamp;
 }
 
-async function readLicence(tx: TransactionSql, licenseId: string): Promise<LicenceFacts | null> {
+export async function readLicence(
+  tx: TransactionSql,
+  licenseId: string,
+): Promise<LicenceFacts | null> {
   const [row] = await tx<
     {
       id: string;
@@ -354,13 +357,13 @@ export async function insertSnapshot(
   };
 }
 
-interface LockedSnapshot {
+export interface LockedSnapshot {
   id: string;
   conversionBps: number;
   seats: number;
 }
 
-async function lockedSnapshot(
+export async function lockedSnapshot(
   tx: TransactionSql,
   licenseId: string,
   periodStart: string,

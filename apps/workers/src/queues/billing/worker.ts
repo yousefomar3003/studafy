@@ -6,6 +6,7 @@ import { createPool, leaseDatabase } from "../../db/pool";
 import { workerLogger } from "../../log";
 
 import { runAiOptInNotices } from "./ai-optin-notices";
+import { runAiRevenueShareStatements } from "./ai-revenue-share-statements";
 import { retryBillingEvent } from "./billing-event.service";
 import { runCostReport } from "./cost-report";
 import { runDunningSweep } from "./dunning-sweep";
@@ -161,7 +162,8 @@ export async function processBillingJob(
     job.name === JOB_NAMES.RUN_LICENSE_LIFECYCLE ||
     job.name === JOB_NAMES.RUN_LICENSE_REMINDERS ||
     job.name === JOB_NAMES.RUN_USAGE_PERIOD_START ||
-    job.name === JOB_NAMES.RUN_AI_OPTIN_NOTICES
+    job.name === JOB_NAMES.RUN_AI_OPTIN_NOTICES ||
+    job.name === JOB_NAMES.RUN_AI_REVENUE_SHARE_STATEMENTS
   ) {
     return processLicenseJob(job.name, database);
   }
@@ -182,6 +184,9 @@ async function processLicenseJob(name: string, database: DatabaseSource): Promis
     }
     if (name === JOB_NAMES.RUN_AI_OPTIN_NOTICES) {
       return await runAiOptInNotices(sql, now, workerLogger);
+    }
+    if (name === JOB_NAMES.RUN_AI_REVENUE_SHARE_STATEMENTS) {
+      return await runAiRevenueShareStatements(sql, now, workerLogger);
     }
     return await runUsagePeriodStart(sql, now, workerLogger);
   } finally {

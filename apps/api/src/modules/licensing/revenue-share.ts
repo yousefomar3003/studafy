@@ -500,7 +500,7 @@ export async function licenseRevenueShare(
 // The super admin's changes
 // ---------------------------------------------------------------------------------------------------
 
-function requireReason(reason: string | null | undefined, actor: LicenseActor): string {
+export function requireReason(reason: string | null | undefined, actor: LicenseActor): string {
   const trimmed = (reason ?? "").trim();
   if (trimmed === "" || trimmed.length > AI_PROGRAMME_LIMITS.reasonMaxLength) {
     throw licenseError(422, ERROR_CODES.AI_PROGRAMME_REASON_REQUIRED, actor.locale);

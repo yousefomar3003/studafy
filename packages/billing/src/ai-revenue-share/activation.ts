@@ -66,6 +66,8 @@ export async function licencesToPutInForce(
     WHERE l.school_id = current_setting('app.school_id')::uuid
       AND l.status IN ('draft', 'awaiting_payment')
       AND i.status <> 'void'
+      -- A Student AI weekly statement's invoice never puts a licence in force (000251).
+      AND i.kind = 'licence'
       ${credited}
       AND (
         i.status = 'paid'
@@ -92,6 +94,7 @@ export async function licencesToPutInForce(
         WHERE inst.school_id = l.school_id
           AND i.license_id = l.id
           AND i.status IN ('issued', 'partially_paid')
+          AND i.kind = 'licence'
           AND inst.status <> 'paid'
           AND inst.due_date + l.nonpayment_grace_days <= ${day(now)}::date
       )

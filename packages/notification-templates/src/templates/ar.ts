@@ -154,6 +154,13 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.EMAIL]:
       "رفعت {schoolName} إيصال تحويل بنكي للفاتورة {invoiceNumber}. سجّل الدفعة وطابق الإيصال معها في لوحة التراخيص.",
   },
+  [NOTIFICATION_TYPES.AI_REVENUE_SHARE_STATEMENTS_READY]: {
+    [NOTIFICATION_CHANNELS.IN_APP]:
+      "{statements} كشوفات أسبوعية للذكاء الاصطناعي للطلاب من {schools} مدارس (أسبوع {weekStart}) بانتظار اعتمادك.",
+    [NOTIFICATION_CHANNELS.PUSH]: "{statements} كشوفات للذكاء الاصطناعي للطلاب بانتظار الاعتماد",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "الكشوفات الأسبوعية للذكاء الاصطناعي للطلاب لأسبوع {weekStart} جاهزة: {statements} كشوفات من {schools} مدارس. اعتمد كل كشف أو علّقه أو ارفضه من لوحة التحكم؛ لا يُفوتر أو يُقيَّد أي شيء قبل اعتمادك.",
+  },
   [NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING]: {
     [NOTIFICATION_CHANNELS.IN_APP]:
       "يتوقف الذكاء الاصطناعي في Studafy لدى {schoolName} في {stopDate}، بعد {daysLeft} أيام، ما لم تُسدَّد الفاتورة {invoiceNumber} (المستحقة في {dueDate}). الرصيد: {balance}.",

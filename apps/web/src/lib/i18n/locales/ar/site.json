@@ -321,7 +321,8 @@
       "MARKS_RELEASED": "صدور الدرجات",
       "AI_OPTIN_AVAILABLE": "إتاحة الذكاء الاصطناعي للطلاب",
       "AI_OPTIN_CONFIRMED": "تأكيدات الذكاء الاصطناعي للطلاب",
-      "AI_OPTIN_SUMMARY": "ملخصات اشتراكات الذكاء الاصطناعي للطلاب"
+      "AI_OPTIN_SUMMARY": "ملخصات اشتراكات الذكاء الاصطناعي للطلاب",
+      "AI_REVENUE_SHARE_STATEMENTS_READY": "الكشوفات الأسبوعية للذكاء الاصطناعي للطلاب"
     },
     "channels": {
       "in_app": "داخل التطبيق",

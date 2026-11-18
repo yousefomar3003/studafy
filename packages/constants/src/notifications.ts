@@ -82,6 +82,10 @@ export const NOTIFICATION_TYPES = {
   // push, never emailed). Mirrored in app.notification_type by migration 000233.
   LICENSE_AI_STOP_WARNING: "LICENSE_AI_STOP_WARNING",
   LICENSE_AI_STOPPED: "LICENSE_AI_STOPPED",
+  // The Student AI weekly statements are ready (000251): written every Monday by the workers'
+  // statements job to the super admins, who approve, hold or reject each one. In-app and push.
+  // Mirrored in app.notification_type by migration 000251.
+  AI_REVENUE_SHARE_STATEMENTS_READY: "AI_REVENUE_SHARE_STATEMENTS_READY",
   // Everyday school events, written by the workers' outbox notify consumer
   // (apps/workers/src/queues/notifications/school-events.ts): an assignment published (to the class's
   // students and their parents), a hand-in's mark released (to that student and their parents), and a

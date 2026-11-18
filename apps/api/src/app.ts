@@ -153,8 +153,10 @@ import {
   aiOptInRoutes,
   platformAiProgrammeRoutes,
   platformAiRevenueShareRoutes,
+  platformAiRevenueShareStatementRoutes,
   platformLicenseRoutes,
   schoolAiRevenueShareRoutes,
+  schoolAiRevenueShareStatementRoutes,
   schoolLicenseBillingRoutes,
   schoolLicenseRoutes,
 } from "./modules/licensing";
@@ -1317,6 +1319,10 @@ export function createApp({
     // payouts, and the school's own read (aiRevenueShare:read).
     app.route("/", platformAiRevenueShareRoutes(licensingDeps));
     app.route("/", schoolAiRevenueShareRoutes(licensingDeps));
+    // The Student AI weekly statements (000251): the super admin's approval queue and the school's
+    // own read.
+    app.route("/", platformAiRevenueShareStatementRoutes(licensingDeps));
+    app.route("/", schoolAiRevenueShareStatementRoutes(licensingDeps));
   }
 
   // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with

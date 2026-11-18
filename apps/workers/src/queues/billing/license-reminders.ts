@@ -234,6 +234,8 @@ async function dueReminders(
     JOIN app.currencies AS c ON c.id = i.currency_id
     WHERE inst.school_id = current_setting('app.school_id')::uuid
       AND i.status IN ('issued', 'partially_paid')
+      -- A Student AI weekly statement's invoice never stops a licence (000251).
+      AND i.kind = 'licence'
       AND inst.status <> 'paid'
       AND l.status IN ('active', 'suspended')
       AND inst.due_date + l.nonpayment_grace_days

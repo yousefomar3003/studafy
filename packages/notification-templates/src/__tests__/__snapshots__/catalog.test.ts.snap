@@ -176,6 +176,12 @@ exports[`renderNotification — snapshot tests en LICENSE_AI_STOPPED / push rend
 
 exports[`renderNotification — snapshot tests en LICENSE_AI_STOPPED / email renders correctly 1`] = `"Amman Academy's Studafy AI stopped on 2026-12-01 because invoice LIC-2026-000042, due on 2026-11-01, still has 364.50 USD unpaid. Students and teachers holding the license's seats have lost its AI features until it is paid. Pay by bank transfer with the payment reference printed on the invoice and upload the receipt in Studafy; the AI starts again as soon as Studafy records the payment."`;
 
+exports[`renderNotification — snapshot tests en AI_REVENUE_SHARE_STATEMENTS_READY / in_app renders correctly 1`] = `"4 Student AI weekly statements from 3 schools (week of 2026-11-16) are waiting for your approval."`;
+
+exports[`renderNotification — snapshot tests en AI_REVENUE_SHARE_STATEMENTS_READY / push renders correctly 1`] = `"4 Student AI statements to approve"`;
+
+exports[`renderNotification — snapshot tests en AI_REVENUE_SHARE_STATEMENTS_READY / email renders correctly 1`] = `"The Student AI weekly statements for the week of 2026-11-16 are ready: 4 statements from 3 schools. Approve, hold or reject each one in the console; nothing is billed or credited before you approve it."`;
+
 exports[`renderNotification — snapshot tests en ASSIGNMENT_PUBLISHED / in_app renders correctly 1`] = `"New assignment: Gravity"`;
 
 exports[`renderNotification — snapshot tests en ASSIGNMENT_PUBLISHED / push renders correctly 1`] = `"Amina Tazi · Physics · due 2026-11-20"`;
@@ -399,6 +405,12 @@ exports[`renderNotification — snapshot tests ar LICENSE_AI_STOPPED / in_app re
 exports[`renderNotification — snapshot tests ar LICENSE_AI_STOPPED / push renders correctly 1`] = `"توقف الذكاء الاصطناعي في Studafy: الفاتورة LIC-2026-000042 غير مسددة"`;
 
 exports[`renderNotification — snapshot tests ar LICENSE_AI_STOPPED / email renders correctly 1`] = `"توقف الذكاء الاصطناعي في Studafy لدى Amman Academy في 2026-12-01 لأن الفاتورة LIC-2026-000042 المستحقة في 2026-11-01 ما زال فيها 364.50 USD غير مسدد. فقد الطلاب والمعلمون الحاملون لمقاعد الترخيص ميزات الذكاء الاصطناعي حتى تُسدَّد. يُرجى الدفع بتحويل بنكي مع ذكر مرجع الدفع المطبوع على الفاتورة ورفع الإيصال في Studafy، ويعود العمل به فور تسجيل Studafy للدفعة."`;
+
+exports[`renderNotification — snapshot tests ar AI_REVENUE_SHARE_STATEMENTS_READY / in_app renders correctly 1`] = `"4 كشوفات أسبوعية للذكاء الاصطناعي للطلاب من 3 مدارس (أسبوع 2026-11-16) بانتظار اعتمادك."`;
+
+exports[`renderNotification — snapshot tests ar AI_REVENUE_SHARE_STATEMENTS_READY / push renders correctly 1`] = `"4 كشوفات للذكاء الاصطناعي للطلاب بانتظار الاعتماد"`;
+
+exports[`renderNotification — snapshot tests ar AI_REVENUE_SHARE_STATEMENTS_READY / email renders correctly 1`] = `"الكشوفات الأسبوعية للذكاء الاصطناعي للطلاب لأسبوع 2026-11-16 جاهزة: 4 كشوفات من 3 مدارس. اعتمد كل كشف أو علّقه أو ارفضه من لوحة التحكم؛ لا يُفوتر أو يُقيَّد أي شيء قبل اعتمادك."`;
 
 exports[`renderNotification — snapshot tests ar ASSIGNMENT_PUBLISHED / in_app renders correctly 1`] = `"واجب جديد: Gravity"`;
 
