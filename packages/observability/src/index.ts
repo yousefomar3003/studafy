@@ -28,3 +28,5 @@ export type {
   ErrorMonitoringHandle,
   ErrorMonitoringOptions,
 } from "./errorMonitoring";
+
+export { redactPiiText } from "./scrubPii";

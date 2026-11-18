@@ -217,6 +217,9 @@ export const JOB_NAMES = {
   // (global) to NULL in batches. app.audit_logs is append-only and keeps its addresses. Carries no
   // payload. Registered on the maintenance queue via Job Scheduler.
   PURGE_EXPIRED_IP_ADDRESSES: "purge-expired-ip-addresses",
+  // Every 15 minutes (QA-055): re-enqueue uploads stuck in `scanning`, and scan the ones left
+  // `unscanned` from before scanning covered them. Maintenance queue.
+  SWEEP_STUCK_UPLOAD_SCANS: "sweep-stuck-upload-scans",
   // Scheduled deletion of materials that will never become available: an upload never confirmed
   // after 24 hours, and a failed material left for 14 days. Their stored files are removed and the
   // space released. Carries no payload. Registered on the maintenance queue via Job Scheduler

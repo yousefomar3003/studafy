@@ -22,6 +22,7 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { AUTH_CHANNELS, issueTokenPair, KeyStore } from "../../src/modules/auth";
 import {
+  appDatabaseFor,
   assignRole,
   createFullTenant,
   createRefreshSession,
@@ -208,10 +209,11 @@ beforeAll(async () => {
   resetSecurityConfig();
 
   app = createApp({
+    idTokenLoginEnabled: true,
     isReady: () => true,
     tracker: createInflightTracker(),
     logger: createLogger({ destination: () => undefined }),
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,

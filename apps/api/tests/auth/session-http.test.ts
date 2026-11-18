@@ -7,6 +7,7 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { KeyStore } from "../../src/modules/auth";
 import {
+  appDatabaseFor,
   assignRole,
   createFullTenant,
   createRefreshSession,
@@ -70,7 +71,7 @@ beforeAll(async () => {
     isReady: () => true,
     tracker: createInflightTracker(),
     logger,
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
@@ -173,8 +174,8 @@ describe("delivery", () => {
     expect(cookie).toBeDefined();
     expect(cookie).toContain("HttpOnly");
     expect(cookie).toContain("SameSite=Strict");
-    // Scoped to the two endpoints that consume it, so it rides on no other request.
-    expect(cookie).toContain("Path=/api/auth");
+    // Path=/ because deployed tiers name it `__Host-session`, which requires it (QA-070).
+    expect(cookie).toContain("Path=/;");
   });
 
   integrationTest("gives a mobile session the token in the body and sets no cookie", async () => {
@@ -264,6 +265,14 @@ describe("failures", () => {
     // The correlation the ticket asks for: the body's request_id is the response header's value.
     expect(problem.request_id).toBe(res.headers.get("x-request-id"));
   });
+
+  integrationTest(
+    "a malformed cookie is a bad credential, not a server error (QA-070)",
+    async () => {
+      const res = await post("/api/auth/refresh", { headers: { cookie: "session=%E0%A4%A" } });
+      expect(res.status).toBe(401);
+    },
+  );
 
   integrationTest("answers 400, not 401, when nothing was presented", async () => {
     const res = await post("/api/auth/refresh", {
@@ -529,4 +538,43 @@ describe("logging", () => {
     expect(breach!.level).toBe(50);
     expect(breach!.family_id).toBe(seed.familyId);
   });
+});
+
+// QA-085: a refresh token slid forever -- every rotation granted a fresh 30 days -- so a stolen
+// session never had to end. A session family now has an absolute lifetime from its first token.
+describe("absolute session lifetime (QA-085)", () => {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+
+  integrationTest("a family older than the cap cannot be refreshed", async () => {
+    const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.STUDENT.id, {
+      channel: "mobile",
+      issuedAt: new Date(Date.now() - 91 * DAY_MS),
+    });
+    const res = await post("/api/auth/refresh", {
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ refresh_token: seed.token }),
+    });
+    expect(res.status).toBe(401);
+  });
+
+  integrationTest(
+    "a refresh near the cap is cut to the cap, not granted 30 more days",
+    async () => {
+      const familyStart = new Date(Date.now() - 89 * DAY_MS);
+      const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.STUDENT.id, {
+        channel: "mobile",
+        issuedAt: familyStart,
+      });
+      const res = await post("/api/auth/refresh", {
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refresh_token: seed.token }),
+      });
+      expect(res.status).toBe(200);
+      const [child] = await sql<{ expires_at: Date }[]>`
+      SELECT expires_at FROM app.refresh_tokens
+      WHERE family_id = ${seed.familyId}::uuid AND parent_token_id IS NOT NULL
+    `;
+      expect(child!.expires_at.getTime()).toBeLessThanOrEqual(familyStart.getTime() + 90 * DAY_MS);
+    },
+  );
 });

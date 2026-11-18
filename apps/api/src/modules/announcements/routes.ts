@@ -18,7 +18,7 @@ import { createAnnouncement, listAnnouncements } from "./service";
 
 import type { Database } from "../../db/client";
 import type { AppEnv } from "../../middleware/requestId";
-import type { Context } from "hono";
+import type { Context, MiddlewareHandler } from "hono";
 
 function tenantFrom(c: Context<AppEnv>) {
   const auth = requireAuth(c);
@@ -42,7 +42,21 @@ const listAnnouncementsRoute = createRoute({
   ),
 });
 
+/**
+ * notification:manage or notification:send, checked before the body is validated (QA-086), so an
+ * unauthorised caller gets 403 rather than a 400 that describes the schema. Which of the two the
+ * caller holds still decides the scope, in the handler.
+ */
+const canAnnounce: MiddlewareHandler<AppEnv> = async (c, next) => {
+  const auth = requireAuth(c);
+  if (!hasPermission(auth.roles, PERMISSIONS.NOTIFICATION_MANAGE)) {
+    requirePermissionIn(c, PERMISSIONS.NOTIFICATION_SEND);
+  }
+  await next();
+};
+
 const createAnnouncementRoute = createRoute({
+  middleware: [canAnnounce] as const,
   method: "post",
   path: "/api/announcements",
   tags: ["Announcements"],
@@ -114,8 +128,8 @@ export function announcementRoutes(database: Database): OpenAPIHono<AppEnv> {
 
     // notification:manage => full authority (any audience, mandatory allowed). Otherwise the caller
     // must hold notification:send and createAnnouncement applies the scoped teacher rules.
+    // canAnnounce has checked the caller holds one of them.
     const scoped = !hasPermission(auth.roles, PERMISSIONS.NOTIFICATION_MANAGE);
-    if (scoped) requirePermissionIn(c, PERMISSIONS.NOTIFICATION_SEND);
 
     const announcement = await withTenantTx(database, tenantFrom(c), (tx) =>
       createAnnouncement(tx, auth.schoolId, auth.userId, body, new Date(), {

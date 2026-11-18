@@ -9,6 +9,10 @@ export interface Migration {
   sql: string;
   checksum: string;
   transactional: boolean;
+  /** Postgres lock_timeout while this migration runs (QA-049). Default "5s". */
+  lockTimeout: string;
+  /** Postgres statement_timeout while this migration runs (QA-049). Default "15min". */
+  statementTimeout: string;
 }
 
 export interface AppliedMigration {

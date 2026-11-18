@@ -1,5 +1,6 @@
 import { DOMAIN_EVENTS } from "@studafy/constants";
 
+import { withAppTx } from "../../../db/tenant-tx";
 import { ErpNextError } from "../../../erpnext/client";
 import { emit } from "../../../lib/events/emitter";
 import { getCurrencyByCode, toMinorUnits } from "../currency";
@@ -75,7 +76,7 @@ async function flagOverdueInstallments(
     SET status = 'overdue',
         updated_at = CURRENT_TIMESTAMP
     WHERE school_id = ${schoolId}::uuid
-      AND due_date < CURRENT_DATE
+      AND due_date < app.school_today()
       AND status IN ('pending', 'partially_paid')
     RETURNING id, student_id, erpnext_fee_schedule_id, due_date, outstanding_amount_minor
   `;
@@ -338,7 +339,11 @@ export async function runGlobalReconciliation(
   erpnextFactory: TenantErpNextFactory,
   logger?: Logger,
 ): Promise<GlobalReconciliationResult> {
-  const schools = await database<{ id: string }[]>`SELECT id FROM app.schools`;
+  // As studafy_app, not the raw login (QA-014); each school then runs in its own tenant scope.
+  const schools = await withAppTx(
+    database,
+    (tx) => tx<{ id: string }[]>`SELECT id FROM app.schools`,
+  );
 
   let totalDrift = 0;
   let totalHealed = 0;

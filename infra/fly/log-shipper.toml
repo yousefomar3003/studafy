@@ -16,6 +16,8 @@ primary_region = "fra"
   image = "ghcr.io/superfly/fly-log-shipper:latest@sha256:844d084753fa29f2f45e3fa37711615793816859929727fb4f01a11c62a3c642"
 
 [env]
+  # QA-072: Studafy is to move out of the shared `personal` organisation into its own
+  # (docs/runbooks/fly-org-migration.md); this and ACCESS_TOKEN change with it.
   ORG = "personal"
   HTTP_URL = "https://eu-central-1.aws.edge.axiom.co/v1/ingest/studafy-logs"
 

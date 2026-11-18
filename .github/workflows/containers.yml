@@ -9,7 +9,11 @@ on:
         "db/**",
         "infra/docker/**",
         "bun.lock",
+        ".dockerignore",
+        "scripts/ci/assert-clean-build-context.sh",
+        "scripts/ci/assert-web-headers.sh",
         ".github/workflows/containers.yml",
+        ".trivyignore",
       ]
   push:
     branches: [dev]
@@ -20,20 +24,44 @@ on:
         "db/**",
         "infra/docker/**",
         "bun.lock",
+        ".dockerignore",
+        "scripts/ci/assert-clean-build-context.sh",
+        "scripts/ci/assert-web-headers.sh",
         ".github/workflows/containers.yml",
+        ".trivyignore",
       ]
 
 permissions:
   contents: read
 
 jobs:
+  # QA-021: every Dockerfile runs `COPY . .` from the repo root, so the root .dockerignore is all
+  # that keeps local secret files and Terraform state out of the builder. Proven with sentinel
+  # files in a throwaway context -- no real secret is ever involved.
+  build-context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Secrets and infrastructure state stay out of the build context
+        run: bash scripts/ci/assert-clean-build-context.sh
+
+  # QA-052: every path the web app serves (SPA routes via /index.html, hashed /assets/) carries the
+  # security headers; nginx drops inherited add_header in any location that sets its own.
+  web-headers:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Security headers on every web path
+        run: bash scripts/ci/assert-web-headers.sh
+
   build-scan:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          # trivy_exit_code gates whether a CRITICAL image finding fails the job. The app-owned
-          # images (built from slim bases we control) stay strict at "1". erpnext rides the large,
+          # trivy_exit_code gates whether a HIGH or CRITICAL image finding fails the job (QA-073:
+          # HIGH too, the same bar the deploy workflow's pre-release scan holds the exact release
+          # digests to). The app-owned images (built from slim bases we control) stay strict at "1". erpnext rides the large,
           # unmodified third-party frappe/erpnext base (see infra/docker/erpnext.Dockerfile) whose
           # CVEs the team does not patch directly and whose vuln set churns with trivy's DB, so its
           # scan is report-only ("0") -- findings still surface in the logs/SBOM but don't block.
@@ -49,9 +77,11 @@ jobs:
             dockerfile: infra/docker/workers.Dockerfile
             max_mb: 250
             trivy_exit_code: "1"
+          # 110, not 100: QA-073's `apk upgrade` layer (patched OpenSSL, musl, zlib) adds ~7MB to an
+          # image that measured ~100MB (layer sum 106.8MB after it).
           - service: migrations
             dockerfile: infra/docker/migrations.Dockerfile
-            max_mb: 100
+            max_mb: 110
             trivy_exit_code: "1"
           - service: web
             dockerfile: infra/docker/web.Dockerfile
@@ -88,7 +118,7 @@ jobs:
       # Authenticated Docker Hub pulls are rate-limited far less aggressively and avoid the
       # "context deadline exceeded" timeouts that unauthenticated pulls hit on GH Actions runners.
       # Conditional so the job doesn't fail when the secrets haven't been configured yet.
-      - uses: docker/login-action@v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         if: ${{ env.DOCKERHUB_USERNAME != '' }}
         env:
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -109,7 +139,7 @@ jobs:
           done
           echo "Build failed after 3 attempts" >&2
           exit 1
-      - uses: anchore/sbom-action@v0
+      - uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           image: studafy/${{ matrix.service }}:ci
           artifact-name: ${{ matrix.service }}.spdx.json
@@ -120,11 +150,11 @@ jobs:
           max=$(( ${{ matrix.max_mb }} * 1024 * 1024 ))
           echo "image size: $((bytes / 1024 / 1024))MB ($bytes bytes) -- budget: ${{ matrix.max_mb }}MB ($max bytes)"
           test "$bytes" -le "$max"
-      - uses: aquasecurity/trivy-action@v0.36.0
+      - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           version: v0.72.0
           image-ref: studafy/${{ matrix.service }}:ci
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: ${{ matrix.trivy_exit_code }}
           trivyignores: .trivyignore

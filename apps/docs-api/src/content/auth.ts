@@ -44,20 +44,26 @@ export const authGuide: Guide = {
     {
       heading: "Logging in",
       body: [
-        "There is no username/password endpoint. A returning user authenticates with an OIDC ID " +
-          "token already verified by Microsoft or Google:",
+        "Staff sign in with Microsoft or Google through a flow the server binds end to end: it " +
+          "issues the PKCE `state` and `nonce`, exchanges the authorization code itself, and only " +
+          "then issues a session. A native client starts with `GET /api/auth/oauth/{provider}/" +
+          "mobile-start`, opens the returned authorization URL, and exchanges the code it gets " +
+          "back. A bare ID token is never accepted on its own.",
       ],
       blocks: [
         {
           language: "http",
-          api: { method: "POST", path: "/api/auth/login/oauth", documented: true },
+          api: {
+            method: "POST",
+            path: "/api/auth/oauth/microsoft/mobile-exchange",
+            documented: true,
+          },
           code:
-            "POST /api/auth/login/oauth\nContent-Type: application/json\n\n" +
+            "POST /api/auth/oauth/microsoft/mobile-exchange\nContent-Type: application/json\n\n" +
             "{\n" +
-            '  "id_token": "<verified Microsoft or Google OIDC id_token>",\n' +
-            '  "nonce": "<the nonce your authorization request generated>",\n' +
-            '  "provider": "microsoft",\n' +
-            '  "channel": "api"\n' +
+            '  "code": "<authorization code from the callback>",\n' +
+            '  "state": "<state returned by mobile-start>",\n' +
+            '  "nonce": "<nonce returned by mobile-start>"\n' +
             "}",
         },
       ],

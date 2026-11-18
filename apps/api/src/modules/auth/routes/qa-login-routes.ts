@@ -26,6 +26,7 @@ import { clientIpFrom } from "../../../lib/client-ip";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
+import { establishedChannel } from "../channels";
 import { deliverTokenPair } from "../delivery";
 import { loginQaUser } from "../services/qa-login-service";
 
@@ -103,7 +104,8 @@ export function qaLoginRoutes(
       throw new HTTPException(404, { message: "QA login is not configured" });
     }
 
-    const { email, password, channel } = c.req.valid("json");
+    const { email, password } = c.req.valid("json");
+    const channel = establishedChannel(c.req.header("origin"), c.req.valid("json").channel);
     const clientIp = clientIpFrom(c);
     const userAgent = c.req.header("user-agent") ?? null;
 

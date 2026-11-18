@@ -1,6 +1,8 @@
 import { z } from "@hono/zod-openapi";
 import { dateTimeSchema, uuidSchema } from "@studafy/shared-schemas";
 
+import { returnUrlSchema } from "../../../lib/security/return-url";
+
 export const startOnlineFeePaymentBodySchema = z
   .object({
     student_id: uuidSchema,
@@ -10,11 +12,10 @@ export const startOnlineFeePaymentBodySchema = z
       .min(1)
       .max(140)
       .openapi({ description: "The ERPNext Sales Invoice name, as in the pay-online link." }),
-    success_url: z
-      .string()
-      .url()
-      .openapi({ description: "Where the payer returns after paying. Not proof of payment." }),
-    cancel_url: z.string().url().openapi({
+    success_url: returnUrlSchema.openapi({
+      description: "Where the payer returns after paying. Not proof of payment.",
+    }),
+    cancel_url: returnUrlSchema.openapi({
       description: "Where the payer returns on cancel (Stripe only; Tap has one URL).",
     }),
   })

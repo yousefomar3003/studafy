@@ -53,7 +53,26 @@ const PERMISSIONS_BY_ROLE: ReadonlyMap<Role, ReadonlySet<Permission>> = new Map(
  * middleware does, instead of reimplementing the lookup against the matrix.
  */
 export function hasPermission(roles: readonly Role[], permission: Permission): boolean {
+  permissionCheckObserver?.(permission);
   return roles.some((role) => PERMISSIONS_BY_ROLE.get(role)?.has(permission) === true);
+}
+
+/** Receives every permission a request is checked against; see `observePermissionChecks`. */
+export type PermissionCheckObserver = (permission: Permission) => void;
+
+let permissionCheckObserver: PermissionCheckObserver | undefined;
+
+/**
+ * Test-only: be told about every permission decision made, by any of the three forms the app uses
+ * (the `requirePermission` middleware, `requirePermissionIn` inside a handler, or a handler's own
+ * `hasPermission` branch) -- all of them funnel through `hasPermission` above.
+ *
+ * tests/security/route-guard-coverage.test.ts drives every OpenAPI operation through the real app
+ * with an observer installed, which is how it knows a route is guarded at all, however the guard is
+ * wired (QA-001). Pass `undefined` to remove it. Nothing in src/ installs one.
+ */
+export function observePermissionChecks(observer: PermissionCheckObserver | undefined): void {
+  permissionCheckObserver = observer;
 }
 
 /**

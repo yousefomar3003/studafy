@@ -1,6 +1,7 @@
 title = "Studafy gitleaks config"
 
-# Use gitleaks' full default ruleset; this file only narrows it with an allowlist.
+# Use gitleaks' full default ruleset; this file only narrows it with allowlists. `[[allowlists]]`
+# needs gitleaks 8.25+; CI pins the version (ci.yml secret-scan-history, GITLEAKS_VERSION).
 [extend]
 useDefault = true
 
@@ -10,7 +11,8 @@ useDefault = true
 # etc.) — never a real credential. Allowlisting by commit SHA, not by rule or pattern, keeps the
 # allowlist as narrow as gitleaks' schema allows: a genuinely new secret added in any other commit,
 # including a later commit touching these same files, still fails the scan.
-[allowlist]
+[[allowlists]]
+  description = "ST-249: commits audited as synthetic test fixtures"
   commits = [
     "d3d28020911ff23f040081adb4d7f4a370b1577a", # stripe-adapter.test.ts: a fake Stripe test key literal
     "68d799e04168a657a72c7d27e075c8e86bbd2ca0", # session-http.test.ts: fake refresh token fixture
@@ -23,4 +25,31 @@ useDefault = true
     # PR, along with the same wording in the findings report doc) -- a self-inflicted repeat of the
     # exact false positive this file exists to allowlist, not a new secret.
     "1e31f23e37387acc43bd39fa4e0b922635be19de",
+  ]
+
+# QA-075: audited on 2026-11-17 with `gitleaks git . --redact` (full history) and `gitleaks dir`
+# (the tracked tree). Everything left was a placeholder, never a credential. Unlike the commit list
+# above, these also clear the scan of the working tree (`gitleaks dir` has no commits), and each
+# regex is the exact fixture value, anchored: any other value in the same files still fails.
+[[allowlists]]
+  description = "QA-075: exact fixture and placeholder values"
+  regexes = [
+    '''^sk_test_[p]laceholder$''',                    # stripe-adapter.test.ts; QA docs quote it
+    '''^mismatch-key-1$''',                            # idempotency.test.ts
+    '''^reconciliation-test-key-0123456789$''',        # secret-compare.test.ts (QA-092)
+    '''^(?:abcdef0123456789){4}$''',                   # invitation/service.test.ts repeated hex
+    '''^dGVzdC10b2tlbi0zMi1ieXRlcy1sb25nLXBhZGRpbmc$''', # csrf.test.ts: base64 "test-token-32-bytes..."
+    '''^7K3M-Q9TZ-2HXR-B8WD$''',                       # member_sign_in_test.dart setup code
+    '''^JWT_(?:NEXT_)?PRIVATE_KEY_PEM=[AB]$''',          # rotation-jwt-jwks.md: keys named A and B
+    '''\[\\s\\S\]\+''',                                 # env.ts: the PKCS#8 PEM *regex*, not a key
+  ]
+
+# QA-075: graphify's build cache (file sizes, mtimes, content hashes, per-file ASTs) was tracked
+# until QA-075, and its hashes match generic-api-key 49 times in commit 51baae3d alone. It is
+# gitignored now, so this path only covers history. It is derived from source files that are
+# scanned themselves.
+[[allowlists]]
+  description = "QA-075: graphify's former build cache"
+  paths = [
+    '''^graphify-out/cache/''',
   ]

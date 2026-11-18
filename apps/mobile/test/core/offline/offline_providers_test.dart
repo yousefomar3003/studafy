@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:studafy_mobile/src/core/auth/auth_providers.dart';
 import 'package:studafy_mobile/src/core/auth/auth_state.dart';
+import 'package:studafy_mobile/src/core/offline/offline_database.dart';
 import 'package:studafy_mobile/src/core/offline/offline_providers.dart';
 
 /// A notifier the test can flip directly, standing in for the real `authNotifierProvider`-backed
@@ -32,28 +35,32 @@ void main() {
     container = ProviderContainer(
       overrides: [
         offlineDatabaseExecutorProvider.overrideWithValue(NativeDatabase.memory()),
+        offlineCacheOwnerProvider.overrideWithValue(() => 'user-1'),
         authStatusProvider.overrideWith((ref) => ref.watch(_fakeAuthStatus)),
       ],
     );
     addTearDown(container.dispose);
   });
 
-  test('clears the cache when the session transitions from authenticated to unauthenticated', () async {
-    _keepAlive(container);
-    final database = container.read(offlineDatabaseProvider);
-    await database.write(
-      resource: 'materials',
-      cacheKey: 'class-1',
-      payload: '[]',
-      fetchedAt: DateTime.now(),
-    );
-    expect(await database.read(resource: 'materials', cacheKey: 'class-1'), isNotNull);
+  test(
+    'clears the cache when the session transitions from authenticated to unauthenticated',
+    () async {
+      _keepAlive(container);
+      final database = container.read(offlineDatabaseProvider);
+      await database.write(
+        resource: 'materials',
+        cacheKey: 'class-1',
+        payload: '[]',
+        fetchedAt: DateTime.now(),
+      );
+      expect(await database.read(resource: 'materials', cacheKey: 'class-1'), isNotNull);
 
-    container.read(_fakeAuthStatus.notifier).state = AuthStatus.unauthenticated;
-    await Future<void>.delayed(Duration.zero);
+      container.read(_fakeAuthStatus.notifier).state = AuthStatus.unauthenticated;
+      await Future<void>.delayed(Duration.zero);
 
-    expect(await database.read(resource: 'materials', cacheKey: 'class-1'), isNull);
-  });
+      expect(await database.read(resource: 'materials', cacheKey: 'class-1'), isNull);
+    },
+  );
 
   test('does not clear the cache while the session stays authenticated', () async {
     _keepAlive(container);
@@ -75,6 +82,7 @@ void main() {
     final bootContainer = ProviderContainer(
       overrides: [
         offlineDatabaseExecutorProvider.overrideWithValue(NativeDatabase.memory()),
+        offlineCacheOwnerProvider.overrideWithValue(() => 'user-1'),
         authStatusProvider.overrideWith((ref) => ref.watch(_fakeAuthStatus)),
       ],
     );
@@ -94,6 +102,54 @@ void main() {
     bootContainer.read(_fakeAuthStatus.notifier).state = AuthStatus.unauthenticated;
     await Future<void>.delayed(Duration.zero);
 
+    expect(await database.read(resource: 'materials', cacheKey: 'class-1'), isNotNull);
+  });
+
+  // QA-080: a previous user's rows must not wait on disk for the next sign-in. Opening the cache
+  // with no active session (the app booted signed out) wipes it.
+  test('wipes the cache when it opens with no active session', () async {
+    final dir = await Directory.systemTemp.createTemp('offline_boot_clear_test');
+    addTearDown(() => dir.delete(recursive: true));
+    final file = File('${dir.path}/offline_cache.sqlite');
+
+    final previous = OfflineDatabase(NativeDatabase(file), () => 'user-1');
+    await previous.write(
+      resource: 'published_grades',
+      cacheKey: 'student-1',
+      payload: '[]',
+      fetchedAt: DateTime.now(),
+    );
+    await previous.close();
+
+    final bootContainer = ProviderContainer(
+      overrides: [
+        offlineDatabaseExecutorProvider.overrideWithValue(NativeDatabase(file)),
+        offlineCacheOwnerProvider.overrideWithValue(() => null),
+        authStatusProvider.overrideWith((ref) => ref.watch(_fakeAuthStatus)),
+      ],
+    );
+    _keepAlive(bootContainer);
+    bootContainer.read(_fakeAuthStatus.notifier).state = AuthStatus.unauthenticated;
+    // Drift runs statements in order, so a read on the same connection waits for the wipe.
+    final booted = bootContainer.read(offlineDatabaseProvider);
+    await booted.readAllForResource('published_grades');
+    bootContainer.dispose();
+    await Future<void>.delayed(Duration.zero);
+
+    final reopened = OfflineDatabase(NativeDatabase(file), () => 'user-1');
+    addTearDown(reopened.close);
+    expect(await reopened.read(resource: 'published_grades', cacheKey: 'student-1'), isNull);
+  });
+
+  test('keeps the cache when it opens with a restored session', () async {
+    _keepAlive(container);
+    final database = container.read(offlineDatabaseProvider);
+    await database.write(
+      resource: 'materials',
+      cacheKey: 'class-1',
+      payload: '[]',
+      fetchedAt: DateTime.now(),
+    );
     expect(await database.read(resource: 'materials', cacheKey: 'class-1'), isNotNull);
   });
 }

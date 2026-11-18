@@ -11,6 +11,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../auth/auth_providers.dart';
 import '../auth/auth_state.dart';
+import 'material_file_cache.dart' show offlineFilesRootProvider;
 
 /// On-device byte cache for pictures served through short-lived pre-signed URLs (chat
 /// attachments, assignment question pictures), keyed by a stable id instead of the URL.
@@ -171,15 +172,20 @@ class AttachmentImageCache {
   }
 }
 
-/// Wipes itself the moment a session logs out, the same rule [materialFileCacheProvider]
-/// (`material_file_cache.dart`) follows: the pictures are school data and must not survive into a
-/// different account signing in on the same device.
+/// Wipes itself the moment a session logs out or the account switches, the same
+/// rule [materialFileCacheProvider] (`material_file_cache.dart`) follows: the
+/// pictures are school data and must not survive into a different account
+/// signing in on the same device.
 final attachmentImageCacheProvider = Provider<AttachmentImageCache>((ref) {
-  final cache = AttachmentImageCache();
+  final cache = AttachmentImageCache(
+    root: ref.watch(offlineFilesRootProvider),
+  );
   ref.listen(authStatusProvider, (previous, next) {
+    // Any exit from `authenticated`, account switches included (QA-081) — see
+    // [materialFileCacheProvider].
     if (previous == AuthStatus.authenticated &&
-        next == AuthStatus.unauthenticated) {
-      cache.clear();
+        next != AuthStatus.authenticated) {
+      unawaited(cache.clear());
     }
   });
   return cache;

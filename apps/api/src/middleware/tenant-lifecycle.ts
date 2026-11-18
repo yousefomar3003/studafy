@@ -15,14 +15,41 @@ import type { MiddlewareHandler } from "hono";
 const SUSPENDED_READ_ROLES: ReadonlySet<Role> = new Set<Role>([ROLES.ORG_ADMIN, ROLES.FINANCE]);
 
 /**
+ * What a closed or suspended school can still reach (QA-038): paying to recover (its own
+ * subscription, plans, checkout, billing portal, invoices), signing out and managing sessions,
+ * privacy requests (a parent's access/export of their child's data), account deletion, and the
+ * feature flags the clients need to render that. Each route's own permission check still applies;
+ * this only stops the lifecycle guard from refusing them outright. Add-on purchases (AI, storage)
+ * and every school feature stay blocked.
+ */
+const RECOVERY_PATHS: readonly string[] = [
+  "/api/auth/logout",
+  "/api/auth/sessions",
+  "/api/subscriptions/current",
+  "/api/subscriptions/plans",
+  "/api/subscriptions/checkout",
+  "/api/subscriptions/school/checkout",
+  "/api/subscriptions/portal",
+  "/api/privacy",
+  "/api/account",
+  "/api/me/features",
+];
+
+/** The path is a recovery path or below one, by whole segments (not a string prefix). */
+function isRecoveryPath(path: string): boolean {
+  return RECOVERY_PATHS.some((base) => path === base || path.startsWith(`${base}/`));
+}
+
+/**
  * Tenant lifecycle guard middleware (ST-092).
  *
  * Enforces the subscription lifecycle state machine on every authenticated `/api/*` request.
  * Reads the `subscriptionStatus` claim from the JWT (zero DB calls per request) and applies
  * the appropriate access rules:
  *
- * - **closed**: All requests blocked (403 Forbidden).
- * - **suspended**: Write operations blocked. GET allowed only for ORG_ADMIN and FINANCE.
+ * - **closed**: All requests blocked (403 Forbidden), except the recovery paths below (QA-038).
+ * - **suspended**: Write operations blocked. GET allowed only for ORG_ADMIN and FINANCE. The
+ *   recovery paths stay open, writes included, so the school can pay.
  * - **grace_period**: Full access with `X-Tenant-Grace-Banner: true` response header.
  * - **trialing / active / past_due / canceled / expired**: Standard access.
  *
@@ -45,6 +72,14 @@ export function tenantLifecycleGuard(): MiddlewareHandler<AppEnv> {
     }
 
     const status = auth.subscriptionStatus;
+
+    if (
+      (status === SUBSCRIPTION_STATUSES.CLOSED || status === ("suspended" as SubscriptionStatus)) &&
+      isRecoveryPath(c.req.path)
+    ) {
+      await next();
+      return;
+    }
 
     switch (status) {
       // ── Terminal lockout ──────────────────────────────────────────────

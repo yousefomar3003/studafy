@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 
+import { returnUrlSchema } from "../../../lib/security/return-url";
 import { requireAuth } from "../../../middleware/authContext";
 import { requireChannel } from "../../../middleware/channelGuard";
 import { standardResponses } from "../../../openapi/responses";
@@ -17,8 +18,8 @@ import type { PaymentProviderRegistry } from "../payment-provider-routing";
 const AiCheckoutRequestSchema = z.object({
   priceId: z.string().uuid(),
   studentId: z.string().uuid(),
-  successUrl: z.string().url(),
-  cancelUrl: z.string().url(),
+  successUrl: returnUrlSchema,
+  cancelUrl: returnUrlSchema,
 });
 
 const AiCheckoutResponseSchema = z.object({

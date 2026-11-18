@@ -3,7 +3,7 @@ import { ROLES } from "@studafy/constants";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 
-import { withSystemTx } from "../../../db/tenant-tx";
+import { pipelinePerSchool, withSystemTx } from "../../../db/tenant-tx";
 import { requireAuth } from "../../../middleware/authContext";
 import { openApiValidationHook } from "../../../openapi/hook";
 import { standardResponses } from "../../../openapi/responses";
@@ -102,7 +102,7 @@ const metricsRoute = createRoute({
 // Query types
 // ---------------------------------------------------------------------------
 
-interface TenantRow {
+export interface TenantRow {
   school_id: string;
   school_name: string;
   subscribed_students: number;
@@ -113,12 +113,62 @@ interface TenantRow {
   period_end: Date;
 }
 
+/**
+ * Per-school AI usage for the platform console (QA-062). app.ai_subscriptions and
+ * app.ai_usage_meters FORCE tenant isolation, so one cross-school GROUP BY in a system transaction
+ * matches nothing; each school's aggregate runs under that school's own scope instead, pipelined in
+ * one round trip (pipelinePerSchool).
+ */
+export async function loadAiTenantRows(database: Database): Promise<TenantRow[]> {
+  return withSystemTx(database, async (tx) => {
+    const schools = await tx<{ id: string; name: string }[]>`
+      SELECT id, name FROM app.schools ORDER BY name
+    `;
+    const perSchool = await pipelinePerSchool(
+      tx,
+      schools,
+      (school) =>
+        [
+          tx<Omit<TenantRow, "school_name">[]>`
+        SELECT
+          ai.school_id,
+          COUNT(*)::int AS subscribed_students,
+          COALESCE(SUM(m.total_tokens), 0)::text AS total_tokens,
+          COALESCE(SUM(m.small_tokens), 0)::text AS small_tokens,
+          COALESCE(SUM(m.large_tokens), 0)::text AS large_tokens,
+          MIN(ai.current_period_start) AS period_start,
+          MAX(ai.current_period_end) AS period_end
+        FROM app.ai_subscriptions ai
+        LEFT JOIN app.ai_usage_meters m
+          ON m.school_id = ai.school_id
+         AND m.student_id = ai.student_id
+         AND m.ai_subscription_id = ai.id
+        WHERE ai.school_id = ${school.id}::uuid
+          AND ai.status = 'active'
+          AND ai.current_period_end > now()
+        GROUP BY ai.school_id
+      `,
+        ] as const,
+    );
+    return schools
+      .flatMap((school, index) =>
+        perSchool[index]![0].map((row) => ({ ...row, school_name: school.name })),
+      )
+      .sort((a, b) => Number(b.total_tokens) - Number(a.total_tokens));
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Route factory
 // ---------------------------------------------------------------------------
 
-export function aiMetricsRoutes(deps: { database: Database }): OpenAPIHono<AppEnv> {
+export function aiMetricsRoutes(deps: {
+  database: Database;
+  /** Test seam for the route's arithmetic; the SQL is covered against a real database. */
+  loadRows?: (database: Database) => Promise<TenantRow[]>;
+}): OpenAPIHono<AppEnv> {
   const { database } = deps;
+  const loadRows = deps.loadRows ?? loadAiTenantRows;
   const routes = new OpenAPIHono<AppEnv>({ defaultHook: openApiValidationHook });
 
   routes.openapi(metricsRoute, async (c) => {
@@ -130,29 +180,7 @@ export function aiMetricsRoutes(deps: { database: Database }): OpenAPIHono<AppEn
       }) as HTTPException;
     }
 
-    const rows = await withSystemTx(database, async (tx) => {
-      return tx<TenantRow[]>`
-        SELECT
-          ai.school_id,
-          s.name AS school_name,
-          COUNT(*)::int AS subscribed_students,
-          COALESCE(SUM(m.total_tokens), 0)::text AS total_tokens,
-          COALESCE(SUM(m.small_tokens), 0)::text AS small_tokens,
-          COALESCE(SUM(m.large_tokens), 0)::text AS large_tokens,
-          MIN(ai.current_period_start) AS period_start,
-          MAX(ai.current_period_end) AS period_end
-        FROM app.ai_subscriptions ai
-        JOIN app.schools s ON s.id = ai.school_id
-        LEFT JOIN app.ai_usage_meters m
-          ON m.school_id = ai.school_id
-         AND m.student_id = ai.student_id
-         AND m.ai_subscription_id = ai.id
-        WHERE ai.status = 'active'
-          AND ai.current_period_end > now()
-        GROUP BY ai.school_id, s.name
-        ORDER BY SUM(m.total_tokens) DESC
-      `;
-    });
+    const rows = await loadRows(database);
 
     const tenants = rows.map((row) => {
       const totalTokens = Number(row.total_tokens);

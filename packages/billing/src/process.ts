@@ -44,6 +44,7 @@ import {
   extractSubscriptionItemId,
 } from "./event-mapping";
 import { deriveIntent, foldStatus, LIVE_STATUSES, resolveAiCascade } from "./state-machine";
+import { loadRowForUpdate } from "./system-transition";
 
 import type { AttributionTarget } from "./attribution";
 import type { BillingEventSource } from "./billing-event-store";
@@ -173,6 +174,11 @@ export interface ProcessOptions {
   logger: BillingLogger;
   /** Correlates the audit row with the HTTP request that caused it, when there was one. */
   requestId?: string | null;
+  /**
+   * Test seam (QA-035): awaited after the fold is computed and before it is applied, so a test can
+   * force two events to interleave there. Never set in production.
+   */
+  beforeApply?: () => Promise<void>;
 }
 
 export type ProcessOutcome =
@@ -254,6 +260,23 @@ async function applyClaimedEvent(
   // the subscription level: `customer.created` concerns a school that may not have bought anything
   // yet. Running it through attribution would park it for "no subscription to apply this to", which
   // would fill the dead-letter queue with events behaving exactly as intended.
+  if (resolution.kind === "alert") {
+    // A dispute names a charge, not a subscription, so nothing is attributed or transitioned here;
+    // the alert is what makes a human look at the charge and decide on the account (QA-056).
+    options.logger.warn(
+      {
+        alert: "billing_alert",
+        billing_alert: resolution.alert,
+        event_id: event.id,
+        event_type: event.type,
+        customer_id: extractCustomerId(event.data),
+      },
+      "billing event needs a human: payment disputed",
+    );
+    await markProcessed(tx, rowId);
+    return { outcome: "processed", transitioned: false };
+  }
+
   if (resolution.kind === "ignored") {
     if (event.provider === "stripe") {
       await applyCustomerSideEffects(tx, event.type, event.data);
@@ -297,7 +320,7 @@ async function applyClaimedEvent(
     return { outcome: "processed", transitioned: false };
   }
 
-  const target = await resolveTarget(tx, schoolId, event.type, event.data, event.id);
+  let target = await resolveTarget(tx, schoolId, event.type, event.data, event.id);
   if (extractAddonHint(event.data) === "storage") {
     await warnOfStorageDuplicate(tx, event, schoolId, options.logger);
   }
@@ -306,6 +329,14 @@ async function applyClaimedEvent(
   }
 
   await attributeEvent(tx, rowId, target.kind, target.id);
+
+  // QA-035: lock the subscription row before folding. Only redeliveries of one event id serialized
+  // before (on the claim); two different events about one subscription each folded what they could
+  // see and the last writer won, even with a stale fold. Holding the row, a concurrent event waits
+  // here until this one commits, then folds a sequence that includes it. The status is re-read
+  // under the lock so `from` (audit) and `transitioned` describe the row as it now is.
+  const locked = await loadRowForUpdate(tx, target.kind, schoolId, target.id);
+  if (locked !== null) target = { ...target, status: locked.status };
 
   const sequence = await loadFoldSequence(tx, target.kind, target.id, rowId);
   const fold = foldStatus(target.kind, sequence);
@@ -322,6 +353,7 @@ async function applyClaimedEvent(
     await saveTapPaymentMethod(tx, target, event.data);
   }
 
+  await options.beforeApply?.();
   await applyTransition(tx, options, target, fold.status, event.data);
   await markProcessed(tx, rowId);
 

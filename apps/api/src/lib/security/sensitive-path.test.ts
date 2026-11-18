@@ -59,3 +59,38 @@ describe("sanitizeQueryParams", () => {
     });
   });
 });
+
+describe("sanitizeQueryParams: allowlist (QA-019 / QA-020)", () => {
+  test("free-text and personal search values never reach the log", () => {
+    const params = new URLSearchParams(
+      "search=Omar Saleh&q=kid@school.example&email=parent@home.example&filter_value=0501234567",
+    );
+    expect(sanitizeQueryParams(params)).toEqual({
+      search: "[REDACTED]",
+      q: "[REDACTED]",
+      email: "[REDACTED]",
+      filter_value: "[REDACTED]",
+    });
+  });
+
+  test("an unknown key is redacted by default; structural keys stay readable", () => {
+    const params = new URLSearchParams(
+      "limit=20&class_id=aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee&status=active&brand_new_param=leak",
+    );
+    expect(sanitizeQueryParams(params)).toEqual({
+      limit: "20",
+      class_id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+      status: "active",
+      brand_new_param: "[REDACTED]",
+    });
+  });
+
+  test("the Google Play RTDN push secret and OAuth codes stay redacted", () => {
+    const params = new URLSearchParams("token=rtdn-shared-secret&code=oauth-code&state=s");
+    expect(Object.values(sanitizeQueryParams(params))).toEqual([
+      "[REDACTED]",
+      "[REDACTED]",
+      "[REDACTED]",
+    ]);
+  });
+});

@@ -1669,8 +1669,15 @@ export const materialIdParamSchema = z
 
 export const presignedUploadResponseSchema = z
   .object({
+    material_id: uuidSchema.openapi({
+      description: "The material created for this upload; confirm it at /materials/{id}/confirm.",
+    }),
     upload_url: z.string().url().openapi({ description: "Pre-signed URL for PUT upload." }),
-    storage_key: z.string().openapi({ description: "Storage key the file will be written to." }),
+    storage_key: z.string().openapi({
+      description:
+        "Staging key (temp/) the file is written to and confirmed with. On confirm the stored object " +
+        "is checked and copied to the material's permanent key.",
+    }),
     expires_at: dateTimeSchema.openapi({ description: "When the upload URL expires." }),
   })
   .openapi("PresignedUpload");

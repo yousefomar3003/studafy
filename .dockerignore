@@ -52,6 +52,23 @@ infra/tools
 # Test/coverage output and local env files — never belongs in a build context
 coverage
 *.log
-.env
-.env.*
+**/.env
+**/.env.*
 !.env.example
+!**/.env.example
+
+# Secrets and infrastructure state (QA-021). Every Dockerfile here runs `COPY . .` in its build
+# stage, so anything not excluded is uploaded to the builder -- Fly's remote builder on a laptop
+# `fly deploy` -- and cached in a layer, even though the runtime stages copy only dist/.
+# scripts/ci/assert-clean-build-context.sh proves these stay out.
+prod-sec*.json
+**/*secret*.json
+**/*.pem
+**/*.p12
+**/*.key
+**/google-services.json
+**/GoogleService-Info.plist
+**/qa/.tokens.env
+infra/terraform
+**/*.tfstate
+**/*.tfstate.*

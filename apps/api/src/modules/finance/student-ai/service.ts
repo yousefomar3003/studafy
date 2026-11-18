@@ -22,6 +22,7 @@
  */
 
 import { setTenantScope, withSystemTx } from "../../../db/tenant-tx";
+import { schoolToday } from "../../../lib/school-today";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits } from "../currency";
 
@@ -133,7 +134,7 @@ export async function setStudentAiAutoBilling(
       VALUES (
         ${schoolId}::uuid,
         ${autoBilling},
-        ${turningOn ? tx`date_trunc('month', CURRENT_DATE)::date` : tx`NULL::date`},
+        ${turningOn ? tx`date_trunc('month', app.school_today())::date` : tx`NULL::date`},
         ${userId}::uuid
       )
       ON CONFLICT (school_id) DO UPDATE
@@ -192,9 +193,9 @@ function decidingOptIn(optIns: readonly StudentAiOptIn[]): StudentAiOptIn {
   return [...pool].sort((a, b) => b.startMonth.localeCompare(a.startMonth))[0]!;
 }
 
+/** The current month by the school's own date (app.school_today, QA-044), not UTC's. */
 async function currentMonth(tx: TransactionSql): Promise<MonthIndex> {
-  const [row] = await tx<{ today: string }[]>`SELECT CURRENT_DATE::text AS today`;
-  return monthIndex(row!.today);
+  return monthIndex(await schoolToday(tx));
 }
 
 /**

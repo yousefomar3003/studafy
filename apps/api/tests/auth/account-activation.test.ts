@@ -8,6 +8,7 @@ import { createLogger } from "../../src/logger";
 import { hashInvitationToken, KeyStore } from "../../src/modules/auth";
 import { activateAccount } from "../../src/modules/auth/services/activation-service";
 import {
+  appDatabaseFor,
   createSchool,
   createTestDatabase,
   integrationEnabled,
@@ -124,7 +125,7 @@ beforeAll(async () => {
     isReady: () => true,
     tracker: createInflightTracker(),
     logger: createLogger({ destination: () => undefined }),
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,

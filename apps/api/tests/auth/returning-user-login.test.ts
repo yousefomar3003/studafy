@@ -7,6 +7,7 @@ import { createInflightTracker } from "../../src/lifecycle";
 import { createLogger } from "../../src/logger";
 import { KeyStore } from "../../src/modules/auth";
 import {
+  appDatabaseFor,
   assignRole,
   createSchool,
   createTestDatabase,
@@ -103,10 +104,11 @@ beforeAll(async () => {
   resetSecurityConfig();
 
   app = createApp({
+    idTokenLoginEnabled: true,
     isReady: () => true,
     tracker: createInflightTracker(),
     logger: createLogger({ destination: () => undefined }),
-    database: sql,
+    database: appDatabaseFor(sql),
     keyStore,
     jwtIssuer: TEST_JWT_ISSUER,
     jwtAudience: TEST_JWT_AUDIENCE,
@@ -139,10 +141,11 @@ describe("returning-user OAuth login", () => {
 
       // Override the verifier to return our deterministic subject.
       app = createApp({
+        idTokenLoginEnabled: true,
         isReady: () => true,
         tracker: createInflightTracker(),
         logger: createLogger({ destination: () => undefined }),
-        database: sql,
+        database: appDatabaseFor(sql),
         keyStore,
         jwtIssuer: TEST_JWT_ISSUER,
         jwtAudience: TEST_JWT_AUDIENCE,
@@ -210,10 +213,11 @@ describe("returning-user OAuth login", () => {
       const unknownSubject = `sub-unknown-${crypto.randomUUID()}`;
 
       app = createApp({
+        idTokenLoginEnabled: true,
         isReady: () => true,
         tracker: createInflightTracker(),
         logger: createLogger({ destination: () => undefined }),
-        database: sql,
+        database: appDatabaseFor(sql),
         keyStore,
         jwtIssuer: TEST_JWT_ISSUER,
         jwtAudience: TEST_JWT_AUDIENCE,
@@ -264,10 +268,11 @@ describe("returning-user OAuth login", () => {
     await seedOAuthIdentity(suspendedSchool.id, user.id, "microsoft", subject);
 
     app = createApp({
+      idTokenLoginEnabled: true,
       isReady: () => true,
       tracker: createInflightTracker(),
       logger: createLogger({ destination: () => undefined }),
-      database: sql,
+      database: appDatabaseFor(sql),
       keyStore,
       jwtIssuer: TEST_JWT_ISSUER,
       jwtAudience: TEST_JWT_AUDIENCE,
@@ -316,10 +321,11 @@ describe("returning-user OAuth login", () => {
       await seedOAuthIdentity(suspendedSchool.id, user.id, "microsoft", subject);
 
       app = createApp({
+        idTokenLoginEnabled: true,
         isReady: () => true,
         tracker: createInflightTracker(),
         logger: createLogger({ destination: () => undefined }),
-        database: sql,
+        database: appDatabaseFor(sql),
         keyStore,
         jwtIssuer: TEST_JWT_ISSUER,
         jwtAudience: TEST_JWT_AUDIENCE,
@@ -365,10 +371,11 @@ describe("returning-user OAuth login", () => {
     await seedOAuthIdentity(suspendedSchool.id, user.id, "microsoft", subject);
 
     app = createApp({
+      idTokenLoginEnabled: true,
       isReady: () => true,
       tracker: createInflightTracker(),
       logger: createLogger({ destination: () => undefined }),
-      database: sql,
+      database: appDatabaseFor(sql),
       keyStore,
       jwtIssuer: TEST_JWT_ISSUER,
       jwtAudience: TEST_JWT_AUDIENCE,
@@ -390,10 +397,11 @@ describe("returning-user OAuth login", () => {
 
   integrationTest("invalid id_token returns AUTH_TOKEN_INVALID", async () => {
     app = createApp({
+      idTokenLoginEnabled: true,
       isReady: () => true,
       tracker: createInflightTracker(),
       logger: createLogger({ destination: () => undefined }),
-      database: sql,
+      database: appDatabaseFor(sql),
       keyStore,
       jwtIssuer: TEST_JWT_ISSUER,
       jwtAudience: TEST_JWT_AUDIENCE,
@@ -440,10 +448,11 @@ describe("returning-user OAuth login", () => {
       await seedOAuthIdentity(okSchool.id, okUser.id, "microsoft", okSubject);
 
       app = createApp({
+        idTokenLoginEnabled: true,
         isReady: () => true,
         tracker: createInflightTracker(),
         logger: createLogger({ destination: () => undefined }),
-        database: sql,
+        database: appDatabaseFor(sql),
         keyStore,
         jwtIssuer: TEST_JWT_ISSUER,
         jwtAudience: TEST_JWT_AUDIENCE,
@@ -464,10 +473,11 @@ describe("returning-user OAuth login", () => {
       await seedOAuthIdentity(susSchool.id, susUser.id, "microsoft", susSubject);
 
       app = createApp({
+        idTokenLoginEnabled: true,
         isReady: () => true,
         tracker: createInflightTracker(),
         logger: createLogger({ destination: () => undefined }),
-        database: sql,
+        database: appDatabaseFor(sql),
         keyStore,
         jwtIssuer: TEST_JWT_ISSUER,
         jwtAudience: TEST_JWT_AUDIENCE,

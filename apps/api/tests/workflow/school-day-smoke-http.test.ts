@@ -346,25 +346,17 @@ describeDb("one school day across roles, with the app's request shapes", () => {
     });
     expectStatus(initiated, 201, "initiate material upload");
     const storageKey = initiated.json.storage_key as string;
-
-    // The app finds the new row by its storage key in the class's material list.
-    const list = await call(
-      actors.teacher,
-      "GET",
-      `/api/academics/materials?class_id=${ids.class}&limit=100`,
-    );
-    expectStatus(list, 200, "list materials");
-    const pending = (list.json.materials as { id: string; storage_key: string }[]).find(
-      (material) => material.storage_key === storageKey,
-    );
-    expect(pending).toBeDefined();
+    // The app takes the material id from the initiate response (QA-009); the storage key is the
+    // temp/ staging key and no longer matches the listed material's permanent key.
+    const materialId = initiated.json.material_id as string;
+    expect(materialId).toMatch(/^[0-9a-f-]{36}$/);
 
     objects.set(storageKey, { contentType: "application/pdf", sizeBytes: 12_000 });
     // ConfirmUploadBody: storage_key only (checksum omitted when unset).
     const confirmed = await call(
       actors.teacher,
       "POST",
-      `/api/academics/materials/${pending!.id}/confirm`,
+      `/api/academics/materials/${materialId}/confirm`,
       { storage_key: storageKey },
     );
     expectStatus(confirmed, 200, "confirm material upload");

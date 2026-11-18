@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -16,6 +18,12 @@ import 'timetable_offline_repository.dart';
 /// clear-on-logout wiring below is exercisable without touching disk or `path_provider`.
 final offlineDatabaseExecutorProvider = Provider<QueryExecutor?>((ref) => null);
 
+/// Whose cache rows are read and written: the active session's user id, resolved at each call so
+/// an account switch takes effect immediately. Null while no one is signed in (QA-080).
+final offlineCacheOwnerProvider = Provider<OfflineCacheOwner>((ref) {
+  return () => ref.read(authSessionProvider).userId;
+});
+
 /// The app-wide offline cache database. A plain (non-autoDispose) provider — same lifetime as
 /// `apiClientProvider` — so every repository below shares one connection.
 ///
@@ -23,13 +31,21 @@ final offlineDatabaseExecutorProvider = Provider<QueryExecutor?>((ref) => null);
 /// anything else): cached school data must not survive into a different account on the same device.
 /// This mirrors `app_providers.dart`'s `routerProvider`, which wires its own `ref.listen` on
 /// `authStatusProvider` the same way rather than needing a separate provider to be read at boot.
+///
+/// It also wipes itself when it opens with no active session (QA-080): a previous account's rows
+/// must not sit on disk until the next sign-in. `StudafyApp` reads this provider at mount, so that
+/// happens at app start. Every row is also stamped with its owner (`offlineCacheOwnerProvider`),
+/// so even a wipe that hasn't run yet never serves one account's data to another.
 final offlineDatabaseProvider = Provider<OfflineDatabase>((ref) {
-  final database = OfflineDatabase(ref.watch(offlineDatabaseExecutorProvider));
+  final owner = ref.watch(offlineCacheOwnerProvider);
+  final database = OfflineDatabase(ref.watch(offlineDatabaseExecutorProvider), owner);
   ref.onDispose(database.close);
+
+  if (owner() == null) unawaited(database.clearAll());
 
   ref.listen(authStatusProvider, (previous, next) {
     if (previous == AuthStatus.authenticated && next != AuthStatus.authenticated) {
-      database.clearAll();
+      unawaited(database.clearAll());
     }
   });
 

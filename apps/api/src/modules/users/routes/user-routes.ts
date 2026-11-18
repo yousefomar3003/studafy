@@ -19,6 +19,7 @@ import {
 } from "../../auth/services/member-password-service";
 import {
   adminRevokeUserSessions,
+  denylistLiveAccessTokens,
   REVOCATION_REASONS,
 } from "../../auth/services/revocation-service";
 import { writeAnswers } from "../../records/record-service";
@@ -40,6 +41,7 @@ import {
 } from "../schemas";
 import { loginSlipContext } from "../slip-context";
 import {
+  assertManageableTarget,
   createUser as createUserService,
   deactivateUser,
   getUser,
@@ -398,9 +400,10 @@ export function userRoutes(
     const auth = requireAuth(c);
     const { userId } = c.req.valid("param");
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      getUser(tx, auth.schoolId, userId),
-    );
+    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      await assertManageableTarget(tx, userId, auth.roles);
+      return getUser(tx, auth.schoolId, userId);
+    });
 
     if (!row) {
       throw new HTTPException(404, {
@@ -447,9 +450,25 @@ export function userRoutes(
     const { userId } = c.req.valid("param");
     const body = c.req.valid("json");
 
-    const row = await withTenantTx(database, tenantFrom(c), (tx) =>
-      updateUserService(tx, auth.schoolId, userId, body),
-    );
+    const row = await withTenantTx(database, tenantFrom(c), async (tx) => {
+      await assertManageableTarget(tx, userId, auth.roles);
+      return updateUserService(tx, auth.schoolId, userId, body);
+    });
+
+    // Switching an account off through PATCH must end it as /deactivate does (QA-010): this path
+    // used to change the status and revoke nothing, so the user kept refreshing indefinitely.
+    if (body.status === "suspended" || body.status === "archived") {
+      await adminRevokeUserSessions({
+        database,
+        denylist,
+        tenant: { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+        targetUserId: userId,
+        reason: REVOCATION_REASONS.ADMIN_REVOKE_ALL_DEVICES,
+        log: c.get("log"),
+        userAgent: c.req.header("User-Agent") ?? null,
+        clientIp: clientIpFrom(c),
+      });
+    }
 
     return c.json(row, 200);
   });
@@ -466,12 +485,26 @@ export function userRoutes(
       }),
     );
 
+    // The target's live access tokens still carry the old roles (QA-026): deny them now. Their
+    // sessions survive, and the next refresh reads the new role.
+    await denylistLiveAccessTokens({
+      database,
+      denylist,
+      tenant: { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") },
+      targetUserId: userId,
+      reason: REVOCATION_REASONS.ROLE_CHANGE,
+      log: c.get("log"),
+    });
+
     return c.json(row, 200);
   });
 
   routes.openapi(deactivateUserRoute, async (c) => {
     const auth = requireAuth(c);
     const { userId } = c.req.valid("param");
+    await withTenantTx(database, tenantFrom(c), (tx) =>
+      assertManageableTarget(tx, userId, auth.roles),
+    );
 
     const result = await deactivateUser({
       database,

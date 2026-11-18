@@ -5,6 +5,7 @@ import { Queue } from "bullmq";
 
 import { CodedHttpException } from "../../../coded-http-exception";
 import { withTenantTx } from "../../../db/tenant-tx";
+import { schoolToday } from "../../../lib/school-today";
 import { requireStorage } from "../../../lib/storage";
 import { auditAction } from "../../../middleware/auditEmitter";
 import { requireAuth } from "../../../middleware/authContext";
@@ -56,10 +57,6 @@ import type { TransactionSql } from "postgres";
 function tenantFrom(c: Context<AppEnv>) {
   const auth = requireAuth(c);
   return { schoolId: auth.schoolId, userId: auth.userId, requestId: c.get("requestId") };
-}
-
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
 }
 
 function toJobResponse(job: FinanceReportJobRow) {
@@ -249,7 +246,7 @@ export function financeReportRoutes(
         tx,
         auth.schoolId,
         {
-          report_date: query.report_date ?? today(),
+          report_date: query.report_date ?? (await schoolToday(tx)),
           ageing_based_on: "Due Date",
           range1: 30,
           range2: 60,
@@ -311,7 +308,7 @@ export function financeReportRoutes(
         tx,
         auth.schoolId,
         {
-          report_date: query.report_date ?? today(),
+          report_date: query.report_date ?? (await schoolToday(tx)),
           based_on_payment_terms: 1,
           show_future_payments: 1,
         },
@@ -352,7 +349,7 @@ export function financeReportRoutes(
         ERP_REPORT_NAMES.arAging,
         {
           ...companyFilters,
-          report_date: query.to_date ?? today(),
+          report_date: query.to_date ?? (await schoolToday(tx)),
           ageing_based_on: "Due Date",
           range1: 30,
           range2: 60,
@@ -367,7 +364,7 @@ export function financeReportRoutes(
         {
           ...companyFilters,
           from_date: query.from_date ?? "1900-01-01",
-          to_date: query.to_date ?? today(),
+          to_date: query.to_date ?? (await schoolToday(tx)),
         },
         locale,
         c.req.header("Accept-Language"),
@@ -432,7 +429,7 @@ export function financeReportRoutes(
             body.parameters.student_ids ?? [],
           );
           parameters = {
-            report_date: body.parameters.report_date ?? today(),
+            report_date: body.parameters.report_date ?? (await schoolToday(tx)),
             ...(customers.length > 0 ? { party_type: "Customer", party: customers } : {}),
           };
           break;
@@ -464,7 +461,7 @@ export function financeReportRoutes(
           parameters = {
             family_id: body.parameters.family_id,
             from_date: body.parameters.from_date ?? "1900-01-01",
-            to_date: body.parameters.to_date ?? today(),
+            to_date: body.parameters.to_date ?? (await schoolToday(tx)),
             party_type: "Customer",
             party: family.customerIds,
           };

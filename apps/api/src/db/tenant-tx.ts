@@ -57,6 +57,28 @@ export async function withTenantTx<T>(
 }
 
 /**
+ * A transaction as `studafy_app` with no tenant armed, for reads of the genuinely global tables
+ * (app.schools by token or email before the school is known, reference data) (QA-014).
+ *
+ * Querying the raw pool instead runs as the database login itself, which only works while that
+ * login holds table privileges of its own -- Supabase `postgres` does, a least-privilege runtime
+ * login (NOBYPASSRLS, owning nothing) does not. Any tenant-isolated table read in here fails closed
+ * (the policy's `current_setting('app.school_id')` is unset), so this cannot leak across schools.
+ */
+export async function withAppTx<T>(
+  database: Database | DatabasePools,
+  fn: (tx: TransactionSql) => Promise<T>,
+): Promise<T> {
+  const selected = selectDatabase(database, {});
+  let result: T | undefined;
+  await selected.begin(async (tx) => {
+    await tx`SELECT set_config('role', 'studafy_app', true)`;
+    result = await fn(tx);
+  });
+  return result as T;
+}
+
+/**
  * A transaction for work the system does on nobody's behalf, with the tenant not yet known.
  *
  * The API's one caller is the payment-provider webhook processor, and its shape is genuinely
@@ -66,8 +88,10 @@ export async function withTenantTx<T>(
  * header of 000016) -- so there is no `school_id` to hand `withTenantTx` at BEGIN time. There is
  * also no acting user: Stripe is not a person.
  *
- * `studafy_admin` is required rather than convenient: `app.billing_events` revokes every privilege
- * from `studafy_app` and its only policy names `studafy_admin`. The elevation is transaction-local
+ * `studafy_system` is required rather than convenient: `app.billing_events` revokes every privilege
+ * from `studafy_app` and its only policy names `studafy_admin` and `studafy_system`. The system role
+ * has the owner's grants and policies but owns nothing, so it cannot switch RLS off, drop a policy
+ * or truncate the audit log (QA-015). The elevation is transaction-local
  * (`SET LOCAL ROLE` ends at COMMIT), which is what keeps it safe under PgBouncer transaction
  * pooling, exactly as the GUC-setting in `configureTenantTx` is.
  *
@@ -84,7 +108,7 @@ export async function withSystemTx<T>(
   const selected = selectDatabase(database, {});
   let result: T | undefined;
   await selected.begin(async (tx) => {
-    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx.unsafe("SET LOCAL ROLE studafy_system");
     result = await fn(tx);
   });
   return result as T;

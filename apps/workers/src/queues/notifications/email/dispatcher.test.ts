@@ -131,6 +131,8 @@ async function seedDigest(schoolId: string, eventName: string, email: string): P
 
 interface RowState {
   dispatched: boolean;
+  /** QA-032: whether the payload still carries the one-time token. */
+  has_token: boolean;
   attempts: number;
   next_attempt_in_s: number | null;
   deliveries: { status: string; attempts: number; last_error: string | null }[];
@@ -142,6 +144,7 @@ async function readRow(schoolId: string, id: string): Promise<RowState> {
     await tx`SELECT set_config('app.school_id', ${schoolId}, true)`;
     const [row] = await tx<Omit<RowState, "deliveries">[]>`
       SELECT email_dispatched_at IS NOT NULL AS dispatched,
+             payload ? 'token' AS has_token,
              email_attempts::int AS attempts,
              extract(epoch FROM email_next_attempt_at - CURRENT_TIMESTAMP)::float8 AS next_attempt_in_s
       FROM app.outbox_events WHERE id = ${id}::bigint
@@ -270,5 +273,39 @@ describe("email dispatcher", () => {
     const second = stubSender();
     await pollOnce(context(second.sender));
     expect(second.attempts.map((a) => a.to)).not.toContain("cycle@example.test");
+  });
+});
+
+// QA-032: the token is a bearer credential (accept an invitation, confirm a deletion). It is kept
+// only until the email that needs it has gone, never for the outbox row's ~14-day life.
+describe("the one-time token leaves the outbox once its email is done (QA-032)", () => {
+  dbTest("a sent invitation no longer carries its token", async () => {
+    const school = await seedSchool();
+    const id = await seedInvitation(school, "scrub@example.test");
+    const { sender } = stubSender();
+    expect(await processSchool(context(sender), school)).toBe(1);
+    const state = await readRow(school, id);
+    expect(state.dispatched).toBe(true);
+    expect(state.has_token).toBe(false);
+  });
+
+  dbTest("a row deferred for retry keeps the token it still needs", async () => {
+    const school = await seedSchool();
+    const id = await seedInvitation(school, "later@example.test");
+    const { sender } = stubSender(new Map([["later@example.test", transientError]]));
+    await processSchool(context(sender), school);
+    const state = await readRow(school, id);
+    expect(state.dispatched).toBe(false);
+    expect(state.has_token).toBe(true);
+  });
+
+  dbTest("a dead-lettered row is scrubbed too", async () => {
+    const school = await seedSchool();
+    const id = await seedInvitation(school, "gone@example.test", EMAIL_MAX_SEND_ATTEMPTS - 1);
+    const { sender } = stubSender(new Map([["gone@example.test", transientError]]));
+    await processSchool(context(sender), school);
+    const state = await readRow(school, id);
+    expect(state.dispatched).toBe(true);
+    expect(state.has_token).toBe(false);
   });
 });

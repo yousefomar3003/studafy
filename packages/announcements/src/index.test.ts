@@ -236,3 +236,66 @@ describe("publishAnnouncement", () => {
     expect(reach).toEqual({ recipientCount: 2, notifiedCount: 2 });
   });
 });
+
+// QA-065: publishing issued two single-row INSERTs per recipient (a notification and a recipient
+// row) inside the publishing transaction -- ~10,000 statements for a school of 5,000 -- holding the
+// transaction (and a sweep or a request) open for all of them. Both are now one set-based statement.
+describe("publishAnnouncement fan-out (QA-065)", () => {
+  dbTest(
+    "a few statements whatever the audience size, and the same rows as before",
+    async () => {
+      const fixture = await seedFixture();
+      const extra = 300;
+      let statements = 0;
+
+      const result = await db!.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${fixture.schoolId}, true)`;
+        await tx`
+        INSERT INTO app.users (school_id, email, normalized_email, status)
+        SELECT ${fixture.schoolId}::uuid, 'bulk-' || n || '-' || ${fixture.schoolId} || '@test.local',
+               'bulk-' || n || '-' || ${fixture.schoolId} || '@test.local', 'active'
+        FROM generate_series(1, ${extra}) AS n
+      `;
+        const id = await insertScheduledAnnouncement(
+          tx,
+          fixture.schoolId,
+          fixture.activeInstructorId,
+          new Date(),
+        );
+        // Count every query the publish issues on this transaction.
+        const counted = new Proxy(tx, {
+          apply(target, self, args) {
+            statements += 1;
+            return Reflect.apply(target as never, self, args);
+          },
+        });
+        return publishAnnouncement(counted, fixture.schoolId, id, new Date());
+      });
+
+      expect(result).toEqual({
+        published: true,
+        recipientCount: extra + 2,
+        notifiedCount: extra + 2,
+      });
+      expect(statements).toBeLessThanOrEqual(6);
+
+      const [rows] = await db!.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${fixture.schoolId}, true)`;
+        return tx<{ notifications: number; recipients: number; linked: number }[]>`
+        SELECT
+          (SELECT count(*)::int FROM app.notifications
+            WHERE school_id = ${fixture.schoolId}::uuid AND metadata ? 'announcement_id') AS notifications,
+          (SELECT count(*)::int FROM app.announcement_recipients
+            WHERE school_id = ${fixture.schoolId}::uuid) AS recipients,
+          (SELECT count(*)::int FROM app.announcement_recipients AS r
+             JOIN app.notifications AS n ON n.id = r.notification_id AND n.user_id = r.user_id
+            WHERE r.school_id = ${fixture.schoolId}::uuid AND r.notified_at IS NOT NULL) AS linked
+      `;
+      });
+      expect(rows).toEqual({ notifications: extra + 2, recipients: extra + 2, linked: extra + 2 });
+    },
+    60_000,
+  );
+});

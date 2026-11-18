@@ -13,6 +13,8 @@
  *     resolved at construction rather than a branch at every call site.
  */
 
+import { redactPiiText } from "@studafy/observability";
+
 export const LOG_LEVEL_NAMES = ["trace", "debug", "info", "warn", "error", "fatal"] as const;
 export type LogLevel = (typeof LOG_LEVEL_NAMES)[number];
 
@@ -127,12 +129,71 @@ function fragment(key: string, value: unknown): string {
   return json === undefined ? "" : `,${JSON.stringify(key)}:${json}`;
 }
 
+/**
+ * Field-name roots whose values are personal data or credentials, redacted before a line is
+ * written (QA-020). Narrower than the Sentry scrubber's list on purpose: operational keys a
+ * debugger needs -- `session_id`, `route`, request ids, `school_id` -- stay readable.
+ */
+const LOG_PII_ROOTS: ReadonlySet<string> = new Set([
+  "email",
+  "mail",
+  "phone",
+  "mobile",
+  "name",
+  "username",
+  "password",
+  "passwd",
+  "secret",
+  "token",
+  "jwt",
+  "bearer",
+  "otp",
+  "credential",
+  "credentials",
+  "authorization",
+  "cookie",
+  "cookies",
+  "dob",
+  "birth",
+  "iban",
+  "card",
+  "cvv",
+  "national",
+  "address",
+]);
+
+function isLogPiiKey(key: string): boolean {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .toLowerCase()
+    .split(/[^a-z]+/)
+    .some((segment) => LOG_PII_ROOTS.has(segment));
+}
+
+/** Redact PII-named keys at any depth, and email/phone/token-shaped text in every string left. */
+function redactForLog(value: unknown, depth = 0): unknown {
+  if (typeof value === "string") return redactPiiText(value);
+  if (depth > 6 || value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) return value.map((item) => redactForLog(item, depth + 1));
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+      key,
+      isLogPiiKey(key) ? "[REDACTED]" : redactForLog(entry, depth + 1),
+    ]),
+  );
+}
+
+// The observer (Sentry's forwardLog) still receives the live fields: it needs the real Error for the
+// stack, and Sentry's own beforeSend scrubber (scrubEvent) redacts PII on that path.
 function fragments(fields: LogFields): string {
   let out = "";
   // Object.entries rather than a computed member access: the latter trips
   // eslint-plugin-security's detect-object-injection, and there is no reason to take the disable.
   for (const [key, value] of Object.entries(fields)) {
-    out += fragment(key, key === "err" ? serializeError(value) : value);
+    // Every caller-supplied field is scrubbed before it is written (QA-020): stdout goes to Axiom,
+    // and an error message can quote the row that failed (`Key (email)=(...)`).
+    const shaped = key === "err" ? serializeError(value) : value;
+    out += fragment(key, isLogPiiKey(key) ? "[REDACTED]" : redactForLog(shaped));
   }
   return out;
 }

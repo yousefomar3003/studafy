@@ -716,6 +716,7 @@ export async function attachDocument<T>(
     tempKey: input.storage_key,
     permanentKey: buildPermanentKey(schoolId, staged.parsed.objectId, staged.parsed.filename),
     sizeBytes: staged.sizeBytes,
+    etag: staged.etag,
   };
   try {
     await verifyStagedChecksum(storage, input.storage_key, input.checksum_sha256);

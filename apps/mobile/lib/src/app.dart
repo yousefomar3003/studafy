@@ -10,6 +10,7 @@ import 'core/auth/auth_state.dart';
 import 'core/di/app_providers.dart';
 import 'core/localization/locale_rebuild_scope.dart';
 import 'core/monitoring/monitoring_providers.dart';
+import 'core/offline/offline_providers.dart';
 import 'core/auth/saved_account.dart';
 import 'core/push/push_providers.dart';
 import 'core/push/push_service.dart';
@@ -42,6 +43,9 @@ class _StudafyAppState extends ConsumerState<StudafyApp> {
     // Activates the auth-status listener that keeps the crash reporter's identified user in
     // sync — see `crashReportingUserSyncProvider`. Reading it is idempotent.
     ref.read(crashReportingUserSyncProvider);
+    // Opens the offline cache now, so a launch with no active session wipes what a previous
+    // account left there (QA-080) instead of waiting for the next screen that uses it.
+    ref.read(offlineDatabaseProvider);
   }
 
   @override

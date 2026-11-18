@@ -101,6 +101,10 @@ function stubErpNext(): void {
       categoryExists = true;
       return json(200, { data: { name: "Student AI" } });
     }
+    if (url.pathname === "/api/resource/Sales%20Invoice" && method === "GET") {
+      // The claim-check before posting (QA-022): no earlier attempt created this invoice.
+      return json(200, { data: [] });
+    }
     if (url.pathname === "/api/resource/Sales%20Invoice") {
       invoiceCounter += 1;
       const items = (body!.items as { qty: number; rate: number }[]) ?? [];
@@ -279,7 +283,8 @@ async function portionStates(s: Seed) {
   return [...rows];
 }
 
-const salesInvoices = () => calls.filter((call) => call.path === "/api/resource/Sales Invoice");
+const salesInvoices = () =>
+  calls.filter((call) => call.method === "POST" && call.path === "/api/resource/Sales Invoice");
 
 describe("generateInvoice with a Student AI line", () => {
   dbTest("bills the portions due by the invoice once, as Student AI items", async () => {

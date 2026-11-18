@@ -49,6 +49,9 @@ jobs:
   android-internal:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: mobile-release-android-internal
+    # QA-006: signing and store secrets live in this environment, which only main and
+    # mobile-v* tags may deploy to (configured in GitHub; see docs/runbooks/mobile-release.md).
+    environment: mobile-release
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -105,6 +108,8 @@ jobs:
       - name: fastlane android internal
         working-directory: apps/mobile
         env:
+          # QA-084: uploads the obfuscated build's Dart symbols to Sentry (Fastfile upload_dart_symbols!).
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
           ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
           ANDROID_UPLOAD_STORE_PASSWORD: ${{ secrets.ANDROID_UPLOAD_STORE_PASSWORD }}
@@ -134,6 +139,9 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: mobile-release-ios-beta
     # macos-26 ships Xcode 26, the SDK App Store Connect requires for uploads.
+    # QA-006: signing and store secrets live in this environment, which only main and
+    # mobile-v* tags may deploy to (configured in GitHub; see docs/runbooks/mobile-release.md).
+    environment: mobile-release
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -181,6 +189,8 @@ jobs:
       - name: fastlane ios beta
         working-directory: apps/mobile
         env:
+          # QA-084: uploads the obfuscated build's Dart symbols to Sentry (Fastfile upload_dart_symbols!).
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
           APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
@@ -198,6 +208,9 @@ jobs:
   android-release:
     if: startsWith(github.ref, 'refs/tags/mobile-v')
     name: mobile-release-android-store
+    # QA-006: signing and store secrets live in this environment, which only main and
+    # mobile-v* tags may deploy to (configured in GitHub; see docs/runbooks/mobile-release.md).
+    environment: mobile-release
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -254,6 +267,8 @@ jobs:
       - name: fastlane android release (10% rollout)
         working-directory: apps/mobile
         env:
+          # QA-084: uploads the obfuscated build's Dart symbols to Sentry (Fastfile upload_dart_symbols!).
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           MOBILE_RELEASE_TAG: ${{ github.ref_name }}
           PLAY_STORE_JSON_KEY: ${{ secrets.PLAY_STORE_JSON_KEY }}
           ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
@@ -274,6 +289,9 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/mobile-v')
     name: mobile-release-ios-store
     # macos-26 ships Xcode 26, the SDK App Store Connect requires for uploads.
+    # QA-006: signing and store secrets live in this environment, which only main and
+    # mobile-v* tags may deploy to (configured in GitHub; see docs/runbooks/mobile-release.md).
+    environment: mobile-release
     runs-on: macos-26
     timeout-minutes: 60
     steps:
@@ -321,6 +339,8 @@ jobs:
       - name: fastlane ios release (submit for review, phased release)
         working-directory: apps/mobile
         env:
+          # QA-084: uploads the obfuscated build's Dart symbols to Sentry (Fastfile upload_dart_symbols!).
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           MOBILE_RELEASE_TAG: ${{ github.ref_name }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_DEVELOPER_TEAM_ID: ${{ secrets.APPLE_DEVELOPER_TEAM_ID }}
@@ -339,6 +359,9 @@ jobs:
   android-promote-rollout:
     if: github.event_name == 'workflow_dispatch'
     name: mobile-release-android-promote-rollout
+    # QA-006: signing and store secrets live in this environment, which only main and
+    # mobile-v* tags may deploy to (configured in GitHub; see docs/runbooks/mobile-release.md).
+    environment: mobile-release
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

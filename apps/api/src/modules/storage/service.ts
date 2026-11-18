@@ -64,7 +64,10 @@ export async function requestUpload(
   }
 
   const storageKey = buildTempKey(schoolId, randomUUID(), params.fileName);
-  const presigned = await storage.presign(storageKey, "PUT", params.contentType);
+  // The declared size is signed (QA-036): the URL accepts that many bytes and no more.
+  const presigned = await storage.presign(storageKey, "PUT", params.contentType, undefined, {
+    contentLength: params.sizeBytes,
+  });
   return { storageKey, presigned };
 }
 
@@ -97,6 +100,8 @@ export interface ConfirmedUpload {
 export interface InspectedStagedUpload {
   /** The validated temp/ key, decomposed. */
   parsed: ParsedStorageKey;
+  /** The ETag the checks below were made against; the promotion copies only that (QA-036). */
+  etag?: string;
   /** Stored Content-Type -- the value S3 bound at upload, not what the client claimed. */
   contentType: string;
   /** Stored size, re-read from the bucket. */
@@ -109,6 +114,7 @@ export interface StagedObject {
   parsed: ParsedStorageKey;
   contentType: string;
   sizeBytes: number;
+  etag?: string;
 }
 
 /**
@@ -139,7 +145,12 @@ export async function readStagedObject(
   if (metadata.sizeBytes <= 0) {
     throw new CodedHttpException(400, ERROR_CODES.VALIDATION_FAILED, "Staged upload is empty");
   }
-  return { parsed, contentType: metadata.contentType, sizeBytes: metadata.sizeBytes };
+  return {
+    parsed,
+    contentType: metadata.contentType,
+    sizeBytes: metadata.sizeBytes,
+    ...(metadata.etag ? { etag: metadata.etag } : {}),
+  };
 }
 
 /** The stored type and size satisfy the content class. Pure: no storage call. */
@@ -204,6 +215,7 @@ export async function inspectStagedUpload(
     contentType: object.contentType,
     sizeBytes: object.sizeBytes,
     checksumSha256: checksum,
+    ...(object.etag ? { etag: object.etag } : {}),
   };
 }
 

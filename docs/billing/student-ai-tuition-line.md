@@ -65,8 +65,9 @@ they never reduce the Student AI line; sales tax applies to it like any other li
 - **Off:** no portions are planned (the school bills Student AI itself). Parents still see the same
   line, "paid with tuition"; `billing` is `outside`.
 - **Changing it mid-year affects only what is not yet invoiced.** Off removes the planned portions.
-  Back on plans again from the current month (`auto_billing_since`), so months the school billed
-  itself while it was off are never billed twice. Invoiced portions never change either way.
+  Back on plans again from the current month (`auto_billing_since`; the month of the school's own
+  date, `app.school_today()`, QA-044), so months the school billed itself while it was off are never
+  billed twice. Invoiced portions never change either way.
 
 ## Reconciliation
 

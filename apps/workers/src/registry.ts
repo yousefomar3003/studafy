@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { JOB_NAMES, QUEUE_NAMES } from "@studafy/constants";
 import { injectTraceContext } from "@studafy/observability";
 import { resolveRecordKeyring } from "@studafy/records";
@@ -56,10 +58,12 @@ import type {
   DispatchNotificationJobData,
 } from "./queues/notifications/dispatcher.worker";
 import type { PushSender } from "./queues/notifications/push";
+import type { UploadScanJobRequest } from "./queues/scan/stuck-scan-sweep";
 import type { QueueName } from "@studafy/constants";
 import type { Job } from "bullmq";
 
-export type Processor = (job: Job) => Promise<unknown>;
+/** `token` is BullMQ's lock token for the job, needed to move it back to the delayed set. */
+export type Processor = (job: Job, token?: string) => Promise<unknown>;
 
 export interface QueueDefinition {
   name: QueueName;
@@ -170,6 +174,34 @@ function enqueueIngestion(schoolId: string, materialId: string): Promise<void> {
  */
 let maintenanceQueueInstance: Queue | null = null;
 
+let scanQueueInstance: Queue | null = null;
+
+/**
+ * The upload-scan sweep's enqueuer (QA-055): the same job and options as the API's. The job id
+ * carries the hour, so a file stuck while the scanner is down costs one queued job an hour.
+ */
+function enqueueUploadScanJobs(requests: readonly UploadScanJobRequest[]): Promise<void> {
+  scanQueueInstance ??= new Queue(QUEUE_NAMES.SCAN, {
+    connection: createRedisConnection(workerEnv) as never,
+  });
+  const hour = Math.floor(Date.now() / 3_600_000);
+  return scanQueueInstance
+    .addBulk(
+      requests.map((request) => ({
+        name: JOB_NAMES.SCAN_UPLOAD,
+        data: request,
+        opts: {
+          jobId: `sweep-${request.target}-${createHash("sha256").update(request.storageKey).digest("hex").slice(0, 32)}-${hour}`,
+          attempts: 3,
+          backoff: { type: "exponential", delay: 5_000 },
+          removeOnComplete: { age: 7 * 24 * 60 * 60 },
+          removeOnFail: { age: 30 * 24 * 60 * 60 },
+        },
+      })),
+    )
+    .then(() => undefined);
+}
+
 function enqueueDsrJob(input: {
   schoolId: string;
   requestId: string;
@@ -271,24 +303,28 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
     // Ingests a material: claim the row, extract + chunk its text, store app.material_chunks. The
     // `missing job data` guard keeps the registry unit test (and any stray producer) from opening a
     // database connection for an empty payload.
-    processor: async (job: Job) => {
+    processor: async (job: Job, token?: string) => {
       const data = job.data as Partial<AiIngestionJobData>;
       if (!data.materialId || !data.schoolId) {
         return { processed: false, reason: "missing job data" };
       }
-      return processIngestJob(job, {
-        databaseUrl,
-        sql: db(),
-        databaseCaCert: workerEnv.DATABASE_CA_CERT,
-        s3Region: workerEnv.S3_REGION,
-        s3Endpoint: workerEnv.S3_ENDPOINT,
-        bucket: workerEnv.S3_APP_FILES_BUCKET,
-        ocrLowConfidenceThreshold: workerEnv.OCR_LOW_CONFIDENCE_THRESHOLD,
-        ocrWorkerPath: workerEnv.OCR_WORKER_PATH,
-        ocrLangPath: workerEnv.OCR_LANG_PATH,
-        semaphore: ingestionSemaphore(),
-        enqueueDerivation,
-      });
+      return processIngestJob(
+        job,
+        {
+          databaseUrl,
+          sql: db(),
+          databaseCaCert: workerEnv.DATABASE_CA_CERT,
+          s3Region: workerEnv.S3_REGION,
+          s3Endpoint: workerEnv.S3_ENDPOINT,
+          bucket: workerEnv.S3_APP_FILES_BUCKET,
+          ocrLowConfidenceThreshold: workerEnv.OCR_LOW_CONFIDENCE_THRESHOLD,
+          ocrWorkerPath: workerEnv.OCR_WORKER_PATH,
+          ocrLangPath: workerEnv.OCR_LANG_PATH,
+          semaphore: ingestionSemaphore(),
+          enqueueDerivation,
+        },
+        token,
+      );
     },
     // The processor itself marks the material failed and alerts the uploader on the last attempt;
     // this only makes that visible in the logs, which otherwise showed nothing for a failed material.
@@ -565,6 +601,7 @@ export const QUEUE_REGISTRY: QueueDefinition[] = [
           googlePlayPackageName: workerEnv.GOOGLE_PLAY_PACKAGE_NAME,
           googlePlayServiceAccount: workerEnv.GOOGLE_PLAY_SERVICE_ACCOUNT,
           recordKeyring: resolveRecordKeyring(workerEnv),
+          enqueueUploadScans: enqueueUploadScanJobs,
         },
         enqueueDsrJob,
       ),

@@ -9,6 +9,7 @@ import '../domain/academic_results.dart';
 import '../domain/transcript.dart';
 import 'widgets/academic_result_widgets.dart';
 import 'widgets/status_pill.dart';
+import '../../../design/widgets/protected_screen.dart';
 
 /// One academic transcript, rendered from its stored `content` — every covered year (grade,
 /// section, subjects, the year's overall result) and the cumulative average and GPA, exactly as
@@ -23,7 +24,7 @@ class TranscriptDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final transcript = ref.watch(academicTranscriptProvider(transcriptId));
 
-    return Scaffold(
+    final screen = Scaffold(
       appBar: AppBar(title: Text('academicResults.transcript.title'.tr())),
       body: transcript.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -50,6 +51,8 @@ class TranscriptDetailScreen extends ConsumerWidget {
         data: (doc) => _Document(transcript: doc),
       ),
     );
+    // Grades and transcripts: no screenshots, hidden in the app switcher (QA-084).
+    return ProtectedScreen(child: screen);
   }
 }
 

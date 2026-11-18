@@ -1,7 +1,7 @@
 /**
  * Resolves a real admin user to act as while dumping/erasing a whole tenant (ST-268).
  *
- * `withSystemTenantTx` arms `app.school_id` and `SET LOCAL ROLE studafy_admin` but leaves
+ * `withSystemTenantTx` arms `app.school_id` and `SET LOCAL ROLE studafy_system` but leaves
  * `app.user_id` unset, which is correct for the narrow, table-specific queries most system jobs run
  * (dunning-sweep.ts, seat-reconciliation.ts). This pipeline is different: it walks every discovered
  * tenant table (tenant-tables.ts), and several of them layer a `role_scope_visibility` RESTRICTIVE

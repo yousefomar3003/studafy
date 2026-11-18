@@ -1,3 +1,5 @@
+import { assertPixelsWithinLimit, imageDimensions } from "./limits";
+
 import type { OcrEngine, OcrReport } from "../ocr";
 import type { ParsedDocument } from "../types";
 
@@ -23,6 +25,9 @@ export async function parseImage(
   bytes: Uint8Array,
   options: ParseImageOptions,
 ): Promise<ParsedDocument> {
+  // QA-043: the header's dimensions are checked before anything decodes the pixels.
+  const size = imageDimensions(bytes);
+  if (size) assertPixelsWithinLimit(size.width, size.height, "image");
   const page = await options.ocr.recognize(bytes, 1);
   const ocrReport: OcrReport = {
     engine: options.ocr.name,

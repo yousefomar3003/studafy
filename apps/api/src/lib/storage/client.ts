@@ -72,6 +72,8 @@ export function isInlineSafeContentType(contentType: string): boolean {
 export interface PresignGetOptions {
   /** Let the browser display the file instead of only saving it. Ignored for PUT. */
   inline?: boolean;
+  /** PUT only: the declared size in bytes, signed so a larger body is refused (QA-036). */
+  contentLength?: number;
 }
 
 export interface PresignedUrl {
@@ -83,6 +85,14 @@ export interface PresignedUrl {
 export interface ObjectMetadata {
   contentType: string;
   sizeBytes: number;
+  /** The object's ETag as stored, which a conditional copy pins (QA-036). */
+  etag?: string;
+}
+
+/** Conditions on a server-side copy. */
+export interface CopyOptions {
+  /** Copy only if the source still has this ETag (CopySourceIfMatch); else PreconditionFailed. */
+  ifMatch?: string;
 }
 
 /** One object surfaced by {@link StorageService.list}. */
@@ -116,8 +126,11 @@ export interface StorageService {
   head(key: string): Promise<ObjectMetadata | null>;
   /** SHA-256 of the object body, streamed from storage. */
   checksumSha256(key: string): Promise<string>;
-  /** Server-side copy. The destination keeps the bucket's own at-rest encryption. */
-  copy(sourceKey: string, destinationKey: string): Promise<void>;
+  /**
+   * Server-side copy. The destination keeps the bucket's own at-rest encryption. With `ifMatch`,
+   * the copy fails (an error named PreconditionFailed, HTTP 412) if the source changed since.
+   */
+  copy(sourceKey: string, destinationKey: string, options?: CopyOptions): Promise<void>;
   remove(key: string): Promise<void>;
   /**
    * Iterate every object under a key prefix, streaming pagination internally.
@@ -160,12 +173,16 @@ export function createStorageService(env: Env): StorageService | null {
 
     async presign(key, method, contentType, ttlOverrideSeconds, options) {
       const expiresIn = ttlOverrideSeconds ?? ttlSeconds;
+      // QA-036: a PUT signs the declared size, so the URL accepts a body of exactly that many bytes
+      // and nothing larger (S3 otherwise takes up to 5 GB on any presigned PUT).
+      const contentLength = method === "PUT" ? options?.contentLength : undefined;
       const command =
         method === "PUT"
           ? new PutObjectCommand({
               Bucket: bucket,
               Key: key,
               ...(contentType ? { ContentType: contentType } : {}),
+              ...(contentLength !== undefined ? { ContentLength: contentLength } : {}),
             })
           : new GetObjectCommand({
               Bucket: bucket,
@@ -175,7 +192,10 @@ export function createStorageService(env: Env): StorageService | null {
                 options?.inline ? "inline" : "attachment",
               ),
             });
-      const url = await getSignedUrl(client, command, { expiresIn });
+      const url = await getSignedUrl(client, command, {
+        expiresIn,
+        ...(contentLength !== undefined ? { signableHeaders: new Set(["content-length"]) } : {}),
+      });
       return { url, expiresAt: new Date(Date.now() + expiresIn * 1000) };
     },
 
@@ -202,6 +222,7 @@ export function createStorageService(env: Env): StorageService | null {
         return {
           contentType: result.ContentType ?? "application/octet-stream",
           sizeBytes: Number(result.ContentLength ?? 0),
+          ...(result.ETag ? { etag: result.ETag } : {}),
         };
       } catch (error) {
         const status = (error as { $metadata?: { httpStatusCode?: number } }).$metadata
@@ -224,12 +245,13 @@ export function createStorageService(env: Env): StorageService | null {
       return hash.digest("hex");
     },
 
-    async copy(sourceKey, destinationKey) {
+    async copy(sourceKey, destinationKey, options) {
       await client.send(
         new CopyObjectCommand({
           Bucket: bucket,
           Key: destinationKey,
           CopySource: encodeURIComponent(`${bucket}/${sourceKey}`),
+          ...(options?.ifMatch ? { CopySourceIfMatch: options.ifMatch } : {}),
         }),
       );
     },

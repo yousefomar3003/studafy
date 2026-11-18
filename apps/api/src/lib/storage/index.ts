@@ -13,5 +13,6 @@ export {
   discardStagedObject,
   promoteTempObject,
   readStagedSize,
+  readStagedSizeAndEtag,
 } from "./promote";
 export type { PromotedObject, PromoteOptions } from "./promote";

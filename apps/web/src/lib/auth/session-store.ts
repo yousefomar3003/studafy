@@ -59,6 +59,60 @@ export interface SessionRefreshClient {
   logout(): Promise<void>;
 }
 
+/**
+ * What the tabs of one browser share (QA-033). Every tab holds the same HttpOnly refresh cookie,
+ * and the API burns the session's whole token family when one refresh token is presented twice,
+ * so two tabs rotating at once (a browser restoring its tabs, say) log the user out. Tabs therefore
+ * rotate one at a time under a cross-tab lock, and the tab that rotated publishes the result; a tab
+ * that waited adopts it instead of rotating again.
+ */
+export interface CrossTabCoordinator {
+  /** Run `fn` while holding the browser-wide refresh lock. */
+  withLock<T>(fn: () => Promise<T>): Promise<T>;
+  /** Share freshly rotated tokens with the other tabs. */
+  publish(tokens: SessionTokens): void;
+  /** The newest tokens any tab has published, or null. */
+  latest(): SessionTokens | null;
+}
+
+const REFRESH_LOCK_NAME = "studafy-refresh";
+const SESSION_CHANNEL_NAME = "studafy-session";
+
+/**
+ * The browser coordinator: Web Locks for mutual exclusion, BroadcastChannel to share tokens. Falls
+ * back to no locking where either API is missing (old browsers, tests without a DOM), which is the
+ * pre-QA-033 behaviour.
+ */
+export function createBrowserCrossTab(): CrossTabCoordinator {
+  let latest: SessionTokens | null = null;
+  const locks = (globalThis.navigator as Navigator | undefined)?.locks;
+  const channel =
+    typeof globalThis.BroadcastChannel === "function"
+      ? new globalThis.BroadcastChannel(SESSION_CHANNEL_NAME)
+      : null;
+  if (channel) {
+    channel.onmessage = (event: MessageEvent<SessionTokens>) => {
+      const tokens = event.data;
+      if (
+        tokens &&
+        typeof tokens.accessToken === "string" &&
+        typeof tokens.expiresAt === "number"
+      ) {
+        latest = tokens;
+      }
+    };
+  }
+  return {
+    withLock: <T>(fn: () => Promise<T>): Promise<T> =>
+      locks ? (locks.request(REFRESH_LOCK_NAME, () => fn()) as Promise<T>) : fn(),
+    publish(tokens) {
+      latest = tokens;
+      channel?.postMessage(tokens);
+    },
+    latest: () => latest,
+  };
+}
+
 /** The opaque handle the rotation timer passes to its `clearTimeout` counterpart. */
 export type TimerHandle = ReturnType<typeof globalThis.setTimeout>;
 
@@ -75,6 +129,13 @@ export interface SessionStoreOptions {
    * TTL is 900 s).
    */
   readonly refreshMarginMs?: number;
+  /** Cross-tab coordination (QA-033). Omitted: this tab alone, as before. */
+  readonly crossTab?: CrossTabCoordinator;
+  /**
+   * Runs on every sign-out, after the in-memory session is dropped, whether or not the server call
+   * succeeded: clears what this browser kept for the person (QA-089, recent searches).
+   */
+  readonly onSignedOut?: () => void;
 }
 
 export interface SessionStore {
@@ -119,6 +180,32 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
   const clearTimer: (id: TimerHandle) => void =
     options.clearTimeoutFn ?? ((id) => globalThis.clearTimeout(id));
   const marginMs = options.refreshMarginMs ?? DEFAULT_REFRESH_MARGIN_MS;
+  const crossTab = options.crossTab ?? null;
+
+  /**
+   * Rotate under the cross-tab lock. A tab that waited on the lock first looks at what the tab
+   * ahead of it published: tokens newer than its own and still outside the refresh margin are
+   * adopted as they are, so N tabs restoring together cost one rotation, not N reuse alarms.
+   */
+  // Not `async`: without a coordinator this must be exactly the old single call, with no extra
+  // microtask hops in the rotation's settling order.
+  function refreshOnce(): Promise<SessionTokens> {
+    if (crossTab === null) return refreshClient.refresh();
+    const held = tokens;
+    return crossTab.withLock(async () => {
+      const shared = crossTab.latest();
+      if (
+        shared !== null &&
+        shared.accessToken !== held?.accessToken &&
+        shared.expiresAt - now() > marginMs
+      ) {
+        return shared;
+      }
+      const next = await refreshClient.refresh();
+      crossTab.publish(next);
+      return next;
+    });
+  }
 
   let status: SessionStatus = "restoring";
   let tokens: SessionTokens | null = null;
@@ -192,7 +279,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
         setStatus("restoring");
       }
       try {
-        const next = await refreshClient.refresh();
+        const next = await refreshOnce();
         tokens = next;
         roles = decodeAccessTokenRoles(next.accessToken);
         userId = decodeAccessTokenUserId(next.accessToken);
@@ -259,6 +346,7 @@ export function createSessionStore(options: SessionStoreOptions): SessionStore {
       userId = null;
       cancelRotationTimer();
       setStatus("unauthenticated");
+      options.onSignedOut?.();
     }
   }
 

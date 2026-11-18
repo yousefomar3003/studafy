@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { DOMAIN_EVENTS, ERROR_CODES } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { withAppTx, withTenantTx } from "../../../db/tenant-tx";
 import { emit } from "../../../lib/events/emitter";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 
@@ -80,20 +81,22 @@ export async function verifySchoolEmail(
   const tokenHash = hashToken(rawToken);
   const now = options.now?.() ?? Date.now();
 
-  // Look up the school by token hash. app.schools is a global table without RLS,
-  // so studafy_app can SELECT directly.
-  const rows = await database<
-    {
-      id: string;
-      slug: string;
-      name: string;
-      email: string;
-      country_id: string;
-      default_currency_id: string;
-      email_verified_at: Date | null;
-      email_verification_expires_at: Date | null;
-    }[]
-  >`
+  // Look up the school by token hash. app.schools is a global table without RLS; the read still
+  // runs as studafy_app rather than the raw login (QA-014).
+  const rows = await withAppTx(
+    database,
+    (tx) => tx<
+      {
+        id: string;
+        slug: string;
+        name: string;
+        email: string;
+        country_id: string;
+        default_currency_id: string;
+        email_verified_at: Date | null;
+        email_verification_expires_at: Date | null;
+      }[]
+    >`
     SELECT
       id, slug, name, email, country_id, default_currency_id,
       email_verified_at,
@@ -101,7 +104,8 @@ export async function verifySchoolEmail(
     FROM app.schools
     WHERE email_verification_token_hash = ${tokenHash}::bytea
     LIMIT 1
-  `;
+  `,
+  );
 
   if (rows.length === 0) {
     throw new CodedHttpException(
@@ -116,13 +120,17 @@ export async function verifySchoolEmail(
   // Already verified — idempotent success.
   if (school.email_verified_at !== null) {
     // Look up admin user for provisioning info.
-    const admin = await database<{ id: string; email: string }[]>`
-      SELECT id, email
-      FROM app.users
-      WHERE school_id = ${school.id}::uuid
-      ORDER BY created_at ASC
-      LIMIT 1
-    `;
+    const admin = await withTenantTx(
+      database,
+      { schoolId: school.id },
+      (tx) => tx<{ id: string; email: string }[]>`
+        SELECT id, email
+        FROM app.users
+        WHERE school_id = ${school.id}::uuid
+        ORDER BY created_at ASC
+        LIMIT 1
+      `,
+    );
     return {
       schoolId: school.id,
       slug: school.slug,
@@ -148,13 +156,17 @@ export async function verifySchoolEmail(
   }
 
   // Look up admin user before the transaction (for provisioning info).
-  const adminRows = await database<{ id: string; email: string }[]>`
-    SELECT id, email
-    FROM app.users
-    WHERE school_id = ${school.id}::uuid
-    ORDER BY created_at ASC
-    LIMIT 1
-  `;
+  const adminRows = await withTenantTx(
+    database,
+    { schoolId: school.id },
+    (tx) => tx<{ id: string; email: string }[]>`
+      SELECT id, email
+      FROM app.users
+      WHERE school_id = ${school.id}::uuid
+      ORDER BY created_at ASC
+      LIMIT 1
+    `,
+  );
 
   const adminUserId = adminRows.length > 0 ? adminRows[0].id : "";
   const adminEmail = adminRows.length > 0 ? adminRows[0].email : "";
@@ -244,19 +256,22 @@ export async function resendVerificationEmail(
   const now = options.now?.() ?? Date.now();
   const expiresAt = new Date(now + VERIFICATION_EXPIRY_HOURS * 60 * 60 * 1000);
 
-  // Find an unverified school with this email.
-  const rows = await database<
-    {
-      id: string;
-      email: string;
-    }[]
-  >`
+  // Find an unverified school with this email (as studafy_app; QA-014).
+  const rows = await withAppTx(
+    database,
+    (tx) => tx<
+      {
+        id: string;
+        email: string;
+      }[]
+    >`
     SELECT id, email
     FROM app.schools
     WHERE normalized_email = ${normalizedEmail}
       AND email_verified_at IS NULL
     LIMIT 1
-  `;
+  `,
+  );
 
   // Return the same response regardless — prevent enumeration.
   if (rows.length === 0) {

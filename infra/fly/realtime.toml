@@ -6,10 +6,18 @@
 app = "studafy-core-realtime"
 primary_region = "fra"
 
+# Graceful shutdown (QA-047). Fly's default is SIGINT with 5 s before SIGKILL, shorter than the
+# time the gateway needs to close its sockets cleanly (clients reconnect to the new machine).
+kill_signal = "SIGTERM"
+kill_timeout = "30s"
+
 [build]
   dockerfile = "../docker/realtime.Dockerfile"
 
 [env]
+  # QA-072: the Prometheus endpoint (METRICS_PORT, [metrics] below) listens on the private network
+  # address only, where fly's scraper reaches it, not on every interface.
+  METRICS_HOST = "fly-local-6pn"
   NODE_ENV = "production"
   PORT = "3001"
   HOST = "0.0.0.0"
@@ -48,3 +56,9 @@ primary_region = "fra"
 [[vm]]
   size = "shared-cpu-1x"
   memory = "512mb"
+
+# Prometheus metrics (RED per route, process) scraped by Fly's managed Prometheus (QA-046). The port
+# is internal; Fly publishes only the http_service port.
+[metrics]
+  port = 9464
+  path = "/metrics"

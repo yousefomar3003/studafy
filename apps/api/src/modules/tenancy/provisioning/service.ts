@@ -82,12 +82,18 @@ export async function provisionTenant(
   const { schoolId } = params;
 
   // ── 1. Idempotency check ────────────────────────────────────────────────
-  const existing = await database<{ provisioning_status: ProvisioningStatus }[]>`
-    SELECT provisioning_status
-    FROM app.subscriptions
-    WHERE school_id = ${schoolId}::uuid
-    LIMIT 1
-  `;
+  // Inside a tenant transaction, like markCompleted (QA-014): app.subscriptions is FORCE-RLS, and a
+  // read off the raw pool worked only because the production login bypasses RLS.
+  const existing = await withTenantTx(
+    database,
+    { schoolId },
+    (tx) => tx<{ provisioning_status: ProvisioningStatus }[]>`
+      SELECT provisioning_status
+      FROM app.subscriptions
+      WHERE school_id = ${schoolId}::uuid
+      LIMIT 1
+    `,
+  );
 
   if (existing.length > 0) {
     const current = existing[0].provisioning_status;
@@ -157,29 +163,30 @@ export async function getProvisioningStatus(
   database: Database,
   schoolId: string,
 ): Promise<ProvisioningStatusResult> {
-  const school = await database<{ provisioning_status: ProvisioningStatus }[]>`
-    SELECT provisioning_status
-    FROM app.schools
-    WHERE id = ${schoolId}::uuid
-    LIMIT 1
-  `;
+  const { school, siteConfig } = await withTenantTx(database, { schoolId }, async (tx) => ({
+    school: await tx<{ provisioning_status: ProvisioningStatus }[]>`
+      SELECT provisioning_status
+      FROM app.schools
+      WHERE id = ${schoolId}::uuid
+      LIMIT 1
+    `,
+    siteConfig: await tx<
+      {
+        site_name: string;
+        company_name: string;
+        status: ProvisioningStatus;
+      }[]
+    >`
+      SELECT site_name, company_name, status
+      FROM app.erpnext_site_configs
+      WHERE school_id = ${schoolId}::uuid
+      LIMIT 1
+    `,
+  }));
 
   if (school.length === 0) {
     throw new CodedHttpException(404, ERROR_CODES.RESOURCE_NOT_FOUND, "School not found.");
   }
-
-  const siteConfig = await database<
-    {
-      site_name: string;
-      company_name: string;
-      status: ProvisioningStatus;
-    }[]
-  >`
-    SELECT site_name, company_name, status
-    FROM app.erpnext_site_configs
-    WHERE school_id = ${schoolId}::uuid
-    LIMIT 1
-  `;
 
   return {
     schoolId,
@@ -397,18 +404,22 @@ async function markFailed(
   const errorMsg = error instanceof Error ? error.message : "Unknown error";
 
   try {
-    await database`
-      UPDATE app.subscriptions
-      SET provisioning_status = 'failed'::app.provisioning_status,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE school_id = ${schoolId}::uuid
-    `;
-    await database`
-      UPDATE app.schools
-      SET provisioning_status = 'failed'::app.provisioning_status,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ${schoolId}::uuid
-    `;
+    // The same tenant transaction markCompleted uses (QA-014): these UPDATEs ran on the raw pool,
+    // which matches nothing on FORCE-RLS app.subscriptions under a login without BYPASSRLS.
+    await withTenantTx(database, { schoolId }, async (tx) => {
+      await tx`
+        UPDATE app.subscriptions
+        SET provisioning_status = 'failed'::app.provisioning_status,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE school_id = ${schoolId}::uuid
+      `;
+      await tx`
+        UPDATE app.schools
+        SET provisioning_status = 'failed'::app.provisioning_status,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${schoolId}::uuid
+      `;
+    });
   } catch (updateError) {
     logger.error(
       {

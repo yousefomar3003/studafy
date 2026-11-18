@@ -121,14 +121,15 @@ function uploadBody(placement: Record<string, unknown>) {
   };
 }
 
-/** Initiates an upload and resolves the created row the way the app does: by its storage key. */
+/** Initiates an upload and resolves the created row the way the app does: by its material id. */
 async function upload(placement: Record<string, unknown>): Promise<MaterialBody> {
   const res = await request("POST", "/api/academics/materials/upload", uploadBody(placement));
   expect(res.status).toBe(201);
-  const { storage_key } = (await res.json()) as { storage_key: string };
+  // The returned storage_key is the temp/ staging key (QA-009); the row is named by material_id.
+  const { material_id } = (await res.json()) as { material_id: string };
   const list = await request("GET", `/api/academics/materials?class_id=${tenant.cls.id}&limit=100`);
   const { materials } = (await list.json()) as { materials: MaterialBody[] };
-  const material = materials.find((m) => m.storage_key === storage_key);
+  const material = materials.find((m) => m.id === material_id);
   expect(material).toBeDefined();
   return material!;
 }

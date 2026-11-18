@@ -54,7 +54,18 @@ export interface SessionTokenConfig {
   accessTtlSeconds: number;
   /** Refresh-token lifetime, applied fresh on every rotation. Threaded from env.JWT_REFRESH_TTL_SECONDS. */
   refreshTtlSeconds: number;
+  /**
+   * How long a session family may live from its first token, however often it rotates (QA-085).
+   * Defaults to {@link REFRESH_ABSOLUTE_LIFETIME_SECONDS}.
+   */
+  refreshAbsoluteLifetimeSeconds?: number;
 }
+
+/**
+ * 90 days: a session signs in again at least this often. Before QA-085 every rotation granted a
+ * fresh refresh lifetime, so a stolen refresh token that kept rotating never had to end.
+ */
+export const REFRESH_ABSOLUTE_LIFETIME_SECONDS = 90 * 24 * 60 * 60;
 
 /** Device metadata captured from the request. Explicit scalars, never a serialized blob. */
 export interface DeviceContext {
@@ -114,6 +125,7 @@ export async function issueTokenPair(
   ]);
 
   if (isSchoolClosed(claims.schoolStatus)) throw schoolClosedException();
+  if (!isActiveUser(claims.userStatus)) throw inactiveUserException();
   if (isWebSessionRefused(params.channel, roles)) throw mobileOnlyWebException();
 
   const minted = mintOpaqueToken(params.schoolId, params.userId);
@@ -219,6 +231,9 @@ interface SessionClaims {
    * (LEGAL_DOCUMENT_VERSIONS; 000188): the `legal_acceptance_pending` claim.
    */
   legalAcceptancePending: boolean;
+  /** The user's own status (app.user_status). Not a claim; read so issuance and rotation can refuse
+   * a suspended or archived account (QA-010). */
+  userStatus: string | null;
 }
 
 /**
@@ -247,6 +262,7 @@ async function readSessionClaims(tx: TransactionSql, userId: string): Promise<Se
       school_status: string | null;
       deletion_pending: boolean | null;
       legal_acceptance_pending: boolean | null;
+      user_status: string | null;
     }[]
   >`
     SELECT
@@ -268,7 +284,8 @@ async function readSessionClaims(tx: TransactionSql, userId: string): Promise<Se
         WHERE id = ${userId}::uuid) AS deletion_pending,
       (SELECT terms_version IS DISTINCT FROM ${LEGAL_DOCUMENT_VERSIONS.terms}
               OR privacy_version IS DISTINCT FROM ${LEGAL_DOCUMENT_VERSIONS.privacy}
-         FROM app.users WHERE id = ${userId}::uuid) AS legal_acceptance_pending
+         FROM app.users WHERE id = ${userId}::uuid) AS legal_acceptance_pending,
+      (SELECT status::text FROM app.users WHERE id = ${userId}::uuid) AS user_status
   `;
 
   return {
@@ -277,7 +294,23 @@ async function readSessionClaims(tx: TransactionSql, userId: string): Promise<Se
     schoolStatus: row?.school_status ?? null,
     deletionPending: row?.deletion_pending ?? false,
     legalAcceptancePending: row?.legal_acceptance_pending ?? false,
+    userStatus: row?.user_status ?? null,
   };
+}
+
+/**
+ * Only an active (or not yet activated) account may hold a session (QA-010). Suspended and archived
+ * accounts are refused on every path -- member-password login already refused them, but the OAuth,
+ * review and invitation paths, and refresh rotation, never read users.status at all.
+ */
+function isActiveUser(status: string | null): boolean {
+  return status === "active" || status === "invited";
+}
+
+function inactiveUserException(): AuthException {
+  // The generic credentials code, as member-password login uses for the same case: the response
+  // does not tell a stranger which accounts exist and are switched off.
+  return new AuthException(ERROR_CODES.AUTH_INVALID_CREDENTIALS, "This account is not active");
 }
 
 // ---------------------------------------------------------------------------
@@ -354,6 +387,19 @@ export async function rotateRefreshToken(
       const claims = await readSessionClaims(tx, session.user_id);
       if (isSchoolClosed(claims.schoolStatus)) return { kind: "school_closed" };
 
+      // A suspended or archived user's family ends here, before the reuse check: the deactivation
+      // revoked its rows, and reporting their next refresh as theft would be a false alarm. Revoking
+      // again covers the window where the status committed but the revocation did not.
+      if (!isActiveUser(claims.userStatus)) {
+        await tx`
+          UPDATE app.refresh_tokens
+             SET revoked_at = CURRENT_TIMESTAMP
+           WHERE family_id = ${session.family_id}
+             AND revoked_at IS NULL
+        `;
+        return { kind: "user_inactive" };
+      }
+
       // Reuse is checked before expiry. The revocation and audit record must commit, so the public
       // exception is raised only after this transaction returns successfully.
       if (session.rotated_at !== null || session.revoked_at !== null) {
@@ -361,6 +407,16 @@ export async function rotateRefreshToken(
       }
 
       if (session.expires_at.getTime() <= Date.now()) return { kind: "expired" };
+
+      // The family's absolute end (QA-085), from its first token's issue time.
+      const [family] = await tx<{ started: Date }[]>`
+        SELECT min(issued_at) AS started FROM app.refresh_tokens
+        WHERE family_id = ${session.family_id}
+      `;
+      const familyEndsAt =
+        family!.started.getTime() +
+        (config.refreshAbsoluteLifetimeSeconds ?? REFRESH_ABSOLUTE_LIFETIME_SECONDS) * 1000;
+      if (familyEndsAt <= Date.now()) return { kind: "expired" };
 
       if (session.roles.length === 0) {
         throw new AuthException(
@@ -375,7 +431,9 @@ export async function rotateRefreshToken(
 
       const minted = mintOpaqueToken(session.school_id, session.user_id);
       const childId = randomUUID();
-      const expiresAt = new Date(Date.now() + config.refreshTtlSeconds * 1000);
+      const expiresAt = new Date(
+        Math.min(Date.now() + config.refreshTtlSeconds * 1000, familyEndsAt),
+      );
       // Generated up front, like childId above and for the same reason: signing and persistence run
       // concurrently below, so every value both statements need has to exist before either starts.
       // Taking the jti back from the signer would serialize them.
@@ -485,6 +543,9 @@ export async function rotateRefreshToken(
     throw new AuthException(ERROR_CODES.AUTH_TOKEN_EXPIRED, "Refresh token has expired");
   }
   if (outcome.kind === "school_closed") throw schoolClosedException();
+  if (outcome.kind === "user_inactive") {
+    throw new AuthException(ERROR_CODES.AUTH_SESSION_NOT_FOUND, "Invalid refresh token");
+  }
   if (outcome.kind === "mobile_only") throw mobileOnlyWebException();
 
   emitTokenReuseDetected(params.log, params.eventSink, {
@@ -992,6 +1053,7 @@ type RotationOutcome =
   | { kind: "not_found" }
   | { kind: "expired" }
   | { kind: "school_closed" }
+  | { kind: "user_inactive" }
   | { kind: "mobile_only" }
   | { kind: "reuse"; event: ReuseEvent };
 

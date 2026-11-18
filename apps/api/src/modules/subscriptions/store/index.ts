@@ -20,6 +20,8 @@ export function createStoreBilling(env: {
   GOOGLE_PLAY_PACKAGE_NAME?: string;
   GOOGLE_PLAY_SERVICE_ACCOUNT?: string;
   GOOGLE_PLAY_RTDN_TOKEN?: string;
+  /** Comma-separated user ids allowed sandbox purchases in production (QA-058); see env.ts. */
+  STORE_SANDBOX_ALLOWED_USER_IDS?: string;
   NODE_ENV?: string;
 }): StoreBilling | null {
   if (!env.AI_STORE_PRODUCT_ID) return null;
@@ -53,5 +55,14 @@ export function createStoreBilling(env: {
     apple,
     google,
     googleNotificationToken: env.GOOGLE_PLAY_RTDN_TOKEN ?? null,
+    sandboxAllowedUserIds:
+      env.NODE_ENV === "production"
+        ? new Set(
+            (env.STORE_SANDBOX_ALLOWED_USER_IDS ?? "")
+              .split(",")
+              .map((id) => id.trim())
+              .filter(Boolean),
+          )
+        : null,
   };
 }

@@ -1,6 +1,7 @@
 import { ERROR_CODES, isServableUploadScanStatus } from "@studafy/constants";
 
 import { CodedHttpException } from "../../../coded-http-exception";
+import { schoolToday } from "../../../lib/school-today";
 import { parseStorageKey } from "../../../lib/storage/keys";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { formatMinorUnits, getCurrencyByCode, toMinorUnits } from "../currency";
@@ -135,13 +136,16 @@ function translateErpNextError(error: unknown): never {
   });
 }
 
+/** An expense whose date is resolved: the request's, or the school's local today (QA-044). */
+type DatedExpenseParams = CreateExpenseParams & { expense_date: string };
+
 function toErpNextPayload(
   documentType: ExpenseDocumentType,
-  params: CreateExpenseParams,
+  params: DatedExpenseParams,
   schoolId: string,
 ): Record<string, unknown> {
   const { category, vendor, amount, currency = "JOD", description, expense_date } = params;
-  const postingDate = expense_date ?? new Date().toISOString().slice(0, 10);
+  const postingDate = expense_date;
 
   switch (documentType) {
     case "purchase_invoice":
@@ -185,7 +189,7 @@ async function projectToCache(
   schoolId: string,
   documentType: ExpenseDocumentType,
   doc: ErpNextExpenseDoc,
-  params: CreateExpenseParams,
+  params: DatedExpenseParams,
 ): Promise<ExpenseRow> {
   const erpnextName = doc.name;
   if (!erpnextName) {
@@ -208,7 +212,7 @@ async function projectToCache(
 
   const totalAmount = totalFromDoc(doc) > 0 ? totalFromDoc(doc) : params.amount;
   const totalMinor = toMinorUnits(totalAmount, currency.minorUnit);
-  const expenseDate = params.expense_date ?? new Date().toISOString().slice(0, 10);
+  const expenseDate = params.expense_date;
 
   const [row] = await tx<Record<string, unknown>[]>`
     INSERT INTO app.expense_cache (
@@ -379,9 +383,13 @@ export async function createExpense(
   tx: TransactionSql,
   erpnext: TenantErpNext,
   schoolId: string,
-  params: CreateExpenseParams,
+  requested: CreateExpenseParams,
   acceptLanguage?: string,
 ): Promise<ExpenseRow> {
+  const params: DatedExpenseParams = {
+    ...requested,
+    expense_date: requested.expense_date ?? (await schoolToday(tx)),
+  };
   assertOwnAttachmentKey(params.attachment_storage_key, schoolId);
   const payload = toErpNextPayload(params.document_type, params, schoolId);
 
@@ -441,14 +449,15 @@ export async function updateExpense(
   const resource = ERPNEXT_RESOURCES[documentType];
   const currencyMinorUnit = before.currency_minor_unit as number;
 
-  const createParams: CreateExpenseParams = {
+  const createParams: DatedExpenseParams = {
     document_type: documentType,
     category: params.category ?? (before.category as string),
     vendor: params.vendor ?? (before.vendor as string),
     amount: params.amount ?? Number(before.amount_minor as number) / 10 ** currencyMinorUnit,
     currency: params.currency ?? (before.currency as string),
     description: params.description ?? (before.description as string | undefined),
-    expense_date: params.expense_date ?? (before.expense_date as string),
+    expense_date:
+      params.expense_date ?? (before.expense_date as string | null) ?? (await schoolToday(tx)),
     attachment_storage_key:
       params.attachment_storage_key ?? (before.attachment_storage_key as string | undefined),
   };

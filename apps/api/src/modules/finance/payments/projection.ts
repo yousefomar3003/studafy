@@ -18,6 +18,7 @@
  *      referenced invoice or an explicit custom field, and refuse to guess.
  */
 
+import { schoolToday } from "../../../lib/school-today";
 import { getCurrencyByCode, toMinorUnits } from "../currency";
 import { upsertMapping } from "../id-mappings/service";
 
@@ -191,7 +192,7 @@ export async function projectPaymentEntry(
 
   const status = paymentStatusFromDocstatus(doc.docstatus);
   const erpnextStatus = erpNextStatusFromDocstatus(doc.docstatus);
-  const paymentDate = doc.posting_date ?? new Date().toISOString().slice(0, 10);
+  const paymentDate = doc.posting_date ?? (await schoolToday(tx));
   const invoiceId = invoiceFromReferences(doc);
   const receiptUrl = status === "confirmed" ? receiptUrlFor(doc, docname) : null;
   // ck_payment_cache_confirmed_state makes status and confirmed_at move together, so the timestamp is

@@ -1,0 +1,5 @@
+telemetry = false
+
+[test]
+# Shout when the database-backed tests are skipped, and fail when REQUIRE_DB_TESTS=1 (QA-004).
+preload = ["../../scripts/test-db-gate.ts"]

@@ -18,6 +18,7 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@studafy/sanitize": "workspace:*",
     "zod": "4.6.7"
   },
   "devDependencies": {

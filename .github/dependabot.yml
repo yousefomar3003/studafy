@@ -5,11 +5,25 @@ updates:
   # dependency scan is supposed to cover, so leaving them to drift unpatched would undercut
   # security-scan/sast rather than complement them.
   - package-ecosystem: github-actions
-    directory: /
+    # QA-006: every action is pinned to a commit SHA with its release in a comment; Dependabot
+    # updates both. The composite action under .github/actions is listed explicitly: `/` covers
+    # only .github/workflows.
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     # A newly published release/tag can be malicious or unstable (the same supply-chain risk the
     # SHA-pinning in ci.yml defends against); waiting a week before proposing it gives a compromised
     # release time to be caught and yanked upstream.
+    cooldown:
+      default-days: 7
+
+  # QA-053: the container base images are pinned by digest; this proposes the digest (and tag)
+  # bumps, with the same one-week cooldown, so pinning does not turn into never patching.
+  - package-ecosystem: docker
+    directory: /infra/docker
+    schedule:
+      interval: weekly
     cooldown:
       default-days: 7

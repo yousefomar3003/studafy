@@ -82,8 +82,9 @@ tagged template sends each `${}` as a **bound parameter** — the value never be
 it cannot change the statement. That is the only way request data may reach the database.
 
 ```ts
-// ✅ Tagged template: `search` is a bound parameter ($1), never SQL text.
-const rows = await tx`SELECT id FROM app.users WHERE email ILIKE ${`%${search}%`}`;
+// ✅ Tagged template: the pattern is a bound parameter ($1), never SQL text. likeContains
+// (src/lib/sql/like.ts) escapes \, % and _ so the search term is matched literally (QA-068).
+const rows = await tx`SELECT id FROM app.users WHERE email ILIKE ${likeContains(search)}`;
 
 // ✅ Optional clauses are tagged fragments, composed into the outer template.
 const statusFilter = status ? tx` AND u.status = ${status}` : tx``;
@@ -163,3 +164,23 @@ For any change that touches SQL:
       from a caller, and the reviewer agrees.
 - [ ] Runtime identifiers (tables, columns, sort keys) come from a hard-coded allowlist.
 - [ ] A new free-text search or filter parameter is added to `sql-injection.test.ts`.
+
+## Migrations
+
+`db/migrations/NNNNNN_name.sql`, applied in order by `packages/db` (`bun run db:migrate`). They are forward-only and immutable once applied.
+
+**Expand, then contract.** A deploy runs migrations first, then replaces the services machine by machine, so for a while the _previous_ release runs against the _new_ schema. Every migration must therefore keep the previous release working:
+
+- add a column nullable, or with a default, and backfill it later; never add a `NOT NULL` column the old code does not write;
+- never rename or drop a column, table or function in the release that stops using it. Ship the code that stops using it first, then drop it in a later release;
+- add constraints `NOT VALID` and `VALIDATE` them in a later migration when the table is large;
+- create indexes on large tables with `CREATE INDEX CONCURRENTLY` in a `transaction=off` migration.
+
+**Timeouts (QA-049).** Every migration runs with `lock_timeout = 5s` and `statement_timeout = 15min`. A migration that can't take its lock within 5 seconds fails and rolls back, instead of queueing every query on a hot table behind it; the deploy stops and you retry later. Override per file with the directive on the first line:
+
+```sql
+-- studafy:migration lock_timeout=30s statement_timeout=2h
+-- studafy:migration transaction=off lock_timeout=10s
+```
+
+Durations are a number and a unit (`ms`, `s`, `min`, `h`); anything else is refused when migrations are discovered.
