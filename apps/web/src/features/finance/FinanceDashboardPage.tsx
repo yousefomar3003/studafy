@@ -49,6 +49,11 @@ const FINANCE_LINKS = [
   { key: "expenses", to: "/portal/finance/expenses", managementOnly: true },
   // VAT is the school admin's to set, so both audiences get the link.
   { key: "tax", to: "/portal/finance/settings/tax", managementOnly: false },
+  // The Student AI line on tuition (000238): finance reads it, billing:update switches it.
+  { key: "studentAi", to: "/portal/finance/settings/student-ai", managementOnly: false },
+  // What the school earns from Student AI and owes Studafy (aiRevenueShare:read, which every role
+  // reaching this page holds).
+  { key: "studentAiEarnings", to: "/portal/finance/student-ai", managementOnly: false },
 ] as const;
 
 export default function FinanceDashboardPage() {

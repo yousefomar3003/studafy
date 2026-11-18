@@ -6,7 +6,9 @@
     "tiers": "Tiers",
     "features": "Features",
     "pricing": "Pricing",
-    "grants": "Manual grants"
+    "grants": "Manual grants",
+    "aiProgramme": "Student AI",
+    "aiProgrammeSchools": "Student AI schools"
   },
   "common": {
     "actions": "Actions",
@@ -285,7 +287,10 @@
       "plan": "Payment plan",
       "open": "Left to Studafy",
       "proposalRow": "{{date}}: {{percent}}% of the total"
-    }
+    },
+    "commitmentLabel": "Commitment",
+    "commitmentDefault": "Keep the licence's (full year for a new licence)",
+    "commitmentHelp": "Full year: the school's whole academic year, can't be cancelled. Month to month: cancellable, with no revenue share by default."
   },
   "quotes": {
     "title": "Quotes",
@@ -391,7 +396,8 @@
     "done": {
       "resolved": "Request resolved.",
       "declined": "Request declined."
-    }
+    },
+    "automatic": "Automatic · Student AI opt-ins"
   },
   "payments": {
     "title": "Payments",
@@ -611,7 +617,9 @@
     "assignPicked_one": "Assign {{count}} person",
     "assignPicked_other": "Assign {{count}} people",
     "assignedCount_one": "{{count}} seat assigned ({{skipped}} not).",
-    "assignedCount_other": "{{count}} seats assigned ({{skipped}} not)."
+    "assignedCount_other": "{{count}} seats assigned ({{skipped}} not).",
+    "programme": "Student AI (whole year)",
+    "programmeLocked": "Held by a Student AI opt-in for the year: it can't be unassigned. The school transfers or releases it when the student leaves."
   },
   "history": {
     "byStudafy": "by Studafy",
@@ -718,6 +726,250 @@
       "paid": "Paid",
       "reason": "Reason",
       "actions": "Actions"
+    }
+  },
+  "aiProgramme": {
+    "title": "Student AI programme",
+    "description": "Prices, minimum seats and the revenue share for Student AI bundled with tuition. Every save is a new version: new quotes, new licences and renewals use it, and existing licences keep the values they were signed with.",
+    "globalTitle": "Global settings",
+    "globalHelp": "These apply to every school unless the school has its own values below.",
+    "versionLine": "Version {{version}}, saved by {{who}} on {{when}}",
+    "systemAuthor": "Studafy (approved defaults)",
+    "pricesHeading": "Prices",
+    "pricesHelp": "Per student per month, in each currency. Schools are priced in their own currency.",
+    "addCurrencyLabel": "Currency code",
+    "addCurrency": "Add currency",
+    "storeReminder": "You changed the in-app purchase price. Update it in App Store Connect and Google Play Console too: Studafy can't change store prices.",
+    "seatsHeading": "Seats",
+    "shareHeading": "Revenue share",
+    "rulesHeading": "Rules",
+    "addTier": "Add tier",
+    "overrideThis": "Set for this school",
+    "reasonLabel": "Reason for this change",
+    "reasonHelp": "Required. Shown in the version history and the audit log.",
+    "appliesTo": "New quotes, new licences and renewals use the new values. Existing licences keep theirs until you apply the current settings to them.",
+    "discard": "Discard changes",
+    "saveVersion": "Save new version",
+    "saved": "Saved as a new version.",
+    "cleared": "School overrides cleared.",
+    "field": {
+      "prices": "Prices",
+      "iapPriceMinor": "In-app purchase price",
+      "licensePriceMinor": "School licence price (per seat)",
+      "parentPriceMinor": "Price parents see",
+      "minSeats": "Minimum seats",
+      "maxShareBps": "Maximum revenue share",
+      "conversionTiers": "Conversion tiers",
+      "largeSchoolMinSeats": "Large-school floor: from seats",
+      "largeSchoolShareBps": "Large-school floor: at least",
+      "contentBonusTiers": "Content bonus tiers",
+      "bonusRequiresConversionShare": "Give the bonus only when the conversion share is above 0%",
+      "measurementOffsetDays": "Measure conversion after (days)",
+      "nonpaymentGraceDays": "Grace period before Student AI stops (days)",
+      "monthToMonthShareBps": "Month-to-month licences earn (% of the tier values)",
+      "payoutMode": "How the revenue share is paid"
+    },
+    "help": {
+      "iap": "For display and calculations only. The stores set the real price.",
+      "minSeats": "The school pays for at least this many seats.",
+      "largeSchool": "A licence with this many seats or more gets at least the floor share. A floor of 0% turns it off.",
+      "conversionTiers": "Conversion is students opted in divided by students enrolled. Each tier applies from its percentage up.",
+      "contentBonusTiers": "Upload consistency is the share of school days with lessons or materials uploaded. The bonus is added to the conversion share.",
+      "measurement": "Conversion is measured this many days after the licence starts, and the tier is then locked.",
+      "grace": "Student AI stops this many days after an instalment goes unpaid.",
+      "monthToMonth": "0% gives month-to-month licences no share. 50% gives half the tier values."
+    },
+    "tier": {
+      "conversionFrom": "From conversion",
+      "uploadsFrom": "From upload consistency",
+      "share": "Share",
+      "bonus": "Bonus"
+    },
+    "payoutMode": {
+      "invoice_credit": "Credit on the next invoice",
+      "payout": "Payout"
+    },
+    "issue": {
+      "out_of_range": "This value is out of range. Prices can't be negative and percentages must be between 0 and 100.",
+      "tiers_invalid": "Start the first tier at 0%, start each tier higher than the one before, and don't lower a share.",
+      "share_above_max": "This is above the maximum revenue share.",
+      "currency_invalid": "Add at least one currency, and list each currency once."
+    },
+    "margin": {
+      "none": "Parents pay the same as the school licence price, so the school keeps no margin. It still earns the revenue share.",
+      "below_cost": "Parents pay less than the school licence price, so the school pays the difference. It still earns the revenue share."
+    },
+    "exampleTitle": "Revenue share example",
+    "exampleHelp": "Try the settings on a school. Nothing is saved.",
+    "example": {
+      "conversion": "Conversion",
+      "uploads": "Upload consistency",
+      "seats": "Seats on the licence",
+      "fullYear": "Full-year committed licence",
+      "conversionShare": "Conversion share",
+      "bonus": "Content bonus",
+      "total": "Revenue share",
+      "floor": "The large-school floor applies.",
+      "capped": "Capped at the maximum revenue share.",
+      "base": "The share is a percentage of what Studafy actually collects from the school at that school's licence price, for the months of its own school year."
+    },
+    "schoolsTitle": "School overrides",
+    "schoolsHelp": "Set any value for one school. Values you don't set follow the global settings.",
+    "searchSchools": "Search schools",
+    "school": "School",
+    "chooseSchool": "Choose a school",
+    "selectedSchool": "Selected school",
+    "noOverride": "This school uses the global settings.",
+    "overrideLine": "This school has its own values (override version {{version}}).",
+    "schoolCurrency": "Prices are in the school's currency, {{currency}}.",
+    "iapGlobalOnly": "Set globally: store prices are the same for every school.",
+    "noPrice": "No price",
+    "pricesMissing": "There are no prices in {{currency}}. Add {{currency}} to the global prices or set this school's prices.",
+    "clearOverrides": "Clear all overrides",
+    "saveOverride": "Save school settings",
+    "overrideHistoryTitle": "This school's versions",
+    "clearedEntry": "Overrides cleared: the school follows the global settings.",
+    "historyTitle": "Version history",
+    "versionLabel": "Version {{version}}",
+    "diff": {
+      "setting": "Setting",
+      "before": "Before",
+      "after": "After",
+      "signed": "Signed with",
+      "current": "Current",
+      "none": "No values changed."
+    },
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days",
+    "licenseTitle": "Student AI programme",
+    "licenseHelp": "This licence keeps these values until you apply the current settings.",
+    "upToDate": "Current settings",
+    "newerAvailable": "Newer settings available",
+    "signedWith": "Signed with",
+    "signedVersion": "Version {{version}}",
+    "signedVersionWithOverride": "Version {{version}} with school override version {{override}}",
+    "appliedAt": "Since",
+    "editSchoolSettings": "Edit this school's settings",
+    "applyCurrent": "Apply current settings",
+    "applyTitle": "Apply current settings to this licence?",
+    "applyHelp": "The licence moves to the values in force now. This is recorded with your reason.",
+    "applyFromTo": "From version {{from}} to version {{to}}.",
+    "applyConfirm": "Apply settings",
+    "applied": "Current settings applied to the licence."
+  },
+  "commitment": {
+    "label": "Commitment",
+    "full_year": "Full year committed",
+    "month_to_month": "Month to month"
+  },
+  "programmeSchools": {
+    "title": "Student AI schools",
+    "description": "Every school in the programme: conversion, upload consistency, the revenue share owed, credited, paid out and forfeited, and what Studafy keeps per seat this year.",
+    "settingsLink": "Programme settings",
+    "filters": "Filter schools",
+    "search": "School name",
+    "inProgrammeOnly": "Licence in the programme",
+    "owedOnly": "Share owed or due",
+    "belowTier": "Earning no share",
+    "empty": "No school matches.",
+    "notInProgramme": "Licence not in the programme",
+    "optedInValue": "{{optedIn}} / {{enrolled}}",
+    "shareParts": "{{conversion}} + {{bonus}}",
+    "payoutDue": "{{amount}} payout due",
+    "pending": "{{amount}} pending",
+    "creditedPaid": "{{credited}} credited · {{paid}} paid out",
+    "netTotal": "{{amount}} in total",
+    "source": {
+      "locked": "Locked",
+      "provisional": "Re-measured",
+      "live": "Today, not locked"
+    },
+    "columns": {
+      "school": "School",
+      "licence": "Licence",
+      "optedIn": "Opted in / enrolled",
+      "conversion": "Conversion",
+      "uploads": "Uploads",
+      "share": "Share rate",
+      "collected": "Collected",
+      "owed": "Owed",
+      "paidOut": "Given",
+      "forfeited": "Forfeited",
+      "netPerSeat": "Studafy net / seat"
+    }
+  },
+  "programmeSchool": {
+    "title": "Student AI: {{school}}",
+    "titleLoading": "Student AI",
+    "description": "The school's conversion, upload consistency and revenue share ledger; re-measure before the lock, recompute, and record payouts.",
+    "linksLabel": "Related pages",
+    "backToSchools": "All programme schools",
+    "licenceLink": "School and licence",
+    "settingsLink": "The school's programme settings",
+    "earningsTitle": "The school's earnings this year",
+    "stats": {
+      "label": "The school's Student AI figures",
+      "students": "Opted in / enrolled",
+      "studentsValue": "{{optedIn}} / {{enrolled}}",
+      "seats": "{{seats}} licence seats",
+      "noLicence": "No licence",
+      "conversion": "Conversion",
+      "uploads": "Upload consistency",
+      "rate": "Share rate",
+      "owed": "Owed to the school",
+      "owedHint": "{{payoutDue}} payout due · {{pending}} pending",
+      "given": "Credited or paid out",
+      "givenHint": "{{credited}} credited · {{paid}} paid out · {{forfeited}} forfeited",
+      "net": "Studafy net per seat",
+      "netHint": "{{collected}} collected − share = {{net}}, over {{seats}} seats"
+    },
+    "measurements": {
+      "title": "Conversion measurements",
+      "help": "Each licence period's conversion is measured and locked on its measurement day; before then Studafy can measure it again, with a reason.",
+      "period": "Period from",
+      "measureOn": "Locked on",
+      "result": "Locked conversion",
+      "history": "Re-measures before the lock",
+      "lockedValue": "{{optedIn}} of {{enrolled}} = {{conversion}} → {{share}}",
+      "locked": "Locked",
+      "notLocked": "Not locked yet",
+      "remeasured": "{{date}}: {{conversion}} ({{reason}})",
+      "lockedNote": "This period's conversion is locked: it can't be measured again.",
+      "remeasureTitle": "Measure this period again",
+      "reason": "Reason",
+      "reasonHelp": "Counts enrolled and opted-in students now. The period is still locked on {{date}}.",
+      "remeasure": "Measure again",
+      "done": "Measured again."
+    },
+    "ledger": {
+      "title": "Revenue share ledger",
+      "help": "One entry per payment and instalment. Recompute works pending shares out again, records shares of payments made before the licence entered the programme, and credits or moves owed shares, as the hourly job does.",
+      "recompute": "Recompute",
+      "recomputed": "Recomputed.",
+      "recomputedDetail": "{{recorded}} recorded, {{resolved}} worked out, {{settled}} settled.",
+      "statusFilter": "Status",
+      "allStatuses": "All statuses",
+      "empty": "No entries.",
+      "period": "Period",
+      "payment": "Payment",
+      "share": "Share",
+      "status": "Status",
+      "destination": "Where it went",
+      "instalment": "{{number}} · instalment {{position}}",
+      "received": "Received {{date}}"
+    },
+    "payouts": {
+      "title": "Payouts",
+      "nothingDue": "Nothing is due to be paid out.",
+      "none": "No payouts recorded.",
+      "due": "{{amount}} is due to be paid out to the school.",
+      "recordTitle": "Record a payout of {{amount}}",
+      "amount": "Amount",
+      "reference": "Transfer reference",
+      "paidOn": "Paid on",
+      "note": "Note",
+      "record": "Record payout",
+      "recorded": "Payout of {{amount}} recorded."
     }
   }
 }

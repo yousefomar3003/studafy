@@ -98,6 +98,10 @@ export function licenseError(
  */
 const CONSTRAINT_ERRORS: Record<string, [409 | 422, ErrorCode]> = {
   ck_license_seats_capacity: [409, ERROR_CODES.LICENSE_SEAT_LIMIT_REACHED],
+  ck_license_seats_programme_locked: [409, ERROR_CODES.LICENSE_SEAT_PROGRAMME_LOCKED],
+  ck_ai_optins_immutable: [409, ERROR_CODES.AI_OPTIN_ENDED],
+  uq_ai_optins_active_student_year: [409, ERROR_CODES.AI_OPTIN_ALREADY_OPTED_IN],
+  uq_ai_optin_windows_one_open: [409, ERROR_CODES.AI_OPTIN_WINDOW_ALREADY_OPEN],
   ck_license_seats_eligible: [422, ERROR_CODES.LICENSE_SEAT_NOT_ELIGIBLE],
   ck_license_seats_license_open: [409, ERROR_CODES.LICENSE_NOT_EDITABLE],
   uq_license_seats_active_person: [409, ERROR_CODES.LICENSE_SEAT_LIMIT_REACHED],

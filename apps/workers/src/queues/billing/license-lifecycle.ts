@@ -10,19 +10,37 @@
  *     how much is paid. Each instalment not paid by its due date is marked overdue the same way
  *     (000221); an invoice's due date is its earliest unpaid instalment's;
  *  4. AI stops 30 days after an unpaid instalment (000233): an active licence with any unpaid
- *     instalment LICENSE_NONPAYMENT_GRACE_DAYS or more past its due date (UTC dates) is suspended and
- *     marked `nonpayment_suspended_at`, and its seat holders' entitlements are bumped so the AI stops
- *     at once. Every instalment counts: a later one going unpaid stops it again;
+ *     instalment its grace period (the licence's nonpayment_grace_days, 000234) or more past its
+ *     due date (UTC dates) is suspended and marked `nonpayment_suspended_at`, and its seat holders'
+ *     entitlements are bumped so the AI stops at once. Every instalment counts: a later one going unpaid stops it again;
  *  5. a licence stopped for non-payment with nothing past the cutoff any more (paid, or its invoice
  *     voided) is resumed. The API resumes it the moment the payment is recorded; this is the safety
- *     net. A licence the super admin suspended by hand is never resumed here.
+ *     net. A licence the super admin suspended by hand is never resumed here;
+ *  6. the Student AI revenue share (000237, @studafy/billing runRevenueShareTick), in a transaction
+ *     of its own so a failure there never holds back the steps above: conversion measurements whose
+ *     measurement day has come are taken and locked, pending shares are worked out again, and the
+ *     school's shares are settled -- forfeited for an instalment unpaid past its cutoff (after step
+ *     4 has stopped the licence), credited on open later invoices, or due for payout once the licence
+ *     has ended. A credit that leaves a licence due to be in force is applied the way the API's
+ *     payment path applies it (@studafy/billing `licencesToPutInForce`, the shared rule): a licence
+ *     it settled for non-payment is resumed (step 5's rule), and a new licence whose first instalment
+ *     a credit paid is activated -- unless a seat holder still pays personally, whose overlap credit
+ *     and renewal stop need the payment providers: that one is left to the API, whose next settle
+ *     for the school (a payment, an invoice, the console's recompute) finds it by the same rule. The
+ *     step is run again on a serialization failure or deadlock (a payment recorded at the same time).
  *
  * Each school runs in its own system tenant transaction (one failing school does not strand the
  * rest), every change writes an audit row with no actor, and every step is idempotent: a re-run finds
  * nothing left to change.
  */
 
-import { LICENSE_NONPAYMENT_GRACE_DAYS } from "@studafy/constants";
+import {
+  activateLicence,
+  licencesToPutInForce,
+  personalSubscriptionsOnLicence,
+  runRevenueShareTick,
+  withTransactionRetry,
+} from "@studafy/billing";
 
 import { emitAuditLogs } from "../../db/audit";
 import { withSystemTenantTx } from "../../db/tenant-tx";
@@ -42,6 +60,16 @@ export interface LicenseLifecycleResult {
   licensesStopped: number;
   licensesResumed: number;
   failedSchools: number;
+  /** Revenue share (000237): measurements locked, pending shares worked out, entries settled. */
+  conversionsLocked: number;
+  sharesResolved: number;
+  sharesSettled: number;
+  /** Schools whose revenue share pass failed (the lifecycle steps for them still committed). */
+  failedRevenueShareSchools: number;
+  /** Licences a revenue share credit put in force (activated). */
+  licensesActivatedByCredit: number;
+  /** Licences a credit left due to activate that wait for the API (a seat holder pays personally). */
+  licensesAwaitingApiActivation: number;
 }
 
 /** Expire the school's licenses that have ended; bump their seat holders. */
@@ -191,8 +219,9 @@ async function bumpSeatHolders(
 }
 
 /**
- * Suspend every active licence with an unpaid instalment LICENSE_NONPAYMENT_GRACE_DAYS or more past
- * its due date (`today` >= due date + 30, both UTC dates). Idempotent: a suspended licence is not
+ * Suspend every active licence with an unpaid instalment its grace period or more past its due date
+ * (`today` >= due date + the licence's nonpayment_grace_days, both UTC dates; 30 by default, a
+ * Student AI programme setting since 000234). Idempotent: a suspended licence is not
  * picked again.
  */
 export async function stopForNonPayment(
@@ -209,10 +238,12 @@ export async function stopForNonPayment(
       SELECT DISTINCT ON (i.license_id) i.license_id, inst.id AS instalment_id, inst.due_date
       FROM app.license_invoice_instalments AS inst
       JOIN app.license_invoices AS i ON i.id = inst.invoice_id AND i.school_id = inst.school_id
+      JOIN app.school_licenses AS grace
+        ON grace.id = i.license_id AND grace.school_id = i.school_id
       WHERE inst.school_id = current_setting('app.school_id')::uuid
         AND i.status IN ('issued', 'partially_paid')
         AND inst.status <> 'paid'
-        AND inst.due_date + ${LICENSE_NONPAYMENT_GRACE_DAYS}::int <= ${today}::date
+        AND inst.due_date + grace.nonpayment_grace_days <= ${today}::date
       ORDER BY i.license_id, inst.due_date, inst.position
     ) AS late
     WHERE l.school_id = current_setting('app.school_id')::uuid
@@ -280,7 +311,7 @@ export async function resumePaidLicenses(
               AND i.license_id = c.id
               AND i.status IN ('issued', 'partially_paid')
               AND inst.status <> 'paid'
-              AND inst.due_date + ${LICENSE_NONPAYMENT_GRACE_DAYS}::int <= ${today}::date
+              AND inst.due_date + c.nonpayment_grace_days <= ${today}::date
           )
         ORDER BY c.starts_at DESC, c.id
         LIMIT 1
@@ -306,6 +337,50 @@ export async function resumePaidLicenses(
   return { resumed: resumed.length, bumped };
 }
 
+/** Step 6 for one school, in one transaction: the revenue share tick, then what its credits settled. */
+export async function revenueShareStep(
+  tx: TransactionSql,
+  schoolId: string,
+  now: Date,
+): Promise<{
+  snapshotsLocked: number;
+  sharesResolved: number;
+  settled: number;
+  activated: number;
+  resumed: number;
+  bumped: number;
+  awaitingApi: string[];
+}> {
+  const audit = (entries: Parameters<typeof emitAuditLogs>[1]) => emitAuditLogs(tx, entries);
+  const tick = await runRevenueShareTick(tx, { schoolId, now, audit });
+  const due = await licencesToPutInForce(tx, now, { creditedOnly: true });
+  let activated = 0;
+  let bumped = 0;
+  const awaitingApi: string[] = [];
+  for (const { licenseId } of due.activate) {
+    if (activated > 0) break; // one active licence at a time
+    if (await personalSubscriptionsOnLicence(tx, licenseId, now)) {
+      awaitingApi.push(licenseId);
+      continue;
+    }
+    const holders = await activateLicence(tx, licenseId, audit);
+    if (!holders) continue;
+    activated += 1;
+    bumped += (await publishUserEntitlementChanges(tx, schoolId, holders)).size;
+  }
+  const resumed =
+    due.resume.length > 0 ? await resumePaidLicenses(tx, schoolId, now) : { resumed: 0, bumped: 0 };
+  return {
+    snapshotsLocked: tick.snapshotsLocked,
+    sharesResolved: tick.sharesResolved,
+    settled: tick.changes.length,
+    activated,
+    resumed: resumed.resumed,
+    bumped: bumped + resumed.bumped,
+    awaitingApi,
+  };
+}
+
 export async function runLicenseLifecycle(
   sql: Sql,
   now: Date,
@@ -322,6 +397,12 @@ export async function runLicenseLifecycle(
     licensesStopped: 0,
     licensesResumed: 0,
     failedSchools: 0,
+    conversionsLocked: 0,
+    sharesResolved: 0,
+    sharesSettled: 0,
+    failedRevenueShareSchools: 0,
+    licensesActivatedByCredit: 0,
+    licensesAwaitingApiActivation: 0,
   };
 
   for (const schoolId of schools) {
@@ -341,6 +422,27 @@ export async function runLicenseLifecycle(
     } catch (err) {
       result.failedSchools += 1;
       log.warn({ err, school_id: schoolId }, "license lifecycle failed for school");
+    }
+    try {
+      const step = await withTransactionRetry(() =>
+        withSystemTenantTx(sql, { schoolId }, (tx) => revenueShareStep(tx, schoolId, now)),
+      );
+      result.conversionsLocked += step.snapshotsLocked;
+      result.sharesResolved += step.sharesResolved;
+      result.sharesSettled += step.settled;
+      result.licensesActivatedByCredit += step.activated;
+      result.licensesResumed += step.resumed;
+      result.entitlementBumps += step.bumped;
+      result.licensesAwaitingApiActivation += step.awaitingApi.length;
+      if (step.awaitingApi.length > 0) {
+        log.warn(
+          { school_id: schoolId, license_ids: step.awaitingApi },
+          "revenue share credit paid a licence's first instalment; a seat holder pays personally, so the API activates it",
+        );
+      }
+    } catch (err) {
+      result.failedRevenueShareSchools += 1;
+      log.warn({ err, school_id: schoolId }, "revenue share pass failed for school");
     }
   }
 

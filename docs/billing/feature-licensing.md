@@ -134,6 +134,10 @@ school's billing contacts are emailed when an instalment goes overdue, 7 days be
 when the AI stops (billing email, not a notification). Any
 other suspension is a manual super admin decision.
 
+Since migration 000234 the 30 days is the default of a Student AI programme setting
+(`nonpaymentGraceDays`, globally or per school), and each licence keeps the grace period it was
+signed with in `school_licenses.nonpayment_grace_days`; see [ai-programme.md](./ai-programme.md).
+
 **The school chooses the length and plan (migration 000233, ADR-021 amendment).** The school's
 request carries the months (1-36), an optional start and monthly / yearly / custom (dates and shares
 of the total); the super admin's quote starts from it and needs a reason the school reads to depart
@@ -738,16 +742,16 @@ Every paid screen and entry point shows one of these, decided in one place per c
 (`apps/mobile/lib/src/core/features/feature_gate.dart`, `apps/web/src/lib/features/gate.ts`, the
 same rules, the same tests):
 
-| State                      | When                                                                                                                                       | Shows                                                                                                                                                            |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Covered by a school seat   | active; every grant is `school_license`                                                                                                    | the feature, "Provided by <school>", usage against the limit; no purchase anywhere                                                                               |
-| Covered personally         | active; only `purchase` / `trial` grants                                                                                                   | the feature, usage against the limit                                                                                                                             |
-| Covered by both            | active; a seat and a personal grant                                                                                                        | "Your school now covers this. Your subscription won't renew after <date>." — and, for an App Store subscription, how to turn renewal off in Settings (text only) |
-| Limit reached              | covered, `reason: limit_reached`                                                                                                           | "Monthly limit reached, resets on <date>" (the 1st of next month, UTC)                                                                                           |
-| Ask your school for a seat | not covered, and the caller holds a seat of the audience (`schoolSeat`) or the school sells one that includes the feature (`schoolOffers`) | "Ask your school for a seat" — never a purchase button                                                                                                           |
-| Purchasable                | not covered, nothing from the school                                                                                                       | the existing paywall (mobile: App Store / Google Play offer; web: the checkout button); "Your access ended on <date>" if it expired                              |
-| School inactive            | `reason: school_inactive`                                                                                                                  | the school's plan is not active                                                                                                                                  |
-| Unavailable                | `reason: paused`, or the feature is not listed (hidden)                                                                                    | temporarily unavailable                                                                                                                                          |
+| State                      | When                                                                                                                                                                                                                               | Shows                                                                                                                                                            |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Covered by a school seat   | active; every grant is `school_license`                                                                                                                                                                                            | the feature, "Provided by <school>", usage against the limit; no purchase anywhere                                                                               |
+| Covered personally         | active; only `purchase` / `trial` grants                                                                                                                                                                                           | the feature, usage against the limit                                                                                                                             |
+| Covered by both            | active; a seat and a personal grant                                                                                                                                                                                                | "Your school now covers this. Your subscription won't renew after <date>." — and, for an App Store subscription, how to turn renewal off in Settings (text only) |
+| Limit reached              | covered, `reason: limit_reached`                                                                                                                                                                                                   | "Monthly limit reached, resets on <date>" (the 1st of next month, UTC)                                                                                           |
+| Ask your school for a seat | not covered, and the caller holds a seat of the audience (`schoolSeat`). In the mobile app since 2026-11-18 a school merely selling one (`schoolOffers`) no longer replaces the purchase: the family chooses the school or the app | "Ask your school for a seat" — never a purchase button                                                                                                           |
+| Purchasable                | not covered, nothing from the school                                                                                                                                                                                               | the existing paywall (mobile: App Store / Google Play offer; web: the checkout button); "Your access ended on <date>" if it expired                              |
+| School inactive            | `reason: school_inactive`                                                                                                                                                                                                          | the school's plan is not active                                                                                                                                  |
+| Unavailable                | `reason: paused`, or the feature is not listed (hidden)                                                                                                                                                                            | temporarily unavailable                                                                                                                                          |
 
 **A seat holder is never shown a store purchase** (App Store / Google Play rules): the gate never
 answers "purchasable" to someone with `schoolSeat`, the mobile AI tab shows the store offer only
@@ -1137,7 +1141,10 @@ Decisions made while building the foundation, beyond the brief:
 1. **The API carries the school context, the clients decide nothing alone**: `GET /api/me/features`
    gained `schoolName`, per-feature `schoolSeat`, `schoolOffers` and `renewalStop`, so both apps
    show the same answer from the same verdict and the rule lives in one tested function per client.
-2. **"Ask your school" covers two cases**: the school sells a seat whose tier includes the feature,
+2. **(Changed 2026-11-18 for the mobile app: only a seat holder is told to ask the school; a person
+   without a seat is offered the in-app purchase, and `GET /api/subscriptions/ai/store/config`
+   answers `covered_by_school` for a seated student -- see docs/billing/ai-programme.md "Choice".)**
+   **"Ask your school" covers two cases**: the school sells a seat whose tier includes the feature,
    or the person already holds a seat (of that audience) whose tier does not. A seat holder is never
    sold the feature personally, whatever their tier lacks.
 3. **Fail closed on purchases**: while the verdict is unknown (loading, offline), the mobile AI tab

@@ -72,6 +72,34 @@ void main() {
       );
     });
 
+    test("a parent's Student AI notices open the Student AI screen", () {
+      for (final type in ['AI_OPTIN_AVAILABLE', 'AI_OPTIN_CONFIRMED']) {
+        expect(
+          resolveNotificationTapRoute({
+            'notification_type': type,
+            'route': '/parent/student-ai',
+          }),
+          '/parent/student-ai',
+          reason: type,
+        );
+        expect(
+          resolveNotificationTapRoute({'notification_type': type}),
+          '/parent/student-ai',
+          reason: '$type without a route',
+        );
+      }
+    });
+
+    test("the leadership's Student AI summary lands in the inbox", () {
+      expect(
+        resolveNotificationTapRoute({
+          'notification_type': 'AI_OPTIN_SUMMARY',
+          'route': '/',
+        }),
+        '/notifications',
+      );
+    });
+
     test('anything the app cannot open lands in the notification inbox', () {
       expect(
         resolveNotificationTapRoute({

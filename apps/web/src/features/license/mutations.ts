@@ -119,3 +119,64 @@ export async function receiptFileUrl(receiptId: string): Promise<string> {
   });
   return required(data, "Receipt file").url;
 }
+
+// ---------------------------------------------------------------------------------------------------
+// Student AI opt-in (000235)
+// ---------------------------------------------------------------------------------------------------
+
+export type OpenWindowBody = Schemas["OpenAiOptInWindowBody"];
+export type RecordOptInsResult = Schemas["RecordAiOptInsResult"];
+
+/** Open an opt-in window; the school must accept the programme's minimum seats. */
+export function useOpenStudentAiWindow() {
+  return useLicenseMutation(async (body: OpenWindowBody) => {
+    const { data } = await api.POST("/api/school/license/student-ai/windows", { body });
+    return required(data, "Open window") as Schemas["AiOptInWindow"];
+  });
+}
+
+export function useCloseStudentAiWindow() {
+  return useLicenseMutation(async (windowId: string) => {
+    const { data } = await api.POST("/api/school/license/student-ai/windows/{windowId}/close", {
+      params: { path: { windowId } },
+    });
+    return required(data, "Close window") as Schemas["AiOptInWindow"];
+  });
+}
+
+/**
+ * Record parents' choices on their behalf: picked students, or the admission numbers of a CSV
+ * column. The note is required (how the choice reached the school).
+ */
+export function useRecordStudentAiOptIns() {
+  return useLicenseMutation(
+    async (body: { studentIds?: string[]; admissionNumbers?: string[]; note: string }) => {
+      const { data } = await api.POST("/api/school/license/student-ai/opt-ins", { body });
+      return required(data, "Record opt-ins") as RecordOptInsResult;
+    },
+  );
+}
+
+/** Move a left student's seat to another enrolled student; billing does not change. */
+export function useTransferStudentAiOptIn() {
+  return useLicenseMutation(
+    async (input: { optInId: string; toStudentId: string; note: string }) => {
+      const { data } = await api.POST("/api/school/license/student-ai/opt-ins/{optInId}/transfer", {
+        params: { path: { optInId: input.optInId } },
+        body: { toStudentId: input.toStudentId, note: input.note },
+      });
+      return required(data, "Transfer") as Schemas["TransferAiOptInResult"];
+    },
+  );
+}
+
+/** Release a left student's seat: no longer charged from the first of next month. */
+export function useReleaseStudentAiOptIn() {
+  return useLicenseMutation(async (input: { optInId: string; note: string }) => {
+    const { data } = await api.POST("/api/school/license/student-ai/opt-ins/{optInId}/release", {
+      params: { path: { optInId: input.optInId } },
+      body: { note: input.note },
+    });
+    return required(data, "Release") as NonNullable<Schemas["AiOptIn"]>;
+  });
+}

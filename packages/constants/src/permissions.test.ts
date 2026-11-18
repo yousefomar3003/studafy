@@ -142,6 +142,12 @@ describe("ROLE_PERMISSIONS", () => {
     );
   });
 
+  test("the school's Student AI revenue share: leadership and finance read it (000237)", () => {
+    expect(rolesHolding(PERMISSIONS.AI_REVENUE_SHARE_READ)).toEqual(
+      [ROLES.FINANCE, ROLES.ORG_ADMIN, ROLES.PRINCIPAL, ROLES.SUPER_ADMIN].sort(),
+    );
+  });
+
   // Custom lists: leadership shapes them; every school staff role may work in one, narrowed by the
   // list's audience; families never hold any of it.
   describe("custom lists", () => {

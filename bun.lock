@@ -257,6 +257,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@studafy/constants": "workspace:*",
+        "@studafy/license-pricing": "workspace:*",
         "postgres": "3.4.9",
       },
       "devDependencies": {

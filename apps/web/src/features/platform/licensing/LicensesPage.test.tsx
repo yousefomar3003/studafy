@@ -39,6 +39,7 @@ const openRequest = {
   startsOn: null,
   paymentPlan: "monthly",
   paymentProposal: null,
+  source: "school",
 };
 
 const consoleLicense = {
@@ -72,17 +73,22 @@ const consoleLicense = {
   ],
   nonpaymentSuspendedAt: null as string | null,
   nextAiStop: null,
+  commitment: "full_year",
 };
 
 type Query = Record<string, unknown> | undefined;
 
 let licenseExtra: Record<string, unknown> = {};
+let requestExtra: Record<string, unknown> = {};
 
 const getMock = mock((path: string, init?: { params?: { query?: Query } }) => {
   if (path === "/api/platform/licenses/change-requests") {
     const status = init?.params?.query?.status;
     return Promise.resolve({
-      data: { requests: status === "open" ? [openRequest] : [], status: status ?? "all" },
+      data: {
+        requests: status === "open" ? [{ ...openRequest, ...requestExtra }] : [],
+        status: status ?? "all",
+      },
     });
   }
   if (path === "/api/platform/licenses") {
@@ -135,6 +141,7 @@ async function inbox() {
 
 afterEach(() => {
   cleanup();
+  requestExtra = {};
   getMock.mockClear();
   postMock.mockClear();
 });
@@ -148,6 +155,27 @@ describe("LicensesPage", () => {
     expect(within(row).getByText("19 days left")).toBeTruthy();
     expect(within(row).getByText("Students: 95 / 100")).toBeTruthy();
     expect(within(row).getByText("$1,250.00")).toBeTruthy();
+    expect(within(row).getByTestId("license-commitment").textContent).toBe("Full year committed");
+  });
+
+  test("a month-to-month licence says so", async () => {
+    licenseExtra = { commitment: "month_to_month" };
+    await renderPage();
+    expect((await screen.findByTestId("license-commitment")).textContent).toBe("Month to month");
+    licenseExtra = {};
+  });
+
+  test("marks a request Student AI opt-ins opened on their own as automatic", async () => {
+    await renderPage();
+    const box = await inbox();
+    await box.findByText("“New grade 7 section”");
+    expect(box.queryByTestId("request-automatic")).toBeNull();
+    cleanup();
+
+    requestExtra = { source: "ai_optin", note: "Student AI opt-ins need 130 seats" };
+    await renderPage();
+    const automatic = await (await inbox()).findByTestId("request-automatic");
+    expect(automatic.textContent).toBe("Automatic · Student AI opt-ins");
   });
 
   test("marks a licence whose AI is stopped for non-payment", async () => {

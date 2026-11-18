@@ -12,7 +12,9 @@
     "seats": "Seats",
     "quotes": "Quotes",
     "invoices": "Invoices and payments",
-    "storage": "Storage"
+    "storage": "Storage",
+    "studentAi": "Student AI",
+    "studentAiResults": "Student AI results"
   },
   "audience": {
     "student": "Students",
@@ -108,7 +110,8 @@
       "yearly": "paid yearly",
       "custom_one": "paid in {{count}} payment on our dates",
       "custom_other": "paid in {{count}} payments on our dates"
-    }
+    },
+    "automatic": "Automatic · Student AI opt-ins"
   },
   "request": {
     "title": "Request more seats or a different tier",
@@ -214,7 +217,11 @@
       "already_assigned_other": "{{count}} people already had a seat:",
       "unnamed": "Unnamed person",
       "dismiss": "Dismiss"
-    }
+    },
+    "programme": "Student AI (whole year)",
+    "programmeLocked": "This seat belongs to a Student AI opt-in for the whole year and can't be unassigned. When the student leaves, transfer or release it on the Student AI page.",
+    "programmeLink": "Student AI page",
+    "programmeNote": "Seats marked Student AI (whole year) are held by a parent's opt-in and can't be unassigned. When a student leaves, transfer or release the seat on the Student AI page."
   },
   "quoteKind": {
     "new": "New license term",
@@ -305,6 +312,11 @@
       },
       "reason": "Why: {{reason}}",
       "same": "This quote follows the length and payment plan you chose."
+    },
+    "minimum": {
+      "title_one": "Student AI: the school pays for at least {{seats}} student seat",
+      "title_other": "Student AI: the school pays for at least {{seats}} student seats",
+      "body": "Even if fewer students opt in, the school pays for the minimum for the whole licence."
     }
   },
   "invoiceFilter": {
@@ -655,5 +667,326 @@
     "warningTitle": "Studafy AI stops on {{date}} if this payment is not made",
     "warningBody_one": "{{amount}} on invoice {{number}} was due {{due}}. {{count}} day left before the AI stops for every seat.",
     "warningBody_other": "{{amount}} on invoice {{number}} was due {{due}}. {{count}} days left before the AI stops for every seat."
+  },
+  "studentAi": {
+    "title": "Student AI",
+    "description": "Parents add Student AI for their child for the rest of the school year. It is paid with tuition and can't be cancelled mid-year. Open an opt-in window so parents can choose it in the app, or record their choice for them.",
+    "blocker": {
+      "title": "An opt-in window can't be opened yet",
+      "no_licence": "Student AI needs a licence with student seats that is active or awaiting payment. Ask Studafy for one on the Overview page.",
+      "no_student_tier": "Your licence has no Student AI tier for students yet. Ask Studafy to add one.",
+      "no_price": "Studafy hasn't set the price parents see in your school's currency yet. Contact Studafy support.",
+      "no_academic_year": "Set up your current academic year first. Student AI follows your school's year."
+    },
+    "seatRequest": {
+      "waiting_one": "{{students}} student is waiting for a seat.",
+      "waiting_other": "{{students}} students are waiting for a seat.",
+      "title": "Your licence needs more student seats.",
+      "asked_one": "Studafy has been asked for {{seats}} seat.",
+      "asked_other": "Studafy has been asked for {{seats}} seats.",
+      "askedMore": "Studafy has been asked for more seats.",
+      "notAsked": "They get a seat as soon as one is free.",
+      "body": "Studafy prices the extra seats and sends you a quote. Once you accept it, waiting students get their seats straight away.",
+      "quotes": "See quotes"
+    },
+    "summary": {
+      "title": "Seats and price",
+      "seats": "Student seats",
+      "seatsValue": "{{assigned}} of {{total}} assigned",
+      "minimum": "Minimum seats",
+      "minimumValue_one": "The school pays for at least {{seats}} seat",
+      "minimumValue_other": "The school pays for at least {{seats}} seats",
+      "parentPrice": "Price parents see",
+      "perMonth": "{{price}} a month",
+      "noPrice": "Not set yet",
+      "today": "Opting in today",
+      "todayRange": "{{from}} to {{to}}, paid with tuition",
+      "rules": "Parents commit for the rest of the school year and pay with tuition. They can't cancel mid-year. Seats can be added during the year but not removed. When a student leaves, transfer their seat to another student or release it."
+    },
+    "priceSum_one": "{{price}} × {{months}} month = {{total}}",
+    "priceSum_other": "{{price}} × {{months}} months = {{total}}",
+    "counts": {
+      "title": "Who opted in",
+      "optedIn": "Opted in",
+      "optedInValue": "{{optedIn}} of {{eligible}} eligible students",
+      "conversion": "Conversion",
+      "waiting": "Waiting for a seat",
+      "seatsNeeded": "Seats needed",
+      "released": "Released",
+      "transferred": "Transferred"
+    },
+    "window": {
+      "title": "Opt-in window",
+      "none": "No opt-in window yet. Open one so parents can choose Student AI in the app.",
+      "open": "Open opt-in window",
+      "close": "Close window",
+      "state": "Status",
+      "states": {
+        "scheduled": "Scheduled",
+        "open": "Open",
+        "ended": "Ended",
+        "closed": "Closed"
+      },
+      "dates": "Dates",
+      "year": "Academic year",
+      "scope": "Who it's for",
+      "all": "All enrolled students",
+      "openedBy": "Opened by",
+      "closedBy": "Closed by",
+      "byOn": "{{name}} on {{date}}",
+      "note": "Note",
+      "openTitle": "Open an opt-in window",
+      "openHelp": "While the window is open, parents see Student AI for their child in the app. Opt-ins already recorded stay for the whole year.",
+      "opensOn": "Opens on",
+      "closesOn": "Closes on",
+      "datesError": "The window must close on or after the day it opens.",
+      "grades": "Grades (optional)",
+      "sections": "Sections (optional)",
+      "scopeHelp": "Leave grades and sections empty to offer it to every enrolled student.",
+      "noteLabel": "Note (optional)",
+      "openConfirm": "Open window",
+      "opened": "Opt-in window opened.",
+      "openError": "The window wasn't opened.",
+      "closeTitle": "Close the opt-in window?",
+      "closeBody": "Parents can no longer opt in from the app. Opt-ins already recorded stay for the whole year.",
+      "closeConfirm": "Close window",
+      "closed": "Opt-in window closed."
+    },
+    "minimum": {
+      "title_one": "The school pays for at least {{seats}} seat",
+      "title_other": "The school pays for at least {{seats}} seats",
+      "body": "If fewer students opt in, the school still pays for the minimum. Studafy asks for the seats when the window opens.",
+      "acknowledge_one": "The school pays for at least {{seats}} seat even if fewer students opt in",
+      "acknowledge_other": "The school pays for at least {{seats}} seats even if fewer students opt in"
+    },
+    "students": {
+      "title": "Students",
+      "filters": "Find students",
+      "search": "Search by name or admission number",
+      "show": "Show",
+      "filter": {
+        "all": "Everyone",
+        "opted_in": "Opted in",
+        "not_opted_in": "Not opted in",
+        "waiting": "Waiting for a seat",
+        "left_with_seat": "Left the school with a seat"
+      },
+      "bulk": "Record choices",
+      "columns": {
+        "student": "Student",
+        "class": "Grade and section",
+        "status": "Student AI",
+        "price": "Paid with tuition"
+      },
+      "admission": "Admission no. {{number}}",
+      "empty": "No students match."
+    },
+    "badge": {
+      "source": {
+        "parent": "Opted in by parent",
+        "school_on_behalf": "Recorded by school",
+        "transfer": "Transferred seat"
+      },
+      "waiting": "Waiting for a seat",
+      "releasedFrom": "Released from {{month}}",
+      "released": "Released",
+      "transferred": "Transferred",
+      "notOptedIn": "Not opted in",
+      "notInWindow": "Not in this window",
+      "left": "Left the school"
+    },
+    "record": {
+      "action": "Record",
+      "named": "Record Student AI for {{name}} on their parent's behalf",
+      "selected_one": "Record on parent's behalf ({{count}} selected)",
+      "selected_other": "Record on parents' behalf ({{count}} selected)",
+      "needsWindow": "Open an opt-in window to record parents' choices.",
+      "title_one": "Record Student AI for {{students}} student on the parent's behalf",
+      "title_other": "Record Student AI for {{students}} students on their parents' behalf",
+      "each": "Each student: {{sum}}.",
+      "total_one": "Total for {{students}} student: {{total}}.",
+      "total_other": "Total for {{students}} students: {{total}}.",
+      "totalUpTo_one": "Up to {{total}} for {{students}} student, if it is recorded.",
+      "totalUpTo_other": "Up to {{total}} for {{students}} students, if all are recorded.",
+      "commitment": "This is the parent's commitment for the rest of the school year, paid with tuition. It can't be cancelled mid-year.",
+      "noteLabel": "How did the parent tell the school?",
+      "noteHelp": "Required. Saved as recorded on behalf of the parent, with your name.",
+      "confirm": "Record",
+      "done_one": "{{count}} opt-in recorded.",
+      "done_other": "{{count}} opt-ins recorded.",
+      "error": "Nothing was recorded."
+    },
+    "csv": {
+      "import": "Import CSV",
+      "fileLabel": "CSV file of admission numbers",
+      "help": "Import a CSV with a column of your school's admission numbers, headed \"Admission number\". Never use government ID numbers.",
+      "noColumn": "No admission number column was found. Use a column headed \"Admission number\".",
+      "empty": "The file has no admission numbers.",
+      "tooMany": "Import up to {{max}} admission numbers at a time.",
+      "found_one": "{{numbers}} admission number found in {{file}}.",
+      "found_other": "{{numbers}} admission numbers found in {{file}}."
+    },
+    "report": {
+      "recorded_one": "{{count}} opt-in recorded.",
+      "recorded_other": "{{count}} opt-ins recorded.",
+      "waiting_one": "{{count}} of them is waiting for a seat.",
+      "waiting_other": "{{count}} of them are waiting for a seat.",
+      "already_opted_in_one": "{{count}} student already has Student AI this year:",
+      "already_opted_in_other": "{{count}} students already have Student AI this year:",
+      "not_eligible_one": "{{count}} student isn't in this window:",
+      "not_eligible_other": "{{count}} students aren't in this window:",
+      "not_found_one": "{{count}} admission number wasn't found:",
+      "not_found_other": "{{count}} admission numbers weren't found:"
+    },
+    "transfer": {
+      "action": "Transfer",
+      "named": "Transfer the seat of {{name}}",
+      "title": "Transfer {{name}}'s seat",
+      "help": "{{name}} has left the school. Their seat and its remaining months go to another enrolled student. Billing doesn't change.",
+      "search": "Find a student",
+      "to": "Give the seat to",
+      "none": "No enrolled student without Student AI matches.",
+      "option": "{{name}} (admission no. {{number}})",
+      "confirm": "Transfer seat",
+      "done": "{{from}}'s seat was transferred to {{to}}."
+    },
+    "release": {
+      "action": "Release",
+      "named": "Release the seat of {{name}}",
+      "title": "Release {{name}}'s seat",
+      "body": "No longer charged from {{month}}. The seat is freed.",
+      "refunds": "Any refund between the school and the parent happens outside Studafy.",
+      "confirm": "Release seat",
+      "done": "{{name}}'s seat was released. No longer charged from {{month}}."
+    },
+    "noteLabel": "Note",
+    "noteRequired": "Add a note."
+  },
+  "commitment": {
+    "label": "Commitment",
+    "full_year": "Full year committed",
+    "month_to_month": "Month to month"
+  },
+  "programme": {
+    "tierFrom": "{{from}} and up",
+    "tierShare": "{{share}} share",
+    "periodValue": "{{from}} to {{to}}",
+    "next": {
+      "top": "The school is in the top conversion tier.",
+      "reached": "Today's opt-ins already reach {{share}}: it counts once the conversion is measured.",
+      "add_one": "Add {{seats}} more seat → unlock {{share}}",
+      "add_other": "Add {{seats}} more seats → unlock {{share}}",
+      "explain": "A seat here is a student opted in. Conversion is opted-in students ÷ the {{enrolled}} enrolled; {{from}} or more earns the next tier.",
+      "floor_one": "Or reach {{minSeats}} licence seats ({{seats}} more) for the large-school floor of {{share}}.",
+      "floor_other": "Or reach {{minSeats}} licence seats ({{seats}} more) for the large-school floor of {{share}}.",
+      "floorCloser_one": "Closer: reach {{minSeats}} licence seats ({{seats}} more) for the large-school floor of {{share}}.",
+      "floorCloser_other": "Closer: reach {{minSeats}} licence seats ({{seats}} more) for the large-school floor of {{share}}."
+    },
+    "conversion": {
+      "title": "Conversion and tier",
+      "noLicence": "The school has no licence yet, so there is no conversion to measure.",
+      "sentence": "{{optedIn}} of {{enrolled}} enrolled students opted in: {{conversion}} conversion, which earns a {{share}} share.",
+      "tiers": "Conversion tiers",
+      "locked": "Measured and locked on {{date}} for this licence period.",
+      "provisional": "Re-measured by Studafy; it is locked on {{date}}.",
+      "live": "Today's figure. It is measured and locked on {{date}}.",
+      "floorApplied": "Raised to the large-school floor ({{minSeats}}+ seats earn at least {{share}})."
+    },
+    "formula": {
+      "sentence": "Collected {{collected}}, conversion {{conversion}} plus bonus {{bonus}} equals {{total}}, share {{amount}}",
+      "arrow": "→",
+      "collected": "Collected",
+      "conversion": "Conversion",
+      "bonus": "Bonus",
+      "total": "Total",
+      "totalCapped": "Total (capped)",
+      "totalScaled": "Total (× {{multiplier}})",
+      "amount": "Share"
+    },
+    "status": {
+      "pending": "Pending",
+      "owed": "Owed",
+      "zero": "No share",
+      "credited": "Credited",
+      "payout_due": "Payout due",
+      "paid_out": "Paid out",
+      "forfeited": "Forfeited",
+      "void": "Void"
+    },
+    "destination": {
+      "credited": "Credited on invoice {{number}}",
+      "paidOut": "Paid out by Studafy",
+      "payoutDue": "To be paid out by Studafy",
+      "owed": "Credited on the next invoice",
+      "forfeitedLate": "Forfeited: the instalment was paid after its cutoff",
+      "forfeitedUnpaid": "Forfeited: the instalment was unpaid at its cutoff",
+      "pendingConversion": "Waits for the conversion to be locked",
+      "pendingBonus": "Waits for the period's upload consistency"
+    },
+    "earnings": {
+      "share": "Revenue share earned",
+      "shareNote": "Final shares of this year's payments to Studafy: owed, credited on an invoice, or paid out.",
+      "marginCollected": "Margin on Student AI lines collected",
+      "marginCollectedNote": "Parent price − licence price per student per month, on Student AI lines Studafy invoiced ({{billed}}), as far as parents have paid those invoices.",
+      "marginEstimated": "Margin on lines the school bills",
+      "estimated": "Estimated",
+      "marginEstimatedNote": "Auto-billing is off for these lines, so Studafy can't see what parents paid: counted as if paid in full.",
+      "margin": "Margin on Student AI lines",
+      "marginNone": "No Student AI tuition lines this year.",
+      "totalFor": "Total earnings, {{year}}",
+      "total": "Total earnings",
+      "totalEstimated": "Includes an estimate.",
+      "marginRule": "Margin: {{margin}} per student per month.",
+      "pending": "{{amount}} of revenue share is still pending and not counted yet.",
+      "expected": "Margin once every line is paid: {{amount}}."
+    },
+    "uploads": {
+      "title": "Upload consistency",
+      "description": "The share of school days on which teachers published lessons or materials, in the classes that have Student AI, this licence period so far. It sets the content bonus.",
+      "aim": "Target: {{aim}} of school days, the next content-bonus tier (or the top one, to keep it).",
+      "teachers": "Per teacher",
+      "teacher": "Teacher",
+      "classes": "Classes",
+      "classesTitle": "Per class",
+      "class": "Class",
+      "days": "Days with uploads",
+      "daysValue": "{{uploaded}} of {{days}}",
+      "consistency": "Consistency",
+      "standing": "Against the target",
+      "belowTarget": "Below target",
+      "none": "No class with Student AI has a school day yet."
+    },
+    "results": {
+      "title": "Student AI results",
+      "description": "How the programme is doing: opt-ins, conversion and its tier, what the next tier takes, the school's earnings and teachers' upload consistency.",
+      "notInProgramme": "The licence is not in the Student AI programme yet: open an opt-in window to start.",
+      "openOptIn": "Go to Student AI opt-in",
+      "earningsTitle": "Earnings this year"
+    },
+    "stats": {
+      "label": "Student AI at a glance",
+      "enrolled": "Students enrolled",
+      "optedIn": "Opted in",
+      "optedInHint": "{{conversion}} of enrolled students today",
+      "conversion": "Conversion",
+      "tier": "Current tier",
+      "floor": "Large-school floor",
+      "uploads": "Upload consistency",
+      "uploadsHint": "Bonus tier {{bonus}}, {{from}} to {{to}}",
+      "rate": "Revenue share rate",
+      "rateHint": "Conversion {{conversion}} + bonus {{bonus}}",
+      "earnings": "Total earnings",
+      "earningsFor": "Earnings, {{year}}"
+    },
+    "tile": {
+      "title": "Student AI",
+      "error": "Student AI results could not be loaded.",
+      "none": "No Student AI licence yet.",
+      "conversion": "Conversion",
+      "tier": "Tier",
+      "earnings": "Earned this year",
+      "students": "{{optedIn}} of {{enrolled}} students opted in",
+      "link": "Open Student AI results"
+    }
   }
 }

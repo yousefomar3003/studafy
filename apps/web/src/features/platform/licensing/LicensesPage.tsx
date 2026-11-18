@@ -155,6 +155,9 @@ function LicenseTable({ licenses }: { licenses: ConsoleLicense[] }) {
                     {formatDate(new Date(license.startsAt), { dateStyle: "medium" })} –{" "}
                     {formatDate(new Date(license.endsAt), { dateStyle: "medium" })}
                   </span>
+                  <span className="platform-muted" data-testid="license-commitment">
+                    {t(`platformLicensing.commitment.${license.commitment}`)}
+                  </span>
                   {license.status === "active" && license.daysLeft >= 0 ? (
                     <span className="platform-muted">
                       {t("platformLicensing.licenses.daysLeft", { count: license.daysLeft })}
@@ -339,6 +342,11 @@ export function ChangeRequestInbox() {
                   <Link to={`/portal/platform/schools/${request.schoolId}`}>
                     {request.schoolName}
                   </Link>
+                  {request.source === "ai_optin" ? (
+                    <span className="platform-pill" data-testid="request-automatic">
+                      {t("platformLicensing.inbox.automatic")}
+                    </span>
+                  ) : null}
                   <span>{wanted(request)}</span>
                   <span className="platform-muted">“{request.note}”</span>
                   <span className="platform-muted">

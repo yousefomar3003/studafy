@@ -110,6 +110,11 @@
       "where": "Studafy platform › Pricing",
       "keywords": "seat price, volume discounts, duration discounts, price per seat, pricing rules, rates"
     },
+    "platform-ai-programme": {
+      "title": "Student AI programme",
+      "where": "Studafy platform › Student AI",
+      "keywords": "student ai, revenue share, tuition, conversion tiers, content bonus, ai price, parent price, in-app price, grace period"
+    },
     "build-license-quote": {
       "title": "Build a license quote",
       "where": "Studafy platform › Quotes",
@@ -380,6 +385,11 @@
       "where": "License › Seats",
       "keywords": "seats, assign seats, seat usage, licensed users, seat count, free seats"
     },
+    "license-student-ai": {
+      "title": "Student AI opt-in",
+      "where": "License › Student AI",
+      "keywords": "student ai, opt in, opt-in window, parents choose ai, record on behalf, transfer seat, release seat, minimum seats, ai with tuition, admission numbers csv"
+    },
     "license-quotes": {
       "title": "License quotes",
       "where": "License › Quotes",
@@ -485,6 +495,11 @@
       "where": "Finance › Settings › Tax",
       "keywords": "vat, tax, sales tax, tax rate, trn, tax registration number, tax exempt, zero-rated, value added tax"
     },
+    "student-ai-billing": {
+      "title": "Student AI on tuition",
+      "where": "Finance › Settings › Student AI",
+      "keywords": "student ai, ai fee, ai on tuition, auto billing, fee schedule, opted in, paid with tuition, ai seats"
+    },
     "school-years": {
       "title": "School years & terms",
       "where": "Principal › School years & terms",
@@ -574,6 +589,21 @@
       "title": "Feature switches",
       "where": "Studafy platform › Feature switches",
       "keywords": "feature switches, kill switch, flag overrides, rollout, school overrides"
+    },
+    "platform-ai-programme-schools": {
+      "title": "Student AI schools",
+      "where": "Studafy platform › Student AI › Schools",
+      "keywords": "student ai, revenue share, conversion, upload consistency, payouts, owed, forfeited, studafy net per seat, ledger"
+    },
+    "license-student-ai-results": {
+      "title": "Student AI results",
+      "where": "License › Student AI results",
+      "keywords": "student ai, conversion, tier, next tier, add seats, unlock, upload consistency, teachers below target, earnings"
+    },
+    "student-ai-earnings": {
+      "title": "Student AI earnings",
+      "where": "Finance › Student AI earnings",
+      "keywords": "student ai, revenue share, owed to studafy, paid to studafy, credit, payout, earnings, margin"
     }
   }
 }

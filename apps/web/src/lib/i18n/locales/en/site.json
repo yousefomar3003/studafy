@@ -314,7 +314,10 @@
       "ASSIGNMENT_GRADED": "Marked assignments",
       "ATTENDANCE_MARKED": "Absences and lates",
       "MATERIAL_PUBLISHED": "New lesson materials",
-      "MARKS_RELEASED": "Released marks"
+      "MARKS_RELEASED": "Released marks",
+      "AI_OPTIN_AVAILABLE": "Student AI available",
+      "AI_OPTIN_CONFIRMED": "Student AI confirmations",
+      "AI_OPTIN_SUMMARY": "Student AI opt-in summaries"
     },
     "channels": {
       "in_app": "In-app",

@@ -30,6 +30,7 @@ AiStoreSetup storeSetup({
   String forStudent = studentId,
   List<String> productIds = addOnProducts,
   bool stamped = false,
+  String? schoolName,
 }) => AiStoreSetup(
   enabled: true,
   productId: purchasable ? productId : null,
@@ -43,6 +44,7 @@ AiStoreSetup storeSetup({
   studentFirstName: 'Sara',
   subscribed: subscribed,
   unavailableReason: unavailableReason,
+  schoolName: schoolName,
 );
 
 class FakeGateway implements StoreGateway {

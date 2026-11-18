@@ -2,7 +2,7 @@ import { ApiError } from "@studafy/api-client";
 import { PERMISSIONS } from "@studafy/constants";
 import { Button, Input, Modal, Select, Table, Tabs, useToast } from "@studafy/ui";
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { usePermissions } from "../../lib/auth";
 import { useFormatters, useTranslation } from "../../lib/i18n";
@@ -17,6 +17,7 @@ import {
   seatsLeft,
   shownAudiences,
   usePeopleQuery,
+  useProgrammeSeatIdsQuery,
   useSchoolLicenseQuery,
 } from "./queries";
 
@@ -122,6 +123,12 @@ function AudienceSeats({
   const search = useDebounced(filters.search.trim(), 300);
   const query: PeopleFilters = { ...filters, search, audience };
   const people = usePeopleQuery(query);
+  // Seats a Student AI opt-in holds for the year can't be unassigned (only transferred or released
+  // on the Student AI page once the student leaves).
+  const programme = useProgrammeSeatIdsQuery(audience === "student");
+  const programmeSeats = programme.data ?? new Set<string>();
+  const isProgramme = (person: LicensePerson) =>
+    person.seatId !== null && programmeSeats.has(person.seatId);
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [pending, setPending] = useState<Pending | null>(null);
   const [result, setResult] = useState<AssignResult | null>(null);
@@ -145,7 +152,7 @@ function AudienceSeats({
   const total = people.data?.total ?? 0;
   const picked = rows.filter((row) => selected.has(row.userId));
   const toAssign = picked.filter((row) => row.seatId === null && row.eligible);
-  const toUnassign = picked.filter((row) => row.seatId !== null);
+  const toUnassign = picked.filter((row) => row.seatId !== null && !isProgramme(row));
   const audienceName = t(`schoolLicense.audience.${audience}`);
 
   function setFilter(patch: Partial<typeof EMPTY_FILTERS>) {
@@ -320,6 +327,13 @@ function AudienceSeats({
         </div>
       ) : null}
 
+      {rows.some(isProgramme) ? (
+        <p className="license-muted" data-testid="programme-note">
+          {t("schoolLicense.seats.programmeNote")}{" "}
+          <Link to="/portal/license/student-ai">{t("schoolLicense.seats.programmeLink")}</Link>
+        </p>
+      ) : null}
+
       {result ? <AssignOutcome result={result} onDismiss={() => setResult(null)} /> : null}
 
       <Table caption={t("schoolLicense.seats.caption", { audience: audienceName })} hideCaption>
@@ -383,11 +397,21 @@ function AudienceSeats({
               </Table.Cell>
               <Table.Cell>
                 {person.seatId ? (
-                  <span className="license-pill" data-tone="success">
-                    {t("schoolLicense.seats.hasSeat", {
-                      date: formatDate(new Date(person.assignedAt!), { dateStyle: "medium" }),
-                    })}
-                  </span>
+                  <>
+                    <span className="license-pill" data-tone="success">
+                      {t("schoolLicense.seats.hasSeat", {
+                        date: formatDate(new Date(person.assignedAt!), { dateStyle: "medium" }),
+                      })}
+                    </span>
+                    {isProgramme(person) ? (
+                      <>
+                        {" "}
+                        <span className="license-pill" data-testid="programme-seat">
+                          {t("schoolLicense.seats.programme")}
+                        </span>
+                      </>
+                    ) : null}
+                  </>
                 ) : person.eligible ? (
                   <span className="license-pill">{t("schoolLicense.seats.noSeat")}</span>
                 ) : (
@@ -410,7 +434,10 @@ function AudienceSeats({
                   {person.seatId ? (
                     <Button
                       variant="tertiary"
-                      disabled={unassign.isPending}
+                      disabled={unassign.isPending || isProgramme(person)}
+                      title={
+                        isProgramme(person) ? t("schoolLicense.seats.programmeLocked") : undefined
+                      }
                       aria-label={t("schoolLicense.seats.unassignNamed", { name: person.name })}
                       onClick={() => runUnassign([person])}
                     >

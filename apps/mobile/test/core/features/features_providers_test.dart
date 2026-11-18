@@ -102,9 +102,10 @@ void main() {
     final c = await container();
     final features = await c.read(myFeaturesProvider.future);
     expect(features.schoolName, 'Alpha Academy');
+    // No seat, though the school sells them: the store (owner, 2026-11-18: the family chooses).
     expect(
       c.read(featureGateProvider(FeatureKeys.aiTutor)).value,
-      isA<FeatureAskSchool>(),
+      isA<FeaturePurchasable>(),
     );
     expect(client.calls, 1);
   });

@@ -283,6 +283,19 @@ const PlatformPricingPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/licensing/PricingSettingsPage"),
 );
+const PlatformAiProgrammePage = lazyWithCatalogs(
+  PLATFORM_CATALOGS,
+  () => import("../features/platform/licensing/AiProgrammePage"),
+);
+// The programme's dashboards share the school licence catalog's `programme` strings.
+const PlatformAiProgrammeSchoolsPage = lazyWithCatalogs(
+  [...PLATFORM_CATALOGS, "schoolLicense"],
+  () => import("../features/platform/licensing/AiProgrammeSchoolsPage"),
+);
+const PlatformAiProgrammeSchoolPage = lazyWithCatalogs(
+  [...PLATFORM_CATALOGS, "schoolLicense"],
+  () => import("../features/platform/licensing/AiProgrammeSchoolPage"),
+);
 const PlatformQuotesPage = lazyWithCatalogs(
   PLATFORM_CATALOGS,
   () => import("../features/platform/licensing/CalculatorPage"),
@@ -314,6 +327,14 @@ const LicensePage = lazyWithCatalogs(
 const LicenseSeatsPage = lazyWithCatalogs(
   LICENSE_CATALOGS,
   () => import("../features/license/SeatsPage"),
+);
+const LicenseStudentAiPage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/StudentAiPage"),
+);
+const LicenseStudentAiResultsPage = lazyWithCatalogs(
+  LICENSE_CATALOGS,
+  () => import("../features/license/StudentAiResultsPage"),
 );
 const LicenseQuotesPage = lazyWithCatalogs(
   LICENSE_CATALOGS,
@@ -501,6 +522,14 @@ const StudentFinancePage = lazyWithCatalogs(
 const TaxSettingsPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
   () => import("../features/finance/settings/TaxSettingsPage"),
+);
+const StudentAiEarningsPage = lazyWithCatalogs(
+  [...FINANCE_CATALOGS, "schoolLicense"],
+  () => import("../features/finance/student-ai/StudentAiEarningsPage"),
+);
+const StudentAiBillingPage = lazyWithCatalogs(
+  FINANCE_CATALOGS,
+  () => import("../features/finance/settings/StudentAiBillingPage"),
 );
 const FamiliesListPage = lazyWithCatalogs(
   FINANCE_CATALOGS,
@@ -724,6 +753,16 @@ export const routes: RouteObject[] = [
               ["platform/features", <PlatformFeaturesPage key="features" />],
               ["platform/tiers", <PlatformTiersPage key="tiers" />],
               ["platform/pricing", <PlatformPricingPage key="pricing" />],
+              ["platform/ai-programme", <PlatformAiProgrammePage key="ai-programme" />],
+              // The programme's dashboards (phase 6): every school's row, and one school's ledger.
+              [
+                "platform/ai-programme/schools",
+                <PlatformAiProgrammeSchoolsPage key="ai-programme-schools" />,
+              ],
+              [
+                "platform/ai-programme/schools/:schoolId",
+                <PlatformAiProgrammeSchoolPage key="ai-programme-school" />,
+              ],
               ["platform/quotes", <PlatformQuotesPage key="quotes" />],
               ["platform/licenses", <PlatformLicensesPage key="licenses" />],
               ["platform/payments", <PlatformPaymentsPage key="payments" />],
@@ -1266,6 +1305,15 @@ export const routes: RouteObject[] = [
             [
               ["license", <LicensePage key="license" />],
               ["license/seats", <LicenseSeatsPage key="seats" />],
+              // Student AI opt-in (000235): opening a window, recording choices and moving or
+              // releasing a left student's seat need `license:manage` too.
+              ["license/student-ai", <LicenseStudentAiPage key="student-ai" />],
+              // Its results (phase 6): conversion, tier, earnings and upload consistency. The
+              // figures come from aiRevenueShare:read, which both roles holding license:read hold.
+              [
+                "license/student-ai/results",
+                <LicenseStudentAiResultsPage key="student-ai-results" />,
+              ],
               ["license/quotes", <LicenseQuotesPage key="quotes" />],
               ["license/quotes/:quoteId", <LicenseQuotePage key="quote" />],
               ["license/invoices", <LicenseInvoicesPage key="invoices" />],
@@ -1486,6 +1534,28 @@ export const routes: RouteObject[] = [
             element: (
               <RequirePermission permission={PERMISSIONS.BILLING_READ}>
                 <TaxSettingsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // The school's Student AI earnings (phase 6): owed and paid to Studafy, the revenue
+            // share per period and the year's earnings. `aiRevenueShare:read`: finance, the school
+            // admin and the principal, as the API.
+            path: "finance/student-ai",
+            element: (
+              <RequirePermission permission={PERMISSIONS.AI_REVENUE_SHARE_READ}>
+                <StudentAiEarningsPage />
+              </RequirePermission>
+            ),
+          },
+          {
+            // The Student AI line on tuition (000238): readable with `billing:read`; the
+            // auto-billing switch and the recalculation need `billing:update`, which the page checks
+            // and the API enforces.
+            path: "finance/settings/student-ai",
+            element: (
+              <RequirePermission permission={PERMISSIONS.BILLING_READ}>
+                <StudentAiBillingPage />
               </RequirePermission>
             ),
           },

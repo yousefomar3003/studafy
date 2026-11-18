@@ -10,6 +10,31 @@ export { schoolLicenseRoutes } from "./school-routes";
 export { platformLicenseBillingRoutes } from "./billing-platform-routes";
 export { schoolLicenseBillingRoutes } from "./billing-school-routes";
 export { platformLicenseConsoleRoutes } from "./console-routes";
+export { platformAiProgrammeRoutes } from "./ai-programme-routes";
+export { aiOptInRoutes } from "./ai-optin-routes";
+export {
+  fillWaitingOptInSeats,
+  parentOffers,
+  schoolAiOptInOverview,
+  type AiOptInView,
+  type AiOptInWindowView,
+} from "./ai-optin";
+export { platformAiRevenueShareRoutes, schoolAiRevenueShareRoutes } from "./revenue-share-routes";
+export {
+  INITIAL_AI_PROGRAMME_VERSION_ID,
+  attachAiProgramme,
+  clearSchoolOverride,
+  currentAiProgrammeStamp,
+  currentAiProgrammeVersion,
+  licenseAiProgramme,
+  reapplyAiProgramme,
+  resolveAiProgrammeStamp,
+  resolveAiProgrammeValues,
+  saveAiProgrammeVersion,
+  saveSchoolOverride,
+  schoolAiProgramme,
+  type AiProgrammeStamp,
+} from "./ai-programme";
 export {
   activateEarly,
   createReceipt,
@@ -62,3 +87,27 @@ export {
   type RenewalProviders,
 } from "./overlap";
 export { inSchool, type LicenseActor } from "./context";
+// Student AI content bonus (phase 4): upload consistency per class, teacher and school.
+export { uploadConsistencyRoutes } from "./upload-consistency-routes";
+export {
+  contentBonusTiersFor,
+  currentUploadPeriod,
+  studentAiClassIds,
+  uploadConsistency,
+  uploadConsistencyBonus,
+  uploadConsistencyView,
+  type UploadConsistencyBonusView,
+  type UploadConsistencyClassView,
+  type UploadConsistencyReport,
+  type UploadConsistencyTeacherView,
+  type UploadConsistencyView,
+  type UploadPeriod,
+} from "./upload-consistency";
+export {
+  licenseRevenueShare,
+  recomputeRevenueShare,
+  recordRevenueSharePayout,
+  remeasureConversion,
+  schoolRevenueShare,
+} from "./revenue-share";
+export { useRevenueShareMeasures } from "./revenue-share-context";

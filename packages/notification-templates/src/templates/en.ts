@@ -201,4 +201,24 @@ export const EN_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "{who}{released}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{released}. Open Studafy to see them.",
   },
+  [NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Student AI is available for {childName}",
+    [NOTIFICATION_CHANNELS.PUSH]:
+      "Offered by {schoolName} for the school year · join by {closesOn}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "{schoolName} offers Student AI for {childName} for the school year, as part of your school fees. Your school will tell you the price. Open Studafy to join by {closesOn}.",
+  },
+  [NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "Student AI confirmed for {childName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "From {startMonth}, included in your school fees",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "Student AI for {childName} at {schoolName} is confirmed from {startMonth}, as part of your school fees. It is committed for the school year and can't be cancelled mid-year.",
+  },
+  [NOTIFICATION_TYPES.AI_OPTIN_SUMMARY]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{newCount} new Student AI opt-ins",
+    [NOTIFICATION_CHANNELS.PUSH]:
+      "{totalCount} students opted in · {waitingCount} waiting for a seat",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "{newCount} more students opted in to Student AI. {totalCount} students have it this year, and {waitingCount} are waiting for a seat on the licence.",
+  },
 } as const satisfies LocaleTemplateSet;

@@ -30,6 +30,12 @@ export type InvoiceFilter = Schemas["LicenseInvoiceFilter"];
 export type InvoiceDetail = Schemas["LicenseInvoiceDetail"];
 export type Receipt = Schemas["LicensePaymentReceipt"];
 export type Payment = Schemas["LicensePayment"];
+export type LicenseCommitment = Schemas["LicenseCommitment"];
+export type StudentAiOverview = Schemas["SchoolAiOptInOverview"];
+export type AiOptInWindow = NonNullable<Schemas["AiOptInWindow"]>;
+export type AiOptIn = NonNullable<Schemas["AiOptIn"]>;
+export type AiOptInStudentRow = Schemas["AiOptInStudentRow"];
+export type AiOptInStudentFilter = Schemas["AiOptInStudentFilter"];
 type PeopleQuery = NonNullable<operations["listSchoolLicensePeople"]["parameters"]["query"]>;
 
 export const SCHOOL_LICENSE_KEY = ["school-license"] as const;
@@ -172,6 +178,89 @@ export function usePaymentsQuery() {
     },
   });
 }
+
+/**
+ * Student AI opt-in (`/portal/license/student-ai`, 000235): the licence's student seats, the price
+ * parents see and what opting in today costs, the window, the counts, and the automatic seat request.
+ */
+export function useStudentAiQuery() {
+  return useQuery({
+    queryKey: [...SCHOOL_LICENSE_KEY, "student-ai"] as const,
+    queryFn: async () => {
+      const { data } = await api.GET("/api/school/license/student-ai");
+      if (!data) throw new Error("Student AI returned no data.");
+      return data as StudentAiOverview;
+    },
+  });
+}
+
+export const STUDENT_AI_PAGE_SIZE = 50;
+
+export interface StudentAiFilters {
+  filter: AiOptInStudentFilter;
+  search: string;
+  gradeLevelId: string;
+  sectionId: string;
+  page: number;
+  /** Rows per page; the transfer picker asks for fewer. */
+  limit?: number;
+}
+
+export function useStudentAiStudentsQuery(filters: StudentAiFilters, enabled = true) {
+  return useQuery({
+    queryKey: [...SCHOOL_LICENSE_KEY, "student-ai", "students", filters] as const,
+    queryFn: async () => {
+      const limit = filters.limit ?? STUDENT_AI_PAGE_SIZE;
+      const { data } = await api.GET("/api/school/license/student-ai/students", {
+        params: {
+          query: {
+            filter: filters.filter,
+            search: filters.search || undefined,
+            // The section is the narrower scope; send only the one picked.
+            sectionId: filters.sectionId || undefined,
+            gradeLevelId: filters.sectionId ? undefined : filters.gradeLevelId || undefined,
+            limit,
+            offset: filters.page * limit,
+          },
+        },
+      });
+      if (!data) throw new Error("Student AI students returned no data.");
+      return data as unknown as { students: AiOptInStudentRow[]; total: number };
+    },
+    placeholderData: keepPreviousData,
+    enabled,
+  });
+}
+
+const SEAT_PAGE = 200;
+
+/**
+ * The student seats a Student AI opt-in holds for the year (`programme`): they cannot be
+ * unassigned, only transferred or released on the Student AI page once the student leaves. Read a
+ * page at a time from the seat list, which is the only place that says so.
+ */
+export function useProgrammeSeatIdsQuery(enabled: boolean) {
+  return useQuery({
+    queryKey: [...SCHOOL_LICENSE_KEY, "programme-seats"] as const,
+    queryFn: async () => {
+      const ids = new Set<string>();
+      for (let offset = 0; ; offset += SEAT_PAGE) {
+        const { data } = await api.GET("/api/school/license/seats", {
+          params: { query: { audience: "student", status: "active", limit: SEAT_PAGE, offset } },
+        });
+        if (!data) throw new Error("Seats returned no data.");
+        const page = data as unknown as { seats: Schemas["LicenseSeat"][]; total: number };
+        for (const seat of page.seats) if (seat.programme) ids.add(seat.seatId);
+        if (page.seats.length < SEAT_PAGE || offset + SEAT_PAGE >= page.total) break;
+      }
+      return ids as ReadonlySet<string>;
+    },
+    enabled,
+  });
+}
+
+/** Student statuses that mean the student has left the school (their seat can move or end). */
+export const LEFT_STUDENT_STATUSES: readonly string[] = ["graduated", "withdrawn", "archived"];
 
 /** Seats left of an audience: purchased minus assigned, never below zero. */
 export function seatsLeft(license: SchoolLicense, audience: LicenseAudience): number {

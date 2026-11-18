@@ -375,6 +375,21 @@ const GUARD_CASES: GuardCase[] = [
     permission: "auditLog:export",
     source: "audit/routes.ts",
   },
+  // Student AI content bonus (phase 4): the school reads its own upload consistency on
+  // license:read (ORG_ADMIN, PRINCIPAL); the super admin reads any school's on platform:read.
+  {
+    method: "GET",
+    path: "/api/school/license/upload-consistency",
+    permission: "license:read",
+    source: "licensing/upload-consistency-routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/platform/schools/{schoolId}/ai-programme/upload-consistency",
+    permission: "platform:read",
+    source: "licensing/upload-consistency-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
   // Academic years, terms, class enrolments and exams: RLS fences them to the school, not to a
   // role, so this gate is the only thing between a signed-in student and a year rollover.
   {
@@ -951,6 +966,104 @@ const GUARD_CASES: GuardCase[] = [
     source: "platform/user-support-routes.ts",
     allowedRole: ROLES.SUPER_ADMIN,
   },
+  // Student AI opt-in (000235): the school's overview on license:read, its writes on license:manage
+  // (the window open is the probe: an empty body is refused after the gate, 400); a parent's offers
+  // and opt-in on studentAi:optIn, held by PARENT alone (not ORG_ADMIN: the school records on a
+  // parent's behalf through license:manage instead).
+  {
+    method: "GET",
+    path: "/api/school/license/student-ai",
+    permission: "license:read",
+    source: "licensing/ai-optin-routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/school/license/student-ai/windows",
+    permission: "license:manage",
+    source: "licensing/ai-optin-routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/parent/student-ai",
+    permission: "studentAi:optIn",
+    source: "licensing/ai-optin-routes.ts",
+    allowedRole: ROLES.PARENT,
+  },
+  {
+    method: "POST",
+    path: "/api/parent/student-ai/opt-ins",
+    permission: "studentAi:optIn",
+    source: "licensing/ai-optin-routes.ts",
+    allowedRole: ROLES.PARENT,
+  },
+  // Student AI programme settings (000234): read on platform:read, every save on platform:manage.
+  // The version save is the probe for the writes: an empty body is refused after the gate (400).
+  {
+    method: "GET",
+    path: "/api/platform/ai-programme",
+    permission: "platform:read",
+    source: "licensing/ai-programme-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  {
+    method: "GET",
+    path: "/api/platform/schools/{schoolId}/ai-programme",
+    permission: "platform:read",
+    source: "licensing/ai-programme-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  {
+    method: "POST",
+    path: "/api/platform/ai-programme/versions",
+    permission: "platform:manage",
+    source: "licensing/ai-programme-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  // Student AI revenue share (000237): the console on platform:read / platform:manage (the payout is
+  // the probe for the writes: an empty body is refused after the gate), the school's own read on
+  // aiRevenueShare:read.
+  {
+    method: "GET",
+    path: "/api/platform/schools/{schoolId}/ai-revenue-share",
+    permission: "platform:read",
+    source: "licensing/revenue-share-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  {
+    method: "POST",
+    path: "/api/platform/schools/{schoolId}/ai-revenue-share/payouts",
+    permission: "platform:manage",
+    source: "licensing/revenue-share-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  {
+    method: "GET",
+    path: "/api/school/ai-revenue-share",
+    permission: "aiRevenueShare:read",
+    source: "licensing/revenue-share-routes.ts",
+    allowedRole: ROLES.FINANCE,
+  },
+  {
+    method: "GET",
+    path: "/api/school/ai-revenue-share/summary",
+    permission: "aiRevenueShare:read",
+    source: "licensing/revenue-share-routes.ts",
+    allowedRole: ROLES.FINANCE,
+  },
+  {
+    method: "GET",
+    path: "/api/platform/schools/{schoolId}/ai-revenue-share/summary",
+    permission: "platform:read",
+    source: "licensing/revenue-share-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
+  {
+    method: "GET",
+    path: "/api/platform/ai-revenue-share/schools",
+    permission: "platform:read",
+    source: "licensing/revenue-share-routes.ts",
+    allowedRole: ROLES.SUPER_ADMIN,
+  },
   // Staff and class records (000181). Literal subject kinds on record-imports: each kind has its
   // own guard, mounted on its own path.
   {
@@ -1177,6 +1290,26 @@ const GUARD_CASES: GuardCase[] = [
     path: "/api/finance/expenses/summary",
     permission: "billing:read",
     source: "finance/expenses/routes.ts",
+  },
+  // The Student AI line on tuition (000238): reads on billing:read, the switch and the
+  // recalculation on billing:update (the recalculation is the write probe: it is idempotent).
+  {
+    method: "GET",
+    path: "/api/finance/student-ai/settings",
+    permission: "billing:read",
+    source: "finance/student-ai/routes.ts",
+  },
+  {
+    method: "GET",
+    path: "/api/finance/student-ai/lines",
+    permission: "billing:read",
+    source: "finance/student-ai/routes.ts",
+  },
+  {
+    method: "POST",
+    path: "/api/finance/student-ai/sync",
+    permission: "billing:update",
+    source: "finance/student-ai/routes.ts",
   },
   {
     method: "GET",

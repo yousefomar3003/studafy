@@ -23,6 +23,7 @@
 
 import { formatMinorUnits } from "../currency";
 import { receiptUrlFor } from "../receipts/url";
+import { studentAiLinesFor, toFamilyStudentAiLine } from "../student-ai/service";
 
 import type {
   FamilyFinancialViewResponse,
@@ -341,6 +342,10 @@ export async function aggregateFamilyFinancialView(
     `,
   ]);
 
+  // The Student AI line (000238): read after the caches, on the same transaction. Its row policy
+  // limits a parent to their own children on top of the family scoping above.
+  const studentAiLines = await studentAiLinesFor(tx, schoolId, studentIds);
+
   const customerIdsByStudent = new Map<string, string[]>();
   for (const student of students) {
     customerIdsByStudent.set(student.id, [student.admission_number]);
@@ -387,6 +392,8 @@ export async function aggregateFamilyFinancialView(
       installments: studentInstallments.map(toInstallmentSummary),
       payments: studentPayments.map(toPaymentSummary),
       totals: [...studentTotals].map(([currency, entry]) => toCurrencyTotal(currency, entry)),
+      // Parents read this view: the line without any amount (the school tells them the price).
+      student_ai_lines: (studentAiLines.get(studentId) ?? []).map(toFamilyStudentAiLine),
     });
   }
 

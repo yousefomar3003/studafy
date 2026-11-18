@@ -75,18 +75,14 @@ void main() {
     });
 
     testWidgets(
-      'the school provides it: "Ask your school for a seat", nothing to buy',
+      'the school sells seats but the person holds none: the store (the family chooses)',
       (tester) async {
         await _pump(tester, [
           featureJson(reason: 'not_included', schoolOffers: true),
         ], _gate);
         expect(find.text('THE PAID SCREEN'), findsNothing);
-        expect(find.text('Ask your school for a seat'), findsOneWidget);
-        expect(
-          find.textContaining('Alpha Academy provides this'),
-          findsOneWidget,
-        );
-        _expectNothingToBuy();
+        expect(find.text('THE STORE PAYWALL'), findsOneWidget);
+        expect(find.text('Ask your school for a seat'), findsNothing);
       },
     );
 
