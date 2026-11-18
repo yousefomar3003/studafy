@@ -2,7 +2,6 @@ import { ApiError } from "@studafy/api-client";
 import { PERMISSIONS } from "@studafy/constants";
 import { Button, Checkbox, Input, Modal, Select, Table, useToast } from "@studafy/ui";
 import { useRef, useState } from "react";
-import { Link } from "react-router-dom";
 
 import { usePermissions } from "../../lib/auth";
 import { parseCsv } from "../../lib/csv";
@@ -145,53 +144,12 @@ export default function StudentAiPage() {
               </div>
             </div>
           ) : null}
-          <SeatRequestNote overview={data} />
           <Summary overview={data} />
           <WindowSection overview={data} canManage={canManage} />
           <StudentsSection overview={data} canManage={canManage} />
         </>
       ) : null}
     </>
-  );
-}
-
-/**
- * Opt-ins beyond the licence's seats wait for one; the API asks Studafy for the seats on its own
- * (a change request Studafy prices as a quote).
- */
-function SeatRequestNote({ overview }: { overview: StudentAiOverview }) {
-  const { t } = useTranslation();
-  const { formatNumber } = useFormatters();
-  const waiting = overview.counts.waitingForSeat;
-  const request = overview.openSeatRequest;
-  if (waiting === 0 && !request) return null;
-  const asked =
-    request && request.studentSeats !== null
-      ? t("schoolLicense.studentAi.seatRequest.asked", {
-          count: request.studentSeats,
-          seats: formatNumber(request.studentSeats),
-        })
-      : request
-        ? t("schoolLicense.studentAi.seatRequest.askedMore")
-        : t("schoolLicense.studentAi.seatRequest.notAsked");
-  return (
-    <div className="license-banner" data-tone="warning" role="status" data-testid="seat-request">
-      <div>
-        <p className="license-banner__title">
-          {waiting > 0
-            ? t("schoolLicense.studentAi.seatRequest.waiting", {
-                count: waiting,
-                students: formatNumber(waiting),
-              })
-            : t("schoolLicense.studentAi.seatRequest.title")}{" "}
-          {asked}
-        </p>
-        <p className="license-banner__body">
-          {t("schoolLicense.studentAi.seatRequest.body")}{" "}
-          <Link to="/portal/license/quotes">{t("schoolLicense.studentAi.seatRequest.quotes")}</Link>
-        </p>
-      </div>
-    </div>
   );
 }
 
@@ -234,14 +192,9 @@ function Summary({ overview }: { overview: StudentAiOverview }) {
           </div>
         ) : null}
         <div>
-          <dt>{t("schoolLicense.studentAi.summary.minimum")}</dt>
-          <dd data-testid="student-ai-minimum">
-            {programme
-              ? t("schoolLicense.studentAi.summary.minimumValue", {
-                  count: programme.minSeats,
-                  seats: formatNumber(programme.minSeats),
-                })
-              : "—"}
+          <dt>{t("schoolLicense.studentAi.summary.billing")}</dt>
+          <dd data-testid="student-ai-billing">
+            {t("schoolLicense.studentAi.summary.billingValue")}
           </dd>
         </div>
         <div>
@@ -292,14 +245,6 @@ function Summary({ overview }: { overview: StudentAiOverview }) {
         <div>
           <dt>{t("schoolLicense.studentAi.counts.conversion")}</dt>
           <dd>{conversion ?? "—"}</dd>
-        </div>
-        <div>
-          <dt>{t("schoolLicense.studentAi.counts.waiting")}</dt>
-          <dd>{formatNumber(counts.waitingForSeat)}</dd>
-        </div>
-        <div>
-          <dt>{t("schoolLicense.studentAi.counts.seatsNeeded")}</dt>
-          <dd>{formatNumber(overview.seatsNeeded)}</dd>
         </div>
         <div>
           <dt>{t("schoolLicense.studentAi.counts.released")}</dt>
@@ -435,11 +380,7 @@ function WindowSection({
         <p className="license-muted">{t("schoolLicense.studentAi.window.none")}</p>
       )}
       {opening && overview.programme ? (
-        <OpenWindowModal
-          today={overview.today}
-          minSeats={overview.programme.minSeats}
-          onClose={() => setOpening(false)}
-        />
+        <OpenWindowModal today={overview.today} onClose={() => setOpening(false)} />
       ) : null}
       <Modal
         open={closing}
@@ -468,20 +409,11 @@ function toggle(list: readonly string[], id: string, on: boolean): string[] {
 
 /**
  * Open a window: the academic year (the current one by default), its dates, optionally only some
- * grades or sections, a note, and the school's acceptance that it pays for the programme's minimum
- * seats even if fewer students opt in -- which the API requires.
+ * grades or sections, and a note. Opt-ins take programme seats with no minimum (000252): each
+ * student's months are billed on tuition and paid to Studafy week by week, as parents pay.
  */
-function OpenWindowModal({
-  today,
-  minSeats,
-  onClose,
-}: {
-  today: string;
-  minSeats: number;
-  onClose: () => void;
-}) {
+function OpenWindowModal({ today, onClose }: { today: string; onClose: () => void }) {
   const { t } = useTranslation();
-  const { formatNumber } = useFormatters();
   const { show } = useToast();
   const open = useOpenStudentAiWindow();
   const years = useAcademicYears();
@@ -495,9 +427,8 @@ function OpenWindowModal({
   const [gradeIds, setGradeIds] = useState<string[]>([]);
   const [sectionIds, setSectionIds] = useState<string[]>([]);
   const [note, setNote] = useState("");
-  const [acknowledged, setAcknowledged] = useState(false);
   const datesInvalid = opensOn !== "" && closesOn !== "" && closesOn < opensOn;
-  const ready = opensOn !== "" && closesOn !== "" && !datesInvalid && acknowledged;
+  const ready = opensOn !== "" && closesOn !== "" && !datesInvalid;
 
   function submit() {
     if (!ready || open.isPending) return;
@@ -509,7 +440,6 @@ function OpenWindowModal({
         gradeLevelIds: gradeIds.length > 0 ? gradeIds : undefined,
         sectionIds: sectionIds.length > 0 ? sectionIds : undefined,
         note: note.trim() || undefined,
-        acknowledgeMinimumSeats: true,
       },
       {
         onSuccess: () => {
@@ -599,26 +529,16 @@ function OpenWindowModal({
           maxLength={1000}
           onChange={(event) => setNote(event.target.value)}
         />
-        <div className="license-banner" data-tone="warning" data-testid="minimum-warning">
+        <div className="license-banner" data-testid="programme-billing">
           <div>
             <p className="license-banner__title">
-              {t("schoolLicense.studentAi.minimum.title", {
-                count: minSeats,
-                seats: formatNumber(minSeats),
-              })}
+              {t("schoolLicense.studentAi.programmeBilling.title")}
             </p>
-            <p className="license-banner__body">{t("schoolLicense.studentAi.minimum.body")}</p>
+            <p className="license-banner__body">
+              {t("schoolLicense.studentAi.programmeBilling.body")}
+            </p>
           </div>
         </div>
-        <Checkbox
-          label={t("schoolLicense.studentAi.minimum.acknowledge", {
-            count: minSeats,
-            seats: formatNumber(minSeats),
-          })}
-          required
-          checked={acknowledged}
-          onChange={(event) => setAcknowledged(event.target.checked)}
-        />
       </Modal.Body>
       <Modal.Footer>
         <Button type="button" variant="tertiary" onClick={onClose}>

@@ -31,9 +31,21 @@ export type RevenueShareStatus = Schemas["AiRevenueShareStatus"];
 export type LicenceRevenueShare = Schemas["AiLicenseRevenueShare"];
 export type ConversionSnapshot = Schemas["AiConversionSnapshot"];
 export type UploadConsistency = Schemas["UploadConsistency"];
+export type Statement = Schemas["AiRevenueShareStatement"];
+export type PlatformStatement = Schemas["PlatformAiRevenueShareStatement"];
+export type StatementDetail = Schemas["AiRevenueShareStatementDetail"];
+export type StatementStatus = Schemas["AiRevenueShareStatementStatus"];
+
+export const STATEMENT_STATUSES: readonly StatementStatus[] = [
+  "awaiting_approval",
+  "held",
+  "approved",
+  "rejected",
+];
 
 export const REVENUE_SHARE_STATUSES: readonly RevenueShareStatus[] = [
   "pending",
+  "awaiting_approval",
   "owed",
   "zero",
   "credited",
@@ -41,6 +53,7 @@ export const REVENUE_SHARE_STATUSES: readonly RevenueShareStatus[] = [
   "paid_out",
   "forfeited",
   "void",
+  "rejected",
 ];
 
 export const SCHOOL_PROGRAMME_KEY = ["ai-programme"] as const;
@@ -207,4 +220,83 @@ export function useRemeasureConversion() {
       return required(data, "Measurement") as LicenceRevenueShare;
     },
   );
+}
+
+// ---------------------------------------------------------------------------------------------------
+// Weekly statements (000251): the console's queue and decisions, the school's own list
+// ---------------------------------------------------------------------------------------------------
+
+export function usePlatformStatementsQuery(status: StatementStatus | "") {
+  return useQuery({
+    queryKey: [...PLATFORM_PROGRAMME_KEY, "statements", status] as const,
+    placeholderData: keepPreviousData,
+    queryFn: async () => {
+      const { data } = await api.GET("/api/platform/ai-revenue-share/statements", {
+        params: { query: status ? { status } : {} },
+      });
+      return required(data, "Statements").statements as PlatformStatement[];
+    },
+  });
+}
+
+export function usePlatformStatementQuery(schoolId: string, statementId: string) {
+  return useQuery({
+    queryKey: [...PLATFORM_PROGRAMME_KEY, schoolId, "statement", statementId] as const,
+    queryFn: async () => {
+      const { data } = await api.GET(
+        "/api/platform/schools/{schoolId}/ai-revenue-share/statements/{statementId}",
+        { params: { path: { schoolId, statementId } } },
+      );
+      return required(data, "Statement") as StatementDetail;
+    },
+  });
+}
+
+interface StatementPath { schoolId: string; statementId: string }
+
+export function useApproveStatement() {
+  return useConsoleMutation(
+    async (
+      input: StatementPath & { expectedNetMinor: number; expectedLicenceShareMinor: number },
+    ) => {
+      const { schoolId, statementId, ...body } = input;
+      const { data } = await api.POST(
+        "/api/platform/schools/{schoolId}/ai-revenue-share/statements/{statementId}/approve",
+        { params: { path: { schoolId, statementId } }, body },
+      );
+      return required(data, "Approve") as StatementDetail;
+    },
+  );
+}
+
+export function useHoldStatement() {
+  return useConsoleMutation(async (input: StatementPath & { note: string }) => {
+    const { schoolId, statementId, note } = input;
+    const { data } = await api.POST(
+      "/api/platform/schools/{schoolId}/ai-revenue-share/statements/{statementId}/hold",
+      { params: { path: { schoolId, statementId } }, body: { note } },
+    );
+    return required(data, "Hold") as StatementDetail;
+  });
+}
+
+export function useRejectStatement() {
+  return useConsoleMutation(async (input: StatementPath & { reason: string }) => {
+    const { schoolId, statementId, reason } = input;
+    const { data } = await api.POST(
+      "/api/platform/schools/{schoolId}/ai-revenue-share/statements/{statementId}/reject",
+      { params: { path: { schoolId, statementId } }, body: { reason } },
+    );
+    return required(data, "Reject") as StatementDetail;
+  });
+}
+
+export function useSchoolStatementsQuery() {
+  return useQuery({
+    queryKey: [...SCHOOL_PROGRAMME_KEY, "statements"] as const,
+    queryFn: async () => {
+      const { data } = await api.GET("/api/school/ai-revenue-share/statements");
+      return required(data, "Statements").statements as Statement[];
+    },
+  });
 }

@@ -787,7 +787,22 @@
       "destination": "Where it went",
       "paidOn": "Paid on",
       "reference": "Reference",
-      "amount": "Amount"
+      "amount": "Amount",
+      "week": "Week of",
+      "months": "Student-months",
+      "owed": "Owed for months",
+      "net": "Net to pay",
+      "decision": "Status",
+      "yourShare": "Your share"
+    },
+    "statementsTitle": "Weekly statements",
+    "statementsIntro": "Each week, the Student AI months parents paid you for: what you owe Studafy for them, less your share. Once Studafy approves a week it is billed on the invoice shown, and those months turn on for the students when you pay it.",
+    "noStatements": "No weekly statements yet.",
+    "statementStatus": {
+      "awaiting_approval": "Awaiting Studafy's approval",
+      "held": "On hold",
+      "approved": "Approved",
+      "rejected": "Rejected"
     }
   }
 }

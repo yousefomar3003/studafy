@@ -16,6 +16,29 @@ import type { ComponentType } from "react";
 
 let summary: Record<string, unknown> = dashboard();
 let book: Record<string, unknown> = ledger();
+const statements = [
+  {
+    id: "st000000-0000-4000-8000-000000000001",
+    schoolId: "s0000000-0000-4000-8000-000000000001",
+    weekStart: "2026-11-16",
+    weekEnd: "2026-11-22",
+    currencyCode: "USD",
+    minorUnit: 2,
+    monthsCount: 3,
+    grossMinor: 1200,
+    shareMinor: 156,
+    netMinor: 1044,
+    licenceShareCount: 0,
+    licenceShareMinor: 0,
+    status: "approved",
+    decidedAt: "2026-11-23T09:00:00.000Z",
+    decidedBy: "u0000000-0000-4000-8000-000000000001",
+    decisionNote: null,
+    invoiceId: "i0000000-0000-4000-8000-000000000001",
+    invoiceNumber: "LIC-2026-000099",
+    createdAt: "2026-11-23T06:00:00.000Z",
+  },
+];
 
 const getMock = mock((path: string) => {
   switch (path) {
@@ -23,6 +46,8 @@ const getMock = mock((path: string) => {
       return Promise.resolve({ data: summary });
     case "/api/school/ai-revenue-share":
       return Promise.resolve({ data: book });
+    case "/api/school/ai-revenue-share/statements":
+      return Promise.resolve({ data: { statements } });
     default:
       throw new Error(`Unhandled GET ${path}`);
   }
@@ -122,6 +147,15 @@ describe("StudentAiEarningsPage", () => {
     await renderPage();
     expect(await screen.findByText(/No revenue share yet/)).toBeTruthy();
     expect(screen.getByText(/No payouts yet/)).toBeTruthy();
+  });
+
+  test("the weekly statements: months owed less the share, and the invoice billed", async () => {
+    await renderPage();
+    const table = await screen.findByTestId("statements");
+    expect(table.textContent).toContain("$12.00");
+    expect(table.textContent).toContain("$1.56");
+    expect(table.textContent).toContain("$10.44");
+    expect(table.textContent).toContain("Approved · LIC-2026-000099");
   });
 
   test("has no accessibility violations", async () => {
