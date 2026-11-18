@@ -13,6 +13,11 @@
   "dashboard": {
     "title": "School overview",
     "intro": "A live snapshot of activation, attendance, approvals, and account health.",
+    "groups": {
+      "people": "People",
+      "academics": "Academics",
+      "administration": "Administration"
+    },
     "links": {
       "users": "Manage users →",
       "students": "Manage students →",

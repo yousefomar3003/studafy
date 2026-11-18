@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { useDisclosure } from "../../layouts/portal/use-disclosure";
 import { useTranslation } from "../../lib/i18n";
 
 import type { DashboardTileStatus } from "../DashboardTile";
@@ -127,5 +128,85 @@ export function HomeShortcuts({
         ))}
       </ul>
     </nav>
+  );
+}
+
+export interface ShortcutGroup {
+  key: string;
+  label: string;
+  links: readonly { key: string; to: string; label: string }[];
+}
+
+/**
+ * Shortcuts sorted into a few named groups on one line, each opening a short list of its links:
+ * for a home with more shortcuts than fit on a row (the admin home has twelve). Each group is a
+ * non-modal disclosure (useDisclosure): Escape closes it and returns focus to its button, a click
+ * outside closes it, and the list holds ordinary links, so it is not an ARIA menu.
+ */
+export function HomeShortcutGroups({ groups }: { groups: readonly ShortcutGroup[] }) {
+  const { t } = useTranslation();
+  return (
+    <nav className="home-shortcuts" aria-labelledby="home-shortcuts-heading">
+      <h2 id="home-shortcuts-heading" className="sf-visually-hidden">
+        {t("home.shortcuts")}
+      </h2>
+      <ul className="home-shortcut-groups">
+        {groups.map((group) => (
+          <li key={group.key}>
+            <ShortcutGroupMenu group={group} />
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
+function ShortcutGroupMenu({ group }: { group: ShortcutGroup }) {
+  const { open, toggle, close, triggerRef, panelRef } = useDisclosure();
+  const panelId = `home-shortcut-group-${group.key}`;
+  return (
+    <div className="home-shortcut-group">
+      <button
+        ref={triggerRef}
+        type="button"
+        className="home-shortcut-group__trigger"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={toggle}
+      >
+        {group.label}
+        <span className="home-shortcut-group__count">{group.links.length}</span>
+        <svg
+          className="home-shortcut-group__chevron"
+          width="12"
+          height="12"
+          viewBox="0 0 12 12"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path
+            d="M2.5 4.5 6 8l3.5-3.5"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {open ? (
+        <div id={panelId} ref={panelRef} className="home-shortcut-group__panel">
+          <ul className="home-shortcut-group__list">
+            {group.links.map((link) => (
+              <li key={link.key}>
+                <Link to={link.to} className="home-shortcut-group__link" onClick={close}>
+                  {link.label.replace(TRAILING_ARROW, "")}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </div>
   );
 }
