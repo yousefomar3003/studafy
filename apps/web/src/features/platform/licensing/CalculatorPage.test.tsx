@@ -64,6 +64,7 @@ const quote = {
   createdAt: "2026-10-20T09:00:00.000Z",
   validUntil: "2026-11-19T09:00:00.000Z",
   invoiceId: null,
+  commitment: "full_year",
 };
 
 /** 80 student seats for 12 months at 5.00: 5% volume, then 10% for the term, a credit and -10.00. */
@@ -337,7 +338,34 @@ describe("CalculatorPage", () => {
     });
     // The school is in the path, not the body.
     expect(init!.body!.schoolId).toBeUndefined();
+    // Left unset, the API keeps the licence's commitment.
+    expect(init!.body!.commitment).toBeUndefined();
     expect(await screen.findByText("Quote saved as a draft.")).toBeTruthy();
+  });
+
+  test("a quote can be made month to month", async () => {
+    await renderPage();
+    await chooseStudentSeats("80");
+    const save = (await screen.findByRole("button", {
+      name: "Save as draft quote",
+    })) as HTMLButtonElement;
+    await waitFor(() => expect(save.disabled).toBe(false));
+
+    fireEvent.click(screen.getByRole("combobox", { name: "Commitment" }));
+    fireEvent.click(screen.getByRole("option", { name: "Month to month" }));
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(
+        postMock.mock.calls.some(
+          ([path]) => path === "/api/platform/schools/{schoolId}/license-quotes",
+        ),
+      ).toBe(true),
+    );
+    const [, init] = postMock.mock.calls.find(
+      ([path]) => path === "/api/platform/schools/{schoolId}/license-quotes",
+    )!;
+    expect(init!.body!.commitment).toBe("month_to_month");
   });
 
   test("a custom payment schedule is priced, checked and saved with the quote", async () => {
@@ -401,6 +429,7 @@ describe("CalculatorPage", () => {
     const row = (await within(quotes).findByText("$4,064.00")).closest("tr")!;
     expect(within(row).getByText("Draft")).toBeTruthy();
     expect(within(row).getByText("New term")).toBeTruthy();
+    expect(within(row).getByTestId("quote-commitment").textContent).toBe("Full year committed");
 
     fireEvent.click(within(row).getByRole("button", { name: "Send" }));
     await waitFor(() =>

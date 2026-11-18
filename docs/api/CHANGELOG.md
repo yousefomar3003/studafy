@@ -13,6 +13,113 @@ when it required the `version-bump` label.
 
 ### Added
 
+- The Student AI programme's dashboards (phase 6; docs/billing/ai-programme.md "Dashboards").
+  School (`aiRevenueShare:read`: the school admin, the principal and finance):
+  `schoolGetAiProgrammeDashboard` (`GET /api/school/ai-revenue-share/summary`,
+  `AiProgrammeDashboard`: enrolled and opted in today, the conversion in force and its tier, the
+  next tier and the opt-ins it takes, the large-school floor, upload consistency and its target, the
+  share rate, the ledger's totals, the year's earnings -- share earned plus the margin on Student AI
+  tuition lines, collected or estimated -- and the licence's invoices). Console (`platform:read`,
+  web): `platformGetAiProgrammeDashboard` (`GET /api/platform/schools/{schoolId}/ai-revenue-share/summary`,
+  `PlatformAiProgrammeDashboard`, adds `studafyNet`) and `platformListAiProgrammeSchools`
+  (`GET /api/platform/ai-revenue-share/schools`, `AiProgrammeSchoolList`). Read-only.
+
+- The Student AI programme's phases integrated (no new paths). The revenue share's `commitment`
+  fields reference the licence's own `LicenseCommitment` enum (the separate
+  `AiRevenueShareCommitment` schema is gone; same values). Upload consistency
+  (`UploadConsistency`) measures the classes of students holding a Student AI programme opt-in with
+  a seat (000235). The family view's `student_ai_lines` follow the parent's opt-in (months and
+  status; no amount).
+
+- Student AI opt-in and programme seats (migration 000235; docs/billing/ai-programme.md, phase 2).
+  School (`license:read` / `license:manage`): `getSchoolStudentAi` (`GET /api/school/license/student-ai`,
+  `SchoolAiOptInOverview`), `openStudentAiWindow` (`POST .../student-ai/windows`,
+  `OpenAiOptInWindowBody`, 201 `AiOptInWindow`), `closeStudentAiWindow`
+  (`POST .../windows/{windowId}/close`), `listStudentAiStudents` (`GET .../student-ai/students`,
+  `AiOptInStudentList`), `recordStudentAiOptIns` (`POST .../student-ai/opt-ins`,
+  `RecordAiOptInsBody` -> `RecordAiOptInsResult`), `transferStudentAiOptIn` and
+  `releaseStudentAiOptIn` (`POST .../opt-ins/{optInId}/transfer|release`). Parent (new permission
+  `studentAi:optIn`, PARENT only): `getParentStudentAi` (`GET /api/parent/student-ai`,
+  `ParentAiOffers`: `schoolName`, per child the state, window, `period` (`ParentAiOfferPeriod`:
+  start/end month) and `optIn` (`ParentAiOptIn`) -- never a price, total or amount, which the school
+  tells parents) and `optInParentStudentAi` (`POST /api/parent/student-ai/opt-ins`,
+  `ParentAiOptInBody`: `studentId`, `acceptTerms`, `termsVersion` -- no price echoed; 201
+  `ParentAiOptIn`, no price). New error codes `AI_OPTIN_NO_LICENCE`,
+  `AI_OPTIN_PRICE_MISSING`, `AI_OPTIN_WINDOW_INVALID`, `AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED`,
+  `AI_OPTIN_WINDOW_CLOSED`, `AI_OPTIN_WINDOW_ALREADY_OPEN`, `AI_OPTIN_WINDOW_NOT_FOUND`,
+  `AI_OPTIN_NOT_ELIGIBLE`, `AI_OPTIN_ALREADY_OPTED_IN`, `AI_OPTIN_YEAR_OVER`,
+  `AI_OPTIN_TERMS_REQUIRED`, `AI_OPTIN_TERMS_CHANGED` (409: the parent accepted an older terms
+  version), `AI_OPTIN_NOT_FOUND`, `AI_OPTIN_ENDED`,
+  `AI_OPTIN_STUDENT_NOT_LEFT` and `LICENSE_SEAT_PROGRAMME_LOCKED` (the school's and the console's
+  `DELETE .../seats/{seatId}` now answer 409 for a seat a Student AI opt-in holds). `LicenseSeat` adds
+  `programme`; `SchoolLicense`, `LicenseQuote` add `commitment` (`LicenseCommitment`: `full_year` |
+  `month_to_month`), and `LicenseQuoteBody` / `LicenseQuoteReplaceBody` take an optional
+  `commitment`; `LicenseChangeRequest` adds `source` (`school` | `ai_optin`). Notification types
+  `AI_OPTIN_AVAILABLE`, `AI_OPTIN_CONFIRMED`, `AI_OPTIN_SUMMARY`.
+
+- The Student AI line on tuition (migration 000238; docs/billing/student-ai-tuition-line.md).
+  `FamilyStudentSection` (`GET /api/finance/families/{familyId}`) adds `student_ai_lines`
+  (`FamilyStudentAiLine[]`, which parents read: academic year, start and end month, `late_start`,
+  `stopped_from`, `status` -- no price, total, currency or amount, since the school tells parents
+  the price; never the licence price or a revenue share). Finance (`StudentAiFinanceLine` keeps the
+  monthly price x months = total, invoiced and planned amounts): `getStudentAiBillingSettings` and
+  `updateStudentAiBillingSettings` (`GET`/`PUT /api/finance/student-ai/settings`,
+  `StudentAiBillingSettings`, body `UpdateStudentAiBillingSettingsBody`, response
+  `StudentAiSettingsResult`), `listStudentAiLines` (`GET /api/finance/student-ai/lines`,
+  `StudentAiFinanceLineList`) and `syncStudentAiLines` (`POST /api/finance/student-ai/sync`,
+  `StudentAiSyncSummary`); reads on `billing:read`, changes on `billing:update`.
+
+- The Student AI programme's settings, versioned (migration 000234; docs/billing/ai-programme.md).
+  Super admin only (`platform:read` to read, `platform:manage` to save, web channel):
+  `platformGetAiProgramme` (`GET /api/platform/ai-programme`), `platformListAiProgrammeVersions` and
+  `platformSaveAiProgrammeVersion` (`GET`/`POST /api/platform/ai-programme/versions`, body
+  `AiProgrammeVersionBody`: every setting, a `reason` and `basedOnVersionId`),
+  `platformGetSchoolAiProgramme` (`GET /api/platform/schools/{schoolId}/ai-programme`:
+  `SchoolAiProgramme` with the global version, the school's override version and the effective
+  `AiProgrammeValues`), `platformListSchoolAiProgrammeOverrides`
+  (`GET .../ai-programme/overrides`), `platformSaveSchoolAiProgrammeOverride`
+  (`PUT .../ai-programme/override`, `AiProgrammeOverrideBody`: any subset, null inherits),
+  `platformClearSchoolAiProgrammeOverride` (`POST .../ai-programme/override/clear`),
+  `platformPreviewSchoolAiProgramme` (`POST .../ai-programme/preview`: effective values and
+  `AiProgrammeIssue[]`, saves nothing), `platformGetLicenseAiProgramme`
+  (`GET /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme`: what the licence was
+  signed with next to the current values) and `platformReapplyLicenseAiProgramme`
+  (`POST .../ai-programme/reapply`, with a reason). New error codes `AI_PROGRAMME_VALUE_OUT_OF_RANGE`,
+  `AI_PROGRAMME_TIERS_INVALID`, `AI_PROGRAMME_SHARE_ABOVE_MAX`, `AI_PROGRAMME_CURRENCY_INVALID`,
+  `AI_PROGRAMME_REASON_REQUIRED` (422) and `AI_PROGRAMME_VERSION_CONFLICT` (409).
+  `PlatformSchoolLicense` (and `ConsoleLicense`) add `aiProgramme` (`LicenseAiProgrammeStamp`).
+  The AI-stop date on `LicenseInvoiceInstalment.aiStopDate` and `LicenseAiStop` now follows the
+  licence's own grace period (default 30 days).
+
+- Upload consistency for the Student AI content bonus (migration 000236 adds an index only;
+  docs/billing/ai-upload-consistency.md). Read-only: `getSchoolUploadConsistency`
+  (`GET /api/school/license/upload-consistency`, `license:read`, the caller's own school) and
+  `platformGetSchoolUploadConsistency`
+  (`GET /api/platform/schools/{schoolId}/ai-programme/upload-consistency`, `platform:read`, web
+  channel). Optional `from` and `to` (YYYY-MM-DD, together, at most 400 days apart; default: the
+  current licence's start to today). Response `UploadConsistency`: school days, the school's
+  `consistencyBps`, `UploadConsistencyClass[]` and `UploadConsistencyTeacher[]`, `basis`
+  (`UploadPeriodBasis`) and `bonus` (`UploadConsistencyBonus`: the content-bonus tier on the
+  licence's values, the next tier and `targetBps`; no amounts).
+
+- The Student AI revenue share engine (migration 000237; docs/billing/ai-programme.md, "Revenue share
+  engine"). Super admin only (`platform:read` / `platform:manage`, web channel):
+  `platformListAiRevenueShare` (`GET /api/platform/schools/{schoolId}/ai-revenue-share`, query
+  `licenseId`, `status`: `AiRevenueShareLedger` -- `AiRevenueShareEntry[]`, `AiRevenueShareTotals[]`
+  per currency, `AiRevenueSharePayout[]`), `platformGetLicenseAiRevenueShare`
+  (`GET /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share`:
+  `AiLicenseRevenueShare` with the licence's `AiConversionMeasurementPeriod[]` and the
+  `AiRevenueShareRate` in force), `platformMeasureLicenseConversion`
+  (`POST .../licenses/{licenseId}/ai-revenue-share/measure`, `AiConversionRemeasureBody` with a
+  `reason`; 409 `AI_REVENUE_SHARE_CONVERSION_LOCKED` once locked), `platformRecomputeAiRevenueShare`
+  (`POST .../ai-revenue-share/recompute`: `AiRevenueShareRecomputeResult`) and
+  `platformRecordAiRevenueSharePayout` (`POST .../ai-revenue-share/payouts`,
+  `AiRevenueSharePayoutBody`; 409 `AI_REVENUE_SHARE_PAYOUT_CHANGED` / `AI_REVENUE_SHARE_NOTHING_DUE`).
+  School: `schoolGetAiRevenueShare` (`GET /api/school/ai-revenue-share`, new permission
+  `aiRevenueShare:read` held by ORG_ADMIN, PRINCIPAL and FINANCE). `LicenseInvoiceLineKind` adds
+  `ai_share_credit`: the revenue share credited on an invoice (a negative line; the invoice's
+  `creditTotalMinor`, total and earliest unpaid instalments come down by it).
+
 - The school chooses its licence length and payment plan; AI stops 30 days after an unpaid
   instalment (migration 000233, ADR-021 amendment). `CreateLicenseChangeRequestBody` takes optional
   `months` (1-36), `startsOn`, `paymentPlan` (`monthly`, `yearly`, `custom`) and, for custom,
@@ -102,6 +209,19 @@ when it required the `version-bump` label.
   anything not refunded, and the last error.
 
 ### Changed
+
+- `getAiStoreConfig` (`GET /api/subscriptions/ai/store/config`, `AiStoreConfig`): new
+  `unavailableReason` value `covered_by_school` and a nullable `schoolName`. A student holding a
+  school seat (a licence in force, or a Student AI programme opt-in with a seat, including one whose
+  licence has not started) is never sold the add-on in the app (owner, 2026-11-18); a student
+  without one is, even at a school with a licence. `registerAiStorePurchase` still accepts a
+  genuine completed purchase for a seated student (the store has taken the money) and then stops its
+  renewal through the seat-overlap path (Google Play cancelled; App Store purchaser notified).
+  `MyFeature.schoolOffers` is now informational only: a person without a seat may buy in the app.
+
+- `AiRevenueShareRecomputeResult` adds `recorded`: the console's recompute now also records the
+  revenue share of payments made on a licence this period before it entered the programme (as
+  opening its first opt-in window does).
 
 - `GET /api/academics/materials` and `GET /api/academics/materials/{materialId}`: a caller who is
   not school staff (students, parents, guests) sees only `ready` materials; another state is left

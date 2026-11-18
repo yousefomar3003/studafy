@@ -91,3 +91,68 @@ export type { SiblingDiscountRule, SiblingDiscountTier, SiblingStanding } from "
 
 export { isLiveStripeMode, stripeModeFromKey } from "./stripe-mode";
 export type { StripeMode } from "./stripe-mode";
+
+// The Student AI revenue share engine (000237): shared by the API (payments, the console) and the
+// workers (the hourly lock-and-settle pass), so both work a share out the same way.
+export {
+  LOCK_CATCH_UP_DAYS,
+  REVENUE_SHARE_STATUSES,
+  insertSnapshot,
+  licenceInProgramme,
+  lockDueConversionSnapshots,
+  measureConversion,
+  measurementPeriods,
+  periodFor,
+  recordEarlierPaymentShares,
+  recordPaymentShares,
+  resolvePendingShares,
+  restoreCreditsOfVoidedInvoice,
+  runRevenueShareTick,
+  settleRevenueShare,
+  utcDay,
+  voidPaymentShares,
+} from "./ai-revenue-share/engine";
+export type {
+  ConversionMeasurement,
+  PaymentPortion,
+  RecordedShare,
+  ResolvedShare,
+  RevenueShareAudit,
+  RevenueShareAuditEntry,
+  RevenueShareContext,
+  RevenueShareStatus,
+  RevenueShareTick,
+  SettleChange,
+  SnapshotRecord,
+  VoidedShare,
+} from "./ai-revenue-share/engine";
+export {
+  REVENUE_SHARE_MEASURES,
+  countEnrolledStudents,
+  countOptedInStudents,
+  licenceCommitment,
+  uploadConsistencyForPeriod,
+} from "./ai-revenue-share/measures";
+export type { ConsistencyPeriod, RevenueShareMeasures } from "./ai-revenue-share/measures";
+export { readProgrammeValues } from "./ai-revenue-share/programme";
+export {
+  activateLicence,
+  isRetryableTransactionError,
+  licencesToPutInForce,
+  personalSubscriptionsOnLicence,
+  withTransactionRetry,
+} from "./ai-revenue-share/activation";
+export type { LicencesToPutInForce } from "./ai-revenue-share/activation";
+export {
+  schoolCalendar,
+  studentAiClassIds,
+  uploadConsistency,
+} from "./ai-revenue-share/upload-consistency";
+export type {
+  SchoolCalendar,
+  UploadConsistencyClassView,
+  UploadConsistencyReport,
+  UploadConsistencyTeacherView,
+  UploadPeriod,
+} from "./ai-revenue-share/upload-consistency";
+export type { ProgrammeStamp } from "./ai-revenue-share/programme";

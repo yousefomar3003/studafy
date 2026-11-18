@@ -1,9 +1,18 @@
 import { randomInt } from "node:crypto";
 
 import {
+  licencesToPutInForce,
+  recordPaymentShares,
+  resolvePendingShares,
+  restoreCreditsOfVoidedInvoice,
+  settleRevenueShare,
+  voidPaymentShares,
+} from "@studafy/billing";
+import {
   ERROR_CODES,
   isAllowedLicensePaymentLink,
   isServableUploadScanStatus,
+  LICENSE_NONPAYMENT_GRACE_DAYS,
   licenseAiStopDate,
 } from "@studafy/constants";
 import {
@@ -20,6 +29,7 @@ import { pipelinePerSchool, withSystemTx } from "../../db/tenant-tx";
 import { auditLicenseChange, licenseError } from "./context";
 import { resumeIfSettled } from "./nonpayment";
 import { auditPlatformChange } from "./pricing";
+import { shareContext } from "./revenue-share-context";
 import { readLicense, transitionLicense } from "./service";
 
 import type { LicenseActor } from "./context";
@@ -297,7 +307,8 @@ async function requireInvoice(
 
 export interface InvoiceLineView {
   position: number;
-  kind: "seats" | "overlap_credit" | "adjustment";
+  /** ai_share_credit: Student AI revenue share credited on this invoice (000237). */
+  kind: "seats" | "overlap_credit" | "adjustment" | "ai_share_credit";
   description: string;
   audience: Audience | null;
   planId: string | null;
@@ -390,6 +401,15 @@ async function instalmentRows(
   `;
 }
 
+/** The licence's grace period before an unpaid instalment stops its AI (000234). */
+async function licenseGraceDays(tx: TransactionSql, licenseId: string): Promise<number> {
+  const [row] = await tx<{ days: number }[]>`
+    SELECT nonpayment_grace_days AS days FROM app.school_licenses
+    WHERE school_id = current_setting('app.school_id')::uuid AND id = ${licenseId}::uuid
+  `;
+  return row?.days ?? LICENSE_NONPAYMENT_GRACE_DAYS;
+}
+
 /** An invoice's instalments in order, as the school and the console show them. */
 export async function invoiceInstalments(
   tx: TransactionSql,
@@ -399,6 +419,7 @@ export async function invoiceInstalments(
   const payable = isPayable(invoice.status);
   const today = utcDate(now);
   const rows = await instalmentRows(tx, invoice.id);
+  const graceDays = await licenseGraceDays(tx, invoice.licenseId);
   const currentId = payable ? rows.find((row) => row.status !== "paid")?.id : undefined;
   return rows.map((row) => {
     const open = payable && row.status !== "paid";
@@ -414,7 +435,7 @@ export async function invoiceInstalments(
       overdueAt: row.overdue_at?.toISOString() ?? null,
       current: row.id === currentId,
       paymentLink: open ? row.payment_link : null,
-      aiStopDate: licenseAiStopDate(row.due_date),
+      aiStopDate: licenseAiStopDate(row.due_date, graceDays),
     };
   });
 }
@@ -1136,18 +1157,22 @@ export async function issueInvoice(
     )}
   `;
 
-  const invoice = (await readInvoice(tx, invoiceId))!;
+  const issued = (await readInvoice(tx, invoiceId))!;
   await auditLicenseChange(tx, schoolId, actor, {
     action: "insert",
     targetTable: "license_invoices",
-    targetId: invoice.id,
+    targetId: issued.id,
     newValues: {
-      ...invoiceSnapshot(invoice),
+      ...invoiceSnapshot(issued),
       lines: lineRows.length,
       instalments: instalments.map((i) => ({ amount_minor: i.amountMinor, due_date: i.dueDate })),
     },
   });
-  return invoice;
+  // The Student AI revenue share the school is owed is credited on its next invoice -- this one
+  // (000237): an ai_share_credit line, and the total and its earliest instalments come down. The
+  // caller activates the licence when that leaves the first instalment paid.
+  await settleRevenueShare(tx, shareContext(tx, schoolId, actor, now));
+  return (await readInvoice(tx, invoiceId))!;
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -1216,7 +1241,7 @@ async function setInvoicePaid(
 }
 
 /** Whether the invoice's first instalment is paid in full: what puts its license in force. */
-async function firstInstalmentPaid(tx: TransactionSql, invoiceId: string): Promise<boolean> {
+export async function firstInstalmentPaid(tx: TransactionSql, invoiceId: string): Promise<boolean> {
   const [first] = await instalmentRows(tx, invoiceId);
   return first?.status === "paid";
 }
@@ -1312,14 +1337,24 @@ export async function recordPayment(
 
   if (input.receiptId) await matchReceipt(tx, schoolId, input.receiptId, paymentId, actor);
 
-  const after = await setInvoicePaid(
-    tx,
-    schoolId,
-    invoice,
-    invoice.paidMinor + input.amountMinor,
-    actor,
-    now,
-  );
+  const paidBefore = await instalmentRows(tx, invoiceId);
+  await setInvoicePaid(tx, schoolId, invoice, invoice.paidMinor + input.amountMinor, actor, now);
+
+  // The Student AI revenue share on what was just collected (000237): one ledger entry per
+  // instalment the payment went on; then anything pending that can now be worked out, and the
+  // school's owed shares credited on its open later invoices.
+  const ctx = shareContext(tx, schoolId, actor, now);
+  const portions = (await instalmentRows(tx, invoiceId)).map((row) => ({
+    instalmentId: row.id,
+    amountMinor:
+      Number(row.paid_minor) -
+      Number(paidBefore.find((previous) => previous.id === row.id)?.paid_minor ?? 0),
+  }));
+  await recordPaymentShares(tx, ctx, paymentId, portions);
+  await resolvePendingShares(tx, ctx);
+  const credits = await settleShares(tx, schoolId, actor, now);
+
+  const after = (await readInvoice(tx, invoiceId))!;
   const activation =
     after.status === "paid" || (await firstInstalmentPaid(tx, after.id))
       ? await activateLicenseFor(tx, schoolId, after, actor, now)
@@ -1332,12 +1367,54 @@ export async function recordPayment(
     result: {
       payment,
       invoice: after,
-      licenseActivated: activation.activated,
-      licenseResumed: resumed.resumed,
+      // Put in force here, or already by the settle above (the shared rule found it due first).
+      licenseActivated: activation.activated || credits.activated.includes(after.licenseId),
+      licenseResumed: resumed.resumed || credits.resumed.includes(after.licenseId),
     },
-    versions: new Map([...activation.versions, ...resumed.versions]),
-    pending: [...activation.pending, ...resumed.pending],
+    versions: new Map([...credits.versions, ...activation.versions, ...resumed.versions]),
+    pending: [...credits.pending, ...activation.pending, ...resumed.pending],
   };
+}
+
+/**
+ * Settle the school's revenue share (000237: forfeit, credit on open later invoices, payout due),
+ * then put in force what is now due to be (@studafy/billing `licencesToPutInForce`, the rule the
+ * workers' hourly job uses too): a licence whose invoice a credit left with its first instalment
+ * paid is activated, and one stopped for non-payment that a credit settled is resumed -- here with
+ * the API's full activation (entitlements, personal-subscription overlaps and renewal stops).
+ */
+export async function settleShares(
+  tx: TransactionSql,
+  schoolId: string,
+  actor: LicenseActor,
+  now: Date = new Date(),
+): Promise<Omit<Changed<unknown>, "result"> & { activated: string[]; resumed: string[] }> {
+  await settleRevenueShare(tx, shareContext(tx, schoolId, actor, now));
+  const versions = new Map<string, number>();
+  const pending: Changed<unknown>["pending"] = [];
+  const activated: string[] = [];
+  const resumedIds: string[] = [];
+  const due = await licencesToPutInForce(tx, now);
+  for (const { invoiceId, licenseId } of due.activate) {
+    const invoice = (await readInvoice(tx, invoiceId))!;
+    const activation = await activateLicenseFor(tx, schoolId, invoice, actor, now);
+    for (const [userId, version] of activation.versions) versions.set(userId, version);
+    pending.push(...activation.pending);
+    if (activation.activated) {
+      activated.push(licenseId);
+      break; // one active licence at a time
+    }
+  }
+  for (const licenseId of due.resume) {
+    const resumed = await resumeIfSettled(tx, schoolId, licenseId, actor, now);
+    for (const [userId, version] of resumed.versions) versions.set(userId, version);
+    pending.push(...resumed.pending);
+    if (resumed.resumed) {
+      resumedIds.push(licenseId);
+      break;
+    }
+  }
+  return { versions, pending, activated, resumed: resumedIds };
 }
 
 /**
@@ -1400,13 +1477,18 @@ export async function voidPayment(
     });
   }
 
-  const after = await setInvoicePaid(
+  await setInvoicePaid(
     tx,
     schoolId,
     invoice,
     invoice.paidMinor - Number(payment.amount_minor),
     actor,
   );
+  // Its revenue share (000237): void where not given yet, reversed where credited or paid out.
+  const ctx = shareContext(tx, schoolId, actor, new Date());
+  await voidPaymentShares(tx, ctx, paymentId);
+  await settleRevenueShare(tx, ctx);
+  const after = (await readInvoice(tx, invoice.id))!;
   const view = (await listPayments(tx, invoice.id)).find((p) => p.id === paymentId)!;
   return { payment: view, invoice: after };
 }
@@ -1485,6 +1567,11 @@ export async function voidInvoice(
     oldValues: { status: invoice.status },
     newValues: { status: "void", void_reason: reason.trim() },
   });
+  // Revenue share credited on it is owed again, and goes on the next open invoice if there is one.
+  const ctx = shareContext(tx, schoolId, actor, new Date());
+  if ((await restoreCreditsOfVoidedInvoice(tx, ctx, invoiceId)).length > 0) {
+    await settleRevenueShare(tx, ctx);
+  }
   return (await readInvoice(tx, invoiceId))!;
 }
 

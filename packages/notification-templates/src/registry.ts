@@ -222,4 +222,24 @@ export const NOTIFICATION_CATALOG = {
       route: "/students/{studentId}/marks",
     },
   },
+  // Student AI opt-in (000239). A parent's notices open the app's Student AI screen; leadership's
+  // daily summary opens the home screen (the opt-in list is on the web portal).
+  [NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE]: {
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH],
+    metadataDefaults: {
+      route: "/parent/student-ai",
+    },
+  },
+  [NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED]: {
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH],
+    metadataDefaults: {
+      route: "/parent/student-ai",
+    },
+  },
+  [NOTIFICATION_TYPES.AI_OPTIN_SUMMARY]: {
+    channels: [NOTIFICATION_CHANNELS.IN_APP, NOTIFICATION_CHANNELS.PUSH],
+    metadataDefaults: {
+      route: "/",
+    },
+  },
 } as const satisfies NotificationCatalog;

@@ -198,4 +198,22 @@ export const AR_TEMPLATES = {
     [NOTIFICATION_CHANNELS.PUSH]: "{who}{released}",
     [NOTIFICATION_CHANNELS.EMAIL]: "{released}. افتح Studafy للاطلاع عليها.",
   },
+  [NOTIFICATION_TYPES.AI_OPTIN_AVAILABLE]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "الذكاء الاصطناعي للطلاب متاح لـ {childName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "تقدّمه {schoolName} للعام الدراسي · انضم حتى {closesOn}",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "تقدّم {schoolName} الذكاء الاصطناعي للطلاب لـ {childName} للعام الدراسي ضمن الرسوم المدرسية. ستُخبرك مدرستك بالسعر. افتح Studafy للانضمام حتى {closesOn}.",
+  },
+  [NOTIFICATION_TYPES.AI_OPTIN_CONFIRMED]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "تم تأكيد الذكاء الاصطناعي للطلاب لـ {childName}",
+    [NOTIFICATION_CHANNELS.PUSH]: "بدءًا من {startMonth}، ضمن الرسوم المدرسية",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "تم تأكيد الذكاء الاصطناعي للطلاب لـ {childName} في {schoolName} بدءًا من {startMonth}، ضمن الرسوم المدرسية. الاشتراك ملزم للعام الدراسي ولا يمكن إلغاؤه خلال العام.",
+  },
+  [NOTIFICATION_TYPES.AI_OPTIN_SUMMARY]: {
+    [NOTIFICATION_CHANNELS.IN_APP]: "{newCount} اشتراكات جديدة في الذكاء الاصطناعي للطلاب",
+    [NOTIFICATION_CHANNELS.PUSH]: "{totalCount} طالبًا مشتركًا · {waitingCount} بانتظار مقعد",
+    [NOTIFICATION_CHANNELS.EMAIL]:
+      "اشترك {newCount} طلاب آخرين في الذكاء الاصطناعي للطلاب. لدى {totalCount} طالبًا الخدمة هذا العام، و{waitingCount} بانتظار مقعد في الترخيص.",
+  },
 } as const satisfies LocaleTemplateSet;

@@ -11,8 +11,11 @@ export {
   scheduleLicenseJobs,
   LICENSE_LIFECYCLE_CRON_PATTERN,
   LICENSE_REMINDERS_CRON_PATTERN,
+  AI_OPTIN_NOTICES_CRON_PATTERN,
   USAGE_PERIOD_START_CRON_PATTERN,
 } from "./license-schedulers";
+export { runAiOptInNotices, AI_OPTIN_SUMMARY_HOUR_UTC } from "./ai-optin-notices";
+export type { AiOptInNoticesResult } from "./ai-optin-notices";
 export { runLicenseLifecycle } from "./license-lifecycle";
 export type { LicenseLifecycleResult } from "./license-lifecycle";
 export { runLicenseReminders } from "./license-reminders";

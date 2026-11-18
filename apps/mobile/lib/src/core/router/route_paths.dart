@@ -47,6 +47,11 @@ abstract final class RoutePaths {
   /// notification type here directly instead of reading `route` off the payload.
   static const parentAlerts = '/parent/alerts';
 
+  /// Student AI for the signed-in parent's children at this school: opt in while the school's
+  /// window is open, or see what was confirmed. The deep link of the `AI_OPTIN_AVAILABLE` and
+  /// `AI_OPTIN_CONFIRMED` notifications.
+  static const parentStudentAi = '/parent/student-ai';
+
   /// The signed-in user's notification inbox, opened from the app bar's bell — and where a
   /// tapped push lands when its own deep link is not one this app can open.
   static const notifications = '/notifications';

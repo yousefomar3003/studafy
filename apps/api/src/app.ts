@@ -125,6 +125,7 @@ import {
   scholarshipRoutes,
   siblingDiscountRoutes,
   taxSettingsRoutes,
+  studentAiFinanceRoutes,
   financeStudentRoutes,
   financeUnlinkedRoutes,
   refundWebhookRoutes,
@@ -149,10 +150,15 @@ import { inquiryRoutes } from "./modules/inquiries";
 import {
   platformLicenseBillingRoutes,
   platformLicenseConsoleRoutes,
+  aiOptInRoutes,
+  platformAiProgrammeRoutes,
+  platformAiRevenueShareRoutes,
   platformLicenseRoutes,
+  schoolAiRevenueShareRoutes,
   schoolLicenseBillingRoutes,
   schoolLicenseRoutes,
 } from "./modules/licensing";
+import { uploadConsistencyRoutes } from "./modules/licensing/upload-consistency-routes";
 import { messagingRoutes } from "./modules/messaging";
 import { mobileConfigRoutes, EMPTY_MOBILE_RELEASE_CONFIG } from "./modules/mobile";
 import { notificationRoutes, notificationPreferencesRoutes } from "./modules/notifications";
@@ -707,6 +713,9 @@ export function createApp({
     app.route("/", siblingDiscountRoutes(database));
     // Sales tax (VAT) settings: Studafy's own too, applied by the billing worker at generation.
     app.route("/", taxSettingsRoutes(database));
+    // The Student AI line on tuition (000238): the auto-billing switch and finance's list. Studafy's
+    // own tables; the billing worker puts the portions on the invoices it generates.
+    app.route("/", studentAiFinanceRoutes(database));
     app.route("/", financeStudentRoutes(database));
     // Students with no guardian and parents with no children: the people no family reaches.
     app.route("/", financeUnlinkedRoutes(database));
@@ -1285,6 +1294,10 @@ export function createApp({
       logger,
       storage,
     };
+    // Student AI content bonus (phase 4): upload consistency per class, teacher and school, read by
+    // the school (license:read) and the super admin (platform:read). Before the routes below, so its
+    // own guards are the ones that answer for its paths.
+    app.route("/", uploadConsistencyRoutes(licensingDeps));
     app.route("/", schoolLicenseRoutes(licensingDeps));
     app.route("/", platformLicenseRoutes(licensingDeps));
     // Session 3: pricing, quotes, invoices and bank-transfer payments. `storage` carries transfer
@@ -1294,6 +1307,16 @@ export function createApp({
     // Session 4: the console's feature catalog, tiers, cross-school licenses and change requests,
     // a school's license overview, and usage next to license revenue.
     app.route("/", platformLicenseConsoleRoutes(licensingDeps));
+    // The Student AI programme's settings (000234): global and per-school versions, and the values a
+    // licence was signed with.
+    app.route("/", platformAiProgrammeRoutes(licensingDeps));
+    // Student AI opt-in (000235): the school's windows, opt-ins and programme seats, and a parent's
+    // opt-in for their own children.
+    app.route("/", aiOptInRoutes(licensingDeps));
+    // The Student AI revenue share (000237): the console's ledger, measurements, recompute and
+    // payouts, and the school's own read (aiRevenueShare:read).
+    app.route("/", platformAiRevenueShareRoutes(licensingDeps));
+    app.route("/", schoolAiRevenueShareRoutes(licensingDeps));
   }
 
   // Announcement management (ST-194). Compose/publish admin- and role/class-targeted notices, with

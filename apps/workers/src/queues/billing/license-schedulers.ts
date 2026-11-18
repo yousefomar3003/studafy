@@ -13,6 +13,8 @@ import type { ConnectionOptions } from "bullmq";
 export const LICENSE_LIFECYCLE_CRON_PATTERN = "5 * * * *";
 /** Hourly at :20, after the lifecycle run has marked what is overdue or expired. */
 export const LICENSE_REMINDERS_CRON_PATTERN = "20 * * * *";
+/** Hourly at :35: Student AI opt-in notices (and, in one hour a day, leadership's summary). */
+export const AI_OPTIN_NOTICES_CRON_PATTERN = "35 * * * *";
 /** 00:05 UTC on the 1st of each month. */
 export const USAGE_PERIOD_START_CRON_PATTERN = "5 0 1 * *";
 
@@ -28,6 +30,11 @@ export async function scheduleLicenseJobs(connection: ConnectionOptions): Promis
       "billing-license-reminders-hourly",
       { pattern: LICENSE_REMINDERS_CRON_PATTERN, tz: "UTC" },
       { name: JOB_NAMES.RUN_LICENSE_REMINDERS },
+    );
+    await queue.upsertJobScheduler(
+      "billing-ai-optin-notices-hourly",
+      { pattern: AI_OPTIN_NOTICES_CRON_PATTERN, tz: "UTC" },
+      { name: JOB_NAMES.RUN_AI_OPTIN_NOTICES },
     );
     await queue.upsertJobScheduler(
       "billing-usage-period-start-monthly",

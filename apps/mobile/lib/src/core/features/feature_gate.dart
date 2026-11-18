@@ -10,13 +10,17 @@ import 'my_features.dart';
 ///
 ///   - covered personally, by a school seat, or by both (then the personal renewal is off);
 ///     a covered feature may have used up this month's limit;
-///   - not covered, and the school sells a seat that includes it (or the person already holds a
-///     seat): ask the school -- never a purchase;
-///   - not covered, no school seat on offer: the store purchase;
+///   - not covered, but the person holds a school seat (of a tier without it): ask the school --
+///     never a purchase;
+///   - not covered and no seat: the store purchase -- even when the school sells seats or runs the
+///     Student AI programme. The family chooses: the school, or the app at the store's price
+///     (owner, 2026-11-18). The purchase offer itself never mentions the school option;
 ///   - the school is inactive, or Studafy paused the feature.
 ///
 /// A person holding a school seat is never in [FeaturePurchasable] (App Store / Google Play rules:
-/// what a school provides is not sold to its users in the app).
+/// what a school provides is not sold to its users in the app). The server enforces it too: the
+/// store config answers `covered_by_school` for a seated student, including a Student AI programme
+/// seat whose licence has not started yet, and the offer card then says "Provided by (school)".
 sealed class FeatureGateState {
   const FeatureGateState();
 }
@@ -61,8 +65,9 @@ class FeatureCovered extends FeatureGateState {
       (renewalStop?.userMustTurnOffRenewal ?? false);
 }
 
-/// Not covered, but the school provides it: "Ask your school for a seat". [hasSeat] is a person
-/// who already holds a seat whose tier does not include this feature.
+/// Not covered, and the person already holds a school seat whose tier does not include this
+/// feature: "Ask your school". Never a purchase for someone with a seat. ([hasSeat] is always true
+/// now; a school merely selling seats no longer replaces the purchase.)
 class FeatureAskSchool extends FeatureGateState {
   const FeatureAskSchool({required this.schoolName, required this.hasSeat});
 
@@ -70,7 +75,8 @@ class FeatureAskSchool extends FeatureGateState {
   final bool hasSeat;
 }
 
-/// Not covered and nothing from the school: the existing store purchase / paywall.
+/// Not covered and no school seat: the existing store purchase / paywall, whether or not the school
+/// also sells seats or runs the Student AI programme (the family chooses).
 class FeaturePurchasable extends FeatureGateState {
   const FeaturePurchasable({this.expiredOn});
 
@@ -146,11 +152,8 @@ FeatureGateState featureGateStateOf(
     );
   }
 
-  if (feature.schoolSeat || feature.schoolOffers) {
-    return FeatureAskSchool(
-      schoolName: features.schoolName,
-      hasSeat: feature.schoolSeat,
-    );
+  if (feature.schoolSeat) {
+    return FeatureAskSchool(schoolName: features.schoolName, hasSeat: true);
   }
   return FeaturePurchasable(
     expiredOn: feature.reason == FeatureReason.expired

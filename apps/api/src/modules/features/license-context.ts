@@ -11,8 +11,8 @@ import type { FeatureAudience, FeatureKey } from "@studafy/constants";
 /**
  * What the school's license means for the people asking, beyond their own grants (session 6 of
  * docs/billing/feature-licensing.md): the school's name ("Provided by …"), which tiers the license in
- * force sells per audience (so an uncovered person is told to ask the school for a seat instead of
- * being sold a personal purchase), who holds a seat on it, and whose personal renewal a seat turned
+ * force sells per audience (informational: since 2026-11-18 a person without a seat may still buy
+ * it in the app; only a seat holder is never sold it), who holds a seat on it, and whose personal renewal a seat turned
  * off (session 2's overlap rows).
  *
  * "In force" is the grant adapter's rule (./grants.ts, licenseSeatGrants): status active and the
