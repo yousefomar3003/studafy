@@ -223,22 +223,65 @@
   margin-block: var(--space-12);
 }
 
-/* A toolbar that groups fields as a fieldset: no browser bevel. A visible legend reads as the
-   group's heading above the fields, with the fields spaced from it. */
+/* A toolbar that groups fields as a fieldset (the licence form): no browser bevel, and its fields
+   in equal columns across the whole width, two side by side where they fit. */
 fieldset.license-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(16rem, 100%), 1fr));
+  align-items: start;
+  gap: var(--space-12) var(--space-16);
   min-width: 0;
   margin-inline: 0;
   padding: 0;
   border: none;
-  /* Fields with help text under them would push their neighbours down if aligned at the bottom. */
-  align-items: flex-start;
 }
 
-/* Taken out of the fieldset's border (float), it becomes a flex item spanning the whole row. */
+/* The grid's columns size these fields, not the toolbar's 220px flex basis. */
+fieldset.license-toolbar > * {
+  min-inline-size: 0;
+}
+
+/* A fieldset with a visible legend is a section of the form: divided from what comes before it,
+   with the legend as its heading. Floated, the legend becomes a grid item spanning the row. */
+fieldset.license-toolbar:has(> legend:not(.sf-visually-hidden)) {
+  padding-block-start: var(--space-16);
+  border-block-start: 1px solid var(--color-border);
+}
+
 fieldset.license-toolbar > legend:not(.sf-visually-hidden) {
   float: left;
-  flex: 0 0 100%;
+  grid-column: 1 / -1;
+  margin: 0;
   padding: 0;
+  font-size: var(--font-size-base);
+}
+
+/* Custom payment dates: each row's date and share in the same equal columns as the rest of the
+   form, the rows spaced by the box's own gap rather than the toolbar margin. */
+.license-terms__custom .license-toolbar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
+  align-items: end;
+  gap: var(--space-12) var(--space-16);
+  margin-block: 0;
+}
+
+.license-terms__custom .license-toolbar > * {
+  min-inline-size: 0;
+}
+
+.license-terms__custom .license-toolbar > button {
+  justify-self: start;
+}
+
+.license-terms__custom > p {
+  margin: 0;
+}
+
+/* The payment plan's few short choices sit on one line. */
+.license-terms .sf-radio-group__items {
+  flex-flow: row wrap;
+  gap: var(--space-8) var(--space-24);
 }
 
 .license-toolbar > * {
