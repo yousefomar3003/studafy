@@ -25,6 +25,8 @@ import type {
   SchoolPaymentPlan,
 } from "@studafy/license-pricing";
 
+import "./license-tables.css";
+
 /**
  * The school's half of "how long, and how do we pay" (ADR-021 as amended by 000233): the licence
  * length in months (presets or any number from 1 to 36), when a new licence should start, and the
@@ -388,8 +390,8 @@ export function LicenceTermsFields({
             currencyCode=""
             shares
           />
-          <div className="platform-table-scroll">
-            <table className="platform-table license-schedule" data-testid="terms-payments">
+          <div className="license-table-scroll license-table-scroll--tall">
+            <table className="license-table license-schedule" data-testid="terms-payments">
               <caption className="sf-visually-hidden">
                 {t("schoolLicense.terms.preview.title")}
               </caption>
@@ -397,7 +399,9 @@ export function LicenceTermsFields({
                 <tr>
                   <th scope="col">{t("schoolLicense.schedule.columns.number")}</th>
                   <th scope="col">{t("schoolLicense.schedule.columns.dueDate")}</th>
-                  <th scope="col">{t("schoolLicense.terms.preview.share")}</th>
+                  <th scope="col" className="license-amount">
+                    {t("schoolLicense.terms.preview.share")}
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -405,7 +409,7 @@ export function LicenceTermsFields({
                   <tr key={index}>
                     <td>{index + 1}</td>
                     <td>{payment.dueDate ? date(payment.dueDate) : "—"}</td>
-                    <td className="licensing-amount">
+                    <td className="license-amount">
                       {formatNumber(payment.shareBps / 100, { maximumFractionDigits: 2 })}%
                     </td>
                   </tr>

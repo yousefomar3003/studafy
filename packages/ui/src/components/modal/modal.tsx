@@ -19,6 +19,8 @@ export interface ModalProps {
   initialFocusRef?: RefObject<HTMLElement | null>;
   closeOnOverlayClick?: boolean;
   closeOnEsc?: boolean;
+  /** "wide" (720px) for a long form with tables or several fields side by side; 480px otherwise. */
+  size?: "default" | "wide";
 }
 
 const ModalRoot = forwardRef<HTMLDivElement, ModalProps>(function Modal(
@@ -31,6 +33,7 @@ const ModalRoot = forwardRef<HTMLDivElement, ModalProps>(function Modal(
     initialFocusRef,
     closeOnOverlayClick = true,
     closeOnEsc = true,
+    size = "default",
   },
   ref,
 ) {
@@ -101,7 +104,7 @@ const ModalRoot = forwardRef<HTMLDivElement, ModalProps>(function Modal(
           aria-describedby={description ? descriptionId : undefined}
           // Focusable so the trap has somewhere to park focus when the dialog has no controls.
           tabIndex={-1}
-          className="sf-modal"
+          className={size === "wide" ? "sf-modal sf-modal--wide" : "sf-modal"}
         >
           <div className="sf-modal__header" ref={headerRef}>
             <h2 className="sf-modal__title" id={titleId}>

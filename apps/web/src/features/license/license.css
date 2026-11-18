@@ -223,6 +223,24 @@
   margin-block: var(--space-12);
 }
 
+/* A toolbar that groups fields as a fieldset: no browser bevel. A visible legend reads as the
+   group's heading above the fields, with the fields spaced from it. */
+fieldset.license-toolbar {
+  min-width: 0;
+  margin-inline: 0;
+  padding: 0;
+  border: none;
+  /* Fields with help text under them would push their neighbours down if aligned at the bottom. */
+  align-items: flex-start;
+}
+
+/* Taken out of the fieldset's border (float), it becomes a flex item spanning the whole row. */
+fieldset.license-toolbar > legend:not(.sf-visually-hidden) {
+  float: left;
+  flex: 0 0 100%;
+  padding: 0;
+}
+
 .license-toolbar > * {
   min-inline-size: 180px;
   flex: 0 1 220px;
@@ -471,8 +489,15 @@
   padding: var(--space-12);
 }
 
-.license-terms__preview h3 {
-  margin-block: 0 var(--space-8);
+.license-terms__preview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.license-terms__preview h3,
+.license-terms__preview p {
+  margin: 0;
 }
 
 .license-terms-compare {
