@@ -252,7 +252,10 @@ export function usePlatformStatementQuery(schoolId: string, statementId: string)
   });
 }
 
-interface StatementPath { schoolId: string; statementId: string }
+interface StatementPath {
+  schoolId: string;
+  statementId: string;
+}
 
 export function useApproveStatement() {
   return useConsoleMutation(
