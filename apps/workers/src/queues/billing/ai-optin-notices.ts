@@ -85,11 +85,8 @@ async function openWindow(tx: TransactionSql, now: Date) {
     }[]
   >`
     WITH today AS (
-      SELECT (${now}::timestamptz AT TIME ZONE COALESCE(
-        (SELECT timezone FROM app.school_settings
-         WHERE school_id = current_setting('app.school_id')::uuid),
-        'UTC'
-      ))::date AS d
+      -- The school's own date (app.school_today, QA-044).
+      SELECT app.school_today(${now}::timestamptz) AS d
     )
     SELECT w.id::text AS id, w.academic_year_id::text AS academic_year_id,
            w.closes_on::text AS closes_on,

@@ -167,3 +167,41 @@ integrationTest("a system transaction still reaches what the owner reached", asy
   `;
   expect([...unwritable]).toEqual([]);
 });
+
+integrationTest(
+  "the Student AI programme (000234-000239, older than this role in production) is reachable",
+  async () => {
+    // Production applied the Student AI migrations before 000246 created studafy_system, so the
+    // role's grants on them come from 000246's catch-up grants, not from default privileges.
+    const tables = [
+      "ai_programme_versions",
+      "ai_programme_version_prices",
+      "ai_programme_version_tiers",
+      "ai_programme_school_overrides",
+      "ai_programme_school_override_tiers",
+      "ai_optin_windows",
+      "ai_optin_window_scopes",
+      "ai_optins",
+      "ai_optin_window_notices",
+      "ai_programme_conversion_snapshots",
+      "ai_programme_revenue_share_entries",
+      "ai_programme_revenue_share_payouts",
+      "student_ai_billing_settings",
+      "student_ai_fee_items",
+      "student_ai_fee_portions",
+    ];
+    const [privileges] = await database!.sql<{ missing: string[] }[]>`
+      SELECT coalesce(array_agg(t ORDER BY t), '{}') AS missing
+      FROM unnest(${tables}::text[]) AS t
+      WHERE NOT has_table_privilege('studafy_system', ('app.' || t)::regclass,
+                                    'SELECT, INSERT, UPDATE, DELETE')
+    `;
+    expect(privileges!.missing).toEqual([]);
+
+    const [settle] = await database!.sql<{ allowed: boolean }[]>`
+      SELECT has_function_privilege('studafy_system', 'app.settle_ai_revenue_share(date)', 'EXECUTE')
+        AS allowed
+    `;
+    expect(settle!.allowed).toBe(true);
+  },
+);
