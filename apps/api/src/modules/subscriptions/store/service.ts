@@ -9,6 +9,9 @@ import { setTenantScope, withSystemTx, withTenantTx } from "../../../db/tenant-t
 import { emit } from "../../../lib/events";
 import { emitAuditLog } from "../../../middleware/auditEmitter";
 import { getLocalizedMessage } from "../../../middleware/locale";
+import { applyRenewalStops, recordSeatOverlaps } from "../../licensing/overlap";
+import { studentSchoolSeat } from "../../licensing/seat-coverage";
+import { readLicense } from "../../licensing/service";
 import { publishEntitlementChange } from "../entitlements/entitlement-change-publisher";
 
 import { storeBillingEvent } from "./events";
@@ -334,6 +337,18 @@ export async function registerStorePurchase(
     waiver: relation.isSelf || relation.isGuardian ? (params.withdrawalWaiver ?? null) : null,
   });
 
+  // A purchase for a student the school already provides for -- one that raced a seat being
+  // assigned, or an app that never asked the server first. The store has taken the money, so it is
+  // never refused here (that would strand the payment): it is recorded, and then handled exactly
+  // as a seat given to someone who already pays personally -- the overlap is recorded, Google Play
+  // renewal is stopped, an App Store purchaser is told to turn renewal off.
+  await stopRenewalIfCoveredBySchool(database, store, logger, {
+    schoolId: params.schoolId,
+    userId: params.userId,
+    requestId: params.requestId,
+    studentId: student.id,
+  });
+
   if (subscription.platform === "google") {
     // Play refunds a purchase left unacknowledged for three days. Acknowledging only after the
     // purchase is recorded means a failure here is retried by the app's next report, never lost.
@@ -349,6 +364,73 @@ export async function registerStorePurchase(
     expiresAt: subscription.periodEnd?.toISOString() ?? null,
     studentId: student.id,
   };
+}
+
+/**
+ * After a store purchase is recorded for a student who holds a school seat
+ * ({@link studentSchoolSeat}): the licensing overlap path (licensing/overlap.ts) for that seat --
+ * an overlap row, the renewal stopped (Google Play, after commit) or the App Store purchaser
+ * notified (LICENSE_SEAT_APPLE_RENEWAL) -- so it never renews on top of the seat. Idempotent: one
+ * overlap row per (seat, subscription), so a re-reported purchase changes nothing. Best effort: a
+ * failure is logged and never undoes the recorded purchase.
+ */
+async function stopRenewalIfCoveredBySchool(
+  database: Database | DatabasePools,
+  store: StoreBilling,
+  logger: Logger,
+  params: { schoolId: string; userId: string; requestId?: string; studentId: string },
+): Promise<void> {
+  // System-attributed in the school, by the purchaser (a parent's role cannot write the overlap).
+  const actor = {
+    kind: "platform" as const,
+    userId: params.userId,
+    homeSchoolId: params.schoolId,
+    requestId: params.requestId,
+  };
+  const runInSchool = <T>(fn: (tx: TransactionSql) => Promise<T>) =>
+    withSystemTx(database, async (tx) => {
+      await setTenantScope(tx, params.schoolId, params.requestId);
+      return fn(tx);
+    });
+  try {
+    const pending = await runInSchool(async (tx) => {
+      const seat = await studentSchoolSeat(tx, params.schoolId, params.studentId);
+      if (!seat) return [];
+      const license = await readLicense(tx, seat.licenseId);
+      if (!license) return [];
+      logger.warn(
+        { school_id: params.schoolId, student_id: params.studentId, seat_id: seat.seatId },
+        "store purchase for a student holding a school seat; recorded, renewal being stopped",
+      );
+      return recordSeatOverlaps(tx, {
+        schoolId: params.schoolId,
+        license,
+        seats: [
+          {
+            seatId: seat.seatId,
+            userId: seat.userId,
+            studentId: seat.studentId,
+            audience: "student",
+          },
+        ],
+        actor,
+      });
+    });
+    if (pending.length > 0) {
+      await applyRenewalStops(pending, {
+        providers: { stripe: null, googlePlay: store.google },
+        schoolId: params.schoolId,
+        actor,
+        logger,
+        runInSchool,
+      });
+    }
+  } catch (error) {
+    logger.error(
+      { err: error, school_id: params.schoolId, student_id: params.studentId },
+      "store purchase for a seated student: stopping its renewal failed; retry from the console",
+    );
+  }
 }
 
 /**
@@ -503,7 +585,12 @@ export type StoreOfferUnavailableReason =
   /** The school's own plan is not live; the add-on only works on top of it. */
   | "school_plan_inactive"
   /** Every product is already held by a brother or sister, so a store account has none left. */
-  | "no_free_product";
+  | "no_free_product"
+  /**
+   * The student holds a school seat (a licence in force, or a Student AI programme seat): the
+   * school provides it, so it is never sold to them in the app (owner, 2026-11-18).
+   */
+  | "covered_by_school";
 
 export interface StoreOffer {
   /** The student the offer is for. */
@@ -515,6 +602,8 @@ export interface StoreOffer {
   /** The product to offer them: the one they already hold, else the first a sibling does not. */
   productId: string | null;
   unavailableReason: StoreOfferUnavailableReason | null;
+  /** The school's name when it provides it (`covered_by_school`), for "Provided by <school>". */
+  schoolName: string | null;
 }
 
 const LIVE_AI_STATUSES = ["trialing", "active", "past_due", "grace_period"];
@@ -539,6 +628,7 @@ export async function readStoreOffer(
     subscribed: false,
     productId: null,
     unavailableReason: reason,
+    schoolName: null,
   });
   if (!store || (store.apple === null && store.google === null)) return none("not_configured");
 
@@ -573,6 +663,24 @@ export async function readStoreOffer(
             AND current_period_end > CURRENT_TIMESTAMP
         ) AS subscribed
     `;
+
+    // A student the school provides for (a seat) is never sold it in the app. One without a seat
+    // -- even at a school that sells seats or runs the programme -- may buy it here: the family
+    // chooses the school or the app (owner, 2026-11-18).
+    const seat = await studentSchoolSeat(tx, params.schoolId, relation.studentId);
+    if (seat) {
+      const [school] = await tx<{ name: string }[]>`
+        SELECT name FROM app.schools WHERE id = ${params.schoolId}::uuid
+      `;
+      return {
+        studentId: relation.studentId,
+        studentFirstName: relation.firstName,
+        subscribed: state!.subscribed,
+        productId: null,
+        unavailableReason: "covered_by_school" as const,
+        schoolName: school?.name ?? null,
+      };
+    }
 
     // The store product each student in the family last bought, for students whose add-on is on.
     const held = await tx<{ student_id: string; product_id: string }[]>`
@@ -621,6 +729,7 @@ export async function readStoreOffer(
         : productId === null
           ? "no_free_product"
           : null,
+      schoolName: null,
     };
   });
 }

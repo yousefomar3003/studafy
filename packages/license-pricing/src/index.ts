@@ -55,3 +55,104 @@ export type {
   SchoolPaymentPlan,
   TermsChange,
 } from "./schedule";
+export {
+  AI_PROGRAMME_FIELDS,
+  AI_PROGRAMME_LIMITS,
+  AI_PROGRAMME_OVERRIDE_FIELDS,
+  AI_PROGRAMME_PAYOUT_MODES,
+  AI_PROGRAMME_TIER_KINDS,
+  DEFAULT_AI_PROGRAMME_SETTINGS,
+  EMPTY_AI_PROGRAMME_OVERRIDE,
+  aiProgrammeChanges,
+  isEmptyAiProgrammeOverride,
+  nextTierFor,
+  previewRevenueShare,
+  resolveAiProgramme,
+  schoolMarginOf,
+  tierFor,
+  validateAiProgrammeOverride,
+  validateAiProgrammeSettings,
+} from "./ai-programme";
+export type {
+  AiProgrammeField,
+  AiProgrammeIssue,
+  AiProgrammeIssueCode,
+  AiProgrammeMargin,
+  AiProgrammeOverride,
+  AiProgrammeOverrideField,
+  AiProgrammePayoutMode,
+  AiProgrammePrice,
+  AiProgrammeSettings,
+  AiProgrammeTier,
+  AiProgrammeTierKind,
+  ResolvedAiProgramme,
+  RevenueSharePreview,
+  RevenueSharePreviewInput,
+} from "./ai-programme";
+export {
+  academicYearMonths,
+  monthCount,
+  monthEnd,
+  monthIndex,
+  monthKey,
+  monthStart,
+} from "./academic-months";
+export type { MonthIndex, MonthRange } from "./academic-months";
+export {
+  AI_OPTIN_SOURCES,
+  AI_OPTIN_STATUSES,
+  AI_OPTIN_TERMS_VERSION,
+  LICENSE_COMMITMENTS,
+  aiOptInPeriod,
+  aiOptInTotal,
+  firstOfMonth,
+  firstOfNextMonth,
+  monthsBetween,
+} from "./ai-optin";
+export type { AiOptInPeriod, AiOptInSource, AiOptInStatus, LicenseCommitment } from "./ai-optin";
+export {
+  computeUploadConsistency,
+  contentBonusStanding,
+  daysInRange,
+  nextDay,
+  schoolDaysBetween,
+} from "./upload-consistency";
+export type {
+  ContentBonusStanding,
+  DayRange,
+  UploadConsistencyClassInput,
+  UploadConsistencyClassResult,
+  UploadConsistencyInput,
+  UploadConsistencyResult,
+  UploadConsistencyTeacherResult,
+} from "./upload-consistency";
+export {
+  addDaysUtc,
+  computeRevenueShare,
+  instalmentPeriods,
+  measurementDateOf,
+  ratioBps,
+  shareAmountOf,
+  studentPartOf,
+} from "./revenue-share";
+export type {
+  InstalmentPeriod,
+  InstalmentPeriodInput,
+  RevenueShareInput,
+  RevenueShareResult,
+  RevenueShareSettings,
+} from "./revenue-share";
+export {
+  contentBonusAimBps,
+  conversionStanding,
+  optInsToReach,
+  paidPartOf,
+  studafyNetOf,
+  studentAiMarginOf,
+} from "./ai-dashboard";
+export type {
+  ConversionStanding,
+  ConversionStandingInput,
+  ConversionTierSettings,
+  StudafyNet,
+} from "./ai-dashboard";

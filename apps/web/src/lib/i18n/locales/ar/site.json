@@ -318,7 +318,10 @@
       "ASSIGNMENT_GRADED": "الواجبات المصححة",
       "ATTENDANCE_MARKED": "الغياب والتأخير",
       "MATERIAL_PUBLISHED": "المواد التعليمية الجديدة",
-      "MARKS_RELEASED": "صدور الدرجات"
+      "MARKS_RELEASED": "صدور الدرجات",
+      "AI_OPTIN_AVAILABLE": "إتاحة الذكاء الاصطناعي للطلاب",
+      "AI_OPTIN_CONFIRMED": "تأكيدات الذكاء الاصطناعي للطلاب",
+      "AI_OPTIN_SUMMARY": "ملخصات اشتراكات الذكاء الاصطناعي للطلاب"
     },
     "channels": {
       "in_app": "داخل التطبيق",

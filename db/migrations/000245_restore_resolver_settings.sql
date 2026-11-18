@@ -6,7 +6,7 @@
 -- statement per transaction today, so it was latent, but a caller that ran more queries in the same
 -- transaction -- a system transaction in particular -- would keep matching other schools' rows
 -- through that policy. Same bodies as before; each now saves the previous values first and restores
--- them after RETURN QUERY (which appends the rows and carries on), as 000200/000216/000221/000234 do.
+-- them after RETURN QUERY (which appends the rows and carries on), as 000200/000216/000221/000240 do.
 -- A caller with no school armed gets the nil UUID back, as before: tenant policies then match
 -- nothing rather than fail on an empty value.
 --

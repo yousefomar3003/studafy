@@ -479,3 +479,17 @@
 .license-terms-compare dd {
   margin: 0;
 }
+
+/* --- Student AI opt-in (/portal/license/student-ai) --- */
+
+.license-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-4, 4px);
+}
+
+.license-radio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}

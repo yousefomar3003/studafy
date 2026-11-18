@@ -164,18 +164,19 @@ void main() {
     expect(find.text("Couldn't load your AI features."), findsOneWidget);
   });
 
-  testWidgets('the school sells a seat with the AI tutor: ask the school, never the store', (
+  testWidgets('the school sells seats but this student holds none: the store offer', (
     tester,
   ) async {
+    // Owner, 2026-11-18: the family chooses the school or the app. The offer never mentions the
+    // school option (no steering).
     await _pump(
       tester,
       unsubscribed(sold: true, tutor: featureJson(reason: 'not_included', schoolOffers: true)),
     );
 
-    expect(find.text('Ask your school for a seat'), findsOneWidget);
-    expect(find.byType(AiStoreOfferCard), findsNothing);
-    expect(find.widgetWithText(FilledButton, 'Subscribe'), findsNothing);
-    expect(find.textContaining('JOD'), findsNothing);
+    expect(find.byType(AiStoreOfferCard), findsOneWidget);
+    expect(find.text('Ask your school for a seat'), findsNothing);
+    expect(find.textContaining(RegExp('school', caseSensitive: false)), findsNothing);
   });
 
   testWidgets('a seat holder whose tier has no AI: never the store', (tester) async {

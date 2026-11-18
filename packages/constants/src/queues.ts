@@ -132,6 +132,10 @@ export const JOB_NAMES = {
   // The 1st of each month (UTC): opens the month's feature usage meters, at zero, for every seat
   // holder of an active license. Carries no payload.
   RUN_USAGE_PERIOD_START: "run-usage-period-start",
+  // Student AI opt-in notices (000235). Scheduled hourly: tells parents "Student AI is available for
+  // <child>" once per child and open window, and once a day tells the school's admins and principals
+  // about new opt-ins. In-app and push only. Carries no payload.
+  RUN_AI_OPTIN_NOTICES: "run-ai-optin-notices",
   // Malware scan of a confirmed material. Carries the material id, its permanent storage
   // key, and the user to notify if the verdict is not clean. One job per confirm, at most once:
   // the worker claims the material by its 'scanning' status and flips it to a terminal state.

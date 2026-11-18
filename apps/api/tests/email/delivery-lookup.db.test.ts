@@ -1,5 +1,5 @@
 /**
- * QA-014 / migration 000234: app.resolve_email_delivery_schools, the email-feedback lookup seam.
+ * QA-014 / migration 000240: app.resolve_email_delivery_schools, the email-feedback lookup seam.
  *
  * The seam is the one place a delivery row is visible without its tenant armed, so it must stay
  * exactly as narrow as it claims: school ids only, only for the named message, nothing for an empty

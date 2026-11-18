@@ -88,7 +88,9 @@ const MyFeatureSchema = z
     schoolOffers: z.boolean().openapi({
       description:
         "The school's license in force sells seats of this feature's audience whose tier " +
-        "includes it: an uncovered person should ask the school for a seat, not buy it.",
+        "includes it. Informational: a person without a seat may still buy it in the app -- the " +
+        "family chooses the school or the app (2026-11-18); only a seat holder (schoolSeat) is " +
+        "never offered a purchase.",
     }),
     renewalStop: FeatureRenewalStopSchema.nullable().openapi({
       description:

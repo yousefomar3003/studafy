@@ -40,11 +40,13 @@ final _classMaterialsRoute = RegExp(r'^/classes/[^/{}]+/materials$');
 final _studentMarksRoute = RegExp(r'^/students/[^/{}]+/marks$');
 
 /// Whether [route] is a deep link this app can open on its own: a filled-in assignment, grades,
-/// class materials or student marks path, or the parent alert center. Server templates for other types point at web-only pages, or
-/// still hold `{placeholders}`, so anything else is not followed.
+/// class materials or student marks path, the parent alert center, or the parent's Student AI.
+/// Server templates for other types point at web-only pages, or still hold `{placeholders}`, so
+/// anything else is not followed.
 bool isOpenableNotificationRoute(String? route) {
   if (route == null || route.isEmpty) return false;
   return route == RoutePaths.parentAlerts ||
+      route == RoutePaths.parentStudentAi ||
       _assignmentRoute.hasMatch(route) ||
       _gradesRoute.hasMatch(route) ||
       _classMaterialsRoute.hasMatch(route) ||
@@ -116,6 +118,12 @@ NotificationTarget notificationTargetFor({
                 gradesTab: GradesTab.exams,
               );
       }
+    case 'AI_OPTIN_AVAILABLE':
+    case 'AI_OPTIN_CONFIRMED':
+      // Parent-only screens: another role (signed in as someone else) has nothing to open.
+      return role == ShellRole.parent
+          ? const NotificationTarget.route(RoutePaths.parentStudentAi)
+          : const NotificationTarget.none();
     case 'MATERIAL_PUBLISHED':
       if (role == ShellRole.student) {
         if (openable != null) return NotificationTarget.route(openable);

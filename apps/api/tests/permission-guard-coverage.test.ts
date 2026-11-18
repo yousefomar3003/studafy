@@ -352,6 +352,9 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/finance/scholarship-awards/{awardId}/approve",
   "POST /api/finance/scholarship-awards/{awardId}/reject",
   "POST /api/finance/scholarship-awards/{awardId}/revoke",
+  // The Student AI line on tuition (000238): billing:update.
+  "PUT /api/finance/student-ai/settings",
+  "POST /api/finance/student-ai/sync",
   // Family finance (finance/family-accounts): billing:update, guarded in that module's routes.
   "POST /api/finance/families/{familyId}/payments",
   "POST /api/finance/families/{familyId}/reminders",
@@ -500,9 +503,27 @@ const EXPECTED_MUTATING_ROUTES = [
   "POST /api/school/license/seats",
   "DELETE /api/school/license/seats/{seatId}",
   "POST /api/school/license/change-requests",
+  // Student AI opt-in (000235): the school's on license:manage, a parent's on studentAi:optIn, in
+  // modules/licensing/ai-optin-routes.ts.
+  "POST /api/school/license/student-ai/windows",
+  "POST /api/school/license/student-ai/windows/{windowId}/close",
+  "POST /api/school/license/student-ai/opt-ins",
+  "POST /api/school/license/student-ai/opt-ins/{optInId}/transfer",
+  "POST /api/school/license/student-ai/opt-ins/{optInId}/release",
+  "POST /api/parent/student-ai/opt-ins",
   // License billing (session 3): the console's routes on platform:manage (web channel), the
   // school's accept and receipt upload on license:manage, in modules/licensing/billing-*-routes.ts.
   "PUT /api/platform/licenses/price-settings/{currencyCode}",
+  // Student AI programme settings (000234), platform:manage.
+  "POST /api/platform/ai-programme/versions",
+  "PUT /api/platform/schools/{schoolId}/ai-programme/override",
+  "POST /api/platform/schools/{schoolId}/ai-programme/override/clear",
+  "POST /api/platform/schools/{schoolId}/ai-programme/preview",
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-programme/reapply",
+  // Student AI revenue share (000237), platform:manage.
+  "POST /api/platform/schools/{schoolId}/licenses/{licenseId}/ai-revenue-share/measure",
+  "POST /api/platform/schools/{schoolId}/ai-revenue-share/recompute",
+  "POST /api/platform/schools/{schoolId}/ai-revenue-share/payouts",
   "PUT /api/platform/licenses/bank-details",
   "POST /api/platform/licenses/quote",
   "POST /api/platform/schools/{schoolId}/license-quotes",

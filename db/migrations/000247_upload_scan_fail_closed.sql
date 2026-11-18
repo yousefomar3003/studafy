@@ -49,9 +49,9 @@ ALTER TABLE app.manual_grants
   ADD COLUMN receipt_scan_status app.upload_scan_status NOT NULL DEFAULT 'unscanned';
 
 COMMENT ON COLUMN app.license_payments.receipt_scan_status IS
-  'Malware scan state of the receipt file (000241).';
+  'Malware scan state of the receipt file (000247).';
 COMMENT ON COLUMN app.manual_grants.receipt_scan_status IS
-  'Malware scan state of the receipt file (000241).';
+  'Malware scan state of the receipt file (000247).';
 
 CREATE TRIGGER trg_record_documents_scan_fail_closed
   BEFORE INSERT OR UPDATE OF storage_key ON app.record_documents

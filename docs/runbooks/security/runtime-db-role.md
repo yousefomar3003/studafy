@@ -24,7 +24,7 @@ Since QA-014, no query reads or writes a table outside the app's own role switch
      NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION;
    GRANT studafy_app   TO studafy_runtime WITH INHERIT FALSE, SET TRUE;
    GRANT studafy_admin TO studafy_runtime WITH INHERIT FALSE, SET TRUE;
-   -- System transactions (QA-015, migration 000240). The migration grants this to every login
+   -- System transactions (QA-015, migration 000246). The migration grants this to every login
    -- already allowed to SET ROLE studafy_admin; a login created later needs it here.
    GRANT studafy_system TO studafy_runtime WITH INHERIT FALSE, SET TRUE;
    -- Migration 000002 revokes CONNECT from PUBLIC, and INHERIT FALSE passes nothing through:
@@ -69,4 +69,4 @@ Restore the previous `DATABASE_USER` and `DATABASE_PASSWORD` secrets on the affe
 ## After
 
 - Rotate the `postgres` password. It's no longer needed by the services and should leave their secret stores (`docs/runbooks/security/rotation-db.md`).
-- QA-015 (migration 000240) moved system transactions off the owner role `studafy_admin` onto the non-owner `studafy_system`. Only workers' partition maintenance still needs `SET ROLE studafy_admin`. A follow-up for the database owner: give the API its own login without the `studafy_admin` grant. While a login can still switch to the owner, SQL injection inside it could too.
+- QA-015 (migration 000246) moved system transactions off the owner role `studafy_admin` onto the non-owner `studafy_system`. Only workers' partition maintenance still needs `SET ROLE studafy_admin`. A follow-up for the database owner: give the API its own login without the `studafy_admin` grant. While a login can still switch to the owner, SQL injection inside it could too.

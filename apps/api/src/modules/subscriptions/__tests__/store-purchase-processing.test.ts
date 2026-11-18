@@ -14,6 +14,7 @@ import { DOMAIN_EVENTS, ERROR_CODES, LEGAL_DOCUMENT_VERSIONS, ROLES } from "@stu
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 
 import { integrationEnabled } from "../../../../tests/harness";
+import { insertOptIn, insertOptInWindow } from "../../../../tests/licensing/programme-optins";
 import { CodedHttpException } from "../../../coded-http-exception";
 import { errorHandlerMiddleware } from "../../../middleware/errorHandler";
 import { openApiValidationHook } from "../../../openapi/hook";
@@ -409,6 +410,7 @@ describe("a family buying on one phone", () => {
         subscribed: false,
         productId: SECOND,
         unavailableReason: null,
+        schoolName: null,
       });
       expect(forBrother).toMatchObject({
         studentId: f.studentId,
@@ -467,6 +469,234 @@ describe("a family buying on one phone", () => {
       unavailableReason: "school_plan_inactive",
     });
   });
+});
+
+/**
+ * A school student seat for `student`: on a licence in force (`in_force`), or a Student AI
+ * programme seat -- an active opt-in holding it -- on a licence awaiting payment that starts next
+ * month (`programme_pending`). `none` gives the school a licence in force with no seat for them.
+ */
+/** The student tier the seats below are of (global, so created once per database). */
+let seatPlanId: string | null = null;
+
+async function giveSchoolSeat(
+  f: BillingFixture,
+  student: { studentId: string; userId: string },
+  kind: "in_force" | "programme_pending" | "none",
+): Promise<{ licenseId: string; seatId: string | null }> {
+  return f.db.sql.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL ROLE studafy_admin");
+    await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+    const tag = crypto.randomUUID().slice(0, 8);
+    if (!seatPlanId) {
+      const [plan] = await tx<{ id: string }[]>`
+        INSERT INTO app.plans (code, display_name, audience, rank)
+        VALUES (${`student_seat_${tag}`}, 'Student AI', 'student', 7) RETURNING id::text AS id
+      `;
+      seatPlanId = plan!.id;
+    }
+    const pending = kind === "programme_pending";
+    const [license] = await tx<{ id: string }[]>`
+      INSERT INTO app.school_licenses (
+        school_id, status, starts_at, ends_at, student_plan_id, student_seats, currency_id,
+        created_by, activated_at, ai_programme_version_id
+      )
+      SELECT ${f.schoolId}::uuid, ${pending ? "awaiting_payment" : "active"},
+             ${pending ? new Date(Date.now() + 30 * 86_400_000) : new Date(Date.now() - 86_400_000)},
+             ${new Date(Date.now() + 300 * 86_400_000)}, ${seatPlanId}::uuid, 5, c.id,
+             ${f.studentUserId}::uuid, ${pending ? null : new Date()},
+             'a1000000-0000-4000-8000-000000000001'::uuid
+      FROM app.currencies AS c WHERE c.code = 'USD'
+      RETURNING id::text AS id
+    `;
+    if (kind === "none") return { licenseId: license!.id, seatId: null };
+    const [seat] = await tx<{ id: string }[]>`
+      INSERT INTO app.license_seats (school_id, license_id, audience, user_id, student_id, assigned_by)
+      VALUES (${f.schoolId}::uuid, ${license!.id}::uuid, 'student', ${student.userId}::uuid,
+              ${student.studentId}::uuid, ${f.studentUserId}::uuid)
+      RETURNING id::text AS id
+    `;
+    if (pending) {
+      const today = new Date();
+      const [year] = await tx<{ id: string }[]>`
+        INSERT INTO app.academic_years (school_id, code, name, starts_on, ends_on, status)
+        VALUES (${f.schoolId}::uuid, ${`AY-${tag}`}, 'This year', CURRENT_DATE - 30,
+                CURRENT_DATE + 300, 'active')
+        RETURNING id::text AS id
+      `;
+      const windowId = await insertOptInWindow(tx, {
+        schoolId: f.schoolId,
+        licenseId: license!.id,
+        academicYearId: year!.id,
+        openedBy: f.studentUserId,
+      });
+      const month = `${today.toISOString().slice(0, 7)}-01`;
+      await insertOptIn(tx, {
+        schoolId: f.schoolId,
+        licenseId: license!.id,
+        academicYearId: year!.id,
+        windowId,
+        studentId: student.studentId,
+        recordedBy: f.studentUserId,
+        startMonth: month,
+        endMonth: month,
+        monthlyPriceMinor: 400,
+        seatId: seat!.id,
+      });
+    }
+    return { licenseId: license!.id, seatId: seat!.id };
+  });
+}
+
+describe("a student the school provides for (owner, 2026-11-18)", () => {
+  integrationTest("is never offered the purchase: a seat on the licence in force", async () => {
+    const f = await createBillingFixture(database!);
+    await activateSchoolPlan(f);
+    await giveSchoolSeat(f, { studentId: f.studentId, userId: f.studentUserId }, "in_force");
+    const { store } = fakeStores();
+
+    const offer = await readStoreOffer(f.db.sql, store, {
+      schoolId: f.schoolId,
+      userId: f.studentUserId,
+    });
+    expect(offer).toMatchObject({
+      studentId: f.studentId,
+      productId: null,
+      unavailableReason: "covered_by_school",
+    });
+    expect(offer.schoolName).toEqual(expect.any(String));
+  });
+
+  integrationTest(
+    "nor is a parent's child holding a programme seat whose licence has not started",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await activateSchoolPlan(f);
+      const family = await addFamily(f);
+      await giveSchoolSeat(f, family.sister, "programme_pending");
+      const { store } = fakeStores();
+
+      const forSister = await readStoreOffer(f.db.sql, store, {
+        schoolId: f.schoolId,
+        userId: family.parentUserId,
+        studentId: family.sister.studentId,
+      });
+      expect(forSister).toMatchObject({
+        studentId: family.sister.studentId,
+        productId: null,
+        unavailableReason: "covered_by_school",
+      });
+      // Her brother has no seat: the family may buy it in the app for him.
+      const forBrother = await readStoreOffer(f.db.sql, store, {
+        schoolId: f.schoolId,
+        userId: family.parentUserId,
+        studentId: f.studentId,
+      });
+      expect(forBrother).toMatchObject({ productId: PRODUCT, unavailableReason: null });
+    },
+  );
+
+  integrationTest(
+    "a student without a seat at a school with a licence may still buy it in the app",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await activateSchoolPlan(f);
+      await giveSchoolSeat(f, { studentId: f.studentId, userId: f.studentUserId }, "none");
+      const { store } = fakeStores();
+
+      const offer = await readStoreOffer(f.db.sql, store, {
+        schoolId: f.schoolId,
+        userId: f.studentUserId,
+      });
+      expect(offer).toMatchObject({
+        studentId: f.studentId,
+        productId: PRODUCT,
+        unavailableReason: null,
+        schoolName: null,
+      });
+    },
+  );
+
+  integrationTest(
+    "a purchase that raced the seat is recorded, never refused, and its renewal is stopped",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await activateSchoolPlan(f);
+      const { licenseId, seatId } = await giveSchoolSeat(
+        f,
+        { studentId: f.studentId, userId: f.studentUserId },
+        "in_force",
+      );
+      const transaction = subscriptionFor(f);
+      const { store } = fakeStores({ transaction });
+
+      // The store has taken the money: the purchase is accepted and recorded.
+      const result = await register(f, store);
+      expect(result.active).toBe(true);
+      expect(await readAiSubscriptionStatuses(f)).toEqual(["active"]);
+      // Reported again (a retry): nothing more is recorded.
+      await register(f, store);
+
+      const [overlaps, notices] = await f.db.sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+        return Promise.all([
+          tx<{ license_id: string; seat_id: string; provider: string; renewal_action: string }[]>`
+            SELECT license_id::text, seat_id::text, provider, renewal_action
+            FROM app.license_seat_overlaps WHERE school_id = ${f.schoolId}::uuid
+          `,
+          tx<{ n: number }[]>`
+            SELECT count(*)::int AS n FROM app.notifications
+            WHERE school_id = ${f.schoolId}::uuid AND user_id = ${f.studentUserId}::uuid
+              AND notification_type = 'LICENSE_SEAT_APPLE_RENEWAL'
+          `,
+        ]);
+      });
+      // An App Store purchase: Studafy cannot stop its renewal, so the purchaser is told how.
+      expect([...overlaps]).toEqual([
+        {
+          license_id: licenseId,
+          seat_id: seatId!,
+          provider: "app_store",
+          renewal_action: "notify_user",
+        },
+      ]);
+      expect(notices[0]!.n).toBe(1);
+    },
+  );
+
+  integrationTest(
+    "a Google Play purchase that raced the seat has its renewal cancelled",
+    async () => {
+      const f = await createBillingFixture(database!);
+      await activateSchoolPlan(f);
+      await giveSchoolSeat(f, { studentId: f.studentId, userId: f.studentUserId }, "in_force");
+      const google = subscriptionFor(f, { platform: "google", schoolId: f.schoolId });
+      const { store, acknowledged } = fakeStores({ google });
+      const cancelled: string[] = [];
+      const recording: StoreBilling = {
+        ...store,
+        google: { ...store.google!, cancel: async (token) => void cancelled.push(token) },
+      };
+
+      const result = await register(f, recording, "google");
+      expect(result.active).toBe(true);
+      // Recorded and acknowledged (Play would refund it otherwise), and it will not renew.
+      expect(acknowledged).toEqual([google.storeRef]);
+      expect(cancelled).toEqual([google.storeRef]);
+      const overlaps = await f.db.sql.begin(async (tx) => {
+        await tx.unsafe("SET LOCAL ROLE studafy_admin");
+        await tx`SELECT set_config('app.school_id', ${f.schoolId}, true)`;
+        return tx<{ provider: string; renewal_action: string; renewal_status: string }[]>`
+        SELECT provider, renewal_action, renewal_status
+        FROM app.license_seat_overlaps WHERE school_id = ${f.schoolId}::uuid
+      `;
+      });
+      expect([...overlaps]).toEqual([
+        { provider: "google_play", renewal_action: "cancel_at_period_end", renewal_status: "done" },
+      ]);
+    },
+  );
 });
 
 async function setSchoolPlanStatus(f: BillingFixture, status: string): Promise<void> {

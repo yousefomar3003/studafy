@@ -40,6 +40,10 @@ enum AiStoreUnavailableReason {
   /// Brothers and sisters (known to Studafy) already hold every product. Only the server's view:
   /// the app checks what this phone's store account really holds before saying so.
   noFreeProduct,
+
+  /// The student holds a school seat (a licence in force, or a Student AI programme seat): the
+  /// school provides it, so it is never sold to them in the app.
+  coveredBySchool,
 }
 
 /// What the server says about selling the AI add-on in the app for one student — the signed-in
@@ -58,6 +62,7 @@ class AiStoreSetup {
     this.studentFirstName,
     this.subscribed = false,
     this.unavailableReason,
+    this.schoolName,
     this.purchaseConfirmation,
   });
 
@@ -86,6 +91,12 @@ class AiStoreSetup {
 
   /// Why it cannot be bought; null when it can.
   final AiStoreUnavailableReason? unavailableReason;
+
+  /// The school providing it ([AiStoreUnavailableReason.coveredBySchool]), for "Provided by …".
+  final String? schoolName;
+
+  /// The school provides it: never sold in the app, never a store sheet.
+  bool get coveredBySchool => unavailableReason == AiStoreUnavailableReason.coveredBySchool;
 
   /// The student's id, stamped on the purchase (Apple `appAccountToken`, Google
   /// `obfuscatedAccountId`). The server refuses a purchase that does not carry it.
@@ -155,8 +166,10 @@ class ApiAiStoreBackend implements AiStoreBackend {
         AiStoreConfigUnavailableReason.schoolPlanInactive =>
           AiStoreUnavailableReason.schoolPlanInactive,
         AiStoreConfigUnavailableReason.noFreeProduct => AiStoreUnavailableReason.noFreeProduct,
+        AiStoreConfigUnavailableReason.coveredBySchool => AiStoreUnavailableReason.coveredBySchool,
         _ => null,
       },
+      schoolName: config.schoolName,
       purchaseConfirmation: switch (config.purchaseConfirmation) {
         final confirmation? => AiStorePurchaseConfirmation(
           acknowledgedAt: confirmation.acknowledgedAt,

@@ -51,9 +51,21 @@ const StoreConfigSchema = z
     subscribed: z.boolean(),
     /** Why it cannot be bought, for the app to say so rather than show nothing. */
     unavailableReason: z
-      .enum(["not_configured", "not_student", "school_plan_inactive", "no_free_product"])
+      .enum([
+        "not_configured",
+        "not_student",
+        "school_plan_inactive",
+        "no_free_product",
+        "covered_by_school",
+      ])
       .nullable()
-      .openapi({ description: "Null when it can be bought." }),
+      .openapi({
+        description:
+          "Null when it can be bought. covered_by_school: the student holds a school seat (a " +
+          "licence in force, or a Student AI programme seat), so it is never sold in the app.",
+      }),
+    /** The school's name when it provides it (`covered_by_school`), for "Provided by <school>". */
+    schoolName: z.string().nullable(),
     /**
      * The ids the app stamps on the purchase when `purchasable` (or `no_free_product`, which the app
      * re-checks against the phone's store account): the student's id (Apple
@@ -266,6 +278,7 @@ export function aiStoreRoutes(
         studentFirstName: offer.studentFirstName,
         subscribed: offer.subscribed,
         unavailableReason: offer.unavailableReason,
+        schoolName: offer.schoolName,
         ...purchaseStamp(offer, auth.schoolId),
         purchaseConfirmation,
       },

@@ -1,4 +1,5 @@
 import { createRoute, OpenAPIHono } from "@hono/zod-openapi";
+import { withTransactionRetry } from "@studafy/billing";
 import { ERROR_CODES, PERMISSIONS } from "@studafy/constants";
 import { customScheduleErrors, scheduleMonths, yearTotals } from "@studafy/license-pricing";
 
@@ -1113,13 +1114,17 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
       });
       receiptStorageKey = confirmed.storageKey;
     }
-    const { result, renewals } = await change(deps, schoolId, actor, (tx) =>
-      recordPayment(
-        tx,
-        schoolId,
-        invoiceId,
-        { ...body, receivedAt: new Date(body.receivedAt), receiptStorageKey },
-        actor,
+    // Two payments for one school at once both settle its revenue share (000237): a deadlock or
+    // serialization failure runs the whole transaction again.
+    const { result, renewals } = await withTransactionRetry(() =>
+      change(deps, schoolId, actor, (tx) =>
+        recordPayment(
+          tx,
+          schoolId,
+          invoiceId,
+          { ...body, receivedAt: new Date(body.receivedAt), receiptStorageKey },
+          actor,
+        ),
       ),
     );
     // Scanned like every other upload (QA-055); served only once clean.
@@ -1135,11 +1140,13 @@ export function platformLicenseBillingRoutes(deps: LicensingDeps): OpenAPIHono<A
     const { schoolId, paymentId } = c.req.valid("param");
     const { reason } = c.req.valid("json");
     const actor = platformActor(c);
-    const { result } = await change(deps, schoolId, actor, async (tx) => ({
-      result: await voidPayment(tx, schoolId, paymentId, reason, actor),
-      versions: new Map(),
-      pending: [],
-    }));
+    const { result } = await withTransactionRetry(() =>
+      change(deps, schoolId, actor, async (tx) => ({
+        result: await voidPayment(tx, schoolId, paymentId, reason, actor),
+        versions: new Map(),
+        pending: [],
+      })),
+    );
     return c.json(result, 200);
   });
 

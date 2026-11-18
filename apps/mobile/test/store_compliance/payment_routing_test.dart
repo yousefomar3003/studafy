@@ -129,6 +129,80 @@ void main() {
     }
   });
 
+  test("the school's Student AI offer names no price, total or way to pay, anywhere in the app", () {
+    // Schools offer Student AI as part of their fees and tell parents the price themselves (owner,
+    // 2026-11-18). A digital service sold outside the stores' billing must not be priced or
+    // purchasable in the app, so the parent's Student AI screens, models and client carry no
+    // price, total, amount or currency at all -- not even a field to hold one -- and no link out.
+    const files = [
+      'lib/src/features/parent/domain/student_ai_offer.dart',
+      'lib/src/features/parent/data/student_ai_client.dart',
+      'lib/src/features/parent/application/student_ai_providers.dart',
+      'lib/src/features/parent/presentation/student_ai_opt_in_screen.dart',
+      'lib/src/features/parent/presentation/widgets/student_ai_offer_card.dart',
+      'lib/src/features/parent/presentation/widgets/student_ai_home_card.dart',
+      'lib/src/features/parent/presentation/widgets/finance_student_ai_tile.dart',
+    ];
+    final money = RegExp(
+      r'price|total|amount|currency|minorUnit|money|NumberFormat|\bcost\b|\bfee\b',
+      caseSensitive: false,
+    );
+    final outbound = RegExp(r'url_launcher|launchUrl|\bUri\.parse|https?://');
+    String code(String source) => source
+        .split('\n')
+        .where((line) => !line.trimLeft().startsWith('//'))
+        .join('\n');
+    final found = <String>[];
+    for (final path in files) {
+      final source = code(File(path).readAsStringSync());
+      for (final match in money.allMatches(source)) {
+        found.add('$path: ${match.group(0)}');
+      }
+      for (final match in outbound.allMatches(source)) {
+        found.add('$path: ${match.group(0)}');
+      }
+    }
+    // The family view's Student AI line, inside family_finance.dart.
+    final finance = File('lib/src/features/parent/domain/family_finance.dart').readAsStringSync();
+    final start = finance.indexOf('class FamilyStudentAiLine');
+    expect(start, isNonNegative);
+    final end = finance.indexOf('\nclass ', start + 1);
+    final line = code(finance.substring(start, end < 0 ? finance.length : end));
+    for (final match in money.allMatches(line)) {
+      found.add('FamilyStudentAiLine: ${match.group(0)}');
+    }
+    expect(found, isEmpty, reason: found.join('\n'));
+
+    for (final locale in ['en', 'ar']) {
+      final translations =
+          jsonDecode(File('assets/translations/$locale.json').readAsStringSync()) as Map;
+      final finance = ((translations['parent'] as Map)['childDetail'] as Map)['finance'] as Map;
+      final copy = [
+        ..._strings(translations['studentAiOptIn']),
+        ..._strings(finance['studentAi']),
+      ].join('\n');
+      expect(copy, isNotEmpty, reason: locale);
+      expect(
+        RegExp(r'[$€£×]|\bUSD\b|\bJOD\b|\bSAR\b|د\.ا|ر\.س|\d').hasMatch(copy),
+        isFalse,
+        reason: '$locale: an amount in the Student AI copy',
+      );
+      expect(
+        RegExp(r'\{(price|total|monthly|amount|months)\}').hasMatch(copy),
+        isFalse,
+        reason: '$locale: a price placeholder in the Student AI copy',
+      );
+      if (locale == 'en') {
+        final steering = RegExp(
+          r'\b(pay|paid|payment|pays|buy|bought|purchase|subscribe|checkout|website|online|'
+          r'card|bank|cheaper|discount|per month|a month)\b',
+          caseSensitive: false,
+        );
+        expect(steering.allMatches(copy).map((m) => m.group(0)).toList(), isEmpty);
+      }
+    }
+  });
+
   test('AI copy carries no price or purchase steering', () {
     for (final locale in ['en', 'ar']) {
       final translations =

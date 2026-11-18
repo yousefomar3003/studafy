@@ -19,6 +19,16 @@ const SECTIONS = [
   { to: "/portal/platform/tiers", labelKey: "platformLicensing.nav.tiers", end: false },
   { to: "/portal/platform/features", labelKey: "platformLicensing.nav.features", end: false },
   { to: "/portal/platform/pricing", labelKey: "platformLicensing.nav.pricing", end: false },
+  {
+    to: "/portal/platform/ai-programme",
+    labelKey: "platformLicensing.nav.aiProgramme",
+    end: true,
+  },
+  {
+    to: "/portal/platform/ai-programme/schools",
+    labelKey: "platformLicensing.nav.aiProgrammeSchools",
+    end: false,
+  },
   { to: "/portal/platform/settings", labelKey: "platform.nav.settings", end: false },
   { to: "/portal/platform/users", labelKey: "platform.nav.users", end: false },
   { to: "/portal/platform/announcements", labelKey: "platform.nav.announcements", end: false },

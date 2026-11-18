@@ -30,6 +30,7 @@ import type {
   ChangeRequest,
   ConsoleTier,
   LicenseAudience,
+  LicenseCommitment,
   PlatformLicense,
   PriceLine,
   QuoteCalculateBody,
@@ -41,6 +42,7 @@ type QuoteKind = QuoteCalculateBody["kind"];
 type PaymentPlan = NonNullable<QuoteCalculateBody["paymentPlan"]>;
 
 const PAYMENT_PLANS: readonly PaymentPlan[] = ["in_full", "monthly", "yearly", "custom"];
+const COMMITMENTS: readonly LicenseCommitment[] = ["full_year", "month_to_month"];
 
 interface CustomRow {
   key: number;
@@ -114,6 +116,8 @@ export default function CalculatorPage() {
   const [adjustmentReason, setAdjustmentReason] = useState("");
   const [notes, setNotes] = useState("");
   const [plan, setPlan] = useState<PaymentPlan>("in_full");
+  // Left unset, the API keeps the licence's commitment (full year for a new licence).
+  const [commitment, setCommitment] = useState<LicenseCommitment | "">("");
   const [customRows, setCustomRows] = useState<CustomRow[]>([{ key: 1, amount: "", dueDate: "" }]);
   const [termsReason, setTermsReason] = useState("");
 
@@ -285,6 +289,7 @@ export default function CalculatorPage() {
           ...terms,
           changeRequestId,
           termsChangeReason: termsChanges.length > 0 ? termsReason.trim() : null,
+          commitment: commitment || undefined,
           notes: notes.trim() || null,
         },
       },
@@ -451,6 +456,24 @@ export default function CalculatorPage() {
                 label: t(`platformLicensing.calculator.plan.${value}`),
               }))}
             />
+            {kind === "seat_increase" ? null : (
+              <Select
+                label={t("platformLicensing.calculator.commitmentLabel")}
+                helperText={t("platformLicensing.calculator.commitmentHelp")}
+                value={commitment}
+                onChange={setCommitment}
+                options={[
+                  {
+                    value: "" as const,
+                    label: t("platformLicensing.calculator.commitmentDefault"),
+                  },
+                  ...COMMITMENTS.map((value) => ({
+                    value,
+                    label: t(`platformLicensing.commitment.${value}`),
+                  })),
+                ]}
+              />
+            )}
             {plan === "custom" ? (
               <CustomScheduleEditor
                 rows={customRows}
@@ -1127,6 +1150,9 @@ export function SchoolQuotes({ schoolId }: { schoolId: string }) {
                             months: quote.months,
                             plan: t(`platformLicensing.calculator.plan.${quote.paymentPlan}`),
                           })}
+                        </span>
+                        <span className="platform-muted" data-testid="quote-commitment">
+                          {t(`platformLicensing.commitment.${quote.commitment}`)}
                         </span>
                         {quote.changeRequestId ? (
                           <span className="platform-muted" data-testid="quote-terms-source">

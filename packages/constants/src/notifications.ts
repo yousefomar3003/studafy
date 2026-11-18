@@ -101,6 +101,14 @@ export const NOTIFICATION_TYPES = {
   // student and their linked parents. Optional, immediate-only and never emailed. Mirrored in
   // app.notification_type by migration 000230.
   MARKS_RELEASED: "MARKS_RELEASED",
+  // Student AI opt-in (000235/000239): "Student AI is available for <child>" to a parent once per
+  // child and window (the workers' run-ai-optin-notices job); a confirmation to the child's parents
+  // when an opt-in is recorded (the API, in the opt-in's transaction); and a daily summary of new
+  // opt-ins to the school's admins and principals (the same job). Optional, immediate-only and never
+  // emailed. Mirrored in app.notification_type by migration 000239.
+  AI_OPTIN_AVAILABLE: "AI_OPTIN_AVAILABLE",
+  AI_OPTIN_CONFIRMED: "AI_OPTIN_CONFIRMED",
+  AI_OPTIN_SUMMARY: "AI_OPTIN_SUMMARY",
 } as const;
 
 export type NotificationType = (typeof NOTIFICATION_TYPES)[keyof typeof NOTIFICATION_TYPES];

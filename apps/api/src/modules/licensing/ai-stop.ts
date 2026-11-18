@@ -1,11 +1,12 @@
-import { LICENSE_NONPAYMENT_GRACE_DAYS, licenseAiStopDate } from "@studafy/constants";
+import { licenseAiStopDate } from "@studafy/constants";
 
 import type { TransactionSql } from "postgres";
 
 /**
  * AI stops 30 days after an unpaid instalment (migration 000233). The workers' licence lifecycle job
- * suspends an active licence once any unpaid instalment of one of its open invoices is
- * LICENSE_NONPAYMENT_GRACE_DAYS past its due date, marking it `nonpayment_suspended_at`; this module tells
+ * suspends an active licence once any unpaid instalment of one of its open invoices is the licence's
+ * own grace period (nonpayment_grace_days, a Student AI programme setting since 000234) past its due
+ * date, marking it `nonpayment_suspended_at`; this module tells
  * the school when the next cutoff is (nonpayment.ts resumes a licence once it is paid).
  */
 
@@ -25,11 +26,12 @@ export async function instalmentsPastCutoff(
     SELECT count(*)::int AS count
     FROM app.license_invoice_instalments AS inst
     JOIN app.license_invoices AS i ON i.id = inst.invoice_id AND i.school_id = inst.school_id
+    JOIN app.school_licenses AS l ON l.id = i.license_id AND l.school_id = i.school_id
     WHERE inst.school_id = current_setting('app.school_id')::uuid
       AND i.license_id = ${licenseId}::uuid
       AND i.status IN ('issued', 'partially_paid')
       AND inst.status <> 'paid'
-      AND inst.due_date + ${LICENSE_NONPAYMENT_GRACE_DAYS}::int <= ${today(now)}::date
+      AND inst.due_date + l.nonpayment_grace_days <= ${today(now)}::date
   `;
   return row?.count ?? 0;
 }
@@ -63,13 +65,15 @@ export async function nextAiStop(
       balance_minor: string;
       currency_code: string;
       minor_unit: number;
+      grace_days: number;
     }[]
   >`
     SELECT i.id::text AS invoice_id, i.number, inst.position, inst.due_date::text AS due_date,
            inst.balance_minor::text AS balance_minor, c.code AS currency_code,
-           c.minor_unit::int AS minor_unit
+           c.minor_unit::int AS minor_unit, l.nonpayment_grace_days AS grace_days
     FROM app.license_invoice_instalments AS inst
     JOIN app.license_invoices AS i ON i.id = inst.invoice_id AND i.school_id = inst.school_id
+    JOIN app.school_licenses AS l ON l.id = i.license_id AND l.school_id = i.school_id
     JOIN app.currencies AS c ON c.id = i.currency_id
     WHERE inst.school_id = current_setting('app.school_id')::uuid
       AND i.license_id = ${licenseId}::uuid
@@ -79,7 +83,7 @@ export async function nextAiStop(
     LIMIT 1
   `;
   if (!row) return null;
-  const stopDate = licenseAiStopDate(row.due_date);
+  const stopDate = licenseAiStopDate(row.due_date, row.grace_days);
   return {
     invoiceId: row.invoice_id,
     invoiceNumber: row.number,

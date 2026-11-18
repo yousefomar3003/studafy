@@ -609,6 +609,9 @@
     "activated": "تم تفعيل Studafy AI.",
     "activatedFor": "تم تفعيل Studafy AI لـ {name}.",
     "thisStudent": "هذا الطالب",
+    "providedBy": "مقدَّم من {school}.",
+    "providedByFor": "Studafy AI لـ {name} مقدَّم من {school}.",
+    "yourSchool": "مدرستك",
     "childButton": "Studafy AI لـ {name}",
     "unavailable": {
       "loadFailed": "تعذّر التحميل الآن. اسحب للأسفل للمحاولة مرة أخرى.",
@@ -1989,6 +1992,12 @@
           "settled": "تمّت تسوية جميع الرسوم.",
           "asOf": "حتى تاريخ {date}"
         },
+        "studentAi": {
+          "title": "الذكاء الاصطناعي للطالب",
+          "line": "Student AI — ضمن الرسوم المدرسية",
+          "from": "ابتداءً من {month}",
+          "stoppedFrom": "توقف ابتداءً من {month}"
+        },
         "invoices": {
           "title": "الفواتير",
           "empty": "لا توجد فواتير بعد.",
@@ -2384,7 +2393,7 @@
         },
         "fees": {
           "title": "الرسوم والفواتير",
-          "subtitle": "الفواتير والدفعات والتذكيرات"
+          "subtitle": "الفواتير والدفعات والتذكيرات وStudent AI"
         },
         "schoolUpdates": {
           "title": "تحديثات المدرسة",
@@ -2657,6 +2666,69 @@
     "otherSchools": "أبناؤك في المدارس الأخرى غير مشمولين بمقعد {school}: يحتاجون إلى اشتراك Family+ الخاص بك، أو مقعد من مدرستهم.",
     "askSchool": "توفّر {school} اشتراك Family+ عبر ترخيصها. اطلب من المدرسة مقعدًا لولي الأمر.",
     "notCovered": "اشتراك Family+ غير نشط لحسابك في هذه المدرسة."
+  },
+  "studentAiOptIn": {
+    "title": "Student AI",
+    "home": {
+      "intro": "تقدّم مدرستك Student AI طوال العام الدراسي، ضمن الرسوم المدرسية.",
+      "open": "عرض Student AI"
+    },
+    "status": {
+      "available": "متاح",
+      "confirmed": "مؤكَّد",
+      "waitingSeat": "بانتظار المدرسة",
+      "ended": "انتهى",
+      "closed": "مغلق"
+    },
+    "screen": {
+      "intro": "Student AI مساعد دراسي تقدّمه مدرستك طوال العام الدراسي. وهو ضمن الرسوم المدرسية، وستُخبرك مدرستك بالسعر.",
+      "empty": "لا تقدّم هذه المدرسة Student AI لأبنائك.",
+      "loadError": "تعذّر تحميل Student AI.",
+      "retry": "حاول مرة أخرى"
+    },
+    "offer": {
+      "title": "Student AI لـ{child}",
+      "offeredBy": "تقدّمه مدرستك",
+      "period": "من {start} إلى {end}",
+      "closesOn": "انضم قبل {date}",
+      "includesTitle": "ما يتضمّنه",
+      "includesHelper": "مساعد دراسي لـ{child} في تطبيق Studafy.",
+      "includesClasses": "شروحات وتمارين في مواد {child} الدراسية.",
+      "includesYear": "متاح لبقية العام الدراسي.",
+      "termsTitle": "قبل التأكيد",
+      "termsCommitted": "الاشتراك ملزِم للعام الدراسي ولا يمكن إلغاؤه في منتصف العام.",
+      "termsFees": "وهو ضمن الرسوم المدرسية.",
+      "termsFromSchool": "ستُخبرك مدرستك بالسعر.",
+      "termsFinal": "بعد التأكيد، لا يمكن التراجع عنه من التطبيق.",
+      "accept": "أفهم أن Student AI لـ{child} ملزِم للعام الدراسي، ولا يمكن إلغاؤه في منتصف العام، وهو ضمن رسومي المدرسية.",
+      "confirm": "انضمام",
+      "confirmed": "انضم {child} إلى Student AI.",
+      "errors": {
+        "windowClosed": "أُغلق الانضمام إلى Student AI في المدرسة للتو.",
+        "alreadyOptedIn": "Student AI مؤكَّد بالفعل لـ{child}.",
+        "notEligible": "لا يمكن لـ{child} الانضمام الآن. تواصل مع المدرسة.",
+        "termsChanged": "تغيّرت الشروط. اقرأها ثم أكّد مرة أخرى.",
+        "generic": "تعذّر الانضمام إلى Student AI. تحقّق من اتصالك وحاول مرة أخرى."
+      }
+    },
+    "optedIn": {
+      "headline": "انضم {child} إلى Student AI.",
+      "inFees": "ضمن الرسوم المدرسية",
+      "recordedBySchool": "سجّلته المدرسة نيابةً عنك.",
+      "transferred": "نقلت المدرسة مكانًا إلى {child}.",
+      "waitingSeat": "بانتظار أن تضيف المدرسة مكانًا. يبدأ Student AI فور إضافته.",
+      "seatReady": "لدى المدرسة مكان لـ{child}، لذا Student AI مفعَّل.",
+      "committed": "ملزِم للعام الدراسي. لأي استفسار، تواصل مع المدرسة."
+    },
+    "ended": {
+      "headline": "انتهى Student AI لـ{child}.",
+      "released": "أنهته المدرسة. يتوقف ابتداءً من {month}.",
+      "transferred": "نقلت المدرسة المكان إلى طالب آخر."
+    },
+    "closed": {
+      "body": "الانضمام إلى Student AI مغلق في {school} حاليًا.",
+      "yourSchool": "مدرستك"
+    }
   },
   "launch": {
     "guide": {

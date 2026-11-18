@@ -78,6 +78,7 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `report:read`                    | ✅          | ✅        | ✅        |                    | ✅      |            |         |        |       | ✅            |
 | `report:export`                  | ✅          | ✅        |           |                    | ✅      |            |         |        |       |               |
 | `report:viewFinancial`           | ✅          | ✅        |           |                    | ✅      |            |         |        |       |               |
+| `aiRevenueShare:read`            | ✅          | ✅        | ✅        |                    | ✅      |            |         |        |       |               |
 | `approval:review`                | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `principalDashboard:view`        | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `attendanceDashboard:view`       | ✅          | ✅        | ✅        | ✅                 |         | ✅         |         |        |       |               |
@@ -95,6 +96,7 @@ Source of truth: `src/permissions.ts` (`PERMISSIONS`, `ROLE_PERMISSIONS`). Regen
 | `platform:manage`                | ✅          |           |           |                    |         |            |         |        |       |               |
 | `license:read`                   | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
 | `license:manage`                 | ✅          | ✅        | ✅        |                    |         |            |         |        |       |               |
+| `studentAi:optIn`                | ✅          |           |           |                    |         |            |         | ✅     |       |               |
 | `auditLog:read`                  | ✅          | ✅        |           |                    | ✅      |            |         |        |       | ✅            |
 | `auditLog:export`                | ✅          | ✅        |           |                    | ✅      |            |         |        |       |               |
 | `privacy:manageDsr`              | ✅          | ✅        |           |                    |         |            |         |        |       |               |

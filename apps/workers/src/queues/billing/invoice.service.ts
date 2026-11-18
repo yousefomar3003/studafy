@@ -12,11 +12,17 @@ import { resolveSchoolCredentials } from "./credential-resolver";
 import { ErpNextClient, ErpNextError } from "./erpnext-client";
 import { applySalesTax, type SalesInvoiceItem, type SalesTaxSettings } from "./sales-tax";
 import { scholarshipDiscountMinor, type ApprovedScholarship } from "./scholarship-discount";
+import {
+  claimStudentAiPortions,
+  ensureStudentAiFeeCategory,
+  markStudentAiPortionsInvoiced,
+  studentAiInvoiceItems,
+} from "./student-ai-line";
 
 import type { GenerateBatchInvoicesJobData, GenerateInvoiceJobData } from "./schemas";
 import type { JSONValue, Sql, TransactionSql } from "postgres";
 
-/** The armed school's local date (app.school_today, migration 000236; QA-044). */
+/** The armed school's local date (app.school_today, migration 000242; QA-044). */
 async function schoolToday(tx: TransactionSql): Promise<string> {
   const [row] = await tx<{ today: string }[]>`SELECT app.school_today()::text AS today`;
   return row!.today;
@@ -429,6 +435,21 @@ export async function generateInvoice(
   if (params.dueDate) {
     payload.due_date = params.dueDate;
   }
+  // The student's Student AI portions due by this invoice (000238): their own lines, added after
+  // the discounts above were computed on the structure's components, so no discount reduces them.
+  const studentAi = studentAiInvoiceItems(
+    await claimStudentAiPortions(
+      tx,
+      schoolId,
+      params.studentId,
+      params.dueDate ?? (payload.posting_date as string),
+    ),
+    currencyCode,
+  );
+  if (studentAi) {
+    await ensureStudentAiFeeCategory(client);
+    items.push(...studentAi.items);
+  }
   applySalesTax(payload, await salesTaxSettings(tx, schoolId));
 
   // Claim-check against ERPNext itself (QA-022): an earlier attempt may have created the invoice
@@ -470,6 +491,9 @@ export async function generateInvoice(
     currencyCode,
     idempotencyKey,
   });
+  if (studentAi) {
+    await markStudentAiPortionsInvoiced(tx, schoolId, studentAi.portionIds, row.erpnext_docname);
+  }
 
   return {
     idempotencyKey,

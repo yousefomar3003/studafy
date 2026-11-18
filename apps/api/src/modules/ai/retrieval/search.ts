@@ -176,7 +176,7 @@ function runHybridQuery(tx: TransactionSql, input: HybridSearchInput): Promise<H
     WITH semantic AS (${semantic}), keyword AS (
       SELECT c.id, row_number() OVER (ORDER BY ts_rank(c.content_tsv, q.query) DESC) AS rank
       FROM app.material_chunks c,
-           -- English and Arabic parses of the question, ORed, matching content_tsv (000243).
+           -- English and Arabic parses of the question, ORed, matching content_tsv (000249).
            (SELECT websearch_to_tsquery('english', ${input.query})
                    || websearch_to_tsquery('arabic', ${input.query})) AS q(query)
       WHERE c.content_tsv @@ q.query

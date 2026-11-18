@@ -64,6 +64,8 @@ const people = {
 
 let familyPlus = false;
 let assignResult: unknown = null;
+/** Seats a Student AI opt-in holds for the year (`programme` on the seat list). */
+let programmeSeatIds: string[] = [];
 
 function overview() {
   return {
@@ -75,6 +77,7 @@ function overview() {
       includeFamilyPlus: familyPlus,
       currencyCode: "USD",
       activatedAt: "2026-09-01T00:00:00.000Z",
+      commitment: "full_year",
       audiences: [
         {
           audience: "student",
@@ -105,6 +108,28 @@ const getMock = mock((path: string, _init?: Init) => {
       });
     case "/api/school/license/invoices":
       return Promise.resolve({ data: { invoices: [], status: "overdue" } });
+    case "/api/school/license/seats": {
+      const seated = Object.values(people).filter((person) => person.seatId !== null);
+      return Promise.resolve({
+        data: {
+          seats: seated.map((person) => ({
+            seatId: person.seatId,
+            audience: "student",
+            userId: person.userId,
+            studentId: person.studentId,
+            name: person.name,
+            email: person.email,
+            assignedAt: person.assignedAt,
+            assignedByPlatform: false,
+            unassignedAt: null,
+            programme: programmeSeatIds.includes(person.seatId!),
+            overlap: null,
+          })),
+          total: seated.length,
+          status: "active",
+        },
+      });
+    }
     case "/api/academics/years":
       return Promise.resolve({
         data: {
@@ -153,6 +178,7 @@ afterEach(() => {
   cleanup();
   familyPlus = false;
   assignResult = null;
+  programmeSeatIds = [];
   getMock.mockClear();
   postMock.mockClear();
   deleteMock.mockClear();
@@ -324,6 +350,36 @@ describe("SeatsPage", () => {
     expect(deleteMock.mock.calls[0]![0]).toBe("/api/school/license/seats/{seatId}");
     expect(deleteMock.mock.calls[0]![1].params!.path).toEqual({ seatId: people.sara.seatId });
     expect(await screen.findByText("1 seat freed.")).toBeTruthy();
+  });
+
+  test("a Student AI seat held for the year is marked and can't be unassigned", async () => {
+    programmeSeatIds = [people.sara.seatId];
+    await renderPage();
+    const table = await rows();
+    const row = (await table.findByText("Sara Ali")).closest("tr")!;
+    expect((await within(row).findByTestId("programme-seat")).textContent).toBe(
+      "Student AI (whole year)",
+    );
+    const unassign = within(row).getByRole("button", { name: "Unassign Sara Ali" });
+    expect((unassign as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.click(unassign);
+    // The page says where the seat can move instead.
+    const note = screen.getByTestId("programme-note");
+    expect(note.textContent).toContain("can't be unassigned");
+    expect(within(note).getByRole("link", { name: "Student AI page" }).getAttribute("href")).toBe(
+      "/portal/license/student-ai",
+    );
+    // Selecting her offers no bulk unassign either.
+    fireEvent.click(table.getByRole("checkbox", { name: "Select Sara Ali" }));
+    const bulk = within(screen.getByRole("group", { name: "Bulk actions" }));
+    expect(
+      (bulk.getByRole("button", { name: "Unassign 0 selected" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(deleteMock).not.toHaveBeenCalled();
+    // Only student seats can be programme seats; the list is read for students alone.
+    expect(
+      getMock.mock.calls.find(([path]) => path === "/api/school/license/seats")?.[1]?.params?.query,
+    ).toEqual({ audience: "student", status: "active", limit: 200, offset: 0 });
   });
 
   test("without license:manage the page is read-only", async () => {

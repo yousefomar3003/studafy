@@ -96,7 +96,14 @@ approved_globals(table_name) AS (
     ('license_invoice_counters'),
     -- Studafy-wide banners (000214): one row is shown in every school, so there is no school_id
     -- to isolate by. Reachable by studafy_admin only, like sales_inquiries.
-    ('platform_announcements')
+    ('platform_announcements'),
+    -- Student AI programme settings (000234): the platform-wide versions of every price, tier and
+    -- rule, the same for every school (a school's own values are the tenant table
+    -- ai_programme_school_overrides). Immutable rows written by studafy_admin; read-only to
+    -- studafy_app, like plans and plan_prices.
+    ('ai_programme_versions'),
+    ('ai_programme_version_prices'),
+    ('ai_programme_version_tiers')
 ),
 approved_flexible_columns(table_name, column_name) AS (
   VALUES
@@ -461,7 +468,7 @@ violations AS (
         ''
       ) = 'provider=NULLIFcurrent_setting''app.oauth_login_provider'',true,''''ANDsubject=NULLIFcurrent_setting''app.oauth_login_subject'',true,'''''
     )
-    -- The email feedback seam (QA-014, migration 000234) resolves a Resend message id to the
+    -- The email feedback seam (QA-014, migration 000240) resolves a Resend message id to the
     -- schools holding deliveries for it, before any tenant is known. Same shape as the carve-outs
     -- here: SELECT-only, studafy_admin only, no WITH CHECK, scoped to one transaction-local GUC.
     AND NOT (
