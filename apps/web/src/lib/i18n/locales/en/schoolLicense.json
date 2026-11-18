@@ -905,13 +905,15 @@
     },
     "status": {
       "pending": "Pending",
+      "awaiting_approval": "Awaiting approval",
       "owed": "Owed",
       "zero": "No share",
       "credited": "Credited",
       "payout_due": "Payout due",
       "paid_out": "Paid out",
       "forfeited": "Forfeited",
-      "void": "Void"
+      "void": "Void",
+      "rejected": "Rejected"
     },
     "destination": {
       "credited": "Credited on invoice {{number}}",

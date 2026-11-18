@@ -1,8 +1,15 @@
-import { academicYearMonths, monthCount, monthEnd, monthStart } from "./academic-months";
+import {
+  academicYearMonths,
+  monthCount,
+  monthEnd,
+  monthIndex,
+  monthStart,
+} from "./academic-months";
 import { previewRevenueShare } from "./ai-programme";
 import { BPS_SCALE, divideHalfUp, toSafeNumber } from "./money";
 import { addMonthsUtc, licenceYears } from "./schedule";
 
+import type { MonthIndex, MonthRange } from "./academic-months";
 import type { LicenseCommitment } from "./ai-optin";
 import type { ResolvedAiProgramme } from "./ai-programme";
 import type { PaymentPlan } from "./schedule";
@@ -58,6 +65,140 @@ export function addDaysUtc(date: string, days: number): string {
 /** The day conversion is measured, and its tier locked: the period's first day + the offset. */
 export function measurementDateOf(periodStart: string, measurementOffsetDays: number): string {
   return addDaysUtc(periodStart, measurementOffsetDays);
+}
+
+/**
+ * The day a month's conversion is measured and locked (owner, 2026-11-18: conversion is monthly):
+ * the month's first day, or the licence's first day when the licence starts later in that month.
+ */
+export function conversionMeasureDay(monthFirstDay: string, licenceStartsOn: string): string {
+  const month = monthFirstDay.slice(0, 10);
+  const start = licenceStartsOn.slice(0, 10);
+  return start > month ? start : month;
+}
+
+/** One calendar month of a period: the days of the period it holds. */
+export interface MonthSlice {
+  /** YYYY-MM-01: the month whose conversion applies. */
+  month: string;
+  /** YYYY-MM-DD, inclusive. */
+  from: string;
+  /** YYYY-MM-DD, inclusive. */
+  to: string;
+  /**
+   * How much of its month the slice pays for, in millionths: 1_000_000 for a whole month (seats are
+   * priced by the month, so every whole month weighs the same, 28 days or 31 -- and a month the
+   * licence counts at its start or end is whole as far as the licence goes), its share of the
+   * month's days for a part of one. Days folded in from a month the licence does not count add no
+   * weight: by the month rule they are part of the month they are folded into.
+   */
+  weight: number;
+}
+
+/** Millionths: the unit of a slice's weight. */
+export const WHOLE_MONTH_WEIGHT = 1_000_000;
+
+function daysInclusive(from: string, to: string): number {
+  const at = (date: string) => {
+    const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((at(to) - at(from)) / 86_400_000) + 1;
+}
+
+/** A licence's term: its first and last day (inclusive). */
+export interface LicenceTerm {
+  startsOn: string;
+  lastDay: string;
+}
+
+/**
+ * The calendar months a period (`from`..`to`, inclusive) of a licence `term` pays for, one slice per
+ * month, in order. Days in a month the licence does not count (THE month rule, `academicYearMonths`:
+ * a licence that starts on 25 Aug does not count August) are folded into the nearest month it does
+ * count, so a slice is always a month with a conversion of its own. `term` null: every calendar
+ * month counts, whole.
+ */
+export function monthSlices(from: string, to: string, term: LicenceTerm | null): MonthSlice[] {
+  const counted: MonthRange | null = term ? academicYearMonths(term.startsOn, term.lastDay) : null;
+  const start = from.slice(0, 10);
+  const end = to.slice(0, 10) < start ? start : to.slice(0, 10);
+  const first = monthIndex(start);
+  const last = monthIndex(end);
+  const slices = new Map<MonthIndex, { from: string; to: string; ownDays: number }>();
+  for (let index = first; index <= last; index += 1) {
+    const sliceFrom = index === first ? start : monthStart(index);
+    const sliceTo = index === last ? end : monthEnd(index);
+    const target = counted ? Math.min(Math.max(index, counted.first), counted.last) : index;
+    const ownDays = target === index ? daysInclusive(sliceFrom, sliceTo) : 0;
+    const slice = slices.get(target);
+    if (slice) {
+      slice.from = sliceFrom < slice.from ? sliceFrom : slice.from;
+      slice.to = sliceTo > slice.to ? sliceTo : slice.to;
+      slice.ownDays += ownDays;
+    } else {
+      slices.set(target, { from: sliceFrom, to: sliceTo, ownDays });
+    }
+  }
+  return [...slices.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([index, slice]) => {
+      // The month as far as the licence goes: a counted month at its start or end is whole there.
+      const monthFrom =
+        term && term.startsOn.slice(0, 10) > monthStart(index)
+          ? term.startsOn.slice(0, 10)
+          : monthStart(index);
+      const monthTo =
+        term && term.lastDay.slice(0, 10) < monthEnd(index)
+          ? term.lastDay.slice(0, 10)
+          : monthEnd(index);
+      const monthDays = Math.max(1, daysInclusive(monthFrom, monthTo));
+      return {
+        month: monthStart(index),
+        from: slice.from,
+        to: slice.to,
+        weight:
+          slice.ownDays >= monthDays
+            ? WHOLE_MONTH_WEIGHT
+            : Math.round((slice.ownDays * WHOLE_MONTH_WEIGHT) / monthDays),
+      };
+    });
+}
+
+/**
+ * `amountMinor` split over slices in proportion to their weights, in whole minor units that add up
+ * to it exactly: each part rounded down, the units left over going to the largest remainders (the
+ * earliest slice on a tie). Same sign as the amount. Slices that all weigh nothing share it equally.
+ */
+export function splitByWeight(
+  amountMinor: number,
+  slices: readonly { weight: number }[],
+): number[] {
+  if (!Number.isSafeInteger(amountMinor)) throw new RangeError("amount must be a whole number");
+  if (slices.length === 0) return [];
+  if (slices.some((slice) => !Number.isSafeInteger(slice.weight) || slice.weight < 0)) {
+    throw new RangeError("weights must be whole numbers >= 0");
+  }
+  const weights = slices.every((slice) => slice.weight === 0)
+    ? slices.map(() => 1)
+    : slices.map((slice) => slice.weight);
+  const total = BigInt(weights.reduce((sum, weight) => sum + weight, 0));
+  const sign = amountMinor < 0 ? -1n : 1n;
+  const amount = BigInt(Math.abs(amountMinor));
+  const parts = weights.map((weight, index) => {
+    const exact = amount * BigInt(weight);
+    return { index, part: exact / total, remainder: exact % total };
+  });
+  let left = amount - parts.reduce((sum, p) => sum + p.part, 0n);
+  const byRemainder = [...parts].sort((a, b) =>
+    a.remainder === b.remainder ? a.index - b.index : a.remainder > b.remainder ? -1 : 1,
+  );
+  for (const p of byRemainder) {
+    if (left === 0n) break;
+    p.part += 1n;
+    left -= 1n;
+  }
+  return parts.map((p) => toSafeNumber(p.part * sign));
 }
 
 /**

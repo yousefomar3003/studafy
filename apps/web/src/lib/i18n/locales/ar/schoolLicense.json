@@ -1116,13 +1116,15 @@
     },
     "status": {
       "pending": "معلّقة",
+      "awaiting_approval": "بانتظار الاعتماد",
       "owed": "مستحقة",
       "zero": "بلا حصة",
       "credited": "مقيّدة رصيدًا",
       "payout_due": "مستحقة الصرف",
       "paid_out": "مصروفة",
       "forfeited": "ساقطة",
-      "void": "ملغاة"
+      "void": "ملغاة",
+      "rejected": "مرفوضة"
     },
     "destination": {
       "credited": "قُيّدت رصيدًا على الفاتورة {{number}}",

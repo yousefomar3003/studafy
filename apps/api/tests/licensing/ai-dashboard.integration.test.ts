@@ -12,8 +12,9 @@
  * invoices in the invoice cache, paid or not.
  */
 
-import { lockDueConversionSnapshots } from "@studafy/billing";
+import { approveShares, lockDueConversionSnapshots } from "@studafy/billing";
 import { ROLES } from "@studafy/constants";
+import { academicYearMonths, conversionMeasureDay, monthStart } from "@studafy/license-pricing";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -73,7 +74,7 @@ interface Measured {
 const measured = new Map<string, Measured>();
 const fakeMeasures: RevenueShareMeasures = {
   countEnrolledStudents: async (_tx, schoolId) => measured.get(schoolId)?.enrolled ?? 0,
-  countOptedInStudents: async (_tx, schoolId) => measured.get(schoolId)?.optedIn ?? 0,
+  countStudentAiHolders: async (_tx, schoolId) => measured.get(schoolId)?.optedIn ?? 0,
   uploadConsistencyForPeriod: async (_tx, period) => measured.get(period.schoolId)?.upload ?? null,
   licenceCommitment: async () => "full_year",
 };
@@ -287,6 +288,44 @@ function recompute(f: SchoolFixture, now: Date) {
   ) as Promise<{ recorded: number; resolved: number; settled: number }>;
 }
 
+/** The months a licence counts and the day each one's conversion is measured (monthly). */
+function licenceMonths(lic: { start: Date }, months: number) {
+  const counted = academicYearMonths(
+    ISO(lic.start),
+    ISO(addDays(addMonths(lic.start, months), -1)),
+  )!;
+  return Array.from({ length: counted.last - counted.first + 1 }, (_, i) => {
+    const month = monthStart(counted.first + i);
+    return {
+      month,
+      measureOn: new Date(`${conversionMeasureDay(month, ISO(lic.start))}T00:00:00Z`),
+    };
+  });
+}
+
+/** The hourly job month after month: the first `k` months locked, each on its measurement day. */
+async function lockMonths(f: SchoolFixture, lic: { start: Date }, months: number, k = months) {
+  for (const { measureOn } of licenceMonths(lic, months).slice(0, k)) {
+    await lock(f, new Date(measureOn.getTime() + 3_600_000));
+  }
+}
+
+/** A super admin approves every share awaiting approval (the weekly statement); it settles. */
+async function approveAll(f: SchoolFixture, now: Date) {
+  await asAdmin(f.schoolId, async (tx) => {
+    const ids = await tx<{ id: string }[]>`
+      SELECT id::text AS id FROM app.ai_programme_revenue_share_entries
+      WHERE school_id = ${f.schoolId}::uuid AND status = 'awaiting_approval'
+    `;
+    await approveShares(
+      tx,
+      { schoolId: f.schoolId, now, audit: async () => undefined, measures: fakeMeasures },
+      ids.map((row) => row.id),
+    );
+  });
+  return recompute(f, now);
+}
+
 /**
  * `count` opted-in students' Student AI tuition lines for the year: `priceMinor` (default $6, the
  * spec's parent price) x `months`, each on one ERPNext invoice (billed through Studafy) whose paid
@@ -402,17 +441,18 @@ async function consoleDashboard(f: SchoolFixture) {
 }
 
 /**
- * A licence paid in full on its first day, its conversion locked and its share worked out. The
- * spec's prices (parents $6, licence $4) unless `defaults`: the global defaults (both $4).
+ * A licence paid in full on its first day, every month's conversion locked, its shares worked out and
+ * approved. The spec's prices (parents $6, licence $4) unless `defaults`: the global defaults (both $4).
  */
 async function workedExample(name: string, months: number, defaults = false) {
   const f = await school(name, {}, defaults ? null : SPEC_PRICES);
   const lic = await licence(f, 350, months);
   // $4 x 350 seats x `months`, paid in full on the licence's first day.
   await pay(f, lic.invoiceId, 400 * 350 * months, lic.start);
-  const measureDay = addDays(lic.start, 30);
-  await lock(f, new Date(measureDay.getTime() + 3_600_000));
-  await recompute(f, new Date(measureDay.getTime() + 2 * 3_600_000));
+  await lockMonths(f, lic, months);
+  const last = licenceMonths(lic, months).at(-1)!.measureOn;
+  await recompute(f, new Date(last.getTime() + 2 * 3_600_000));
+  await approveAll(f, new Date(last.getTime() + 2 * 3_600_000));
   await tuitionLines(f, lic.licenseId, { count: 350, months, priceMinor: defaults ? 400 : 600 });
   return { f, lic };
 }
@@ -446,8 +486,8 @@ describe("the spec's worked example, on the dashboards", () => {
         tierFromBps: 7000,
         shareBps: 1000,
         floorApplied: false,
-        periodStart: ISO(lic.start),
-        measureOn: ISO(addDays(lic.start, 30)),
+        periodStart: licenceMonths(lic, 10)[0]!.month,
+        measureOn: ISO(licenceMonths(lic, 10)[0]!.measureOn),
       });
       // "Add 75 more seats -> unlock 12%"; the 500-seat floor (8%) pays less than 10%.
       expect(view.nextTier).toEqual({ fromBps: 8500, shareBps: 1200, optInsNeeded: 75 });
@@ -904,8 +944,9 @@ describe("payments recorded before the licence entered the programme", () => {
         forfeitReason: "late_payment",
       });
 
-      // Once only: the console's recompute records nothing more; then the lock works month 1 out.
-      const measureDay = addDays(lic.start, 30);
+      // Once only: the console's recompute records nothing more; then month 1's lock works it out,
+      // and it waits for the super admin's approval.
+      const measureDay = licenceMonths(lic, 10)[0]!.measureOn;
       expect((await recompute(f, new Date())).recorded).toBe(0);
       await lock(f, new Date(measureDay.getTime() + 3_600_000));
       await recompute(f, new Date(measureDay.getTime() + 2 * 3_600_000));
@@ -913,7 +954,11 @@ describe("payments recorded before the licence entered the programme", () => {
         (a, b) => a.instalmentPosition - b.instalmentPosition,
       );
       expect(after).toHaveLength(2);
-      expect(after[0]).toMatchObject({ status: "owed", totalBps: 1300, amountMinor: 18_200 });
+      expect(after[0]).toMatchObject({
+        status: "awaiting_approval",
+        totalBps: 1300,
+        amountMinor: 18_200,
+      });
       // A forfeited share is final as recorded: it never becomes money.
       expect(after[1]).toMatchObject({ status: "forfeited", forfeitReason: "late_payment" });
 

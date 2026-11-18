@@ -19,7 +19,7 @@ console page `/portal/platform/ai-programme`.
 | Large-school floor                                                                 | `largeSchoolMinSeats` / `largeSchoolShareBps` | 500 seats / 800                                               | seats / bps (0 turns it off)               |
 | Content-bonus tiers (upload consistency -> bonus)                                  | `contentBonusTiers`                           | 0->0, 6000->150, 8000->300                                    | bps                                        |
 | Bonus only above a 0% conversion share                                             | `bonusRequiresConversionShare`                | true                                                          |                                            |
-| Conversion measured after                                                          | `measurementOffsetDays`                       | 30                                                            | days after the licence starts              |
+| Conversion measured after                                                          | `measurementOffsetDays`                       | 30                                                            | unused since 000250: conversion is monthly |
 | Grace before Student AI stops                                                      | `nonpaymentGraceDays`                         | 30                                                            | days after an unpaid instalment's due date |
 | Month-to-month licences earn                                                       | `monthToMonthShareBps`                        | 0                                                             | bps of the tier values (5000 = half)       |
 | How the share is given                                                             | `payoutMode`                                  | `invoice_credit`                                              | `invoice_credit` or `payout`               |
@@ -202,8 +202,9 @@ hard-coded.
 
 `computeRevenueShare(values, { conversionBps, uploadConsistencyBps, seats, commitment, baseMinor })`:
 
-- **Conversion share**: the conversion tier of the locked conversion, raised to the large-school floor
-  when the licence's student seats (at measurement) reach `largeSchoolMinSeats`.
+- **Conversion share**: the conversion tier of the month's locked conversion, raised to the
+  large-school floor when the students the school provides Student AI to that month reach
+  `largeSchoolMinSeats`.
 - **Content bonus**: the upload-consistency tier, counted only when the conversion share is above 0%
   if `bonusRequiresConversionShare`.
 - **Full-year share**: conversion + bonus, capped at `maxShareBps`.
@@ -225,29 +226,36 @@ cap).
 | Student AI part of a payment   | `collected x student seat lines / all seat lines`, rounded half up to a minor unit                                     |
 | Amount                         | `base x total bps / 10000`, rounded half up to a minor unit                                                            |
 
-One amount per ledger entry (a payment's part of one instalment), so a licence's total share can
-differ from the share of its total by at most half a minor unit per entry. The worked example is a
-test: 350 of 500 (70% -> 10%) + uploads 85% (+3%) = 13% of $14,000 (= $4 x 350 x 10) = $1,820, and
-the same in ten monthly payments of $182; so is an 8-month school at its own price.
+One amount per ledger entry (a payment's part of one instalment for one month), so a licence's
+total share can differ from the share of its total by at most half a minor unit per entry. The
+worked example is a test: 350 of 500 (70% -> 10%) + uploads 85% (+3%) = 13% of $14,000 (= $4 x 350 x 10) = $1,820, as ten monthly shares of $182 whether paid monthly or at once; so is an 8-month school
+at its own price.
+
+**Monthly, approved (owner, 2026-11-18; migration 000250).** Conversion is measured every month;
+every share is per month; and nothing is credited or paid out before a super admin approves it on
+the school's weekly statement. See "Monthly conversion" and the `awaiting_approval` status below.
 
 ### Conversion snapshots (`app.ai_programme_conversion_snapshots`)
 
-- A licence's **measurement periods**: its start, and the first day each accepted extension (a
-  renewal) adds. Measurement day = period start + `measurementOffsetDays`.
-- The workers' hourly licence lifecycle job (step 6, its own transaction) measures each period on its
-  measurement day -- enrolled students and opted-in students as of that day -- and **locks** it
+- A licence's **measurement periods are its months** (000250): every month it counts by THE month
+  rule over its whole span, renewals included (an accepted extension moves its end). Measurement day =
+  the month's first day, or the licence's first day in a month it starts inside
+  (`conversionMeasureDay`). `measurementOffsetDays` is no longer used.
+- The workers' hourly licence lifecycle job (step 6, its own transaction) measures each month on its
+  measurement day -- enrolled students and Student AI holders as of that day -- and **locks** it
   (`source = scheduled`). One locked row per period; nothing is measured for a locked period again. A
   measurement day more than 31 days back is locked only when a share waits for it (no back-measuring
   of old licences on deploy).
 - Before the lock, the super admin can re-measure now, with a reason (`source = super_admin`,
   audited): a provisional figure; the lock still happens on the day.
 - Enrolled = students with status `enrolled` who existed and were admitted by the end of the day.
-- Opted in = `countOptedInStudents(tx, schoolId, licenseId, onDate)` in
-  `packages/billing/src/ai-revenue-share/measures.ts`: the school's phase 2 opt-ins for the academic
-  year covering the day (or, before any year began, the next one), taken by the end of the day and
-  not ended by then, each student once. Opt-ins are **per academic year**: parents choose again each
-  new year, and a licence renewal does not carry them over; counting the year's opt-ins (not only
-  the licence's) means a renewal measures that year's choices rather than 0.
+- Student AI holders = `countStudentAiHolders(tx, schoolId, licenseId, month, onDate)` in
+  `packages/billing/src/ai-revenue-share/measures.ts` (stored as `opted_in_count`): enrolled students
+  with a phase 2 opt-in covering the month (taken by the end of the day, not released from that
+  month, not ended by then) **or** a student seat the school assigned and still held at the end of the
+  day, each student once. A student's own in-app purchase is not a school seat and does not count.
+  Only students counted as enrolled that day count, so conversion never passes 100%. Opt-ins are
+  **per academic year**: parents choose again each new year.
 - **Only licences in the programme earn a share**: a licence with at least one opt-in window or
   programme opt-in (`licenceInProgramme`). A licence without either gets no ledger entries and no
   conversion measurement. A payment recorded before the licence's first window opens earns nothing
@@ -255,8 +263,11 @@ the same in ten monthly payments of $182; so is an 8-month school at its own pri
 
 ### The ledger (`app.ai_programme_revenue_share_entries`)
 
-Recording a payment (the console's "Record a transfer") writes one entry per instalment it paid:
-collected, the Student AI part (`base`), the period that instalment pays for (monthly: the term's
+Recording a payment (the console's "Record a transfer") writes one entry per instalment it paid
+**and month that instalment pays for** (000250: an instalment for several months -- yearly, at once,
+custom -- is split by `monthSlices`: every whole month weighs the same, a part of a month its share
+of the month's days, the money split exactly with `splitByWeight`; each month gets its own
+conversion): collected, the Student AI part (`base`), the period that instalment pays for (monthly: the term's
 k-th month by the one month rule -- `academicYearMonths`, a calendar month counts when the term covers
 at least half of it, the same months the parent's opt-in and the tuition line count -- the first
 stretched back to the term's start and the last on to its end; yearly: licence year k; at once: the
@@ -267,16 +278,23 @@ period's last day has passed in the school's timezone -- until then the bonus st
 hourly job works it out; a finished period with no class to measure is 0%), bonus, cap, multiplier,
 total and amount.
 
-| Status       | Meaning                                                                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
-| `pending`    | conversion not locked or bonus not known: provisional, worked out again (each payment, the console's recompute, the hourly job) |
-| `owed`       | final; to be credited on the school's next licence invoice                                                                      |
-| `zero`       | final and 0 (under the first tier, month-to-month at 0%)                                                                        |
-| `credited`   | an `ai_share_credit` line on the next invoice (`credit_invoice_id`)                                                             |
-| `payout_due` | payout mode, or the licence ended with no open next invoice                                                                     |
-| `paid_out`   | in a recorded payout (`app.ai_programme_revenue_share_payouts`, with the transfer reference)                                    |
-| `forfeited`  | its instalment was not paid by its cutoff (decision 11, below)                                                                  |
-| `void`       | its payment was voided before the share was given                                                                               |
+| Status              | Meaning                                                                                                                         |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `pending`           | conversion not locked or bonus not known: provisional, worked out again (each payment, the console's recompute, the hourly job) |
+| `awaiting_approval` | final (`final_at`); waits for a super admin's approval on the school's weekly statement -- never credited or paid before        |
+| `owed`              | approved; to be credited on the school's next licence invoice                                                                   |
+| `zero`              | final and 0 (under the first tier, month-to-month at 0%)                                                                        |
+| `credited`          | an `ai_share_credit` line on the next invoice (`credit_invoice_id`)                                                             |
+| `payout_due`        | payout mode, or the licence ended with no open next invoice                                                                     |
+| `paid_out`          | in a recorded payout (`app.ai_programme_revenue_share_payouts`, with the transfer reference)                                    |
+| `forfeited`         | its instalment was not paid by its cutoff (decision 11, below)                                                                  |
+| `void`              | its payment was voided before the share was given                                                                               |
+| `rejected`          | a super admin rejected it (`rejected_at`): never given                                                                          |
+
+A final share goes to `awaiting_approval` (or `zero`), never straight to owed or payout due.
+Approving it (`approveShares`) makes it `owed`, or `payout_due` in payout mode; rejecting it
+(`rejectShares`, with a reason) makes it `rejected`. Shares already final when 000250 applied (owed
+or payout due, not yet given) were moved to `awaiting_approval`.
 
 The figures of a final entry never change and rows are never deleted (trigger). A pending entry keeps
 the versions it was recorded under. A voided payment whose share was already credited or paid out gets
@@ -288,8 +306,8 @@ a `reversal` entry (negative), netted against the next credit or payout.
 for the caller to audit) runs after a payment is recorded or voided, after an invoice is issued
 (including a school accepting a quote), on the console's recompute, and hourly:
 
-1. **Forfeit** (below).
-2. **Credit**: owed shares go on the school's open invoices issued after their own invoice, earliest
+1. **Forfeit** (below) -- shares awaiting approval included.
+2. **Credit**: owed (approved) shares go on the school's open invoices issued after their own invoice, earliest
    first, never above an invoice's unpaid balance (reversals netted in first). The invoice gets an
    `ai_share_credit` line; `credit_total_minor` goes up and `total_minor` down; its unpaid instalments
    come down earliest first (an instalment taken to 0 is paid); its status, due date and overdue mark
