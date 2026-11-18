@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # QA-005: refuse to release a commit unless it is on the release branch and CI passed for it.
 #
-#   verify-ci-green.sh <owner/repo> <sha> <git ref> [workflow file, default ci.yml] [branch, default dev]
+#   verify-ci-green.sh <owner/repo> <sha> <git ref> [workflow file, default ci.yml] [branch, default main]
 #
 # The newest push run of the CI workflow for exactly this SHA on the release branch must be
 # `completed` with conclusion `success`. Missing, running, failed or cancelled runs all refuse.
@@ -12,7 +12,7 @@ repo="$1"
 sha="$2"
 ref="$3"
 workflow="${4:-ci.yml}"
-branch="${5:-dev}"
+branch="${5:-main}"
 gh_bin="${GH:-gh}"
 
 if [ "$ref" != "refs/heads/$branch" ]; then

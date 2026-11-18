@@ -234,7 +234,7 @@ domains; keep the three lists in step.
 
 ## Deploying
 
-Normally: run **Production deploy (fly.io)** from the Actions tab, on `dev`. It gates on CI, builds and scans each image once, deploys by digest, smoke-checks `/readyz` and rolls back on failure ([docs/runbooks/deploy.md](../../docs/runbooks/deploy.md)). By hand, in an emergency only, the same steps:
+Normally: run **Production deploy (fly.io)** from the Actions tab, on `main`. It gates on CI, builds and scans each image once, deploys by digest, smoke-checks `/readyz` and rolls back on failure ([docs/runbooks/deploy.md](../../docs/runbooks/deploy.md)). By hand, in an emergency only, the same steps:
 
 ```sh
 fly deploy . --config infra/fly/scanner.toml --remote-only

@@ -10,12 +10,12 @@ name: Production deploy (fly.io)
 # Order matters and matches the README: the scanner first (the workers reach it), then migrations
 # (a release never runs against an older schema), then api, realtime, workers and web.
 #
-# QA-005: a `gate` job (no secrets, no environment) refuses any ref but dev and any commit whose CI
+# QA-005: a `gate` job (no secrets, no environment) refuses any ref but main and any commit whose CI
 # run did not pass. App images are built once, Trivy-scanned at HIGH, and deployed by digest, so the
 # scanned image is the released one. The smoke check needs /readyz, the auth surface and one shared
 # JWT key; if it (or any deploy step) fails, the services go back to the digests they ran before.
 # Migrations are forward-only and are not rolled back. The `prod` environment's deployment-branch
-# policy (dev only) and required reviewers are the server-side half of the gate: a modified copy of
+# policy (main only) and required reviewers are the server-side half of the gate: a modified copy of
 # this file on another branch cannot pass them (docs/runbooks/deploy.md).
 #
 # Replaced the retired AWS ECS deploy workflows, removed with the rest of the AWS stack.
@@ -39,10 +39,10 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Release only dev, and only a commit CI passed
+      - name: Release only main, and only a commit CI passed
         env:
           GH_TOKEN: ${{ github.token }}
-        run: scripts/deploy/verify-ci-green.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_REF" ci.yml dev
+        run: scripts/deploy/verify-ci-green.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$GITHUB_REF" ci.yml main
 
   deploy:
     needs: gate
