@@ -195,12 +195,18 @@ export function platformAiRevenueShareStatementRoutes(deps: LicensingDeps): Open
   for (const path of paths) routes.use(path, requireChannel(AUTH_CHANNELS.WEB));
   for (const path of paths) routes.use(path, requirePermission(PERMISSIONS.PLATFORM_READ));
   for (const path of paths) routes.use(path, writesOnly);
-  for (const action of ["approve", "hold", "reject"]) {
-    routes.use(
-      `/api/platform/schools/:schoolId/ai-revenue-share/statements/:statementId/${action}`,
-      auditAction("update", "ai_programme_weekly_statements"),
-    );
-  }
+  routes.use(
+    "/api/platform/schools/:schoolId/ai-revenue-share/statements/:statementId/approve",
+    auditAction("update", "ai_programme_weekly_statements"),
+  );
+  routes.use(
+    "/api/platform/schools/:schoolId/ai-revenue-share/statements/:statementId/hold",
+    auditAction("update", "ai_programme_weekly_statements"),
+  );
+  routes.use(
+    "/api/platform/schools/:schoolId/ai-revenue-share/statements/:statementId/reject",
+    auditAction("update", "ai_programme_weekly_statements"),
+  );
 
   routes.openapi(listRoute, async (c) => {
     const query = c.req.valid("query");
