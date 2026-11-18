@@ -14,7 +14,7 @@
     "title": "School overview",
     "intro": "A live snapshot of activation, attendance, approvals, and account health.",
     "groups": {
-      "people": "People",
+      "people": "Users & students",
       "academics": "Academics",
       "administration": "Administration"
     },

@@ -190,7 +190,7 @@ describe("AdminDashboardPage", () => {
     const { container } = await renderPage(await loadAdminDashboardPage());
     await screen.findByText("Nothing needs your attention right now.");
 
-    const people = screen.getByRole("button", { name: /People/ });
+    const people = screen.getByRole("button", { name: /Users & students/ });
     expect(screen.getByRole("button", { name: /Academics/ })).toBeTruthy();
     expect(screen.getByRole("button", { name: /Administration/ })).toBeTruthy();
     // Closed groups show no links, so the row stays one line.
