@@ -39,6 +39,8 @@ concurrency:
 
 env:
   FLUTTER_VERSION: "3.44.8" # in step with ci.yml / mobile-integration.yml
+  # A release (not beta) Xcode on the xcode-27 runner image; App Store submissions reject beta SDKs.
+  XCODE_VERSION: "27.2"
   RUBY_VERSION: "3.3"
   # Sentry project `flutter` (studafy-limited) — the Fastfile bakes it in as --dart-define=SENTRY_DSN.
   # A public client key; empty leaves crash reporting to Sentry off.
@@ -138,13 +140,25 @@ jobs:
   ios-beta:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     name: mobile-release-ios-beta
-    # macos-26 ships Xcode 26, the SDK App Store Connect requires for uploads.
+    # ITMS-90725: from April 2027 App Store Connect only accepts builds made with the iOS 27 SDK
+    # (Xcode 27). macos-26 tops out at Xcode 26.x, so iOS builds run on GitHub's xcode-27 image,
+    # and the first step pins the Xcode release and fails fast if the SDK is ever older.
     # QA-006: signing and store secrets live in this environment, which only main and
     # mobile-v* tags may deploy to (configured in GitHub; see docs/runbooks/mobile-release.md).
     environment: mobile-release
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
+      - name: Select Xcode 27 (iOS 27 SDK, ITMS-90725)
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+          sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "iOS SDK ${sdk}"
+          if [ "${sdk%%.*}" -lt 27 ]; then
+            echo "::error::iOS SDK ${sdk} is older than 27 — App Store Connect rejects it (ITMS-90725)"
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -288,13 +302,25 @@ jobs:
   ios-release:
     if: startsWith(github.ref, 'refs/tags/mobile-v')
     name: mobile-release-ios-store
-    # macos-26 ships Xcode 26, the SDK App Store Connect requires for uploads.
+    # ITMS-90725: from April 2027 App Store Connect only accepts builds made with the iOS 27 SDK
+    # (Xcode 27). macos-26 tops out at Xcode 26.x, so iOS builds run on GitHub's xcode-27 image,
+    # and the first step pins the Xcode release and fails fast if the SDK is ever older.
     # QA-006: signing and store secrets live in this environment, which only main and
     # mobile-v* tags may deploy to (configured in GitHub; see docs/runbooks/mobile-release.md).
     environment: mobile-release
-    runs-on: macos-26
+    runs-on: xcode-27
     timeout-minutes: 60
     steps:
+      - name: Select Xcode 27 (iOS 27 SDK, ITMS-90725)
+        run: |
+          sudo xcode-select -s "/Applications/Xcode_${XCODE_VERSION}.app"
+          xcodebuild -version
+          sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "iOS SDK ${sdk}"
+          if [ "${sdk%%.*}" -lt 27 ]; then
+            echo "::error::iOS SDK ${sdk} is older than 27 — App Store Connect rejects it (ITMS-90725)"
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
