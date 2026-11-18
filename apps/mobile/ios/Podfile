@@ -55,5 +55,14 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    # Xcode 27 (the iOS 27 SDK App Store Connect requires, ITMS-90725) only builds deployment targets
+    # 15.0+ and fails the archive on any pod that declares less (Firebase 12.0, Sentry 11.0,
+    # PromisesObjC 9.0, ...). Lift those to the app's own floor; never lower a pod that asks for more.
+    target.build_configurations.each do |config|
+      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+      if current.nil? || Gem::Version.new(current) < Gem::Version.new('15.0')
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      end
+    end
   end
 end
