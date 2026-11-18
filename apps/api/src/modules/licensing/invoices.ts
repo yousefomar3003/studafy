@@ -25,6 +25,7 @@ import postgres from "postgres";
 
 import { CodedHttpException } from "../../coded-http-exception";
 import { pipelinePerSchool, withSystemTx } from "../../db/tenant-tx";
+import { publishUserEntitlementChanges } from "../subscriptions/entitlements/entitlement-change-publisher";
 
 import { auditLicenseChange, licenseError } from "./context";
 import { resumeIfSettled } from "./nonpayment";
@@ -1047,8 +1048,9 @@ export interface IssueInvoiceInput {
 
 /**
  * A statement invoice paid in full (by a payment, or by credits at issue): its billed months are
- * activated -- the students have Student AI for those months. Returns the students whose months
- * were activated (their entitlements change). Nothing for another invoice, or one not paid in full.
+ * activated -- the students have Student AI for those months (their programme seats cover them,
+ * 000252), and their entitlements are refreshed. Returns the new entitlement versions. Nothing for
+ * another invoice, or one not paid in full.
  */
 export async function activatePaidStatement(
   tx: TransactionSql,
@@ -1056,7 +1058,7 @@ export async function activatePaidStatement(
   invoiceId: string,
   actor: LicenseActor,
   now: Date = new Date(),
-): Promise<string[]> {
+): Promise<Map<string, number>> {
   const activated = await tx<{ id: string; student_id: string }[]>`
     UPDATE app.student_ai_months AS m
     SET status = 'activated', activated_at = ${now},
@@ -1082,7 +1084,17 @@ export async function activatePaidStatement(
       },
     });
   }
-  return [...new Set(activated.map((m) => m.student_id))];
+  if (activated.length === 0) return new Map();
+  const users = await tx<{ user_id: string }[]>`
+    SELECT DISTINCT user_id::text AS user_id FROM app.students
+    WHERE school_id = current_setting('app.school_id')::uuid
+      AND id = ANY(${[...new Set(activated.map((m) => m.student_id))]}::uuid[])
+      AND user_id IS NOT NULL
+  `;
+  return publishUserEntitlementChanges(tx, {
+    schoolId,
+    userIds: users.map((u) => u.user_id),
+  });
 }
 
 /**
@@ -1493,9 +1505,10 @@ export async function recordPayment(
   const unchanged = { versions: new Map<string, number>(), pending: [] };
   // A Student AI weekly statement's invoice (000251) never starts or resumes a licence: paid in
   // full, it activates the student-months it billed.
-  if (after.kind === "ai_statement") {
-    await activatePaidStatement(tx, schoolId, after.id, actor, now);
-  }
+  const activatedMonths =
+    after.kind === "ai_statement"
+      ? await activatePaidStatement(tx, schoolId, after.id, actor, now)
+      : new Map<string, number>();
   const licence = after.kind === "licence";
   const activation =
     licence && (after.status === "paid" || (await firstInstalmentPaid(tx, after.id)))
@@ -1515,7 +1528,12 @@ export async function recordPayment(
       licenseActivated: activation.activated || credits.activated.includes(after.licenseId),
       licenseResumed: resumed.resumed || credits.resumed.includes(after.licenseId),
     },
-    versions: new Map([...credits.versions, ...activation.versions, ...resumed.versions]),
+    versions: new Map([
+      ...credits.versions,
+      ...activation.versions,
+      ...resumed.versions,
+      ...activatedMonths,
+    ]),
     pending: [...credits.pending, ...activation.pending, ...resumed.pending],
   };
 }

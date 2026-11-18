@@ -44,7 +44,8 @@ export interface CollectedMonths {
 
 /**
  * Record the Student AI months the school has collected from parents: every month of a tuition
- * portion billed through Studafy (auto-billing) whose ERPNext invoice is paid in full -- a part
+ * portion billed through Studafy (auto-billing), for an opt-in on a programme seat (000252), whose
+ * ERPNext invoice is paid in full -- a part
  * payment is not enough: Studafy cannot tell which fees it paid. One row per student and month,
  * priced at what the school owes Studafy for it (the licence's programme seat price, in the
  * licence's currency). A month already recorded is left alone. A month not yet on a statement whose
@@ -83,15 +84,19 @@ export async function recordCollectedStudentAiMonths(
   const prices = new Map<string, { currencyId: string; priceMinor: number } | null>();
   let recorded = 0;
   for (const portion of portions) {
-    const [optIn] = await tx<{ id: string }[]>`
-      SELECT id::text AS id FROM app.ai_optins
-      WHERE school_id = current_setting('app.school_id')::uuid
-        AND student_id = ${portion.student_id}::uuid
-        AND academic_year_id = ${portion.academic_year_id}::uuid
-      ORDER BY (status = 'active') DESC, opted_in_at DESC
+    // Only an opt-in on a programme seat (000252) is paid month by month on statements: one holding
+    // a seat the school bought on its licence was paid for there, and is never billed again.
+    const [optIn] = await tx<{ id: string; programme: boolean }[]>`
+      SELECT o.id::text AS id, COALESCE(seat.programme, false) AS programme
+      FROM app.ai_optins AS o
+      LEFT JOIN app.license_seats AS seat ON seat.id = o.seat_id AND seat.school_id = o.school_id
+      WHERE o.school_id = current_setting('app.school_id')::uuid
+        AND o.student_id = ${portion.student_id}::uuid
+        AND o.academic_year_id = ${portion.academic_year_id}::uuid
+      ORDER BY (o.status = 'active') DESC, o.opted_in_at DESC
       LIMIT 1
     `;
-    if (!optIn) continue;
+    if (!optIn || !optIn.programme) continue;
     if (!prices.has(portion.license_id)) {
       const licence = await readLicence(tx, portion.license_id);
       // No licence, or no programme price in its currency: the month cannot be priced yet.

@@ -331,6 +331,12 @@ export interface LicenseSeatGrant {
   licenseStatus: "active" | "expired" | "cancelled" | "suspended";
   startsAt: string;
   endsAt: string;
+  /**
+   * A Student AI programme seat (000252): the months (YYYY-MM-01) it covers its holder, the ones the
+   * school paid Studafy for. Null (or absent, in an entry cached before) for a seat the school bought
+   * on its licence, which covers the whole licence period.
+   */
+  activeMonths?: string[] | null;
 }
 
 /**
@@ -348,6 +354,7 @@ interface LicenseSeatRow {
   license_status: LicenseSeatGrant["licenseStatus"];
   starts_at: Date;
   ends_at: Date;
+  active_months: string[] | null;
 }
 
 interface UserSubscriptionRow {
@@ -425,7 +432,9 @@ export async function resolveUserEntitlement(
       p.code AS plan_code,
       l.status AS license_status,
       l.starts_at,
-      l.ends_at
+      l.ends_at,
+      CASE WHEN s.programme THEN app.student_ai_active_months(s.student_id)::text[] END
+        AS active_months
     FROM app.license_seats AS s
     JOIN app.school_licenses AS l
       ON l.id = s.license_id
@@ -484,6 +493,7 @@ export async function resolveUserEntitlement(
       licenseStatus: row.license_status,
       startsAt: row.starts_at.toISOString(),
       endsAt: row.ends_at.toISOString(),
+      activeMonths: row.active_months,
     })),
     manualGrants: manualGrants.map((row) => ({
       grantId: row.grant_id,

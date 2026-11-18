@@ -29,7 +29,7 @@ import {
   schoolAiOptInOverview,
   transferOptIn,
 } from "../../src/modules/licensing/ai-optin";
-import { unassignSeat, updateLicense } from "../../src/modules/licensing/service";
+import { assignSeats, unassignSeat, updateLicense } from "../../src/modules/licensing/service";
 import {
   assignRole,
   authenticatedRequest,
@@ -327,13 +327,26 @@ async function seatRequests(f: Fixture) {
 // ---------------------------------------------------------------------------------------------------
 
 describe("windows", () => {
-  integrationTest("needs a licence and the minimum accepted; one open at a time", async () => {
+  integrationTest("needs a licence and auto-billing; no minimum; one open at a time", async () => {
     const none = await school(5, { license: false });
     expect(await refusal(open(none))).toBe("AI_OPTIN_NO_LICENCE");
 
     const f = await school(5);
-    expect(await refusal(open(f, { acknowledgeMinimumSeats: false }))).toBe(
-      "AI_OPTIN_MINIMUM_NOT_ACKNOWLEDGED",
+    // Studafy must bill Student AI on tuition to see what parents paid (000252).
+    await asAdmin(
+      f.schoolId,
+      (tx) => tx`
+        INSERT INTO app.student_ai_billing_settings (school_id, auto_billing)
+        VALUES (${f.schoolId}::uuid, false)
+      `,
+    );
+    expect(await refusal(open(f))).toBe("AI_OPTIN_AUTO_BILLING_REQUIRED");
+    await asAdmin(
+      f.schoolId,
+      (tx) => tx`
+        UPDATE app.student_ai_billing_settings SET auto_billing = true
+        WHERE school_id = ${f.schoolId}::uuid
+      `,
     );
     expect(await refusal(open(f, { closesOn: "2027-08-01" }))).toBe("AI_OPTIN_WINDOW_INVALID");
     expect(await refusal(open(f, { opensOn: "2026-12-20", closesOn: "2026-12-01" }))).toBe(
@@ -345,10 +358,8 @@ describe("windows", () => {
     expect(opened.academicYear.name).toBe("2026-27");
     expect(await refusal(open(f))).toBe("AI_OPTIN_WINDOW_ALREADY_OPEN");
 
-    // Accepting the minimum asks Studafy for it: 5 seats < 30, an automatic request for 30.
-    expect(await seatRequests(f)).toEqual([
-      { student_seats: 30, status: "open", source: "ai_optin" },
-    ]);
+    // No minimum: opt-ins take programme seats outside the licence's, so no seats are requested.
+    expect(await seatRequests(f)).toEqual([]);
 
     const closed = await as(f.schoolId, f.admin, async (tx) => ({
       result: await closeWindow(tx, f.schoolId, opened.id, f.admin, NOW),
@@ -357,7 +368,7 @@ describe("windows", () => {
     expect((await open(f, { opensOn: "2026-11-20" })).state).toBe("scheduled");
   });
 
-  integrationTest("the overview shows price, months, minimum and counts", async () => {
+  integrationTest("the overview shows price, months and counts", async () => {
     const f = await school(5);
     await open(f);
     await child(f, f.sectionA);
@@ -377,8 +388,8 @@ describe("windows", () => {
       totalMinor: 4800,
     });
     expect(overview.counts.eligible).toBe(1);
-    expect(overview.seatsNeeded).toBe(30);
-    expect(overview.openSeatRequest?.studentSeats).toBe(30);
+    expect(overview.seatsNeeded).toBe(0);
+    expect(overview.openSeatRequest).toBeNull();
   });
 });
 
@@ -626,7 +637,7 @@ describe("on a parent's behalf", () => {
 
 describe("seats", () => {
   integrationTest(
-    "opt-ins beyond the licence wait, the request grows, more seats fill them",
+    "every opt-in gets a programme seat at once, beyond the licence's seats: no minimum, no request",
     async () => {
       const f = await school(2);
       await open(f);
@@ -637,27 +648,33 @@ describe("seats", () => {
       ];
       const made = [];
       for (const kid of kids) made.push(await optIn(kid, f));
-      expect(made.map((o) => o.seatId !== null)).toEqual([true, true, false]);
+      expect(made.every((o) => o.seatId !== null)).toBe(true);
 
-      // One automatic request, at the minimum (30 > 3 opt-ins).
-      expect(await seatRequests(f)).toEqual([
-        { student_seats: 30, status: "open", source: "ai_optin" },
-      ]);
-
-      // The super admin raises the licence (what a seat-increase quote does): the wait is over.
-      await as(f.schoolId, operator, async (tx) => {
-        const changed = await updateLicense(
+      // Programme seats (000252): outside the 2 seats the school bought, none of which is used.
+      const seats = await asAdmin(
+        f.schoolId,
+        (tx) => tx<{ programme: boolean }[]>`
+          SELECT programme FROM app.license_seats
+          WHERE school_id = ${f.schoolId}::uuid AND license_id = ${f.licenseId}::uuid
+            AND unassigned_at IS NULL
+        `,
+      );
+      expect(seats.map((seat) => seat.programme)).toEqual([true, true, true]);
+      expect(await seatRequests(f)).toEqual([]);
+      // The school can still give its 2 bought seats to others.
+      const assigned = await as(f.schoolId, f.admin, async (tx) => {
+        const other = await child(f, f.sectionB);
+        const changed = await assignSeats(
           tx,
           f.schoolId,
           f.licenseId,
-          { student: { planId: studentTier, seats: 30 } },
-          operator,
+          { audience: "student", userIds: [other.userId] },
+          f.admin,
+          NOW,
         );
-        const filled = await fillWaitingOptInSeats(tx, f.schoolId, f.licenseId, operator, NOW);
-        expect(filled.result).toBe(1);
-        return { result: changed.result };
+        return { result: changed.result.assigned.length };
       });
-      expect((await seatOf(f, made[2]!.id)).seat_id).not.toBeNull();
+      expect(assigned).toBe(1);
     },
   );
 
@@ -695,8 +712,9 @@ describe("a student leaves", () => {
       const leaver = await child(f, f.sectionA);
       const waiting = await child(f, f.sectionA);
       const held = await optIn(leaver, f);
+      // Beyond the licence's one seat: a programme seat at once (000252), nobody waits.
       const queued = await optIn(waiting, f);
-      expect(queued.seatId).toBeNull();
+      expect(queued.seatId).not.toBeNull();
 
       const release = () =>
         as(f.schoolId, f.admin, (tx) =>
@@ -712,7 +730,6 @@ describe("a student leaves", () => {
         endNote: "Moved abroad",
       });
       expect((await seatOf(f, held.id)).unassigned_at).not.toBeNull();
-      // The freed seat goes to the student waiting for one.
       expect((await seatOf(f, queued.id)).seat_id).not.toBeNull();
       expect(await refusal(release())).toBe("AI_OPTIN_ENDED");
     },

@@ -231,11 +231,10 @@ export function platformAiRevenueShareStatementRoutes(deps: LicensingDeps): Open
     const { schoolId, statementId } = c.req.valid("param");
     const body = c.req.valid("json");
     const actor = actorOf(c, "platform");
-    const { result } = await runLicenseChange(deps, schoolId, actor, async (tx) => ({
-      result: await approveStatement(tx, schoolId, statementId, body, actor),
-      versions: new Map<string, number>(),
-      pending: [],
-    }));
+    const { result } = await runLicenseChange(deps, schoolId, actor, async (tx) => {
+      const approved = await approveStatement(tx, schoolId, statementId, body, actor);
+      return { result: approved.detail, versions: approved.versions, pending: [] };
+    });
     return c.json(result, 200);
   });
 

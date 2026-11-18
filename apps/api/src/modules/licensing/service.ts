@@ -321,6 +321,7 @@ async function audienceSeats(tx: TransactionSql, license: LicenseRecord): Promis
       WHERE school_id = current_setting('app.school_id')::uuid
         AND license_id = ${license.id}::uuid
         AND unassigned_at IS NULL
+        AND NOT programme
       GROUP BY audience
     `,
   ]);
@@ -1054,8 +1055,15 @@ export async function listPeople(
 // Seats
 // ---------------------------------------------------------------------------------------------------
 
-export type AssignRequest =
-  { audience: Audience; userIds: readonly string[] } | { audience: Audience; scope: SeatScope };
+export type AssignRequest = (
+  { audience: Audience; userIds: readonly string[] } | { audience: Audience; scope: SeatScope }
+) & {
+  /**
+   * Student AI programme seats for parent opt-ins (000252): outside the licence's priced capacity,
+   * neither counted nor capped; they cover their holder only in the months the school paid for.
+   */
+  programme?: boolean;
+};
 
 export type NotAssignedReason = "already_assigned" | "not_eligible" | "no_seats_left";
 
@@ -1103,8 +1111,9 @@ export async function assignSeats(
   if (!ASSIGNABLE_STATUSES.has(license.status)) {
     throw licenseError(409, ERROR_CODES.LICENSE_NOT_EDITABLE, actor.locale);
   }
+  const programme = request.programme === true && request.audience === "student";
   const purchased = purchasedSeats(license, request.audience);
-  if (purchased === 0) {
+  if (purchased === 0 && !programme) {
     throw licenseError(409, ERROR_CODES.LICENSE_AUDIENCE_NOT_LICENSED, actor.locale);
   }
 
@@ -1132,8 +1141,9 @@ export async function assignSeats(
       AND license_id = ${licenseId}::uuid
       AND audience = ${request.audience}
       AND unassigned_at IS NULL
+      AND NOT programme
   `;
-  let free = purchased - Number(counted?.assigned ?? 0);
+  let free = programme ? Number.POSITIVE_INFINITY : purchased - Number(counted?.assigned ?? 0);
 
   const toAssign: CandidateRow[] = [];
   for (const row of rows) {
@@ -1156,10 +1166,11 @@ export async function assignSeats(
   // One statement; the seat trigger still checks every row (capacity and eligibility).
   const inserted = await tx<{ id: string; user_id: string }[]>`
     INSERT INTO app.license_seats (
-      school_id, license_id, audience, user_id, student_id, assigned_by, assigned_by_platform
+      school_id, license_id, audience, user_id, student_id, assigned_by, assigned_by_platform,
+      programme
     )
     SELECT ${schoolId}::uuid, ${licenseId}::uuid, ${request.audience}, p.user_id, p.student_id,
-           ${actor.userId}::uuid, ${actor.kind === "platform"}
+           ${actor.userId}::uuid, ${actor.kind === "platform"}, ${programme}
     FROM unnest(
       ${toAssign.map((row) => row.user_id)}::uuid[],
       ${toAssign.map((row) => row.student_id)}::uuid[]
@@ -1188,6 +1199,7 @@ export async function assignSeats(
         user_id: seat.user_id,
         student_id: person.student_id,
         assigned_by_platform: actor.kind === "platform",
+        ...(programme ? { programme: true } : {}),
       },
     });
   }

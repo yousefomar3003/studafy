@@ -76,6 +76,7 @@ export const licenseSeatGrants: GrantSourceAdapter = ({ user }, now) =>
     const started = Date.parse(seat.startsAt) <= now.getTime();
     const ended = now.getTime() >= Date.parse(seat.endsAt);
     if (seat.licenseStatus === "active" && !started) return [];
+    if (seat.activeMonths) return programmeSeatGrant(seat, seat.activeMonths, now, started, ended);
     return [
       {
         source: "school_license" as const,
@@ -87,6 +88,43 @@ export const licenseSeatGrants: GrantSourceAdapter = ({ user }, now) =>
       },
     ];
   });
+
+/** The first instant of the month after a YYYY-MM-01 month (UTC). */
+function monthEndOf(month: string): string {
+  const [year, m] = month.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(year, m, 1)).toISOString();
+}
+
+/**
+ * A Student AI programme seat (000252) covers its holder only in the months the school paid Studafy
+ * for (owner, 2026-11-18: as parents pay their tuition):
+ *
+ *   - this month paid for, the licence active and inside its period  -> live, for this month
+ *   - a month paid for, but not this one                             -> ended (waiting for payment)
+ *   - no month paid for yet                                          -> no grant
+ */
+function programmeSeatGrant(
+  seat: { seatId: string; planCode: string | null; licenseStatus: string },
+  activeMonths: readonly string[],
+  now: Date,
+  started: boolean,
+  ended: boolean,
+) {
+  if (!seat.planCode || activeMonths.length === 0) return [];
+  const thisMonth = `${now.toISOString().slice(0, 7)}-01`;
+  const paid = activeMonths.includes(thisMonth);
+  const shown = paid ? thisMonth : activeMonths.at(-1)!;
+  return [
+    {
+      source: "school_license" as const,
+      tierCode: seat.planCode,
+      live: seat.licenseStatus === "active" && started && !ended && paid,
+      periodStart: `${shown}T00:00:00.000Z`,
+      periodEnd: monthEndOf(shown),
+      ref: `license_seats:${seat.seatId}`,
+    },
+  ];
+}
 
 /**
  * Tiers Studafy staff granted by hand (`app.manual_grants`, 000211), usually after a cash payment.
