@@ -97,14 +97,17 @@ export type { StripeMode } from "./stripe-mode";
 export {
   LOCK_CATCH_UP_DAYS,
   REVENUE_SHARE_STATUSES,
+  approveShares,
   insertSnapshot,
   licenceInProgramme,
   lockDueConversionSnapshots,
   measureConversion,
+  measurementDayOf,
   measurementPeriods,
   periodFor,
   recordEarlierPaymentShares,
   recordPaymentShares,
+  rejectShares,
   resolvePendingShares,
   restoreCreditsOfVoidedInvoice,
   runRevenueShareTick,
@@ -114,6 +117,7 @@ export {
 } from "./ai-revenue-share/engine";
 export type {
   ConversionMeasurement,
+  DecidedShare,
   PaymentPortion,
   RecordedShare,
   ResolvedShare,
@@ -129,7 +133,7 @@ export type {
 export {
   REVENUE_SHARE_MEASURES,
   countEnrolledStudents,
-  countOptedInStudents,
+  countStudentAiHolders,
   licenceCommitment,
   uploadConsistencyForPeriod,
 } from "./ai-revenue-share/measures";

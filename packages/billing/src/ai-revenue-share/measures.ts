@@ -7,8 +7,9 @@ import type { TransactionSql } from "postgres";
  * What the revenue share engine measures about a school, each behind one function:
  *
  *   * countEnrolledStudents      -- students enrolled at the end of the day.
- *   * countOptedInStudents       -- phase 2's opt-ins (app.ai_optins) active at the end of the day,
- *                                   for the academic year covering it.
+ *   * countStudentAiHolders      -- enrolled students the school provides Student AI to in a month:
+ *                                   an opt-in covering the month, or a student seat the school
+ *                                   assigned, held at the end of the day (not in-app purchases).
  *   * uploadConsistencyForPeriod -- phase 4's upload consistency over the days a payment covers
  *                                   (./upload-consistency.ts, the same read the API's views use),
  *                                   once those days are over.
@@ -30,10 +31,11 @@ export interface ConsistencyPeriod {
 
 export interface RevenueShareMeasures {
   countEnrolledStudents(tx: TransactionSql, schoolId: string, onDate: string): Promise<number>;
-  countOptedInStudents(
+  countStudentAiHolders(
     tx: TransactionSql,
     schoolId: string,
     licenseId: string,
+    month: string,
     onDate: string,
   ): Promise<number>;
   /** Basis points (school days with an upload / school days), or null while it is not known. */
@@ -63,42 +65,58 @@ export async function countEnrolledStudents(
 }
 
 /**
- * Students opted in to Student AI at the end of `onDate`: the school's phase 2 opt-ins
- * (app.ai_optins) for the academic year covering `onDate` -- or, before any year has begun, the next
- * one (parents opt in before the year starts) -- taken by then and not ended by then (released or
- * transferred after the day still count), each student once.
+ * Enrolled students the school provides Student AI to in `month` (YYYY-MM-01), as of the END of
+ * `onDate` -- the numerator of the month's conversion (owner, 2026-11-18: conversion is the
+ * students holding Student AI each month, not opt-ins alone):
  *
- * Opt-ins are per academic year: parents choose again each new year, and a licence renewal does NOT
- * carry them over. They are counted for the school's year, not only this licence's, so a renewal (or
- * a second licence in the same year) measures the year's opt-ins rather than 0. `licenseId` is kept
- * for the signature; it does not narrow the count.
+ *   * a phase 2 opt-in (app.ai_optins) covering the month: taken by then, starting on or before the
+ *     month and ending on or after it, not released from it (`released_effective_month`), and not
+ *     ended by then (released or transferred after the day still count); or
+ *   * a student seat the school assigned (app.license_seats, any of its licences), held at the end
+ *     of the day.
+ *
+ * Each student once, and only students counted as enrolled that day (`countEnrolledStudents`), so
+ * the conversion never passes 100%. A student's own in-app purchase is not a school seat and does
+ * not count. `licenseId` is kept for the signature: opt-ins are the school's year's (a renewal
+ * measures the year's choices rather than 0) and seats are counted across its licences.
  */
-export async function countOptedInStudents(
+export async function countStudentAiHolders(
   tx: TransactionSql,
   _schoolId: string,
   _licenseId: string,
+  month: string,
   onDate: string,
 ): Promise<number> {
   const [row] = await tx<{ count: number }[]>`
-    WITH year AS (
-      SELECT ay.id
-      FROM app.academic_years AS ay
-      WHERE ay.school_id = current_setting('app.school_id')::uuid
-        AND ay.ends_on >= ${onDate}::date
-      ORDER BY (ay.starts_on <= ${onDate}::date) DESC,
-               CASE WHEN ay.starts_on <= ${onDate}::date THEN ay.starts_on END DESC,
-               ay.starts_on ASC
-      LIMIT 1
+    WITH holders AS (
+      SELECT o.student_id
+      FROM app.ai_optins AS o
+      WHERE o.school_id = current_setting('app.school_id')::uuid
+        AND o.opted_in_at < ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
+        AND o.start_month <= ${month}::date AND o.end_month >= ${month}::date
+        AND (o.released_effective_month IS NULL OR o.released_effective_month > ${month}::date)
+        AND (
+          o.status = 'active'
+          OR o.ended_at >= ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
+        )
+      UNION
+      SELECT s.student_id
+      FROM app.license_seats AS s
+      WHERE s.school_id = current_setting('app.school_id')::uuid
+        AND s.audience = 'student'
+        AND s.assigned_at < ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
+        AND (
+          s.unassigned_at IS NULL
+          OR s.unassigned_at >= ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
+        )
     )
-    SELECT count(DISTINCT o.student_id)::int AS count
-    FROM app.ai_optins AS o
-    JOIN year ON year.id = o.academic_year_id
-    WHERE o.school_id = current_setting('app.school_id')::uuid
-      AND o.opted_in_at < ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
-      AND (
-        o.status = 'active'
-        OR o.ended_at >= ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
-      )
+    SELECT count(*)::int AS count
+    FROM holders AS h
+    JOIN app.students AS st
+      ON st.id = h.student_id AND st.school_id = current_setting('app.school_id')::uuid
+    WHERE st.status = 'enrolled'
+      AND st.created_at < ((${onDate}::date + 1)::timestamp AT TIME ZONE 'UTC')
+      AND (st.admission_date IS NULL OR st.admission_date <= ${onDate}::date)
   `;
   return row?.count ?? 0;
 }
@@ -136,7 +154,7 @@ export async function licenceCommitment(
 /** The measures the API and the workers use. Tests pass their own. */
 export const REVENUE_SHARE_MEASURES: RevenueShareMeasures = {
   countEnrolledStudents,
-  countOptedInStudents,
+  countStudentAiHolders,
   uploadConsistencyForPeriod,
   licenceCommitment,
 };

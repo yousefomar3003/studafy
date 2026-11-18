@@ -5,10 +5,13 @@ import { DEFAULT_AI_PROGRAMME_SETTINGS, resolveAiProgramme } from "./ai-programm
 import {
   addDaysUtc,
   computeRevenueShare,
+  conversionMeasureDay,
   instalmentPeriods,
   measurementDateOf,
+  monthSlices,
   ratioBps,
   shareAmountOf,
+  splitByWeight,
   studentPartOf,
 } from "./revenue-share";
 import { buildSchedule } from "./schedule";
@@ -371,5 +374,91 @@ describe("dates", () => {
       { position: 1, from: "2026-09-01", to: "2026-11-30" },
       { position: 2, from: "2026-09-01", to: "2026-11-30" },
     ]);
+  });
+});
+
+describe("monthly conversion: months and their measurement day", () => {
+  test("a month is measured on its first day, or on the licence's first day when it starts later", () => {
+    expect(conversionMeasureDay("2026-10-01", "2026-09-01")).toBe("2026-10-01");
+    expect(conversionMeasureDay("2026-09-01", "2026-09-10")).toBe("2026-09-10");
+  });
+
+  const year = { startsOn: "2026-09-01", lastDay: "2027-06-30" };
+
+  test("one month paid for is one slice, a whole month", () => {
+    expect(monthSlices("2026-09-01", "2026-09-30", year)).toEqual([
+      { month: "2026-09-01", from: "2026-09-01", to: "2026-09-30", weight: 1_000_000 },
+    ]);
+  });
+
+  test("a year paid at once is one whole-month slice per counted month, 28 days or 31", () => {
+    const slices = monthSlices("2026-09-01", "2027-06-30", year);
+    expect(slices.map((s) => s.month)).toEqual([
+      "2026-09-01",
+      "2026-10-01",
+      "2026-11-01",
+      "2026-12-01",
+      "2027-01-01",
+      "2027-02-01",
+      "2027-03-01",
+      "2027-04-01",
+      "2027-05-01",
+      "2027-06-01",
+    ]);
+    expect(slices.every((s) => s.weight === 1_000_000)).toBe(true);
+  });
+
+  test("days of a month the licence does not count go to the nearest month it counts, adding no weight", () => {
+    // A term from 25 Aug: August is not counted (a week of it), so its days belong to September,
+    // and 3 Jul (past a 30 Jun year end that the rule counts) belongs to June.
+    const counted = { startsOn: "2026-08-25", lastDay: "2027-07-03" };
+    expect(monthSlices("2026-08-25", "2026-09-30", counted)).toEqual([
+      { month: "2026-09-01", from: "2026-08-25", to: "2026-09-30", weight: 1_000_000 },
+    ]);
+    expect(monthSlices("2027-06-01", "2027-07-03", counted)).toEqual([
+      { month: "2027-06-01", from: "2027-06-01", to: "2027-07-03", weight: 1_000_000 },
+    ]);
+  });
+
+  test("a month the licence counts at its edge is whole as far as the licence goes", () => {
+    // 19 Nov to 18 Sep: November (12 days) is folded into December; September (18 of 30 days)
+    // counts, whole -- a year paid at once is ten equal months.
+    const term = { startsOn: "2026-11-19", lastDay: "2027-09-18" };
+    const slices = monthSlices("2026-11-19", "2027-09-18", term);
+    expect(slices).toHaveLength(10);
+    expect(slices[0]).toMatchObject({ month: "2026-12-01", from: "2026-11-19" });
+    expect(slices.every((s) => s.weight === 1_000_000)).toBe(true);
+    expect(splitByWeight(1_400_000, slices)).toEqual(Array(10).fill(140_000));
+  });
+
+  test("a part of a month weighs its share of the month's days", () => {
+    expect(monthSlices("2026-09-20", "2026-10-05", null).map((s) => [s.month, s.weight])).toEqual([
+      ["2026-09-01", 366_667],
+      ["2026-10-01", 161_290],
+    ]);
+  });
+});
+
+describe("splitting an amount over months", () => {
+  const year = { startsOn: "2026-09-01", lastDay: "2027-06-30" };
+
+  test("a year paid at once: every month the same, the parts adding up exactly", () => {
+    const slices = monthSlices("2026-09-01", "2027-06-30", year);
+    expect(splitByWeight(1_400_000, slices)).toEqual(Array(10).fill(140_000));
+    for (const amount of [1, 0, 99_999, 7_777_777, -4_200]) {
+      const parts = splitByWeight(amount, slices);
+      expect(parts.reduce((sum, p) => sum + p, 0)).toBe(amount);
+      expect(parts).toHaveLength(10);
+    }
+  });
+
+  test("in proportion to the weights, the leftover unit to the largest remainder (earliest on a tie)", () => {
+    expect(splitByWeight(100, [{ weight: 1 }, { weight: 1 }, { weight: 1 }])).toEqual([34, 33, 33]);
+    expect(splitByWeight(10, [{ weight: 3 }, { weight: 1 }])).toEqual([8, 2]);
+    expect(splitByWeight(9, [{ weight: 0 }, { weight: 0 }])).toEqual([5, 4]);
+  });
+
+  test("a single slice takes it all", () => {
+    expect(splitByWeight(12_345, [{ weight: 1_000_000 }])).toEqual([12_345]);
   });
 });

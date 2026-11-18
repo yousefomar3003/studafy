@@ -13,7 +13,7 @@ import { ERROR_CODES } from "@studafy/constants";
 import {
   AI_PROGRAMME_LIMITS,
   computeRevenueShare,
-  measurementDateOf,
+  conversionMeasureDay,
 } from "@studafy/license-pricing";
 
 import { setTenantScope, withSystemTx } from "../../db/tenant-tx";
@@ -226,12 +226,16 @@ export interface RevenueShareTotals {
   baseMinor: number;
   /** Provisional: not final yet. */
   pendingMinor: number;
+  /** Final, waiting for a super admin's approval on the school's weekly statement. */
+  awaitingApprovalMinor: number;
   owedMinor: number;
   creditedMinor: number;
   payoutDueMinor: number;
   paidOutMinor: number;
   forfeitedMinor: number;
-  /** What the school has earned so far: credited + paid out + owed + payout due. */
+  /** Rejected by a super admin: never given. */
+  rejectedMinor: number;
+  /** What the school has earned so far (approved): credited + paid out + owed + payout due. */
   earnedMinor: number;
 }
 
@@ -246,21 +250,25 @@ export function revenueShareTotals(
       minorUnit: entry.minorUnit,
       baseMinor: 0,
       pendingMinor: 0,
+      awaitingApprovalMinor: 0,
       owedMinor: 0,
       creditedMinor: 0,
       payoutDueMinor: 0,
       paidOutMinor: 0,
       forfeitedMinor: 0,
+      rejectedMinor: 0,
       earnedMinor: 0,
     };
     if (entry.status !== "void") t.baseMinor += entry.baseMinor;
     const amount = entry.amountMinor;
     if (entry.status === "pending") t.pendingMinor += amount;
+    if (entry.status === "awaiting_approval") t.awaitingApprovalMinor += amount;
     if (entry.status === "owed") t.owedMinor += amount;
     if (entry.status === "credited") t.creditedMinor += amount;
     if (entry.status === "payout_due") t.payoutDueMinor += amount;
     if (entry.status === "paid_out") t.paidOutMinor += amount;
     if (entry.status === "forfeited") t.forfeitedMinor += amount;
+    if (entry.status === "rejected") t.rejectedMinor += amount;
     t.earnedMinor = t.owedMinor + t.creditedMinor + t.payoutDueMinor + t.paidOutMinor;
     totals.set(entry.currencyCode, t);
   }
@@ -449,7 +457,7 @@ export async function licenseRevenueShare(
     const measurements = snapshots.filter((s) => s.periodStart === periodStart);
     return {
       periodStart,
-      measureOn: measurementDateOf(periodStart, values.measurementOffsetDays),
+      measureOn: conversionMeasureDay(periodStart, license.startsAt.toISOString()),
       locked: measurements.find((s) => s.locked) ?? null,
       measurements,
     };
