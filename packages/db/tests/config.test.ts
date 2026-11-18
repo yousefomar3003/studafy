@@ -78,6 +78,7 @@ describe("migrations directory default (QA-004)", () => {
       DATABASE_URL: "postgres://u:p@localhost:5432/db",
       MIGRATIONS_DIR: "/app/db/migrations",
     });
-    expect(config.migrationsDir).toBe("/app/db/migrations");
+    // resolve(): an absolute POSIX path gains the current drive letter on Windows.
+    expect(config.migrationsDir).toBe(resolve("/app/db/migrations"));
   });
 });
