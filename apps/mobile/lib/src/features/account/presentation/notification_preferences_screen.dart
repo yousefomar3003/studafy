@@ -102,7 +102,6 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
   NotificationPreferences? _saved;
   NotificationQuietHours? _savedQuietHours;
   final Set<String> _saving = {};
-  bool _sendingTest = false;
   bool _retryingSetup = false;
 
   @override
@@ -180,25 +179,6 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
     if (mounted) setState(() => _retryingSetup = false);
   }
 
-  Future<void> _sendTest() async {
-    setState(() => _sendingTest = true);
-    try {
-      // Registers again first, so a phone whose token changed is reachable before the send.
-      await ref.read(pushServiceProvider).registerIfAuthenticated();
-      await ref.read(sendTestNotificationProvider)();
-      _snack('account.notifications.phone.testSent');
-    } on PushRegistrationException catch (e) {
-      // The test would be queued but could never reach this phone: say why instead of "Sent".
-      _snackText('account.notifications.phone.notRegistered'.tr(namedArgs: {'reason': e.reason}));
-      // The card shows the reason too, with "Try again".
-      ref.invalidate(pushPhoneStatusProvider);
-    } on Object {
-      _snack('account.notifications.phone.testFailed');
-    } finally {
-      if (mounted) setState(() => _sendingTest = false);
-    }
-  }
-
   Future<void> _setQuietHours(String? start, String? end) async {
     setState(() => _saving.add('quiet'));
     try {
@@ -245,11 +225,9 @@ class _NotificationPreferencesScreenState extends ConsumerState<NotificationPref
         padding: const EdgeInsets.all(AppSpacing.space16).withBottomInset(context),
         children: [
           _PhoneCard(
-            sendingTest: _sendingTest,
             retrying: _retryingSetup,
             onTurnOn: _turnOnPhone,
             onOpenSettings: () => ref.read(pushServiceProvider).openSystemSettings(),
-            onSendTest: _sendTest,
             onRetry: _retrySetup,
           ),
           const SizedBox(height: AppSpacing.space24),
@@ -375,19 +353,15 @@ class _RetryCard extends StatelessWidget {
 /// reason is shown under the status with "Try again", so a phone that gets nothing can say why.
 class _PhoneCard extends ConsumerWidget {
   const _PhoneCard({
-    required this.sendingTest,
     required this.retrying,
     required this.onTurnOn,
     required this.onOpenSettings,
-    required this.onSendTest,
     required this.onRetry,
   });
 
-  final bool sendingTest;
   final bool retrying;
   final VoidCallback onTurnOn;
   final VoidCallback onOpenSettings;
-  final VoidCallback onSendTest;
   final VoidCallback onRetry;
 
   @override
@@ -472,14 +446,6 @@ class _PhoneCard extends ConsumerWidget {
                     onPressed: retrying ? null : onRetry,
                     icon: const Icon(Icons.refresh),
                     label: Text('account.notifications.phone.retrySetup'.tr()),
-                  ),
-                if (status == PushPermission.granted ||
-                    (status == PushPermission.unavailable && (phone?.canSendTest ?? false)))
-                  OutlinedButton.icon(
-                    key: const Key('notificationSendTest'),
-                    onPressed: sendingTest ? null : onSendTest,
-                    icon: const Icon(Icons.send_outlined),
-                    label: Text('account.notifications.phone.sendTest'.tr()),
                   ),
                 if (status == PushPermission.denied)
                   FilledButton.icon(
