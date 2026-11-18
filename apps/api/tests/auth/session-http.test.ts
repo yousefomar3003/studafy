@@ -178,6 +178,27 @@ describe("delivery", () => {
     expect(cookie).toContain("Path=/;");
   });
 
+  integrationTest(
+    "expires the pre-QA-070 cookie at Path=/api/auth whenever it sets the new one",
+    async () => {
+      // A browser that signed in before QA-070 still holds `session` at Path=/api/auth. Where the
+      // new cookie has the same name (development), the browser sends the old, more specific one
+      // first on /api/auth/refresh, so it would shadow every new sign-in until it is expired.
+      const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.ORG_ADMIN.id, {
+        channel: "web",
+      });
+
+      const res = await post("/api/auth/refresh", { headers: webHeaders(seed.token) });
+
+      expect(res.status).toBe(200);
+      const legacy = res.headers
+        .getSetCookie()
+        .find((cookie) => cookie.startsWith("session=") && cookie.includes("Path=/api/auth"));
+      expect(legacy).toBeDefined();
+      expect(legacy).toContain("Max-Age=0");
+    },
+  );
+
   integrationTest("gives a mobile session the token in the body and sets no cookie", async () => {
     const seed = await createRefreshSession(sql, tenant.schoolId, tenant.users.INSTRUCTOR.id, {
       channel: "mobile",
@@ -309,6 +330,13 @@ describe("logout", () => {
     // Max-Age=0 is how a browser is told to drop it; the attributes must match the ones it was set
     // with or the deletion is ignored.
     expect(cookie).toContain("Max-Age=0");
+    // The pre-QA-070 cookie is cleared too, even where it shares the current name (development).
+    const legacy = res.headers
+      .getSetCookie()
+      .find(
+        (setCookie) => setCookie.startsWith("session=") && setCookie.includes("Path=/api/auth"),
+      );
+    expect(legacy).toContain("Max-Age=0");
 
     const [row] = await sql<{ revoked_at: Date | null }[]>`
       SELECT revoked_at FROM app.refresh_tokens WHERE id = ${seed.sessionId}

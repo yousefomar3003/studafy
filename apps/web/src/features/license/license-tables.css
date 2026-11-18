@@ -1,0 +1,67 @@
+/**
+ * Tables in the licence components (payment plan, year totals, payment schedule, storage history).
+ * Imported by each component itself rather than relying on a page stylesheet: the components appear
+ * on the school's licence pages and on the platform console's calculator and invoice pages, and
+ * each feature's stylesheet loads only with its own pages.
+ */
+
+/* Each table sits in a bordered box, so it reads as one block in a page, a card or a dialog, and on
+   a narrow screen it scrolls inside that box instead of widening the page. */
+.license-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.license-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.license-table th,
+.license-table td {
+  padding: var(--space-8) var(--space-12);
+  text-align: start;
+  vertical-align: top;
+  border-block-end: 1px solid var(--color-border);
+}
+
+.license-table thead th {
+  background-color: var(--color-surface);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-muted-foreground);
+  white-space: nowrap;
+}
+
+.license-table tbody th {
+  font-weight: var(--font-weight-medium);
+}
+
+.license-table td {
+  font-variant-numeric: tabular-nums;
+}
+
+.license-table tbody tr:last-child > * {
+  border-block-end: none;
+}
+
+/* Money and percentages line up on their last digit. */
+.license-amount,
+.license-table :is(th, td).license-amount {
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  white-space: nowrap;
+}
+
+/* A long schedule scrolls inside its own box, with its header row kept in view. */
+.license-table-scroll--tall {
+  max-height: 18rem;
+  overflow-y: auto;
+}
+
+.license-table-scroll--tall thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+}

@@ -56,29 +56,35 @@ describe("verify-ci-green.sh", () => {
   const verify = (ref: string, runs: object[], sha = SHA) =>
     run("verify-ci-green.sh", ["o/r", sha, ref], { GH: ghReturning(runs) });
 
-  test("passes for dev with a green CI run on that exact SHA", () => {
-    expect(verify("refs/heads/dev", [runFor({})]).code).toBe(0);
+  test("passes for main with a green CI run on that exact SHA", () => {
+    expect(verify("refs/heads/main", [runFor({})]).code).toBe(0);
   });
 
   test("refuses any other ref, even with green CI", () => {
-    for (const ref of ["refs/heads/stage", "refs/heads/feature/x", "refs/tags/v1"]) {
+    // dev is refused too: production is released from main, which holds what dev was merged into.
+    for (const ref of [
+      "refs/heads/dev",
+      "refs/heads/stage",
+      "refs/heads/feature/x",
+      "refs/tags/v1",
+    ]) {
       const result = verify(ref, [runFor({})]);
       expect(result.code).toBe(1);
-      expect(result.stderr).toContain("only from dev");
+      expect(result.stderr).toContain("only from main");
     }
   });
 
   test("refuses red, cancelled, running or missing CI", () => {
-    expect(verify("refs/heads/dev", [runFor({ conclusion: "failure" })]).code).toBe(1);
-    expect(verify("refs/heads/dev", [runFor({ conclusion: "cancelled" })]).code).toBe(1);
+    expect(verify("refs/heads/main", [runFor({ conclusion: "failure" })]).code).toBe(1);
+    expect(verify("refs/heads/main", [runFor({ conclusion: "cancelled" })]).code).toBe(1);
     expect(
-      verify("refs/heads/dev", [runFor({ status: "in_progress", conclusion: null })]).code,
+      verify("refs/heads/main", [runFor({ status: "in_progress", conclusion: null })]).code,
     ).toBe(1);
-    expect(verify("refs/heads/dev", []).code).toBe(1);
+    expect(verify("refs/heads/main", []).code).toBe(1);
   });
 
   test("judges the newest run: a later red re-run wins over an earlier green one", () => {
-    const result = verify("refs/heads/dev", [
+    const result = verify("refs/heads/main", [
       runFor({ created_at: "2026-11-16T10:00:00Z" }),
       runFor({ created_at: "2026-11-16T11:00:00Z", conclusion: "failure" }),
     ]);
@@ -86,7 +92,7 @@ describe("verify-ci-green.sh", () => {
   });
 
   test("ignores runs for other commits", () => {
-    expect(verify("refs/heads/dev", [runFor({ head_sha: "b".repeat(40) })]).code).toBe(1);
+    expect(verify("refs/heads/main", [runFor({ head_sha: "b".repeat(40) })]).code).toBe(1);
   });
 });
 
@@ -100,6 +106,36 @@ describe("release.sh", () => {
     });
     expect(result.code).toBe(0);
     expect(result.stdout.trim()).toBe(`registry.fly.io/studafy-core-api@${digest}`);
+  });
+
+  test("build waits for a registry that lags the push", () => {
+    const counter = join(mkdtempSync(join(tmpdir(), "qa005-")), "count");
+    const result = run("release.sh", ["build", "studafy-core-web", "infra/fly/web.toml", "rel1"], {
+      FLYCTL: fake("flyctl", "exit 0"),
+      // "not found" twice, then the manifest: what registry.fly.io did right after a push.
+      DOCKER: fake(
+        "docker",
+        `n=$(( $(cat "${counter}" 2>/dev/null || echo 0) + 1 )); echo $n > "${counter}"
+if [ $n -lt 3 ]; then echo "ERROR: not found" >&2; exit 1; fi
+echo '{"digest":"${digest}"}'`,
+      ),
+      DIGEST_RETRY_DELAY: "0",
+    });
+    expect(result.code).toBe(0);
+    expect(result.stdout.trim()).toBe(`registry.fly.io/studafy-core-web@${digest}`);
+    expect(readFileSync(counter, "utf8").trim()).toBe("3");
+  });
+
+  test("build fails, printing nothing, when the digest never appears", () => {
+    const result = run("release.sh", ["build", "studafy-core-web", "infra/fly/web.toml", "rel1"], {
+      FLYCTL: fake("flyctl", "exit 0"),
+      DOCKER: fake("docker", `echo "ERROR: not found" >&2; exit 1`),
+      DIGEST_ATTEMPTS: "2",
+      DIGEST_RETRY_DELAY: "0",
+    });
+    expect(result.code).toBe(1);
+    expect(result.stdout.trim()).toBe("");
+    expect(result.stderr).toContain("Could not resolve a digest");
   });
 
   test("deploy refuses a mutable tag", () => {

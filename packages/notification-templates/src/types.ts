@@ -149,6 +149,11 @@ export interface NotificationTypeVars {
     schoolName: string;
     invoiceNumber: string;
   };
+  AI_REVENUE_SHARE_STATEMENTS_READY: {
+    statements: string;
+    schools: string;
+    weekStart: string;
+  };
   LICENSE_AI_STOP_WARNING: {
     schoolName: string;
     invoiceNumber: string;

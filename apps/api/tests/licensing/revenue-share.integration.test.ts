@@ -19,13 +19,21 @@
 
 import {
   REVENUE_SHARE_MEASURES,
+  approveShares,
   licenceInProgramme,
   lockDueConversionSnapshots,
   measureConversion,
   readProgrammeValues,
+  rejectShares,
 } from "@studafy/billing";
 import { ROLES } from "@studafy/constants";
-import { instalmentPeriods, splitEvenly } from "@studafy/license-pricing";
+import {
+  academicYearMonths,
+  conversionMeasureDay,
+  instalmentPeriods,
+  monthStart,
+  splitEvenly,
+} from "@studafy/license-pricing";
 // eslint-disable-next-line import-x/no-unresolved -- "bun:test" is a virtual Bun built-in with no resolvable file path
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -99,7 +107,7 @@ interface Measured {
 const measured = new Map<string, Measured>();
 const fakeMeasures: RevenueShareMeasures = {
   countEnrolledStudents: async (_tx, schoolId) => measured.get(schoolId)?.enrolled ?? 0,
-  countOptedInStudents: async (_tx, schoolId) => measured.get(schoolId)?.optedIn ?? 0,
+  countStudentAiHolders: async (_tx, schoolId) => measured.get(schoolId)?.optedIn ?? 0,
   uploadConsistencyForPeriod: async (_tx, period) => measured.get(period.schoolId)?.upload ?? null,
   licenceCommitment: async (_tx, schoolId) => measured.get(schoolId)?.commitment ?? "full_year",
 };
@@ -366,16 +374,67 @@ const byPosition = (entries: RevenueShareEntryView[]) =>
       a.kind.localeCompare(b.kind),
   );
 
-/** A licence with its conversion locked and its first `paid` instalments paid on their due dates. */
+/**
+ * The months a programme licence counts (THE month rule: the licences start tomorrow, so the first
+ * month is tomorrow's, or the next one when tomorrow is late in its month) and the day each month's
+ * conversion is measured and locked: its first day, or the licence's first day in the first month.
+ */
+function licenceMonths(
+  licence: ProgrammeLicence,
+  months = 10,
+): { month: string; measureOn: Date }[] {
+  const counted = academicYearMonths(
+    ISO(licence.start),
+    ISO(addDays(addMonths(licence.start, months), -1)),
+  )!;
+  return Array.from({ length: counted.last - counted.first + 1 }, (_, i) => {
+    const month = monthStart(counted.first + i);
+    const day = conversionMeasureDay(month, ISO(licence.start));
+    return { month, measureOn: new Date(`${day}T00:00:00Z`) };
+  });
+}
+
+/** The hourly job month after month: months 1..k locked, each on its measurement day. */
+async function lockMonths(f: SchoolFixture, licence: ProgrammeLicence, k: number) {
+  for (const { measureOn } of licenceMonths(licence).slice(0, k)) await lock(f, measureOn);
+}
+
+/** A super admin approves every share awaiting approval (the weekly statement), then it settles. */
+async function approveAll(f: SchoolFixture, now: Date) {
+  await asAdmin(f.schoolId, async (tx) => {
+    const ids = await tx<{ id: string }[]>`
+      SELECT id::text AS id FROM app.ai_programme_revenue_share_entries
+      WHERE school_id = ${f.schoolId}::uuid AND status = 'awaiting_approval'
+    `;
+    await approveShares(
+      tx,
+      { schoolId: f.schoolId, now, audit: async () => undefined, measures: fakeMeasures },
+      ids.map((row) => row.id),
+    );
+  });
+  return recompute(f, now);
+}
+
+const latest = (...dates: Date[]) => new Date(Math.max(...dates.map((d) => d.getTime())));
+
+/**
+ * A licence with its first `paid` instalments paid on their due dates, those months' conversion
+ * locked, and their shares approved (owed, or payout due in payout mode).
+ */
 async function lockedAndPaid(f: SchoolFixture, paid: number, seats = 350) {
   const licence = await programmeLicence(f, seats);
   const monthly = (seats * 400 * 10) / 10;
-  await lock(f, addDays(licence.start, 30));
+  let last = licence.start;
   for (let k = 1; k <= paid; k += 1) {
     // Month 1 is paid on day 29 (its cutoff is day 30); the others on their due dates.
-    await pay(f, licence.invoiceId, monthly, k === 1 ? addDays(licence.start, 29) : licence.due(k));
+    last = k === 1 ? addDays(licence.start, 29) : licence.due(k);
+    await pay(f, licence.invoiceId, monthly, last);
   }
-  return { ...licence, monthly };
+  await lockMonths(f, licence, paid);
+  const settleOn = latest(last, licenceMonths(licence)[paid - 1]!.measureOn);
+  await recompute(f, settleOn);
+  await approveAll(f, settleOn);
+  return { ...licence, monthly, settleOn };
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -388,6 +447,8 @@ describe("the spec's worked example", () => {
     async () => {
       const f = await school();
       const licence = await programmeLicence(f);
+      const months = licenceMonths(licence);
+      expect(months).toHaveLength(10);
       const detail = await asAdmin(f.schoolId, (tx) =>
         requireInvoiceDetail(tx, licence.invoiceId, operator),
       );
@@ -417,20 +478,21 @@ describe("the spec's worked example", () => {
             dueDate: ISO(licence.due(i + 1)),
           })),
         })[0]!.to,
-        measurementPeriodStart: ISO(licence.start),
+        measurementPeriodStart: months[0]!.month,
         conversionBps: null,
         amountMinor: 0,
         commitment: "full_year",
       });
 
-      // Day 29: nothing to lock yet. Day 30 (start + measurementOffsetDays): locked, once.
-      expect(await lock(f, addDays(licence.start, 29))).toEqual([]);
-      const locked = await lock(f, addDays(licence.start, 30));
+      // The day before month 1's measurement day: nothing to lock. On it: month 1 locked, once.
+      const m1 = months[0]!.measureOn;
+      expect(await lock(f, addDays(m1, -1))).toEqual([]);
+      const locked = await lock(f, m1);
       expect(locked).toHaveLength(1);
       expect(locked[0]).toMatchObject({
-        periodStart: ISO(licence.start),
-        measureOn: ISO(addDays(licence.start, 30)),
-        asOf: ISO(addDays(licence.start, 30)),
+        periodStart: months[0]!.month,
+        measureOn: ISO(m1),
+        asOf: ISO(m1),
         enrolledCount: 500,
         optedInCount: 350,
         conversionBps: 7000,
@@ -440,14 +502,14 @@ describe("the spec's worked example", () => {
         locked: true,
         source: "scheduled",
       });
-      expect(await lock(f, addDays(licence.start, 31))).toEqual([]);
+      expect(await lock(f, addDays(m1, 1))).toEqual([]);
 
-      // The pending share is worked out now: 10% + 3% = 13% of $1,400 = $182.
-      const { resolved } = await recompute(f, addDays(licence.start, 30));
+      // The pending share is worked out now: 10% + 3% = 13% of $1,400 = $182, waiting for approval.
+      const { resolved } = await recompute(f, m1);
       expect(resolved).toBe(1);
       [entry] = await ledger(f);
       expect(entry).toMatchObject({
-        status: "owed",
+        status: "awaiting_approval",
         conversionPending: false,
         conversionBps: 7000,
         seats: 350,
@@ -459,9 +521,20 @@ describe("the spec's worked example", () => {
         amountMinor: 18_200,
       });
 
-      // The other nine months, each paid on its due date, are final at once.
+      // The other nine months, each paid on its due date: each waits for its own month's conversion,
+      // locked on its first day, then for approval. Approved, all ten are owed.
       for (let k = 2; k <= 10; k += 1) await pay(f, licence.invoiceId, 140_000, licence.due(k));
-      const entries = byPosition(await ledger(f));
+      expect((await ledger(f)).filter((e) => e.status === "pending")).toHaveLength(9);
+      await lockMonths(f, licence, 10);
+      const end = latest(licence.due(10), months[9]!.measureOn);
+      await recompute(f, end);
+      let entries = byPosition(await ledger(f));
+      expect(entries.map((e) => e.measurementPeriodStart)).toEqual(months.map((m) => m.month));
+      expect(
+        entries.every((e) => e.status === "awaiting_approval" && e.amountMinor === 18_200),
+      ).toBe(true);
+      await approveAll(f, end);
+      entries = byPosition(await ledger(f));
       expect(entries).toHaveLength(10);
       expect(entries.every((e) => e.status === "owed" && e.amountMinor === 18_200)).toBe(true);
       expect(entries[9]!.periodTo).toBe(ISO(addDays(addMonths(licence.start, 10), -1)));
@@ -473,6 +546,7 @@ describe("the spec's worked example", () => {
           owedMinor: 182_000,
           earnedMinor: 182_000,
           pendingMinor: 0,
+          awaitingApprovalMinor: 0,
         }),
       ]);
 
@@ -509,7 +583,7 @@ describe("the spec's worked example", () => {
         )
       `,
       );
-      await lock(f, addDays(licence.start, 30));
+      await lock(f, licenceMonths(licence)[0]!.measureOn);
       await pay(f, licence.invoiceId, 140_000, addDays(licence.start, 29));
       const [entry] = await ledger(f);
       // 70% of $1,400 is $980; 13% of that is $127.40.
@@ -599,8 +673,15 @@ describe("credit on the next invoice", () => {
         `,
       );
       expect(audit!.v).toBe("36400");
-      // A later payment on the first invoice: the open seat-increase invoice is still its next one.
+      // A later payment on the first invoice: once its month is locked and its share approved, the
+      // open seat-increase invoice is still its next one.
       await pay(f, licence.invoiceId, licence.monthly, licence.due(3));
+      expect(byPosition(await ledger(f, licence.licenseId))[2]!.status).toBe("pending");
+      await lockMonths(f, licence, 3);
+      const third = latest(licence.due(3), licenceMonths(licence)[2]!.measureOn);
+      await recompute(f, third);
+      expect(byPosition(await ledger(f, licence.licenseId))[2]!.status).toBe("awaiting_approval");
+      await approveAll(f, third);
       expect(byPosition(await ledger(f, licence.licenseId))[2]).toMatchObject({
         status: "credited",
         creditInvoiceId: invoice.id,
@@ -659,6 +740,93 @@ describe("credit on the next invoice", () => {
         ["payout_due", null],
         ["payout_due", null],
       ]);
+    },
+  );
+});
+
+describe("monthly shares and approval (owner, 2026-11-18)", () => {
+  integrationTest(
+    "a year paid at once: one share per month it pays for, each final once its month is locked",
+    async () => {
+      const f = await school();
+      const licence = await programmeLicence(f, 350, {
+        paymentPlan: "in_full",
+      } as Partial<QuoteTerms>);
+      const months = licenceMonths(licence);
+      await pay(f, licence.invoiceId, 1_400_000, licence.start);
+      let entries = await ledger(f);
+      // The money split over the ten months: every month its own entry, money and conversion.
+      expect(entries).toHaveLength(10);
+      expect(entries.every((e) => e.collectedMinor === 140_000)).toBe(true);
+      expect([...entries.map((e) => e.measurementPeriodStart)].sort()).toEqual(
+        months.map((m) => m.month),
+      );
+      expect(entries.every((e) => e.status === "pending" && e.conversionPending)).toBe(true);
+
+      // Month by month, each becomes final as its conversion locks on its first day.
+      await lockMonths(f, licence, 2);
+      await recompute(f, months[1]!.measureOn);
+      entries = await ledger(f);
+      expect(entries.filter((e) => e.status === "awaiting_approval")).toHaveLength(2);
+      expect(entries.filter((e) => e.status === "pending")).toHaveLength(8);
+
+      await lockMonths(f, licence, 10);
+      await recompute(f, months[9]!.measureOn);
+      entries = await ledger(f);
+      // 13% of each month's $1,400: $182 a month, $1,820 in all.
+      expect(
+        entries.every((e) => e.status === "awaiting_approval" && e.amountMinor === 18_200),
+      ).toBe(true);
+    },
+  );
+
+  integrationTest(
+    "a share awaiting approval is never credited; a rejected one never will be",
+    async () => {
+      const f = await school();
+      const licence = await programmeLicence(f);
+      await pay(f, licence.invoiceId, 140_000, licence.start);
+      await lockMonths(f, licence, 1);
+      await recompute(f, licenceMonths(licence)[0]!.measureOn);
+      const [entry] = await ledger(f);
+      expect(entry).toMatchObject({ status: "awaiting_approval", amountMinor: 18_200 });
+
+      // A next invoice is issued while it waits: nothing is credited on it.
+      const next = await programmeLicence(f, 30);
+      const detail = await asAdmin(f.schoolId, (tx) =>
+        requireInvoiceDetail(tx, next.invoiceId, operator),
+      );
+      expect(detail.creditTotalMinor).toBe(0);
+      expect((await ledger(f, licence.licenseId))[0]!.status).toBe("awaiting_approval");
+
+      // Rejected by the super admin: final, never given, and it cannot be approved afterwards.
+      await asAdmin(f.schoolId, (tx) =>
+        rejectShares(
+          tx,
+          { schoolId: f.schoolId, now: new Date(), audit: async () => undefined },
+          [entry!.id],
+          "Duplicate transfer",
+        ),
+      );
+      await approveAll(f, new Date());
+      expect((await ledger(f, licence.licenseId))[0]!.status).toBe("rejected");
+      expect(
+        await refusal(
+          asAdmin(
+            f.schoolId,
+            (tx) => tx`
+              UPDATE app.ai_programme_revenue_share_entries SET status = 'owed', rejected_at = NULL
+              WHERE id = ${entry!.id}::uuid
+            `,
+          ),
+        ),
+      ).toBe("23514");
+      const totals = (await asAdmin(f.schoolId, (tx) => schoolRevenueShare(tx))).totals[0]!;
+      expect(totals).toMatchObject({
+        rejectedMinor: 18_200,
+        earnedMinor: 0,
+        awaitingApprovalMinor: 0,
+      });
     },
   );
 });
@@ -783,17 +951,20 @@ describe("forfeiture (decision 11)", () => {
     async () => {
       const f = await school();
       const licence = await lockedAndPaid(f, 1);
-      // Half of month 2 on its due date.
+      // Half of month 2 on its due date; month 2's conversion locks and the share awaits approval.
       await pay(f, licence.invoiceId, 70_000, licence.due(2));
+      await lockMonths(f, licence, 2);
+      await recompute(f, latest(licence.due(2), licenceMonths(licence)[1]!.measureOn));
       let entries = byPosition(await ledger(f));
       expect(entries.map((e) => [e.instalmentPosition, e.status, e.amountMinor])).toEqual([
         [1, "owed", 18_200],
-        [2, "owed", 9_100],
+        [2, "awaiting_approval", 9_100],
       ]);
 
-      // Day 29 after month 2's due date: nothing happens. Day 30 (the AI stop): its share is lost.
+      // Day 29 after month 2's due date: nothing happens. Day 30 (the AI stop): its share is lost,
+      // approved or not.
       await recompute(f, addDays(licence.due(2), 29));
-      expect(byPosition(await ledger(f))[1]!.status).toBe("owed");
+      expect(byPosition(await ledger(f))[1]!.status).toBe("awaiting_approval");
       await recompute(f, addDays(licence.due(2), 30));
       entries = byPosition(await ledger(f));
       expect(entries.map((e) => [e.instalmentPosition, e.status, e.forfeitReason])).toEqual([
@@ -804,6 +975,10 @@ describe("forfeiture (decision 11)", () => {
       // The late rest of month 2 earns nothing either; month 3 paid on time earns as usual.
       await pay(f, licence.invoiceId, 70_000, addDays(licence.due(2), 35));
       await pay(f, licence.invoiceId, 140_000, addDays(licence.due(2), 35));
+      await lockMonths(f, licence, 3);
+      const third = latest(addDays(licence.due(2), 35), licenceMonths(licence)[2]!.measureOn);
+      await recompute(f, third);
+      await approveAll(f, third);
       entries = byPosition(await ledger(f));
       expect(entries.map((e) => [e.instalmentPosition, e.status, e.forfeitReason])).toEqual([
         [1, "owed", null],
@@ -938,11 +1113,18 @@ describe("routes", () => {
       });
       expect(measured1.status).toBe(201);
       const after = (await measured1.json()) as {
-        periods: { locked: unknown; measurements: { conversionBps: number; source: string }[] }[];
+        periods: {
+          periodStart: string;
+          locked: unknown;
+          measurements: { conversionBps: number; source: string }[];
+        }[];
         rate: { conversionSource: string; conversionShareBps: number };
       };
-      expect(after.periods[0]!.locked).toBeNull();
-      expect(after.periods[0]!.measurements[0]).toMatchObject({
+      // Monthly periods, newest first: the one re-measured is the month today falls in (the first).
+      const first = after.periods.find((p) => p.measurements.length > 0)!;
+      expect(after.periods).toHaveLength(10);
+      expect(first.locked).toBeNull();
+      expect(first.measurements[0]).toMatchObject({
         conversionBps: 4500,
         source: "super_admin",
       });
@@ -951,7 +1133,7 @@ describe("routes", () => {
         conversionShareBps: 600,
       });
 
-      await lock(f, addDays(licence.start, 30));
+      await lock(f, licenceMonths(licence)[0]!.measureOn);
       const refused = await asOperator("POST", `${path}/measure`, { reason: "Again" });
       expect(refused.status).toBe(409);
       expect(((await refused.json()) as { code: string }).code).toBe(
@@ -1090,6 +1272,15 @@ describe("the measures", () => {
       const f = await school();
       const students: { id: string; userId: string }[] = [];
       for (let i = 0; i < 4; i += 1) students.push(await createStudent(db.sql, f.schoolId));
+      // Enrolled for a while: a student counts only on the days they were enrolled.
+      await asAdmin(
+        f.schoolId,
+        (tx) => tx`
+          UPDATE app.students SET created_at = now() - interval '10 days',
+                                  updated_at = GREATEST(updated_at, now() - interval '10 days')
+          WHERE school_id = ${f.schoolId}::uuid
+        `,
+      );
       const licenseId = await as(f.schoolId, operator, async (tx) => {
         const license = await createLicense(
           tx,
@@ -1128,9 +1319,10 @@ describe("the measures", () => {
         }
         return ids;
       });
-      const count = (onDate: string) =>
+      const thisMonth = `${ISO(new Date()).slice(0, 7)}-01`;
+      const count = (onDate: string, month = thisMonth) =>
         asAdmin(f.schoolId, (tx) =>
-          REVENUE_SHARE_MEASURES.countOptedInStudents(tx, f.schoolId, licenseId, onDate),
+          REVENUE_SHARE_MEASURES.countStudentAiHolders(tx, f.schoolId, licenseId, month, onDate),
         );
       const today = ISO(new Date());
       const measurement = await asAdmin(f.schoolId, (tx) =>
@@ -1143,7 +1335,7 @@ describe("the measures", () => {
             measures: REVENUE_SHARE_MEASURES,
           },
           licenseId,
-          ISO(new Date(Date.now() - 5 * DAY)),
+          thisMonth,
           today,
         ),
       );
@@ -1202,7 +1394,7 @@ describe("the measures", () => {
     async () => {
       const f = await school({}, "Not In The Programme");
       const licence = await programmeLicence(f, 350, {}, 10, false);
-      await lock(f, addDays(licence.start, 30));
+      await lock(f, licenceMonths(licence)[0]!.measureOn);
       const first = await pay(f, licence.invoiceId, 140_000, licence.start);
       expect(first.licenseActivated).toBe(true);
       expect(await ledger(f)).toEqual([]);
@@ -1257,9 +1449,9 @@ describe("the programme values a share uses", () => {
           operator,
         ),
       );
-      await lock(f, addDays(licence.start, 30));
       await pay(f, licence.invoiceId, 140_000, licence.due(2));
-      await recompute(f, licence.due(2));
+      await lockMonths(f, licence, 2);
+      await recompute(f, latest(licence.due(2), licenceMonths(licence)[1]!.measureOn));
       let entries = byPosition(await ledger(f));
       expect(entries.map((e) => [e.programmeVersionId, e.totalBps])).toEqual([
         [signedVersion, 1300],
@@ -1272,6 +1464,8 @@ describe("the programme values a share uses", () => {
         await reapplyAiProgramme(tx, f.schoolId, license, "Move to current values", operator);
       });
       await pay(f, licence.invoiceId, 140_000, licence.due(3));
+      await lockMonths(f, licence, 3);
+      await recompute(f, latest(licence.due(3), licenceMonths(licence)[2]!.measureOn));
       entries = byPosition(await ledger(f));
       const newVersion = (await asAdmin(null, currentAiProgrammeVersion)).id;
       expect(entries.map((e) => [e.programmeVersionId, e.conversionShareBps, e.totalBps])).toEqual([

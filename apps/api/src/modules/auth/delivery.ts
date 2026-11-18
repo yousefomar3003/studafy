@@ -61,6 +61,10 @@ export function deliverTokenPair(c: Context<AppEnv>, issued: IssuedTokenPair): T
 
   if (usesCookieDelivery(issued.channel)) {
     setCookie(c, refreshCookieName(), issued.refreshToken, refreshCookieOptions());
+    // A pre-QA-070 cookie still at Path=/api/auth would ride along on every refresh. Where it shares
+    // the current name (development), the browser sends it first, as the more specific path, so it
+    // would shadow this new token and every refresh would fail. Expire it with each new token.
+    clearLegacyRefreshCookie(c);
     // Note what is *not* here: no `refresh_token` key. Setting the cookie and also returning the
     // token in the body would make HttpOnly decorative, since the value an attacker wants would be
     // readable from the response that set it.
@@ -99,14 +103,20 @@ export function clearRefreshCookie(c: Context<AppEnv>): void {
     secure: useSecureCookie(),
     sameSite: "Strict",
   });
-  // And the pre-QA-070 cookie, wherever it still exists.
-  if (refreshCookieName() !== LEGACY_SESSION_COOKIE_NAME) {
-    deleteCookie(c, LEGACY_SESSION_COOKIE_NAME, {
-      path: LEGACY_REFRESH_COOKIE_PATH,
-      secure: useSecureCookie(),
-      sameSite: "Strict",
-    });
-  }
+  clearLegacyRefreshCookie(c);
+}
+
+/**
+ * Expire the pre-QA-070 refresh cookie (`session`, Path=/api/auth). Always, not only when the
+ * current name differs: a cookie is identified by name *and* path, so where both are `session`
+ * (development) the old one is still a separate cookie that the current deletion does not reach.
+ */
+function clearLegacyRefreshCookie(c: Context<AppEnv>): void {
+  deleteCookie(c, LEGACY_SESSION_COOKIE_NAME, {
+    path: LEGACY_REFRESH_COOKIE_PATH,
+    secure: useSecureCookie(),
+    sameSite: "Strict",
+  });
 }
 
 /** Whether a channel receives its token as a cookie rather than in the body. */

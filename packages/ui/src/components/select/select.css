@@ -19,9 +19,20 @@
   font-size: var(--font-size-sm);
   line-height: var(--line-height-sm);
   color: var(--color-foreground);
+  /* A <button> centres its text by default; a field reads from the start like an input does. */
+  text-align: start;
 
   cursor: pointer;
   transition: border-color var(--duration-fast) var(--easing-standard);
+}
+
+/* The chosen value stays on one line, cut with "…" when the trigger is too narrow for it. */
+.sf-select__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .sf-select__trigger:hover:not(:disabled) {

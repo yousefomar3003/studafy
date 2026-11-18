@@ -335,6 +335,7 @@ export function ShareFormula({
 
 const STATUS_TONE: Record<RevenueShareStatus, "success" | "warning" | "danger" | undefined> = {
   pending: "warning",
+  awaiting_approval: "warning",
   owed: "warning",
   zero: undefined,
   credited: "success",
@@ -342,6 +343,7 @@ const STATUS_TONE: Record<RevenueShareStatus, "success" | "warning" | "danger" |
   paid_out: "success",
   forfeited: "danger",
   void: undefined,
+  rejected: "danger",
 };
 
 export function ShareStatusPill({ status }: { status: RevenueShareStatus }) {

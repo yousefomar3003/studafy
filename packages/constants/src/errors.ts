@@ -566,6 +566,15 @@ export const ERROR_CODES = {
   AI_REVENUE_SHARE_CONVERSION_LOCKED: "AI_REVENUE_SHARE_CONVERSION_LOCKED",
   AI_REVENUE_SHARE_NOTHING_DUE: "AI_REVENUE_SHARE_NOTHING_DUE",
   AI_REVENUE_SHARE_PAYOUT_CHANGED: "AI_REVENUE_SHARE_PAYOUT_CHANGED",
+  // A Student AI weekly statement (000251). AI_REVENUE_SHARE_STATEMENT_DECIDED: it was already
+  // approved or rejected. AI_REVENUE_SHARE_STATEMENT_CHANGED: what it bills or credits is no longer
+  // what the super admin saw (a share forfeited or voided since) -- reload and decide again.
+  AI_REVENUE_SHARE_STATEMENT_DECIDED: "AI_REVENUE_SHARE_STATEMENT_DECIDED",
+  AI_REVENUE_SHARE_STATEMENT_CHANGED: "AI_REVENUE_SHARE_STATEMENT_CHANGED",
+  // Student AI opt-ins are billed on the parents' tuition through Studafy, which is how Studafy
+  // sees what parents paid (000252): a window is not opened, and auto-billing is not turned off,
+  // while the school bills Student AI itself.
+  AI_OPTIN_AUTO_BILLING_REQUIRED: "AI_OPTIN_AUTO_BILLING_REQUIRED",
   // The Student AI programme's settings (000234), the super admin's. AI_PROGRAMME_VALUE_OUT_OF_RANGE:
   // a price, percentage, seat count or day count outside its bounds. AI_PROGRAMME_TIERS_INVALID: a
   // tier table must start at 0%, raise its threshold on every row, never lower a share, and have at

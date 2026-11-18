@@ -271,11 +271,11 @@ afterEach(() => {
 });
 
 describe("StudentAiPage", () => {
-  test("shows the seats, the minimum, the price parents see, what opting in costs and who did", async () => {
+  test("shows the seats, how it's billed, the price parents see, what opting in costs and who did", async () => {
     await renderPage();
     expect((await screen.findByTestId("student-ai-seats")).textContent).toBe("40 of 50 assigned");
-    expect(screen.getByTestId("student-ai-minimum").textContent).toBe(
-      "The school pays for at least 30 seats",
+    expect(screen.getByTestId("student-ai-billing").textContent).toBe(
+      "Month by month, as parents pay — no minimum seats",
     );
     expect(screen.getByTestId("student-ai-price").textContent).toBe("$6.00 a month");
     const today = screen.getByTestId("student-ai-today").textContent;
@@ -289,7 +289,7 @@ describe("StudentAiPage", () => {
     expect(within(window).getByText("Open")).toBeTruthy();
     expect(window.textContent).toContain("Grade 7");
     expect(window.textContent).toContain("Huda Admin on Nov 1, 2026");
-    // No blocker and no seat request.
+    // No blocker, and no minimum or seat request any more (programme seats, 000252).
     expect(screen.queryByTestId("student-ai-blocker")).toBeNull();
     expect(screen.queryByTestId("seat-request")).toBeNull();
   });
@@ -309,44 +309,19 @@ describe("StudentAiPage", () => {
     ).toBeTruthy();
   });
 
-  test("explains who is waiting for a seat and the seats Studafy was asked for", async () => {
-    overviewExtra = {
-      counts: { eligible: 100, optedIn: 55, waitingForSeat: 5, released: 0, transferred: 0 },
-      seatsNeeded: 55,
-      openSeatRequest: { id: "r-1", studentSeats: 55, createdAt: "2026-11-10T00:00:00.000Z" },
-    };
-    await renderPage();
-    const note = await screen.findByTestId("seat-request");
-    expect(note.textContent).toContain(
-      "5 students are waiting for a seat. Studafy has been asked for 55 seats.",
-    );
-    expect(within(note).getByRole("link", { name: "See quotes" }).getAttribute("href")).toBe(
-      "/portal/license/quotes",
-    );
-    const omar = await rowOf("Omar Saleh");
-    expect(within(omar).getByText("Waiting for a seat")).toBeTruthy();
-  });
-
-  test("opening a window needs the school to accept the minimum seats", async () => {
+  test("opening a window explains month-by-month billing, with no minimum to accept", async () => {
     overviewExtra = { window: null };
     await renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Open opt-in window" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Open an opt-in window" }));
-    expect(dialog.getByTestId("minimum-warning").textContent).toContain(
-      "The school pays for at least 30 seats",
+    expect(dialog.getByTestId("programme-billing").textContent).toContain(
+      "Billed month by month, as parents pay",
     );
     expect((dialog.getByLabelText("Opens on") as HTMLInputElement).value).toBe("2026-11-17");
     fireEvent.change(dialog.getByLabelText("Closes on"), { target: { value: "2026-12-15" } });
     fireEvent.click(await dialog.findByLabelText("Grade 7"));
 
     const submit = dialog.getByRole("button", { name: "Open window" }) as HTMLButtonElement;
-    expect(submit.disabled).toBe(true);
-    fireEvent.click(submit);
-    expect(bodiesOf("/api/school/license/student-ai/windows")).toHaveLength(0);
-
-    fireEvent.click(
-      dialog.getByLabelText("The school pays for at least 30 seats even if fewer students opt in"),
-    );
     await waitFor(() => expect(submit.disabled).toBe(false));
     fireEvent.click(submit);
     await waitFor(() => expect(bodiesOf("/api/school/license/student-ai/windows")).toHaveLength(1));
@@ -357,7 +332,6 @@ describe("StudentAiPage", () => {
       gradeLevelIds: [GRADE_ID],
       sectionIds: undefined,
       note: undefined,
-      acknowledgeMinimumSeats: true,
     });
     expect(await screen.findByText("Opt-in window opened.")).toBeTruthy();
   });
@@ -368,9 +342,6 @@ describe("StudentAiPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Open opt-in window" }));
     const dialog = within(await screen.findByRole("dialog", { name: "Open an opt-in window" }));
     fireEvent.change(dialog.getByLabelText("Closes on"), { target: { value: "2026-11-01" } });
-    fireEvent.click(
-      dialog.getByLabelText("The school pays for at least 30 seats even if fewer students opt in"),
-    );
     expect(dialog.getByText("The window must close on or after the day it opens.")).toBeTruthy();
     expect(
       (dialog.getByRole("button", { name: "Open window" }) as HTMLButtonElement).disabled,

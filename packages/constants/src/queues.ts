@@ -136,6 +136,10 @@ export const JOB_NAMES = {
   // <child>" once per child and open window, and once a day tells the school's admins and principals
   // about new opt-ins. In-app and push only. Carries no payload.
   RUN_AI_OPTIN_NOTICES: "run-ai-optin-notices",
+  // Student AI weekly statements (000251). Scheduled every Monday at 06:00 UTC: states the week that
+  // just ended for every school (collected opt-in months less the school's share, and its licence
+  // shares that became final) and tells the super admins they wait for approval. Carries no payload.
+  RUN_AI_REVENUE_SHARE_STATEMENTS: "run-ai-revenue-share-statements",
   // Malware scan of a confirmed material. Carries the material id, its permanent storage
   // key, and the user to notify if the verdict is not clean. One job per confirm, at most once:
   // the worker claims the material by its 'scanning' status and flips it to a terminal state.

@@ -127,17 +127,23 @@ export type {
   UploadConsistencyTeacherResult,
 } from "./upload-consistency";
 export {
+  WHOLE_MONTH_WEIGHT,
   addDaysUtc,
   computeRevenueShare,
+  conversionMeasureDay,
   instalmentPeriods,
   measurementDateOf,
+  monthSlices,
   ratioBps,
   shareAmountOf,
+  splitByWeight,
   studentPartOf,
 } from "./revenue-share";
 export type {
   InstalmentPeriod,
   InstalmentPeriodInput,
+  LicenceTerm,
+  MonthSlice,
   RevenueShareInput,
   RevenueShareResult,
   RevenueShareSettings,

@@ -114,6 +114,9 @@ describe("templates — completeness", () => {
                       "subjectName",
                       "released",
                       "stopDate",
+                      "statements",
+                      "schools",
+                      "weekStart",
                       "childName",
                       "price",
                       "closesOn",
@@ -244,6 +247,11 @@ describe("renderNotification — snapshot tests", () => {
     [NOTIFICATION_TYPES.LICENSE_RECEIPT_UPLOADED]: {
       schoolName: "Amman Academy",
       invoiceNumber: "LIC-2026-000042",
+    },
+    [NOTIFICATION_TYPES.AI_REVENUE_SHARE_STATEMENTS_READY]: {
+      statements: "4",
+      schools: "3",
+      weekStart: "2026-11-16",
     },
     [NOTIFICATION_TYPES.LICENSE_AI_STOP_WARNING]: {
       schoolName: "Amman Academy",
