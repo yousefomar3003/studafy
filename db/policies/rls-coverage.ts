@@ -468,7 +468,7 @@ violations AS (
         ''
       ) = 'provider=NULLIFcurrent_setting''app.oauth_login_provider'',true,''''ANDsubject=NULLIFcurrent_setting''app.oauth_login_subject'',true,'''''
     )
-    -- The email feedback seam (QA-014, migration 000234) resolves a Resend message id to the
+    -- The email feedback seam (QA-014, migration 000240) resolves a Resend message id to the
     -- schools holding deliveries for it, before any tenant is known. Same shape as the carve-outs
     -- here: SELECT-only, studafy_admin only, no WITH CHECK, scoped to one transaction-local GUC.
     AND NOT (

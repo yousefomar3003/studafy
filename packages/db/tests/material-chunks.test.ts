@@ -281,7 +281,7 @@ integrationTest(
           RETURNING id, content_tsv::text AS tsv
         `,
       );
-      // The English parse (stemmed) and the Arabic parse (000243, QA-051) together: the English
+      // The English parse (stemmed) and the Arabic parse (000249, QA-051) together: the English
       // stem "produc" is there; the Arabic parse keeps English words as they are.
       expect(row!.tsv).toContain("mitochondria");
       expect(row!.tsv).toContain("cellular");

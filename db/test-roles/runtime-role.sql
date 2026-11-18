@@ -21,7 +21,7 @@ $$;
 
 GRANT studafy_app TO studafy_runtime WITH INHERIT FALSE, SET TRUE;
 GRANT studafy_admin TO studafy_runtime WITH INHERIT FALSE, SET TRUE;
--- Created by migration 000240 (QA-015), which this script follows.
+-- Created by migration 000246 (QA-015), which this script follows.
 GRANT studafy_system TO studafy_runtime WITH INHERIT FALSE, SET TRUE;
 
 -- Migration 000002 revokes CONNECT from PUBLIC and grants it to studafy_app/studafy_admin only; with

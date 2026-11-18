@@ -5,7 +5,7 @@
  * overdue checks compared with `CURRENT_DATE`, both UTC. Studafy's schools are UTC+1 to UTC+4: a
  * payment at 01:30 in Riyadh was dated the previous day, breaking daily reconciliation and
  * month-end periods, and invoices turned overdue hours late. `app.school_today()` (migration
- * 000236) is the school-local date; every such site now uses it.
+ * 000242) is the school-local date; every such site now uses it.
  *
  *   TEST_DATABASE_URL=postgres://... bun test tests/finance/school-local-today.test.ts
  */

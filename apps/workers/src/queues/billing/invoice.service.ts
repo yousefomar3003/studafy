@@ -22,7 +22,7 @@ import {
 import type { GenerateBatchInvoicesJobData, GenerateInvoiceJobData } from "./schemas";
 import type { JSONValue, Sql, TransactionSql } from "postgres";
 
-/** The armed school's local date (app.school_today, migration 000236; QA-044). */
+/** The armed school's local date (app.school_today, migration 000242; QA-044). */
 async function schoolToday(tx: TransactionSql): Promise<string> {
   const [row] = await tx<{ today: string }[]>`SELECT app.school_today()::text AS today`;
   return row!.today;
